@@ -220,15 +220,15 @@ void draw_study_panel(App& app) {
         // Order matches VolumeMesher enum. Hybrid zoo is the SPEC default path.
         static const char* kMeshers[] = {
             "tet (grid)",   "hex (grid)",    "hex VEM (grid)", "graded tet",
-            "hex+pyramid",  "prism (grid)",  "hybrid zoo",
+            "hex+pyramid",  "prism (grid)",  "hybrid zoo",     "octa (exp)",
         };
-        if (iw::selector("mesher", &m, kMeshers, 7)) {
+        if (iw::selector("mesher", &m, kMeshers, 8)) {
             app.setup.mesher = static_cast<VolumeMesher>(m);
         }
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip(
-                "hybrid zoo (default): hex bulk + tet skin in one mesh (mixed types).\n"
-                "hex+pyramid / graded / prism are mono or transition specializations.\n"
+                "hybrid zoo (default): hex bulk + pyramid skin → all-pyramid FE.\n"
+                "graded tet: LEB-conforming size grading. octa: experimental BCC.\n"
                 "Cartesian lattice + surface snap (ADR-0015) — not CAD-fitted Delaunay.");
         }
     }

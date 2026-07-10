@@ -10,6 +10,7 @@ add_library(mesh
     src/cell_stamp.cpp
     src/hybrid_fill.cpp
     src/mixed_fill.cpp
+    src/octa_fill.cpp
     src/transition_fill.cpp
     src/local_refine.cpp
 )

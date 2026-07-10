@@ -1,17 +1,16 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-// Multi-element hybrid lattice fill (SPEC zoo, ADR-0012 v2).
+// Multi-element hybrid lattice fill (SPEC zoo, ADR-0012 v3 / H2).
 //
 // Cartesian classification by distance-to-boundary (+ optional feature /
 // curvature bands):
 //   • bulk (deep)     → hex8
-//   • skin / feature  → Kuhn 6× tet4 per cell (snap-friendly curved walls)
+//   • skin / feature  → 6× pyramid5 per cell (apex at cell centre)
 //
-// Shared lattice faces use the same Kuhn diagonal convention on both sides
-// when hex is assembled as Kuhn PL in a hybrid mesh (see fea/assembly.cpp),
-// so constant-strain patch is exact with true multi-type elements.
-// Optional surface snap on free-boundary lattice nodes.
+// Product FE path expands remaining hex → pyramids (ADR-0013) so the solve
+// mesh is all-pyramid with matching face diagonals (constant-strain exact).
+// Free-surface bases stay quads (no Kuhn diagonals on the silhouette).
 // NOT Delaunay / CAD-fitted (ADR-0015).
 
 #include "geom/features.hpp"
@@ -47,7 +46,7 @@ struct MixedFillOutput {
     std::size_t n_feature_skin_cells = 0;
 };
 
-/// Hybrid zoo: hex bulk + Kuhn tet skin. `skin_layers` ≥ 1.
+/// Hybrid zoo: hex bulk + pyramid skin. `skin_layers` ≥ 1.
 MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                                    const Eigen::Vector3d& bbox_min,
                                    const Eigen::Vector3d& bbox_max, double h,
@@ -57,7 +56,8 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                                    std::span<const Eigen::Vector3d> curvature_seeds = {},
                                    double seed_band = 0.0, bool snap_boundary = true);
 
-/// Optional: expand hex → 6 pyramids (legacy ADR-0013 path). Tets pass through.
+/// Expand every hex8 → 6 pyramid5 (centroid apex). Pyramids/tets pass through.
+/// Product FE path for hybrid / hexpyr (constant-strain exact).
 MixedFillOutput expand_mixed_hex_to_pyramids(const MixedFillOutput& fill);
 
 } // namespace polymesh::mesh

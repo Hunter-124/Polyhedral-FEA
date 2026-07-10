@@ -32,27 +32,47 @@ Eigen::VectorXd solve_reduced(const Eigen::SparseMatrix<double>& kff,
     const SolveMethod method = select_solve_method(nfree, options);
 
     if (method == SolveMethod::kCG) {
-        using CG =
+        // V1: IncompleteLUT preconditioner (far better than diagonal on FE
+        // systems). Fall back to diagonal if ILUT setup fails.
+        using CG_ILUT =
+            Eigen::ConjugateGradient<Eigen::SparseMatrix<double>, Eigen::Lower | Eigen::Upper,
+                                     Eigen::IncompleteLUT<double>>;
+        using CG_Diag =
             Eigen::ConjugateGradient<Eigen::SparseMatrix<double>, Eigen::Lower | Eigen::Upper,
                                      Eigen::DiagonalPreconditioner<double>>;
-        CG cg;
-        cg.setTolerance(options.cg_tol);
         const int max_iters =
             options.cg_max_iters > 0
                 ? options.cg_max_iters
                 : static_cast<int>(std::max<Eigen::Index>(2 * nfree, Eigen::Index{1000}));
+
+        CG_ILUT cg;
+        cg.setTolerance(options.cg_tol);
         cg.setMaxIterations(max_iters);
+        // Drop fill / drop tol: modest fill keeps setup cheap on mid-size systems.
+        cg.preconditioner().setDroptol(1e-4);
+        cg.preconditioner().setFillfactor(10);
         cg.compute(kff);
-        if (cg.info() != Eigen::Success) {
+        if (cg.info() == Eigen::Success) {
+            const Eigen::VectorXd uf = cg.solve(rhs);
+            if (cg.info() == Eigen::Success) {
+                return uf;
+            }
+        }
+
+        CG_Diag cg_d;
+        cg_d.setTolerance(options.cg_tol);
+        cg_d.setMaxIterations(max_iters);
+        cg_d.compute(kff);
+        if (cg_d.info() != Eigen::Success) {
             throw FeaError("solve_elastostatics: CG setup failed — system is singular "
                            "(insufficient constraints?)");
         }
-        const Eigen::VectorXd uf = cg.solve(rhs);
-        if (cg.info() != Eigen::Success) {
+        const Eigen::VectorXd uf = cg_d.solve(rhs);
+        if (cg_d.info() != Eigen::Success) {
             throw FeaError(
                 std::format("solve_elastostatics: CG failed to converge after {} iterations "
                             "(tol={}, estimated error={})",
-                            cg.iterations(), options.cg_tol, cg.error()));
+                            cg_d.iterations(), options.cg_tol, cg_d.error()));
         }
         return uf;
     }

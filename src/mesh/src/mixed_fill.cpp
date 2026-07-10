@@ -38,15 +38,6 @@ constexpr std::array<std::array<int, 3>, 6> kFaceNbr{{
     {{1, 0, 0}},
 }};
 
-constexpr std::array<std::array<int, 4>, 6> kCubeTets{{
-    {{0, 1, 2, 6}},
-    {{0, 2, 3, 6}},
-    {{0, 1, 5, 6}},
-    {{0, 3, 7, 6}},
-    {{0, 4, 5, 6}},
-    {{0, 4, 7, 6}},
-}};
-
 constexpr std::array<std::array<double, 3>, 8> kHexCornerSigns{{
     {{-1, -1, -1}}, {{1, -1, -1}}, {{1, 1, -1}}, {{-1, 1, -1}},
     {{-1, -1, 1}},  {{1, -1, 1}},  {{1, 1, 1}},  {{-1, 1, 1}},
@@ -105,6 +96,46 @@ bool hex_inverted(const std::array<std::uint32_t, 8>& hx,
 bool tet_inverted(const std::array<std::uint32_t, 4>& n,
                   const std::vector<Eigen::Vector3d>& nodes, double vol_eps) {
     return tet_vol(nodes[n[0]], nodes[n[1]], nodes[n[2]], nodes[n[3]]) <= vol_eps;
+}
+
+bool pyramid_inverted(const std::array<std::uint32_t, 5>& n,
+                      const std::vector<Eigen::Vector3d>& nodes, double vol_eps) {
+    // Pyramid stiffness uses base diagonal 0–2; both tets must have volume.
+    const double v1 =
+        tet_vol(nodes[n[0]], nodes[n[1]], nodes[n[2]], nodes[n[4]]);
+    const double v2 =
+        tet_vol(nodes[n[0]], nodes[n[2]], nodes[n[3]], nodes[n[4]]);
+    return std::abs(v1) <= vol_eps || std::abs(v2) <= vol_eps;
+}
+
+void emit_cell_pyramids(MixedFillOutput& out, const std::array<std::uint32_t, 8>& c,
+                        const Eigen::Vector3d& center) {
+    const auto apex = static_cast<std::uint32_t>(out.nodes.size());
+    out.nodes.push_back(center);
+    for (const auto& face : kHexFaces) {
+        MixedCell pyr;
+        pyr.kind = MixedCellKind::kPyramid5;
+        pyr.n_nodes = 5;
+        const Eigen::Vector3d& p0 = out.nodes[c[static_cast<std::size_t>(face[0])]];
+        const Eigen::Vector3d& p1 = out.nodes[c[static_cast<std::size_t>(face[1])]];
+        const Eigen::Vector3d& p2 = out.nodes[c[static_cast<std::size_t>(face[2])]];
+        const Eigen::Vector3d nrm = (p1 - p0).cross(p2 - p0);
+        const bool apex_on_positive = nrm.dot(center - p0) > 0.0;
+        if (apex_on_positive) {
+            pyr.nodes[0] = c[static_cast<std::size_t>(face[0])];
+            pyr.nodes[1] = c[static_cast<std::size_t>(face[1])];
+            pyr.nodes[2] = c[static_cast<std::size_t>(face[2])];
+            pyr.nodes[3] = c[static_cast<std::size_t>(face[3])];
+        } else {
+            pyr.nodes[0] = c[static_cast<std::size_t>(face[0])];
+            pyr.nodes[1] = c[static_cast<std::size_t>(face[3])];
+            pyr.nodes[2] = c[static_cast<std::size_t>(face[2])];
+            pyr.nodes[3] = c[static_cast<std::size_t>(face[1])];
+        }
+        pyr.nodes[4] = apex;
+        out.cells.push_back(pyr);
+        ++out.n_pyramid;
+    }
 }
 
 } // namespace
@@ -249,26 +280,8 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                     out.cells.push_back(hx);
                     ++out.n_hex;
                 } else {
-                    for (const auto& t : kCubeTets) {
-                        MixedCell tet;
-                        tet.kind = MixedCellKind::kTet4;
-                        tet.n_nodes = 4;
-                        tet.nodes[0] = c[static_cast<std::size_t>(t[0])];
-                        tet.nodes[1] = c[static_cast<std::size_t>(t[1])];
-                        tet.nodes[2] = c[static_cast<std::size_t>(t[2])];
-                        tet.nodes[3] = c[static_cast<std::size_t>(t[3])];
-                        double v =
-                            tet_vol(out.nodes[tet.nodes[0]], out.nodes[tet.nodes[1]],
-                                    out.nodes[tet.nodes[2]], out.nodes[tet.nodes[3]]);
-                        if (v < 0.0) {
-                            std::swap(tet.nodes[1], tet.nodes[2]);
-                            v = -v;
-                        }
-                        if (v > 0.0) {
-                            out.cells.push_back(tet);
-                            ++out.n_tet;
-                        }
-                    }
+                    // H2: pyramid skin (quad free surface) instead of Kuhn tet diagonals.
+                    emit_cell_pyramids(out, c, grid.cell_center(i, j, k));
                 }
 
                 for (std::size_t f = 0; f < 6; ++f) {
@@ -308,6 +321,11 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                             bad = tet_inverted({cell.nodes[0], cell.nodes[1], cell.nodes[2],
                                                 cell.nodes[3]},
                                                out.nodes, vol_eps);
+                        } else if (cell.kind == MixedCellKind::kPyramid5) {
+                            bad = pyramid_inverted(
+                                {cell.nodes[0], cell.nodes[1], cell.nodes[2], cell.nodes[3],
+                                 cell.nodes[4]},
+                                out.nodes, vol_eps);
                         } else {
                             bad = hex_inverted(
                                 {cell.nodes[0], cell.nodes[1], cell.nodes[2], cell.nodes[3],
@@ -318,22 +336,14 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                             continue;
                         }
                         for (std::uint8_t m = 0; m < cell.n_nodes; ++m) {
+                            // Do not unsnap pyramid apices (interior) via this path —
+                            // only lattice corners are in bnodes; still report offenders.
                             offenders.insert(cell.nodes[m]);
                         }
                     }
                 },
-                /*max_move_frac=*/0.9, /*passes=*/6)
+                /*max_move_frac=*/0.85, /*passes=*/4)
                 .max_residual;
-        for (auto& cell : out.cells) {
-            if (cell.kind != MixedCellKind::kTet4) {
-                continue;
-            }
-            const double v = tet_vol(out.nodes[cell.nodes[0]], out.nodes[cell.nodes[1]],
-                                     out.nodes[cell.nodes[2]], out.nodes[cell.nodes[3]]);
-            if (v < 0.0) {
-                std::swap(cell.nodes[1], cell.nodes[2]);
-            }
-        }
     }
     return out;
 }

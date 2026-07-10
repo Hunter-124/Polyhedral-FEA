@@ -2,6 +2,7 @@
 add_library(fea
     src/material.cpp
     src/backend.cpp
+    src/spmv.cpp
     src/nodal_mesh.cpp
     src/quadrature.cpp
     src/shape.cpp

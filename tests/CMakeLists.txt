@@ -8,6 +8,7 @@ add_executable(polymesh_tests
     test_sizing_field.cpp
     test_reference_case.cpp
     test_backend.cpp
+    test_spmv.cpp
     test_quadrature.cpp
     test_shape.cpp
     test_tier0.cpp

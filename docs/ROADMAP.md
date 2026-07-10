@@ -60,10 +60,10 @@ and error, export VTU — without CLI.
 | ID | Task | Acceptance |
 |----|------|------------|
 | B1 | Frontal / constrained Delaunay tet (or documented grid-fill limits) | Tier-1 e2e on *our* mesh for box + L-domain |
-| B2 | Quality metrics in mesh note + VTU cell data | minQ, slivers reported |
+| B2 | ~~Quality metrics in mesh note + VTU cell data~~ | Done (mesher note minQ/slivers; VTU `quality` CellData) |
 | B3 | Surface snap Jacobian safety (tet + hexpyr) | No inverted elems after snap |
 | B4 | STEP path: OCC build option CI job or docker note | Documented how to enable |
-| B5 | Fixture geometry suite under `bench/geometries/public/` | ≥3 closed solids |
+| B5 | ~~Fixture geometry suite under `bench/geometries/public/`~~ | Done (≥3 closed STLs + README + load smoke) |
 
 ## Track C — Hybrid / features (P3 + P4)
 

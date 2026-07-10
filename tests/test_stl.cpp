@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
 #include <string_view>
 #include <vector>
 
@@ -83,4 +84,18 @@ TEST_CASE("binary roundtrip") {
 TEST_CASE("truncated binary header is rejected") {
     const std::vector<std::byte> bytes(40, std::byte{0});
     REQUIRE_THROWS_AS(detail::parse_binary(bytes), polymesh::geom::GeomError);
+}
+
+TEST_CASE("public fixture STLs load and validate") {
+    // CWD for ctest is repo root (see tests/CMakeLists.txt).
+    const std::filesystem::path dir = "bench/geometries/public";
+    for (const char* name :
+         {"unit_box.stl", "l_domain.stl", "plate.stl", "cylinder_prism.stl"}) {
+        const auto path = dir / name;
+        REQUIRE(std::filesystem::exists(path));
+        auto surface = polymesh::geom::load_stl(path);
+        REQUIRE(surface.vertices.size() >= 4);
+        REQUIRE(surface.triangles.size() >= 4);
+        REQUIRE_NOTHROW(surface.validate());
+    }
 }

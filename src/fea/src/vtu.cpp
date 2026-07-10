@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "fea/vtu.hpp"
 
-#include <cstdio>
+#include "mesh/quality.hpp"
+
+#include <array>
 #include <format>
 #include <fstream>
 
@@ -31,8 +33,29 @@ int vtk_cell_type(ElementType t) {
 
 } // namespace
 
+std::vector<double> tet4_cell_quality(const NodalMesh& mesh) {
+    std::vector<double> out(mesh.elements.size(), 0.0);
+    std::vector<std::array<std::uint32_t, 4>> tets;
+    std::vector<std::size_t> map;
+    tets.reserve(mesh.elements.size());
+    map.reserve(mesh.elements.size());
+    for (std::size_t i = 0; i < mesh.elements.size(); ++i) {
+        const auto& e = mesh.elements[i];
+        if (e.type == ElementType::kTet4 && e.nodes.size() == 4) {
+            tets.push_back({e.nodes[0], e.nodes[1], e.nodes[2], e.nodes[3]});
+            map.push_back(i);
+        }
+    }
+    const auto aspects = mesh::tet4_aspect_ratios(mesh.nodes, tets);
+    for (std::size_t k = 0; k < aspects.size(); ++k) {
+        out[map[k]] = aspects[k];
+    }
+    return out;
+}
+
 void write_vtu(const std::filesystem::path& path, const NodalMesh& mesh,
-               const std::vector<VtuPointData>& point_data) {
+               const std::vector<VtuPointData>& point_data,
+               const std::vector<VtuCellData>& cell_data) {
     mesh.check_validity();
     std::ofstream out(path);
     if (!out) {
@@ -41,10 +64,6 @@ void write_vtu(const std::filesystem::path& path, const NodalMesh& mesh,
 
     const auto n_pts = mesh.nodes.size();
     const auto n_cells = mesh.elements.size();
-    std::size_t connectivity_len = 0;
-    for (const auto& e : mesh.elements) {
-        connectivity_len += e.nodes.size();
-    }
 
     out << R"(<?xml version="1.0"?>
 <VTKFile type="UnstructuredGrid" version="0.1" byte_order="LittleEndian">
@@ -110,8 +129,26 @@ void write_vtu(const std::filesystem::path& path, const NodalMesh& mesh,
         out << "</PointData>\n";
     }
 
+    if (!cell_data.empty()) {
+        out << "<CellData>\n";
+        for (const auto& cd : cell_data) {
+            if (cd.scalars.empty()) {
+                continue;
+            }
+            if (cd.scalars.size() != n_cells) {
+                throw FeaError("write_vtu: cell scalar array size mismatch");
+            }
+            out << "<DataArray type=\"Float64\" Name=\"" << cd.name
+                << "\" format=\"ascii\">\n";
+            for (double v : cd.scalars) {
+                out << v << '\n';
+            }
+            out << "</DataArray>\n";
+        }
+        out << "</CellData>\n";
+    }
+
     out << "</Piece>\n</UnstructuredGrid>\n</VTKFile>\n";
-    (void)connectivity_len;
 }
 
 } // namespace polymesh::fea

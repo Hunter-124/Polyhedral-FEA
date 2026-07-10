@@ -2,7 +2,7 @@
 #pragma once
 
 // VTK XML unstructured grid (.vtu) export for ParaView.
-// Writes tet4 / hex8 / tet10 / hex20 connectivity with optional point data.
+// Writes tet4 / hex8 / tet10 / hex20 connectivity with optional point/cell data.
 
 #include "fea/nodal_mesh.hpp"
 
@@ -22,8 +22,19 @@ struct VtuPointData {
     Eigen::VectorXd vectors;
 };
 
-/// Write mesh (+ optional point data) to path. Throws FeaError on I/O failure.
+struct VtuCellData {
+    std::string name;
+    /// One scalar per mesh cell (element). Size must equal mesh.elements.size().
+    std::vector<double> scalars;
+};
+
+/// Write mesh (+ optional point/cell data) to path. Throws FeaError on I/O failure.
+/// Existing callers that pass only point_data keep working (cell_data defaults empty).
 void write_vtu(const std::filesystem::path& path, const NodalMesh& mesh,
-               const std::vector<VtuPointData>& point_data = {});
+               const std::vector<VtuPointData>& point_data = {},
+               const std::vector<VtuCellData>& cell_data = {});
+
+/// Per-element tet4 aspect quality in (0,1] (regular ≈ 1). Non-tet4 cells are 0.
+std::vector<double> tet4_cell_quality(const NodalMesh& mesh);
 
 } // namespace polymesh::fea

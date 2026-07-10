@@ -53,7 +53,7 @@ sudo apt-get install -y --no-install-recommends \
 
 Optional:
 
-- **OpenCASCADE** (`POLYMESH_WITH_OCC=ON`) for STEP/B-rep — install OCCT dev packages for your distro.
+- **OpenCASCADE** (`POLYMESH_WITH_OCC=ON`) for STEP/B-rep — see [STEP / OpenCASCADE](#step--opencascade-polymesh_with_occ) below.
 - **CUDA** (`POLYMESH_WITH_CUDA=ON`) for GPU backends — requires a toolkit; CPU path always builds.
 - **clang-format 18** for style checks: `pip install 'clang-format==18.1.8'` (or use the version on `PATH`).
 
@@ -126,6 +126,31 @@ cmake -B build -DPOLYMESH_WITH_OCC=ON    # STEP/B-rep (OpenCASCADE)
 cmake -B build -DPOLYMESH_WITH_CUDA=ON   # GPU backends
 cmake -B build -DPOLYMESH_WITH_GUI=OFF   # libs + CLI + tests only
 ```
+
+### STEP / OpenCASCADE (`POLYMESH_WITH_OCC`)
+
+Default builds are **STL-only**. STEP/B-rep import is optional (ADR-0001):
+
+```sh
+# Ubuntu / Debian (package names vary slightly by release; 7.6+ typical)
+sudo apt install libocct-data-exchange-dev libocct-foundation-dev \
+  libocct-modeling-algorithms-dev libocct-modeling-data-dev \
+  libocct-ocaf-dev libocct-visualization-dev
+
+cmake -S . -B build -G Ninja -DPOLYMESH_WITH_OCC=ON
+cmake --build build
+# STEP tests run when OCC is linked; with OCC off they SKIP.
+```
+
+If CMake cannot find OCCT: `-DOpenCASCADE_DIR=/path/to/cmake/OpenCASCADE` (or the
+prefix that contains `OpenCASCADEConfig.cmake`). See `src/geom/CMakeLists.txt`.
+
+### Mesh path caveat
+
+Product volume fills are **Cartesian grid** tet/hex/graded/hex+pyramid over the
+bbox (stair-cased boundary, limited surface snap) — **not** constrained Delaunay
+or advancing-front. Validity and determinism are guaranteed; analytical Tier-1
+accuracy on product meshes is not claimed yet ([ADR-0015](docs/decisions/0015-grid-fill-limits.md)).
 
 ## Layout (short)
 

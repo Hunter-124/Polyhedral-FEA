@@ -7,7 +7,8 @@
 //   - Interior lattice cells (all 6 face-neighbors inside) → hex8
 //   - Boundary lattice cells → six pyramid5 (apex = cell center, bases = faces)
 // Interior hex–pyramid faces are conforming quads. Optional limited surface
-// snap pulls boundary lattice nodes toward the STL without collapsing cells.
+// snap (≤0.35 h) pulls boundary lattice nodes toward the STL; nodes that would
+// invert a hex (center J) or pyramid (tet-split volume) are unsnapped (B3).
 
 #include "geom/tri_surface.hpp"
 

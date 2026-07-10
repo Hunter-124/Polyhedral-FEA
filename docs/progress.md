@@ -6,7 +6,7 @@
 
 **Active:** Track A (GUI usable) → M1 study app. 81 tests green. Solver core
 (GATE 1) frozen. Mesh/adapt product path advancing (graded, hexpyr, seed remesh).
-C1 hybrid product FE + D5 auto h0 + E4 product-mesh smoke + G1 README done.
+B1/B3/B4 mesh honesty + C1 hybrid FE + D5 auto h0 + E4 product-mesh smoke + G1 README done.
 
 GATE 1 deliverables ready:
 - Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)
@@ -18,6 +18,10 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: B1/B3/B4 — ADR-0015 Cartesian grid-fill limits (not Delaunay);
+  surface-snap Jacobian safety (unsnap nodes that invert tet / hex J / pyramid
+  volume); README OCC enablement (Ubuntu libocct-* + `POLYMESH_WITH_OCC=ON`);
+  Catch2 unit-box snap + L-domain fixture validity. B1 = documented limits.
 - 2026-07-10: D5+E4+G1 — `resolve_mesh_size` (bbox extent/16 ∩ diagonal/28 +
   sharp-edge density / min feature); pipeline mesh-only+solve and CLI omit `-h`
   use it; mesher_note carries `auto h=…` for GUI. E4 Catch2 product-mesh box
@@ -105,8 +109,8 @@ GATE 0 was approved by owner on 2026-07-09.
   when OFF); exact B-rep feature queries still deferred to P3 (ADR-0001).
 - CUDA toolkit not installed on dev machine; `POLYMESH_WITH_CUDA` untested
   until it is (ADR-0008). RTX 3080 Ti present.
-- Geometric validity: boundary manifold + tet volume checks in place; limited
-  surface snap on tet and hex+pyramid fills. True Delaunay / CAD feature
-  queries still open.
+- Geometric validity: boundary manifold + tet volume checks; limited surface
+  snap with Jacobian unsnap (B3) on tet and hex+pyramid fills. True Delaunay
+  deferred (B1 = ADR-0015 documented limits). CAD feature queries still open.
 - Goodier: exact continuum-field BCs + ZZ recovery would tighten SCF further
   (ADR-0009); P1 bar is 12% with Saint-Venant Dirichlet + nodal averaging.

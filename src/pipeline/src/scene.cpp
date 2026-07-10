@@ -269,8 +269,9 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         }
         out.boundary_quads = std::move(fill.boundary_quads);
         out.mesher_note = std::format(
-            "hex+pyramid product FE (all-pyramid expand): {} lattice hex → {} pyramids "
-            "({} skin + {} from hex), {} nodes, h={:.4g} m, boundary max|d|={:.3g} m",
+            "hex+pyramid product FE (Cartesian grid, not Delaunay; all-pyramid expand): "
+            "{} lattice hex → {} pyramids ({} skin + {} from hex), {} nodes, h={:.4g} m, "
+            "boundary max|d|={:.3g} m",
             n_hex_lattice, fill.n_pyramid, n_pyr_skin, fill.n_pyramid - n_pyr_skin,
             out.mesh.nodes.size(), fill_h, fill.boundary_max_distance);
     } else if (mesher == VolumeMesher::kGradedTet) {
@@ -324,10 +325,11 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             }
         }
         const auto q = mesh::summarize_tet4_quality(out.mesh.nodes, tet_ids);
-        out.mesher_note = std::format("tet grid fill v1: {} tet4, {} nodes, h={:.4g} m, "
-                                      "minQ={:.3f}, meanQ={:.3f}, slivers={}",
-                                      out.mesh.elements.size(), out.mesh.nodes.size(), fill_h,
-                                      q.min_aspect, q.mean_aspect, q.n_sliver);
+        out.mesher_note = std::format(
+            "tet grid fill v1 (Cartesian, not Delaunay): {} tet4, {} nodes, h={:.4g} m, "
+            "minQ={:.3f}, meanQ={:.3f}, slivers={}",
+            out.mesh.elements.size(), out.mesh.nodes.size(), fill_h, q.min_aspect,
+            q.mean_aspect, q.n_sliver);
     }
 
     const auto& surf = model.surface;

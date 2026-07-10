@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "mesh/tet_fill.hpp"
 
+#include "mesh/surface_project.hpp"
+
 #include <Eigen/Geometry>
 
 #include <algorithm>
 #include <cmath>
 #include <format>
-#include <limits>
 #include <map>
 #include <set>
+#include <unordered_map>
 
 namespace polymesh::mesh {
 namespace {
@@ -209,115 +211,61 @@ TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
         for (const auto& q : out.boundary_quads) {
             bnodes.insert(q.begin(), q.end());
         }
+        // Limited snap: pull toward the surface by at most 0.35 h. Full projection
+        // can invert tets; Jacobian safety below unsnaps offenders (ADR-0015/B3).
+        std::unordered_map<std::uint32_t, Eigen::Vector3d> pre_snap;
+        pre_snap.reserve(bnodes.size());
         for (auto ni : bnodes) {
-            const Eigen::Vector3d& p = out.nodes[ni];
-            double best = std::numeric_limits<double>::max();
-            Eigen::Vector3d closest = p;
-            for (const auto& tri : surface.triangles) {
-                const Eigen::Vector3d& a = surface.vertices[tri[0]];
-                const Eigen::Vector3d& b = surface.vertices[tri[1]];
-                const Eigen::Vector3d& c = surface.vertices[tri[2]];
-                // Ericson closest-point on triangle
-                const Eigen::Vector3d ab = b - a, ac = c - a, ap = p - a;
-                const double d1 = ab.dot(ap), d2 = ac.dot(ap);
-                if (d1 <= 0.0 && d2 <= 0.0) {
-                    const double dist = (p - a).norm();
-                    if (dist < best) {
-                        best = dist;
-                        closest = a;
-                    }
-                    continue;
-                }
-                const Eigen::Vector3d bp = p - b;
-                const double d3 = ab.dot(bp), d4 = ac.dot(bp);
-                if (d3 >= 0.0 && d4 <= d3) {
-                    const double dist = (p - b).norm();
-                    if (dist < best) {
-                        best = dist;
-                        closest = b;
-                    }
-                    continue;
-                }
-                const double vc = d1 * d4 - d3 * d2;
-                if (vc <= 0.0 && d1 >= 0.0 && d3 <= 0.0) {
-                    const double v = d1 / (d1 - d3);
-                    const Eigen::Vector3d q = a + ab * v;
-                    const double dist = (p - q).norm();
-                    if (dist < best) {
-                        best = dist;
-                        closest = q;
-                    }
-                    continue;
-                }
-                const Eigen::Vector3d cp = p - c;
-                const double d5 = ab.dot(cp), d6 = ac.dot(cp);
-                if (d6 >= 0.0 && d5 <= d6) {
-                    const double dist = (p - c).norm();
-                    if (dist < best) {
-                        best = dist;
-                        closest = c;
-                    }
-                    continue;
-                }
-                const double vb = d5 * d2 - d1 * d6;
-                if (vb <= 0.0 && d2 >= 0.0 && d6 <= 0.0) {
-                    const double w = d2 / (d2 - d6);
-                    const Eigen::Vector3d q = a + ac * w;
-                    const double dist = (p - q).norm();
-                    if (dist < best) {
-                        best = dist;
-                        closest = q;
-                    }
-                    continue;
-                }
-                const double va = d3 * d6 - d5 * d4;
-                if (va <= 0.0 && (d4 - d3) >= 0.0 && (d5 - d6) >= 0.0) {
-                    const double w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
-                    const Eigen::Vector3d q = b + (c - b) * w;
-                    const double dist = (p - q).norm();
-                    if (dist < best) {
-                        best = dist;
-                        closest = q;
-                    }
-                    continue;
-                }
-                const double denom = 1.0 / (va + vb + vc);
-                const Eigen::Vector3d q = a + ab * (vb * denom) + ac * (vc * denom);
-                const double dist = (p - q).norm();
-                if (dist < best) {
-                    best = dist;
-                    closest = q;
-                }
-            }
-            // Limited snap: pull toward the surface without collapsing cells.
-            // Full projection can invert tets and disconnect the lattice.
-            if (best < 1.25 * h && best > 0.0) {
-                const Eigen::Vector3d delta = closest - p;
-                const double move = std::min(best, 0.35 * h);
-                out.nodes[ni] = p + delta * (move / best);
+            const Eigen::Vector3d p = out.nodes[ni];
+            const auto cp = closest_on_surface(surface, p);
+            if (cp.distance > 0.0 && cp.distance < 1.25 * h) {
+                const Eigen::Vector3d delta = cp.point - p;
+                const double move = std::min(cp.distance, 0.35 * h);
+                pre_snap.emplace(ni, p);
+                out.nodes[ni] = p + delta * (move / cp.distance);
             }
         }
-        // Re-orient only; keep connectivity so the solve graph stays intact.
+
+        // Unsnap any still-moved node that participates in a non-positive tet.
+        // Revert iterates to a fixed point: undoing one node can rescue others.
         const double vol_eps = 1e-14 * h * h * h;
+        bool progressed = true;
+        while (progressed && !pre_snap.empty()) {
+            progressed = false;
+            std::set<std::uint32_t> offenders;
+            for (const auto& n : out.tets) {
+                const double v = tet_signed_volume_impl(out.nodes[n[0]], out.nodes[n[1]],
+                                                        out.nodes[n[2]], out.nodes[n[3]]);
+                if (v > vol_eps) {
+                    continue;
+                }
+                for (const auto idx : n) {
+                    if (pre_snap.find(idx) != pre_snap.end()) {
+                        offenders.insert(idx);
+                    }
+                }
+            }
+            for (const auto ni : offenders) {
+                const auto it = pre_snap.find(ni);
+                if (it == pre_snap.end()) {
+                    continue;
+                }
+                out.nodes[ni] = it->second;
+                pre_snap.erase(it);
+                progressed = true;
+            }
+        }
+
+        // Orientation only (connectivity unchanged). Unsnap restores lattice
+        // positivity; residual negatives should only be FP noise on orientation.
         for (auto& n : out.tets) {
-            double v = tet_signed_volume_impl(out.nodes[n[0]], out.nodes[n[1]],
-                                              out.nodes[n[2]], out.nodes[n[3]]);
+            const double v = tet_signed_volume_impl(out.nodes[n[0]], out.nodes[n[1]],
+                                                    out.nodes[n[2]], out.nodes[n[3]]);
             if (v < 0.0) {
                 std::swap(n[1], n[2]);
-                v = -v;
-            }
-            if (v <= vol_eps) {
-                // Last resort: nudge mid-edge of first face slightly along +z of
-                // the reference to break exact coplanarity (should be rare).
-                out.nodes[n[3]] += Eigen::Vector3d(0.0, 0.0, 1e-9 * h);
-                v = tet_signed_volume_impl(out.nodes[n[0]], out.nodes[n[1]], out.nodes[n[2]],
-                                           out.nodes[n[3]]);
-                if (v < 0.0) {
-                    std::swap(n[1], n[2]);
-                }
             }
         }
-        check_tet_fill_geometry(out, -vol_eps);
+        check_tet_fill_geometry(out, vol_eps);
         return out;
     }
 

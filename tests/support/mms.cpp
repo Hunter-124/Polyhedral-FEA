@@ -3,6 +3,7 @@
 
 #include "fea/quadrature.hpp"
 #include "fea/shape.hpp"
+#include "fea/vem.hpp"
 
 // Eigen/Dense (not just Core) is REQUIRED in any TU calling .inverse():
 // without the LU module, Inverse<> falls back to a generic assignment that
@@ -132,16 +133,32 @@ double energy_norm_error(const fea::NodalMesh& mesh, const fea::Material& materi
     const auto d = material.d_matrix();
     double error_sq = 0.0;
     for (const auto& element : mesh.elements) {
+        Eigen::VectorXd u_e(3 * element.nodes.size());
+        for (std::size_t a = 0; a < element.nodes.size(); ++a) {
+            u_e.segment<3>(3 * static_cast<Eigen::Index>(a)) =
+                u_fem.segment<3>(3 * static_cast<Eigen::Index>(element.nodes[a]));
+        }
+
+        if (element.type == ElementType::kPolyVem) {
+            std::vector<Eigen::Vector3d> coords;
+            coords.reserve(element.nodes.size());
+            for (auto id : element.nodes) {
+                coords.push_back(mesh.nodes[id]);
+            }
+            const int order = fea::vem_infer_order(element.nodes.size(), element.faces);
+            error_sq += fea::vem_energy_error_sq(
+                coords, element.faces, u_e, material,
+                [&](const Eigen::Vector3d& p) { return exact.strain(p); }, order);
+            continue;
+        }
+
         const bool is_tet =
             element.type == ElementType::kTet4 || element.type == ElementType::kTet10;
         const auto rule = is_tet ? fea::tet_rule(4) : fea::hex_rule(4);
 
         Eigen::Matrix<double, Eigen::Dynamic, 3> x(element.nodes.size(), 3);
-        Eigen::VectorXd u_e(3 * element.nodes.size());
         for (std::size_t a = 0; a < element.nodes.size(); ++a) {
             x.row(static_cast<Eigen::Index>(a)) = mesh.nodes[element.nodes[a]].transpose();
-            u_e.segment<3>(3 * static_cast<Eigen::Index>(a)) =
-                u_fem.segment<3>(3 * static_cast<Eigen::Index>(element.nodes[a]));
         }
 
         for (const auto& qp : rule) {

@@ -6,7 +6,7 @@
 
 **Active:** Track A (GUI usable) → M1 study app. Solver core (GATE 1) frozen.
 Mesh/adapt product path advancing (graded, hexpyr, seed remesh, local LEB).
-F1/F2 + E1–E3 + B1/B3/B4 + C1 + C2 + C5 + D3–D5 + E4 + G1–G4 done.
+F1/F2 + E1–E3 + B1/B3/B4 + C1 + C2 + C4 + C5 + D3–D5 + E4 + G1–G4 done.
 
 GATE 1 deliverables ready:
 - Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)
@@ -18,6 +18,9 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: C4 VEM k=2 — serendipity edge midpoints on `kPolyVem` (order
+  inferred: nv→k=1, nv+ne→k=2); hex path = isoparametric hex20 (ADR-0017);
+  patch test + degree-2 exact + MMS energy-norm order ≈2 ±0.2; k=1 unchanged.
 - 2026-07-10: D4 true local h-refine — ADR-0016 Rivara longest-edge bisection
   (LEPP, no hanging nodes); `mesh::local_refine_tets`; Catch2 single-tet +
   multi-tet center mark (validity, +volume, volume conserve) + solve smoke;

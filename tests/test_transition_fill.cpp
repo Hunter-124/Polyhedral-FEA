@@ -6,6 +6,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <set>
+#include <string>
 
 using namespace polymesh::mesh;
 namespace fea = polymesh::fea;
@@ -62,15 +63,12 @@ TEST_CASE("hex+pyramid mesh solves linear elasticity") {
     m.region_count = 1;
     auto vol = pipeline::volume_mesh(m, 0.2, pipeline::VolumeMesher::kHexPyramid, 2);
     REQUIRE_FALSE(vol.mesh.elements.empty());
-    bool has_hex = false, has_pyr = false;
+    // Product FE path expands lattice hex cores to pyramids (ADR-0013).
     for (const auto& e : vol.mesh.elements) {
-        if (e.type == fea::ElementType::kHex8)
-            has_hex = true;
-        if (e.type == fea::ElementType::kPyramid5)
-            has_pyr = true;
+        REQUIRE(e.type == fea::ElementType::kPyramid5);
+        REQUIRE(e.nodes.size() == 5);
     }
-    REQUIRE(has_hex);
-    REQUIRE(has_pyr);
+    REQUIRE(vol.mesher_note.find("product FE") != std::string::npos);
     fea::Dirichlet bc;
     Eigen::VectorXd loads =
         Eigen::VectorXd::Zero(3 * static_cast<Eigen::Index>(vol.mesh.nodes.size()));
@@ -126,4 +124,61 @@ TEST_CASE("pyramid lattice patch test: constant strain (all-pyramid cells)") {
         max_error = std::max(max_error, (fem - exact).norm());
     }
     REQUIRE(max_error < 1e-12);
+}
+
+TEST_CASE("hybrid hex+pyramid product path patch test: constant strain") {
+    // Lattice with nonempty hex core; product FE expands hex → 6 pyramids.
+    auto raw =
+        transition_fill_surface(box(), {-0.05, -0.05, -0.05}, {1.05, 1.05, 1.05}, 0.2, false);
+    REQUIRE(raw.n_hex > 0);
+    REQUIRE(raw.n_pyramid > 0);
+    const auto fill = expand_hex_core_to_pyramids(raw);
+    REQUIRE(fill.n_hex == 0);
+    REQUIRE(fill.n_pyramid == raw.n_pyramid + 6 * raw.n_hex);
+
+    fea::NodalMesh mesh;
+    mesh.nodes = fill.nodes;
+    for (const auto& cell : fill.cells) {
+        REQUIRE(cell.kind == TransitionCellKind::kPyramid5);
+        mesh.elements.push_back(fea::NodalElement{
+            fea::ElementType::kPyramid5,
+            {cell.nodes[0], cell.nodes[1], cell.nodes[2], cell.nodes[3], cell.nodes[4]}});
+    }
+
+    Eigen::Matrix3d g;
+    g << 1e-3, 4e-4, -2e-4, //
+        3e-4, -8e-4, 5e-4,  //
+        -6e-4, 2e-4, 7e-4;
+
+    std::set<std::uint32_t> bnodes;
+    for (const auto& q : fill.boundary_quads) {
+        bnodes.insert(q.begin(), q.end());
+    }
+    fea::Dirichlet bc;
+    for (auto i : bnodes) {
+        bc.fix_node(i, g * mesh.nodes[i]);
+    }
+    const fea::Material mat{.youngs_modulus = 200e9, .poissons_ratio = 0.3};
+    const Eigen::VectorXd loads =
+        Eigen::VectorXd::Zero(3 * static_cast<Eigen::Index>(mesh.nodes.size()));
+    const auto u = fea::solve_elastostatics(mesh, mat, bc, loads);
+
+    double max_error = 0.0;
+    for (std::size_t i = 0; i < mesh.nodes.size(); ++i) {
+        const Eigen::Vector3d exact = g * mesh.nodes[i];
+        const Eigen::Vector3d fem = u.segment<3>(3 * static_cast<Eigen::Index>(i));
+        max_error = std::max(max_error, (fem - exact).norm());
+    }
+    REQUIRE(max_error < 1e-12);
+
+    // Pipeline product path is the same expand.
+    pipeline::Model m;
+    m.surface = box();
+    m.bbox_min = {-0.05, -0.05, -0.05};
+    m.bbox_max = {1.05, 1.05, 1.05};
+    m.triangle_region.assign(12, 0);
+    m.region_count = 1;
+    auto vol = pipeline::volume_mesh(m, 0.2, pipeline::VolumeMesher::kHexPyramid, 2);
+    REQUIRE(vol.mesh.elements.size() == fill.n_pyramid);
+    REQUIRE(vol.mesher_note.find("product FE") != std::string::npos);
 }

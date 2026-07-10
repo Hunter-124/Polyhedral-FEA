@@ -4,9 +4,9 @@
 **Master plan:** [`docs/ROADMAP.md`](ROADMAP.md) · **Agent loop:**
 [`docs/process/agent-loop.md`](process/agent-loop.md)
 
-**Active:** Track A (GUI usable) → M1 study app. 74 tests green. Solver core
+**Active:** Track A (GUI usable) → M1 study app. 77 tests green. Solver core
 (GATE 1) frozen. Mesh/adapt product path advancing (graded, hexpyr, seed remesh).
-B2 VTU cell quality + B5 public fixtures done.
+C1 hybrid product FE path done; B2 VTU cell quality + B5 public fixtures done.
 
 GATE 1 deliverables ready:
 - Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)
@@ -18,6 +18,10 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: C1 hybrid honesty — product FE path `expand_hex_core_to_pyramids`
+  (interior hex → 6 pyramids, matching face diagonals); pipeline kHexPyramid
+  always expands; Catch2 hybrid constant-strain patch < 1e-12 on mixed lattice;
+  ADR-0013 amended. Pure-pyramid patch unchanged. 77 tests.
 - 2026-07-10: B2+B5 — VTU `VtuCellData` + tet4 `quality` cell array on CLI/GUI export;
   Catch2 CellData XML check; public fixtures `l_domain`/`plate`/`cylinder_prism` +
   README; STL load smoke. 74 tests.

@@ -46,4 +46,14 @@ TransitionFillOutput transition_fill_surface(const geom::TriSurface& surface,
                                              const Eigen::Vector3d& bbox_max, double h,
                                              bool snap_boundary = true);
 
+/// Product FE path (ADR-0013): expand every interior hex8 into six pyramid5
+/// (apex at the cell centroid) so the whole volume uses the same base-diagonal
+/// convention as the pyramid skin. Mixed isoparametric hex8 + tet-split pyramid
+/// is nonconforming on shared faces; this expand restores a conforming
+/// piecewise-linear space that passes the constant-strain patch test.
+///
+/// Topology stats: `n_hex` is cleared (0); `n_pyramid` counts all pyramids.
+/// `boundary_quads` and lattice corner nodes are unchanged; new nodes are apices.
+TransitionFillOutput expand_hex_core_to_pyramids(const TransitionFillOutput& fill);
+
 } // namespace polymesh::mesh

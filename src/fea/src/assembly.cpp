@@ -60,9 +60,9 @@ Eigen::MatrixXd element_stiffness(const NodalMesh& mesh, const NodalElement& ele
     }
     // Pyramid5: two tet4s (base diagonal 0-2 + apex). Flip-aware scatter keeps
     // local DOF order consistent with the stiffness matrix. Hex8 stays true
-    // isoparametric trilinear (GATE 1 freeze). Hex–pyramid hybrid meshes are
-    // therefore piecewise-linear vs bilinear on shared faces — patch-test the
-    // pure-pyramid lattice; full hybrid constant-strain is deferred (ADR-0013).
+    // isoparametric trilinear (GATE 1 freeze). Product hybrid path expands hex
+    // cores to six pyramids so all faces share this diagonal convention
+    // (ADR-0013); mixed isoparametric-hex + pyramid is nonconforming.
     if (element.type == ElementType::kPyramid5 && element.nodes.size() == 5) {
         const auto& n = element.nodes;
         Eigen::MatrixXd k = Eigen::MatrixXd::Zero(15, 15);

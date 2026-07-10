@@ -178,34 +178,28 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                                       mesher == VolumeMesher::kHexVem ? "hex-VEM" : "hex",
                                       out.mesh.elements.size(), out.mesh.nodes.size(), fill_h);
     } else if (mesher == VolumeMesher::kHexPyramid) {
-        // Hex core + pyramid skin as native element types (ADR-0013). GATE-1
-        // hex is isoparametric; pyramid is tet-split. Hybrid constant-strain
-        // patch is not exact across hex–pyramid faces; pure-hex and pure-
-        // pyramid patches are.
-        auto fill =
+        // Topology: hex core + pyramid skin (ADR-0013). Product FE path expands
+        // each interior hex to six pyramids (centroid apex) so face diagonals
+        // match the tet-split pyramid skin — constant-strain patch exact.
+        auto raw =
             mesh::transition_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
+        const std::size_t n_hex_lattice = raw.n_hex;
+        const std::size_t n_pyr_skin = raw.n_pyramid;
+        auto fill = mesh::expand_hex_core_to_pyramids(raw);
         fill_h = fill.h;
         out.mesh.nodes = std::move(fill.nodes);
         out.mesh.elements.reserve(fill.cells.size());
         for (const auto& cell : fill.cells) {
-            if (cell.kind == mesh::TransitionCellKind::kHex8) {
-                out.mesh.elements.push_back(fea::NodalElement{
-                    fea::ElementType::kHex8,
-                    {cell.nodes[0], cell.nodes[1], cell.nodes[2], cell.nodes[3], cell.nodes[4],
-                     cell.nodes[5], cell.nodes[6], cell.nodes[7]}});
-            } else {
-                out.mesh.elements.push_back(
-                    fea::NodalElement{fea::ElementType::kPyramid5,
-                                      {cell.nodes[0], cell.nodes[1], cell.nodes[2],
-                                       cell.nodes[3], cell.nodes[4]}});
-            }
+            out.mesh.elements.push_back(fea::NodalElement{
+                fea::ElementType::kPyramid5,
+                {cell.nodes[0], cell.nodes[1], cell.nodes[2], cell.nodes[3], cell.nodes[4]}});
         }
         out.boundary_quads = std::move(fill.boundary_quads);
         out.mesher_note = std::format(
-            "hex+pyramid transition v1: {} hex, {} pyramids, {} nodes, h={:.4g} m, "
-            "boundary max|d|={:.3g} m",
-            fill.n_hex, fill.n_pyramid, out.mesh.nodes.size(), fill_h,
-            fill.boundary_max_distance);
+            "hex+pyramid product FE (all-pyramid expand): {} lattice hex → {} pyramids "
+            "({} skin + {} from hex), {} nodes, h={:.4g} m, boundary max|d|={:.3g} m",
+            n_hex_lattice, fill.n_pyramid, n_pyr_skin, fill.n_pyramid - n_pyr_skin,
+            out.mesh.nodes.size(), fill_h, fill.boundary_max_distance);
     } else if (mesher == VolumeMesher::kGradedTet) {
         std::vector<geom::SharpEdge> edges;
         double feature_band = 0.0;

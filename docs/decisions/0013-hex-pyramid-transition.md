@@ -1,29 +1,38 @@
 # ADR-0013: Hex core + pyramid skin transition mesher
 
-- Status: accepted (2026-07-10)
+- Status: accepted (2026-07-10); product FE path amended (C1, 2026-07-10)
 
 ## Decision
 `transition_fill_surface` / `VolumeMesher::kHexPyramid`:
-- Interior lattice cells → hex8
+- Interior lattice cells → hex8 (topology)
 - Boundary lattice cells → 6 pyramid5 (apex at cell center, bases = hex faces)
 
 ## Why
 Hex–tet faces are non-conforming. Pyramid bases are quads, so interior
-hex–pyramid interfaces are conforming nodal matches. Boundary quads remain
+hex–pyramid interfaces are conforming **nodal** matches. Boundary quads remain
 available for BC region mapping.
 
-## Assembly note
+## Nonconformity (why native hex8 + pyramid5 fails the patch test)
 Pyramid5 stiffness is the sum of **two tet4** stiffnesses (base diagonal
-0–2 + apex), with orientation flip applied to both the tet connectivity and
-the local DOF scatter map. Hex8 stays true isoparametric trilinear (GATE 1
-freeze).
+0–2 + apex). Hex8 stays true isoparametric trilinear (GATE 1 freeze). On a
+shared face the hex side is bilinear while the pyramid side is piecewise
+linear on two triangles; nodal forces for constant stress do not cancel, so a
+joint constant-strain patch fails (typical max error ~1e-5 on a small lattice).
 
-## Product FE path (pipeline)
-`VolumeMesher::kHexPyramid` emits native `kHex8` + `kPyramid5` elements.
-Hex stays GATE-1 isoparametric trilinear; pyramid stiffness is two tet4s.
-The hybrid does not pass a joint constant-strain patch (bilinear hex face vs
-piecewise-linear pyramid base). Isolated hex (Tier-0) and pure-pyramid
-lattices (tests) do.
+Pure-hex (Tier-0) and pure-pyramid lattices pass independently.
+
+## Product FE path (C1 honesty)
+`expand_hex_core_to_pyramids` converts every interior hex8 into **six pyramid5**
+with apex at the cell centroid, using the same face order and base-diagonal
+convention as the skin. Pipeline `VolumeMesher::kHexPyramid` always runs this
+expand before emitting `fea::NodalMesh` elements.
+
+Result: the FE mesh is all-pyramid5 (tet-split stiffness) with matching face
+diagonals across former hex–pyramid interfaces. Constant-strain patch on a
+mixed lattice (nonempty hex core + pyramid skin) is exact (max error < 1e-12).
+
+Display / mesher notes still report lattice hex count; the solve mesh is the
+expanded product path. GATE-1 pure hex8 is unchanged.
 
 ## Orientation
 Mesher orders pyramid bases so the apex lies on the +normal side of the

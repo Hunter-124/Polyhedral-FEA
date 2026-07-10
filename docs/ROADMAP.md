@@ -69,7 +69,7 @@ and error, export VTU — without CLI.
 
 | ID | Task | Acceptance |
 |----|------|------------|
-| C1 | Conforming hex–pyramid FE (or Kuhn product path that passes hybrid patch) | Hybrid patch test < 1e-12 |
+| C1 | ~~Conforming hex–pyramid FE (or product path that passes hybrid patch)~~ | Done — all-pyramid expand; patch < 1e-12 |
 | C2 | Curvature + thin-wall feature indicators | Sizing reacts on fillet-like meshes |
 | C3 | Prism sweep regions (extrusion-detectable solids) | Prism elements in volume_mesh option |
 | C4 | VEM k=2 + MMS order check | Order matches theory ±0.2 |
@@ -141,7 +141,7 @@ A1 A3 ──> A2 A10 ──> A4 A5 A8 ──> A6 A7
 |-------|--------|
 | A GUI | M1 core in: argv open, mesh preview, ZZ error, colorbar, failure dismiss, A6 wireframe/undeformed, A7 drag-drop open, A8 mesh note+DOF. Still: A9 theme GATE. |
 | B Mesh | Grid tet/hex/graded/hexpyr; B2 quality+VTU cell data; B5 fixtures (≥3). Not true Delaunay (B1 open). |
-| C Hybrid | Hex+pyramid topology; hybrid patch nonconforming (ADR-0013). VEM k=1 only. |
+| C Hybrid | C1 done: hex+pyramid product FE (hex→6 pyramids) patch < 1e-12 (ADR-0013). VEM k=1 only. |
 | D Adapt | Seed remesh (ADR-0014) + η target stop (D2). Still: p-adapt, auto-h polish, local h-refine. |
 | E Verify | P1 Tier-0/1/2 green on imported meshes; product-mesh e2e weak. |
 | F Perf | CPU direct solver only. |

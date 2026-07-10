@@ -237,4 +237,59 @@ TransitionFillOutput transition_fill_surface(const geom::TriSurface& surface,
     return out;
 }
 
+TransitionFillOutput expand_hex_core_to_pyramids(const TransitionFillOutput& fill) {
+    TransitionFillOutput out;
+    out.h = fill.h;
+    out.boundary_quads = fill.boundary_quads;
+    out.boundary_max_distance = fill.boundary_max_distance;
+    out.nodes = fill.nodes;
+    out.cells.reserve(fill.n_pyramid + 6 * fill.n_hex);
+    out.n_hex = 0;
+    out.n_pyramid = 0;
+
+    for (const auto& cell : fill.cells) {
+        if (cell.kind == TransitionCellKind::kPyramid5) {
+            out.cells.push_back(cell);
+            ++out.n_pyramid;
+            continue;
+        }
+        // Interior hex → six pyramids, same face order / orientation as the skin.
+        Eigen::Vector3d center = Eigen::Vector3d::Zero();
+        for (int i = 0; i < 8; ++i) {
+            center += out.nodes[cell.nodes[static_cast<std::size_t>(i)]];
+        }
+        center /= 8.0;
+        const auto apex = static_cast<std::uint32_t>(out.nodes.size());
+        out.nodes.push_back(center);
+        for (const auto& face : kHexFaces) {
+            TransitionCell pyr;
+            pyr.kind = TransitionCellKind::kPyramid5;
+            pyr.n_nodes = 5;
+            const Eigen::Vector3d& p0 =
+                out.nodes[cell.nodes[static_cast<std::size_t>(face[0])]];
+            const Eigen::Vector3d& p1 =
+                out.nodes[cell.nodes[static_cast<std::size_t>(face[1])]];
+            const Eigen::Vector3d& p2 =
+                out.nodes[cell.nodes[static_cast<std::size_t>(face[2])]];
+            const Eigen::Vector3d n = (p1 - p0).cross(p2 - p0);
+            const bool apex_on_positive = n.dot(center - p0) > 0.0;
+            if (apex_on_positive) {
+                pyr.nodes[0] = cell.nodes[static_cast<std::size_t>(face[0])];
+                pyr.nodes[1] = cell.nodes[static_cast<std::size_t>(face[1])];
+                pyr.nodes[2] = cell.nodes[static_cast<std::size_t>(face[2])];
+                pyr.nodes[3] = cell.nodes[static_cast<std::size_t>(face[3])];
+            } else {
+                pyr.nodes[0] = cell.nodes[static_cast<std::size_t>(face[0])];
+                pyr.nodes[1] = cell.nodes[static_cast<std::size_t>(face[3])];
+                pyr.nodes[2] = cell.nodes[static_cast<std::size_t>(face[2])];
+                pyr.nodes[3] = cell.nodes[static_cast<std::size_t>(face[1])];
+            }
+            pyr.nodes[4] = apex;
+            out.cells.push_back(pyr);
+            ++out.n_pyramid;
+        }
+    }
+    return out;
+}
+
 } // namespace polymesh::mesh

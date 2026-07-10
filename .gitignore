@@ -8,11 +8,18 @@ compile_commands.json
 *.vtu
 /polymesh-setup/
 
-# machine-local graphify interpreter
+# machine-local graphify artifacts (committed: graph.json, GRAPH_REPORT.md,
+# .graphify_labels.json, manifest.json — see CONTRIBUTING.md §8)
 graphify-out/.graphify_python
+graphify-out/.graphify_root
 graphify-out/cache/
+graphify-out/cost.json
 graphify-out/graph.html
 imgui.ini
+
+# Accidental local CAD/smoke dumps at repo root (fixtures live under bench/, examples/)
+/test-part.stl
+/*.stl
 
 # Example script VTU dumps
 examples/out/

@@ -4,3 +4,9 @@ graphify-out/** linguist-generated
 *.html linguist-vendored
 docs/** linguist-documentation
 bench/results/** linguist-generated
+
+# Union-merge concurrent graph updates (requires local:
+#   git config merge.graphify.driver "graphify merge-driver %O %A %B"
+# after `uv tool install graphifyy` / `pip install graphifyy`).
+graphify-out/graph.json merge=graphify
+graphify-out/manifest.json merge=union

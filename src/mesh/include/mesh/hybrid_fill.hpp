@@ -1,17 +1,12 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-// Graded tet fill: fine boundary skin, coarse deep interior (2:1 Kuhn blocks).
+// Graded tet fill: coarse bulk + fine skin/feature/seed bands (2:1 Kuhn).
 //
-// Cartesian lattice at the fine spacing (~h/2); free-surface cells (and
-// `skin_layers` of neighbors) plus optional sharp-feature / seed bands are
-// refined into Kuhn tets at h_fine; deeper cells use 2×2×2 blocks at ~h
-// (h_coarse ≈ 2·h_fine ≈ h when the cell budget allows).
-//
-// Always 2:1 grading (subdivision = 2). A former ultra-fine h/4 global lattice
-// for features blew past RAM/time while bulk still only reached h/2 — features
-// now densify *which* blocks are fine, not the whole grid. Grid-based, not
-// Delaunay (ADR-0015).
+// Coarse-primary lattice at target spacing h (same cost class as tet/hybrid
+// classify). Free-surface skin, sharp-feature bands, and a posteriori seeds
+// are refined by local 2×2×2 subdivision → Kuhn tets at ~h/2; deep bulk emits
+// one Kuhn split per coarse cell at ~h. Grid-based, not Delaunay (ADR-0015).
 
 #include "geom/features.hpp"
 #include "geom/tri_surface.hpp"
@@ -24,22 +19,23 @@
 namespace polymesh::mesh {
 
 struct GradedTetFillOutput {
-    TetFillOutput mesh;    // nodes + tets + boundary quads at the fine lattice
+    TetFillOutput mesh;    // nodes + tets + boundary quads
     double h_coarse = 0.0; // metres (~ target h when budget allows)
-    double h_fine = 0.0;   // metres (~ h_coarse/2)
+    double h_fine = 0.0;   // metres (~ h_coarse/2 on refined cells)
     std::size_t n_coarse_cells = 0;
-    std::size_t n_fine_cells = 0;
+    std::size_t n_fine_cells = 0; // count of h/2 Kuhn cubes (≤ 8 × refined coarse)
     int skin_layers = 0;
-    /// Coarse-block grouping size on the fine lattice (always 2 for 2:1 Kuhn).
+    /// Coarse→fine subdivision factor (always 2 for 2:1 Kuhn).
     int subdivision = 2;
-    /// Coarse blocks forced fine by feature band.
+    /// Coarse cells forced fine by feature band.
     std::size_t n_feature_cells = 0;
-    /// Coarse blocks forced fine by a posteriori error seeds.
+    /// Coarse cells forced fine by a posteriori / geometry seeds.
     std::size_t n_seed_cells = 0;
 };
 
-/// `skin_layers` ≥ 1. Fine ≈ h/2 near free surface / feature / seed bands;
-/// coarse bulk ≈ h. (`feature_band`, `seed_band` in metres; 0 disables).
+/// `skin_layers` ≥ 1 (coarse-cell hops from free surface). Fine ≈ h/2 near
+/// free surface / feature / seed bands; coarse bulk ≈ h.
+/// (`feature_band`, `seed_band` in metres; 0 disables).
 GradedTetFillOutput graded_tet_fill_surface(
     const geom::TriSurface& surface, const Eigen::Vector3d& bbox_min,
     const Eigen::Vector3d& bbox_max, double h, int skin_layers = 2,

@@ -7,6 +7,14 @@
   conforming mesher exists, the GUI solves on a clearly-labeled draft voxel
   mesher (v0) so import -> pick faces -> constrain/load -> solve -> results
   works end-to-end today.
+- **Restyle (2026-07-10):** owner pivoted chrome + controls to the Interwebz
+  v2 look (deep plum panels, header-strip group boxes, rose gradient
+  accents, lavender labels, fixed constrained window layout). The reference
+  source (KingsleydotDev/ImGui-Menus) is an unlicensed leak, so nothing was
+  copied: the look was re-implemented clean-room in `src/gui/widgets.cpp`
+  on public Dear ImGui APIs, with only color values and layout proportions
+  taken from visual inspection. The 3D viewport keeps the light studio
+  canvas.
 - Decision: scope addition (SPEC originally pinned "no GUI" for v1)
 
 ## Decision

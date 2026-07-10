@@ -9,18 +9,20 @@ void apply_theme() {
     ImGuiStyle& s = ImGui::GetStyle();
     const Palette& p = palette;
 
-    s.WindowRounding = 4.0f;
-    s.ChildRounding = 4.0f;
-    s.FrameRounding = 3.0f;
-    s.PopupRounding = 4.0f;
-    s.GrabRounding = 3.0f;
-    s.TabRounding = 3.0f;
+    // Interwebz-v2 geometry: tight 2px rounding, thin frames, compact rows.
+    s.WindowRounding = 2.0f;
+    s.ChildRounding = 2.0f;
+    s.FrameRounding = 2.0f;
+    s.PopupRounding = 2.0f;
+    s.GrabRounding = 2.0f;
+    s.TabRounding = 2.0f;
     s.WindowBorderSize = 1.0f;
-    s.FrameBorderSize = 0.0f;
-    s.WindowPadding = {10, 10};
-    s.FramePadding = {8, 4};
-    s.ItemSpacing = {8, 6};
-    s.ScrollbarSize = 12.0f;
+    s.FrameBorderSize = 1.0f;
+    s.WindowPadding = {12, 12};
+    s.FramePadding = {7, 4};
+    s.ItemSpacing = {8, 7};
+    s.ScrollbarSize = 10.0f;
+    s.WindowMinSize = {320, 240};
 
     ImVec4* c = s.Colors;
     c[ImGuiCol_WindowBg] = p.panel_bg;

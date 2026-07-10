@@ -39,6 +39,7 @@ find_package(OpenGL REQUIRED)
 add_executable(polymesh-gui
     main.cpp
     theme.cpp
+    widgets.cpp
     viewport.cpp
     scene.cpp
 )

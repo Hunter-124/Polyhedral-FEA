@@ -13,6 +13,13 @@ on the cut planes, plane-strain `u_z = 0`. Using the continuum traction field
 as the Neumann data makes the infinite-plate solution exact on the finite
 annulus, so residual error is pure discretization (no domain truncation).
 
+**C5 / equal-DOF grading (2026-07-10):** GATE 3 peak-stress claim uses the same
+annular BC setup on **tet10** with two a priori radial maps at identical
+topology (exact equal free DOFs): linear `r` (uniform baseline) vs logarithmic
+`r = a (b/a)^ξ` (feature-aware concentration at the hole). Product Cartesian
+tet fill is not used here — it stair-cases the hole (ADR-0015). Test:
+`tests/test_kirsch_c5_graded.cpp`.
+
 ### Goodier cavity (SCF = 3(9−5ν)/(2(7−5ν)))
 Spherical-shell octant, hex20 with **logarithmic radial spacing** (nodes
 clustered at the cavity), polar angle starting above zero to keep Jacobians

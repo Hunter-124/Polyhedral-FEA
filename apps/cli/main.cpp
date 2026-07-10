@@ -39,7 +39,8 @@ int usage() {
                "  backend                    print compute backend\n"
                "\n"
                "mesh size: omit -h (or -h 0) for auto h0 from bbox + sharp-edge density\n"
-               "mesher names: tet (default), hex, hexvem|vem, graded, hexpyr|transition\n"
+               "mesher names: tet (default), hex, hexvem|vem, graded, hexpyr|transition, "
+               "prism|sweep\n"
                "--skin n: graded-tet fine skin layers (default 2)\n"
                "--feature: refine graded mesh near sharp edges (default off in CLI)\n"
                "--adapt n: ZZ→Dörfler remesh passes (local seeds on graded path)\n"
@@ -62,6 +63,9 @@ polymesh::pipeline::VolumeMesher parse_mesher(const std::string& m) {
     }
     if (m == "hexpyr" || m == "transition") {
         return polymesh::pipeline::VolumeMesher::kHexPyramid;
+    }
+    if (m == "prism" || m == "sweep") {
+        return polymesh::pipeline::VolumeMesher::kPrismSweep;
     }
     return polymesh::pipeline::VolumeMesher::kTetFill;
 }

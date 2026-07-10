@@ -109,7 +109,7 @@ Fixture: [`bench/geometries/public/unit_box.stl`](bench/geometries/public/unit_b
   -h 0.08 -o /tmp/unit_box_result.vtu --mesher tet
 ```
 
-Useful flags: `--mesher tet|hex|hexvem|graded|hexpyr`, `--feature`, `--adapt n`,
+Useful flags: `--mesher tet|hex|hexvem|graded|hexpyr|prism`, `--feature`, `--adapt n`,
 `--eta-target η`, `-E`, `-nu`. Run `./build/apps/cli/polymesh` with no args for full help.
 
 ### GUI

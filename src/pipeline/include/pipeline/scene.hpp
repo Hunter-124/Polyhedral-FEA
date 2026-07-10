@@ -29,6 +29,7 @@ enum class VolumeMesher : int {
     kHexVem = 2,
     kGradedTet = 3,
     kHexPyramid = 4, // hex core + pyramid skin; FE = all-pyramid expand (ADR-0013)
+    kPrismSweep = 5, // Cartesian prism6 wedges along dominant axis (ADR-0015 / C3)
 };
 
 /// Imported model: triangle surface segmented into CAD-style "faces"

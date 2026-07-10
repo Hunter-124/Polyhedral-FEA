@@ -5,8 +5,8 @@
 [`docs/process/agent-loop.md`](process/agent-loop.md)
 
 **Active:** Track A (GUI usable) → M1 study app. Solver core (GATE 1) frozen.
-Mesh/adapt product path advancing (graded, hexpyr, seed remesh, local LEB).
-F1/F2 + E1–E3 + B1/B3/B4 + C1 + C2 + C4 + C5 + D3–D5 + E4 + G1–G4 done.
+Mesh/adapt product path advancing (graded, hexpyr, prism, seed remesh, local LEB).
+F1/F2 + E1–E3 + B1/B3/B4 + C1 + C2 + C3 + C4 + C5 + D3–D5 + E4 + G1–G4 done.
 
 GATE 1 deliverables ready:
 - Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)
@@ -18,6 +18,11 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: C3 prism sweep volume fill — `prism_fill_surface` (Cartesian
+  lattice, each inside voxel → 2× prism6 along longest bbox axis); pipeline
+  `VolumeMesher::kPrismSweep`; CLI `--mesher prism|sweep`; GUI mesher combo;
+  Catch2 validity + constant-strain patch + solve smoke; ADR-0015 updated.
+  Honesty: not CAD extrusion detection (same grid-fill limits as tet/hex).
 - 2026-07-10: C4 VEM k=2 — serendipity edge midpoints on `kPolyVem` (order
   inferred: nv→k=1, nv+ne→k=2); hex path = isoparametric hex20 (ADR-0017);
   patch test + degree-2 exact + MMS energy-norm order ≈2 ±0.2; k=1 unchanged.

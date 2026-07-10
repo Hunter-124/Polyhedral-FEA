@@ -3,6 +3,7 @@ add_library(mesh
     src/poly_mesh.cpp
     src/tet_fill.cpp
     src/hex_fill.cpp
+    src/prism_fill.cpp
     src/quality.cpp
     src/surface_project.cpp
     src/hybrid_fill.cpp

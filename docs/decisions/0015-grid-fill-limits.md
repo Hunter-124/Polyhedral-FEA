@@ -5,13 +5,15 @@
 
 ## Context
 Product meshers (`tet_fill_surface`, `hex_fill_surface`, `graded_tet_fill_surface`,
-`transition_fill_surface`) fill a **Cartesian lattice** over the axis-aligned
-bbox of a closed triangle surface, classify cells inside/outside by ray cast,
-and emit tet4 / hex8 / pyramid5 connectivity. Optional limited surface snap
-(≤ 0.35 h) pulls boundary lattice nodes toward the STL with Jacobian unsnap
-safety (B3 / ADR-0013).
+`transition_fill_surface`, `prism_fill_surface`) fill a **Cartesian lattice** over
+the axis-aligned bbox of a closed triangle surface, classify cells inside/outside
+by ray cast, and emit tet4 / hex8 / pyramid5 / prism6 connectivity. Optional
+limited surface snap (≤ 0.35 h) pulls boundary lattice nodes toward the STL with
+Jacobian unsnap safety (B3 / ADR-0013).
 
 This is **not** constrained Delaunay, advancing-front, or CAD-aware meshing.
+`prism_fill_surface` / `VolumeMesher::kPrismSweep` is **not** CAD extrusion
+detection: it is an AABB lattice of prism6 wedges along the longest bbox axis.
 
 ## Decision
 Document and ship Cartesian grid fills as the v1 product path. Do **not** claim
@@ -25,6 +27,7 @@ analytical mesh quality, boundary-fitted DOF efficiency, or Tier-1 accuracy on
 | hex | Inside voxels → hex8 | Stair-cased (no snap yet) |
 | graded tet | Fine skin / coarse core on lattice | Stair-cased (no snap) |
 | hex+pyramid | Interior hex, boundary cell → 6 pyramids | Limited snap + unsnap |
+| prism sweep | Inside voxels → 2× prism6 (base diag), sweep = longest axis | Stair-cased (no snap) |
 
 ## Staircasing and when they fail
 - **Staircasing:** free surface follows lattice faces, not the CAD/STL, except

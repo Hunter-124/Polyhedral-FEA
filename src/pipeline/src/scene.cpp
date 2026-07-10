@@ -14,6 +14,7 @@
 #include "mesh/hex_fill.hpp"
 #include "mesh/hybrid_fill.hpp"
 #include "mesh/local_refine.hpp"
+#include "mesh/prism_fill.hpp"
 #include "mesh/quality.hpp"
 #include "mesh/surface_project.hpp"
 #include "mesh/tet_fill.hpp"
@@ -276,6 +277,25 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             "boundary max|d|={:.3g} m",
             n_hex_lattice, fill.n_pyramid, n_pyr_skin, fill.n_pyramid - n_pyr_skin,
             out.mesh.nodes.size(), fill_h, fill.boundary_max_distance);
+    } else if (mesher == VolumeMesher::kPrismSweep) {
+        // Cartesian prism6 wedges along the longest bbox axis (ROADMAP C3).
+        // Not CAD extrusion detection — same grid-fill honesty as tet/hex (ADR-0015).
+        auto fill = mesh::prism_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
+        fill_h = fill.h;
+        out.mesh.nodes = std::move(fill.nodes);
+        out.mesh.elements.reserve(fill.prisms.size());
+        for (const auto& pr : fill.prisms) {
+            out.mesh.elements.push_back(fea::NodalElement{
+                fea::ElementType::kPrism6, {pr[0], pr[1], pr[2], pr[3], pr[4], pr[5]}});
+        }
+        out.boundary_quads = std::move(fill.boundary_quads);
+        static constexpr const char* kAxis[] = {"x", "y", "z"};
+        const char* axis_name =
+            (fill.sweep_axis >= 0 && fill.sweep_axis < 3) ? kAxis[fill.sweep_axis] : "?";
+        out.mesher_note =
+            std::format("prism sweep grid fill v1 (Cartesian, not CAD extrusion; sweep={}): "
+                        "{} prism6, {} nodes, h={:.4g} m",
+                        axis_name, out.mesh.elements.size(), out.mesh.nodes.size(), fill_h);
     } else if (mesher == VolumeMesher::kGradedTet) {
         std::vector<geom::SharpEdge> edges;
         double feature_band = 0.0;

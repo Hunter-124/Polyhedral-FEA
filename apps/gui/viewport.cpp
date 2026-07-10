@@ -12,6 +12,8 @@
 
 #include <cmath>
 #include <cstdio>
+#include <limits>
+#include <utility>
 
 namespace polymesh::gui {
 namespace {
@@ -46,6 +48,24 @@ void main() {
     float shade = 0.35 + 0.6 * ndv;
     float rim = pow(1.0 - ndv, 3.0) * 0.15;
     frag = vec4(v_color.rgb * shade + vec3(rim), 1.0);
+})";
+
+constexpr const char* kLineVs = R"(#version 330 core
+layout(location = 0) in vec3 in_pos;
+layout(location = 1) in vec4 in_color;
+uniform mat4 u_view;
+uniform mat4 u_proj;
+out vec4 v_color;
+void main() {
+    v_color = in_color;
+    gl_Position = u_proj * u_view * vec4(in_pos, 1.0);
+})";
+
+constexpr const char* kLineFs = R"(#version 330 core
+in vec4 v_color;
+out vec4 frag;
+void main() {
+    frag = v_color;
 })";
 
 constexpr const char* kBackgroundVs = R"(#version 330 core
@@ -103,6 +123,17 @@ std::array<float, 3> fea_colormap(float t) {
     const float g = std::clamp(std::min(4.0f * t, 3.4f - 3.0f * t), 0.0f, 1.0f);
     const float b = std::clamp(2.0f - 4.0f * t, 0.0f, 1.0f);
     return {t > 0.75f ? 1.0f : r * 0.9f, g * 0.85f, b};
+}
+
+void bind_line_attr(GLuint vao, GLuint vbo) {
+    glBindVertexArray(vao);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    constexpr GLsizei stride = 7 * sizeof(float); // pos3 color4
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, nullptr);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, stride,
+                          reinterpret_cast<void*>(3 * sizeof(float)));
 }
 
 } // namespace
@@ -187,6 +218,7 @@ Viewport::~Viewport() = default;
 void Viewport::init() {
     model_program_ = link(kModelVs, kModelFs);
     background_program_ = link(kBackgroundVs, kBackgroundFs);
+    line_program_ = link(kLineVs, kLineFs);
     glGenVertexArrays(1, &background_vao_);
     glGenVertexArrays(1, &model_vao_);
     glGenBuffers(1, &model_vbo_);
@@ -194,6 +226,10 @@ void Viewport::init() {
     glGenBuffers(1, &mesh_vbo_);
     glGenVertexArrays(1, &result_vao_);
     glGenBuffers(1, &result_vbo_);
+    glGenVertexArrays(1, &mesh_edge_vao_);
+    glGenBuffers(1, &mesh_edge_vbo_);
+    glGenVertexArrays(1, &result_edge_vao_);
+    glGenBuffers(1, &result_edge_vbo_);
 
     const auto bind_attr = [](GLuint vao, GLuint vbo) {
         glBindVertexArray(vao);
@@ -211,6 +247,8 @@ void Viewport::init() {
     bind_attr(model_vao_, model_vbo_);
     bind_attr(mesh_vao_, mesh_vbo_);
     bind_attr(result_vao_, result_vbo_);
+    bind_line_attr(mesh_edge_vao_, mesh_edge_vbo_);
+    bind_line_attr(result_edge_vao_, result_edge_vbo_);
     glBindVertexArray(0);
 }
 
@@ -238,6 +276,40 @@ void Viewport::ensure_framebuffer(int width, int height) {
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER,
                               depth_rbo_);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void Viewport::upload_boundary_edges(const std::vector<Eigen::Vector3d>& nodes,
+                                     const std::vector<std::array<std::uint32_t, 4>>& quads,
+                                     float r, float g, float b, float a, std::uint32_t vbo,
+                                     int& vertex_count) {
+    // pos3 + color4 per endpoint; 4 edges × 2 verts per boundary quad.
+    std::vector<float> data;
+    data.reserve(quads.size() * 8 * 7);
+    const auto emit = [&](std::uint32_t ni) {
+        const auto& p = nodes[ni];
+        data.push_back(static_cast<float>(p[0]));
+        data.push_back(static_cast<float>(p[1]));
+        data.push_back(static_cast<float>(p[2]));
+        data.push_back(r);
+        data.push_back(g);
+        data.push_back(b);
+        data.push_back(a);
+    };
+    for (const auto& q : quads) {
+        // Degenerate tri-as-quad: skip zero-length edges (q[2]==q[3] for triangles).
+        const std::array<std::pair<int, int>, 4> edges = {{{0, 1}, {1, 2}, {2, 3}, {3, 0}}};
+        for (const auto& [ia, ib] : edges) {
+            if (q[static_cast<std::size_t>(ia)] == q[static_cast<std::size_t>(ib)]) {
+                continue;
+            }
+            emit(q[static_cast<std::size_t>(ia)]);
+            emit(q[static_cast<std::size_t>(ib)]);
+        }
+    }
+    vertex_count = static_cast<int>(data.size() / 7);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(data.size() * sizeof(float)),
+                 data.data(), GL_DYNAMIC_DRAW);
 }
 
 void Viewport::set_model(const Model& model) {
@@ -363,6 +435,10 @@ void Viewport::set_mesh(const VolumeMeshOutput& mesh_out) {
     glBindBuffer(GL_ARRAY_BUFFER, mesh_vbo_);
     glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(data.size() * sizeof(float)),
                  data.data(), GL_DYNAMIC_DRAW);
+
+    // Rest-position wireframe (also used as undeformed outline on results).
+    upload_boundary_edges(nodes, mesh_out.boundary_quads, 0.08f, 0.08f, 0.10f, 0.95f,
+                          mesh_edge_vbo_, mesh_edge_vertex_count_);
 }
 
 void Viewport::set_result(const SolveResult& result) {
@@ -431,6 +507,17 @@ void Viewport::bake_result(DisplayMode mode, float deform_scale, float result_ma
     glBindBuffer(GL_ARRAY_BUFFER, result_vbo_);
     glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(data.size() * sizeof(float)),
                  data.data(), GL_DYNAMIC_DRAW);
+
+    // Deformed wireframe edges (same scale as shaded surface).
+    std::vector<Eigen::Vector3d> deformed(result_rest_.size());
+    for (std::size_t i = 0; i < result_rest_.size(); ++i) {
+        deformed[i] =
+            result_rest_[i] + static_cast<double>(deform_scale) *
+                                  result_disp_.segment<3>(3 * static_cast<Eigen::Index>(i));
+    }
+    upload_boundary_edges(deformed, result_quads_, 0.05f, 0.05f, 0.08f, 0.90f,
+                          result_edge_vbo_, result_edge_vertex_count_);
+
     baked_mode_ = mode;
     baked_scale_ = deform_scale;
     baked_max_ = result_max;
@@ -438,7 +525,7 @@ void Viewport::bake_result(DisplayMode mode, float deform_scale, float result_ma
 }
 
 void Viewport::render(int width, int height, DisplayMode mode, float deform_scale,
-                      float result_max) {
+                      float result_max, bool show_wireframe, bool show_undeformed) {
     if (width <= 0 || height <= 0) {
         return;
     }
@@ -473,6 +560,10 @@ void Viewport::render(int width, int height, DisplayMode mode, float deform_scal
                        proj.data());
     glUniform3f(glGetUniformLocation(model_program_, "u_eye"), eye.x(), eye.y(), eye.z());
 
+    const bool results_mode = mode == DisplayMode::kResultsVonMises ||
+                              mode == DisplayMode::kResultsDisplacement ||
+                              mode == DisplayMode::kResultsError;
+
     if (mode == DisplayMode::kSetup) {
         if (model_vertex_count_ > 0) {
             glBindVertexArray(model_vao_);
@@ -493,6 +584,40 @@ void Viewport::render(int width, int height, DisplayMode mode, float deform_scal
             glDrawArrays(GL_TRIANGLES, 0, result_vertex_count_);
         }
     }
+
+    // Edge overlays: polygon offset so lines sit cleanly on shaded surfaces.
+    if (show_wireframe || (show_undeformed && results_mode)) {
+        glEnable(GL_POLYGON_OFFSET_LINE);
+        glPolygonOffset(-1.0f, -1.0f);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glUseProgram(line_program_);
+        glUniformMatrix4fv(glGetUniformLocation(line_program_, "u_view"), 1, GL_FALSE,
+                           view.data());
+        glUniformMatrix4fv(glGetUniformLocation(line_program_, "u_proj"), 1, GL_FALSE,
+                           proj.data());
+        glLineWidth(1.0f);
+
+        if (show_undeformed && results_mode && mesh_edge_vertex_count_ > 0) {
+            // Rest outline (light gray) behind deformed mesh.
+            glDepthMask(GL_FALSE);
+            glBindVertexArray(mesh_edge_vao_);
+            glDrawArrays(GL_LINES, 0, mesh_edge_vertex_count_);
+            glDepthMask(GL_TRUE);
+        }
+        if (show_wireframe) {
+            if (results_mode && result_edge_vertex_count_ > 0) {
+                glBindVertexArray(result_edge_vao_);
+                glDrawArrays(GL_LINES, 0, result_edge_vertex_count_);
+            } else if (mode == DisplayMode::kMeshPreview && mesh_edge_vertex_count_ > 0) {
+                glBindVertexArray(mesh_edge_vao_);
+                glDrawArrays(GL_LINES, 0, mesh_edge_vertex_count_);
+            }
+        }
+        glDisable(GL_BLEND);
+        glDisable(GL_POLYGON_OFFSET_LINE);
+    }
+
     glBindVertexArray(0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }

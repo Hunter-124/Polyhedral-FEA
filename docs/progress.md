@@ -17,6 +17,9 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: GUI A6/A7/A8 — wireframe + undeformed outline toggles (OpenGL
+  boundary edges), GLFW drag-drop open (.stl/.step/.stp) with path field
+  fallback, mesh_note + DOF (3×nnodes) in sidebar/status after mesh/solve.
 - 2026-07-10: D2 global η stopping criterion — `SimSetup::eta_target` (0=off);
   adapt loop early-stops when `global_eta ≤ eta_target`; CLI `--eta-target`;
   GUI η input near adapt passes; Catch2 early-stop + disabled-path tests.

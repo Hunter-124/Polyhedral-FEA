@@ -20,6 +20,8 @@ int vtk_cell_type(ElementType t) {
         return 25;
     case ElementType::kPrism6:
         return 13; // VTK_WEDGE
+    case ElementType::kPyramid5:
+        return 14; // VTK_PYRAMID
     case ElementType::kPolyVem:
         // VTK_POLYHEDRON = 42 needs face stream; export as VTK_CONVEX_POINT_SET=41
         return 41;

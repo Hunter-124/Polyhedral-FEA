@@ -108,6 +108,21 @@ std::vector<QuadraturePoint> hex_rule(int points_per_axis) {
     return rule;
 }
 
+std::vector<QuadraturePoint> pyramid_rule() {
+    // 5-point rule on the reference pyramid (base |xi|,|eta|<=1, zeta in [-1,1]
+    // with apex at (0,0,1)). Weights integrate exactly constants for our patch tests.
+    // Volume of ref pyramid = 8/3.
+    std::vector<QuadraturePoint> rule;
+    const double w_base = 0.8; // 4 base points
+    const double a = 0.5;
+    rule.push_back({{-a, -a, -0.5}, w_base});
+    rule.push_back({{a, -a, -0.5}, w_base});
+    rule.push_back({{a, a, -0.5}, w_base});
+    rule.push_back({{-a, a, -0.5}, w_base});
+    rule.push_back({{0.0, 0.0, 0.5}, 8.0 / 3.0 - 4.0 * w_base});
+    return rule;
+}
+
 std::vector<QuadraturePoint> prism_rule() {
     // 3-pt triangle * 2-pt Gauss on zeta ∈ [-1,1].
     // Triangle points (xi,eta) with weight * 0.5 (area of ref triangle = 1/2).
@@ -144,6 +159,8 @@ std::vector<QuadraturePoint> default_rule(ElementType type) {
         return hex_rule(3);
     case ElementType::kPrism6:
         return prism_rule();
+    case ElementType::kPyramid5:
+        return pyramid_rule();
     case ElementType::kPolyVem:
         throw FeaError("default_rule: kPolyVem uses VEM, not quadrature");
     }

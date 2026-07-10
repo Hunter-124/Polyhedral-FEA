@@ -140,8 +140,9 @@ Eigen::VectorXd assemble_body_load(const NodalMesh& mesh, const BodyForce& body_
         std::vector<QuadraturePoint> rule;
         if (element.type == ElementType::kTet4 || element.type == ElementType::kTet10) {
             rule = tet_rule(4);
-        } else if (element.type == ElementType::kPrism6) {
-            rule = default_rule(ElementType::kPrism6);
+        } else if (element.type == ElementType::kPrism6 ||
+                   element.type == ElementType::kPyramid5) {
+            rule = default_rule(element.type);
         } else {
             rule = hex_rule(4);
         }

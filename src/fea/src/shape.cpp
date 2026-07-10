@@ -70,6 +70,32 @@ ShapeEval eval_tet10(const Eigen::Vector3d& xi) {
     return s;
 }
 
+ShapeEval eval_pyramid5(const Eigen::Vector3d& xi) {
+    // Base corners (xi,eta) at zeta=-1: (-1,-1),(1,-1),(1,1),(-1,1); apex at zeta=+1.
+    // t=(1-zeta)/2 is 1 on the base and 0 at the apex so sum N_i = 1.
+    const double x = xi[0], y = xi[1], z = xi[2];
+    const double t = 0.5 * (1.0 - z); // base weight
+    ShapeEval s;
+    s.n.resize(5);
+    s.dn.resize(5, 3);
+    s.n[0] = 0.25 * (1.0 - x) * (1.0 - y) * t;
+    s.n[1] = 0.25 * (1.0 + x) * (1.0 - y) * t;
+    s.n[2] = 0.25 * (1.0 + x) * (1.0 + y) * t;
+    s.n[3] = 0.25 * (1.0 - x) * (1.0 + y) * t;
+    s.n[4] = 0.5 * (1.0 + z); // = 1 - t
+    // dN/d(xi,eta,zeta); dt/dzeta = -0.5
+    s.dn.row(0) << -0.25 * (1.0 - y) * t, -0.25 * (1.0 - x) * t,
+        0.25 * (1.0 - x) * (1.0 - y) * (-0.5);
+    s.dn.row(1) << 0.25 * (1.0 - y) * t, -0.25 * (1.0 + x) * t,
+        0.25 * (1.0 + x) * (1.0 - y) * (-0.5);
+    s.dn.row(2) << 0.25 * (1.0 + y) * t, 0.25 * (1.0 + x) * t,
+        0.25 * (1.0 + x) * (1.0 + y) * (-0.5);
+    s.dn.row(3) << -0.25 * (1.0 + y) * t, 0.25 * (1.0 - x) * t,
+        0.25 * (1.0 - x) * (1.0 + y) * (-0.5);
+    s.dn.row(4) << 0.0, 0.0, 0.5;
+    return s;
+}
+
 ShapeEval eval_prism6(const Eigen::Vector3d& xi) {
     // Base triangle barycentric: L0=1-xi-eta, L1=xi, L2=eta; zeta in [-1,1].
     const double l0 = 1.0 - xi[0] - xi[1];
@@ -168,6 +194,8 @@ ShapeEval eval_shape(ElementType type, const Eigen::Vector3d& xi) {
         return eval_hex20(xi);
     case ElementType::kPrism6:
         return eval_prism6(xi);
+    case ElementType::kPyramid5:
+        return eval_pyramid5(xi);
     case ElementType::kPolyVem:
         throw FeaError("eval_shape: kPolyVem has no isoparametric shape functions");
     }
@@ -202,6 +230,8 @@ std::vector<Eigen::Vector3d> reference_nodes(ElementType type) {
     case ElementType::kPrism6:
         // Bottom tri zeta=-1, top zeta=+1; base corners (0,0), (1,0), (0,1).
         return {{0, 0, -1}, {1, 0, -1}, {0, 1, -1}, {0, 0, 1}, {1, 0, 1}, {0, 1, 1}};
+    case ElementType::kPyramid5:
+        return {{-1, -1, -1}, {1, -1, -1}, {1, 1, -1}, {-1, 1, -1}, {0, 0, 1}};
     case ElementType::kPolyVem:
         throw FeaError("reference_nodes: kPolyVem has no fixed reference nodes");
     }

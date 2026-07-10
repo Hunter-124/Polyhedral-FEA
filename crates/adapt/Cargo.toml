@@ -1,0 +1,16 @@
+[package]
+name = "adapt"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Sizing fields, ZZ error estimation, Dörfler marking, hp-refinement decisions"
+
+[dependencies]
+mesh.workspace = true
+fea.workspace = true
+nalgebra.workspace = true
+
+[lints]
+workspace = true

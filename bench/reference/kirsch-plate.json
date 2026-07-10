@@ -1,0 +1,7 @@
+{
+  "name": "kirsch-plate",
+  "citation": "Kirsch, G. (1898). Die Theorie der Elastizität und die Bedürfnisse der Festigkeitslehre. Infinite plate with circular hole under uniaxial remote tension: tangential stress at the hole equator is 3x the remote stress (SCF = 3), independent of E, nu, hole radius.",
+  "values": {
+    "scf": 3.0
+  }
+}

@@ -1,0 +1,6 @@
+/target
+# Holdout geometries are never committed or shown to the implementation loop
+# (BENCHMARKS.md anti-cheat rule 1).
+/bench/geometries/holdout/
+*.vtu
+/polymesh-setup/

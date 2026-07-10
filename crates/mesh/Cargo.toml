@@ -1,0 +1,16 @@
+[package]
+name = "mesh"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Face-based polyhedral mesh data structure, validity checking, hybrid mesh generation"
+
+[dependencies]
+geom.workspace = true
+nalgebra.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

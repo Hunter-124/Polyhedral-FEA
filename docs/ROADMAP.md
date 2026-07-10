@@ -143,6 +143,6 @@ A1 A3 ──> A2 A10 ──> A4 A5 A8 ──> A6 A7
 | B Mesh | Grid tet/hex/graded/hexpyr; B1 documented limits (ADR-0015); B2/B3/B4/B5 done. Not true Delaunay. |
 | C Hybrid | C1/C2/C3/C4/C5 done (hex→pyramids; geometry sizing; prism fill; VEM k=2; Kirsch graded @ equal DOF). |
 | D Adapt | Seed remesh + η (D2) + auto h0 (D5) + p-elev (D3) + local LEB (D4) + D6 L-domain instrument (5.12× DOF / 12.2× time). Product-path Tier-3 on full public suite still open. |
-| E Verify | E1–E4 done: CalculiX smoke peer, gate1-p1 Lamé/Kirsch scoreboard, holdout protocol stub, product-mesh smoke. Tight Lamé on product mesh needs better mesher. |
-| F Perf | F1 OpenMP assembly + F2 Eigen CG (auto >8k free DOFs). CUDA optional. |
+| E Verify | E1–E4 done; D6 Tier-3 scoreboard instrument on L-domain. |
+| F Perf | F1–F3 done: OpenMP assembly, auto CG >8k free DOFs, CSR SpMV + optional CUDA parity. |
 | G Release | G1–G4 done: README, examples/, header units, CI green (format+ctest+grep-audit). |

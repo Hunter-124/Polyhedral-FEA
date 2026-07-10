@@ -1,15 +1,77 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "fea/solve.hpp"
 
+#include <Eigen/IterativeLinearSolvers>
 #include <Eigen/SparseCholesky>
 
+#include <algorithm>
 #include <format>
 #include <vector>
 
 namespace polymesh::fea {
 
+SolveMethod select_solve_method(Eigen::Index nfree, const SolveOptions& options) {
+    switch (options.method) {
+    case SolveMethod::kDirect:
+        return SolveMethod::kDirect;
+    case SolveMethod::kCG:
+        return SolveMethod::kCG;
+    case SolveMethod::kAuto:
+        return (nfree > options.cg_threshold) ? SolveMethod::kCG : SolveMethod::kDirect;
+    }
+    return SolveMethod::kDirect;
+}
+
+namespace {
+
+Eigen::VectorXd solve_reduced(const Eigen::SparseMatrix<double>& kff,
+                              const Eigen::VectorXd& rhs, const SolveOptions& options) {
+    const Eigen::Index nfree = kff.rows();
+    const SolveMethod method = select_solve_method(nfree, options);
+
+    if (method == SolveMethod::kCG) {
+        using CG =
+            Eigen::ConjugateGradient<Eigen::SparseMatrix<double>, Eigen::Lower | Eigen::Upper,
+                                     Eigen::DiagonalPreconditioner<double>>;
+        CG cg;
+        cg.setTolerance(options.cg_tol);
+        const int max_iters =
+            options.cg_max_iters > 0
+                ? options.cg_max_iters
+                : static_cast<int>(std::max<Eigen::Index>(2 * nfree, Eigen::Index{1000}));
+        cg.setMaxIterations(max_iters);
+        cg.compute(kff);
+        if (cg.info() != Eigen::Success) {
+            throw FeaError("solve_elastostatics: CG setup failed — system is singular "
+                           "(insufficient constraints?)");
+        }
+        const Eigen::VectorXd uf = cg.solve(rhs);
+        if (cg.info() != Eigen::Success) {
+            throw FeaError(
+                std::format("solve_elastostatics: CG failed to converge after {} iterations "
+                            "(tol={}, estimated error={})",
+                            cg.iterations(), options.cg_tol, cg.error()));
+        }
+        return uf;
+    }
+
+    Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> ldlt(kff);
+    if (ldlt.info() != Eigen::Success) {
+        throw FeaError("solve_elastostatics: factorization failed — system is singular "
+                       "(insufficient constraints?)");
+    }
+    const Eigen::VectorXd uf = ldlt.solve(rhs);
+    if (ldlt.info() != Eigen::Success) {
+        throw FeaError("solve_elastostatics: back-substitution failed");
+    }
+    return uf;
+}
+
+} // namespace
+
 Eigen::VectorXd solve_elastostatics(const NodalMesh& mesh, const Material& material,
-                                    const Dirichlet& dirichlet, const Eigen::VectorXd& loads) {
+                                    const Dirichlet& dirichlet, const Eigen::VectorXd& loads,
+                                    const SolveOptions& options) {
     const Eigen::Index ndof = 3 * static_cast<Eigen::Index>(mesh.nodes.size());
     if (loads.size() != ndof) {
         throw FeaError(std::format("solve_elastostatics: load vector size {} != 3N = {}",
@@ -57,15 +119,7 @@ Eigen::VectorXd solve_elastostatics(const NodalMesh& mesh, const Material& mater
     Eigen::SparseMatrix<double> kff(nfree, nfree);
     kff.setFromTriplets(triplets.begin(), triplets.end());
 
-    Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> ldlt(kff);
-    if (ldlt.info() != Eigen::Success) {
-        throw FeaError("solve_elastostatics: factorization failed — system is singular "
-                       "(insufficient constraints?)");
-    }
-    const Eigen::VectorXd uf = ldlt.solve(rhs);
-    if (ldlt.info() != Eigen::Success) {
-        throw FeaError("solve_elastostatics: back-substitution failed");
-    }
+    const Eigen::VectorXd uf = solve_reduced(kff, rhs, options);
 
     Eigen::VectorXd u(ndof);
     for (Eigen::Index dof = 0; dof < ndof; ++dof) {

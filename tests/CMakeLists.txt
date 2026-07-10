@@ -12,6 +12,7 @@ add_executable(polymesh_tests
     test_shape.cpp
     test_tier0.cpp
     test_cantilever.cpp
+    test_iterative_solve.cpp
     test_mms_convergence.cpp
     test_lame_cylinder.cpp
     test_kirsch_plate.cpp

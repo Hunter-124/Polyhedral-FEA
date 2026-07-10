@@ -16,6 +16,8 @@ other — not glued together after the fact.
 - **Linear elastostatics** (3D), STL (STEP via OpenCASCADE option), VTU export.
 - **Optional OpenMP** for multi-threaded element stiffness assembly when the toolchain
   provides it; serial path always builds.
+- **Sparse direct + iterative solvers**: SimplicialLDLT for small/medium free systems;
+  ConjugateGradient (diagonal preconditioner) auto-selected above 8000 free DOFs.
 - **Optional CUDA** for kernels where f64 parallelism wins; CPU path always exists.
 - **Verified**: patch tests, manufactured-solution convergence orders, analytical
   Tier-1 cases — see [docs/benchmarks.md](docs/benchmarks.md).
@@ -141,6 +143,20 @@ thread-local sparse triplets and merging without a critical section in the hot l
 Results match the serial path within patch-test / Tier-0 tolerances. Disable with
 `-DPOLYMESH_WITH_OPENMP=OFF`, or leave ON when the compiler has no OpenMP — the build
 then falls back to serial assembly automatically.
+
+### Linear solve (direct / CG)
+
+`fea::solve_elastostatics` partitions Dirichlet DOFs then solves the free system:
+
+| Free DOFs (`nfree`) | Default (`SolveMethod::kAuto`) |
+|---|---|
+| ≤ 8000 | Eigen `SimplicialLDLT` (sparse Cholesky) |
+| > 8000 | Eigen `ConjugateGradient` + `DiagonalPreconditioner` |
+
+Override with `SolveOptions` (`method = kDirect | kCG`, `cg_threshold`, `cg_tol`,
+`cg_max_iters`). Patch tests and small verification meshes stay on the direct path
+by default so constant-strain exactness is preserved. Force CG for large-N checks
+or when factorisation memory would dominate. See `fea/solve.hpp`.
 
 ### STEP / OpenCASCADE (`POLYMESH_WITH_OCC`)
 

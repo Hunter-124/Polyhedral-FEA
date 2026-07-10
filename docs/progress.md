@@ -1,8 +1,9 @@
 # PROGRESS
 
 ## Current phase
-**Active development on master.** 63 tests green. Meshers include hex+pyramid transition
-with limited surface snap; CLI `mesh`/`solve` accept `--mesher` / `--skin`. Element zoo:
+**Active development on master.** 66 tests green. Meshers include hex+pyramid transition
+with limited surface snap; CLI `mesh`/`solve` accept `--mesher` / `--skin`; FeatureSizing
+a priori field; pyramid5 patch on pure-pyramid lattices. Element zoo:
 tet/hex/prism/pyramid/VEM.
 
 GATE 1 deliverables ready:
@@ -15,9 +16,12 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: FeatureSizing field + feature-aware solve h; pyramid5 patch test
+  (pure pyramid lattice); pyramid base orientation for +Jacobian; Duffy product
+  quadrature; documented hex–pyramid hybrid nonconformity (ADR-0013). 66 tests.
 - 2026-07-10: Hex+pyramid boundary snap (0.35h), pipeline residual distance note,
-  CLI solve/mesh `--mesher` + `--skin`, ZZ tet-split stress for pyramid5,
-  ADR-0013 snap/ZZ notes. 63 tests.
+  CLI solve/mesh `--mesher` + `--skin`, pyramid tet-split stiffness (flip-safe
+  scatter), ADR-0013 snap notes. 63 tests.
 - 2026-07-10: Graded tet fill (fine skin / coarse core), surface conformity
   metrics, ADR-0012 (hybrid = graded all-tet until pyramids). 58 tests.
 - 2026-07-10: Prism6 wedges; hex-VEM hybrid; quality metrics; CalculiX smoke.

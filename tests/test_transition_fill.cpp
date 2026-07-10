@@ -5,6 +5,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <set>
+
 using namespace polymesh::mesh;
 namespace fea = polymesh::fea;
 namespace pipe = polymesh::pipeline;
@@ -81,4 +83,52 @@ TEST_CASE("hex+pyramid mesh solves linear elasticity") {
     REQUIRE_FALSE(bc.dof_values.empty());
     const fea::Material mat{.youngs_modulus = 1e9, .poissons_ratio = 0.3};
     REQUIRE_NOTHROW(fea::solve_elastostatics(vol.mesh, mat, bc, loads));
+}
+
+TEST_CASE("pyramid lattice patch test: constant strain (all-pyramid cells)") {
+    // Sacred patch test for pyramid5 (tet-split assembly). Use h coarse enough
+    // that the transition fill has no hex core — pure pyramid mesh passes
+    // exactly. Hex–pyramid hybrids are nonconforming (hex bilinear vs pyramid
+    // two-triangle faces); full hybrid patch is deferred (ADR-0013).
+    // No surface snap: nodal geometry stays on the Cartesian lattice so the
+    // pure-tet FE space of the pyramid split is exact for linear fields.
+    auto fill =
+        transition_fill_surface(box(), {-0.01, -0.01, -0.01}, {1.01, 1.01, 1.01}, 0.25, false);
+    REQUIRE(fill.n_hex == 0);
+    REQUIRE(fill.n_pyramid > 0);
+
+    fea::NodalMesh mesh;
+    mesh.nodes = fill.nodes;
+    for (const auto& cell : fill.cells) {
+        REQUIRE(cell.kind == TransitionCellKind::kPyramid5);
+        mesh.elements.push_back(fea::NodalElement{
+            fea::ElementType::kPyramid5,
+            {cell.nodes[0], cell.nodes[1], cell.nodes[2], cell.nodes[3], cell.nodes[4]}});
+    }
+
+    Eigen::Matrix3d g;
+    g << 1e-3, 4e-4, -2e-4, //
+        3e-4, -8e-4, 5e-4,  //
+        -6e-4, 2e-4, 7e-4;
+
+    std::set<std::uint32_t> bnodes;
+    for (const auto& q : fill.boundary_quads) {
+        bnodes.insert(q.begin(), q.end());
+    }
+    fea::Dirichlet bc;
+    for (auto i : bnodes) {
+        bc.fix_node(i, g * mesh.nodes[i]);
+    }
+    const fea::Material mat{.youngs_modulus = 200e9, .poissons_ratio = 0.3};
+    const Eigen::VectorXd loads =
+        Eigen::VectorXd::Zero(3 * static_cast<Eigen::Index>(mesh.nodes.size()));
+    const auto u = fea::solve_elastostatics(mesh, mat, bc, loads);
+
+    double max_error = 0.0;
+    for (std::size_t i = 0; i < mesh.nodes.size(); ++i) {
+        const Eigen::Vector3d exact = g * mesh.nodes[i];
+        const Eigen::Vector3d fem = u.segment<3>(3 * static_cast<Eigen::Index>(i));
+        max_error = std::max(max_error, (fem - exact).norm());
+    }
+    REQUIRE(max_error < 1e-12);
 }

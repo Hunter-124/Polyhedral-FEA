@@ -109,17 +109,31 @@ std::vector<QuadraturePoint> hex_rule(int points_per_axis) {
 }
 
 std::vector<QuadraturePoint> pyramid_rule() {
-    // 5-point rule on the reference pyramid (base |xi|,|eta|<=1, zeta in [-1,1]
-    // with apex at (0,0,1)). Weights integrate exactly constants for our patch tests.
-    // Volume of ref pyramid = 8/3.
+    // Product Gauss via Duffy map on the reference pyramid used by eval_pyramid5:
+    //   zeta ∈ [-1,1], cross-section half-width a = (1-zeta)/2 so base zeta=-1 has
+    //   |xi|,|eta|≤1 and the apex is at zeta=+1.
+    // Map (s,t,z) ∈ [-1,1]^3 → (xi,eta,zeta) = (a s, a t, z) with a=(1-z)/2.
+    // dV_ref = a² · (1/2? no) |∂(xi,eta,zeta)/∂(s,t,z)| ds dt dz = a² ds dt dz
+    // since xi=a(s)s with a depending only on z: det = a * a * 1 = a².
+    // 3-point Gauss per axis is enough for constant-stress patch residuals on
+    // affine-ish physical pyramids (hex–pyramid hybrids).
+    const auto g = gauss_1d(3);
     std::vector<QuadraturePoint> rule;
-    const double w_base = 0.8; // 4 base points
-    const double a = 0.5;
-    rule.push_back({{-a, -a, -0.5}, w_base});
-    rule.push_back({{a, -a, -0.5}, w_base});
-    rule.push_back({{a, a, -0.5}, w_base});
-    rule.push_back({{-a, a, -0.5}, w_base});
-    rule.push_back({{0.0, 0.0, 0.5}, 8.0 / 3.0 - 4.0 * w_base});
+    rule.reserve(g.nodes.size() * g.nodes.size() * g.nodes.size());
+    for (std::size_t iz = 0; iz < g.nodes.size(); ++iz) {
+        const double z = g.nodes[iz];
+        const double a = 0.5 * (1.0 - z);
+        const double a2 = a * a;
+        for (std::size_t is = 0; is < g.nodes.size(); ++is) {
+            for (std::size_t it = 0; it < g.nodes.size(); ++it) {
+                const double s = g.nodes[is];
+                const double t = g.nodes[it];
+                const double w =
+                    g.weights[iz] * g.weights[is] * g.weights[it] * a2;
+                rule.push_back({{a * s, a * t, z}, w});
+            }
+        }
+    }
     return rule;
 }
 

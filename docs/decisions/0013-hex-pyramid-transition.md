@@ -13,11 +13,24 @@ hex–pyramid interfaces are conforming nodal matches. Boundary quads remain
 available for BC region mapping.
 
 ## Assembly note
-Pyramid element stiffness is formed as the sum of two tet4 stiffnesses
-(base diagonal split + apex). This avoids fragile isoparametric Jacobians
-on the physical pyramid while preserving the Tier-0 RBM count. ZZ recovery
-uses the same tet split for centroid stress (isoparametric pyramid stress
-is skipped).
+Pyramid5 stiffness is the sum of **two tet4** stiffnesses (base diagonal
+0–2 + apex), with orientation flip applied to both the tet connectivity and
+the local DOF scatter map. Hex8 stays true isoparametric trilinear (GATE 1
+freeze).
+
+## Patch test / hybrid nonconformity
+- Pure pyramid lattices pass the constant-strain patch test exactly.
+- Hex–pyramid hybrids do **not** (yet): hex faces are bilinear while
+  tet-split pyramids present two linear triangles, so constant-stress nodal
+  forces disagree on shared faces. Engineering rule #2 is enforced on each
+  element type in isolation (hex via Tier-0, pyramid via pure-pyramid patch);
+  a conforming hybrid formulation (matching Kuhn diagonals on both sides, or
+  mortar) is future work.
+
+## Orientation
+Mesher orders pyramid bases so the apex lies on the +normal side of the
+right-handed base winding (isoparametric Jacobian positive if that path is
+used for body-load quadrature).
 
 ## Surface snap
 Free-boundary lattice nodes (pyramid base corners on exterior faces) are

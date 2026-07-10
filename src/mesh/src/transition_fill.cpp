@@ -163,8 +163,10 @@ TransitionFillOutput transition_fill_surface(const geom::TriSurface& surface,
                         TransitionCell pyr;
                         pyr.kind = TransitionCellKind::kPyramid5;
                         pyr.n_nodes = 5;
-                        // Order base so its normal points away from the apex
-                        // (positive pyramid volume / Jacobian).
+                        // Order base so the apex lies on the +normal side of the
+                        // right-handed base winding. That matches the isoparametric
+                        // pyramid reference (base zeta=-1, apex zeta=+1) and yields
+                        // positive Jacobians for element_stiffness.
                         const Eigen::Vector3d& p0 =
                             out.nodes[c[static_cast<std::size_t>(face[0])]];
                         const Eigen::Vector3d& p1 =
@@ -172,17 +174,17 @@ TransitionFillOutput transition_fill_surface(const geom::TriSurface& surface,
                         const Eigen::Vector3d& p2 =
                             out.nodes[c[static_cast<std::size_t>(face[2])]];
                         const Eigen::Vector3d n = (p1 - p0).cross(p2 - p0);
-                        const bool flip = n.dot(center - p0) > 0.0; // apex on wrong side
-                        if (flip) {
-                            pyr.nodes[0] = c[static_cast<std::size_t>(face[0])];
-                            pyr.nodes[1] = c[static_cast<std::size_t>(face[3])];
-                            pyr.nodes[2] = c[static_cast<std::size_t>(face[2])];
-                            pyr.nodes[3] = c[static_cast<std::size_t>(face[1])];
-                        } else {
+                        const bool apex_on_positive = n.dot(center - p0) > 0.0;
+                        if (apex_on_positive) {
                             pyr.nodes[0] = c[static_cast<std::size_t>(face[0])];
                             pyr.nodes[1] = c[static_cast<std::size_t>(face[1])];
                             pyr.nodes[2] = c[static_cast<std::size_t>(face[2])];
                             pyr.nodes[3] = c[static_cast<std::size_t>(face[3])];
+                        } else {
+                            pyr.nodes[0] = c[static_cast<std::size_t>(face[0])];
+                            pyr.nodes[1] = c[static_cast<std::size_t>(face[3])];
+                            pyr.nodes[2] = c[static_cast<std::size_t>(face[2])];
+                            pyr.nodes[3] = c[static_cast<std::size_t>(face[1])];
                         }
                         pyr.nodes[4] = apex;
                         out.cells.push_back(pyr);

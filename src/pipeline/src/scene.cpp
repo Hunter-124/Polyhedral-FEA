@@ -9,11 +9,13 @@
 #include "geom/features.hpp"
 #include "geom/step.hpp"
 #include "geom/stl.hpp"
+#include "mesh/quality.hpp"
 #include "mesh/tet_fill.hpp"
 
 #include <Eigen/Geometry>
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cmath>
 #include <format>
@@ -156,8 +158,18 @@ VolumeMeshOutput volume_mesh(const Model& model, double h) {
             fea::NodalElement{fea::ElementType::kTet4, {tet[0], tet[1], tet[2], tet[3]}});
     }
     out.boundary_quads = std::move(fill.boundary_quads);
-    out.mesher_note = std::format("tet grid fill v1: {} tet4, {} nodes, h = {:.4g} m",
-                                  out.mesh.elements.size(), out.mesh.nodes.size(), fill.h);
+    std::vector<std::array<std::uint32_t, 4>> tet_ids;
+    tet_ids.reserve(out.mesh.elements.size());
+    for (const auto& el : out.mesh.elements) {
+        if (el.nodes.size() == 4) {
+            tet_ids.push_back({el.nodes[0], el.nodes[1], el.nodes[2], el.nodes[3]});
+        }
+    }
+    const auto q = mesh::summarize_tet4_quality(out.mesh.nodes, tet_ids);
+    out.mesher_note = std::format("tet grid fill v1: {} tet4, {} nodes, h={:.4g} m, "
+                                  "minQ={:.3f}, meanQ={:.3f}, slivers={}",
+                                  out.mesh.elements.size(), out.mesh.nodes.size(), fill.h,
+                                  q.min_aspect, q.mean_aspect, q.n_sliver);
 
     const auto& surf = model.surface;
     std::set<std::uint32_t> boundary_nodes;

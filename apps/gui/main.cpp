@@ -329,9 +329,13 @@ void draw_study_panel(App& app) {
                                          .scalars = app.result->nodal_eta,
                                          .vectors = {}});
                     }
+                    std::vector<fea::VtuCellData> cdata;
+                    cdata.push_back(
+                        {.name = "quality",
+                         .scalars = fea::tet4_cell_quality(app.result->volume_mesh)});
                     const std::string out =
                         app.model ? (app.model->name + "_result.vtu") : "result.vtu";
-                    fea::write_vtu(out, app.result->volume_mesh, pdata);
+                    fea::write_vtu(out, app.result->volume_mesh, pdata, cdata);
                     app.status = std::format("wrote {}", out);
                 } catch (const std::exception& e) {
                     app.status = std::format("export failed: {}", e.what());

@@ -4,8 +4,9 @@
 **Master plan:** [`docs/ROADMAP.md`](ROADMAP.md) · **Agent loop:**
 [`docs/process/agent-loop.md`](process/agent-loop.md)
 
-**Active:** Track A (GUI usable) → M1 study app. 70 tests green. Solver core
+**Active:** Track A (GUI usable) → M1 study app. 74 tests green. Solver core
 (GATE 1) frozen. Mesh/adapt product path advancing (graded, hexpyr, seed remesh).
+B2 VTU cell quality + B5 public fixtures done.
 
 GATE 1 deliverables ready:
 - Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)
@@ -17,6 +18,9 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: B2+B5 — VTU `VtuCellData` + tet4 `quality` cell array on CLI/GUI export;
+  Catch2 CellData XML check; public fixtures `l_domain`/`plate`/`cylinder_prism` +
+  README; STL load smoke. 74 tests.
 - 2026-07-10: GUI A6/A7/A8 — wireframe + undeformed outline toggles (OpenGL
   boundary edges), GLFW drag-drop open (.stl/.step/.stp) with path field
   fallback, mesh_note + DOF (3×nnodes) in sidebar/status after mesh/solve.

@@ -1,0 +1,226 @@
+solid cylinder_prism
+  facet normal 0 0 -1
+    outer loop
+      vertex 0 0 0
+      vertex 0.353553 0.353553 0
+      vertex 0.5 0 0
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 0 0 1
+      vertex 0.5 0 1
+      vertex 0.353553 0.353553 1
+    endloop
+  endfacet
+  facet normal 0.92388 0.382683 0
+    outer loop
+      vertex 0.5 0 0
+      vertex 0.353553 0.353553 0
+      vertex 0.353553 0.353553 1
+    endloop
+  endfacet
+  facet normal 0.92388 0.382683 -0
+    outer loop
+      vertex 0.5 0 0
+      vertex 0.353553 0.353553 1
+      vertex 0.5 0 1
+    endloop
+  endfacet
+  facet normal 0 0 -1
+    outer loop
+      vertex 0 0 0
+      vertex 3.06162e-17 0.5 0
+      vertex 0.353553 0.353553 0
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 0 0 1
+      vertex 0.353553 0.353553 1
+      vertex 3.06162e-17 0.5 1
+    endloop
+  endfacet
+  facet normal 0.382683 0.92388 0
+    outer loop
+      vertex 0.353553 0.353553 0
+      vertex 3.06162e-17 0.5 0
+      vertex 3.06162e-17 0.5 1
+    endloop
+  endfacet
+  facet normal 0.382683 0.92388 -0
+    outer loop
+      vertex 0.353553 0.353553 0
+      vertex 3.06162e-17 0.5 1
+      vertex 0.353553 0.353553 1
+    endloop
+  endfacet
+  facet normal 0 0 -1
+    outer loop
+      vertex 0 0 0
+      vertex -0.353553 0.353553 0
+      vertex 3.06162e-17 0.5 0
+    endloop
+  endfacet
+  facet normal 0 -0 1
+    outer loop
+      vertex 0 0 1
+      vertex 3.06162e-17 0.5 1
+      vertex -0.353553 0.353553 1
+    endloop
+  endfacet
+  facet normal -0.382683 0.92388 0
+    outer loop
+      vertex 3.06162e-17 0.5 0
+      vertex -0.353553 0.353553 0
+      vertex -0.353553 0.353553 1
+    endloop
+  endfacet
+  facet normal -0.382683 0.92388 0
+    outer loop
+      vertex 3.06162e-17 0.5 0
+      vertex -0.353553 0.353553 1
+      vertex 3.06162e-17 0.5 1
+    endloop
+  endfacet
+  facet normal 0 0 -1
+    outer loop
+      vertex 0 0 0
+      vertex -0.5 6.12323e-17 0
+      vertex -0.353553 0.353553 0
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 0 0 1
+      vertex -0.353553 0.353553 1
+      vertex -0.5 6.12323e-17 1
+    endloop
+  endfacet
+  facet normal -0.92388 0.382683 0
+    outer loop
+      vertex -0.353553 0.353553 0
+      vertex -0.5 6.12323e-17 0
+      vertex -0.5 6.12323e-17 1
+    endloop
+  endfacet
+  facet normal -0.92388 0.382683 0
+    outer loop
+      vertex -0.353553 0.353553 0
+      vertex -0.5 6.12323e-17 1
+      vertex -0.353553 0.353553 1
+    endloop
+  endfacet
+  facet normal -0 0 -1
+    outer loop
+      vertex 0 0 0
+      vertex -0.353553 -0.353553 0
+      vertex -0.5 6.12323e-17 0
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 0 0 1
+      vertex -0.5 6.12323e-17 1
+      vertex -0.353553 -0.353553 1
+    endloop
+  endfacet
+  facet normal -0.92388 -0.382683 0
+    outer loop
+      vertex -0.5 6.12323e-17 0
+      vertex -0.353553 -0.353553 0
+      vertex -0.353553 -0.353553 1
+    endloop
+  endfacet
+  facet normal -0.92388 -0.382683 0
+    outer loop
+      vertex -0.5 6.12323e-17 0
+      vertex -0.353553 -0.353553 1
+      vertex -0.5 6.12323e-17 1
+    endloop
+  endfacet
+  facet normal 0 0 -1
+    outer loop
+      vertex 0 0 0
+      vertex -9.18485e-17 -0.5 0
+      vertex -0.353553 -0.353553 0
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 0 0 1
+      vertex -0.353553 -0.353553 1
+      vertex -9.18485e-17 -0.5 1
+    endloop
+  endfacet
+  facet normal -0.382683 -0.92388 0
+    outer loop
+      vertex -0.353553 -0.353553 0
+      vertex -9.18485e-17 -0.5 0
+      vertex -9.18485e-17 -0.5 1
+    endloop
+  endfacet
+  facet normal -0.382683 -0.92388 0
+    outer loop
+      vertex -0.353553 -0.353553 0
+      vertex -9.18485e-17 -0.5 1
+      vertex -0.353553 -0.353553 1
+    endloop
+  endfacet
+  facet normal 0 -0 -1
+    outer loop
+      vertex 0 0 0
+      vertex 0.353553 -0.353553 0
+      vertex -9.18485e-17 -0.5 0
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 0 0 1
+      vertex -9.18485e-17 -0.5 1
+      vertex 0.353553 -0.353553 1
+    endloop
+  endfacet
+  facet normal 0.382683 -0.92388 0
+    outer loop
+      vertex -9.18485e-17 -0.5 0
+      vertex 0.353553 -0.353553 0
+      vertex 0.353553 -0.353553 1
+    endloop
+  endfacet
+  facet normal 0.382683 -0.92388 0
+    outer loop
+      vertex -9.18485e-17 -0.5 0
+      vertex 0.353553 -0.353553 1
+      vertex -9.18485e-17 -0.5 1
+    endloop
+  endfacet
+  facet normal 0 0 -1
+    outer loop
+      vertex 0 0 0
+      vertex 0.5 0 0
+      vertex 0.353553 -0.353553 0
+    endloop
+  endfacet
+  facet normal -0 0 1
+    outer loop
+      vertex 0 0 1
+      vertex 0.353553 -0.353553 1
+      vertex 0.5 0 1
+    endloop
+  endfacet
+  facet normal 0.92388 -0.382683 0
+    outer loop
+      vertex 0.353553 -0.353553 0
+      vertex 0.5 0 0
+      vertex 0.5 0 1
+    endloop
+  endfacet
+  facet normal 0.92388 -0.382683 0
+    outer loop
+      vertex 0.353553 -0.353553 0
+      vertex 0.5 0 1
+      vertex 0.353553 -0.353553 1
+    endloop
+  endfacet
+endsolid cylinder_prism

@@ -119,7 +119,10 @@ int cmd_mesh(std::span<char*> args) {
     std::printf("mesh: %zu nodes, %zu elems, h=%.6g m\n%s\n", vol.mesh.nodes.size(),
                 vol.mesh.elements.size(), h, vol.mesher_note.c_str());
     if (!out_path.empty()) {
-        polymesh::fea::write_vtu(out_path, vol.mesh);
+        const auto quality = polymesh::fea::tet4_cell_quality(vol.mesh);
+        std::vector<polymesh::fea::VtuCellData> cdata;
+        cdata.push_back({.name = "quality", .scalars = quality});
+        polymesh::fea::write_vtu(out_path, vol.mesh, {}, cdata);
         std::printf("wrote %s\n", out_path.c_str());
     }
     return 0;
@@ -274,7 +277,10 @@ int cmd_solve(std::span<char*> args) {
     std::vector<polymesh::fea::VtuPointData> pdata;
     pdata.push_back({.name = "von_Mises", .scalars = vm, .vectors = {}});
     pdata.push_back({.name = "displacement", .scalars = {}, .vectors = u});
-    polymesh::fea::write_vtu(out_path, vol.mesh, pdata);
+    const auto quality = polymesh::fea::tet4_cell_quality(vol.mesh);
+    std::vector<polymesh::fea::VtuCellData> cdata;
+    cdata.push_back({.name = "quality", .scalars = quality});
+    polymesh::fea::write_vtu(out_path, vol.mesh, pdata, cdata);
 
     std::printf("solve: %zu nodes, %zu elems | max von Mises %.4g Pa | max |u| %.4g m | "
                 "ZZ η %.4g | h=%.4g | seeds=%zu\n%s\n",

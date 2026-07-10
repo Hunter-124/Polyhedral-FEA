@@ -10,6 +10,7 @@
 #include <format>
 #include <map>
 #include <queue>
+#include <span>
 
 namespace polymesh::mesh {
 namespace {
@@ -70,12 +71,17 @@ constexpr std::array<std::array<int, 4>, 6> kCubeTets{{
 GradedTetFillOutput graded_tet_fill_surface(const geom::TriSurface& surface,
                                             const Eigen::Vector3d& bbox_min,
                                             const Eigen::Vector3d& bbox_max, double h,
-                                            int skin_layers) {
+                                            int skin_layers,
+                                            std::span<const geom::SharpEdge> features,
+                                            double feature_band) {
     if (!(h > 0.0) || !std::isfinite(h)) {
         throw ValidityError("graded_tet_fill_surface: h must be positive");
     }
     if (skin_layers < 1) {
         skin_layers = 1;
+    }
+    if (!(feature_band > 0.0) || features.empty()) {
+        feature_band = 0.0;
     }
     const Eigen::Vector3d extent = bbox_max - bbox_min;
     if (extent.minCoeff() <= 0.0) {
@@ -161,10 +167,12 @@ GradedTetFillOutput graded_tet_fill_surface(const geom::TriSurface& surface,
         }
     }
 
-    // Coarse skin: a 2×2×2 block is "fine" if any of its fine cells has dist < 2*skin_layers.
+    // Coarse skin: a 2×2×2 block is "fine" if any of its fine cells has dist < 2*skin_layers
+    // or the block center is within feature_band of a sharp edge.
     const int nxc = nxf / 2, nyc = nyf / 2, nzc = nzf / 2;
     const int fine_dist_thresh = std::max(1, 2 * skin_layers);
     std::vector<bool> coarse_fine(static_cast<std::size_t>(nxc) * nyc * nzc, false);
+    std::vector<bool> coarse_feature(static_cast<std::size_t>(nxc) * nyc * nzc, false);
     const auto cidx = [&](int i, int j, int k) {
         return (static_cast<std::size_t>(k) * nyc + j) * nxc + i;
     };
@@ -188,7 +196,21 @@ GradedTetFillOutput graded_tet_fill_surface(const geom::TriSurface& surface,
                         }
                     }
                 }
-                if (any_in && need_fine) {
+                if (!any_in) {
+                    continue;
+                }
+                if (feature_band > 0.0) {
+                    const Eigen::Vector3d center =
+                        origin + Eigen::Vector3d((2 * ic + 1) * hf, (2 * jc + 1) * hf,
+                                                 (2 * kc + 1) * hf);
+                    const double dfeat =
+                        geom::distance_to_features(center, surface, features);
+                    if (dfeat <= feature_band) {
+                        need_fine = true;
+                        coarse_feature[cidx(ic, jc, kc)] = true;
+                    }
+                }
+                if (need_fine) {
                     coarse_fine[cidx(ic, jc, kc)] = true;
                 }
             }
@@ -198,7 +220,7 @@ GradedTetFillOutput graded_tet_fill_surface(const geom::TriSurface& surface,
     GradedTetFillOutput out;
     out.h_coarse = h;
     out.h_fine = hf;
-    out.skin_layers = static_cast<std::size_t>(skin_layers);
+    out.skin_layers = skin_layers;
     out.mesh.h = hf;
 
     std::map<std::array<int, 3>, std::uint32_t> node_ids;
@@ -267,6 +289,9 @@ GradedTetFillOutput graded_tet_fill_surface(const geom::TriSurface& surface,
                     ++out.n_coarse_cells;
                 } else {
                     // Fine: every occupied fine cell becomes 6 tets.
+                    if (coarse_feature[cidx(ic, jc, kc)]) {
+                        ++out.n_feature_cells;
+                    }
                     for (int dk = 0; dk < 2; ++dk) {
                         for (int dj = 0; dj < 2; ++dj) {
                             for (int di = 0; di < 2; ++di) {

@@ -3,17 +3,17 @@
 
 // Graded tet fill: boundary skin at h/2, deep interior at h (conforming).
 //
-// True hex-core + tet-skin needs pyramid (or mortar) transitions — pure
-// hex/tet face pairs are non-conforming (quad vs two tris). Until pyramids
-// land, "hybrid" means *graded all-tet*: Cartesian lattice at spacing h,
-// cells on the free surface (and `skin_layers` of neighbors) are refined
-// into 2×2×2 Kuhn tets at h/2; deeper cells use one Kuhn split at h.
-// That is conforming, deterministic, and feature-friendly.
+// Cartesian lattice at spacing h; free-surface cells (and `skin_layers` of
+// neighbors) plus an optional band around sharp features are refined into
+// 2×2×2 Kuhn tets at h/2; deeper cells use one Kuhn split at h.
 
+#include "geom/features.hpp"
 #include "geom/tri_surface.hpp"
 #include "mesh/tet_fill.hpp"
 
 #include <Eigen/Core>
+
+#include <span>
 
 namespace polymesh::mesh {
 
@@ -24,12 +24,16 @@ struct GradedTetFillOutput {
     std::size_t n_coarse_cells = 0;
     std::size_t n_fine_cells = 0;
     int skin_layers = 0;
+    /// Cells forced fine by feature band (subset of fine cells).
+    std::size_t n_feature_cells = 0;
 };
 
 /// `skin_layers` ≥ 1. Coarse spacing is `h`; fine is `h/2` in the skin.
-GradedTetFillOutput graded_tet_fill_surface(const geom::TriSurface& surface,
-                                            const Eigen::Vector3d& bbox_min,
-                                            const Eigen::Vector3d& bbox_max, double h,
-                                            int skin_layers = 2);
+/// If `features` is non-empty and `feature_band > 0`, coarse blocks whose
+/// center is within `feature_band` of a sharp edge are also refined.
+GradedTetFillOutput graded_tet_fill_surface(
+    const geom::TriSurface& surface, const Eigen::Vector3d& bbox_min,
+    const Eigen::Vector3d& bbox_max, double h, int skin_layers = 2,
+    std::span<const geom::SharpEdge> features = {}, double feature_band = 0.0);
 
 } // namespace polymesh::mesh

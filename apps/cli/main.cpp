@@ -27,16 +27,17 @@ int usage() {
         "\n"
         "commands:\n"
         "  check <file.stl|.step>     validate surface geometry\n"
-        "  mesh  <file> [-h m] [-o out.vtu] [--mesher name] [--skin n]\n"
+        "  mesh  <file> [-h m] [-o out.vtu] [--mesher name] [--skin n] [--feature]\n"
         "                             volume mesh; optional VTU write\n"
         "  solve <file> -o out.vtu [-h m] [-E Pa] [-nu r]\n"
-        "              [--mesher name] [--skin n]\n"
+        "              [--mesher name] [--skin n] [--feature]\n"
         "                             mesh + cantilever-style BCs + VTU\n"
         "                             (fix min-x face nodes, load +Fy on max-x)\n"
         "  backend                    print compute backend\n"
         "\n"
         "mesher names: tet (default), hex, hexvem|vem, graded, hexpyr|transition\n"
-        "--skin n: graded-tet fine skin layers (default 2)\n",
+        "--skin n: graded-tet fine skin layers (default 2)\n"
+        "--feature: refine graded mesh near sharp edges (default off in CLI)\n",
         stderr);
     return 2;
 }
@@ -86,6 +87,7 @@ int cmd_mesh(std::span<char*> args) {
     std::string out_path;
     auto mesher = polymesh::pipeline::VolumeMesher::kTetFill;
     int skin = 2;
+    bool feature = false;
     for (std::size_t i = 3; i < args.size(); ++i) {
         if (std::strcmp(args[i], "-h") == 0 && i + 1 < args.size()) {
             h = std::atof(args[++i]);
@@ -98,6 +100,8 @@ int cmd_mesh(std::span<char*> args) {
             if (skin < 1) {
                 skin = 1;
             }
+        } else if (std::strcmp(args[i], "--feature") == 0) {
+            feature = true;
         } else {
             return usage();
         }
@@ -107,7 +111,7 @@ int cmd_mesh(std::span<char*> args) {
     if (h <= 0.0) {
         h = extent / 16.0;
     }
-    auto vol = polymesh::pipeline::volume_mesh(model, h, mesher, skin);
+    auto vol = polymesh::pipeline::volume_mesh(model, h, mesher, skin, feature);
     vol.mesh.check_validity();
     std::printf("mesh: %zu nodes, %zu elems, h=%.6g m\n%s\n", vol.mesh.nodes.size(),
                 vol.mesh.elements.size(), h, vol.mesher_note.c_str());
@@ -129,6 +133,7 @@ int cmd_solve(std::span<char*> args) {
     std::string out_path;
     auto mesher = polymesh::pipeline::VolumeMesher::kTetFill;
     int skin = 2;
+    bool feature = false;
     for (std::size_t i = 3; i < args.size(); ++i) {
         if (std::strcmp(args[i], "-h") == 0 && i + 1 < args.size()) {
             h = std::atof(args[++i]);
@@ -145,6 +150,8 @@ int cmd_solve(std::span<char*> args) {
             if (skin < 1) {
                 skin = 1;
             }
+        } else if (std::strcmp(args[i], "--feature") == 0) {
+            feature = true;
         } else {
             return usage();
         }
@@ -159,7 +166,7 @@ int cmd_solve(std::span<char*> args) {
     if (h <= 0.0) {
         h = extent / 12.0;
     }
-    auto vol = polymesh::pipeline::volume_mesh(model, h, mesher, skin);
+    auto vol = polymesh::pipeline::volume_mesh(model, h, mesher, skin, feature);
     vol.mesh.check_validity();
 
     // Auto BCs: fix nodes near min-x plane; load +Y on max-x plane nodes.

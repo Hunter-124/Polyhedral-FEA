@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause
+#include "geom/features.hpp"
 #include "mesh/hybrid_fill.hpp"
 #include "mesh/surface_project.hpp"
 #include "mesh/tet_fill.hpp"
@@ -56,4 +57,32 @@ TEST_CASE("pipeline graded mesher builds valid nodal mesh") {
     REQUIRE_FALSE(vol.mesh.elements.empty());
     REQUIRE_NOTHROW(vol.mesh.check_validity());
     REQUIRE(vol.mesher_note.find("graded") != std::string::npos);
+}
+
+TEST_CASE("feature band refines more cells than surface skin alone") {
+    const auto s = unit_box();
+    const auto edges = polymesh::geom::detect_sharp_edges(s, 30.0);
+    REQUIRE_FALSE(edges.empty());
+    // Large h → few cells; feature_band covering the whole box should force
+    // more fine blocks than skin-only grading.
+    auto skin_only = graded_tet_fill_surface(s, {0, 0, 0}, {1, 1, 1}, 0.5, 1, {}, 0.0);
+    auto with_feat =
+        graded_tet_fill_surface(s, {0, 0, 0}, {1, 1, 1}, 0.5, 1, edges, 2.0);
+    REQUIRE(with_feat.n_fine_cells >= skin_only.n_fine_cells);
+    REQUIRE(with_feat.n_feature_cells > 0);
+    REQUIRE(with_feat.mesh.tets.size() >= skin_only.mesh.tets.size());
+    check_tet_fill_geometry(with_feat.mesh);
+}
+
+TEST_CASE("pipeline graded with feature_refine notes feature blocks") {
+    polymesh::pipeline::Model m;
+    m.surface = unit_box();
+    m.bbox_min = {0, 0, 0};
+    m.bbox_max = {1, 1, 1};
+    m.region_count = 1;
+    m.triangle_region.assign(m.surface.triangles.size(), 0);
+    auto vol = polymesh::pipeline::volume_mesh(
+        m, 0.5, polymesh::pipeline::VolumeMesher::kGradedTet, 1, true);
+    REQUIRE(vol.mesher_note.find("feature") != std::string::npos);
+    REQUIRE_NOTHROW(vol.mesh.check_validity());
 }

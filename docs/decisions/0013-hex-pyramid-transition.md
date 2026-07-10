@@ -18,14 +18,12 @@ Pyramid5 stiffness is the sum of **two tet4** stiffnesses (base diagonal
 the local DOF scatter map. Hex8 stays true isoparametric trilinear (GATE 1
 freeze).
 
-## Patch test / hybrid nonconformity
-- Pure pyramid lattices pass the constant-strain patch test exactly.
-- Hex–pyramid hybrids do **not** (yet): hex faces are bilinear while
-  tet-split pyramids present two linear triangles, so constant-stress nodal
-  forces disagree on shared faces. Engineering rule #2 is enforced on each
-  element type in isolation (hex via Tier-0, pyramid via pure-pyramid patch);
-  a conforming hybrid formulation (matching Kuhn diagonals on both sides, or
-  mortar) is future work.
+## Product FE path (pipeline)
+`VolumeMesher::kHexPyramid` emits native `kHex8` + `kPyramid5` elements.
+Hex stays GATE-1 isoparametric trilinear; pyramid stiffness is two tet4s.
+The hybrid does not pass a joint constant-strain patch (bilinear hex face vs
+piecewise-linear pyramid base). Isolated hex (Tier-0) and pure-pyramid
+lattices (tests) do.
 
 ## Orientation
 Mesher orders pyramid bases so the apex lies on the +normal side of the

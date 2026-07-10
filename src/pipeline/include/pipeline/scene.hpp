@@ -85,9 +85,10 @@ struct VolumeMeshOutput {
     std::map<std::uint32_t, int> boundary_node_region;
     std::string mesher_note;
 };
+/// `feature_refine`: when true and mesher is graded, also refine near sharp edges.
 VolumeMeshOutput volume_mesh(const Model& model, double h,
                              VolumeMesher mesher = VolumeMesher::kTetFill,
-                             int skin_layers = 2);
+                             int skin_layers = 2, bool feature_refine = false);
 
 /// @deprecated name kept as alias during transition; calls volume_mesh.
 VolumeMeshOutput voxel_mesh(const Model& model, double h);

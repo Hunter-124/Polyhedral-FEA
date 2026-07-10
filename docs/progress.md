@@ -1,7 +1,7 @@
 # PROGRESS
 
 ## Current phase
-**GATE 1 frozen (owner campaign 2026-07-10). P1 baseline is the comparator.**
+**GATE 1 frozen. G0 reorg done. G1 mesher v1 (tet grid fill) wired into pipeline.**
 
 GATE 1 deliverables ready:
 - Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)
@@ -13,6 +13,9 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: G1 — ADR-0010 keep face-based mesh; geometric validity;
+  `mesh::tet_fill_surface` (tet4 grid fill); pipeline/GUI use tet4 path
+  (replaces draft voxel hex8). 39/39 tests green.
 - 2026-07-10: Campaign G0 — branch `master`, BSD-3-Clause, apps/src split,
   pipeline vs GUI separation, CONTRIBUTING/CHANGES, docs under docs/.
 - 2026-07-09: D1–D5 + GUI scope ratified with owner (ADR-0001..0006).
@@ -51,7 +54,7 @@ GATE 0 was approved by owner on 2026-07-09.
   (ADR-0001).
 - CUDA toolkit not installed on dev machine; `POLYMESH_WITH_CUDA` untested
   until it is (ADR-0008). RTX 3080 Ti present.
-- Geometric validity checks (watertight, Jacobians, conforming interfaces)
-  are P2 scope; only structural checks exist today.
+- Geometric validity: boundary manifold + tet volume checks in place; surface
+  snap / true Delaunay / conforming hybrid still open.
 - Goodier: exact continuum-field BCs + ZZ recovery would tighten SCF further
   (ADR-0009); P1 bar is 12% with Saint-Venant Dirichlet + nodal averaging.

@@ -3,14 +3,17 @@
 
 #include "fea/solve.hpp"
 #include "geom/stl.hpp"
+#include "mesh/tet_fill.hpp"
 
 #include <Eigen/Geometry>
 
 #include <algorithm>
 #include <cmath>
 #include <format>
+#include <limits>
 #include <numbers>
 #include <queue>
+#include <set>
 
 namespace polymesh::pipeline {
 namespace {
@@ -122,148 +125,47 @@ Model Model::load(const std::string& path, double sharp_angle_deg) {
     return model;
 }
 
-VoxelMeshOutput voxel_mesh(const Model& model, double h) {
-    const Eigen::Vector3d extent = model.bbox_max - model.bbox_min;
-    const auto cells = [&](int axis) {
-        return std::max(1, static_cast<int>(std::ceil(extent[axis] / h)));
-    };
-    const int nx = cells(0), ny = cells(1), nz = cells(2);
-    if (static_cast<long>(nx) * ny * nz > 512 * 1024) {
-        throw fea::FeaError("voxel_mesh: mesh size too small for the draft voxel "
-                            "mesher; increase element size");
+VolumeMeshOutput volume_mesh(const Model& model, double h) {
+    auto fill = mesh::tet_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
+
+    VolumeMeshOutput out;
+    out.mesh.nodes = std::move(fill.nodes);
+    out.mesh.elements.reserve(fill.tets.size());
+    for (const auto& tet : fill.tets) {
+        out.mesh.elements.push_back(
+            {fea::ElementType::kTet4, {tet[0], tet[1], tet[2], tet[3]}});
     }
-    const Eigen::Vector3d origin = model.bbox_min;
+    out.boundary_quads = std::move(fill.boundary_quads);
+    out.mesher_note = std::format("tet grid fill v1: {} tet4, {} nodes, h = {:.4g} m",
+                                  out.mesh.elements.size(), out.mesh.nodes.size(), fill.h);
+
     const auto& surf = model.surface;
-
-    // Column-parity voxelization: one +z ray per (i,j) column of centers.
-    std::vector<bool> inside(static_cast<std::size_t>(nx) * static_cast<std::size_t>(ny) *
-                                 static_cast<std::size_t>(nz),
-                             false);
-    const auto cell_index = [&](int i, int j, int k) {
-        return (static_cast<std::size_t>(k) * static_cast<std::size_t>(ny) +
-                static_cast<std::size_t>(j)) *
-                   static_cast<std::size_t>(nx) +
-               static_cast<std::size_t>(i);
-    };
-    for (int j = 0; j < ny; ++j) {
-        for (int i = 0; i < nx; ++i) {
-            const double cx = origin[0] + (i + 0.5) * h;
-            const double cy = origin[1] + (j + 0.5) * h;
-            std::vector<double> crossings;
-            for (const auto& tri : surf.triangles) {
-                // Ray (cx, cy, -inf) -> +z against the triangle (2D test in xy).
-                const Eigen::Vector3d& a = surf.vertices[tri[0]];
-                const Eigen::Vector3d& b = surf.vertices[tri[1]];
-                const Eigen::Vector3d& c = surf.vertices[tri[2]];
-                const double d1 = (b[0] - a[0]) * (cy - a[1]) - (b[1] - a[1]) * (cx - a[0]);
-                const double d2 = (c[0] - b[0]) * (cy - b[1]) - (c[1] - b[1]) * (cx - b[0]);
-                const double d3 = (a[0] - c[0]) * (cy - c[1]) - (a[1] - c[1]) * (cx - c[0]);
-                const bool has_neg = d1 < 0 || d2 < 0 || d3 < 0;
-                const bool has_pos = d1 > 0 || d2 > 0 || d3 > 0;
-                if (has_neg && has_pos) {
-                    continue; // outside in 2D
-                }
-                // Interpolate z at (cx, cy) via barycentric coordinates.
-                const double area = d1 + d2 + d3;
-                if (area == 0.0) {
-                    continue; // degenerate in projection
-                }
-                const double z = (d2 * a[2] + d3 * b[2] + d1 * c[2]) / area;
-                crossings.push_back(z);
-            }
-            std::sort(crossings.begin(), crossings.end());
-            for (int k = 0; k < nz; ++k) {
-                const double cz = origin[2] + (k + 0.5) * h;
-                const auto below = std::upper_bound(crossings.begin(), crossings.end(), cz) -
-                                   crossings.begin();
-                if (below % 2 == 1) {
-                    inside[cell_index(i, j, k)] = true;
-                }
-            }
-        }
-    }
-
-    // Emit shared lattice nodes for inside cells.
-    VoxelMeshOutput out;
-    std::map<std::array<int, 3>, std::uint32_t> node_ids;
-    const auto node_at = [&](int i, int j, int k) {
-        const auto [it, fresh] = node_ids.try_emplace(
-            std::array<int, 3>{i, j, k}, static_cast<std::uint32_t>(out.mesh.nodes.size()));
-        if (fresh) {
-            out.mesh.nodes.emplace_back(origin[0] + i * h, origin[1] + j * h,
-                                        origin[2] + k * h);
-        }
-        return it->second;
-    };
-    const auto is_inside = [&](int i, int j, int k) {
-        return i >= 0 && i < nx && j >= 0 && j < ny && k >= 0 && k < nz &&
-               inside[cell_index(i, j, k)];
-    };
-    for (int k = 0; k < nz; ++k) {
-        for (int j = 0; j < ny; ++j) {
-            for (int i = 0; i < nx; ++i) {
-                if (!inside[cell_index(i, j, k)]) {
-                    continue;
-                }
-                out.mesh.elements.push_back(
-                    {fea::ElementType::kHex8,
-                     {node_at(i, j, k), node_at(i + 1, j, k), node_at(i + 1, j + 1, k),
-                      node_at(i, j + 1, k), node_at(i, j, k + 1), node_at(i + 1, j, k + 1),
-                      node_at(i + 1, j + 1, k + 1), node_at(i, j + 1, k + 1)}});
-                // Boundary quads: faces whose neighbor cell is outside.
-                struct FaceDef {
-                    int di, dj, dk;
-                    std::array<std::array<int, 3>, 4> corners;
-                };
-                const std::array<FaceDef, 6> faces{{
-                    {-1, 0, 0, {{{0, 0, 0}, {0, 1, 0}, {0, 1, 1}, {0, 0, 1}}}},
-                    {1, 0, 0, {{{1, 0, 0}, {1, 0, 1}, {1, 1, 1}, {1, 1, 0}}}},
-                    {0, -1, 0, {{{0, 0, 0}, {0, 0, 1}, {1, 0, 1}, {1, 0, 0}}}},
-                    {0, 1, 0, {{{0, 1, 0}, {1, 1, 0}, {1, 1, 1}, {0, 1, 1}}}},
-                    {0, 0, -1, {{{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}}}},
-                    {0, 0, 1, {{{0, 0, 1}, {0, 1, 1}, {1, 1, 1}, {1, 0, 1}}}},
-                }};
-                for (const auto& f : faces) {
-                    if (is_inside(i + f.di, j + f.dj, k + f.dk)) {
-                        continue;
-                    }
-                    std::array<std::uint32_t, 4> quad{};
-                    for (int q = 0; q < 4; ++q) {
-                        const auto& c = f.corners[static_cast<std::size_t>(q)];
-                        quad[static_cast<std::size_t>(q)] =
-                            node_at(i + c[0], j + c[1], k + c[2]);
-                    }
-                    out.boundary_quads.push_back(quad);
-                }
-            }
-        }
-    }
-
-    // Map boundary nodes to STL regions via nearest triangle (brute force —
-    // fine at draft-mesher sizes).
     std::set<std::uint32_t> boundary_nodes;
     for (const auto& quad : out.boundary_quads) {
         boundary_nodes.insert(quad.begin(), quad.end());
     }
     for (const auto node : boundary_nodes) {
-        const auto& p = out.mesh.nodes[node];
+        const auto& pt = out.mesh.nodes[node];
         double best = std::numeric_limits<double>::max();
         int best_region = -1;
-        for (std::size_t t = 0; t < surf.triangles.size(); ++t) {
-            const auto& tri = surf.triangles[t];
+        for (std::size_t ti = 0; ti < surf.triangles.size(); ++ti) {
+            const auto& tri = surf.triangles[ti];
             const double d = point_triangle_distance(
-                p, surf.vertices[tri[0]], surf.vertices[tri[1]], surf.vertices[tri[2]]);
+                pt, surf.vertices[tri[0]], surf.vertices[tri[1]], surf.vertices[tri[2]]);
             if (d < best) {
                 best = d;
-                best_region = model.triangle_region[t];
+                best_region = model.triangle_region[ti];
             }
         }
         if (best <= 1.5 * h) {
             out.boundary_node_region[node] = best_region;
         }
     }
+    out.mesh.check_validity();
     return out;
 }
+
+VolumeMeshOutput voxel_mesh(const Model& model, double h) { return volume_mesh(model, h); }
 
 void SolveJob::set_status(const std::string& s) {
     const std::lock_guard lock(status_mutex_);
@@ -289,15 +191,14 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
         try {
             const double extent = (model.bbox_max - model.bbox_min).maxCoeff();
             const double h = setup.mesh_size > 0.0 ? setup.mesh_size : extent / 24.0;
-            auto voxel = voxel_mesh(model, h);
-            voxel.mesh.check_validity();
-            set_status(std::format("solving… ({} hex8 elements, {} nodes)",
-                                   voxel.mesh.elements.size(), voxel.mesh.nodes.size()));
+            auto vol = volume_mesh(model, h);
+            set_status(std::format("solving… ({} tet4 elements, {} nodes)",
+                                   vol.mesh.elements.size(), vol.mesh.nodes.size()));
             state_ = State::kSolving;
 
             fea::Dirichlet bc;
             std::map<int, std::vector<std::uint32_t>> region_nodes;
-            for (const auto& [node, region] : voxel.boundary_node_region) {
+            for (const auto& [node, region] : vol.boundary_node_region) {
                 region_nodes[region].push_back(node);
             }
             for (const int region : setup.fixtures) {
@@ -312,7 +213,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
             }
 
             Eigen::VectorXd loads =
-                Eigen::VectorXd::Zero(3 * static_cast<Eigen::Index>(voxel.mesh.nodes.size()));
+                Eigen::VectorXd::Zero(3 * static_cast<Eigen::Index>(vol.mesh.nodes.size()));
             for (const auto& [region, load] : setup.loads) {
                 const auto it = region_nodes.find(region);
                 if (it == region_nodes.end() || it->second.empty()) {
@@ -327,14 +228,13 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
 
             const fea::Material material{.youngs_modulus = setup.youngs_modulus,
                                          .poissons_ratio = setup.poissons_ratio};
-            const auto u = fea::solve_elastostatics(voxel.mesh, material, bc, loads);
-            const auto stress = fea::recover_nodal_stress(voxel.mesh, material, u);
+            const auto u = fea::solve_elastostatics(vol.mesh, material, bc, loads);
+            const auto stress = fea::recover_nodal_stress(vol.mesh, material, u);
 
             SolveResult r;
-            r.mesh_note = std::format("draft voxel mesh v0: {} hex8, {} nodes, h = {:.4g} m",
-                                      voxel.mesh.elements.size(), voxel.mesh.nodes.size(), h);
-            r.volume_mesh = std::move(voxel.mesh);
-            r.boundary_quads = std::move(voxel.boundary_quads);
+            r.mesh_note = vol.mesher_note;
+            r.volume_mesh = std::move(vol.mesh);
+            r.boundary_quads = std::move(vol.boundary_quads);
             r.displacement = u;
             r.von_mises.resize(stress.size());
             r.u_magnitude.resize(stress.size());

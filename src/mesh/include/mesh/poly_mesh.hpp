@@ -56,10 +56,12 @@ struct PolyMesh {
     std::vector<Cell> cells;
 
     /// Structural validity: index ranges, face/cell cross-references, minimum
-    /// topology. Geometric checks (watertightness, positive Jacobians,
-    /// conforming interfaces) land in Phase P2 and extend this.
-    /// Throws ValidityError on the first violation.
+    /// topology. Throws ValidityError on the first violation.
     void check_validity() const;
+
+    /// Geometric validity (P2): manifold boundary edges appear once, interior
+    /// face pairs match, tet cells have positive volume. Throws ValidityError.
+    void check_geometry() const;
 };
 
 } // namespace polymesh::mesh

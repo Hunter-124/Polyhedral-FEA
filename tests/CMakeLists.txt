@@ -18,6 +18,7 @@ add_executable(polymesh_tests
     test_l_domain.cpp
     test_msh.cpp
     test_gui_pipeline.cpp
+    test_tet_fill.cpp
     support/structured_mesh.cpp
     support/mms.cpp
 )

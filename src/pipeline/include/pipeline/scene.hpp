@@ -62,17 +62,20 @@ struct SolveResult {
     std::string mesh_note; // e.g. element/node counts, mesher version
 };
 
-/// Draft v0 mesher: voxelizes the STL interior on a uniform grid and emits a
-/// hex8 mesh (stair-cased boundary — clearly labeled; the conforming
-/// adaptive mesher replaces this in Phases P2/P3).
-struct VoxelMeshOutput {
+/// Volume mesh from closed surface: tet4 grid fill (P2 v1) with stair-cased
+/// boundary quads for region mapping / rendering.
+struct VolumeMeshOutput {
     fea::NodalMesh mesh;
     std::vector<std::array<std::uint32_t, 4>> boundary_quads;
     // For every mesh node on the boundary: the region of the nearest STL
     // triangle (used to map picked regions to constraint/load node sets).
     std::map<std::uint32_t, int> boundary_node_region;
+    std::string mesher_note;
 };
-VoxelMeshOutput voxel_mesh(const Model& model, double h);
+VolumeMeshOutput volume_mesh(const Model& model, double h);
+
+/// @deprecated name kept as alias during transition; calls volume_mesh.
+VolumeMeshOutput voxel_mesh(const Model& model, double h);
 
 /// Background solve pipeline. Poll `state` from the UI thread.
 class SolveJob {

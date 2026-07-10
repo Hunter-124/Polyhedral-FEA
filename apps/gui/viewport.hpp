@@ -21,7 +21,7 @@ using pipeline::RegionLoad;
 using pipeline::SimSetup;
 using pipeline::SolveJob;
 using pipeline::SolveResult;
-using pipeline::VoxelMeshOutput;
+using pipeline::VolumeMeshOutput;
 
 class Camera {
   public:

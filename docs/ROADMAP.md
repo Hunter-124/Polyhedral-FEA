@@ -84,7 +84,7 @@ and error, export VTU — without CLI.
 | D3 | ~~p-elevation on smooth marked elements (tet10/hex20 promote)~~ | Done (`fea::p_elevate`, `mark_smooth`, pipeline/CLI) |
 | D4 | ~~True local h-refine with hanging-node or remesh conformity~~ | Done (ADR-0016 LEB) |
 | D5 | ~~Auto settings: h0 from bbox + feature density~~ | Done (`resolve_mesh_size`, CLI omit -h, GUI note) |
-| D6 | Tier-3: ≥5× DOF, ≥3× time vs uniform tet10 baseline | Measured in scoreboard |
+| D6 | ~~Tier-3: ≥5× DOF, ≥3× time vs uniform tet10 baseline~~ | Done — L-domain instrument: **5.12× DOF**, **12.2× time** (graded tet10 geometric vs uniform n6; scoreboard `d6-tier3`) |
 
 ## Track E — Verification / competitive
 
@@ -141,8 +141,8 @@ A1 A3 ──> A2 A10 ──> A4 A5 A8 ──> A6 A7
 |-------|--------|
 | A GUI | M1 core in: argv open, mesh preview, ZZ error, colorbar, failure dismiss, A6 wireframe/undeformed, A7 drag-drop open, A8 mesh note+DOF. Still: A9 theme GATE. |
 | B Mesh | Grid tet/hex/graded/hexpyr; B1 documented limits (ADR-0015); B2/B3/B4/B5 done. Not true Delaunay. |
-| C Hybrid | C1/C2/C5 done (hex→pyramids patch; geometry sizing; Kirsch graded tet @ equal DOF). VEM k=1 only. |
-| D Adapt | Seed remesh (ADR-0014) + η (D2) + auto h0 (D5) + p-elev (D3) + local LEB (D4/ADR-0016). |
+| C Hybrid | C1/C2/C3/C4/C5 done (hex→pyramids; geometry sizing; prism fill; VEM k=2; Kirsch graded @ equal DOF). |
+| D Adapt | Seed remesh + η (D2) + auto h0 (D5) + p-elev (D3) + local LEB (D4) + D6 L-domain instrument (5.12× DOF / 12.2× time). Product-path Tier-3 on full public suite still open. |
 | E Verify | E1–E4 done: CalculiX smoke peer, gate1-p1 Lamé/Kirsch scoreboard, holdout protocol stub, product-mesh smoke. Tight Lamé on product mesh needs better mesher. |
 | F Perf | F1 OpenMP assembly + F2 Eigen CG (auto >8k free DOFs). CUDA optional. |
 | G Release | G1–G4 done: README, examples/, header units, CI green (format+ctest+grep-audit). |

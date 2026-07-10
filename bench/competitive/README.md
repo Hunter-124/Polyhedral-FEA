@@ -109,6 +109,26 @@ Private geometries are **not** in this tree. Protocol:
 [`audits/README.md`](../../audits/README.md). Agent records metrics only;
 owner keeps reference solutions offline.
 
+## D6 Tier-3 (uniform tet10 vs graded)
+
+L-domain energy instrument (ADR-0005): same solver, geometric grading toward the
+re-entrant corner vs uniform tet10. Driver + binary:
+
+```sh
+cmake --build build --target polymesh-d6-tier3 -j
+python3 bench/d6/run_tier3.py --full --render   # writes bench/results + scoreboard
+python3 bench/d6/run_tier3.py --help            # smoke
+```
+
+| Artifact | Role |
+|---|---|
+| `apps/bench/polymesh-d6-tier3` | C++ timed suite |
+| `bench/d6/run_tier3.py` | Build/run/split JSON + `docs/bench/d6-tier3.md` |
+| `bench/d6/out/polymesh-d6-l-domain-raw.json` | Full run grid + summary ratios |
+| `bench/results/polymesh-d6-l-domain.json` | Scoreboard rows (`d6-tier3`) |
+
+Not a multi-minute ctest gate; Catch2 only checks `--help` / committed JSON shape.
+
 ## Adding a labeled PolyMesh point
 
 1. Run the suite (smoke script or full `ctest`).

@@ -47,6 +47,7 @@ add_subdirectory(src/pipeline)
 
 # --- applications (depend on libraries; no reverse deps) ---
 add_subdirectory(apps/cli)
+add_subdirectory(apps/bench)
 if(POLYMESH_WITH_GUI)
     add_subdirectory(apps/gui)
 endif()

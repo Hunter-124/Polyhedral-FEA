@@ -16,3 +16,9 @@ imgui.ini
 
 # Example script VTU dumps
 examples/out/
+
+# Root-level binaries from build.bat / build.sh
+/polymesh
+/polymesh.exe
+/polymesh-gui
+/polymesh-gui.exe

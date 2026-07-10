@@ -417,27 +417,15 @@ void SolveJob::start_mesh(const Model& model, const SimSetup& setup) {
     set_status("meshing…");
     worker_ = std::thread([this, model, setup] {
         try {
+            // Global scalar h from D5 only. Do NOT min-sample geometry sizing at
+            // sharp corners for uniform meshers — that forced h→h_min on every
+            // CAD box and ~8× DOF, which freezes interactive "mesh only".
+            // Feature grading is applied as feature_refine (graded skin / bands).
             const auto resolved = resolve_mesh_size(model, setup.mesh_size);
             const double h = resolved.h;
-            double h_use = h;
-            if (setup.use_feature_grading) {
-                // C2: curvature + thin-wall + sharp edges (geometry sizing).
-                const auto edges = geom::detect_sharp_edges(model.surface, 30.0);
-                const auto field =
-                    adapt::make_geometry_sizing(h * 0.5, h, 2.0 * h, model.surface, edges);
-                h_use =
-                    std::min(h_use, field->size_at(0.5 * (model.bbox_min + model.bbox_max)));
-                for (int mask = 0; mask < 8; ++mask) {
-                    Eigen::Vector3d c;
-                    c[0] = (mask & 1) ? model.bbox_max[0] : model.bbox_min[0];
-                    c[1] = (mask & 2) ? model.bbox_max[1] : model.bbox_min[1];
-                    c[2] = (mask & 4) ? model.bbox_max[2] : model.bbox_min[2];
-                    h_use = std::min(h_use, field->size_at(c));
-                }
-            }
-            mesh_only_ = volume_mesh(model, h_use, setup.mesher, setup.skin_layers,
+            set_status(std::format("meshing… ({}, h={:.4g} m)", resolved.note, h));
+            mesh_only_ = volume_mesh(model, h, setup.mesher, setup.skin_layers,
                                      setup.use_feature_grading);
-            // Prefix auto/user h note so GUI mesh_note shows resolved size (D5).
             mesh_only_.mesher_note =
                 std::format("{} | {}", resolved.note, mesh_only_.mesher_note);
             set_status(std::format("mesh ready — {} elems, {} nodes | {}",
@@ -497,26 +485,12 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
     // Copy inputs by value into the worker.
     worker_ = std::thread([this, model, setup] {
         try {
+            // Global h from D5 only (same as start_mesh). Feature grading is
+            // feature_refine on graded fills — not global h→h_min at corners.
             const auto resolved = resolve_mesh_size(model, setup.mesh_size);
             const double h = resolved.h;
             double h_use = h;
-            if (setup.use_feature_grading) {
-                // A priori: geometry sizing (sharp edges + curvature + thin-wall)
-                // tightens global h so skin/transition resolve creases, fillets,
-                // and thin regions (meshers still take a scalar h).
-                const auto edges = geom::detect_sharp_edges(model.surface, 30.0);
-                const auto field =
-                    adapt::make_geometry_sizing(h * 0.5, h, 2.0 * h, model.surface, edges);
-                const Eigen::Vector3d mid = 0.5 * (model.bbox_min + model.bbox_max);
-                h_use = std::min(h_use, field->size_at(mid));
-                for (int mask = 0; mask < 8; ++mask) {
-                    Eigen::Vector3d c;
-                    c[0] = (mask & 1) ? model.bbox_max[0] : model.bbox_min[0];
-                    c[1] = (mask & 2) ? model.bbox_max[1] : model.bbox_min[1];
-                    c[2] = (mask & 4) ? model.bbox_max[2] : model.bbox_min[2];
-                    h_use = std::min(h_use, field->size_at(c));
-                }
-            }
+            set_status(std::format("meshing… ({}, h={:.4g} m)", resolved.note, h));
             std::vector<Eigen::Vector3d> adapt_seeds;
             double adapt_seed_band = 0.0;
             // D4: Dörfler element indices for optional local LEB before remesh.

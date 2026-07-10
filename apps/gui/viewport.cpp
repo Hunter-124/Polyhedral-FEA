@@ -376,6 +376,8 @@ void Viewport::update_overlays(const Model& model, const SimSetup& setup, int se
 
 void Viewport::set_mesh(const VolumeMeshOutput& mesh_out) {
     // Boundary quads colored by owning element type (hex/tet/pyramid/…).
+    // O(nodes + elems + quads) — never scan all elements per quad (that froze
+    // the GUI for ~seconds on ~200k-element auto meshes).
     namespace fea = polymesh::fea;
     auto type_color = [](fea::ElementType t) -> std::array<float, 3> {
         switch (t) {
@@ -394,18 +396,23 @@ void Viewport::set_mesh(const VolumeMeshOutput& mesh_out) {
         }
         return {0.6f, 0.6f, 0.6f};
     };
-    auto elem_type_for_quad = [&](const std::array<std::uint32_t, 4>& q) {
-        for (const auto& el : mesh_out.mesh.elements) {
-            int hits = 0;
-            for (auto n : el.nodes) {
-                for (auto qn : q) {
-                    if (n == qn) {
-                        ++hits;
-                    }
-                }
+    // Prefer type of any incident element for a boundary node (majority not needed
+    // for uniform fills; mixed hybrids still get a stable color per face).
+    std::vector<fea::ElementType> node_type(mesh_out.mesh.nodes.size(),
+                                            fea::ElementType::kTet4);
+    std::vector<char> node_set(mesh_out.mesh.nodes.size(), 0);
+    for (const auto& el : mesh_out.mesh.elements) {
+        for (auto n : el.nodes) {
+            if (n < node_type.size()) {
+                node_type[n] = el.type;
+                node_set[n] = 1;
             }
-            if (hits >= 4 || (el.nodes.size() == 4 && hits >= 3)) {
-                return el.type;
+        }
+    }
+    auto elem_type_for_quad = [&](const std::array<std::uint32_t, 4>& q) {
+        for (auto qn : q) {
+            if (qn < node_set.size() && node_set[qn]) {
+                return node_type[qn];
             }
         }
         return fea::ElementType::kTet4;

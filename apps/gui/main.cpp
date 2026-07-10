@@ -259,14 +259,21 @@ void draw_study_panel(App& app) {
     ImGui::TextColored(palette.sim_load, "loads: %zu", app.setup.loads.size());
     iw::end_group_box();
 
-    iw::begin_group_box("mesh & solve", 150);
+    iw::begin_group_box("mesh & solve", 170);
     const auto state = app.job.state();
     const bool busy = state == SolveJob::State::kMeshing || state == SolveJob::State::kSolving;
+    // Live status while worker runs (job.status_text updates from the thread).
+    if (busy) {
+        ImGui::TextColored(palette.status_warn, "%s", app.job.status_text().c_str());
+        app.status = app.job.status_text();
+    }
     ImGui::BeginDisabled(!app.model || busy);
     if (iw::button("mesh only", ImVec2(-1, 0))) {
+        app.status = "meshing…";
         app.job.start_mesh(*app.model, app.setup);
     }
     if (iw::button(busy ? "working…" : "solve", ImVec2(-1, 26), /*primary=*/true)) {
+        app.status = "solving…";
         app.job.start(*app.model, app.setup);
     }
     ImGui::EndDisabled();
@@ -276,8 +283,9 @@ void draw_study_panel(App& app) {
             app.job.clear_failure();
             app.status = "ready";
         }
-    } else if (state != SolveJob::State::kIdle || app.result || !app.mesh_status.empty()) {
-        const ImVec4 status_color = busy ? palette.status_warn : palette.status_ok;
+    } else if (!busy &&
+               (state != SolveJob::State::kIdle || app.result || !app.mesh_status.empty())) {
+        const ImVec4 status_color = palette.status_ok;
         ImGui::TextColored(status_color, "%s", app.job.status_text().c_str());
     }
     if (app.dof_count > 0) {

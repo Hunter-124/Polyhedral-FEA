@@ -6,6 +6,7 @@ add_library(mesh
     src/prism_fill.cpp
     src/quality.cpp
     src/surface_project.cpp
+    src/grid_classify.cpp
     src/hybrid_fill.cpp
     src/transition_fill.cpp
     src/local_refine.cpp

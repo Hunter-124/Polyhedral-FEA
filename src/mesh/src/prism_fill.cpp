@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "mesh/prism_fill.hpp"
 
+#include "mesh/grid_classify.hpp"
+
 #include <Eigen/Geometry>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <format>
 #include <map>
@@ -73,98 +76,48 @@ void check_prism_fill_geometry(const PrismFillOutput& out, double min_volume) {
 PrismFillOutput prism_fill_surface(const geom::TriSurface& surface,
                                    const Eigen::Vector3d& bbox_min,
                                    const Eigen::Vector3d& bbox_max, double h) {
-    if (!(h > 0.0) || !std::isfinite(h)) {
-        throw ValidityError("prism_fill_surface: h must be positive and finite");
-    }
+    const CartesianGrid grid = make_bbox_grid(bbox_min, bbox_max, h);
     const Eigen::Vector3d extent = bbox_max - bbox_min;
-    if (extent.minCoeff() <= 0.0) {
-        throw ValidityError("prism_fill_surface: empty bounding box");
-    }
-
     const int sweep = pick_sweep_axis(extent);
     const int a0 = (sweep + 1) % 3; // base axis 0
     const int a1 = (sweep + 2) % 3; // base axis 1
 
-    const auto cells = [&](int axis) {
-        return std::max(1, static_cast<int>(std::ceil(extent[axis] / h)));
-    };
-    // Grid in (base0, base1, sweep) index order — renamed i,j,k for clarity.
-    const int ni = cells(a0), nj = cells(a1), nk = cells(sweep);
-    if (static_cast<long>(ni) * nj * nk > 512 * 1024) {
-        throw ValidityError("prism_fill_surface: grid too fine; increase element size");
-    }
+    // Classify in xyz, then view lattice as (i,j,k)=(a0,a1,sweep).
+    const auto inside_xyz = classify_cells_inside_axis(surface, grid, sweep);
+    const int n_xyz[3] = {grid.nx, grid.ny, grid.nz};
+    const int ni = n_xyz[a0], nj = n_xyz[a1], nk = n_xyz[sweep];
 
-    const Eigen::Vector3d origin = bbox_min;
-    std::vector<bool> inside(static_cast<std::size_t>(ni) * static_cast<std::size_t>(nj) *
-                                 static_cast<std::size_t>(nk),
-                             false);
+    const auto to_xyz = [&](int i, int j, int k) {
+        int ix = 0, iy = 0, iz = 0;
+        int* comps[3] = {&ix, &iy, &iz};
+        *comps[a0] = i;
+        *comps[a1] = j;
+        *comps[sweep] = k;
+        return std::array<int, 3>{ix, iy, iz};
+    };
     const auto cell_index = [&](int i, int j, int k) {
-        return (static_cast<std::size_t>(k) * static_cast<std::size_t>(nj) +
-                static_cast<std::size_t>(j)) *
-                   static_cast<std::size_t>(ni) +
-               static_cast<std::size_t>(i);
+        const auto xyz = to_xyz(i, j, k);
+        return grid.index(xyz[0], xyz[1], xyz[2]);
     };
-
-    // Ray cast along sweep through each base-plane cell centre (parity test).
-    for (int j = 0; j < nj; ++j) {
-        for (int i = 0; i < ni; ++i) {
-            const double c0 = origin[a0] + (i + 0.5) * h;
-            const double c1 = origin[a1] + (j + 0.5) * h;
-            std::vector<double> crossings;
-            crossings.reserve(surface.triangles.size() / 8 + 4);
-            for (const auto& tri : surface.triangles) {
-                const Eigen::Vector3d& A = surface.vertices[tri[0]];
-                const Eigen::Vector3d& B = surface.vertices[tri[1]];
-                const Eigen::Vector3d& C = surface.vertices[tri[2]];
-                // 2D orientation in (a0, a1) plane.
-                const double d1 =
-                    (B[a0] - A[a0]) * (c1 - A[a1]) - (B[a1] - A[a1]) * (c0 - A[a0]);
-                const double d2 =
-                    (C[a0] - B[a0]) * (c1 - B[a1]) - (C[a1] - B[a1]) * (c0 - B[a0]);
-                const double d3 =
-                    (A[a0] - C[a0]) * (c1 - C[a1]) - (A[a1] - C[a1]) * (c0 - C[a0]);
-                const bool has_neg = d1 < 0 || d2 < 0 || d3 < 0;
-                const bool has_pos = d1 > 0 || d2 > 0 || d3 > 0;
-                if (has_neg && has_pos) {
-                    continue;
-                }
-                const double area = d1 + d2 + d3;
-                if (area == 0.0) {
-                    continue;
-                }
-                crossings.push_back((d2 * A[sweep] + d3 * B[sweep] + d1 * C[sweep]) / area);
-            }
-            std::sort(crossings.begin(), crossings.end());
-            for (int k = 0; k < nk; ++k) {
-                const double cs = origin[sweep] + (k + 0.5) * h;
-                const auto below = std::upper_bound(crossings.begin(), crossings.end(), cs) -
-                                   crossings.begin();
-                if (below % 2 == 1) {
-                    inside[cell_index(i, j, k)] = true;
-                }
-            }
+    const auto is_inside = [&](int i, int j, int k) {
+        if (i < 0 || i >= ni || j < 0 || j >= nj || k < 0 || k >= nk) {
+            return false;
         }
-    }
+        return inside_xyz[cell_index(i, j, k)];
+    };
 
     PrismFillOutput out;
-    out.h = h;
+    out.h = grid.max_edge();
     out.sweep_axis = sweep;
     std::map<std::array<int, 3>, std::uint32_t> node_ids;
     const auto node_at = [&](int i, int j, int k) {
         const auto [it, fresh] = node_ids.try_emplace(
             std::array<int, 3>{i, j, k}, static_cast<std::uint32_t>(out.nodes.size()));
         if (fresh) {
-            Eigen::Vector3d p = Eigen::Vector3d::Zero();
-            p[a0] = origin[a0] + static_cast<double>(i) * h;
-            p[a1] = origin[a1] + static_cast<double>(j) * h;
-            p[sweep] = origin[sweep] + static_cast<double>(k) * h;
-            out.nodes.push_back(p);
+            const auto xyz = to_xyz(i, j, k);
+            out.nodes.push_back(grid.node(xyz[0], xyz[1], xyz[2]));
         }
         return it->second;
-    };
-    const auto is_inside = [&](int i, int j, int k) {
-        return i >= 0 && i < ni && j >= 0 && j < nj && k >= 0 && k < nk &&
-               inside[cell_index(i, j, k)];
     };
 
     // Each inside voxel → 2 prisms (base quad diagonal i,j → i+1,j+1).
@@ -176,7 +129,7 @@ PrismFillOutput prism_fill_surface(const geom::TriSurface& surface,
     for (int k = 0; k < nk; ++k) {
         for (int j = 0; j < nj; ++j) {
             for (int i = 0; i < ni; ++i) {
-                if (!inside[cell_index(i, j, k)]) {
+                if (!is_inside(i, j, k)) {
                     continue;
                 }
                 const std::array<std::uint32_t, 8> c{{

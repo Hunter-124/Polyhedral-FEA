@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "mesh/tet_fill.hpp"
 
+#include "mesh/grid_classify.hpp"
 #include "mesh/surface_project.hpp"
 
 #include <Eigen/Geometry>
@@ -52,92 +53,31 @@ void check_tet_fill_geometry(const TetFillOutput& out, double min_volume) {
 TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
                                const Eigen::Vector3d& bbox_min,
                                const Eigen::Vector3d& bbox_max, double h, bool snap_boundary) {
-    if (!(h > 0.0) || !std::isfinite(h)) {
-        throw ValidityError("tet_fill_surface: h must be positive and finite");
-    }
-    const Eigen::Vector3d extent = bbox_max - bbox_min;
-    if (extent.minCoeff() <= 0.0) {
-        throw ValidityError("tet_fill_surface: empty bounding box");
-    }
-
-    const auto cells = [&](int axis) {
-        return std::max(1, static_cast<int>(std::ceil(extent[axis] / h)));
-    };
-    const int nx = cells(0), ny = cells(1), nz = cells(2);
-    if (static_cast<long>(nx) * ny * nz > 512 * 1024) {
-        throw ValidityError("tet_fill_surface: grid too fine; increase element size");
-    }
-
-    const Eigen::Vector3d origin = bbox_min;
-    std::vector<bool> inside(static_cast<std::size_t>(nx) * static_cast<std::size_t>(ny) *
-                                 static_cast<std::size_t>(nz),
-                             false);
-    const auto cell_index = [&](int i, int j, int k) {
-        return (static_cast<std::size_t>(k) * static_cast<std::size_t>(ny) +
-                static_cast<std::size_t>(j)) *
-                   static_cast<std::size_t>(nx) +
-               static_cast<std::size_t>(i);
-    };
-
-    for (int j = 0; j < ny; ++j) {
-        for (int i = 0; i < nx; ++i) {
-            const double cx = origin[0] + (i + 0.5) * h;
-            const double cy = origin[1] + (j + 0.5) * h;
-            std::vector<double> crossings;
-            crossings.reserve(surface.triangles.size() / 8 + 4);
-            for (const auto& tri : surface.triangles) {
-                const Eigen::Vector3d& a = surface.vertices[tri[0]];
-                const Eigen::Vector3d& b = surface.vertices[tri[1]];
-                const Eigen::Vector3d& c = surface.vertices[tri[2]];
-                const double d1 = (b[0] - a[0]) * (cy - a[1]) - (b[1] - a[1]) * (cx - a[0]);
-                const double d2 = (c[0] - b[0]) * (cy - b[1]) - (c[1] - b[1]) * (cx - b[0]);
-                const double d3 = (a[0] - c[0]) * (cy - c[1]) - (a[1] - c[1]) * (cx - c[0]);
-                const bool has_neg = d1 < 0 || d2 < 0 || d3 < 0;
-                const bool has_pos = d1 > 0 || d2 > 0 || d3 > 0;
-                if (has_neg && has_pos) {
-                    continue;
-                }
-                const double area = d1 + d2 + d3;
-                if (area == 0.0) {
-                    continue;
-                }
-                crossings.push_back((d2 * a[2] + d3 * b[2] + d1 * c[2]) / area);
-            }
-            std::sort(crossings.begin(), crossings.end());
-            for (int k = 0; k < nz; ++k) {
-                const double cz = origin[2] + (k + 0.5) * h;
-                const auto below = std::upper_bound(crossings.begin(), crossings.end(), cz) -
-                                   crossings.begin();
-                if (below % 2 == 1) {
-                    inside[cell_index(i, j, k)] = true;
-                }
-            }
-        }
-    }
+    const CartesianGrid grid = make_bbox_grid(bbox_min, bbox_max, h);
+    const auto inside = classify_cells_inside(surface, grid);
+    const int nx = grid.nx, ny = grid.ny, nz = grid.nz;
 
     TetFillOutput out;
-    out.h = h;
+    out.h = grid.max_edge();
     std::map<std::array<int, 3>, std::uint32_t> node_ids;
     const auto node_at = [&](int i, int j, int k) {
         const auto [it, fresh] = node_ids.try_emplace(
             std::array<int, 3>{i, j, k}, static_cast<std::uint32_t>(out.nodes.size()));
         if (fresh) {
-            out.nodes.emplace_back(origin[0] + static_cast<double>(i) * h,
-                                   origin[1] + static_cast<double>(j) * h,
-                                   origin[2] + static_cast<double>(k) * h);
+            out.nodes.push_back(grid.node(i, j, k));
         }
         return it->second;
     };
     const auto is_inside = [&](int i, int j, int k) {
         return i >= 0 && i < nx && j >= 0 && j < ny && k >= 0 && k < nz &&
-               inside[cell_index(i, j, k)];
+               inside[grid.index(i, j, k)];
     };
 
     // Corner numbering matches hex8 convention.
     for (int k = 0; k < nz; ++k) {
         for (int j = 0; j < ny; ++j) {
             for (int i = 0; i < nx; ++i) {
-                if (!inside[cell_index(i, j, k)]) {
+                if (!inside[grid.index(i, j, k)]) {
                     continue;
                 }
                 const std::array<std::uint32_t, 8> c{{
@@ -213,22 +153,22 @@ TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
         }
         // Limited snap: pull toward the surface by at most 0.35 h. Full projection
         // can invert tets; Jacobian safety below unsnaps offenders (ADR-0015/B3).
+        const double h_snap = out.h;
         std::unordered_map<std::uint32_t, Eigen::Vector3d> pre_snap;
         pre_snap.reserve(bnodes.size());
         for (auto ni : bnodes) {
             const Eigen::Vector3d p = out.nodes[ni];
             const auto cp = closest_on_surface(surface, p);
-            if (cp.distance > 0.0 && cp.distance < 1.25 * h) {
+            if (cp.distance > 0.0 && cp.distance < 1.25 * h_snap) {
                 const Eigen::Vector3d delta = cp.point - p;
-                const double move = std::min(cp.distance, 0.35 * h);
+                const double move = std::min(cp.distance, 0.35 * h_snap);
                 pre_snap.emplace(ni, p);
                 out.nodes[ni] = p + delta * (move / cp.distance);
             }
         }
 
         // Unsnap any still-moved node that participates in a non-positive tet.
-        // Revert iterates to a fixed point: undoing one node can rescue others.
-        const double vol_eps = 1e-14 * h * h * h;
+        const double vol_eps = 1e-14 * h_snap * h_snap * h_snap;
         bool progressed = true;
         while (progressed && !pre_snap.empty()) {
             progressed = false;
@@ -256,8 +196,6 @@ TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
             }
         }
 
-        // Orientation only (connectivity unchanged). Unsnap restores lattice
-        // positivity; residual negatives should only be FP noise on orientation.
         for (auto& n : out.tets) {
             const double v = tet_signed_volume_impl(out.nodes[n[0]], out.nodes[n[1]],
                                                     out.nodes[n[2]], out.nodes[n[3]]);

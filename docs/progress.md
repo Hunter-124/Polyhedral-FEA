@@ -18,6 +18,12 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: **Mesh gap fix** — shared-edge ray-parity double-count punched
+  diagonal tunnels through cubes/plates (cells with \(c_x\approx c_y\) outside);
+  bbox-fitted anisotropic lattice so nodes hit AABB faces. Shared
+  `mesh/grid_classify` used by tet/hex/graded/transition/prism. Unit box volume
+  exact (6000 tet @ h=0.1); edge fixtures thin plate / slender / offset / sphere;
+  Catch2 regressions. ADR-0015 updated.
 - 2026-07-10: Fix GUI mesh-only freeze — stop corner geometry-sizing from shrinking global h 8×; O(n) element-type colors in viewport; live meshing status; `build.bat`/`build.sh` copy CLI+GUI to repo root.
 - 2026-07-10: D6 Tier-3 instrument — L-domain uniform tet10 vs geometric graded
   tet10 (same solver, ADR-0005). Harness: `apps/bench/polymesh-d6-tier3` +

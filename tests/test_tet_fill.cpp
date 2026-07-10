@@ -4,8 +4,10 @@
 #include "mesh/tet_fill.hpp"
 #include "pipeline/scene.hpp"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cmath>
 
 using namespace polymesh::mesh;
@@ -96,4 +98,108 @@ TEST_CASE("single tet poly mesh passes geometry") {
     m.faces.push_back(Face{{1, 2, 3}, 0, {}});
     m.cells.push_back(Cell{CellKind::kTet, {0, 1, 2, 3}});
     REQUIRE_NOTHROW(m.check_geometry());
+}
+
+TEST_CASE("tet_fill unit box has no diagonal voids (ray parity)") {
+    // Regression: shared face-diagonal edges used to double-count crossings so
+    // cells with cx≈cy were marked outside — visible tunnels through the cube.
+    const auto surf = unit_box();
+    for (const double h : {0.5, 0.25, 0.1, 0.3}) {
+        const auto fill = tet_fill_surface(surf, {0, 0, 0}, {1, 1, 1}, h, true);
+        REQUIRE_NOTHROW(check_tet_fill_geometry(fill));
+        // Full AABB coverage: mesh nodes must reach all six faces.
+        Eigen::Vector3d mn = fill.nodes.front();
+        Eigen::Vector3d mx = fill.nodes.front();
+        for (const auto& p : fill.nodes) {
+            mn = mn.cwiseMin(p);
+            mx = mx.cwiseMax(p);
+        }
+        REQUIRE(mn[0] == Catch::Approx(0.0).margin(1e-12));
+        REQUIRE(mn[1] == Catch::Approx(0.0).margin(1e-12));
+        REQUIRE(mn[2] == Catch::Approx(0.0).margin(1e-12));
+        REQUIRE(mx[0] == Catch::Approx(1.0).margin(1e-12));
+        REQUIRE(mx[1] == Catch::Approx(1.0).margin(1e-12));
+        REQUIRE(mx[2] == Catch::Approx(1.0).margin(1e-12));
+        // Volume of Kuhn-split voxels ≈ box volume (all cells inside).
+        double vol = 0.0;
+        for (const auto& n : fill.tets) {
+            vol += tet_signed_volume(fill.nodes[n[0]], fill.nodes[n[1]], fill.nodes[n[2]],
+                                     fill.nodes[n[3]]);
+        }
+        REQUIRE(vol == Catch::Approx(1.0).margin(1e-9));
+        // 6 tets per interior voxel; unit box must fill every voxel in the lattice.
+        REQUIRE(fill.tets.size() % 6 == 0);
+        const auto n_vox = fill.tets.size() / 6;
+        const int nx = std::max(1, static_cast<int>(std::ceil(1.0 / h - 1e-14)));
+        REQUIRE(n_vox == static_cast<std::size_t>(nx) * nx * nx);
+    }
+}
+
+TEST_CASE("tet_fill public unit_box.stl solid (no interior gaps)") {
+    auto model = pipeline::Model::load("bench/geometries/public/unit_box.stl");
+    for (const double h : {0.25, 0.1, 0.3}) {
+        auto vol = pipeline::volume_mesh(model, h, pipeline::VolumeMesher::kTetFill);
+        REQUIRE_FALSE(vol.mesh.elements.empty());
+        REQUIRE_NOTHROW(vol.mesh.check_validity());
+        Eigen::Vector3d mn = vol.mesh.nodes.front();
+        Eigen::Vector3d mx = vol.mesh.nodes.front();
+        for (const auto& p : vol.mesh.nodes) {
+            mn = mn.cwiseMin(p);
+            mx = mx.cwiseMax(p);
+        }
+        REQUIRE((mn - model.bbox_min).norm() < 1e-9);
+        REQUIRE((mx - model.bbox_max).norm() < 1e-9);
+    }
+}
+
+TEST_CASE("tet_fill edge-case STLs: exact volume on AABB solids") {
+    // thin plate, slender beam, offset box — no interior voids; volume = AABB vol
+    // when the solid is a filled rectangular brick.
+    struct Case {
+        const char* path;
+        double volume;
+    };
+    const Case cases[] = {
+        {"bench/geometries/edge/unit_box.stl", 1.0},
+        {"bench/geometries/edge/offset_box.stl", 1.0},
+        {"bench/geometries/edge/thin_plate.stl", 0.1},    // 2×1×0.05
+        {"bench/geometries/edge/slender_beam.stl", 0.16}, // 4×0.2×0.2
+    };
+    for (const auto& c : cases) {
+        auto model = pipeline::Model::load(c.path);
+        auto vol = pipeline::volume_mesh(model, 0.1, pipeline::VolumeMesher::kTetFill);
+        REQUIRE_NOTHROW(vol.mesh.check_validity());
+        double mesh_vol = 0.0;
+        for (const auto& el : vol.mesh.elements) {
+            REQUIRE(el.type == polymesh::fea::ElementType::kTet4);
+            mesh_vol +=
+                tet_signed_volume(vol.mesh.nodes[el.nodes[0]], vol.mesh.nodes[el.nodes[1]],
+                                  vol.mesh.nodes[el.nodes[2]], vol.mesh.nodes[el.nodes[3]]);
+        }
+        REQUIRE(mesh_vol == Catch::Approx(c.volume).margin(1e-9 * std::max(1.0, c.volume)));
+        Eigen::Vector3d mn = vol.mesh.nodes.front();
+        Eigen::Vector3d mx = vol.mesh.nodes.front();
+        for (const auto& p : vol.mesh.nodes) {
+            mn = mn.cwiseMin(p);
+            mx = mx.cwiseMax(p);
+        }
+        REQUIRE((mn - model.bbox_min).cwiseAbs().maxCoeff() < 1e-9);
+        REQUIRE((mx - model.bbox_max).cwiseAbs().maxCoeff() < 1e-9);
+    }
+}
+
+TEST_CASE("tet_fill sphere edge STL is solid (no crash, positive volume)") {
+    auto model = pipeline::Model::load("bench/geometries/edge/sphere.stl");
+    auto vol = pipeline::volume_mesh(model, 0.1, pipeline::VolumeMesher::kTetFill);
+    REQUIRE(vol.mesh.elements.size() > 100);
+    REQUIRE_NOTHROW(vol.mesh.check_validity());
+    double mesh_vol = 0.0;
+    for (const auto& el : vol.mesh.elements) {
+        mesh_vol +=
+            tet_signed_volume(vol.mesh.nodes[el.nodes[0]], vol.mesh.nodes[el.nodes[1]],
+                              vol.mesh.nodes[el.nodes[2]], vol.mesh.nodes[el.nodes[3]]);
+    }
+    // Staircased sphere ≈ 0.47 vs analytical 4/3 π r³ ≈ 0.524 at h=0.1 — band only.
+    REQUIRE(mesh_vol > 0.35);
+    REQUIRE(mesh_vol < 0.55);
 }

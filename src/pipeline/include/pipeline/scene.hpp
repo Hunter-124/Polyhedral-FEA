@@ -93,8 +93,8 @@ struct VolumeMeshOutput {
 /// `feature_refine`: when true and mesher is graded, also refine near sharp edges.
 /// `refine_seeds` / `seed_band`: a posteriori error balls for graded fine blocks.
 VolumeMeshOutput volume_mesh(const Model& model, double h,
-                             VolumeMesher mesher = VolumeMesher::kTetFill,
-                             int skin_layers = 2, bool feature_refine = false,
+                             VolumeMesher mesher = VolumeMesher::kTetFill, int skin_layers = 2,
+                             bool feature_refine = false,
                              std::span<const Eigen::Vector3d> refine_seeds = {},
                              double seed_band = 0.0);
 

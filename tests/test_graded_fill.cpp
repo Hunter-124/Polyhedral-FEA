@@ -66,8 +66,7 @@ TEST_CASE("feature band refines more cells than surface skin alone") {
     // Large h → few cells; feature_band covering the whole box should force
     // more fine blocks than skin-only grading.
     auto skin_only = graded_tet_fill_surface(s, {0, 0, 0}, {1, 1, 1}, 0.5, 1, {}, 0.0);
-    auto with_feat =
-        graded_tet_fill_surface(s, {0, 0, 0}, {1, 1, 1}, 0.5, 1, edges, 2.0);
+    auto with_feat = graded_tet_fill_surface(s, {0, 0, 0}, {1, 1, 1}, 0.5, 1, edges, 2.0);
     REQUIRE(with_feat.n_fine_cells >= skin_only.n_fine_cells);
     REQUIRE(with_feat.n_feature_cells > 0);
     REQUIRE(with_feat.mesh.tets.size() >= skin_only.mesh.tets.size());

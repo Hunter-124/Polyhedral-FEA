@@ -3,8 +3,8 @@
 #include "geom/features.hpp"
 #include "geom/tri_surface.hpp"
 
-#include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 TEST_CASE("uniform sizing is constant") {
     const polymesh::adapt::UniformSizing f(0.05);

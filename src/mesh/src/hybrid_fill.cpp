@@ -68,14 +68,11 @@ constexpr std::array<std::array<int, 4>, 6> kCubeTets{{
 
 } // namespace
 
-GradedTetFillOutput graded_tet_fill_surface(const geom::TriSurface& surface,
-                                            const Eigen::Vector3d& bbox_min,
-                                            const Eigen::Vector3d& bbox_max, double h,
-                                            int skin_layers,
-                                            std::span<const geom::SharpEdge> features,
-                                            double feature_band,
-                                            std::span<const Eigen::Vector3d> refine_seeds,
-                                            double seed_band) {
+GradedTetFillOutput
+graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& bbox_min,
+                        const Eigen::Vector3d& bbox_max, double h, int skin_layers,
+                        std::span<const geom::SharpEdge> features, double feature_band,
+                        std::span<const Eigen::Vector3d> refine_seeds, double seed_band) {
     if (!(h > 0.0) || !std::isfinite(h)) {
         throw ValidityError("graded_tet_fill_surface: h must be positive");
     }
@@ -206,11 +203,10 @@ GradedTetFillOutput graded_tet_fill_surface(const geom::TriSurface& surface,
                     continue;
                 }
                 const Eigen::Vector3d center =
-                    origin + Eigen::Vector3d((2 * ic + 1) * hf, (2 * jc + 1) * hf,
-                                             (2 * kc + 1) * hf);
+                    origin +
+                    Eigen::Vector3d((2 * ic + 1) * hf, (2 * jc + 1) * hf, (2 * kc + 1) * hf);
                 if (feature_band > 0.0) {
-                    const double dfeat =
-                        geom::distance_to_features(center, surface, features);
+                    const double dfeat = geom::distance_to_features(center, surface, features);
                     if (dfeat <= feature_band) {
                         need_fine = true;
                         coarse_feature[cidx(ic, jc, kc)] = true;

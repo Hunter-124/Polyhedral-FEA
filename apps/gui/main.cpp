@@ -317,8 +317,8 @@ void draw_viewport_content(App& app) {
     if (app.result && (app.mode == DisplayMode::kResultsVonMises ||
                        app.mode == DisplayMode::kResultsDisplacement ||
                        app.mode == DisplayMode::kResultsError)) {
-        ImGui::SetCursorScreenPos(ImVec2(ImGui::GetItemRectMin().x + 12,
-                                         ImGui::GetItemRectMin().y + 12));
+        ImGui::SetCursorScreenPos(
+            ImVec2(ImGui::GetItemRectMin().x + 12, ImGui::GetItemRectMin().y + 12));
         ImGui::BeginChild("##cbar", ImVec2(120, 170), false,
                           ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoInputs);
         if (app.mode == DisplayMode::kResultsVonMises) {
@@ -522,6 +522,4 @@ int run(int argc, char** argv) {
 } // namespace
 } // namespace polymesh::gui
 
-int main(int argc, char** argv) {
-    return polymesh::gui::run(argc, argv);
-}
+int main(int argc, char** argv) { return polymesh::gui::run(argc, argv); }

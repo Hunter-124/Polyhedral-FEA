@@ -139,7 +139,7 @@ A1 A3 ──> A2 A10 ──> A4 A5 A8 ──> A6 A7
 
 | Track | Status |
 |-------|--------|
-| A GUI | Scaffold works (import, pick, solve, VM/deflection, VTU). Missing mesh preview, argv open, error field, polish. |
+| A GUI | M1 core in: argv open, mesh preview, ZZ error, colorbar, failure dismiss. Still: A6 wireframe, A7 file dialog, A8 DOF polish. |
 | B Mesh | Grid tet/hex/graded/hexpyr; not true Delaunay. |
 | C Hybrid | Hex+pyramid topology; hybrid patch nonconforming (ADR-0013). VEM k=1 only. |
 | D Adapt | Seed remesh (ADR-0014); no η target stop, no p-adapt. |

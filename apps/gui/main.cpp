@@ -100,8 +100,9 @@ void draw_study_panel(App& app) {
     }
     {
         int m = static_cast<int>(app.setup.mesher);
-        static const char* kMeshers[] = {"tet fill", "hex fill", "hex VEM", "graded tet"};
-        if (iw::selector("mesher", &m, kMeshers, 4)) {
+        static const char* kMeshers[] = {"tet fill", "hex fill", "hex VEM", "graded tet",
+                                         "hex+pyramid"};
+        if (iw::selector("mesher", &m, kMeshers, 5)) {
             app.setup.mesher = static_cast<VolumeMesher>(m);
         }
     }

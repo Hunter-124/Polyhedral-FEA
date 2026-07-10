@@ -6,6 +6,7 @@ add_library(mesh
     src/quality.cpp
     src/surface_project.cpp
     src/hybrid_fill.cpp
+    src/transition_fill.cpp
 )
 target_include_directories(mesh PUBLIC include)
 target_link_libraries(mesh PUBLIC geom Eigen3::Eigen PRIVATE polymesh_warnings)

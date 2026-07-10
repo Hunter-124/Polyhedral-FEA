@@ -15,6 +15,7 @@
 #include "mesh/quality.hpp"
 #include "mesh/surface_project.hpp"
 #include "mesh/tet_fill.hpp"
+#include "mesh/transition_fill.hpp"
 
 #include <Eigen/Geometry>
 
@@ -174,6 +175,29 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         out.mesher_note = std::format("{} grid fill v1: {} cells, {} nodes, h={:.4g} m",
                                       mesher == VolumeMesher::kHexVem ? "hex-VEM" : "hex",
                                       out.mesh.elements.size(), out.mesh.nodes.size(), fill_h);
+    } else if (mesher == VolumeMesher::kHexPyramid) {
+        auto fill =
+            mesh::transition_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
+        fill_h = fill.h;
+        out.mesh.nodes = std::move(fill.nodes);
+        out.mesh.elements.reserve(fill.cells.size());
+        for (const auto& cell : fill.cells) {
+            if (cell.kind == mesh::TransitionCellKind::kHex8) {
+                out.mesh.elements.push_back(fea::NodalElement{
+                    fea::ElementType::kHex8,
+                    {cell.nodes[0], cell.nodes[1], cell.nodes[2], cell.nodes[3], cell.nodes[4],
+                     cell.nodes[5], cell.nodes[6], cell.nodes[7]}});
+            } else {
+                out.mesh.elements.push_back(
+                    fea::NodalElement{fea::ElementType::kPyramid5,
+                                      {cell.nodes[0], cell.nodes[1], cell.nodes[2],
+                                       cell.nodes[3], cell.nodes[4]}});
+            }
+        }
+        out.boundary_quads = std::move(fill.boundary_quads);
+        out.mesher_note =
+            std::format("hex+pyramid transition v1: {} hex, {} pyramids, {} nodes, h={:.4g} m",
+                        fill.n_hex, fill.n_pyramid, out.mesh.nodes.size(), fill_h);
     } else if (mesher == VolumeMesher::kGradedTet) {
         auto graded = mesh::graded_tet_fill_surface(
             model.surface, model.bbox_min, model.bbox_max, h, std::max(1, skin_layers));

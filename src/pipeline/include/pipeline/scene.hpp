@@ -22,7 +22,13 @@
 
 namespace polymesh::pipeline {
 
-enum class VolumeMesher : int { kTetFill = 0, kHexFill = 1, kHexVem = 2, kGradedTet = 3 };
+enum class VolumeMesher : int {
+    kTetFill = 0,
+    kHexFill = 1,
+    kHexVem = 2,
+    kGradedTet = 3,
+    kHexPyramid = 4, // hex core + pyramid skin (conforming)
+};
 
 /// Imported model: triangle surface segmented into CAD-style "faces"
 /// (regions of triangles separated by sharp edges), so a click can select

@@ -62,14 +62,20 @@ struct SimSetup {
     /// (bbox extent/diagonal + sharp-edge feature density).
     double mesh_size = 0.0;
     bool use_feature_grading = true; // sharp edges + curvature + thin-wall sizing
-    int adapt_passes = 0;            // extra solve→ZZ→refine mesh loops (max cap)
+    /// Max solve→ZZ→(LEB|seed-remesh) refine passes after the initial mesh.
+    /// **0 = single mesh+solve** (no adapt). Prefer ≥1 with `eta_target` for
+    /// fully adaptive product runs (stops early when η is small enough).
+    int adapt_passes = 0;
     /// Stop adapt when global ZZ relative indicator \(\eta \le\) this value.
-    /// Dimensionless (energy-norm style); **0 = disabled**.
+    /// Dimensionless (energy-norm style); **0 = disabled** (run all passes).
     double eta_target = 0.0;
     /// p-elevate smooth (non-Dörfler) linear elements to tet10/hex20 after the
     /// last h-adapt pass (or after the single solve when adapt_passes=0).
     /// When false, still auto-enables if adapt_passes > 0 (hp product path).
     bool p_elevate = false;
+    /// Extra Rivara LEB waves per adapt pass (seed-ball re-mark, no re-solve).
+    /// 1 = one LEB (ADR-0016); 2–3 deepen local h before falling back to remesh.
+    int adapt_leb_waves = 2;
     int skin_layers = 2; // graded-tet boundary skin depth (coarse cells)
     VolumeMesher mesher = VolumeMesher::kTetFill;
     std::set<int> fixtures; // region ids with all DOFs fixed

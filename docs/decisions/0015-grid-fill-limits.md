@@ -35,6 +35,12 @@ lattice **exactly** spans the AABB (nodes land on bbox faces). Cell sizes may be
 anisotropic when the requested \(h\) does not divide an axis. This removes the
 systematic underfill gap when \(n h > L\) left a partial exterior layer empty.
 
+**Cell budget:** default max is \(512\cdot 1024\) cells. If the requested \(h\)
+would exceed that (common for graded tet, which builds a fine lattice at
+\(h/2\)), the grid is **auto-coarsened** rather than throwing
+`grid too fine`. Graded fill also pre-floors \(h\) via `min_h_for_cell_budget`
+(subdivision=2). Mesher notes may say `h raised to cell budget`.
+
 ## Ray parity (shared-edge dedupe)
 Inside tests use even-odd ray casting. Coplanar face diagonals / shared edges
 used to register **two** identical crossings, flipping parity and punching

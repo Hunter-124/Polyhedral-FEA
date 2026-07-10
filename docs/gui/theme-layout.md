@@ -7,7 +7,9 @@ Widgets: `widgets.hpp` / `widgets.cpp` (Interwebz-style). Viewport: `viewport.*`
 1. **No raw colors** in widgets/viewport/main — use palette tokens.
 2. **Theme switch** goes through one apply function in `theme.cpp`.
 3. **Layout** uses fixed constrained panels; prefer widget helpers for
-   spacing/centering over one-off magic numbers.
+   spacing/centering over one-off magic numbers. Group boxes auto-size to
+   content (no hardcoded content heights). Selectors wrap when options would
+   overflow. Button labels are clipped/centered inside the control bounds.
 4. **No physics** in `apps/gui` — call `pipeline` / libraries.
 
 ## Adding a colorscheme

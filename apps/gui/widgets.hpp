@@ -11,9 +11,9 @@
 
 namespace polymesh::gui::iw {
 
-/// Group box with a header strip and floating title. Pass the content height
-/// (the box frames it plus header/padding). Always pair with end_group_box().
-void begin_group_box(const char* title, float content_height);
+/// Group box with a header strip and floating title. Height auto-fits content —
+/// always pair with end_group_box().
+void begin_group_box(const char* title);
 void end_group_box();
 
 /// Rose-gradient checkbox with label to the right.
@@ -24,14 +24,17 @@ bool slider_double(const char* label, double* value, double min, double max,
                    const char* format);
 
 /// Flat bordered button; `primary` gets the rose gradient fill.
+/// size.x <= 0 (or -1) fills available width; size.y <= 0 uses text + padding.
 bool button(const char* label, const ImVec2& size = ImVec2(0, 0), bool primary = false);
 
-/// Lavender field label followed by a dark input box on the same row grid.
+/// Lavender field label followed by a dark input box (stacked if the label is
+/// too wide for a single row).
 bool input_double(const char* label, double* value, const char* format);
 bool input_float3(const char* label, float value[3]);
 bool input_text(const char* label, char* buffer, size_t buffer_size, const char* hint);
 
-/// Horizontal selector row (radio replacement): returns true on change.
+/// Horizontal/wrapping selector row (radio replacement): returns true on change.
+/// Options wrap to extra rows when they would overflow the available width.
 bool selector(const char* label, int* index, const char* const* options, int count);
 
 } // namespace polymesh::gui::iw

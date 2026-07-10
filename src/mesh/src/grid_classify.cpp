@@ -113,6 +113,103 @@ std::vector<bool> classify_impl(const geom::TriSurface& surface, const Cartesian
 
 } // namespace
 
+double min_h_for_cell_budget(const Eigen::Vector3d& bbox_min, const Eigen::Vector3d& bbox_max,
+                             long max_cells, int subdivision) {
+    const Eigen::Vector3d extent = bbox_max - bbox_min;
+    if (extent.minCoeff() <= 0.0 || !extent.allFinite() || max_cells < 1) {
+        return 0.0;
+    }
+    const int sub = std::max(1, subdivision);
+    // Isotropic: (sub * L_i / h) product ≤ max_cells ⇒ h ≥ sub * cbrt(∏ L / max).
+    const double vol = std::max(extent[0] * extent[1] * extent[2], 1e-300);
+    const double h_iso = static_cast<double>(sub) * std::cbrt(vol / static_cast<double>(max_cells));
+    // Axis-wise lower bound: each n_i ≥ 1, but also n_i ≈ sub*L_i/h; if one axis
+    // is very short, isotropic still works; pad 5% for ceil/even rounding.
+    return h_iso * 1.05;
+}
+
+namespace {
+
+void set_cell_from_n(CartesianGrid& g, const Eigen::Vector3d& extent) {
+    g.cell[0] = extent[0] / static_cast<double>(std::max(1, g.nx));
+    g.cell[1] = extent[1] / static_cast<double>(std::max(1, g.ny));
+    g.cell[2] = extent[2] / static_cast<double>(std::max(1, g.nz));
+}
+
+/// Shrink n so nx*ny*nz ≤ max_cells while keeping n ≥ min_n and optional even.
+void fit_cell_budget(CartesianGrid& g, const Eigen::Vector3d& extent, long max_cells, int min_n,
+                     bool even) {
+    if (max_cells < 1) {
+        max_cells = 1;
+    }
+    min_n = std::max(1, min_n);
+    if (even && (min_n % 2)) {
+        ++min_n;
+    }
+    // Snap toward coarser (never finer): odd → n-1 when even required.
+    auto snap = [&](int n) {
+        n = std::max(min_n, n);
+        if (even && (n % 2)) {
+            n = std::max(min_n, n - 1);
+        }
+        return n;
+    };
+
+    for (int attempt = 0; attempt < 64 && g.cell_count() > max_cells; ++attempt) {
+        const double ratio =
+            static_cast<double>(max_cells) / static_cast<double>(std::max(1L, g.cell_count()));
+        const double scale = std::cbrt(ratio) * 0.999;
+        auto shrink_axis = [&](int n) {
+            int n2 = snap(static_cast<int>(std::floor(static_cast<double>(n) * scale)));
+            if (n2 >= n && n > min_n) {
+                n2 = snap(n - (even ? 2 : 1));
+            }
+            return n2;
+        };
+        const int nx0 = g.nx, ny0 = g.ny, nz0 = g.nz;
+        g.nx = shrink_axis(g.nx);
+        g.ny = shrink_axis(g.ny);
+        g.nz = shrink_axis(g.nz);
+        if (g.nx == nx0 && g.ny == ny0 && g.nz == nz0) {
+            break; // at min — fall through to proportional reassignment
+        }
+        set_cell_from_n(g, extent);
+    }
+
+    if (g.cell_count() > max_cells) {
+        // Last resort: distribute max_cells ∝ extent, honouring min_n / even.
+        const double ex = std::max(extent[0], 1e-300);
+        const double ey = std::max(extent[1], 1e-300);
+        const double ez = std::max(extent[2], 1e-300);
+        const double s = std::cbrt(static_cast<double>(max_cells) / (ex * ey * ez));
+        g.nx = snap(static_cast<int>(std::floor(ex * s)));
+        g.ny = snap(static_cast<int>(std::floor(ey * s)));
+        g.nz = snap(static_cast<int>(std::floor(ez * s)));
+        while (g.cell_count() > max_cells) {
+            if (g.nx >= g.ny && g.nx >= g.nz && g.nx > min_n) {
+                g.nx = snap(g.nx - (even ? 2 : 1));
+            } else if (g.ny >= g.nz && g.ny > min_n) {
+                g.ny = snap(g.ny - (even ? 2 : 1));
+            } else if (g.nz > min_n) {
+                g.nz = snap(g.nz - (even ? 2 : 1));
+            } else {
+                break;
+            }
+        }
+        set_cell_from_n(g, extent);
+    }
+
+    if (g.cell_count() > max_cells) {
+        // Pathological: min_n³ > max_cells — emit densest legal min grid.
+        g.nx = min_n;
+        g.ny = min_n;
+        g.nz = min_n;
+        set_cell_from_n(g, extent);
+    }
+}
+
+} // namespace
+
 CartesianGrid make_bbox_grid(const Eigen::Vector3d& bbox_min, const Eigen::Vector3d& bbox_max,
                              double h, long max_cells) {
     validate_h_bbox(bbox_min, bbox_max, h, "make_bbox_grid");
@@ -122,11 +219,9 @@ CartesianGrid make_bbox_grid(const Eigen::Vector3d& bbox_min, const Eigen::Vecto
     g.nx = cells_for_extent(extent[0], h);
     g.ny = cells_for_extent(extent[1], h);
     g.nz = cells_for_extent(extent[2], h);
-    g.cell[0] = extent[0] / static_cast<double>(g.nx);
-    g.cell[1] = extent[1] / static_cast<double>(g.ny);
-    g.cell[2] = extent[2] / static_cast<double>(g.nz);
+    set_cell_from_n(g, extent);
     if (g.cell_count() > max_cells) {
-        throw ValidityError("make_bbox_grid: grid too fine; increase element size");
+        fit_cell_budget(g, extent, max_cells, /*min_n=*/1, /*even=*/false);
     }
     return g;
 }
@@ -137,6 +232,9 @@ CartesianGrid make_bbox_grid_even(const Eigen::Vector3d& bbox_min,
     validate_h_bbox(bbox_min, bbox_max, h, "make_bbox_grid_even");
     if (min_cells < 2) {
         min_cells = 2;
+    }
+    if (min_cells % 2) {
+        ++min_cells;
     }
     const Eigen::Vector3d extent = bbox_max - bbox_min;
     CartesianGrid g;
@@ -151,11 +249,9 @@ CartesianGrid make_bbox_grid_even(const Eigen::Vector3d& bbox_min,
     g.nx = even_n(extent[0]);
     g.ny = even_n(extent[1]);
     g.nz = even_n(extent[2]);
-    g.cell[0] = extent[0] / static_cast<double>(g.nx);
-    g.cell[1] = extent[1] / static_cast<double>(g.ny);
-    g.cell[2] = extent[2] / static_cast<double>(g.nz);
+    set_cell_from_n(g, extent);
     if (g.cell_count() > max_cells) {
-        throw ValidityError("make_bbox_grid_even: grid too fine; increase element size");
+        fit_cell_budget(g, extent, max_cells, min_cells, /*even=*/true);
     }
     return g;
 }

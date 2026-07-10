@@ -12,7 +12,6 @@
 #include <format>
 #include <map>
 #include <set>
-#include <unordered_map>
 
 namespace polymesh::mesh {
 namespace {
@@ -244,60 +243,29 @@ TransitionFillOutput transition_fill_surface(const geom::TriSurface& surface,
         throw ValidityError("transition_fill_surface: no interior cells");
     }
 
-    // Limited surface snap on free-boundary lattice nodes (not pyramid apices).
-    // Jacobian safety (B3): unsnap any moved node that inverts a hex or pyramid
-    // so no non-positive Jacobian element reaches the solver.
+    // Multi-pass surface snap on free-boundary lattice nodes (not pyramid apices).
+    // Jacobian safety (B3): unsnap any moved node that inverts a hex or pyramid.
     if (snap_boundary && !out.boundary_quads.empty()) {
-        std::set<std::uint32_t> bnodes;
+        std::set<std::uint32_t> bnode_set;
         for (const auto& q : out.boundary_quads) {
-            bnodes.insert(q.begin(), q.end());
+            bnode_set.insert(q.begin(), q.end());
         }
-        std::unordered_map<std::uint32_t, Eigen::Vector3d> pre_snap;
-        pre_snap.reserve(bnodes.size());
-        for (auto ni : bnodes) {
-            const Eigen::Vector3d p = out.nodes[ni];
-            const auto cp = closest_on_surface(surface, p);
-            if (cp.distance > 0.0 && cp.distance < 1.25 * h_cell) {
-                const Eigen::Vector3d delta = cp.point - p;
-                const double move = std::min(cp.distance, 0.35 * h_cell);
-                pre_snap.emplace(ni, p);
-                out.nodes[ni] = p + delta * (move / cp.distance);
-            }
-        }
-
+        std::vector<std::uint32_t> bnodes(bnode_set.begin(), bnode_set.end());
         const double vol_eps = 1e-14 * h_cell * h_cell * h_cell;
-        bool progressed = true;
-        while (progressed && !pre_snap.empty()) {
-            progressed = false;
-            std::set<std::uint32_t> offenders;
-            for (const auto& cell : out.cells) {
-                if (!cell_inverted(cell, out.nodes, vol_eps)) {
-                    continue;
-                }
-                for (std::uint8_t i = 0; i < cell.n_nodes; ++i) {
-                    const auto idx = cell.nodes[i];
-                    if (pre_snap.find(idx) != pre_snap.end()) {
-                        offenders.insert(idx);
+        const auto snap = snap_boundary_nodes(
+            surface, out.nodes, bnodes, h_cell,
+            [&](std::set<std::uint32_t>& offenders) {
+                for (const auto& cell : out.cells) {
+                    if (!cell_inverted(cell, out.nodes, vol_eps)) {
+                        continue;
+                    }
+                    for (std::uint8_t i = 0; i < cell.n_nodes; ++i) {
+                        offenders.insert(cell.nodes[i]);
                     }
                 }
-            }
-            for (const auto ni : offenders) {
-                const auto it = pre_snap.find(ni);
-                if (it == pre_snap.end()) {
-                    continue;
-                }
-                out.nodes[ni] = it->second;
-                pre_snap.erase(it);
-                progressed = true;
-            }
-        }
-
-        // Residual distance after snap / unsnap (metres).
-        double max_d = 0.0;
-        for (auto ni : bnodes) {
-            max_d = std::max(max_d, closest_on_surface(surface, out.nodes[ni]).distance);
-        }
-        out.boundary_max_distance = max_d;
+            },
+            /*max_move_frac=*/0.55, /*passes=*/3);
+        out.boundary_max_distance = snap.max_residual;
 
         // Hard gate: still-inverted cells must not leave the mesher.
         for (std::size_t e = 0; e < out.cells.size(); ++e) {

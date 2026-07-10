@@ -375,7 +375,8 @@ void Viewport::update_overlays(const Model& model, const SimSetup& setup, int se
 }
 
 void Viewport::set_mesh(const VolumeMeshOutput& mesh_out) {
-    // Boundary quads colored by owning element type (hex/tet/pyramid/…).
+    // Boundary quads colored by owning element type (hex/tet/pyramid/…) with a
+    // light checkerboard so individual faces stay readable at dense grids.
     // O(nodes + elems + quads) — never scan all elements per quad (that froze
     // the GUI for ~seconds on ~200k-element auto meshes).
     namespace fea = polymesh::fea;
@@ -383,16 +384,16 @@ void Viewport::set_mesh(const VolumeMeshOutput& mesh_out) {
         switch (t) {
         case fea::ElementType::kTet4:
         case fea::ElementType::kTet10:
-            return {0.35f, 0.55f, 0.95f};
+            return {0.42f, 0.58f, 0.92f};
         case fea::ElementType::kHex8:
         case fea::ElementType::kHex20:
-            return {0.30f, 0.75f, 0.45f};
+            return {0.35f, 0.78f, 0.50f};
         case fea::ElementType::kPyramid5:
-            return {0.95f, 0.55f, 0.20f};
+            return {0.95f, 0.58f, 0.28f};
         case fea::ElementType::kPrism6:
-            return {0.70f, 0.40f, 0.90f};
+            return {0.72f, 0.45f, 0.90f};
         case fea::ElementType::kPolyVem:
-            return {0.20f, 0.80f, 0.85f};
+            return {0.25f, 0.82f, 0.85f};
         }
         return {0.6f, 0.6f, 0.6f};
     };
@@ -421,12 +422,22 @@ void Viewport::set_mesh(const VolumeMeshOutput& mesh_out) {
     std::vector<float> data;
     data.reserve(mesh_out.boundary_quads.size() * 6 * 10);
     const auto& nodes = mesh_out.mesh.nodes;
-    for (const auto& quad : mesh_out.boundary_quads) {
+    for (std::size_t qi = 0; qi < mesh_out.boundary_quads.size(); ++qi) {
+        const auto& quad = mesh_out.boundary_quads[qi];
         const Eigen::Vector3d a = nodes[quad[0]];
         const Eigen::Vector3d b = nodes[quad[1]];
         const Eigen::Vector3d c = nodes[quad[2]];
         const Eigen::Vector3d n = (b - a).cross(c - a).normalized();
-        const auto rgb = type_color(elem_type_for_quad(quad));
+        auto rgb = type_color(elem_type_for_quad(quad));
+        // Deterministic face checker: alternate brightness so edges read clearly
+        // against a uniform blue sea of Cartesian cells.
+        const std::uint32_t face_hash =
+            quad[0] * 73856093u ^ quad[1] * 19349663u ^ quad[2] * 83492791u ^
+            static_cast<std::uint32_t>(qi) * 2654435761u;
+        const float shade = (face_hash & 1u) ? 1.0f : 0.78f;
+        rgb[0] *= shade;
+        rgb[1] *= shade;
+        rgb[2] *= shade;
         for (const auto idx : {0, 1, 2, 0, 2, 3}) {
             const auto& p = nodes[quad[static_cast<std::size_t>(idx)]];
             for (int i = 0; i < 3; ++i) {
@@ -443,8 +454,8 @@ void Viewport::set_mesh(const VolumeMeshOutput& mesh_out) {
     glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(data.size() * sizeof(float)),
                  data.data(), GL_DYNAMIC_DRAW);
 
-    // Rest-position wireframe (also used as undeformed outline on results).
-    upload_boundary_edges(nodes, mesh_out.boundary_quads, 0.08f, 0.08f, 0.10f, 0.95f,
+    // High-contrast dark wireframe so individual elements stay identifiable.
+    upload_boundary_edges(nodes, mesh_out.boundary_quads, 0.02f, 0.02f, 0.04f, 1.0f,
                           mesh_edge_vbo_, mesh_edge_vertex_count_);
 }
 
@@ -486,11 +497,18 @@ void Viewport::bake_result(DisplayMode mode, float deform_scale, float result_ma
         scalars = &result_scalar_eta_;
     }
     const float denom = result_max > 0.0f ? result_max : 1.0f;
+    const Eigen::Index n_disp = result_disp_.size();
+    const auto disp_at = [&](std::uint32_t node) -> Eigen::Vector3d {
+        const Eigen::Index base = 3 * static_cast<Eigen::Index>(node);
+        if (base + 2 >= n_disp) {
+            return Eigen::Vector3d::Zero();
+        }
+        return result_disp_.segment<3>(base);
+    };
     const auto emit = [&](std::uint32_t node, const Eigen::Vector3d& normal) {
+        // Apply exaggerated displacement so the deformed shape is visible.
         const Eigen::Vector3d pos =
-            result_rest_[node] +
-            static_cast<double>(deform_scale) *
-                result_disp_.segment<3>(3 * static_cast<Eigen::Index>(node));
+            result_rest_[node] + static_cast<double>(deform_scale) * disp_at(node);
         for (int i = 0; i < 3; ++i) {
             data.push_back(static_cast<float>(pos[i]));
         }
@@ -502,10 +520,20 @@ void Viewport::bake_result(DisplayMode mode, float deform_scale, float result_ma
         data.insert(data.end(), {rgb[0], rgb[1], rgb[2], 1.0f});
     };
     for (const auto& quad : result_quads_) {
-        const Eigen::Vector3d a = result_rest_[quad[0]];
-        const Eigen::Vector3d b = result_rest_[quad[1]];
-        const Eigen::Vector3d c = result_rest_[quad[2]];
-        const Eigen::Vector3d n = (b - a).cross(c - a).normalized();
+        // Normals from deformed positions so lighting follows the warped surface.
+        const Eigen::Vector3d a =
+            result_rest_[quad[0]] + static_cast<double>(deform_scale) * disp_at(quad[0]);
+        const Eigen::Vector3d b =
+            result_rest_[quad[1]] + static_cast<double>(deform_scale) * disp_at(quad[1]);
+        const Eigen::Vector3d c =
+            result_rest_[quad[2]] + static_cast<double>(deform_scale) * disp_at(quad[2]);
+        Eigen::Vector3d n = (b - a).cross(c - a);
+        const double nn = n.norm();
+        if (nn > 1e-30) {
+            n /= nn;
+        } else {
+            n = Eigen::Vector3d::UnitZ();
+        }
         for (const auto idx : {0, 1, 2, 0, 2, 3}) {
             emit(quad[static_cast<std::size_t>(idx)], n);
         }
@@ -519,10 +547,9 @@ void Viewport::bake_result(DisplayMode mode, float deform_scale, float result_ma
     std::vector<Eigen::Vector3d> deformed(result_rest_.size());
     for (std::size_t i = 0; i < result_rest_.size(); ++i) {
         deformed[i] =
-            result_rest_[i] + static_cast<double>(deform_scale) *
-                                  result_disp_.segment<3>(3 * static_cast<Eigen::Index>(i));
+            result_rest_[i] + static_cast<double>(deform_scale) * disp_at(static_cast<std::uint32_t>(i));
     }
-    upload_boundary_edges(deformed, result_quads_, 0.05f, 0.05f, 0.08f, 0.90f,
+    upload_boundary_edges(deformed, result_quads_, 0.02f, 0.02f, 0.04f, 0.95f,
                           result_edge_vbo_, result_edge_vertex_count_);
 
     baked_mode_ = mode;
@@ -571,6 +598,13 @@ void Viewport::render(int width, int height, DisplayMode mode, float deform_scal
                               mode == DisplayMode::kResultsDisplacement ||
                               mode == DisplayMode::kResultsError;
 
+    // Push filled surfaces slightly back so edge lines win the depth test.
+    const bool draw_edges = show_wireframe || (show_undeformed && results_mode);
+    if (draw_edges) {
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(1.0f, 1.0f);
+    }
+
     if (mode == DisplayMode::kSetup) {
         if (model_vertex_count_ > 0) {
             glBindVertexArray(model_vao_);
@@ -592,21 +626,21 @@ void Viewport::render(int width, int height, DisplayMode mode, float deform_scal
         }
     }
 
-    // Edge overlays: polygon offset so lines sit cleanly on shaded surfaces.
-    if (show_wireframe || (show_undeformed && results_mode)) {
-        glEnable(GL_POLYGON_OFFSET_LINE);
-        glPolygonOffset(-1.0f, -1.0f);
+    if (draw_edges) {
+        glDisable(GL_POLYGON_OFFSET_FILL);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDepthFunc(GL_LEQUAL);
         glUseProgram(line_program_);
         glUniformMatrix4fv(glGetUniformLocation(line_program_, "u_view"), 1, GL_FALSE,
                            view.data());
         glUniformMatrix4fv(glGetUniformLocation(line_program_, "u_proj"), 1, GL_FALSE,
                            proj.data());
-        glLineWidth(1.0f);
+        // Core profile may clamp >1; still request 1.5 for drivers that honor it.
+        glLineWidth(1.5f);
 
         if (show_undeformed && results_mode && mesh_edge_vertex_count_ > 0) {
-            // Rest outline (light gray) behind deformed mesh.
+            // Rest outline behind deformed mesh.
             glDepthMask(GL_FALSE);
             glBindVertexArray(mesh_edge_vao_);
             glDrawArrays(GL_LINES, 0, mesh_edge_vertex_count_);
@@ -621,8 +655,9 @@ void Viewport::render(int width, int height, DisplayMode mode, float deform_scal
                 glDrawArrays(GL_LINES, 0, mesh_edge_vertex_count_);
             }
         }
+        glDepthFunc(GL_LESS);
+        glLineWidth(1.0f);
         glDisable(GL_BLEND);
-        glDisable(GL_POLYGON_OFFSET_LINE);
     }
 
     glBindVertexArray(0);

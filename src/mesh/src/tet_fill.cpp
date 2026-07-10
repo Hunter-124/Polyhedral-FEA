@@ -11,7 +11,6 @@
 #include <format>
 #include <map>
 #include <set>
-#include <unordered_map>
 
 namespace polymesh::mesh {
 namespace {
@@ -147,54 +146,27 @@ TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
     }
 
     if (snap_boundary && !out.boundary_quads.empty()) {
-        std::set<std::uint32_t> bnodes;
+        std::set<std::uint32_t> bnode_set;
         for (const auto& q : out.boundary_quads) {
-            bnodes.insert(q.begin(), q.end());
+            bnode_set.insert(q.begin(), q.end());
         }
-        // Limited snap: pull toward the surface by at most 0.35 h. Full projection
-        // can invert tets; Jacobian safety below unsnaps offenders (ADR-0015/B3).
+        std::vector<std::uint32_t> bnodes(bnode_set.begin(), bnode_set.end());
         const double h_snap = out.h;
-        std::unordered_map<std::uint32_t, Eigen::Vector3d> pre_snap;
-        pre_snap.reserve(bnodes.size());
-        for (auto ni : bnodes) {
-            const Eigen::Vector3d p = out.nodes[ni];
-            const auto cp = closest_on_surface(surface, p);
-            if (cp.distance > 0.0 && cp.distance < 1.25 * h_snap) {
-                const Eigen::Vector3d delta = cp.point - p;
-                const double move = std::min(cp.distance, 0.35 * h_snap);
-                pre_snap.emplace(ni, p);
-                out.nodes[ni] = p + delta * (move / cp.distance);
-            }
-        }
-
-        // Unsnap any still-moved node that participates in a non-positive tet.
         const double vol_eps = 1e-14 * h_snap * h_snap * h_snap;
-        bool progressed = true;
-        while (progressed && !pre_snap.empty()) {
-            progressed = false;
-            std::set<std::uint32_t> offenders;
-            for (const auto& n : out.tets) {
-                const double v = tet_signed_volume_impl(out.nodes[n[0]], out.nodes[n[1]],
-                                                        out.nodes[n[2]], out.nodes[n[3]]);
-                if (v > vol_eps) {
-                    continue;
-                }
-                for (const auto idx : n) {
-                    if (pre_snap.find(idx) != pre_snap.end()) {
-                        offenders.insert(idx);
+        // Multi-pass snap ≤0.55 h with Jacobian safety (shared helper; ADR-0015/B3).
+        snap_boundary_nodes(
+            surface, out.nodes, bnodes, h_snap,
+            [&](std::set<std::uint32_t>& offenders) {
+                for (const auto& n : out.tets) {
+                    const double v = tet_signed_volume_impl(
+                        out.nodes[n[0]], out.nodes[n[1]], out.nodes[n[2]], out.nodes[n[3]]);
+                    if (v > vol_eps) {
+                        continue;
                     }
+                    offenders.insert(n.begin(), n.end());
                 }
-            }
-            for (const auto ni : offenders) {
-                const auto it = pre_snap.find(ni);
-                if (it == pre_snap.end()) {
-                    continue;
-                }
-                out.nodes[ni] = it->second;
-                pre_snap.erase(it);
-                progressed = true;
-            }
-        }
+            },
+            /*max_move_frac=*/0.55, /*passes=*/3);
 
         for (auto& n : out.tets) {
             const double v = tet_signed_volume_impl(out.nodes[n[0]], out.nodes[n[1]],

@@ -47,17 +47,29 @@ struct CartesianGrid {
     [[nodiscard]] double max_edge() const { return cell.maxCoeff(); }
 };
 
+/// Default product-mesh cell budget (fine lattice for graded is ~8× denser).
+inline constexpr long kDefaultMaxGridCells = 512 * 1024;
+
+/// Minimum target \(h\) so a Cartesian lattice at spacing \(h/\mathrm{subdivision}\)
+/// stays within `max_cells`. Use `subdivision=2` for graded-tet fine grids (h/2).
+/// Returns a conservative isotropic estimate (metres); actual grids may still
+/// auto-coarsen slightly due to ceil/even rounding.
+double min_h_for_cell_budget(const Eigen::Vector3d& bbox_min, const Eigen::Vector3d& bbox_max,
+                             long max_cells = kDefaultMaxGridCells, int subdivision = 1);
+
 /// Lattice that exactly fills [bbox_min, bbox_max] with n = ceil(extent/h)
 /// cells per axis and dx = extent/n (so faces land on AABB corners/edges).
-/// Throws ValidityError if h or bbox is invalid or the grid is absurdly fine.
+/// If the requested \(h\) would exceed `max_cells`, the grid is **auto-coarsened**
+/// (larger effective cell size) instead of throwing — product meshers must always
+/// produce a mesh. Throws only on invalid h/bbox.
 CartesianGrid make_bbox_grid(const Eigen::Vector3d& bbox_min, const Eigen::Vector3d& bbox_max,
-                             double h, long max_cells = 512 * 1024);
+                             double h, long max_cells = kDefaultMaxGridCells);
 
 /// Same, but round each axis up to an even count (≥ min_cells). Used by graded
-/// 2:1 fine/coarse grouping.
+/// 2:1 fine/coarse grouping. Auto-coarsens when over `max_cells` (keeps even n).
 CartesianGrid make_bbox_grid_even(const Eigen::Vector3d& bbox_min,
                                   const Eigen::Vector3d& bbox_max, double h, int min_cells = 2,
-                                  long max_cells = 512 * 1024);
+                                  long max_cells = kDefaultMaxGridCells);
 
 /// Even-odd inside test with Z-axis rays. Shared triangle edges (same z within
 /// eps) count once so coplanar face diagonals do not flip parity.

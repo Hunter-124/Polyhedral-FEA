@@ -6,6 +6,7 @@
 // a study sidebar (splitter-resizable) and the viewport filling the rest —
 // windows cannot be dragged out of the frame, collapsed, or lost.
 
+#include "fea/backend.hpp"
 #include "fea/vtu.hpp"
 #include "pipeline/scene.hpp"
 #include "theme.hpp"
@@ -717,6 +718,9 @@ void draw_frame(App& app) {
 }
 
 int run(int argc, char** argv) {
+    // OpenMP + Eigen multi-thread (double-only; no fast-math).
+    fea::init_runtime_performance();
+
     glfwSetErrorCallback([](int code, const char* text) {
         std::fprintf(stderr, "glfw error %d: %s\n", code, text);
     });

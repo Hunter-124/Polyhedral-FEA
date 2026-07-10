@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "fea/solve.hpp"
 
+#include "fea/backend.hpp"
+
 #include <Eigen/IterativeLinearSolvers>
 #include <Eigen/SparseCholesky>
 
@@ -72,6 +74,7 @@ Eigen::VectorXd solve_reduced(const Eigen::SparseMatrix<double>& kff,
 Eigen::VectorXd solve_elastostatics(const NodalMesh& mesh, const Material& material,
                                     const Dirichlet& dirichlet, const Eigen::VectorXd& loads,
                                     const SolveOptions& options) {
+    init_runtime_performance();
     const Eigen::Index ndof = 3 * static_cast<Eigen::Index>(mesh.nodes.size());
     if (loads.size() != ndof) {
         throw FeaError(std::format("solve_elastostatics: load vector size {} != 3N = {}",

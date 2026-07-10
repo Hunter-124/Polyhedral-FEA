@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "fea/assembly.hpp"
 
+#include "fea/backend.hpp"
 #include "fea/quadrature.hpp"
 #include "fea/shape.hpp"
 #include "fea/vem.hpp"
@@ -8,6 +9,7 @@
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <format>
@@ -129,6 +131,7 @@ Eigen::MatrixXd element_stiffness(const NodalMesh& mesh, const NodalElement& ele
 
 Eigen::SparseMatrix<double> assemble_stiffness(const NodalMesh& mesh,
                                                const Material& material) {
+    init_runtime_performance();
     mesh.check_validity();
     const Eigen::Index ndof = 3 * static_cast<Eigen::Index>(mesh.nodes.size());
     const auto ne = static_cast<std::ptrdiff_t>(mesh.elements.size());
@@ -161,15 +164,25 @@ Eigen::SparseMatrix<double> assemble_stiffness(const NodalMesh& mesh,
     // Thread-local triplets, critical-free during the element loop, then merge
     // in thread-id order. setFromTriplets sums duplicate (i,j) entries; patch
     // tests / Tier-0 remain exact within tol (same math as serial).
-    std::vector<std::vector<Eigen::Triplet<double>>> per_thread;
+    // Pre-size outside the parallel region so we never resize under concurrency.
+    const int nthreads = std::max(1, omp_get_max_threads());
+    std::vector<std::vector<Eigen::Triplet<double>>> per_thread(
+        static_cast<std::size_t>(nthreads));
+    // Rough reserve: ~ (nodes_per_elem^2 * 9) triplets per element, / threads.
+    const std::size_t reserve_each =
+        static_cast<std::size_t>(ne) * 16 * 9 / static_cast<std::size_t>(nthreads) + 64;
+    for (auto& buf : per_thread) {
+        buf.reserve(reserve_each);
+    }
     std::string parallel_error;
     std::atomic<bool> had_error{false};
 #pragma omp parallel
     {
-#pragma omp single
-        per_thread.resize(static_cast<std::size_t>(omp_get_num_threads()));
-        auto& local = per_thread[static_cast<std::size_t>(omp_get_thread_num())];
-#pragma omp for schedule(static) nowait
+        const int tid = omp_get_thread_num();
+        // Clamp if runtime thread count exceeds pre-size (should not happen).
+        auto& local =
+            per_thread[static_cast<std::size_t>(std::min(tid, nthreads - 1))];
+#pragma omp for schedule(static)
         for (std::ptrdiff_t e = 0; e < ne; ++e) {
             if (had_error.load(std::memory_order_relaxed)) {
                 continue;

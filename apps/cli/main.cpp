@@ -36,7 +36,7 @@ int usage() {
                "              [--eta-target η] [--p-elevate]\n"
                "                             mesh + cantilever-style BCs + VTU\n"
                "                             (fix min-x face nodes, load +Fy on max-x)\n"
-               "  backend                    print compute backend\n"
+               "  backend                    print compute backend + OpenMP/opt summary\n"
                "\n"
                "mesh size: omit -h (or -h 0) for auto h0 from bbox + sharp-edge density\n"
                "mesher names: tet (default), hex, hexvem|vem, graded, hexpyr|transition, "
@@ -338,6 +338,7 @@ int cmd_solve(std::span<char*> args) {
 } // namespace
 
 int main(int argc, char** argv) {
+    polymesh::fea::init_runtime_performance();
     const std::span<char*> args(argv, static_cast<std::size_t>(argc));
     if (args.size() < 2) {
         return usage();
@@ -354,7 +355,8 @@ int main(int argc, char** argv) {
             return cmd_solve(args);
         }
         if (command == "backend" && args.size() == 2) {
-            std::printf("%s\n", polymesh::fea::backend_description().c_str());
+            polymesh::fea::init_runtime_performance();
+            std::printf("%s\n", polymesh::fea::performance_description().c_str());
             return 0;
         }
     } catch (const std::exception& e) {

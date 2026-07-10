@@ -12,4 +12,10 @@ add_library(mesh
     src/local_refine.cpp
 )
 target_include_directories(mesh PUBLIC include)
-target_link_libraries(mesh PUBLIC geom Eigen3::Eigen PRIVATE polymesh_warnings)
+target_link_libraries(mesh PUBLIC geom Eigen3::Eigen PRIVATE polymesh_warnings polymesh_perf)
+
+# OpenMP for Cartesian inside-tests (grid classify) and similar mesh hot loops.
+if(POLYMESH_OPENMP_FOUND)
+    target_link_libraries(mesh PUBLIC OpenMP::OpenMP_CXX)
+    target_compile_definitions(mesh PUBLIC POLYMESH_WITH_OPENMP)
+endif()

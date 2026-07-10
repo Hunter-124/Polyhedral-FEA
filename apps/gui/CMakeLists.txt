@@ -46,5 +46,5 @@ add_executable(polymesh-gui
 )
 target_include_directories(polymesh-gui PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(polymesh-gui
-    PRIVATE pipeline imgui_lib OpenGL::GL polymesh_warnings
+    PRIVATE pipeline imgui_lib OpenGL::GL polymesh_warnings polymesh_perf
 )

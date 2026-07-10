@@ -18,6 +18,7 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: **Performance build** — Release defaults to **-O3**; OpenMP ON for assembly, mesh classify (uint8 mask, not vector<bool>), ZZ, stress, SpMV; Eigen kept serial to avoid nested OpenMP hangs; no -ffast-math; LTO/native-arch OFF (Eigen miscompile risk). `polymesh backend` reports thread stack. 133 tests green.
 - 2026-07-10: **Results viewport + geo-hybrid mesh** — pan/orbit fixed in von
   Mises/deflection/error (Image hover captured before colorbar child);
   auto-exaggerated deformation (max |u| → ~12% of model diagonal, true-scale

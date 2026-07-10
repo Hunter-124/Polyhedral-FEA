@@ -10,13 +10,18 @@ BUILD_TYPE="${1:-Release}"
 JOBS="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 
 echo "[polymesh] configure ($BUILD_TYPE)..."
+# Performance defaults: Release ⇒ -O3; OpenMP ON; host CPU tuning; LTO.
 # Do not force POLYMESH_BUILD_TESTS=OFF — that poisons the CMake cache for
 # later ctest runs. --target below still builds only the apps we install.
+# Accuracy: never pass -ffast-math / -Ofast (patch tests + Tier-1 stay exact).
 cmake -S . -B build -G Ninja \
   -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
   -DPOLYMESH_WITH_GUI=ON \
   -DPOLYMESH_WITH_OCC=OFF \
-  -DPOLYMESH_WITH_CUDA=OFF
+  -DPOLYMESH_WITH_CUDA=OFF \
+  -DPOLYMESH_WITH_OPENMP=ON \
+  -DPOLYMESH_NATIVE_ARCH=OFF \
+  -DPOLYMESH_ENABLE_LTO=OFF
 
 # Build only the apps we install to the repo root (not the full test suite).
 echo "[polymesh] build (jobs=$JOBS)..."

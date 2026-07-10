@@ -14,8 +14,9 @@ other — not glued together after the fact.
   general polyhedra (VEM).
 - **Geometry- and solution-driven adaptivity** (sizing, hp, local remesh).
 - **Linear elastostatics** (3D), STL (STEP via OpenCASCADE option), VTU export.
-- **Optional OpenMP** for multi-threaded element stiffness assembly when the toolchain
-  provides it; serial path always builds.
+- **OpenMP multithreading** (default ON) for stiffness assembly, mesh inside-tests,
+  ZZ recovery, stress recovery, and CSR SpMV. Eigen dense kernels stay single-threaded
+  to avoid nested OpenMP hangs. Serial path always builds if OpenMP is missing.
 - **Sparse direct + iterative solvers**: SimplicialLDLT for small/medium free systems;
   ConjugateGradient (diagonal preconditioner) auto-selected above 8000 free DOFs.
 - **Optional CUDA** for kernels where f64 parallelism wins; CPU path always exists.
@@ -58,13 +59,29 @@ sudo apt-get install -y --no-install-recommends \
 Optional:
 
 - **OpenCASCADE** (`POLYMESH_WITH_OCC=ON`) for STEP/B-rep — see [STEP / OpenCASCADE](#step--opencascade-polymesh_with_occ) below.
-- **OpenMP** (`POLYMESH_WITH_OPENMP=ON`, default) for parallel stiffness assembly — uses
-  libgomp with GCC; on Clang install `libomp-dev`. If OpenMP is missing, the build stays
-  serial (no hard dependency).
+- **OpenMP** (`POLYMESH_WITH_OPENMP=ON`, default) for parallel assembly, mesh classify,
+  ZZ/stress recovery, SpMV — uses libgomp with GCC; on Clang install `libomp-dev`. If
+  OpenMP is missing, the build stays serial (no hard dependency).
 - **CUDA** (`POLYMESH_WITH_CUDA=ON`) for GPU backends — requires a toolkit; CPU path always builds.
 - **clang-format 18** for style checks: `pip install 'clang-format==18.1.8'` (or use the version on `PATH`).
 
 C++20 compiler required (GCC 12+ or Clang 16+ recommended). CMake ≥ 3.24. Catch2, GLFW, and ImGui are fetched by CMake.
+
+### Performance build notes
+
+| Setting | Default | Effect |
+|---------|---------|--------|
+| `CMAKE_BUILD_TYPE=Release` | Release if unset | **`-O3 -DNDEBUG`** (GCC/Clang) |
+| `POLYMESH_WITH_OPENMP` | ON | Multi-thread assembly / mesh / ZZ / SpMV |
+| `POLYMESH_NATIVE_ARCH` | **OFF** | Optional `-march=x86-64-v3` (try only if ctest stays green) |
+| `POLYMESH_ENABLE_LTO` | **OFF** | LTO can miscompile Eigen (SEGV); leave off |
+
+We deliberately **do not** use `-ffast-math` / `-Ofast` / reduced precision — patch tests
+and Tier-1 verification stay double-exact. Primary speed levers: **`-O3`** (Release) and
+**OpenMP**. Host ISA flags (`-march=*`) have caused Eigen heap corruption on this
+toolchain; leave them off unless you re-verify with `ctest`.
+
+Check the runtime stack: `polymesh backend` → e.g. `cpu | OpenMP 16 threads | Eigen serial (no nest)`.
 
 ### Clone, configure, build, test
 
@@ -74,10 +91,12 @@ git clone <this-repo-url> polymesh && cd polymesh
 cmake -S . -B build -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DPOLYMESH_WITH_GUI=ON \
+  -DPOLYMESH_WITH_OPENMP=ON \
   -DPOLYMESH_WITH_OCC=OFF \
   -DPOLYMESH_WITH_CUDA=OFF
 
 cmake --build build -j
+./build/apps/cli/polymesh backend   # confirm OpenMP threads
 ctest --test-dir build --output-on-failure --parallel 2
 ```
 

@@ -5,4 +5,4 @@ add_library(adapt
     src/sizing_field.cpp
 )
 target_include_directories(adapt PUBLIC include)
-target_link_libraries(adapt PUBLIC geom mesh Eigen3::Eigen PRIVATE polymesh_warnings)
+target_link_libraries(adapt PUBLIC geom mesh Eigen3::Eigen PRIVATE polymesh_warnings polymesh_perf)

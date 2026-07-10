@@ -24,4 +24,19 @@ Backend active_backend();
 /// Human-readable description, e.g. "cpu" or "cuda (NVIDIA GeForce RTX 3080 Ti)".
 std::string backend_description();
 
+/// Whether this build linked OpenMP for assembly / mesh / recovery hot paths.
+bool openmp_enabled();
+
+/// Max OpenMP threads the runtime will use (1 if OpenMP is off).
+int openmp_max_threads();
+
+/// One-line performance summary: backend + OpenMP thread count.
+/// Example: `"cpu | OpenMP 16 threads | Eigen multi-thread"`.
+std::string performance_description();
+
+/// Call once at process start (CLI/GUI) and before large solves: enables
+/// Eigen multi-threaded dense kernels when OpenMP is present. Safe to call
+/// repeatedly. Does not change floating-point mode or solver tolerances.
+void init_runtime_performance();
+
 } // namespace polymesh::fea

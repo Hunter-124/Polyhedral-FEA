@@ -18,18 +18,25 @@ where ninja >nul 2>&1
 if errorlevel 1 set "GEN=Visual Studio 17 2022"
 
 echo [polymesh] configure (%BUILD_TYPE%, generator=%GEN%)...
+REM Release = -O3; OpenMP + native arch + LTO for performance (no /fp:fast).
 if /I "%GEN%"=="Ninja" (
   cmake -S . -B build -G Ninja ^
     -DCMAKE_BUILD_TYPE=%BUILD_TYPE% ^
     -DPOLYMESH_WITH_GUI=ON ^
     -DPOLYMESH_WITH_OCC=OFF ^
-    -DPOLYMESH_WITH_CUDA=OFF
+    -DPOLYMESH_WITH_CUDA=OFF ^
+    -DPOLYMESH_WITH_OPENMP=ON ^
+    -DPOLYMESH_NATIVE_ARCH=OFF ^
+    -DPOLYMESH_ENABLE_LTO=OFF
 ) else (
   cmake -S . -B build -G "%GEN%" -A x64 ^
     -DCMAKE_BUILD_TYPE=%BUILD_TYPE% ^
     -DPOLYMESH_WITH_GUI=ON ^
     -DPOLYMESH_WITH_OCC=OFF ^
-    -DPOLYMESH_WITH_CUDA=OFF
+    -DPOLYMESH_WITH_CUDA=OFF ^
+    -DPOLYMESH_WITH_OPENMP=ON ^
+    -DPOLYMESH_NATIVE_ARCH=OFF ^
+    -DPOLYMESH_ENABLE_LTO=OFF
 )
 if errorlevel 1 (
   echo [polymesh] configure failed

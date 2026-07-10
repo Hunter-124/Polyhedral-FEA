@@ -17,7 +17,7 @@ add_library(fea
     src/p_elevate.cpp
 )
 target_include_directories(fea PUBLIC include)
-target_link_libraries(fea PUBLIC mesh Eigen3::Eigen PRIVATE polymesh_warnings)
+target_link_libraries(fea PUBLIC mesh Eigen3::Eigen PRIVATE polymesh_warnings polymesh_perf)
 
 if(POLYMESH_WITH_CUDA)
     target_sources(fea PRIVATE src/backend_cuda.cu)
@@ -25,14 +25,8 @@ if(POLYMESH_WITH_CUDA)
     target_link_libraries(fea PUBLIC CUDA::cudart)
 endif()
 
-# Optional OpenMP for assemble_stiffness (F1). Build remains serial if missing.
-if(POLYMESH_WITH_OPENMP)
-    find_package(OpenMP)
-    if(OpenMP_CXX_FOUND)
-        target_link_libraries(fea PUBLIC OpenMP::OpenMP_CXX)
-        target_compile_definitions(fea PUBLIC POLYMESH_WITH_OPENMP)
-        message(STATUS "OpenMP: enabled for fea element stiffness assembly")
-    else()
-        message(STATUS "OpenMP: not found — serial stiffness assembly")
-    endif()
+# OpenMP for assemble_stiffness, ZZ recovery, stress, SpMV (F1+). Serial if missing.
+if(POLYMESH_OPENMP_FOUND)
+    target_link_libraries(fea PUBLIC OpenMP::OpenMP_CXX)
+    target_compile_definitions(fea PUBLIC POLYMESH_WITH_OPENMP)
 endif()

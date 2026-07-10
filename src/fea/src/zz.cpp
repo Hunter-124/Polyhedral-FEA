@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "fea/zz.hpp"
 
+#include "fea/backend.hpp"
 #include "fea/shape.hpp"
 
 #include <Eigen/Dense>
@@ -9,6 +10,10 @@
 #include <cmath>
 #include <map>
 #include <vector>
+
+#if defined(POLYMESH_WITH_OPENMP)
+#include <omp.h>
+#endif
 
 namespace polymesh::fea {
 namespace {
@@ -47,6 +52,7 @@ Eigen::Vector3d element_centroid(const NodalMesh& mesh, const NodalElement& el) 
 
 ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
                       const Eigen::VectorXd& u) {
+    init_runtime_performance();
     const auto d = material.d_matrix();
     const auto n_nodes = mesh.nodes.size();
     const auto n_elem = mesh.elements.size();
@@ -54,11 +60,15 @@ ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
     // Element centroid stress (superconvergent sampling points for linear elements).
     std::vector<Stress> el_stress(n_elem, Stress::Zero());
     std::vector<Eigen::Vector3d> el_cent(n_elem);
-    for (std::size_t e = 0; e < n_elem; ++e) {
-        const auto& el = mesh.elements[e];
-        el_cent[e] = element_centroid(mesh, el);
+#if defined(POLYMESH_WITH_OPENMP)
+#pragma omp parallel for schedule(static)
+#endif
+    for (std::ptrdiff_t e = 0; e < static_cast<std::ptrdiff_t>(n_elem); ++e) {
+        const auto eu = static_cast<std::size_t>(e);
+        const auto& el = mesh.elements[eu];
+        el_cent[eu] = element_centroid(mesh, el);
         if (el.type == ElementType::kPolyVem) {
-            el_stress[e].setZero();
+            el_stress[eu].setZero();
             continue;
         }
         Eigen::Matrix<double, Eigen::Dynamic, 3> x(el.nodes.size(), 3);
@@ -72,10 +82,10 @@ ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
             xi += r;
         }
         xi /= static_cast<double>(ref.size());
-        el_stress[e] = stress_at(el, x, u, d, xi);
+        el_stress[eu] = stress_at(el, x, u, d, xi);
     }
 
-    // Node → incident elements.
+    // Node → incident elements (serial — graph build).
     std::vector<std::vector<std::size_t>> incident(n_nodes);
     for (std::size_t e = 0; e < n_elem; ++e) {
         for (auto n : mesh.elements[e].nodes) {
@@ -86,8 +96,12 @@ ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
     // Per-node least-squares fit of stress components: σ(x) ≈ a0 + a1 x + a2 y + a3 z
     ZzRecovery out;
     out.nodal_stress.assign(n_nodes, Stress::Zero());
-    for (std::size_t n = 0; n < n_nodes; ++n) {
-        const auto& patch = incident[n];
+#if defined(POLYMESH_WITH_OPENMP)
+#pragma omp parallel for schedule(static)
+#endif
+    for (std::ptrdiff_t n = 0; n < static_cast<std::ptrdiff_t>(n_nodes); ++n) {
+        const auto nu = static_cast<std::size_t>(n);
+        const auto& patch = incident[nu];
         if (patch.empty()) {
             continue;
         }
@@ -97,7 +111,7 @@ ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
             for (auto e : patch) {
                 acc += el_stress[e];
             }
-            out.nodal_stress[n] = acc / static_cast<double>(patch.size());
+            out.nodal_stress[nu] = acc / static_cast<double>(patch.size());
             continue;
         }
         const auto m = static_cast<Eigen::Index>(patch.size());
@@ -116,26 +130,30 @@ ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
         const Eigen::MatrixXd ata = A.transpose() * A;
         const Eigen::MatrixXd atb = A.transpose() * B;
         const Eigen::MatrixXd coeff = ata.ldlt().solve(atb);
-        const Eigen::Vector3d& p = mesh.nodes[n];
+        const Eigen::Vector3d& p = mesh.nodes[nu];
         Eigen::RowVector4d row;
         row << 1.0, p[0], p[1], p[2];
-        out.nodal_stress[n] = (row * coeff).transpose();
+        out.nodal_stress[nu] = (row * coeff).transpose();
     }
 
     // Element indicators: ||σ* - σ_h||_energy-ish via stress L2 at centroid.
     out.element_eta.assign(n_elem, 0.0);
     double sum_sq = 0.0;
-    for (std::size_t e = 0; e < n_elem; ++e) {
-        const auto& el = mesh.elements[e];
+#if defined(POLYMESH_WITH_OPENMP)
+#pragma omp parallel for schedule(static) reduction(+ : sum_sq)
+#endif
+    for (std::ptrdiff_t e = 0; e < static_cast<std::ptrdiff_t>(n_elem); ++e) {
+        const auto eu = static_cast<std::size_t>(e);
+        const auto& el = mesh.elements[eu];
         Stress star = Stress::Zero();
         for (auto n : el.nodes) {
             star += out.nodal_stress[n];
         }
         star /= static_cast<double>(el.nodes.size());
-        const Stress diff = star - el_stress[e];
+        const Stress diff = star - el_stress[eu];
         // Energy-like: (1/2) e : C^{-1} : e ≈ use ||diff||^2 scaled (C positive definite).
         const double eta = diff.norm();
-        out.element_eta[e] = eta;
+        out.element_eta[eu] = eta;
         sum_sq += eta * eta;
     }
     out.global_eta = std::sqrt(sum_sq);

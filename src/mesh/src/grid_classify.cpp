@@ -5,8 +5,13 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <format>
 #include <vector>
+
+#if defined(POLYMESH_WITH_OPENMP)
+#include <omp.h>
+#endif
 
 namespace polymesh::mesh {
 namespace {
@@ -48,7 +53,9 @@ std::vector<bool> classify_impl(const geom::TriSurface& surface, const Cartesian
     const int a0 = (ray_axis + 1) % 3;
     const int a1 = (ray_axis + 2) % 3;
     // Lattice is always (nx,ny,nz) in xyz. Plane axes a0/a1, ray along ray_axis.
-    std::vector<bool> inside(static_cast<std::size_t>(grid.cell_count()), false);
+    // IMPORTANT: use uint8_t (not vector<bool>) for the parallel fill — vector<bool>
+    // packs bits so concurrent writes to different indices still race on the same word.
+    std::vector<std::uint8_t> inside(static_cast<std::size_t>(grid.cell_count()), 0);
 
     const double char_len = std::max({grid.cell[0], grid.cell[1], grid.cell[2], 1.0});
     const double zeps = 1e-12 * char_len + 1e-9 * char_len;
@@ -59,6 +66,10 @@ std::vector<bool> classify_impl(const geom::TriSurface& surface, const Cartesian
     const int nj = n_axis[a1];
     const int nk = n_axis[ray_axis];
 
+    // Parallel over plane rows: each (i,j) owns a disjoint set of cells along the ray.
+#if defined(POLYMESH_WITH_OPENMP)
+#pragma omp parallel for schedule(dynamic, 4)
+#endif
     for (int j = 0; j < nj; ++j) {
         for (int i = 0; i < ni; ++i) {
             const double c0 = grid.origin[a0] + (static_cast<double>(i) + 0.5) * grid.cell[a0];
@@ -104,11 +115,12 @@ std::vector<bool> classify_impl(const geom::TriSurface& surface, const Cartesian
                 *comps[a0] = i;
                 *comps[a1] = j;
                 *comps[ray_axis] = k;
-                inside[grid.index(ix, iy, iz)] = true;
+                inside[grid.index(ix, iy, iz)] = 1;
             }
         }
     }
-    return inside;
+    // API keeps vector<bool>; conversion is serial and cheap vs the classify.
+    return std::vector<bool>(inside.begin(), inside.end());
 }
 
 } // namespace

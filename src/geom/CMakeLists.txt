@@ -7,7 +7,7 @@ add_library(geom
     src/indicators.cpp
 )
 target_include_directories(geom PUBLIC include)
-target_link_libraries(geom PUBLIC Eigen3::Eigen PRIVATE polymesh_warnings)
+target_link_libraries(geom PUBLIC Eigen3::Eigen PRIVATE polymesh_warnings polymesh_perf)
 
 if(POLYMESH_WITH_OCC)
     # Optional B-rep/STEP path (ADR-0001). Requires OpenCASCADE (OCCT).

@@ -1,18 +1,20 @@
 {
+  "schema_version": 1,
   "solver": "calculix",
-  "version": "This is Version 2.23",
+  "version": "2.23",
   "case_id": "cantilever_smoke",
-  "dofs": null,
+  "dofs": 48,
   "wall_time_s": {
     "mesh": null,
-    "solve": 0.013698279999516672,
-    "total": 0.013698279999516672
+    "solve": 0.030549247996532358,
+    "total": 0.030549247996532358
   },
   "accuracy": {
     "name": "smoke_ran",
-    "value": 1.0
+    "value": 1.0,
+    "unit": "bool"
   },
   "label": "calculix-cantilever-smoke",
-  "timestamp": "2026-07-10T06:57:41.733698+00:00",
-  "notes": "ccx smoke deck; not a calibrated accuracy benchmark"
+  "timestamp": "2026-07-10T08:54:04.391282+00:00",
+  "notes": "ccx C3D8 4x1x1 smoke deck (20 nodes, 48 free DOF); not a calibrated accuracy benchmark vs PolyMesh tip err"
 }

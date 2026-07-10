@@ -3,6 +3,7 @@
 
 #include "adapt/error.hpp"
 #include "adapt/loop.hpp"
+#include "fea/p_elevate.hpp"
 #include "fea/solve.hpp"
 #include "fea/vem.hpp"
 #include "fea/vtu.hpp"
@@ -556,6 +557,82 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 return cents;
             };
 
+            // D3: p-elevate smooth linear elems after last h-pass (or single solve).
+            // Explicit flag or auto when adapt_passes > 0.
+            const bool do_p_elevate = setup.p_elevate || setup.adapt_passes > 0;
+
+            // After mid-edge insertion, assign boundary regions to new nodes that
+            // sit between two existing boundary nodes of the same region so
+            // fixtures/loads still cover face mid-edge DOFs.
+            auto extend_boundary_regions = [&]() {
+                std::map<std::pair<std::uint32_t, std::uint32_t>, std::uint32_t> edge_mid;
+                for (const auto& el : vol.mesh.elements) {
+                    if (el.type != fea::ElementType::kTet10 &&
+                        el.type != fea::ElementType::kHex20) {
+                        continue;
+                    }
+                    const int n_corner = (el.type == fea::ElementType::kTet10) ? 4 : 8;
+                    const int n_mid = (el.type == fea::ElementType::kTet10) ? 6 : 12;
+                    // Canonical edge order matches p_elevate mid-edge append order.
+                    static constexpr std::array<std::array<int, 2>, 6> kTetEdges{
+                        {{0, 1}, {1, 2}, {0, 2}, {0, 3}, {1, 3}, {2, 3}}};
+                    static constexpr std::array<std::array<int, 2>, 12> kHexEdges{{{0, 1},
+                                                                                   {1, 2},
+                                                                                   {2, 3},
+                                                                                   {3, 0},
+                                                                                   {4, 5},
+                                                                                   {5, 6},
+                                                                                   {6, 7},
+                                                                                   {7, 4},
+                                                                                   {0, 4},
+                                                                                   {1, 5},
+                                                                                   {2, 6},
+                                                                                   {3, 7}}};
+                    for (int m = 0; m < n_mid; ++m) {
+                        const auto& epair = (el.type == fea::ElementType::kTet10)
+                                                ? kTetEdges[static_cast<std::size_t>(m)]
+                                                : kHexEdges[static_cast<std::size_t>(m)];
+                        const auto a = el.nodes[static_cast<std::size_t>(epair[0])];
+                        const auto b = el.nodes[static_cast<std::size_t>(epair[1])];
+                        const auto mid = el.nodes[static_cast<std::size_t>(n_corner + m)];
+                        edge_mid[std::minmax(a, b)] = mid;
+                    }
+                }
+                for (const auto& [ab, mid] : edge_mid) {
+                    if (vol.boundary_node_region.contains(mid)) {
+                        continue;
+                    }
+                    const auto ita = vol.boundary_node_region.find(ab.first);
+                    const auto itb = vol.boundary_node_region.find(ab.second);
+                    if (ita != vol.boundary_node_region.end() &&
+                        itb != vol.boundary_node_region.end() && ita->second == itb->second) {
+                        vol.boundary_node_region[mid] = ita->second;
+                    }
+                }
+            };
+
+            auto maybe_p_elevate = [&](const std::vector<double>& element_eta,
+                                       std::string& note_suffix) {
+                if (!do_p_elevate || element_eta.empty()) {
+                    return false;
+                }
+                const auto smooth = adapt::mark_smooth(element_eta, 0.3);
+                if (smooth.empty()) {
+                    note_suffix = " p-elev=0";
+                    return false;
+                }
+                const auto before = vol.mesh.nodes.size();
+                vol.mesh = fea::p_elevate(vol.mesh, smooth);
+                extend_boundary_regions();
+                apply_bcs();
+                const auto counts = fea::count_element_types(vol.mesh);
+                note_suffix =
+                    std::format(" p-elev={} n+{} (tet10={} hex20={})", smooth.size(),
+                                vol.mesh.nodes.size() - before, counts.tet10, counts.hex20);
+                set_status(std::format("p-elevate… ({} smooth → quadratic)", smooth.size()));
+                return true;
+            };
+
             for (int pass = 0; pass <= setup.adapt_passes; ++pass) {
                 if (pass > 0) {
                     // Prefer graded mesher when local seeds are available so
@@ -570,15 +647,20 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     set_status(std::format("adapt pass {}… ({} elems, {} seeds)", pass,
                                            vol.mesh.elements.size(), adapt_seeds.size()));
                 }
-                const auto u_try = fea::solve_elastostatics(vol.mesh, material, bc, loads);
-                const auto zz_try = fea::recover_zz(vol.mesh, material, u_try);
+                auto u_try = fea::solve_elastostatics(vol.mesh, material, bc, loads);
+                auto zz_try = fea::recover_zz(vol.mesh, material, u_try);
                 // D2: global η target — stop when η is small enough (0 = disabled).
                 if (setup.eta_target > 0.0 && zz_try.global_eta <= setup.eta_target) {
+                    std::string pnote;
+                    if (maybe_p_elevate(zz_try.element_eta, pnote)) {
+                        u_try = fea::solve_elastostatics(vol.mesh, material, bc, loads);
+                        zz_try = fea::recover_zz(vol.mesh, material, u_try);
+                    }
                     SolveResult r;
-                    r.mesh_note =
-                        std::format("{} | eta-target stop η={:.4g}≤{:.4g} pass={}/{} h={:.4g}",
-                                    vol.mesher_note, zz_try.global_eta, setup.eta_target, pass,
-                                    setup.adapt_passes, h_use);
+                    r.mesh_note = std::format(
+                        "{} | eta-target stop η={:.4g}≤{:.4g} pass={}/{} h={:.4g}{}",
+                        vol.mesher_note, zz_try.global_eta, setup.eta_target, pass,
+                        setup.adapt_passes, h_use, pnote);
                     r.volume_mesh = std::move(vol.mesh);
                     r.boundary_quads = std::move(vol.boundary_quads);
                     fill_result_fields(r, zz_try, u_try);
@@ -590,9 +672,14 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     const auto sug = adapt::suggest_refine(cents, zz_try.element_eta, h_use,
                                                            0.3, 0.75, h * 0.35);
                     if (sug.n_marked == 0 && sug.h_next >= h_use * 0.98) {
+                        std::string pnote;
+                        if (maybe_p_elevate(zz_try.element_eta, pnote)) {
+                            u_try = fea::solve_elastostatics(vol.mesh, material, bc, loads);
+                            zz_try = fea::recover_zz(vol.mesh, material, u_try);
+                        }
                         SolveResult r;
-                        r.mesh_note = std::format("{} | adapt early-stop h={:.4g}",
-                                                  vol.mesher_note, h_use);
+                        r.mesh_note = std::format("{} | adapt early-stop h={:.4g}{}",
+                                                  vol.mesher_note, h_use, pnote);
                         r.volume_mesh = std::move(vol.mesh);
                         r.boundary_quads = std::move(vol.boundary_quads);
                         fill_result_fields(r, zz_try, u_try);
@@ -604,10 +691,15 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     adapt_seed_band = sug.seed_band;
                     continue;
                 }
+                std::string pnote;
+                if (maybe_p_elevate(zz_try.element_eta, pnote)) {
+                    u_try = fea::solve_elastostatics(vol.mesh, material, bc, loads);
+                    zz_try = fea::recover_zz(vol.mesh, material, u_try);
+                }
                 SolveResult r;
                 r.mesh_note =
-                    std::format("{} | adapt_passes={} h={:.4g} seeds={}", vol.mesher_note,
-                                setup.adapt_passes, h_use, adapt_seeds.size());
+                    std::format("{} | adapt_passes={} h={:.4g} seeds={}{}", vol.mesher_note,
+                                setup.adapt_passes, h_use, adapt_seeds.size(), pnote);
                 r.volume_mesh = std::move(vol.mesh);
                 r.boundary_quads = std::move(vol.boundary_quads);
                 fill_result_fields(r, zz_try, u_try);

@@ -6,7 +6,7 @@
 
 **Active:** Track A (GUI usable) → M1 study app. 90+ tests green. Solver core
 (GATE 1) frozen. Mesh/adapt product path advancing (graded, hexpyr, seed remesh).
-F1 OpenMP + F2 CG + E1–E3 + B1/B3/B4 + C1 + C2 + D5 + E4 + G1–G4 done.
+F1 OpenMP + F2 CG + E1–E3 + B1/B3/B4 + C1 + C2 + D3 + D5 + E4 + G1–G4 done.
 
 GATE 1 deliverables ready:
 - Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)
@@ -18,6 +18,11 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: D3 p-elevation — `fea::promote_to_quadratic` / `fea::p_elevate`
+  (tet4→tet10, hex8→hex20, shared mid-edge map); `adapt::mark_smooth` (Dörfler
+  complement); `SimSetup::p_elevate` + auto when `adapt_passes>0`; CLI
+  `--p-elevate`; GUI checkbox; Catch2 promote/patch/selective/mark tests.
+  test_support wraps product API.
 - 2026-07-10: C2 curvature + thin-wall indicators — `geom::estimate_vertex_curvature`
   (dihedral 1-ring |H| proxy) + `estimate_local_thickness` (inward ray cast);
   `adapt::GeometrySizing` / `make_geometry_sizing` mins sharp-edge blend, h≈c/κ,

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "support/structured_mesh.hpp"
 
+#include "fea/p_elevate.hpp"
+
 #include <array>
-#include <map>
-#include <utility>
 
 namespace polymesh::test_support {
 
@@ -83,57 +83,7 @@ NodalMesh box_tet_mesh(int nx, int ny, int nz, const Eigen::Vector3d& size) {
 }
 
 NodalMesh promote_to_quadratic(const NodalMesh& mesh) {
-    // Edges per element type, matching the canonical mid-edge node ordering
-    // in fea/nodal_mesh.hpp.
-    constexpr std::array<std::array<int, 2>, 6> kTetEdges{
-        {{0, 1}, {1, 2}, {0, 2}, {0, 3}, {1, 3}, {2, 3}}};
-    constexpr std::array<std::array<int, 2>, 12> kHexEdges{{{0, 1},
-                                                            {1, 2},
-                                                            {2, 3},
-                                                            {3, 0},
-                                                            {4, 5},
-                                                            {5, 6},
-                                                            {6, 7},
-                                                            {7, 4},
-                                                            {0, 4},
-                                                            {1, 5},
-                                                            {2, 6},
-                                                            {3, 7}}};
-    NodalMesh out;
-    out.nodes = mesh.nodes;
-    std::map<std::pair<std::uint32_t, std::uint32_t>, std::uint32_t> midpoints;
-    const auto midpoint = [&](std::uint32_t a, std::uint32_t b) {
-        const auto key = std::minmax(a, b);
-        const auto [it, inserted] =
-            midpoints.try_emplace(key, static_cast<std::uint32_t>(out.nodes.size()));
-        if (inserted) {
-            out.nodes.push_back(0.5 * (out.nodes[a] + out.nodes[b]));
-        }
-        return it->second;
-    };
-    for (const auto& element : mesh.elements) {
-        NodalElement promoted;
-        promoted.nodes = element.nodes;
-        if (element.type == ElementType::kTet4) {
-            promoted.type = ElementType::kTet10;
-            for (const auto& e : kTetEdges) {
-                promoted.nodes.push_back(
-                    midpoint(element.nodes[static_cast<std::size_t>(e[0])],
-                             element.nodes[static_cast<std::size_t>(e[1])]));
-            }
-        } else if (element.type == ElementType::kHex8) {
-            promoted.type = ElementType::kHex20;
-            for (const auto& e : kHexEdges) {
-                promoted.nodes.push_back(
-                    midpoint(element.nodes[static_cast<std::size_t>(e[0])],
-                             element.nodes[static_cast<std::size_t>(e[1])]));
-            }
-        } else {
-            throw fea::FeaError("promote_to_quadratic: element is already quadratic");
-        }
-        out.elements.push_back(std::move(promoted));
-    }
-    return out;
+    return fea::promote_to_quadratic(mesh);
 }
 
 void distort_interior(NodalMesh& mesh, double amplitude, double h, std::uint64_t seed) {

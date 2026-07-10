@@ -65,6 +65,10 @@ struct SimSetup {
     /// Stop adapt when global ZZ relative indicator \(\eta \le\) this value.
     /// Dimensionless (energy-norm style); **0 = disabled**.
     double eta_target = 0.0;
+    /// p-elevate smooth (non-Dörfler) linear elements to tet10/hex20 after the
+    /// last h-adapt pass (or after the single solve when adapt_passes=0).
+    /// When false, still auto-enables if adapt_passes > 0 (hp product path).
+    bool p_elevate = false;
     int skin_layers = 2; // graded-tet boundary skin depth (coarse cells)
     VolumeMesher mesher = VolumeMesher::kTetFill;
     std::set<int> fixtures; // region ids with all DOFs fixed

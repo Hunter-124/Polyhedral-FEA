@@ -19,6 +19,12 @@ namespace polymesh::adapt {
 std::vector<std::size_t> dorfler_mark(const std::vector<double>& element_eta,
                                       double theta = 0.3);
 
+/// Smooth (low-error) complement of Dörfler: candidates for p-elevation.
+/// Returns element indices not in the high-η Dörfler set (ascending order).
+/// When total η² is zero, returns all indices (entire mesh is smooth).
+std::vector<std::size_t> mark_smooth(const std::vector<double>& element_eta,
+                                     double theta = 0.3);
+
 /// Sizing that refines toward sharp features:
 /// \( h(x) = \mathrm{clamp}(h_{\min} + \alpha\, d_{\mathrm{feat}},\, h_{\min},\, h_{\max}) \).
 /// Lengths \(h_{\min}\), \(h_{\max}\), \(d_{\mathrm{feat}}\) in metres; \(\alpha\)

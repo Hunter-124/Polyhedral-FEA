@@ -37,6 +37,23 @@ std::vector<std::size_t> dorfler_mark(const std::vector<double>& element_eta, do
     return marked;
 }
 
+std::vector<std::size_t> mark_smooth(const std::vector<double>& element_eta, double theta) {
+    const auto n = element_eta.size();
+    const auto high = dorfler_mark(element_eta, theta);
+    std::vector<char> is_high(n, 0);
+    for (auto i : high) {
+        is_high[i] = 1;
+    }
+    std::vector<std::size_t> smooth;
+    smooth.reserve(n - high.size());
+    for (std::size_t i = 0; i < n; ++i) {
+        if (!is_high[i]) {
+            smooth.push_back(i);
+        }
+    }
+    return smooth;
+}
+
 double FeatureGradedSizing::size_at(const Eigen::Vector3d& point) const {
     const double d = geom::distance_to_features(point, *surface_, edges_);
     if (!std::isfinite(d)) {

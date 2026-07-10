@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
 // Gmsh .msh format version 2.2 (ASCII) import for the P1 reference solver.

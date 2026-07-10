@@ -2,71 +2,66 @@
 
 **Adaptive hybrid polyhedral mesh generator co-designed with an FEA solver.**
 
-Most FEA workflows treat meshing and solving as separate concerns: a uniform
-tet mesh wastes enormous compute on regions a single large element would
-resolve, while under-resolving the stress concentrations at edges, corners,
-and fillets — exactly where results matter. PolyMesh reads the geometry,
-classifies regions by criticality, and chooses element **shape, size, and
-polynomial order** per region — then iterates with solver feedback until a
-target accuracy is met at minimum cost.
+Most FEA workflows treat meshing and solving as separate concerns. PolyMesh
+classifies geometry by criticality and chooses element **shape, size, and
+polynomial order** per region, then iterates with solver feedback toward a
+target accuracy at minimum cost. The mesher and solver are optimized for each
+other — not glued together after the fact.
 
-## What it does (v1 scope)
+## What it does
 
-- **Hybrid element zoo** in one conforming mesh: tets, hexes, prisms,
-  pyramids, and general polyhedra (Virtual Element Method).
-- **Adaptive polynomial order** p = 1–4 per element: cheap low-order elements
-  in benign regions, high-order where stress accuracy matters.
-- **Geometry-driven sizing**: sharp edges, corners, high curvature, and thin
-  walls are detected automatically and get graded, high-fidelity treatment.
-- **Solution-driven adaptivity**: solve → estimate error per element → refine
-  size, raise order, or swap element type locally → re-solve.
-- **Linear elastostatics** (3D), STL and STEP input, VTU output for ParaView.
-- **CUDA acceleration** (optional): parallelizable kernels — batched element
-  stiffness, sparse matrix-vector products, error indicators — offload to the
-  GPU in full double precision, with a CPU reference path that always exists.
-- **Verified, not vibes**: every element passes patch tests, every claimed
-  convergence order is demonstrated on manufactured solutions, and benchmarks
-  run against closed-form analytical cases (see [BENCHMARKS.md](BENCHMARKS.md)).
+- **Hybrid element zoo** in one conforming mesh: tets, hexes, prisms, pyramids,
+  general polyhedra (VEM).
+- **Geometry- and solution-driven adaptivity** (sizing, hp, local remesh).
+- **Linear elastostatics** (3D), STL (STEP via OpenCASCADE option), VTU export.
+- **Optional CUDA** for kernels where f64 parallelism wins; CPU path always exists.
+- **Verified**: patch tests, manufactured-solution convergence orders, analytical
+  Tier-1 cases — see [docs/benchmarks.md](docs/benchmarks.md).
 
 ## Status
 
-Early development — Phase P0 (scaffolding) complete; Phase P1 (reference
-solver on standard elements) is next. See [PHASES.md](PHASES.md) for the plan
-and [PROGRESS.md](PROGRESS.md) for the current state.
+P1 reference solver frozen as baseline. Campaign in progress: real mesher,
+hybrid zoo, adaptivity, competitive scoreboard. Tracking:
+[docs/progress.md](docs/progress.md), [docs/phases.md](docs/phases.md).
 
 ## Building
 
-Requires a C++20 compiler, CMake ≥ 3.24, Eigen, and nlohmann-json
-(Catch2 is fetched automatically for tests).
+C++20, CMake ≥ 3.24, Ninja, Eigen, nlohmann-json (Catch2/GLFW/ImGui via FetchContent).
 
 ```sh
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ctest --test-dir build
+./build/apps/gui/polymesh-gui
 ```
-
-Optional components:
 
 ```sh
-# STEP/B-rep import via OpenCASCADE
-cmake -B build -DPOLYMESH_WITH_OCC=ON
-# CUDA backend (requires the CUDA toolkit)
-cmake -B build -DPOLYMESH_WITH_CUDA=ON
+cmake -B build -DPOLYMESH_WITH_OCC=ON    # STEP/B-rep (OpenCASCADE)
+cmake -B build -DPOLYMESH_WITH_CUDA=ON   # GPU backends
 ```
 
-## Layout
+## Layout (short)
 
-| Module | Purpose |
+| Path | Role |
 |---|---|
-| `src/geom` | Geometry input (STL; STEP via `POLYMESH_WITH_OCC`), feature analysis |
-| `src/mesh` | Face-based polyhedral mesh structure, validity, generation |
-| `src/adapt` | Sizing fields, error estimation, hp-refinement decisions |
-| `src/fea` | Element formulations, assembly, sparse solve, CPU/CUDA backends |
-| `src/bench` | Verification harness (Tier 0–3) and anti-cheat audit tooling |
-| `src/cli` | `polymesh` command-line interface |
+| `apps/cli`, `apps/gui` | Executables only (GUI is presentation) |
+| `src/geom` `mesh` `adapt` `fea` | Core libraries |
+| `src/pipeline` | Headless import → mesh → solve (no OpenGL) |
+| `src/bench` | Reference JSON loader (anti-cheat boundary) |
+| `tests/` | Catch2 suite |
+| `bench/` | Reference cases, reports, peer harness |
+| `docs/` | Spec, phases, ADRs, progress |
+| `graphify-out/` | Committed knowledge graph for agents |
 
-Design decisions are recorded ADR-style in [docs/decisions/](docs/decisions/).
+**Full map and coding standards:** [CONTRIBUTING.md](CONTRIBUTING.md)  
+**How to branch, commit, and open a PR (strict, novice-safe):** [CHANGES.md](CHANGES.md)
+
+## Benchmark scoreboard
+
+Competitive time/accuracy charts vs free solvers will land under `bench/results/`
+and be summarized here as labeled release points. Until the peer harness ships,
+internal verification status lives in [docs/progress.md](docs/progress.md).
 
 ## License
 
-[AGPL-3.0-or-later](LICENSE).
+[BSD-3-Clause](LICENSE).

@@ -1,20 +1,17 @@
-# ADR-0007: Implementation language — C++20 (switched from Rust)
+# ADR-0007: Implementation language — C++20
 
-- Status: accepted (2026-07-09, GATE 0 revision)
+- Status: accepted (2026-07-09, GATE 0; scrubbed 2026-07-10)
 
 ## Decision
-The project is C++20 with CMake + Ninja. The Rust scaffold from earlier the
-same day was ported before any physics existed. Toolchain guardrails replace
-the borrow checker: `-Werror` with a wide warning set, clang-format
-enforcement, RAII-only memory management, sanitizer CI planned, Catch2 tests.
+The project is **C++20 only**, built with CMake + Ninja. Toolchain guardrails:
+`-Werror` with a wide warning set, clang-format, RAII-only memory management,
+sanitizer CI planned, Catch2 tests.
 
 ## Alternatives
-- Rust (original choice): stronger memory safety, but every heavyweight
-  neighbor in this domain — OpenCASCADE, CUDA, CalculiX, VTK — is C/C++ and
-  would live behind FFI.
+- Other systems languages: rejected; the domain neighbors (OpenCASCADE, CUDA,
+  CalculiX, VTK/VTU tooling) are native C/C++.
 
 ## Why
-Owner decision. Concrete wins: OpenCASCADE binds natively instead of through
-maintained-by-one-person FFI crates; CUDA is first-class (ADR-0008); the FEA
-reference ecosystem is directly linkable. The cost (manual memory discipline)
-is mitigated by the guardrails above.
+OpenCASCADE binds natively; CUDA is first-class (ADR-0008); FEA reference
+ecosystem is directly linkable. Memory discipline is enforced by the
+guardrails above, not by a second language.

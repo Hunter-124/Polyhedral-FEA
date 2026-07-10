@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: BSD-3-Clause
 
 // Tier-1: thick-walled cylinder under internal pressure vs the Lamé closed
 // form (plane strain). Reference values live in bench/reference/ and are

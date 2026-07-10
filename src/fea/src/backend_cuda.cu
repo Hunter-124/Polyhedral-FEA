@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: BSD-3-Clause
 // CUDA device discovery for the backend dispatch layer (ADR-0008).
 // Compute kernels (batched element stiffness, SpMV for iterative solves)
 // land here as the phases that need them arrive; every kernel gets a CPU

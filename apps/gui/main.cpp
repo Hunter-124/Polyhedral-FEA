@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: BSD-3-Clause
 
 // PolyMesh desktop app: import geometry, click faces to assign fixtures and
 // loads, tune mesher/solver settings, solve, and inspect stress/deflection
@@ -6,7 +6,7 @@
 // a study sidebar (splitter-resizable) and the viewport filling the rest —
 // windows cannot be dragged out of the frame, collapsed, or lost.
 
-#include "scene.hpp"
+#include "pipeline/scene.hpp"
 #include "theme.hpp"
 #include "viewport.hpp"
 #include "widgets.hpp"
@@ -23,6 +23,15 @@
 #include <optional>
 
 namespace polymesh::gui {
+
+// Core types live in pipeline (headless). GUI only presents them.
+using pipeline::Model;
+using pipeline::RegionLoad;
+using pipeline::SimSetup;
+using pipeline::SolveJob;
+using pipeline::SolveResult;
+using pipeline::VoxelMeshOutput;
+
 namespace {
 
 constexpr ImGuiWindowFlags kPanelFlags =

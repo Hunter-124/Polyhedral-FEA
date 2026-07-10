@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
 // 3D viewport: renders into an offscreen framebuffer shown as an ImGui
@@ -6,7 +6,7 @@
 // model with per-region overlay colors, orbit/pan/zoom camera, CPU ray
 // picking.
 
-#include "scene.hpp"
+#include "pipeline/scene.hpp"
 
 #include <Eigen/Core>
 
@@ -14,6 +14,14 @@
 #include <optional>
 
 namespace polymesh::gui {
+
+// Core types live in pipeline (headless). GUI only presents them.
+using pipeline::Model;
+using pipeline::RegionLoad;
+using pipeline::SimSetup;
+using pipeline::SolveJob;
+using pipeline::SolveResult;
+using pipeline::VoxelMeshOutput;
 
 class Camera {
   public:

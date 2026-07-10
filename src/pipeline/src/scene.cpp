@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
-#include "scene.hpp"
+// SPDX-License-Identifier: BSD-3-Clause
+#include "pipeline/scene.hpp"
 
 #include "fea/solve.hpp"
 #include "geom/stl.hpp"
@@ -12,7 +12,7 @@
 #include <numbers>
 #include <queue>
 
-namespace polymesh::gui {
+namespace polymesh::pipeline {
 namespace {
 
 Eigen::Vector3d triangle_normal(const geom::TriSurface& s, std::size_t t) {
@@ -373,4 +373,4 @@ SolveJob::~SolveJob() {
     }
 }
 
-} // namespace polymesh::gui
+} // namespace polymesh::pipeline

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: BSD-3-Clause
 #include "adapt/sizing_field.hpp"
 
 #include <catch2/catch_test_macros.hpp>

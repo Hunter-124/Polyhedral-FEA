@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: BSD-3-Clause
 
 // PolyMesh CLI. Subcommands grow with the phases; `check` is the P0 stub.
 

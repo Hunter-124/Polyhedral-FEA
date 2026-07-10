@@ -38,9 +38,8 @@ performance in both meshing and solving, and offload to GPU wherever it wins
 - Nonlinear materials, plasticity, contact, dynamics — v1 is linear elastostatics
   (3D Hooke's law), because that's what our analytical verification suite covers.
 - Shell/beam elements, CFD, thermal (design the element traits so these can come later).
-- A GUI *during the solver phases*. The GUI is in scope for the v1 release but
-  built after the adaptive core works (phase P6.5, ADR-0006); CLI + VTU export
-  remain the automation path throughout.
+- Full multiphysics (v1 is linear elastostatics). GUI exists early as a client of
+  `src/pipeline`; core must not depend on GUI.
 - Distributed/MPI solves. Single node, multi-threaded; GPU acceleration of
   assembly/solves is a P6 performance-phase topic (ADR-0003).
 
@@ -83,8 +82,7 @@ STEP/B-rep or STL in
 - **D1 Geometry kernel** (ADR-0001): OpenCASCADE for B-rep/STEP behind the
   `POLYMESH_WITH_OCC` CMake option; STL loader + discrete feature detection
   always compiled and used for P1–P2.
-- **D2 License** (ADR-0002): **AGPL-3.0-or-later**. Dual commercial licensing
-  kept open; CLA/assignment policy needed before accepting external PRs.
+- **D2 License** (ADR-0002): **BSD-3-Clause**. License topic closed.
 - **D3 Element formulations** (ADR-0003): unified `Element` interface —
   isoparametric FEM at adaptive order p=1..4 on tets/hexes/prisms/pyramids,
   VEM k=1,2 on general polyhedra. Double precision only.

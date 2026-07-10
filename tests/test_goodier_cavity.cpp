@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: BSD-3-Clause
 
 // Tier-1: spherical cavity under remote uniaxial tension vs Goodier SCF.
 // Reference values live in bench/reference/goodier-cavity.json (rule #1).

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
 // Classic nodal-connectivity mesh consumed by the reference solver (Phase P1).

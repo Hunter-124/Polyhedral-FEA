@@ -1,6 +1,6 @@
-# SPDX-License-Identifier: AGPL-3.0-or-later
-# Desktop GUI: GLFW + Dear ImGui (docking) + OpenGL — the same stack and
-# theme family as the owner's AI-CAD application (ADR-0006).
+# SPDX-License-Identifier: BSD-3-Clause
+# Desktop GUI presentation layer only (GLFW + Dear ImGui + OpenGL).
+# Physics, meshing, and solve live in src/* and src/pipeline — never here.
 
 include(FetchContent)
 
@@ -18,8 +18,6 @@ FetchContent_Declare(imgui
 )
 FetchContent_MakeAvailable(glfw imgui)
 
-# ImGui has no CMake build; compile it as a third-party static lib
-# (deliberately without our warning flags).
 add_library(imgui_lib STATIC
     ${imgui_SOURCE_DIR}/imgui.cpp
     ${imgui_SOURCE_DIR}/imgui_draw.cpp
@@ -41,8 +39,8 @@ add_executable(polymesh-gui
     theme.cpp
     widgets.cpp
     viewport.cpp
-    scene.cpp
 )
+target_include_directories(polymesh-gui PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(polymesh-gui
-    PRIVATE geom mesh adapt fea imgui_lib OpenGL::GL polymesh_warnings
+    PRIVATE pipeline imgui_lib OpenGL::GL polymesh_warnings
 )

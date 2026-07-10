@@ -6,3 +6,7 @@ compile_commands.json
 /bench/geometries/holdout/
 *.vtu
 /polymesh-setup/
+
+# machine-local graphify interpreter
+graphify-out/.graphify_python
+graphify-out/cache/

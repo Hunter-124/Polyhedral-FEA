@@ -1,11 +1,11 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: BSD-3-Clause
 
 // Headless test of the GUI scene pipeline: STL import -> CAD-style face
 // regions -> draft voxel mesh -> fixture/load mapping -> solve. Keeps the
 // interactive path covered by CI without a display.
 
 #include "fea/solve.hpp"
-#include "scene.hpp"
+#include "pipeline/scene.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -13,7 +13,7 @@
 #include <format>
 #include <fstream>
 
-using namespace polymesh::gui;
+using namespace polymesh::pipeline;
 namespace fea = polymesh::fea;
 
 namespace {

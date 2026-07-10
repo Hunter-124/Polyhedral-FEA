@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
 
 jobs:
@@ -25,15 +25,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: clang-format check
         run: |
-          find src tests -name '*.cpp' -o -name '*.hpp' -o -name '*.cu' \
+          find apps src tests -name '*.cpp' -o -name '*.hpp' -o -name '*.cu' \
             | xargs clang-format --dry-run --Werror
 
-  # Anti-cheat: no reference values may be read by solver code
-  # (BENCHMARKS.md rule 4). Grep is intentionally crude; hits need human review.
   grep-audit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: No bench/reference reads outside the bench module
         run: |
-          ! grep -rn "bench/reference" src/geom src/mesh src/adapt src/fea src/cli
+          ! grep -rn "bench/reference" src/geom src/mesh src/adapt src/fea src/pipeline apps

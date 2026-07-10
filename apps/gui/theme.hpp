@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
 // PolyMesh UI theme — Interwebz-v2-inspired plum/rose chrome (owner pivot,

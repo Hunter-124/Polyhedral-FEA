@@ -1,9 +1,9 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-// Scene model for the GUI: imported geometry with CAD-style face regions,
-// simulation setup (fixtures/loads/material/mesh settings), and the
-// background solve pipeline.
+// Headless study pipeline: import geometry, CAD-style face regions,
+// fixtures/loads/material/mesh settings, draft mesher, background solve.
+// apps/gui is presentation-only and consumes this library.
 
 #include "fea/nodal_mesh.hpp"
 #include "fea/stress.hpp"
@@ -20,7 +20,7 @@
 #include <thread>
 #include <vector>
 
-namespace polymesh::gui {
+namespace polymesh::pipeline {
 
 /// Imported model: triangle surface segmented into CAD-style "faces"
 /// (regions of triangles separated by sharp edges), so a click can select
@@ -97,4 +97,4 @@ class SolveJob {
     void set_status(const std::string& s);
 };
 
-} // namespace polymesh::gui
+} // namespace polymesh::pipeline

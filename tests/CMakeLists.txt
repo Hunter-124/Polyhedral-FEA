@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: BSD-3-Clause
 add_executable(polymesh_tests
     test_tri_surface.cpp
     test_stl.cpp
@@ -18,15 +18,13 @@ add_executable(polymesh_tests
     test_l_domain.cpp
     test_msh.cpp
     test_gui_pipeline.cpp
-    ${CMAKE_SOURCE_DIR}/src/gui/scene.cpp
     support/structured_mesh.cpp
     support/mms.cpp
 )
-# scene.cpp is the GUI's display-independent core (import, regions, voxel
-# mesher, solve job) — tested headless here.
-target_include_directories(polymesh_tests PRIVATE . ${CMAKE_SOURCE_DIR}/src/gui)
+# Headless pipeline is tested via libpipeline — no GUI / display required.
+target_include_directories(polymesh_tests PRIVATE .)
 target_link_libraries(polymesh_tests
-    PRIVATE geom mesh adapt fea bench_harness Catch2::Catch2WithMain polymesh_warnings
+    PRIVATE geom mesh adapt fea bench_harness pipeline Catch2::Catch2WithMain polymesh_warnings
 )
 
 include(Catch)

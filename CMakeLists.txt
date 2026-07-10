@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: BSD-3-Clause
 cmake_minimum_required(VERSION 3.24)
 project(polymesh VERSION 0.1.0 LANGUAGES CXX)
 
@@ -30,14 +30,18 @@ target_compile_options(polymesh_warnings INTERFACE
 find_package(Eigen3 REQUIRED)
 find_package(nlohmann_json 3.11 REQUIRED)
 
+# --- libraries (core) ---
 add_subdirectory(src/geom)
 add_subdirectory(src/mesh)
 add_subdirectory(src/adapt)
 add_subdirectory(src/fea)
 add_subdirectory(src/bench)
-add_subdirectory(src/cli)
+add_subdirectory(src/pipeline)
+
+# --- applications (depend on libraries; no reverse deps) ---
+add_subdirectory(apps/cli)
 if(POLYMESH_WITH_GUI)
-    add_subdirectory(src/gui)
+    add_subdirectory(apps/gui)
 endif()
 
 if(POLYMESH_BUILD_TESTS)

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: BSD-3-Clause
 
 // Tier-2 MMS convergence verification (BENCHMARKS.md): an element claiming
 // order p must demonstrate O(h^p) energy-norm convergence under uniform

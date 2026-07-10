@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: BSD-3-Clause
 
 // Tier-1: L-shaped domain with a re-entrant corner — singularity-limited
 // convergence under uniform refinement (Williams 1952). Reference values in

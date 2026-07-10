@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: BSD-3-Clause
 
 // Tier-1: plate with circular hole under uniaxial tension vs Kirsch SCF = 3.
 // Reference values live in bench/reference/kirsch-plate.json (rule #1).

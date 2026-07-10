@@ -1,7 +1,7 @@
 # PROGRESS
 
 ## Current phase
-**P1 complete — waiting at ⛔ GATE 1 for owner review.**
+**GATE 1 frozen (owner campaign 2026-07-10). P1 baseline is the comparator.**
 
 GATE 1 deliverables ready:
 - Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)
@@ -10,16 +10,15 @@ GATE 1 deliverables ready:
 - Convergence report: `bench/reports/p1-gate1-convergence.md`
 - ADR-0009 (Tier-1 verification setups)
 
-Do **not** start P2 until the owner approves GATE 1 (baseline freeze).
-
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: Campaign G0 — branch `master`, BSD-3-Clause, apps/src split,
+  pipeline vs GUI separation, CONTRIBUTING/CHANGES, docs under docs/.
 - 2026-07-09: D1–D5 + GUI scope ratified with owner (ADR-0001..0006).
-- 2026-07-09: License AGPL-3.0-or-later applied; git identity policy recorded
-  in CLAUDE.md.
+- 2026-07-09: License BSD-3-Clause applied; process docs live under docs/.
 - 2026-07-09: Owner switched language to C++ (ADR-0007) and made CUDA a
-  first-class optional backend (ADR-0008). Rust scaffold ported the same day:
+  first-class optional backend (ADR-0008). C++ scaffold the same day:
   CMake/Ninja workspace (geom, mesh, adapt, fea, bench, cli), STL loader with
   welding, face-based mesh structure with structural validity checker,
   Material/D-matrix, backend dispatch (cpu/cuda), reference-case loader,
@@ -46,8 +45,8 @@ GATE 0 was approved by owner on 2026-07-09.
 | Tier 3 performance | not yet (needs P2+ adaptive path) |
 
 ## Open issues
-- **⛔ GATE 1 owner review** of `bench/reports/p1-gate1-convergence.md`.
-- CLA/DCO policy before first external contribution (ADR-0002).
+- GATE 1 frozen; see `bench/reports/p1-gate1-convergence.md`.
+- License closed: BSD-3-Clause (ADR-0002); no CLA process.
 - `POLYMESH_WITH_OCC` wiring deferred until P3 consumes exact geometry
   (ADR-0001).
 - CUDA toolkit not installed on dev machine; `POLYMESH_WITH_CUDA` untested

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: BSD-3-Clause
 
 // First Tier-1 physics smoke test: gravity-loaded cantilever vs Timoshenko
 // beam theory. Uses a consistent body-force load (no traction machinery

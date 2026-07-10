@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: BSD-3-Clause
 #include "bench/reference_case.hpp"
 
 #include <nlohmann/json.hpp>

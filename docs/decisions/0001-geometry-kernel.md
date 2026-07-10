@@ -13,10 +13,9 @@ always compiled and is the input for the P1–P2 mesher/solver work.
 - STL-only for v1 (SPEC's original recommendation): fastest to the adaptive
   loop, but defers STEP import the owner wants from day one.
 - OCC as a hard dependency: exact geometry everywhere, but a heavy C++ build
-  taxing every `cargo test` cycle before any physics exists.
+  taxing every `ctest` cycle before any physics exists.
 
 ## Why
-Owner decision at GATE 0: OCC now. Option-gating gives STEP/B-rep without
-putting the large OCC build on the critical path of solver development. The
-option turns on when P3 feature-analysis work starts consuming exact
-geometry. OpenCASCADE is LGPL-2.1, compatible with our AGPLv3 (ADR-0002).
+Owner decision at GATE 0 (updated 2026-07-10): OCC may be linked directly when
+needed; option-gating still keeps default CI light. OpenCASCADE is LGPL-2.1,
+compatible with BSD-3-Clause (ADR-0002).

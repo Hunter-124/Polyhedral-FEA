@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: BSD-3-Clause
 
 // Tier-0 correctness gates (BENCHMARKS.md): patch test on distorted meshes,
 // rigid-body modes, single-element eigenvalue check. These must pass exactly

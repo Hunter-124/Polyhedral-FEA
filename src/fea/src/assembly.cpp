@@ -137,9 +137,14 @@ Eigen::VectorXd assemble_body_load(const NodalMesh& mesh, const BodyForce& body_
         // Elevated rule: body-force fields (e.g. manufactured solutions) are
         // often higher-degree than the stiffness integrand, and consistent
         // loads must not become the accuracy bottleneck.
-        const bool is_tet =
-            element.type == ElementType::kTet4 || element.type == ElementType::kTet10;
-        const auto rule = is_tet ? tet_rule(4) : hex_rule(4);
+        std::vector<QuadraturePoint> rule;
+        if (element.type == ElementType::kTet4 || element.type == ElementType::kTet10) {
+            rule = tet_rule(4);
+        } else if (element.type == ElementType::kPrism6) {
+            rule = default_rule(ElementType::kPrism6);
+        } else {
+            rule = hex_rule(4);
+        }
         for (const auto& qp : rule) {
             const auto shape = eval_shape(element.type, qp.xi);
             const Eigen::Matrix3d jac = shape.dn.transpose() * x;

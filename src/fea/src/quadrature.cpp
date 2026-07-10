@@ -108,6 +108,30 @@ std::vector<QuadraturePoint> hex_rule(int points_per_axis) {
     return rule;
 }
 
+std::vector<QuadraturePoint> prism_rule() {
+    // 3-pt triangle * 2-pt Gauss on zeta ∈ [-1,1].
+    // Triangle points (xi,eta) with weight * 0.5 (area of ref triangle = 1/2).
+    const std::array<Eigen::Vector2d, 3> tri_xi{{
+        {1.0 / 6.0, 1.0 / 6.0},
+        {2.0 / 3.0, 1.0 / 6.0},
+        {1.0 / 6.0, 2.0 / 3.0},
+    }};
+    const double tri_w = 1.0 / 6.0; // each of 3 pts: area 1/2 * 1/3
+    const std::array<double, 2> z_nodes{{-0.5773502691896257, 0.5773502691896257}};
+    const std::array<double, 2> z_w{{1.0, 1.0}};
+    std::vector<QuadraturePoint> rule;
+    rule.reserve(6);
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 2; ++j) {
+            rule.push_back({{tri_xi[static_cast<std::size_t>(i)][0],
+                             tri_xi[static_cast<std::size_t>(i)][1],
+                             z_nodes[static_cast<std::size_t>(j)]},
+                            tri_w * z_w[static_cast<std::size_t>(j)]});
+        }
+    }
+    return rule;
+}
+
 std::vector<QuadraturePoint> default_rule(ElementType type) {
     switch (type) {
     case ElementType::kTet4:
@@ -118,6 +142,8 @@ std::vector<QuadraturePoint> default_rule(ElementType type) {
         return hex_rule(2);
     case ElementType::kHex20:
         return hex_rule(3);
+    case ElementType::kPrism6:
+        return prism_rule();
     case ElementType::kPolyVem:
         throw FeaError("default_rule: kPolyVem uses VEM, not quadrature");
     }

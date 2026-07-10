@@ -70,6 +70,27 @@ ShapeEval eval_tet10(const Eigen::Vector3d& xi) {
     return s;
 }
 
+ShapeEval eval_prism6(const Eigen::Vector3d& xi) {
+    // Base triangle barycentric: L0=1-xi-eta, L1=xi, L2=eta; zeta in [-1,1].
+    const double l0 = 1.0 - xi[0] - xi[1];
+    const double l1 = xi[0];
+    const double l2 = xi[1];
+    const double zm = 0.5 * (1.0 - xi[2]);
+    const double zp = 0.5 * (1.0 + xi[2]);
+    ShapeEval s;
+    s.n.resize(6);
+    s.dn.resize(6, 3);
+    s.n << l0 * zm, l1 * zm, l2 * zm, l0 * zp, l1 * zp, l2 * zp;
+    // d/dxi, d/deta, d/dzeta
+    s.dn.row(0) << -zm, -zm, -0.5 * l0;
+    s.dn.row(1) << zm, 0.0, -0.5 * l1;
+    s.dn.row(2) << 0.0, zm, -0.5 * l2;
+    s.dn.row(3) << -zp, -zp, 0.5 * l0;
+    s.dn.row(4) << zp, 0.0, 0.5 * l1;
+    s.dn.row(5) << 0.0, zp, 0.5 * l2;
+    return s;
+}
+
 ShapeEval eval_hex8(const Eigen::Vector3d& xi) {
     ShapeEval s;
     s.n.resize(8);
@@ -145,6 +166,8 @@ ShapeEval eval_shape(ElementType type, const Eigen::Vector3d& xi) {
         return eval_hex8(xi);
     case ElementType::kHex20:
         return eval_hex20(xi);
+    case ElementType::kPrism6:
+        return eval_prism6(xi);
     case ElementType::kPolyVem:
         throw FeaError("eval_shape: kPolyVem has no isoparametric shape functions");
     }
@@ -176,6 +199,9 @@ std::vector<Eigen::Vector3d> reference_nodes(ElementType type) {
             }
         }
         return nodes;
+    case ElementType::kPrism6:
+        // Bottom tri zeta=-1, top zeta=+1; base corners (0,0), (1,0), (0,1).
+        return {{0, 0, -1}, {1, 0, -1}, {0, 1, -1}, {0, 0, 1}, {1, 0, 1}, {0, 1, 1}};
     case ElementType::kPolyVem:
         throw FeaError("reference_nodes: kPolyVem has no fixed reference nodes");
     }

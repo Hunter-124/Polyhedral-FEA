@@ -23,7 +23,7 @@ class FeaError : public std::runtime_error {
     using std::runtime_error::runtime_error;
 };
 
-enum class ElementType : std::uint8_t { kTet4, kTet10, kHex8, kHex20, kPolyVem };
+enum class ElementType : std::uint8_t { kTet4, kTet10, kHex8, kHex20, kPrism6, kPolyVem };
 
 /// Number of nodes for an element type.
 constexpr int element_num_nodes(ElementType type) {
@@ -36,6 +36,8 @@ constexpr int element_num_nodes(ElementType type) {
         return 8;
     case ElementType::kHex20:
         return 20;
+    case ElementType::kPrism6:
+        return 6;
     case ElementType::kPolyVem:
         return 0; // variable; validated via element.nodes.size()
     }
@@ -49,6 +51,8 @@ constexpr int element_num_nodes(ElementType type) {
 ///   (-1,-1,-1),(1,-1,-1),(1,1,-1),(-1,1,-1),(-1,-1,1),(1,-1,1),(1,1,1),(-1,1,1).
 ///   Hex20 adds mid-edge nodes 8..19 on bottom edges (0,1),(1,2),(2,3),(3,0),
 ///   top edges (4,5),(5,6),(6,7),(7,4), then vertical edges (0,4),(1,5),(2,6),(3,7).
+/// - Prism6: bottom tri (0,1,2) at zeta=-1, top tri (3,4,5) at zeta=+1; base uses
+///   barycentric L on (xi,eta), extruded in zeta ∈ [-1,1].
 struct NodalElement {
     ElementType type = ElementType::kTet4;
     std::vector<std::uint32_t> nodes;

@@ -3,6 +3,7 @@
 
 #include "adapt/error.hpp"
 #include "adapt/loop.hpp"
+#include "fea/boundary_faces.hpp"
 #include "fea/p_elevate.hpp"
 #include "fea/solve.hpp"
 #include "fea/vem.hpp"
@@ -16,6 +17,7 @@
 #include "mesh/hex_fill.hpp"
 #include "mesh/hybrid_fill.hpp"
 #include "mesh/local_refine.hpp"
+#include "mesh/mixed_fill.hpp"
 #include "mesh/prism_fill.hpp"
 #include "mesh/quality.hpp"
 #include "mesh/surface_project.hpp"
@@ -236,7 +238,70 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                              std::span<const Eigen::Vector3d> refine_seeds, double seed_band) {
     VolumeMeshOutput out;
     double fill_h = h;
-    if (mesher == VolumeMesher::kHexFill || mesher == VolumeMesher::kHexVem) {
+    if (mesher == VolumeMesher::kHybrid) {
+        // SPEC hybrid zoo: hex bulk + pyramid transition + tet skin (curved snap).
+        std::vector<geom::SharpEdge> edges;
+        std::vector<Eigen::Vector3d> curv_seeds(refine_seeds.begin(), refine_seeds.end());
+        double feat_band = 0.0;
+        double s_band = seed_band;
+        if (feature_refine) {
+            edges = geom::detect_sharp_edges(model.surface, 30.0);
+            if (!edges.empty()) {
+                feat_band = 2.5 * h;
+            }
+            const auto curv = geom::estimate_vertex_curvature(model.surface);
+            // Seed high-κ surface verts so curved walls get tet skin + snap.
+            const double kappa_abs = 1.0 / (25.0 * std::max(h, 1e-12));
+            for (std::size_t i = 0; i < model.surface.vertices.size(); ++i) {
+                if (i < curv.kappa.size() && curv.kappa[i] >= kappa_abs) {
+                    curv_seeds.push_back(model.surface.vertices[i]);
+                }
+            }
+            // Also seed edge midpoints on curved facets (reduces silhouette corners).
+            for (const auto& tri : model.surface.triangles) {
+                for (int e = 0; e < 3; ++e) {
+                    const auto a = tri[static_cast<std::size_t>(e)];
+                    const auto b = tri[static_cast<std::size_t>((e + 1) % 3)];
+                    if (a < curv.kappa.size() && b < curv.kappa.size() &&
+                        0.5 * (curv.kappa[a] + curv.kappa[b]) >= kappa_abs) {
+                        curv_seeds.push_back(0.5 * (model.surface.vertices[a] +
+                                                    model.surface.vertices[b]));
+                    }
+                }
+            }
+            if (s_band <= 0.0 && !curv_seeds.empty()) {
+                s_band = 2.0 * h;
+            }
+        }
+        // True multi-type: hex bulk + Kuhn tet skin (same face diagonals; FE
+        // assembles hybrid hex as Kuhn PL so constant-strain patch is exact).
+        auto fill =
+            mesh::mixed_fill_surface(model.surface, model.bbox_min, model.bbox_max, h,
+                                     std::max(1, skin_layers), edges, feat_band, curv_seeds,
+                                     s_band, /*snap_boundary=*/true);
+        fill_h = fill.h;
+        out.mesh.nodes = std::move(fill.nodes);
+        out.mesh.elements.reserve(fill.cells.size());
+        for (const auto& cell : fill.cells) {
+            if (cell.kind == mesh::MixedCellKind::kHex8) {
+                out.mesh.elements.push_back(fea::NodalElement{
+                    fea::ElementType::kHex8,
+                    {cell.nodes[0], cell.nodes[1], cell.nodes[2], cell.nodes[3],
+                     cell.nodes[4], cell.nodes[5], cell.nodes[6], cell.nodes[7]}});
+            } else {
+                out.mesh.elements.push_back(fea::NodalElement{
+                    fea::ElementType::kTet4,
+                    {cell.nodes[0], cell.nodes[1], cell.nodes[2], cell.nodes[3]}});
+            }
+        }
+        out.boundary_quads = std::move(fill.boundary_quads);
+        out.mesher_note = std::format(
+            "hybrid zoo v1 (hex bulk + tet skin, multi-type; not Delaunay): "
+            "{} hex8 + {} tet4, {} nodes, h={:.4g} m, snap max|d|={:.3g} m, "
+            "feature_skin_cells={}",
+            fill.n_hex, fill.n_tet, out.mesh.nodes.size(), fill_h, fill.boundary_max_distance,
+            fill.n_feature_skin_cells);
+    } else if (mesher == VolumeMesher::kHexFill || mesher == VolumeMesher::kHexVem) {
         auto fill = mesh::hex_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
         fill_h = fill.h;
         out.mesh.nodes = std::move(fill.nodes);
@@ -252,9 +317,11 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             out.mesh.elements.push_back(std::move(el));
         }
         out.boundary_quads = std::move(fill.boundary_quads);
-        out.mesher_note = std::format("{} grid fill v1: {} cells, {} nodes, h={:.4g} m",
-                                      mesher == VolumeMesher::kHexVem ? "hex-VEM" : "hex",
-                                      out.mesh.elements.size(), out.mesh.nodes.size(), fill_h);
+        out.mesher_note = std::format(
+            "{} grid fill v1 (Cartesian, not CAD-fitted): {} cells, {} nodes, h={:.4g} m, "
+            "snap max|d|={:.3g} m",
+            mesher == VolumeMesher::kHexVem ? "hex-VEM" : "hex", out.mesh.elements.size(),
+            out.mesh.nodes.size(), fill_h, fill.boundary_max_distance);
     } else if (mesher == VolumeMesher::kHexPyramid) {
         // Topology: hex core + pyramid skin (ADR-0013). Product FE path expands
         // each interior hex to six pyramids (centroid apex) so face diagonals
@@ -296,12 +363,15 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             (fill.sweep_axis >= 0 && fill.sweep_axis < 3) ? kAxis[fill.sweep_axis] : "?";
         out.mesher_note =
             std::format("prism sweep grid fill v1 (Cartesian, not CAD extrusion; sweep={}): "
-                        "{} prism6, {} nodes, h={:.4g} m",
-                        axis_name, out.mesh.elements.size(), out.mesh.nodes.size(), fill_h);
+                        "{} prism6, {} nodes, h={:.4g} m, snap max|d|={:.3g} m",
+                        axis_name, out.mesh.elements.size(), out.mesh.nodes.size(), fill_h,
+                        fill.boundary_max_distance);
     } else if (mesher == VolumeMesher::kGradedTet) {
         std::vector<geom::SharpEdge> edges;
         double feature_band = 0.0;
         // Merge caller seeds with a priori geometry seeds (curvature / thin wall).
+        // Keep this sparse: graded fill is always 2:1 (bulk≈h, fine≈h/2); seeds
+        // only choose *which* blocks are fine — they must not flood the volume.
         std::vector<Eigen::Vector3d> seeds(refine_seeds.begin(), refine_seeds.end());
         double band = seed_band;
         std::size_t n_curv_seeds = 0;
@@ -309,18 +379,16 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         if (feature_refine) {
             edges = geom::detect_sharp_edges(model.surface, 30.0);
             if (!edges.empty()) {
-                // Wider crease band so rounded fillets near sharp edges densify.
-                feature_band = 3.0 * h;
+                // Crease band ~ one bulk cell so fillets densify without eating bulk.
+                feature_band = 1.5 * h;
             }
-            // Curvature / cylinder-hole grading. Discrete κ (geom/indicators) is a
-            // lower bound on true mean curvature on coarse STLs — seed when
-            // κ ≳ 1/(20 h) (proxy radius R ≲ 20 h) OR κ is in the upper half
-            // of positive surface κ (captures relative "curved vs flat" regions).
-            // Thin walls (t < 5h) also seed fine bands.
-            // With seeds present, graded fill targets ~h/4 near seed/feature balls.
+            // Curvature / hole grading. Discrete κ is a lower bound on coarse STLs.
+            // Seed when κ ≳ 1/(12 h) (proxy R ≲ 12 h) OR in the top ~25% of
+            // positive κ (relative). Thin walls (t < 2.5 h) also seed. Cap count
+            // below so we never flood the volume with seed balls.
             const auto curv = geom::estimate_vertex_curvature(model.surface);
             const auto thick = geom::estimate_local_thickness(model.surface);
-            const double kappa_abs = 1.0 / (20.0 * std::max(h, 1e-12));
+            const double kappa_abs = 1.0 / (12.0 * std::max(h, 1e-12));
             std::vector<double> pos_kappa;
             pos_kappa.reserve(curv.kappa.size());
             for (double k : curv.kappa) {
@@ -331,16 +399,17 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             double kappa_rel = kappa_abs;
             if (!pos_kappa.empty()) {
                 std::sort(pos_kappa.begin(), pos_kappa.end());
-                // 50th percentile of positive κ — mark half of curved verts (aggressive).
+                // 75th percentile of positive κ — densify the most curved quarter.
                 const std::size_t iq =
-                    std::min(pos_kappa.size() - 1, pos_kappa.size() / 2);
+                    std::min(pos_kappa.size() - 1, (pos_kappa.size() * 75) / 100);
+                // Take the *less* strict of abs/rel so coarse cylinder facets still seed.
                 kappa_rel = std::min(kappa_abs, pos_kappa[iq] * 0.999);
             }
-            const double kappa_thresh = kappa_rel;
+            const double kappa_thresh = std::max(kappa_rel, 1e-12);
             if (band <= 0.0) {
-                band = 2.5 * h; // seed ball radius on the fine lattice
+                band = 1.25 * h; // seed ball ≈ one bulk cell
             }
-            seeds.reserve(seeds.size() + model.surface.vertices.size() / 2);
+            seeds.reserve(seeds.size() + model.surface.vertices.size() / 4 + 16);
             for (std::size_t i = 0; i < model.surface.vertices.size(); ++i) {
                 bool seed_here = false;
                 if (i < curv.kappa.size() && curv.kappa[i] >= kappa_thresh) {
@@ -349,7 +418,7 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                 }
                 if (i < thick.thickness.size() &&
                     geom::has_finite_thickness(thick.thickness[i]) &&
-                    thick.thickness[i] < 5.0 * h) {
+                    thick.thickness[i] < 2.5 * h) {
                     seed_here = true;
                     ++n_thin_seeds;
                 }
@@ -357,16 +426,50 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                     seeds.push_back(model.surface.vertices[i]);
                 }
             }
-            // Even flat-only solids benefit from at least a surface fine skin at h/4
-            // when feature_refine is on: seed a sparse surface sample so ultra-fine
-            // lattice activates without needing curvature.
-            if (seeds.empty() && feature_band <= 0.0) {
-                for (std::size_t i = 0; i < model.surface.vertices.size(); i += 8) {
-                    seeds.push_back(model.surface.vertices[i]);
+            // Sparse edge midpoints on the highest-κ facets only (stride 3).
+            for (std::size_t ti = 0; ti < model.surface.triangles.size(); ti += 3) {
+                const auto& tri = model.surface.triangles[ti];
+                for (int e = 0; e < 3; ++e) {
+                    const auto a = tri[static_cast<std::size_t>(e)];
+                    const auto b = tri[static_cast<std::size_t>((e + 1) % 3)];
+                    if (a >= curv.kappa.size() || b >= curv.kappa.size()) {
+                        continue;
+                    }
+                    if (0.5 * (curv.kappa[a] + curv.kappa[b]) < kappa_thresh) {
+                        continue;
+                    }
+                    seeds.push_back(0.5 *
+                                    (model.surface.vertices[a] + model.surface.vertices[b]));
+                    ++n_curv_seeds;
                 }
-                if (band <= 0.0) {
-                    band = 1.5 * h;
+            }
+            // Spatial decimation: keep ≤ 192 seeds so stamp cost stays O(1).
+            constexpr std::size_t kMaxGeoSeeds = 192;
+            if (seeds.size() > kMaxGeoSeeds) {
+                std::vector<Eigen::Vector3d> kept;
+                kept.reserve(kMaxGeoSeeds);
+                // Always keep caller-provided adapt seeds first.
+                const std::size_t n_caller = refine_seeds.size();
+                for (std::size_t i = 0; i < std::min(n_caller, seeds.size()); ++i) {
+                    kept.push_back(seeds[i]);
                 }
+                const std::size_t remain = kMaxGeoSeeds - kept.size();
+                const std::size_t geo_n = seeds.size() - n_caller;
+                if (remain > 0 && geo_n > 0) {
+                    const std::size_t stride =
+                        std::max<std::size_t>(1, geo_n / remain);
+                    for (std::size_t i = n_caller; i < seeds.size() && kept.size() < kMaxGeoSeeds;
+                         i += stride) {
+                        kept.push_back(seeds[i]);
+                    }
+                }
+                // Recount geo seeds after decimation (approx).
+                n_curv_seeds = std::min(n_curv_seeds, kept.size());
+                seeds = std::move(kept);
+            }
+            // Flat solids: free-surface skin alone is enough (no fake seed flood).
+            if (band > 0.0 && seeds.empty()) {
+                band = 0.0;
             }
         }
         auto graded = mesh::graded_tet_fill_surface(
@@ -392,7 +495,7 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                 ? ", h raised to cell budget"
                 : "";
         out.mesher_note = std::format(
-            "graded tet v2 (geo-hybrid): {} tets ({} coarse, {} fine, {} feature, {} seed), "
+            "graded tet v3 (2:1 geo): {} tets ({} coarse, {} fine, {} feature, {} seed), "
             "h_bulk={:.4g}/h_fine={:.4g} m (÷{}), snap max|d|={:.3g} m mean|d|={:.3g} m"
             "{}{}{}",
             out.mesh.elements.size(), graded.n_coarse_cells, graded.n_fine_cells,
@@ -418,11 +521,28 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             }
         }
         const auto q = mesh::summarize_tet4_quality(out.mesh.nodes, tet_ids);
+        // Snap residual from boundary nodes (snap already ran inside tet_fill).
+        std::vector<std::uint32_t> btmp;
+        for (const auto& qf : out.boundary_quads) {
+            btmp.insert(btmp.end(), qf.begin(), qf.end());
+        }
+        std::sort(btmp.begin(), btmp.end());
+        btmp.erase(std::unique(btmp.begin(), btmp.end()), btmp.end());
+        const auto conf = mesh::surface_conformity(model.surface, out.mesh.nodes, btmp);
         out.mesher_note = std::format(
             "tet grid fill v1 (Cartesian, not Delaunay): {} tet4, {} nodes, h={:.4g} m, "
-            "minQ={:.3f}, meanQ={:.3f}, slivers={}",
+            "minQ={:.3f}, meanQ={:.3f}, slivers={}, snap max|d|={:.3g} m mean|d|={:.3g} m",
             out.mesh.elements.size(), out.mesh.nodes.size(), fill_h, q.min_aspect,
-            q.mean_aspect, q.n_sliver);
+            q.mean_aspect, q.n_sliver, conf.max_distance, conf.mean_distance);
+    }
+
+    // Prefer true element exterior faces for display/region skin so tet/prism
+    // previews show element triangles (incl. Kuhn diagonals), not only lattice quads.
+    {
+        auto exterior = fea::extract_boundary_faces(out.mesh);
+        if (!exterior.empty()) {
+            out.boundary_quads = std::move(exterior);
+        }
     }
 
     const auto& surf = model.surface;
@@ -650,8 +770,14 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
             };
 
             // D3: p-elevate smooth linear elems after last h-pass (or single solve).
-            // Explicit flag or auto when adapt_passes > 0.
-            const bool do_p_elevate = setup.p_elevate || setup.adapt_passes > 0;
+            // Explicit flag or auto when adapt_passes > 0 — but never on huge meshes
+            // (tet10 ~3–4× DOF; was a common OOM path with graded+feature floods).
+            constexpr std::size_t kPElevateMaxNodes = 40000;
+            const bool want_p_elevate = setup.p_elevate || setup.adapt_passes > 0;
+            auto p_elevate_allowed = [&]() {
+                return want_p_elevate && vol.mesh.nodes.size() <= kPElevateMaxNodes;
+            };
+            const bool do_p_elevate = want_p_elevate; // gate per-call via p_elevate_allowed
 
             // After mid-edge insertion, assign boundary regions to new nodes that
             // sit between two existing boundary nodes of the same region so
@@ -708,6 +834,11 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 if (!do_p_elevate || element_eta.empty()) {
                     return false;
                 }
+                if (!p_elevate_allowed()) {
+                    note_suffix = std::format(" p-elev skipped (nodes {}>{} budget)",
+                                              vol.mesh.nodes.size(), kPElevateMaxNodes);
+                    return false;
+                }
                 const auto smooth = adapt::mark_smooth(element_eta, 0.3);
                 if (smooth.empty()) {
                     note_suffix = " p-elev=0";
@@ -733,8 +864,15 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 if (!do_p_elevate || !setup.use_feature_grading) {
                     return;
                 }
+                if (!p_elevate_allowed()) {
+                    vol.mesher_note = std::format(
+                        "{} | geo-hp skipped (nodes {}>{} budget)", vol.mesher_note,
+                        vol.mesh.nodes.size(), kPElevateMaxNodes);
+                    return;
+                }
                 if (setup.mesher != VolumeMesher::kGradedTet &&
-                    setup.mesher != VolumeMesher::kTetFill) {
+                    setup.mesher != VolumeMesher::kTetFill &&
+                    setup.mesher != VolumeMesher::kHybrid) {
                     return;
                 }
                 const double bulk_band = 1.75 * h_use;
@@ -812,8 +950,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                             fea::ElementType::kTet4, {tet[0], tet[1], tet[2], tet[3]}});
                     }
                     vol.mesh.check_validity();
-                    // Lattice boundary quads no longer match midpoints; drop them.
-                    vol.boundary_quads.clear();
+                    // Lattice quads invalid after midpoints — rebuild true exterior faces.
+                    vol.boundary_quads = fea::extract_boundary_faces(vol.mesh);
                     assign_boundary_regions(1.5 * h_use);
                     vol.mesher_note = std::format(
                         "{} | local LEB (ADR-0016): +{} tets, +{} nodes, {} bisections",
@@ -873,11 +1011,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 return any;
             };
 
-            // Grid budget floor: graded+features uses ~h/4 lattice (÷4); plain graded ÷2.
-            const int grid_sub =
-                (setup.mesher == VolumeMesher::kGradedTet)
-                    ? (setup.use_feature_grading ? 4 : 2)
-                    : 1;
+            // Grid budget floor: graded is always 2:1 (fine lattice ≈ h/2).
+            const int grid_sub = (setup.mesher == VolumeMesher::kGradedTet) ? 2 : 1;
             const double h_grid_floor = mesh::min_h_for_cell_budget(
                 model.bbox_min, model.bbox_max, mesh::kDefaultMaxGridCells, grid_sub);
             const double h_adapt_floor = std::max(h * 0.35, h_grid_floor);
@@ -900,11 +1035,11 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                               setup.mesher == VolumeMesher::kGradedTet))
                                 ? VolumeMesher::kGradedTet
                                 : setup.mesher;
-                        // Remesh: graded+seeds/features use ÷4 lattice budget (h/4 fine).
+                        // Remesh: graded always uses ÷2 lattice budget (fine ≈ h/2).
                         const int remesh_sub =
                             (!adapt_seeds.empty() ||
                              mesher_adapt == VolumeMesher::kGradedTet)
-                                ? (setup.use_feature_grading ? 4 : 2)
+                                ? 2
                                 : 1;
                         const double h_remesh = std::max(
                             h_use, mesh::min_h_for_cell_budget(

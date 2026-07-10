@@ -39,8 +39,8 @@ int usage() {
                "  backend                    print compute backend + OpenMP/opt summary\n"
                "\n"
                "mesh size: omit -h (or -h 0) for auto h0 from bbox + sharp-edge density\n"
-               "mesher names: tet (default), hex, hexvem|vem, graded, hexpyr|transition, "
-               "prism|sweep\n"
+               "mesher names: hybrid|zoo (default), tet, hex, hexvem|vem, graded,\n"
+               "              hexpyr|transition, prism|sweep\n"
                "--skin n: graded-tet fine skin layers (default 2)\n"
                "--feature: refine graded mesh near sharp edges (default off in CLI)\n"
                "--adapt n: ZZ→Dörfler remesh passes (local seeds on graded path)\n"
@@ -52,6 +52,12 @@ int usage() {
 }
 
 polymesh::pipeline::VolumeMesher parse_mesher(const std::string& m) {
+    if (m == "hybrid" || m == "zoo" || m == "mixed") {
+        return polymesh::pipeline::VolumeMesher::kHybrid;
+    }
+    if (m == "tet") {
+        return polymesh::pipeline::VolumeMesher::kTetFill;
+    }
     if (m == "hex") {
         return polymesh::pipeline::VolumeMesher::kHexFill;
     }
@@ -67,7 +73,7 @@ polymesh::pipeline::VolumeMesher parse_mesher(const std::string& m) {
     if (m == "prism" || m == "sweep") {
         return polymesh::pipeline::VolumeMesher::kPrismSweep;
     }
-    return polymesh::pipeline::VolumeMesher::kTetFill;
+    return polymesh::pipeline::VolumeMesher::kHybrid;
 }
 
 polymesh::geom::TriSurface load_surface(std::string_view path) {
@@ -97,7 +103,7 @@ int cmd_mesh(std::span<char*> args) {
     const std::string path = args[2];
     double h = 0.0;
     std::string out_path;
-    auto mesher = polymesh::pipeline::VolumeMesher::kTetFill;
+    auto mesher = polymesh::pipeline::VolumeMesher::kHybrid;
     int skin = 2;
     bool feature = false;
     for (std::size_t i = 3; i < args.size(); ++i) {
@@ -144,7 +150,7 @@ int cmd_solve(std::span<char*> args) {
     double E = 200e9;
     double nu = 0.3;
     std::string out_path;
-    auto mesher = polymesh::pipeline::VolumeMesher::kTetFill;
+    auto mesher = polymesh::pipeline::VolumeMesher::kHybrid;
     int skin = 2;
     bool feature = false;
     int adapt_passes = 0;

@@ -264,7 +264,7 @@ TransitionFillOutput transition_fill_surface(const geom::TriSurface& surface,
                     }
                 }
             },
-            /*max_move_frac=*/0.55, /*passes=*/3);
+            /*max_move_frac=*/0.75, /*passes=*/4);
         out.boundary_max_distance = snap.max_residual;
 
         // Hard gate: still-inverted cells must not leave the mesher.

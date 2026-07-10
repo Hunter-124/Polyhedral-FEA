@@ -8,8 +8,8 @@ Product meshers (`tet_fill_surface`, `hex_fill_surface`, `graded_tet_fill_surfac
 `transition_fill_surface`, `prism_fill_surface`) fill a **Cartesian lattice** over
 the axis-aligned bbox of a closed triangle surface, classify cells inside/outside
 by ray cast, and emit tet4 / hex8 / pyramid5 / prism6 connectivity. Optional
-limited surface snap (≤ 0.35 h) pulls boundary lattice nodes toward the STL with
-Jacobian unsnap safety (B3 / ADR-0013).
+limited surface snap (≤ 0.75 h, multi-pass) pulls boundary lattice nodes toward
+the STL with Jacobian unsnap safety (B3 / ADR-0013). Hex/prism fills snap too.
 
 This is **not** constrained Delaunay, advancing-front, or CAD-aware meshing.
 `prism_fill_surface` / `VolumeMesher::kPrismSweep` is **not** CAD extrusion
@@ -24,10 +24,10 @@ analytical mesh quality, boundary-fitted DOF efficiency, or Tier-1 accuracy on
 | Path | Algorithm | Boundary |
 |------|-----------|----------|
 | tet | Kuhn 6-tet split of inside voxels | Stair-cased + limited snap |
-| hex | Inside voxels → hex8 | Stair-cased (no snap yet) |
-| graded tet | Fine skin / coarse core on lattice | Stair-cased (no snap) |
+| hex | Inside voxels → hex8 | Stair-cased + limited snap |
+| graded tet | Fine skin / coarse core on lattice | Stair-cased + limited snap |
 | hex+pyramid | Interior hex, boundary cell → 6 pyramids | Limited snap + unsnap |
-| prism sweep | Inside voxels → 2× prism6 (base diag), sweep = longest axis | Stair-cased (no snap) |
+| prism sweep | Inside voxels → 2× prism6 (base diag), sweep = longest axis | Stair-cased + limited snap |
 
 ## Lattice construction (bbox-fitted)
 `make_bbox_grid` sets \(n_a=\lceil L_a/h\rceil\) and \(\Delta_a=L_a/n_a\) so the
@@ -38,8 +38,10 @@ systematic underfill gap when \(n h > L\) left a partial exterior layer empty.
 **Cell budget:** default max is \(512\cdot 1024\) cells. If the requested \(h\)
 would exceed that (common for graded tet, which builds a fine lattice at
 \(h/2\)), the grid is **auto-coarsened** rather than throwing
-`grid too fine`. Graded fill also pre-floors \(h\) via `min_h_for_cell_budget`
-(subdivision=2). Mesher notes may say `h raised to cell budget`.
+`grid too fine`. Graded fill pre-floors \(h\) via `min_h_for_cell_budget`
+(subdivision=2) and is **always 2:1** (bulk≈\(h\), fine≈\(h/2\)) — feature/seed
+bands only choose which blocks are fine, not a global \(h/4\) lattice.
+Mesher notes may say `h raised to cell budget`.
 
 ## Ray parity (shared-edge dedupe)
 Inside tests use even-odd ray casting. Coplanar face diagonals / shared edges
@@ -50,8 +52,10 @@ surface hit counts once (`mesh/grid_classify.hpp`).
 
 ## Staircasing and when they fail
 - **Staircasing:** free surface follows lattice faces, not the CAD/STL, except
-  where limited snap moves nodes ≤ 0.35 h (may still leave residual gap ~O(h)
+  where limited snap moves nodes ≤ 0.75 h (may still leave residual gap ~O(h)
   on *curved* surfaces; AABB bricks fill solid with exact bbox coverage).
+  Mesh preview draws true element exterior faces (tet triangles include Kuhn
+  diagonals); topology remains lattice-based until B1 true mesher.
 - **Feature loss:** thin walls, fillets, and re-entrant corners thinner than ~h
   are under-resolved or dropped (inside test uses cell centres). Thin plates
   with thickness \(t<h\) still mesh when \(n_z=\lceil t/h\rceil\ge 1\) and

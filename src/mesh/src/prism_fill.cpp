@@ -2,6 +2,7 @@
 #include "mesh/prism_fill.hpp"
 
 #include "mesh/grid_classify.hpp"
+#include "mesh/surface_project.hpp"
 
 #include <Eigen/Geometry>
 
@@ -10,6 +11,7 @@
 #include <cmath>
 #include <format>
 #include <map>
+#include <set>
 
 namespace polymesh::mesh {
 namespace {
@@ -75,7 +77,8 @@ void check_prism_fill_geometry(const PrismFillOutput& out, double min_volume) {
 
 PrismFillOutput prism_fill_surface(const geom::TriSurface& surface,
                                    const Eigen::Vector3d& bbox_min,
-                                   const Eigen::Vector3d& bbox_max, double h) {
+                                   const Eigen::Vector3d& bbox_max, double h,
+                                   bool snap_boundary) {
     const CartesianGrid grid = make_bbox_grid(bbox_min, bbox_max, h);
     const Eigen::Vector3d extent = bbox_max - bbox_min;
     const int sweep = pick_sweep_axis(extent);
@@ -192,6 +195,45 @@ PrismFillOutput prism_fill_surface(const geom::TriSurface& surface,
     if (out.prisms.empty()) {
         throw ValidityError("prism_fill_surface: no interior cells (empty or open surface?)");
     }
+
+    if (snap_boundary && !out.boundary_quads.empty()) {
+        std::set<std::uint32_t> bnode_set;
+        for (const auto& q : out.boundary_quads) {
+            bnode_set.insert(q.begin(), q.end());
+        }
+        std::vector<std::uint32_t> bnodes(bnode_set.begin(), bnode_set.end());
+        const double vol_eps = 1e-14 * out.h * out.h * out.h;
+        out.boundary_max_distance =
+            snap_boundary_nodes(
+                surface, out.nodes, bnodes, out.h,
+                [&](std::set<std::uint32_t>& offenders) {
+                    for (const auto& n : out.prisms) {
+                        const double v = prism_signed_volume_impl(
+                            out.nodes[n[0]], out.nodes[n[1]], out.nodes[n[2]],
+                            out.nodes[n[3]], out.nodes[n[4]], out.nodes[n[5]]);
+                        if (v > vol_eps) {
+                            continue;
+                        }
+                        offenders.insert(n.begin(), n.end());
+                    }
+                },
+                /*max_move_frac=*/0.75, /*passes=*/4)
+                .max_residual;
+        // Re-orient any prisms flipped by residual geometry (rare).
+        for (auto& n : out.prisms) {
+            const double v =
+                prism_signed_volume_impl(out.nodes[n[0]], out.nodes[n[1]], out.nodes[n[2]],
+                                         out.nodes[n[3]], out.nodes[n[4]], out.nodes[n[5]]);
+            if (v < 0.0) {
+                std::swap(n[1], n[2]);
+                std::swap(n[4], n[5]);
+            }
+        }
+        check_prism_fill_geometry(out, vol_eps);
+        return out;
+    }
+
+    check_prism_fill_geometry(out);
     return out;
 }
 

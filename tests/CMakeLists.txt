@@ -37,6 +37,7 @@ add_executable(polymesh_tests
     test_graded_fill.cpp
     test_pyramid.cpp
     test_transition_fill.cpp
+    test_mixed_fill.cpp
     test_p_elevate.cpp
     test_d6_bench_smoke.cpp
 

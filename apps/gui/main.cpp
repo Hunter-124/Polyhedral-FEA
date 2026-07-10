@@ -51,15 +51,17 @@ constexpr ImGuiWindowFlags kPanelFlags =
 struct App {
     std::optional<Model> model;
     SimSetup setup = [] {
-        // Product defaults: graded tet + light adaptive loop (η-target stop).
+        // Product defaults: hybrid zoo + light adaptive loop (η-target stop).
+        // Graded tet is 2:1 (bulk≈h, fine≈h/2); keep skin thin and p-elev opt-in
+        // so interactive mesh/solve stays under RAM.
         SimSetup s;
-        s.mesher = VolumeMesher::kGradedTet;
-        s.adapt_passes = 3;
+        s.mesher = VolumeMesher::kHybrid;
+        s.adapt_passes = 2;
         s.eta_target = 0.12;
         s.adapt_leb_waves = 2;
-        s.use_feature_grading = true; // curvature/thin-wall → h/4 near features
-        s.skin_layers = 3;            // thicker fine boundary band
-        s.p_elevate = true;           // geo-hp bulk quadratic + ZZ smooth elev
+        s.use_feature_grading = true; // curvature/thin-wall → fine bands near features
+        s.skin_layers = 2;            // free-surface fine depth (capped on thin parts)
+        s.p_elevate = false;          // auto on adapt when mesh is under node budget
         return s;
     }();
     SolveJob job;
@@ -215,10 +217,19 @@ void draw_study_panel(App& app) {
     }
     {
         int m = static_cast<int>(app.setup.mesher);
-        static const char* kMeshers[] = {"tet fill",   "hex fill",    "hex VEM",
-                                         "graded tet", "hex+pyramid", "prism sweep"};
-        if (iw::selector("mesher", &m, kMeshers, 6)) {
+        // Order matches VolumeMesher enum. Hybrid zoo is the SPEC default path.
+        static const char* kMeshers[] = {
+            "tet (grid)",   "hex (grid)",    "hex VEM (grid)", "graded tet",
+            "hex+pyramid",  "prism (grid)",  "hybrid zoo",
+        };
+        if (iw::selector("mesher", &m, kMeshers, 7)) {
             app.setup.mesher = static_cast<VolumeMesher>(m);
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(
+                "hybrid zoo (default): hex bulk + tet skin in one mesh (mixed types).\n"
+                "hex+pyramid / graded / prism are mono or transition specializations.\n"
+                "Cartesian lattice + surface snap (ADR-0015) — not CAD-fitted Delaunay.");
         }
     }
     {

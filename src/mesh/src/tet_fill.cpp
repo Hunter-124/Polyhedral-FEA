@@ -153,7 +153,7 @@ TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
         std::vector<std::uint32_t> bnodes(bnode_set.begin(), bnode_set.end());
         const double h_snap = out.h;
         const double vol_eps = 1e-14 * h_snap * h_snap * h_snap;
-        // Multi-pass snap ≤0.55 h with Jacobian safety (shared helper; ADR-0015/B3).
+        // Multi-pass snap ≤0.75 h with Jacobian safety (shared helper; ADR-0015/B3).
         snap_boundary_nodes(
             surface, out.nodes, bnodes, h_snap,
             [&](std::set<std::uint32_t>& offenders) {
@@ -166,7 +166,7 @@ TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
                     offenders.insert(n.begin(), n.end());
                 }
             },
-            /*max_move_frac=*/0.55, /*passes=*/3);
+            /*max_move_frac=*/0.75, /*passes=*/4);
 
         for (auto& n : out.tets) {
             const double v = tet_signed_volume_impl(out.nodes[n[0]], out.nodes[n[1]],

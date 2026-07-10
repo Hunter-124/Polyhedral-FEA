@@ -30,6 +30,7 @@ enum class VolumeMesher : int {
     kGradedTet = 3,
     kHexPyramid = 4, // hex core + pyramid skin; FE = all-pyramid expand (ADR-0013)
     kPrismSweep = 5, // Cartesian prism6 wedges along dominant axis (ADR-0015 / C3)
+    kHybrid = 6,     // hex bulk + pyramid ring + tet skin (SPEC zoo; FE expands hex)
 };
 
 /// Imported model: triangle surface segmented into CAD-style "faces"
@@ -77,7 +78,7 @@ struct SimSetup {
     /// 1 = one LEB (ADR-0016); 2–3 deepen local h before falling back to remesh.
     int adapt_leb_waves = 2;
     int skin_layers = 2; // graded-tet boundary skin depth (coarse cells)
-    VolumeMesher mesher = VolumeMesher::kTetFill;
+    VolumeMesher mesher = VolumeMesher::kHybrid;
     std::set<int> fixtures; // region ids with all DOFs fixed
     std::map<int, RegionLoad> loads;
 };
@@ -133,7 +134,7 @@ struct VolumeMeshOutput {
 /// @param refine_seeds Centroids for a posteriori fine blocks, metres (world coords).
 /// @param seed_band Ball radius around each seed for graded fine cells, metres (0 = off).
 VolumeMeshOutput volume_mesh(const Model& model, double h,
-                             VolumeMesher mesher = VolumeMesher::kTetFill, int skin_layers = 2,
+                             VolumeMesher mesher = VolumeMesher::kHybrid, int skin_layers = 2,
                              bool feature_refine = false,
                              std::span<const Eigen::Vector3d> refine_seeds = {},
                              double seed_band = 0.0);

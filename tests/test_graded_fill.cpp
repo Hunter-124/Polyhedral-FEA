@@ -74,25 +74,42 @@ TEST_CASE("feature band refines more cells than surface skin alone") {
     check_tet_fill_geometry(with_feat.mesh);
 }
 
-TEST_CASE("feature/seed bands target ultra-fine lattice (~h/4)") {
-    // Without features: fine ≈ h/2. With feature band: subdiv=4 → fine ≈ h/4.
+TEST_CASE("feature/seed bands refine more blocks at fixed 2:1 lattice") {
+    // Graded is always subdiv=2 (bulk≈h, fine≈h/2). Features/seeds densify
+    // *which* blocks are fine — they must not rebuild a global h/4 lattice.
     const auto s = unit_box();
     const auto edges = polymesh::geom::detect_sharp_edges(s, 30.0);
     auto plain = graded_tet_fill_surface(s, {0, 0, 0}, {1, 1, 1}, 0.4, 1, {}, 0.0);
     auto feat = graded_tet_fill_surface(s, {0, 0, 0}, {1, 1, 1}, 0.4, 1, edges, 0.8);
     REQUIRE(plain.subdivision == 2);
-    REQUIRE(feat.subdivision == 4);
-    // Realized fine spacing with features should be clearly smaller than plain.
-    REQUIRE(feat.h_fine < plain.h_fine * 0.75);
-    REQUIRE(feat.mesh.tets.size() > plain.mesh.tets.size());
+    REQUIRE(feat.subdivision == 2);
+    // Same lattice spacing; features force more fine cells / tets.
+    REQUIRE(std::abs(feat.h_fine - plain.h_fine) < 1e-12);
+    REQUIRE(feat.n_feature_cells > 0);
+    REQUIRE(feat.n_fine_cells >= plain.n_fine_cells);
+    REQUIRE(feat.mesh.tets.size() >= plain.mesh.tets.size());
     check_tet_fill_geometry(feat.mesh);
 
-    // Seed balls alone also activate ultra-fine (no sharp edges needed).
+    // Seed balls alone mark fine blocks (no sharp edges needed).
     std::vector<Eigen::Vector3d> seeds{{0.5, 0.5, 0.0}, {0.5, 0.5, 1.0}};
     auto seeded = graded_tet_fill_surface(s, {0, 0, 0}, {1, 1, 1}, 0.4, 1, {}, 0.0, seeds, 0.5);
-    REQUIRE(seeded.subdivision == 4);
+    REQUIRE(seeded.subdivision == 2);
     REQUIRE(seeded.n_seed_cells > 0);
     check_tet_fill_geometry(seeded.mesh);
+}
+
+TEST_CASE("graded tet bulk size tracks requested h (2:1)") {
+    const auto s = unit_box();
+    auto graded = graded_tet_fill_surface(s, {0, 0, 0}, {1, 1, 1}, 0.25, 2);
+    REQUIRE(graded.subdivision == 2);
+    // h_coarse ≈ h, h_fine ≈ h/2 (within lattice rounding).
+    REQUIRE(graded.h_coarse > 0.2);
+    REQUIRE(graded.h_coarse < 0.35);
+    REQUIRE(graded.h_fine > 0.1);
+    REQUIRE(graded.h_fine < 0.2);
+    REQUIRE(graded.n_coarse_cells > 0);
+    REQUIRE(graded.n_fine_cells > 0);
+    check_tet_fill_geometry(graded.mesh);
 }
 
 TEST_CASE("pipeline graded with feature_refine notes feature blocks") {

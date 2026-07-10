@@ -8,6 +8,7 @@ add_library(mesh
     src/surface_project.cpp
     src/grid_classify.cpp
     src/hybrid_fill.cpp
+    src/mixed_fill.cpp
     src/transition_fill.cpp
     src/local_refine.cpp
 )

@@ -18,6 +18,13 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: **Graded tet fix (size + speed + RAM)** — Dropped global \(h/4\)
+  lattice when features/seeds active (was bulk only \(h/2\), 8× cells, thin plates
+  fully fine → slow mesh + FEA OOM). Always **2:1** (bulk≈\(h\), fine≈\(h/2\));
+  feature/seed stamp via rasterized balls (not O(blocks·seeds)); skin depth
+  capped by interior thickness; snap Jacobian only on boundary-touching tets;
+  pipeline seeds sparse (≤192, 85th-κ, band≈1.25\(h\)); p-elevate skipped when
+  nodes>40k. GUI: skin=2, p-elev opt-in. Tests updated (subdiv always 2).
 - 2026-07-10: **Performance build** — Release defaults to **-O3**; OpenMP ON for assembly, mesh classify (uint8 mask, not vector<bool>), ZZ, stress, SpMV; Eigen kept serial to avoid nested OpenMP hangs; no -ffast-math; LTO/native-arch OFF (Eigen miscompile risk). `polymesh backend` reports thread stack. 133 tests green.
 - 2026-07-10: **Results viewport + geo-hybrid mesh** — pan/orbit fixed in von
   Mises/deflection/error (Image hover captured before colorbar child);

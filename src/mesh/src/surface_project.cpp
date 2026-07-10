@@ -89,12 +89,13 @@ SnapStats snap_boundary_nodes(const geom::TriSurface& surface,
     if (boundary_nodes.empty() || !(h > 0.0) || !std::isfinite(h) || !collect_offenders) {
         return stats;
     }
-    max_move_frac = std::clamp(max_move_frac, 0.05, 0.85);
-    passes = std::clamp(passes, 1, 6);
+    max_move_frac = std::clamp(max_move_frac, 0.05, 0.95);
+    passes = std::clamp(passes, 1, 8);
     const double max_total = max_move_frac * h;
     const double step_cap = max_total / static_cast<double>(passes);
-    // Search radius: allow slightly beyond stair-case residual (~0.5√3 h).
-    const double search_r = 1.5 * h;
+    // Search radius: allow full stair residual (~0.5√3 h) plus margin for
+    // anisotropic lattice cells and coarse STL facets on cylinders.
+    const double search_r = 2.0 * h;
 
     std::unordered_map<std::uint32_t, Eigen::Vector3d> original;
     original.reserve(boundary_nodes.size());
@@ -132,23 +133,34 @@ SnapStats snap_boundary_nodes(const geom::TriSurface& surface,
     }
     stats.n_moved = moved.size();
 
-    // Unsnap offenders until the mesh is valid (or nothing left to unsnap).
-    bool progressed = true;
-    while (progressed && !original.empty()) {
-        progressed = false;
+    // Greedy unsnap: restore only the worst moved offender each round so
+    // other boundary nodes can stay on the surface (better cylinders/fillets).
+    while (!original.empty()) {
         std::set<std::uint32_t> offenders;
         collect_offenders(offenders);
+        std::uint32_t worst = 0xffffffffu;
+        double worst_move = -1.0;
         for (const auto ni : offenders) {
-            const auto it = original.find(ni);
-            if (it == original.end()) {
+            const auto it = moved.find(ni);
+            if (it == moved.end()) {
                 continue;
             }
-            nodes[ni] = it->second;
-            original.erase(it);
-            moved.erase(ni);
-            ++stats.n_unsnapped;
-            progressed = true;
+            if (it->second > worst_move) {
+                worst_move = it->second;
+                worst = ni;
+            }
         }
+        if (worst == 0xffffffffu || worst_move < 0.0) {
+            break; // inverted cell not caused by a still-snapped node
+        }
+        const auto oit = original.find(worst);
+        if (oit == original.end()) {
+            break;
+        }
+        nodes[worst] = oit->second;
+        original.erase(oit);
+        moved.erase(worst);
+        ++stats.n_unsnapped;
     }
 
     stats.max_residual = 0.0;

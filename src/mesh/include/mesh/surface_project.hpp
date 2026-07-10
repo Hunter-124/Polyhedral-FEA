@@ -50,13 +50,13 @@ using CollectOffendersFn = std::function<void(std::set<std::uint32_t>& offenders
 /// any node that participates in an inverted element (B3 / ADR-0015).
 ///
 /// @param h Characteristic lattice size (metres) — caps travel.
-/// @param max_move_frac Max |Δ| / h per node across all passes (default 0.55;
-///        formerly 0.35 single-pass — higher budget helps cylinders/fillets).
-/// @param passes Number of incremental projection passes (default 3).
+/// @param max_move_frac Max |Δ| / h per node across all passes (default 0.75;
+///        raised from 0.55 so curved walls/cylinders can leave the stair-case).
+/// @param passes Number of incremental projection passes (default 4).
 SnapStats snap_boundary_nodes(const geom::TriSurface& surface,
                               std::vector<Eigen::Vector3d>& nodes,
                               const std::vector<std::uint32_t>& boundary_nodes, double h,
                               const CollectOffendersFn& collect_offenders,
-                              double max_move_frac = 0.55, int passes = 3);
+                              double max_move_frac = 0.75, int passes = 4);
 
 } // namespace polymesh::mesh

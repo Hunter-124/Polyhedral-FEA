@@ -68,10 +68,10 @@ Eigen::MatrixXd element_stiffness(const NodalMesh& mesh, const NodalElement& ele
         return vem_poly_stiffness(mesh, cell, material);
     }
     // Pyramid5: two tet4s (base diagonal 0-2 + apex). Flip-aware scatter keeps
-    // local DOF order consistent with the stiffness matrix. Hex8 stays true
-    // isoparametric trilinear (GATE 1 freeze). Product hybrid path expands hex
-    // cores to six pyramids so all faces share this diagonal convention
-    // (ADR-0013); mixed isoparametric-hex + pyramid is nonconforming.
+    // local DOF order consistent with the stiffness matrix.
+    //
+    // Pyramid5: tet-split (base diagonal 0-2 + apex). ADR-0013 product expand
+    // path remains available; hybrid zoo prefers hex+tet (below).
     if (element.type == ElementType::kPyramid5 && element.nodes.size() == 5) {
         const auto& n = element.nodes;
         Eigen::MatrixXd k = Eigen::MatrixXd::Zero(15, 15);
@@ -104,6 +104,64 @@ Eigen::MatrixXd element_stiffness(const NodalMesh& mesh, const NodalElement& ele
         add_tet({{0, 1, 2, 4}});
         add_tet({{0, 2, 3, 4}});
         return k;
+    }
+    if (element.type == ElementType::kHex8 && element.nodes.size() == 8) {
+        // Hybrid zoo: hex bulk + Kuhn tet skin. Assemble hex as the same Kuhn
+        // 6-tet split so shared faces are conforming PL (constant-strain exact).
+        // Pure-hex meshes keep GATE-1 isoparametric trilinear.
+        thread_local const NodalMesh* hybrid_mesh_ptr = nullptr;
+        thread_local bool hybrid_mesh = false;
+        if (hybrid_mesh_ptr != &mesh) {
+            hybrid_mesh_ptr = &mesh;
+            hybrid_mesh = false;
+            for (const auto& el : mesh.elements) {
+                if (el.type == ElementType::kTet4 || el.type == ElementType::kTet10 ||
+                    el.type == ElementType::kPyramid5) {
+                    hybrid_mesh = true;
+                    break;
+                }
+            }
+        }
+        if (hybrid_mesh) {
+            static constexpr std::array<std::array<int, 4>, 6> kCubeTets{{
+                {{0, 1, 2, 6}},
+                {{0, 2, 3, 6}},
+                {{0, 1, 5, 6}},
+                {{0, 3, 7, 6}},
+                {{0, 4, 5, 6}},
+                {{0, 4, 7, 6}},
+            }};
+            const auto& n = element.nodes;
+            Eigen::MatrixXd k = Eigen::MatrixXd::Zero(24, 24);
+            for (const auto& t : kCubeTets) {
+                std::array<int, 4> loc = {t[0], t[1], t[2], t[3]};
+                std::array<std::uint32_t, 4> ids{
+                    n[static_cast<std::size_t>(loc[0])], n[static_cast<std::size_t>(loc[1])],
+                    n[static_cast<std::size_t>(loc[2])], n[static_cast<std::size_t>(loc[3])]};
+                const Eigen::Vector3d& pa = mesh.nodes[ids[0]];
+                const Eigen::Vector3d& pb = mesh.nodes[ids[1]];
+                const Eigen::Vector3d& pc = mesh.nodes[ids[2]];
+                const Eigen::Vector3d& pd = mesh.nodes[ids[3]];
+                if ((pb - pa).dot((pc - pa).cross(pd - pa)) < 0.0) {
+                    std::swap(ids[1], ids[2]);
+                    std::swap(loc[1], loc[2]);
+                }
+                NodalElement tet{ElementType::kTet4, {ids[0], ids[1], ids[2], ids[3]}};
+                const Eigen::MatrixXd kt = element_stiffness(mesh, tet, material);
+                for (int a = 0; a < 4; ++a) {
+                    for (int b = 0; b < 4; ++b) {
+                        for (int i = 0; i < 3; ++i) {
+                            for (int j = 0; j < 3; ++j) {
+                                k(3 * loc[static_cast<std::size_t>(a)] + i,
+                                  3 * loc[static_cast<std::size_t>(b)] + j) +=
+                                    kt(3 * a + i, 3 * b + j);
+                            }
+                        }
+                    }
+                }
+            }
+            return k;
+        }
     }
     const auto x = element_coords(mesh, element);
     const auto d = material.d_matrix();

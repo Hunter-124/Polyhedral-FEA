@@ -375,9 +375,9 @@ void Viewport::update_overlays(const Model& model, const SimSetup& setup, int se
 }
 
 void Viewport::set_mesh(const VolumeMeshOutput& mesh_out) {
-    // Boundary quads colored by owning element type (hex/tet/pyramid/…) with a
-    // light checkerboard so individual faces stay readable at dense grids.
-    // O(nodes + elems + quads) — never scan all elements per quad (that froze
+    // Exterior faces (from element connectivity when available): quads or
+    // degenerate tri-as-quads, colored by element type with a light checkerboard.
+    // O(nodes + elems + faces) — never scan all elements per face (that froze
     // the GUI for ~seconds on ~200k-element auto meshes).
     namespace fea = polymesh::fea;
     auto type_color = [](fea::ElementType t) -> std::array<float, 3> {
@@ -424,13 +424,23 @@ void Viewport::set_mesh(const VolumeMeshOutput& mesh_out) {
     const auto& nodes = mesh_out.mesh.nodes;
     for (std::size_t qi = 0; qi < mesh_out.boundary_quads.size(); ++qi) {
         const auto& quad = mesh_out.boundary_quads[qi];
+        if (quad[0] >= nodes.size() || quad[1] >= nodes.size() || quad[2] >= nodes.size() ||
+            quad[3] >= nodes.size()) {
+            continue;
+        }
         const Eigen::Vector3d a = nodes[quad[0]];
         const Eigen::Vector3d b = nodes[quad[1]];
         const Eigen::Vector3d c = nodes[quad[2]];
-        const Eigen::Vector3d n = (b - a).cross(c - a).normalized();
+        Eigen::Vector3d n = (b - a).cross(c - a);
+        const double nn = n.norm();
+        if (nn > 1e-30) {
+            n /= nn;
+        } else {
+            n = Eigen::Vector3d::UnitZ();
+        }
         auto rgb = type_color(elem_type_for_quad(quad));
         // Deterministic face checker: alternate brightness so edges read clearly
-        // against a uniform blue sea of Cartesian cells.
+        // against a uniform sea of Cartesian cells.
         const std::uint32_t face_hash =
             quad[0] * 73856093u ^ quad[1] * 19349663u ^ quad[2] * 83492791u ^
             static_cast<std::uint32_t>(qi) * 2654435761u;
@@ -438,8 +448,12 @@ void Viewport::set_mesh(const VolumeMeshOutput& mesh_out) {
         rgb[0] *= shade;
         rgb[1] *= shade;
         rgb[2] *= shade;
-        for (const auto idx : {0, 1, 2, 0, 2, 3}) {
-            const auto& p = nodes[quad[static_cast<std::size_t>(idx)]];
+        // Degenerate tri-as-quad (v2==v3): one triangle. Else two tris of the quad.
+        const bool is_tri = (quad[2] == quad[3]);
+        const int corners[] = {0, 1, 2, 0, 2, 3};
+        const int n_idx = is_tri ? 3 : 6;
+        for (int k = 0; k < n_idx; ++k) {
+            const auto& p = nodes[quad[static_cast<std::size_t>(corners[k])]];
             for (int i = 0; i < 3; ++i) {
                 data.push_back(static_cast<float>(p[i]));
             }
@@ -534,8 +548,11 @@ void Viewport::bake_result(DisplayMode mode, float deform_scale, float result_ma
         } else {
             n = Eigen::Vector3d::UnitZ();
         }
-        for (const auto idx : {0, 1, 2, 0, 2, 3}) {
-            emit(quad[static_cast<std::size_t>(idx)], n);
+        const bool is_tri = (quad[2] == quad[3]);
+        const int corners[] = {0, 1, 2, 0, 2, 3};
+        const int n_idx = is_tri ? 3 : 6;
+        for (int k = 0; k < n_idx; ++k) {
+            emit(quad[static_cast<std::size_t>(corners[k])], n);
         }
     }
     result_vertex_count_ = static_cast<int>(data.size() / 10);

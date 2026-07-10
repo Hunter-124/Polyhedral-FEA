@@ -9,11 +9,12 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
-#include <format>
 #include <map>
 #include <queue>
 #include <set>
 #include <span>
+#include <unordered_set>
+#include <vector>
 
 namespace polymesh::mesh {
 namespace {
@@ -27,6 +28,123 @@ constexpr std::array<std::array<int, 4>, 6> kCubeTets{{
     {{0, 4, 5, 6}},
     {{0, 4, 7, 6}},
 }};
+
+// Mark coarse blocks within `band` of any seed by rasterizing balls on the
+// coarse index grid — O(seeds · ball_cells) instead of O(blocks · seeds).
+void mark_seed_blocks(std::vector<bool>& coarse_fine, std::vector<bool>& coarse_seed,
+                      int nxc, int nyc, int nzc, const CartesianGrid& fine,
+                      std::span<const Eigen::Vector3d> seeds, double seed_band) {
+    if (!(seed_band > 0.0) || seeds.empty() || nxc < 1 || nyc < 1 || nzc < 1) {
+        return;
+    }
+    const double band2 = seed_band * seed_band;
+    // Coarse cell size ≈ 2 fine cells.
+    const Eigen::Vector3d hc = 2.0 * fine.cell;
+    const double h_ref = std::max({hc[0], hc[1], hc[2], 1e-30});
+    const int r = std::max(1, static_cast<int>(std::ceil(seed_band / h_ref)) + 1);
+
+    const auto cidx = [&](int i, int j, int k) {
+        return (static_cast<std::size_t>(k) * static_cast<std::size_t>(nyc) +
+                static_cast<std::size_t>(j)) *
+                   static_cast<std::size_t>(nxc) +
+               static_cast<std::size_t>(i);
+    };
+
+    for (const auto& seed : seeds) {
+        // Continuous fine-lattice index of the seed, then coarse parent.
+        const Eigen::Vector3d local = seed - fine.origin;
+        const int ifine = static_cast<int>(std::floor(local[0] / fine.cell[0]));
+        const int jfine = static_cast<int>(std::floor(local[1] / fine.cell[1]));
+        const int kfine = static_cast<int>(std::floor(local[2] / fine.cell[2]));
+        const int ic0 = ifine / 2;
+        const int jc0 = jfine / 2;
+        const int kc0 = kfine / 2;
+        for (int dk = -r; dk <= r; ++dk) {
+            for (int dj = -r; dj <= r; ++dj) {
+                for (int di = -r; di <= r; ++di) {
+                    const int ic = ic0 + di, jc = jc0 + dj, kc = kc0 + dk;
+                    if (ic < 0 || ic >= nxc || jc < 0 || jc >= nyc || kc < 0 ||
+                        kc >= nzc) {
+                        continue;
+                    }
+                    // Coarse-block center on the fine lattice (same as emit path).
+                    const Eigen::Vector3d center =
+                        fine.node(2 * ic + 1, 2 * jc + 1, 2 * kc + 1);
+                    if ((center - seed).squaredNorm() <= band2) {
+                        const auto id = cidx(ic, jc, kc);
+                        coarse_fine[id] = true;
+                        coarse_seed[id] = true;
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Feature band: sample sharp-edge segments onto the coarse grid and expand.
+// Avoids O(blocks · n_edges) distance_to_features scans.
+void mark_feature_blocks(std::vector<bool>& coarse_fine, std::vector<bool>& coarse_feature,
+                         int nxc, int nyc, int nzc, const CartesianGrid& fine,
+                         const geom::TriSurface& surface,
+                         std::span<const geom::SharpEdge> features, double feature_band) {
+    if (!(feature_band > 0.0) || features.empty() || nxc < 1) {
+        return;
+    }
+    const Eigen::Vector3d hc = 2.0 * fine.cell;
+    const double h_ref = std::max({hc[0], hc[1], hc[2], 1e-30});
+    const int r = std::max(1, static_cast<int>(std::ceil(feature_band / h_ref)) + 1);
+    const double band2 = feature_band * feature_band;
+
+    const auto cidx = [&](int i, int j, int k) {
+        return (static_cast<std::size_t>(k) * static_cast<std::size_t>(nyc) +
+                static_cast<std::size_t>(j)) *
+                   static_cast<std::size_t>(nxc) +
+               static_cast<std::size_t>(i);
+    };
+
+    auto stamp = [&](const Eigen::Vector3d& p) {
+        const Eigen::Vector3d local = p - fine.origin;
+        const int ifine = static_cast<int>(std::floor(local[0] / fine.cell[0]));
+        const int jfine = static_cast<int>(std::floor(local[1] / fine.cell[1]));
+        const int kfine = static_cast<int>(std::floor(local[2] / fine.cell[2]));
+        const int ic0 = ifine / 2;
+        const int jc0 = jfine / 2;
+        const int kc0 = kfine / 2;
+        for (int dk = -r; dk <= r; ++dk) {
+            for (int dj = -r; dj <= r; ++dj) {
+                for (int di = -r; di <= r; ++di) {
+                    const int ic = ic0 + di, jc = jc0 + dj, kc = kc0 + dk;
+                    if (ic < 0 || ic >= nxc || jc < 0 || jc >= nyc || kc < 0 ||
+                        kc >= nzc) {
+                        continue;
+                    }
+                    const Eigen::Vector3d center =
+                        fine.node(2 * ic + 1, 2 * jc + 1, 2 * kc + 1);
+                    if ((center - p).squaredNorm() <= band2) {
+                        const auto id = cidx(ic, jc, kc);
+                        coarse_fine[id] = true;
+                        coarse_feature[id] = true;
+                    }
+                }
+            }
+        }
+    };
+
+    for (const auto& e : features) {
+        if (e.v0 >= surface.vertices.size() || e.v1 >= surface.vertices.size()) {
+            continue;
+        }
+        const Eigen::Vector3d& a = surface.vertices[e.v0];
+        const Eigen::Vector3d& b = surface.vertices[e.v1];
+        const double len = (b - a).norm();
+        // Sample along the crease so long edges still densify a continuous band.
+        const int n_samp = std::max(2, static_cast<int>(std::ceil(len / h_ref)) + 1);
+        for (int s = 0; s <= n_samp; ++s) {
+            const double t = static_cast<double>(s) / static_cast<double>(n_samp);
+            stamp((1.0 - t) * a + t * b);
+        }
+    }
+}
 
 } // namespace
 
@@ -52,14 +170,10 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         throw ValidityError("graded_tet_fill_surface: empty bbox");
     }
 
-    // Fine lattice: h/2 by default. With feature or seed bands, target h/4 so
-    // curved edges / error seeds get much smaller elements (skin also denser).
-    // Coarse blocks remain 2×2×2 of fine cells → bulk spacing ≈ 2·h_fine.
-    // Bbox-fitted even grid + robust ray parity (shared-edge dedupe).
-    // Pre-floor h so the fine lattice fits the cell budget; make_bbox_grid_even
-    // also auto-coarsens as a backstop (avoids "grid too fine" on small user h).
-    const bool ultra_fine = (feature_band > 0.0) || (seed_band > 0.0);
-    const int subdiv = ultra_fine ? 4 : 2; // requested h / fine-target ratio
+    // Always 2:1: fine lattice ≈ h/2, coarse blocks span 2 fine cells ≈ h.
+    // (Former subdiv=4 built a global h/4 lattice whenever features/seeds were
+    // active — 8× cells, bulk still only h/2, and thin plates went fully fine.)
+    constexpr int subdiv = 2;
     const double h_budget = min_h_for_cell_budget(bbox_min, bbox_max, kDefaultMaxGridCells,
                                                   /*subdivision=*/subdiv);
     const double h_use = (h_budget > 0.0) ? std::max(h, h_budget) : h;
@@ -74,9 +188,13 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                inside[idx(i, j, k)];
     };
 
-    // Boundary distance in cell hops (0 = touches exterior).
+    // Boundary distance in cell hops (0 = shares a face with exterior).
+    // Face-only (6-connected) — 26-connected over-marked corner shells and
+    // inflated the fine band on thin plates / near holes.
     std::vector<int> dist(inside.size(), -1);
     std::queue<std::array<int, 3>> q;
+    const int face_nbr[6][3] = {{-1, 0, 0}, {1, 0, 0},  {0, -1, 0},
+                                {0, 1, 0},  {0, 0, -1}, {0, 0, 1}};
     for (int k = 0; k < nzf; ++k) {
         for (int j = 0; j < nyf; ++j) {
             for (int i = 0; i < nxf; ++i) {
@@ -84,17 +202,10 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                     continue;
                 }
                 bool boundary = false;
-                for (int dk = -1; dk <= 1 && !boundary; ++dk) {
-                    for (int dj = -1; dj <= 1 && !boundary; ++dj) {
-                        for (int di = -1; di <= 1; ++di) {
-                            if (di == 0 && dj == 0 && dk == 0) {
-                                continue;
-                            }
-                            if (!inb(i + di, j + dj, k + dk)) {
-                                boundary = true;
-                                break;
-                            }
-                        }
+                for (const auto& o : face_nbr) {
+                    if (!inb(i + o[0], j + o[1], k + o[2])) {
+                        boundary = true;
+                        break;
                     }
                 }
                 if (boundary) {
@@ -104,13 +215,13 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             }
         }
     }
-    const int dijk[6][3] = {{-1, 0, 0}, {1, 0, 0},  {0, -1, 0},
-                            {0, 1, 0},  {0, 0, -1}, {0, 0, 1}};
+    int max_dist = 0;
     while (!q.empty()) {
         const auto c = q.front();
         q.pop();
         const int d0 = dist[idx(c[0], c[1], c[2])];
-        for (const auto& o : dijk) {
+        max_dist = std::max(max_dist, d0);
+        for (const auto& o : face_nbr) {
             const int ni = c[0] + o[0], nj = c[1] + o[1], nk = c[2] + o[2];
             if (!inb(ni, nj, nk)) {
                 continue;
@@ -123,10 +234,14 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         }
     }
 
-    // Coarse skin: a 2×2×2 block is "fine" if any fine cell has dist < 2*skin_layers,
-    // or the block center is near a sharp edge / error seed.
+    // Cap skin depth so thin plates keep a coarse core when possible.
+    // Requested skin is 2*skin_layers fine cells; never eat more than half the
+    // interior thickness (else "graded" becomes uniform fine on plates/shells).
+    const int requested_thresh = std::max(1, 2 * skin_layers);
+    const int thickness_cap = std::max(1, (max_dist + 1) / 2);
+    const int fine_dist_thresh = std::min(requested_thresh, thickness_cap);
+
     const int nxc = nxf / 2, nyc = nyf / 2, nzc = nzf / 2;
-    const int fine_dist_thresh = std::max(1, 2 * skin_layers);
     std::vector<bool> coarse_fine(static_cast<std::size_t>(nxc) * nyc * nzc, false);
     std::vector<bool> coarse_feature(static_cast<std::size_t>(nxc) * nyc * nzc, false);
     std::vector<bool> coarse_seed(static_cast<std::size_t>(nxc) * nyc * nzc, false);
@@ -156,23 +271,6 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 if (!any_in) {
                     continue;
                 }
-                const Eigen::Vector3d center = fine.node(2 * ic + 1, 2 * jc + 1, 2 * kc + 1);
-                if (feature_band > 0.0) {
-                    const double dfeat = geom::distance_to_features(center, surface, features);
-                    if (dfeat <= feature_band) {
-                        need_fine = true;
-                        coarse_feature[cidx(ic, jc, kc)] = true;
-                    }
-                }
-                if (seed_band > 0.0) {
-                    for (const auto& seed : refine_seeds) {
-                        if ((center - seed).norm() <= seed_band) {
-                            need_fine = true;
-                            coarse_seed[cidx(ic, jc, kc)] = true;
-                            break;
-                        }
-                    }
-                }
                 if (need_fine) {
                     coarse_fine[cidx(ic, jc, kc)] = true;
                 }
@@ -180,9 +278,13 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         }
     }
 
+    // Feature / seed bands force fine without rebuilding a finer global lattice.
+    mark_feature_blocks(coarse_fine, coarse_feature, nxc, nyc, nzc, fine, surface, features,
+                        feature_band);
+    mark_seed_blocks(coarse_fine, coarse_seed, nxc, nyc, nzc, fine, refine_seeds, seed_band);
+
     GradedTetFillOutput out;
-    // Report realized spacings (may exceed targets after cell-budget floor).
-    out.h_coarse = 2.0 * hf; // one coarse Kuhn cube spans 2 fine cells
+    out.h_coarse = 2.0 * hf; // one coarse Kuhn cube spans 2 fine cells ≈ target h
     out.h_fine = hf;
     out.skin_layers = skin_layers;
     out.subdivision = subdiv;
@@ -199,7 +301,6 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     };
 
     auto emit_cube_tets = [&](int i0, int j0, int k0, int step) {
-        // Cube from (i0,j0,k0) to +step in each axis on fine lattice.
         const std::array<std::uint32_t, 8> c{{
             node_at(i0, j0, k0),
             node_at(i0 + step, j0, k0),
@@ -229,7 +330,6 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     for (int kc = 0; kc < nzc; ++kc) {
         for (int jc = 0; jc < nyc; ++jc) {
             for (int ic = 0; ic < nxc; ++ic) {
-                // Is the whole 2×2×2 block interior?
                 bool all_in = true;
                 bool any_in = false;
                 for (int dk = 0; dk < 2 && all_in; ++dk) {
@@ -248,11 +348,9 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                     continue;
                 }
                 if (all_in && !coarse_fine[cidx(ic, jc, kc)]) {
-                    // Coarse cube = one Kuhn split spanning 2 fine cells.
                     emit_cube_tets(2 * ic, 2 * jc, 2 * kc, 2);
                     ++out.n_coarse_cells;
                 } else {
-                    // Fine: every occupied fine cell becomes 6 tets.
                     if (coarse_feature[cidx(ic, jc, kc)]) {
                         ++out.n_feature_cells;
                     }
@@ -323,11 +421,28 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             bnode_set.insert(q.begin(), q.end());
         }
         std::vector<std::uint32_t> bnodes(bnode_set.begin(), bnode_set.end());
+
+        // Only tets that touch a boundary node can invert from snap — skip the
+        // interior (was O(passes · n_tets) and dominated wall time).
+        std::vector<std::size_t> skin_tets;
+        skin_tets.reserve(bnodes.size() * 4);
+        {
+            std::unordered_set<std::uint32_t> bset(bnodes.begin(), bnodes.end());
+            for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+                const auto& n = out.mesh.tets[ti];
+                if (bset.count(n[0]) || bset.count(n[1]) || bset.count(n[2]) ||
+                    bset.count(n[3])) {
+                    skin_tets.push_back(ti);
+                }
+            }
+        }
+
         const double vol_eps = 1e-14 * hf * hf * hf;
         snap_boundary_nodes(
             surface, out.mesh.nodes, bnodes, hf,
             [&](std::set<std::uint32_t>& offenders) {
-                for (const auto& n : out.mesh.tets) {
+                for (const auto ti : skin_tets) {
+                    const auto& n = out.mesh.tets[ti];
                     const double v =
                         tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
                                           out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
@@ -337,7 +452,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                     offenders.insert(n.begin(), n.end());
                 }
             },
-            /*max_move_frac=*/0.55, /*passes=*/3);
+            /*max_move_frac=*/0.85, /*passes=*/4);
         for (auto& n : out.mesh.tets) {
             const double v = tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
                                                out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);

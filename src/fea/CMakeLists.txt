@@ -4,6 +4,7 @@ add_library(fea
     src/backend.cpp
     src/spmv.cpp
     src/nodal_mesh.cpp
+    src/boundary_faces.cpp
     src/quadrature.cpp
     src/shape.cpp
     src/assembly.cpp

@@ -4,7 +4,7 @@
 // Deterministic tet4 fill of a closed triangle surface (P2 v1 mesher).
 // Cartesian grid over the bbox; each inside voxel is split into 6 tets along
 // the space diagonal so shared faces match. Boundary is stair-cased; optional
-// limited multi-pass surface snap (≤0.55 h) with Jacobian safety (unsnap if a
+// limited multi-pass surface snap (≤0.75 h) with Jacobian safety (unsnap if a
 // tet would invert). NOT constrained Delaunay / frontal — see ADR-0015. Fully
 // deterministic for (surface, h, snap flag).
 //

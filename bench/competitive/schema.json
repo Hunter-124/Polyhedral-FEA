@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://polymesh.local/bench/competitive/result.schema.json",
+  "title": "PolyMesh competitive benchmark result",
+  "description": "One labeled run of one case on one solver. Files under bench/results/ may be a single object or an array of objects.",
+  "type": "object",
+  "required": [
+    "solver",
+    "version",
+    "case_id",
+    "dofs",
+    "wall_time_s",
+    "accuracy",
+    "label",
+    "timestamp"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Result schema major version (currently 1)."
+    },
+    "solver": {
+      "type": "string",
+      "description": "Solver product name, e.g. PolyMesh, CalculiX, Elmer."
+    },
+    "version": {
+      "type": "string",
+      "description": "Solver version string (semver, package version, or unknown)."
+    },
+    "case_id": {
+      "type": "string",
+      "description": "Stable case id matching bench/reference or competitive case catalog (e.g. lame-cylinder, kirsch-plate, timoshenko-cantilever)."
+    },
+    "dofs": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Active degrees of freedom after BC elimination, or null if not recorded."
+    },
+    "wall_time_s": {
+      "type": "object",
+      "required": ["mesh", "solve", "total"],
+      "properties": {
+        "mesh": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "Wall seconds for meshing only; null if unknown or external mesh."
+        },
+        "solve": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "Wall seconds for assembly + linear solve (+ recovery if included)."
+        },
+        "total": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "End-to-end wall seconds for the timed harness step."
+        }
+      },
+      "additionalProperties": false
+    },
+    "accuracy": {
+      "type": "object",
+      "required": ["name", "value"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Metric id, e.g. tip_rel_err_pct, u_r_rel_err_pct, scf_rel_err_pct."
+        },
+        "value": {
+          "type": ["number", "null"],
+          "description": "Metric value (lower is better for *err* metrics unless noted)."
+        },
+        "unit": {
+          "type": "string",
+          "description": "Optional unit hint (percent, ratio, Pa, m)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "label": {
+      "type": "string",
+      "description": "Git sha, release tag, or milestone id for the scoreboard x-axis (e.g. gate1-p1, abc1234)."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 UTC timestamp of the run."
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional free-text context (element type, mesh source, host)."
+    },
+    "host": {
+      "type": "string",
+      "description": "Optional machine/CPU label for fair-time comparisons."
+    }
+  },
+  "additionalProperties": true
+}

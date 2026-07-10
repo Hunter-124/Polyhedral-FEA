@@ -13,6 +13,9 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: Optional OpenCASCADE STEP path — `geom::load_step`, CMake
+  `POLYMESH_WITH_OCC` finds OCCT (TKDESTEP + BRepMesh), stub throws when OFF;
+  Catch2 tests + unit-cube fixture.
 - 2026-07-10: G1 — ADR-0010 keep face-based mesh; geometric validity;
   `mesh::tet_fill_surface` (tet4 grid fill); pipeline/GUI use tet4 path
   (replaces draft voxel hex8). 39/39 tests green.
@@ -50,8 +53,8 @@ GATE 0 was approved by owner on 2026-07-09.
 ## Open issues
 - GATE 1 frozen; see `bench/reports/p1-gate1-convergence.md`.
 - License closed: BSD-3-Clause (ADR-0002); no CLA process.
-- `POLYMESH_WITH_OCC` wiring deferred until P3 consumes exact geometry
-  (ADR-0001).
+- `POLYMESH_WITH_OCC` wired in `src/geom` (`load_step`, CMake find + stub
+  when OFF); exact B-rep feature queries still deferred to P3 (ADR-0001).
 - CUDA toolkit not installed on dev machine; `POLYMESH_WITH_CUDA` untested
   until it is (ADR-0008). RTX 3080 Ti present.
 - Geometric validity: boundary manifold + tet volume checks in place; surface

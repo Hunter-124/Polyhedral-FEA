@@ -58,9 +58,20 @@ cmake -B build -DPOLYMESH_WITH_CUDA=ON   # GPU backends
 
 ## Benchmark scoreboard
 
-Competitive time/accuracy charts vs free solvers will land under `bench/results/`
-and be summarized here as labeled release points. Until the peer harness ships,
-internal verification status lives in [docs/progress.md](docs/progress.md).
+Labeled time/accuracy snapshots live in [`bench/results/`](bench/results/)
+(schema: [`bench/competitive/schema.json`](bench/competitive/schema.json)).
+Generated table + sparklines:
+
+**[docs/bench/scoreboard.md](docs/bench/scoreboard.md)**
+
+```sh
+python3 bench/competitive/render_scoreboard.py   # refresh scoreboard
+./bench/competitive/run_polymesh_smoke.sh        # Tier-0/1 ctest smoke
+```
+
+Peer priority (headless): **CalculiX first**, then Elmer, then Code_Aster —
+see [bench/competitive/README.md](bench/competitive/README.md). Internal
+verification detail: [docs/progress.md](docs/progress.md).
 
 ## License
 

@@ -54,7 +54,7 @@ cmake -B build -DPOLYMESH_WITH_CUDA=ON   # GPU backends
 | `graphify-out/` | Committed knowledge graph for agents |
 
 **Full map and coding standards:** [CONTRIBUTING.md](CONTRIBUTING.md)  
-**How to branch, commit, and open a PR (strict, novice-safe):** [CHANGES.md](CHANGES.md)
+**External contributors (for their AI agents — clone/branch/PR):** [CHANGES.md](CHANGES.md)
 
 ## Benchmark scoreboard
 

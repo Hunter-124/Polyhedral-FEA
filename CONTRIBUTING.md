@@ -1,7 +1,7 @@
 # CONTRIBUTING — Codebase map & standards
 
 **Root markdown allowed:** `README.md`, `CONTRIBUTING.md`, `CHANGES.md` only.  
-Version-control rules for humans/agents shipping patches: **[CHANGES.md](CHANGES.md)**.  
+External-contributor **agent** PR policy: **[CHANGES.md](CHANGES.md)** (not for owner/`master` direct work).  
 Process/spec/phases/progress: under `docs/`. Do not reintroduce other root `.md` files.
 
 This file is the onboarding map for **fresh agents and humans**. Read it before grepping the whole tree.
@@ -30,7 +30,7 @@ Options: `POLYMESH_WITH_OCC`, `POLYMESH_WITH_CUDA`, `POLYMESH_WITH_GUI`, `POLYME
 .
 ├── README.md                 # product + build + bench scoreboard
 ├── CONTRIBUTING.md           # THIS FILE — map & standards
-├── CHANGES.md                # git / PR rules for contributors (novice-safe)
+├── CHANGES.md                # external-agent PR workflow (clone → branch → PR)
 ├── LICENSE                   # BSD-3-Clause
 ├── CMakeLists.txt            # root build; add_subdirectory only
 ├── .clang-format
@@ -127,7 +127,7 @@ bench_harness loads bench/reference/* — ONLY module allowed to
 - Deps: MIT/Apache/BSD/LGPL-compatible only.
 
 ### Git identity (owner agents)
-- Commits as configured local identity (**Hunter-124**). No AI attribution lines. See **CHANGES.md**.
+- Owner agents: commit as configured identity (**Hunter-124**), often on `master`. No AI attribution. External agents: **CHANGES.md**.
 
 ### CUDA
 - Optional (`POLYMESH_WITH_CUDA`). Use GPU only where f64 parallel work wins.
@@ -141,7 +141,7 @@ bench_harness loads bench/reference/* — ONLY module allowed to
 |---|---|
 | Product pitch + build + scoreboard | `README.md` |
 | Map + standards (agents) | `CONTRIBUTING.md` (this file) |
-| Git/PR checklists for novices | `CHANGES.md` |
+| External agent PR / clone / merge | `CHANGES.md` |
 | Spec / phases / benches / progress | `docs/*.md` |
 | One decision = one short ADR | `docs/decisions/` |
 | GUI theme tokens / layout rules | `docs/gui/` |
@@ -198,7 +198,7 @@ Prefer graph queries over blind full-repo greps when the graph exists. Rebuild w
 | Feeling | Action |
 |---|---|
 | Don’t know folder | §2 layout + §3 table |
-| Don’t know git | `CHANGES.md` only |
+| External PR / wrong clone | `CHANGES.md` (agents) |
 | Don’t know phase | `docs/phases.md` + `docs/progress.md` |
 | Don’t know why a choice | `docs/decisions/` |
 | Don’t know who calls what | `graphify-out/` / graphify query |

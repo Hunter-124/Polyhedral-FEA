@@ -55,7 +55,8 @@ struct SimSetup {
     double poissons_ratio = 0.3;
     double mesh_size = 0.0;          // m; 0 = auto (bbox/30)
     bool use_feature_grading = true; // refine toward sharp edges
-    int adapt_passes = 0;            // extra solve→ZZ→refine mesh loops
+    int adapt_passes = 0;            // extra solve→ZZ→refine mesh loops (max cap)
+    double eta_target = 0.0;         // stop adapt when global η ≤ target; 0 = disabled
     int skin_layers = 2;             // graded-tet boundary skin depth
     VolumeMesher mesher = VolumeMesher::kTetFill;
     std::set<int> fixtures; // region ids with all DOFs fixed

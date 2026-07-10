@@ -139,7 +139,7 @@ void draw_study_panel(App& app) {
     iw::input_double("poisson's ratio", &app.setup.poissons_ratio, "%.3f");
     iw::end_group_box();
 
-    iw::begin_group_box("mesh", 165);
+    iw::begin_group_box("mesh", 190);
     double h_mm = app.setup.mesh_size * 1e3;
     if (iw::input_double("element size (mm, 0=auto)", &h_mm, "%.2f")) {
         app.setup.mesh_size = h_mm / 1e3;
@@ -156,6 +156,10 @@ void draw_study_panel(App& app) {
         int ap = app.setup.adapt_passes;
         if (ImGui::SliderInt("adapt passes", &ap, 0, 3)) {
             app.setup.adapt_passes = ap;
+        }
+        double eta_t = app.setup.eta_target;
+        if (ImGui::InputDouble("η target (0=off)", &eta_t, 0.0, 0.0, "%.4g")) {
+            app.setup.eta_target = eta_t < 0.0 ? 0.0 : eta_t;
         }
         bool fg = app.setup.use_feature_grading;
         if (ImGui::Checkbox("feature grading", &fg)) {

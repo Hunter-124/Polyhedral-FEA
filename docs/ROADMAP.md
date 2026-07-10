@@ -80,7 +80,7 @@ and error, export VTU — without CLI.
 | ID | Task | Acceptance |
 |----|------|------------|
 | D1 | ~~Dörfler seed remesh~~ | Done (ADR-0014) |
-| D2 | Global η stopping criterion (user target) | Adapt stops when η < target |
+| D2 | ~~Global η stopping criterion (user target)~~ | Done (η target / early-stop) |
 | D3 | p-elevation on smooth marked elements (tet10/hex20 promote) | Order increases where smooth |
 | D4 | True local h-refine with hanging-node or remesh conformity | Documented + tested |
 | D5 | Auto settings: h0 from bbox + feature density | Zero-tune path |

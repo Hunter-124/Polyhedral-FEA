@@ -4,7 +4,7 @@
 // 3D viewport: renders into an offscreen framebuffer shown as an ImGui
 // image. Light studio-gradient background (AI-CAD viewport look), shaded
 // model with per-region overlay colors, orbit/pan/zoom camera, CPU ray
-// picking.
+// picking. Optional wireframe edges and undeformed outline on results.
 
 #include "pipeline/scene.hpp"
 
@@ -73,7 +73,9 @@ class Viewport {
                          int hovered_region);
 
     /// Renders the scene into the offscreen buffer at the given size.
-    void render(int width, int height, DisplayMode mode, float deform_scale, float result_max);
+    /// Wireframe draws boundary edges; undeformed draws rest outline on results.
+    void render(int width, int height, DisplayMode mode, float deform_scale, float result_max,
+                bool show_wireframe = false, bool show_undeformed = false);
 
     /// Texture handle to show via ImGui::Image.
     std::uint32_t texture() const { return color_texture_; }
@@ -89,16 +91,22 @@ class Viewport {
   private:
     std::uint32_t fbo_ = 0, color_texture_ = 0, depth_rbo_ = 0;
     int fb_width_ = 0, fb_height_ = 0;
-    std::uint32_t model_program_ = 0, background_program_ = 0;
+    std::uint32_t model_program_ = 0, background_program_ = 0, line_program_ = 0;
     // Setup-mode model buffers.
     std::uint32_t model_vao_ = 0, model_vbo_ = 0;
     int model_vertex_count_ = 0;
     // Mesh-preview buffers (undeformed boundary, element-type colors).
     std::uint32_t mesh_vao_ = 0, mesh_vbo_ = 0;
     int mesh_vertex_count_ = 0;
+    // Rest-position boundary edges (mesh wireframe + undeformed outline).
+    std::uint32_t mesh_edge_vao_ = 0, mesh_edge_vbo_ = 0;
+    int mesh_edge_vertex_count_ = 0;
     // Results-mode buffers (deformed voxel boundary, scalar-colored).
     std::uint32_t result_vao_ = 0, result_vbo_ = 0;
     int result_vertex_count_ = 0;
+    // Deformed boundary edges (wireframe on results).
+    std::uint32_t result_edge_vao_ = 0, result_edge_vbo_ = 0;
+    int result_edge_vertex_count_ = 0;
     std::uint32_t background_vao_ = 0;
     // CPU-side copies for overlay recolor and picking.
     std::vector<float> model_vertex_data_;
@@ -115,6 +123,10 @@ class Viewport {
     float baked_max_ = -1.0f;
     void bake_result(DisplayMode mode, float deform_scale, float result_max);
     void ensure_framebuffer(int width, int height);
+    void upload_boundary_edges(const std::vector<Eigen::Vector3d>& nodes,
+                               const std::vector<std::array<std::uint32_t, 4>>& quads, float r,
+                               float g, float b, float a, std::uint32_t vbo,
+                               int& vertex_count);
 };
 
 } // namespace polymesh::gui

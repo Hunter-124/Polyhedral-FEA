@@ -19,9 +19,12 @@
 #include <GLFW/glfw3.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <format>
 #include <optional>
+#include <string>
+#include <vector>
 
 namespace polymesh::gui {
 
@@ -55,12 +58,40 @@ struct App {
     int hovered_region = -1;
     double deform_scale = 1.0;
     bool overlays_dirty = false;
+    bool show_wireframe = true;
+    bool show_undeformed = false;
     float sidebar_width = 360.0f;
     char open_path[512] = "";
-    std::string status = "open an STL/STEP or pass a path: polymesh-gui part.stl";
+    std::string status = "drop an STL/STEP on the window, or type a path below";
     std::string mesh_status;
+    std::string mesh_note; // mesher note (and DOF line) after mesh/solve
+    std::size_t dof_count = 0;
     float load_force[3] = {0.0f, 0.0f, -1000.0f};
+    // Paths dropped via GLFW (processed on the main thread next frame).
+    std::vector<std::string> pending_drops;
 };
+
+bool is_geometry_path(const std::string& path) {
+    auto lower = path;
+    for (char& c : lower) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    const auto dot = lower.rfind('.');
+    if (dot == std::string::npos) {
+        return false;
+    }
+    const auto ext = lower.substr(dot);
+    return ext == ".stl" || ext == ".step" || ext == ".stp";
+}
+
+void set_mesh_info(App& app, const std::string& note, std::size_t nnodes, std::size_t nelems) {
+    app.dof_count = 3 * nnodes;
+    app.mesh_note = note;
+    app.mesh_status =
+        std::format("{} | nodes {}  elems {}  DOF {}", note, nnodes, nelems, app.dof_count);
+    app.status =
+        std::format("mesh: {} elems, {} nodes, {} DOF", nelems, nnodes, app.dof_count);
+}
 
 void load_model(App& app, const std::string& path) {
     try {
@@ -69,6 +100,8 @@ void load_model(App& app, const std::string& path) {
         app.result.reset();
         app.mesh_preview.reset();
         app.mesh_status.clear();
+        app.mesh_note.clear();
+        app.dof_count = 0;
         app.mode = DisplayMode::kSetup;
         app.selected_region = -1;
         app.viewport.set_model(*app.model);
@@ -79,6 +112,18 @@ void load_model(App& app, const std::string& path) {
                                  app.model->surface.triangles.size(), app.model->region_count);
     } catch (const std::exception& e) {
         app.status = std::format("import failed: {}", e.what());
+    }
+}
+
+void drop_callback(GLFWwindow* window, int count, const char** paths) {
+    auto* app = static_cast<App*>(glfwGetWindowUserPointer(window));
+    if (app == nullptr || paths == nullptr) {
+        return;
+    }
+    for (int i = 0; i < count; ++i) {
+        if (paths[i] != nullptr && paths[i][0] != '\0') {
+            app->pending_drops.emplace_back(paths[i]);
+        }
     }
 }
 
@@ -124,7 +169,8 @@ void draw_colorbar(const char* title, float vmin, float vmax, const char* unit) 
 }
 
 void draw_study_panel(App& app) {
-    iw::begin_group_box("model", 52);
+    iw::begin_group_box("model", 68);
+    ImGui::TextColored(palette.text_dim, "drop .stl/.step/.stp on window");
     iw::input_text("path", app.open_path, sizeof(app.open_path), "path/to/part.stl|.step");
     if (iw::button("open", ImVec2(-1, 0)) && app.open_path[0] != '\0') {
         load_model(app, app.open_path);
@@ -206,7 +252,7 @@ void draw_study_panel(App& app) {
     ImGui::TextColored(palette.sim_load, "loads: %zu", app.setup.loads.size());
     iw::end_group_box();
 
-    iw::begin_group_box("mesh & solve", 110);
+    iw::begin_group_box("mesh & solve", 150);
     const auto state = app.job.state();
     const bool busy = state == SolveJob::State::kMeshing || state == SolveJob::State::kSolving;
     ImGui::BeginDisabled(!app.model || busy);
@@ -227,13 +273,18 @@ void draw_study_panel(App& app) {
         const ImVec4 status_color = busy ? palette.status_warn : palette.status_ok;
         ImGui::TextColored(status_color, "%s", app.job.status_text().c_str());
     }
-    if (!app.mesh_status.empty()) {
+    if (app.dof_count > 0) {
+        ImGui::Text("DOF: %zu  (3 × nodes)", app.dof_count);
+    }
+    if (!app.mesh_note.empty()) {
+        ImGui::TextWrapped("%s", app.mesh_note.c_str());
+    } else if (!app.mesh_status.empty()) {
         ImGui::TextWrapped("%s", app.mesh_status.c_str());
     }
     iw::end_group_box();
 
     if (app.mesh_preview || app.result) {
-        iw::begin_group_box("display", 200);
+        iw::begin_group_box("display", 240);
         static const char* kModes[] = {"setup (CAD)", "mesh", "von mises", "deflection",
                                        "error η"};
         int mode = static_cast<int>(app.mode);
@@ -253,12 +304,16 @@ void draw_study_panel(App& app) {
                                                            : DisplayMode::kSetup;
             }
         }
+        iw::checkbox("wireframe edges", &app.show_wireframe);
         if (app.result) {
+            iw::checkbox("undeformed outline", &app.show_undeformed);
             iw::slider_double("deformation scale", &app.deform_scale, 0.0, 100.0, "%.0fx");
             ImGui::Text("max von mises: %.4g MPa", app.result->max_von_mises / 1e6);
             ImGui::Text("max deflection: %.4g mm", app.result->max_displacement * 1e3);
             ImGui::Text("ZZ η global: %.4g  max nodal: %.4g", app.result->global_eta,
                         app.result->max_nodal_eta);
+            ImGui::Text("nodes %zu  DOF %zu", app.result->volume_mesh.nodes.size(),
+                        3 * app.result->volume_mesh.nodes.size());
             ImGui::TextColored(palette.text_dim, "%s", app.result->mesh_note.c_str());
             if (iw::button("export VTU", ImVec2(-1, 0))) {
                 try {
@@ -283,9 +338,10 @@ void draw_study_panel(App& app) {
                 }
             }
         } else if (app.mesh_preview) {
+            ImGui::Text("nodes %zu  elems %zu  DOF %zu", app.mesh_preview->mesh.nodes.size(),
+                        app.mesh_preview->mesh.elements.size(),
+                        3 * app.mesh_preview->mesh.nodes.size());
             ImGui::TextColored(palette.text_dim, "%s", app.mesh_preview->mesher_note.c_str());
-            ImGui::Text("nodes %zu  elems %zu", app.mesh_preview->mesh.nodes.size(),
-                        app.mesh_preview->mesh.elements.size());
         }
         iw::end_group_box();
     }
@@ -313,7 +369,8 @@ void draw_viewport_content(App& app) {
         }
     }
     app.viewport.render(static_cast<int>(size.x), static_cast<int>(size.y), app.mode,
-                        static_cast<float>(app.deform_scale), result_max);
+                        static_cast<float>(app.deform_scale), result_max, app.show_wireframe,
+                        app.show_undeformed);
     ImGui::Image(static_cast<ImTextureID>(app.viewport.texture()), size, ImVec2(0, 1),
                  ImVec2(1, 0));
 
@@ -390,6 +447,10 @@ void draw_frame(App& app) {
             if (ImGui::MenuItem("theme: slate", nullptr, active_theme == ThemeId::kSlate)) {
                 apply_theme(ThemeId::kSlate);
             }
+            ImGui::MenuItem("wireframe edges", nullptr, &app.show_wireframe);
+            if (app.result) {
+                ImGui::MenuItem("undeformed outline", nullptr, &app.show_undeformed);
+            }
             ImGui::EndMenu();
         }
         ImGui::TextColored(palette.text_dim, "  %s", app.status.c_str());
@@ -442,9 +503,17 @@ void draw_frame(App& app) {
     ImGui::PushStyleColor(ImGuiCol_WindowBg, palette.status_bg);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10, 4));
     ImGui::Begin("##status", nullptr, kPanelFlags);
-    ImGui::TextColored(palette.text_dim,
-                       "polymesh — adaptive hybrid mesher + fea | lmb pick/orbit, "
-                       "shift+lmb pan, wheel zoom");
+    if (app.dof_count > 0) {
+        ImGui::TextColored(
+            palette.text_dim,
+            "polymesh — %s | DOF %zu | lmb pick/orbit, shift+lmb pan, wheel zoom",
+            app.status.c_str(), app.dof_count);
+    } else {
+        ImGui::TextColored(palette.text_dim,
+                           "polymesh — %s | drop .stl/.step or type path | lmb pick/orbit, "
+                           "shift+lmb pan, wheel zoom",
+                           app.status.c_str());
+    }
     ImGui::End();
     ImGui::PopStyleVar();
     ImGui::PopStyleColor();
@@ -478,6 +547,8 @@ int run(int argc, char** argv) {
     ImGui_ImplOpenGL3_Init("#version 330");
 
     App app;
+    glfwSetWindowUserPointer(window, &app);
+    glfwSetDropCallback(window, drop_callback);
     app.viewport.init();
     if (argc >= 2 && argv[1] != nullptr && argv[1][0] != '\0') {
         load_model(app, argv[1]);
@@ -485,6 +556,25 @@ int run(int argc, char** argv) {
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
+
+        // Process drag-and-drop on the main thread (paths queued by callback).
+        if (!app.pending_drops.empty()) {
+            std::string chosen;
+            for (const auto& p : app.pending_drops) {
+                if (is_geometry_path(p)) {
+                    chosen = p;
+                    break;
+                }
+            }
+            if (chosen.empty()) {
+                app.status = std::format("drop ignored (want .stl/.step/.stp): {}",
+                                         app.pending_drops.front());
+            } else {
+                load_model(app, chosen);
+            }
+            app.pending_drops.clear();
+        }
+
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
@@ -492,15 +582,20 @@ int run(int argc, char** argv) {
         if (auto mesh = app.job.take_mesh()) {
             app.mesh_preview = std::move(mesh);
             app.viewport.set_mesh(*app.mesh_preview);
-            app.mesh_status = app.mesh_preview->mesher_note;
+            set_mesh_info(app, app.mesh_preview->mesher_note,
+                          app.mesh_preview->mesh.nodes.size(),
+                          app.mesh_preview->mesh.elements.size());
             app.mode = DisplayMode::kMeshPreview;
-            app.status = std::format("mesh: {} elems", app.mesh_preview->mesh.elements.size());
         }
         if (auto result = app.job.take_result()) {
             app.result = std::move(result);
             app.viewport.set_result(*app.result);
-            app.mesh_status = app.result->mesh_note;
+            set_mesh_info(app, app.result->mesh_note, app.result->volume_mesh.nodes.size(),
+                          app.result->volume_mesh.elements.size());
             app.mode = DisplayMode::kResultsVonMises;
+            app.status = std::format("solved: {} elems, {} DOF, max σ_vm {:.4g} MPa",
+                                     app.result->volume_mesh.elements.size(), app.dof_count,
+                                     app.result->max_von_mises / 1e6);
         }
 
         draw_frame(app);

@@ -2,12 +2,16 @@
 #include "pipeline/scene.hpp"
 
 #include "fea/solve.hpp"
+#include "fea/vtu.hpp"
+#include "fea/zz.hpp"
+#include "geom/step.hpp"
 #include "geom/stl.hpp"
 #include "mesh/tet_fill.hpp"
 
 #include <Eigen/Geometry>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <format>
 #include <limits>
@@ -66,9 +70,20 @@ double point_triangle_distance(const Eigen::Vector3d& p, const Eigen::Vector3d& 
 
 Model Model::load(const std::string& path, double sharp_angle_deg) {
     Model model;
-    model.surface = geom::load_stl(path);
+    const auto lower = [&] {
+        std::string s = path;
+        for (char& c : s)
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        return s;
+    }();
+    if (lower.ends_with(".step") || lower.ends_with(".stp")) {
+        model.surface = geom::load_step(path);
+    } else {
+        model.surface = geom::load_stl(path);
+    }
     model.surface.validate();
-    model.name = path.substr(path.find_last_of('/') + 1);
+    const auto slash = path.find_last_of("/\\");
+    model.name = slash == std::string::npos ? path : path.substr(slash + 1);
 
     model.bbox_min = model.surface.vertices.front();
     model.bbox_max = model.surface.vertices.front();
@@ -229,13 +244,15 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
             const fea::Material material{.youngs_modulus = setup.youngs_modulus,
                                          .poissons_ratio = setup.poissons_ratio};
             const auto u = fea::solve_elastostatics(vol.mesh, material, bc, loads);
-            const auto stress = fea::recover_nodal_stress(vol.mesh, material, u);
+            const auto zz = fea::recover_zz(vol.mesh, material, u);
+            const auto& stress = zz.nodal_stress;
 
             SolveResult r;
             r.mesh_note = vol.mesher_note;
             r.volume_mesh = std::move(vol.mesh);
             r.boundary_quads = std::move(vol.boundary_quads);
             r.displacement = u;
+            r.global_eta = zz.global_eta;
             r.von_mises.resize(stress.size());
             r.u_magnitude.resize(stress.size());
             for (std::size_t i = 0; i < stress.size(); ++i) {

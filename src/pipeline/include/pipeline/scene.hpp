@@ -2,7 +2,7 @@
 #pragma once
 
 // Headless study pipeline: import geometry, CAD-style face regions,
-// fixtures/loads/material/mesh settings, draft mesher, background solve.
+// fixtures/loads/material/mesh settings, tet mesher, background solve.
 // apps/gui is presentation-only and consumes this library.
 
 #include "fea/nodal_mesh.hpp"
@@ -57,6 +57,7 @@ struct SolveResult {
     std::vector<double> u_magnitude; // per node, m
     double max_von_mises = 0.0;
     double max_displacement = 0.0;
+    double global_eta = 0.0; // ZZ indicator
     // Boundary quads of the voxel mesh (node indices), for rendering.
     std::vector<std::array<std::uint32_t, 4>> boundary_quads;
     std::string mesh_note; // e.g. element/node counts, mesher version

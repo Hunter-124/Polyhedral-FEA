@@ -56,9 +56,15 @@ struct Palette {
     ImVec4 status_err{0.961f, 0.549f, 0.420f, 1};
 };
 
-extern Palette palette;
+enum class ThemeId : int { kInterwebz = 0, kSlate = 1, kCount };
 
-/// Populates ImGuiStyle from the palette. Call once after ImGui context init.
-void apply_theme();
+/// Active chrome palette (read by widgets; never hardcode colors).
+extern Palette palette;
+extern ThemeId active_theme;
+
+/// Load a named palette into `palette` and push it into ImGuiStyle.
+void apply_theme(ThemeId id = ThemeId::kInterwebz);
+Palette make_interwebz_palette();
+Palette make_slate_palette();
 
 } // namespace polymesh::gui

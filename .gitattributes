@@ -1,0 +1,6 @@
+# Keep GitHub language stats on C++ product code, not agent tooling / docs HTML.
+graphify-out/** linguist-vendored
+graphify-out/** linguist-generated
+*.html linguist-vendored
+docs/** linguist-documentation
+bench/results/** linguist-generated

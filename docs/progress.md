@@ -1,7 +1,7 @@
 # PROGRESS
 
 ## Current phase
-**GATE 1 frozen. G0 reorg done. G1 mesher v1 (tet grid fill) wired into pipeline.**
+**Active development on master.** P1 baseline frozen. Product path: tet fill + snap, ZZ, VTU, CLI mesh/solve, themed GUI, OCC STEP, feature/Dörfler scaffolding.
 
 GATE 1 deliverables ready:
 - Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)
@@ -13,6 +13,10 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: Product batch — VTU export, ZZ recovery + Dörfler marking,
+  sharp-edge features + graded sizing, limited surface snap on tet fill,
+  CLI `mesh`/`solve`, GUI STEP paths + theme switch + VTU export button,
+  linguist fix (graphify HTML vendored). 47/47 tests green.
 - 2026-07-10: Optional OpenCASCADE STEP path — `geom::load_step`, CMake
   `POLYMESH_WITH_OCC` finds OCCT (TKDESTEP + BRepMesh), stub throws when OFF;
   Catch2 tests + unit-cube fixture.

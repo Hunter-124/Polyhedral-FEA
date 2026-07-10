@@ -20,9 +20,11 @@ other — not glued together after the fact.
 
 ## Status
 
-P1 reference solver frozen as baseline. Campaign in progress: real mesher,
-hybrid zoo, adaptivity, competitive scoreboard. Tracking:
-[docs/progress.md](docs/progress.md), [docs/phases.md](docs/phases.md).
+P1 solver baseline frozen. Working product path: tet mesh from STL/STEP, GUI
+study (fixtures/loads/solve/export), CLI mesh/solve → VTU, ZZ indicators,
+feature-edge sizing hooks. Hybrid VEM/adapt loop still expanding. Tracking:
+[docs/progress.md](docs/progress.md), [docs/phases.md](docs/phases.md),
+[docs/bench/scoreboard.md](docs/bench/scoreboard.md).
 
 ## Building
 
@@ -38,6 +40,14 @@ ctest --test-dir build
 ```sh
 cmake -B build -DPOLYMESH_WITH_OCC=ON    # STEP/B-rep (OpenCASCADE)
 cmake -B build -DPOLYMESH_WITH_CUDA=ON   # GPU backends
+```
+
+## CLI
+
+```sh
+./build/apps/cli/polymesh check part.stl
+./build/apps/cli/polymesh mesh part.stl -h 0.01 -o mesh.vtu
+./build/apps/cli/polymesh solve part.stl -h 0.01 -o result.vtu
 ```
 
 ## Layout (short)

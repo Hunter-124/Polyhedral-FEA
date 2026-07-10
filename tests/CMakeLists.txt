@@ -20,6 +20,9 @@ add_executable(polymesh_tests
     test_msh.cpp
     test_gui_pipeline.cpp
     test_tet_fill.cpp
+    test_features.cpp
+    test_zz.cpp
+    test_vtu.cpp
     support/structured_mesh.cpp
     support/mms.cpp
 )

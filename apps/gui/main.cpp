@@ -6,6 +6,7 @@
 // a study sidebar (splitter-resizable) and the viewport filling the rest —
 // windows cannot be dragged out of the frame, collapsed, or lost.
 
+#include "fea/vtu.hpp"
 #include "pipeline/scene.hpp"
 #include "theme.hpp"
 #include "viewport.hpp"
@@ -23,6 +24,8 @@
 #include <optional>
 
 namespace polymesh::gui {
+
+namespace fea = polymesh::fea;
 
 // Core types live in pipeline (headless). GUI only presents them.
 using pipeline::Model;
@@ -75,7 +78,7 @@ void load_model(App& app, const std::string& path) {
 
 void draw_study_panel(App& app) {
     iw::begin_group_box("model", 52);
-    iw::input_text("path", app.open_path, sizeof(app.open_path), "path/to/part.stl");
+    iw::input_text("path", app.open_path, sizeof(app.open_path), "path/to/part.stl|.step");
     if (iw::button("open", ImVec2(-1, 0)) && app.open_path[0] != '\0') {
         load_model(app, app.open_path);
     }
@@ -94,7 +97,7 @@ void draw_study_panel(App& app) {
     if (iw::input_double("element size (mm, 0=auto)", &h_mm, "%.2f")) {
         app.setup.mesh_size = h_mm / 1e3;
     }
-    ImGui::TextColored(palette.status_warn, "draft voxel mesher v0 (P2/P3 replaces)");
+    ImGui::TextColored(palette.text_dim, "tet grid fill + surface snap");
     iw::end_group_box();
 
     iw::begin_group_box("fixtures & loads", 150);
@@ -148,7 +151,7 @@ void draw_study_panel(App& app) {
     iw::end_group_box();
 
     if (app.result) {
-        iw::begin_group_box("results", 132);
+        iw::begin_group_box("results", 168);
         static const char* kModes[] = {"setup", "von mises", "deflection"};
         int mode = app.mode == DisplayMode::kSetup             ? 0
                    : app.mode == DisplayMode::kResultsVonMises ? 1
@@ -162,6 +165,23 @@ void draw_study_panel(App& app) {
         ImGui::Text("max von mises: %.4g MPa", app.result->max_von_mises / 1e6);
         ImGui::Text("max deflection: %.4g mm", app.result->max_displacement * 1e3);
         ImGui::TextColored(palette.text_dim, "%s", app.result->mesh_note.c_str());
+        ImGui::Text("ZZ η (global): %.4g", app.result->global_eta);
+        if (iw::button("export VTU", ImVec2(-1, 0))) {
+            try {
+                std::vector<fea::VtuPointData> pdata;
+                pdata.push_back(
+                    {.name = "von_Mises", .scalars = app.result->von_mises, .vectors = {}});
+                pdata.push_back({.name = "displacement",
+                                 .scalars = {},
+                                 .vectors = app.result->displacement});
+                const std::string out =
+                    app.model ? (app.model->name + "_result.vtu") : "result.vtu";
+                fea::write_vtu(out, app.result->volume_mesh, pdata);
+                app.status = std::format("wrote {}", out);
+            } catch (const std::exception& e) {
+                app.status = std::format("export failed: {}", e.what());
+            }
+        }
         iw::end_group_box();
     }
 }
@@ -231,6 +251,16 @@ void draw_frame(App& app) {
         if (ImGui::BeginMenu("file")) {
             if (ImGui::MenuItem("quit")) {
                 glfwSetWindowShouldClose(glfwGetCurrentContext(), GLFW_TRUE);
+            }
+            ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("view")) {
+            if (ImGui::MenuItem("theme: interwebz", nullptr,
+                                active_theme == ThemeId::kInterwebz)) {
+                apply_theme(ThemeId::kInterwebz);
+            }
+            if (ImGui::MenuItem("theme: slate", nullptr, active_theme == ThemeId::kSlate)) {
+                apply_theme(ThemeId::kSlate);
             }
             ImGui::EndMenu();
         }

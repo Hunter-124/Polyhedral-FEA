@@ -33,7 +33,8 @@ struct TetFillOutput {
 /// Throws ValidityError on empty volume or absurd grid size.
 TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
                                const Eigen::Vector3d& bbox_min,
-                               const Eigen::Vector3d& bbox_max, double h);
+                               const Eigen::Vector3d& bbox_max, double h,
+                               bool snap_boundary = true);
 
 double tet_signed_volume(const Eigen::Vector3d& a, const Eigen::Vector3d& b,
                          const Eigen::Vector3d& c, const Eigen::Vector3d& d);

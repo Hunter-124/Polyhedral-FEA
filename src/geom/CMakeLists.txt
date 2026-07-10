@@ -3,6 +3,7 @@ add_library(geom
     src/tri_surface.cpp
     src/stl.cpp
     src/step.cpp
+    src/features.cpp
 )
 target_include_directories(geom PUBLIC include)
 target_link_libraries(geom PUBLIC Eigen3::Eigen PRIVATE polymesh_warnings)

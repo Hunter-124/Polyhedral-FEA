@@ -4,12 +4,51 @@
 namespace polymesh::gui {
 
 Palette palette;
+ThemeId active_theme = ThemeId::kInterwebz;
 
-void apply_theme() {
+Palette make_interwebz_palette() {
+    return Palette{}; // defaults in theme.hpp are Interwebz
+}
+
+Palette make_slate_palette() {
+    Palette p;
+    p.window_bg = {0.07f, 0.08f, 0.10f, 1};
+    p.panel_bg = {0.12f, 0.13f, 0.16f, 1};
+    p.header_bg = {0.16f, 0.18f, 0.22f, 1};
+    p.popup_bg = {0.14f, 0.15f, 0.18f, 1};
+    p.border = {0.28f, 0.30f, 0.36f, 1};
+    p.status_bg = {0.05f, 0.06f, 0.08f, 1};
+    p.text = {0.95f, 0.96f, 0.98f, 1};
+    p.text_dim = {0.65f, 0.68f, 0.74f, 1};
+    p.text_disabled = {0.45f, 0.48f, 0.52f, 1};
+    p.accent = {0.30f, 0.62f, 0.90f, 1};
+    p.accent_soft_top = {0.35f, 0.55f, 0.75f, 1};
+    p.accent_dim = {0.20f, 0.42f, 0.65f, 1};
+    p.accent_soft = {0.30f, 0.62f, 0.90f, 0.22f};
+    p.accent_mid = {0.30f, 0.62f, 0.90f, 0.40f};
+    p.button = {0.14f, 0.15f, 0.18f, 1};
+    p.button_hovered = {0.18f, 0.20f, 0.24f, 1};
+    p.button_active = {0.22f, 0.24f, 0.28f, 1};
+    p.frame_bg = {0.14f, 0.15f, 0.18f, 1};
+    p.frame_bg_hovered = {0.18f, 0.20f, 0.24f, 1};
+    p.frame_bg_active = {0.22f, 0.24f, 0.28f, 1};
+    p.sim_fixture = {0.20f, 0.75f, 0.45f, 0.65f};
+    p.sim_load = {0.95f, 0.45f, 0.20f, 0.65f};
+    p.selection = {0.30f, 0.62f, 0.90f, 0.55f};
+    p.hover = {0.30f, 0.62f, 0.90f, 0.28f};
+    p.status_ok = {0.30f, 0.85f, 0.55f, 1};
+    p.status_warn = {0.95f, 0.75f, 0.30f, 1};
+    p.status_err = {0.95f, 0.40f, 0.35f, 1};
+    return p;
+}
+
+void apply_theme(ThemeId id) {
+    active_theme = id;
+    palette = (id == ThemeId::kSlate) ? make_slate_palette() : make_interwebz_palette();
+
     ImGuiStyle& s = ImGui::GetStyle();
     const Palette& p = palette;
 
-    // Interwebz-v2 geometry: tight 2px rounding, thin frames, compact rows.
     s.WindowRounding = 2.0f;
     s.ChildRounding = 2.0f;
     s.FrameRounding = 2.0f;

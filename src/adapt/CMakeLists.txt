@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
-# Header-only for now; gains sources in Phase P5.
-add_library(adapt INTERFACE)
-target_include_directories(adapt INTERFACE include)
-target_link_libraries(adapt INTERFACE mesh Eigen3::Eigen)
+add_library(adapt
+    src/error.cpp
+)
+target_include_directories(adapt PUBLIC include)
+target_link_libraries(adapt PUBLIC geom mesh Eigen3::Eigen PRIVATE polymesh_warnings)

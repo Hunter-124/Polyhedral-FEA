@@ -1,7 +1,9 @@
 # PROGRESS
 
 ## Current phase
-**Active development on master.** 62 tests green. Meshers include hex+pyramid transition (true hybrid). Element zoo: tet/hex/prism/pyramid/VEM.
+**Active development on master.** 63 tests green. Meshers include hex+pyramid transition
+with limited surface snap; CLI `mesh`/`solve` accept `--mesher` / `--skin`. Element zoo:
+tet/hex/prism/pyramid/VEM.
 
 GATE 1 deliverables ready:
 - Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)
@@ -13,6 +15,9 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: Hex+pyramid boundary snap (0.35h), pipeline residual distance note,
+  CLI solve/mesh `--mesher` + `--skin`, ZZ tet-split stress for pyramid5,
+  ADR-0013 snap/ZZ notes. 63 tests.
 - 2026-07-10: Graded tet fill (fine skin / coarse core), surface conformity
   metrics, ADR-0012 (hybrid = graded all-tet until pyramids). 58 tests.
 - 2026-07-10: Prism6 wedges; hex-VEM hybrid; quality metrics; CalculiX smoke.
@@ -67,7 +72,8 @@ GATE 0 was approved by owner on 2026-07-09.
   when OFF); exact B-rep feature queries still deferred to P3 (ADR-0001).
 - CUDA toolkit not installed on dev machine; `POLYMESH_WITH_CUDA` untested
   until it is (ADR-0008). RTX 3080 Ti present.
-- Geometric validity: boundary manifold + tet volume checks in place; surface
-  snap / true Delaunay / conforming hybrid still open.
+- Geometric validity: boundary manifold + tet volume checks in place; limited
+  surface snap on tet and hex+pyramid fills. True Delaunay / CAD feature
+  queries still open.
 - Goodier: exact continuum-field BCs + ZZ recovery would tighten SCF further
   (ADR-0009); P1 bar is 12% with Saint-Venant Dirichlet + nodal averaging.

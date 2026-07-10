@@ -2,6 +2,7 @@
 #include "mesh/transition_fill.hpp"
 
 #include "mesh/poly_mesh.hpp"
+#include "mesh/surface_project.hpp"
 
 #include <Eigen/Geometry>
 
@@ -9,6 +10,7 @@
 #include <cmath>
 #include <format>
 #include <map>
+#include <set>
 
 namespace polymesh::mesh {
 namespace {
@@ -37,7 +39,8 @@ constexpr std::array<std::array<int, 3>, 6> kFaceNbr{{
 
 TransitionFillOutput transition_fill_surface(const geom::TriSurface& surface,
                                              const Eigen::Vector3d& bbox_min,
-                                             const Eigen::Vector3d& bbox_max, double h) {
+                                             const Eigen::Vector3d& bbox_max, double h,
+                                             bool snap_boundary) {
     if (!(h > 0.0) || !std::isfinite(h)) {
         throw ValidityError("transition_fill_surface: h must be positive");
     }
@@ -206,6 +209,28 @@ TransitionFillOutput transition_fill_surface(const geom::TriSurface& surface,
 
     if (out.cells.empty()) {
         throw ValidityError("transition_fill_surface: no interior cells");
+    }
+
+    // Limited surface snap on free-boundary lattice nodes (not pyramid apices).
+    if (snap_boundary && !out.boundary_quads.empty()) {
+        std::set<std::uint32_t> bnodes;
+        for (const auto& q : out.boundary_quads) {
+            bnodes.insert(q.begin(), q.end());
+        }
+        for (auto ni : bnodes) {
+            const auto cp = closest_on_surface(surface, out.nodes[ni]);
+            if (cp.distance > 0.0 && cp.distance < 1.25 * h) {
+                const Eigen::Vector3d delta = cp.point - out.nodes[ni];
+                const double move = std::min(cp.distance, 0.35 * h);
+                out.nodes[ni] += delta * (move / cp.distance);
+            }
+        }
+        // Residual distance after snap (metres).
+        double max_d = 0.0;
+        for (auto ni : bnodes) {
+            max_d = std::max(max_d, closest_on_surface(surface, out.nodes[ni]).distance);
+        }
+        out.boundary_max_distance = max_d;
     }
     return out;
 }

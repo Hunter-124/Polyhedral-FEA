@@ -22,18 +22,39 @@
 namespace {
 
 int usage() {
-    std::fputs("usage: polymesh <command> [args]\n"
-               "\n"
-               "commands:\n"
-               "  check <file.stl|.step>     validate surface geometry\n"
-               "  mesh  <file> [-h m] [-o out.vtu]\n"
-               "                             tet-fill mesh; optional VTU write\n"
-               "  solve <file> -o out.vtu [-h m] [-E Pa] [-nu r]\n"
-               "                             mesh + cantilever-style BCs + VTU\n"
-               "                             (fix min-x face nodes, load +Fy on max-x)\n"
-               "  backend                    print compute backend\n",
-               stderr);
+    std::fputs(
+        "usage: polymesh <command> [args]\n"
+        "\n"
+        "commands:\n"
+        "  check <file.stl|.step>     validate surface geometry\n"
+        "  mesh  <file> [-h m] [-o out.vtu] [--mesher name] [--skin n]\n"
+        "                             volume mesh; optional VTU write\n"
+        "  solve <file> -o out.vtu [-h m] [-E Pa] [-nu r]\n"
+        "              [--mesher name] [--skin n]\n"
+        "                             mesh + cantilever-style BCs + VTU\n"
+        "                             (fix min-x face nodes, load +Fy on max-x)\n"
+        "  backend                    print compute backend\n"
+        "\n"
+        "mesher names: tet (default), hex, hexvem|vem, graded, hexpyr|transition\n"
+        "--skin n: graded-tet fine skin layers (default 2)\n",
+        stderr);
     return 2;
+}
+
+polymesh::pipeline::VolumeMesher parse_mesher(const std::string& m) {
+    if (m == "hex") {
+        return polymesh::pipeline::VolumeMesher::kHexFill;
+    }
+    if (m == "hexvem" || m == "vem") {
+        return polymesh::pipeline::VolumeMesher::kHexVem;
+    }
+    if (m == "graded") {
+        return polymesh::pipeline::VolumeMesher::kGradedTet;
+    }
+    if (m == "hexpyr" || m == "transition") {
+        return polymesh::pipeline::VolumeMesher::kHexPyramid;
+    }
+    return polymesh::pipeline::VolumeMesher::kTetFill;
 }
 
 polymesh::geom::TriSurface load_surface(std::string_view path) {
@@ -64,23 +85,18 @@ int cmd_mesh(std::span<char*> args) {
     double h = 0.0;
     std::string out_path;
     auto mesher = polymesh::pipeline::VolumeMesher::kTetFill;
+    int skin = 2;
     for (std::size_t i = 3; i < args.size(); ++i) {
         if (std::strcmp(args[i], "-h") == 0 && i + 1 < args.size()) {
             h = std::atof(args[++i]);
         } else if (std::strcmp(args[i], "-o") == 0 && i + 1 < args.size()) {
             out_path = args[++i];
         } else if (std::strcmp(args[i], "--mesher") == 0 && i + 1 < args.size()) {
-            const std::string m = args[++i];
-            if (m == "hex") {
-                mesher = polymesh::pipeline::VolumeMesher::kHexFill;
-            } else if (m == "hexvem" || m == "vem") {
-                mesher = polymesh::pipeline::VolumeMesher::kHexVem;
-            } else if (m == "graded") {
-                mesher = polymesh::pipeline::VolumeMesher::kGradedTet;
-            } else if (m == "hexpyr" || m == "transition") {
-                mesher = polymesh::pipeline::VolumeMesher::kHexPyramid;
-            } else {
-                mesher = polymesh::pipeline::VolumeMesher::kTetFill;
+            mesher = parse_mesher(args[++i]);
+        } else if (std::strcmp(args[i], "--skin") == 0 && i + 1 < args.size()) {
+            skin = std::atoi(args[++i]);
+            if (skin < 1) {
+                skin = 1;
             }
         } else {
             return usage();
@@ -91,7 +107,7 @@ int cmd_mesh(std::span<char*> args) {
     if (h <= 0.0) {
         h = extent / 16.0;
     }
-    auto vol = polymesh::pipeline::volume_mesh(model, h, mesher, 2);
+    auto vol = polymesh::pipeline::volume_mesh(model, h, mesher, skin);
     vol.mesh.check_validity();
     std::printf("mesh: %zu nodes, %zu elems, h=%.6g m\n%s\n", vol.mesh.nodes.size(),
                 vol.mesh.elements.size(), h, vol.mesher_note.c_str());
@@ -111,6 +127,8 @@ int cmd_solve(std::span<char*> args) {
     double E = 200e9;
     double nu = 0.3;
     std::string out_path;
+    auto mesher = polymesh::pipeline::VolumeMesher::kTetFill;
+    int skin = 2;
     for (std::size_t i = 3; i < args.size(); ++i) {
         if (std::strcmp(args[i], "-h") == 0 && i + 1 < args.size()) {
             h = std::atof(args[++i]);
@@ -120,6 +138,13 @@ int cmd_solve(std::span<char*> args) {
             E = std::atof(args[++i]);
         } else if (std::strcmp(args[i], "-nu") == 0 && i + 1 < args.size()) {
             nu = std::atof(args[++i]);
+        } else if (std::strcmp(args[i], "--mesher") == 0 && i + 1 < args.size()) {
+            mesher = parse_mesher(args[++i]);
+        } else if (std::strcmp(args[i], "--skin") == 0 && i + 1 < args.size()) {
+            skin = std::atoi(args[++i]);
+            if (skin < 1) {
+                skin = 1;
+            }
         } else {
             return usage();
         }
@@ -134,8 +159,7 @@ int cmd_solve(std::span<char*> args) {
     if (h <= 0.0) {
         h = extent / 12.0;
     }
-    auto vol = polymesh::pipeline::volume_mesh(model, h,
-                                               polymesh::pipeline::VolumeMesher::kTetFill, 2);
+    auto vol = polymesh::pipeline::volume_mesh(model, h, mesher, skin);
     vol.mesh.check_validity();
 
     // Auto BCs: fix nodes near min-x plane; load +Y on max-x plane nodes.

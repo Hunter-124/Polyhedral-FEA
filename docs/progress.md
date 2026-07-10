@@ -4,10 +4,11 @@
 **Master plan:** [`docs/ROADMAP.md`](ROADMAP.md) · **Agent loop:**
 [`docs/process/agent-loop.md`](process/agent-loop.md)
 
-**Active:** Nearly all ROADMAP tracks closed on master. **138 tests** green
-(3 skip without OCC/CUDA). Remaining owner-facing gate: **A9** theme polish ⛔
-GATE 6.5. Product mesh is still Cartesian-grid limited (ADR-0015); true Delaunay
-/ full product-mesh Tier-1 remain open R&D.
+**Active:** Track **H** mesher honesty/perf overhaul in progress
+([`docs/plans/mesher-solver-overhaul.md`](plans/mesher-solver-overhaul.md)).
+**141 tests** green (3 skip without OCC/CUDA). Remaining owner-facing gate:
+**A9** theme polish ⛔ GATE 6.5. Open H nodes: true hybrid hex+pyramid FE (H2),
+octa experiment (O1), CG precond (V1).
 
 GATE 1 deliverables ready:
 - Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)

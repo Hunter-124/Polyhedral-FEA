@@ -7,6 +7,7 @@ add_library(mesh
     src/quality.cpp
     src/surface_project.cpp
     src/grid_classify.cpp
+    src/cell_stamp.cpp
     src/hybrid_fill.cpp
     src/mixed_fill.cpp
     src/transition_fill.cpp

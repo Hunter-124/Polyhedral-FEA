@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "mesh/hybrid_fill.hpp"
 
+#include "mesh/cell_stamp.hpp"
 #include "mesh/grid_classify.hpp"
+#include "mesh/local_refine.hpp"
 #include "mesh/poly_mesh.hpp"
+#include "mesh/quality.hpp"
 #include "mesh/surface_project.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <map>
 #include <queue>
 #include <set>
 #include <span>
@@ -30,99 +34,6 @@ constexpr std::array<std::array<int, 4>, 6> kCubeTets{{
 
 constexpr int kFaceNbr[6][3] = {{-1, 0, 0}, {1, 0, 0},  {0, -1, 0},
                                 {0, 1, 0},  {0, 0, -1}, {0, 0, 1}};
-
-// Stamp seeds onto coarse cells — O(seeds · ball) not O(cells · seeds).
-void mark_seed_cells(std::vector<char>& is_fine, std::vector<char>& is_seed, int nx, int ny,
-                     int nz, const CartesianGrid& grid, std::span<const Eigen::Vector3d> seeds,
-                     double seed_band) {
-    if (!(seed_band > 0.0) || seeds.empty() || nx < 1) {
-        return;
-    }
-    const double band2 = seed_band * seed_band;
-    const double h_ref = std::max({grid.cell[0], grid.cell[1], grid.cell[2], 1e-30});
-    const int r = std::max(1, static_cast<int>(std::ceil(seed_band / h_ref)) + 1);
-    const auto idx = [&](int i, int j, int k) {
-        return (static_cast<std::size_t>(k) * static_cast<std::size_t>(ny) +
-                static_cast<std::size_t>(j)) *
-                   static_cast<std::size_t>(nx) +
-               static_cast<std::size_t>(i);
-    };
-    for (const auto& seed : seeds) {
-        const Eigen::Vector3d local = seed - grid.origin;
-        const int i0 = static_cast<int>(std::floor(local[0] / grid.cell[0]));
-        const int j0 = static_cast<int>(std::floor(local[1] / grid.cell[1]));
-        const int k0 = static_cast<int>(std::floor(local[2] / grid.cell[2]));
-        for (int dk = -r; dk <= r; ++dk) {
-            for (int dj = -r; dj <= r; ++dj) {
-                for (int di = -r; di <= r; ++di) {
-                    const int i = i0 + di, j = j0 + dj, k = k0 + dk;
-                    if (i < 0 || i >= nx || j < 0 || j >= ny || k < 0 || k >= nz) {
-                        continue;
-                    }
-                    const Eigen::Vector3d c = grid.cell_center(i, j, k);
-                    if ((c - seed).squaredNorm() <= band2) {
-                        const auto id = idx(i, j, k);
-                        is_fine[id] = 1;
-                        is_seed[id] = 1;
-                    }
-                }
-            }
-        }
-    }
-}
-
-void mark_feature_cells(std::vector<char>& is_fine, std::vector<char>& is_feature, int nx,
-                        int ny, int nz, const CartesianGrid& grid,
-                        const geom::TriSurface& surface,
-                        std::span<const geom::SharpEdge> features, double feature_band) {
-    if (!(feature_band > 0.0) || features.empty() || nx < 1) {
-        return;
-    }
-    const double band2 = feature_band * feature_band;
-    const double h_ref = std::max({grid.cell[0], grid.cell[1], grid.cell[2], 1e-30});
-    const int r = std::max(1, static_cast<int>(std::ceil(feature_band / h_ref)) + 1);
-    const auto idx = [&](int i, int j, int k) {
-        return (static_cast<std::size_t>(k) * static_cast<std::size_t>(ny) +
-                static_cast<std::size_t>(j)) *
-                   static_cast<std::size_t>(nx) +
-               static_cast<std::size_t>(i);
-    };
-    auto stamp = [&](const Eigen::Vector3d& p) {
-        const Eigen::Vector3d local = p - grid.origin;
-        const int i0 = static_cast<int>(std::floor(local[0] / grid.cell[0]));
-        const int j0 = static_cast<int>(std::floor(local[1] / grid.cell[1]));
-        const int k0 = static_cast<int>(std::floor(local[2] / grid.cell[2]));
-        for (int dk = -r; dk <= r; ++dk) {
-            for (int dj = -r; dj <= r; ++dj) {
-                for (int di = -r; di <= r; ++di) {
-                    const int i = i0 + di, j = j0 + dj, k = k0 + dk;
-                    if (i < 0 || i >= nx || j < 0 || j >= ny || k < 0 || k >= nz) {
-                        continue;
-                    }
-                    const Eigen::Vector3d c = grid.cell_center(i, j, k);
-                    if ((c - p).squaredNorm() <= band2) {
-                        const auto id = idx(i, j, k);
-                        is_fine[id] = 1;
-                        is_feature[id] = 1;
-                    }
-                }
-            }
-        }
-    };
-    for (const auto& e : features) {
-        if (e.v0 >= surface.vertices.size() || e.v1 >= surface.vertices.size()) {
-            continue;
-        }
-        const Eigen::Vector3d& a = surface.vertices[e.v0];
-        const Eigen::Vector3d& b = surface.vertices[e.v1];
-        const double len = (b - a).norm();
-        const int n_samp = std::max(2, static_cast<int>(std::ceil(len / h_ref)) + 1);
-        for (int s = 0; s <= n_samp; ++s) {
-            const double t = static_cast<double>(s) / static_cast<double>(n_samp);
-            stamp((1.0 - t) * a + t * b);
-        }
-    }
-}
 
 } // namespace
 
@@ -149,10 +60,12 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     }
 
     // Coarse-primary lattice at target h (classify cost matches tet/hybrid).
-    // Local 2×2×2 only on fine-marked cells → bulk ≈ h, skin/feature ≈ h/2.
+    // LEB refine on fine-marked cells (ADR-0018). Cap cells below the global
+    // 512k budget: LEB+snap on multi-million-tet meshes is not interactive.
     constexpr int subdiv = 2;
+    constexpr std::size_t kGradedMaxCells = 48 * 1024; // ~6 tets/cell → under LEB budget
     const double h_budget =
-        min_h_for_cell_budget(bbox_min, bbox_max, kDefaultMaxGridCells, /*subdivision=*/1);
+        min_h_for_cell_budget(bbox_min, bbox_max, kGradedMaxCells, /*subdivision=*/1);
     const double h_use = (h_budget > 0.0) ? std::max(h, h_budget) : h;
     const CartesianGrid grid = make_bbox_grid(bbox_min, bbox_max, h_use);
     const int nx = grid.nx, ny = grid.ny, nz = grid.nz;
@@ -221,8 +134,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             is_fine[c] = 1;
         }
     }
-    mark_feature_cells(is_fine, is_feature, nx, ny, nz, grid, surface, features, feature_band);
-    mark_seed_cells(is_fine, is_seed, nx, ny, nz, grid, refine_seeds, seed_band);
+    stamp_feature_cells(is_fine, &is_feature, nx, ny, nz, grid, surface, features, feature_band);
+    stamp_seed_cells(is_fine, &is_seed, nx, ny, nz, grid, refine_seeds, seed_band);
     // Only interior cells may be refined.
     for (std::size_t c = 0; c < inside.size(); ++c) {
         if (!inside[c]) {
@@ -239,44 +152,30 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     out.subdivision = subdiv;
     out.mesh.h = hf;
 
-    // Dense fine-index node table: fine indices (0..2*n) map half-cell steps.
-    // Coarse cell (i,j,k) occupies fine corners (2i,2j,2k) … (2i+2,2j+2,2k+2).
-    const int nfx = 2 * nx + 1, nfy = 2 * ny + 1, nfz = 2 * nz + 1;
-    const std::size_t n_slot =
-        static_cast<std::size_t>(nfx) * static_cast<std::size_t>(nfy) * static_cast<std::size_t>(nfz);
-    std::vector<std::int32_t> node_of(n_slot, -1);
-    const auto flat = [&](int fi, int fj, int fk) {
-        return (static_cast<std::size_t>(fk) * static_cast<std::size_t>(nfy) +
-                static_cast<std::size_t>(fj)) *
-                   static_cast<std::size_t>(nfx) +
-               static_cast<std::size_t>(fi);
-    };
-    const auto node_at = [&](int fi, int fj, int fk) -> std::uint32_t {
-        auto& slot = node_of[flat(fi, fj, fk)];
-        if (slot >= 0) {
-            return static_cast<std::uint32_t>(slot);
+    // ADR-0018: emit a *uniform* coarse Kuhn lattice first, then LEB-refine tets
+    // whose centroids lie in fine-marked cells. LEPP closure keeps the mesh
+    // face-conforming (no 2:1 hanging nodes). Old path emitted coarse step-2
+    // Kuhn next to fine 2×2×2 Kuhn → nonconforming mid-edge nodes.
+    std::map<std::array<int, 3>, std::uint32_t> node_ids;
+    const auto node_at = [&](int i, int j, int k) {
+        const auto [it, fresh] = node_ids.try_emplace(
+            std::array<int, 3>{i, j, k}, static_cast<std::uint32_t>(out.mesh.nodes.size()));
+        if (fresh) {
+            out.mesh.nodes.push_back(grid.node(i, j, k));
         }
-        const Eigen::Vector3d p = grid.origin + Eigen::Vector3d(0.5 * static_cast<double>(fi) *
-                                                                   grid.cell[0],
-                                                               0.5 * static_cast<double>(fj) *
-                                                                   grid.cell[1],
-                                                               0.5 * static_cast<double>(fk) *
-                                                                   grid.cell[2]);
-        slot = static_cast<std::int32_t>(out.mesh.nodes.size());
-        out.mesh.nodes.push_back(p);
-        return static_cast<std::uint32_t>(slot);
+        return it->second;
     };
 
-    auto emit_cube_tets = [&](int fi0, int fj0, int fk0, int step) {
+    auto emit_cube_tets = [&](int i, int j, int k) {
         const std::array<std::uint32_t, 8> c{{
-            node_at(fi0, fj0, fk0),
-            node_at(fi0 + step, fj0, fk0),
-            node_at(fi0 + step, fj0 + step, fk0),
-            node_at(fi0, fj0 + step, fk0),
-            node_at(fi0, fj0, fk0 + step),
-            node_at(fi0 + step, fj0, fk0 + step),
-            node_at(fi0 + step, fj0 + step, fk0 + step),
-            node_at(fi0, fj0 + step, fk0 + step),
+            node_at(i, j, k),
+            node_at(i + 1, j, k),
+            node_at(i + 1, j + 1, k),
+            node_at(i, j + 1, k),
+            node_at(i, j, k + 1),
+            node_at(i + 1, j, k + 1),
+            node_at(i + 1, j + 1, k + 1),
+            node_at(i, j + 1, k + 1),
         }};
         for (const auto& t : kCubeTets) {
             std::array<std::uint32_t, 4> n{
@@ -294,37 +193,34 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         }
     };
 
-    // Face corner offsets in fine indices for step-size `s` cell at (fi,fj,fk).
-    // Order matches prior lattice quad convention (outward not required for snap).
-    auto emit_face_quads = [&](int fi, int fj, int fk, int s, int face) {
+    // Exterior lattice quads for snap / display (before LEB; rebuilt after).
+    auto emit_face_quad = [&](int i, int j, int k, int face) {
         // face: 0=-x 1=+x 2=-y 3=+y 4=-z 5=+z
         std::array<std::array<int, 3>, 4> corners{};
         switch (face) {
-        case 0: // -x
-            corners = {{{0, 0, 0}, {0, s, 0}, {0, s, s}, {0, 0, s}}};
+        case 0:
+            corners = {{{0, 0, 0}, {0, 1, 0}, {0, 1, 1}, {0, 0, 1}}};
             break;
-        case 1: // +x
-            corners = {{{s, 0, 0}, {s, 0, s}, {s, s, s}, {s, s, 0}}};
+        case 1:
+            corners = {{{1, 0, 0}, {1, 0, 1}, {1, 1, 1}, {1, 1, 0}}};
             break;
-        case 2: // -y
-            corners = {{{0, 0, 0}, {0, 0, s}, {s, 0, s}, {s, 0, 0}}};
+        case 2:
+            corners = {{{0, 0, 0}, {0, 0, 1}, {1, 0, 1}, {1, 0, 0}}};
             break;
-        case 3: // +y
-            corners = {{{0, s, 0}, {s, s, 0}, {s, s, s}, {0, s, s}}};
+        case 3:
+            corners = {{{0, 1, 0}, {1, 1, 0}, {1, 1, 1}, {0, 1, 1}}};
             break;
-        case 4: // -z
-            corners = {{{0, 0, 0}, {s, 0, 0}, {s, s, 0}, {0, s, 0}}};
+        case 4:
+            corners = {{{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}}};
             break;
-        default: // +z
-            corners = {{{0, 0, s}, {0, s, s}, {s, s, s}, {s, 0, s}}};
+        default:
+            corners = {{{0, 0, 1}, {0, 1, 1}, {1, 1, 1}, {1, 0, 1}}};
             break;
         }
         std::array<std::uint32_t, 4> quad{};
         for (int q = 0; q < 4; ++q) {
-            quad[static_cast<std::size_t>(q)] =
-                node_at(fi + corners[static_cast<std::size_t>(q)][0],
-                        fj + corners[static_cast<std::size_t>(q)][1],
-                        fk + corners[static_cast<std::size_t>(q)][2]);
+            const auto& c = corners[static_cast<std::size_t>(q)];
+            quad[static_cast<std::size_t>(q)] = node_at(i + c[0], j + c[1], k + c[2]);
         }
         out.mesh.boundary_quads.push_back(quad);
     };
@@ -336,77 +232,21 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                     continue;
                 }
                 const auto id = idx(i, j, k);
-                if (!is_fine[id]) {
-                    // Coarse Kuhn cube spanning fine indices step 2.
-                    emit_cube_tets(2 * i, 2 * j, 2 * k, 2);
-                    ++out.n_coarse_cells;
-                    for (int f = 0; f < 6; ++f) {
-                        if (!inb(i + kFaceNbr[f][0], j + kFaceNbr[f][1],
-                                 k + kFaceNbr[f][2])) {
-                            emit_face_quads(2 * i, 2 * j, 2 * k, 2, f);
-                        }
-                    }
-                } else {
+                emit_cube_tets(i, j, k);
+                if (is_fine[id]) {
+                    ++out.n_fine_cells;
                     if (is_feature[id]) {
                         ++out.n_feature_cells;
                     }
                     if (is_seed[id]) {
                         ++out.n_seed_cells;
                     }
-                    // Local 2×2×2 fine Kuhn cubes.
-                    for (int dk = 0; dk < 2; ++dk) {
-                        for (int dj = 0; dj < 2; ++dj) {
-                            for (int di = 0; di < 2; ++di) {
-                                emit_cube_tets(2 * i + di, 2 * j + dj, 2 * k + dk, 1);
-                                ++out.n_fine_cells;
-                            }
-                        }
-                    }
-                    // Exterior faces of the parent coarse cell → 2×2 fine quads.
-                    for (int f = 0; f < 6; ++f) {
-                        if (inb(i + kFaceNbr[f][0], j + kFaceNbr[f][1],
-                                k + kFaceNbr[f][2])) {
-                            continue;
-                        }
-                        // Sub-faces on the exterior side of the coarse cell.
-                        for (int a = 0; a < 2; ++a) {
-                            for (int b = 0; b < 2; ++b) {
-                                int fi = 2 * i, fj = 2 * j, fk = 2 * k;
-                                switch (f) {
-                                case 0: // -x face: di fixed 0
-                                    fi = 2 * i;
-                                    fj = 2 * j + a;
-                                    fk = 2 * k + b;
-                                    break;
-                                case 1: // +x
-                                    fi = 2 * i + 1;
-                                    fj = 2 * j + a;
-                                    fk = 2 * k + b;
-                                    break;
-                                case 2: // -y
-                                    fi = 2 * i + a;
-                                    fj = 2 * j;
-                                    fk = 2 * k + b;
-                                    break;
-                                case 3: // +y
-                                    fi = 2 * i + a;
-                                    fj = 2 * j + 1;
-                                    fk = 2 * k + b;
-                                    break;
-                                case 4: // -z
-                                    fi = 2 * i + a;
-                                    fj = 2 * j + b;
-                                    fk = 2 * k;
-                                    break;
-                                default: // +z
-                                    fi = 2 * i + a;
-                                    fj = 2 * j + b;
-                                    fk = 2 * k + 1;
-                                    break;
-                                }
-                                emit_face_quads(fi, fj, fk, 1, f);
-                            }
-                        }
+                } else {
+                    ++out.n_coarse_cells;
+                }
+                for (int f = 0; f < 6; ++f) {
+                    if (!inb(i + kFaceNbr[f][0], j + kFaceNbr[f][1], k + kFaceNbr[f][2])) {
+                        emit_face_quad(i, j, k, f);
                     }
                 }
             }
@@ -417,17 +257,77 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         throw ValidityError("graded_tet_fill_surface: no interior cells");
     }
 
-    // Multi-pass surface snap (Jacobian-safe). Only boundary-touching tets.
-    if (!out.mesh.boundary_quads.empty()) {
-        std::set<std::uint32_t> bnode_set;
+    // Map a point to the coarse cell that contains it (clamped).
+    const auto cell_of_point = [&](const Eigen::Vector3d& p) -> int {
+        const Eigen::Vector3d local = p - grid.origin;
+        int i = static_cast<int>(std::floor(local[0] / grid.cell[0]));
+        int j = static_cast<int>(std::floor(local[1] / grid.cell[1]));
+        int k = static_cast<int>(std::floor(local[2] / grid.cell[2]));
+        i = std::clamp(i, 0, nx - 1);
+        j = std::clamp(j, 0, ny - 1);
+        k = std::clamp(k, 0, nz - 1);
+        return static_cast<int>(idx(i, j, k));
+    };
+
+    // LEB refine tets in fine cells. Prefer lattice boundary nodes for snap
+    // (already collected); LEB clears topology-accurate quads but we keep the
+    // node ids that were on the free surface.
+    std::vector<std::uint32_t> snap_nodes;
+    {
+        std::set<std::uint32_t> bset;
         for (const auto& q : out.mesh.boundary_quads) {
-            bnode_set.insert(q.begin(), q.end());
+            bset.insert(q.begin(), q.end());
         }
-        std::vector<std::uint32_t> bnodes(bnode_set.begin(), bnode_set.end());
+        snap_nodes.assign(bset.begin(), bset.end());
+    }
+
+    const bool any_fine = out.n_fine_cells > 0;
+    // LEB is O(n log n) with large constants; skip grading on huge lattices so
+    // auto-coarsened tiny-h still returns a conforming coarse mesh quickly.
+    constexpr std::size_t kLebTetBudget = 120'000;
+    if (any_fine && out.mesh.tets.size() <= kLebTetBudget) {
+        // Large-but-under-budget: one LEB pass. Small: up to subdiv.
+        const int passes =
+            (out.mesh.tets.size() > 40'000) ? 1 : subdiv;
+        for (int pass = 0; pass < passes; ++pass) {
+            std::vector<std::size_t> marked;
+            marked.reserve(out.mesh.tets.size() / 4 + 8);
+            for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+                const auto& n = out.mesh.tets[ti];
+                const Eigen::Vector3d c =
+                    0.25 * (out.mesh.nodes[n[0]] + out.mesh.nodes[n[1]] + out.mesh.nodes[n[2]] +
+                            out.mesh.nodes[n[3]]);
+                const int cid = cell_of_point(c);
+                if (cid >= 0 && static_cast<std::size_t>(cid) < is_fine.size() &&
+                    is_fine[static_cast<std::size_t>(cid)]) {
+                    marked.push_back(ti);
+                }
+            }
+            if (marked.empty()) {
+                break;
+            }
+            LocalRefineStats st;
+            auto refined = local_refine_tets(std::move(out.mesh.nodes), std::move(out.mesh.tets),
+                                             marked, &st);
+            out.mesh.nodes = std::move(refined.nodes);
+            out.mesh.tets = std::move(refined.tets);
+            // Keep pre-LEB lattice boundary_quads: corner node ids remain valid
+            // (LEB only appends midpoints). Pipeline may replace with exterior
+            // faces for display; tests use quads for snap residual checks.
+        }
+    }
+
+    if (!snap_nodes.empty()) {
+        // Drop any snap node indices that somehow went out of range (should not).
+        snap_nodes.erase(std::remove_if(snap_nodes.begin(), snap_nodes.end(),
+                                        [&](std::uint32_t i) {
+                                            return i >= out.mesh.nodes.size();
+                                        }),
+                         snap_nodes.end());
         std::vector<std::size_t> skin_tets;
-        skin_tets.reserve(bnodes.size() * 4);
+        skin_tets.reserve(snap_nodes.size() * 4);
         {
-            std::unordered_set<std::uint32_t> bset(bnodes.begin(), bnodes.end());
+            std::unordered_set<std::uint32_t> bset(snap_nodes.begin(), snap_nodes.end());
             for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
                 const auto& n = out.mesh.tets[ti];
                 if (bset.count(n[0]) || bset.count(n[1]) || bset.count(n[2]) ||
@@ -438,7 +338,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         }
         const double vol_eps = 1e-14 * hf * hf * hf;
         snap_boundary_nodes(
-            surface, out.mesh.nodes, bnodes, hf,
+            surface, out.mesh.nodes, snap_nodes, hf,
             [&](std::set<std::uint32_t>& offenders) {
                 for (const auto ti : skin_tets) {
                     const auto& n = out.mesh.tets[ti];
@@ -451,13 +351,17 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                     offenders.insert(n.begin(), n.end());
                 }
             },
-            /*max_move_frac=*/0.85, /*passes=*/4);
+            /*max_move_frac=*/0.85, /*passes=*/3);
         for (auto& n : out.mesh.tets) {
             const double v = tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
                                                out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
             if (v < 0.0) {
                 std::swap(n[1], n[2]);
             }
+        }
+        // Restore simple boundary quads from pre-LEB lattice nodes for region map.
+        if (out.mesh.boundary_quads.empty() && snap_nodes.size() >= 3) {
+            // Pipeline replaces these via extract_boundary_faces; leave empty OK.
         }
     }
 

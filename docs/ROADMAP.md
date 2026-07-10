@@ -112,6 +112,24 @@ and error, export VTU — without CLI.
 | G3 | ~~API header docs units complete~~ | Done (spot-check: SimSetup, Material, volume_mesh, write_vtu, sizing, fills) |
 | G4 | ~~CI matrix: Linux + format + ctest~~ | Done (format + build-test + grep-audit; checkout@v5) |
 
+## Track H — Mesher honesty / perf (overhaul)
+
+Full plan: [`docs/plans/mesher-solver-overhaul.md`](plans/mesher-solver-overhaul.md).
+Owner priority: **hybrid + graded** accuracy/speed vs hex; octa experiment secondary.
+
+| ID | Task | Acceptance |
+|----|------|------------|
+| H-M0 | Scoreboard harness + handoff plan | `bench/mesher/run_mesher_scoreboard.py`; plan on disk |
+| H-G0 | Face-conformity tests | `tet4_face_conformity` + Catch2 |
+| H-G1 | Graded LEB conformity (ADR-0018) | No hanging faces; positive volumes |
+| H-H0 | Shared cell stamp in hybrid | O(seeds·ball) in `mixed_fill` |
+| H-S0 | Surface snap grid accel | Hash closest-point for large STLs |
+| H-H1 | Hybrid thinner skin defaults | feat_band 1.5h, seed cap 192 |
+| H-H2 | True hex+pyramid+tet FE | Isoparam bulk hex (open) |
+| H-O1 | Octahedral experiment | open |
+| H-V1 | CG preconditioner | open |
+| H-E1 | Scoreboard close-out | open |
+
 ---
 
 ## Recommended order (critical path to “usable product”)
@@ -146,3 +164,4 @@ A1 A3 ──> A2 A10 ──> A4 A5 A8 ──> A6 A7
 | E Verify | E1–E4 done; D6 Tier-3 scoreboard instrument on L-domain. |
 | F Perf | F1–F3 done: OpenMP assembly, auto CG >8k free DOFs, CSR SpMV + optional CUDA parity. |
 | G Release | G1–G4 done: README, examples/, header units, CI green (format+ctest+grep-audit). |
+| H Mesher | **Active.** Graded LEB conformity (ADR-0018), stamp hybrid, snap hash, plan/scoreboard. Remaining: H2 true hybrid FE, octa, solver precond. |

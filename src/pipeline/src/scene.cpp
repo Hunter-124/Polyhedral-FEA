@@ -247,18 +247,27 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         if (feature_refine) {
             edges = geom::detect_sharp_edges(model.surface, 30.0);
             if (!edges.empty()) {
-                feat_band = 2.5 * h;
+                // H1: thinner feature band — was 2.5 h and flooded the volume.
+                feat_band = 1.5 * h;
             }
             const auto curv = geom::estimate_vertex_curvature(model.surface);
             // Seed high-κ surface verts so curved walls get tet skin + snap.
             const double kappa_abs = 1.0 / (25.0 * std::max(h, 1e-12));
+            constexpr std::size_t kMaxHybridSeeds = 192;
             for (std::size_t i = 0; i < model.surface.vertices.size(); ++i) {
+                if (curv_seeds.size() >= kMaxHybridSeeds) {
+                    break;
+                }
                 if (i < curv.kappa.size() && curv.kappa[i] >= kappa_abs) {
                     curv_seeds.push_back(model.surface.vertices[i]);
                 }
             }
-            // Also seed edge midpoints on curved facets (reduces silhouette corners).
-            for (const auto& tri : model.surface.triangles) {
+            // Sparse edge midpoints on curved facets (stride 3).
+            for (std::size_t ti = 0; ti < model.surface.triangles.size(); ti += 3) {
+                if (curv_seeds.size() >= kMaxHybridSeeds) {
+                    break;
+                }
+                const auto& tri = model.surface.triangles[ti];
                 for (int e = 0; e < 3; ++e) {
                     const auto a = tri[static_cast<std::size_t>(e)];
                     const auto b = tri[static_cast<std::size_t>((e + 1) % 3)];
@@ -266,11 +275,14 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                         0.5 * (curv.kappa[a] + curv.kappa[b]) >= kappa_abs) {
                         curv_seeds.push_back(0.5 * (model.surface.vertices[a] +
                                                     model.surface.vertices[b]));
+                        if (curv_seeds.size() >= kMaxHybridSeeds) {
+                            break;
+                        }
                     }
                 }
             }
             if (s_band <= 0.0 && !curv_seeds.empty()) {
-                s_band = 2.0 * h;
+                s_band = 1.25 * h; // H1: was 2 h
             }
         }
         // True multi-type: hex bulk + Kuhn tet skin (same face diagonals; FE
@@ -495,8 +507,9 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                 ? ", h raised to cell budget"
                 : "";
         out.mesher_note = std::format(
-            "graded tet v3 (2:1 geo): {} tets ({} coarse, {} fine, {} feature, {} seed), "
-            "h_bulk={:.4g}/h_fine={:.4g} m (÷{}), snap max|d|={:.3g} m mean|d|={:.3g} m"
+            "graded tet v4 (LEB-conforming geo): {} tets ({} bulk cells, {} refined cells, "
+            "{} feature, {} seed), h_bulk={:.4g}/h_fine~{:.4g} m (LEB×{}), "
+            "snap max|d|={:.3g} m mean|d|={:.3g} m"
             "{}{}{}",
             out.mesh.elements.size(), graded.n_coarse_cells, graded.n_fine_cells,
             graded.n_feature_cells, graded.n_seed_cells, graded.h_coarse, graded.h_fine,

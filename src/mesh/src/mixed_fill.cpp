@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "mesh/mixed_fill.hpp"
 
+#include "mesh/cell_stamp.hpp"
 #include "mesh/grid_classify.hpp"
 #include "mesh/poly_mesh.hpp"
 #include "mesh/surface_project.hpp"
@@ -180,6 +181,7 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
     out.h = h_cell;
     out.skin_layers = skin_layers;
     std::vector<char> is_skin(inside.size(), 0);
+    // Free-surface skin by hop distance (cheap).
     for (int k = 0; k < nz; ++k) {
         for (int j = 0; j < ny; ++j) {
             for (int i = 0; i < nx; ++i) {
@@ -187,25 +189,25 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                     continue;
                 }
                 const int d = dist[idx(i, j, k)];
-                bool skin = (d >= 0 && d < skin_layers);
-                const Eigen::Vector3d center = grid.cell_center(i, j, k);
-                if (!skin && feature_band > 0.0) {
-                    if (geom::distance_to_features(center, surface, features) <= feature_band) {
-                        skin = true;
-                        ++out.n_feature_skin_cells;
-                    }
+                if (d >= 0 && d < skin_layers) {
+                    is_skin[idx(i, j, k)] = 1;
                 }
-                if (!skin && seed_band > 0.0) {
-                    for (const auto& s : curvature_seeds) {
-                        if ((center - s).squaredNorm() <= seed_band * seed_band) {
-                            skin = true;
-                            ++out.n_feature_skin_cells;
-                            break;
-                        }
-                    }
-                }
-                is_skin[idx(i, j, k)] = skin ? 1 : 0;
             }
+        }
+    }
+    // Feature / seed bands via O(samples · ball) stamps (not O(cells · features)).
+    std::vector<char> is_feature_skin(inside.size(), 0);
+    std::vector<char> is_seed_skin(inside.size(), 0);
+    stamp_feature_cells(is_skin, &is_feature_skin, nx, ny, nz, grid, surface, features,
+                        feature_band);
+    stamp_seed_cells(is_skin, &is_seed_skin, nx, ny, nz, grid, curvature_seeds, seed_band);
+    for (std::size_t c = 0; c < inside.size(); ++c) {
+        if (!inside[c]) {
+            is_skin[c] = 0;
+            continue;
+        }
+        if (is_feature_skin[c] || is_seed_skin[c]) {
+            ++out.n_feature_skin_cells;
         }
     }
 

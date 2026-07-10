@@ -5,6 +5,7 @@
 #include <cmath>
 #include <limits>
 #include <unordered_map>
+#include <vector>
 
 namespace polymesh::mesh {
 namespace {
@@ -43,9 +44,165 @@ Eigen::Vector3d closest_on_triangle(const Eigen::Vector3d& p, const Eigen::Vecto
     return a + ab * (vb * denom) + ac * (vc * denom);
 }
 
-} // namespace
+/// Uniform grid hash over triangle AABBs for accelerated closest-point (S0).
+struct SurfaceGrid {
+    Eigen::Vector3d origin = Eigen::Vector3d::Zero();
+    Eigen::Vector3d cell = Eigen::Vector3d::Ones();
+    int nx = 1, ny = 1, nz = 1;
+    std::vector<std::vector<std::size_t>> bins;
 
-ClosestPoint closest_on_surface(const geom::TriSurface& surface, const Eigen::Vector3d& p) {
+    int flat(int i, int j, int k) const {
+        return (k * ny + j) * nx + i;
+    }
+
+    void build(const geom::TriSurface& surface) {
+        if (surface.triangles.empty() || surface.vertices.empty()) {
+            bins.clear();
+            return;
+        }
+        Eigen::Vector3d bmin = surface.vertices[0];
+        Eigen::Vector3d bmax = surface.vertices[0];
+        for (const auto& v : surface.vertices) {
+            bmin = bmin.cwiseMin(v);
+            bmax = bmax.cwiseMax(v);
+        }
+        // Pad slightly so boundary queries land inside the hash.
+        const Eigen::Vector3d extent = (bmax - bmin).cwiseMax(Eigen::Vector3d::Constant(1e-12));
+        const double pad = 1e-6 * extent.norm() + 1e-12;
+        bmin.array() -= pad;
+        bmax.array() += pad;
+
+        // Target ~8 triangles per bin; clamp resolution.
+        const std::size_t ntri = surface.triangles.size();
+        const double ntri_d = static_cast<double>(std::max<std::size_t>(1, ntri / 8));
+        const int target = std::max(4, static_cast<int>(std::cbrt(ntri_d)));
+        const int res = std::clamp(target, 4, 64);
+        nx = ny = nz = res;
+        origin = bmin;
+        cell = (bmax - bmin).cwiseQuotient(Eigen::Vector3d(nx, ny, nz));
+        cell = cell.cwiseMax(Eigen::Vector3d::Constant(1e-30));
+        bins.assign(static_cast<std::size_t>(nx * ny * nz), {});
+
+        for (std::size_t t = 0; t < ntri; ++t) {
+            const auto& tri = surface.triangles[t];
+            const Eigen::Vector3d& A = surface.vertices[tri[0]];
+            const Eigen::Vector3d& B = surface.vertices[tri[1]];
+            const Eigen::Vector3d& C = surface.vertices[tri[2]];
+            const Eigen::Vector3d tmin = A.cwiseMin(B).cwiseMin(C);
+            const Eigen::Vector3d tmax = A.cwiseMax(B).cwiseMax(C);
+            const Eigen::Vector3d lomin = (tmin - origin).cwiseQuotient(cell);
+            const Eigen::Vector3d lomax = (tmax - origin).cwiseQuotient(cell);
+            const int i0 = std::clamp(static_cast<int>(std::floor(lomin[0])), 0, nx - 1);
+            const int j0 = std::clamp(static_cast<int>(std::floor(lomin[1])), 0, ny - 1);
+            const int k0 = std::clamp(static_cast<int>(std::floor(lomin[2])), 0, nz - 1);
+            const int i1 = std::clamp(static_cast<int>(std::floor(lomax[0])), 0, nx - 1);
+            const int j1 = std::clamp(static_cast<int>(std::floor(lomax[1])), 0, ny - 1);
+            const int k1 = std::clamp(static_cast<int>(std::floor(lomax[2])), 0, nz - 1);
+            for (int k = k0; k <= k1; ++k) {
+                for (int j = j0; j <= j1; ++j) {
+                    for (int i = i0; i <= i1; ++i) {
+                        bins[static_cast<std::size_t>(flat(i, j, k))].push_back(t);
+                    }
+                }
+            }
+        }
+    }
+
+    ClosestPoint query(const geom::TriSurface& surface, const Eigen::Vector3d& p) const {
+        ClosestPoint best;
+        best.distance = std::numeric_limits<double>::infinity();
+        if (bins.empty()) {
+            return best;
+        }
+
+        auto consider = [&](std::size_t t) {
+            const auto& tri = surface.triangles[t];
+            const Eigen::Vector3d q = closest_on_triangle(
+                p, surface.vertices[tri[0]], surface.vertices[tri[1]], surface.vertices[tri[2]]);
+            const double d = (p - q).norm();
+            if (d < best.distance) {
+                best.distance = d;
+                best.point = q;
+                best.triangle = t;
+            }
+        };
+
+        const Eigen::Vector3d local = (p - origin).cwiseQuotient(cell);
+        const int ic = std::clamp(static_cast<int>(std::floor(local[0])), 0, nx - 1);
+        const int jc = std::clamp(static_cast<int>(std::floor(local[1])), 0, ny - 1);
+        const int kc = std::clamp(static_cast<int>(std::floor(local[2])), 0, nz - 1);
+
+        // Expanding shell until the best distance cannot improve.
+        const int max_r = std::max({nx, ny, nz});
+        for (int r = 0; r <= max_r; ++r) {
+            const int i0 = std::max(0, ic - r), i1 = std::min(nx - 1, ic + r);
+            const int j0 = std::max(0, jc - r), j1 = std::min(ny - 1, jc + r);
+            const int k0 = std::max(0, kc - r), k1 = std::min(nz - 1, kc + r);
+            for (int k = k0; k <= k1; ++k) {
+                for (int j = j0; j <= j1; ++j) {
+                    for (int i = i0; i <= i1; ++i) {
+                        // Only the shell at radius r (avoid re-scanning inner cubes).
+                        if (r > 0) {
+                            const bool on_shell = (i == i0 || i == i1 || j == j0 || j == j1 ||
+                                                   k == k0 || k == k1);
+                            if (!on_shell) {
+                                continue;
+                            }
+                        }
+                        for (std::size_t t : bins[static_cast<std::size_t>(flat(i, j, k))]) {
+                            consider(t);
+                        }
+                    }
+                }
+            }
+            if (std::isfinite(best.distance)) {
+                // Lower bound to any unvisited bin: distance to shell outside r.
+                // Conservative: cell diagonal * (r+0.5) approx; stop if best is
+                // closer than the nearest unexplored cell face.
+                const double cell_diag = cell.norm();
+                if (best.distance <= (static_cast<double>(r) + 0.5) * cell_diag * 0.5 ||
+                    r >= 2) {
+                    // After a few shells, also do a small safety ring once more then stop
+                    // if distance is finite. For correctness under AABB over-approx,
+                    // expand until best.distance^2 cannot beat next shell.
+                    const double next_lb = static_cast<double>(r) * std::min({cell[0], cell[1], cell[2]});
+                    if (r > 0 && best.distance <= next_lb) {
+                        break;
+                    }
+                    if (r >= 4 && best.distance < cell_diag) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Fallback brute force if hash failed (empty bins / degenerate).
+        if (!std::isfinite(best.distance)) {
+            for (std::size_t t = 0; t < surface.triangles.size(); ++t) {
+                consider(t);
+            }
+        }
+        return best;
+    }
+};
+
+// Thread-local cache: rebuild when surface pointer / triangle count changes.
+const SurfaceGrid& grid_for(const geom::TriSurface& surface) {
+    thread_local const geom::TriSurface* cached_ptr = nullptr;
+    thread_local std::size_t cached_ntri = 0;
+    thread_local std::size_t cached_nv = 0;
+    thread_local SurfaceGrid cached;
+    if (cached_ptr != &surface || cached_ntri != surface.triangles.size() ||
+        cached_nv != surface.vertices.size()) {
+        cached.build(surface);
+        cached_ptr = &surface;
+        cached_ntri = surface.triangles.size();
+        cached_nv = surface.vertices.size();
+    }
+    return cached;
+}
+
+ClosestPoint closest_on_surface_brute(const geom::TriSurface& surface, const Eigen::Vector3d& p) {
     ClosestPoint best;
     best.distance = std::numeric_limits<double>::infinity();
     for (std::size_t t = 0; t < surface.triangles.size(); ++t) {
@@ -58,6 +215,27 @@ ClosestPoint closest_on_surface(const geom::TriSurface& surface, const Eigen::Ve
             best.point = q;
             best.triangle = t;
         }
+    }
+    return best;
+}
+
+} // namespace
+
+ClosestPoint closest_on_surface(const geom::TriSurface& surface, const Eigen::Vector3d& p) {
+    if (surface.triangles.size() < 32) {
+        return closest_on_surface_brute(surface, p);
+    }
+    // Grid hash; for absolute correctness on rare hash misses, compare is not
+    // needed when the expanding-shell termination is conservative. If the grid
+    // is empty, brute force.
+    const auto& g = grid_for(surface);
+    if (g.bins.empty()) {
+        return closest_on_surface_brute(surface, p);
+    }
+    auto best = g.query(surface, p);
+    // Safety: if result looks wrong (non-finite), brute.
+    if (!std::isfinite(best.distance)) {
+        return closest_on_surface_brute(surface, p);
     }
     return best;
 }
@@ -96,6 +274,9 @@ SnapStats snap_boundary_nodes(const geom::TriSurface& surface,
     // Search radius: allow full stair residual (~0.5√3 h) plus margin for
     // anisotropic lattice cells and coarse STL facets on cylinders.
     const double search_r = 2.0 * h;
+
+    // Warm the surface grid once.
+    (void)grid_for(surface);
 
     std::unordered_map<std::uint32_t, Eigen::Vector3d> original;
     original.reserve(boundary_nodes.size());

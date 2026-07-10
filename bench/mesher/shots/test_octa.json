@@ -1,0 +1,27 @@
+{
+  "nodes": 11546,
+  "elems": 61440,
+  "h": 2.55576,
+  "notes": [
+    "auto h=2.556 m (extent/16\u2229diag/28, n_sharp=206, min_feat=38.1 m, dens\u00d70.88, R\u03ba\u22489.68)",
+    "octahedral experimental (BCC face-octa \u2192 tet4; not product): 61440 tets (14104 octa + 2512 bdy pyr), 11546 nodes, h=2.54 m",
+    "wrote bench\\mesher\\shots\\test_octa.vtu"
+  ],
+  "ok": true,
+  "returncode": 0,
+  "wall_s": 0.44003739999607205,
+  "mesher": "octa",
+  "geometry": "tests\\fixtures\\test.stl",
+  "cmd": [
+    "polymesh.exe",
+    "mesh",
+    "tests\\fixtures\\test.stl",
+    "-o",
+    "bench\\mesher\\shots\\test_octa.vtu",
+    "--mesher",
+    "octa",
+    "--feature"
+  ],
+  "stdout": "mesh: 11546 nodes, 61440 elems, h=2.55576 m\nauto h=2.556 m (extent/16\u2229diag/28, n_sharp=206, min_feat=38.1 m, dens\u00d70.88, R\u03ba\u22489.68)\noctahedral experimental (BCC face-octa \u2192 tet4; not product): 61440 tets (14104 octa + 2512 bdy pyr), 11546 nodes, h=2.54 m\nwrote bench\\mesher\\shots\\test_octa.vtu\n\n",
+  "png": false
+}

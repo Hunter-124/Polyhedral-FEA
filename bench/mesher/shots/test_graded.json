@@ -1,0 +1,29 @@
+{
+  "nodes": 30363,
+  "elems": 152702,
+  "h": 1.6132,
+  "snap_max": 0.645,
+  "notes": [
+    "auto h=1.613 m (extent/16\u2229diag/28, n_sharp=206, min_feat=38.1 m, dens\u00d70.88, R\u03ba\u22489.68)",
+    "graded tet v5 (multi-level LEB geo): 152702 tets (19503 bulk, 1489 refined L1/L2, 1264 feature, 738 seed), h_bulk=1.587/h_L2~0.3969 m (L0/L1/L2), snap max|d|=0.645 m mean|d|=0.00773 m, curv_seeds=192",
+    "wrote bench\\mesher\\shots\\test_graded.vtu"
+  ],
+  "ok": true,
+  "returncode": 0,
+  "wall_s": 3.195482399998582,
+  "mesher": "graded",
+  "geometry": "tests\\fixtures\\test.stl",
+  "cmd": [
+    "polymesh.exe",
+    "mesh",
+    "tests\\fixtures\\test.stl",
+    "-o",
+    "bench\\mesher\\shots\\test_graded.vtu",
+    "--mesher",
+    "graded",
+    "--feature"
+  ],
+  "stdout": "mesh: 30363 nodes, 152702 elems, h=1.6132 m\nauto h=1.613 m (extent/16\u2229diag/28, n_sharp=206, min_feat=38.1 m, dens\u00d70.88, R\u03ba\u22489.68)\ngraded tet v5 (multi-level LEB geo): 152702 tets (19503 bulk, 1489 refined L1/L2, 1264 feature, 738 seed), h_bulk=1.587/h_L2~0.3969 m (L0/L1/L2), snap max|d|=0.645 m mean|d|=0.00773 m, curv_seeds=192\nwrote bench\\mesher\\shots\\test_graded.vtu\n\n",
+  "png": true,
+  "png_path": "bench\\mesher\\shots\\test_graded.png"
+}

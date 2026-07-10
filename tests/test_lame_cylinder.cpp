@@ -38,7 +38,7 @@ std::array<std::int64_t, 3> param_key(const Eigen::Vector3d& p) {
 
 } // namespace
 
-TEST_CASE("Lamé thick-walled cylinder: displacement and hoop stress vs closed form") {
+TEST_CASE("Lame thick-walled cylinder: displacement and hoop stress vs closed form") {
     const auto ref = polymesh::bench::load_reference("bench/reference/lame-cylinder.json");
     const double a = ref.values.at("inner_radius_m");
     const double b = ref.values.at("outer_radius_m");

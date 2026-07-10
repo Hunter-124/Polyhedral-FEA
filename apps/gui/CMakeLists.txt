@@ -38,6 +38,19 @@ target_link_libraries(imgui_lib PUBLIC glfw)
 
 find_package(OpenGL REQUIRED)
 
+# Windows system OpenGL is 1.1 only — load 3.x entry points with glad.
+# Linux/macOS keep GL_GLEXT_PROTOTYPES (CI has no glad package).
+set(POLYMESH_GUI_GL_LIBS OpenGL::GL)
+if(WIN32)
+    find_package(glad CONFIG REQUIRED)
+    target_compile_definitions(imgui_lib PUBLIC IMGUI_IMPL_OPENGL_LOADER_GLAD)
+    target_link_libraries(imgui_lib PUBLIC glad::glad)
+    list(APPEND POLYMESH_GUI_GL_LIBS glad::glad)
+    message(STATUS "GUI OpenGL: glad loader (Windows)")
+else()
+    message(STATUS "GUI OpenGL: system headers + GLEXT prototypes")
+endif()
+
 add_executable(polymesh-gui
     main.cpp
     theme.cpp
@@ -46,5 +59,5 @@ add_executable(polymesh-gui
 )
 target_include_directories(polymesh-gui PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(polymesh-gui
-    PRIVATE pipeline imgui_lib OpenGL::GL polymesh_warnings polymesh_perf
+    PRIVATE pipeline imgui_lib ${POLYMESH_GUI_GL_LIBS} polymesh_warnings polymesh_perf
 )

@@ -1,0 +1,28 @@
+{
+  "nodes": 7945,
+  "elems": 21318,
+  "h": 0.061859,
+  "snap_max": 0.0338,
+  "notes": [
+    "auto h=0.06186 m (extent/16\u2229diag/28, n_sharp=24, min_feat=0.383 m, dens\u00d71.00, R\u03ba\u22480.504)",
+    "hybrid zoo v2 (hex bulk + pyramid skin \u2192 all-pyramid FE; not Delaunay): 1573 lattice hex + 11880 skin pyr \u2192 21318 pyramid5, 7945 nodes, h=0.05882 m, snap max|d|=0.0338 m, feature_skin_cells=715",
+    "wrote bench\\mesher\\shots\\cylinder_prism_hybrid.vtu"
+  ],
+  "ok": true,
+  "returncode": 0,
+  "wall_s": 0.5439143000112381,
+  "mesher": "hybrid",
+  "geometry": "bench\\geometries\\public\\cylinder_prism.stl",
+  "cmd": [
+    "polymesh.exe",
+    "mesh",
+    "bench\\geometries\\public\\cylinder_prism.stl",
+    "-o",
+    "bench\\mesher\\shots\\cylinder_prism_hybrid.vtu",
+    "--mesher",
+    "hybrid",
+    "--feature"
+  ],
+  "stdout": "mesh: 7945 nodes, 21318 elems, h=0.061859 m\nauto h=0.06186 m (extent/16\u2229diag/28, n_sharp=24, min_feat=0.383 m, dens\u00d71.00, R\u03ba\u22480.504)\nhybrid zoo v2 (hex bulk + pyramid skin \u2192 all-pyramid FE; not Delaunay): 1573 lattice hex + 11880 skin pyr \u2192 21318 pyramid5, 7945 nodes, h=0.05882 m, snap max|d|=0.0338 m, feature_skin_cells=715\nwrote bench\\mesher\\shots\\cylinder_prism_hybrid.vtu\n\n",
+  "png": false
+}

@@ -1,0 +1,28 @@
+{
+  "nodes": 3289,
+  "elems": 13452,
+  "h": 0.07,
+  "snap_max": 5.38e-15,
+  "notes": [
+    "auto h=0.07 m (extent/16\u2229diag/28, n_sharp=12, min_feat=0.2 m, dens\u00d71.00, R\u03ba\u22480.371)",
+    "graded tet v5 (multi-level LEB geo): 13452 tets (1117 bulk, 188 refined L1/L2, 172 feature, 188 seed), h_bulk=0.06897/h_L2~0.01724 m (L0/L1/L2), snap max|d|=5.38e-15 m mean|d|=1.02e-16 m, curv_seeds=20",
+    "wrote bench\\mesher\\shots\\plate_graded.vtu"
+  ],
+  "ok": true,
+  "returncode": 0,
+  "wall_s": 0.20361939999565948,
+  "mesher": "graded",
+  "geometry": "bench\\geometries\\public\\plate.stl",
+  "cmd": [
+    "polymesh.exe",
+    "mesh",
+    "bench\\geometries\\public\\plate.stl",
+    "-o",
+    "bench\\mesher\\shots\\plate_graded.vtu",
+    "--mesher",
+    "graded",
+    "--feature"
+  ],
+  "stdout": "mesh: 3289 nodes, 13452 elems, h=0.07 m\nauto h=0.07 m (extent/16\u2229diag/28, n_sharp=12, min_feat=0.2 m, dens\u00d71.00, R\u03ba\u22480.371)\ngraded tet v5 (multi-level LEB geo): 13452 tets (1117 bulk, 188 refined L1/L2, 172 feature, 188 seed), h_bulk=0.06897/h_L2~0.01724 m (L0/L1/L2), snap max|d|=5.38e-15 m mean|d|=1.02e-16 m, curv_seeds=20\nwrote bench\\mesher\\shots\\plate_graded.vtu\n\n",
+  "png": false
+}

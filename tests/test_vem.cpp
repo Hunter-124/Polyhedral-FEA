@@ -173,7 +173,7 @@ TEST_CASE("VEM k=2 exact quadratic: degree-2 MMS nearly zero energy error") {
     REQUIRE(error < 1e-8 * scale);
 }
 
-TEST_CASE("VEM k=2 MMS energy-norm order ≈ 2 on hex path") {
+TEST_CASE("VEM k=2 MMS energy-norm order ~ 2 on hex path") {
     // Cubic field outside [P₂]³; theory for k=2 is O(h²) in energy norm.
     const auto mms = ManufacturedSolution::random(/*degree=*/3, /*seed=*/2026, kSteel);
     auto solve_err = [&](int n) {

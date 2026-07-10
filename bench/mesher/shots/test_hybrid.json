@@ -1,0 +1,29 @@
+{
+  "nodes": 104456,
+  "elems": 280155,
+  "h": 1.6132,
+  "snap_max": 1.02e-11,
+  "notes": [
+    "auto h=1.613 m (extent/16\u2229diag/28, n_sharp=206, min_feat=38.1 m, dens\u00d70.88, R\u03ba\u22489.68)",
+    "hybrid zoo v3 (hex bulk@h + 2:1 fine@h/2 + pyr transition \u2192 all-pyramid FE; not Delaunay): 41929 hex + 28581 pyr raw \u2192 280155 pyramid5, 104456 nodes, h_bulk=1.587/h_fine=0.7937 m, fine_cells=3399 transition=2856 feature=1876, snap max|d|=1.02e-11 m, curv_seeds=168",
+    "wrote bench\\mesher\\shots\\test_hybrid.vtu"
+  ],
+  "ok": true,
+  "returncode": 0,
+  "wall_s": 3.693634100010968,
+  "mesher": "hybrid",
+  "geometry": "tests\\fixtures\\test.stl",
+  "cmd": [
+    "polymesh.exe",
+    "mesh",
+    "tests\\fixtures\\test.stl",
+    "-o",
+    "bench\\mesher\\shots\\test_hybrid.vtu",
+    "--mesher",
+    "hybrid",
+    "--feature"
+  ],
+  "stdout": "mesh: 104456 nodes, 280155 elems, h=1.6132 m\nauto h=1.613 m (extent/16\u2229diag/28, n_sharp=206, min_feat=38.1 m, dens\u00d70.88, R\u03ba\u22489.68)\nhybrid zoo v3 (hex bulk@h + 2:1 fine@h/2 + pyr transition \u2192 all-pyramid FE; not Delaunay): 41929 hex + 28581 pyr raw \u2192 280155 pyramid5, 104456 nodes, h_bulk=1.587/h_fine=0.7937 m, fine_cells=3399 transition=2856 feature=1876, snap max|d|=1.02e-11 m, curv_seeds=168\nwrote bench\\mesher\\shots\\test_hybrid.vtu\n\n",
+  "png": true,
+  "png_path": "bench\\mesher\\shots\\test_hybrid.png"
+}

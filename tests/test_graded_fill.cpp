@@ -8,7 +8,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cmath>
+#include <vector>
 
 using namespace polymesh::mesh;
 
@@ -74,35 +76,36 @@ TEST_CASE("feature band refines more cells than surface skin alone") {
     check_tet_fill_geometry(with_feat.mesh);
 }
 
-TEST_CASE("feature/seed bands refine more blocks at fixed 2:1 lattice") {
-    // Graded is always subdiv=2 (bulk≈h, fine≈h/2). Features/seeds densify
-    // *which* blocks are fine — they must not rebuild a global h/4 lattice.
+TEST_CASE("feature/seed bands refine more blocks at multi-level lattice") {
+    // Features/seeds densify which blocks are L1/L2; same coarse lattice.
     const auto s = unit_box();
     const auto edges = polymesh::geom::detect_sharp_edges(s, 30.0);
     auto plain = graded_tet_fill_surface(s, {0, 0, 0}, {1, 1, 1}, 0.4, 1, {}, 0.0);
     auto feat = graded_tet_fill_surface(s, {0, 0, 0}, {1, 1, 1}, 0.4, 1, edges, 0.8);
     REQUIRE(plain.subdivision == 2);
     REQUIRE(feat.subdivision == 2);
-    // Same lattice spacing; features force more fine cells / tets.
-    REQUIRE(std::abs(feat.h_fine - plain.h_fine) < 1e-12);
+    // Same coarse spacing; features force more fine cells / tets.
+    REQUIRE(std::abs(feat.h_coarse - plain.h_coarse) < 1e-12);
     REQUIRE(feat.n_feature_cells > 0);
     REQUIRE(feat.n_fine_cells >= plain.n_fine_cells);
     REQUIRE(feat.mesh.tets.size() >= plain.mesh.tets.size());
     check_tet_fill_geometry(feat.mesh);
 
-    // Seed balls alone mark fine blocks (no sharp edges needed).
+    // Seed balls alone mark L2 blocks (no sharp edges needed).
     std::vector<Eigen::Vector3d> seeds{{0.5, 0.5, 0.0}, {0.5, 0.5, 1.0}};
     auto seeded = graded_tet_fill_surface(s, {0, 0, 0}, {1, 1, 1}, 0.4, 1, {}, 0.0, seeds, 0.5);
     REQUIRE(seeded.subdivision == 2);
     REQUIRE(seeded.n_seed_cells > 0);
+    // L2 active → h_fine ~ h/4.
+    REQUIRE(seeded.h_fine < 0.55 * seeded.h_coarse);
     check_tet_fill_geometry(seeded.mesh);
 }
 
-TEST_CASE("graded tet bulk size tracks requested h (2:1)") {
+TEST_CASE("graded tet bulk size tracks requested h (multi-level)") {
     const auto s = unit_box();
     auto graded = graded_tet_fill_surface(s, {0, 0, 0}, {1, 1, 1}, 0.25, 2);
     REQUIRE(graded.subdivision == 2);
-    // h_coarse ≈ h, h_fine ≈ h/2 (within lattice rounding).
+    // h_coarse ≈ h; skin-only → L1 → h_fine ≈ h/2 (within lattice rounding).
     REQUIRE(graded.h_coarse > 0.2);
     REQUIRE(graded.h_coarse < 0.35);
     REQUIRE(graded.h_fine > 0.1);
@@ -110,6 +113,51 @@ TEST_CASE("graded tet bulk size tracks requested h (2:1)") {
     REQUIRE(graded.n_coarse_cells > 0);
     REQUIRE(graded.n_fine_cells > 0);
     check_tet_fill_geometry(graded.mesh);
+}
+
+TEST_CASE("graded multi-level has finer edges near seeds than bulk") {
+    const auto s = unit_box();
+    std::vector<Eigen::Vector3d> seeds{{0.5, 0.5, 0.5}};
+    auto graded =
+        graded_tet_fill_surface(s, {0, 0, 0}, {1, 1, 1}, 0.25, 1, {}, 0.0, seeds, 0.35);
+    REQUIRE(graded.n_seed_cells > 0);
+    REQUIRE_FALSE(graded.mesh.tets.empty());
+
+    // Classify tets by centroid distance to seed; compare median edge lengths.
+    std::vector<double> near_edges;
+    std::vector<double> far_edges;
+    const Eigen::Vector3d seed = seeds[0];
+    for (const auto& t : graded.mesh.tets) {
+        const Eigen::Vector3d c =
+            0.25 * (graded.mesh.nodes[t[0]] + graded.mesh.nodes[t[1]] +
+                    graded.mesh.nodes[t[2]] + graded.mesh.nodes[t[3]]);
+        double elen = 0.0;
+        int ne = 0;
+        for (int a = 0; a < 4; ++a) {
+            for (int b = a + 1; b < 4; ++b) {
+                elen += (graded.mesh.nodes[t[static_cast<std::size_t>(a)]] -
+                         graded.mesh.nodes[t[static_cast<std::size_t>(b)]])
+                            .norm();
+                ++ne;
+            }
+        }
+        elen /= static_cast<double>(ne);
+        if ((c - seed).norm() < 0.35) {
+            near_edges.push_back(elen);
+        } else if ((c - seed).norm() > 0.55) {
+            far_edges.push_back(elen);
+        }
+    }
+    REQUIRE_FALSE(near_edges.empty());
+    REQUIRE_FALSE(far_edges.empty());
+    auto median = [](std::vector<double> v) {
+        std::sort(v.begin(), v.end());
+        return v[v.size() / 2];
+    };
+    const double m_near = median(near_edges);
+    const double m_far = median(far_edges);
+    // Far bulk should be coarser than the seed band (visible size field).
+    REQUIRE(m_far > 1.35 * m_near);
 }
 
 TEST_CASE("pipeline graded with feature_refine notes feature blocks") {

@@ -4,6 +4,7 @@
 // Closest-point projection onto a triangle surface, boundary conformity
 // metrics, and Jacobian-safe limited surface snap for Cartesian fills.
 
+#include "geom/features.hpp"
 #include "geom/tri_surface.hpp"
 
 #include <Eigen/Core>
@@ -11,6 +12,7 @@
 #include <cstdint>
 #include <functional>
 #include <set>
+#include <span>
 #include <vector>
 
 namespace polymesh::mesh {
@@ -51,12 +53,17 @@ using CollectOffendersFn = std::function<void(std::set<std::uint32_t>& offenders
 ///
 /// @param h Characteristic lattice size (metres) — caps travel.
 /// @param max_move_frac Max |Δ| / h per node across all passes (default 0.75;
-///        raised from 0.55 so curved walls/cylinders can leave the stair-case).
+///        product paths often pass 1.0–1.15 so LEB mid-edges leave the stair).
 /// @param passes Number of incremental projection passes (default 4).
+/// @param feature_edges Optional sharp CAD edges: true crease nodes (as close
+///        to a feature as to the surface) project to the edge first; free-face
+///        / hole-wall nodes still project to the surface.
 SnapStats snap_boundary_nodes(const geom::TriSurface& surface,
                               std::vector<Eigen::Vector3d>& nodes,
                               const std::vector<std::uint32_t>& boundary_nodes, double h,
                               const CollectOffendersFn& collect_offenders,
-                              double max_move_frac = 0.75, int passes = 4);
+                              double max_move_frac = 0.75, int passes = 4,
+                              std::span<const geom::SharpEdge> feature_edges = {});
 
 } // namespace polymesh::mesh
+

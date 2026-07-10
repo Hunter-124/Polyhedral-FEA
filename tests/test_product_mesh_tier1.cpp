@@ -171,7 +171,7 @@ TEST_CASE("E4 product mesh: slender box SolveJob finishes with finite stress") {
     REQUIRE(result->volume_mesh.elements.size() >= 4);
 }
 
-TEST_CASE("E4 product mesh: public cylinder_prism smoke (mesh+solve, not Lamé tol)") {
+TEST_CASE("E4 product mesh: public cylinder_prism smoke (mesh+solve, not Lame tol)") {
     // Product tet mesh on published fixture. Stair-cased grid fill cannot meet
     // Lamé analytical tolerance — assert solve + finite stress only.
     const std::filesystem::path geom = "bench/geometries/public/cylinder_prism.stl";

@@ -17,7 +17,14 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
+// On Windows, glad owns GL symbols — keep GLFW from including system gl.h.
+#if defined(_WIN32)
+#define GLFW_INCLUDE_NONE
+#endif
 #include <GLFW/glfw3.h>
+#if defined(_WIN32)
+#include <glad/glad.h>
+#endif
 
 #include <algorithm>
 #include <cctype>
@@ -52,15 +59,15 @@ struct App {
     std::optional<Model> model;
     SimSetup setup = [] {
         // Product defaults: hybrid zoo + light adaptive loop (η-target stop).
-        // Graded tet is 2:1 (bulk≈h, fine≈h/2); keep skin thin and p-elev opt-in
-        // so interactive mesh/solve stays under RAM.
+        // Graded multi-level LEB: L0 bulk / L1 features / L2 high-κ. Thin parts
+        // skip free-surface flood when feature grading is on. p-elev opt-in.
         SimSetup s;
         s.mesher = VolumeMesher::kHybrid;
         s.adapt_passes = 2;
         s.eta_target = 0.12;
         s.adapt_leb_waves = 2;
-        s.use_feature_grading = true; // curvature/thin-wall → fine bands near features
-        s.skin_layers = 2;            // free-surface fine depth (capped on thin parts)
+        s.use_feature_grading = true; // curvature/thin-wall → L1/L2 near features
+        s.skin_layers = 1;            // free-surface depth (0 on thin+feature path)
         s.p_elevate = false;          // auto on adapt when mesh is under node budget
         return s;
     }();
@@ -228,7 +235,8 @@ void draw_study_panel(App& app) {
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip(
                 "hybrid zoo (default): hex bulk + pyramid skin → all-pyramid FE.\n"
-                "graded tet: LEB-conforming size grading. octa: experimental BCC.\n"
+                "graded tet: multi-level LEB (bulk / feature / high-κ) size field.\n"
+                "octa: experimental BCC (budget-capped; not product).\n"
                 "Cartesian lattice + surface snap (ADR-0015) — not CAD-fitted Delaunay.");
         }
     }
@@ -750,6 +758,12 @@ int run(int argc, char** argv) {
     glfwSetWindowSizeLimits(window, 960, 640, GLFW_DONT_CARE, GLFW_DONT_CARE);
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);
+#if defined(_WIN32)
+    if (gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress)) == 0) {
+        std::fprintf(stderr, "glad: failed to load OpenGL\n");
+        return 1;
+    }
+#endif
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();

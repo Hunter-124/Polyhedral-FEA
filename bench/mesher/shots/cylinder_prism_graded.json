@@ -1,0 +1,28 @@
+{
+  "nodes": 7608,
+  "elems": 37278,
+  "h": 0.061859,
+  "snap_max": 0.0407,
+  "notes": [
+    "auto h=0.06186 m (extent/16\u2229diag/28, n_sharp=24, min_feat=0.383 m, dens\u00d71.00, R\u03ba\u22480.504)",
+    "graded tet v5 (multi-level LEB geo): 37278 tets (1573 bulk, 1980 refined L1/L2, 640 feature, 240 seed), h_bulk=0.05882/h_L2~0.01471 m (L0/L1/L2), snap max|d|=0.0407 m mean|d|=0.00608 m, curv_seeds=39",
+    "wrote bench\\mesher\\shots\\cylinder_prism_graded.vtu"
+  ],
+  "ok": true,
+  "returncode": 0,
+  "wall_s": 0.6959751999966102,
+  "mesher": "graded",
+  "geometry": "bench\\geometries\\public\\cylinder_prism.stl",
+  "cmd": [
+    "polymesh.exe",
+    "mesh",
+    "bench\\geometries\\public\\cylinder_prism.stl",
+    "-o",
+    "bench\\mesher\\shots\\cylinder_prism_graded.vtu",
+    "--mesher",
+    "graded",
+    "--feature"
+  ],
+  "stdout": "mesh: 7608 nodes, 37278 elems, h=0.061859 m\nauto h=0.06186 m (extent/16\u2229diag/28, n_sharp=24, min_feat=0.383 m, dens\u00d71.00, R\u03ba\u22480.504)\ngraded tet v5 (multi-level LEB geo): 37278 tets (1573 bulk, 1980 refined L1/L2, 640 feature, 240 seed), h_bulk=0.05882/h_L2~0.01471 m (L0/L1/L2), snap max|d|=0.0407 m mean|d|=0.00608 m, curv_seeds=39\nwrote bench\\mesher\\shots\\cylinder_prism_graded.vtu\n\n",
+  "png": false
+}

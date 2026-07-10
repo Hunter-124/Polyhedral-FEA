@@ -10,6 +10,7 @@
 #include <Eigen/Core>
 
 #include <cstdint>
+#include <limits>
 #include <span>
 #include <utility>
 #include <vector>
@@ -31,5 +32,14 @@ std::vector<SharpEdge> detect_sharp_edges(const TriSurface& surface,
 /// Distance from point to closest sharp edge segment (metres). Large if none.
 double distance_to_features(const Eigen::Vector3d& p, const TriSurface& surface,
                             std::span<const SharpEdge> edges);
+
+/// Closest point on any sharp-edge segment (for edge-aware snap).
+struct ClosestOnFeature {
+    Eigen::Vector3d point = Eigen::Vector3d::Zero();
+    double distance = std::numeric_limits<double>::infinity();
+};
+
+ClosestOnFeature closest_on_features(const Eigen::Vector3d& p, const TriSurface& surface,
+                                     std::span<const SharpEdge> edges);
 
 } // namespace polymesh::geom

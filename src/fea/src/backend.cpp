@@ -73,7 +73,12 @@ void init_runtime_performance() {
         // solves never nest OpenMP — avoids deadlocks when ctest -j N runs many
         // processes each with OMP_NUM_THREADS=hw_cores.
         Eigen::setNbThreads(1);
+        // OpenMP 3.0+ API; MSVC ships OpenMP 2.0 only (omp_set_nested).
+#if defined(_OPENMP) && _OPENMP >= 200805
         omp_set_max_active_levels(1);
+#else
+        omp_set_nested(0);
+#endif
 #else
         Eigen::setNbThreads(1);
 #endif

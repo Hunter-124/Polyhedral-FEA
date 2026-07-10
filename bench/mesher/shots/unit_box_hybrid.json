@@ -1,0 +1,28 @@
+{
+  "nodes": 10745,
+  "elems": 29478,
+  "h": 0.061859,
+  "snap_max": 2.48e-16,
+  "notes": [
+    "auto h=0.06186 m (extent/16\u2229diag/28, n_sharp=12, min_feat=1 m, dens\u00d71.00, R\u03ba\u22480.424)",
+    "hybrid zoo v2 (hex bulk + pyramid skin \u2192 all-pyramid FE; not Delaunay): 2197 lattice hex + 16296 skin pyr \u2192 29478 pyramid5, 10745 nodes, h=0.05882 m, snap max|d|=2.48e-16 m, feature_skin_cells=208",
+    "wrote bench\\mesher\\shots\\unit_box_hybrid.vtu"
+  ],
+  "ok": true,
+  "returncode": 0,
+  "wall_s": 0.23774489999050274,
+  "mesher": "hybrid",
+  "geometry": "bench\\geometries\\public\\unit_box.stl",
+  "cmd": [
+    "polymesh.exe",
+    "mesh",
+    "bench\\geometries\\public\\unit_box.stl",
+    "-o",
+    "bench\\mesher\\shots\\unit_box_hybrid.vtu",
+    "--mesher",
+    "hybrid",
+    "--feature"
+  ],
+  "stdout": "mesh: 10745 nodes, 29478 elems, h=0.061859 m\nauto h=0.06186 m (extent/16\u2229diag/28, n_sharp=12, min_feat=1 m, dens\u00d71.00, R\u03ba\u22480.424)\nhybrid zoo v2 (hex bulk + pyramid skin \u2192 all-pyramid FE; not Delaunay): 2197 lattice hex + 16296 skin pyr \u2192 29478 pyramid5, 10745 nodes, h=0.05882 m, snap max|d|=2.48e-16 m, feature_skin_cells=208\nwrote bench\\mesher\\shots\\unit_box_hybrid.vtu\n\n",
+  "png": false
+}

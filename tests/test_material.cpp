@@ -9,7 +9,7 @@
 
 using polymesh::fea::Material;
 
-TEST_CASE("d matrix matches Lamé constants") {
+TEST_CASE("d matrix matches Lame constants") {
     // Steel-ish: E = 200 GPa, nu = 0.3.
     const Material m{.youngs_modulus = 200e9, .poissons_ratio = 0.3};
     const auto d = m.d_matrix();

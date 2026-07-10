@@ -123,3 +123,21 @@ TEST_CASE("hybrid zoo cylinder_prism smoke: pyramid FE + snap") {
     }
     REQUIRE(has_pyr);
 }
+
+TEST_CASE("hybrid zoo 2:1 size adaptivity on feature band") {
+    // Open box with a sharp crease band: feature grading must refine to h/2.
+    auto model = pipeline::Model::load("bench/geometries/public/cylinder_prism.stl");
+    const double h = 0.15 * (model.bbox_max - model.bbox_min).maxCoeff();
+    auto plain = mixed_fill_surface(model.surface, model.bbox_min, model.bbox_max, h,
+                                    /*skin=*/1, {}, 0.0, {}, 0.0, /*snap=*/false);
+    auto edges = polymesh::geom::detect_sharp_edges(model.surface, 30.0);
+    REQUIRE_FALSE(edges.empty());
+    auto graded = mixed_fill_surface(model.surface, model.bbox_min, model.bbox_max, h,
+                                     /*skin=*/1, edges, 2.0 * h, {}, 0.0,
+                                     /*snap=*/false);
+    REQUIRE(graded.n_fine_cells > 0);
+    REQUIRE(graded.n_transition_cells > 0);
+    REQUIRE(graded.h_fine == Catch::Approx(0.5 * graded.h).margin(1e-9));
+    // Fine path should produce more cells than plain (2×2×2 in feature bands).
+    REQUIRE(graded.cells.size() > plain.cells.size());
+}

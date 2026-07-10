@@ -77,10 +77,30 @@ std::vector<SharpEdge> detect_sharp_edges(const TriSurface& surface, double shar
 
 double distance_to_features(const Eigen::Vector3d& p, const TriSurface& surface,
                             std::span<const SharpEdge> edges) {
-    double best = std::numeric_limits<double>::infinity();
+    return closest_on_features(p, surface, edges).distance;
+}
+
+ClosestOnFeature closest_on_features(const Eigen::Vector3d& p, const TriSurface& surface,
+                                     std::span<const SharpEdge> edges) {
+    ClosestOnFeature best;
     for (const auto& e : edges) {
-        best = std::min(
-            best, point_segment_distance(p, surface.vertices[e.v0], surface.vertices[e.v1]));
+        if (e.v0 >= surface.vertices.size() || e.v1 >= surface.vertices.size()) {
+            continue;
+        }
+        const Eigen::Vector3d& a = surface.vertices[e.v0];
+        const Eigen::Vector3d& b = surface.vertices[e.v1];
+        const Eigen::Vector3d ab = b - a;
+        const double denom = ab.squaredNorm();
+        Eigen::Vector3d q = a;
+        if (denom > 0.0) {
+            const double t = std::clamp((p - a).dot(ab) / denom, 0.0, 1.0);
+            q = a + t * ab;
+        }
+        const double d = (p - q).norm();
+        if (d < best.distance) {
+            best.distance = d;
+            best.point = q;
+        }
     }
     return best;
 }

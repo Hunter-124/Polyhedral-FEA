@@ -5,8 +5,10 @@
 //
 // Cartesian classification by distance-to-boundary (+ optional feature /
 // curvature bands):
-//   • bulk (deep)     → hex8
-//   • skin / feature  → 6× pyramid5 per cell (apex at cell centre)
+//   • bulk (deep)          → hex8 at h
+//   • feature / seed fine  → 2×2×2 hex8 at h/2 (true size adaptivity)
+//   • 2:1 interface        → pyramid5 transition (mid-face nodes, no hanging)
+//   • plain free-surface   → pyramid5 skin at h (when no geo drivers)
 //
 // Product FE path expands remaining hex → pyramids (ADR-0013) so the solve
 // mesh is all-pyramid with matching face diagonals (constant-strain exact).
@@ -37,16 +39,20 @@ struct MixedFillOutput {
     std::vector<Eigen::Vector3d> nodes; // metres
     std::vector<MixedCell> cells;
     std::vector<std::array<std::uint32_t, 4>> boundary_quads;
-    double h = 0.0;
+    double h = 0.0;       // bulk cell edge (metres)
+    double h_fine = 0.0;  // fine cell edge when 2:1 active (≈ h/2), else = h
     std::size_t n_hex = 0;
     std::size_t n_pyramid = 0;
     std::size_t n_tet = 0;
     double boundary_max_distance = 0.0;
     int skin_layers = 0;
     std::size_t n_feature_skin_cells = 0;
+    std::size_t n_fine_cells = 0;       // coarse cells refined to 2×2×2
+    std::size_t n_transition_cells = 0; // 2:1 interface pyramid cells
 };
 
-/// Hybrid zoo: hex bulk + pyramid skin. `skin_layers` ≥ 1.
+/// Hybrid zoo: hex bulk + optional 2:1 feature fine + pyramid skin/transition.
+/// `skin_layers` ≥ 1 (used only when no feature/seed drivers).
 MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                                    const Eigen::Vector3d& bbox_min,
                                    const Eigen::Vector3d& bbox_max, double h,

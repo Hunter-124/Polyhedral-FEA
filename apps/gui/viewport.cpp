@@ -4,9 +4,15 @@
 #include "fea/nodal_mesh.hpp"
 #include "theme.hpp"
 
+// OpenGL 3.3 core for offscreen FBO + shaders.
+// Windows: glad (system opengl32 is 1.1 only). Elsewhere: GLEXT prototypes.
+#if defined(_WIN32)
+#include <glad/glad.h>
+#else
 #define GL_GLEXT_PROTOTYPES
 #include <GL/gl.h>
 #include <GL/glext.h>
+#endif
 
 #include <Eigen/Geometry>
 

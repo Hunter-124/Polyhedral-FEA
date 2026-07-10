@@ -65,7 +65,13 @@ OctaFillOutput octa_fill_surface(const geom::TriSurface& surface,
     if (!(h > 0.0) || !std::isfinite(h)) {
         throw ValidityError("octa_fill_surface: h must be positive");
     }
-    const CartesianGrid grid = make_bbox_grid(bbox_min, bbox_max, h);
+    // Experimental path: hard cell budget so auto-h never builds multi-million
+    // tet floods (product GUI must stay interactive).
+    constexpr std::size_t kOctaMaxCells = 24 * 1024;
+    const double h_budget =
+        min_h_for_cell_budget(bbox_min, bbox_max, kOctaMaxCells, /*subdivision=*/1);
+    const double h_use = (h_budget > 0.0) ? std::max(h, h_budget) : h;
+    const CartesianGrid grid = make_bbox_grid(bbox_min, bbox_max, h_use);
     const auto inside = classify_cells_inside(surface, grid);
     const int nx = grid.nx, ny = grid.ny, nz = grid.nz;
     const auto idx = [&](int i, int j, int k) { return grid.index(i, j, k); };

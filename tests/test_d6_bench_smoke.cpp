@@ -6,11 +6,14 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <string>
 
 namespace {
+
+namespace fs = std::filesystem;
 
 std::string slurp(const std::string& path) {
     std::ifstream in(path);
@@ -22,24 +25,47 @@ std::string slurp(const std::string& path) {
 
 int run_cmd(const std::string& cmd) { return std::system(cmd.c_str()); }
 
+// Prefer python3, fall back to python (common on Windows installs).
+const char* python_exe() {
+#if defined(_WIN32)
+    // WindowsApps python3 may be a stub; prefer a real `python` if present.
+    if (std::system("python -c \"import sys\" >nul 2>&1") == 0) {
+        return "python";
+    }
+    return "python3";
+#else
+    return "python3";
+#endif
+}
+
+std::string temp_out_path(const char* name) {
+    const fs::path p = fs::temp_directory_path() / name;
+    return p.string();
+}
+
 } // namespace
 
 TEST_CASE("D6 run_tier3.py --help exits 0") {
     // Working directory is repo root (catch_discover_tests WORKING_DIRECTORY).
-    const int rc =
-        run_cmd("python3 bench/d6/run_tier3.py --help > /tmp/polymesh_d6_help.txt 2>&1");
+    const std::string out_path = temp_out_path("polymesh_d6_help.txt");
+    const std::string cmd =
+        std::string(python_exe()) + " bench/d6/run_tier3.py --help > \"" + out_path + "\" 2>&1";
+    const int rc = run_cmd(cmd);
     REQUIRE(rc == 0);
-    const auto out = slurp("/tmp/polymesh_d6_help.txt");
+    const auto out = slurp(out_path);
     REQUIRE(out.find("D6") != std::string::npos);
     REQUIRE(out.find("--quick") != std::string::npos);
     REQUIRE(out.find("--full") != std::string::npos);
 }
 
 TEST_CASE("D6 run_tier3.py --dry-run prints artifact paths") {
-    const int rc =
-        run_cmd("python3 bench/d6/run_tier3.py --dry-run > /tmp/polymesh_d6_dry.txt 2>&1");
+    const std::string out_path = temp_out_path("polymesh_d6_dry.txt");
+    const std::string cmd =
+        std::string(python_exe()) + " bench/d6/run_tier3.py --dry-run > \"" + out_path +
+        "\" 2>&1";
+    const int rc = run_cmd(cmd);
     REQUIRE(rc == 0);
-    const auto out = slurp("/tmp/polymesh_d6_dry.txt");
+    const auto out = slurp(out_path);
     REQUIRE(out.find("polymesh-d6-l-domain") != std::string::npos);
 }
 

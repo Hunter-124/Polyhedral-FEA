@@ -58,7 +58,7 @@ double patch_max_error(const fea::NodalMesh& mesh) {
 
 } // namespace
 
-TEST_CASE("D3: promote pure tet4 lattice → all tet10; nodes grow; patch < 1e-12") {
+TEST_CASE("D3: promote pure tet4 lattice to all tet10; nodes grow; patch < 1e-12") {
     auto mesh = box_tet_mesh(2, 2, 2, {1.0, 0.8, 1.2});
     const auto n_lin = mesh.nodes.size();
     const auto n_el = mesh.elements.size();
@@ -96,7 +96,7 @@ TEST_CASE("D3: promote pure tet4 lattice → all tet10; nodes grow; patch < 1e-1
     CHECK(patch_max_error(mesh) < 1e-12);
 }
 
-TEST_CASE("D3: promote pure hex8 lattice → all hex20; patch < 1e-12") {
+TEST_CASE("D3: promote pure hex8 lattice to all hex20; patch < 1e-12") {
     auto mesh = box_hex_mesh(2, 2, 2, {1.0, 0.8, 1.2});
     const auto n_lin = mesh.nodes.size();
     const auto n_el = mesh.elements.size();
@@ -125,7 +125,7 @@ TEST_CASE("D3: selective p_elevate leaves unlisted tet4 linear") {
     REQUIRE(mesh.elements[3].type == fea::ElementType::kTet4);
 }
 
-TEST_CASE("D3: mark_smooth is complement of Dörfler") {
+TEST_CASE("D3: mark_smooth is complement of Doerfler") {
     // Synthetic η: a few large, many small.
     std::vector<double> eta{1.0, 0.9, 0.1, 0.05, 0.02, 0.01};
     const auto high = polymesh::adapt::dorfler_mark(eta, 0.3);
@@ -144,7 +144,7 @@ TEST_CASE("D3: mark_smooth is complement of Dörfler") {
     REQUIRE(all.size() == eta.size());
 }
 
-TEST_CASE("D3: mark_smooth all when total η² is zero") {
+TEST_CASE("D3: mark_smooth all when total eta^2 is zero") {
     const std::vector<double> eta{0.0, 0.0, 0.0};
     const auto smooth = polymesh::adapt::mark_smooth(eta, 0.3);
     REQUIRE(smooth.size() == 3);

@@ -1,0 +1,28 @@
+{
+  "nodes": 7480,
+  "elems": 6048,
+  "h": 2.41981,
+  "snap_max": 9.18e-12,
+  "notes": [
+    "auto h=2.42 m (extent/16\u2229diag/28, n_sharp=206, min_feat=38.1 m, dens\u00d70.88, R\u03ba\u22489.68)",
+    "hex grid fill v1 (Cartesian, not CAD-fitted): 6048 cells, 7480 nodes, h=2.419 m, snap max|d|=9.18e-12 m",
+    "wrote bench\\mesher\\shots\\test_hex.vtu"
+  ],
+  "ok": true,
+  "returncode": 0,
+  "wall_s": 0.3210506000032183,
+  "mesher": "hex",
+  "geometry": "tests\\fixtures\\test.stl",
+  "cmd": [
+    "polymesh.exe",
+    "mesh",
+    "tests\\fixtures\\test.stl",
+    "-o",
+    "bench\\mesher\\shots\\test_hex.vtu",
+    "--mesher",
+    "hex",
+    "--feature"
+  ],
+  "stdout": "mesh: 7480 nodes, 6048 elems, h=2.41981 m\nauto h=2.42 m (extent/16\u2229diag/28, n_sharp=206, min_feat=38.1 m, dens\u00d70.88, R\u03ba\u22489.68)\nhex grid fill v1 (Cartesian, not CAD-fitted): 6048 cells, 7480 nodes, h=2.419 m, snap max|d|=9.18e-12 m\nwrote bench\\mesher\\shots\\test_hex.vtu\n\n",
+  "png": false
+}

@@ -4,9 +4,9 @@
 **Master plan:** [`docs/ROADMAP.md`](ROADMAP.md) · **Agent loop:**
 [`docs/process/agent-loop.md`](process/agent-loop.md)
 
-**Active:** Track A (GUI usable) → M1 study app. Solver core (GATE 1) frozen.
-Mesh/adapt product path advancing (graded, hexpyr, prism, seed remesh, local LEB).
-F1–F3 + E1–E4 + B* + C1–C5 + D1–D6 + G1–G4 done.
+**Active:** Nearly all ROADMAP tracks closed on master. **123 tests** green.
+Remaining owner-facing gate: **A9** theme polish ⛔ GATE 6.5. Product mesh is still
+Cartesian-grid limited (ADR-0015); true Delaunay / full product-mesh Tier-1 remain open R&D.
 
 GATE 1 deliverables ready:
 - Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)

@@ -12,6 +12,7 @@ add_executable(polymesh_tests
     test_tier0.cpp
     test_cantilever.cpp
     test_mms_convergence.cpp
+    test_lame_cylinder.cpp
     support/structured_mesh.cpp
     support/mms.cpp
 )
@@ -21,4 +22,5 @@ target_link_libraries(polymesh_tests
 )
 
 include(Catch)
-catch_discover_tests(polymesh_tests)
+# Working directory = repo root so the bench harness can load bench/reference/.
+catch_discover_tests(polymesh_tests WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

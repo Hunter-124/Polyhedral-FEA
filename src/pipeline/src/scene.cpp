@@ -155,8 +155,7 @@ Model Model::load(const std::string& path, double sharp_angle_deg) {
 
 VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                              int skin_layers, bool feature_refine,
-                             std::span<const Eigen::Vector3d> refine_seeds,
-                             double seed_band) {
+                             std::span<const Eigen::Vector3d> refine_seeds, double seed_band) {
     VolumeMeshOutput out;
     double fill_h = h;
     if (mesher == VolumeMesher::kHexFill || mesher == VolumeMesher::kHexVem) {
@@ -335,14 +334,15 @@ void SolveJob::start_mesh(const Model& model, const SimSetup& setup) {
                 if (!edges.empty()) {
                     const auto field =
                         adapt::make_feature_sizing(h * 0.5, h, 2.0 * h, model.surface, edges);
-                    h_use = std::min(h_use, field->size_at(0.5 * (model.bbox_min + model.bbox_max)));
+                    h_use = std::min(h_use,
+                                     field->size_at(0.5 * (model.bbox_min + model.bbox_max)));
                 }
             }
             mesh_only_ = volume_mesh(model, h_use, setup.mesher, setup.skin_layers,
                                      setup.use_feature_grading);
             set_status(std::format("mesh ready — {} elems, {} nodes | {}",
-                                   mesh_only_.mesh.elements.size(), mesh_only_.mesh.nodes.size(),
-                                   mesh_only_.mesher_note));
+                                   mesh_only_.mesh.elements.size(),
+                                   mesh_only_.mesh.nodes.size(), mesh_only_.mesher_note));
             state_ = State::kMeshDone;
         } catch (const std::exception& e) {
             set_status(std::format("mesh failed: {}", e.what()));
@@ -359,7 +359,8 @@ void fill_result_fields(SolveResult& r, const fea::ZzRecovery& zz, const Eigen::
     const auto n_nodes = r.volume_mesh.nodes.size();
     r.nodal_eta.assign(n_nodes, 0.0);
     std::vector<int> counts(n_nodes, 0);
-    for (std::size_t e = 0; e < r.volume_mesh.elements.size() && e < zz.element_eta.size(); ++e) {
+    for (std::size_t e = 0; e < r.volume_mesh.elements.size() && e < zz.element_eta.size();
+         ++e) {
         for (auto n : r.volume_mesh.elements[e].nodes) {
             r.nodal_eta[n] += zz.element_eta[e];
             ++counts[n];
@@ -407,8 +408,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     // available for local queries; meshers still take scalar h).
                     const auto field =
                         adapt::make_feature_sizing(h * 0.5, h, 2.0 * h, model.surface, edges);
-                    const Eigen::Vector3d mid =
-                        0.5 * (model.bbox_min + model.bbox_max);
+                    const Eigen::Vector3d mid = 0.5 * (model.bbox_min + model.bbox_max);
                     h_use = std::min(h_use, field->size_at(mid));
                     // Sample bbox corners (feature-rich on CAD boxes).
                     for (int mask = 0; mask < 8; ++mask) {
@@ -515,9 +515,9 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     continue;
                 }
                 SolveResult r;
-                r.mesh_note = std::format("{} | adapt_passes={} h={:.4g} seeds={}",
-                                          vol.mesher_note, setup.adapt_passes, h_use,
-                                          adapt_seeds.size());
+                r.mesh_note =
+                    std::format("{} | adapt_passes={} h={:.4g} seeds={}", vol.mesher_note,
+                                setup.adapt_passes, h_use, adapt_seeds.size());
                 r.volume_mesh = std::move(vol.mesh);
                 r.boundary_quads = std::move(vol.boundary_quads);
                 fill_result_fields(r, zz_try, u_try);
@@ -552,8 +552,6 @@ std::optional<VolumeMeshOutput> SolveJob::take_mesh() {
     return std::move(mesh_only_);
 }
 
-SolveJob::~SolveJob() {
-    join_worker();
-}
+SolveJob::~SolveJob() { join_worker(); }
 
 } // namespace polymesh::pipeline

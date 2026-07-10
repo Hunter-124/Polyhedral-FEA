@@ -29,9 +29,9 @@ struct AdaptSuggestion {
 
 /// Centroids of Dörfler-marked elements. `element_centroids` must align with
 /// `element_eta` (one entry per mesh element).
-std::vector<Eigen::Vector3d> marked_centroids(
-    std::span<const Eigen::Vector3d> element_centroids,
-    const std::vector<double>& element_eta, double theta = 0.3);
+std::vector<Eigen::Vector3d>
+marked_centroids(std::span<const Eigen::Vector3d> element_centroids,
+                 const std::vector<double>& element_eta, double theta = 0.3);
 
 /// From current element η and current h, produce refined uniform size.
 /// Marked fraction / counts come from Dörfler; seeds are empty.

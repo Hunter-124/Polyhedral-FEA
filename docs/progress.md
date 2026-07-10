@@ -17,6 +17,7 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: CI green again — clang-format 18.1.8 pinned in workflow (was drift vs local), full tree reformat; rename `namespace pipe` alias in test_transition_fill (POSIX `pipe()` collision on Ubuntu).
 - 2026-07-10: Master ROADMAP + agent-loop protocol; GUI M1 path — argv open,
   mesh-only job + element-type preview, ZZ error field + colorbar, failure
   dismiss, public `unit_box.stl` fixture. (in progress / this commit)

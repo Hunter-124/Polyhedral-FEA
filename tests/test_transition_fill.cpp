@@ -9,7 +9,7 @@
 
 using namespace polymesh::mesh;
 namespace fea = polymesh::fea;
-namespace pipe = polymesh::pipeline;
+namespace pipeline = polymesh::pipeline;
 
 namespace {
 polymesh::geom::TriSurface box() {
@@ -43,24 +43,24 @@ TEST_CASE("transition fill snap reduces boundary distance vs no-snap") {
     REQUIRE(raw.n_hex == snapped.n_hex);
     REQUIRE(raw.n_pyramid == snapped.n_pyramid);
     // Snapped mesh remains valid through the pipeline.
-    pipe::Model m;
+    pipeline::Model m;
     m.surface = surf;
     m.bbox_min = bmin;
     m.bbox_max = bmax;
     m.triangle_region.assign(12, 0);
     m.region_count = 1;
-    auto vol = pipe::volume_mesh(m, 0.2, pipe::VolumeMesher::kHexPyramid, 2);
+    auto vol = pipeline::volume_mesh(m, 0.2, pipeline::VolumeMesher::kHexPyramid, 2);
     REQUIRE_NOTHROW(vol.mesh.check_validity());
 }
 
 TEST_CASE("hex+pyramid mesh solves linear elasticity") {
-    pipe::Model m;
+    pipeline::Model m;
     m.surface = box();
     m.bbox_min = {-0.01, -0.01, -0.01};
     m.bbox_max = {1.01, 1.01, 1.01};
     m.triangle_region.assign(12, 0);
     m.region_count = 1;
-    auto vol = pipe::volume_mesh(m, 0.2, pipe::VolumeMesher::kHexPyramid, 2);
+    auto vol = pipeline::volume_mesh(m, 0.2, pipeline::VolumeMesher::kHexPyramid, 2);
     REQUIRE_FALSE(vol.mesh.elements.empty());
     bool has_hex = false, has_pyr = false;
     for (const auto& e : vol.mesh.elements) {

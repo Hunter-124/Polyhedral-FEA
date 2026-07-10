@@ -23,24 +23,23 @@
 namespace {
 
 int usage() {
-    std::fputs(
-        "usage: polymesh <command> [args]\n"
-        "\n"
-        "commands:\n"
-        "  check <file.stl|.step>     validate surface geometry\n"
-        "  mesh  <file> [-h m] [-o out.vtu] [--mesher name] [--skin n] [--feature]\n"
-        "                             volume mesh; optional VTU write\n"
-        "  solve <file> -o out.vtu [-h m] [-E Pa] [-nu r]\n"
-        "              [--mesher name] [--skin n] [--feature] [--adapt n]\n"
-        "                             mesh + cantilever-style BCs + VTU\n"
-        "                             (fix min-x face nodes, load +Fy on max-x)\n"
-        "  backend                    print compute backend\n"
-        "\n"
-        "mesher names: tet (default), hex, hexvem|vem, graded, hexpyr|transition\n"
-        "--skin n: graded-tet fine skin layers (default 2)\n"
-        "--feature: refine graded mesh near sharp edges (default off in CLI)\n"
-        "--adapt n: ZZ→Dörfler remesh passes (local seeds on graded path)\n",
-        stderr);
+    std::fputs("usage: polymesh <command> [args]\n"
+               "\n"
+               "commands:\n"
+               "  check <file.stl|.step>     validate surface geometry\n"
+               "  mesh  <file> [-h m] [-o out.vtu] [--mesher name] [--skin n] [--feature]\n"
+               "                             volume mesh; optional VTU write\n"
+               "  solve <file> -o out.vtu [-h m] [-E Pa] [-nu r]\n"
+               "              [--mesher name] [--skin n] [--feature] [--adapt n]\n"
+               "                             mesh + cantilever-style BCs + VTU\n"
+               "                             (fix min-x face nodes, load +Fy on max-x)\n"
+               "  backend                    print compute backend\n"
+               "\n"
+               "mesher names: tet (default), hex, hexvem|vem, graded, hexpyr|transition\n"
+               "--skin n: graded-tet fine skin layers (default 2)\n"
+               "--feature: refine graded mesh near sharp edges (default off in CLI)\n"
+               "--adapt n: ZZ→Dörfler remesh passes (local seeds on graded path)\n",
+               stderr);
     return 2;
 }
 

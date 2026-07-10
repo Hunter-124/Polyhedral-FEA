@@ -7,9 +7,9 @@
 
 namespace polymesh::adapt {
 
-std::vector<Eigen::Vector3d> marked_centroids(
-    std::span<const Eigen::Vector3d> element_centroids,
-    const std::vector<double>& element_eta, double theta) {
+std::vector<Eigen::Vector3d>
+marked_centroids(std::span<const Eigen::Vector3d> element_centroids,
+                 const std::vector<double>& element_eta, double theta) {
     if (element_centroids.size() != element_eta.size()) {
         throw std::invalid_argument("marked_centroids: size mismatch");
     }
@@ -52,8 +52,8 @@ AdaptSuggestion suggest_refine(std::span<const Eigen::Vector3d> element_centroid
     }
     s.refine_seeds = marked_centroids(element_centroids, element_eta, theta);
     s.n_marked = s.refine_seeds.size();
-    s.marked_fraction = static_cast<double>(s.n_marked) /
-                        static_cast<double>(element_centroids.size());
+    s.marked_fraction =
+        static_cast<double>(s.n_marked) / static_cast<double>(element_centroids.size());
     s.seed_band = 1.5 * h_current;
     return s;
 }

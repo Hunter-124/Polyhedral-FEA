@@ -128,8 +128,7 @@ std::vector<QuadraturePoint> pyramid_rule() {
             for (std::size_t it = 0; it < g.nodes.size(); ++it) {
                 const double s = g.nodes[is];
                 const double t = g.nodes[it];
-                const double w =
-                    g.weights[iz] * g.weights[is] * g.weights[it] * a2;
+                const double w = g.weights[iz] * g.weights[is] * g.weights[it] * a2;
                 rule.push_back({{a * s, a * t, z}, w});
             }
         }

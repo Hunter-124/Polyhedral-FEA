@@ -99,10 +99,10 @@ void draw_study_panel(App& app) {
         app.setup.mesh_size = h_mm / 1e3;
     }
     {
-        int m = app.setup.mesher == VolumeMesher::kHexFill ? 1 : 0;
-        static const char* kMeshers[] = {"tet fill", "hex fill"};
-        if (iw::selector("mesher", &m, kMeshers, 2)) {
-            app.setup.mesher = m == 1 ? VolumeMesher::kHexFill : VolumeMesher::kTetFill;
+        int m = static_cast<int>(app.setup.mesher);
+        static const char* kMeshers[] = {"tet fill", "hex fill", "hex VEM"};
+        if (iw::selector("mesher", &m, kMeshers, 3)) {
+            app.setup.mesher = static_cast<VolumeMesher>(m);
         }
     }
     {

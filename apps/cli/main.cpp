@@ -63,11 +63,21 @@ int cmd_mesh(std::span<char*> args) {
     const std::string path = args[2];
     double h = 0.0;
     std::string out_path;
+    auto mesher = polymesh::pipeline::VolumeMesher::kTetFill;
     for (std::size_t i = 3; i < args.size(); ++i) {
         if (std::strcmp(args[i], "-h") == 0 && i + 1 < args.size()) {
             h = std::atof(args[++i]);
         } else if (std::strcmp(args[i], "-o") == 0 && i + 1 < args.size()) {
             out_path = args[++i];
+        } else if (std::strcmp(args[i], "--mesher") == 0 && i + 1 < args.size()) {
+            const std::string m = args[++i];
+            if (m == "hex") {
+                mesher = polymesh::pipeline::VolumeMesher::kHexFill;
+            } else if (m == "hexvem" || m == "vem") {
+                mesher = polymesh::pipeline::VolumeMesher::kHexVem;
+            } else {
+                mesher = polymesh::pipeline::VolumeMesher::kTetFill;
+            }
         } else {
             return usage();
         }
@@ -77,19 +87,12 @@ int cmd_mesh(std::span<char*> args) {
     if (h <= 0.0) {
         h = extent / 16.0;
     }
-    auto fill = polymesh::mesh::tet_fill_surface(model.surface, model.bbox_min, model.bbox_max,
-                                                 h, true);
-    polymesh::fea::NodalMesh mesh;
-    mesh.nodes = std::move(fill.nodes);
-    for (const auto& tet : fill.tets) {
-        mesh.elements.push_back(polymesh::fea::NodalElement{polymesh::fea::ElementType::kTet4,
-                                                            {tet[0], tet[1], tet[2], tet[3]}});
-    }
-    mesh.check_validity();
-    std::printf("mesh: %zu nodes, %zu tet4, h=%.6g m\n", mesh.nodes.size(),
-                mesh.elements.size(), h);
+    auto vol = polymesh::pipeline::volume_mesh(model, h, mesher);
+    vol.mesh.check_validity();
+    std::printf("mesh: %zu nodes, %zu elems, h=%.6g m\n%s\n", vol.mesh.nodes.size(),
+                vol.mesh.elements.size(), h, vol.mesher_note.c_str());
     if (!out_path.empty()) {
-        polymesh::fea::write_vtu(out_path, mesh);
+        polymesh::fea::write_vtu(out_path, vol.mesh);
         std::printf("wrote %s\n", out_path.c_str());
     }
     return 0;

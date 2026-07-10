@@ -8,6 +8,7 @@
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 
+#include <array>
 #include <format>
 #include <vector>
 
@@ -57,28 +58,28 @@ Eigen::MatrixXd element_stiffness(const NodalMesh& mesh, const NodalElement& ele
         cell.faces = element.faces;
         return vem_poly_stiffness(mesh, cell, material);
     }
-    // Pyramid: assemble as two tets (base split 0-1-2 / 0-2-3 + apex). Avoids
-    // fragile isoparametric Jacobians on skewed physical pyramids.
+    // Pyramid5: two tet4s (base diagonal 0-2 + apex). Flip-aware scatter keeps
+    // local DOF order consistent with the stiffness matrix. Hex8 stays true
+    // isoparametric trilinear (GATE 1 freeze). Hex–pyramid hybrid meshes are
+    // therefore piecewise-linear vs bilinear on shared faces — patch-test the
+    // pure-pyramid lattice; full hybrid constant-strain is deferred (ADR-0013).
     if (element.type == ElementType::kPyramid5 && element.nodes.size() == 5) {
-        NodalMesh tmp;
-        tmp.nodes = mesh.nodes;
         const auto& n = element.nodes;
-        auto tet_k = [&](std::uint32_t a, std::uint32_t b, std::uint32_t c, std::uint32_t d) {
-            NodalElement tet{ElementType::kTet4, {a, b, c, d}};
-            // Ensure positive volume.
-            const Eigen::Vector3d& pa = mesh.nodes[a];
-            const Eigen::Vector3d& pb = mesh.nodes[b];
-            const Eigen::Vector3d& pc = mesh.nodes[c];
-            const Eigen::Vector3d& pd = mesh.nodes[d];
-            const double vol = (pb - pa).dot((pc - pa).cross(pd - pa));
-            if (vol < 0.0) {
-                tet.nodes = {a, c, b, d};
-            }
-            return element_stiffness(mesh, tet, material);
-        };
-        // Map local tet DOFs into the 15 pyramid DOFs.
         Eigen::MatrixXd k = Eigen::MatrixXd::Zero(15, 15);
-        auto scatter = [&](const Eigen::MatrixXd& kt, const std::array<int, 4>& loc) {
+        auto add_tet = [&](std::array<int, 4> loc) {
+            std::array<std::uint32_t, 4> ids{
+                n[static_cast<std::size_t>(loc[0])], n[static_cast<std::size_t>(loc[1])],
+                n[static_cast<std::size_t>(loc[2])], n[static_cast<std::size_t>(loc[3])]};
+            const Eigen::Vector3d& pa = mesh.nodes[ids[0]];
+            const Eigen::Vector3d& pb = mesh.nodes[ids[1]];
+            const Eigen::Vector3d& pc = mesh.nodes[ids[2]];
+            const Eigen::Vector3d& pd = mesh.nodes[ids[3]];
+            if ((pb - pa).dot((pc - pa).cross(pd - pa)) < 0.0) {
+                std::swap(ids[1], ids[2]);
+                std::swap(loc[1], loc[2]);
+            }
+            NodalElement tet{ElementType::kTet4, {ids[0], ids[1], ids[2], ids[3]}};
+            const Eigen::MatrixXd kt = element_stiffness(mesh, tet, material);
             for (int a = 0; a < 4; ++a) {
                 for (int b = 0; b < 4; ++b) {
                     for (int i = 0; i < 3; ++i) {
@@ -91,9 +92,8 @@ Eigen::MatrixXd element_stiffness(const NodalMesh& mesh, const NodalElement& ele
                 }
             }
         };
-        // local indices: base 0,1,2,3 apex 4
-        scatter(tet_k(n[0], n[1], n[2], n[4]), {{0, 1, 2, 4}});
-        scatter(tet_k(n[0], n[2], n[3], n[4]), {{0, 2, 3, 4}});
+        add_tet({{0, 1, 2, 4}});
+        add_tet({{0, 2, 3, 4}});
         return k;
     }
     const auto x = element_coords(mesh, element);

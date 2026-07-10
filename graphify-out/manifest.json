@@ -220,9 +220,9 @@
     "semantic_hash": "f9fe559fd0bd1b4a5e0cc80b46151347"
   },
   "src/pipeline/src/scene.cpp": {
-    "mtime": 1783707679.0689182,
-    "ast_hash": "f597f4a654f19120568dc6ebf33b1d42",
-    "semantic_hash": "f597f4a654f19120568dc6ebf33b1d42"
+    "mtime": 1783713919.3268344,
+    "ast_hash": "36ea9d2911f9844d95f579c80b1cf7ec",
+    "semantic_hash": ""
   },
   "tests/support/mms.cpp": {
     "mtime": 1783690980.986312,
@@ -360,14 +360,14 @@
     "semantic_hash": "a101d75e7954c1b177686dcb9ab4175d"
   },
   "CONTRIBUTING.md": {
-    "mtime": 1783690980.9781146,
-    "ast_hash": "2de8d52be81e689a7a9ef87134f331e1",
-    "semantic_hash": "2de8d52be81e689a7a9ef87134f331e1"
+    "mtime": 1783709156.573332,
+    "ast_hash": "83a653829f3c34a54e2232641c5ba051",
+    "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1783705262.0080316,
-    "ast_hash": "d7e29d5eae3ca18f2237ed724d58b856",
-    "semantic_hash": "d7e29d5eae3ca18f2237ed724d58b856"
+    "mtime": 1783709173.2317927,
+    "ast_hash": "a536eba09440d97f727885f112274b38",
+    "semantic_hash": ""
   },
   "apps/cli/CMakeLists.txt": {
     "mtime": 1783703561.1217368,
@@ -450,9 +450,9 @@
     "semantic_hash": "acc284702c1b759ff08ba7016d463915"
   },
   "docs/progress.md": {
-    "mtime": 1783707605.150749,
-    "ast_hash": "eb49bef5364f575c030ea888d33a4c74",
-    "semantic_hash": "eb49bef5364f575c030ea888d33a4c74"
+    "mtime": 1783714550.2774732,
+    "ast_hash": "bb39435cb4c6455ff32b83023584ca39",
+    "semantic_hash": ""
   },
   "docs/spec.md": {
     "mtime": 1783690980.9816158,
@@ -480,9 +480,9 @@
     "semantic_hash": "faa252a92b55587bb8f05de1684e68f5"
   },
   "src/mesh/CMakeLists.txt": {
-    "mtime": 1783706769.9467921,
-    "ast_hash": "0ba1f716757d188842048f2804156ebb",
-    "semantic_hash": "0ba1f716757d188842048f2804156ebb"
+    "mtime": 1783713865.345465,
+    "ast_hash": "5a24fb72d2f0af4e68c71edc5229cf66",
+    "semantic_hash": ""
   },
   "src/pipeline/CMakeLists.txt": {
     "mtime": 1783703561.1217368,
@@ -490,9 +490,9 @@
     "semantic_hash": "053f4c059688725f22c55dd83114fc94"
   },
   "tests/CMakeLists.txt": {
-    "mtime": 1783706834.791416,
-    "ast_hash": "d4d16e88eabd184db6c1fdcbf9410783",
-    "semantic_hash": "d4d16e88eabd184db6c1fdcbf9410783"
+    "mtime": 1783713939.1220453,
+    "ast_hash": "0f56027115048b5b3c2dcbbaec62cfe7",
+    "semantic_hash": ""
   },
   "apps/bench/d6_tier3.cpp": {
     "mtime": 1783690980.978884,
@@ -680,9 +680,9 @@
     "semantic_hash": "cd1a1938f8df22e01b6affb6475cf473"
   },
   "src/mesh/include/mesh/hybrid_fill.hpp": {
-    "mtime": 1783708518.07549,
-    "ast_hash": "c088ca684e97a30b375eb6b98f868bda",
-    "semantic_hash": "c088ca684e97a30b375eb6b98f868bda"
+    "mtime": 1783713919.3268344,
+    "ast_hash": "cf8cfcd889eab7021d5bc0edd4ec6c5d",
+    "semantic_hash": ""
   },
   "src/mesh/include/mesh/local_refine.hpp": {
     "mtime": 1783690980.9851146,
@@ -700,9 +700,9 @@
     "semantic_hash": "776136f81a51e13860b5c37eacc30b22"
   },
   "src/mesh/include/mesh/quality.hpp": {
-    "mtime": 1783690980.9851146,
-    "ast_hash": "685e2d54662e37a61deb774207fa4ec0",
-    "semantic_hash": "685e2d54662e37a61deb774207fa4ec0"
+    "mtime": 1783713801.5718112,
+    "ast_hash": "c82d1a75ceddc3aeb15aa20cd854fce5",
+    "semantic_hash": ""
   },
   "src/mesh/include/mesh/surface_project.hpp": {
     "mtime": 1783706119.860107,
@@ -730,9 +730,9 @@
     "semantic_hash": "03875670545b546851ff2ba3dc08e4a0"
   },
   "src/mesh/src/hybrid_fill.cpp": {
-    "mtime": 1783708518.07549,
-    "ast_hash": "f96af05ee1f5c6ac6c24251acec5215f",
-    "semantic_hash": "f96af05ee1f5c6ac6c24251acec5215f"
+    "mtime": 1783714535.9113371,
+    "ast_hash": "0b4b50ffc992cc9ca1c5428b57fba0f1",
+    "semantic_hash": ""
   },
   "src/mesh/src/local_refine.cpp": {
     "mtime": 1783690980.9851146,
@@ -740,9 +740,9 @@
     "semantic_hash": "04a69c3192eeffd7154b9069783566ca"
   },
   "src/mesh/src/mixed_fill.cpp": {
-    "mtime": 1783707155.930797,
-    "ast_hash": "aa59f497207cb11a8be5dcdbd611cda9",
-    "semantic_hash": "aa59f497207cb11a8be5dcdbd611cda9"
+    "mtime": 1783713871.8827558,
+    "ast_hash": "55bf8327d65f2cc821c4d703d6e4f695",
+    "semantic_hash": ""
   },
   "src/mesh/src/prism_fill.cpp": {
     "mtime": 1783706145.9815946,
@@ -750,14 +750,14 @@
     "semantic_hash": "62c58b9a88e8af45db60f699ffe9fc15"
   },
   "src/mesh/src/quality.cpp": {
-    "mtime": 1783690980.9851146,
-    "ast_hash": "3694f4d99666668619fe0d939c26dbfa",
-    "semantic_hash": "3694f4d99666668619fe0d939c26dbfa"
+    "mtime": 1783713801.5718112,
+    "ast_hash": "518d94a5e752e90b28eec14058c85e0b",
+    "semantic_hash": ""
   },
   "src/mesh/src/surface_project.cpp": {
-    "mtime": 1783706259.9849014,
-    "ast_hash": "fc989c9c460c7c7107b978d06752d4fd",
-    "semantic_hash": "fc989c9c460c7c7107b978d06752d4fd"
+    "mtime": 1783713962.7517436,
+    "ast_hash": "108f0d2c967d73e1574560cdc373ba3d",
+    "semantic_hash": ""
   },
   "src/mesh/src/tet_fill.cpp": {
     "mtime": 1783706119.860107,
@@ -910,9 +910,9 @@
     "semantic_hash": "5076123ad637e86217cebda0d04e0bce"
   },
   "docs/ROADMAP.md": {
-    "mtime": 1783703465.1651127,
-    "ast_hash": "0b96604b71d1078312147d726d3b03d6",
-    "semantic_hash": "0b96604b71d1078312147d726d3b03d6"
+    "mtime": 1783713947.3069155,
+    "ast_hash": "36b895499b05a70039db17c10d236d94",
+    "semantic_hash": ""
   },
   "docs/bench/d6-tier3.md": {
     "mtime": 1783690980.980688,
@@ -978,5 +978,40 @@
     "mtime": 1783690980.9816158,
     "ast_hash": "95a2a754ead78438356fdc070bed00c6",
     "semantic_hash": "95a2a754ead78438356fdc070bed00c6"
+  },
+  "bench/mesher/run_mesher_scoreboard.py": {
+    "mtime": 1783713939.1220453,
+    "ast_hash": "9423d6ca30baeff11de109e5f8fdb017",
+    "semantic_hash": ""
+  },
+  "src/mesh/include/mesh/cell_stamp.hpp": {
+    "mtime": 1783713865.3451939,
+    "ast_hash": "9351820dcc440bfb7baf02f326fa026e",
+    "semantic_hash": ""
+  },
+  "src/mesh/src/cell_stamp.cpp": {
+    "mtime": 1783713865.3451939,
+    "ast_hash": "18c97f5c8edc9fa0f09400e1c782f799",
+    "semantic_hash": ""
+  },
+  "tests/test_mesh_conformity.cpp": {
+    "mtime": 1783713962.7577434,
+    "ast_hash": "26d661004a2a6b4971fd5208157297d8",
+    "semantic_hash": ""
+  },
+  "CLAUDE.md": {
+    "mtime": 1783709170.175162,
+    "ast_hash": "1e769a74bb758261715e29733b852e72",
+    "semantic_hash": ""
+  },
+  "docs/decisions/0018-graded-conformity.md": {
+    "mtime": 1783713939.1220453,
+    "ast_hash": "a719bd63532b42d1539237a706bd402c",
+    "semantic_hash": ""
+  },
+  "docs/plans/mesher-solver-overhaul.md": {
+    "mtime": 1783713737.118257,
+    "ast_hash": "a28e679236c7be66ec547b235dc76571",
+    "semantic_hash": ""
   }
 }

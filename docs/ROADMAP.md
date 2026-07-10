@@ -83,7 +83,7 @@ and error, export VTU — without CLI.
 | D2 | ~~Global η stopping criterion (user target)~~ | Done (η target / early-stop) |
 | D3 | p-elevation on smooth marked elements (tet10/hex20 promote) | Order increases where smooth |
 | D4 | True local h-refine with hanging-node or remesh conformity | Documented + tested |
-| D5 | Auto settings: h0 from bbox + feature density | Zero-tune path |
+| D5 | ~~Auto settings: h0 from bbox + feature density~~ | Done (`resolve_mesh_size`, CLI omit -h, GUI note) |
 | D6 | Tier-3: ≥5× DOF, ≥3× time vs uniform tet10 baseline | Measured in scoreboard |
 
 ## Track E — Verification / competitive
@@ -93,7 +93,7 @@ and error, export VTU — without CLI.
 | E1 | CalculiX cantilever peer runner green when `ccx` present | JSON under bench/results |
 | E2 | PolyMesh labeled scoreboard points for Lamé + Kirsch | docs/bench/scoreboard.md |
 | E3 | Holdout geometry protocol (audit) | audits/ stub + instructions |
-| E4 | Product mesh → Tier-1 Lamé/Kirsch tests (not only Gmsh import) | New Catch cases |
+| E4 | ~~Product mesh → Tier-1 Lamé/Kirsch tests (not only Gmsh import)~~ | Done (box cantilever + cylinder_prism smoke; Lamé tight tol deferred B1) |
 
 ## Track F — Performance (P6)
 
@@ -107,7 +107,7 @@ and error, export VTU — without CLI.
 
 | ID | Task | Acceptance |
 |----|------|------------|
-| G1 | README quickstart (CLI + GUI + screenshots) | Clone → run in 10 min |
+| G1 | ~~README quickstart (CLI + GUI + screenshots)~~ | Done (apt deps, cmake/ctest, CLI unit_box, GUI) |
 | G2 | Example models + scripts | `examples/` |
 | G3 | API header docs units complete | Spot-check public headers |
 | G4 | CI matrix: Linux + format + ctest | Green on PR/master |
@@ -142,7 +142,7 @@ A1 A3 ──> A2 A10 ──> A4 A5 A8 ──> A6 A7
 | A GUI | M1 core in: argv open, mesh preview, ZZ error, colorbar, failure dismiss, A6 wireframe/undeformed, A7 drag-drop open, A8 mesh note+DOF. Still: A9 theme GATE. |
 | B Mesh | Grid tet/hex/graded/hexpyr; B2 quality+VTU cell data; B5 fixtures (≥3). Not true Delaunay (B1 open). |
 | C Hybrid | C1 done: hex+pyramid product FE (hex→6 pyramids) patch < 1e-12 (ADR-0013). VEM k=1 only. |
-| D Adapt | Seed remesh (ADR-0014) + η target stop (D2). Still: p-adapt, auto-h polish, local h-refine. |
-| E Verify | P1 Tier-0/1/2 green on imported meshes; product-mesh e2e weak. |
+| D Adapt | Seed remesh (ADR-0014) + η target (D2) + auto h0 (D5). Still: p-adapt, local h-refine. |
+| E Verify | P1 Tier-0/1/2 + E4 product-mesh box/cylinder smoke. Tight Lamé on product mesh needs B1. |
 | F Perf | CPU direct solver only. |
-| G Release | CONTRIBUTING/CHANGES exist; README/examples thin. |
+| G Release | README quickstart (G1); examples/ still open (G2). |

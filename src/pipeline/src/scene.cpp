@@ -153,6 +153,79 @@ Model Model::load(const std::string& path, double sharp_angle_deg) {
     return model;
 }
 
+ResolvedMeshSize resolve_mesh_size(const Model& model, double requested_h,
+                                   double sharp_angle_deg) {
+    ResolvedMeshSize out;
+    if (requested_h > 0.0) {
+        out.h = requested_h;
+        out.auto_chosen = false;
+        out.note = std::format("h={:.4g} m (user)", out.h);
+        return out;
+    }
+
+    const Eigen::Vector3d extent_vec = model.bbox_max - model.bbox_min;
+    const double extent = extent_vec.maxCoeff();
+    const double diagonal = extent_vec.norm();
+    // Primary scale: max edge of AABB / 16 (practical zero-tune; former CLI
+    // mesh default). Secondary: diagonal / 28 — keeps long thin parts from
+    // exploding along the short axes while still resolving the long span.
+    double h_geom = extent / 16.0;
+    if (diagonal > 0.0) {
+        h_geom = std::min(h_geom, diagonal / 28.0);
+    }
+    if (!(h_geom > 0.0) || !std::isfinite(h_geom)) {
+        h_geom = 0.05; // last-resort fallback for degenerate bbox
+    }
+
+    const auto edges = geom::detect_sharp_edges(model.surface, sharp_angle_deg);
+    out.n_sharp_edges = edges.size();
+    double min_feature = std::numeric_limits<double>::infinity();
+    for (const auto& e : edges) {
+        const double len =
+            (model.surface.vertices[e.v0] - model.surface.vertices[e.v1]).norm();
+        if (len > 1e-15) {
+            min_feature = std::min(min_feature, len);
+        }
+    }
+    if (!std::isfinite(min_feature)) {
+        min_feature = 0.0;
+    }
+    out.min_feature_length = min_feature;
+
+    // Feature density: more creases than a simple brick (12 edges) → mild refine.
+    double density_scale = 1.0;
+    if (out.n_sharp_edges > 24) {
+        density_scale = 0.85;
+    }
+    if (out.n_sharp_edges > 80) {
+        density_scale = 0.7;
+    }
+    if (out.n_sharp_edges > 200) {
+        density_scale = 0.55;
+    }
+
+    double h0 = h_geom * density_scale;
+    // Aim for ≥ ~2 elements across the shortest crease when that is smaller
+    // than the geometric default — but never below h_geom/4 (CI runtime).
+    if (min_feature > 0.0) {
+        const double h_feat = 0.5 * min_feature;
+        if (h_feat < h0) {
+            h0 = std::max(h_feat, h_geom * 0.25);
+        }
+    }
+
+    // Absolute clamps from diagonal so pathological geometry stays meshable.
+    if (diagonal > 0.0) {
+        h0 = std::clamp(h0, diagonal / 200.0, diagonal / 6.0);
+    }
+    out.h = h0;
+    out.auto_chosen = true;
+    out.note = std::format(
+        "auto h={:.4g} m (extent/16∩diag/28, n_sharp={}, min_feat={:.3g} m, dens×{:.2f})",
+        out.h, out.n_sharp_edges, out.min_feature_length, density_scale);
+    return out;
+}
+
 VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                              int skin_layers, bool feature_refine,
                              std::span<const Eigen::Vector3d> refine_seeds, double seed_band) {
@@ -320,8 +393,8 @@ void SolveJob::start_mesh(const Model& model, const SimSetup& setup) {
     set_status("meshing…");
     worker_ = std::thread([this, model, setup] {
         try {
-            const double extent = (model.bbox_max - model.bbox_min).maxCoeff();
-            const double h = setup.mesh_size > 0.0 ? setup.mesh_size : extent / 24.0;
+            const auto resolved = resolve_mesh_size(model, setup.mesh_size);
+            const double h = resolved.h;
             double h_use = h;
             if (setup.use_feature_grading) {
                 const auto edges = geom::detect_sharp_edges(model.surface, 30.0);
@@ -334,6 +407,9 @@ void SolveJob::start_mesh(const Model& model, const SimSetup& setup) {
             }
             mesh_only_ = volume_mesh(model, h_use, setup.mesher, setup.skin_layers,
                                      setup.use_feature_grading);
+            // Prefix auto/user h note so GUI mesh_note shows resolved size (D5).
+            mesh_only_.mesher_note =
+                std::format("{} | {}", resolved.note, mesh_only_.mesher_note);
             set_status(std::format("mesh ready — {} elems, {} nodes | {}",
                                    mesh_only_.mesh.elements.size(),
                                    mesh_only_.mesh.nodes.size(), mesh_only_.mesher_note));
@@ -391,8 +467,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
     // Copy inputs by value into the worker.
     worker_ = std::thread([this, model, setup] {
         try {
-            const double extent = (model.bbox_max - model.bbox_min).maxCoeff();
-            const double h = setup.mesh_size > 0.0 ? setup.mesh_size : extent / 24.0;
+            const auto resolved = resolve_mesh_size(model, setup.mesh_size);
+            const double h = resolved.h;
             double h_use = h;
             if (setup.use_feature_grading) {
                 const auto edges = geom::detect_sharp_edges(model.surface, 30.0);
@@ -418,6 +494,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
             double adapt_seed_band = 0.0;
             auto vol = volume_mesh(model, h_use, setup.mesher, setup.skin_layers,
                                    setup.use_feature_grading, adapt_seeds, adapt_seed_band);
+            // Keep resolved-h note on mesher_note for solve mesh_note (GUI/CLI).
+            vol.mesher_note = std::format("{} | {}", resolved.note, vol.mesher_note);
             set_status(std::format("solving… ({} elements, {} nodes)",
                                    vol.mesh.elements.size(), vol.mesh.nodes.size()));
             state_ = State::kSolving;

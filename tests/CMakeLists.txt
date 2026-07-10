@@ -19,6 +19,7 @@ add_executable(polymesh_tests
     test_l_domain.cpp
     test_msh.cpp
     test_gui_pipeline.cpp
+    test_product_mesh_tier1.cpp
     test_tet_fill.cpp
     test_features.cpp
     test_zz.cpp

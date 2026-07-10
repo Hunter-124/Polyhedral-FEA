@@ -4,9 +4,9 @@
 **Master plan:** [`docs/ROADMAP.md`](ROADMAP.md) · **Agent loop:**
 [`docs/process/agent-loop.md`](process/agent-loop.md)
 
-**Active:** Track A (GUI usable) → M1 study app. 77 tests green. Solver core
+**Active:** Track A (GUI usable) → M1 study app. 81 tests green. Solver core
 (GATE 1) frozen. Mesh/adapt product path advancing (graded, hexpyr, seed remesh).
-C1 hybrid product FE path done; B2 VTU cell quality + B5 public fixtures done.
+C1 hybrid product FE + D5 auto h0 + E4 product-mesh smoke + G1 README done.
 
 GATE 1 deliverables ready:
 - Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)
@@ -18,6 +18,12 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: D5+E4+G1 — `resolve_mesh_size` (bbox extent/16 ∩ diagonal/28 +
+  sharp-edge density / min feature); pipeline mesh-only+solve and CLI omit `-h`
+  use it; mesher_note carries `auto h=…` for GUI. E4 Catch2 product-mesh box
+  cantilever (max|u|>0, finite σ_vm) + cylinder_prism smoke (not Lamé tol).
+  README quickstart: Ubuntu apt (CI list), cmake/build/ctest, CLI mesh/solve on
+  `unit_box.stl`, GUI argv/auto-h note. 81 tests (with C1).
 - 2026-07-10: C1 hybrid honesty — product FE path `expand_hex_core_to_pyramids`
   (interior hex → 6 pyramids, matching face diagonals); pipeline kHexPyramid
   always expands; Catch2 hybrid constant-strain patch < 1e-12 on mixed lattice;

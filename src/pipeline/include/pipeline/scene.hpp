@@ -53,7 +53,9 @@ struct RegionLoad {
 struct SimSetup {
     double youngs_modulus = 200e9; // Pa
     double poissons_ratio = 0.3;
-    double mesh_size = 0.0;          // m; 0 = auto (bbox/30)
+    /// Target element size in metres. **0 = auto** via `resolve_mesh_size`
+    /// (bbox extent/diagonal + sharp-edge feature density).
+    double mesh_size = 0.0;
     bool use_feature_grading = true; // refine toward sharp edges
     int adapt_passes = 0;            // extra solve→ZZ→refine mesh loops (max cap)
     double eta_target = 0.0;         // stop adapt when global η ≤ target; 0 = disabled
@@ -62,6 +64,23 @@ struct SimSetup {
     std::set<int> fixtures; // region ids with all DOFs fixed
     std::map<int, RegionLoad> loads;
 };
+
+/// Resolved mesh size for product mesh / solve paths (D5).
+/// When `requested_h > 0`, returns that value. When `requested_h <= 0` (or
+/// SimSetup::mesh_size == 0), chooses h0 from bbox extent and diagonal, then
+/// tightens using sharp-edge count and shortest feature length so dense CAD
+/// creases get a slightly finer default without exploding DOF.
+struct ResolvedMeshSize {
+    double h = 0.0; // metres
+    bool auto_chosen = false;
+    std::size_t n_sharp_edges = 0;
+    double min_feature_length = 0.0; // metres; 0 if none
+    std::string note;                // e.g. "auto h=0.0417 m (extent/24, n_sharp=12)"
+};
+
+/// Single source of truth for default h0 (mesh-only, solve, CLI when -h omitted).
+ResolvedMeshSize resolve_mesh_size(const Model& model, double requested_h,
+                                   double sharp_angle_deg = 30.0);
 
 /// Solve products, ready for rendering / VTU.
 struct SolveResult {

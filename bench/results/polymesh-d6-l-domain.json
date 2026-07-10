@@ -1,0 +1,82 @@
+[
+  {
+    "schema_version": 1,
+    "solver": "PolyMesh",
+    "version": "0.1.0",
+    "case_id": "l-domain-d6-baseline",
+    "dofs": 6384,
+    "wall_time_s": {
+      "mesh": 0.013222331,
+      "solve": 2.748505626,
+      "total": 2.761727957
+    },
+    "accuracy": {
+      "name": "energy_deficit_pct",
+      "unit": "percent",
+      "value": 0.08536833311841327
+    },
+    "label": "d6-tier3",
+    "timestamp": "2026-07-10T10:20:00Z",
+    "notes": "D6 uniform tet10 baseline n6; dof_ratio=5.115384615384615; time_ratio=12.183424287525373; claim=graded_energy_ge_uniform_n6_with_fewer_dofs"
+  },
+  {
+    "schema_version": 1,
+    "solver": "PolyMesh",
+    "version": "0.1.0",
+    "case_id": "l-domain-d6-graded",
+    "dofs": 1248,
+    "wall_time_s": {
+      "mesh": 0.001028152,
+      "solve": 0.225650973,
+      "total": 0.226679125
+    },
+    "accuracy": {
+      "name": "energy_deficit_pct",
+      "unit": "percent",
+      "value": 0.08881331731470384
+    },
+    "label": "d6-tier3",
+    "timestamp": "2026-07-10T10:20:00Z",
+    "notes": "D6 graded tet10 h0=w/8_rho2 geometric layers toward re-entrant corner; dof_ratio=5.115384615384615; time_ratio=12.183424287525373; claim=graded_energy_ge_uniform_n6_with_fewer_dofs"
+  },
+  {
+    "schema_version": 1,
+    "solver": "PolyMesh",
+    "version": "0.1.0",
+    "case_id": "l-domain-d6-ratio",
+    "dofs": 1248,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.226679125
+    },
+    "accuracy": {
+      "name": "dof_ratio_uniform_over_graded",
+      "value": 5.115384615384615,
+      "unit": "ratio"
+    },
+    "label": "d6-tier3",
+    "timestamp": "2026-07-10T10:20:00Z",
+    "notes": "Tier-3 instrument: uniform n6 (6384 DOF) vs graded h0=w/8_rho2 (1248 DOF); time_ratio=12.183424287525373; meets_dof=True; meets_time=True; claim=graded_energy_ge_uniform_n6_with_fewer_dofs"
+  },
+  {
+    "schema_version": 1,
+    "solver": "PolyMesh",
+    "version": "0.1.0",
+    "case_id": "l-domain-d6-ratio",
+    "dofs": 1248,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.226679125
+    },
+    "accuracy": {
+      "name": "time_ratio_uniform_over_graded",
+      "value": 12.183424287525373,
+      "unit": "ratio"
+    },
+    "label": "d6-tier3",
+    "timestamp": "2026-07-10T10:20:00Z",
+    "notes": "Companion time ratio (uniform total / graded total) at matched claim."
+  }
+]

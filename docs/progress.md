@@ -6,7 +6,7 @@
 
 **Active:** Track A (GUI usable) → M1 study app. Solver core (GATE 1) frozen.
 Mesh/adapt product path advancing (graded, hexpyr, prism, seed remesh, local LEB).
-F1–F3 + E1–E3 + B1/B3/B4 + C1 + C2 + C3 + C4 + C5 + D3–D5 + E4 + G1–G4 done.
+F1–F3 + E1–E4 + B* + C1–C5 + D1–D6 + G1–G4 done.
 
 GATE 1 deliverables ready:
 - Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)
@@ -18,6 +18,15 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: D6 Tier-3 instrument — L-domain uniform tet10 vs geometric graded
+  tet10 (same solver, ADR-0005). Harness: `apps/bench/polymesh-d6-tier3` +
+  `bench/d6/run_tier3.py`; raw `bench/d6/out/…-raw.json`, scoreboard rows
+  `bench/results/polymesh-d6-l-domain.json`; writeup `docs/bench/d6-tier3.md`;
+  label `d6-tier3`. Measured (full suite): **5.12× DOF** and **12.2× wall time**
+  at matched strain energy (graded `h0=w/8_rho2` 1248 free DOFs / 0.23 s vs
+  uniform n6 6384 DOFs / 2.76 s; energy match tol 0.01%). Catch2 smoke for
+  script --help / JSON schema (not multi-minute bench). ROADMAP D6 closed on
+  this instrument; product-mesh Tier-3 on full public geometry suite still open.
 - 2026-07-10: F3 CUDA SpMV scaffolding — `fea/spmv.hpp` CSR + `spmv_cpu` (always),
   `try_spmv_cuda` / device kernel in `backend_cuda.cu` when `POLYMESH_WITH_CUDA=ON`,
   Catch2 CPU vs Eigen + CUDA-vs-CPU parity (SKIP without toolkit/device). Default
@@ -151,7 +160,7 @@ GATE 0 was approved by owner on 2026-07-09.
 | Tier 1 L-domain (hex20, energy-gap order) | PASS, order 1.265 vs 1.089 (±0.35) |
 | Tier 2 MMS convergence | PASS: tet4 0.997, hex8 0.997, tet10 2.000, hex20 2.000 (theory 1/1/2/2, tol ±0.2) |
 | Tier 2 MMS exact-representation sanity (p=2, quadratic field) | PASS (< 1e-9 relative) |
-| Tier 3 performance | not yet (needs P2+ adaptive path) |
+| Tier 3 performance | L-domain instrument PASS: 5.12× DOF, 12.2× time (d6-tier3); full public-suite product path still open |
 
 ## Open issues
 - GATE 1 frozen; see `bench/reports/p1-gate1-convergence.md`.

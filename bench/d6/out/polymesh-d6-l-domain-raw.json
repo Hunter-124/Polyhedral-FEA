@@ -1,0 +1,450 @@
+{
+  "case": "l-domain",
+  "label": "d6-tier3",
+  "results": [
+    {
+      "accuracy": {
+        "name": "energy_deficit_pct",
+        "unit": "percent",
+        "value": 0.6995880658040066
+      },
+      "case_id": "l-domain",
+      "dofs": 336,
+      "label": "d6-tier3",
+      "mesh_n": 2,
+      "mesh_tag": "n2",
+      "nelems": 72,
+      "nnodes": 195,
+      "notes": "L-domain tet10 uniform_tet10 n2 nelems=72",
+      "path": "uniform_tet10",
+      "schema_version": 1,
+      "solver": "PolyMesh",
+      "strain_energy_j": 0.1059588044938837,
+      "timestamp": "2026-07-10T10:20:00Z",
+      "version": "0.1.0",
+      "wall_time_s": {
+        "mesh": 0.000270526,
+        "solve": 0.091080987,
+        "total": 0.091351513
+      }
+    },
+    {
+      "accuracy": {
+        "name": "energy_deficit_pct",
+        "unit": "percent",
+        "value": 0.3423909443782612
+      },
+      "case_id": "l-domain",
+      "dofs": 720,
+      "label": "d6-tier3",
+      "mesh_n": 3,
+      "mesh_tag": "n3",
+      "nelems": 162,
+      "nnodes": 399,
+      "notes": "L-domain tet10 uniform_tet10 n3 nelems=162",
+      "path": "uniform_tet10",
+      "schema_version": 1,
+      "solver": "PolyMesh",
+      "strain_energy_j": 0.10633995276122432,
+      "timestamp": "2026-07-10T10:20:00Z",
+      "version": "0.1.0",
+      "wall_time_s": {
+        "mesh": 0.00055684,
+        "solve": 0.150052643,
+        "total": 0.150609483
+      }
+    },
+    {
+      "accuracy": {
+        "name": "energy_deficit_pct",
+        "unit": "percent",
+        "value": 0.21106988752289227
+      },
+      "case_id": "l-domain",
+      "dofs": 2080,
+      "label": "d6-tier3",
+      "mesh_n": 4,
+      "mesh_tag": "n4",
+      "nelems": 576,
+      "nnodes": 1125,
+      "notes": "L-domain tet10 uniform_tet10 n4 nelems=576",
+      "path": "uniform_tet10",
+      "schema_version": 1,
+      "solver": "PolyMesh",
+      "strain_energy_j": 0.10648007929160054,
+      "timestamp": "2026-07-10T10:20:00Z",
+      "version": "0.1.0",
+      "wall_time_s": {
+        "mesh": 0.002016058,
+        "solve": 1.019556874,
+        "total": 1.021572932
+      }
+    },
+    {
+      "accuracy": {
+        "name": "energy_deficit_pct",
+        "unit": "percent",
+        "value": 0.08536833311841327
+      },
+      "case_id": "l-domain",
+      "dofs": 6384,
+      "label": "d6-tier3",
+      "mesh_n": 6,
+      "mesh_tag": "n6",
+      "nelems": 1944,
+      "nnodes": 3367,
+      "notes": "L-domain tet10 uniform_tet10 n6 nelems=1944",
+      "path": "uniform_tet10",
+      "schema_version": 1,
+      "solver": "PolyMesh",
+      "strain_energy_j": 0.10661420951491268,
+      "timestamp": "2026-07-10T10:20:00Z",
+      "version": "0.1.0",
+      "wall_time_s": {
+        "mesh": 0.013222331,
+        "solve": 2.748505626,
+        "total": 2.761727957
+      }
+    },
+    {
+      "accuracy": {
+        "name": "energy_deficit_pct",
+        "unit": "percent",
+        "value": 0.030260802374132992
+      },
+      "case_id": "l-domain",
+      "dofs": 14400,
+      "label": "d6-tier3",
+      "mesh_n": 8,
+      "mesh_tag": "n8",
+      "nelems": 4608,
+      "nnodes": 7497,
+      "notes": "L-domain tet10 uniform_tet10 n8 nelems=4608",
+      "path": "uniform_tet10",
+      "schema_version": 1,
+      "solver": "PolyMesh",
+      "strain_energy_j": 0.10667301217204711,
+      "timestamp": "2026-07-10T10:20:00Z",
+      "version": "0.1.0",
+      "wall_time_s": {
+        "mesh": 0.016324941,
+        "solve": 9.523972162,
+        "total": 9.540297103
+      }
+    },
+    {
+      "accuracy": {
+        "name": "energy_deficit_pct",
+        "unit": "percent",
+        "value": 0.0
+      },
+      "case_id": "l-domain",
+      "dofs": 27280,
+      "label": "d6-tier3",
+      "mesh_n": 10,
+      "mesh_tag": "n10",
+      "nelems": 9000,
+      "nnodes": 14091,
+      "notes": "L-domain tet10 uniform_tet10 n10 nelems=9000",
+      "path": "uniform_tet10",
+      "schema_version": 1,
+      "solver": "PolyMesh",
+      "strain_energy_j": 0.10670530205262398,
+      "timestamp": "2026-07-10T10:20:00Z",
+      "version": "0.1.0",
+      "wall_time_s": {
+        "mesh": 0.033527733,
+        "solve": 32.573739948,
+        "total": 32.607267681
+      }
+    },
+    {
+      "accuracy": {
+        "name": "energy_deficit_pct",
+        "unit": "percent",
+        "value": 0.3573646557455329
+      },
+      "case_id": "l-domain",
+      "dofs": 720,
+      "label": "d6-tier3",
+      "mesh_h0": 0.08333333333333333,
+      "mesh_rho": 2.0,
+      "mesh_tag": "h0=w/6_rho2",
+      "nelems": 162,
+      "nnodes": 399,
+      "notes": "L-domain tet10 graded_tet10 h0=w/6_rho2 nelems=162",
+      "path": "graded_tet10",
+      "schema_version": 1,
+      "solver": "PolyMesh",
+      "strain_energy_j": 0.10632397501728139,
+      "timestamp": "2026-07-10T10:20:00Z",
+      "version": "0.1.0",
+      "wall_time_s": {
+        "mesh": 0.000560798,
+        "solve": 0.152944958,
+        "total": 0.153505756
+      }
+    },
+    {
+      "accuracy": {
+        "name": "energy_deficit_pct",
+        "unit": "percent",
+        "value": 0.08881331731470384
+      },
+      "case_id": "l-domain",
+      "dofs": 1248,
+      "label": "d6-tier3",
+      "mesh_h0": 0.0625,
+      "mesh_rho": 2.0,
+      "mesh_tag": "h0=w/8_rho2",
+      "nelems": 288,
+      "nnodes": 675,
+      "notes": "L-domain tet10 graded_tet10 h0=w/8_rho2 nelems=288",
+      "path": "graded_tet10",
+      "schema_version": 1,
+      "solver": "PolyMesh",
+      "strain_energy_j": 0.10661053353412037,
+      "timestamp": "2026-07-10T10:20:00Z",
+      "version": "0.1.0",
+      "wall_time_s": {
+        "mesh": 0.001028152,
+        "solve": 0.225650973,
+        "total": 0.226679125
+      }
+    },
+    {
+      "accuracy": {
+        "name": "energy_deficit_pct",
+        "unit": "percent",
+        "value": 0.14124254166874212
+      },
+      "case_id": "l-domain",
+      "dofs": 1248,
+      "label": "d6-tier3",
+      "mesh_h0": 0.05,
+      "mesh_rho": 2.0,
+      "mesh_tag": "h0=w/10_rho2",
+      "nelems": 288,
+      "nnodes": 675,
+      "notes": "L-domain tet10 graded_tet10 h0=w/10_rho2 nelems=288",
+      "path": "graded_tet10",
+      "schema_version": 1,
+      "solver": "PolyMesh",
+      "strain_energy_j": 0.10655458877190954,
+      "timestamp": "2026-07-10T10:20:00Z",
+      "version": "0.1.0",
+      "wall_time_s": {
+        "mesh": 0.001006641,
+        "solve": 0.22779491,
+        "total": 0.228801551
+      }
+    },
+    {
+      "accuracy": {
+        "name": "energy_deficit_pct",
+        "unit": "percent",
+        "value": 0.2200160958739932
+      },
+      "case_id": "l-domain",
+      "dofs": 1248,
+      "label": "d6-tier3",
+      "mesh_h0": 0.041666666666666664,
+      "mesh_rho": 2.0,
+      "mesh_tag": "h0=w/12_rho2",
+      "nelems": 288,
+      "nnodes": 675,
+      "notes": "L-domain tet10 graded_tet10 h0=w/12_rho2 nelems=288",
+      "path": "graded_tet10",
+      "schema_version": 1,
+      "solver": "PolyMesh",
+      "strain_energy_j": 0.10647053321295724,
+      "timestamp": "2026-07-10T10:20:00Z",
+      "version": "0.1.0",
+      "wall_time_s": {
+        "mesh": 0.00100049,
+        "solve": 0.232643683,
+        "total": 0.233644173
+      }
+    },
+    {
+      "accuracy": {
+        "name": "energy_deficit_pct",
+        "unit": "percent",
+        "value": 0.15023366795725654
+      },
+      "case_id": "l-domain",
+      "dofs": 1248,
+      "label": "d6-tier3",
+      "mesh_h0": 0.0625,
+      "mesh_rho": 1.7,
+      "mesh_tag": "h0=w/8_rho1.7",
+      "nelems": 288,
+      "nnodes": 675,
+      "notes": "L-domain tet10 graded_tet10 h0=w/8_rho1.7 nelems=288",
+      "path": "graded_tet10",
+      "schema_version": 1,
+      "solver": "PolyMesh",
+      "strain_energy_j": 0.10654499476344545,
+      "timestamp": "2026-07-10T10:20:00Z",
+      "version": "0.1.0",
+      "wall_time_s": {
+        "mesh": 0.001013524,
+        "solve": 0.229308098,
+        "total": 0.230321622
+      }
+    },
+    {
+      "accuracy": {
+        "name": "energy_deficit_pct",
+        "unit": "percent",
+        "value": 0.25025378799900927
+      },
+      "case_id": "l-domain",
+      "dofs": 3200,
+      "label": "d6-tier3",
+      "mesh_h0": 0.05,
+      "mesh_rho": 1.7,
+      "mesh_tag": "h0=w/10_rho1.7_bg2",
+      "nelems": 900,
+      "nnodes": 1705,
+      "notes": "L-domain tet10 graded_tet10 h0=w/10_rho1.7_bg2 nelems=900",
+      "path": "graded_tet10",
+      "schema_version": 1,
+      "solver": "PolyMesh",
+      "strain_energy_j": 0.1064382679922415,
+      "timestamp": "2026-07-10T10:20:00Z",
+      "version": "0.1.0",
+      "wall_time_s": {
+        "mesh": 0.003058806,
+        "solve": 0.784848513,
+        "total": 0.787907319
+      }
+    },
+    {
+      "accuracy": {
+        "name": "energy_deficit_pct",
+        "unit": "percent",
+        "value": 0.072031204134479
+      },
+      "case_id": "l-domain",
+      "dofs": 4560,
+      "label": "d6-tier3",
+      "mesh_h0": 0.041666666666666664,
+      "mesh_rho": 1.6,
+      "mesh_tag": "h0=w/12_rho1.6_bg2",
+      "nelems": 1296,
+      "nnodes": 2405,
+      "notes": "L-domain tet10 graded_tet10 h0=w/12_rho1.6_bg2 nelems=1296",
+      "path": "graded_tet10",
+      "schema_version": 1,
+      "solver": "PolyMesh",
+      "strain_energy_j": 0.10662844093868014,
+      "timestamp": "2026-07-10T10:20:00Z",
+      "version": "0.1.0",
+      "wall_time_s": {
+        "mesh": 0.004684014,
+        "solve": 1.236420465,
+        "total": 1.241104479
+      }
+    },
+    {
+      "accuracy": {
+        "name": "energy_deficit_pct",
+        "unit": "percent",
+        "value": 0.08262635389778258
+      },
+      "case_id": "l-domain",
+      "dofs": 1920,
+      "label": "d6-tier3",
+      "mesh_h0": 0.03125,
+      "mesh_rho": 1.8,
+      "mesh_tag": "h0=w/16_rho1.8",
+      "nelems": 450,
+      "nnodes": 1023,
+      "notes": "L-domain tet10 graded_tet10 h0=w/16_rho1.8 nelems=450",
+      "path": "graded_tet10",
+      "schema_version": 1,
+      "solver": "PolyMesh",
+      "strain_energy_j": 0.10661713535212228,
+      "timestamp": "2026-07-10T10:20:00Z",
+      "version": "0.1.0",
+      "wall_time_s": {
+        "mesh": 0.001566428,
+        "solve": 0.363926305,
+        "total": 0.365492733
+      }
+    },
+    {
+      "accuracy": {
+        "name": "energy_deficit_pct",
+        "unit": "percent",
+        "value": 0.08536833311841327
+      },
+      "case_id": "l-domain-d6-baseline",
+      "dofs": 6384,
+      "label": "d6-tier3",
+      "mesh_tag": "n6",
+      "nelems": 1944,
+      "nnodes": 3367,
+      "notes": "D6 uniform tet10 baseline n6",
+      "path": "uniform_tet10",
+      "schema_version": 1,
+      "solver": "PolyMesh",
+      "strain_energy_j": 0.10661420951491268,
+      "timestamp": "2026-07-10T10:20:00Z",
+      "version": "0.1.0",
+      "wall_time_s": {
+        "mesh": 0.013222331,
+        "solve": 2.748505626,
+        "total": 2.761727957
+      }
+    },
+    {
+      "accuracy": {
+        "name": "energy_deficit_pct",
+        "unit": "percent",
+        "value": 0.08881331731470384
+      },
+      "case_id": "l-domain-d6-graded",
+      "dofs": 1248,
+      "label": "d6-tier3",
+      "mesh_tag": "h0=w/8_rho2",
+      "nelems": 288,
+      "nnodes": 675,
+      "notes": "D6 graded tet10 h0=w/8_rho2 geometric layers toward re-entrant corner",
+      "path": "graded_tet10",
+      "schema_version": 1,
+      "solver": "PolyMesh",
+      "strain_energy_j": 0.10661053353412037,
+      "timestamp": "2026-07-10T10:20:00Z",
+      "version": "0.1.0",
+      "wall_time_s": {
+        "mesh": 0.001028152,
+        "solve": 0.225650973,
+        "total": 0.226679125
+      }
+    }
+  ],
+  "schema_version": 1,
+  "summary": {
+    "baseline_dofs": 6384,
+    "baseline_energy_j": 0.10661420951491268,
+    "baseline_path": "uniform_tet10",
+    "baseline_tag": "n6",
+    "baseline_total_s": 2.761727957,
+    "claim": "graded_energy_ge_uniform_n6_with_fewer_dofs",
+    "dof_ratio_uniform_over_graded": 5.115384615384615,
+    "energy_ref_j": 0.10670530205262398,
+    "graded_dofs": 1248,
+    "graded_energy_j": 0.10661053353412037,
+    "graded_path": "graded_tet10",
+    "graded_tag": "h0=w/8_rho2",
+    "graded_total_s": 0.226679125,
+    "meets_dof_target": true,
+    "meets_time_target": true,
+    "tier3_dof_target": 5.0,
+    "tier3_time_target": 3.0,
+    "time_ratio_uniform_over_graded": 12.183424287525373
+  },
+  "timestamp": "2026-07-10T10:20:00Z"
+}

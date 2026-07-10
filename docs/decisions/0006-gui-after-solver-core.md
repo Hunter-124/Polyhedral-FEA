@@ -1,6 +1,12 @@
 # ADR-0006: GUI — after the solver core, as phase P6.5
 
-- Status: accepted (2026-07-09, GATE 0)
+- Status: accepted (2026-07-09, GATE 0); **revised same day** — owner pulled
+  the GUI forward to run alongside solver development. Stack locked to
+  GLFW + Dear ImGui (docking) + OpenGL, the same as the owner's AI-CAD app,
+  with its dark teal palette mirrored token-for-token. Until the P2/P3
+  conforming mesher exists, the GUI solves on a clearly-labeled draft voxel
+  mesher (v0) so import -> pick faces -> constrain/load -> solve -> results
+  works end-to-end today.
 - Decision: scope addition (SPEC originally pinned "no GUI" for v1)
 
 ## Decision

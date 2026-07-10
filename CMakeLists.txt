@@ -11,6 +11,7 @@ set(CMAKE_FIND_PACKAGE_NO_PACKAGE_REGISTRY ON)
 
 option(POLYMESH_WITH_OCC "Build B-rep/STEP support via OpenCASCADE (ADR-0001)" OFF)
 option(POLYMESH_WITH_CUDA "Build CUDA backends for parallelizable kernels (ADR-0008)" OFF)
+option(POLYMESH_WITH_GUI "Build the desktop GUI (GLFW + Dear ImGui + OpenGL)" ON)
 option(POLYMESH_BUILD_TESTS "Build the test suite" ON)
 
 if(POLYMESH_WITH_CUDA)
@@ -35,6 +36,9 @@ add_subdirectory(src/adapt)
 add_subdirectory(src/fea)
 add_subdirectory(src/bench)
 add_subdirectory(src/cli)
+if(POLYMESH_WITH_GUI)
+    add_subdirectory(src/gui)
+endif()
 
 if(POLYMESH_BUILD_TESTS)
     include(FetchContent)

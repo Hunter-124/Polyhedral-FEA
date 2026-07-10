@@ -1,0 +1,100 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+#pragma once
+
+// Scene model for the GUI: imported geometry with CAD-style face regions,
+// simulation setup (fixtures/loads/material/mesh settings), and the
+// background solve pipeline.
+
+#include "fea/nodal_mesh.hpp"
+#include "fea/stress.hpp"
+#include "geom/tri_surface.hpp"
+
+#include <Eigen/Core>
+
+#include <atomic>
+#include <map>
+#include <mutex>
+#include <optional>
+#include <set>
+#include <string>
+#include <thread>
+#include <vector>
+
+namespace polymesh::gui {
+
+/// Imported model: triangle surface segmented into CAD-style "faces"
+/// (regions of triangles separated by sharp edges), so a click can select
+/// a whole planar/smooth face rather than one triangle.
+struct Model {
+    geom::TriSurface surface;
+    std::vector<int> triangle_region; // region id per triangle
+    int region_count = 0;
+    Eigen::Vector3d bbox_min = Eigen::Vector3d::Zero();
+    Eigen::Vector3d bbox_max = Eigen::Vector3d::Ones();
+    std::string name;
+
+    static Model load(const std::string& path, double sharp_angle_deg = 30.0);
+};
+
+/// A force applied to a region: total force vector in newtons.
+struct RegionLoad {
+    Eigen::Vector3d force = Eigen::Vector3d::Zero();
+};
+
+struct SimSetup {
+    double youngs_modulus = 200e9; // Pa
+    double poissons_ratio = 0.3;
+    double mesh_size = 0.0; // m; 0 = auto (bbox/30)
+    std::set<int> fixtures; // region ids with all DOFs fixed
+    std::map<int, RegionLoad> loads;
+};
+
+/// Solve products, ready for rendering.
+struct SolveResult {
+    fea::NodalMesh volume_mesh;
+    Eigen::VectorXd displacement;    // 3N
+    std::vector<double> von_mises;   // per node, Pa
+    std::vector<double> u_magnitude; // per node, m
+    double max_von_mises = 0.0;
+    double max_displacement = 0.0;
+    // Boundary quads of the voxel mesh (node indices), for rendering.
+    std::vector<std::array<std::uint32_t, 4>> boundary_quads;
+    std::string mesh_note; // e.g. element/node counts, mesher version
+};
+
+/// Draft v0 mesher: voxelizes the STL interior on a uniform grid and emits a
+/// hex8 mesh (stair-cased boundary — clearly labeled; the conforming
+/// adaptive mesher replaces this in Phases P2/P3).
+struct VoxelMeshOutput {
+    fea::NodalMesh mesh;
+    std::vector<std::array<std::uint32_t, 4>> boundary_quads;
+    // For every mesh node on the boundary: the region of the nearest STL
+    // triangle (used to map picked regions to constraint/load node sets).
+    std::map<std::uint32_t, int> boundary_node_region;
+};
+VoxelMeshOutput voxel_mesh(const Model& model, double h);
+
+/// Background solve pipeline. Poll `state` from the UI thread.
+class SolveJob {
+  public:
+    enum class State { kIdle, kMeshing, kSolving, kDone, kFailed };
+
+    void start(const Model& model, const SimSetup& setup);
+    /// Joins a finished worker and returns the result once ready.
+    std::optional<SolveResult> take_result();
+
+    State state() const { return state_.load(); }
+    std::string status_text() const;
+    ~SolveJob();
+
+  private:
+    std::atomic<State> state_{State::kIdle};
+    std::thread worker_;
+    SolveResult result_;
+    std::string error_;
+    mutable std::mutex status_mutex_;
+    std::string status_;
+    void set_status(const std::string& s);
+};
+
+} // namespace polymesh::gui

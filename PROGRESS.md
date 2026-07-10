@@ -1,10 +1,13 @@
 # PROGRESS
 
 ## Current phase
-**P1 — Reference solver: core + Tier-0 + Tier-2 MMS green.**
-Remaining for GATE 1: Lamé cylinder + Kirsch/Goodier Tier-1 analytical cases
-(needs surface-traction loads + curved mapped meshes), convergence plots for
-review, mesh file import.
+**P1 nearly complete + GUI v0 shipped (pulled forward from P6.5).**
+- P1 remaining for GATE 1: Kirsch/Goodier/L-domain Tier-1 cases, convergence
+  plots for owner review, Gmsh mesh import.
+- GUI (`polymesh-gui`): STL import, CAD-style face-region picking, fixtures/
+  loads/material/mesh settings, background solve, von Mises + deflection
+  results on deformed shape. Solves via draft voxel mesher v0 until the
+  P2/P3 conforming mesher replaces it.
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done

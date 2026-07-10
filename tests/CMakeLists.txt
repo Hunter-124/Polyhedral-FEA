@@ -13,10 +13,14 @@ add_executable(polymesh_tests
     test_cantilever.cpp
     test_mms_convergence.cpp
     test_lame_cylinder.cpp
+    test_gui_pipeline.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/scene.cpp
     support/structured_mesh.cpp
     support/mms.cpp
 )
-target_include_directories(polymesh_tests PRIVATE .)
+# scene.cpp is the GUI's display-independent core (import, regions, voxel
+# mesher, solve job) — tested headless here.
+target_include_directories(polymesh_tests PRIVATE . ${CMAKE_SOURCE_DIR}/src/gui)
 target_link_libraries(polymesh_tests
     PRIVATE geom mesh adapt fea bench_harness Catch2::Catch2WithMain polymesh_warnings
 )

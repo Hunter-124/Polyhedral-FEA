@@ -26,6 +26,7 @@ add_executable(polymesh_tests
     test_vem.cpp
     test_quality.cpp
     test_hex_vem_pipeline.cpp
+    test_prism.cpp
     support/structured_mesh.cpp
     support/mms.cpp
 )

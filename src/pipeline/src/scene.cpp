@@ -4,9 +4,9 @@
 #include "adapt/error.hpp"
 #include "adapt/loop.hpp"
 #include "fea/solve.hpp"
+#include "fea/vem.hpp"
 #include "fea/vtu.hpp"
 #include "fea/zz.hpp"
-#include "fea/vem.hpp"
 #include "geom/features.hpp"
 #include "geom/step.hpp"
 #include "geom/stl.hpp"
@@ -168,10 +168,9 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher) 
             out.mesh.elements.push_back(std::move(el));
         }
         out.boundary_quads = std::move(fill.boundary_quads);
-        out.mesher_note =
-            std::format("{} grid fill v1: {} cells, {} nodes, h={:.4g} m",
-                        mesher == VolumeMesher::kHexVem ? "hex-VEM" : "hex",
-                        out.mesh.elements.size(), out.mesh.nodes.size(), fill_h);
+        out.mesher_note = std::format("{} grid fill v1: {} cells, {} nodes, h={:.4g} m",
+                                      mesher == VolumeMesher::kHexVem ? "hex-VEM" : "hex",
+                                      out.mesh.elements.size(), out.mesh.nodes.size(), fill_h);
     } else {
         auto fill = mesh::tet_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
         fill_h = fill.h;

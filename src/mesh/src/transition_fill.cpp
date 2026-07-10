@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "mesh/transition_fill.hpp"
 
+#include "mesh/grid_classify.hpp"
 #include "mesh/poly_mesh.hpp"
 #include "mesh/surface_project.hpp"
 
@@ -119,59 +120,12 @@ TransitionFillOutput transition_fill_surface(const geom::TriSurface& surface,
                                              const Eigen::Vector3d& bbox_min,
                                              const Eigen::Vector3d& bbox_max, double h,
                                              bool snap_boundary) {
-    if (!(h > 0.0) || !std::isfinite(h)) {
-        throw ValidityError("transition_fill_surface: h must be positive");
-    }
-    const Eigen::Vector3d extent = bbox_max - bbox_min;
-    if (extent.minCoeff() <= 0.0) {
-        throw ValidityError("transition_fill_surface: empty bbox");
-    }
-    const auto cells = [&](int a) {
-        return std::max(1, static_cast<int>(std::ceil(extent[a] / h)));
-    };
-    const int nx = cells(0), ny = cells(1), nz = cells(2);
-    if (static_cast<long>(nx) * ny * nz > 512 * 1024) {
-        throw ValidityError("transition_fill_surface: grid too fine");
-    }
+    const CartesianGrid grid = make_bbox_grid(bbox_min, bbox_max, h);
+    const auto inside = classify_cells_inside(surface, grid);
+    const int nx = grid.nx, ny = grid.ny, nz = grid.nz;
+    const double h_cell = grid.max_edge();
 
-    const Eigen::Vector3d origin = bbox_min;
-    std::vector<bool> inside(static_cast<std::size_t>(nx) * ny * nz, false);
-    const auto cell_index = [&](int i, int j, int k) {
-        return (static_cast<std::size_t>(k) * ny + j) * nx + i;
-    };
-    for (int j = 0; j < ny; ++j) {
-        for (int i = 0; i < nx; ++i) {
-            const double cx = origin[0] + (i + 0.5) * h;
-            const double cy = origin[1] + (j + 0.5) * h;
-            std::vector<double> crossings;
-            for (const auto& tri : surface.triangles) {
-                const auto& a = surface.vertices[tri[0]];
-                const auto& b = surface.vertices[tri[1]];
-                const auto& c = surface.vertices[tri[2]];
-                const double d1 = (b[0] - a[0]) * (cy - a[1]) - (b[1] - a[1]) * (cx - a[0]);
-                const double d2 = (c[0] - b[0]) * (cy - b[1]) - (c[1] - b[1]) * (cx - b[0]);
-                const double d3 = (a[0] - c[0]) * (cy - c[1]) - (a[1] - c[1]) * (cx - c[0]);
-                if ((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0)) {
-                    continue;
-                }
-                const double area = d1 + d2 + d3;
-                if (area == 0.0) {
-                    continue;
-                }
-                crossings.push_back((d2 * a[2] + d3 * b[2] + d1 * c[2]) / area);
-            }
-            std::sort(crossings.begin(), crossings.end());
-            for (int k = 0; k < nz; ++k) {
-                const double cz = origin[2] + (k + 0.5) * h;
-                const auto below = std::upper_bound(crossings.begin(), crossings.end(), cz) -
-                                   crossings.begin();
-                if (below % 2 == 1) {
-                    inside[cell_index(i, j, k)] = true;
-                }
-            }
-        }
-    }
-
+    const auto cell_index = [&](int i, int j, int k) { return grid.index(i, j, k); };
     const auto is_inside = [&](int i, int j, int k) {
         return i >= 0 && i < nx && j >= 0 && j < ny && k >= 0 && k < nz &&
                inside[cell_index(i, j, k)];
@@ -196,13 +150,13 @@ TransitionFillOutput transition_fill_surface(const geom::TriSurface& surface,
     }
 
     TransitionFillOutput out;
-    out.h = h;
+    out.h = h_cell;
     std::map<std::array<int, 3>, std::uint32_t> node_ids;
     const auto node_at = [&](int i, int j, int k) {
         const auto [it, fresh] = node_ids.try_emplace(
             std::array<int, 3>{i, j, k}, static_cast<std::uint32_t>(out.nodes.size()));
         if (fresh) {
-            out.nodes.emplace_back(origin[0] + i * h, origin[1] + j * h, origin[2] + k * h);
+            out.nodes.push_back(grid.node(i, j, k));
         }
         return it->second;
     };
@@ -233,8 +187,7 @@ TransitionFillOutput transition_fill_surface(const geom::TriSurface& surface,
                     ++out.n_hex;
                 } else {
                     // Pyramid skin: apex at cell center (new node).
-                    const Eigen::Vector3d center =
-                        origin + Eigen::Vector3d((i + 0.5) * h, (j + 0.5) * h, (k + 0.5) * h);
+                    const Eigen::Vector3d center = grid.cell_center(i, j, k);
                     const auto apex = static_cast<std::uint32_t>(out.nodes.size());
                     out.nodes.push_back(center);
                     for (const auto& face : kHexFaces) {
@@ -304,15 +257,15 @@ TransitionFillOutput transition_fill_surface(const geom::TriSurface& surface,
         for (auto ni : bnodes) {
             const Eigen::Vector3d p = out.nodes[ni];
             const auto cp = closest_on_surface(surface, p);
-            if (cp.distance > 0.0 && cp.distance < 1.25 * h) {
+            if (cp.distance > 0.0 && cp.distance < 1.25 * h_cell) {
                 const Eigen::Vector3d delta = cp.point - p;
-                const double move = std::min(cp.distance, 0.35 * h);
+                const double move = std::min(cp.distance, 0.35 * h_cell);
                 pre_snap.emplace(ni, p);
                 out.nodes[ni] = p + delta * (move / cp.distance);
             }
         }
 
-        const double vol_eps = 1e-14 * h * h * h;
+        const double vol_eps = 1e-14 * h_cell * h_cell * h_cell;
         bool progressed = true;
         while (progressed && !pre_snap.empty()) {
             progressed = false;

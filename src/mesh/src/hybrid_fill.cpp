@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "mesh/hybrid_fill.hpp"
 
+#include "mesh/grid_classify.hpp"
 #include "mesh/poly_mesh.hpp"
 
 #include <algorithm>
@@ -14,47 +15,6 @@
 
 namespace polymesh::mesh {
 namespace {
-
-std::vector<bool> inside_mask(const geom::TriSurface& surface, const Eigen::Vector3d& origin,
-                              int nx, int ny, int nz, double h) {
-    std::vector<bool> inside(static_cast<std::size_t>(nx) * ny * nz, false);
-    const auto cell_index = [&](int i, int j, int k) {
-        return (static_cast<std::size_t>(k) * ny + j) * nx + i;
-    };
-    for (int j = 0; j < ny; ++j) {
-        for (int i = 0; i < nx; ++i) {
-            const double cx = origin[0] + (i + 0.5) * h;
-            const double cy = origin[1] + (j + 0.5) * h;
-            std::vector<double> crossings;
-            for (const auto& tri : surface.triangles) {
-                const auto& a = surface.vertices[tri[0]];
-                const auto& b = surface.vertices[tri[1]];
-                const auto& c = surface.vertices[tri[2]];
-                const double d1 = (b[0] - a[0]) * (cy - a[1]) - (b[1] - a[1]) * (cx - a[0]);
-                const double d2 = (c[0] - b[0]) * (cy - b[1]) - (c[1] - b[1]) * (cx - b[0]);
-                const double d3 = (a[0] - c[0]) * (cy - c[1]) - (a[1] - c[1]) * (cx - c[0]);
-                if ((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0)) {
-                    continue;
-                }
-                const double area = d1 + d2 + d3;
-                if (area == 0.0) {
-                    continue;
-                }
-                crossings.push_back((d2 * a[2] + d3 * b[2] + d1 * c[2]) / area);
-            }
-            std::sort(crossings.begin(), crossings.end());
-            for (int k = 0; k < nz; ++k) {
-                const double cz = origin[2] + (k + 0.5) * h;
-                const auto below = std::upper_bound(crossings.begin(), crossings.end(), cz) -
-                                   crossings.begin();
-                if (below % 2 == 1) {
-                    inside[cell_index(i, j, k)] = true;
-                }
-            }
-        }
-    }
-    return inside;
-}
 
 // Kuhn 6-tet split of a unit cube with corners numbered as hex8.
 constexpr std::array<std::array<int, 4>, 6> kCubeTets{{
@@ -90,31 +50,14 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         throw ValidityError("graded_tet_fill_surface: empty bbox");
     }
 
-    // Work on the fine lattice (h/2) so coarse cells are 2×2×2 fine cells.
-    const double hf = h * 0.5;
-    const auto n_axis = [&](int a) {
-        return std::max(2, static_cast<int>(std::ceil(extent[a] / hf)));
-    };
-    // Even counts so coarse grouping is clean.
-    int nxf = n_axis(0), nyf = n_axis(1), nzf = n_axis(2);
-    if (nxf % 2) {
-        ++nxf;
-    }
-    if (nyf % 2) {
-        ++nyf;
-    }
-    if (nzf % 2) {
-        ++nzf;
-    }
-    if (static_cast<long>(nxf) * nyf * nzf > 512 * 1024) {
-        throw ValidityError("graded_tet_fill_surface: grid too fine");
-    }
-
-    const Eigen::Vector3d origin = bbox_min;
-    const auto inside = inside_mask(surface, origin, nxf, nyf, nzf, hf);
-    const auto idx = [&](int i, int j, int k) {
-        return (static_cast<std::size_t>(k) * nyf + j) * nxf + i;
-    };
+    // Work on the fine lattice (~h/2) so coarse cells are 2×2×2 fine cells.
+    // Bbox-fitted even grid + robust ray parity (shared-edge dedupe).
+    const double hf_target = h * 0.5;
+    const CartesianGrid fine = make_bbox_grid_even(bbox_min, bbox_max, hf_target, 2);
+    const int nxf = fine.nx, nyf = fine.ny, nzf = fine.nz;
+    const double hf = fine.max_edge();
+    const auto inside = classify_cells_inside(surface, fine);
+    const auto idx = [&](int i, int j, int k) { return fine.index(i, j, k); };
     const auto inb = [&](int i, int j, int k) {
         return i >= 0 && i < nxf && j >= 0 && j < nyf && k >= 0 && k < nzf &&
                inside[idx(i, j, k)];
@@ -202,9 +145,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 if (!any_in) {
                     continue;
                 }
-                const Eigen::Vector3d center =
-                    origin +
-                    Eigen::Vector3d((2 * ic + 1) * hf, (2 * jc + 1) * hf, (2 * kc + 1) * hf);
+                const Eigen::Vector3d center = fine.node(2 * ic + 1, 2 * jc + 1, 2 * kc + 1);
                 if (feature_band > 0.0) {
                     const double dfeat = geom::distance_to_features(center, surface, features);
                     if (dfeat <= feature_band) {
@@ -229,7 +170,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     }
 
     GradedTetFillOutput out;
-    out.h_coarse = h;
+    out.h_coarse = std::max(h, 2.0 * hf);
     out.h_fine = hf;
     out.skin_layers = skin_layers;
     out.mesh.h = hf;
@@ -239,8 +180,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         const auto [it, fresh] = node_ids.try_emplace(
             std::array<int, 3>{i, j, k}, static_cast<std::uint32_t>(out.mesh.nodes.size()));
         if (fresh) {
-            out.mesh.nodes.emplace_back(origin[0] + i * hf, origin[1] + j * hf,
-                                        origin[2] + k * hf);
+            out.mesh.nodes.push_back(fine.node(i, j, k));
         }
         return it->second;
     };

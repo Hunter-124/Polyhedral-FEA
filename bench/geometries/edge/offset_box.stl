@@ -1,0 +1,86 @@
+solid offset_box
+  facet normal 0 0 -1
+    outer loop
+      vertex 10 20 30
+      vertex 11 21 30
+      vertex 11 20 30
+    endloop
+  endfacet
+  facet normal 0 0 -1
+    outer loop
+      vertex 10 20 30
+      vertex 10 21 30
+      vertex 11 21 30
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 10 20 31
+      vertex 11 20 31
+      vertex 11 21 31
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 10 20 31
+      vertex 11 21 31
+      vertex 10 21 31
+    endloop
+  endfacet
+  facet normal 0 -1 0
+    outer loop
+      vertex 10 20 30
+      vertex 11 20 30
+      vertex 11 20 31
+    endloop
+  endfacet
+  facet normal 0 -1 0
+    outer loop
+      vertex 10 20 30
+      vertex 11 20 31
+      vertex 10 20 31
+    endloop
+  endfacet
+  facet normal 0 1 0
+    outer loop
+      vertex 11 21 30
+      vertex 10 21 30
+      vertex 10 21 31
+    endloop
+  endfacet
+  facet normal 0 1 0
+    outer loop
+      vertex 11 21 30
+      vertex 10 21 31
+      vertex 11 21 31
+    endloop
+  endfacet
+  facet normal -1 0 0
+    outer loop
+      vertex 10 20 30
+      vertex 10 20 31
+      vertex 10 21 31
+    endloop
+  endfacet
+  facet normal -1 0 0
+    outer loop
+      vertex 10 20 30
+      vertex 10 21 31
+      vertex 10 21 30
+    endloop
+  endfacet
+  facet normal 1 0 0
+    outer loop
+      vertex 11 20 30
+      vertex 11 21 30
+      vertex 11 21 31
+    endloop
+  endfacet
+  facet normal 1 0 0
+    outer loop
+      vertex 11 20 30
+      vertex 11 21 31
+      vertex 11 20 31
+    endloop
+  endfacet
+endsolid offset_box

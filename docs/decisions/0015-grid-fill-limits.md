@@ -29,14 +29,30 @@ analytical mesh quality, boundary-fitted DOF efficiency, or Tier-1 accuracy on
 | hex+pyramid | Interior hex, boundary cell → 6 pyramids | Limited snap + unsnap |
 | prism sweep | Inside voxels → 2× prism6 (base diag), sweep = longest axis | Stair-cased (no snap) |
 
+## Lattice construction (bbox-fitted)
+`make_bbox_grid` sets \(n_a=\lceil L_a/h\rceil\) and \(\Delta_a=L_a/n_a\) so the
+lattice **exactly** spans the AABB (nodes land on bbox faces). Cell sizes may be
+anisotropic when the requested \(h\) does not divide an axis. This removes the
+systematic underfill gap when \(n h > L\) left a partial exterior layer empty.
+
+## Ray parity (shared-edge dedupe)
+Inside tests use even-odd ray casting. Coplanar face diagonals / shared edges
+used to register **two** identical crossings, flipping parity and punching
+diagonal tunnels through cubes and other AABB bricks (cells with \(c_x\approx c_y\)
+marked outside). Crossings are now **deduplicated** within a small z-ε so each
+surface hit counts once (`mesh/grid_classify.hpp`).
+
 ## Staircasing and when they fail
 - **Staircasing:** free surface follows lattice faces, not the CAD/STL, except
-  where limited snap moves nodes ≤ 0.35 h (may still leave residual gap ~O(h)).
+  where limited snap moves nodes ≤ 0.35 h (may still leave residual gap ~O(h)
+  on *curved* surfaces; AABB bricks fill solid with exact bbox coverage).
 - **Feature loss:** thin walls, fillets, and re-entrant corners thinner than ~h
-  are under-resolved or dropped (inside test uses cell centres).
+  are under-resolved or dropped (inside test uses cell centres). Thin plates
+  with thickness \(t<h\) still mesh when \(n_z=\lceil t/h\rceil\ge 1\) and
+  \(\Delta_z=t/n_z\).
 - **Empty / open surfaces:** ray parity fails → `ValidityError` or empty volume.
 - **Non-watertight STL:** undefined interior; validate surface first.
-- **High aspect domains:** uniform h over bbox wastes DOFs in large empty
+- **High aspect domains:** uniform target h over bbox wastes DOFs in large empty
   exterior grid spans (still allocated as nodes only where cells are inside).
 - **Not quality-optimal:** min dihedral / aspect not optimized; slivers can
   appear near jagged snaps (mitigated by unsnap, not by remeshing).

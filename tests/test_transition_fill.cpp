@@ -133,10 +133,12 @@ TEST_CASE("hex+pyramid mesh solves linear elasticity") {
 
 TEST_CASE("pyramid lattice patch test: constant strain (all-pyramid cells)") {
     // Element-level pyramid5 (tet-split stiffness) on pure-pyramid lattice.
-    auto fill =
-        transition_fill_surface(box(), {-0.01, -0.01, -0.01}, {1.01, 1.01, 1.01}, 0.25, false);
+    // Single voxel of the unit box → every face is exterior → pyramid skin only
+    // (no hex core). Larger grids correctly form a hex interior after bbox-fitted
+    // classification; those use expand_hex_core_to_pyramids in the hybrid test.
+    auto fill = transition_fill_surface(box(), {0, 0, 0}, {1, 1, 1}, 1.0, false);
     REQUIRE(fill.n_hex == 0);
-    REQUIRE(fill.n_pyramid > 0);
+    REQUIRE(fill.n_pyramid == 6);
 
     fea::NodalMesh mesh;
     mesh.nodes = fill.nodes;

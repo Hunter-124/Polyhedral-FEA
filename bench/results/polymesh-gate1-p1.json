@@ -1,0 +1,82 @@
+[
+  {
+    "schema_version": 1,
+    "solver": "PolyMesh",
+    "version": "0.1.0",
+    "case_id": "timoshenko-cantilever",
+    "dofs": null,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.45
+    },
+    "accuracy": {
+      "name": "tip_rel_err_pct",
+      "value": 1.50,
+      "unit": "percent"
+    },
+    "label": "gate1-p1",
+    "timestamp": "2026-07-10T00:00:00Z",
+    "notes": "hex20 gravity-loaded cantilever; tip err from docs/progress.md. total ≈ ctest wall (structured mesh + solve)."
+  },
+  {
+    "schema_version": 1,
+    "solver": "PolyMesh",
+    "version": "0.1.0",
+    "case_id": "lame-cylinder",
+    "dofs": null,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.32
+    },
+    "accuracy": {
+      "name": "u_r_rel_err_pct",
+      "value": 0.0068,
+      "unit": "percent"
+    },
+    "label": "gate1-p1",
+    "timestamp": "2026-07-10T00:00:00Z",
+    "notes": "hex20 sector; u_r at inner wall. Companion hoop err 1.36% (see hoop entry). total ≈ ctest wall."
+  },
+  {
+    "schema_version": 1,
+    "solver": "PolyMesh",
+    "version": "0.1.0",
+    "case_id": "lame-cylinder",
+    "dofs": null,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.32
+    },
+    "accuracy": {
+      "name": "hoop_rel_err_pct",
+      "value": 1.36,
+      "unit": "percent"
+    },
+    "label": "gate1-p1",
+    "timestamp": "2026-07-10T00:00:00Z",
+    "notes": "hex20 sector; hoop stress at inner wall. Same run as u_r metric."
+  },
+  {
+    "schema_version": 1,
+    "solver": "PolyMesh",
+    "version": "0.1.0",
+    "case_id": "kirsch-plate",
+    "dofs": null,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.39
+    },
+    "accuracy": {
+      "name": "scf_rel_err_pct",
+      "value": 1.87,
+      "unit": "percent"
+    },
+    "label": "gate1-p1",
+    "timestamp": "2026-07-10T00:00:00Z",
+    "notes": "hex20 annulus, exact field BC; SCF 3.056 vs 3. total ≈ ctest wall."
+  }
+]

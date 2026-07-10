@@ -2,12 +2,49 @@
 add_library(geom
     src/tri_surface.cpp
     src/stl.cpp
+    src/step.cpp
 )
 target_include_directories(geom PUBLIC include)
 target_link_libraries(geom PUBLIC Eigen3::Eigen PRIVATE polymesh_warnings)
 
 if(POLYMESH_WITH_OCC)
-    # Wired up when Phase P3 starts consuming exact geometry (ADR-0001).
-    find_package(OpenCASCADE REQUIRED)
+    # Optional B-rep/STEP path (ADR-0001). Requires OpenCASCADE (OCCT).
+    # Components cover STEP read (DataExchange) + BRepMesh (ModelingAlgorithms)
+    # and the transitive CAF/Visualization deps of modern TKDESTEP.
+    find_package(OpenCASCADE
+        COMPONENTS
+            FoundationClasses
+            ModelingData
+            ModelingAlgorithms
+            Visualization
+            ApplicationFramework
+            DataExchange
+    )
+    if(NOT OpenCASCADE_FOUND)
+        message(FATAL_ERROR
+            "POLYMESH_WITH_OCC=ON but OpenCASCADE was not found.\n"
+            "  Install OCCT development packages, or set -DOpenCASCADE_DIR=...\n"
+            "  or reconfigure with -DPOLYMESH_WITH_OCC=OFF (default).")
+    endif()
+
     target_compile_definitions(geom PUBLIC POLYMESH_WITH_OCC)
+    target_include_directories(geom SYSTEM PRIVATE ${OpenCASCADE_INCLUDE_DIR})
+    # Imported TK* targets carry INTERFACE_INCLUDE_DIRECTORIES and transitive
+    # link deps. TKDESTEP = STEP read; TKMesh = BRepMesh_IncrementalMesh.
+    target_link_libraries(geom PRIVATE
+        TKDESTEP
+        TKMesh
+        TKXSBase
+        TKDE
+        TKBRep
+        TKTopAlgo
+        TKMath
+        TKernel
+        TKG3d
+        TKG2d
+        TKGeomBase
+        TKGeomAlgo
+        TKShHealing
+    )
+    message(STATUS "OpenCASCADE STEP support enabled (POLYMESH_WITH_OCC)")
 endif()

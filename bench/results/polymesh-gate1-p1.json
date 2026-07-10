@@ -3,8 +3,10 @@
     "schema_version": 1,
     "solver": "PolyMesh",
     "version": "0.1.0",
+    "label": "gate1-p1",
+    "timestamp": "2026-07-10T00:00:00Z",
     "case_id": "timoshenko-cantilever",
-    "dofs": null,
+    "dofs": 1440,
     "wall_time_s": {
       "mesh": null,
       "solve": null,
@@ -12,19 +14,19 @@
     },
     "accuracy": {
       "name": "tip_rel_err_pct",
-      "value": 1.50,
+      "value": 1.5,
       "unit": "percent"
     },
-    "label": "gate1-p1",
-    "timestamp": "2026-07-10T00:00:00Z",
-    "notes": "hex20 gravity-loaded cantilever; tip err from docs/progress.md. total ≈ ctest wall (structured mesh + solve)."
+    "notes": "hex20 gravity cantilever; tip err from GATE1 report. dofs\u22481440 free (hex20 16\u00d72\u00d72, root face fixed; estimate). total \u2248 ctest wall (structured mesh + solve)."
   },
   {
     "schema_version": 1,
     "solver": "PolyMesh",
     "version": "0.1.0",
+    "label": "gate1-p1",
+    "timestamp": "2026-07-10T00:00:00Z",
     "case_id": "lame-cylinder",
-    "dofs": null,
+    "dofs": 1257,
     "wall_time_s": {
       "mesh": null,
       "solve": null,
@@ -35,16 +37,16 @@
       "value": 0.0068,
       "unit": "percent"
     },
-    "label": "gate1-p1",
-    "timestamp": "2026-07-10T00:00:00Z",
-    "notes": "hex20 sector; u_r at inner wall. Companion hoop err 1.36% (see hoop entry). total ≈ ctest wall."
+    "notes": "hex20 sector nr=4 nt=12 nz=1; u_r at inner wall. dofs=1257 (=3\u00d7nnodes; free DOFs after BC lower). Companion hoop err 1.36% (see hoop entry). total \u2248 ctest wall."
   },
   {
     "schema_version": 1,
     "solver": "PolyMesh",
     "version": "0.1.0",
+    "label": "gate1-p1",
+    "timestamp": "2026-07-10T00:00:00Z",
     "case_id": "lame-cylinder",
-    "dofs": null,
+    "dofs": 1257,
     "wall_time_s": {
       "mesh": null,
       "solve": null,
@@ -55,16 +57,16 @@
       "value": 1.36,
       "unit": "percent"
     },
-    "label": "gate1-p1",
-    "timestamp": "2026-07-10T00:00:00Z",
-    "notes": "hex20 sector; hoop stress at inner wall. Same run as u_r metric."
+    "notes": "hex20 sector; hoop stress at inner wall. Same run as u_r. dofs=1257 (=3\u00d7nnodes estimate)."
   },
   {
     "schema_version": 1,
     "solver": "PolyMesh",
     "version": "0.1.0",
+    "label": "gate1-p1",
+    "timestamp": "2026-07-10T00:00:00Z",
     "case_id": "kirsch-plate",
-    "dofs": null,
+    "dofs": 1509,
     "wall_time_s": {
       "mesh": null,
       "solve": null,
@@ -75,8 +77,6 @@
       "value": 1.87,
       "unit": "percent"
     },
-    "label": "gate1-p1",
-    "timestamp": "2026-07-10T00:00:00Z",
-    "notes": "hex20 annulus, exact field BC; SCF 3.056 vs 3. total ≈ ctest wall."
+    "notes": "hex20 annulus nr=6 nt=10 nz=1, exact field BC; SCF 3.056 vs 3. dofs=1509 (=3\u00d7nnodes estimate). total \u2248 ctest wall."
   }
 ]

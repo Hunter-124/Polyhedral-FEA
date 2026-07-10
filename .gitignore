@@ -2,8 +2,9 @@
 compile_commands.json
 .cache/
 # Holdout geometries are never committed or shown to the implementation loop
-# (BENCHMARKS.md anti-cheat rule 1).
+# (BENCHMARKS.md anti-cheat rule 1). See audits/README.md for protocol.
 /bench/geometries/holdout/
+/audits/local/
 *.vtu
 /polymesh-setup/
 

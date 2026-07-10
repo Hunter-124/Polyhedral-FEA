@@ -90,9 +90,9 @@ and error, export VTU — without CLI.
 
 | ID | Task | Acceptance |
 |----|------|------------|
-| E1 | CalculiX cantilever peer runner green when `ccx` present | JSON under bench/results |
-| E2 | PolyMesh labeled scoreboard points for Lamé + Kirsch | docs/bench/scoreboard.md |
-| E3 | Holdout geometry protocol (audit) | audits/ stub + instructions |
+| E1 | ~~CalculiX cantilever peer runner green when `ccx` present~~ | Done (`run_calculix_cantilever.py`; skip exit 0 if no ccx) |
+| E2 | ~~PolyMesh labeled scoreboard points for Lamé + Kirsch~~ | Done (gate1-p1 JSON + scoreboard; `emit_polymesh_gate1.py`) |
+| E3 | ~~Holdout geometry protocol (audit)~~ | Done (`audits/README.md` stub; no secrets) |
 | E4 | ~~Product mesh → Tier-1 Lamé/Kirsch tests (not only Gmsh import)~~ | Done (box cantilever + cylinder_prism smoke; Lamé tight tol deferred B1) |
 
 ## Track F — Performance (P6)
@@ -143,6 +143,6 @@ A1 A3 ──> A2 A10 ──> A4 A5 A8 ──> A6 A7
 | B Mesh | Grid tet/hex/graded/hexpyr; B1 documented limits (ADR-0015); B2/B3/B4/B5 done. Not true Delaunay. |
 | C Hybrid | C1 done: hex+pyramid product FE (hex→6 pyramids) patch < 1e-12 (ADR-0013). VEM k=1 only. |
 | D Adapt | Seed remesh (ADR-0014) + η target (D2) + auto h0 (D5). Still: p-adapt, local h-refine. |
-| E Verify | P1 Tier-0/1/2 + E4 product-mesh box/cylinder smoke. Tight Lamé on product mesh needs B1. |
+| E Verify | E1–E4 done: CalculiX smoke peer, gate1-p1 Lamé/Kirsch scoreboard, holdout protocol stub, product-mesh smoke. Tight Lamé on product mesh needs better mesher. |
 | F Perf | CPU direct solver only. |
 | G Release | README quickstart (G1); examples/ still open (G2). |

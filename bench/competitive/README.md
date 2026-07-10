@@ -61,15 +61,58 @@ by marketing claims.
 **Not first:** GUI-only commercial demos, or anything that cannot run unattended
 from a shell with a file-based deck.
 
-## CalculiX
+## CalculiX peer (E1)
 
-If `ccx` is not installed, see [`peers/calculix_stub.md`](peers/calculix_stub.md).
-No network package installs are required by this scaffold; peer execution is
-optional until the real runner lands.
+Headless smoke runner (optional peer — not required for CI green):
+
+```sh
+# when ccx is on PATH: writes bench/results/calculix-cantilever-smoke.json
+# and refreshes docs/bench/scoreboard.md
+python3 bench/competitive/peers/run_calculix_cantilever.py
+
+# when ccx is missing: prints a skip message and exits 0 (CI-safe)
+```
+
+| Behavior | Exit | Output |
+|---|---:|---|
+| `ccx` present, deck OK | 0 | JSON row + scoreboard refresh |
+| `ccx` present, deck fails | 1 | stderr from ccx |
+| `ccx` absent | 0 | `ccx not found; skip …` |
+
+Install notes and future Lamé/Kirsch deck plans:
+[`peers/calculix_stub.md`](peers/calculix_stub.md). No network package installs
+from this harness.
+
+## PolyMesh labeled points (E2)
+
+GATE 1 scoreboard rows (Lamé + Kirsch + cantilever) live in
+`bench/results/polymesh-gate1-p1.json`. Accuracy comes from the frozen GATE 1
+report; DOFs are best-effort estimates from structured-mesh dims in the Tier-1
+tests (not hardcoded into `src/`).
+
+Refresh / fill missing fields from the GATE 1 snapshot:
+
+```sh
+# dry-run to stdout
+python3 bench/competitive/emit_polymesh_gate1.py
+
+# write JSON + regenerate scoreboard
+python3 bench/competitive/emit_polymesh_gate1.py --write --render
+```
+
+Or hand-edit a result JSON after `ctest` and re-run
+`python3 bench/competitive/render_scoreboard.py`.
+
+## Holdout audits (E3)
+
+Private geometries are **not** in this tree. Protocol:
+[`audits/README.md`](../../audits/README.md). Agent records metrics only;
+owner keeps reference solutions offline.
 
 ## Adding a labeled PolyMesh point
 
 1. Run the suite (smoke script or full `ctest`).
-2. Drop a JSON under `bench/results/` matching `schema.json`.
+2. Drop a JSON under `bench/results/` matching `schema.json`
+   (or refresh gate1-p1 via `emit_polymesh_gate1.py --write`).
 3. `python3 bench/competitive/render_scoreboard.py`
 4. Commit results + scoreboard together with the label (sha/tag).

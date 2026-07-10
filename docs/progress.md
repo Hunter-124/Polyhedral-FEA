@@ -18,6 +18,10 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: E1/E2/E3 — CalculiX peer `run_calculix_cantilever.py` (skip exit 0
+  without ccx; JSON when present); gate1-p1 Lamé/Kirsch/cantilever scoreboard
+  + `emit_polymesh_gate1.py` best-effort DOF fill; `audits/README.md` holdout
+  protocol (no secret geometries). Scoreboard regenerated.
 - 2026-07-10: B1/B3/B4 — ADR-0015 Cartesian grid-fill limits (not Delaunay);
   surface-snap Jacobian safety (unsnap nodes that invert tet / hex J / pyramid
   volume); README OCC enablement (Ubuntu libocct-* + `POLYMESH_WITH_OCC=ON`);

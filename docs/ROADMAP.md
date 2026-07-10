@@ -140,9 +140,9 @@ A1 A3 ──> A2 A10 ──> A4 A5 A8 ──> A6 A7
 | Track | Status |
 |-------|--------|
 | A GUI | M1 core in: argv open, mesh preview, ZZ error, colorbar, failure dismiss, A6 wireframe/undeformed, A7 drag-drop open, A8 mesh note+DOF. Still: A9 theme GATE. |
-| B Mesh | Grid tet/hex/graded/hexpyr; not true Delaunay. |
+| B Mesh | Grid tet/hex/graded/hexpyr; B2 quality+VTU cell data; B5 fixtures (≥3). Not true Delaunay (B1 open). |
 | C Hybrid | Hex+pyramid topology; hybrid patch nonconforming (ADR-0013). VEM k=1 only. |
-| D Adapt | Seed remesh (ADR-0014); no η target stop, no p-adapt. |
+| D Adapt | Seed remesh (ADR-0014) + η target stop (D2). Still: p-adapt, auto-h polish, local h-refine. |
 | E Verify | P1 Tier-0/1/2 green on imported meshes; product-mesh e2e weak. |
 | F Perf | CPU direct solver only. |
 | G Release | CONTRIBUTING/CHANGES exist; README/examples thin. |

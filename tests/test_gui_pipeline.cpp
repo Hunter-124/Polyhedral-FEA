@@ -184,3 +184,83 @@ TEST_CASE("solve job fills nodal ZZ eta for error-field display") {
     REQUIRE(result->global_eta >= 0.0);
     REQUIRE(result->max_nodal_eta >= 0.0);
 }
+
+namespace {
+
+/// Shared cantilever setup on the unit-ish box STL for SolveJob tests.
+SimSetup cantilever_setup(const Model& model, double mesh_size) {
+    SimSetup setup;
+    setup.mesh_size = mesh_size;
+    setup.mesher = VolumeMesher::kTetFill;
+    setup.youngs_modulus = 70e9;
+    setup.poissons_ratio = 0.33;
+    setup.use_feature_grading = false;
+    int fixed = -1, loaded = -1;
+    for (std::size_t t = 0; t < model.surface.triangles.size(); ++t) {
+        double x = 0;
+        for (auto v : model.surface.triangles[t]) {
+            x += model.surface.vertices[v][0];
+        }
+        if (x < 1e-12) {
+            fixed = model.triangle_region[t];
+        }
+        if (x > 0.29) {
+            loaded = model.triangle_region[t];
+        }
+    }
+    REQUIRE(fixed >= 0);
+    REQUIRE(loaded >= 0);
+    setup.fixtures.insert(fixed);
+    setup.loads[loaded].force = {0, 0, -100};
+    return setup;
+}
+
+std::optional<SolveResult> run_solve_job(const Model& model, const SimSetup& setup) {
+    SolveJob job;
+    job.start(model, setup);
+    for (int i = 0; i < 800; ++i) {
+        if (auto r = job.take_result()) {
+            return r;
+        }
+        if (job.state() == SolveJob::State::kFailed) {
+            FAIL(job.status_text());
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    return std::nullopt;
+}
+
+} // namespace
+
+TEST_CASE("D2: high eta_target early-stops adapt before max passes") {
+    const auto path = write_box_stl(0.1, 0.02, 0.02);
+    const auto model = Model::load(path.string());
+    auto setup = cantilever_setup(model, 0.012);
+    setup.adapt_passes = 2;
+    // Any real ZZ η is finite and ≪ this; stop on pass 0 without remesh.
+    setup.eta_target = 1e100;
+
+    const auto result = run_solve_job(model, setup);
+    REQUIRE(result.has_value());
+    REQUIRE(result->global_eta <= setup.eta_target);
+    REQUIRE(result->mesh_note.find("eta-target stop") != std::string::npos);
+    REQUIRE(result->mesh_note.find("pass=0/2") != std::string::npos);
+    // No adapt remesh: seeds not applied; note must not claim full adapt_passes finish.
+    REQUIRE(result->mesh_note.find("adapt_passes=") == std::string::npos);
+}
+
+TEST_CASE("D2: eta_target=0 leaves adapt path unchanged (no eta-target stop note)") {
+    const auto path = write_box_stl(0.1, 0.02, 0.02);
+    const auto model = Model::load(path.string());
+    auto setup = cantilever_setup(model, 0.012);
+    setup.adapt_passes = 1;
+    setup.eta_target = 0.0; // disabled
+
+    const auto result = run_solve_job(model, setup);
+    REQUIRE(result.has_value());
+    REQUIRE(result->global_eta >= 0.0);
+    REQUIRE(result->mesh_note.find("eta-target stop") == std::string::npos);
+    // Finished either via max passes or Dörfler early-stop — never η-target.
+    REQUIRE((result->mesh_note.find("adapt_passes=") != std::string::npos ||
+             result->mesh_note.find("adapt early-stop") != std::string::npos));
+}

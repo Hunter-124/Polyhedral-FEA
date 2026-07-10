@@ -31,6 +31,7 @@ int usage() {
                "                             volume mesh; optional VTU write\n"
                "  solve <file> -o out.vtu [-h m] [-E Pa] [-nu r]\n"
                "              [--mesher name] [--skin n] [--feature] [--adapt n]\n"
+               "              [--eta-target η]\n"
                "                             mesh + cantilever-style BCs + VTU\n"
                "                             (fix min-x face nodes, load +Fy on max-x)\n"
                "  backend                    print compute backend\n"
@@ -38,7 +39,8 @@ int usage() {
                "mesher names: tet (default), hex, hexvem|vem, graded, hexpyr|transition\n"
                "--skin n: graded-tet fine skin layers (default 2)\n"
                "--feature: refine graded mesh near sharp edges (default off in CLI)\n"
-               "--adapt n: ZZ→Dörfler remesh passes (local seeds on graded path)\n",
+               "--adapt n: ZZ→Dörfler remesh passes (local seeds on graded path)\n"
+               "--eta-target η: stop adapt when global ZZ η ≤ η (0=off; needs --adapt)\n",
                stderr);
     return 2;
 }
@@ -136,6 +138,7 @@ int cmd_solve(std::span<char*> args) {
     int skin = 2;
     bool feature = false;
     int adapt_passes = 0;
+    double eta_target = 0.0;
     for (std::size_t i = 3; i < args.size(); ++i) {
         if (std::strcmp(args[i], "-h") == 0 && i + 1 < args.size()) {
             h = std::atof(args[++i]);
@@ -158,6 +161,11 @@ int cmd_solve(std::span<char*> args) {
             adapt_passes = std::atoi(args[++i]);
             if (adapt_passes < 0) {
                 adapt_passes = 0;
+            }
+        } else if (std::strcmp(args[i], "--eta-target") == 0 && i + 1 < args.size()) {
+            eta_target = std::atof(args[++i]);
+            if (eta_target < 0.0) {
+                eta_target = 0.0;
             }
         } else {
             return usage();
@@ -229,6 +237,11 @@ int cmd_solve(std::span<char*> args) {
         }
         u = polymesh::fea::solve_elastostatics(vol.mesh, mat, bc, loads);
         zz = polymesh::fea::recover_zz(vol.mesh, mat, u);
+        if (eta_target > 0.0 && zz.global_eta <= eta_target) {
+            std::printf("eta-target stop: η=%.4g ≤ %.4g at pass %d/%d\n", zz.global_eta,
+                        eta_target, pass, adapt_passes);
+            break;
+        }
         if (pass < adapt_passes) {
             std::vector<Eigen::Vector3d> cents;
             cents.reserve(vol.mesh.elements.size());

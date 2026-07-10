@@ -495,6 +495,19 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 }
                 const auto u_try = fea::solve_elastostatics(vol.mesh, material, bc, loads);
                 const auto zz_try = fea::recover_zz(vol.mesh, material, u_try);
+                // D2: global η target — stop when η is small enough (0 = disabled).
+                if (setup.eta_target > 0.0 && zz_try.global_eta <= setup.eta_target) {
+                    SolveResult r;
+                    r.mesh_note =
+                        std::format("{} | eta-target stop η={:.4g}≤{:.4g} pass={}/{} h={:.4g}",
+                                    vol.mesher_note, zz_try.global_eta, setup.eta_target, pass,
+                                    setup.adapt_passes, h_use);
+                    r.volume_mesh = std::move(vol.mesh);
+                    r.boundary_quads = std::move(vol.boundary_quads);
+                    fill_result_fields(r, zz_try, u_try);
+                    result_ = std::move(r);
+                    break;
+                }
                 if (pass < setup.adapt_passes) {
                     const auto cents = element_centroids(vol.mesh);
                     const auto sug = adapt::suggest_refine(cents, zz_try.element_eta, h_use,

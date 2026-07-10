@@ -4,13 +4,14 @@
 **Master plan:** [`docs/ROADMAP.md`](ROADMAP.md) · **Agent loop:**
 [`docs/process/agent-loop.md`](process/agent-loop.md)
 
-**Active:** Track **H** mesher honesty/perf overhaul — wave 2 partially landed
-(compile-clean, full ctest **not re-run** after last edits — handoff mid-flight).
+**Active:** Track **H** mesher honesty/perf overhaul — wave 2 on Windows.
 Plan: [`docs/plans/mesher-solver-overhaul.md`](plans/mesher-solver-overhaul.md).
 Remaining owner-facing gate: **A9** theme polish ⛔ GATE 6.5.
 
-**Handoff (next machine):** `cmake --build build -j && ctest --test-dir build -j`
-then fix any red tests; close E1 (docs/scoreboard) if green.
+**Windows (2026-07-10):** Release + GUI builds with MSVC 19.51 / VS 18 + vcpkg
+(`eigen3`, `nlohmann-json`, `glad`). CLI mesh + GUI launch smoke OK. Root
+binaries: `polymesh.exe`, `polymesh-gui.exe`. Full ctest not fully signed off
+this pass (earlier Unicode Catch names + VTU temp locks fixed; suite can re-run).
 
 GATE 1 deliverables ready:
 - Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)
@@ -22,6 +23,56 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: **Curved mesh scorecard + graded free-surface fixes (T0/Q1–Q2)** —
+  New `mesh/surface_metrics` (M1 node residual, M2 face-sample residual, M3 volume
+  error, M4 radial, M5 azimuth gap, M6 boundary aspect + composite). Catch2
+  `test_curved_mesh_quality` on sphere / cylinder_prism / `test.stl` hole plate:
+  hex must pass floor; graded/hybrid documented under bug ceilings and lag hex
+  (flip assertions after residual wins). Fixes: LEB free-edge midpoints project
+  onto STL with Jacobian chord fallback (`local_refine` + surface arg from graded
+  fill); post-LEB snap uses only unpaired-face nodes; unsnap line-search
+  0.75→0.5→0.25; graded curvature seeds spatial-thinned like hybrid (0.75h /
+  cap 256). Related mesher suite green. Remaining: flip scorecard to pass bars
+  when graded residual on hole plate beats hex competitiveness; hybrid free-
+  surface size consistency (S4); graded perf after quality.
+- 2026-07-10: **Hybrid zoo v3 true size adaptivity (hole transition usable)** —
+  Root cause of “no adaptive size”: hybrid only swapped hex↔pyramid at fixed `h`.
+  Fix: **2:1 fine** (2×2×2 hex @ h/2) on feature/seed cells + **pyramid transition
+  cells** on interior coarse neighbors (no hanging faces). Free-surface never hosts
+  transitions (gap-close 2 hops only — long FS BFS flooded flat faces). Spatial
+  seed thinning (min sep 0.75h, cap 256) so hole wall is refined **all around**
+  (index-order 192-seed cap had clustered one sector). Post-expand surface snap
+  (pyramid Jacobian) → snap max|d|≈0. Graded tet unchanged multi-level LEB path.
+  **Scoreboard (`tests/fixtures/test.stl`, auto+feature):** hybrid ~280k pyr /
+  ~3.7 s, h_bulk=1.59/h_fine=0.79, fine_cells=3399 transition=2856 feature=1876,
+  curv_seeds=168, snap≈0, azimuthal short-edge coverage uniform; graded ~153k
+  tet / ~3.2 s, snap mean|d|≈0.008 max 0.645 (ADR-0015). Shots:
+  `bench/mesher/shots/test_{hybrid,graded}{,_hole,_hole_iso,_hole_top}.png`.
+  Catch2 hybrid/mixed/graded green (incl. 2:1 size test).
+- 2026-07-10: **Hole transition + adaptive size (verified on `test.stl`)** —
+  Snap: smarter feature prefer (rim only, not hole wall), soft-then-full unsnap,
+  pre-LEB + post-LEB + accept/reject residual reproject. Auto-h: Rκ/6 (~6 bulk
+  cells across hole radius). Feature/seed bands widened (2h / 1.6h); L2 feature
+  core 0.75×band. **Free-surface skin flood OFF when feature/seed grading is on**
+  so L0 bulk vs L1/L2 hole contrast is visible (was flooding whole exterior →
+  uniform look). Hole-zoom harness: `scripts/vtu_wire_png.py --hole-zoom`.
+  Residual graded max|d| still ~0.4h on few unsnapped Kuhn nodes (ADR-0015).
+- 2026-07-10: **Adaptive size + surface quality (mesher product fix)** —
+  Multi-level graded LEB (L0 bulk / L1 feature / L2 high-κ → ~h, h/2, h/4);
+  thin plates skip free-surface flood when feature grading is on (size contrast);
+  **post-LEB exterior recollect + re-snap** (mid-edge hole nodes no longer miss
+  snap); edge-aware snap prefers sharp CAD creases; auto-h no longer densifies
+  from STL facet count (uses Rκ/thickness; dens floor 0.88). Hybrid: same thin
+  + edge snap; octa cell budget. Hole-plate (`test.stl`) auto: graded ~69k /
+  1.3s, hybrid ~36k / 0.6s (was multi-million / unusable). Harness:
+  `scripts/mesh_preview.py` (90s timeout) + `scripts/vtu_wire_png.py` →
+  `bench/mesher/shots/`. Catch2 graded multi-level size ratio + conformity green.
+- 2026-07-10: **Graded tet interactive again (LEB perf)** — `local_refine_tets`
+  was O(n²) (full-mesh edge scan + rebuild every bisection); edge→tet adjacency
+  + in-place child replace. Graded fill uses **one** LEB pass for true 2:1
+  (second pass re-marked the same cells → ~4:1 and multi-minute freezes). Auto-h
+  unit_box graded+feature: ~70 s → **~0.5 s**; public STLs graded ≈ hybrid.
+  Catch2 local_refine + graded + conformity green. Root `polymesh*.exe` rebuilt.
 - 2026-07-10: **Mesher overhaul wave 2 (WIP handoff)** — H2: hybrid zoo → hex
   bulk + pyramid skin, product FE expands hex→pyramids (removed Kuhn-hex
   assembly); O1: experimental `octa_fill` + `VolumeMesher::kOctahedral` +

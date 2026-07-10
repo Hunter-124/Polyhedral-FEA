@@ -195,9 +195,11 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             }
         }
         out.boundary_quads = std::move(fill.boundary_quads);
-        out.mesher_note =
-            std::format("hex+pyramid transition v1: {} hex, {} pyramids, {} nodes, h={:.4g} m",
-                        fill.n_hex, fill.n_pyramid, out.mesh.nodes.size(), fill_h);
+        out.mesher_note = std::format(
+            "hex+pyramid transition v1: {} hex, {} pyramids, {} nodes, h={:.4g} m, "
+            "boundary max|d|={:.3g} m",
+            fill.n_hex, fill.n_pyramid, out.mesh.nodes.size(), fill_h,
+            fill.boundary_max_distance);
     } else if (mesher == VolumeMesher::kGradedTet) {
         auto graded = mesh::graded_tet_fill_surface(
             model.surface, model.bbox_min, model.bbox_max, h, std::max(1, skin_layers));

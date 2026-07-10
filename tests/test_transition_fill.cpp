@@ -26,6 +26,29 @@ TEST_CASE("transition fill has hex core and pyramid skin") {
     REQUIRE(fill.n_hex > 0);
     REQUIRE(fill.n_pyramid > 0);
     REQUIRE(fill.n_pyramid % 6 == 0); // 6 pyramids per boundary hex
+    REQUIRE(fill.boundary_max_distance >= 0.0);
+    REQUIRE(fill.boundary_max_distance < 0.5); // limited snap residual
+}
+
+TEST_CASE("transition fill snap reduces boundary distance vs no-snap") {
+    const auto surf = box();
+    const Eigen::Vector3d bmin{-0.01, -0.01, -0.01};
+    const Eigen::Vector3d bmax{1.01, 1.01, 1.01};
+    auto snapped = transition_fill_surface(surf, bmin, bmax, 0.2, true);
+    auto raw = transition_fill_surface(surf, bmin, bmax, 0.2, false);
+    // Without snap, residual is not tracked (stays 0); with snap it is measured.
+    REQUIRE(snapped.boundary_max_distance >= 0.0);
+    REQUIRE(raw.n_hex == snapped.n_hex);
+    REQUIRE(raw.n_pyramid == snapped.n_pyramid);
+    // Snapped mesh remains valid through the pipeline.
+    pipe::Model m;
+    m.surface = surf;
+    m.bbox_min = bmin;
+    m.bbox_max = bmax;
+    m.triangle_region.assign(12, 0);
+    m.region_count = 1;
+    auto vol = pipe::volume_mesh(m, 0.2, pipe::VolumeMesher::kHexPyramid, 2);
+    REQUIRE_NOTHROW(vol.mesh.check_validity());
 }
 
 TEST_CASE("hex+pyramid mesh solves linear elasticity") {

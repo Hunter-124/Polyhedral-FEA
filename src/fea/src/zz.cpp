@@ -55,16 +55,46 @@ ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
     std::vector<Eigen::Vector3d> el_cent(n_elem);
     for (std::size_t e = 0; e < n_elem; ++e) {
         const auto& el = mesh.elements[e];
+        el_cent[e] = element_centroid(mesh, el);
         if (el.type == ElementType::kPolyVem) {
-            el_cent[e] = element_centroid(mesh, el);
             el_stress[e].setZero();
+            continue;
+        }
+        // Pyramid: average tet-split stresses (matches stiffness assembly).
+        if (el.type == ElementType::kPyramid5 && el.nodes.size() == 5) {
+            const auto& n = el.nodes;
+            auto tet_stress = [&](std::uint32_t a, std::uint32_t b, std::uint32_t c,
+                                  std::uint32_t apex) -> Stress {
+                NodalElement tet{ElementType::kTet4, {a, b, c, apex}};
+                const Eigen::Vector3d& pa = mesh.nodes[a];
+                const Eigen::Vector3d& pb = mesh.nodes[b];
+                const Eigen::Vector3d& pc = mesh.nodes[c];
+                const Eigen::Vector3d& pd = mesh.nodes[apex];
+                const double vol = (pb - pa).dot((pc - pa).cross(pd - pa));
+                if (vol < 0.0) {
+                    tet.nodes = {a, c, b, apex};
+                }
+                Eigen::Matrix<double, Eigen::Dynamic, 3> x(4, 3);
+                for (std::size_t i = 0; i < 4; ++i) {
+                    x.row(static_cast<Eigen::Index>(i)) =
+                        mesh.nodes[tet.nodes[i]].transpose();
+                }
+                const auto ref = reference_nodes(ElementType::kTet4);
+                Eigen::Vector3d xi = Eigen::Vector3d::Zero();
+                for (const auto& r : ref) {
+                    xi += r;
+                }
+                xi /= static_cast<double>(ref.size());
+                return stress_at(tet, x, u, d, xi);
+            };
+            el_stress[e] = 0.5 * (tet_stress(n[0], n[1], n[2], n[4]) +
+                                  tet_stress(n[0], n[2], n[3], n[4]));
             continue;
         }
         Eigen::Matrix<double, Eigen::Dynamic, 3> x(el.nodes.size(), 3);
         for (std::size_t a = 0; a < el.nodes.size(); ++a) {
             x.row(static_cast<Eigen::Index>(a)) = mesh.nodes[el.nodes[a]].transpose();
         }
-        el_cent[e] = element_centroid(mesh, el);
         // Reference centroid: average of reference nodes.
         const auto ref = reference_nodes(el.type);
         Eigen::Vector3d xi = Eigen::Vector3d::Zero();

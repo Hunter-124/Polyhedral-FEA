@@ -6,6 +6,7 @@
 #include "fea/solve.hpp"
 #include "fea/vtu.hpp"
 #include "fea/zz.hpp"
+#include "fea/vem.hpp"
 #include "geom/features.hpp"
 #include "geom/step.hpp"
 #include "geom/stl.hpp"
@@ -151,19 +152,26 @@ Model Model::load(const std::string& path, double sharp_angle_deg) {
 VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher) {
     VolumeMeshOutput out;
     double fill_h = h;
-    if (mesher == VolumeMesher::kHexFill) {
+    if (mesher == VolumeMesher::kHexFill || mesher == VolumeMesher::kHexVem) {
         auto fill = mesh::hex_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
         fill_h = fill.h;
         out.mesh.nodes = std::move(fill.nodes);
         out.mesh.elements.reserve(fill.hexes.size());
         for (const auto& hx : fill.hexes) {
-            out.mesh.elements.push_back(
-                fea::NodalElement{fea::ElementType::kHex8,
-                                  {hx[0], hx[1], hx[2], hx[3], hx[4], hx[5], hx[6], hx[7]}});
+            fea::NodalElement el{fea::ElementType::kHex8,
+                                 {hx[0], hx[1], hx[2], hx[3], hx[4], hx[5], hx[6], hx[7]}};
+            if (mesher == VolumeMesher::kHexVem) {
+                auto poly = fea::hex8_as_poly(el);
+                el.type = fea::ElementType::kPolyVem;
+                el.faces = std::move(poly.faces);
+            }
+            out.mesh.elements.push_back(std::move(el));
         }
         out.boundary_quads = std::move(fill.boundary_quads);
-        out.mesher_note = std::format("hex grid fill v1: {} hex8, {} nodes, h={:.4g} m",
-                                      out.mesh.elements.size(), out.mesh.nodes.size(), fill_h);
+        out.mesher_note =
+            std::format("{} grid fill v1: {} cells, {} nodes, h={:.4g} m",
+                        mesher == VolumeMesher::kHexVem ? "hex-VEM" : "hex",
+                        out.mesh.elements.size(), out.mesh.nodes.size(), fill_h);
     } else {
         auto fill = mesh::tet_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
         fill_h = fill.h;

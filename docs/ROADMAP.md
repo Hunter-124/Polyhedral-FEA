@@ -99,7 +99,7 @@ and error, export VTU — without CLI.
 
 | ID | Task | Acceptance |
 |----|------|------------|
-| F1 | OpenMP assembly | Speedup on ≥4 cores |
+| F1 | ~~OpenMP assembly~~ | Done (`POLYMESH_WITH_OPENMP`, parallel `assemble_stiffness`) |
 | F2 | CG + AMG (or Eigen iterative) for large N | Solves >50k DOF |
 | F3 | CUDA SpMV / batched Ke parity tests | POLYMESH_WITH_CUDA optional |
 

@@ -14,6 +14,8 @@ other — not glued together after the fact.
   general polyhedra (VEM).
 - **Geometry- and solution-driven adaptivity** (sizing, hp, local remesh).
 - **Linear elastostatics** (3D), STL (STEP via OpenCASCADE option), VTU export.
+- **Optional OpenMP** for multi-threaded element stiffness assembly when the toolchain
+  provides it; serial path always builds.
 - **Optional CUDA** for kernels where f64 parallelism wins; CPU path always exists.
 - **Verified**: patch tests, manufactured-solution convergence orders, analytical
   Tier-1 cases — see [docs/benchmarks.md](docs/benchmarks.md).
@@ -54,6 +56,9 @@ sudo apt-get install -y --no-install-recommends \
 Optional:
 
 - **OpenCASCADE** (`POLYMESH_WITH_OCC=ON`) for STEP/B-rep — see [STEP / OpenCASCADE](#step--opencascade-polymesh_with_occ) below.
+- **OpenMP** (`POLYMESH_WITH_OPENMP=ON`, default) for parallel stiffness assembly — uses
+  libgomp with GCC; on Clang install `libomp-dev`. If OpenMP is missing, the build stays
+  serial (no hard dependency).
 - **CUDA** (`POLYMESH_WITH_CUDA=ON`) for GPU backends — requires a toolkit; CPU path always builds.
 - **clang-format 18** for style checks: `pip install 'clang-format==18.1.8'` (or use the version on `PATH`).
 
@@ -122,10 +127,20 @@ via Catch2, not the window.
 ## Building (options)
 
 ```sh
-cmake -B build -DPOLYMESH_WITH_OCC=ON    # STEP/B-rep (OpenCASCADE)
-cmake -B build -DPOLYMESH_WITH_CUDA=ON   # GPU backends
-cmake -B build -DPOLYMESH_WITH_GUI=OFF   # libs + CLI + tests only
+cmake -B build -DPOLYMESH_WITH_OCC=ON     # STEP/B-rep (OpenCASCADE)
+cmake -B build -DPOLYMESH_WITH_CUDA=ON    # GPU backends
+cmake -B build -DPOLYMESH_WITH_OPENMP=OFF # force serial assembly
+cmake -B build -DPOLYMESH_WITH_GUI=OFF    # libs + CLI + tests only
 ```
+
+### OpenMP assembly (`POLYMESH_WITH_OPENMP`)
+
+When CMake finds OpenMP (default **ON**), `fea::assemble_stiffness` forms element
+stiffness matrices over elements in parallel (`#pragma omp parallel for`), writing
+thread-local sparse triplets and merging without a critical section in the hot loop.
+Results match the serial path within patch-test / Tier-0 tolerances. Disable with
+`-DPOLYMESH_WITH_OPENMP=OFF`, or leave ON when the compiler has no OpenMP — the build
+then falls back to serial assembly automatically.
 
 ### STEP / OpenCASCADE (`POLYMESH_WITH_OCC`)
 

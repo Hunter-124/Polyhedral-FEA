@@ -9,8 +9,15 @@
 #include <Eigen/Geometry>
 
 #include <array>
+#include <atomic>
 #include <format>
+#include <iterator>
+#include <string>
 #include <vector>
+
+#if defined(POLYMESH_WITH_OPENMP)
+#include <omp.h>
+#endif
 
 namespace polymesh::fea {
 namespace {
@@ -124,9 +131,12 @@ Eigen::SparseMatrix<double> assemble_stiffness(const NodalMesh& mesh,
                                                const Material& material) {
     mesh.check_validity();
     const Eigen::Index ndof = 3 * static_cast<Eigen::Index>(mesh.nodes.size());
-    std::vector<Eigen::Triplet<double>> triplets;
-    for (const auto& element : mesh.elements) {
-        const auto k = element_stiffness(mesh, element, material);
+    const auto ne = static_cast<std::ptrdiff_t>(mesh.elements.size());
+
+    // Scatter one element's Ke into a triplet buffer (shared helper for serial
+    // and per-thread OpenMP paths so the contribution pattern stays identical).
+    auto scatter_element = [](const NodalElement& element, const Eigen::MatrixXd& k,
+                              std::vector<Eigen::Triplet<double>>& triplets) {
         const auto n = static_cast<Eigen::Index>(element.nodes.size());
         for (Eigen::Index a = 0; a < n; ++a) {
             for (Eigen::Index b = 0; b < n; ++b) {
@@ -143,7 +153,62 @@ Eigen::SparseMatrix<double> assemble_stiffness(const NodalMesh& mesh,
                 }
             }
         }
+    };
+
+    std::vector<Eigen::Triplet<double>> triplets;
+
+#if defined(POLYMESH_WITH_OPENMP)
+    // Thread-local triplets, critical-free during the element loop, then merge
+    // in thread-id order. setFromTriplets sums duplicate (i,j) entries; patch
+    // tests / Tier-0 remain exact within tol (same math as serial).
+    std::vector<std::vector<Eigen::Triplet<double>>> per_thread;
+    std::string parallel_error;
+    std::atomic<bool> had_error{false};
+#pragma omp parallel
+    {
+#pragma omp single
+        per_thread.resize(static_cast<std::size_t>(omp_get_num_threads()));
+        auto& local = per_thread[static_cast<std::size_t>(omp_get_thread_num())];
+#pragma omp for schedule(static) nowait
+        for (std::ptrdiff_t e = 0; e < ne; ++e) {
+            if (had_error.load(std::memory_order_relaxed)) {
+                continue;
+            }
+            try {
+                const auto& element = mesh.elements[static_cast<std::size_t>(e)];
+                const auto k = element_stiffness(mesh, element, material);
+                scatter_element(element, k, local);
+            } catch (const std::exception& ex) {
+#pragma omp critical(polymesh_assemble_stiffness_error)
+                {
+                    if (!had_error.load(std::memory_order_relaxed)) {
+                        parallel_error = ex.what();
+                        had_error.store(true, std::memory_order_relaxed);
+                    }
+                }
+            }
+        }
     }
+    if (had_error.load(std::memory_order_relaxed)) {
+        throw FeaError(parallel_error);
+    }
+    std::size_t total = 0;
+    for (const auto& buf : per_thread) {
+        total += buf.size();
+    }
+    triplets.reserve(total);
+    for (auto& buf : per_thread) {
+        triplets.insert(triplets.end(), std::make_move_iterator(buf.begin()),
+                        std::make_move_iterator(buf.end()));
+    }
+#else
+    for (std::ptrdiff_t e = 0; e < ne; ++e) {
+        const auto& element = mesh.elements[static_cast<std::size_t>(e)];
+        const auto k = element_stiffness(mesh, element, material);
+        scatter_element(element, k, triplets);
+    }
+#endif
+
     Eigen::SparseMatrix<double> global(ndof, ndof);
     global.setFromTriplets(triplets.begin(), triplets.end());
     return global;

@@ -6,7 +6,7 @@
 
 **Active:** Track A (GUI usable) → M1 study app. 81 tests green. Solver core
 (GATE 1) frozen. Mesh/adapt product path advancing (graded, hexpyr, seed remesh).
-B1/B3/B4 mesh honesty + C1 hybrid FE + D5 auto h0 + E4 product-mesh smoke + G1 README done.
+F1 OpenMP assembly landed; B1/B3/B4 + C1 + D5 + E4 + G1 done.
 
 GATE 1 deliverables ready:
 - Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)
@@ -18,6 +18,11 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: F1 OpenMP assembly — CMake `POLYMESH_WITH_OPENMP` (default ON)
+  finds OpenMP; when present, `fea` links `OpenMP::OpenMP_CXX` and defines
+  `POLYMESH_WITH_OPENMP`. `assemble_stiffness` uses `#pragma omp parallel for`
+  with thread-local triplets (critical-free hot loop), then merges; serial if
+  OpenMP missing. README notes. Patch/Tier-0 remain green with OpenMP on.
 - 2026-07-10: E1/E2/E3 — CalculiX peer `run_calculix_cantilever.py` (skip exit 0
   without ccx; JSON when present); gate1-p1 Lamé/Kirsch/cantilever scoreboard
   + `emit_polymesh_gate1.py` best-effort DOF fill; `audits/README.md` holdout

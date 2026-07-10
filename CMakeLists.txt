@@ -11,6 +11,7 @@ set(CMAKE_FIND_PACKAGE_NO_PACKAGE_REGISTRY ON)
 
 option(POLYMESH_WITH_OCC "Build B-rep/STEP support via OpenCASCADE (ADR-0001)" OFF)
 option(POLYMESH_WITH_CUDA "Build CUDA backends for parallelizable kernels (ADR-0008)" OFF)
+option(POLYMESH_WITH_OPENMP "Use OpenMP for element stiffness assembly when available" ON)
 option(POLYMESH_WITH_GUI "Build the desktop GUI (GLFW + Dear ImGui + OpenGL)" ON)
 option(POLYMESH_BUILD_TESTS "Build the test suite" ON)
 

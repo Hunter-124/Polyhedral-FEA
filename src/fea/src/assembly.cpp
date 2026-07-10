@@ -6,6 +6,7 @@
 #include "fea/vem.hpp"
 
 #include <Eigen/Dense>
+#include <Eigen/Geometry>
 
 #include <format>
 #include <vector>
@@ -55,6 +56,45 @@ Eigen::MatrixXd element_stiffness(const NodalMesh& mesh, const NodalElement& ele
         cell.nodes = element.nodes;
         cell.faces = element.faces;
         return vem_poly_stiffness(mesh, cell, material);
+    }
+    // Pyramid: assemble as two tets (base split 0-1-2 / 0-2-3 + apex). Avoids
+    // fragile isoparametric Jacobians on skewed physical pyramids.
+    if (element.type == ElementType::kPyramid5 && element.nodes.size() == 5) {
+        NodalMesh tmp;
+        tmp.nodes = mesh.nodes;
+        const auto& n = element.nodes;
+        auto tet_k = [&](std::uint32_t a, std::uint32_t b, std::uint32_t c, std::uint32_t d) {
+            NodalElement tet{ElementType::kTet4, {a, b, c, d}};
+            // Ensure positive volume.
+            const Eigen::Vector3d& pa = mesh.nodes[a];
+            const Eigen::Vector3d& pb = mesh.nodes[b];
+            const Eigen::Vector3d& pc = mesh.nodes[c];
+            const Eigen::Vector3d& pd = mesh.nodes[d];
+            const double vol = (pb - pa).dot((pc - pa).cross(pd - pa));
+            if (vol < 0.0) {
+                tet.nodes = {a, c, b, d};
+            }
+            return element_stiffness(mesh, tet, material);
+        };
+        // Map local tet DOFs into the 15 pyramid DOFs.
+        Eigen::MatrixXd k = Eigen::MatrixXd::Zero(15, 15);
+        auto scatter = [&](const Eigen::MatrixXd& kt, const std::array<int, 4>& loc) {
+            for (int a = 0; a < 4; ++a) {
+                for (int b = 0; b < 4; ++b) {
+                    for (int i = 0; i < 3; ++i) {
+                        for (int j = 0; j < 3; ++j) {
+                            k(3 * loc[static_cast<std::size_t>(a)] + i,
+                              3 * loc[static_cast<std::size_t>(b)] + j) +=
+                                kt(3 * a + i, 3 * b + j);
+                        }
+                    }
+                }
+            }
+        };
+        // local indices: base 0,1,2,3 apex 4
+        scatter(tet_k(n[0], n[1], n[2], n[4]), {{0, 1, 2, 4}});
+        scatter(tet_k(n[0], n[2], n[3], n[4]), {{0, 2, 3, 4}});
+        return k;
     }
     const auto x = element_coords(mesh, element);
     const auto d = material.d_matrix();

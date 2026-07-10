@@ -77,6 +77,8 @@ int cmd_mesh(std::span<char*> args) {
                 mesher = polymesh::pipeline::VolumeMesher::kHexVem;
             } else if (m == "graded") {
                 mesher = polymesh::pipeline::VolumeMesher::kGradedTet;
+            } else if (m == "hexpyr" || m == "transition") {
+                mesher = polymesh::pipeline::VolumeMesher::kHexPyramid;
             } else {
                 mesher = polymesh::pipeline::VolumeMesher::kTetFill;
             }

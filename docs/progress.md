@@ -1,7 +1,7 @@
 # PROGRESS
 
 ## Current phase
-**Active development on master.** 60 tests green. Element zoo: tet4/10, hex8/20, prism6, pyramid5, poly VEM k=1. Meshers: tet/hex/hex-VEM/graded-tet.
+**Active development on master.** 62 tests green. Meshers include hex+pyramid transition (true hybrid). Element zoo: tet/hex/prism/pyramid/VEM.
 
 GATE 1 deliverables ready:
 - Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)

@@ -9,6 +9,7 @@
 #include "geom/features.hpp"
 #include "geom/step.hpp"
 #include "geom/stl.hpp"
+#include "mesh/hex_fill.hpp"
 #include "mesh/quality.hpp"
 #include "mesh/tet_fill.hpp"
 
@@ -147,29 +148,45 @@ Model Model::load(const std::string& path, double sharp_angle_deg) {
     return model;
 }
 
-VolumeMeshOutput volume_mesh(const Model& model, double h) {
-    auto fill = mesh::tet_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
-
+VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher) {
     VolumeMeshOutput out;
-    out.mesh.nodes = std::move(fill.nodes);
-    out.mesh.elements.reserve(fill.tets.size());
-    for (const auto& tet : fill.tets) {
-        out.mesh.elements.push_back(
-            fea::NodalElement{fea::ElementType::kTet4, {tet[0], tet[1], tet[2], tet[3]}});
-    }
-    out.boundary_quads = std::move(fill.boundary_quads);
-    std::vector<std::array<std::uint32_t, 4>> tet_ids;
-    tet_ids.reserve(out.mesh.elements.size());
-    for (const auto& el : out.mesh.elements) {
-        if (el.nodes.size() == 4) {
-            tet_ids.push_back({el.nodes[0], el.nodes[1], el.nodes[2], el.nodes[3]});
+    double fill_h = h;
+    if (mesher == VolumeMesher::kHexFill) {
+        auto fill = mesh::hex_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
+        fill_h = fill.h;
+        out.mesh.nodes = std::move(fill.nodes);
+        out.mesh.elements.reserve(fill.hexes.size());
+        for (const auto& hx : fill.hexes) {
+            out.mesh.elements.push_back(
+                fea::NodalElement{fea::ElementType::kHex8,
+                                  {hx[0], hx[1], hx[2], hx[3], hx[4], hx[5], hx[6], hx[7]}});
         }
+        out.boundary_quads = std::move(fill.boundary_quads);
+        out.mesher_note = std::format("hex grid fill v1: {} hex8, {} nodes, h={:.4g} m",
+                                      out.mesh.elements.size(), out.mesh.nodes.size(), fill_h);
+    } else {
+        auto fill = mesh::tet_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
+        fill_h = fill.h;
+        out.mesh.nodes = std::move(fill.nodes);
+        out.mesh.elements.reserve(fill.tets.size());
+        for (const auto& tet : fill.tets) {
+            out.mesh.elements.push_back(
+                fea::NodalElement{fea::ElementType::kTet4, {tet[0], tet[1], tet[2], tet[3]}});
+        }
+        out.boundary_quads = std::move(fill.boundary_quads);
+        std::vector<std::array<std::uint32_t, 4>> tet_ids;
+        tet_ids.reserve(out.mesh.elements.size());
+        for (const auto& el : out.mesh.elements) {
+            if (el.nodes.size() == 4) {
+                tet_ids.push_back({el.nodes[0], el.nodes[1], el.nodes[2], el.nodes[3]});
+            }
+        }
+        const auto q = mesh::summarize_tet4_quality(out.mesh.nodes, tet_ids);
+        out.mesher_note = std::format("tet grid fill v1: {} tet4, {} nodes, h={:.4g} m, "
+                                      "minQ={:.3f}, meanQ={:.3f}, slivers={}",
+                                      out.mesh.elements.size(), out.mesh.nodes.size(), fill_h,
+                                      q.min_aspect, q.mean_aspect, q.n_sliver);
     }
-    const auto q = mesh::summarize_tet4_quality(out.mesh.nodes, tet_ids);
-    out.mesher_note = std::format("tet grid fill v1: {} tet4, {} nodes, h={:.4g} m, "
-                                  "minQ={:.3f}, meanQ={:.3f}, slivers={}",
-                                  out.mesh.elements.size(), out.mesh.nodes.size(), fill.h,
-                                  q.min_aspect, q.mean_aspect, q.n_sliver);
 
     const auto& surf = model.surface;
     std::set<std::uint32_t> boundary_nodes;
@@ -189,7 +206,7 @@ VolumeMeshOutput volume_mesh(const Model& model, double h) {
                 best_region = model.triangle_region[ti];
             }
         }
-        if (best <= 1.5 * h) {
+        if (best <= 1.5 * fill_h) {
             out.boundary_node_region[node] = best_region;
         }
     }
@@ -230,8 +247,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     h_use = std::min(h_use, h * 0.85);
                 }
             }
-            auto vol = volume_mesh(model, h_use);
-            set_status(std::format("solving… ({} tet4 elements, {} nodes)",
+            auto vol = volume_mesh(model, h_use, setup.mesher);
+            set_status(std::format("solving… ({} elements, {} nodes)",
                                    vol.mesh.elements.size(), vol.mesh.nodes.size()));
             state_ = State::kSolving;
 
@@ -275,9 +292,9 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
 
             for (int pass = 0; pass <= setup.adapt_passes; ++pass) {
                 if (pass > 0) {
-                    vol = volume_mesh(model, h_use);
+                    vol = volume_mesh(model, h_use, setup.mesher);
                     apply_bcs();
-                    set_status(std::format("adapt pass {}… ({} tet4)", pass,
+                    set_status(std::format("adapt pass {}… ({} elems)", pass,
                                            vol.mesh.elements.size()));
                 }
                 const auto u_try = fea::solve_elastostatics(vol.mesh, material, bc, loads);

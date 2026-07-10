@@ -13,6 +13,7 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: Hex grid fill option + GUI mesher selector; tet quality notes.
 - 2026-07-10: VEM k=1 polyhedra (patch test + 6 RBM), adapt_passes in pipeline,
   feature grading, CalculiX smoke peer, GUI adapt/feature controls. 50/50 tests.
 - 2026-07-10: Product batch — VTU export, ZZ recovery + Dörfler marking,

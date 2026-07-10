@@ -12,9 +12,10 @@ Adaptive remesh after ZZ recovery:
    to free-surface skin and optional sharp-edge feature bands.
 
 ## Why
-Full local h-refinement with hanging nodes is deferred. Seed balls reuse the
-existing conforming graded tet path and concentrate DOFs where the indicator
-is large without remeshing the whole domain to h_min.
+Seed balls reuse the existing conforming graded tet path and concentrate DOFs
+where the indicator is large without remeshing the whole domain to h_min.
+True local h-refine on tet4 (Rivara LEB, no hanging nodes) is ADR-0016 / D4;
+pipeline tries LEB first on tet/graded-tet adapt passes, then falls back here.
 
 ## CLI / GUI
 - CLI: `polymesh solve … --adapt n`

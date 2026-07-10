@@ -24,6 +24,7 @@ add_executable(polymesh_tests
     test_zz.cpp
     test_vtu.cpp
     test_vem.cpp
+    test_quality.cpp
     support/structured_mesh.cpp
     support/mms.cpp
 )

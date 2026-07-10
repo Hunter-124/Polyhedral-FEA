@@ -1,0 +1,14 @@
+{
+  "name": "l-domain",
+  "citation": "Williams, M.L. (1952). Stress singularities resulting from various boundary conditions in angular corners of plates in extension. ASME J. Appl. Mech. 19:526–528. Re-entrant corner of internal angle 3*pi/2 (L-shaped domain) with free-free edges: the leading mode-I singularity exponent for the Airy stress function is the smallest positive root of sin(lambda*alpha)+lambda*sin(alpha)=0 with alpha=3*pi/2, giving lambda ≈ 0.544483736782464. Displacement ~ r^lambda, stress ~ r^(lambda-1). Under uniform h-refinement the energy-norm error of standard FEM is limited to O(h^lambda) (≈ O(h^0.544)), independent of polynomial order p ≥ 1 — optimal rates require geometric grading (P3/P5). Reference energy is not closed-form; the verification checks the observed self-convergence order against lambda ± 0.2.",
+  "values": {
+    "arm_length_m": 1.0,
+    "arm_width_m": 0.5,
+    "thickness_m": 0.1,
+    "youngs_modulus_pa": 200.0e9,
+    "poissons_ratio": 0.3,
+    "traction_pa": 1.0e6,
+    "singularity_lambda": 0.544483736782464,
+    "theory_energy_order": 0.544483736782464
+  }
+}

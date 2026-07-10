@@ -1,0 +1,13 @@
+{
+  "name": "goodier-cavity",
+  "citation": "Goodier, J.N. (1933). Concentration of stress around spherical and cylindrical inclusions and flaws. ASME J. Appl. Mech. 1:39–44. Infinite elastic solid with a spherical cavity of radius a under remote uniaxial tension T: maximum circumferential stress at the cavity equator is SCF * T with SCF = 3(9-5*nu)/(2(7-5*nu)). For nu = 0.3, SCF = 3(9-1.5)/(2(7-1.5)) = 22.5/11 = 2.045454... . Also derived in Timoshenko & Goodier, Theory of Elasticity, Art. 155. Verification uses a spherical-shell octant of outer radius outer_radius_m with remote uniaxial strain imposed as Dirichlet on the outer surface (Saint-Venant approximation to the infinite body) and symmetry BCs on the coordinate planes. The continuum SCF is approached as outer/cavity grows and the mesh is refined; P1 accepts ≤12% relative error under nodal-averaged recovery (ADR-0009).",
+  "values": {
+    "cavity_radius_m": 0.1,
+    "outer_radius_m": 1.5,
+    "remote_tension_pa": 1.0e6,
+    "youngs_modulus_pa": 200.0e9,
+    "poissons_ratio": 0.3,
+    "scf": 2.045454545454545,
+    "sigma_hoop_max_pa": 2.045454545454545e6
+  }
+}

@@ -13,6 +13,10 @@ add_executable(polymesh_tests
     test_cantilever.cpp
     test_mms_convergence.cpp
     test_lame_cylinder.cpp
+    test_kirsch_plate.cpp
+    test_goodier_cavity.cpp
+    test_l_domain.cpp
+    test_msh.cpp
     test_gui_pipeline.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/scene.cpp
     support/structured_mesh.cpp

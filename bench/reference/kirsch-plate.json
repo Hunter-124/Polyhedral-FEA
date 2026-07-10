@@ -1,7 +1,14 @@
 {
   "name": "kirsch-plate",
-  "citation": "Kirsch, G. (1898). Die Theorie der Elastizität und die Bedürfnisse der Festigkeitslehre. Infinite plate with circular hole under uniaxial remote tension: tangential stress at the hole equator is 3x the remote stress (SCF = 3), independent of E, nu, hole radius.",
+  "citation": "Kirsch, G. (1898). Die Theorie der Elastizität und die Bedürfnisse der Festigkeitslehre. Zeitschrift des Vereines Deutscher Ingenieure 42:797–807. Infinite plate with circular hole of radius a under remote uniaxial tension sigma_inf: in polar form, sigma_theta(r=a, theta=pi/2) = 3 sigma_inf (SCF = 3), independent of E, nu, and a. Stress field (Timoshenko & Goodier, Theory of Elasticity, Art. 35): sigma_r = (sigma/2)(1-a^2/r^2) + (sigma/2)(1-4a^2/r^2+3a^4/r^4)cos2theta; sigma_theta = (sigma/2)(1+a^2/r^2) - (sigma/2)(1+3a^4/r^4)cos2theta; tau_rtheta = -(sigma/2)(1+2a^2/r^2-3a^4/r^4)sin2theta. Verification applies this traction field on a finite annular sector so the finite-domain error is zero in the continuum limit.",
   "values": {
-    "scf": 3.0
+    "hole_radius_m": 0.1,
+    "outer_radius_m": 1.0,
+    "thickness_m": 0.05,
+    "remote_tension_pa": 1.0e6,
+    "youngs_modulus_pa": 200.0e9,
+    "poissons_ratio": 0.3,
+    "scf": 3.0,
+    "sigma_hoop_max_pa": 3.0e6
   }
 }

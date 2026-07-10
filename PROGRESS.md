@@ -1,13 +1,17 @@
 # PROGRESS
 
 ## Current phase
-**P1 nearly complete + GUI v0 shipped (pulled forward from P6.5).**
-- P1 remaining for GATE 1: Kirsch/Goodier/L-domain Tier-1 cases, convergence
-  plots for owner review, Gmsh mesh import.
-- GUI (`polymesh-gui`): STL import, CAD-style face-region picking, fixtures/
-  loads/material/mesh settings, background solve, von Mises + deflection
-  results on deformed shape. Solves via draft voxel mesher v0 until the
-  P2/P3 conforming mesher replaces it.
+**P1 complete — waiting at ⛔ GATE 1 for owner review.**
+
+GATE 1 deliverables ready:
+- Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)
+- MMS convergence orders matching theory
+- Gmsh `.msh` v2.2 ASCII import
+- Convergence report: `bench/reports/p1-gate1-convergence.md`
+- ADR-0009 (Tier-1 verification setups)
+
+Do **not** start P2 until the owner approves GATE 1 (baseline freeze).
+
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
@@ -19,8 +23,12 @@ GATE 0 was approved by owner on 2026-07-09.
   CMake/Ninja workspace (geom, mesh, adapt, fea, bench, cli), STL loader with
   welding, face-based mesh structure with structural validity checker,
   Material/D-matrix, backend dispatch (cpu/cuda), reference-case loader,
-  CLI `check`/`backend` subcommands, 16 Catch2 tests green.
+  CLI `check`/`backend` subcommands, Catch2 tests green.
   CI: warnings-as-errors build + ctest + clang-format + grep audit.
+- 2026-07-10: P1 Tier-1 completion — Kirsch plate (SCF 3.056 vs 3), Goodier
+  cavity (SCF 1.902 vs 2.045), L-domain singularity energy-gap order 1.265
+  vs 2λ=1.089, Gmsh v2.2 import, GATE 1 convergence report, ADR-0009.
+  37/37 tests green.
 
 ## Benchmark table
 | Case | Status |
@@ -28,14 +36,17 @@ GATE 0 was approved by owner on 2026-07-09.
 | Tier 0 patch test (all 4 element types, distorted meshes) | PASS, max error < 1e-12 m |
 | Tier 0 rigid-body modes | PASS (< 1e-12 relative) |
 | Tier 0 single-element eigenvalues (6 zero modes) | PASS |
-| Tier 1 Timoshenko cantilever (hex20, gravity load) | PASS within 3% |
-| Tier 1 Lamé cylinder / Kirsch / Goodier / L-domain | not yet (needs tractions + curved meshes) |
+| Tier 1 Timoshenko cantilever (hex20, gravity load) | PASS, tip err 1.50% (tol 3%) |
+| Tier 1 Lamé cylinder (hex20 sector) | PASS, u_r 0.0068%, hoop 1.36% |
+| Tier 1 Kirsch plate (hex20, exact field BC) | PASS, SCF 3.056 vs 3 (1.87%) |
+| Tier 1 Goodier cavity (hex20 shell, b/a=15) | PASS, SCF 1.902 vs 2.045 (7.0%) |
+| Tier 1 L-domain (hex20, energy-gap order) | PASS, order 1.265 vs 1.089 (±0.35) |
 | Tier 2 MMS convergence | PASS: tet4 0.997, hex8 0.997, tet10 2.000, hex20 2.000 (theory 1/1/2/2, tol ±0.2) |
 | Tier 2 MMS exact-representation sanity (p=2, quadratic field) | PASS (< 1e-9 relative) |
 | Tier 3 performance | not yet (needs P2+ adaptive path) |
 
 ## Open issues
-- GATE 0 review by owner: repo skeleton + ratified decisions.
+- **⛔ GATE 1 owner review** of `bench/reports/p1-gate1-convergence.md`.
 - CLA/DCO policy before first external contribution (ADR-0002).
 - `POLYMESH_WITH_OCC` wiring deferred until P3 consumes exact geometry
   (ADR-0001).
@@ -43,3 +54,5 @@ GATE 0 was approved by owner on 2026-07-09.
   until it is (ADR-0008). RTX 3080 Ti present.
 - Geometric validity checks (watertight, Jacobians, conforming interfaces)
   are P2 scope; only structural checks exist today.
+- Goodier: exact continuum-field BCs + ZZ recovery would tighten SCF further
+  (ADR-0009); P1 bar is 12% with Saint-Venant Dirichlet + nodal averaging.

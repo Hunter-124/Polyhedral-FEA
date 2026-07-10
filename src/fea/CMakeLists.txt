@@ -9,6 +9,7 @@ add_library(fea
     src/solve.cpp
     src/traction.cpp
     src/stress.cpp
+    src/msh.cpp
 )
 target_include_directories(fea PUBLIC include)
 target_link_libraries(fea PUBLIC mesh Eigen3::Eigen PRIVATE polymesh_warnings)

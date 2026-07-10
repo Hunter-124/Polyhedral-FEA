@@ -11,6 +11,7 @@
 #include <format>
 #include <map>
 #include <set>
+#include <unordered_map>
 
 namespace polymesh::mesh {
 namespace {
@@ -34,6 +35,83 @@ constexpr std::array<std::array<int, 3>, 6> kFaceNbr{{
     {{-1, 0, 0}},
     {{1, 0, 0}},
 }};
+
+// Hex8 corner (xi,eta,zeta) signs for trilinear shape functions.
+constexpr std::array<std::array<double, 3>, 8> kHexCornerSigns{{{-1, -1, -1},
+                                                                {1, -1, -1},
+                                                                {1, 1, -1},
+                                                                {-1, 1, -1},
+                                                                {-1, -1, 1},
+                                                                {1, -1, 1},
+                                                                {1, 1, 1},
+                                                                {-1, 1, 1}}};
+
+// 2×2×2 Gauss points (1/√3) matching the product rule used by hex assembly.
+constexpr double kG = 0.5773502691896257;
+constexpr std::array<std::array<double, 3>, 8> kHexGaussPts{{{-kG, -kG, -kG},
+                                                             {kG, -kG, -kG},
+                                                             {-kG, kG, -kG},
+                                                             {kG, kG, -kG},
+                                                             {-kG, -kG, kG},
+                                                             {kG, -kG, kG},
+                                                             {-kG, kG, kG},
+                                                             {kG, kG, kG}}};
+
+double tet_signed_vol(const Eigen::Vector3d& a, const Eigen::Vector3d& b,
+                      const Eigen::Vector3d& c, const Eigen::Vector3d& d) {
+    return (b - a).dot((c - a).cross(d - a)) / 6.0;
+}
+
+/// Isoparametric hex8 Jacobian det at reference `xi` (fea convention:
+/// J(r,c) = d x_c / d xi_r).
+double hex8_jacobian_det(const std::array<Eigen::Vector3d, 8>& x, const Eigen::Vector3d& xi) {
+    Eigen::Matrix3d jac = Eigen::Matrix3d::Zero();
+    for (int a = 0; a < 8; ++a) {
+        const double sx = kHexCornerSigns[static_cast<std::size_t>(a)][0];
+        const double sy = kHexCornerSigns[static_cast<std::size_t>(a)][1];
+        const double sz = kHexCornerSigns[static_cast<std::size_t>(a)][2];
+        const double dxi = 0.125 * sx * (1.0 + sy * xi[1]) * (1.0 + sz * xi[2]);
+        const double deta = 0.125 * sy * (1.0 + sx * xi[0]) * (1.0 + sz * xi[2]);
+        const double dzeta = 0.125 * sz * (1.0 + sx * xi[0]) * (1.0 + sy * xi[1]);
+        const auto& xa = x[static_cast<std::size_t>(a)];
+        jac(0, 0) += dxi * xa[0];
+        jac(0, 1) += dxi * xa[1];
+        jac(0, 2) += dxi * xa[2];
+        jac(1, 0) += deta * xa[0];
+        jac(1, 1) += deta * xa[1];
+        jac(1, 2) += deta * xa[2];
+        jac(2, 0) += dzeta * xa[0];
+        jac(2, 1) += dzeta * xa[1];
+        jac(2, 2) += dzeta * xa[2];
+    }
+    return jac.determinant();
+}
+
+/// True if cell would produce non-positive Jacobian / collapsed volume.
+/// Hex: det J at centre + assembly Gauss points. Pyramid: |tet-split vols| > ε
+/// (assembly may flip orientation).
+bool cell_inverted(const TransitionCell& cell, const std::vector<Eigen::Vector3d>& nodes,
+                   double vol_eps) {
+    if (cell.kind == TransitionCellKind::kHex8) {
+        std::array<Eigen::Vector3d, 8> x{};
+        for (int i = 0; i < 8; ++i) {
+            x[static_cast<std::size_t>(i)] = nodes[cell.nodes[static_cast<std::size_t>(i)]];
+        }
+        if (hex8_jacobian_det(x, Eigen::Vector3d::Zero()) <= 0.0) {
+            return true;
+        }
+        for (const auto& gp : kHexGaussPts) {
+            if (hex8_jacobian_det(x, Eigen::Vector3d(gp[0], gp[1], gp[2])) <= 0.0) {
+                return true;
+            }
+        }
+        return false;
+    }
+    const auto& n = cell.nodes;
+    const double v1 = tet_signed_vol(nodes[n[0]], nodes[n[1]], nodes[n[2]], nodes[n[4]]);
+    const double v2 = tet_signed_vol(nodes[n[0]], nodes[n[2]], nodes[n[3]], nodes[n[4]]);
+    return std::abs(v1) <= vol_eps || std::abs(v2) <= vol_eps;
+}
 
 } // namespace
 
@@ -214,25 +292,67 @@ TransitionFillOutput transition_fill_surface(const geom::TriSurface& surface,
     }
 
     // Limited surface snap on free-boundary lattice nodes (not pyramid apices).
+    // Jacobian safety (B3): unsnap any moved node that inverts a hex or pyramid
+    // so no non-positive Jacobian element reaches the solver.
     if (snap_boundary && !out.boundary_quads.empty()) {
         std::set<std::uint32_t> bnodes;
         for (const auto& q : out.boundary_quads) {
             bnodes.insert(q.begin(), q.end());
         }
+        std::unordered_map<std::uint32_t, Eigen::Vector3d> pre_snap;
+        pre_snap.reserve(bnodes.size());
         for (auto ni : bnodes) {
-            const auto cp = closest_on_surface(surface, out.nodes[ni]);
+            const Eigen::Vector3d p = out.nodes[ni];
+            const auto cp = closest_on_surface(surface, p);
             if (cp.distance > 0.0 && cp.distance < 1.25 * h) {
-                const Eigen::Vector3d delta = cp.point - out.nodes[ni];
+                const Eigen::Vector3d delta = cp.point - p;
                 const double move = std::min(cp.distance, 0.35 * h);
-                out.nodes[ni] += delta * (move / cp.distance);
+                pre_snap.emplace(ni, p);
+                out.nodes[ni] = p + delta * (move / cp.distance);
             }
         }
-        // Residual distance after snap (metres).
+
+        const double vol_eps = 1e-14 * h * h * h;
+        bool progressed = true;
+        while (progressed && !pre_snap.empty()) {
+            progressed = false;
+            std::set<std::uint32_t> offenders;
+            for (const auto& cell : out.cells) {
+                if (!cell_inverted(cell, out.nodes, vol_eps)) {
+                    continue;
+                }
+                for (std::uint8_t i = 0; i < cell.n_nodes; ++i) {
+                    const auto idx = cell.nodes[i];
+                    if (pre_snap.find(idx) != pre_snap.end()) {
+                        offenders.insert(idx);
+                    }
+                }
+            }
+            for (const auto ni : offenders) {
+                const auto it = pre_snap.find(ni);
+                if (it == pre_snap.end()) {
+                    continue;
+                }
+                out.nodes[ni] = it->second;
+                pre_snap.erase(it);
+                progressed = true;
+            }
+        }
+
+        // Residual distance after snap / unsnap (metres).
         double max_d = 0.0;
         for (auto ni : bnodes) {
             max_d = std::max(max_d, closest_on_surface(surface, out.nodes[ni]).distance);
         }
         out.boundary_max_distance = max_d;
+
+        // Hard gate: still-inverted cells must not leave the mesher.
+        for (std::size_t e = 0; e < out.cells.size(); ++e) {
+            if (cell_inverted(out.cells[e], out.nodes, vol_eps)) {
+                throw ValidityError(std::format(
+                    "transition_fill_surface: cell {} non-positive Jacobian after snap", e));
+            }
+        }
     }
     return out;
 }

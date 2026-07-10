@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: BSD-3-Clause
+#include "fea/assembly.hpp"
 #include "fea/solve.hpp"
 #include "mesh/transition_fill.hpp"
 #include "pipeline/scene.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <Eigen/Geometry>
+
+#include <array>
 #include <set>
 #include <string>
 
@@ -52,6 +56,50 @@ TEST_CASE("transition fill snap reduces boundary distance vs no-snap") {
     m.region_count = 1;
     auto vol = pipeline::volume_mesh(m, 0.2, pipeline::VolumeMesher::kHexPyramid, 2);
     REQUIRE_NOTHROW(vol.mesh.check_validity());
+}
+
+TEST_CASE("transition fill snap: no inverted hex/pyramid (B3 Jacobian safety)") {
+    const auto surf = box();
+    const Eigen::Vector3d bmin{-0.01, -0.01, -0.01};
+    const Eigen::Vector3d bmax{1.01, 1.01, 1.01};
+    // Must not throw ValidityError from post-snap Jacobian gate.
+    auto fill = transition_fill_surface(surf, bmin, bmax, 0.2, true);
+    REQUIRE(fill.n_hex + fill.n_pyramid == fill.cells.size());
+    REQUIRE_FALSE(fill.cells.empty());
+
+    // Pyramid tet-split volumes non-collapsed; stiffness accepts every element.
+    auto tet_vol = [](const Eigen::Vector3d& a, const Eigen::Vector3d& b,
+                      const Eigen::Vector3d& c, const Eigen::Vector3d& d) {
+        const Eigen::Vector3d ab = b - a;
+        const Eigen::Vector3d ac = c - a;
+        const Eigen::Vector3d ad = d - a;
+        return ab.dot(ac.cross(ad)) / 6.0;
+    };
+    for (const auto& cell : fill.cells) {
+        if (cell.kind == TransitionCellKind::kPyramid5) {
+            const auto& n = cell.nodes;
+            const double v1 = tet_vol(fill.nodes[n[0]], fill.nodes[n[1]], fill.nodes[n[2]],
+                                      fill.nodes[n[4]]);
+            const double v2 = tet_vol(fill.nodes[n[0]], fill.nodes[n[2]], fill.nodes[n[3]],
+                                      fill.nodes[n[4]]);
+            REQUIRE(std::abs(v1) > 0.0);
+            REQUIRE(std::abs(v2) > 0.0);
+        }
+    }
+
+    // Solver path: stiffness assembly rejects non-positive Jacobians.
+    pipeline::Model m;
+    m.surface = surf;
+    m.bbox_min = bmin;
+    m.bbox_max = bmax;
+    m.triangle_region.assign(12, 0);
+    m.region_count = 1;
+    auto vol = pipeline::volume_mesh(m, 0.2, pipeline::VolumeMesher::kHexPyramid, 2);
+    REQUIRE_NOTHROW(vol.mesh.check_validity());
+    const fea::Material mat{.youngs_modulus = 1e9, .poissons_ratio = 0.3};
+    for (const auto& el : vol.mesh.elements) {
+        REQUIRE_NOTHROW(fea::element_stiffness(vol.mesh, el, mat));
+    }
 }
 
 TEST_CASE("hex+pyramid mesh solves linear elasticity") {

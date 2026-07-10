@@ -59,10 +59,10 @@ and error, export VTU — without CLI.
 
 | ID | Task | Acceptance |
 |----|------|------------|
-| B1 | Frontal / constrained Delaunay tet (or documented grid-fill limits) | Tier-1 e2e on *our* mesh for box + L-domain |
+| B1 | ~~Frontal / constrained Delaunay tet (or documented grid-fill limits)~~ | Documented limits (ADR-0015); not true Delaunay |
 | B2 | ~~Quality metrics in mesh note + VTU cell data~~ | Done (mesher note minQ/slivers; VTU `quality` CellData) |
-| B3 | Surface snap Jacobian safety (tet + hexpyr) | No inverted elems after snap |
-| B4 | STEP path: OCC build option CI job or docker note | Documented how to enable |
+| B3 | ~~Surface snap Jacobian safety (tet + hexpyr)~~ | Done (unsnap offenders; Catch2 unit box) |
+| B4 | ~~STEP path: OCC build option CI job or docker note~~ | Done (README Ubuntu packages + cmake flag) |
 | B5 | ~~Fixture geometry suite under `bench/geometries/public/`~~ | Done (≥3 closed STLs + README + load smoke) |
 
 ## Track C — Hybrid / features (P3 + P4)
@@ -140,7 +140,7 @@ A1 A3 ──> A2 A10 ──> A4 A5 A8 ──> A6 A7
 | Track | Status |
 |-------|--------|
 | A GUI | M1 core in: argv open, mesh preview, ZZ error, colorbar, failure dismiss, A6 wireframe/undeformed, A7 drag-drop open, A8 mesh note+DOF. Still: A9 theme GATE. |
-| B Mesh | Grid tet/hex/graded/hexpyr; B2 quality+VTU cell data; B5 fixtures (≥3). Not true Delaunay (B1 open). |
+| B Mesh | Grid tet/hex/graded/hexpyr; B1 documented limits (ADR-0015); B2/B3/B4/B5 done. Not true Delaunay. |
 | C Hybrid | C1 done: hex+pyramid product FE (hex→6 pyramids) patch < 1e-12 (ADR-0013). VEM k=1 only. |
 | D Adapt | Seed remesh (ADR-0014) + η target (D2) + auto h0 (D5). Still: p-adapt, local h-refine. |
 | E Verify | P1 Tier-0/1/2 + E4 product-mesh box/cylinder smoke. Tight Lamé on product mesh needs B1. |

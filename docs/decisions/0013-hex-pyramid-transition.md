@@ -45,3 +45,15 @@ optionally pulled toward the STL by at most `0.35 h` (same budget as tet
 fill). Pyramid apices stay at cell centers so hex–pyramid interfaces remain
 conforming. Residual max distance is reported in `boundary_max_distance`
 and the pipeline mesher note.
+
+### Jacobian safety (B3)
+After the limited snap, any moved node that participates in a non-positive
+cell is **reverted** to its pre-snap lattice position (iterate to fixed point):
+- **Hex8:** non-positive isoparametric Jacobian det at reference centre or at
+  any of the 8 product-Gauss points used by assembly.
+- **Pyramid5:** either tet of the base-diagonal split (0–1–2–apex / 0–2–3–apex)
+  has |volume| ≤ ε (collapsed). Assembly may flip orientation; zero volume is
+  the hard fail.
+
+If a cell remains inverted after all offenders are unsnapped, the mesher
+throws `ValidityError` rather than hand the solver a bad element.

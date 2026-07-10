@@ -10,6 +10,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <chrono>
+#include <cmath>
 #include <filesystem>
 #include <format>
 #include <fstream>
@@ -263,4 +264,49 @@ TEST_CASE("D2: eta_target=0 leaves adapt path unchanged (no eta-target stop note
     // Finished either via max passes or Dörfler early-stop — never η-target.
     REQUIRE((result->mesh_note.find("adapt_passes=") != std::string::npos ||
              result->mesh_note.find("adapt early-stop") != std::string::npos));
+}
+
+TEST_CASE("D5: mesh_size=0 auto h yields finite mesh and note with auto h") {
+    const auto path = write_box_stl(1.0, 1.0, 1.0);
+    const auto model = Model::load(path.string());
+
+    // Direct helper: auto on unit box → positive finite h, note tagged auto.
+    const auto resolved = resolve_mesh_size(model, 0.0);
+    REQUIRE(resolved.auto_chosen);
+    REQUIRE(resolved.h > 0.0);
+    REQUIRE(std::isfinite(resolved.h));
+    // Unit cube: extent=1 → base ~1/16; clamps keep it mesh-scale.
+    REQUIRE(resolved.h < 0.5);
+    REQUIRE(resolved.h > 1e-4);
+    REQUIRE(resolved.note.find("auto h=") != std::string::npos);
+    REQUIRE(resolved.n_sharp_edges > 0); // box has crease edges
+
+    // User-specified h is not auto.
+    const auto user = resolve_mesh_size(model, 0.1);
+    REQUIRE_FALSE(user.auto_chosen);
+    REQUIRE(std::abs(user.h - 0.1) < 1e-15);
+    REQUIRE(user.note.find("user") != std::string::npos);
+
+    // Mesh-only job with mesh_size=0 must produce elements and carry auto note.
+    SimSetup setup;
+    setup.mesh_size = 0.0;
+    setup.mesher = VolumeMesher::kTetFill;
+    setup.use_feature_grading = false;
+    SolveJob job;
+    job.start_mesh(model, setup);
+    VolumeMeshOutput mesh;
+    for (int i = 0; i < 300; ++i) {
+        if (auto m = job.take_mesh()) {
+            mesh = std::move(*m);
+            break;
+        }
+        if (job.state() == SolveJob::State::kFailed) {
+            FAIL(job.status_text());
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    REQUIRE_FALSE(mesh.mesh.elements.empty());
+    REQUIRE_FALSE(mesh.mesh.nodes.empty());
+    REQUIRE_NOTHROW(mesh.mesh.check_validity());
+    REQUIRE(mesh.mesher_note.find("auto h=") != std::string::npos);
 }

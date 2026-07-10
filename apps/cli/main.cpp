@@ -36,6 +36,7 @@ int usage() {
                "                             (fix min-x face nodes, load +Fy on max-x)\n"
                "  backend                    print compute backend\n"
                "\n"
+               "mesh size: omit -h (or -h 0) for auto h0 from bbox + sharp-edge density\n"
                "mesher names: tet (default), hex, hexvem|vem, graded, hexpyr|transition\n"
                "--skin n: graded-tet fine skin layers (default 2)\n"
                "--feature: refine graded mesh near sharp edges (default off in CLI)\n"
@@ -110,14 +111,12 @@ int cmd_mesh(std::span<char*> args) {
         }
     }
     const auto model = polymesh::pipeline::Model::load(path);
-    const double extent = (model.bbox_max - model.bbox_min).maxCoeff();
-    if (h <= 0.0) {
-        h = extent / 16.0;
-    }
+    const auto resolved = polymesh::pipeline::resolve_mesh_size(model, h);
+    h = resolved.h;
     auto vol = polymesh::pipeline::volume_mesh(model, h, mesher, skin, feature);
     vol.mesh.check_validity();
-    std::printf("mesh: %zu nodes, %zu elems, h=%.6g m\n%s\n", vol.mesh.nodes.size(),
-                vol.mesh.elements.size(), h, vol.mesher_note.c_str());
+    std::printf("mesh: %zu nodes, %zu elems, h=%.6g m\n%s\n%s\n", vol.mesh.nodes.size(),
+                vol.mesh.elements.size(), h, resolved.note.c_str(), vol.mesher_note.c_str());
     if (!out_path.empty()) {
         const auto quality = polymesh::fea::tet4_cell_quality(vol.mesh);
         std::vector<polymesh::fea::VtuCellData> cdata;
@@ -180,10 +179,8 @@ int cmd_solve(std::span<char*> args) {
     }
 
     const auto model = polymesh::pipeline::Model::load(path);
-    const double extent = (model.bbox_max - model.bbox_min).maxCoeff();
-    if (h <= 0.0) {
-        h = extent / 12.0;
-    }
+    const auto resolved = polymesh::pipeline::resolve_mesh_size(model, h);
+    h = resolved.h;
 
     double h_use = h;
     std::vector<Eigen::Vector3d> seeds;
@@ -283,9 +280,9 @@ int cmd_solve(std::span<char*> args) {
     polymesh::fea::write_vtu(out_path, vol.mesh, pdata, cdata);
 
     std::printf("solve: %zu nodes, %zu elems | max von Mises %.4g Pa | max |u| %.4g m | "
-                "ZZ η %.4g | h=%.4g | seeds=%zu\n%s\n",
+                "ZZ η %.4g | h=%.4g | seeds=%zu\n%s\n%s\n",
                 vol.mesh.nodes.size(), vol.mesh.elements.size(), max_vm, max_u, zz.global_eta,
-                h_use, seeds.size(), vol.mesher_note.c_str());
+                h_use, seeds.size(), resolved.note.c_str(), vol.mesher_note.c_str());
     std::printf("wrote %s\n", out_path.c_str());
     return 0;
 }

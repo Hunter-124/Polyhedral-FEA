@@ -6,27 +6,60 @@ on:
   pull_request:
 
 jobs:
+  # Core libraries + Catch2 suite. GUI is built too (X11-only GLFW) so
+  # presentation code stays compiling, but tests only need libs.
   build-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y ninja-build libeigen3-dev nlohmann-json3-dev
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ninja-build \
+            cmake \
+            g++ \
+            libeigen3-dev \
+            nlohmann-json3-dev \
+            libgl1-mesa-dev \
+            libx11-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libxext-dev
+
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DPOLYMESH_WITH_GUI=ON \
+            -DPOLYMESH_WITH_OCC=OFF \
+            -DPOLYMESH_WITH_CUDA=OFF
+
       - name: Build (warnings are errors)
         run: cmake --build build
+
       - name: Test
-        run: ctest --test-dir build --output-on-failure
+        # Working directory for discovered tests is the repo root (bench/reference).
+        run: ctest --test-dir build --output-on-failure --parallel 2
 
   format:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install clang-format
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang-format
       - name: clang-format check
         run: |
-          find apps src tests -name '*.cpp' -o -name '*.hpp' -o -name '*.cu' \
-            | xargs clang-format --dry-run --Werror
+          mapfile -t files < <(find apps src tests \
+            \( -name '*.cpp' -o -name '*.hpp' -o -name '*.cu' \) | sort)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No C++ sources found"
+            exit 1
+          fi
+          clang-format --dry-run --Werror "${files[@]}"
 
   grep-audit:
     runs-on: ubuntu-latest
@@ -34,4 +67,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: No bench/reference reads outside the bench module
         run: |
-          ! grep -rn "bench/reference" src/geom src/mesh src/adapt src/fea src/pipeline apps
+          # Anti-cheat: product code must not load reference answers.
+          if grep -rn "bench/reference" src/geom src/mesh src/adapt src/fea src/pipeline apps; then
+            echo "ERROR: bench/reference referenced outside src/bench"
+            exit 1
+          fi
+          echo "grep-audit clean"

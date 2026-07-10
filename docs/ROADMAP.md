@@ -141,7 +141,7 @@ A1 A3 ──> A2 A10 ──> A4 A5 A8 ──> A6 A7
 |-------|--------|
 | A GUI | M1 core in: argv open, mesh preview, ZZ error, colorbar, failure dismiss, A6 wireframe/undeformed, A7 drag-drop open, A8 mesh note+DOF. Still: A9 theme GATE. |
 | B Mesh | Grid tet/hex/graded/hexpyr; B1 documented limits (ADR-0015); B2/B3/B4/B5 done. Not true Delaunay. |
-| C Hybrid | C1 done (hex→6 pyramids patch); C5 done (Kirsch log-graded tet10 beats uniform @ equal free DOF). VEM k=1 only. |
+| C Hybrid | C1/C2/C5 done (hex→pyramids patch; geometry sizing; Kirsch graded tet @ equal DOF). VEM k=1 only. |
 | D Adapt | Seed remesh (ADR-0014) + η target (D2) + auto h0 (D5). Still: p-adapt, local h-refine. |
 | E Verify | E1–E4 done: CalculiX smoke peer, gate1-p1 Lamé/Kirsch scoreboard, holdout protocol stub, product-mesh smoke. Tight Lamé on product mesh needs better mesher. |
 | F Perf | CPU direct solver only. |

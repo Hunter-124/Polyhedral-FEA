@@ -20,6 +20,11 @@ bulk regions (flat faces, uniform-stress volumes) use large cheap elements.
   assembly or solves.
 - Dependencies: Eigen (dense + sparse; SimplicialLDLT first, iterative CG+AMG
   later), nlohmann-json, Catch2, OpenCASCADE behind `POLYMESH_WITH_OCC`.
+- **Eigen gotcha**: any TU calling `.inverse()` must include `<Eigen/Dense>`
+  (or `<Eigen/LU>`), never just `<Eigen/Core>` — otherwise the generic
+  assignment path recurses infinitely at runtime and COMDAT folding poisons
+  every other TU. Also avoid nested `inverse().transpose()` expressions;
+  materialize the inverse first.
 - **CUDA** (ADR-0008): optional backend behind `POLYMESH_WITH_CUDA` for
   parallelizable kernels (batched element stiffness, SpMV, error indicators).
   The CPU path is the reference implementation and always exists; every CUDA

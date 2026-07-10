@@ -220,21 +220,16 @@ Eigen::VectorXd assemble_body_load(const NodalMesh& mesh, const BodyForce& body_
         Eigen::VectorXd::Zero(3 * static_cast<Eigen::Index>(mesh.nodes.size()));
     for (const auto& element : mesh.elements) {
         if (element.type == ElementType::kPolyVem) {
-            // Lumped consistent load: equal share of volume * b(centroid).
             std::vector<Eigen::Vector3d> coords;
             coords.reserve(element.nodes.size());
-            Eigen::Vector3d c = Eigen::Vector3d::Zero();
             for (auto id : element.nodes) {
                 coords.push_back(mesh.nodes[id]);
-                c += mesh.nodes[id];
             }
-            c /= static_cast<double>(element.nodes.size());
-            const double vol = poly_volume(coords, element.faces);
-            const Eigen::Vector3d b = body_force(c);
-            const Eigen::Vector3d share =
-                b * (vol / static_cast<double>(element.nodes.size()));
-            for (auto id : element.nodes) {
-                f.segment<3>(3 * static_cast<Eigen::Index>(id)) += share;
+            const int order = vem_infer_order(element.nodes.size(), element.faces);
+            const Eigen::VectorXd fe = vem_body_load(coords, element.faces, body_force, order);
+            for (std::size_t a = 0; a < element.nodes.size(); ++a) {
+                f.segment<3>(3 * static_cast<Eigen::Index>(element.nodes[a])) +=
+                    fe.segment<3>(3 * static_cast<Eigen::Index>(a));
             }
             continue;
         }

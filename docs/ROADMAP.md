@@ -72,7 +72,7 @@ and error, export VTU — without CLI.
 | C1 | ~~Conforming hex–pyramid FE (or product path that passes hybrid patch)~~ | Done — all-pyramid expand; patch < 1e-12 |
 | C2 | ~~Curvature + thin-wall feature indicators~~ | Done — geometry sizing on κ + thickness |
 | C3 | Prism sweep regions (extrusion-detectable solids) | Prism elements in volume_mesh option |
-| C4 | VEM k=2 + MMS order check | Order matches theory ±0.2 |
+| C4 | ~~VEM k=2 + MMS order check~~ | Done — hex serendipity k=2; MMS order ≈2 ±0.2 (ADR-0017) |
 | C5 | ~~Kirsch peak stress @ equal DOF vs uniform tet~~ | Done — log-graded tet10 SCF err < uniform at equal free DOF |
 
 ## Track D — Adaptive product (P5)

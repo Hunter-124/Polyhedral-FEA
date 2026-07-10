@@ -2,6 +2,7 @@
 
 // PolyMesh CLI — geometry check, tet mesh, elastostatic solve + VTU export.
 
+#include "adapt/loop.hpp"
 #include "fea/backend.hpp"
 #include "fea/material.hpp"
 #include "fea/solve.hpp"
@@ -30,14 +31,15 @@ int usage() {
         "  mesh  <file> [-h m] [-o out.vtu] [--mesher name] [--skin n] [--feature]\n"
         "                             volume mesh; optional VTU write\n"
         "  solve <file> -o out.vtu [-h m] [-E Pa] [-nu r]\n"
-        "              [--mesher name] [--skin n] [--feature]\n"
+        "              [--mesher name] [--skin n] [--feature] [--adapt n]\n"
         "                             mesh + cantilever-style BCs + VTU\n"
         "                             (fix min-x face nodes, load +Fy on max-x)\n"
         "  backend                    print compute backend\n"
         "\n"
         "mesher names: tet (default), hex, hexvem|vem, graded, hexpyr|transition\n"
         "--skin n: graded-tet fine skin layers (default 2)\n"
-        "--feature: refine graded mesh near sharp edges (default off in CLI)\n",
+        "--feature: refine graded mesh near sharp edges (default off in CLI)\n"
+        "--adapt n: ZZ→Dörfler remesh passes (local seeds on graded path)\n",
         stderr);
     return 2;
 }
@@ -134,6 +136,7 @@ int cmd_solve(std::span<char*> args) {
     auto mesher = polymesh::pipeline::VolumeMesher::kTetFill;
     int skin = 2;
     bool feature = false;
+    int adapt_passes = 0;
     for (std::size_t i = 3; i < args.size(); ++i) {
         if (std::strcmp(args[i], "-h") == 0 && i + 1 < args.size()) {
             h = std::atof(args[++i]);
@@ -152,6 +155,11 @@ int cmd_solve(std::span<char*> args) {
             }
         } else if (std::strcmp(args[i], "--feature") == 0) {
             feature = true;
+        } else if (std::strcmp(args[i], "--adapt") == 0 && i + 1 < args.size()) {
+            adapt_passes = std::atoi(args[++i]);
+            if (adapt_passes < 0) {
+                adapt_passes = 0;
+            }
         } else {
             return usage();
         }
@@ -166,40 +174,83 @@ int cmd_solve(std::span<char*> args) {
     if (h <= 0.0) {
         h = extent / 12.0;
     }
-    auto vol = polymesh::pipeline::volume_mesh(model, h, mesher, skin, feature);
+
+    double h_use = h;
+    std::vector<Eigen::Vector3d> seeds;
+    double seed_band = 0.0;
+    auto mesh_now = [&](polymesh::pipeline::VolumeMesher m) {
+        return polymesh::pipeline::volume_mesh(model, h_use, m, skin, feature, seeds,
+                                               seed_band);
+    };
+    auto vol = mesh_now(mesher);
     vol.mesh.check_validity();
 
-    // Auto BCs: fix nodes near min-x plane; load +Y on max-x plane nodes.
-    const double xmin = model.bbox_min[0];
-    const double xmax = model.bbox_max[0];
-    const double tol = 0.51 * h;
-    polymesh::fea::Dirichlet bc;
-    std::vector<std::uint32_t> load_nodes;
-    for (std::uint32_t i = 0; i < vol.mesh.nodes.size(); ++i) {
-        const double x = vol.mesh.nodes[i][0];
-        if (x <= xmin + tol) {
-            bc.fix_node(i);
+    const polymesh::fea::Material mat{.youngs_modulus = E, .poissons_ratio = nu};
+    auto make_bc_loads = [&](const polymesh::pipeline::VolumeMeshOutput& v) {
+        const double xmin = model.bbox_min[0];
+        const double xmax = model.bbox_max[0];
+        const double tol = 0.51 * h_use;
+        polymesh::fea::Dirichlet bc;
+        std::vector<std::uint32_t> load_nodes;
+        for (std::uint32_t i = 0; i < v.mesh.nodes.size(); ++i) {
+            const double x = v.mesh.nodes[i][0];
+            if (x <= xmin + tol) {
+                bc.fix_node(i);
+            }
+            if (x >= xmax - tol) {
+                load_nodes.push_back(i);
+            }
         }
-        if (x >= xmax - tol) {
-            load_nodes.push_back(i);
+        Eigen::VectorXd loads =
+            Eigen::VectorXd::Zero(3 * static_cast<Eigen::Index>(v.mesh.nodes.size()));
+        if (!load_nodes.empty()) {
+            const Eigen::Vector3d f(0.0, 1000.0 / static_cast<double>(load_nodes.size()), 0.0);
+            for (auto n : load_nodes) {
+                loads.segment<3>(3 * static_cast<Eigen::Index>(n)) += f;
+            }
         }
-    }
-    if (bc.dof_values.empty()) {
-        std::fputs("solve: no fixture nodes found\n", stderr);
-        return 1;
-    }
-    Eigen::VectorXd loads =
-        Eigen::VectorXd::Zero(3 * static_cast<Eigen::Index>(vol.mesh.nodes.size()));
-    if (!load_nodes.empty()) {
-        const Eigen::Vector3d f(0.0, 1000.0 / static_cast<double>(load_nodes.size()), 0.0);
-        for (auto n : load_nodes) {
-            loads.segment<3>(3 * static_cast<Eigen::Index>(n)) += f;
+        return std::pair{std::move(bc), std::move(loads)};
+    };
+
+    Eigen::VectorXd u;
+    polymesh::fea::ZzRecovery zz;
+    for (int pass = 0; pass <= adapt_passes; ++pass) {
+        if (pass > 0) {
+            auto m = mesher;
+            if (!seeds.empty() && mesher == polymesh::pipeline::VolumeMesher::kTetFill) {
+                m = polymesh::pipeline::VolumeMesher::kGradedTet;
+            }
+            vol = mesh_now(m);
+            vol.mesh.check_validity();
+        }
+        auto [bc, loads] = make_bc_loads(vol);
+        if (bc.dof_values.empty()) {
+            std::fputs("solve: no fixture nodes found\n", stderr);
+            return 1;
+        }
+        u = polymesh::fea::solve_elastostatics(vol.mesh, mat, bc, loads);
+        zz = polymesh::fea::recover_zz(vol.mesh, mat, u);
+        if (pass < adapt_passes) {
+            std::vector<Eigen::Vector3d> cents;
+            cents.reserve(vol.mesh.elements.size());
+            for (const auto& el : vol.mesh.elements) {
+                Eigen::Vector3d c = Eigen::Vector3d::Zero();
+                for (auto n : el.nodes) {
+                    c += vol.mesh.nodes[n];
+                }
+                cents.push_back(c / static_cast<double>(el.nodes.size()));
+            }
+            const auto sug = polymesh::adapt::suggest_refine(cents, zz.element_eta, h_use, 0.3,
+                                                             0.75, h * 0.35);
+            if (sug.n_marked == 0 && sug.h_next >= h_use * 0.98) {
+                break;
+            }
+            h_use = sug.h_next;
+            seeds = sug.refine_seeds;
+            seed_band = sug.seed_band;
         }
     }
 
-    const polymesh::fea::Material mat{.youngs_modulus = E, .poissons_ratio = nu};
-    const auto u = polymesh::fea::solve_elastostatics(vol.mesh, mat, bc, loads);
-    const auto zz = polymesh::fea::recover_zz(vol.mesh, mat, u);
     std::vector<double> vm(zz.nodal_stress.size());
     double max_vm = 0.0, max_u = 0.0;
     for (std::size_t i = 0; i < vm.size(); ++i) {
@@ -214,8 +265,9 @@ int cmd_solve(std::span<char*> args) {
     polymesh::fea::write_vtu(out_path, vol.mesh, pdata);
 
     std::printf("solve: %zu nodes, %zu elems | max von Mises %.4g Pa | max |u| %.4g m | "
-                "ZZ η %.4g\n",
-                vol.mesh.nodes.size(), vol.mesh.elements.size(), max_vm, max_u, zz.global_eta);
+                "ZZ η %.4g | h=%.4g | seeds=%zu\n%s\n",
+                vol.mesh.nodes.size(), vol.mesh.elements.size(), max_vm, max_u, zz.global_eta,
+                h_use, seeds.size(), vol.mesher_note.c_str());
     std::printf("wrote %s\n", out_path.c_str());
     return 0;
 }

@@ -28,6 +28,7 @@
 #include <numbers>
 #include <queue>
 #include <set>
+#include <span>
 
 namespace polymesh::pipeline {
 namespace adapt = polymesh::adapt;
@@ -153,7 +154,9 @@ Model Model::load(const std::string& path, double sharp_angle_deg) {
 }
 
 VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
-                             int skin_layers, bool feature_refine) {
+                             int skin_layers, bool feature_refine,
+                             std::span<const Eigen::Vector3d> refine_seeds,
+                             double seed_band) {
     VolumeMeshOutput out;
     double fill_h = h;
     if (mesher == VolumeMesher::kHexFill || mesher == VolumeMesher::kHexVem) {
@@ -215,7 +218,7 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         }
         auto graded = mesh::graded_tet_fill_surface(
             model.surface, model.bbox_min, model.bbox_max, h, std::max(1, skin_layers), edges,
-            feature_band);
+            feature_band, refine_seeds, seed_band);
         fill_h = graded.h_fine;
         out.mesh.nodes = std::move(graded.mesh.nodes);
         out.mesh.elements.reserve(graded.mesh.tets.size());
@@ -232,11 +235,11 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         bnodes.erase(std::unique(bnodes.begin(), bnodes.end()), bnodes.end());
         const auto conf = mesh::surface_conformity(model.surface, out.mesh.nodes, bnodes);
         out.mesher_note = std::format(
-            "graded tet v1: {} tets ({} coarse blocks, {} fine cells, {} feature blocks), "
+            "graded tet v1: {} tets ({} coarse, {} fine, {} feature, {} seed blocks), "
             "h={:.4g}/{:.4g} m, boundary max|d|={:.3g} m mean|d|={:.3g} m",
             out.mesh.elements.size(), graded.n_coarse_cells, graded.n_fine_cells,
-            graded.n_feature_cells, graded.h_coarse, graded.h_fine, conf.max_distance,
-            conf.mean_distance);
+            graded.n_feature_cells, graded.n_seed_cells, graded.h_coarse, graded.h_fine,
+            conf.max_distance, conf.mean_distance);
     } else {
         auto fill = mesh::tet_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
         fill_h = fill.h;
@@ -337,8 +340,10 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     }
                 }
             }
+            std::vector<Eigen::Vector3d> adapt_seeds;
+            double adapt_seed_band = 0.0;
             auto vol = volume_mesh(model, h_use, setup.mesher, setup.skin_layers,
-                                   setup.use_feature_grading);
+                                   setup.use_feature_grading, adapt_seeds, adapt_seed_band);
             set_status(std::format("solving… ({} elements, {} nodes)",
                                    vol.mesh.elements.size(), vol.mesh.nodes.size()));
             state_ = State::kSolving;
@@ -381,20 +386,40 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
             };
             apply_bcs();
 
+            auto element_centroids = [&](const fea::NodalMesh& m) {
+                std::vector<Eigen::Vector3d> cents;
+                cents.reserve(m.elements.size());
+                for (const auto& el : m.elements) {
+                    Eigen::Vector3d c = Eigen::Vector3d::Zero();
+                    for (auto n : el.nodes) {
+                        c += m.nodes[n];
+                    }
+                    cents.push_back(c / static_cast<double>(el.nodes.size()));
+                }
+                return cents;
+            };
+
             for (int pass = 0; pass <= setup.adapt_passes; ++pass) {
                 if (pass > 0) {
-                    vol = volume_mesh(model, h_use, setup.mesher, setup.skin_layers,
-                                      setup.use_feature_grading);
+                    // Prefer graded mesher when local seeds are available so
+                    // a posteriori balls can refine without global h→0.
+                    const auto mesher_adapt =
+                        (!adapt_seeds.empty() && setup.mesher == VolumeMesher::kTetFill)
+                            ? VolumeMesher::kGradedTet
+                            : setup.mesher;
+                    vol = volume_mesh(model, h_use, mesher_adapt, setup.skin_layers,
+                                      setup.use_feature_grading, adapt_seeds, adapt_seed_band);
                     apply_bcs();
-                    set_status(std::format("adapt pass {}… ({} elems)", pass,
-                                           vol.mesh.elements.size()));
+                    set_status(std::format("adapt pass {}… ({} elems, {} seeds)", pass,
+                                           vol.mesh.elements.size(), adapt_seeds.size()));
                 }
                 const auto u_try = fea::solve_elastostatics(vol.mesh, material, bc, loads);
                 const auto zz_try = fea::recover_zz(vol.mesh, material, u_try);
                 if (pass < setup.adapt_passes) {
-                    const auto sug = adapt::suggest_uniform_refine(zz_try.element_eta, h_use,
-                                                                   0.3, 0.75, h * 0.35);
-                    if (sug.h_next >= h_use * 0.98) {
+                    const auto cents = element_centroids(vol.mesh);
+                    const auto sug = adapt::suggest_refine(cents, zz_try.element_eta, h_use,
+                                                           0.3, 0.75, h * 0.35);
+                    if (sug.n_marked == 0 && sug.h_next >= h_use * 0.98) {
                         // No further refinement — accept this solve as final.
                         const auto& stress = zz_try.nodal_stress;
                         SolveResult r;
@@ -418,13 +443,16 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         break;
                     }
                     h_use = sug.h_next;
+                    adapt_seeds = sug.refine_seeds;
+                    adapt_seed_band = sug.seed_band;
                     continue;
                 }
                 // Final pass results.
                 const auto& stress = zz_try.nodal_stress;
                 SolveResult r;
-                r.mesh_note = std::format("{} | adapt_passes={} h={:.4g}", vol.mesher_note,
-                                          setup.adapt_passes, h_use);
+                r.mesh_note = std::format("{} | adapt_passes={} h={:.4g} seeds={}",
+                                          vol.mesher_note, setup.adapt_passes, h_use,
+                                          adapt_seeds.size());
                 r.volume_mesh = std::move(vol.mesh);
                 r.boundary_quads = std::move(vol.boundary_quads);
                 r.displacement = u_try;

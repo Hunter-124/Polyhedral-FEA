@@ -36,6 +36,7 @@ add_executable(polymesh_tests
     test_prism_fill.cpp
     test_graded_fill.cpp
     test_mesh_conformity.cpp
+    test_curved_mesh_quality.cpp
     test_pyramid.cpp
     test_transition_fill.cpp
     test_mixed_fill.cpp

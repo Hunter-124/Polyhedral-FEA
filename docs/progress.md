@@ -22,12 +22,16 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: **Mesher overhaul wave 2 (WIP handoff)** — H2: hybrid zoo → hex
+  bulk + pyramid skin, product FE expands hex→pyramids (removed Kuhn-hex
+  assembly); O1: experimental `octa_fill` + `VolumeMesher::kOctahedral` +
+  CLI/GUI; V1: CG IncompleteLUT with diagonal fallback. Builds; **full ctest
+  not verified this commit** — run suite on next machine before claiming green.
 - 2026-07-10: **Mesher overhaul wave 1 (Track H)** — Plan on disk
   (`docs/plans/mesher-solver-overhaul.md`); ADR-0018 graded LEB conformity
   (no 2:1 hanging Kuhn); `tet4_face_conformity` + Catch2; shared
   `cell_stamp` in hybrid zoo; surface grid-hash closest-point; hybrid
   thinner feature/seed defaults; mesher scoreboard script. **141** tests green.
-  Remaining: H2 isoparam hex+pyramid hybrid FE, octa experimental, CG precond.
 - 2026-07-10: **Graded tet coarse-primary lattice** — Recovered WIP after agent
   crash: classify at target \(h\) (same cost class as tet/hybrid), then local
   \(2×2×2\) Kuhn only on skin/feature/seed cells (bulk≈\(h\), fine≈\(h/2\)).

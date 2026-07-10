@@ -6,7 +6,7 @@
 
 **Active:** Track A (GUI usable) → M1 study app. Solver core (GATE 1) frozen.
 Mesh/adapt product path advancing (graded, hexpyr, prism, seed remesh, local LEB).
-F1/F2 + E1–E3 + B1/B3/B4 + C1 + C2 + C3 + C4 + C5 + D3–D5 + E4 + G1–G4 done.
+F1–F3 + E1–E3 + B1/B3/B4 + C1 + C2 + C3 + C4 + C5 + D3–D5 + E4 + G1–G4 done.
 
 GATE 1 deliverables ready:
 - Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)
@@ -18,6 +18,10 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: F3 CUDA SpMV scaffolding — `fea/spmv.hpp` CSR + `spmv_cpu` (always),
+  `try_spmv_cuda` / device kernel in `backend_cuda.cu` when `POLYMESH_WITH_CUDA=ON`,
+  Catch2 CPU vs Eigen + CUDA-vs-CPU parity (SKIP without toolkit/device). Default
+  CI remains CPU-only. README CUDA enable notes. ROADMAP F3 closed.
 - 2026-07-10: C3 prism sweep volume fill — `prism_fill_surface` (Cartesian
   lattice, each inside voxel → 2× prism6 along longest bbox axis); pipeline
   `VolumeMesher::kPrismSweep`; CLI `--mesher prism|sweep`; GUI mesher combo;
@@ -154,8 +158,9 @@ GATE 0 was approved by owner on 2026-07-09.
 - License closed: BSD-3-Clause (ADR-0002); no CLA process.
 - `POLYMESH_WITH_OCC` wired in `src/geom` (`load_step`, CMake find + stub
   when OFF); exact B-rep feature queries still deferred to P3 (ADR-0001).
-- CUDA toolkit not installed on dev machine; `POLYMESH_WITH_CUDA` untested
-  until it is (ADR-0008). RTX 3080 Ti present.
+- CUDA SpMV scaffolding landed (F3); enable with `POLYMESH_WITH_CUDA=ON` +
+  toolkit on PATH (`nvcc`). CI stays CPU-only. Batched Ke kernels still open.
+  RTX 3080 Ti present (ADR-0008).
 - Geometric validity: boundary manifold + tet volume checks; limited surface
   snap with Jacobian unsnap (B3) on tet and hex+pyramid fills. True Delaunay
   deferred (B1 = ADR-0015 documented limits). CAD feature queries still open.

@@ -101,7 +101,7 @@ and error, export VTU — without CLI.
 |----|------|------------|
 | F1 | ~~OpenMP assembly~~ | Done (`POLYMESH_WITH_OPENMP`, parallel `assemble_stiffness`) |
 | F2 | ~~CG + Eigen iterative for large N~~ | Done (auto CG >8k free DOFs; DiagonalPreconditioner; ~15k free DOF test) |
-| F3 | CUDA SpMV / batched Ke parity tests | POLYMESH_WITH_CUDA optional |
+| F3 | ~~CUDA SpMV / batched Ke parity tests~~ | Done (CSR SpMV CPU+CUDA parity; Ke batch later) |
 
 ## Track G — Release (P7)
 

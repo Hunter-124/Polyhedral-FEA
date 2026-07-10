@@ -16,6 +16,11 @@ option(POLYMESH_WITH_GUI "Build the desktop GUI (GLFW + Dear ImGui + OpenGL)" ON
 option(POLYMESH_BUILD_TESTS "Build the test suite" ON)
 
 if(POLYMESH_WITH_CUDA)
+    # native = detect local GPU(s). Override e.g. -DCMAKE_CUDA_ARCHITECTURES=86
+    # if cross-building or the default arch (often 75) fails to JIT on newer cards.
+    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+        set(CMAKE_CUDA_ARCHITECTURES native)
+    endif()
     enable_language(CUDA)
     find_package(CUDAToolkit REQUIRED)
     set(CMAKE_CUDA_STANDARD 20)
@@ -23,9 +28,10 @@ if(POLYMESH_WITH_CUDA)
 endif()
 
 # Shared warning flags; every target links this.
+# COMPILE_LANGUAGE:CXX — do not pass host -W* flags to nvcc (it mis-parses -Werror).
 add_library(polymesh_warnings INTERFACE)
 target_compile_options(polymesh_warnings INTERFACE
-    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic -Wconversion -Werror>
+    $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CXX_COMPILER_ID:GNU,Clang>>:-Wall -Wextra -Wpedantic -Wconversion -Werror>
 )
 
 find_package(Eigen3 REQUIRED)

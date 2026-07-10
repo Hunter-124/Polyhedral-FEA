@@ -158,6 +158,31 @@ Override with `SolveOptions` (`method = kDirect | kCG`, `cg_threshold`, `cg_tol`
 by default so constant-strain exactness is preserved. Force CG for large-N checks
 or when factorisation memory would dominate. See `fea/solve.hpp`.
 
+### CUDA backends (`POLYMESH_WITH_CUDA`)
+
+Default **OFF**. CI and CPU-only machines never need a toolkit. When ON:
+
+```sh
+# Toolkit on PATH (example: CUDA 12/13 under /usr/local/cuda)
+export PATH=/usr/local/cuda/bin:$PATH
+# or: cmake ... -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc
+
+cmake -S . -B build -G Ninja -DPOLYMESH_WITH_CUDA=ON
+# If host GCC is newer than nvcc supports (e.g. GCC 16 + CUDA 13.x):
+#   cmake ... -DCMAKE_CUDA_FLAGS="-allow-unsupported-compiler"
+# Architectures default to "native" (detect local GPU). Cross-build example:
+#   cmake ... -DCMAKE_CUDA_ARCHITECTURES=86
+cmake --build build -j
+ctest --test-dir build --output-on-failure -R "SpMV|spmv"
+```
+
+- **CPU CSR SpMV** (`fea::spmv_cpu` / `fea::csr_from_eigen`) always builds — free-DOF
+  helper for CG / iterative backends; unit-tested against Eigen sparse × vector.
+- **CUDA SpMV** lives in `backend_cuda.cu` and runs only when a device is present;
+  Catch2 parity test compares GPU vs CPU (SKIP if toolkit off or no GPU).
+- `polymesh backend` reports `cpu` or `cuda (<device name>)`.
+- Batched element-stiffness GPU kernels are not wired yet (same dispatch layer).
+
 ### STEP / OpenCASCADE (`POLYMESH_WITH_OCC`)
 
 Default builds are **STL-only**. STEP/B-rep import is optional (ADR-0001):

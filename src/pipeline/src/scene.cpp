@@ -153,7 +153,7 @@ Model Model::load(const std::string& path, double sharp_angle_deg) {
 }
 
 VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
-                             int skin_layers) {
+                             int skin_layers, bool feature_refine) {
     VolumeMeshOutput out;
     double fill_h = h;
     if (mesher == VolumeMesher::kHexFill || mesher == VolumeMesher::kHexVem) {
@@ -176,6 +176,10 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                                       mesher == VolumeMesher::kHexVem ? "hex-VEM" : "hex",
                                       out.mesh.elements.size(), out.mesh.nodes.size(), fill_h);
     } else if (mesher == VolumeMesher::kHexPyramid) {
+        // Hex core + pyramid skin as native element types (ADR-0013). GATE-1
+        // hex is isoparametric; pyramid is tet-split. Hybrid constant-strain
+        // patch is not exact across hex–pyramid faces; pure-hex and pure-
+        // pyramid patches are.
         auto fill =
             mesh::transition_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
         fill_h = fill.h;
@@ -201,8 +205,17 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             fill.n_hex, fill.n_pyramid, out.mesh.nodes.size(), fill_h,
             fill.boundary_max_distance);
     } else if (mesher == VolumeMesher::kGradedTet) {
+        std::vector<geom::SharpEdge> edges;
+        double feature_band = 0.0;
+        if (feature_refine) {
+            edges = geom::detect_sharp_edges(model.surface, 30.0);
+            if (!edges.empty()) {
+                feature_band = 2.0 * h; // one coarse cell radius around creases
+            }
+        }
         auto graded = mesh::graded_tet_fill_surface(
-            model.surface, model.bbox_min, model.bbox_max, h, std::max(1, skin_layers));
+            model.surface, model.bbox_min, model.bbox_max, h, std::max(1, skin_layers), edges,
+            feature_band);
         fill_h = graded.h_fine;
         out.mesh.nodes = std::move(graded.mesh.nodes);
         out.mesh.elements.reserve(graded.mesh.tets.size());
@@ -219,10 +232,11 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         bnodes.erase(std::unique(bnodes.begin(), bnodes.end()), bnodes.end());
         const auto conf = mesh::surface_conformity(model.surface, out.mesh.nodes, bnodes);
         out.mesher_note = std::format(
-            "graded tet v1: {} tets ({} coarse blocks, {} fine cells), h={:.4g}/{:.4g} m, "
-            "boundary max|d|={:.3g} m mean|d|={:.3g} m",
+            "graded tet v1: {} tets ({} coarse blocks, {} fine cells, {} feature blocks), "
+            "h={:.4g}/{:.4g} m, boundary max|d|={:.3g} m mean|d|={:.3g} m",
             out.mesh.elements.size(), graded.n_coarse_cells, graded.n_fine_cells,
-            graded.h_coarse, graded.h_fine, conf.max_distance, conf.mean_distance);
+            graded.n_feature_cells, graded.h_coarse, graded.h_fine, conf.max_distance,
+            conf.mean_distance);
     } else {
         auto fill = mesh::tet_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
         fill_h = fill.h;
@@ -323,7 +337,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     }
                 }
             }
-            auto vol = volume_mesh(model, h_use, setup.mesher, setup.skin_layers);
+            auto vol = volume_mesh(model, h_use, setup.mesher, setup.skin_layers,
+                                   setup.use_feature_grading);
             set_status(std::format("solving… ({} elements, {} nodes)",
                                    vol.mesh.elements.size(), vol.mesh.nodes.size()));
             state_ = State::kSolving;
@@ -368,7 +383,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
 
             for (int pass = 0; pass <= setup.adapt_passes; ++pass) {
                 if (pass > 0) {
-                    vol = volume_mesh(model, h_use, setup.mesher, setup.skin_layers);
+                    vol = volume_mesh(model, h_use, setup.mesher, setup.skin_layers,
+                                      setup.use_feature_grading);
                     apply_bcs();
                     set_status(std::format("adapt pass {}… ({} elems)", pass,
                                            vol.mesh.elements.size()));

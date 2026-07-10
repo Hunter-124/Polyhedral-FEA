@@ -1,10 +1,9 @@
 # PROGRESS
 
 ## Current phase
-**Active development on master.** 66 tests green. Meshers include hex+pyramid transition
-with limited surface snap; CLI `mesh`/`solve` accept `--mesher` / `--skin`; FeatureSizing
-a priori field; pyramid5 patch on pure-pyramid lattices. Element zoo:
-tet/hex/prism/pyramid/VEM.
+**Active development on master.** 68+ tests green. Feature-distance graded tet
+(fine band around sharp edges); CLI `--feature`; hex+pyramid + FeatureSizing as
+before. Element zoo: tet/hex/prism/pyramid/VEM.
 
 GATE 1 deliverables ready:
 - Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)
@@ -16,6 +15,8 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: Graded tet feature band (sharp-edge distance), pipeline
+  `feature_refine`, CLI `--feature`, feature-block stats in mesher notes. 68 tests.
 - 2026-07-10: FeatureSizing field + feature-aware solve h; pyramid5 patch test
   (pure pyramid lattice); pyramid base orientation for +Jacobian; Duffy product
   quadrature; documented hex–pyramid hybrid nonconformity (ADR-0013). 66 tests.

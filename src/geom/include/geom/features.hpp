@@ -9,6 +9,7 @@
 #include <Eigen/Core>
 
 #include <cstdint>
+#include <span>
 #include <utility>
 #include <vector>
 
@@ -28,6 +29,6 @@ std::vector<SharpEdge> detect_sharp_edges(const TriSurface& surface,
 
 /// Distance from point to closest sharp edge segment (metres). Large if none.
 double distance_to_features(const Eigen::Vector3d& p, const TriSurface& surface,
-                            const std::vector<SharpEdge>& edges);
+                            std::span<const SharpEdge> edges);
 
 } // namespace polymesh::geom

@@ -7,6 +7,7 @@
 #include <cmath>
 #include <limits>
 #include <map>
+#include <span>
 #include <utility>
 
 namespace polymesh::geom {
@@ -75,7 +76,7 @@ std::vector<SharpEdge> detect_sharp_edges(const TriSurface& surface, double shar
 }
 
 double distance_to_features(const Eigen::Vector3d& p, const TriSurface& surface,
-                            const std::vector<SharpEdge>& edges) {
+                            std::span<const SharpEdge> edges) {
     double best = std::numeric_limits<double>::infinity();
     for (const auto& e : edges) {
         best = std::min(

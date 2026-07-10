@@ -86,12 +86,7 @@ TEST_CASE("hex+pyramid mesh solves linear elasticity") {
 }
 
 TEST_CASE("pyramid lattice patch test: constant strain (all-pyramid cells)") {
-    // Sacred patch test for pyramid5 (tet-split assembly). Use h coarse enough
-    // that the transition fill has no hex core — pure pyramid mesh passes
-    // exactly. Hex–pyramid hybrids are nonconforming (hex bilinear vs pyramid
-    // two-triangle faces); full hybrid patch is deferred (ADR-0013).
-    // No surface snap: nodal geometry stays on the Cartesian lattice so the
-    // pure-tet FE space of the pyramid split is exact for linear fields.
+    // Element-level pyramid5 (tet-split stiffness) on pure-pyramid lattice.
     auto fill =
         transition_fill_surface(box(), {-0.01, -0.01, -0.01}, {1.01, 1.01, 1.01}, 0.25, false);
     REQUIRE(fill.n_hex == 0);

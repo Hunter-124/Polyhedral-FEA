@@ -22,6 +22,8 @@
 
 namespace polymesh::pipeline {
 
+enum class VolumeMesher : int { kTetFill = 0, kHexFill = 1 };
+
 /// Imported model: triangle surface segmented into CAD-style "faces"
 /// (regions of triangles separated by sharp edges), so a click can select
 /// a whole planar/smooth face rather than one triangle.
@@ -47,7 +49,8 @@ struct SimSetup {
     double mesh_size = 0.0;          // m; 0 = auto (bbox/30)
     bool use_feature_grading = true; // refine toward sharp edges
     int adapt_passes = 0;            // extra solve→ZZ→refine mesh loops
-    std::set<int> fixtures;          // region ids with all DOFs fixed
+    VolumeMesher mesher = VolumeMesher::kTetFill;
+    std::set<int> fixtures; // region ids with all DOFs fixed
     std::map<int, RegionLoad> loads;
 };
 
@@ -75,7 +78,8 @@ struct VolumeMeshOutput {
     std::map<std::uint32_t, int> boundary_node_region;
     std::string mesher_note;
 };
-VolumeMeshOutput volume_mesh(const Model& model, double h);
+VolumeMeshOutput volume_mesh(const Model& model, double h,
+                             VolumeMesher mesher = VolumeMesher::kTetFill);
 
 /// @deprecated name kept as alias during transition; calls volume_mesh.
 VolumeMeshOutput voxel_mesh(const Model& model, double h);

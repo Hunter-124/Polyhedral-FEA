@@ -1,0 +1,13 @@
+{
+  "name": "lame-cylinder",
+  "citation": "Lamé (1852), thick-walled cylinder under internal pressure, plane strain. Parameters: a = 0.05 m (inner radius), b = 0.10 m (outer), p = 10 MPa internal, E = 200 GPa, nu = 0.3. With A = p a^2/(b^2-a^2) and B = A b^2: sigma_r = A - B/r^2, sigma_theta = A + B/r^2, u_r = (1+nu)/E * (A(1-2nu) r + B/r). At r = a: sigma_theta = p(a^2+b^2)/(b^2-a^2) = 5p/3, u_r = (1+nu)/E * (A(1-2nu)a + B/a).",
+  "values": {
+    "inner_radius_m": 0.05,
+    "outer_radius_m": 0.1,
+    "pressure_pa": 10.0e6,
+    "youngs_modulus_pa": 200.0e9,
+    "poissons_ratio": 0.3,
+    "u_r_inner_m": 4.766666666666667e-6,
+    "sigma_hoop_inner_pa": 1.6666666666666668e7
+  }
+}

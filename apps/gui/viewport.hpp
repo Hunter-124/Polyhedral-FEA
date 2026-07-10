@@ -46,7 +46,13 @@ class Camera {
 };
 
 /// What the viewport is currently displaying.
-enum class DisplayMode { kSetup, kResultsVonMises, kResultsDisplacement };
+enum class DisplayMode {
+    kSetup = 0,
+    kMeshPreview = 1,
+    kResultsVonMises = 2,
+    kResultsDisplacement = 3,
+    kResultsError = 4,
+};
 
 class Viewport {
   public:
@@ -57,6 +63,8 @@ class Viewport {
 
     /// Uploads model geometry (setup mode).
     void set_model(const Model& model);
+    /// Uploads volume mesh boundary for mesh-preview mode (element-type colors).
+    void set_mesh(const VolumeMeshOutput& mesh);
     /// Uploads solve results (deformed boundary mesh + nodal scalars).
     void set_result(const SolveResult& result);
 
@@ -70,6 +78,9 @@ class Viewport {
     /// Texture handle to show via ImGui::Image.
     std::uint32_t texture() const { return color_texture_; }
 
+    bool has_mesh_preview() const { return mesh_vertex_count_ > 0; }
+    bool has_result() const { return !result_rest_.empty(); }
+
     Camera camera;
 
     /// Picks the model triangle under the pixel; returns its region id.
@@ -82,6 +93,9 @@ class Viewport {
     // Setup-mode model buffers.
     std::uint32_t model_vao_ = 0, model_vbo_ = 0;
     int model_vertex_count_ = 0;
+    // Mesh-preview buffers (undeformed boundary, element-type colors).
+    std::uint32_t mesh_vao_ = 0, mesh_vbo_ = 0;
+    int mesh_vertex_count_ = 0;
     // Results-mode buffers (deformed voxel boundary, scalar-colored).
     std::uint32_t result_vao_ = 0, result_vbo_ = 0;
     int result_vertex_count_ = 0;
@@ -92,6 +106,7 @@ class Viewport {
     std::vector<Eigen::Vector3d> result_rest_;
     std::vector<double> result_scalar_vm_;
     std::vector<double> result_scalar_u_;
+    std::vector<double> result_scalar_eta_;
     std::vector<std::array<std::uint32_t, 4>> result_quads_;
     Eigen::VectorXd result_disp_;
     bool result_dirty_ = false;

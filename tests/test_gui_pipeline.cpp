@@ -9,9 +9,11 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <chrono>
 #include <filesystem>
 #include <format>
 #include <fstream>
+#include <thread>
 
 using namespace polymesh::pipeline;
 namespace fea = polymesh::fea;
@@ -109,4 +111,76 @@ TEST_CASE("GUI pipeline: box STL segments into six faces and solves end-to-end")
     }
     CHECK(min_uz < -1e-7);
     CHECK(min_uz > -1e-2);
+}
+
+TEST_CASE("mesh-only job produces volume mesh for GUI preview") {
+    const auto path = write_box_stl(1.0, 1.0, 1.0);
+    const auto model = Model::load(path.string());
+    SimSetup setup;
+    setup.mesh_size = 0.25;
+    setup.mesher = VolumeMesher::kTetFill;
+    SolveJob job;
+    job.start_mesh(model, setup);
+    // Poll until done (mesh is small).
+    VolumeMeshOutput mesh;
+    for (int i = 0; i < 200; ++i) {
+        if (auto m = job.take_mesh()) {
+            mesh = std::move(*m);
+            break;
+        }
+        if (job.state() == SolveJob::State::kFailed) {
+            FAIL(job.status_text());
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    REQUIRE_FALSE(mesh.mesh.elements.empty());
+    REQUIRE_FALSE(mesh.boundary_quads.empty());
+    REQUIRE_FALSE(mesh.mesher_note.empty());
+    REQUIRE_NOTHROW(mesh.mesh.check_validity());
+}
+
+TEST_CASE("solve job fills nodal ZZ eta for error-field display") {
+    const auto path = write_box_stl(0.1, 0.02, 0.02);
+    const auto model = Model::load(path.string());
+    SimSetup setup;
+    setup.mesh_size = 0.01;
+    setup.mesher = VolumeMesher::kTetFill;
+    setup.youngs_modulus = 70e9;
+    setup.poissons_ratio = 0.33;
+    // Fixture min-x, load max-x via regions from model.
+    int fixed = -1, loaded = -1;
+    for (std::size_t t = 0; t < model.surface.triangles.size(); ++t) {
+        double x = 0;
+        for (auto v : model.surface.triangles[t]) {
+            x += model.surface.vertices[v][0];
+        }
+        if (x < 1e-12) {
+            fixed = model.triangle_region[t];
+        }
+        if (x > 0.29) {
+            loaded = model.triangle_region[t];
+        }
+    }
+    REQUIRE(fixed >= 0);
+    REQUIRE(loaded >= 0);
+    setup.fixtures.insert(fixed);
+    setup.loads[loaded].force = {0, 0, -100};
+    SolveJob job;
+    job.start(model, setup);
+    std::optional<SolveResult> result;
+    for (int i = 0; i < 500; ++i) {
+        result = job.take_result();
+        if (result) {
+            break;
+        }
+        if (job.state() == SolveJob::State::kFailed) {
+            FAIL(job.status_text());
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    REQUIRE(result.has_value());
+    REQUIRE(result->nodal_eta.size() == result->volume_mesh.nodes.size());
+    REQUIRE(result->element_eta.size() == result->volume_mesh.elements.size());
+    REQUIRE(result->global_eta >= 0.0);
+    REQUIRE(result->max_nodal_eta >= 0.0);
 }

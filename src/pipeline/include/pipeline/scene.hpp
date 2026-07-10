@@ -62,14 +62,18 @@ struct SimSetup {
     std::map<int, RegionLoad> loads;
 };
 
-/// Solve products, ready for rendering.
+/// Solve products, ready for rendering / VTU.
 struct SolveResult {
     fea::NodalMesh volume_mesh;
     Eigen::VectorXd displacement;    // 3N
     std::vector<double> von_mises;   // per node, Pa
     std::vector<double> u_magnitude; // per node, m
+    /// Nodal average of element ZZ indicators (for error-field display).
+    std::vector<double> nodal_eta;
+    std::vector<double> element_eta; // raw per-element η
     double max_von_mises = 0.0;
     double max_displacement = 0.0;
+    double max_nodal_eta = 0.0;
     double global_eta = 0.0; // ZZ indicator
     // Boundary quads of the voxel mesh (node indices), for rendering.
     std::vector<std::array<std::uint32_t, 4>> boundary_quads;
@@ -97,14 +101,20 @@ VolumeMeshOutput volume_mesh(const Model& model, double h,
 /// @deprecated name kept as alias during transition; calls volume_mesh.
 VolumeMeshOutput voxel_mesh(const Model& model, double h);
 
-/// Background solve pipeline. Poll `state` from the UI thread.
+/// Background mesh / solve pipeline. Poll `state` from the UI thread.
 class SolveJob {
   public:
-    enum class State { kIdle, kMeshing, kSolving, kDone, kFailed };
+    enum class State { kIdle, kMeshing, kSolving, kDone, kFailed, kMeshDone };
 
     void start(const Model& model, const SimSetup& setup);
-    /// Joins a finished worker and returns the result once ready.
+    /// Mesh only (for viewport preview). Same worker thread rules as start().
+    void start_mesh(const Model& model, const SimSetup& setup);
+    /// Joins a finished solve worker and returns the result once ready.
     std::optional<SolveResult> take_result();
+    /// Joins a finished mesh-only worker.
+    std::optional<VolumeMeshOutput> take_mesh();
+    /// Clear kFailed → kIdle so the user can retry.
+    void clear_failure();
 
     State state() const { return state_.load(); }
     std::string status_text() const;
@@ -114,10 +124,12 @@ class SolveJob {
     std::atomic<State> state_{State::kIdle};
     std::thread worker_;
     SolveResult result_;
+    VolumeMeshOutput mesh_only_;
     std::string error_;
     mutable std::mutex status_mutex_;
     std::string status_;
     void set_status(const std::string& s);
+    void join_worker();
 };
 
 } // namespace polymesh::pipeline

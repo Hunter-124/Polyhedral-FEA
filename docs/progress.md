@@ -1,9 +1,11 @@
 # PROGRESS
 
 ## Current phase
-**Active development on master.** 70 tests green. ZZ→Dörfler local seed remesh
-for graded fill (ADR-0014); CLI `solve --adapt n`. Feature-band graded tet +
-hex+pyramid as before. Element zoo: tet/hex/prism/pyramid/VEM.
+**Master plan:** [`docs/ROADMAP.md`](ROADMAP.md) · **Agent loop:**
+[`docs/process/agent-loop.md`](process/agent-loop.md)
+
+**Active:** Track A (GUI usable) → M1 study app. 70 tests green. Solver core
+(GATE 1) frozen. Mesh/adapt product path advancing (graded, hexpyr, seed remesh).
 
 GATE 1 deliverables ready:
 - Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)
@@ -15,6 +17,9 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: Master ROADMAP + agent-loop protocol; GUI M1 path — argv open,
+  mesh-only job + element-type preview, ZZ error field + colorbar, failure
+  dismiss, public `unit_box.stl` fixture. (in progress / this commit)
 - 2026-07-10: A posteriori adapt seeds — Dörfler centroids → graded fine balls;
   `suggest_refine`; pipeline adapt remesh; CLI `solve --adapt n`. ~70 tests.
 - 2026-07-10: Graded tet feature band (sharp-edge distance), pipeline

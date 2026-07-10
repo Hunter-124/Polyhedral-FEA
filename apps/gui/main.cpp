@@ -48,6 +48,7 @@ struct App {
     SimSetup setup;
     SolveJob job;
     std::optional<SolveResult> result;
+    std::optional<VolumeMeshOutput> mesh_preview;
     Viewport viewport;
     DisplayMode mode = DisplayMode::kSetup;
     int selected_region = -1;
@@ -56,7 +57,8 @@ struct App {
     bool overlays_dirty = false;
     float sidebar_width = 360.0f;
     char open_path[512] = "";
-    std::string status = "open an STL to begin";
+    std::string status = "open an STL/STEP or pass a path: polymesh-gui part.stl";
+    std::string mesh_status;
     float load_force[3] = {0.0f, 0.0f, -1000.0f};
 };
 
@@ -65,16 +67,60 @@ void load_model(App& app, const std::string& path) {
         app.model = Model::load(path);
         app.setup = SimSetup{};
         app.result.reset();
+        app.mesh_preview.reset();
+        app.mesh_status.clear();
         app.mode = DisplayMode::kSetup;
         app.selected_region = -1;
         app.viewport.set_model(*app.model);
         app.viewport.camera.fit(app.model->bbox_min, app.model->bbox_max);
         app.overlays_dirty = true;
+        std::snprintf(app.open_path, sizeof(app.open_path), "%s", path.c_str());
         app.status = std::format("{}: {} triangles, {} faces", app.model->name,
                                  app.model->surface.triangles.size(), app.model->region_count);
     } catch (const std::exception& e) {
         app.status = std::format("import failed: {}", e.what());
     }
+}
+
+void draw_colorbar(const char* title, float vmin, float vmax, const char* unit) {
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    const ImVec2 p0 = ImGui::GetCursorScreenPos();
+    const float w = 18.0f;
+    const float h = 140.0f;
+    for (int i = 0; i < 32; ++i) {
+        const float t0 = static_cast<float>(i) / 32.0f;
+        const float t1 = static_cast<float>(i + 1) / 32.0f;
+        // Match fea_colormap: blue→cyan→green→yellow→red
+        auto col = [](float t) {
+            t = std::clamp(t, 0.0f, 1.0f);
+            ImVec4 c;
+            if (t < 0.25f) {
+                const float u = t / 0.25f;
+                c = ImVec4(0, u, 1, 1);
+            } else if (t < 0.5f) {
+                const float u = (t - 0.25f) / 0.25f;
+                c = ImVec4(0, 1, 1 - u, 1);
+            } else if (t < 0.75f) {
+                const float u = (t - 0.5f) / 0.25f;
+                c = ImVec4(u, 1, 0, 1);
+            } else {
+                const float u = (t - 0.75f) / 0.25f;
+                c = ImVec4(1, 1 - u, 0, 1);
+            }
+            return ImGui::ColorConvertFloat4ToU32(c);
+        };
+        dl->AddRectFilled(ImVec2(p0.x, p0.y + h * (1.0f - t1)),
+                          ImVec2(p0.x + w, p0.y + h * (1.0f - t0)), col(0.5f * (t0 + t1)));
+    }
+    dl->AddRect(p0, ImVec2(p0.x + w, p0.y + h), IM_COL32(255, 255, 255, 80));
+    ImGui::Dummy(ImVec2(w + 8, h));
+    ImGui::SameLine();
+    ImGui::BeginGroup();
+    ImGui::Text("%s", title);
+    ImGui::Text("%.3g %s", static_cast<double>(vmax), unit);
+    ImGui::Dummy(ImVec2(0, h - 48));
+    ImGui::Text("%.3g", static_cast<double>(vmin));
+    ImGui::EndGroup();
 }
 
 void draw_study_panel(App& app) {
@@ -156,53 +202,86 @@ void draw_study_panel(App& app) {
     ImGui::TextColored(palette.sim_load, "loads: %zu", app.setup.loads.size());
     iw::end_group_box();
 
-    iw::begin_group_box("solve", 54);
+    iw::begin_group_box("mesh & solve", 110);
     const auto state = app.job.state();
     const bool busy = state == SolveJob::State::kMeshing || state == SolveJob::State::kSolving;
     ImGui::BeginDisabled(!app.model || busy);
+    if (iw::button("mesh only", ImVec2(-1, 0))) {
+        app.job.start_mesh(*app.model, app.setup);
+    }
     if (iw::button(busy ? "working…" : "solve", ImVec2(-1, 26), /*primary=*/true)) {
         app.job.start(*app.model, app.setup);
     }
     ImGui::EndDisabled();
-    const ImVec4 status_color = state == SolveJob::State::kFailed ? palette.status_err
-                                : busy                            ? palette.status_warn
-                                                                  : palette.status_ok;
-    if (state != SolveJob::State::kIdle || app.result) {
+    if (state == SolveJob::State::kFailed) {
+        ImGui::TextColored(palette.status_err, "%s", app.job.status_text().c_str());
+        if (iw::button("dismiss error", ImVec2(-1, 0))) {
+            app.job.clear_failure();
+            app.status = "ready";
+        }
+    } else if (state != SolveJob::State::kIdle || app.result || !app.mesh_status.empty()) {
+        const ImVec4 status_color = busy ? palette.status_warn : palette.status_ok;
         ImGui::TextColored(status_color, "%s", app.job.status_text().c_str());
+    }
+    if (!app.mesh_status.empty()) {
+        ImGui::TextWrapped("%s", app.mesh_status.c_str());
     }
     iw::end_group_box();
 
-    if (app.result) {
-        iw::begin_group_box("results", 168);
-        static const char* kModes[] = {"setup", "von mises", "deflection"};
-        int mode = app.mode == DisplayMode::kSetup             ? 0
-                   : app.mode == DisplayMode::kResultsVonMises ? 1
-                                                               : 2;
-        if (iw::selector("mode", &mode, kModes, 3)) {
-            app.mode = mode == 0   ? DisplayMode::kSetup
-                       : mode == 1 ? DisplayMode::kResultsVonMises
-                                   : DisplayMode::kResultsDisplacement;
+    if (app.mesh_preview || app.result) {
+        iw::begin_group_box("display", 200);
+        static const char* kModes[] = {"setup (CAD)", "mesh", "von mises", "deflection",
+                                       "error η"};
+        int mode = static_cast<int>(app.mode);
+        if (mode < 0 || mode > 4) {
+            mode = 0;
         }
-        iw::slider_double("deformation scale", &app.deform_scale, 0.0, 100.0, "%.0fx");
-        ImGui::Text("max von mises: %.4g MPa", app.result->max_von_mises / 1e6);
-        ImGui::Text("max deflection: %.4g mm", app.result->max_displacement * 1e3);
-        ImGui::TextColored(palette.text_dim, "%s", app.result->mesh_note.c_str());
-        ImGui::Text("ZZ η (global): %.4g", app.result->global_eta);
-        if (iw::button("export VTU", ImVec2(-1, 0))) {
-            try {
-                std::vector<fea::VtuPointData> pdata;
-                pdata.push_back(
-                    {.name = "von_Mises", .scalars = app.result->von_mises, .vectors = {}});
-                pdata.push_back({.name = "displacement",
-                                 .scalars = {},
-                                 .vectors = app.result->displacement});
-                const std::string out =
-                    app.model ? (app.model->name + "_result.vtu") : "result.vtu";
-                fea::write_vtu(out, app.result->volume_mesh, pdata);
-                app.status = std::format("wrote {}", out);
-            } catch (const std::exception& e) {
-                app.status = std::format("export failed: {}", e.what());
+        if (iw::selector("mode", &mode, kModes, 5)) {
+            app.mode = static_cast<DisplayMode>(mode);
+            if (app.mode == DisplayMode::kMeshPreview && !app.viewport.has_mesh_preview()) {
+                app.mode = DisplayMode::kSetup;
             }
+            if ((app.mode == DisplayMode::kResultsVonMises ||
+                 app.mode == DisplayMode::kResultsDisplacement ||
+                 app.mode == DisplayMode::kResultsError) &&
+                !app.result) {
+                app.mode = app.viewport.has_mesh_preview() ? DisplayMode::kMeshPreview
+                                                           : DisplayMode::kSetup;
+            }
+        }
+        if (app.result) {
+            iw::slider_double("deformation scale", &app.deform_scale, 0.0, 100.0, "%.0fx");
+            ImGui::Text("max von mises: %.4g MPa", app.result->max_von_mises / 1e6);
+            ImGui::Text("max deflection: %.4g mm", app.result->max_displacement * 1e3);
+            ImGui::Text("ZZ η global: %.4g  max nodal: %.4g", app.result->global_eta,
+                        app.result->max_nodal_eta);
+            ImGui::TextColored(palette.text_dim, "%s", app.result->mesh_note.c_str());
+            if (iw::button("export VTU", ImVec2(-1, 0))) {
+                try {
+                    std::vector<fea::VtuPointData> pdata;
+                    pdata.push_back({.name = "von_Mises",
+                                     .scalars = app.result->von_mises,
+                                     .vectors = {}});
+                    pdata.push_back({.name = "displacement",
+                                     .scalars = {},
+                                     .vectors = app.result->displacement});
+                    if (!app.result->nodal_eta.empty()) {
+                        pdata.push_back({.name = "ZZ_eta",
+                                         .scalars = app.result->nodal_eta,
+                                         .vectors = {}});
+                    }
+                    const std::string out =
+                        app.model ? (app.model->name + "_result.vtu") : "result.vtu";
+                    fea::write_vtu(out, app.result->volume_mesh, pdata);
+                    app.status = std::format("wrote {}", out);
+                } catch (const std::exception& e) {
+                    app.status = std::format("export failed: {}", e.what());
+                }
+            }
+        } else if (app.mesh_preview) {
+            ImGui::TextColored(palette.text_dim, "%s", app.mesh_preview->mesher_note.c_str());
+            ImGui::Text("nodes %zu  elems %zu", app.mesh_preview->mesh.nodes.size(),
+                        app.mesh_preview->mesh.elements.size());
         }
         iw::end_group_box();
     }
@@ -219,15 +298,38 @@ void draw_viewport_content(App& app) {
                                      app.hovered_region);
         app.overlays_dirty = false;
     }
-    const float result_max = app.result
-                                 ? (app.mode == DisplayMode::kResultsVonMises
-                                        ? static_cast<float>(app.result->max_von_mises)
-                                        : static_cast<float>(app.result->max_displacement))
-                                 : 1.0f;
+    float result_max = 1.0f;
+    if (app.result) {
+        if (app.mode == DisplayMode::kResultsVonMises) {
+            result_max = static_cast<float>(app.result->max_von_mises);
+        } else if (app.mode == DisplayMode::kResultsDisplacement) {
+            result_max = static_cast<float>(app.result->max_displacement);
+        } else if (app.mode == DisplayMode::kResultsError) {
+            result_max = static_cast<float>(std::max(app.result->max_nodal_eta, 1e-30));
+        }
+    }
     app.viewport.render(static_cast<int>(size.x), static_cast<int>(size.y), app.mode,
                         static_cast<float>(app.deform_scale), result_max);
     ImGui::Image(static_cast<ImTextureID>(app.viewport.texture()), size, ImVec2(0, 1),
                  ImVec2(1, 0));
+
+    // Colorbar overlay (results modes only).
+    if (app.result && (app.mode == DisplayMode::kResultsVonMises ||
+                       app.mode == DisplayMode::kResultsDisplacement ||
+                       app.mode == DisplayMode::kResultsError)) {
+        ImGui::SetCursorScreenPos(ImVec2(ImGui::GetItemRectMin().x + 12,
+                                         ImGui::GetItemRectMin().y + 12));
+        ImGui::BeginChild("##cbar", ImVec2(120, 170), false,
+                          ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoInputs);
+        if (app.mode == DisplayMode::kResultsVonMises) {
+            draw_colorbar("von Mises", 0.0f, result_max, "Pa");
+        } else if (app.mode == DisplayMode::kResultsDisplacement) {
+            draw_colorbar("|u|", 0.0f, result_max, "m");
+        } else {
+            draw_colorbar("ZZ η", 0.0f, result_max, "");
+        }
+        ImGui::EndChild();
+    }
 
     if (ImGui::IsItemHovered()) {
         const ImGuiIO& io = ImGui::GetIO();
@@ -344,7 +446,7 @@ void draw_frame(App& app) {
     ImGui::PopStyleColor();
 }
 
-int run() {
+int run(int argc, char** argv) {
     glfwSetErrorCallback([](int code, const char* text) {
         std::fprintf(stderr, "glfw error %d: %s\n", code, text);
     });
@@ -373,6 +475,9 @@ int run() {
 
     App app;
     app.viewport.init();
+    if (argc >= 2 && argv[1] != nullptr && argv[1][0] != '\0') {
+        load_model(app, argv[1]);
+    }
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
@@ -380,9 +485,17 @@ int run() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
+        if (auto mesh = app.job.take_mesh()) {
+            app.mesh_preview = std::move(mesh);
+            app.viewport.set_mesh(*app.mesh_preview);
+            app.mesh_status = app.mesh_preview->mesher_note;
+            app.mode = DisplayMode::kMeshPreview;
+            app.status = std::format("mesh: {} elems", app.mesh_preview->mesh.elements.size());
+        }
         if (auto result = app.job.take_result()) {
             app.result = std::move(result);
             app.viewport.set_result(*app.result);
+            app.mesh_status = app.result->mesh_note;
             app.mode = DisplayMode::kResultsVonMises;
         }
 
@@ -410,7 +523,5 @@ int run() {
 } // namespace polymesh::gui
 
 int main(int argc, char** argv) {
-    (void)argc;
-    (void)argv;
-    return polymesh::gui::run();
+    return polymesh::gui::run(argc, argv);
 }

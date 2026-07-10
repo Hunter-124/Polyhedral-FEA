@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "viewport.hpp"
 
+#include "fea/nodal_mesh.hpp"
 #include "theme.hpp"
 
 #define GL_GLEXT_PROTOTYPES
@@ -189,11 +190,12 @@ void Viewport::init() {
     glGenVertexArrays(1, &background_vao_);
     glGenVertexArrays(1, &model_vao_);
     glGenBuffers(1, &model_vbo_);
+    glGenVertexArrays(1, &mesh_vao_);
+    glGenBuffers(1, &mesh_vbo_);
     glGenVertexArrays(1, &result_vao_);
     glGenBuffers(1, &result_vbo_);
 
-    for (const GLuint vao : {model_vao_, result_vao_}) {
-        const GLuint vbo = vao == model_vao_ ? model_vbo_ : result_vbo_;
+    const auto bind_attr = [](GLuint vao, GLuint vbo) {
         glBindVertexArray(vao);
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
         constexpr GLsizei stride = 10 * sizeof(float); // pos3 normal3 color4
@@ -205,7 +207,10 @@ void Viewport::init() {
         glEnableVertexAttribArray(2);
         glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, stride,
                               reinterpret_cast<void*>(6 * sizeof(float)));
-    }
+    };
+    bind_attr(model_vao_, model_vbo_);
+    bind_attr(mesh_vao_, mesh_vbo_);
+    bind_attr(result_vao_, result_vbo_);
     glBindVertexArray(0);
 }
 
@@ -297,13 +302,75 @@ void Viewport::update_overlays(const Model& model, const SimSetup& setup, int se
                     model_vertex_data_.data());
 }
 
+void Viewport::set_mesh(const VolumeMeshOutput& mesh_out) {
+    // Boundary quads colored by owning element type (hex/tet/pyramid/…).
+    namespace fea = polymesh::fea;
+    auto type_color = [](fea::ElementType t) -> std::array<float, 3> {
+        switch (t) {
+        case fea::ElementType::kTet4:
+        case fea::ElementType::kTet10:
+            return {0.35f, 0.55f, 0.95f};
+        case fea::ElementType::kHex8:
+        case fea::ElementType::kHex20:
+            return {0.30f, 0.75f, 0.45f};
+        case fea::ElementType::kPyramid5:
+            return {0.95f, 0.55f, 0.20f};
+        case fea::ElementType::kPrism6:
+            return {0.70f, 0.40f, 0.90f};
+        case fea::ElementType::kPolyVem:
+            return {0.20f, 0.80f, 0.85f};
+        }
+        return {0.6f, 0.6f, 0.6f};
+    };
+    auto elem_type_for_quad = [&](const std::array<std::uint32_t, 4>& q) {
+        for (const auto& el : mesh_out.mesh.elements) {
+            int hits = 0;
+            for (auto n : el.nodes) {
+                for (auto qn : q) {
+                    if (n == qn) {
+                        ++hits;
+                    }
+                }
+            }
+            if (hits >= 4 || (el.nodes.size() == 4 && hits >= 3)) {
+                return el.type;
+            }
+        }
+        return fea::ElementType::kTet4;
+    };
+
+    std::vector<float> data;
+    data.reserve(mesh_out.boundary_quads.size() * 6 * 10);
+    const auto& nodes = mesh_out.mesh.nodes;
+    for (const auto& quad : mesh_out.boundary_quads) {
+        const Eigen::Vector3d a = nodes[quad[0]];
+        const Eigen::Vector3d b = nodes[quad[1]];
+        const Eigen::Vector3d c = nodes[quad[2]];
+        const Eigen::Vector3d n = (b - a).cross(c - a).normalized();
+        const auto rgb = type_color(elem_type_for_quad(quad));
+        for (const auto idx : {0, 1, 2, 0, 2, 3}) {
+            const auto& p = nodes[quad[static_cast<std::size_t>(idx)]];
+            for (int i = 0; i < 3; ++i) {
+                data.push_back(static_cast<float>(p[i]));
+            }
+            for (int i = 0; i < 3; ++i) {
+                data.push_back(static_cast<float>(n[i]));
+            }
+            data.insert(data.end(), {rgb[0], rgb[1], rgb[2], 1.0f});
+        }
+    }
+    mesh_vertex_count_ = static_cast<int>(data.size() / 10);
+    glBindBuffer(GL_ARRAY_BUFFER, mesh_vbo_);
+    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(data.size() * sizeof(float)),
+                 data.data(), GL_DYNAMIC_DRAW);
+}
+
 void Viewport::set_result(const SolveResult& result) {
-    // Store rest positions + scalars; deformation is applied at render time
-    // on the CPU only when the scale changes... v0 keeps it simple and bakes
-    // positions per set_result call; render() re-bakes when scale changes.
+    // Store rest positions + scalars; bake when mode/scale/range changes.
     result_rest_.clear();
     result_scalar_vm_.clear();
     result_scalar_u_.clear();
+    result_scalar_eta_.clear();
     result_quads_ = result.boundary_quads;
     result_disp_ = result.displacement;
     const auto& nodes = result.volume_mesh.nodes;
@@ -313,14 +380,28 @@ void Viewport::set_result(const SolveResult& result) {
     }
     result_scalar_vm_ = result.von_mises;
     result_scalar_u_ = result.u_magnitude;
+    result_scalar_eta_ = result.nodal_eta;
+    if (result_scalar_eta_.size() != nodes.size()) {
+        result_scalar_eta_.assign(nodes.size(), 0.0);
+    }
+    // Also upload undeformed mesh boundary for mesh-preview after solve.
+    VolumeMeshOutput preview;
+    preview.mesh = result.volume_mesh;
+    preview.boundary_quads = result.boundary_quads;
+    preview.mesher_note = result.mesh_note;
+    set_mesh(preview);
     result_dirty_ = true;
 }
 
 void Viewport::bake_result(DisplayMode mode, float deform_scale, float result_max) {
     std::vector<float> data;
     data.reserve(result_quads_.size() * 6 * 10);
-    const auto& scalars =
-        mode == DisplayMode::kResultsVonMises ? result_scalar_vm_ : result_scalar_u_;
+    const std::vector<double>* scalars = &result_scalar_u_;
+    if (mode == DisplayMode::kResultsVonMises) {
+        scalars = &result_scalar_vm_;
+    } else if (mode == DisplayMode::kResultsError) {
+        scalars = &result_scalar_eta_;
+    }
     const float denom = result_max > 0.0f ? result_max : 1.0f;
     const auto emit = [&](std::uint32_t node, const Eigen::Vector3d& normal) {
         const Eigen::Vector3d pos =
@@ -333,7 +414,8 @@ void Viewport::bake_result(DisplayMode mode, float deform_scale, float result_ma
         for (int i = 0; i < 3; ++i) {
             data.push_back(static_cast<float>(normal[i]));
         }
-        const auto rgb = fea_colormap(static_cast<float>(scalars[node]) / denom);
+        const double s = node < scalars->size() ? (*scalars)[node] : 0.0;
+        const auto rgb = fea_colormap(static_cast<float>(s) / denom);
         data.insert(data.end(), {rgb[0], rgb[1], rgb[2], 1.0f});
     };
     for (const auto& quad : result_quads_) {
@@ -395,6 +477,11 @@ void Viewport::render(int width, int height, DisplayMode mode, float deform_scal
         if (model_vertex_count_ > 0) {
             glBindVertexArray(model_vao_);
             glDrawArrays(GL_TRIANGLES, 0, model_vertex_count_);
+        }
+    } else if (mode == DisplayMode::kMeshPreview) {
+        if (mesh_vertex_count_ > 0) {
+            glBindVertexArray(mesh_vao_);
+            glDrawArrays(GL_TRIANGLES, 0, mesh_vertex_count_);
         }
     } else {
         if (result_dirty_ || baked_mode_ != mode || baked_scale_ != deform_scale ||

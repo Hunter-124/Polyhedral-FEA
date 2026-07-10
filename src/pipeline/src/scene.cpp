@@ -304,13 +304,93 @@ std::string SolveJob::status_text() const {
     return status_;
 }
 
+void SolveJob::join_worker() {
+    if (worker_.joinable()) {
+        worker_.join();
+    }
+}
+
+void SolveJob::clear_failure() {
+    if (state_ == State::kFailed) {
+        join_worker();
+        state_ = State::kIdle;
+        set_status("idle");
+    }
+}
+
+void SolveJob::start_mesh(const Model& model, const SimSetup& setup) {
+    if (state_ == State::kMeshing || state_ == State::kSolving) {
+        return;
+    }
+    join_worker();
+    state_ = State::kMeshing;
+    set_status("meshing…");
+    worker_ = std::thread([this, model, setup] {
+        try {
+            const double extent = (model.bbox_max - model.bbox_min).maxCoeff();
+            const double h = setup.mesh_size > 0.0 ? setup.mesh_size : extent / 24.0;
+            double h_use = h;
+            if (setup.use_feature_grading) {
+                const auto edges = geom::detect_sharp_edges(model.surface, 30.0);
+                if (!edges.empty()) {
+                    const auto field =
+                        adapt::make_feature_sizing(h * 0.5, h, 2.0 * h, model.surface, edges);
+                    h_use = std::min(h_use, field->size_at(0.5 * (model.bbox_min + model.bbox_max)));
+                }
+            }
+            mesh_only_ = volume_mesh(model, h_use, setup.mesher, setup.skin_layers,
+                                     setup.use_feature_grading);
+            set_status(std::format("mesh ready — {} elems, {} nodes | {}",
+                                   mesh_only_.mesh.elements.size(), mesh_only_.mesh.nodes.size(),
+                                   mesh_only_.mesher_note));
+            state_ = State::kMeshDone;
+        } catch (const std::exception& e) {
+            set_status(std::format("mesh failed: {}", e.what()));
+            state_ = State::kFailed;
+        }
+    });
+}
+
+namespace {
+void fill_result_fields(SolveResult& r, const fea::ZzRecovery& zz, const Eigen::VectorXd& u) {
+    r.displacement = u;
+    r.global_eta = zz.global_eta;
+    r.element_eta = zz.element_eta;
+    const auto n_nodes = r.volume_mesh.nodes.size();
+    r.nodal_eta.assign(n_nodes, 0.0);
+    std::vector<int> counts(n_nodes, 0);
+    for (std::size_t e = 0; e < r.volume_mesh.elements.size() && e < zz.element_eta.size(); ++e) {
+        for (auto n : r.volume_mesh.elements[e].nodes) {
+            r.nodal_eta[n] += zz.element_eta[e];
+            ++counts[n];
+        }
+    }
+    r.max_nodal_eta = 0.0;
+    for (std::size_t i = 0; i < n_nodes; ++i) {
+        if (counts[i] > 0) {
+            r.nodal_eta[i] /= static_cast<double>(counts[i]);
+        }
+        r.max_nodal_eta = std::max(r.max_nodal_eta, r.nodal_eta[i]);
+    }
+    const auto& stress = zz.nodal_stress;
+    r.von_mises.resize(stress.size());
+    r.u_magnitude.resize(stress.size());
+    r.max_von_mises = 0.0;
+    r.max_displacement = 0.0;
+    for (std::size_t i = 0; i < stress.size(); ++i) {
+        r.von_mises[i] = fea::von_mises(stress[i]);
+        r.u_magnitude[i] = u.segment<3>(3 * static_cast<Eigen::Index>(i)).norm();
+        r.max_von_mises = std::max(r.max_von_mises, r.von_mises[i]);
+        r.max_displacement = std::max(r.max_displacement, r.u_magnitude[i]);
+    }
+}
+} // namespace
+
 void SolveJob::start(const Model& model, const SimSetup& setup) {
     if (state_ == State::kMeshing || state_ == State::kSolving) {
         return;
     }
-    if (worker_.joinable()) {
-        worker_.join();
-    }
+    join_worker();
     state_ = State::kMeshing;
     set_status("meshing…");
     // Copy inputs by value into the worker.
@@ -420,25 +500,12 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     const auto sug = adapt::suggest_refine(cents, zz_try.element_eta, h_use,
                                                            0.3, 0.75, h * 0.35);
                     if (sug.n_marked == 0 && sug.h_next >= h_use * 0.98) {
-                        // No further refinement — accept this solve as final.
-                        const auto& stress = zz_try.nodal_stress;
                         SolveResult r;
                         r.mesh_note = std::format("{} | adapt early-stop h={:.4g}",
                                                   vol.mesher_note, h_use);
                         r.volume_mesh = std::move(vol.mesh);
                         r.boundary_quads = std::move(vol.boundary_quads);
-                        r.displacement = u_try;
-                        r.global_eta = zz_try.global_eta;
-                        r.von_mises.resize(stress.size());
-                        r.u_magnitude.resize(stress.size());
-                        for (std::size_t i = 0; i < stress.size(); ++i) {
-                            r.von_mises[i] = fea::von_mises(stress[i]);
-                            r.u_magnitude[i] =
-                                u_try.segment<3>(3 * static_cast<Eigen::Index>(i)).norm();
-                            r.max_von_mises = std::max(r.max_von_mises, r.von_mises[i]);
-                            r.max_displacement =
-                                std::max(r.max_displacement, r.u_magnitude[i]);
-                        }
+                        fill_result_fields(r, zz_try, u_try);
                         result_ = std::move(r);
                         break;
                     }
@@ -447,25 +514,13 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     adapt_seed_band = sug.seed_band;
                     continue;
                 }
-                // Final pass results.
-                const auto& stress = zz_try.nodal_stress;
                 SolveResult r;
                 r.mesh_note = std::format("{} | adapt_passes={} h={:.4g} seeds={}",
                                           vol.mesher_note, setup.adapt_passes, h_use,
                                           adapt_seeds.size());
                 r.volume_mesh = std::move(vol.mesh);
                 r.boundary_quads = std::move(vol.boundary_quads);
-                r.displacement = u_try;
-                r.global_eta = zz_try.global_eta;
-                r.von_mises.resize(stress.size());
-                r.u_magnitude.resize(stress.size());
-                for (std::size_t i = 0; i < stress.size(); ++i) {
-                    r.von_mises[i] = fea::von_mises(stress[i]);
-                    r.u_magnitude[i] =
-                        u_try.segment<3>(3 * static_cast<Eigen::Index>(i)).norm();
-                    r.max_von_mises = std::max(r.max_von_mises, r.von_mises[i]);
-                    r.max_displacement = std::max(r.max_displacement, r.u_magnitude[i]);
-                }
+                fill_result_fields(r, zz_try, u_try);
                 result_ = std::move(r);
             } // adapt passes
             set_status(std::format("done — max von Mises {:.4g} MPa, max deflection {:.4g} mm",
@@ -483,17 +538,22 @@ std::optional<SolveResult> SolveJob::take_result() {
     if (state_ != State::kDone) {
         return std::nullopt;
     }
-    if (worker_.joinable()) {
-        worker_.join();
-    }
+    join_worker();
     state_ = State::kIdle;
     return std::move(result_);
 }
 
-SolveJob::~SolveJob() {
-    if (worker_.joinable()) {
-        worker_.join();
+std::optional<VolumeMeshOutput> SolveJob::take_mesh() {
+    if (state_ != State::kMeshDone) {
+        return std::nullopt;
     }
+    join_worker();
+    state_ = State::kIdle;
+    return std::move(mesh_only_);
+}
+
+SolveJob::~SolveJob() {
+    join_worker();
 }
 
 } // namespace polymesh::pipeline

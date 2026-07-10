@@ -4,8 +4,8 @@
 - Decision: D1
 
 ## Decision
-Bind OpenCASCADE via the `opencascade-rs` bindings for B-rep/STEP import and
-exact feature queries, behind a non-default `occ` cargo feature in `geom`.
+Link OpenCASCADE directly (native C++, ADR-0007) for B-rep/STEP import and
+exact feature queries, behind a default-OFF CMake option `POLYMESH_WITH_OCC`.
 The STL path (own loader + discrete curvature/dihedral feature detection) is
 always compiled and is the input for the P1–P2 mesher/solver work.
 
@@ -16,7 +16,7 @@ always compiled and is the input for the P1–P2 mesher/solver work.
   taxing every `cargo test` cycle before any physics exists.
 
 ## Why
-Owner decision at GATE 0: OCC now. Feature-gating gives STEP/B-rep without
-putting the C++ build on the critical path of solver development. The `occ`
-feature turns on when P3 feature-analysis work starts consuming exact
-geometry. `opencascade-rs` is LGPL-2.1, compatible with our AGPLv3 (ADR-0002).
+Owner decision at GATE 0: OCC now. Option-gating gives STEP/B-rep without
+putting the large OCC build on the critical path of solver development. The
+option turns on when P3 feature-analysis work starts consuming exact
+geometry. OpenCASCADE is LGPL-2.1, compatible with our AGPLv3 (ADR-0002).

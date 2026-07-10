@@ -80,16 +80,20 @@ STEP/B-rep or STL in
   special treatment" idea from the original discussion.
 
 ## Decisions — ratified at GATE 0 (2026-07-09; full rationale in docs/decisions/)
-- **D1 Geometry kernel** (ADR-0001): OpenCASCADE for B-rep/STEP behind a
-  non-default `occ` feature in `geom`; STL loader + discrete feature detection
+- **D1 Geometry kernel** (ADR-0001): OpenCASCADE for B-rep/STEP behind the
+  `POLYMESH_WITH_OCC` CMake option; STL loader + discrete feature detection
   always compiled and used for P1–P2.
 - **D2 License** (ADR-0002): **AGPL-3.0-or-later**. Dual commercial licensing
   kept open; CLA/assignment policy needed before accepting external PRs.
-- **D3 Element formulations** (ADR-0003): unified `Element` trait —
+- **D3 Element formulations** (ADR-0003): unified `Element` interface —
   isoparametric FEM at adaptive order p=1..4 on tets/hexes/prisms/pyramids,
-  VEM k=1,2 on general polyhedra. GPU acceleration slotted for P6, f64 only.
+  VEM k=1,2 on general polyhedra. Double precision only.
 - **D4 Mesh data structure** (ADR-0004): face-based owner/neighbour.
 - **D5 Benchmark baseline** (ADR-0005): our own uniform tet10 path, frozen at
   GATE 1, plus CalculiX cross-check inside `/audit`.
+- **Language** (ADR-0007): C++20, CMake + Ninja, Eigen for linear algebra.
+- **CUDA** (ADR-0008): optional runtime-selected backend for parallelizable
+  kernels (batched stiffness, SpMV, error indicators); CPU path is the
+  always-present reference, parity-tested against every GPU kernel.
 - **GUI** (ADR-0006): in scope for v1, built as phase P6.5 after the adaptive
-  core — wgpu + egui, dark CAD-style theme matching the owner's CAD app.
+  core — native viewport, dark CAD-style theme matching the owner's CAD app.

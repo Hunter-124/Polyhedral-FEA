@@ -7,11 +7,23 @@ size, and polynomial order to the geometry and the physics so critical regions
 bulk regions (flat faces, uniform-stress volumes) use large cheap elements.
 
 ## Language & tooling
-- **Rust**, stable toolchain, edition 2024. `cargo fmt` + `clippy -D warnings` must pass before any commit.
-- Workspace crates: `geom` (B-rep/geometry kernel interface), `mesh` (data structures + generation), `adapt` (sizing fields, error estimation, refinement), `fea` (solver), `bench` (verification harness), `cli`.
-- No `unsafe` outside `geom` FFI bindings and clearly justified hot paths (each `unsafe` block needs a `// SAFETY:` comment).
-- `f64` everywhere in the solver. No `f32` shortcuts in assembly or solves.
-- Prefer well-audited crates: `nalgebra`/`faer` for linear algebra, `rayon` for parallelism. Sparse solves: `faer` sparse Cholesky/LU first; iterative CG+AMG later.
+- **C++20**, CMake ≥ 3.24 + Ninja (ADR-0007). Builds with `-Wall -Wextra
+  -Wpedantic -Wconversion -Werror`; `clang-format` (repo `.clang-format`) must
+  be clean before any commit. Tests: Catch2 via `ctest --test-dir build`.
+- Modules under `src/`: `geom` (geometry kernel interface), `mesh` (data
+  structures + generation), `adapt` (sizing fields, error estimation,
+  refinement), `fea` (solver), `bench` (verification harness), `cli`.
+- Memory safety: RAII everywhere, no raw `new`/`delete` outside clearly
+  justified hot paths (each needs a `// SAFETY:` comment). Prefer
+  `std::vector`/`std::span`/smart pointers.
+- `double` everywhere in the solver — CPU and GPU. No `float` shortcuts in
+  assembly or solves.
+- Dependencies: Eigen (dense + sparse; SimplicialLDLT first, iterative CG+AMG
+  later), nlohmann-json, Catch2, OpenCASCADE behind `POLYMESH_WITH_OCC`.
+- **CUDA** (ADR-0008): optional backend behind `POLYMESH_WITH_CUDA` for
+  parallelizable kernels (batched element stiffness, SpMV, error indicators).
+  The CPU path is the reference implementation and always exists; every CUDA
+  kernel needs a parity test against it. CI builds CPU-only.
 
 ## Non-negotiable engineering rules
 1. **Never hardcode expected benchmark values anywhere in `mesh/`, `adapt/`, or `fea/`.** Reference values live only in `bench/reference/` and are loaded by the harness. Any constant in solver code that matches a benchmark target is treated as cheating.

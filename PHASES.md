@@ -10,7 +10,8 @@ P0 ──> P1 ──> P2 ──┬──> P3 ──> P5 ──> P6 ──> P6.5 
 
 ## P0 — Decisions & scaffolding
 - Resolve Open Decisions D1–D5 in SPEC.md (human input required).
-- Cargo workspace, CI (fmt, clippy, test), VTU export stub, PROGRESS.md.
+- CMake workspace, CI (format, warnings-as-errors build, tests), VTU export
+  stub, PROGRESS.md.
 - ⛔ GATE 0: decisions ratified, repo skeleton reviewed.
 
 ## P1 — Reference solver on standard elements (the trustworthy baseline)
@@ -48,16 +49,17 @@ P0 ──> P1 ──> P2 ──┬──> P3 ──> P5 ──> P6 ──> P6.5 
 - ⛔ GATE 5: full `/audit` including holdout geometries.
 
 ## P6 — Performance engineering
-- rayon parallel assembly, iterative solver + AMG for large N, memory profiling,
-  mesh generation profiling. GPU acceleration (wgpu compute) for assembly and
-  iterative solves where it wins, f64 only (ADR-0003).
+- Multithreaded assembly (OpenMP/TBB), iterative solver + AMG for large N,
+  memory profiling, mesh generation profiling. CUDA kernels (ADR-0008) for
+  every parallelizable hot spot found in profiling — batched stiffness, SpMV,
+  error indicators — each with CPU parity tests; double precision only.
   No accuracy regressions permitted (full suite re-run).
 - ⛔ GATE 6.
 
 ## P6.5 — GUI (ADR-0006)
-- `gui` crate: wgpu 3D viewport + egui panels, dark CAD-style theme matching
+- `gui` module: native 3D viewport + panels, dark CAD-style theme matching
   the owner's desktop CAD app (theme tokens in one module, tuned against
-  screenshots at phase start).
+  screenshots at phase start; toolkit chosen then).
 - Geometry import, mesh preview colored by element type/order, load/BC setup,
   run control, stress + error-field visualization. No physics logic in `gui`.
 - ⛔ GATE 6.5: owner reviews look/feel against the CAD app.

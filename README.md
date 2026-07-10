@@ -21,6 +21,9 @@ target accuracy is met at minimum cost.
 - **Solution-driven adaptivity**: solve → estimate error per element → refine
   size, raise order, or swap element type locally → re-solve.
 - **Linear elastostatics** (3D), STL and STEP input, VTU output for ParaView.
+- **CUDA acceleration** (optional): parallelizable kernels — batched element
+  stiffness, sparse matrix-vector products, error indicators — offload to the
+  GPU in full double precision, with a CPU reference path that always exists.
 - **Verified, not vibes**: every element passes patch tests, every claimed
   convergence order is demonstrated on manufactured solutions, and benchmarks
   run against closed-form analytical cases (see [BENCHMARKS.md](BENCHMARKS.md)).
@@ -33,27 +36,34 @@ and [PROGRESS.md](PROGRESS.md) for the current state.
 
 ## Building
 
+Requires a C++20 compiler, CMake ≥ 3.24, Eigen, and nlohmann-json
+(Catch2 is fetched automatically for tests).
+
 ```sh
-cargo build --workspace
-cargo test --workspace
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+ctest --test-dir build
 ```
 
-STEP/B-rep support (OpenCASCADE, long C++ build) is feature-gated:
+Optional components:
 
 ```sh
-cargo build -p geom --features occ
+# STEP/B-rep import via OpenCASCADE
+cmake -B build -DPOLYMESH_WITH_OCC=ON
+# CUDA backend (requires the CUDA toolkit)
+cmake -B build -DPOLYMESH_WITH_CUDA=ON
 ```
 
 ## Layout
 
-| Crate | Purpose |
+| Module | Purpose |
 |---|---|
-| `geom` | Geometry input (STL, STEP via `occ` feature), feature analysis |
-| `mesh` | Face-based polyhedral mesh structure, validity, generation |
-| `adapt` | Sizing fields, error estimation, hp-refinement decisions |
-| `fea` | Element formulations, assembly, sparse solve |
-| `bench` | Verification harness (Tier 0–3) and anti-cheat audit tooling |
-| `cli` | `polymesh` command-line interface |
+| `src/geom` | Geometry input (STL; STEP via `POLYMESH_WITH_OCC`), feature analysis |
+| `src/mesh` | Face-based polyhedral mesh structure, validity, generation |
+| `src/adapt` | Sizing fields, error estimation, hp-refinement decisions |
+| `src/fea` | Element formulations, assembly, sparse solve, CPU/CUDA backends |
+| `src/bench` | Verification harness (Tier 0–3) and anti-cheat audit tooling |
+| `src/cli` | `polymesh` command-line interface |
 
 Design decisions are recorded ADR-style in [docs/decisions/](docs/decisions/).
 

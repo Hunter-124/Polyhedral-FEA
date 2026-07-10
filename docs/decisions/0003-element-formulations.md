@@ -13,9 +13,9 @@ One `fea::Element` trait spans the whole zoo:
 - **General polyhedra**: Virtual Element Method (VEM) k = 1, 2 — handles
   non-convex cells and hanging nodes, and has clean hp theory. Stabilization
   correctness is guarded by Tier-0 single-element eigenvalue tests.
-- **GPU acceleration** (wgpu compute for assembly / iterative solves) is
-  scheduled in the performance phase (P6), not baked into the formulation;
-  accuracy-critical arithmetic remains f64 everywhere.
+- **GPU acceleration**: CUDA backend for parallelizable kernels wherever
+  they appear (ADR-0008), never baked into the formulation itself;
+  accuracy-critical arithmetic remains double precision everywhere.
 
 ## Alternatives
 - Wachspress/mean-value polyhedral FEM: convex-only, effectively first-order —

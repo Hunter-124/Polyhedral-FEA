@@ -2,6 +2,11 @@
 add_library(fea
     src/material.cpp
     src/backend.cpp
+    src/nodal_mesh.cpp
+    src/quadrature.cpp
+    src/shape.cpp
+    src/assembly.cpp
+    src/solve.cpp
 )
 target_include_directories(fea PUBLIC include)
 target_link_libraries(fea PUBLIC mesh Eigen3::Eigen PRIVATE polymesh_warnings)

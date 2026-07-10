@@ -4,12 +4,9 @@
 **Master plan:** [`docs/ROADMAP.md`](ROADMAP.md) · **Agent loop:**
 [`docs/process/agent-loop.md`](process/agent-loop.md)
 
-**Active:** Track A (GUI usable) → M1 study app. Solver core
-(GATE 1) frozen. Mesh/adapt product path advancing (graded, hexpyr, seed remesh).
-F1 OpenMP + F2 CG + E1–E3 + B1/B3/B4 + C1 + C2 + C5 + D5 + E4 + G1–G4 done.
-(GATE 1) frozen. Mesh/adapt product path advancing (graded, hexpyr, seed remesh).
-F1 OpenMP + F2 CG + E1–E3 + B1/B3/B4 + C1 + C2 + D3 + D5 + E4 + G1–G4 done.
-F1 OpenMP + F2 CG + E1–E3 + B1/B3/B4 + C1 + C2 + C5 + D5 + E4 + G1–G4 done.
+**Active:** Track A (GUI usable) → M1 study app. Solver core (GATE 1) frozen.
+Mesh/adapt product path advancing (graded, hexpyr, seed remesh).
+F1/F2 + E1–E3 + B1/B3/B4 + C1 + C2 + C5 + D3 + D5 + E4 + G1–G4 done.
 
 GATE 1 deliverables ready:
 - Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)

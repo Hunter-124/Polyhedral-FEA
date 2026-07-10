@@ -30,18 +30,18 @@ struct TransitionCell {
 };
 
 struct TransitionFillOutput {
-    std::vector<Eigen::Vector3d> nodes;
+    std::vector<Eigen::Vector3d> nodes; // metres
     std::vector<TransitionCell> cells;
     std::vector<std::array<std::uint32_t, 4>> boundary_quads;
-    double h = 0.0;
+    double h = 0.0; // grid spacing used, metres
     std::size_t n_hex = 0;
     std::size_t n_pyramid = 0;
     /// Max boundary-node distance to surface after optional snap (metres).
     double boundary_max_distance = 0.0;
 };
 
-/// Hex core + pyramid skin. If `snap_boundary`, lattice nodes on the free
-/// surface are pulled toward the STL by at most 0.35 h.
+/// Hex core + pyramid skin. `h` and bbox in metres. If `snap_boundary`, lattice
+/// nodes on the free surface are pulled toward the STL by at most 0.35 h.
 TransitionFillOutput transition_fill_surface(const geom::TriSurface& surface,
                                              const Eigen::Vector3d& bbox_min,
                                              const Eigen::Vector3d& bbox_max, double h,

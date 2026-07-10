@@ -18,9 +18,9 @@
 namespace polymesh::mesh {
 
 struct GradedTetFillOutput {
-    TetFillOutput mesh; // nodes + tets + boundary quads at the fine lattice
-    double h_coarse = 0.0;
-    double h_fine = 0.0;
+    TetFillOutput mesh;    // nodes + tets + boundary quads at the fine lattice
+    double h_coarse = 0.0; // metres
+    double h_fine = 0.0;   // metres (typically h_coarse/2)
     std::size_t n_coarse_cells = 0;
     std::size_t n_fine_cells = 0;
     int skin_layers = 0;
@@ -30,8 +30,9 @@ struct GradedTetFillOutput {
     std::size_t n_seed_cells = 0;
 };
 
-/// `skin_layers` ≥ 1. Coarse spacing is `h`; fine is `h/2` in the skin.
-/// Optional sharp-edge band and/or error-seed balls also force fine blocks.
+/// `skin_layers` ≥ 1. Coarse spacing is `h` (metres); fine is `h/2` in the skin.
+/// Optional sharp-edge band and/or error-seed balls also force fine blocks
+/// (`feature_band`, `seed_band` in metres; 0 disables).
 GradedTetFillOutput graded_tet_fill_surface(
     const geom::TriSurface& surface, const Eigen::Vector3d& bbox_min,
     const Eigen::Vector3d& bbox_max, double h, int skin_layers = 2,

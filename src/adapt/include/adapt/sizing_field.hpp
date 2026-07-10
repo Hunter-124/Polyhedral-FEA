@@ -44,23 +44,28 @@ class UniformSizing final : public SizingField {
 };
 
 /// Size blends from `h_min` at features (distance 0) to `h_max` at and beyond
-/// `blend_distance`. Linear ramp in between.
+/// `blend_distance`. Linear ramp in between. All lengths in metres.
 class FeatureSizing final : public SizingField {
   public:
     using DistanceFn = std::function<double(const Eigen::Vector3d&)>;
 
+    /// @param h_min Size at features, metres (must be > 0).
+    /// @param h_max Far-field size, metres (must be ≥ h_min).
+    /// @param blend_distance Distance to full h_max, metres.
+    /// @param distance_fn Distance to nearest feature, metres.
     FeatureSizing(double h_min, double h_max, double blend_distance, DistanceFn distance_fn);
 
     double size_at(const Eigen::Vector3d& point) const override;
 
   private:
-    double h_min_ = 0.0;
-    double h_max_ = 0.0;
-    double blend_ = 0.0;
+    double h_min_ = 0.0; // m
+    double h_max_ = 0.0; // m
+    double blend_ = 0.0; // m
     DistanceFn dist_;
 };
 
 /// Feature sizing using `geom::distance_to_features` on the given sharp edges.
+/// @param h_min,h_max,blend_distance Lengths in metres (see FeatureSizing).
 std::unique_ptr<SizingField> make_feature_sizing(double h_min, double h_max,
                                                  double blend_distance,
                                                  const geom::TriSurface& surface,

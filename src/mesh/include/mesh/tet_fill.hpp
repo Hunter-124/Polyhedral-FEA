@@ -23,25 +23,27 @@
 namespace polymesh::mesh {
 
 struct TetFillOutput {
-    std::vector<Eigen::Vector3d> nodes;
+    std::vector<Eigen::Vector3d> nodes; // metres
     /// Each tet: four node indices, positive orientation.
     std::vector<std::array<std::uint32_t, 4>> tets;
     /// Outer quads of the voxel lattice (region mapping / rendering).
     std::vector<std::array<std::uint32_t, 4>> boundary_quads;
-    double h = 0.0;
+    double h = 0.0; // grid spacing used, metres
 };
 
-/// Fill the interior of `surface` (assumed closed, outward CCW) at spacing h.
-/// Throws ValidityError on empty volume or absurd grid size.
+/// Fill the interior of `surface` (assumed closed, outward CCW) at spacing `h` (metres).
+/// Bbox corners are metres. Throws ValidityError on empty volume or absurd grid size.
 TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
                                const Eigen::Vector3d& bbox_min,
                                const Eigen::Vector3d& bbox_max, double h,
                                bool snap_boundary = true);
 
+/// Signed tet volume, m³ (positive for right-handed a,b,c,d).
 double tet_signed_volume(const Eigen::Vector3d& a, const Eigen::Vector3d& b,
                          const Eigen::Vector3d& c, const Eigen::Vector3d& d);
 
 /// Positive volumes and finite coordinates for every tet in `out`.
+/// @param min_volume Lower bound on |V|, m³ (0 = any positive).
 void check_tet_fill_geometry(const TetFillOutput& out, double min_volume = 0.0);
 
 } // namespace polymesh::mesh

@@ -4,9 +4,9 @@
 **Master plan:** [`docs/ROADMAP.md`](ROADMAP.md) · **Agent loop:**
 [`docs/process/agent-loop.md`](process/agent-loop.md)
 
-**Active:** Track A (GUI usable) → M1 study app. 81 tests green. Solver core
+**Active:** Track A (GUI usable) → M1 study app. 84 tests green. Solver core
 (GATE 1) frozen. Mesh/adapt product path advancing (graded, hexpyr, seed remesh).
-F1 OpenMP assembly landed; B1/B3/B4 + C1 + D5 + E4 + G1 done.
+F1 OpenMP + E1–E3 + B1/B3/B4 + C1 + D5 + E4 + G1–G4 done.
 
 GATE 1 deliverables ready:
 - Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)
@@ -18,6 +18,11 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: G2+G3+G4 — `examples/` README + `run_mesh_public.sh` /
+  `run_solve_public.sh` (auto-h CLI on `bench/geometries/public/*.stl`, symlink
+  geometries); public-header SI units/doxygen spot-check (SimSetup, volume_mesh,
+  write_vtu, sizing, tet/hex/graded/transition fills); CI `actions/checkout@v5`
+  (setup-python stays @v5); ROADMAP G2–G4 closed.
 - 2026-07-10: F1 OpenMP assembly — CMake `POLYMESH_WITH_OPENMP` (default ON)
   finds OpenMP; when present, `fea` links `OpenMP::OpenMP_CXX` and defines
   `POLYMESH_WITH_OPENMP`. `assemble_stiffness` uses `#pragma omp parallel for`

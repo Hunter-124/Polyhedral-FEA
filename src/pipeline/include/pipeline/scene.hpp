@@ -50,16 +50,22 @@ struct RegionLoad {
     Eigen::Vector3d force = Eigen::Vector3d::Zero();
 };
 
+/// Material, mesh, adapt, and BC settings for a study solve.
+/// SI throughout: length m, stress/modulus Pa, force N (via RegionLoad).
 struct SimSetup {
-    double youngs_modulus = 200e9; // Pa
+    /// Young's modulus \(E\), Pa (default steel-scale 200 GPa).
+    double youngs_modulus = 200e9;
+    /// Poisson's ratio \(\nu\), dimensionless, in (-1, 0.5).
     double poissons_ratio = 0.3;
-    /// Target element size in metres. **0 = auto** via `resolve_mesh_size`
+    /// Target element size \(h\), metres. **0 = auto** via `resolve_mesh_size`
     /// (bbox extent/diagonal + sharp-edge feature density).
     double mesh_size = 0.0;
     bool use_feature_grading = true; // refine toward sharp edges
     int adapt_passes = 0;            // extra solve→ZZ→refine mesh loops (max cap)
-    double eta_target = 0.0;         // stop adapt when global η ≤ target; 0 = disabled
-    int skin_layers = 2;             // graded-tet boundary skin depth
+    /// Stop adapt when global ZZ relative indicator \(\eta \le\) this value.
+    /// Dimensionless (energy-norm style); **0 = disabled**.
+    double eta_target = 0.0;
+    int skin_layers = 2; // graded-tet boundary skin depth (coarse cells)
     VolumeMesher mesher = VolumeMesher::kTetFill;
     std::set<int> fixtures; // region ids with all DOFs fixed
     std::map<int, RegionLoad> loads;
@@ -110,8 +116,11 @@ struct VolumeMeshOutput {
     std::map<std::uint32_t, int> boundary_node_region;
     std::string mesher_note;
 };
-/// `feature_refine`: when true and mesher is graded, also refine near sharp edges.
-/// `refine_seeds` / `seed_band`: a posteriori error balls for graded fine blocks.
+/// Volume fill of a closed model surface.
+/// @param h Coarse target edge length, metres (must be > 0; call resolve_mesh_size first).
+/// @param feature_refine When true and mesher is graded, also refine near sharp edges.
+/// @param refine_seeds Centroids for a posteriori fine blocks, metres (world coords).
+/// @param seed_band Ball radius around each seed for graded fine cells, metres (0 = off).
 VolumeMeshOutput volume_mesh(const Model& model, double h,
                              VolumeMesher mesher = VolumeMesher::kTetFill, int skin_layers = 2,
                              bool feature_refine = false,
@@ -119,6 +128,7 @@ VolumeMeshOutput volume_mesh(const Model& model, double h,
                              double seed_band = 0.0);
 
 /// @deprecated name kept as alias during transition; calls volume_mesh.
+/// @param h Target edge length, metres.
 VolumeMeshOutput voxel_mesh(const Model& model, double h);
 
 /// Background mesh / solve pipeline. Poll `state` from the UI thread.

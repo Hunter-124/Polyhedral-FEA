@@ -19,9 +19,14 @@ namespace polymesh::adapt {
 std::vector<std::size_t> dorfler_mark(const std::vector<double>& element_eta,
                                       double theta = 0.3);
 
-/// Sizing that refines toward sharp features: h(x) = clamp(h_min + α d_feat, h_min, h_max).
+/// Sizing that refines toward sharp features:
+/// \( h(x) = \mathrm{clamp}(h_{\min} + \alpha\, d_{\mathrm{feat}},\, h_{\min},\, h_{\max}) \).
+/// Lengths \(h_{\min}\), \(h_{\max}\), \(d_{\mathrm{feat}}\) in metres; \(\alpha\)
+/// dimensionless.
 class FeatureGradedSizing final : public SizingField {
   public:
+    /// @param h_min,h_max Edge lengths, metres. @param alpha Dimensionless scale on
+    /// \(d_{\mathrm{feat}}\).
     FeatureGradedSizing(const geom::TriSurface& surface, std::vector<geom::SharpEdge> edges,
                         double h_min, double h_max, double alpha = 0.35)
         : surface_(&surface), edges_(std::move(edges)), h_min_(h_min), h_max_(h_max),
@@ -32,8 +37,8 @@ class FeatureGradedSizing final : public SizingField {
   private:
     const geom::TriSurface* surface_;
     std::vector<geom::SharpEdge> edges_;
-    double h_min_;
-    double h_max_;
+    double h_min_; // m
+    double h_max_; // m
     double alpha_;
 };
 

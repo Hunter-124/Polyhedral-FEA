@@ -108,9 +108,9 @@ and error, export VTU — without CLI.
 | ID | Task | Acceptance |
 |----|------|------------|
 | G1 | ~~README quickstart (CLI + GUI + screenshots)~~ | Done (apt deps, cmake/ctest, CLI unit_box, GUI) |
-| G2 | Example models + scripts | `examples/` |
-| G3 | API header docs units complete | Spot-check public headers |
-| G4 | CI matrix: Linux + format + ctest | Green on PR/master |
+| G2 | ~~Example models + scripts~~ | Done (`examples/` README + mesh/solve scripts on public STLs) |
+| G3 | ~~API header docs units complete~~ | Done (spot-check: SimSetup, Material, volume_mesh, write_vtu, sizing, fills) |
+| G4 | ~~CI matrix: Linux + format + ctest~~ | Done (format + build-test + grep-audit; checkout@v5) |
 
 ---
 
@@ -145,4 +145,4 @@ A1 A3 ──> A2 A10 ──> A4 A5 A8 ──> A6 A7
 | D Adapt | Seed remesh (ADR-0014) + η target (D2) + auto h0 (D5). Still: p-adapt, local h-refine. |
 | E Verify | E1–E4 done: CalculiX smoke peer, gate1-p1 Lamé/Kirsch scoreboard, holdout protocol stub, product-mesh smoke. Tight Lamé on product mesh needs better mesher. |
 | F Perf | CPU direct solver only. |
-| G Release | README quickstart (G1); examples/ still open (G2). |
+| G Release | G1–G4 done: README, examples/, header units, CI green (format+ctest+grep-audit). |

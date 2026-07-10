@@ -177,6 +177,7 @@ accuracy on product meshes is not claimed yet ([ADR-0015](docs/decisions/0015-gr
 | `src/bench` | Reference JSON loader (anti-cheat boundary) |
 | `tests/` | Catch2 suite |
 | `bench/` | Reference cases, reports, peer harness |
+| `examples/` | CLI mesh/solve scripts on public fixtures |
 | `docs/` | Spec, phases, ADRs, progress |
 | `graphify-out/` | Committed knowledge graph for agents |
 

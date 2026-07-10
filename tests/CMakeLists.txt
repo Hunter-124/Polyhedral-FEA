@@ -16,6 +16,7 @@ add_executable(polymesh_tests
     test_mms_convergence.cpp
     test_lame_cylinder.cpp
     test_kirsch_plate.cpp
+    test_kirsch_c5_graded.cpp
     test_goodier_cavity.cpp
     test_l_domain.cpp
     test_msh.cpp

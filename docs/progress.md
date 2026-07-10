@@ -4,9 +4,12 @@
 **Master plan:** [`docs/ROADMAP.md`](ROADMAP.md) · **Agent loop:**
 [`docs/process/agent-loop.md`](process/agent-loop.md)
 
-**Active:** Track A (GUI usable) → M1 study app. 90+ tests green. Solver core
+**Active:** Track A (GUI usable) → M1 study app. Solver core
+(GATE 1) frozen. Mesh/adapt product path advancing (graded, hexpyr, seed remesh).
+F1 OpenMP + F2 CG + E1–E3 + B1/B3/B4 + C1 + C2 + C5 + D5 + E4 + G1–G4 done.
 (GATE 1) frozen. Mesh/adapt product path advancing (graded, hexpyr, seed remesh).
 F1 OpenMP + F2 CG + E1–E3 + B1/B3/B4 + C1 + C2 + D3 + D5 + E4 + G1–G4 done.
+F1 OpenMP + F2 CG + E1–E3 + B1/B3/B4 + C1 + C2 + C5 + D5 + E4 + G1–G4 done.
 
 GATE 1 deliverables ready:
 - Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)
@@ -23,6 +26,11 @@ GATE 0 was approved by owner on 2026-07-09.
   complement); `SimSetup::p_elevate` + auto when `adapt_passes>0`; CLI
   `--p-elevate`; GUI checkbox; Catch2 promote/patch/selective/mark tests.
   test_support wraps product API.
+- 2026-07-10: C5 Kirsch equal-DOF graded vs uniform tet — structured annular
+  tet10 (ADR-0009 BC setup; not Cartesian product fill — stair-case on hole,
+  ADR-0015). Same free DOFs (648); log radial map vs linear: SCF rel err
+  **0.70%** vs **3.06%** (analytical SCF=3). Catch2
+  `test_kirsch_c5_graded.cpp`. ROADMAP C5 closed (GATE 3 Kirsch leg).
 - 2026-07-10: C2 curvature + thin-wall indicators — `geom::estimate_vertex_curvature`
   (dihedral 1-ring |H| proxy) + `estimate_local_thickness` (inward ray cast);
   `adapt::GeometrySizing` / `make_geometry_sizing` mins sharp-edge blend, h≈c/κ,

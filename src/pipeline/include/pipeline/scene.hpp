@@ -16,6 +16,7 @@
 #include <mutex>
 #include <optional>
 #include <set>
+#include <span>
 #include <string>
 #include <thread>
 #include <vector>
@@ -86,9 +87,12 @@ struct VolumeMeshOutput {
     std::string mesher_note;
 };
 /// `feature_refine`: when true and mesher is graded, also refine near sharp edges.
+/// `refine_seeds` / `seed_band`: a posteriori error balls for graded fine blocks.
 VolumeMeshOutput volume_mesh(const Model& model, double h,
                              VolumeMesher mesher = VolumeMesher::kTetFill,
-                             int skin_layers = 2, bool feature_refine = false);
+                             int skin_layers = 2, bool feature_refine = false,
+                             std::span<const Eigen::Vector3d> refine_seeds = {},
+                             double seed_band = 0.0);
 
 /// @deprecated name kept as alias during transition; calls volume_mesh.
 VolumeMeshOutput voxel_mesh(const Model& model, double h);

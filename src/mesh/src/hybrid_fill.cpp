@@ -73,7 +73,9 @@ GradedTetFillOutput graded_tet_fill_surface(const geom::TriSurface& surface,
                                             const Eigen::Vector3d& bbox_max, double h,
                                             int skin_layers,
                                             std::span<const geom::SharpEdge> features,
-                                            double feature_band) {
+                                            double feature_band,
+                                            std::span<const Eigen::Vector3d> refine_seeds,
+                                            double seed_band) {
     if (!(h > 0.0) || !std::isfinite(h)) {
         throw ValidityError("graded_tet_fill_surface: h must be positive");
     }
@@ -82,6 +84,9 @@ GradedTetFillOutput graded_tet_fill_surface(const geom::TriSurface& surface,
     }
     if (!(feature_band > 0.0) || features.empty()) {
         feature_band = 0.0;
+    }
+    if (!(seed_band > 0.0) || refine_seeds.empty()) {
+        seed_band = 0.0;
     }
     const Eigen::Vector3d extent = bbox_max - bbox_min;
     if (extent.minCoeff() <= 0.0) {
@@ -167,12 +172,13 @@ GradedTetFillOutput graded_tet_fill_surface(const geom::TriSurface& surface,
         }
     }
 
-    // Coarse skin: a 2×2×2 block is "fine" if any of its fine cells has dist < 2*skin_layers
-    // or the block center is within feature_band of a sharp edge.
+    // Coarse skin: a 2×2×2 block is "fine" if any fine cell has dist < 2*skin_layers,
+    // or the block center is near a sharp edge / error seed.
     const int nxc = nxf / 2, nyc = nyf / 2, nzc = nzf / 2;
     const int fine_dist_thresh = std::max(1, 2 * skin_layers);
     std::vector<bool> coarse_fine(static_cast<std::size_t>(nxc) * nyc * nzc, false);
     std::vector<bool> coarse_feature(static_cast<std::size_t>(nxc) * nyc * nzc, false);
+    std::vector<bool> coarse_seed(static_cast<std::size_t>(nxc) * nyc * nzc, false);
     const auto cidx = [&](int i, int j, int k) {
         return (static_cast<std::size_t>(k) * nyc + j) * nxc + i;
     };
@@ -199,15 +205,24 @@ GradedTetFillOutput graded_tet_fill_surface(const geom::TriSurface& surface,
                 if (!any_in) {
                     continue;
                 }
+                const Eigen::Vector3d center =
+                    origin + Eigen::Vector3d((2 * ic + 1) * hf, (2 * jc + 1) * hf,
+                                             (2 * kc + 1) * hf);
                 if (feature_band > 0.0) {
-                    const Eigen::Vector3d center =
-                        origin + Eigen::Vector3d((2 * ic + 1) * hf, (2 * jc + 1) * hf,
-                                                 (2 * kc + 1) * hf);
                     const double dfeat =
                         geom::distance_to_features(center, surface, features);
                     if (dfeat <= feature_band) {
                         need_fine = true;
                         coarse_feature[cidx(ic, jc, kc)] = true;
+                    }
+                }
+                if (seed_band > 0.0) {
+                    for (const auto& seed : refine_seeds) {
+                        if ((center - seed).norm() <= seed_band) {
+                            need_fine = true;
+                            coarse_seed[cidx(ic, jc, kc)] = true;
+                            break;
+                        }
                     }
                 }
                 if (need_fine) {
@@ -291,6 +306,9 @@ GradedTetFillOutput graded_tet_fill_surface(const geom::TriSurface& surface,
                     // Fine: every occupied fine cell becomes 6 tets.
                     if (coarse_feature[cidx(ic, jc, kc)]) {
                         ++out.n_feature_cells;
+                    }
+                    if (coarse_seed[cidx(ic, jc, kc)]) {
+                        ++out.n_seed_cells;
                     }
                     for (int dk = 0; dk < 2; ++dk) {
                         for (int dj = 0; dj < 2; ++dj) {

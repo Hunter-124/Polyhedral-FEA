@@ -24,16 +24,18 @@ struct GradedTetFillOutput {
     std::size_t n_coarse_cells = 0;
     std::size_t n_fine_cells = 0;
     int skin_layers = 0;
-    /// Cells forced fine by feature band (subset of fine cells).
+    /// Coarse blocks forced fine by feature band.
     std::size_t n_feature_cells = 0;
+    /// Coarse blocks forced fine by a posteriori error seeds.
+    std::size_t n_seed_cells = 0;
 };
 
 /// `skin_layers` ≥ 1. Coarse spacing is `h`; fine is `h/2` in the skin.
-/// If `features` is non-empty and `feature_band > 0`, coarse blocks whose
-/// center is within `feature_band` of a sharp edge are also refined.
+/// Optional sharp-edge band and/or error-seed balls also force fine blocks.
 GradedTetFillOutput graded_tet_fill_surface(
     const geom::TriSurface& surface, const Eigen::Vector3d& bbox_min,
     const Eigen::Vector3d& bbox_max, double h, int skin_layers = 2,
-    std::span<const geom::SharpEdge> features = {}, double feature_band = 0.0);
+    std::span<const geom::SharpEdge> features = {}, double feature_band = 0.0,
+    std::span<const Eigen::Vector3d> refine_seeds = {}, double seed_band = 0.0);
 
 } // namespace polymesh::mesh

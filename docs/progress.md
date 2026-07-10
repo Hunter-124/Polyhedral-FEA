@@ -1,9 +1,9 @@
 # PROGRESS
 
 ## Current phase
-**Active development on master.** 68+ tests green. Feature-distance graded tet
-(fine band around sharp edges); CLI `--feature`; hex+pyramid + FeatureSizing as
-before. Element zoo: tet/hex/prism/pyramid/VEM.
+**Active development on master.** 70 tests green. ZZ→Dörfler local seed remesh
+for graded fill (ADR-0014); CLI `solve --adapt n`. Feature-band graded tet +
+hex+pyramid as before. Element zoo: tet/hex/prism/pyramid/VEM.
 
 GATE 1 deliverables ready:
 - Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)
@@ -15,6 +15,8 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: A posteriori adapt seeds — Dörfler centroids → graded fine balls;
+  `suggest_refine`; pipeline adapt remesh; CLI `solve --adapt n`. ~70 tests.
 - 2026-07-10: Graded tet feature band (sharp-edge distance), pipeline
   `feature_refine`, CLI `--feature`, feature-block stats in mesher notes. 68 tests.
 - 2026-07-10: FeatureSizing field + feature-aware solve h; pyramid5 patch test

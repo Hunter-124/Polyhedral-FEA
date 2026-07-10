@@ -81,7 +81,7 @@ and error, export VTU — without CLI.
 |----|------|------------|
 | D1 | ~~Dörfler seed remesh~~ | Done (ADR-0014) |
 | D2 | ~~Global η stopping criterion (user target)~~ | Done (η target / early-stop) |
-| D3 | p-elevation on smooth marked elements (tet10/hex20 promote) | Order increases where smooth |
+| D3 | ~~p-elevation on smooth marked elements (tet10/hex20 promote)~~ | Done (`fea::p_elevate`, `mark_smooth`, pipeline/CLI) |
 | D4 | True local h-refine with hanging-node or remesh conformity | Documented + tested |
 | D5 | ~~Auto settings: h0 from bbox + feature density~~ | Done (`resolve_mesh_size`, CLI omit -h, GUI note) |
 | D6 | Tier-3: ≥5× DOF, ≥3× time vs uniform tet10 baseline | Measured in scoreboard |

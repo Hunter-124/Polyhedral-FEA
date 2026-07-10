@@ -211,6 +211,13 @@ void draw_study_panel(App& app) {
         if (ImGui::Checkbox("feature grading", &fg)) {
             app.setup.use_feature_grading = fg;
         }
+        bool pe = app.setup.p_elevate;
+        if (ImGui::Checkbox("p-elevate smooth", &pe)) {
+            app.setup.p_elevate = pe;
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Promote low-η tet4/hex8 → tet10/hex20 (auto when adapt>0)");
+        }
         int skin = app.setup.skin_layers;
         if (ImGui::SliderInt("skin layers", &skin, 1, 4)) {
             app.setup.skin_layers = skin;

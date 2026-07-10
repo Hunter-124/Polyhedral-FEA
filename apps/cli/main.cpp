@@ -2,9 +2,11 @@
 
 // PolyMesh CLI — geometry check, tet mesh, elastostatic solve + VTU export.
 
+#include "adapt/error.hpp"
 #include "adapt/loop.hpp"
 #include "fea/backend.hpp"
 #include "fea/material.hpp"
+#include "fea/p_elevate.hpp"
 #include "fea/solve.hpp"
 #include "fea/vtu.hpp"
 #include "fea/zz.hpp"
@@ -31,7 +33,7 @@ int usage() {
                "                             volume mesh; optional VTU write\n"
                "  solve <file> -o out.vtu [-h m] [-E Pa] [-nu r]\n"
                "              [--mesher name] [--skin n] [--feature] [--adapt n]\n"
-               "              [--eta-target η]\n"
+               "              [--eta-target η] [--p-elevate]\n"
                "                             mesh + cantilever-style BCs + VTU\n"
                "                             (fix min-x face nodes, load +Fy on max-x)\n"
                "  backend                    print compute backend\n"
@@ -41,7 +43,9 @@ int usage() {
                "--skin n: graded-tet fine skin layers (default 2)\n"
                "--feature: refine graded mesh near sharp edges (default off in CLI)\n"
                "--adapt n: ZZ→Dörfler remesh passes (local seeds on graded path)\n"
-               "--eta-target η: stop adapt when global ZZ η ≤ η (0=off; needs --adapt)\n",
+               "--eta-target η: stop adapt when global ZZ η ≤ η (0=off; needs --adapt)\n"
+               "--p-elevate: promote smooth (non-Dörfler) tet4/hex8 → tet10/hex20\n"
+               "             (auto-on when --adapt n>0)\n",
                stderr);
     return 2;
 }
@@ -141,6 +145,7 @@ int cmd_solve(std::span<char*> args) {
     bool feature = false;
     int adapt_passes = 0;
     double eta_target = 0.0;
+    bool p_elevate = false;
     for (std::size_t i = 3; i < args.size(); ++i) {
         if (std::strcmp(args[i], "-h") == 0 && i + 1 < args.size()) {
             h = std::atof(args[++i]);
@@ -169,9 +174,15 @@ int cmd_solve(std::span<char*> args) {
             if (eta_target < 0.0) {
                 eta_target = 0.0;
             }
+        } else if (std::strcmp(args[i], "--p-elevate") == 0) {
+            p_elevate = true;
         } else {
             return usage();
         }
+    }
+    // Auto when adapt_passes > 0 (hp product path), same as SimSetup.
+    if (adapt_passes > 0) {
+        p_elevate = true;
     }
     if (out_path.empty()) {
         std::fputs("solve: -o out.vtu is required\n", stderr);
@@ -237,9 +248,32 @@ int cmd_solve(std::span<char*> args) {
         }
         u = polymesh::fea::solve_elastostatics(vol.mesh, mat, bc, loads);
         zz = polymesh::fea::recover_zz(vol.mesh, mat, u);
-        if (eta_target > 0.0 && zz.global_eta <= eta_target) {
-            std::printf("eta-target stop: η=%.4g ≤ %.4g at pass %d/%d\n", zz.global_eta,
-                        eta_target, pass, adapt_passes);
+        const bool last_pass =
+            (pass == adapt_passes) || (eta_target > 0.0 && zz.global_eta <= eta_target);
+        if (last_pass) {
+            if (eta_target > 0.0 && zz.global_eta <= eta_target) {
+                std::printf("eta-target stop: η=%.4g ≤ %.4g at pass %d/%d\n", zz.global_eta,
+                            eta_target, pass, adapt_passes);
+            }
+            if (p_elevate) {
+                const auto smooth = polymesh::adapt::mark_smooth(zz.element_eta, 0.3);
+                if (!smooth.empty()) {
+                    const auto n0 = vol.mesh.nodes.size();
+                    vol.mesh = polymesh::fea::p_elevate(vol.mesh, smooth);
+                    vol.mesh.check_validity();
+                    auto [bc2, loads2] = make_bc_loads(vol);
+                    if (bc2.dof_values.empty()) {
+                        std::fputs("solve: no fixture nodes after p-elevate\n", stderr);
+                        return 1;
+                    }
+                    u = polymesh::fea::solve_elastostatics(vol.mesh, mat, bc2, loads2);
+                    zz = polymesh::fea::recover_zz(vol.mesh, mat, u);
+                    const auto counts = polymesh::fea::count_element_types(vol.mesh);
+                    std::printf("p-elevate: %zu smooth, nodes %zu→%zu (tet10=%zu hex20=%zu)\n",
+                                smooth.size(), n0, vol.mesh.nodes.size(), counts.tet10,
+                                counts.hex20);
+                }
+            }
             break;
         }
         if (pass < adapt_passes) {
@@ -255,6 +289,16 @@ int cmd_solve(std::span<char*> args) {
             const auto sug = polymesh::adapt::suggest_refine(cents, zz.element_eta, h_use, 0.3,
                                                              0.75, h * 0.35);
             if (sug.n_marked == 0 && sug.h_next >= h_use * 0.98) {
+                if (p_elevate) {
+                    const auto smooth = polymesh::adapt::mark_smooth(zz.element_eta, 0.3);
+                    if (!smooth.empty()) {
+                        vol.mesh = polymesh::fea::p_elevate(vol.mesh, smooth);
+                        vol.mesh.check_validity();
+                        auto [bc2, loads2] = make_bc_loads(vol);
+                        u = polymesh::fea::solve_elastostatics(vol.mesh, mat, bc2, loads2);
+                        zz = polymesh::fea::recover_zz(vol.mesh, mat, u);
+                    }
+                }
                 break;
             }
             h_use = sug.h_next;

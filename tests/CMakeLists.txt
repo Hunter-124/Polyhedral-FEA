@@ -33,6 +33,7 @@ add_executable(polymesh_tests
     test_graded_fill.cpp
     test_pyramid.cpp
     test_transition_fill.cpp
+    test_p_elevate.cpp
     support/structured_mesh.cpp
     support/mms.cpp
 )

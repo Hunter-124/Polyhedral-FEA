@@ -21,6 +21,7 @@ fea::NodalMesh box_tet_mesh(int nx, int ny, int nz, const Eigen::Vector3d& size)
 
 /// Promotes a tet4 mesh to tet10 / hex8 to hex20 by inserting shared
 /// mid-edge nodes at edge midpoints (straight-edged quadratic elements).
+/// Thin wrapper over `fea::promote_to_quadratic` for existing tests.
 fea::NodalMesh promote_to_quadratic(const fea::NodalMesh& mesh);
 
 /// Deterministically perturbs interior corner nodes by up to `amplitude`

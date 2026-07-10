@@ -25,8 +25,8 @@ Eigen::Vector3d tri_normal(const TriSurface& s, std::size_t t) {
     return Eigen::Vector3d(0.0, 0.0, 1.0);
 }
 
-double point_segment_distance(const Eigen::Vector3d& p, const Eigen::Vector3d& a,
-                              const Eigen::Vector3d& b) {
+[[maybe_unused]] double point_segment_distance(const Eigen::Vector3d& p, const Eigen::Vector3d& a,
+                                               const Eigen::Vector3d& b) {
     const Eigen::Vector3d ab = b - a;
     const double denom = ab.squaredNorm();
     if (denom == 0.0) {

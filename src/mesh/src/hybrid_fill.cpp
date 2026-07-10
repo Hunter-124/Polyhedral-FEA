@@ -114,7 +114,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     const CartesianGrid grid = make_bbox_grid(bbox_min, bbox_max, h_use);
     const int nx = grid.nx, ny = grid.ny, nz = grid.nz;
     const double hc = grid.max_edge();
-    const double hf = 0.5 * hc;
+    [[maybe_unused]] const double hf = 0.5 * hc;
     const auto inside = classify_cells_inside(surface, grid);
     const auto idx = [&](int i, int j, int k) { return grid.index(i, j, k); };
     const auto inb = [&](int i, int j, int k) {

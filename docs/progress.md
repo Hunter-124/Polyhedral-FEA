@@ -1,7 +1,7 @@
 # PROGRESS
 
 ## Current phase
-**Active development on master.** 53 tests green. Working product: tet/hex/hex-VEM meshers, VEM k=1, ZZ adapt passes, VTU, GUI, CLI, CalculiX smoke.
+**Active development on master.** 58 tests green. Meshers: tet / hex / hex-VEM / graded tet; VEM k=1; prism6; ZZ adapt; VTU; GUI/CLI.
 
 GATE 1 deliverables ready:
 - Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)
@@ -13,6 +13,9 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: Graded tet fill (fine skin / coarse core), surface conformity
+  metrics, ADR-0012 (hybrid = graded all-tet until pyramids). 58 tests.
+- 2026-07-10: Prism6 wedges; hex-VEM hybrid; quality metrics; CalculiX smoke.
 - 2026-07-10: Hex grid fill option + GUI mesher selector; tet quality notes.
 - 2026-07-10: VEM k=1 polyhedra (patch test + 6 RBM), adapt_passes in pipeline,
   feature grading, CalculiX smoke peer, GUI adapt/feature controls. 50/50 tests.

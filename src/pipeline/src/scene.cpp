@@ -11,7 +11,9 @@
 #include "geom/step.hpp"
 #include "geom/stl.hpp"
 #include "mesh/hex_fill.hpp"
+#include "mesh/hybrid_fill.hpp"
 #include "mesh/quality.hpp"
+#include "mesh/surface_project.hpp"
 #include "mesh/tet_fill.hpp"
 
 #include <Eigen/Geometry>
@@ -149,7 +151,8 @@ Model Model::load(const std::string& path, double sharp_angle_deg) {
     return model;
 }
 
-VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher) {
+VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
+                             int skin_layers) {
     VolumeMeshOutput out;
     double fill_h = h;
     if (mesher == VolumeMesher::kHexFill || mesher == VolumeMesher::kHexVem) {
@@ -171,6 +174,29 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher) 
         out.mesher_note = std::format("{} grid fill v1: {} cells, {} nodes, h={:.4g} m",
                                       mesher == VolumeMesher::kHexVem ? "hex-VEM" : "hex",
                                       out.mesh.elements.size(), out.mesh.nodes.size(), fill_h);
+    } else if (mesher == VolumeMesher::kGradedTet) {
+        auto graded = mesh::graded_tet_fill_surface(
+            model.surface, model.bbox_min, model.bbox_max, h, std::max(1, skin_layers));
+        fill_h = graded.h_fine;
+        out.mesh.nodes = std::move(graded.mesh.nodes);
+        out.mesh.elements.reserve(graded.mesh.tets.size());
+        for (const auto& tet : graded.mesh.tets) {
+            out.mesh.elements.push_back(
+                fea::NodalElement{fea::ElementType::kTet4, {tet[0], tet[1], tet[2], tet[3]}});
+        }
+        out.boundary_quads = std::move(graded.mesh.boundary_quads);
+        std::vector<std::uint32_t> bnodes;
+        for (const auto& q : out.boundary_quads) {
+            bnodes.insert(bnodes.end(), q.begin(), q.end());
+        }
+        std::sort(bnodes.begin(), bnodes.end());
+        bnodes.erase(std::unique(bnodes.begin(), bnodes.end()), bnodes.end());
+        const auto conf = mesh::surface_conformity(model.surface, out.mesh.nodes, bnodes);
+        out.mesher_note = std::format(
+            "graded tet v1: {} tets ({} coarse blocks, {} fine cells), h={:.4g}/{:.4g} m, "
+            "boundary max|d|={:.3g} m mean|d|={:.3g} m",
+            out.mesh.elements.size(), graded.n_coarse_cells, graded.n_fine_cells,
+            graded.h_coarse, graded.h_fine, conf.max_distance, conf.mean_distance);
     } else {
         auto fill = mesh::tet_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
         fill_h = fill.h;
@@ -221,7 +247,9 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher) 
     return out;
 }
 
-VolumeMeshOutput voxel_mesh(const Model& model, double h) { return volume_mesh(model, h); }
+VolumeMeshOutput voxel_mesh(const Model& model, double h) {
+    return volume_mesh(model, h, VolumeMesher::kTetFill, 2);
+}
 
 void SolveJob::set_status(const std::string& s) {
     const std::lock_guard lock(status_mutex_);
@@ -254,7 +282,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     h_use = std::min(h_use, h * 0.85);
                 }
             }
-            auto vol = volume_mesh(model, h_use, setup.mesher);
+            auto vol = volume_mesh(model, h_use, setup.mesher, setup.skin_layers);
             set_status(std::format("solving… ({} elements, {} nodes)",
                                    vol.mesh.elements.size(), vol.mesh.nodes.size()));
             state_ = State::kSolving;
@@ -299,7 +327,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
 
             for (int pass = 0; pass <= setup.adapt_passes; ++pass) {
                 if (pass > 0) {
-                    vol = volume_mesh(model, h_use, setup.mesher);
+                    vol = volume_mesh(model, h_use, setup.mesher, setup.skin_layers);
                     apply_bcs();
                     set_status(std::format("adapt pass {}… ({} elems)", pass,
                                            vol.mesh.elements.size()));

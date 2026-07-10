@@ -22,7 +22,7 @@
 
 namespace polymesh::pipeline {
 
-enum class VolumeMesher : int { kTetFill = 0, kHexFill = 1, kHexVem = 2 };
+enum class VolumeMesher : int { kTetFill = 0, kHexFill = 1, kHexVem = 2, kGradedTet = 3 };
 
 /// Imported model: triangle surface segmented into CAD-style "faces"
 /// (regions of triangles separated by sharp edges), so a click can select
@@ -49,6 +49,7 @@ struct SimSetup {
     double mesh_size = 0.0;          // m; 0 = auto (bbox/30)
     bool use_feature_grading = true; // refine toward sharp edges
     int adapt_passes = 0;            // extra solve→ZZ→refine mesh loops
+    int skin_layers = 2;             // graded-tet boundary skin depth
     VolumeMesher mesher = VolumeMesher::kTetFill;
     std::set<int> fixtures; // region ids with all DOFs fixed
     std::map<int, RegionLoad> loads;
@@ -79,7 +80,8 @@ struct VolumeMeshOutput {
     std::string mesher_note;
 };
 VolumeMeshOutput volume_mesh(const Model& model, double h,
-                             VolumeMesher mesher = VolumeMesher::kTetFill);
+                             VolumeMesher mesher = VolumeMesher::kTetFill,
+                             int skin_layers = 2);
 
 /// @deprecated name kept as alias during transition; calls volume_mesh.
 VolumeMeshOutput voxel_mesh(const Model& model, double h);

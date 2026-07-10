@@ -93,15 +93,15 @@ void draw_study_panel(App& app) {
     iw::input_double("poisson's ratio", &app.setup.poissons_ratio, "%.3f");
     iw::end_group_box();
 
-    iw::begin_group_box("mesh", 140);
+    iw::begin_group_box("mesh", 165);
     double h_mm = app.setup.mesh_size * 1e3;
     if (iw::input_double("element size (mm, 0=auto)", &h_mm, "%.2f")) {
         app.setup.mesh_size = h_mm / 1e3;
     }
     {
         int m = static_cast<int>(app.setup.mesher);
-        static const char* kMeshers[] = {"tet fill", "hex fill", "hex VEM"};
-        if (iw::selector("mesher", &m, kMeshers, 3)) {
+        static const char* kMeshers[] = {"tet fill", "hex fill", "hex VEM", "graded tet"};
+        if (iw::selector("mesher", &m, kMeshers, 4)) {
             app.setup.mesher = static_cast<VolumeMesher>(m);
         }
     }
@@ -113,6 +113,10 @@ void draw_study_panel(App& app) {
         bool fg = app.setup.use_feature_grading;
         if (ImGui::Checkbox("feature grading", &fg)) {
             app.setup.use_feature_grading = fg;
+        }
+        int skin = app.setup.skin_layers;
+        if (ImGui::SliderInt("skin layers", &skin, 1, 4)) {
+            app.setup.skin_layers = skin;
         }
     }
     iw::end_group_box();

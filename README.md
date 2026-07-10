@@ -20,7 +20,7 @@ other — not glued together after the fact.
 
 ## Status
 
-P1 solver baseline frozen. Working product path: tet mesh from STL/STEP, GUI
+P1 solver baseline frozen. Working product path: tet/hex/hex-VEM/graded-tet mesh from STL/STEP, GUI
 study (fixtures/loads/solve/export), CLI mesh/solve → VTU, ZZ indicators,
 feature-edge sizing hooks. Hybrid VEM/adapt loop still expanding. Tracking:
 [docs/progress.md](docs/progress.md), [docs/phases.md](docs/phases.md),

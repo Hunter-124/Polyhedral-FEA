@@ -75,6 +75,8 @@ int cmd_mesh(std::span<char*> args) {
                 mesher = polymesh::pipeline::VolumeMesher::kHexFill;
             } else if (m == "hexvem" || m == "vem") {
                 mesher = polymesh::pipeline::VolumeMesher::kHexVem;
+            } else if (m == "graded") {
+                mesher = polymesh::pipeline::VolumeMesher::kGradedTet;
             } else {
                 mesher = polymesh::pipeline::VolumeMesher::kTetFill;
             }
@@ -87,7 +89,7 @@ int cmd_mesh(std::span<char*> args) {
     if (h <= 0.0) {
         h = extent / 16.0;
     }
-    auto vol = polymesh::pipeline::volume_mesh(model, h, mesher);
+    auto vol = polymesh::pipeline::volume_mesh(model, h, mesher, 2);
     vol.mesh.check_validity();
     std::printf("mesh: %zu nodes, %zu elems, h=%.6g m\n%s\n", vol.mesh.nodes.size(),
                 vol.mesh.elements.size(), h, vol.mesher_note.c_str());
@@ -130,7 +132,8 @@ int cmd_solve(std::span<char*> args) {
     if (h <= 0.0) {
         h = extent / 12.0;
     }
-    auto vol = polymesh::pipeline::volume_mesh(model, h);
+    auto vol = polymesh::pipeline::volume_mesh(model, h,
+                                               polymesh::pipeline::VolumeMesher::kTetFill, 2);
     vol.mesh.check_validity();
 
     // Auto BCs: fix nodes near min-x plane; load +Y on max-x plane nodes.

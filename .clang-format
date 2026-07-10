@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+BasedOnStyle: LLVM
+IndentWidth: 4
+ColumnLimit: 95
+AccessModifierOffset: -2
+PointerAlignment: Left
+IncludeBlocks: Preserve

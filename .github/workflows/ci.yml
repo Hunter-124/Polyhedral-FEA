@@ -5,31 +5,35 @@ on:
     branches: [main]
   pull_request:
 
-env:
-  CARGO_TERM_COLOR: always
-
 jobs:
-  check:
+  build-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
-      - name: Format
-        run: cargo fmt --all --check
-      - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y ninja-build libeigen3-dev nlohmann-json3-dev
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+      - name: Build (warnings are errors)
+        run: cmake --build build
       - name: Test
-        run: cargo test --workspace
+        run: ctest --test-dir build --output-on-failure
 
-  # Anti-cheat: no numeric reference values may live in solver code
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: clang-format check
+        run: |
+          find src tests -name '*.cpp' -o -name '*.hpp' -o -name '*.cu' \
+            | xargs clang-format --dry-run --Werror
+
+  # Anti-cheat: no reference values may be read by solver code
   # (BENCHMARKS.md rule 4). Grep is intentionally crude; hits need human review.
   grep-audit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: No bench/reference reads outside bench crate
+      - name: No bench/reference reads outside the bench module
         run: |
-          ! grep -rn "bench/reference" crates/geom crates/mesh crates/adapt crates/fea crates/cli --include='*.rs'
+          ! grep -rn "bench/reference" src/geom src/mesh src/adapt src/fea src/cli

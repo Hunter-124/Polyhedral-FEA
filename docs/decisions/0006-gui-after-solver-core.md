@@ -6,7 +6,9 @@
 ## Decision
 A desktop GUI is in scope for v1 release, built after the adaptive loop works
 (new phase P6.5, between performance engineering and OSS release):
-- `gui` crate: wgpu 3D viewport + egui panels.
+- `gui` module: native C++ 3D viewport (OpenGL/Vulkan) + immediate-mode or Qt
+  panels — toolkit finalized at phase start (owner's CAD app lives at
+  ~/Repositories/CAD; match its stack and styling).
 - Capabilities: geometry import, mesh preview with element-type/order
   coloring, load/BC setup, run control, stress and error-field visualization.
 - Visual style: clean dark CAD-style theme to match the owner's desktop CAD

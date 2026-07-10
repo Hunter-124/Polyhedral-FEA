@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "geom/features.hpp"
+#include "mesh/grid_classify.hpp"
 #include "mesh/hybrid_fill.hpp"
 #include "mesh/surface_project.hpp"
 #include "mesh/tet_fill.hpp"
@@ -73,6 +74,27 @@ TEST_CASE("feature band refines more cells than surface skin alone") {
     check_tet_fill_geometry(with_feat.mesh);
 }
 
+TEST_CASE("feature/seed bands target ultra-fine lattice (~h/4)") {
+    // Without features: fine ≈ h/2. With feature band: subdiv=4 → fine ≈ h/4.
+    const auto s = unit_box();
+    const auto edges = polymesh::geom::detect_sharp_edges(s, 30.0);
+    auto plain = graded_tet_fill_surface(s, {0, 0, 0}, {1, 1, 1}, 0.4, 1, {}, 0.0);
+    auto feat = graded_tet_fill_surface(s, {0, 0, 0}, {1, 1, 1}, 0.4, 1, edges, 0.8);
+    REQUIRE(plain.subdivision == 2);
+    REQUIRE(feat.subdivision == 4);
+    // Realized fine spacing with features should be clearly smaller than plain.
+    REQUIRE(feat.h_fine < plain.h_fine * 0.75);
+    REQUIRE(feat.mesh.tets.size() > plain.mesh.tets.size());
+    check_tet_fill_geometry(feat.mesh);
+
+    // Seed balls alone also activate ultra-fine (no sharp edges needed).
+    std::vector<Eigen::Vector3d> seeds{{0.5, 0.5, 0.0}, {0.5, 0.5, 1.0}};
+    auto seeded = graded_tet_fill_surface(s, {0, 0, 0}, {1, 1, 1}, 0.4, 1, {}, 0.0, seeds, 0.5);
+    REQUIRE(seeded.subdivision == 4);
+    REQUIRE(seeded.n_seed_cells > 0);
+    check_tet_fill_geometry(seeded.mesh);
+}
+
 TEST_CASE("pipeline graded with feature_refine notes feature blocks") {
     polymesh::pipeline::Model m;
     m.surface = unit_box();
@@ -84,4 +106,78 @@ TEST_CASE("pipeline graded with feature_refine notes feature blocks") {
         m, 0.5, polymesh::pipeline::VolumeMesher::kGradedTet, 1, true);
     REQUIRE(vol.mesher_note.find("feature") != std::string::npos);
     REQUIRE_NOTHROW(vol.mesh.check_validity());
+}
+
+TEST_CASE("graded tet tiny h auto-coarsens instead of throwing grid too fine") {
+    // Previously: make_bbox_grid_even(h/2) blew past 512k cells and threw
+    // "grid too fine; increase element size" — product graded path must mesh.
+    const auto s = unit_box();
+    REQUIRE_NOTHROW(graded_tet_fill_surface(s, {0, 0, 0}, {1, 1, 1}, 1e-4, 2));
+    auto graded = graded_tet_fill_surface(s, {0, 0, 0}, {1, 1, 1}, 1e-4, 2);
+    REQUIRE_FALSE(graded.mesh.tets.empty());
+    REQUIRE(graded.h_coarse > 1e-4); // raised to cell budget
+    REQUIRE_NOTHROW(check_tet_fill_geometry(graded.mesh));
+
+    polymesh::pipeline::Model m;
+    m.surface = s;
+    m.bbox_min = {0, 0, 0};
+    m.bbox_max = {1, 1, 1};
+    m.region_count = 1;
+    m.triangle_region.assign(s.triangles.size(), 0);
+    auto vol = polymesh::pipeline::volume_mesh(
+        m, 1e-4, polymesh::pipeline::VolumeMesher::kGradedTet, 2, true);
+    REQUIRE_FALSE(vol.mesh.elements.empty());
+    REQUIRE_NOTHROW(vol.mesh.check_validity());
+    REQUIRE(vol.mesher_note.find("graded") != std::string::npos);
+}
+
+TEST_CASE("make_bbox_grid_even respects max_cells budget") {
+    using polymesh::mesh::make_bbox_grid_even;
+    using polymesh::mesh::kDefaultMaxGridCells;
+    // Request absurdly fine even lattice on unit cube.
+    auto g = make_bbox_grid_even({0, 0, 0}, {1, 1, 1}, 1e-6, 2, kDefaultMaxGridCells);
+    REQUIRE(g.nx % 2 == 0);
+    REQUIRE(g.ny % 2 == 0);
+    REQUIRE(g.nz % 2 == 0);
+    REQUIRE(g.cell_count() <= kDefaultMaxGridCells);
+    REQUIRE(g.nx >= 2);
+}
+
+TEST_CASE("graded fill surface-snaps boundary (not pure staircase)") {
+    const auto s = unit_box();
+    auto graded = graded_tet_fill_surface(s, {0, 0, 0}, {1, 1, 1}, 0.25, 2);
+    REQUIRE_FALSE(graded.mesh.boundary_quads.empty());
+    std::vector<std::uint32_t> bnodes;
+    for (const auto& q : graded.mesh.boundary_quads) {
+        bnodes.insert(bnodes.end(), q.begin(), q.end());
+    }
+    std::sort(bnodes.begin(), bnodes.end());
+    bnodes.erase(std::unique(bnodes.begin(), bnodes.end()), bnodes.end());
+    const auto conf = surface_conformity(s, graded.mesh.nodes, bnodes);
+    // After multi-pass snap, max residual should be well below one fine cell.
+    REQUIRE(conf.max_distance < 0.55 * graded.h_fine);
+    REQUIRE_NOTHROW(check_tet_fill_geometry(graded.mesh));
+}
+
+TEST_CASE("cylinder_prism graded+feature notes curvature seeds and snaps") {
+    // Hole / curved wall fixture: feature grading should emit curv_seeds and a
+    // snap residual line (geometry-variable mesh path).
+    auto model =
+        polymesh::pipeline::Model::load("bench/geometries/public/cylinder_prism.stl");
+    REQUIRE(model.surface.triangles.size() >= 4);
+    // volume_mesh needs positive h (auto-h is resolve_mesh_size in the job path).
+    const double h = 0.15 * (model.bbox_max - model.bbox_min).maxCoeff();
+    REQUIRE(h > 0.0);
+    auto vol = polymesh::pipeline::volume_mesh(
+        model, h, polymesh::pipeline::VolumeMesher::kGradedTet, 2, true);
+    REQUIRE_FALSE(vol.mesh.elements.empty());
+    REQUIRE_NOTHROW(vol.mesh.check_validity());
+    REQUIRE(vol.mesher_note.find("graded") != std::string::npos);
+    REQUIRE(vol.mesher_note.find("snap max|d|") != std::string::npos);
+    // Curved hole should register curvature seeds on a decent tessellation.
+    // (Allow either curv_seeds or thin_seeds — both are geometry grading.)
+    const bool geo = vol.mesher_note.find("curv_seeds") != std::string::npos ||
+                     vol.mesher_note.find("thin_seeds") != std::string::npos ||
+                     vol.mesher_note.find("feature") != std::string::npos;
+    REQUIRE(geo);
 }

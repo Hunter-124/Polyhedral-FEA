@@ -58,9 +58,10 @@ void apply_theme(ThemeId id) {
     s.WindowBorderSize = 1.0f;
     s.FrameBorderSize = 1.0f;
     s.WindowPadding = {12, 12};
-    s.FramePadding = {7, 4};
-    s.ItemSpacing = {8, 7};
-    s.ScrollbarSize = 10.0f;
+    s.FramePadding = {8, 5}; // enough room for frame labels without clipping
+    s.ItemSpacing = {8, 8};
+    s.ItemInnerSpacing = {6, 4};
+    s.ScrollbarSize = 12.0f;
     s.WindowMinSize = {320, 240};
 
     ImVec4* c = s.Colors;

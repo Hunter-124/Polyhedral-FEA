@@ -139,9 +139,9 @@ A1 A3 ──> A2 A10 ──> A4 A5 A8 ──> A6 A7
 
 | Track | Status |
 |-------|--------|
-| A GUI | M1 core in: argv open, mesh preview, ZZ error, colorbar, failure dismiss, A6 wireframe/undeformed, A7 drag-drop open, A8 mesh note+DOF. Still: A9 theme GATE. |
-| B Mesh | Grid tet/hex/graded/hexpyr; B1 documented limits (ADR-0015); B2/B3/B4/B5 done. Not true Delaunay. |
-| C Hybrid | C1/C2/C3/C4/C5 done (hex→pyramids; geometry sizing; prism fill; VEM k=2; Kirsch graded @ equal DOF). |
+| A GUI | M1 core in: argv open, mesh preview, ZZ error, colorbar, failure dismiss, A6 wireframe/undeformed, A7 drag-drop open, A8 mesh note+DOF. **Results camera** (pan/orbit in σ_vm/|u|/η) + auto deformation scale. Still: A9 theme GATE. |
+| B Mesh | Grid tet/hex/graded/hexpyr; B1 documented limits (ADR-0015); B2/B3/B4/B5 done. Graded+feature now **h/4 fine** near curvature/seeds. Not true Delaunay. |
+| C Hybrid | C1/C2/C3/C4/C5 done (hex→pyramids; geometry sizing; prism fill; VEM k=2; Kirsch graded @ equal DOF). Product **geo-hp**: variable h (skin/features) + bulk p=2 / surface p=1. |
 | D Adapt | Seed remesh + η (D2) + auto h0 (D5) + p-elev (D3) + local LEB (D4) + D6 L-domain instrument (5.12× DOF / 12.2× time). Product-path Tier-3 on full public suite still open. |
 | E Verify | E1–E4 done; D6 Tier-3 scoreboard instrument on L-domain. |
 | F Perf | F1–F3 done: OpenMP assembly, auto CG >8k free DOFs, CSR SpMV + optional CUDA parity. |

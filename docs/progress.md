@@ -4,7 +4,7 @@
 **Master plan:** [`docs/ROADMAP.md`](ROADMAP.md) · **Agent loop:**
 [`docs/process/agent-loop.md`](process/agent-loop.md)
 
-**Active:** Nearly all ROADMAP tracks closed on master. **123 tests** green.
+**Active:** Nearly all ROADMAP tracks closed on master. **132 tests** green.
 Remaining owner-facing gate: **A9** theme polish ⛔ GATE 6.5. Product mesh is still
 Cartesian-grid limited (ADR-0015); true Delaunay / full product-mesh Tier-1 remain open R&D.
 
@@ -18,6 +18,26 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: **Results viewport + geo-hybrid mesh** — pan/orbit fixed in von
+  Mises/deflection/error (Image hover captured before colorbar child);
+  auto-exaggerated deformation (max |u| → ~12% of model diagonal, true-scale
+  checkbox); graded fill targets **h/4** near feature/seed bands (subdiv=4)
+  so curved edges densify vs bulk h/2; more aggressive κ/thin seeds + thicker
+  skin default; pre-solve **geo-hp** bulk p-elevate (tet10 interior, linear
+  near surface); GUI defaults graded+feature+adapt+p-elev. 132 tests green.
+- 2026-07-10: **GUI layout + mesher product pass** — group-box right padding
+  (content child reserves both sides); single workspace tiles study|splitter|
+  viewport (no purple gap); fixtures: CAD face list + click-to-select without
+  orbit fight + “show CAD” when in mesh mode; mesh preview checkerboard + dark
+  wireframe with depth bias; multi-pass surface snap ≤0.55h on tet/graded/
+  hexpyr; graded feature path seeds curvature (cylinder/hole) + thin-wall
+  bands; 131 tests green.
+- 2026-07-10: **Graded tet “grid too fine” fix + full-adapt product path** —
+  `make_bbox_grid` / `make_bbox_grid_even` auto-coarsen under the 512k cell
+  budget (no hard fail); graded fill pre-floors \(h\) for the fine \(h/2\)
+  lattice; adapt loop uses multi-wave LEB, grid-aware \(h\) floor, graded seed
+  remesh; GUI defaults graded tet + 3 adapt passes + η=0.12. Catch2 tiny-h
+  graded + grid budget tests.
 - 2026-07-10: **Mesh gap fix** — shared-edge ray-parity double-count punched
   diagonal tunnels through cubes/plates (cells with \(c_x\approx c_y\) outside);
   bbox-fitted anisotropic lattice so nodes hit AABB faces. Shared

@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <unordered_map>
 
 namespace polymesh::mesh {
 namespace {
@@ -77,6 +78,88 @@ ConformityStats surface_conformity(const geom::TriSurface& surface,
     }
     s.mean_distance = sum / static_cast<double>(s.count);
     return s;
+}
+
+SnapStats snap_boundary_nodes(const geom::TriSurface& surface,
+                              std::vector<Eigen::Vector3d>& nodes,
+                              const std::vector<std::uint32_t>& boundary_nodes, double h,
+                              const CollectOffendersFn& collect_offenders, double max_move_frac,
+                              int passes) {
+    SnapStats stats;
+    if (boundary_nodes.empty() || !(h > 0.0) || !std::isfinite(h) || !collect_offenders) {
+        return stats;
+    }
+    max_move_frac = std::clamp(max_move_frac, 0.05, 0.85);
+    passes = std::clamp(passes, 1, 6);
+    const double max_total = max_move_frac * h;
+    const double step_cap = max_total / static_cast<double>(passes);
+    // Search radius: allow slightly beyond stair-case residual (~0.5√3 h).
+    const double search_r = 1.5 * h;
+
+    std::unordered_map<std::uint32_t, Eigen::Vector3d> original;
+    original.reserve(boundary_nodes.size());
+    std::unordered_map<std::uint32_t, double> moved;
+    moved.reserve(boundary_nodes.size());
+
+    stats.n_candidates = boundary_nodes.size();
+
+    for (int pass = 0; pass < passes; ++pass) {
+        for (auto ni : boundary_nodes) {
+            if (ni >= nodes.size()) {
+                continue;
+            }
+            const Eigen::Vector3d p = nodes[ni];
+            const auto cp = closest_on_surface(surface, p);
+            if (!(cp.distance > 1e-15) || cp.distance > search_r) {
+                continue;
+            }
+            const double already = moved.count(ni) ? moved[ni] : 0.0;
+            const double budget = max_total - already;
+            if (budget <= 1e-15) {
+                continue;
+            }
+            const double move = std::min({cp.distance, step_cap, budget});
+            if (move <= 1e-15) {
+                continue;
+            }
+            if (!original.count(ni)) {
+                original.emplace(ni, p);
+            }
+            const Eigen::Vector3d delta = cp.point - p;
+            nodes[ni] = p + delta * (move / cp.distance);
+            moved[ni] = already + move;
+        }
+    }
+    stats.n_moved = moved.size();
+
+    // Unsnap offenders until the mesh is valid (or nothing left to unsnap).
+    bool progressed = true;
+    while (progressed && !original.empty()) {
+        progressed = false;
+        std::set<std::uint32_t> offenders;
+        collect_offenders(offenders);
+        for (const auto ni : offenders) {
+            const auto it = original.find(ni);
+            if (it == original.end()) {
+                continue;
+            }
+            nodes[ni] = it->second;
+            original.erase(it);
+            moved.erase(ni);
+            ++stats.n_unsnapped;
+            progressed = true;
+        }
+    }
+
+    stats.max_residual = 0.0;
+    for (auto ni : boundary_nodes) {
+        if (ni >= nodes.size()) {
+            continue;
+        }
+        stats.max_residual =
+            std::max(stats.max_residual, closest_on_surface(surface, nodes[ni]).distance);
+    }
+    return stats;
 }
 
 } // namespace polymesh::mesh

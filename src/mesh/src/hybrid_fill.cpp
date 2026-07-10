@@ -3,6 +3,7 @@
 
 #include "mesh/grid_classify.hpp"
 #include "mesh/poly_mesh.hpp"
+#include "mesh/surface_project.hpp"
 
 #include <algorithm>
 #include <array>
@@ -11,6 +12,7 @@
 #include <format>
 #include <map>
 #include <queue>
+#include <set>
 #include <span>
 
 namespace polymesh::mesh {
@@ -50,9 +52,18 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         throw ValidityError("graded_tet_fill_surface: empty bbox");
     }
 
-    // Work on the fine lattice (~h/2) so coarse cells are 2×2×2 fine cells.
+    // Fine lattice: h/2 by default. With feature or seed bands, target h/4 so
+    // curved edges / error seeds get much smaller elements (skin also denser).
+    // Coarse blocks remain 2×2×2 of fine cells → bulk spacing ≈ 2·h_fine.
     // Bbox-fitted even grid + robust ray parity (shared-edge dedupe).
-    const double hf_target = h * 0.5;
+    // Pre-floor h so the fine lattice fits the cell budget; make_bbox_grid_even
+    // also auto-coarsens as a backstop (avoids "grid too fine" on small user h).
+    const bool ultra_fine = (feature_band > 0.0) || (seed_band > 0.0);
+    const int subdiv = ultra_fine ? 4 : 2; // requested h / fine-target ratio
+    const double h_budget = min_h_for_cell_budget(bbox_min, bbox_max, kDefaultMaxGridCells,
+                                                  /*subdivision=*/subdiv);
+    const double h_use = (h_budget > 0.0) ? std::max(h, h_budget) : h;
+    const double hf_target = h_use / static_cast<double>(subdiv);
     const CartesianGrid fine = make_bbox_grid_even(bbox_min, bbox_max, hf_target, 2);
     const int nxf = fine.nx, nyf = fine.ny, nzf = fine.nz;
     const double hf = fine.max_edge();
@@ -170,9 +181,11 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     }
 
     GradedTetFillOutput out;
-    out.h_coarse = std::max(h, 2.0 * hf);
+    // Report realized spacings (may exceed targets after cell-budget floor).
+    out.h_coarse = 2.0 * hf; // one coarse Kuhn cube spans 2 fine cells
     out.h_fine = hf;
     out.skin_layers = skin_layers;
+    out.subdivision = subdiv;
     out.mesh.h = hf;
 
     std::map<std::array<int, 3>, std::uint32_t> node_ids;
@@ -267,7 +280,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         throw ValidityError("graded_tet_fill_surface: no interior cells");
     }
 
-    // Boundary quads on the fine lattice (for region mapping).
+    // Boundary quads on the fine lattice (for region mapping + snap).
     for (int k = 0; k < nzf; ++k) {
         for (int j = 0; j < nyf; ++j) {
             for (int i = 0; i < nxf; ++i) {
@@ -298,6 +311,38 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                     }
                     out.mesh.boundary_quads.push_back(quad);
                 }
+            }
+        }
+    }
+
+    // Multi-pass surface snap so curved walls (cylinders/holes) are not pure
+    // stair-cases. Jacobian safety unsnaps offenders (ADR-0015/B3).
+    if (!out.mesh.boundary_quads.empty()) {
+        std::set<std::uint32_t> bnode_set;
+        for (const auto& q : out.mesh.boundary_quads) {
+            bnode_set.insert(q.begin(), q.end());
+        }
+        std::vector<std::uint32_t> bnodes(bnode_set.begin(), bnode_set.end());
+        const double vol_eps = 1e-14 * hf * hf * hf;
+        snap_boundary_nodes(
+            surface, out.mesh.nodes, bnodes, hf,
+            [&](std::set<std::uint32_t>& offenders) {
+                for (const auto& n : out.mesh.tets) {
+                    const double v =
+                        tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
+                                          out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
+                    if (v > vol_eps) {
+                        continue;
+                    }
+                    offenders.insert(n.begin(), n.end());
+                }
+            },
+            /*max_move_frac=*/0.55, /*passes=*/3);
+        for (auto& n : out.mesh.tets) {
+            const double v = tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
+                                               out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
+            if (v < 0.0) {
+                std::swap(n[1], n[2]);
             }
         }
     }

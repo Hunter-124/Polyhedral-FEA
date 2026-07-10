@@ -11,7 +11,9 @@ add_executable(polymesh_tests
     test_shape.cpp
     test_tier0.cpp
     test_cantilever.cpp
+    test_mms_convergence.cpp
     support/structured_mesh.cpp
+    support/mms.cpp
 )
 target_include_directories(polymesh_tests PRIVATE .)
 target_link_libraries(polymesh_tests

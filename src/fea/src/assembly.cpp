@@ -62,9 +62,11 @@ Eigen::MatrixXd element_stiffness(const NodalMesh& mesh, const NodalElement& ele
             throw FeaError(std::format(
                 "element_stiffness: non-positive Jacobian ({:.3e}) — inverted element", det));
         }
-        // dN/dx = dN/dxi * J^{-T} ... with our row convention: dndx = dn * J^{-1}.
-        const Eigen::Matrix<double, Eigen::Dynamic, 3> dndx =
-            shape.dn * jac.inverse().transpose().eval();
+        // dN/dx = dN/dxi * J^{-T}. The inverse is materialized first: Eigen 5's
+        // evaluator recurses infinitely on the nested inverse().transpose()
+        // expression (stack overflow).
+        const Eigen::Matrix3d jac_inv = jac.inverse();
+        const Eigen::Matrix<double, Eigen::Dynamic, 3> dndx = shape.dn * jac_inv.transpose();
         const auto b = b_matrix(dndx);
         k.noalias() += b.transpose() * d * b * (det * qp.weight);
     }
@@ -106,7 +108,13 @@ Eigen::VectorXd assemble_body_load(const NodalMesh& mesh, const BodyForce& body_
         Eigen::VectorXd::Zero(3 * static_cast<Eigen::Index>(mesh.nodes.size()));
     for (const auto& element : mesh.elements) {
         const auto x = element_coords(mesh, element);
-        for (const auto& qp : default_rule(element.type)) {
+        // Elevated rule: body-force fields (e.g. manufactured solutions) are
+        // often higher-degree than the stiffness integrand, and consistent
+        // loads must not become the accuracy bottleneck.
+        const bool is_tet =
+            element.type == ElementType::kTet4 || element.type == ElementType::kTet10;
+        const auto rule = is_tet ? tet_rule(4) : hex_rule(4);
+        for (const auto& qp : rule) {
             const auto shape = eval_shape(element.type, qp.xi);
             const Eigen::Matrix3d jac = shape.dn.transpose() * x;
             const double det = jac.determinant();

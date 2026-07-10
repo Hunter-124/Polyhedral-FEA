@@ -4,9 +4,10 @@
 **Master plan:** [`docs/ROADMAP.md`](ROADMAP.md) · **Agent loop:**
 [`docs/process/agent-loop.md`](process/agent-loop.md)
 
-**Active:** Nearly all ROADMAP tracks closed on master. **132 tests** green.
-Remaining owner-facing gate: **A9** theme polish ⛔ GATE 6.5. Product mesh is still
-Cartesian-grid limited (ADR-0015); true Delaunay / full product-mesh Tier-1 remain open R&D.
+**Active:** Nearly all ROADMAP tracks closed on master. **138 tests** green
+(3 skip without OCC/CUDA). Remaining owner-facing gate: **A9** theme polish ⛔
+GATE 6.5. Product mesh is still Cartesian-grid limited (ADR-0015); true Delaunay
+/ full product-mesh Tier-1 remain open R&D.
 
 GATE 1 deliverables ready:
 - Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)
@@ -18,6 +19,16 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: **Graded tet coarse-primary lattice** — Recovered WIP after agent
+  crash: classify at target \(h\) (same cost class as tet/hybrid), then local
+  \(2×2×2\) Kuhn only on skin/feature/seed cells (bulk≈\(h\), fine≈\(h/2\)).
+  Replaces fine-global lattice + coarse-block aggregation. Boundary quads
+  emitted per exterior coarse/fine face. **138/138** Catch2 green on related +
+  full suite.
+- 2026-07-10: **Graphify shared workflow** — Rebuilt `graphify-out/` (AST +
+  docs); gitignore machine-local artifacts; CONTRIBUTING §8 + `CLAUDE.md`
+  document clone setup, `graphify update`, hooks, merge driver for concurrent
+  graph.json updates.
 - 2026-07-10: **Graded tet fix (size + speed + RAM)** — Dropped global \(h/4\)
   lattice when features/seeds active (was bulk only \(h/2\), 8× cells, thin plates
   fully fine → slow mesh + FEA OOM). Always **2:1** (bulk≈\(h\), fine≈\(h/2\));

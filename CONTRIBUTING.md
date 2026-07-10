@@ -177,13 +177,50 @@ bench_harness loads bench/reference/* — ONLY module allowed to
 
 ## 8. Graphify (for agents)
 
-Committed outputs live in **`graphify-out/`** so a fresh clone can query without rebuild:
+Shared knowledge graph so humans and agents navigate the codebase without full-repo greps. **Commit the portable artifacts**; regenerate machine-local views.
 
-- `graphify-out/graph.json` — graph data  
-- `graphify-out/GRAPH_REPORT.md` — communities / god nodes  
-- `graphify-out/graph.html` — interactive view  
+### What is version-controlled
 
-Prefer graph queries over blind full-repo greps when the graph exists. Rebuild with the graphify skill (`/graphify .` or `--update`) after large structural moves.
+| Path | Commit? | Role |
+|---|---|---|
+| `graphify-out/graph.json` | **yes** | Graph data (query / path / explain) |
+| `graphify-out/GRAPH_REPORT.md` | **yes** | Communities, god nodes, audit |
+| `graphify-out/.graphify_labels.json` | **yes** | Community names for viz / report |
+| `graphify-out/manifest.json` | **yes** | File inventory for `--update` |
+| `graphify-out/graph.html` | no (gitignored) | Interactive browser view — regenerate |
+| `graphify-out/cache/` | no | Semantic extraction cache |
+| `graphify-out/.graphify_python` | no | Local interpreter path |
+| `graphify-out/.graphify_root` | no | Absolute scan root |
+| `graphify-out/cost.json` | no | Local token accounting |
+
+### Setup (once per clone)
+
+```sh
+# install CLI (pick one)
+uv tool install graphifyy          # preferred
+# pip install graphifyy
+
+graphify hook install              # post-commit AST rebuild + post-checkout
+git config merge.graphify.driver "graphify merge-driver %O %A %B"  # union-merge graph.json
+graphify export html               # optional local browser viz
+```
+
+`.gitattributes` maps `graphify-out/graph.json` to the `graphify` merge driver so concurrent graph updates union-merge instead of conflict soup.
+
+### Keep the graph current
+
+| Change type | Command |
+|---|---|
+| Code edits (typical) | `graphify update .` — AST only, no LLM/API key |
+| After commit (if hook installed) | automatic for code paths under the post-commit hook |
+| Docs / ADRs / large renames | `/graphify .` or `/graphify --update` (semantic refresh) |
+| Force shrink after deletions | `graphify update . --force` |
+
+Prefer `graphify query "…"`, `graphify path "A" "B"`, `graphify explain "X"` over blind greps when `graphify-out/graph.json` exists. Skip the hook for a one-off commit with `GRAPHIFY_SKIP_HOOK=1`.
+
+### PR hygiene
+
+If your PR changes public structure (new libs, renames, major call graph), include an updated `graphify-out/` in the same PR (or run `graphify update .` and commit the result). Doc-only PRs do not need a graph refresh.
 
 ---
 

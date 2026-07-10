@@ -239,7 +239,7 @@ accuracy on product meshes is not claimed yet ([ADR-0015](docs/decisions/0015-gr
 | `bench/` | Reference cases, reports, peer harness |
 | `examples/` | CLI mesh/solve scripts on public fixtures |
 | `docs/` | Spec, phases, ADRs, progress |
-| `graphify-out/` | Committed knowledge graph for agents |
+| `graphify-out/` | Committed knowledge graph for agents (see CONTRIBUTING §8) |
 
 **Full map and coding standards:** [CONTRIBUTING.md](CONTRIBUTING.md)  
 **External contributors (for their AI agents — clone/branch/PR):** [CHANGES.md](CHANGES.md)

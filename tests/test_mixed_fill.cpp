@@ -30,16 +30,16 @@ polymesh::geom::TriSurface unit_box() {
 
 } // namespace
 
-TEST_CASE("mixed_fill unit box: hex bulk + tet skin") {
+TEST_CASE("mixed_fill unit box: hex bulk + pyramid skin") {
     const auto s = unit_box();
     auto fill = mixed_fill_surface(s, {0, 0, 0}, {1, 1, 1}, 0.2, /*skin_layers=*/1);
     REQUIRE(fill.n_hex > 0);
-    REQUIRE(fill.n_tet > 0);
-    REQUIRE(fill.n_pyramid == 0);
+    REQUIRE(fill.n_pyramid > 0);
+    REQUIRE(fill.n_tet == 0);
     REQUIRE_FALSE(fill.boundary_quads.empty());
 }
 
-TEST_CASE("pipeline hybrid zoo emits mixed hex+tet elements") {
+TEST_CASE("pipeline hybrid zoo emits all-pyramid product FE") {
     pipeline::Model m;
     m.surface = unit_box();
     m.bbox_min = {0, 0, 0};
@@ -51,40 +51,34 @@ TEST_CASE("pipeline hybrid zoo emits mixed hex+tet elements") {
     REQUIRE_NOTHROW(vol.mesh.check_validity());
     REQUIRE(vol.mesher_note.find("hybrid zoo") != std::string::npos);
 
-    std::size_t n_hex = 0, n_tet = 0, n_other = 0;
+    std::size_t n_pyr = 0, n_other = 0;
     for (const auto& el : vol.mesh.elements) {
-        if (el.type == fea::ElementType::kHex8) {
-            ++n_hex;
-        } else if (el.type == fea::ElementType::kTet4) {
-            ++n_tet;
+        if (el.type == fea::ElementType::kPyramid5) {
+            ++n_pyr;
         } else {
             ++n_other;
         }
     }
-    REQUIRE(n_hex > 0);
-    REQUIRE(n_tet > 0);
+    REQUIRE(n_pyr > 0);
     REQUIRE(n_other == 0);
 }
 
-TEST_CASE("hybrid zoo native hex+tet patch test: constant strain") {
-    auto fill = mixed_fill_surface(unit_box(), {-0.05, -0.05, -0.05}, {1.05, 1.05, 1.05}, 0.2,
-                                   /*skin_layers=*/1, {}, 0.0, {}, 0.0, /*snap=*/false);
-    REQUIRE(fill.n_hex > 0);
-    REQUIRE(fill.n_tet > 0);
+TEST_CASE("hybrid zoo expanded product path patch test: constant strain") {
+    auto raw = mixed_fill_surface(unit_box(), {-0.05, -0.05, -0.05}, {1.05, 1.05, 1.05}, 0.2,
+                                  /*skin_layers=*/1, {}, 0.0, {}, 0.0, /*snap=*/false);
+    REQUIRE(raw.n_hex > 0);
+    REQUIRE(raw.n_pyramid > 0);
+    auto fill = expand_mixed_hex_to_pyramids(raw);
+    REQUIRE(fill.n_hex == 0);
+    REQUIRE(fill.n_pyramid > 0);
 
     fea::NodalMesh mesh;
     mesh.nodes = fill.nodes;
     for (const auto& cell : fill.cells) {
-        if (cell.kind == MixedCellKind::kHex8) {
-            mesh.elements.push_back(fea::NodalElement{
-                fea::ElementType::kHex8,
-                {cell.nodes[0], cell.nodes[1], cell.nodes[2], cell.nodes[3], cell.nodes[4],
-                 cell.nodes[5], cell.nodes[6], cell.nodes[7]}});
-        } else {
-            mesh.elements.push_back(fea::NodalElement{
-                fea::ElementType::kTet4,
-                {cell.nodes[0], cell.nodes[1], cell.nodes[2], cell.nodes[3]}});
-        }
+        REQUIRE(cell.kind == MixedCellKind::kPyramid5);
+        mesh.elements.push_back(fea::NodalElement{
+            fea::ElementType::kPyramid5,
+            {cell.nodes[0], cell.nodes[1], cell.nodes[2], cell.nodes[3], cell.nodes[4]}});
     }
 
     Eigen::Matrix3d g;
@@ -114,7 +108,7 @@ TEST_CASE("hybrid zoo native hex+tet patch test: constant strain") {
     REQUIRE(max_error < 1e-10);
 }
 
-TEST_CASE("hybrid zoo cylinder_prism smoke: mixed types + snap") {
+TEST_CASE("hybrid zoo cylinder_prism smoke: pyramid FE + snap") {
     auto model = pipeline::Model::load("bench/geometries/public/cylinder_prism.stl");
     const double h = 0.12 * (model.bbox_max - model.bbox_min).maxCoeff();
     auto vol = pipeline::volume_mesh(model, h, pipeline::VolumeMesher::kHybrid, 2, true);
@@ -123,11 +117,9 @@ TEST_CASE("hybrid zoo cylinder_prism smoke: mixed types + snap") {
     REQUIRE(vol.mesher_note.find("hybrid zoo") != std::string::npos);
     REQUIRE(vol.mesher_note.find("snap max|d|") != std::string::npos);
 
-    bool has_tet = false, has_hex = false;
+    bool has_pyr = false;
     for (const auto& el : vol.mesh.elements) {
-        has_tet = has_tet || el.type == fea::ElementType::kTet4;
-        has_hex = has_hex || el.type == fea::ElementType::kHex8;
+        has_pyr = has_pyr || el.type == fea::ElementType::kPyramid5;
     }
-    REQUIRE(has_tet);
-    (void)has_hex; // thin solids may be all-skin
+    REQUIRE(has_pyr);
 }

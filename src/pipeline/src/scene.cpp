@@ -18,6 +18,7 @@
 #include "mesh/hybrid_fill.hpp"
 #include "mesh/local_refine.hpp"
 #include "mesh/mixed_fill.hpp"
+#include "mesh/octa_fill.hpp"
 #include "mesh/prism_fill.hpp"
 #include "mesh/quality.hpp"
 #include "mesh/surface_project.hpp"
@@ -285,17 +286,26 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                 s_band = 1.25 * h; // H1: was 2 h
             }
         }
-        // True multi-type: hex bulk + Kuhn tet skin (same face diagonals; FE
-        // assembles hybrid hex as Kuhn PL so constant-strain patch is exact).
-        auto fill =
+        // H2: hex bulk + pyramid skin (feature bands). Product FE expands hex →
+        // pyramids (ADR-0013) so constant-strain patch is exact; free surface
+        // stays quads (no Kuhn diagonals on the silhouette).
+        auto raw =
             mesh::mixed_fill_surface(model.surface, model.bbox_min, model.bbox_max, h,
                                      std::max(1, skin_layers), edges, feat_band, curv_seeds,
                                      s_band, /*snap_boundary=*/true);
+        const std::size_t n_hex_lattice = raw.n_hex;
+        const std::size_t n_pyr_skin = raw.n_pyramid;
+        auto fill = mesh::expand_mixed_hex_to_pyramids(raw);
         fill_h = fill.h;
         out.mesh.nodes = std::move(fill.nodes);
         out.mesh.elements.reserve(fill.cells.size());
         for (const auto& cell : fill.cells) {
-            if (cell.kind == mesh::MixedCellKind::kHex8) {
+            if (cell.kind == mesh::MixedCellKind::kPyramid5) {
+                out.mesh.elements.push_back(fea::NodalElement{
+                    fea::ElementType::kPyramid5,
+                    {cell.nodes[0], cell.nodes[1], cell.nodes[2], cell.nodes[3],
+                     cell.nodes[4]}});
+            } else if (cell.kind == mesh::MixedCellKind::kHex8) {
                 out.mesh.elements.push_back(fea::NodalElement{
                     fea::ElementType::kHex8,
                     {cell.nodes[0], cell.nodes[1], cell.nodes[2], cell.nodes[3],
@@ -308,11 +318,11 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         }
         out.boundary_quads = std::move(fill.boundary_quads);
         out.mesher_note = std::format(
-            "hybrid zoo v1 (hex bulk + tet skin, multi-type; not Delaunay): "
-            "{} hex8 + {} tet4, {} nodes, h={:.4g} m, snap max|d|={:.3g} m, "
-            "feature_skin_cells={}",
-            fill.n_hex, fill.n_tet, out.mesh.nodes.size(), fill_h, fill.boundary_max_distance,
-            fill.n_feature_skin_cells);
+            "hybrid zoo v2 (hex bulk + pyramid skin → all-pyramid FE; not Delaunay): "
+            "{} lattice hex + {} skin pyr → {} pyramid5, {} nodes, h={:.4g} m, "
+            "snap max|d|={:.3g} m, feature_skin_cells={}",
+            n_hex_lattice, n_pyr_skin, fill.n_pyramid, out.mesh.nodes.size(), fill_h,
+            fill.boundary_max_distance, fill.n_feature_skin_cells);
     } else if (mesher == VolumeMesher::kHexFill || mesher == VolumeMesher::kHexVem) {
         auto fill = mesh::hex_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
         fill_h = fill.h;
@@ -516,6 +526,23 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             graded.subdivision, conf.max_distance, conf.mean_distance, budget_note,
             n_curv_seeds > 0 ? std::format(", curv_seeds={}", n_curv_seeds) : std::string{},
             n_thin_seeds > 0 ? std::format(", thin_seeds={}", n_thin_seeds) : std::string{});
+    } else if (mesher == VolumeMesher::kOctahedral) {
+        // Experimental BCC octahedra → tet4 (ADR-0019). Not a product claim.
+        auto fill =
+            mesh::octa_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
+        fill_h = fill.h;
+        out.mesh.nodes = std::move(fill.mesh.nodes);
+        out.mesh.elements.reserve(fill.mesh.tets.size());
+        for (const auto& tet : fill.mesh.tets) {
+            out.mesh.elements.push_back(
+                fea::NodalElement{fea::ElementType::kTet4, {tet[0], tet[1], tet[2], tet[3]}});
+        }
+        out.boundary_quads = std::move(fill.mesh.boundary_quads);
+        out.mesher_note = std::format(
+            "octahedral experimental (BCC face-octa → tet4; not product): "
+            "{} tets ({} octa + {} bdy pyr), {} nodes, h={:.4g} m",
+            out.mesh.elements.size(), fill.n_octahedra, fill.n_boundary_pyramids,
+            out.mesh.nodes.size(), fill_h);
     } else {
         auto fill = mesh::tet_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
         fill_h = fill.h;

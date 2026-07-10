@@ -13,6 +13,7 @@
 #include "geom/stl.hpp"
 #include "mesh/hex_fill.hpp"
 #include "mesh/hybrid_fill.hpp"
+#include "mesh/local_refine.hpp"
 #include "mesh/quality.hpp"
 #include "mesh/surface_project.hpp"
 #include "mesh/tet_fill.hpp"
@@ -498,6 +499,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
             }
             std::vector<Eigen::Vector3d> adapt_seeds;
             double adapt_seed_band = 0.0;
+            // D4: Dörfler element indices for optional local LEB before remesh.
+            std::vector<std::size_t> adapt_marked;
             auto vol = volume_mesh(model, h_use, setup.mesher, setup.skin_layers,
                                    setup.use_feature_grading, adapt_seeds, adapt_seed_band);
             // Keep resolved-h note on mesher_note for solve mesh_note (GUI/CLI).
@@ -511,6 +514,30 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
             Eigen::VectorXd loads;
             const fea::Material material{.youngs_modulus = setup.youngs_modulus,
                                          .poissons_ratio = setup.poissons_ratio};
+
+            auto assign_boundary_regions = [&](double band) {
+                vol.boundary_node_region.clear();
+                const auto& surf = model.surface;
+                for (std::uint32_t node = 0;
+                     node < static_cast<std::uint32_t>(vol.mesh.nodes.size()); ++node) {
+                    const auto& pt = vol.mesh.nodes[node];
+                    double best = std::numeric_limits<double>::max();
+                    int best_region = -1;
+                    for (std::size_t ti = 0; ti < surf.triangles.size(); ++ti) {
+                        const auto& tri = surf.triangles[ti];
+                        const double d = point_triangle_distance(pt, surf.vertices[tri[0]],
+                                                                 surf.vertices[tri[1]],
+                                                                 surf.vertices[tri[2]]);
+                        if (d < best) {
+                            best = d;
+                            best_region = model.triangle_region[ti];
+                        }
+                    }
+                    if (best <= band) {
+                        vol.boundary_node_region[node] = best_region;
+                    }
+                }
+            };
 
             auto apply_bcs = [&]() {
                 bc = fea::Dirichlet{};
@@ -633,19 +660,81 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 return true;
             };
 
+            auto mesh_is_all_tet4 = [](const fea::NodalMesh& m) {
+                if (m.elements.empty()) {
+                    return false;
+                }
+                for (const auto& el : m.elements) {
+                    if (el.type != fea::ElementType::kTet4 || el.nodes.size() != 4) {
+                        return false;
+                    }
+                }
+                return true;
+            };
+
+            /// ADR-0016: try Rivara LEB on marked tets; returns true if mesh grew.
+            auto try_local_leb = [&](std::span<const std::size_t> marks) -> bool {
+                if (marks.empty() || !mesh_is_all_tet4(vol.mesh)) {
+                    return false;
+                }
+                std::vector<std::array<std::uint32_t, 4>> tets;
+                tets.reserve(vol.mesh.elements.size());
+                for (const auto& el : vol.mesh.elements) {
+                    tets.push_back({el.nodes[0], el.nodes[1], el.nodes[2], el.nodes[3]});
+                }
+                const std::size_t n0 = tets.size();
+                try {
+                    mesh::LocalRefineStats st;
+                    auto refined =
+                        mesh::local_refine_tets(vol.mesh.nodes, std::move(tets), marks, &st);
+                    if (refined.tets.size() <= n0) {
+                        return false;
+                    }
+                    vol.mesh.nodes = std::move(refined.nodes);
+                    vol.mesh.elements.clear();
+                    vol.mesh.elements.reserve(refined.tets.size());
+                    for (const auto& tet : refined.tets) {
+                        vol.mesh.elements.push_back(fea::NodalElement{
+                            fea::ElementType::kTet4, {tet[0], tet[1], tet[2], tet[3]}});
+                    }
+                    vol.mesh.check_validity();
+                    // Lattice boundary quads no longer match midpoints; drop them.
+                    vol.boundary_quads.clear();
+                    assign_boundary_regions(1.5 * h_use);
+                    vol.mesher_note = std::format(
+                        "{} | local LEB (ADR-0016): +{} tets, +{} nodes, {} bisections",
+                        vol.mesher_note, refined.tets.size() - n0, st.n_new_nodes,
+                        st.n_bisections);
+                    return true;
+                } catch (const std::exception&) {
+                    return false;
+                }
+            };
+
             for (int pass = 0; pass <= setup.adapt_passes; ++pass) {
                 if (pass > 0) {
-                    // Prefer graded mesher when local seeds are available so
-                    // a posteriori balls can refine without global h→0.
-                    const auto mesher_adapt =
-                        (!adapt_seeds.empty() && setup.mesher == VolumeMesher::kTetFill)
-                            ? VolumeMesher::kGradedTet
-                            : setup.mesher;
-                    vol = volume_mesh(model, h_use, mesher_adapt, setup.skin_layers,
-                                      setup.use_feature_grading, adapt_seeds, adapt_seed_band);
+                    // D4: prefer true local LEB on tet meshes when marks exist.
+                    const bool tet_path = setup.mesher == VolumeMesher::kTetFill ||
+                                          setup.mesher == VolumeMesher::kGradedTet;
+                    bool did_local = false;
+                    if (tet_path && !adapt_marked.empty()) {
+                        did_local = try_local_leb(adapt_marked);
+                    }
+                    if (!did_local) {
+                        // Prefer graded mesher when local seeds are available so
+                        // a posteriori balls can refine without global h→0.
+                        const auto mesher_adapt =
+                            (!adapt_seeds.empty() && setup.mesher == VolumeMesher::kTetFill)
+                                ? VolumeMesher::kGradedTet
+                                : setup.mesher;
+                        vol = volume_mesh(model, h_use, mesher_adapt, setup.skin_layers,
+                                          setup.use_feature_grading, adapt_seeds,
+                                          adapt_seed_band);
+                    }
                     apply_bcs();
-                    set_status(std::format("adapt pass {}… ({} elems, {} seeds)", pass,
-                                           vol.mesh.elements.size(), adapt_seeds.size()));
+                    set_status(std::format("adapt pass {}… ({} elems, {} seeds{})", pass,
+                                           vol.mesh.elements.size(), adapt_seeds.size(),
+                                           did_local ? ", local LEB" : ""));
                 }
                 auto u_try = fea::solve_elastostatics(vol.mesh, material, bc, loads);
                 auto zz_try = fea::recover_zz(vol.mesh, material, u_try);
@@ -689,6 +778,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     h_use = sug.h_next;
                     adapt_seeds = sug.refine_seeds;
                     adapt_seed_band = sug.seed_band;
+                    adapt_marked = adapt::dorfler_mark(zz_try.element_eta, 0.3);
                     continue;
                 }
                 std::string pnote;

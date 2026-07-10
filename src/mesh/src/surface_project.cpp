@@ -262,18 +262,20 @@ SnapStats snap_boundary_nodes(const geom::TriSurface& surface,
                               std::vector<Eigen::Vector3d>& nodes,
                               const std::vector<std::uint32_t>& boundary_nodes, double h,
                               const CollectOffendersFn& collect_offenders, double max_move_frac,
-                              int passes) {
+                              int passes, std::span<const geom::SharpEdge> feature_edges) {
     SnapStats stats;
     if (boundary_nodes.empty() || !(h > 0.0) || !std::isfinite(h) || !collect_offenders) {
         return stats;
     }
-    max_move_frac = std::clamp(max_move_frac, 0.05, 0.95);
-    passes = std::clamp(passes, 1, 8);
+    // Allow up to ~1 cell diagonal so LEB mid-edges on cylinders can leave the stair.
+    max_move_frac = std::clamp(max_move_frac, 0.05, 1.25);
+    passes = std::clamp(passes, 1, 10);
     const double max_total = max_move_frac * h;
     const double step_cap = max_total / static_cast<double>(passes);
-    // Search radius: allow full stair residual (~0.5√3 h) plus margin for
-    // anisotropic lattice cells and coarse STL facets on cylinders.
-    const double search_r = 2.0 * h;
+    // Search radius: full cell diagonal (~√3 h) plus margin for coarse facets.
+    const double search_r = 2.5 * h;
+    // Prefer CAD crease only for true rim/crease nodes (see below).
+    const double edge_prefer_r = 0.55 * h;
 
     // Warm the surface grid once.
     (void)grid_for(surface);
@@ -292,7 +294,31 @@ SnapStats snap_boundary_nodes(const geom::TriSurface& surface,
             }
             const Eigen::Vector3d p = nodes[ni];
             const auto cp = closest_on_surface(surface, p);
-            if (!(cp.distance > 1e-15) || cp.distance > search_r) {
+            Eigen::Vector3d target = p;
+            double dist = 0.0;
+            bool have = false;
+            // Feature prefer only when the node is *as close* to a crease as to
+            // the surface (true rim). Hole-wall / free-face nodes often sit near
+            // a rim in 3D (thin walls) but their closest surface is the wall —
+            // those must project to the wall, not collapse onto the rim edge.
+            if (!feature_edges.empty()) {
+                const auto cf = geom::closest_on_features(p, surface, feature_edges);
+                if (std::isfinite(cf.distance) && cf.distance > 1e-15 &&
+                    cf.distance <= edge_prefer_r &&
+                    cf.distance <= cp.distance + 0.08 * h) {
+                    target = cf.point;
+                    dist = cf.distance;
+                    have = true;
+                }
+            }
+            if (!have) {
+                if (cp.distance > 1e-15 && cp.distance <= search_r) {
+                    target = cp.point;
+                    dist = cp.distance;
+                    have = true;
+                }
+            }
+            if (!have) {
                 continue;
             }
             const double already = moved.count(ni) ? moved[ni] : 0.0;
@@ -300,22 +326,22 @@ SnapStats snap_boundary_nodes(const geom::TriSurface& surface,
             if (budget <= 1e-15) {
                 continue;
             }
-            const double move = std::min({cp.distance, step_cap, budget});
+            const double move = std::min({dist, step_cap, budget});
             if (move <= 1e-15) {
                 continue;
             }
             if (!original.count(ni)) {
                 original.emplace(ni, p);
             }
-            const Eigen::Vector3d delta = cp.point - p;
-            nodes[ni] = p + delta * (move / cp.distance);
+            const Eigen::Vector3d delta = target - p;
+            nodes[ni] = p + delta * (move / dist);
             moved[ni] = already + move;
         }
     }
     stats.n_moved = moved.size();
 
-    // Greedy unsnap: restore only the worst moved offender each round so
-    // other boundary nodes can stay on the surface (better cylinders/fillets).
+    // Line-search unsnap: try keeping as much projection as possible (0.75→0.5→
+    // 0.25→full restore). Soft half-restore alone left cylinder/hole residual.
     while (!original.empty()) {
         std::set<std::uint32_t> offenders;
         collect_offenders(offenders);
@@ -338,7 +364,26 @@ SnapStats snap_boundary_nodes(const geom::TriSurface& surface,
         if (oit == original.end()) {
             break;
         }
-        nodes[worst] = oit->second;
+        const Eigen::Vector3d cur = nodes[worst];
+        const Eigen::Vector3d orig = oit->second;
+        bool fixed = false;
+        static constexpr double kFracs[] = {0.75, 0.5, 0.25};
+        for (const double f : kFracs) {
+            // f = fraction of *remaining* snap kept (toward surface from orig).
+            nodes[worst] = orig + f * (cur - orig);
+            std::set<std::uint32_t> still;
+            collect_offenders(still);
+            if (!still.count(worst)) {
+                moved[worst] = (nodes[worst] - orig).norm();
+                fixed = true;
+                break;
+            }
+        }
+        if (fixed) {
+            continue;
+        }
+        // Full restore.
+        nodes[worst] = orig;
         original.erase(oit);
         moved.erase(worst);
         ++stats.n_unsnapped;

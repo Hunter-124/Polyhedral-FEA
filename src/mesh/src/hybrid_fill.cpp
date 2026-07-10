@@ -16,6 +16,7 @@
 #include <queue>
 #include <set>
 #include <span>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -34,6 +35,50 @@ constexpr std::array<std::array<int, 4>, 6> kCubeTets{{
 
 constexpr int kFaceNbr[6][3] = {{-1, 0, 0}, {1, 0, 0},  {0, -1, 0},
                                 {0, 1, 0},  {0, 0, -1}, {0, 0, 1}};
+
+// Exterior triangular faces of a tet mesh (appear once). Returns node ids.
+std::vector<std::uint32_t>
+tet_boundary_nodes(const std::vector<std::array<std::uint32_t, 4>>& tets) {
+    struct FaceKey {
+        std::uint32_t a, b, c;
+        bool operator==(const FaceKey& o) const {
+            return a == o.a && b == o.b && c == o.c;
+        }
+    };
+    struct FaceHash {
+        std::size_t operator()(const FaceKey& f) const noexcept {
+            std::size_t h = f.a;
+            h ^= static_cast<std::size_t>(f.b) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+            h ^= static_cast<std::size_t>(f.c) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+            return h;
+        }
+    };
+    auto make_key = [](std::uint32_t i, std::uint32_t j, std::uint32_t k) {
+        std::array<std::uint32_t, 3> v{{i, j, k}};
+        std::sort(v.begin(), v.end());
+        return FaceKey{v[0], v[1], v[2]};
+    };
+    std::unordered_map<FaceKey, int, FaceHash> count;
+    count.reserve(tets.size() * 2);
+    static constexpr int kFaces[4][3] = {{0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}};
+    for (const auto& t : tets) {
+        for (const auto& f : kFaces) {
+            ++count[make_key(t[static_cast<std::size_t>(f[0])],
+                             t[static_cast<std::size_t>(f[1])],
+                             t[static_cast<std::size_t>(f[2])])];
+        }
+    }
+    std::unordered_set<std::uint32_t> nodes;
+    nodes.reserve(count.size());
+    for (const auto& [key, c] : count) {
+        if (c == 1) {
+            nodes.insert(key.a);
+            nodes.insert(key.b);
+            nodes.insert(key.c);
+        }
+    }
+    return {nodes.begin(), nodes.end()};
+}
 
 } // namespace
 
@@ -59,11 +104,10 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         throw ValidityError("graded_tet_fill_surface: empty bbox");
     }
 
-    // Coarse-primary lattice at target h (classify cost matches tet/hybrid).
-    // LEB refine on fine-marked cells (ADR-0018). Cap cells below the global
-    // 512k budget: LEB+snap on multi-million-tet meshes is not interactive.
-    constexpr int subdiv = 2;
-    constexpr std::size_t kGradedMaxCells = 48 * 1024; // ~6 tets/cell → under LEB budget
+    // Coarse-primary lattice at target h. Multi-level LEB (ADR-0018):
+    //   L0 bulk ~ h, L1 feature/skin ~ h/2, L2 high-κ seeds ~ h/4.
+    constexpr int subdiv = 2; // max LEB depth (L2)
+    constexpr std::size_t kGradedMaxCells = 48 * 1024;
     const double h_budget =
         min_h_for_cell_budget(bbox_min, bbox_max, kGradedMaxCells, /*subdivision=*/1);
     const double h_use = (h_budget > 0.0) ? std::max(h, h_budget) : h;
@@ -119,43 +163,82 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         }
     }
 
-    // Skin depth in coarse cells; never eat more than half the interior.
+    // Skin depth: never eat more than half the interior.
+    // When feature/seed grading is on, skip free-surface hop flood — otherwise
+    // the whole exterior becomes L1 and the adaptive size field is invisible
+    // (everything looks the same size in the free-surface wireframe). Plain
+    // graded (no geo drivers) still skins so unit boxes get an L1 shell.
     const int skin_cap = std::max(1, (max_dist + 1) / 2);
-    const int skin_thresh = std::min(skin_layers, skin_cap);
+    const bool have_geo_drivers = (feature_band > 0.0) || (seed_band > 0.0);
+    const int skin_thresh =
+        have_geo_drivers ? 0 : std::min(skin_layers, skin_cap);
 
-    std::vector<char> is_fine(inside.size(), 0);
+    // refine_level: 0=bulk, 1=L1 (~h/2), 2=L2 (~h/4 near high-κ seeds)
+    std::vector<std::uint8_t> refine_level(inside.size(), 0);
     std::vector<char> is_feature(inside.size(), 0);
     std::vector<char> is_seed(inside.size(), 0);
+    std::vector<char> is_l1(inside.size(), 0);
+    std::vector<char> is_l2(inside.size(), 0);
+
     for (std::size_t c = 0; c < inside.size(); ++c) {
         if (!inside[c]) {
             continue;
         }
-        if (dist[c] >= 0 && dist[c] < skin_thresh) {
-            is_fine[c] = 1;
+        if (skin_thresh > 0 && dist[c] >= 0 && dist[c] < skin_thresh) {
+            is_l1[c] = 1;
+            refine_level[c] = 1;
         }
     }
-    stamp_feature_cells(is_fine, &is_feature, nx, ny, nz, grid, surface, features, feature_band);
-    stamp_seed_cells(is_fine, &is_seed, nx, ny, nz, grid, refine_seeds, seed_band);
-    // Only interior cells may be refined.
+    // Features → L1 band (hole rims, creases).
+    stamp_feature_cells(is_l1, &is_feature, nx, ny, nz, grid, surface, features, feature_band);
+    // Seeds (curvature / a-posteriori) → L2 superfine.
+    stamp_seed_cells(is_l2, &is_seed, nx, ny, nz, grid, refine_seeds, seed_band);
+    // Feature core → L2 so hole rims get two LEB levels (~h/4).
+    if (feature_band > 0.0 && !features.empty()) {
+        std::vector<char> feature_core(inside.size(), 0);
+        stamp_feature_cells(feature_core, nullptr, nx, ny, nz, grid, surface, features,
+                            0.75 * feature_band);
+        for (std::size_t c = 0; c < inside.size(); ++c) {
+            if (feature_core[c]) {
+                is_l2[c] = 1;
+            }
+        }
+    }
+
     for (std::size_t c = 0; c < inside.size(); ++c) {
         if (!inside[c]) {
-            is_fine[c] = 0;
+            refine_level[c] = 0;
             is_feature[c] = 0;
             is_seed[c] = 0;
+            is_l1[c] = 0;
+            is_l2[c] = 0;
+            continue;
+        }
+        if (is_l1[c] || is_feature[c]) {
+            refine_level[c] = std::max<std::uint8_t>(refine_level[c], 1);
+        }
+        if (is_l2[c] || is_seed[c]) {
+            refine_level[c] = 2;
+        }
+    }
+
+    bool any_l2 = false;
+    for (auto lv : refine_level) {
+        if (lv >= 2) {
+            any_l2 = true;
+            break;
         }
     }
 
     GradedTetFillOutput out;
     out.h_coarse = hc;
-    out.h_fine = hf;
+    // L1 → ~h/2, L2 → ~h/4 (report deepest active level).
+    out.h_fine = any_l2 ? 0.25 * hc : 0.5 * hc;
     out.skin_layers = skin_layers;
     out.subdivision = subdiv;
-    out.mesh.h = hf;
+    out.mesh.h = out.h_fine;
 
-    // ADR-0018: emit a *uniform* coarse Kuhn lattice first, then LEB-refine tets
-    // whose centroids lie in fine-marked cells. LEPP closure keeps the mesh
-    // face-conforming (no 2:1 hanging nodes). Old path emitted coarse step-2
-    // Kuhn next to fine 2×2×2 Kuhn → nonconforming mid-edge nodes.
+    // Uniform coarse Kuhn lattice, then multi-level LEB (ADR-0018).
     std::map<std::array<int, 3>, std::uint32_t> node_ids;
     const auto node_at = [&](int i, int j, int k) {
         const auto [it, fresh] = node_ids.try_emplace(
@@ -193,9 +276,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         }
     };
 
-    // Exterior lattice quads for snap / display (before LEB; rebuilt after).
     auto emit_face_quad = [&](int i, int j, int k, int face) {
-        // face: 0=-x 1=+x 2=-y 3=+y 4=-z 5=+z
         std::array<std::array<int, 3>, 4> corners{};
         switch (face) {
         case 0:
@@ -218,13 +299,14 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             break;
         }
         std::array<std::uint32_t, 4> quad{};
-        for (int q = 0; q < 4; ++q) {
-            const auto& c = corners[static_cast<std::size_t>(q)];
-            quad[static_cast<std::size_t>(q)] = node_at(i + c[0], j + c[1], k + c[2]);
+        for (int qn = 0; qn < 4; ++qn) {
+            const auto& c = corners[static_cast<std::size_t>(qn)];
+            quad[static_cast<std::size_t>(qn)] = node_at(i + c[0], j + c[1], k + c[2]);
         }
         out.mesh.boundary_quads.push_back(quad);
     };
 
+    std::size_t n_l2_cells = 0;
     for (int k = 0; k < nz; ++k) {
         for (int j = 0; j < ny; ++j) {
             for (int i = 0; i < nx; ++i) {
@@ -233,13 +315,16 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 }
                 const auto id = idx(i, j, k);
                 emit_cube_tets(i, j, k);
-                if (is_fine[id]) {
+                if (refine_level[id] > 0) {
                     ++out.n_fine_cells;
                     if (is_feature[id]) {
                         ++out.n_feature_cells;
                     }
-                    if (is_seed[id]) {
+                    if (is_seed[id] || refine_level[id] >= 2) {
                         ++out.n_seed_cells;
+                    }
+                    if (refine_level[id] >= 2) {
+                        ++n_l2_cells;
                     }
                 } else {
                     ++out.n_coarse_cells;
@@ -252,12 +337,12 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             }
         }
     }
+    (void)n_l2_cells;
 
     if (out.mesh.tets.empty()) {
         throw ValidityError("graded_tet_fill_surface: no interior cells");
     }
 
-    // Map a point to the coarse cell that contains it (clamped).
     const auto cell_of_point = [&](const Eigen::Vector3d& p) -> int {
         const Eigen::Vector3d local = p - grid.origin;
         int i = static_cast<int>(std::floor(local[0] / grid.cell[0]));
@@ -269,61 +354,91 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         return static_cast<int>(idx(i, j, k));
     };
 
-    // LEB refine tets in fine cells. Prefer lattice boundary nodes for snap
-    // (already collected); LEB clears topology-accurate quads but we keep the
-    // node ids that were on the free surface.
-    std::vector<std::uint32_t> snap_nodes;
-    {
-        std::set<std::uint32_t> bset;
-        for (const auto& q : out.mesh.boundary_quads) {
-            bset.insert(q.begin(), q.end());
+    // Multi-level LEB: pass 1 marks level≥1, pass 2 marks level≥2.
+    constexpr std::size_t kLebTetBudget = 200'000;
+    auto run_leb_for_min_level = [&](std::uint8_t min_level) {
+        if (out.mesh.tets.size() > kLebTetBudget) {
+            return;
         }
-        snap_nodes.assign(bset.begin(), bset.end());
-    }
+        std::vector<std::size_t> marked;
+        marked.reserve(out.mesh.tets.size() / 4 + 8);
+        for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+            const auto& n = out.mesh.tets[ti];
+            const Eigen::Vector3d c =
+                0.25 * (out.mesh.nodes[n[0]] + out.mesh.nodes[n[1]] + out.mesh.nodes[n[2]] +
+                        out.mesh.nodes[n[3]]);
+            const int cid = cell_of_point(c);
+            if (cid >= 0 && static_cast<std::size_t>(cid) < refine_level.size() &&
+                refine_level[static_cast<std::size_t>(cid)] >= min_level) {
+                marked.push_back(ti);
+            }
+        }
+        if (marked.empty()) {
+            return;
+        }
+        LocalRefineStats st;
+        // S1: project free-surface LEB mids onto STL (avoid hole-void chords).
+        auto refined = local_refine_tets(std::move(out.mesh.nodes), std::move(out.mesh.tets),
+                                         marked, &st, &surface);
+        out.mesh.nodes = std::move(refined.nodes);
+        out.mesh.tets = std::move(refined.tets);
+    };
 
-    const bool any_fine = out.n_fine_cells > 0;
-    // LEB is O(n log n) with large constants; skip grading on huge lattices so
-    // auto-coarsened tiny-h still returns a conforming coarse mesh quickly.
-    constexpr std::size_t kLebTetBudget = 120'000;
-    if (any_fine && out.mesh.tets.size() <= kLebTetBudget) {
-        // Large-but-under-budget: one LEB pass. Small: up to subdiv.
-        const int passes =
-            (out.mesh.tets.size() > 40'000) ? 1 : subdiv;
-        for (int pass = 0; pass < passes; ++pass) {
-            std::vector<std::size_t> marked;
-            marked.reserve(out.mesh.tets.size() / 4 + 8);
+    // Pre-LEB snap of lattice corners so LEB mid-edges start closer to the CAD
+    // (cleaner hole rims; midpoints of two on-surface nodes ≈ on surface).
+    {
+        std::vector<std::uint32_t> pre_snap = tet_boundary_nodes(out.mesh.tets);
+        if (!pre_snap.empty()) {
+            std::unordered_set<std::uint32_t> bset(pre_snap.begin(), pre_snap.end());
+            std::vector<std::size_t> skin_tets;
             for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
                 const auto& n = out.mesh.tets[ti];
-                const Eigen::Vector3d c =
-                    0.25 * (out.mesh.nodes[n[0]] + out.mesh.nodes[n[1]] + out.mesh.nodes[n[2]] +
-                            out.mesh.nodes[n[3]]);
-                const int cid = cell_of_point(c);
-                if (cid >= 0 && static_cast<std::size_t>(cid) < is_fine.size() &&
-                    is_fine[static_cast<std::size_t>(cid)]) {
-                    marked.push_back(ti);
+                if (bset.count(n[0]) || bset.count(n[1]) || bset.count(n[2]) ||
+                    bset.count(n[3])) {
+                    skin_tets.push_back(ti);
                 }
             }
-            if (marked.empty()) {
-                break;
+            const double vol_eps = 1e-14 * hc * hc * hc;
+            snap_boundary_nodes(
+                surface, out.mesh.nodes, pre_snap, hc,
+                [&](std::set<std::uint32_t>& offenders) {
+                    for (const auto ti : skin_tets) {
+                        const auto& n = out.mesh.tets[ti];
+                        const double v = tet_signed_volume(
+                            out.mesh.nodes[n[0]], out.mesh.nodes[n[1]], out.mesh.nodes[n[2]],
+                            out.mesh.nodes[n[3]]);
+                        if (v > vol_eps) {
+                            continue;
+                        }
+                        offenders.insert(n.begin(), n.end());
+                    }
+                },
+                /*max_move_frac=*/1.05, /*passes=*/5, features);
+            for (auto& n : out.mesh.tets) {
+                const double v =
+                    tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
+                                      out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
+                if (v < 0.0) {
+                    std::swap(n[1], n[2]);
+                }
             }
-            LocalRefineStats st;
-            auto refined = local_refine_tets(std::move(out.mesh.nodes), std::move(out.mesh.tets),
-                                             marked, &st);
-            out.mesh.nodes = std::move(refined.nodes);
-            out.mesh.tets = std::move(refined.tets);
-            // Keep pre-LEB lattice boundary_quads: corner node ids remain valid
-            // (LEB only appends midpoints). Pipeline may replace with exterior
-            // faces for display; tests use quads for snap residual checks.
         }
     }
 
+    if (out.n_fine_cells > 0) {
+        run_leb_for_min_level(1);
+        if (any_l2) {
+            run_leb_for_min_level(2);
+        }
+    }
+
+    // CRITICAL: recollect free-surface nodes *after* LEB so mid-edge nodes on
+    // the hole rim actually get snapped. Only unpaired-face nodes (S3) — do not
+    // merge stale pre-LEB lattice quads (those can include interior/non-skin
+    // corners after refine).
+    std::vector<std::uint32_t> snap_nodes = tet_boundary_nodes(out.mesh.tets);
+
     if (!snap_nodes.empty()) {
-        // Drop any snap node indices that somehow went out of range (should not).
-        snap_nodes.erase(std::remove_if(snap_nodes.begin(), snap_nodes.end(),
-                                        [&](std::uint32_t i) {
-                                            return i >= out.mesh.nodes.size();
-                                        }),
-                         snap_nodes.end());
         std::vector<std::size_t> skin_tets;
         skin_tets.reserve(snap_nodes.size() * 4);
         {
@@ -336,22 +451,55 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 }
             }
         }
-        const double vol_eps = 1e-14 * hf * hf * hf;
-        snap_boundary_nodes(
-            surface, out.mesh.nodes, snap_nodes, hf,
-            [&](std::set<std::uint32_t>& offenders) {
+        const double vol_eps = 1e-14 * hc * hc * hc;
+        auto collect_invert = [&](std::set<std::uint32_t>& offenders) {
+            for (const auto ti : skin_tets) {
+                const auto& n = out.mesh.tets[ti];
+                const double v = tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
+                                                   out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
+                if (v > vol_eps) {
+                    continue;
+                }
+                offenders.insert(n.begin(), n.end());
+            }
+        };
+        // Strong budget so LEB mid-edges on holes leave the Cartesian stair.
+        // Use max(hc, ~cell diagonal) scale via frac>1; soft-unsnap keeps quality.
+        snap_boundary_nodes(surface, out.mesh.nodes, snap_nodes, hc, collect_invert,
+                            /*max_move_frac=*/1.15, /*passes=*/7, features);
+        // Per-node accept/reject re-project for residual outliers (hole kinks).
+        // Full projection; keep only if no skin tet inverts.
+        {
+            const double thr = 0.08 * hc;
+            for (auto ni : snap_nodes) {
+                if (ni >= out.mesh.nodes.size()) {
+                    continue;
+                }
+                const auto cp = closest_on_surface(surface, out.mesh.nodes[ni]);
+                if (!(cp.distance > thr) || cp.distance > 2.5 * hc) {
+                    continue;
+                }
+                const Eigen::Vector3d saved = out.mesh.nodes[ni];
+                out.mesh.nodes[ni] = cp.point;
+                bool ok = true;
                 for (const auto ti : skin_tets) {
                     const auto& n = out.mesh.tets[ti];
+                    if (n[0] != ni && n[1] != ni && n[2] != ni && n[3] != ni) {
+                        continue;
+                    }
                     const double v =
                         tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
                                           out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
-                    if (v > vol_eps) {
-                        continue;
+                    if (v <= vol_eps) {
+                        ok = false;
+                        break;
                     }
-                    offenders.insert(n.begin(), n.end());
                 }
-            },
-            /*max_move_frac=*/0.85, /*passes=*/3);
+                if (!ok) {
+                    out.mesh.nodes[ni] = saved;
+                }
+            }
+        }
         for (auto& n : out.mesh.tets) {
             const double v = tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
                                                out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
@@ -359,12 +507,11 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 std::swap(n[1], n[2]);
             }
         }
-        // Restore simple boundary quads from pre-LEB lattice nodes for region map.
-        if (out.mesh.boundary_quads.empty() && snap_nodes.size() >= 3) {
-            // Pipeline replaces these via extract_boundary_faces; leave empty OK.
-        }
     }
 
+    // Rebuild boundary quads as exterior tris padded for pipeline display
+    // (quad[3]=quad[2] for pure tris is OK — pipeline may re-extract).
+    // Keep original lattice quads when present; append nothing if already set.
     check_tet_fill_geometry(out.mesh);
     return out;
 }

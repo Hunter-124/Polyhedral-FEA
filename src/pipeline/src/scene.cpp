@@ -187,12 +187,34 @@ ResolvedMeshSize resolve_mesh_size(const Model& model, double requested_h,
 
     const auto edges = geom::detect_sharp_edges(model.surface, sharp_angle_deg);
     out.n_sharp_edges = edges.size();
+    // Prefer geometric feature scale over STL facet edge length: a faceted hole
+    // has hundreds of short creases that used to drive global h → million-elem floods.
     double min_feature = std::numeric_limits<double>::infinity();
     for (const auto& e : edges) {
         const double len =
             (model.surface.vertices[e.v0] - model.surface.vertices[e.v1]).norm();
-        if (len > 1e-15) {
+        if (len > 0.02 * extent) { // ignore facet-scale creases
             min_feature = std::min(min_feature, len);
+        }
+    }
+    // Curvature radius proxy: R ≈ 1/κ for high-κ verts (holes/fillets).
+    double r_curv = std::numeric_limits<double>::infinity();
+    {
+        const auto curv = geom::estimate_vertex_curvature(model.surface);
+        for (double k : curv.kappa) {
+            if (k > 1e-9) {
+                r_curv = std::min(r_curv, 1.0 / k);
+            }
+        }
+    }
+    // Thickness: thin plates need a few elements through thickness, not global flood.
+    double t_min = std::numeric_limits<double>::infinity();
+    {
+        const auto thick = geom::estimate_local_thickness(model.surface);
+        for (double t : thick.thickness) {
+            if (geom::has_finite_thickness(t) && t > 1e-12) {
+                t_min = std::min(t_min, t);
+            }
         }
     }
     if (!std::isfinite(min_feature)) {
@@ -200,37 +222,48 @@ ResolvedMeshSize resolve_mesh_size(const Model& model, double requested_h,
     }
     out.min_feature_length = min_feature;
 
-    // Feature density: more creases than a simple brick (12 edges) → mild refine.
+    // Mild density tweak only — never the old dens×0.55 from facet count.
     double density_scale = 1.0;
-    if (out.n_sharp_edges > 24) {
-        density_scale = 0.85;
-    }
-    if (out.n_sharp_edges > 80) {
-        density_scale = 0.7;
-    }
-    if (out.n_sharp_edges > 200) {
-        density_scale = 0.55;
+    if (out.n_sharp_edges > 40 && out.n_sharp_edges <= 120) {
+        density_scale = 0.92;
+    } else if (out.n_sharp_edges > 120) {
+        density_scale = 0.88; // faceted curves: keep bulk coarse; local LEB refines
     }
 
     double h0 = h_geom * density_scale;
-    // Aim for ≥ ~2 elements across the shortest crease when that is smaller
-    // than the geometric default — but never below h_geom/4 (CI runtime).
+    // Resolve feature geometry with local multi-level LEB, not global h collapse.
+    // Aim ~5–6 bulk cells across characteristic R so L2 (~h/4) yields a smooth hole.
+    if (std::isfinite(r_curv) && r_curv > 0.0) {
+        // ~6 bulk cells across characteristic radius; L2 LEB densifies the rim further.
+        const double h_r = r_curv / 6.0;
+        if (h_r < h0) {
+            h0 = std::max(h_r, h_geom * 0.28);
+        }
+    }
+    if (std::isfinite(t_min) && t_min > 0.0) {
+        const double h_t = t_min / 2.0;
+        if (h_t < h0 && h_t > h_geom * 0.2) {
+            h0 = std::min(h0, std::max(h_t, h_geom * 0.35));
+        }
+    }
     if (min_feature > 0.0) {
-        const double h_feat = 0.5 * min_feature;
+        const double h_feat = 0.35 * min_feature;
         if (h_feat < h0) {
-            h0 = std::max(h_feat, h_geom * 0.25);
+            h0 = std::max(h_feat, h_geom * 0.4);
         }
     }
 
-    // Absolute clamps from diagonal so pathological geometry stays meshable.
+    // Absolute clamps: coarser floor than before so interactive meshes stay sane.
     if (diagonal > 0.0) {
-        h0 = std::clamp(h0, diagonal / 200.0, diagonal / 6.0);
+        h0 = std::clamp(h0, diagonal / 80.0, diagonal / 6.0);
     }
     out.h = h0;
     out.auto_chosen = true;
     out.note = std::format(
-        "auto h={:.4g} m (extent/16∩diag/28, n_sharp={}, min_feat={:.3g} m, dens×{:.2f})",
-        out.h, out.n_sharp_edges, out.min_feature_length, density_scale);
+        "auto h={:.4g} m (extent/16∩diag/28, n_sharp={}, min_feat={:.3g} m, dens×{:.2f}"
+        "{})",
+        out.h, out.n_sharp_edges, out.min_feature_length, density_scale,
+        std::isfinite(r_curv) ? std::format(", Rκ≈{:.3g}", r_curv) : std::string{});
     return out;
 }
 
@@ -240,63 +273,132 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
     VolumeMeshOutput out;
     double fill_h = h;
     if (mesher == VolumeMesher::kHybrid) {
-        // SPEC hybrid zoo: hex bulk + pyramid transition + tet skin (curved snap).
+        // SPEC hybrid zoo: hex bulk @ h + 2:1 fine @ h/2 on feature/seed bands +
+        // pyramid transitions (no hanging faces). Product FE expands hex→pyramids.
         std::vector<geom::SharpEdge> edges;
         std::vector<Eigen::Vector3d> curv_seeds(refine_seeds.begin(), refine_seeds.end());
         double feat_band = 0.0;
         double s_band = seed_band;
+        std::size_t n_curv_seeds = 0;
         if (feature_refine) {
             edges = geom::detect_sharp_edges(model.surface, 30.0);
             if (!edges.empty()) {
-                // H1: thinner feature band — was 2.5 h and flooded the volume.
-                feat_band = 1.5 * h;
+                // Feature band ~2 bulk cells so hole rims get a clear h/2 shell.
+                feat_band = 2.0 * h;
             }
+            // Match graded seeding: κ ≳ 1/(12h) or top ~25% of positive κ.
             const auto curv = geom::estimate_vertex_curvature(model.surface);
-            // Seed high-κ surface verts so curved walls get tet skin + snap.
-            const double kappa_abs = 1.0 / (25.0 * std::max(h, 1e-12));
-            constexpr std::size_t kMaxHybridSeeds = 192;
-            for (std::size_t i = 0; i < model.surface.vertices.size(); ++i) {
-                if (curv_seeds.size() >= kMaxHybridSeeds) {
-                    break;
-                }
-                if (i < curv.kappa.size() && curv.kappa[i] >= kappa_abs) {
-                    curv_seeds.push_back(model.surface.vertices[i]);
+            const double kappa_abs = 1.0 / (12.0 * std::max(h, 1e-12));
+            std::vector<double> pos_kappa;
+            pos_kappa.reserve(curv.kappa.size());
+            for (double k : curv.kappa) {
+                if (k > 1e-9) {
+                    pos_kappa.push_back(k);
                 }
             }
-            // Sparse edge midpoints on curved facets (stride 3).
-            for (std::size_t ti = 0; ti < model.surface.triangles.size(); ti += 3) {
-                if (curv_seeds.size() >= kMaxHybridSeeds) {
-                    break;
+            double kappa_rel = kappa_abs;
+            if (!pos_kappa.empty()) {
+                std::sort(pos_kappa.begin(), pos_kappa.end());
+                const std::size_t iq =
+                    std::min(pos_kappa.size() - 1, (pos_kappa.size() * 75) / 100);
+                kappa_rel = std::min(kappa_abs, pos_kappa[iq] * 0.999);
+            }
+            const double kappa_thresh = std::max(kappa_rel, 1e-12);
+            // Collect all high-κ candidates then spatial-thin so a hole wall is
+            // covered all around (index-order cap clustered on one sector).
+            std::vector<Eigen::Vector3d> candidates;
+            candidates.reserve(std::min<std::size_t>(model.surface.vertices.size(), 4096));
+            for (std::size_t i = 0; i < model.surface.vertices.size(); ++i) {
+                if (i < curv.kappa.size() && curv.kappa[i] >= kappa_thresh) {
+                    candidates.push_back(model.surface.vertices[i]);
                 }
+            }
+            for (std::size_t ti = 0; ti < model.surface.triangles.size(); ti += 3) {
                 const auto& tri = model.surface.triangles[ti];
                 for (int e = 0; e < 3; ++e) {
                     const auto a = tri[static_cast<std::size_t>(e)];
                     const auto b = tri[static_cast<std::size_t>((e + 1) % 3)];
                     if (a < curv.kappa.size() && b < curv.kappa.size() &&
-                        0.5 * (curv.kappa[a] + curv.kappa[b]) >= kappa_abs) {
-                        curv_seeds.push_back(0.5 * (model.surface.vertices[a] +
+                        0.5 * (curv.kappa[a] + curv.kappa[b]) >= kappa_thresh) {
+                        candidates.push_back(0.5 * (model.surface.vertices[a] +
                                                     model.surface.vertices[b]));
-                        if (curv_seeds.size() >= kMaxHybridSeeds) {
-                            break;
-                        }
                     }
                 }
             }
+            constexpr std::size_t kMaxHybridSeeds = 256;
+            const double min_sep = 0.75 * h;
+            const double min_sep2 = min_sep * min_sep;
+            for (const auto& p : candidates) {
+                if (curv_seeds.size() >= kMaxHybridSeeds) {
+                    break;
+                }
+                bool far = true;
+                for (const auto& q : curv_seeds) {
+                    if ((p - q).squaredNorm() < min_sep2) {
+                        far = false;
+                        break;
+                    }
+                }
+                if (far) {
+                    curv_seeds.push_back(p);
+                    ++n_curv_seeds;
+                }
+            }
             if (s_band <= 0.0 && !curv_seeds.empty()) {
-                s_band = 1.25 * h; // H1: was 2 h
+                s_band = 2.0 * h; // cover hole wall thickness + one bulk cell
+            }
+            if (s_band > 0.0 && curv_seeds.empty()) {
+                s_band = 0.0;
             }
         }
-        // H2: hex bulk + pyramid skin (feature bands). Product FE expands hex →
-        // pyramids (ADR-0013) so constant-strain patch is exact; free surface
-        // stays quads (no Kuhn diagonals on the silhouette).
+        // Build lattice without snap first; snap after hex→pyramid expand so free
+        // surface Jacobian is pyramid-based (hex free-face snap unsnaps too often).
         auto raw =
             mesh::mixed_fill_surface(model.surface, model.bbox_min, model.bbox_max, h,
                                      std::max(1, skin_layers), edges, feat_band, curv_seeds,
-                                     s_band, /*snap_boundary=*/true);
+                                     s_band, /*snap_boundary=*/false);
         const std::size_t n_hex_lattice = raw.n_hex;
-        const std::size_t n_pyr_skin = raw.n_pyramid;
+        const std::size_t n_pyr_raw = raw.n_pyramid;
         auto fill = mesh::expand_mixed_hex_to_pyramids(raw);
         fill_h = fill.h;
+        // Post-expand free-surface snap (boundary quads from lattice).
+        if (!fill.boundary_quads.empty()) {
+            std::set<std::uint32_t> bset;
+            for (const auto& q : fill.boundary_quads) {
+                bset.insert(q.begin(), q.end());
+            }
+            std::vector<std::uint32_t> bnodes(bset.begin(), bset.end());
+            const double h_snap = fill.h > 0.0 ? fill.h : h;
+            const double vol_eps = 1e-14 * h_snap * h_snap * h_snap;
+            fill.boundary_max_distance =
+                mesh::snap_boundary_nodes(
+                    model.surface, fill.nodes, bnodes, h_snap,
+                    [&](std::set<std::uint32_t>& offenders) {
+                        for (const auto& cell : fill.cells) {
+                            if (cell.kind != mesh::MixedCellKind::kPyramid5) {
+                                continue;
+                            }
+                            const double v1 = ((fill.nodes[cell.nodes[1]] - fill.nodes[cell.nodes[0]])
+                                                   .dot((fill.nodes[cell.nodes[2]] -
+                                                         fill.nodes[cell.nodes[0]])
+                                                            .cross(fill.nodes[cell.nodes[4]] -
+                                                                   fill.nodes[cell.nodes[0]]))) /
+                                              6.0;
+                            const double v2 = ((fill.nodes[cell.nodes[2]] - fill.nodes[cell.nodes[0]])
+                                                   .dot((fill.nodes[cell.nodes[3]] -
+                                                         fill.nodes[cell.nodes[0]])
+                                                            .cross(fill.nodes[cell.nodes[4]] -
+                                                                   fill.nodes[cell.nodes[0]]))) /
+                                              6.0;
+                            if (std::abs(v1) <= vol_eps || std::abs(v2) <= vol_eps) {
+                                offenders.insert(cell.nodes.begin(),
+                                                 cell.nodes.begin() + cell.n_nodes);
+                            }
+                        }
+                    },
+                    /*max_move_frac=*/1.25, /*passes=*/8, edges)
+                    .max_residual;
+        }
         out.mesh.nodes = std::move(fill.nodes);
         out.mesh.elements.reserve(fill.cells.size());
         for (const auto& cell : fill.cells) {
@@ -318,11 +420,14 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         }
         out.boundary_quads = std::move(fill.boundary_quads);
         out.mesher_note = std::format(
-            "hybrid zoo v2 (hex bulk + pyramid skin → all-pyramid FE; not Delaunay): "
-            "{} lattice hex + {} skin pyr → {} pyramid5, {} nodes, h={:.4g} m, "
-            "snap max|d|={:.3g} m, feature_skin_cells={}",
-            n_hex_lattice, n_pyr_skin, fill.n_pyramid, out.mesh.nodes.size(), fill_h,
-            fill.boundary_max_distance, fill.n_feature_skin_cells);
+            "hybrid zoo v3 (hex bulk@h + 2:1 fine@h/2 + pyr transition → all-pyramid FE; "
+            "not Delaunay): {} hex + {} pyr raw → {} pyramid5, {} nodes, "
+            "h_bulk={:.4g}/h_fine={:.4g} m, fine_cells={} transition={} feature={}, "
+            "snap max|d|={:.3g} m{}",
+            n_hex_lattice, n_pyr_raw, fill.n_pyramid, out.mesh.nodes.size(), fill.h,
+            fill.h_fine > 0.0 ? fill.h_fine : fill.h, fill.n_fine_cells,
+            fill.n_transition_cells, fill.n_feature_skin_cells, fill.boundary_max_distance,
+            n_curv_seeds > 0 ? std::format(", curv_seeds={}", n_curv_seeds) : std::string{});
     } else if (mesher == VolumeMesher::kHexFill || mesher == VolumeMesher::kHexVem) {
         auto fill = mesh::hex_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
         fill_h = fill.h;
@@ -401,8 +506,8 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         if (feature_refine) {
             edges = geom::detect_sharp_edges(model.surface, 30.0);
             if (!edges.empty()) {
-                // Crease band ~ one bulk cell so fillets densify without eating bulk.
-                feature_band = 1.5 * h;
+                // Crease band ~ two bulk cells so hole rims get a clear L1/L2 shell.
+                feature_band = 2.0 * h;
             }
             // Curvature / hole grading. Discrete κ is a lower bound on coarse STLs.
             // Seed when κ ≳ 1/(12 h) (proxy R ≲ 12 h) OR in the top ~25% of
@@ -429,7 +534,7 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             }
             const double kappa_thresh = std::max(kappa_rel, 1e-12);
             if (band <= 0.0) {
-                band = 1.25 * h; // seed ball ≈ one bulk cell
+                band = 1.6 * h; // seed ball covers hole wall + rim neighborhood
             }
             seeds.reserve(seeds.size() + model.surface.vertices.size() / 4 + 16);
             for (std::size_t i = 0; i < model.surface.vertices.size(); ++i) {
@@ -465,27 +570,33 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                     ++n_curv_seeds;
                 }
             }
-            // Spatial decimation: keep ≤ 192 seeds so stamp cost stays O(1).
-            constexpr std::size_t kMaxGeoSeeds = 192;
-            if (seeds.size() > kMaxGeoSeeds) {
+            // Spatial thinning (parity with hybrid): min sep 0.75 h so hole
+            // walls get seeds all around (index-stride clustered one sector).
+            constexpr std::size_t kMaxGeoSeeds = 256;
+            {
                 std::vector<Eigen::Vector3d> kept;
-                kept.reserve(kMaxGeoSeeds);
+                kept.reserve(std::min(seeds.size(), kMaxGeoSeeds));
                 // Always keep caller-provided adapt seeds first.
                 const std::size_t n_caller = refine_seeds.size();
                 for (std::size_t i = 0; i < std::min(n_caller, seeds.size()); ++i) {
                     kept.push_back(seeds[i]);
                 }
-                const std::size_t remain = kMaxGeoSeeds - kept.size();
-                const std::size_t geo_n = seeds.size() - n_caller;
-                if (remain > 0 && geo_n > 0) {
-                    const std::size_t stride =
-                        std::max<std::size_t>(1, geo_n / remain);
-                    for (std::size_t i = n_caller; i < seeds.size() && kept.size() < kMaxGeoSeeds;
-                         i += stride) {
-                        kept.push_back(seeds[i]);
+                const double min_sep = 0.75 * h;
+                const double min_sep2 = min_sep * min_sep;
+                for (std::size_t i = n_caller; i < seeds.size() && kept.size() < kMaxGeoSeeds;
+                     ++i) {
+                    const auto& p = seeds[i];
+                    bool far = true;
+                    for (const auto& q : kept) {
+                        if ((p - q).squaredNorm() < min_sep2) {
+                            far = false;
+                            break;
+                        }
+                    }
+                    if (far) {
+                        kept.push_back(p);
                     }
                 }
-                // Recount geo seeds after decimation (approx).
                 n_curv_seeds = std::min(n_curv_seeds, kept.size());
                 seeds = std::move(kept);
             }
@@ -504,7 +615,11 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             out.mesh.elements.push_back(
                 fea::NodalElement{fea::ElementType::kTet4, {tet[0], tet[1], tet[2], tet[3]}});
         }
-        out.boundary_quads = std::move(graded.mesh.boundary_quads);
+        // Prefer true exterior faces after LEB (includes mid-edge free-surface nodes).
+        out.boundary_quads = fea::extract_boundary_faces(out.mesh);
+        if (out.boundary_quads.empty()) {
+            out.boundary_quads = std::move(graded.mesh.boundary_quads);
+        }
         std::vector<std::uint32_t> bnodes;
         for (const auto& q : out.boundary_quads) {
             bnodes.insert(bnodes.end(), q.begin(), q.end());
@@ -517,13 +632,13 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                 ? ", h raised to cell budget"
                 : "";
         out.mesher_note = std::format(
-            "graded tet v4 (LEB-conforming geo): {} tets ({} bulk cells, {} refined cells, "
-            "{} feature, {} seed), h_bulk={:.4g}/h_fine~{:.4g} m (LEB×{}), "
+            "graded tet v5 (multi-level LEB geo): {} tets ({} bulk, {} refined L1/L2, "
+            "{} feature, {} seed), h_bulk={:.4g}/h_L2~{:.4g} m (L0/L1/L2), "
             "snap max|d|={:.3g} m mean|d|={:.3g} m"
             "{}{}{}",
             out.mesh.elements.size(), graded.n_coarse_cells, graded.n_fine_cells,
             graded.n_feature_cells, graded.n_seed_cells, graded.h_coarse, graded.h_fine,
-            graded.subdivision, conf.max_distance, conf.mean_distance, budget_note,
+            conf.max_distance, conf.mean_distance, budget_note,
             n_curv_seeds > 0 ? std::format(", curv_seeds={}", n_curv_seeds) : std::string{},
             n_thin_seeds > 0 ? std::format(", thin_seeds={}", n_thin_seeds) : std::string{});
     } else if (mesher == VolumeMesher::kOctahedral) {

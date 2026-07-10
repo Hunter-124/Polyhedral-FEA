@@ -10,6 +10,7 @@
 //
 // Units: node coordinates in metres.
 
+#include "geom/tri_surface.hpp"
 #include "mesh/tet_fill.hpp"
 
 #include <Eigen/Core>
@@ -30,6 +31,8 @@ struct LocalRefineStats {
     /// Number of parent tet → 2 children replacements.
     std::size_t n_bisections = 0;
     std::size_t n_new_nodes = 0;
+    /// Free-surface midpoints projected onto `surface` (S1 curved residual).
+    std::size_t n_surface_mids = 0;
 };
 
 /// Longest-edge bisection of a pure tet4 mesh.
@@ -38,6 +41,9 @@ struct LocalRefineStats {
 /// @param tets  Each entry four node indices, preferably positive orientation.
 /// @param marked Element indices into `tets` to refine (duplicates ignored).
 /// @param stats Optional statistics.
+/// @param surface Optional CAD/STL: free-surface edge midpoints are projected
+///        onto the surface instead of Euclidean chords (reduces hole/void
+///        residual after LEB). Nullptr = pure geometric mids (default).
 /// @return Refined mesh (`boundary_quads` left empty — topology of the lattice
 ///         skin is no longer valid after interior splits).
 /// @throws ValidityError on empty mesh, out-of-range indices, or non-positive
@@ -45,11 +51,13 @@ struct LocalRefineStats {
 TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
                                 std::vector<std::array<std::uint32_t, 4>> tets,
                                 std::span<const std::size_t> marked,
-                                LocalRefineStats* stats = nullptr);
+                                LocalRefineStats* stats = nullptr,
+                                const geom::TriSurface* surface = nullptr);
 
 /// Same as above, taking a `TetFillOutput` (nodes + tets). Boundary quads from
 /// the input are **not** preserved.
 TetFillOutput local_refine_tets(const TetFillOutput& mesh, std::span<const std::size_t> marked,
-                                LocalRefineStats* stats = nullptr);
+                                LocalRefineStats* stats = nullptr,
+                                const geom::TriSurface* surface = nullptr);
 
 } // namespace polymesh::mesh

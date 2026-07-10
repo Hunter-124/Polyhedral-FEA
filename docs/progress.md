@@ -1,7 +1,7 @@
 # PROGRESS
 
 ## Current phase
-**Active development on master.** P1 frozen. VEM k=1 + adapt passes + feature grading + VTU/CLI/GUI live. 50 tests green.
+**Active development on master.** 53 tests green. Working product: tet/hex/hex-VEM meshers, VEM k=1, ZZ adapt passes, VTU, GUI, CLI, CalculiX smoke.
 
 GATE 1 deliverables ready:
 - Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)

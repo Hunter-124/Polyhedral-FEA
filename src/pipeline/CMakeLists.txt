@@ -7,6 +7,6 @@ add_library(pipeline
 )
 target_include_directories(pipeline PUBLIC include)
 target_link_libraries(pipeline
-    PUBLIC geom mesh fea Eigen3::Eigen
+    PUBLIC geom mesh fea adapt Eigen3::Eigen
     PRIVATE polymesh_warnings
 )

@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "pipeline/scene.hpp"
 
+#include "adapt/error.hpp"
+#include "adapt/loop.hpp"
 #include "fea/solve.hpp"
 #include "fea/vtu.hpp"
 #include "fea/zz.hpp"
+#include "geom/features.hpp"
 #include "geom/step.hpp"
 #include "geom/stl.hpp"
 #include "mesh/tet_fill.hpp"
@@ -20,6 +23,8 @@
 #include <set>
 
 namespace polymesh::pipeline {
+namespace adapt = polymesh::adapt;
+
 namespace {
 
 Eigen::Vector3d triangle_normal(const geom::TriSurface& s, std::size_t t) {
@@ -148,7 +153,7 @@ VolumeMeshOutput volume_mesh(const Model& model, double h) {
     out.mesh.elements.reserve(fill.tets.size());
     for (const auto& tet : fill.tets) {
         out.mesh.elements.push_back(
-            {fea::ElementType::kTet4, {tet[0], tet[1], tet[2], tet[3]}});
+            fea::NodalElement{fea::ElementType::kTet4, {tet[0], tet[1], tet[2], tet[3]}});
     }
     out.boundary_quads = std::move(fill.boundary_quads);
     out.mesher_note = std::format("tet grid fill v1: {} tet4, {} nodes, h = {:.4g} m",
@@ -206,62 +211,114 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
         try {
             const double extent = (model.bbox_max - model.bbox_min).maxCoeff();
             const double h = setup.mesh_size > 0.0 ? setup.mesh_size : extent / 24.0;
-            auto vol = volume_mesh(model, h);
+            double h_use = h;
+            if (setup.use_feature_grading) {
+                const auto edges = geom::detect_sharp_edges(model.surface, 30.0);
+                if (!edges.empty()) {
+                    h_use = std::min(h_use, h * 0.85);
+                }
+            }
+            auto vol = volume_mesh(model, h_use);
             set_status(std::format("solving… ({} tet4 elements, {} nodes)",
                                    vol.mesh.elements.size(), vol.mesh.nodes.size()));
             state_ = State::kSolving;
 
             fea::Dirichlet bc;
             std::map<int, std::vector<std::uint32_t>> region_nodes;
-            for (const auto& [node, region] : vol.boundary_node_region) {
-                region_nodes[region].push_back(node);
-            }
-            for (const int region : setup.fixtures) {
-                if (const auto it = region_nodes.find(region); it != region_nodes.end()) {
-                    for (const auto node : it->second) {
-                        bc.fix_node(node);
-                    }
-                }
-            }
-            if (bc.dof_values.empty()) {
-                throw fea::FeaError("no fixtures: fix at least one face before solving");
-            }
-
-            Eigen::VectorXd loads =
-                Eigen::VectorXd::Zero(3 * static_cast<Eigen::Index>(vol.mesh.nodes.size()));
-            for (const auto& [region, load] : setup.loads) {
-                const auto it = region_nodes.find(region);
-                if (it == region_nodes.end() || it->second.empty()) {
-                    continue;
-                }
-                const Eigen::Vector3d per_node =
-                    load.force / static_cast<double>(it->second.size());
-                for (const auto node : it->second) {
-                    loads.segment<3>(3 * static_cast<Eigen::Index>(node)) += per_node;
-                }
-            }
-
+            Eigen::VectorXd loads;
             const fea::Material material{.youngs_modulus = setup.youngs_modulus,
                                          .poissons_ratio = setup.poissons_ratio};
-            const auto u = fea::solve_elastostatics(vol.mesh, material, bc, loads);
-            const auto zz = fea::recover_zz(vol.mesh, material, u);
-            const auto& stress = zz.nodal_stress;
 
-            SolveResult r;
-            r.mesh_note = vol.mesher_note;
-            r.volume_mesh = std::move(vol.mesh);
-            r.boundary_quads = std::move(vol.boundary_quads);
-            r.displacement = u;
-            r.global_eta = zz.global_eta;
-            r.von_mises.resize(stress.size());
-            r.u_magnitude.resize(stress.size());
-            for (std::size_t i = 0; i < stress.size(); ++i) {
-                r.von_mises[i] = fea::von_mises(stress[i]);
-                r.u_magnitude[i] = u.segment<3>(3 * static_cast<Eigen::Index>(i)).norm();
-                r.max_von_mises = std::max(r.max_von_mises, r.von_mises[i]);
-                r.max_displacement = std::max(r.max_displacement, r.u_magnitude[i]);
-            }
-            result_ = std::move(r);
+            auto apply_bcs = [&]() {
+                bc = fea::Dirichlet{};
+                region_nodes.clear();
+                for (const auto& [node, region] : vol.boundary_node_region) {
+                    region_nodes[region].push_back(node);
+                }
+                for (const int region : setup.fixtures) {
+                    if (const auto it = region_nodes.find(region); it != region_nodes.end()) {
+                        for (const auto node : it->second) {
+                            bc.fix_node(node);
+                        }
+                    }
+                }
+                if (bc.dof_values.empty()) {
+                    throw fea::FeaError("no fixtures: fix at least one face before solving");
+                }
+                loads = Eigen::VectorXd::Zero(
+                    3 * static_cast<Eigen::Index>(vol.mesh.nodes.size()));
+                for (const auto& [region, load] : setup.loads) {
+                    const auto it = region_nodes.find(region);
+                    if (it == region_nodes.end() || it->second.empty()) {
+                        continue;
+                    }
+                    const Eigen::Vector3d per_node =
+                        load.force / static_cast<double>(it->second.size());
+                    for (const auto node : it->second) {
+                        loads.segment<3>(3 * static_cast<Eigen::Index>(node)) += per_node;
+                    }
+                }
+            };
+            apply_bcs();
+
+            for (int pass = 0; pass <= setup.adapt_passes; ++pass) {
+                if (pass > 0) {
+                    vol = volume_mesh(model, h_use);
+                    apply_bcs();
+                    set_status(std::format("adapt pass {}… ({} tet4)", pass,
+                                           vol.mesh.elements.size()));
+                }
+                const auto u_try = fea::solve_elastostatics(vol.mesh, material, bc, loads);
+                const auto zz_try = fea::recover_zz(vol.mesh, material, u_try);
+                if (pass < setup.adapt_passes) {
+                    const auto sug = adapt::suggest_uniform_refine(zz_try.element_eta, h_use,
+                                                                   0.3, 0.75, h * 0.35);
+                    if (sug.h_next >= h_use * 0.98) {
+                        // No further refinement — accept this solve as final.
+                        const auto& stress = zz_try.nodal_stress;
+                        SolveResult r;
+                        r.mesh_note = std::format("{} | adapt early-stop h={:.4g}",
+                                                  vol.mesher_note, h_use);
+                        r.volume_mesh = std::move(vol.mesh);
+                        r.boundary_quads = std::move(vol.boundary_quads);
+                        r.displacement = u_try;
+                        r.global_eta = zz_try.global_eta;
+                        r.von_mises.resize(stress.size());
+                        r.u_magnitude.resize(stress.size());
+                        for (std::size_t i = 0; i < stress.size(); ++i) {
+                            r.von_mises[i] = fea::von_mises(stress[i]);
+                            r.u_magnitude[i] =
+                                u_try.segment<3>(3 * static_cast<Eigen::Index>(i)).norm();
+                            r.max_von_mises = std::max(r.max_von_mises, r.von_mises[i]);
+                            r.max_displacement =
+                                std::max(r.max_displacement, r.u_magnitude[i]);
+                        }
+                        result_ = std::move(r);
+                        break;
+                    }
+                    h_use = sug.h_next;
+                    continue;
+                }
+                // Final pass results.
+                const auto& stress = zz_try.nodal_stress;
+                SolveResult r;
+                r.mesh_note = std::format("{} | adapt_passes={} h={:.4g}", vol.mesher_note,
+                                          setup.adapt_passes, h_use);
+                r.volume_mesh = std::move(vol.mesh);
+                r.boundary_quads = std::move(vol.boundary_quads);
+                r.displacement = u_try;
+                r.global_eta = zz_try.global_eta;
+                r.von_mises.resize(stress.size());
+                r.u_magnitude.resize(stress.size());
+                for (std::size_t i = 0; i < stress.size(); ++i) {
+                    r.von_mises[i] = fea::von_mises(stress[i]);
+                    r.u_magnitude[i] =
+                        u_try.segment<3>(3 * static_cast<Eigen::Index>(i)).norm();
+                    r.max_von_mises = std::max(r.max_von_mises, r.von_mises[i]);
+                    r.max_displacement = std::max(r.max_displacement, r.u_magnitude[i]);
+                }
+                result_ = std::move(r);
+            } // adapt passes
             set_status(std::format("done — max von Mises {:.4g} MPa, max deflection {:.4g} mm",
                                    result_.max_von_mises / 1e6,
                                    result_.max_displacement * 1e3));

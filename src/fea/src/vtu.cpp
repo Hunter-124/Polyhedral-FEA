@@ -18,6 +18,9 @@ int vtk_cell_type(ElementType t) {
         return 24;
     case ElementType::kHex20:
         return 25;
+    case ElementType::kPolyVem:
+        // VTK_POLYHEDRON = 42 needs face stream; export as VTK_CONVEX_POINT_SET=41
+        return 41;
     }
     return 0;
 }

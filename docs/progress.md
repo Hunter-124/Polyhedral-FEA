@@ -1,7 +1,7 @@
 # PROGRESS
 
 ## Current phase
-**Active development on master.** P1 baseline frozen. Product path: tet fill + snap, ZZ, VTU, CLI mesh/solve, themed GUI, OCC STEP, feature/Dörfler scaffolding.
+**Active development on master.** P1 frozen. VEM k=1 + adapt passes + feature grading + VTU/CLI/GUI live. 50 tests green.
 
 GATE 1 deliverables ready:
 - Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)
@@ -13,6 +13,8 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: VEM k=1 polyhedra (patch test + 6 RBM), adapt_passes in pipeline,
+  feature grading, CalculiX smoke peer, GUI adapt/feature controls. 50/50 tests.
 - 2026-07-10: Product batch — VTU export, ZZ recovery + Dörfler marking,
   sharp-edge features + graded sizing, limited surface snap on tet fill,
   CLI `mesh`/`solve`, GUI STEP paths + theme switch + VTU export button,

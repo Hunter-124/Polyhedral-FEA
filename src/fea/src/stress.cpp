@@ -16,6 +16,9 @@ std::vector<Stress> recover_nodal_stress(const NodalMesh& mesh, const Material& 
     std::vector<int> hits(mesh.nodes.size(), 0);
 
     for (const auto& element : mesh.elements) {
+        if (element.type == ElementType::kPolyVem) {
+            continue; // constant-strain VEM stress recovered via ZZ path later
+        }
         const auto ref = reference_nodes(element.type);
         Eigen::Matrix<double, Eigen::Dynamic, 3> x(element.nodes.size(), 3);
         for (std::size_t a = 0; a < element.nodes.size(); ++a) {

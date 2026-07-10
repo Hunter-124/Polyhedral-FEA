@@ -274,7 +274,8 @@ MshModel parse_msh(const std::string& text) {
             nodes.push_back(it->second);
         }
         if (is_volume(gtype)) {
-            model.mesh.elements.push_back({to_element_type(gtype), std::move(nodes)});
+            model.mesh.elements.push_back(
+                NodalElement{to_element_type(gtype), std::move(nodes)});
             ++volume_count;
         } else if (is_surface(gtype)) {
             model.physical_faces[physical].push_back({to_face_type(gtype), std::move(nodes)});

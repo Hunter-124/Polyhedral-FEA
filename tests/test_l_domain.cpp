@@ -70,7 +70,8 @@ NodalMesh make_l_hex_mesh(int n, double L, double w, double thickness) {
                         add_node(xa, ya, za), add_node(xb, ya, za), add_node(xb, yb, za),
                         add_node(xa, yb, za), add_node(xa, ya, zb), add_node(xb, ya, zb),
                         add_node(xb, yb, zb), add_node(xa, yb, zb)};
-                    mesh.elements.push_back({ElementType::kHex8, {c.begin(), c.end()}});
+                    mesh.elements.push_back(
+                        NodalElement{ElementType::kHex8, {c.begin(), c.end()}});
                 }
             }
         }

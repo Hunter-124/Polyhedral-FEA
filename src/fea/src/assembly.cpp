@@ -3,6 +3,7 @@
 
 #include "fea/quadrature.hpp"
 #include "fea/shape.hpp"
+#include "fea/vem.hpp"
 
 #include <Eigen/Dense>
 
@@ -49,6 +50,12 @@ Eigen::MatrixXd b_matrix(const Eigen::Matrix<double, Eigen::Dynamic, 3>& dndx) {
 
 Eigen::MatrixXd element_stiffness(const NodalMesh& mesh, const NodalElement& element,
                                   const Material& material) {
+    if (element.type == ElementType::kPolyVem) {
+        PolyCell cell;
+        cell.nodes = element.nodes;
+        cell.faces = element.faces;
+        return vem_poly_stiffness(mesh, cell, material);
+    }
     const auto x = element_coords(mesh, element);
     const auto d = material.d_matrix();
     const Eigen::Index ndof = 3 * x.rows();
@@ -107,6 +114,25 @@ Eigen::VectorXd assemble_body_load(const NodalMesh& mesh, const BodyForce& body_
     Eigen::VectorXd f =
         Eigen::VectorXd::Zero(3 * static_cast<Eigen::Index>(mesh.nodes.size()));
     for (const auto& element : mesh.elements) {
+        if (element.type == ElementType::kPolyVem) {
+            // Lumped consistent load: equal share of volume * b(centroid).
+            std::vector<Eigen::Vector3d> coords;
+            coords.reserve(element.nodes.size());
+            Eigen::Vector3d c = Eigen::Vector3d::Zero();
+            for (auto id : element.nodes) {
+                coords.push_back(mesh.nodes[id]);
+                c += mesh.nodes[id];
+            }
+            c /= static_cast<double>(element.nodes.size());
+            const double vol = poly_volume(coords, element.faces);
+            const Eigen::Vector3d b = body_force(c);
+            const Eigen::Vector3d share =
+                b * (vol / static_cast<double>(element.nodes.size()));
+            for (auto id : element.nodes) {
+                f.segment<3>(3 * static_cast<Eigen::Index>(id)) += share;
+            }
+            continue;
+        }
         const auto x = element_coords(mesh, element);
         // Elevated rule: body-force fields (e.g. manufactured solutions) are
         // often higher-degree than the stiffness integrand, and consistent

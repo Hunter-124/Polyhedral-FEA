@@ -23,7 +23,7 @@ class FeaError : public std::runtime_error {
     using std::runtime_error::runtime_error;
 };
 
-enum class ElementType : std::uint8_t { kTet4, kTet10, kHex8, kHex20 };
+enum class ElementType : std::uint8_t { kTet4, kTet10, kHex8, kHex20, kPolyVem };
 
 /// Number of nodes for an element type.
 constexpr int element_num_nodes(ElementType type) {
@@ -36,6 +36,8 @@ constexpr int element_num_nodes(ElementType type) {
         return 8;
     case ElementType::kHex20:
         return 20;
+    case ElementType::kPolyVem:
+        return 0; // variable; validated via element.nodes.size()
     }
     return 0; // unreachable
 }
@@ -50,6 +52,14 @@ constexpr int element_num_nodes(ElementType type) {
 struct NodalElement {
     ElementType type = ElementType::kTet4;
     std::vector<std::uint32_t> nodes;
+    /// Local face loops for kPolyVem (indices into `nodes`). Empty for FEM types.
+    std::vector<std::vector<std::uint32_t>> faces;
+
+    NodalElement() = default;
+    NodalElement(ElementType t, std::vector<std::uint32_t> n) : type(t), nodes(std::move(n)) {}
+    NodalElement(ElementType t, std::vector<std::uint32_t> n,
+                 std::vector<std::vector<std::uint32_t>> f)
+        : type(t), nodes(std::move(n)), faces(std::move(f)) {}
 };
 
 struct NodalMesh {

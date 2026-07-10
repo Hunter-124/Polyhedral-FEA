@@ -55,6 +55,11 @@ ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
     std::vector<Eigen::Vector3d> el_cent(n_elem);
     for (std::size_t e = 0; e < n_elem; ++e) {
         const auto& el = mesh.elements[e];
+        if (el.type == ElementType::kPolyVem) {
+            el_cent[e] = element_centroid(mesh, el);
+            el_stress[e].setZero();
+            continue;
+        }
         Eigen::Matrix<double, Eigen::Dynamic, 3> x(el.nodes.size(), 3);
         for (std::size_t a = 0; a < el.nodes.size(); ++a) {
             x.row(static_cast<Eigen::Index>(a)) = mesh.nodes[el.nodes[a]].transpose();

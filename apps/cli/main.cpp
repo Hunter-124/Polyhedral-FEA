@@ -82,8 +82,8 @@ int cmd_mesh(std::span<char*> args) {
     polymesh::fea::NodalMesh mesh;
     mesh.nodes = std::move(fill.nodes);
     for (const auto& tet : fill.tets) {
-        mesh.elements.push_back(
-            {polymesh::fea::ElementType::kTet4, {tet[0], tet[1], tet[2], tet[3]}});
+        mesh.elements.push_back(polymesh::fea::NodalElement{polymesh::fea::ElementType::kTet4,
+                                                            {tet[0], tet[1], tet[2], tet[3]}});
     }
     mesh.check_validity();
     std::printf("mesh: %zu nodes, %zu tet4, h=%.6g m\n", mesh.nodes.size(),

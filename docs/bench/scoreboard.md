@@ -1,6 +1,6 @@
 # Benchmark scoreboard
 
-_Generated 2026-07-10T06:19:25Z from `bench/results/*.json` via `bench/competitive/render_scoreboard.py`. Schema: `bench/competitive/schema.json`._
+_Generated 2026-07-10T06:57:41Z from `bench/results/*.json` via `bench/competitive/render_scoreboard.py`. Schema: `bench/competitive/schema.json`._
 
 Primary DOF-reduction baseline is PolyMesh's frozen P1 uniform path (ADR-0005). Peer solvers are audit cross-checks.
 
@@ -12,10 +12,18 @@ Primary DOF-reduction baseline is PolyMesh's frozen P1 uniform path (ADR-0005). 
 | PolyMesh | 0.1.0 | lame-cylinder | — | — | — | 0.32 | u_r_rel_err_pct | 0.0068 | `gate1-p1` | 2026-07-10T00:00:00Z |
 | PolyMesh | 0.1.0 | lame-cylinder | — | — | — | 0.32 | hoop_rel_err_pct | 1.36 | `gate1-p1` | 2026-07-10T00:00:00Z |
 | PolyMesh | 0.1.0 | timoshenko-cantilever | — | — | — | 0.45 | tip_rel_err_pct | 1.5 | `gate1-p1` | 2026-07-10T00:00:00Z |
+| calculix | This is Version 2.23 | cantilever_smoke | — | — | 0.0137 | 0.0137 | smoke_ran | 1 | `calculix-cantilever-smoke` | 2026-07-10T06:57:41.733698+00:00 |
 
 ## Accuracy vs labeled commits
 
 ASCII sparkline scales within each case/metric series (height ∝ value). SVG polyline when ≥2 numeric points. Lower is better for `*_err_*` metrics.
+
+### `cantilever_smoke` — `smoke_ran`
+
+- labels: `calculix-cantilever-smoke`
+- solvers: calculix
+- values: 1
+- sparkline: `▁`
 
 ### `kirsch-plate` — `scf_rel_err_pct`
 

@@ -51,7 +51,8 @@ NodalMesh box_hex_mesh(int nx, int ny, int nz, const Eigen::Vector3d& size) {
         for (int j = 0; j < ny; ++j) {
             for (int i = 0; i < nx; ++i) {
                 const auto c = cell_corners(i, j, k, nx, ny);
-                mesh.elements.push_back({ElementType::kHex8, {c.begin(), c.end()}});
+                mesh.elements.push_back(
+                    NodalElement{ElementType::kHex8, {c.begin(), c.end()}});
             }
         }
     }
@@ -69,11 +70,11 @@ NodalMesh box_tet_mesh(int nx, int ny, int nz, const Eigen::Vector3d& size) {
             for (int i = 0; i < nx; ++i) {
                 const auto c = cell_corners(i, j, k, nx, ny);
                 for (const auto& t : kTets) {
-                    mesh.elements.push_back(
-                        {ElementType::kTet4,
-                         {c[static_cast<std::size_t>(t[0])], c[static_cast<std::size_t>(t[1])],
-                          c[static_cast<std::size_t>(t[2])],
-                          c[static_cast<std::size_t>(t[3])]}});
+                    mesh.elements.push_back(NodalElement{ElementType::kTet4,
+                                                         {c[static_cast<std::size_t>(t[0])],
+                                                          c[static_cast<std::size_t>(t[1])],
+                                                          c[static_cast<std::size_t>(t[2])],
+                                                          c[static_cast<std::size_t>(t[3])]}});
                 }
             }
         }

@@ -118,6 +118,8 @@ std::vector<QuadraturePoint> default_rule(ElementType type) {
         return hex_rule(2);
     case ElementType::kHex20:
         return hex_rule(3);
+    case ElementType::kPolyVem:
+        throw FeaError("default_rule: kPolyVem uses VEM, not quadrature");
     }
     throw FeaError("default_rule: unknown element type");
 }

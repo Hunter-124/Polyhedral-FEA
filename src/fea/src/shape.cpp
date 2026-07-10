@@ -145,6 +145,8 @@ ShapeEval eval_shape(ElementType type, const Eigen::Vector3d& xi) {
         return eval_hex8(xi);
     case ElementType::kHex20:
         return eval_hex20(xi);
+    case ElementType::kPolyVem:
+        throw FeaError("eval_shape: kPolyVem has no isoparametric shape functions");
     }
     throw FeaError("eval_shape: unknown element type");
 }
@@ -174,6 +176,8 @@ std::vector<Eigen::Vector3d> reference_nodes(ElementType type) {
             }
         }
         return nodes;
+    case ElementType::kPolyVem:
+        throw FeaError("reference_nodes: kPolyVem has no fixed reference nodes");
     }
     throw FeaError("reference_nodes: unknown element type");
 }

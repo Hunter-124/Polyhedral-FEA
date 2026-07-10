@@ -92,12 +92,22 @@ void draw_study_panel(App& app) {
     iw::input_double("poisson's ratio", &app.setup.poissons_ratio, "%.3f");
     iw::end_group_box();
 
-    iw::begin_group_box("mesh", 56);
+    iw::begin_group_box("mesh", 110);
     double h_mm = app.setup.mesh_size * 1e3;
     if (iw::input_double("element size (mm, 0=auto)", &h_mm, "%.2f")) {
         app.setup.mesh_size = h_mm / 1e3;
     }
     ImGui::TextColored(palette.text_dim, "tet grid fill + surface snap");
+    {
+        int ap = app.setup.adapt_passes;
+        if (ImGui::SliderInt("adapt passes", &ap, 0, 3)) {
+            app.setup.adapt_passes = ap;
+        }
+        bool fg = app.setup.use_feature_grading;
+        if (ImGui::Checkbox("feature grading", &fg)) {
+            app.setup.use_feature_grading = fg;
+        }
+    }
     iw::end_group_box();
 
     iw::begin_group_box("fixtures & loads", 150);

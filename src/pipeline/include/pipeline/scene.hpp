@@ -44,8 +44,10 @@ struct RegionLoad {
 struct SimSetup {
     double youngs_modulus = 200e9; // Pa
     double poissons_ratio = 0.3;
-    double mesh_size = 0.0; // m; 0 = auto (bbox/30)
-    std::set<int> fixtures; // region ids with all DOFs fixed
+    double mesh_size = 0.0;          // m; 0 = auto (bbox/30)
+    bool use_feature_grading = true; // refine toward sharp edges
+    int adapt_passes = 0;            // extra solve→ZZ→refine mesh loops
+    std::set<int> fixtures;          // region ids with all DOFs fixed
     std::map<int, RegionLoad> loads;
 };
 

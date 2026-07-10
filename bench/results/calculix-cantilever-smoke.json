@@ -1,0 +1,18 @@
+{
+  "solver": "calculix",
+  "version": "This is Version 2.23",
+  "case_id": "cantilever_smoke",
+  "dofs": null,
+  "wall_time_s": {
+    "mesh": null,
+    "solve": 0.013698279999516672,
+    "total": 0.013698279999516672
+  },
+  "accuracy": {
+    "name": "smoke_ran",
+    "value": 1.0
+  },
+  "label": "calculix-cantilever-smoke",
+  "timestamp": "2026-07-10T06:57:41.733698+00:00",
+  "notes": "ccx smoke deck; not a calibrated accuracy benchmark"
+}

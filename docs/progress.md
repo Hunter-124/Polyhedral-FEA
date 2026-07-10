@@ -4,9 +4,9 @@
 **Master plan:** [`docs/ROADMAP.md`](ROADMAP.md) · **Agent loop:**
 [`docs/process/agent-loop.md`](process/agent-loop.md)
 
-**Active:** Track A (GUI usable) → M1 study app. Solver core (GATE 1) frozen.
-Mesh/adapt product path advancing (graded, hexpyr, seed remesh).
-F1 OpenMP + F2 CG + E1–E3 + B1/B3/B4 + C1 + D5 + E4 + G1–G4 done.
+**Active:** Track A (GUI usable) → M1 study app. 90+ tests green. Solver core
+(GATE 1) frozen. Mesh/adapt product path advancing (graded, hexpyr, seed remesh).
+F1 OpenMP + F2 CG + E1–E3 + B1/B3/B4 + C1 + C2 + D5 + E4 + G1–G4 done.
 
 GATE 1 deliverables ready:
 - Full Tier-0 + Tier-1 suite (Lamé, Timoshenko, Kirsch, Goodier, L-domain)
@@ -18,6 +18,11 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: C2 curvature + thin-wall indicators — `geom::estimate_vertex_curvature`
+  (dihedral 1-ring |H| proxy) + `estimate_local_thickness` (inward ray cast);
+  `adapt::GeometrySizing` / `make_geometry_sizing` mins sharp-edge blend, h≈c/κ,
+  h≈f·thickness; pipeline feature-grading samples geometry sizing. Catch2 thin
+  plate vs bulk + sphere vs flat. ROADMAP C2 closed.
 - 2026-07-10: F2 iterative CG solve — `SolveOptions` / `SolveMethod`
   (`kAuto`|`kDirect`|`kCG`); default auto switches to Eigen
   `ConjugateGradient` + `DiagonalPreconditioner` when free DOFs > 8000

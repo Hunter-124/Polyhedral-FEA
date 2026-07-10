@@ -70,7 +70,7 @@ and error, export VTU — without CLI.
 | ID | Task | Acceptance |
 |----|------|------------|
 | C1 | ~~Conforming hex–pyramid FE (or product path that passes hybrid patch)~~ | Done — all-pyramid expand; patch < 1e-12 |
-| C2 | Curvature + thin-wall feature indicators | Sizing reacts on fillet-like meshes |
+| C2 | ~~Curvature + thin-wall feature indicators~~ | Done — geometry sizing on κ + thickness |
 | C3 | Prism sweep regions (extrusion-detectable solids) | Prism elements in volume_mesh option |
 | C4 | VEM k=2 + MMS order check | Order matches theory ±0.2 |
 | C5 | Kirsch peak stress @ equal DOF vs uniform tet | Beats baseline (GATE 3 exit) |

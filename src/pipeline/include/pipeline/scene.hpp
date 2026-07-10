@@ -60,7 +60,7 @@ struct SimSetup {
     /// Target element size \(h\), metres. **0 = auto** via `resolve_mesh_size`
     /// (bbox extent/diagonal + sharp-edge feature density).
     double mesh_size = 0.0;
-    bool use_feature_grading = true; // refine toward sharp edges
+    bool use_feature_grading = true; // sharp edges + curvature + thin-wall sizing
     int adapt_passes = 0;            // extra solve→ZZ→refine mesh loops (max cap)
     /// Stop adapt when global ZZ relative indicator \(\eta \le\) this value.
     /// Dimensionless (energy-norm style); **0 = disabled**.

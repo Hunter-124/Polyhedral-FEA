@@ -38,3 +38,14 @@ TEST_CASE("make_feature_sizing uses sharp edges on unit cube") {
     CHECK(h_near >= 0.02 - 1e-12);
     CHECK(h_far <= 0.2 + 1e-12);
 }
+
+TEST_CASE("make_geometry_sizing factory self-contained") {
+    polymesh::geom::TriSurface s;
+    s.vertices = {{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0},
+                  {0, 0, 1}, {1, 0, 1}, {1, 1, 1}, {0, 1, 1}};
+    s.triangles = {{0, 2, 1}, {0, 3, 2}, {4, 5, 6}, {4, 6, 7}, {0, 1, 5}, {0, 5, 4},
+                   {2, 3, 7}, {2, 7, 6}, {0, 4, 7}, {0, 7, 3}, {1, 2, 6}, {1, 6, 5}};
+    const auto edges = polymesh::geom::detect_sharp_edges(s, 30.0);
+    auto field = polymesh::adapt::make_geometry_sizing(0.02, 0.2, 0.5, s, edges);
+    CHECK(field->size_at({0.0, 0.0, 0.0}) < field->size_at({0.5, 0.5, 0.5}));
+}

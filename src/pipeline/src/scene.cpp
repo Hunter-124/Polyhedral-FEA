@@ -399,12 +399,18 @@ void SolveJob::start_mesh(const Model& model, const SimSetup& setup) {
             const double h = resolved.h;
             double h_use = h;
             if (setup.use_feature_grading) {
+                // C2: curvature + thin-wall + sharp edges (geometry sizing).
                 const auto edges = geom::detect_sharp_edges(model.surface, 30.0);
-                if (!edges.empty()) {
-                    const auto field =
-                        adapt::make_feature_sizing(h * 0.5, h, 2.0 * h, model.surface, edges);
-                    h_use = std::min(h_use,
-                                     field->size_at(0.5 * (model.bbox_min + model.bbox_max)));
+                const auto field =
+                    adapt::make_geometry_sizing(h * 0.5, h, 2.0 * h, model.surface, edges);
+                h_use =
+                    std::min(h_use, field->size_at(0.5 * (model.bbox_min + model.bbox_max)));
+                for (int mask = 0; mask < 8; ++mask) {
+                    Eigen::Vector3d c;
+                    c[0] = (mask & 1) ? model.bbox_max[0] : model.bbox_min[0];
+                    c[1] = (mask & 2) ? model.bbox_max[1] : model.bbox_min[1];
+                    c[2] = (mask & 4) ? model.bbox_max[2] : model.bbox_min[2];
+                    h_use = std::min(h_use, field->size_at(c));
                 }
             }
             mesh_only_ = volume_mesh(model, h_use, setup.mesher, setup.skin_layers,
@@ -473,23 +479,20 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
             const double h = resolved.h;
             double h_use = h;
             if (setup.use_feature_grading) {
+                // A priori: geometry sizing (sharp edges + curvature + thin-wall)
+                // tightens global h so skin/transition resolve creases, fillets,
+                // and thin regions (meshers still take a scalar h).
                 const auto edges = geom::detect_sharp_edges(model.surface, 30.0);
-                if (!edges.empty()) {
-                    // A priori: tighten global h toward feature min size so the
-                    // skin / transition layers resolve creases (FeatureSizing
-                    // available for local queries; meshers still take scalar h).
-                    const auto field =
-                        adapt::make_feature_sizing(h * 0.5, h, 2.0 * h, model.surface, edges);
-                    const Eigen::Vector3d mid = 0.5 * (model.bbox_min + model.bbox_max);
-                    h_use = std::min(h_use, field->size_at(mid));
-                    // Sample bbox corners (feature-rich on CAD boxes).
-                    for (int mask = 0; mask < 8; ++mask) {
-                        Eigen::Vector3d c;
-                        c[0] = (mask & 1) ? model.bbox_max[0] : model.bbox_min[0];
-                        c[1] = (mask & 2) ? model.bbox_max[1] : model.bbox_min[1];
-                        c[2] = (mask & 4) ? model.bbox_max[2] : model.bbox_min[2];
-                        h_use = std::min(h_use, field->size_at(c));
-                    }
+                const auto field =
+                    adapt::make_geometry_sizing(h * 0.5, h, 2.0 * h, model.surface, edges);
+                const Eigen::Vector3d mid = 0.5 * (model.bbox_min + model.bbox_max);
+                h_use = std::min(h_use, field->size_at(mid));
+                for (int mask = 0; mask < 8; ++mask) {
+                    Eigen::Vector3d c;
+                    c[0] = (mask & 1) ? model.bbox_max[0] : model.bbox_min[0];
+                    c[1] = (mask & 2) ? model.bbox_max[1] : model.bbox_min[1];
+                    c[2] = (mask & 4) ? model.bbox_max[2] : model.bbox_min[2];
+                    h_use = std::min(h_use, field->size_at(c));
                 }
             }
             std::vector<Eigen::Vector3d> adapt_seeds;

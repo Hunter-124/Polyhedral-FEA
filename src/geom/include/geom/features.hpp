@@ -3,6 +3,7 @@
 
 // Discrete feature analysis on triangle surfaces (P3 a priori path).
 // Sharp edges via dihedral angle; used to seed graded sizing fields.
+// Curvature / thin-wall indicators live in geom/indicators.hpp (C2).
 
 #include "geom/tri_surface.hpp"
 

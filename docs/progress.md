@@ -23,7 +23,16 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
-<<<<<<< HEAD
+- 2026-07-11: **Unified mixed FE+VEM assembly (DAG `fe-vem-assembly`, ADR-0019
+  §1)** — hybrid zoo gains `native_poly_transitions`: each 2:1 transition
+  coarse cell is one unsplit polyhedron (`MixedCellKind::kPolyVem`) with faces
+  matched to bulk FE hex / fine 2×2×2 hex (no centroid apex, no fan slivers).
+  `VolumeMesher::kHybridVem` (CLI `hybridvem`, GUI "hybrid VEM") keeps hex as
+  FE and solves poly cells as VEM in the **same** `assemble_stiffness` K.
+  Gate: constant-strain patch (`u=Gx` on boundary) exact to 1e-9 across
+  FE/VEM interfaces — `tests/test_fe_vem_assembly.cpp` (checkerboard, tet+hex
+  VEM, native-poly fill, pipeline path). Docs: solver-core §3 expanded;
+  PROGRAM.yaml node `done`. Default `kHybrid` product-FE path unchanged.
 - 2026-07-11: **Validation part library (DAG node `part-library`)** — three
   solid fixtures under `tests/fixtures/parts/` for the test lab, each with
   `.stl` + `.case.json` + `bench/reference/<name>.json` (schemas in
@@ -35,18 +44,6 @@ GATE 0 was approved by owner on 2026-07-09.
   tip deflection 2.0153e-4 m. Geometry regenerator
   `scripts/gen_part_library.py` (does not emit truths — anti-cheat). Node
   marked `done` in `docs/dag/PROGRAM.yaml`.
-=======
-- 2026-07-11: **Unified mixed FE+VEM assembly (DAG `fe-vem-assembly`, ADR-0019
-  §1)** — hybrid zoo gains `native_poly_transitions`: each 2:1 transition
-  coarse cell is one unsplit polyhedron (`MixedCellKind::kPolyVem`) with faces
-  matched to bulk FE hex / fine 2×2×2 hex (no centroid apex, no fan slivers).
-  `VolumeMesher::kHybridVem` (CLI `hybridvem`, GUI "hybrid VEM") keeps hex as
-  FE and solves poly cells as VEM in the **same** `assemble_stiffness` K.
-  Gate: constant-strain patch (`u=Gx` on boundary) exact to 1e-9 across
-  FE/VEM interfaces — `tests/test_fe_vem_assembly.cpp` (checkerboard, tet+hex
-  VEM, native-poly fill, pipeline path). Docs: solver-core §3 expanded;
-  PROGRAM.yaml node `done`. Default `kHybrid` product-FE path unchanged.
->>>>>>> 5c8b1e3 (fe-vem-assembly: native poly VEM transitions in same K as FE hex)
 - 2026-07-10: **Conforming hierarchical assembly + MMS proof (ADR-0019 lane B)** —
   `fea/hp_assembly.{hpp,cpp}`: per-entity global DOF numbering (vertices,
   edges, faces, cell interiors) with the **minimum rule** for mixed order,

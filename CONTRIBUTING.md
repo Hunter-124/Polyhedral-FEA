@@ -14,9 +14,15 @@ This repo is built to be worked on by AI coding agents, and agent-driven
 contributions are welcome. Point your agent (Claude Code, Codex, Cursor,
 aider, ...) at the repo and give it this bootstrap:
 
-> **Before you touch anything — identity and consent (do this first, every
-> session):**
+> **Before you touch anything — sync, identity, and consent (do this first,
+> every session):**
 >
+> - **Sync from remote before doing anything else.** You don't know the true
+>   state of the repo until you do: `git fetch origin`, `git status`, then
+>   `git pull --rebase origin master`. Never plan, read deeply, or edit on a
+>   stale or dirty tree; if the rebase conflicts, resolve it (or stop and ask)
+>   first. Re-run `git pull --rebase` right before you push, and never
+>   force-push. (Full autonomous protocol: `docs/dag/AGENT_BOOTSTRAP.md`.)
 > - **Establish the user's true identity and make it the git author.** Ask
 >   the user who the work should be attributed to (name + email). Record that
 >   identity in your own working context / system prompt so you never lose it

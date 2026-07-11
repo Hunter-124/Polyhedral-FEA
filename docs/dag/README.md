@@ -3,6 +3,15 @@
 This directory is the coordination point for the adaptive-polyhedral-core
 program. Any agent or human, in any session, resumes work like this:
 
+> For autonomous / overnight agents, paste
+> [AGENT_BOOTSTRAP.md](AGENT_BOOTSTRAP.md) into the harness — it wraps this
+> protocol with the sync-first, identity, and verification steps in one block.
+
+0. **Sync from remote first — always, before anything else.** You don't know
+   the true state until you do: `git fetch origin`, `git status`, then
+   `git pull --rebase origin master`. Never plan or edit on a stale or dirty
+   tree; if the rebase conflicts, resolve it (or stop and ask) before working.
+   Re-run `git pull --rebase` right before you push. Never force-push.
 1. Read [PROGRAM.yaml](PROGRAM.yaml). Find a node whose `deps` are all
    `done` and whose `status` is `todo` (or an abandoned `in_progress` —
    check `git log` on its `scope` paths to see if someone is actually on it).

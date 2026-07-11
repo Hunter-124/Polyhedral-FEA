@@ -134,13 +134,16 @@ nodes:
 
   - id: hp-driver
     title: Joint (h, p, shape) adaptive driver
-    status: todo
+    status: done
     deps: [p-hierarchical, fe-vem-assembly]
     scope: [src/adapt/, src/pipeline/]
     note: >
-      One loop deciding locally: refine h, raise p, or change element shape,
-      from geometry (turning angle, thinness) + ZZ error + cost model.
-      This is the revolutionary bit — land it with docs + tests.
+      DONE: adapt/hp_driver.{hpp,cpp} — decide_element + drive_hp from geometry
+      (h·κ, thin-wall), ZZ/surplus smoothness, and DOF cost heuristics; shape
+      majority → mesher tendency. SolveJob adapt loop builds signals from ZZ +
+      surface κ/t and applies h seeds / p-mark / tendency. Gates in
+      tests/test_hp_driver.cpp (curved→h, smooth→p, shape flip, deterministic).
+      Docs: solver-core §4 policy.
 
   - id: solver-docs
     title: Human-readable solver-core documentation

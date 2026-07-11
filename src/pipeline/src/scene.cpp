@@ -2,6 +2,7 @@
 #include "pipeline/scene.hpp"
 
 #include "adapt/error.hpp"
+#include "adapt/hp_driver.hpp"
 #include "adapt/loop.hpp"
 #include "fea/boundary_faces.hpp"
 #include "fea/p_elevate.hpp"
@@ -1166,9 +1167,62 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 }
             };
 
-            auto maybe_p_elevate = [&](const std::vector<double>& element_eta,
+            // Joint (h,p,shape) driver policy (ADR-0019 §4). Seed fixed for
+            // deterministic product runs; campaign-fitted costs land later.
+            // h_min is set once h_adapt_floor is known (below).
+            adapt::HpDriverPolicy hp_policy;
+            hp_policy.seed = 0x48504452ull; // 'HPDR'
+            hp_policy.h_refine_factor = 0.75;
+
+            // Surface geometry attributes for a-priori h gate (once per solve).
+            std::vector<double> surf_kappa;
+            std::vector<double> surf_thickness;
+            if (setup.use_feature_grading && !model.surface.vertices.empty()) {
+                try {
+                    surf_kappa = geom::estimate_vertex_curvature(model.surface).kappa;
+                    surf_thickness =
+                        geom::estimate_local_thickness(model.surface).thickness;
+                } catch (...) {
+                    surf_kappa.clear();
+                    surf_thickness.clear();
+                }
+            }
+
+            auto build_hp_signals = [&](const std::vector<Eigen::Vector3d>& cents,
+                                        const std::vector<double>& element_eta) {
+                const auto n = element_eta.size();
+                std::vector<double> h_loc(n, h_use);
+                std::vector<double> kappa(n, 0.0);
+                std::vector<double> thick(n, 0.0);
+                std::vector<int> p_ord(n, 1);
+                for (std::size_t e = 0; e < n && e < vol.mesh.elements.size(); ++e) {
+                    const auto& el = vol.mesh.elements[e];
+                    if (el.type == fea::ElementType::kTet10 ||
+                        el.type == fea::ElementType::kHex20) {
+                        p_ord[e] = 2;
+                    }
+                    if (e < cents.size() && !surf_kappa.empty()) {
+                        const auto vi = geom::nearest_vertex_index(model.surface, cents[e]);
+                        if (vi < surf_kappa.size()) {
+                            kappa[e] = surf_kappa[vi];
+                        }
+                        if (vi < surf_thickness.size() &&
+                            geom::has_finite_thickness(surf_thickness[vi])) {
+                            thick[e] = surf_thickness[vi];
+                        }
+                    }
+                }
+                // Empty surplus → driver estimates from ZZ ranking.
+                return adapt::make_hp_signals(h_loc, kappa, thick, element_eta, {}, p_ord,
+                                              {}, {}, {}, hp_policy);
+            };
+
+            auto maybe_p_elevate = [&](const std::vector<std::size_t>& elevate_idx,
                                        std::string& note_suffix) {
-                if (!do_p_elevate || element_eta.empty()) {
+                if (!do_p_elevate || elevate_idx.empty()) {
+                    if (do_p_elevate && elevate_idx.empty()) {
+                        note_suffix = " p-elev=0";
+                    }
                     return false;
                 }
                 if (!p_elevate_allowed()) {
@@ -1176,20 +1230,32 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                                               vol.mesh.nodes.size(), kPElevateMaxNodes);
                     return false;
                 }
-                const auto smooth = adapt::mark_smooth(element_eta, 0.3);
-                if (smooth.empty()) {
+                // Only elevate still-linear zoo elements (driver may re-list p=2).
+                std::vector<std::size_t> linear;
+                linear.reserve(elevate_idx.size());
+                for (auto e : elevate_idx) {
+                    if (e >= vol.mesh.elements.size()) {
+                        continue;
+                    }
+                    const auto t = vol.mesh.elements[e].type;
+                    if (t == fea::ElementType::kTet4 || t == fea::ElementType::kHex8) {
+                        linear.push_back(e);
+                    }
+                }
+                if (linear.empty()) {
                     note_suffix = " p-elev=0";
                     return false;
                 }
                 const auto before = vol.mesh.nodes.size();
-                vol.mesh = fea::p_elevate(vol.mesh, smooth);
+                vol.mesh = fea::p_elevate(vol.mesh, linear);
                 extend_boundary_regions();
                 apply_bcs();
                 const auto counts = fea::count_element_types(vol.mesh);
                 note_suffix =
-                    std::format(" p-elev={} n+{} (tet10={} hex20={})", smooth.size(),
+                    std::format(" p-elev={} n+{} (tet10={} hex20={})", linear.size(),
                                 vol.mesh.nodes.size() - before, counts.tet10, counts.hex20);
-                set_status(std::format("p-elevate… ({} smooth → quadratic)", smooth.size()));
+                set_status(std::format("p-elevate… ({} → quadratic via hp-driver)",
+                                       linear.size()));
                 return true;
             };
 
@@ -1353,6 +1419,37 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
             const double h_grid_floor = mesh::min_h_for_cell_budget(
                 model.bbox_min, model.bbox_max, mesh::kDefaultMaxGridCells, grid_sub);
             const double h_adapt_floor = std::max(h * 0.35, h_grid_floor);
+            hp_policy.h_min = h_adapt_floor;
+
+            // Prefer mesher matching the last shape vote (mesher-tendency will own the
+            // continuous dial; here we only flip discrete product meshers when the
+            // driver majority-votes).
+            auto mesher_for_tendency = [&](VolumeMesher base,
+                                           adapt::ShapeTendency t) -> VolumeMesher {
+                switch (t) {
+                case adapt::ShapeTendency::kPreferTet:
+                    if (base == VolumeMesher::kHybrid || base == VolumeMesher::kHybridVem ||
+                        base == VolumeMesher::kHexFill || base == VolumeMesher::kHexVem) {
+                        return VolumeMesher::kGradedTet;
+                    }
+                    break;
+                case adapt::ShapeTendency::kPreferPoly:
+                    if (base == VolumeMesher::kHybrid) {
+                        return VolumeMesher::kHybridVem;
+                    }
+                    break;
+                case adapt::ShapeTendency::kPreferHex:
+                    if (base == VolumeMesher::kTetFill || base == VolumeMesher::kGradedTet) {
+                        return VolumeMesher::kHybrid;
+                    }
+                    break;
+                case adapt::ShapeTendency::kKeep:
+                default:
+                    break;
+                }
+                return base;
+            };
+            adapt::ShapeTendency last_shape_vote = adapt::ShapeTendency::kKeep;
 
             for (int pass = 0; pass <= setup.adapt_passes; ++pass) {
                 if (pass > 0) {
@@ -1366,11 +1463,12 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     if (!did_local) {
                         // Prefer graded mesher when local seeds are available so
                         // a posteriori balls can refine without global h→0.
-                        const auto mesher_adapt = (!adapt_seeds.empty() &&
-                                                   (setup.mesher == VolumeMesher::kTetFill ||
-                                                    setup.mesher == VolumeMesher::kGradedTet))
-                                                      ? VolumeMesher::kGradedTet
-                                                      : setup.mesher;
+                        auto mesher_adapt = (!adapt_seeds.empty() &&
+                                             (setup.mesher == VolumeMesher::kTetFill ||
+                                              setup.mesher == VolumeMesher::kGradedTet))
+                                                ? VolumeMesher::kGradedTet
+                                                : setup.mesher;
+                        mesher_adapt = mesher_for_tendency(mesher_adapt, last_shape_vote);
                         // Remesh: graded always uses ÷2 lattice budget (fine ≈ h/2).
                         const int remesh_sub =
                             (!adapt_seeds.empty() || mesher_adapt == VolumeMesher::kGradedTet)
@@ -1396,17 +1494,24 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 }
                 auto u_try = fea::solve_elastostatics(vol.mesh, material, bc, loads);
                 auto zz_try = fea::recover_zz(vol.mesh, material, u_try);
+                const auto cents = element_centroids(vol.mesh);
+                const auto signals = build_hp_signals(cents, zz_try.element_eta);
+                const auto hp_plan =
+                    adapt::drive_hp(signals, hp_policy, cents, h_use);
+                last_shape_vote = hp_plan.global_shape;
+                const std::string hp_note = adapt::summarize_hp_plan(hp_plan);
+
                 // D2: global η target — stop when η is small enough (0 = disabled).
                 if (setup.eta_target > 0.0 && zz_try.global_eta <= setup.eta_target) {
                     std::string pnote;
-                    if (maybe_p_elevate(zz_try.element_eta, pnote)) {
+                    if (maybe_p_elevate(hp_plan.p_mark, pnote)) {
                         u_try = fea::solve_elastostatics(vol.mesh, material, bc, loads);
                         zz_try = fea::recover_zz(vol.mesh, material, u_try);
                     }
                     SolveResult r;
                     r.mesh_note = std::format(
-                        "{} | eta-target stop η={:.4g}≤{:.4g} pass={}/{} h={:.4g}{}",
-                        vol.mesher_note, zz_try.global_eta, setup.eta_target, pass,
+                        "{} | {} | eta-target stop η={:.4g}≤{:.4g} pass={}/{} h={:.4g}{}",
+                        vol.mesher_note, hp_note, zz_try.global_eta, setup.eta_target, pass,
                         setup.adapt_passes, h_use, pnote);
                     r.volume_mesh = std::move(vol.mesh);
                     r.boundary_quads = std::move(vol.boundary_quads);
@@ -1415,39 +1520,62 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     break;
                 }
                 if (pass < setup.adapt_passes) {
-                    const auto cents = element_centroids(vol.mesh);
-                    const auto sug = adapt::suggest_refine(cents, zz_try.element_eta, h_use,
-                                                           0.3, 0.75, h_adapt_floor);
-                    if (sug.n_marked == 0 && sug.h_next >= h_use * 0.98) {
+                    const auto& sug = hp_plan.h_suggestion;
+                    // Early stop only when neither h nor p wants work.
+                    if (sug.n_marked == 0 && sug.h_next >= h_use * 0.98 &&
+                        hp_plan.p_mark.empty()) {
                         std::string pnote;
-                        if (maybe_p_elevate(zz_try.element_eta, pnote)) {
+                        // Still try mark_smooth fallback if driver was silent on p
+                        // but residual remains (legacy complement path).
+                        auto p_idx = hp_plan.p_mark;
+                        if (p_idx.empty()) {
+                            p_idx = adapt::mark_smooth(zz_try.element_eta, 0.3);
+                        }
+                        if (maybe_p_elevate(p_idx, pnote)) {
                             u_try = fea::solve_elastostatics(vol.mesh, material, bc, loads);
                             zz_try = fea::recover_zz(vol.mesh, material, u_try);
                         }
                         SolveResult r;
-                        r.mesh_note = std::format("{} | adapt early-stop h={:.4g}{}",
-                                                  vol.mesher_note, h_use, pnote);
+                        r.mesh_note = std::format("{} | {} | adapt early-stop h={:.4g}{}",
+                                                  vol.mesher_note, hp_note, h_use, pnote);
                         r.volume_mesh = std::move(vol.mesh);
                         r.boundary_quads = std::move(vol.boundary_quads);
                         fill_result_fields(r, zz_try, u_try);
                         result_ = std::move(r);
                         break;
                     }
+                    // Mid-loop p-raise when driver prefers p and marks few h cells.
+                    if (!hp_plan.p_mark.empty() &&
+                        hp_plan.h_mark.size() * 4 < hp_plan.p_mark.size()) {
+                        std::string pnote;
+                        if (maybe_p_elevate(hp_plan.p_mark, pnote)) {
+                            u_try = fea::solve_elastostatics(vol.mesh, material, bc, loads);
+                            zz_try = fea::recover_zz(vol.mesh, material, u_try);
+                            vol.mesher_note =
+                                std::format("{} | mid-loop{}", vol.mesher_note, pnote);
+                        }
+                    }
                     h_use = std::max(sug.h_next, h_adapt_floor);
                     adapt_seeds = sug.refine_seeds;
                     adapt_seed_band = sug.seed_band;
-                    adapt_marked = adapt::dorfler_mark(zz_try.element_eta, 0.3);
+                    adapt_marked = hp_plan.h_mark.empty()
+                                       ? adapt::dorfler_mark(zz_try.element_eta, 0.3)
+                                       : hp_plan.h_mark;
                     continue;
                 }
                 std::string pnote;
-                if (maybe_p_elevate(zz_try.element_eta, pnote)) {
+                auto p_idx = hp_plan.p_mark;
+                if (p_idx.empty() && do_p_elevate) {
+                    p_idx = adapt::mark_smooth(zz_try.element_eta, 0.3);
+                }
+                if (maybe_p_elevate(p_idx, pnote)) {
                     u_try = fea::solve_elastostatics(vol.mesh, material, bc, loads);
                     zz_try = fea::recover_zz(vol.mesh, material, u_try);
                 }
                 SolveResult r;
-                r.mesh_note =
-                    std::format("{} | adapt_passes={} h={:.4g} seeds={}{}", vol.mesher_note,
-                                setup.adapt_passes, h_use, adapt_seeds.size(), pnote);
+                r.mesh_note = std::format(
+                    "{} | {} | adapt_passes={} h={:.4g} seeds={}{}", vol.mesher_note,
+                    hp_note, setup.adapt_passes, h_use, adapt_seeds.size(), pnote);
                 r.volume_mesh = std::move(vol.mesh);
                 r.boundary_quads = std::move(vol.boundary_quads);
                 fill_result_fields(r, zz_try, u_try);

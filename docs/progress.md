@@ -28,6 +28,16 @@ GATE 0 was approved by owner on 2026-07-09.
   checkpoint, results.jsonl, progress.json; anti-cheat reference load). Smoke
   campaign green on smoke_bar (hex rel_err≈3.7%, hybrid_zoo ≈14.8%). GUI:
   Test Lab | Sim Setup | viewport | Results; ImGui-free parsers + ProcessRunner.
+- 2026-07-11: **Joint (h,p,shape) adaptive driver (DAG `hp-driver`, ADR-0019
+  §4)** — `adapt/hp_driver.{hpp,cpp}`: per-element utilities from geometry
+  turning angle / thin-wall (a priori → h), ZZ + hierarchical surplus
+  smoothness (→ p), and shape fitness + DOF cost heuristics (→ shape
+  tendency). `drive_hp` emits h/p/shape marks, seeded `AdaptSuggestion`, and
+  global mesher tendency. `SolveJob` adapt loop builds signals from ZZ η +
+  surface κ/thickness, applies mid-loop p when p dominates, and can flip
+  `kHybrid`→`kHybridVem` / tet↔hex on majority shape vote. Gates:
+  `tests/test_hp_driver.cpp` (curved→h, smooth→p, shape flip, deterministic).
+  Cost weights are v1 heuristics; campaign calibration is `feedback-loop`.
 - 2026-07-11: **Hierarchical p≥3 (node `p-hierarchical-highp`)** —
   multi-mode entity DOFs; tet edge sign (−1)^m on reversed edges; hex
   quad-face dihedral transform; tet k≥3 face/interior kernels (p≤4); hex

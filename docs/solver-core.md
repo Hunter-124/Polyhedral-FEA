@@ -148,7 +148,7 @@ explicitly when you want unsplit VEM transitions.
 
 ## 4. The driver: choosing (h, p, shape) together
 
-(Implementation target: `src/adapt/`, node `hp-driver`; see ADR-0019 §4.)
+(Implementation: `src/adapt/hp_driver.hpp`, node `hp-driver`; see ADR-0019 §4.)
 
 The adaptive loop looks at three signals and turns the matching knob:
 
@@ -165,6 +165,28 @@ truth, tagged by the geometric conditions of the part. Over many runs the
 driver learns *which knob actually pays off under which conditions* instead of
 applying a fixed rule everywhere. That is the "recursive improvement" loop:
 measure, update the defaults, measure again.
+
+### Decision policy (v1, `adapt::drive_hp`)
+
+Per element the driver scores three utilities (benefit / relative DOF cost)
+and picks the max; ties break **h > p > shape**:
+
+1. **Geometry gate.** Turning angle \(h\cdot\kappa > \theta\) (default
+   \(\theta = 15^\circ\)) or thin-wall \(h > f_t\, t\) forces **h** — p is
+   zeroed so a faceted boundary cannot “win” by surplus alone.
+2. **Smoothness.** On flat cells, large hierarchical surplus / η (or the ZZ
+   ranking estimate from `estimate_surplus_from_zz`) raises **p** when
+   \(p < p_{\max}\). Tiny surplus with large η marks non-smooth residuals for
+   **h**.
+3. **Shape.** Decisive fitness (hex / tet / native-poly) with residual error
+   casts a shape vote; majority vote becomes `global_shape` for the next
+   remesh (`kHybrid`→`kHybridVem` on poly, etc.). Cost weights default to
+   \(c_h{=}8\), \(c_p{=}2.5{+}0.4p\), \(c_{\mathrm{shape}}{=}3.5\) until
+   `feedback-loop` calibrates them from campaigns.
+
+Product path: `SolveJob` builds signals from ZZ η + surface κ/thickness and
+calls `drive_hp` each adapt pass (`tests/test_hp_driver.cpp` locks the
+synthetic curved→h / smooth→p / shape-flip cases).
 
 ### Why "branch trimming" matters
 The space of possible settings is enormous (shape × order × refinement
@@ -193,6 +215,9 @@ Start here and follow the includes:
   `VolumeMesher::kHybridVem` in `src/pipeline/scene.hpp` — unsplit transition
   cells as VEM PolyCells next to FE hex.
 - `tests/test_fe_vem_assembly.cpp` — FE/VEM interface constant-strain gate.
+- `src/adapt/hp_driver.hpp` — joint (h, p, shape) decisions; `drive_hp` plan
+  feeds seeds, p-elevate indices, and mesher tendency in `pipeline/scene.cpp`.
+- `tests/test_hp_driver.cpp` — synthetic indicator gates for the driver.
 - `docs/decisions/0019-mixed-fe-vem-adaptive-order-core.md` — the *why* behind
   every choice above, and the staging plan.
 - `docs/decisions/0012-hybrid-graded-tet.md` — the meshers that produce the

@@ -45,6 +45,7 @@ add_executable(polymesh_tests
     test_mixed_fill.cpp
     test_octa_fill.cpp
     test_p_elevate.cpp
+    test_hp_driver.cpp
     test_d6_bench_smoke.cpp
     testlab_selfcheck.cpp
 

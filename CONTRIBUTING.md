@@ -14,6 +14,25 @@ This repo is built to be worked on by AI coding agents, and agent-driven
 contributions are welcome. Point your agent (Claude Code, Codex, Cursor,
 aider, ...) at the repo and give it this bootstrap:
 
+> **Before you touch anything — identity and consent (do this first, every
+> session):**
+>
+> - **Establish the user's true identity and make it the git author.** Ask
+>   the user who the work should be attributed to (name + email). Record that
+>   identity in your own working context / system prompt so you never lose it
+>   mid-session, and set it in *this repository's* active git config:
+>   `git config user.name "<name>"` and `git config user.email "<email>"`.
+>   Then **verify** it with `git config user.name && git config user.email`
+>   before your first commit — never inherit a stale, generic, or
+>   session-default identity, and never guess an email. Commit and push only
+>   under that verified identity, with zero AI-attribution trailers (see §4).
+> - **Double-check with the user before doing anything.** Before you create,
+>   edit, delete, or push anything, state plainly what you are about to do and
+>   its scope, and get an explicit go-ahead. Do not run ahead on assumptions.
+>   Anything hard to reverse — pushing, rewriting history, force-pushing,
+>   deleting files — requires confirmation *every* time; approval for one
+>   step is not approval for the next.
+
 1. **Read the map**: this file, then `CLAUDE.md` (agent house rules — any
    agent should follow it, not just Claude).
 2. **Ask the knowledge graph before grepping**: `graphify query "<question>"`

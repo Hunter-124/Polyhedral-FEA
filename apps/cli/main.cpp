@@ -30,10 +30,11 @@ int usage() {
                "commands:\n"
                "  check <file.stl|.step>     validate surface geometry\n"
                "  mesh  <file> [-h m] [-o out.vtu] [--mesher name] [--skin n] [--feature]\n"
+               "              [--element-tendency t]\n"
                "                             volume mesh; optional VTU write\n"
                "  solve <file> -o out.vtu [-h m] [-E Pa] [-nu r]\n"
                "              [--mesher name] [--skin n] [--feature] [--adapt n]\n"
-               "              [--eta-target η] [--p-elevate]\n"
+               "              [--eta-target η] [--p-elevate] [--element-tendency t]\n"
                "                             mesh + cantilever-style BCs + VTU\n"
                "                             (fix min-x face nodes, load +Fy on max-x)\n"
                "  backend                    print compute backend + OpenMP/opt summary\n"
@@ -44,6 +45,7 @@ int usage() {
                "              octa|octahedral (experimental)\n"
                "--skin n: graded-tet fine skin layers (default 2)\n"
                "--feature: refine graded mesh near sharp edges (default off in CLI)\n"
+               "--element-tendency t: shape dial in [-1,+1] (hex↔fan hybrid↔poly VEM↔tet)\n"
                "--adapt n: ZZ→Dörfler remesh passes (local seeds on graded path)\n"
                "--eta-target η: stop adapt when global ZZ η ≤ η (0=off; needs --adapt)\n"
                "--p-elevate: promote smooth (non-Dörfler) tet4/hex8 → tet10/hex20\n"
@@ -113,6 +115,7 @@ int cmd_mesh(std::span<char*> args) {
     auto mesher = polymesh::pipeline::VolumeMesher::kHybrid;
     int skin = 2;
     bool feature = false;
+    double element_tendency = 0.0;
     for (std::size_t i = 3; i < args.size(); ++i) {
         if (std::strcmp(args[i], "-h") == 0 && i + 1 < args.size()) {
             h = std::atof(args[++i]);
@@ -127,6 +130,8 @@ int cmd_mesh(std::span<char*> args) {
             }
         } else if (std::strcmp(args[i], "--feature") == 0) {
             feature = true;
+        } else if (std::strcmp(args[i], "--element-tendency") == 0 && i + 1 < args.size()) {
+            element_tendency = std::atof(args[++i]);
         } else {
             return usage();
         }
@@ -134,7 +139,8 @@ int cmd_mesh(std::span<char*> args) {
     const auto model = polymesh::pipeline::Model::load(path);
     const auto resolved = polymesh::pipeline::resolve_mesh_size(model, h);
     h = resolved.h;
-    auto vol = polymesh::pipeline::volume_mesh(model, h, mesher, skin, feature);
+    auto vol = polymesh::pipeline::volume_mesh(model, h, mesher, skin, feature, {}, 0.0,
+                                               element_tendency);
     vol.mesh.check_validity();
     std::printf("mesh: %zu nodes, %zu elems, h=%.6g m\n%s\n%s\n", vol.mesh.nodes.size(),
                 vol.mesh.elements.size(), h, resolved.note.c_str(), vol.mesher_note.c_str());
@@ -163,6 +169,7 @@ int cmd_solve(std::span<char*> args) {
     int adapt_passes = 0;
     double eta_target = 0.0;
     bool p_elevate = false;
+    double element_tendency = 0.0;
     for (std::size_t i = 3; i < args.size(); ++i) {
         if (std::strcmp(args[i], "-h") == 0 && i + 1 < args.size()) {
             h = std::atof(args[++i]);
@@ -181,6 +188,8 @@ int cmd_solve(std::span<char*> args) {
             }
         } else if (std::strcmp(args[i], "--feature") == 0) {
             feature = true;
+        } else if (std::strcmp(args[i], "--element-tendency") == 0 && i + 1 < args.size()) {
+            element_tendency = std::atof(args[++i]);
         } else if (std::strcmp(args[i], "--adapt") == 0 && i + 1 < args.size()) {
             adapt_passes = std::atoi(args[++i]);
             if (adapt_passes < 0) {
@@ -215,7 +224,7 @@ int cmd_solve(std::span<char*> args) {
     double seed_band = 0.0;
     auto mesh_now = [&](polymesh::pipeline::VolumeMesher m) {
         return polymesh::pipeline::volume_mesh(model, h_use, m, skin, feature, seeds,
-                                               seed_band);
+                                               seed_band, element_tendency);
     };
     auto vol = mesh_now(mesher);
     vol.mesh.check_validity();

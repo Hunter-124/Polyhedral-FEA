@@ -125,12 +125,15 @@ nodes:
 
   - id: mesher-tendency
     title: Element-tendency knob in the meshers (hex/tet/poly preference)
-    status: todo
+    status: done
     deps: [fe-vem-assembly]
     scope: [src/mesh/, src/pipeline/]
     note: >
-      Continuous dial the tuner can sweep: bulk shape preference, transition
-      style (fan-split vs native poly), skin treatment.
+      DONE: SimSetup.element_tendency ∈ [-1,+1] + volume_mesh param +
+      resolve_element_tendency(). Hybrid-family map: t≤-0.5 hex fill;
+      (-0.5,0.25] fan-split kHybrid; (0.25,0.75] kHybridVem native-poly;
+      t>0.75 graded tet. t=0 preserves base mesher. Skin thins on mild hex
+      bias. CLI --element-tendency. Tests: test_element_tendency.cpp.
 
   - id: hp-driver
     title: Joint (h, p, shape) adaptive driver

@@ -140,9 +140,20 @@ first-class element in the same solve.
   fill; full pipeline hybrid-VEM mesh).
 
 The default `kHybrid` mesher still uses fan transitions + all-pyramid expand
-for the hardened product-FE scorecard. `mesher-tendency` will expose the
-fan-split vs native-poly dial for the tuner; until then pick `kHybridVem`
-explicitly when you want unsplit VEM transitions.
+for the hardened product-FE scorecard. The continuous dial
+`SimSetup::element_tendency` ∈ [-1, +1] (node `mesher-tendency`) remaps
+hybrid / hex / tet families via `resolve_element_tendency`:
+
+| tendency | Effective path |
+|---|---|
+| ≤ −0.5 | `kHexFill` (hex bulk) |
+| (−0.5, +0.25] | `kHybrid` fan-split product FE |
+| (+0.25, +0.75] | `kHybridVem` native-poly VEM transitions |
+| > +0.75 | `kGradedTet` |
+
+Exact `0` preserves the requested base mesher (so default hybrid and explicit
+`kHybridVem` stay put). CLI: `--element-tendency t`. Campaign grid key:
+`element_tendency`.
 
 ---
 

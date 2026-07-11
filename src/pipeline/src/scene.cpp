@@ -269,11 +269,101 @@ ResolvedMeshSize resolve_mesh_size(const Model& model, double requested_h,
     return out;
 }
 
+ElementTendencyPlan resolve_element_tendency(VolumeMesher base, double tendency,
+                                             int skin_layers) {
+    ElementTendencyPlan plan;
+    plan.tendency = std::clamp(tendency, -1.0, 1.0);
+    plan.skin_layers = std::max(1, skin_layers);
+    plan.mesher = base;
+    plan.native_poly_transitions = (base == VolumeMesher::kHybridVem);
+    plan.remapped = false;
+
+    const auto label_for = [](VolumeMesher m) -> const char* {
+        switch (m) {
+        case VolumeMesher::kHexFill:
+            return "hex";
+        case VolumeMesher::kHexVem:
+            return "hex-vem";
+        case VolumeMesher::kHybrid:
+            return "hybrid-fan";
+        case VolumeMesher::kHybridVem:
+            return "hybrid-vem";
+        case VolumeMesher::kGradedTet:
+            return "graded-tet";
+        case VolumeMesher::kTetFill:
+            return "tet";
+        case VolumeMesher::kHexPyramid:
+            return "hex-pyramid";
+        case VolumeMesher::kPrismSweep:
+            return "prism";
+        case VolumeMesher::kOctahedral:
+            return "octahedral";
+        }
+        return "unknown";
+    };
+    plan.label = label_for(base);
+
+    // Exact zero (campaign default / SimSetup default) preserves the base
+    // mesher so kHybrid and kHybridVem product paths stay unchanged.
+    if (std::abs(plan.tendency) < 1e-12) {
+        return plan;
+    }
+
+    const auto is_hybrid_family = [](VolumeMesher m) {
+        return m == VolumeMesher::kHybrid || m == VolumeMesher::kHybridVem;
+    };
+    const auto is_hex_family = [](VolumeMesher m) {
+        return m == VolumeMesher::kHexFill || m == VolumeMesher::kHexVem;
+    };
+    const auto is_tet_family = [](VolumeMesher m) {
+        return m == VolumeMesher::kTetFill || m == VolumeMesher::kGradedTet;
+    };
+
+    // Shape dial for hybrid / hex / tet families. Prism / octa / hexpyr keep
+    // their explicit base (no continuous remap yet).
+    VolumeMesher effective = base;
+    if (is_hybrid_family(base) || is_hex_family(base) || is_tet_family(base)) {
+        if (plan.tendency <= -0.5) {
+            effective = VolumeMesher::kHexFill;
+        } else if (plan.tendency <= 0.25) {
+            effective = VolumeMesher::kHybrid;
+        } else if (plan.tendency <= 0.75) {
+            effective = VolumeMesher::kHybridVem;
+        } else {
+            effective = VolumeMesher::kGradedTet;
+        }
+    }
+
+    plan.mesher = effective;
+    plan.native_poly_transitions = (effective == VolumeMesher::kHybridVem);
+    plan.label = label_for(effective);
+    plan.remapped = (effective != base);
+
+    // Skin treatment: hex bias on hybrid → thinner free-surface skin (more
+    // bulk hex); strong tet bias → one extra graded skin hop.
+    if (effective == VolumeMesher::kHybrid && plan.tendency < 0.0) {
+        const int thinned = std::max(1, skin_layers - 1);
+        if (thinned != plan.skin_layers) {
+            plan.skin_layers = thinned;
+            plan.remapped = true;
+        }
+    } else if (effective == VolumeMesher::kGradedTet && plan.tendency > 0.75) {
+        plan.skin_layers = skin_layers + 1;
+        plan.remapped = true;
+    }
+
+    return plan;
+}
+
 VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                              int skin_layers, bool feature_refine,
-                             std::span<const Eigen::Vector3d> refine_seeds, double seed_band) {
+                             std::span<const Eigen::Vector3d> refine_seeds, double seed_band,
+                             double element_tendency) {
     VolumeMeshOutput out;
     double fill_h = h;
+    const auto tendency_plan = resolve_element_tendency(mesher, element_tendency, skin_layers);
+    mesher = tendency_plan.mesher;
+    skin_layers = tendency_plan.skin_layers;
     // Per-cell turning-angle refinement threshold (feature_refine paths): refine
     // where the surface turns more than this per bulk cell (h·κ). Angle-based,
     // so gentle curves / big bores stay coarse and flats never refine — replaces
@@ -905,6 +995,12 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             out.boundary_node_region[node] = best_region;
         }
     }
+    if (std::abs(tendency_plan.tendency) >= 1e-12 || tendency_plan.remapped) {
+        out.mesher_note = std::format(
+            "{} | element_tendency={:.3g}→{}{}", out.mesher_note, tendency_plan.tendency,
+            tendency_plan.label,
+            tendency_plan.remapped ? " (remapped)" : "");
+    }
     out.mesh.check_validity();
     return out;
 }
@@ -954,7 +1050,8 @@ void SolveJob::start_mesh(const Model& model, const SimSetup& setup) {
             const double h = resolved.h;
             set_status(std::format("meshing… ({}, h={:.4g} m)", resolved.note, h));
             mesh_only_ = volume_mesh(model, h, setup.mesher, setup.skin_layers,
-                                     setup.use_feature_grading);
+                                     setup.use_feature_grading, {}, 0.0,
+                                     setup.element_tendency);
             mesh_only_.mesher_note =
                 std::format("{} | {}", resolved.note, mesh_only_.mesher_note);
             set_status(std::format("mesh ready — {} elems, {} nodes | {}",
@@ -1025,7 +1122,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
             // D4: Dörfler element indices for optional local LEB before remesh.
             std::vector<std::size_t> adapt_marked;
             auto vol = volume_mesh(model, h_use, setup.mesher, setup.skin_layers,
-                                   setup.use_feature_grading, adapt_seeds, adapt_seed_band);
+                                   setup.use_feature_grading, adapt_seeds, adapt_seed_band,
+                                   setup.element_tendency);
             // Keep resolved-h note on mesher_note for solve mesh_note (GUI/CLI).
             vol.mesher_note = std::format("{} | {}", resolved.note, vol.mesher_note);
             set_status(std::format("solving… ({} elements, {} nodes)",
@@ -1480,7 +1578,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                                                 mesh::kDefaultMaxGridCells, remesh_sub));
                         vol = volume_mesh(model, h_remesh, mesher_adapt, setup.skin_layers,
                                           setup.use_feature_grading, adapt_seeds,
-                                          adapt_seed_band);
+                                          adapt_seed_band, setup.element_tendency);
                         h_use = std::max(h_use, h_remesh);
                     }
                     apply_bcs();

@@ -38,6 +38,13 @@ GATE 0 was approved by owner on 2026-07-09.
   `kHybrid`→`kHybridVem` / tet↔hex on majority shape vote. Gates:
   `tests/test_hp_driver.cpp` (curved→h, smooth→p, shape flip, deterministic).
   Cost weights are v1 heuristics; campaign calibration is `feedback-loop`.
+- 2026-07-11: **Element-tendency dial (DAG `mesher-tendency`)** —
+  continuous `element_tendency ∈ [-1,+1]` on `SimSetup` and `volume_mesh`
+  (`resolve_element_tendency`). Hybrid-family map: hex fill / fan-split
+  `kHybrid` / native-poly `kHybridVem` / graded tet; t=0 preserves base;
+  mild hex bias thins skin. CLI `--element-tendency`. Gate:
+  `tests/test_element_tendency.cpp` (resolve thresholds + cell-kind mix on
+  unit box with seed transitions). Campaign grid key is live.
 - 2026-07-11: **Hierarchical p≥3 (node `p-hierarchical-highp`)** —
   multi-mode entity DOFs; tet edge sign (−1)^m on reversed edges; hex
   quad-face dihedral transform; tet k≥3 face/interior kernels (p≤4); hex

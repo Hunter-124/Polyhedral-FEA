@@ -1,0 +1,135 @@
+# Polyhedral-FEA adaptive-core program DAG.
+# THE pick-up-anywhere artifact: any agent/session resumes by reading this
+# file, claiming a node whose deps are all `done`, setting it `in_progress`,
+# and committing the status flip with the work. Keep statuses honest —
+# `done` means built, tested, and documented, not "mostly there".
+#
+# Statuses: todo | in_progress | done | blocked (note why in `note:`)
+# Parallel lanes: nodes with disjoint `scope:` paths may run concurrently.
+# See interfaces.md for the normative file schemas nodes communicate through.
+
+program: adaptive-polyhedral-core
+goal: >
+  Adaptive order + adaptive size + adaptive element shape working together
+  (tet/hex/pyramid/arbitrary polyhedra in one part, mixed FE+VEM, arbitrary-p
+  hierarchical basis), with an automated test lab that measures mesh-gen
+  time / accuracy / solve time per geometric condition and recursively feeds
+  the best settings back into the defaults. Quality ahead of all else.
+
+nodes:
+  # ── Lane 0: coordination ────────────────────────────────────────────────
+  - id: dag-workflow
+    title: DAG workflow + normative interface schemas
+    status: done
+    deps: []
+    scope: [docs/dag/]
+    note: This file, README.md, interfaces.md.
+
+  # ── Lane A: test lab (scaffolding) ──────────────────────────────────────
+  - id: testlab-harness
+    title: Campaign runner with pause/play, resource caps, branch trimming
+    status: in_progress
+    deps: [dag-workflow]
+    scope: [apps/testlab/, bench/campaigns/]
+    note: >
+      CLI `polymesh_testlab run|resume|pause-status`. Successive-halving
+      trimming across fidelity tiers. SIGINT-safe checkpointing. Respects
+      anti-cheat: reads truth only from bench/reference/.
+
+  - id: part-library
+    title: Validation part library + hand-calculation references
+    status: in_progress
+    deps: [dag-workflow]
+    scope: [tests/fixtures/parts/, bench/reference/, docs/validation/]
+    note: >
+      Committed fixture parts + load cases + analytic hand-calc truths with
+      derivations. Every case documents formula, units, tolerance.
+
+  - id: gui-testlab
+    title: GUI panel rebuild (Test Lab / Sim Setup / Results)
+    status: in_progress
+    deps: [dag-workflow]
+    scope: [apps/gui/]
+    note: >
+      Keep GLFW+ImGui+Interwebz-v2 chrome. Talks to testlab only through
+      the interfaces.md file formats (campaign/checkpoint/results), so it
+      does not depend on testlab code landing first.
+
+  - id: campaign-1
+    title: First full settings campaign on the part library
+    status: todo
+    deps: [testlab-harness, part-library]
+    scope: [bench/campaigns/]
+    note: >
+      No stone unturned: full mesher option grid at tier 0, trimmed
+      aggressively at higher tiers. Output = Pareto frontier per geometric
+      condition class.
+
+  # ── Lane B: solver core (lead) ──────────────────────────────────────────
+  - id: adr-0019
+    title: "ADR-0019: mixed FE+VEM adaptive-order core"
+    status: in_progress
+    deps: [dag-workflow]
+    scope: [docs/decisions/]
+
+  - id: p-hierarchical
+    title: Hierarchical arbitrary-p basis (integrated Legendre) + MMS tests
+    status: todo
+    deps: [adr-0019]
+    scope: [src/fea/]
+    note: >
+      Per-entity (vertex/edge/face/interior) modes on tet + hex; min-rule
+      conforming transitions between neighbouring orders; MMS convergence
+      p=1..4 must match theory before `done`.
+
+  - id: fe-vem-assembly
+    title: Unified mixed FE+VEM assembly (polyhedra unsplit)
+    status: todo
+    deps: [adr-0019]
+    scope: [src/fea/, src/pipeline/]
+    note: >
+      Hybrid zoo transition cells stay native polyhedra solved as VEM
+      PolyCells in the same K as FE cells. Patch test across the FE/VEM
+      interface is the gate.
+
+  - id: mesher-tendency
+    title: Element-tendency knob in the meshers (hex/tet/poly preference)
+    status: todo
+    deps: [fe-vem-assembly]
+    scope: [src/mesh/, src/pipeline/]
+    note: >
+      Continuous dial the tuner can sweep: bulk shape preference, transition
+      style (fan-split vs native poly), skin treatment.
+
+  - id: hp-driver
+    title: Joint (h, p, shape) adaptive driver
+    status: todo
+    deps: [p-hierarchical, fe-vem-assembly]
+    scope: [src/adapt/, src/pipeline/]
+    note: >
+      One loop deciding locally: refine h, raise p, or change element shape,
+      from geometry (turning angle, thinness) + ZZ error + cost model.
+      This is the revolutionary bit — land it with docs + tests.
+
+  - id: solver-docs
+    title: Human-readable solver-core documentation
+    status: todo
+    deps: [p-hierarchical, fe-vem-assembly]
+    scope: [docs/]
+
+  # ── Lane C: recursive improvement (repeats) ─────────────────────────────
+  - id: feedback-loop
+    title: Feed campaign results back into defaults (repeatable node)
+    status: todo
+    deps: [campaign-1, hp-driver]
+    scope: [src/pipeline/, bench/campaigns/, docs/]
+    note: >
+      Analyse accumulated results.jsonl -> update default knob values +
+      per-condition presets -> rerun affected campaign slices -> document
+      deltas. Re-enter this node every time new sim data accumulates.
+
+  - id: gui-sim-controls
+    title: GUI live solve progress + pause/play + resource caps wired
+    status: todo
+    deps: [gui-testlab, testlab-harness]
+    scope: [apps/gui/]

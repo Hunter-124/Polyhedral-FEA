@@ -23,6 +23,17 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-11: **Validation part library (DAG node `part-library`)** — three
+  solid fixtures under `tests/fixtures/parts/` for the test lab, each with
+  `.stl` + `.case.json` + `bench/reference/<name>.json` (schemas in
+  `docs/dag/interfaces.md` §4–§5) and closed-form derivations in
+  `docs/validation/hand-calcs.md`. **smoke_bar** (0.1×0.01×0.01 m, E=2e11,
+  ν=0.3, clamp x≈0, end traction 1e6 Pa): σ_vm=1e6 Pa, tip ux=5e-7 m.
+  **plate_hole** (Kirsch plate, a=0.01 m, remote tension 1e6 Pa): SCF=3.0.
+  **cantilever** (1.0×0.1×0.1 m, tip traction −1e5 Pa → P=1 kN): Timoshenko
+  tip deflection 2.0153e-4 m. Geometry regenerator
+  `scripts/gen_part_library.py` (does not emit truths — anti-cheat). Node
+  marked `done` in `docs/dag/PROGRAM.yaml`.
 - 2026-07-10: **Conforming hierarchical assembly + MMS proof (ADR-0019 lane B)** —
   `fea/hp_assembly.{hpp,cpp}`: per-entity global DOF numbering (vertices,
   edges, faces, cell interiors) with the **minimum rule** for mixed order,

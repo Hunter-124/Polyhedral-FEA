@@ -1,0 +1,18 @@
+{
+  "part": "plate_hole",
+  "geometry": "tests/fixtures/parts/plate_hole.stl",
+  "material": { "E": 2.1e11, "nu": 0.3, "rho": 7850 },
+  "bcs": [
+    {
+      "select": { "box": [[-1e9, -1e9, -1e9], [-0.099, 1e9, 1e9]] },
+      "fix": [true, true, true]
+    }
+  ],
+  "loads": [
+    {
+      "select": { "box": [[0.099, -1e9, -1e9], [1e9, 1e9, 1e9]] },
+      "traction": [1.0e6, 0.0, 0.0]
+    }
+  ],
+  "reference": "bench/reference/plate_hole.json"
+}

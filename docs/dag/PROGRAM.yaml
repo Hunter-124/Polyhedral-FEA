@@ -38,12 +38,17 @@ nodes:
 
   - id: part-library
     title: Validation part library + hand-calculation references
-    status: in_progress
+    status: done
     deps: [dag-workflow]
     scope: [tests/fixtures/parts/, bench/reference/, docs/validation/]
     note: >
-      Committed fixture parts + load cases + analytic hand-calc truths with
-      derivations. Every case documents formula, units, tolerance.
+      DONE: three solid fixtures (smoke_bar, plate_hole, cantilever) each with
+      .stl + .case.json + bench/reference/<name>.json (interfaces.md §4–§5) and
+      full derivations in docs/validation/hand-calcs.md. smoke_bar: uniaxial
+      bar σ_vm=1e6 Pa, tip ux=5e-7 m. plate_hole: Kirsch SCF=3.0.
+      cantilever: Timoshenko tip deflection 2.0153e-4 m. Generator
+      scripts/gen_part_library.py (geometry only; truths hand-authored).
+      Anti-cheat: truths only in bench/reference/ and docs/validation/.
 
   - id: gui-testlab
     title: GUI panel rebuild (Test Lab / Sim Setup / Results)

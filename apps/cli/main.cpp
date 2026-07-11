@@ -39,8 +39,9 @@ int usage() {
                "  backend                    print compute backend + OpenMP/opt summary\n"
                "\n"
                "mesh size: omit -h (or -h 0) for auto h0 from bbox + sharp-edge density\n"
-               "mesher names: hybrid|zoo (default), tet, hex, hexvem|vem, graded,\n"
-               "              hexpyr|transition, prism|sweep, octa|octahedral (experimental)\n"
+               "mesher names: hybrid|zoo (default), hybridvem|hybrid-vem, tet, hex,\n"
+               "              hexvem|vem, graded, hexpyr|transition, prism|sweep,\n"
+               "              octa|octahedral (experimental)\n"
                "--skin n: graded-tet fine skin layers (default 2)\n"
                "--feature: refine graded mesh near sharp edges (default off in CLI)\n"
                "--adapt n: ZZ→Dörfler remesh passes (local seeds on graded path)\n"
@@ -54,6 +55,9 @@ int usage() {
 polymesh::pipeline::VolumeMesher parse_mesher(const std::string& m) {
     if (m == "hybrid" || m == "zoo" || m == "mixed") {
         return polymesh::pipeline::VolumeMesher::kHybrid;
+    }
+    if (m == "hybridvem" || m == "hybrid-vem" || m == "hybrid_vem") {
+        return polymesh::pipeline::VolumeMesher::kHybridVem;
     }
     if (m == "tet") {
         return polymesh::pipeline::VolumeMesher::kTetFill;

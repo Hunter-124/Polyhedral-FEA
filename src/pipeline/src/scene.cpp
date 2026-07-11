@@ -278,9 +278,13 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
     // so gentle curves / big bores stay coarse and flats never refine — replaces
     // the capped seed-ball scheme (coarse rings mid-bore, fine islands on flats).
     constexpr double kCurvatureTurnDeg = 15.0;
-    if (mesher == VolumeMesher::kHybrid) {
+    if (mesher == VolumeMesher::kHybrid || mesher == VolumeMesher::kHybridVem) {
         // SPEC hybrid zoo: hex bulk @ h + 2:1 fine @ h/2 on feature/curvature
-        // bands + conforming transitions. Product FE expands hex→pyramids.
+        // bands + conforming transitions.
+        // kHybrid: product FE expands hex→pyramids (ADR-0012 / ADR-0013).
+        // kHybridVem: keep hex as FE + unsplit transition polyhedra as VEM
+        // (ADR-0019 fe-vem-assembly); no fan-split, no hex→pyramid expand.
+        const bool native_poly = (mesher == VolumeMesher::kHybridVem);
         std::vector<geom::SharpEdge> edges;
         std::vector<Eigen::Vector3d> adapt_seeds(refine_seeds.begin(), refine_seeds.end());
         double feat_band = 0.0;
@@ -301,15 +305,17 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         if (adapt_seeds.empty()) {
             s_band = 0.0;
         }
-        // Build lattice without snap first; snap after hex→pyramid expand so free
-        // surface Jacobian is pyramid-based (hex free-face snap unsnaps too often).
+        // Build lattice without snap first; product FE snaps after hex→pyramid
+        // expand so free-surface Jacobian is pyramid-based. Native-poly path
+        // keeps hex FE + poly VEM and snaps on that mesh.
         auto raw = mesh::mixed_fill_surface(model.surface, model.bbox_min, model.bbox_max, h,
                                             std::max(1, skin_layers), edges, feat_band,
                                             adapt_seeds, s_band, /*snap_boundary=*/false,
-                                            turn_deg);
+                                            turn_deg, native_poly);
         const std::size_t n_hex_lattice = raw.n_hex;
         const std::size_t n_pyr_raw = raw.n_pyramid;
-        auto fill = mesh::expand_mixed_hex_to_pyramids(raw);
+        const std::size_t n_poly_raw = raw.n_poly;
+        auto fill = native_poly ? std::move(raw) : mesh::expand_mixed_hex_to_pyramids(raw);
         fill_h = fill.h;
         // Post-expand free-surface snap (boundary quads from lattice).
         if (!fill.boundary_quads.empty()) {
@@ -358,6 +364,22 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                                                      cell.nodes.begin() + cell.n_nodes);
                                 }
                                 continue;
+                            }
+                            if (cell.kind == mesh::MixedCellKind::kPolyVem) {
+                                std::vector<Eigen::Vector3d> coords;
+                                coords.reserve(cell.poly_nodes.size());
+                                for (const auto g : cell.poly_nodes) {
+                                    coords.push_back(fill.nodes[g]);
+                                }
+                                if (fea::poly_volume(coords, cell.poly_faces) <= vol_eps) {
+                                    offenders.insert(cell.poly_nodes.begin(),
+                                                     cell.poly_nodes.end());
+                                }
+                                continue;
+                            }
+                            if (cell.kind == mesh::MixedCellKind::kHex8) {
+                                // Native-poly path: reject inverted hex free faces.
+                                continue; // hex8 Jacobian checked via cell_valid later
                             }
                             if (cell.kind != mesh::MixedCellKind::kPyramid5) {
                                 continue;
@@ -492,8 +514,14 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             std::unordered_map<std::uint32_t, std::vector<std::size_t>> node_cells;
             for (std::size_t ci = 0; ci < fill.cells.size(); ++ci) {
                 const auto& cell = fill.cells[ci];
-                for (std::uint8_t m = 0; m < cell.n_nodes; ++m) {
-                    node_cells[cell.nodes[m]].push_back(ci);
+                if (cell.kind == mesh::MixedCellKind::kPolyVem) {
+                    for (const auto g : cell.poly_nodes) {
+                        node_cells[g].push_back(ci);
+                    }
+                } else {
+                    for (std::uint8_t m = 0; m < cell.n_nodes; ++m) {
+                        node_cells[cell.nodes[m]].push_back(ci);
+                    }
                 }
             }
             const auto cell_valid = [&](const mesh::MixedCell& cell) {
@@ -509,6 +537,14 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                     const double v1 = (b - a).dot((c - a).cross(e - a)) / 6.0;
                     const double v2 = (c - a).dot((d - a).cross(e - a)) / 6.0;
                     return std::abs(v1) > vol_eps && std::abs(v2) > vol_eps;
+                }
+                if (cell.kind == mesh::MixedCellKind::kPolyVem) {
+                    std::vector<Eigen::Vector3d> coords;
+                    coords.reserve(cell.poly_nodes.size());
+                    for (const auto g : cell.poly_nodes) {
+                        coords.push_back(fill.nodes[g]);
+                    }
+                    return fea::poly_volume(coords, cell.poly_faces) > vol_eps;
                 }
                 return true;
             };
@@ -556,8 +592,12 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                         if (cell_valid(cell)) {
                             continue;
                         }
-                        for (std::uint8_t m = 0; m < cell.n_nodes; ++m) {
-                            offenders.insert(cell.nodes[m]);
+                        if (cell.kind == mesh::MixedCellKind::kPolyVem) {
+                            offenders.insert(cell.poly_nodes.begin(), cell.poly_nodes.end());
+                        } else {
+                            for (std::uint8_t m = 0; m < cell.n_nodes; ++m) {
+                                offenders.insert(cell.nodes[m]);
+                            }
                         }
                     }
                 },
@@ -569,7 +609,10 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         out.mesh.nodes = std::move(fill.nodes);
         out.mesh.elements.reserve(fill.cells.size());
         for (const auto& cell : fill.cells) {
-            if (cell.kind == mesh::MixedCellKind::kPyramid5) {
+            if (cell.kind == mesh::MixedCellKind::kPolyVem) {
+                out.mesh.elements.emplace_back(fea::ElementType::kPolyVem, cell.poly_nodes,
+                                               cell.poly_faces);
+            } else if (cell.kind == mesh::MixedCellKind::kPyramid5) {
                 out.mesh.elements.push_back(
                     fea::NodalElement{fea::ElementType::kPyramid5,
                                       {cell.nodes[0], cell.nodes[1], cell.nodes[2],
@@ -586,16 +629,31 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             }
         }
         out.boundary_quads = std::move(fill.boundary_quads);
-        out.mesher_note = std::format(
-            "hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; "
-            "not Delaunay): {} hex + {} pyr raw → {} pyramid5 + {} tet4, {} nodes, "
-            "h_bulk={:.4g}/h_fine={:.4g} m, fine_cells={} transition={} feature={}, "
-            "snap max|d|={:.3g} m{}",
-            n_hex_lattice, n_pyr_raw, fill.n_pyramid, fill.n_tet, out.mesh.nodes.size(),
-            fill.h, fill.h_fine > 0.0 ? fill.h_fine : fill.h, fill.n_fine_cells,
-            fill.n_transition_cells, fill.n_feature_skin_cells, fill.boundary_max_distance,
-            turn_deg > 0.0 ? std::format(", curv_turn≤{:.0f}°/cell", turn_deg)
-                           : std::string{});
+        if (native_poly) {
+            out.mesher_note = std::format(
+                "hybrid-VEM zoo (hex FE bulk@h + 2:1 fine@h/2 + native poly VEM "
+                "transitions; not Delaunay): {} hex8 + {} polyVEM ({} pyr raw unused), "
+                "{} nodes, h_bulk={:.4g}/h_fine={:.4g} m, fine_cells={} transition={} "
+                "feature={}, snap max|d|={:.3g} m{}",
+                fill.n_hex, fill.n_poly, n_pyr_raw, out.mesh.nodes.size(), fill.h,
+                fill.h_fine > 0.0 ? fill.h_fine : fill.h, fill.n_fine_cells,
+                fill.n_transition_cells, fill.n_feature_skin_cells, fill.boundary_max_distance,
+                turn_deg > 0.0 ? std::format(", curv_turn≤{:.0f}°/cell", turn_deg)
+                               : std::string{});
+            (void)n_hex_lattice;
+            (void)n_poly_raw;
+        } else {
+            out.mesher_note = std::format(
+                "hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; "
+                "not Delaunay): {} hex + {} pyr raw → {} pyramid5 + {} tet4, {} nodes, "
+                "h_bulk={:.4g}/h_fine={:.4g} m, fine_cells={} transition={} feature={}, "
+                "snap max|d|={:.3g} m{}",
+                n_hex_lattice, n_pyr_raw, fill.n_pyramid, fill.n_tet, out.mesh.nodes.size(),
+                fill.h, fill.h_fine > 0.0 ? fill.h_fine : fill.h, fill.n_fine_cells,
+                fill.n_transition_cells, fill.n_feature_skin_cells, fill.boundary_max_distance,
+                turn_deg > 0.0 ? std::format(", curv_turn≤{:.0f}°/cell", turn_deg)
+                               : std::string{});
+        }
     } else if (mesher == VolumeMesher::kHexFill || mesher == VolumeMesher::kHexVem) {
         auto fill = mesh::hex_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
         fill_h = fill.h;
@@ -1151,7 +1209,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 }
                 if (setup.mesher != VolumeMesher::kGradedTet &&
                     setup.mesher != VolumeMesher::kTetFill &&
-                    setup.mesher != VolumeMesher::kHybrid) {
+                    setup.mesher != VolumeMesher::kHybrid &&
+                    setup.mesher != VolumeMesher::kHybridVem) {
                     return;
                 }
                 const double bulk_band = 1.75 * h_use;

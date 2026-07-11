@@ -1,0 +1,12 @@
+{
+  "campaign": "smoke",
+  "completed_runs": 2,
+  "started_utc": "2026-07-11T05:17:48Z",
+  "state": "finished",
+  "survivors": [
+    "cfg-35f5ae24",
+    "cfg-5b36c35e"
+  ],
+  "tier": 0,
+  "updated_utc": "2026-07-11T05:17:49Z"
+}

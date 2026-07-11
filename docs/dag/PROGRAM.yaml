@@ -28,13 +28,14 @@ nodes:
   # ── Lane A: test lab (scaffolding) ──────────────────────────────────────
   - id: testlab-harness
     title: Campaign runner with pause/play, resource caps, branch trimming
-    status: in_progress
+    status: done
     deps: [dag-workflow]
     scope: [apps/testlab/, bench/campaigns/]
     note: >
-      CLI `polymesh_testlab run|resume|pause-status`. Successive-halving
-      trimming across fidelity tiers. SIGINT-safe checkpointing. Respects
-      anti-cheat: reads truth only from bench/reference/.
+      DONE: polymesh_testlab CLI (run|resume|pause-status) with successive-halving,
+      SIGINT-safe atomic checkpoint.json, results.jsonl, progress.json. Smoke
+      campaign bench/campaigns/smoke finishes green on smoke_bar (hex + hybrid_zoo).
+      Truths loaded only from bench/reference/*.json. Probe aliases for max_vm etc.
 
   - id: part-library
     title: Validation part library + hand-calculation references
@@ -52,13 +53,13 @@ nodes:
 
   - id: gui-testlab
     title: GUI panel rebuild (Test Lab / Sim Setup / Results)
-    status: in_progress
+    status: done
     deps: [dag-workflow]
     scope: [apps/gui/]
     note: >
-      Keep GLFW+ImGui+Interwebz-v2 chrome. Talks to testlab only through
-      the interfaces.md file formats (campaign/checkpoint/results), so it
-      does not depend on testlab code landing first.
+      DONE: layout Test Lab | Sim Setup | viewport | Results. ImGui-free
+      testlab_data parsers (unit-tested), ProcessRunner fork/exec + SIGINT pause,
+      talks to harness only via interfaces.md files. hybrid VEM mesher retained.
 
   - id: campaign-1
     title: First full settings campaign on the part library

@@ -3,12 +3,14 @@
 // PolyMesh desktop app: import geometry, click faces to assign fixtures and
 // loads, tune mesher/solver settings, solve, and inspect stress/deflection
 // results. Interwebz-v2-styled chrome with a fixed, constrained layout:
-// a study sidebar (splitter-resizable) and the viewport filling the rest —
-// windows cannot be dragged out of the frame, collapsed, or lost.
+// Test Lab | Sim Setup | viewport | Results — panels cannot be dragged out
+// of the frame, collapsed, or lost. Test Lab talks to the harness only via
+// docs/dag/interfaces.md file formats (no apps/testlab link).
 
 #include "fea/backend.hpp"
 #include "fea/vtu.hpp"
 #include "pipeline/scene.hpp"
+#include "testlab_panel.hpp"
 #include "theme.hpp"
 #include "viewport.hpp"
 #include "widgets.hpp"
@@ -87,7 +89,6 @@ struct App {
     bool show_wireframe = true;
     bool show_undeformed = false;
     bool deform_true_scale = false;
-    float sidebar_width = 360.0f;
     char open_path[512] = "";
     std::string status = "drop an STL/STEP on the window, or type a path below";
     std::string mesh_status;
@@ -99,6 +100,7 @@ struct App {
     // Click-vs-orbit: accumulate LMB drag so a pure click selects a face.
     float lmb_drag_px = 0.0f;
     bool pick_faces = true; // when true, LMB click assigns selection (CAD pick)
+    TestLabState testlab;
 };
 
 bool is_geometry_path(const std::string& path) {
@@ -616,12 +618,27 @@ void draw_viewport_content(App& app) {
     }
 }
 
-/// Fixed, constrained layout: menu bar on top, a single workspace (study |
-/// splitter | viewport) filling the content band, status strip bottom. One
-/// window tiles left/right so there is no multi-window gap / purple strip
-/// between the tools panel and the 3D view.
+/// Drag splitter between columns. Mutates `*width` by mouse delta * `sign`
+/// (+1 grows left column to the right; -1 grows right column to the left).
+void draw_column_splitter(const char* id, float row_h, float* width, float sign = 1.0f) {
+    constexpr float kSplitter = 6.0f;
+    ImGui::InvisibleButton(id, ImVec2(kSplitter, row_h));
+    if (ImGui::IsItemActive()) {
+        *width += sign * ImGui::GetIO().MouseDelta.x;
+    }
+    if (ImGui::IsItemHovered() || ImGui::IsItemActive()) {
+        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+        ImGui::GetWindowDrawList()->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(),
+                                                  ImGui::GetColorU32(palette.accent_mid));
+    }
+}
+
+/// Fixed, constrained layout: menu bar on top; workspace columns
+/// Test Lab | Sim Setup | viewport | Results; status strip bottom.
+/// One host window tiles children with zero gap so chrome never leaks.
 void draw_frame(App& app) {
     const ImGuiViewport* vp = ImGui::GetMainViewport();
+    auto& gs = app.testlab.settings;
 
     float menu_height = 0.0f;
     if (ImGui::BeginMainMenuBar()) {
@@ -636,9 +653,11 @@ void draw_frame(App& app) {
             if (ImGui::MenuItem("theme: interwebz", nullptr,
                                 active_theme == ThemeId::kInterwebz)) {
                 apply_theme(ThemeId::kInterwebz);
+                gs.theme = ThemeId::kInterwebz;
             }
             if (ImGui::MenuItem("theme: slate", nullptr, active_theme == ThemeId::kSlate)) {
                 apply_theme(ThemeId::kSlate);
+                gs.theme = ThemeId::kSlate;
             }
             ImGui::MenuItem("wireframe edges", nullptr, &app.show_wireframe);
             if (app.result) {
@@ -658,10 +677,23 @@ void draw_frame(App& app) {
         std::floor(vp->Pos.y + vp->Size.y - kStatusHeight) - content_y;
     const float content_w = std::floor(vp->Size.x);
 
-    // Cap sidebar so the viewport is never squeezed by a huge empty-looking panel.
-    const float sidebar_max = std::min(420.0f, content_w * 0.38f);
-    app.sidebar_width = std::clamp(app.sidebar_width, 300.0f, std::max(300.0f, sidebar_max));
-    app.sidebar_width = std::floor(app.sidebar_width);
+    // Clamp panel widths so the viewport keeps a usable center band.
+    const float min_view = 280.0f;
+    const float max_side = std::max(200.0f, (content_w - min_view - 3.0f * kSplitter) * 0.4f);
+    gs.testlab_width = std::floor(std::clamp(gs.testlab_width, 200.0f, max_side));
+    gs.sim_width = std::floor(std::clamp(gs.sim_width, 240.0f, max_side));
+    gs.results_width = std::floor(std::clamp(gs.results_width, 200.0f, max_side));
+    // If panels still overflow, shrink results then testlab then sim.
+    float panels = gs.testlab_width + gs.sim_width + gs.results_width + 3.0f * kSplitter;
+    if (panels + min_view > content_w) {
+        const float overflow = panels + min_view - content_w;
+        gs.results_width = std::max(180.0f, gs.results_width - overflow);
+        panels = gs.testlab_width + gs.sim_width + gs.results_width + 3.0f * kSplitter;
+        if (panels + min_view > content_w) {
+            const float o2 = panels + min_view - content_w;
+            gs.testlab_width = std::max(180.0f, gs.testlab_width - o2);
+        }
+    }
 
     // Single fullscreen content window — children abut with zero gap.
     ImGui::SetNextWindowPos(ImVec2(std::floor(vp->Pos.x), content_y));
@@ -673,36 +705,50 @@ void draw_frame(App& app) {
 
     const float row_h = ImGui::GetContentRegionAvail().y;
 
-    // Left: study tools (padding restored for controls).
+    // Col 1: Test Lab
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 12.0f));
-    ImGui::BeginChild("study", ImVec2(app.sidebar_width, row_h),
-                      ImGuiChildFlags_AlwaysUseWindowPadding,
+    ImGui::BeginChild("testlab", ImVec2(gs.testlab_width, row_h),
+                      ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_None);
+    draw_testlab_panel(app.testlab);
+    ImGui::EndChild();
+    ImGui::PopStyleVar();
+
+    ImGui::SameLine(0.0f, 0.0f);
+    draw_column_splitter("##split_tl_sim", row_h, &gs.testlab_width, +1.0f);
+    ImGui::SameLine(0.0f, 0.0f);
+
+    // Col 2: Sim Setup (existing study tools)
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 12.0f));
+    ImGui::BeginChild("study", ImVec2(gs.sim_width, row_h), ImGuiChildFlags_AlwaysUseWindowPadding,
                       ImGuiWindowFlags_None);
     draw_study_panel(app);
     ImGui::EndChild();
     ImGui::PopStyleVar();
 
     ImGui::SameLine(0.0f, 0.0f);
-
-    // Drag splitter (thin hit target; accent fill only while hovered/dragged).
-    ImGui::InvisibleButton("##splitter", ImVec2(kSplitter, row_h));
-    if (ImGui::IsItemActive()) {
-        app.sidebar_width += ImGui::GetIO().MouseDelta.x;
-    }
-    if (ImGui::IsItemHovered() || ImGui::IsItemActive()) {
-        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-        ImGui::GetWindowDrawList()->AddRectFilled(ImGui::GetItemRectMin(),
-                                                  ImGui::GetItemRectMax(),
-                                                  ImGui::GetColorU32(palette.accent_mid));
-    }
-
+    draw_column_splitter("##split_sim_vp", row_h, &gs.sim_width, +1.0f);
     ImGui::SameLine(0.0f, 0.0f);
 
-    // Right: 3D viewport fills remaining width.
+    // Col 3: 3D viewport fills remaining width (minus results + splitter).
+    const float results_band = gs.results_width + kSplitter;
+    const float view_w = std::max(1.0f, ImGui::GetContentRegionAvail().x - results_band);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-    ImGui::BeginChild("viewport", ImVec2(0.0f, row_h), ImGuiChildFlags_None,
+    ImGui::BeginChild("viewport", ImVec2(view_w, row_h), ImGuiChildFlags_None,
                       ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
     draw_viewport_content(app);
+    ImGui::EndChild();
+    ImGui::PopStyleVar();
+
+    ImGui::SameLine(0.0f, 0.0f);
+    // Dragging this splitter left grows the results panel.
+    draw_column_splitter("##split_vp_res", row_h, &gs.results_width, -1.0f);
+    ImGui::SameLine(0.0f, 0.0f);
+
+    // Col 4: Results
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 12.0f));
+    ImGui::BeginChild("results", ImVec2(0.0f, row_h), ImGuiChildFlags_AlwaysUseWindowPadding,
+                      ImGuiWindowFlags_None);
+    draw_results_panel(app.testlab);
     ImGui::EndChild();
     ImGui::PopStyleVar();
 
@@ -719,15 +765,16 @@ void draw_frame(App& app) {
                  kPanelFlags | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
     {
         std::string line;
+        const char* tl = app.testlab.status.c_str();
         if (app.dof_count > 0) {
             line = std::format(
-                "polymesh — {} | DOF {} | lmb orbit (all modes), shift+lmb pan, wheel zoom",
-                app.status, app.dof_count);
+                "polymesh — {} | testlab: {} | DOF {} | lmb orbit, shift+lmb pan, wheel zoom",
+                app.status, tl, app.dof_count);
         } else {
             line = std::format(
-                "polymesh — {} | drop .stl/.step or type path | lmb pick/orbit, "
+                "polymesh — {} | testlab: {} | drop .stl/.step | lmb pick/orbit, "
                 "shift+lmb pan, wheel zoom",
-                app.status);
+                app.status, tl);
         }
         ImGui::PushStyleColor(ImGuiCol_Text, palette.text_dim);
         ImGui::TextUnformatted(line.c_str());
@@ -778,6 +825,9 @@ int run(int argc, char** argv) {
     glfwSetWindowUserPointer(window, &app);
     glfwSetDropCallback(window, drop_callback);
     app.viewport.init();
+    app.testlab.sync_buffers_from_settings();
+    app.testlab.force_refresh = true;
+    app.testlab.tick(0.0f);
     if (argc >= 2 && argv[1] != nullptr && argv[1][0] != '\0') {
         load_model(app, argv[1]);
     }
@@ -806,6 +856,9 @@ int run(int argc, char** argv) {
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
+
+        // Poll harness process + refresh campaign files (chrono-gated inside).
+        app.testlab.tick(ImGui::GetIO().DeltaTime);
 
         if (auto mesh = app.job.take_mesh()) {
             app.mesh_preview = std::move(mesh);

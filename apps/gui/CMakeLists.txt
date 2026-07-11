@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Desktop GUI presentation layer only (GLFW + Dear ImGui + OpenGL).
 # Physics, meshing, and solve live in src/* and src/pipeline — never here.
+# Test Lab talks to polymesh_testlab only via docs/dag/interfaces.md files.
 
 include(FetchContent)
 
@@ -51,13 +52,32 @@ else()
     message(STATUS "GUI OpenGL: system headers + GLEXT prototypes")
 endif()
 
+# ImGui-free campaign file parsers (also linked by tests/testlab_selfcheck).
+add_library(gui_testlab_data STATIC
+    testlab_data.cpp
+)
+target_include_directories(gui_testlab_data PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(gui_testlab_data
+    PUBLIC nlohmann_json::nlohmann_json
+    PRIVATE polymesh_warnings
+)
+
 add_executable(polymesh-gui
     main.cpp
     theme.cpp
     widgets.cpp
     viewport.cpp
+    gui_settings.cpp
+    process_runner.cpp
+    testlab_panel.cpp
 )
 target_include_directories(polymesh-gui PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(polymesh-gui
-    PRIVATE pipeline imgui_lib ${POLYMESH_GUI_GL_LIBS} polymesh_warnings polymesh_perf
+    PRIVATE
+        pipeline
+        gui_testlab_data
+        imgui_lib
+        ${POLYMESH_GUI_GL_LIBS}
+        polymesh_warnings
+        polymesh_perf
 )

@@ -46,6 +46,7 @@ add_executable(polymesh_tests
     test_octa_fill.cpp
     test_p_elevate.cpp
     test_d6_bench_smoke.cpp
+    testlab_selfcheck.cpp
 
     support/structured_mesh.cpp
     support/mms.cpp
@@ -55,6 +56,17 @@ target_include_directories(polymesh_tests PRIVATE .)
 target_link_libraries(polymesh_tests
     PRIVATE geom mesh adapt fea bench_harness pipeline Catch2::Catch2WithMain polymesh_warnings
 )
+
+
+# gui_testlab_data is built under apps/gui when POLYMESH_WITH_GUI=ON. When GUI
+# is off, compile the same unit into the test binary so selfcheck still runs.
+if(TARGET gui_testlab_data)
+    target_link_libraries(polymesh_tests PRIVATE gui_testlab_data)
+else()
+    target_sources(polymesh_tests PRIVATE ${CMAKE_SOURCE_DIR}/apps/gui/testlab_data.cpp)
+    target_include_directories(polymesh_tests PRIVATE ${CMAKE_SOURCE_DIR}/apps/gui)
+    target_link_libraries(polymesh_tests PRIVATE nlohmann_json::nlohmann_json)
+endif()
 
 include(Catch)
 # Working directory = repo root so the bench harness can load bench/reference/.

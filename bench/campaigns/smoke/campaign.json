@@ -1,0 +1,16 @@
+{
+  "name": "smoke",
+  "parts": ["tests/fixtures/parts/smoke_bar.case.json"],
+  "tiers": [
+    { "h_scale": 2.0, "keep_frac": 1.0 }
+  ],
+  "grid": {
+    "mesher": ["hex", "hybrid_zoo"],
+    "feature_refine": [false],
+    "order": [1]
+  },
+  "score": {
+    "weights": { "accuracy": 0.5, "solve_ms": 0.25, "mesh_ms": 0.25 }
+  },
+  "resources": { "max_threads": 0, "max_mem_gb": 0 }
+}

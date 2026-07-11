@@ -421,48 +421,63 @@ void draw_testlab_panel(TestLabState& tl) {
 }
 
 void draw_results_panel(TestLabState& tl) {
+    // Measure panel height *before* auto-sized group boxes. A table height
+    // taken inside AutoResizeY children is ~0, which capped the runs list at
+    // ~120 px; fill the remaining column so many rows are visible at once.
+    const float panel_y0 = ImGui::GetCursorScreenPos().y;
+    const float panel_h = ImGui::GetContentRegionAvail().y;
+
     iw::begin_group_box("results");
     ImGui::TextColored(palette.text_dim, "results.jsonl (append-only)");
     if (tl.selected_summary() == nullptr) {
         ImGui::TextColored(palette.text_dim, "select a campaign");
+        iw::end_group_box();
+        // Still show an empty runs box so the column doesn't look sparse.
+        const float used = ImGui::GetCursorScreenPos().y - panel_y0;
+        const float runs_h = std::max(160.0f, panel_h - used);
+        iw::begin_group_box_fill("runs", runs_h);
+        ImGui::TextColored(palette.text_dim, "select a campaign to load results");
         iw::end_group_box();
         return;
     }
     ImGui::Text("%zu rows", tl.results.size());
     if (tl.results.empty()) {
         ImGui::TextWrapped("No runs recorded yet. Start a campaign from the Test Lab panel.");
-        iw::end_group_box();
-        return;
-    }
-
-    // Aggregate quick stats.
-    int n_ok = 0, n_fail = 0;
-    double best_err = 1e300;
-    for (const auto& r : tl.results) {
-        if (r.status == "ok") {
-            ++n_ok;
-            if (r.accuracy.rel_err < best_err) {
-                best_err = r.accuracy.rel_err;
+    } else {
+        // Aggregate quick stats.
+        int n_ok = 0, n_fail = 0;
+        double best_err = 1e300;
+        for (const auto& r : tl.results) {
+            if (r.status == "ok") {
+                ++n_ok;
+                if (r.accuracy.rel_err < best_err) {
+                    best_err = r.accuracy.rel_err;
+                }
+            } else {
+                ++n_fail;
             }
-        } else {
-            ++n_fail;
         }
-    }
-    ImGui::TextColored(palette.status_ok, "ok %d", n_ok);
-    ImGui::SameLine(0, 12);
-    ImGui::TextColored(n_fail > 0 ? palette.status_err : palette.text_dim, "fail %d", n_fail);
-    if (n_ok > 0 && best_err < 1e299) {
-        ImGui::Text("best |rel_err|: %.4g", best_err);
+        ImGui::TextColored(palette.status_ok, "ok %d", n_ok);
+        ImGui::SameLine(0, 12);
+        ImGui::TextColored(n_fail > 0 ? palette.status_err : palette.text_dim, "fail %d", n_fail);
+        if (n_ok > 0 && best_err < 1e299) {
+            ImGui::Text("best |rel_err|: %.4g", best_err);
+        }
     }
     iw::end_group_box();
 
-    iw::begin_group_box("runs");
-    const float table_h = std::max(120.0f, ImGui::GetContentRegionAvail().y - 8.0f);
+    const float used = ImGui::GetCursorScreenPos().y - panel_y0;
+    const float runs_h = std::max(160.0f, panel_h - used);
+    iw::begin_group_box_fill("runs", runs_h);
+    // Table fills the fixed content region (scroll inside).
+    const float table_h = std::max(80.0f, ImGui::GetContentRegionAvail().y);
     if (ImGui::BeginChild("##results_table", ImVec2(-FLT_MIN, table_h), ImGuiChildFlags_Borders)) {
-        if (ImGui::BeginTable("##res", 7,
-                              ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
-                                  ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable |
-                                  ImGuiTableFlags_SizingStretchProp)) {
+        if (tl.results.empty()) {
+            ImGui::TextColored(palette.text_dim, "no runs yet");
+        } else if (ImGui::BeginTable("##res", 7,
+                                     ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+                                         ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable |
+                                         ImGuiTableFlags_SizingStretchProp)) {
             ImGui::TableSetupScrollFreeze(0, 1);
             ImGui::TableSetupColumn("cfg");
             ImGui::TableSetupColumn("part");

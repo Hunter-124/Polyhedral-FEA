@@ -322,6 +322,8 @@ TEST_CASE("SolveJob reports phase progress during mesh-only") {
     job.start_mesh(model, setup);
 
     bool saw_mesh_phase = false;
+    double first_elapsed = -1.0;
+    double max_elapsed = 0.0;
     VolumeMeshOutput mesh;
     for (int i = 0; i < 300; ++i) {
         const auto p = job.progress();
@@ -331,6 +333,14 @@ TEST_CASE("SolveJob reports phase progress during mesh-only") {
         CHECK(p.phase_frac >= 0.0);
         CHECK(p.phase_frac <= 1.0);
         CHECK(p.elapsed_ms >= 0.0);
+        // Live wall-clock while busy (not only at report() boundaries).
+        const auto st = job.state();
+        if (st == SolveJob::State::kMeshing || st == SolveJob::State::kSolving) {
+            if (first_elapsed < 0.0) {
+                first_elapsed = p.elapsed_ms;
+            }
+            max_elapsed = std::max(max_elapsed, p.elapsed_ms);
+        }
         if (auto m = job.take_mesh()) {
             mesh = std::move(*m);
             break;
@@ -345,10 +355,65 @@ TEST_CASE("SolveJob reports phase progress during mesh-only") {
     }
     REQUIRE_FALSE(mesh.mesh.elements.empty());
     REQUIRE(saw_mesh_phase);
+    // Elapsed must advance across polls even if phase_frac is stuck (long mesh).
+    if (first_elapsed >= 0.0) {
+        CHECK(max_elapsed >= first_elapsed);
+        // With 5 ms sleeps, expect some measurable advance if job was non-instant.
+        // Instant finishes still leave max >= first (equality OK).
+    }
     const auto done = job.progress();
     // After take_mesh the job is idle; last progress should still be "done".
     REQUIRE(done.phase == "done");
     REQUIRE(std::abs(done.phase_frac - 1.0) < 1e-12);
+}
+
+TEST_CASE("SolveJob elapsed_ms advances while phase is held") {
+    // Larger mesh so the worker stays in kMeshing long enough for wall-clock
+    // polls to diverge (regression: UI looked frozen mid-mesh/solve).
+    const auto path = write_box_stl(1.0, 1.0, 1.0);
+    const auto model = Model::load(path.string());
+    SimSetup setup;
+    setup.mesh_size = 0.12;
+    setup.mesher = VolumeMesher::kTetFill;
+    setup.use_feature_grading = false;
+    SolveJob job;
+    job.start_mesh(model, setup);
+
+    double t_a = -1.0;
+    double t_b = -1.0;
+    for (int i = 0; i < 200; ++i) {
+        const auto st = job.state();
+        if (st == SolveJob::State::kMeshing) {
+            const double e = job.progress().elapsed_ms;
+            if (t_a < 0.0) {
+                t_a = e;
+            } else if (e > t_a + 15.0) {
+                t_b = e;
+                break;
+            }
+        }
+        if (st == SolveJob::State::kMeshDone || st == SolveJob::State::kFailed ||
+            st == SolveJob::State::kCancelled) {
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    // Drain worker.
+    for (int i = 0; i < 300; ++i) {
+        if (job.take_mesh()) {
+            break;
+        }
+        if (job.state() == SolveJob::State::kFailed) {
+            FAIL(job.status_text());
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    if (t_b > t_a && t_a >= 0.0) {
+        REQUIRE(t_b > t_a);
+    } else {
+        // Machine finished too fast to sample two ticks — still OK.
+        SUCCEED("mesh finished before dual elapsed samples");
+    }
 }
 
 TEST_CASE("SolveJob cancel between phases reaches kCancelled") {

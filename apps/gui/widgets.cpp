@@ -38,6 +38,8 @@ struct GroupBoxFrame {
     ImVec2 start{};
     float width = 0.0f;
     const char* title = nullptr;
+    /// When > 0, content child uses this fixed height instead of AutoResizeY.
+    float fixed_content_h = 0.0f;
 };
 
 std::vector<GroupBoxFrame> g_group_stack;
@@ -84,6 +86,7 @@ void begin_group_box(const char* title) {
     frame.start = ImGui::GetCursorScreenPos();
     frame.width = ImGui::GetContentRegionAvail().x;
     frame.title = title;
+    frame.fixed_content_h = 0.0f;
 
     // Outer group claims the full box width; header is reserved with a Dummy so
     // layout height is correct before content is measured.
@@ -106,19 +109,54 @@ void begin_group_box(const char* title) {
     g_group_stack.push_back(frame);
 }
 
+void begin_group_box_fill(const char* title, float outer_height) {
+    GroupBoxFrame frame;
+    frame.start = ImGui::GetCursorScreenPos();
+    frame.width = ImGui::GetContentRegionAvail().x;
+    frame.title = title;
+    // Header + top/bottom pad; content fills the rest.
+    const float chrome = kGroupHeader + 2.0f * kGroupPad;
+    frame.fixed_content_h = std::max(1.0f, outer_height - chrome);
+
+    ImGui::BeginGroup();
+    // Fixed outer height so chrome bounds match the fill region.
+    ImGui::Dummy(ImVec2(frame.width, std::max(outer_height, chrome)));
+    // Rewind to place content under the header.
+    ImGui::SetCursorScreenPos(
+        ImVec2(frame.start.x + kGroupPad, frame.start.y + kGroupHeader + kGroupPad));
+
+    const float content_w = std::max(1.0f, frame.width - 2.0f * kGroupPad);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+    ImGui::BeginChild(title, ImVec2(content_w, frame.fixed_content_h), ImGuiChildFlags_None,
+                      ImGuiWindowFlags_NoBackground);
+    ImGui::PopStyleVar();
+    ImGui::PushItemWidth(content_w);
+
+    g_group_stack.push_back(frame);
+}
+
 void end_group_box() {
     IM_ASSERT(!g_group_stack.empty());
     const GroupBoxFrame frame = g_group_stack.back();
     g_group_stack.pop_back();
 
     ImGui::PopItemWidth();
-    ImGui::EndChild(); // content (auto-height)
+    ImGui::EndChild(); // content
 
-    // Bottom padding inside the border; Dummy spans full frame width for chrome.
-    ImGui::SetCursorScreenPos(
-        ImVec2(frame.start.x, std::max(ImGui::GetItemRectMax().y, frame.start.y + kGroupHeader) +
-                                  kGroupPad));
-    ImGui::Dummy(ImVec2(frame.width, 0.0f));
+    if (frame.fixed_content_h > 0.0f) {
+        // Fixed-fill: outer Dummy already reserved full height; place cursor
+        // after the box for the trailing gap.
+        ImGui::SetCursorScreenPos(ImVec2(
+            frame.start.x,
+            frame.start.y + kGroupHeader + 2.0f * kGroupPad + frame.fixed_content_h));
+        ImGui::Dummy(ImVec2(frame.width, 0.0f));
+    } else {
+        // Auto-height: bottom padding inside the border.
+        ImGui::SetCursorScreenPos(ImVec2(
+            frame.start.x,
+            std::max(ImGui::GetItemRectMax().y, frame.start.y + kGroupHeader) + kGroupPad));
+        ImGui::Dummy(ImVec2(frame.width, 0.0f));
+    }
     ImGui::EndGroup(); // outer chrome bounds
 
     const ImVec2 box_min = ImGui::GetItemRectMin();

@@ -14,6 +14,10 @@ namespace polymesh::gui::iw {
 /// Group box with a header strip and floating title. Height auto-fits content —
 /// always pair with end_group_box().
 void begin_group_box(const char* title);
+/// Same chrome as begin_group_box, but content region has a fixed outer height
+/// (fills remaining panel space). Use for tables/lists that should grow.
+/// `outer_height` is the full box height including header + padding.
+void begin_group_box_fill(const char* title, float outer_height);
 void end_group_box();
 
 /// Rose-gradient checkbox with label to the right.

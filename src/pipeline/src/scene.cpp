@@ -1101,8 +1101,21 @@ std::string SolveJob::status_text() const {
 }
 
 JobProgress SolveJob::progress() const {
-    const std::lock_guard lock(status_mutex_);
-    return progress_;
+    // Recompute wall-clock on every UI poll. `report()` only stamps phase
+    // boundaries; mesh/assemble/solve can run for minutes without another
+    // report, which made the progress panel look frozen while CPU was busy.
+    JobProgress p;
+    {
+        const std::lock_guard lock(status_mutex_);
+        p = progress_;
+    }
+    const auto st = state_.load(std::memory_order_relaxed);
+    if (st == State::kMeshing || st == State::kSolving) {
+        p.elapsed_ms = std::chrono::duration<double, std::milli>(
+                           std::chrono::steady_clock::now() - t0_)
+                           .count();
+    }
+    return p;
 }
 
 void SolveJob::request_cancel() {

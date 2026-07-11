@@ -8,6 +8,7 @@ add_library(fea
     src/quadrature.cpp
     src/shape.cpp
     src/hierarchical.cpp
+    src/hp_assembly.cpp
     src/assembly.cpp
     src/solve.cpp
     src/traction.cpp

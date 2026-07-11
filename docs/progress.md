@@ -23,6 +23,19 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: **Conforming hierarchical assembly + MMS proof (ADR-0019 lane B)** —
+  `fea/hp_assembly.{hpp,cpp}`: per-entity global DOF numbering (vertices,
+  edges, faces, cell interiors) with the **minimum rule** for mixed order,
+  conforming assembly, consistent body load, partitioned Dirichlet solve, and
+  energy-norm error. At order ≤2 every orientation sign is +1 (φ₂ even, hex
+  face mode symmetric), so no sign bookkeeping is needed yet. Tests
+  (`test_hp_assembly.cpp`): a **mixed p1/p2** constant-strain patch reproduces
+  a linear field to **0 error across the order interface** (the min rule keeps
+  it conforming), and an MMS problem (u=sin πx·sin πy·sin πz, homogeneous
+  Dirichlet) converges in the energy norm at **rate 1.00 (p=1)** and
+  **2.00 (p=2)** — the end-to-end proof that shared entity DOFs assemble
+  correctly. Full suite 157 cases green. Follow-on: p≥3 orientation
+  signs/transforms + tet k≥3 kernels (node `p-hierarchical-highp`).
 - 2026-07-10: **Hierarchical arbitrary-p basis foundation (ADR-0019 lane B)** —
   `fea/hierarchical.{hpp,cpp}`: 1D integrated-Legendre (Lobatto) basis with
   derivatives (vertex funcs + order-k bubbles φ_k = (P_k−P_{k−2})/√(2(2k−1))),

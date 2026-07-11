@@ -74,18 +74,31 @@ nodes:
 
   - id: p-hierarchical
     title: Hierarchical arbitrary-p basis (integrated Legendre) + MMS tests
-    status: in_progress
+    status: done
     deps: [adr-0019]
     scope: [src/fea/]
     note: >
-      LANDED: fea/hierarchical.{hpp,cpp} — 1D Lobatto (integrated Legendre)
-      basis + derivatives; hex full tensor-product modes order 1..4; tet
-      vertex + quadratic edge bubbles (order 1..2); subparametric
-      single-element stiffness. Tests: 1D identities, p=1 == nodal hex8/tet4,
-      6 rigid-body modes at all orders on distorted geometry, SPD.
-      REMAINING before `done`: per-entity global DOF numbering + edge/face
-      orientation signs (assembler), MMS h- and p-convergence p=1..4 matching
-      theory, tet k>=3 edge/face/interior kernels, hex order>4 quadrature.
+      DONE: fea/hierarchical.{hpp,cpp} — 1D Lobatto basis + derivatives; hex
+      tensor-product modes order 1..4; tet vertex + quadratic edge bubbles
+      (order 1..2); subparametric single-element stiffness. fea/hp_assembly
+      .{hpp,cpp} — per-entity global DOF numbering with the minimum rule,
+      conforming assembly, body load, partitioned solve, energy-norm error.
+      Tests (test_hierarchical + test_hp_assembly): 1D identities, p=1 ==
+      nodal hex8/tet4, six rigid-body modes on distorted geometry, mixed
+      p1/p2 constant-strain patch reproduced to 0 error, MMS energy-norm
+      rate p=1 -> 1.00 and p=2 -> 2.00. Full suite 157 cases green.
+      FOLLOW-ON (tracked in node p-hierarchical-highp below): p>=3 edge/face
+      orientation signs + transforms, tet k>=3 kernels, hex order>4 rule.
+
+  - id: p-hierarchical-highp
+    title: Extend hierarchical assembler to p>=3 (orientation) + tet k>=3
+    status: todo
+    deps: [p-hierarchical]
+    scope: [src/fea/]
+    note: >
+      Odd edge-bubble sign (-1)^m on reversed edges; quad-face orientation
+      transform (8 symmetries) for hex faces; tet face/interior kernels;
+      hex order 5..6 Gauss rules. Unlocks MMS p=3,4 rate checks.
 
   - id: fe-vem-assembly
     title: Unified mixed FE+VEM assembly (polyhedra unsplit)

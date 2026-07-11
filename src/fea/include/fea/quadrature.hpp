@@ -28,7 +28,7 @@ struct QuadraturePoint {
 std::vector<QuadraturePoint> tet_rule(int degree);
 
 /// Tensor-product Gauss-Legendre rule, exact for degree <= 2n-1 per axis.
-/// Supports n in [1, 5].
+/// Supports n in [1, 6].
 std::vector<QuadraturePoint> hex_rule(int points_per_axis);
 
 /// Default stiffness-integration rule for an element type. Assumes

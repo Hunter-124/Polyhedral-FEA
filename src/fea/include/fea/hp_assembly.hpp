@@ -9,10 +9,16 @@
 // by global id, neighbouring elements of different order stay conforming with
 // no constraint equations.
 //
-// Scope: uniform or mixed order p in {1, 2} on tet and hex. At p <= 2 every
-// orientation sign is +1 (the edge bubble phi_2 is even and the single hex
-// face mode is symmetric), so no orientation bookkeeping is needed yet; the
-// p >= 3 sign/transform machinery is the next increment (ADR-0019 lane B).
+// Scope: uniform or mixed order p in {1..6} on hex, {1..4} on tet. Orientation
+// bookkeeping for p >= 3:
+//   - Tet odd edge-bubble sign (-1)^m when local (λ_b-λ_a) opposes the global
+//     min→max edge direction. Hex tensor-product edge modes are tied to
+//     reference coordinates and do not flip with endpoint order.
+//   - Hex quad-face dihedral transform (8 symmetries of the square): local
+//     face modes (i,j) map to a signed global mode (i',j') so both sides of a
+//     shared face agree.
+//   - Tet triangular face kernels: the p=3 product is orientation-invariant;
+//     higher face multi-indices use the min-vertex origin rule.
 //
 // This is the FE half of the eventual mixed FE+VEM system (node
 // `fe-vem-assembly`); VEM polyhedra scatter into the same global matrix.
@@ -56,8 +62,12 @@ struct HpSystem {
     /// Per element, per local hierarchical mode (in hp_modes order): the global
     /// mode index, or -1 when the minimum rule suppresses it.
     std::vector<std::vector<Eigen::Index>> local_to_global;
+    /// Per element, per local mode: orientation sign applied when scattering
+    /// (edge odd-bubble reverse and hex face dihedral sign). +1 when unused.
+    std::vector<std::vector<double>> local_sign;
     /// Per global mode, the node ids that define its owning entity (1 vertex,
-    /// 2 edge, 4 hex face, 8 interior). Lets callers classify boundary modes.
+    /// 2 edge, 3 tet-face / 4 hex-face, n interior). Lets callers classify
+    /// boundary modes.
     std::vector<std::vector<std::uint32_t>> mode_nodes;
 };
 

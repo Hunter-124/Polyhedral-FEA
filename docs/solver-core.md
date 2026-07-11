@@ -80,9 +80,10 @@ We proved this is not just theory: a mesh with a p=1 element next to a p=2
 element reproduces a linear displacement field to *zero* error across the
 interface (`test_hp_assembly.cpp`), and a smooth manufactured solution
 converges in the energy norm at exactly the textbook rate — order 1 for p=1,
-order 2 for p=2. When the higher orders (p≥3) come online, the only new work
-is a handful of sign flips for edges traversed "backwards" and an orientation
-map for faces; the architecture does not change.
+order 2 for p=2, and (with the highp increment) order 3 for p=3 and order 4
+for p=4. At p≥3 the assembler adds tet edge-orientation signs (−1)^m, a hex
+quad-face dihedral transform, and multi-mode blocks per entity; the
+minimum-rule architecture does not change.
 
 ### What "order" costs
 Higher order adds DOFs per element (edges, then faces, then interior fill in),

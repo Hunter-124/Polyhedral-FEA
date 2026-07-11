@@ -23,6 +23,11 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-11: **Hierarchical p≥3 (node `p-hierarchical-highp`)** —
+  multi-mode entity DOFs; tet edge sign (−1)^m on reversed edges; hex
+  quad-face dihedral transform; tet k≥3 face/interior kernels (p≤4); hex
+  p≤6; Gauss n=6. MMS energy rates p=1..4: **1.02 / 1.99 / 2.98 / 3.98**.
+  Q2-poly exact at p=2,3,4. Full suite 161 green.
 - 2026-07-11: **Unified mixed FE+VEM assembly (DAG `fe-vem-assembly`, ADR-0019
   §1)** — hybrid zoo gains `native_poly_transitions`: each 2:1 transition
   coarse cell is one unsplit polyhedron (`MixedCellKind::kPolyVem`) with faces

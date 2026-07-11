@@ -81,15 +81,28 @@ TEST_CASE("Lobatto derivative matches the integrated-Legendre identity", "[hiera
     }
 }
 
+TEST_CASE("Lobatto parity: phi_k(-xi) = (-1)^k phi_k(xi)", "[hierarchical]") {
+    for (int k = 2; k <= 6; ++k) {
+        for (double xi : {0.1, 0.4, 0.85}) {
+            const double sign = (k % 2 == 0) ? 1.0 : -1.0;
+            CHECK_THAT(lobatto::value(k, -xi), WithinAbs(sign * lobatto::value(k, xi), 1e-12));
+        }
+    }
+}
+
 TEST_CASE("Hierarchical mode counts follow the entity tally", "[hierarchical]") {
     // Hex uniform p: (p+1)^3.
     CHECK(hp_num_modes(ElementType::kHex8, 1) == 8);
     CHECK(hp_num_modes(ElementType::kHex8, 2) == 27);
     CHECK(hp_num_modes(ElementType::kHex8, 3) == 64);
     CHECK(hp_num_modes(ElementType::kHex8, 4) == 125);
-    // Tet: p=1 -> 4 (vertices), p=2 -> 10 (+ 6 edges).
+    CHECK(hp_num_modes(ElementType::kHex8, 5) == 216);
+    CHECK(hp_num_modes(ElementType::kHex8, 6) == 343);
+    // Tet complete P_p: (p+1)(p+2)(p+3)/6.
     CHECK(hp_num_modes(ElementType::kTet4, 1) == 4);
     CHECK(hp_num_modes(ElementType::kTet4, 2) == 10);
+    CHECK(hp_num_modes(ElementType::kTet4, 3) == 20);
+    CHECK(hp_num_modes(ElementType::kTet4, 4) == 35);
     // First entries are always the vertices (so p=1 is the nodal restriction).
     const auto modes = hp_modes(ElementType::kHex8, 3);
     for (int v = 0; v < 8; ++v) {
@@ -140,10 +153,10 @@ TEST_CASE("Hierarchical stiffness has exactly six rigid-body modes", "[hierarchi
         }
     }
 
-    SECTION("tet, orders 1..2, distorted geometry") {
+    SECTION("tet, orders 1..4, distorted geometry") {
         auto x = unit_tet_coords();
         x.row(3) += Eigen::RowVector3d(0.1, 0.05, 0.0);
-        for (std::uint8_t p = 1; p <= 2; ++p) {
+        for (std::uint8_t p = 1; p <= 4; ++p) {
             const Eigen::MatrixXd k = hp_element_stiffness(x, ElementType::kTet4, p, steel);
             INFO("tet order " << int(p) << " ndof " << k.rows());
             CHECK(count_zero_modes(k, 1e-9) == 6);
@@ -160,4 +173,31 @@ TEST_CASE("Hierarchical stiffness is symmetric positive semidefinite", "[hierarc
         Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(k);
         CHECK(es.eigenvalues().minCoeff() >= -1e-9 * es.eigenvalues().cwiseAbs().maxCoeff());
     }
+}
+
+TEST_CASE("Tet edge/face bubbles vanish on the complementary skeleton", "[hierarchical]") {
+    // At a point on face opposite vertex 3 (zeta=0 plane of ref tet has λ3=0
+    // wait — ref tet: λ0=1-x-y-z, λ1=x, λ2=y, λ3=z. Face opposite v3 is z=0.
+    // Edge (0,1) bubble must vanish on faces that do not contain that edge.
+    const auto field2 = hp_eval(ElementType::kTet4, 2, {0.2, 0.3, 0.0}); // on face 012
+    const auto modes2 = hp_modes(ElementType::kTet4, 2);
+    // Edge (0,3) = local edge 3 does not lie on face 012 (z=0); its bubble ~ λ0 λ3 = 0.
+    for (std::size_t m = 0; m < modes2.size(); ++m) {
+        if (modes2[m].entity == HpMode::Entity::kEdge && modes2[m].entity_index == 3) {
+            CHECK_THAT(field2.n(static_cast<Eigen::Index>(m)), WithinAbs(0.0, 1e-13));
+        }
+    }
+    // p=3 face bubble on face 012 must vanish on the edges of that face? It is
+    // λ0 λ1 λ2, which vanishes on each edge of face 012 (one λ=0). Interior
+    // sample on face is nonzero.
+    const auto field3 = hp_eval(ElementType::kTet4, 3, {0.25, 0.25, 0.0});
+    const auto modes3 = hp_modes(ElementType::kTet4, 3);
+    bool saw_face = false;
+    for (std::size_t m = 0; m < modes3.size(); ++m) {
+        if (modes3[m].entity == HpMode::Entity::kFace && modes3[m].entity_index == 0) {
+            saw_face = true;
+            CHECK(std::abs(field3.n(static_cast<Eigen::Index>(m))) > 1e-6);
+        }
+    }
+    CHECK(saw_face);
 }

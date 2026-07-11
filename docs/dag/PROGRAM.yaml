@@ -98,13 +98,17 @@ nodes:
 
   - id: p-hierarchical-highp
     title: Extend hierarchical assembler to p>=3 (orientation) + tet k>=3
-    status: todo
+    status: done
     deps: [p-hierarchical]
     scope: [src/fea/]
     note: >
-      Odd edge-bubble sign (-1)^m on reversed edges; quad-face orientation
-      transform (8 symmetries) for hex faces; tet face/interior kernels;
-      hex order 5..6 Gauss rules. Unlocks MMS p=3,4 rate checks.
+      DONE: multi-mode per-entity DOFs (edge/face/interior blocks); tet edge
+      odd-bubble sign (-1)^m on reversed (λ_b-λ_a) edges (hex tensor-product
+      edge modes do not flip with endpoint order); hex quad-face dihedral
+      transform (8 symmetries); tet face/interior kernels order 1..4; hex
+      basis order 1..6; Gauss n=6. MMS energy-norm rates (hex, n=2→4):
+      p=1 → 1.02, p=2 → 1.99, p=3 → 2.98, p=4 → 3.98. Q2-poly exact at
+      p=2,3,4. Full suite 161 cases green.
 
   - id: fe-vem-assembly
     title: Unified mixed FE+VEM assembly (polyhedra unsplit)

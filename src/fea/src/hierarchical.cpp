@@ -16,8 +16,11 @@ namespace {
 
 // Legendre polynomial P_n(x) on [-1, 1] by the three-term recurrence.
 double legendre_p(int n, double x) {
-    if (n == 0) {
+    if (n <= 0) {
         return 1.0;
+    }
+    if (n == 1) {
+        return x;
     }
     double p_prev = 1.0; // P_0
     double p_cur = x;    // P_1
@@ -29,6 +32,26 @@ double legendre_p(int n, double x) {
         p_cur = p_next;
     }
     return p_cur;
+}
+
+// dP_n/dx via (1-x^2) P_n' = n P_{n-1} - n x P_n, rearranged at |x|<1;
+// at the endpoints use the known values P_n'(±1) = (±1)^{n+1} n(n+1)/2.
+double legendre_p_deriv(int n, double x) {
+    if (n <= 0) {
+        return 0.0;
+    }
+    if (n == 1) {
+        return 1.0;
+    }
+    if (std::abs(x) >= 1.0 - 1e-14) {
+        const double s = (x > 0.0) ? 1.0 : -1.0;
+        // P_n'(1) = n(n+1)/2, P_n'(-1) = (-1)^{n+1} n(n+1)/2.
+        const double mag = 0.5 * static_cast<double>(n) * static_cast<double>(n + 1);
+        return (n % 2 == 0) ? (s > 0 ? mag : -mag) : mag;
+    }
+    const double pn = legendre_p(n, x);
+    const double pn1 = legendre_p(n - 1, x);
+    return (static_cast<double>(n) / (1.0 - x * x)) * (pn1 - x * pn);
 }
 
 } // namespace
@@ -105,6 +128,10 @@ constexpr std::array<HexFace, 6> kHexF{{{2, 0, 0, 1},
 constexpr std::array<std::array<int, 2>, 6> kTetE{
     {{0, 1}, {1, 2}, {0, 2}, {0, 3}, {1, 3}, {2, 3}}};
 
+// Tet faces as vertex triples (outward not required for H1 bubbles).
+constexpr std::array<std::array<int, 3>, 4> kTetF{
+    {{0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}}};
+
 // A single hex mode as its tensor indices plus the public descriptor.
 struct HexRecipe {
     int i;
@@ -114,9 +141,9 @@ struct HexRecipe {
 };
 
 std::vector<HexRecipe> build_hex(std::uint8_t order) {
-    if (order < 1 || order > 4) {
+    if (order < 1 || order > 6) {
         throw FeaError(std::format(
-            "hierarchical hex: order {} unsupported (1..4; cap is the Gauss rule)", order));
+            "hierarchical hex: order {} unsupported (1..6; cap is the Gauss rule)", order));
     }
     const int p = order;
     std::vector<HexRecipe> out;
@@ -148,6 +175,7 @@ std::vector<HexRecipe> build_hex(std::uint8_t order) {
             m.entity_index = static_cast<std::uint8_t>(e);
             m.order = static_cast<std::uint8_t>(mo);
             m.edge_odd = (mo % 2 == 1);
+            m.index0 = static_cast<std::uint8_t>(mo);
             out.push_back({idx[0], idx[1], idx[2], m});
         }
     }
@@ -164,6 +192,8 @@ std::vector<HexRecipe> build_hex(std::uint8_t order) {
                 m.entity = HpMode::Entity::kFace;
                 m.entity_index = static_cast<std::uint8_t>(f);
                 m.order = static_cast<std::uint8_t>(std::max(m1, m2));
+                m.index0 = static_cast<std::uint8_t>(m1);
+                m.index1 = static_cast<std::uint8_t>(m2);
                 out.push_back({idx[0], idx[1], idx[2], m});
             }
         }
@@ -176,6 +206,9 @@ std::vector<HexRecipe> build_hex(std::uint8_t order) {
                 m.entity = HpMode::Entity::kInterior;
                 m.entity_index = 0;
                 m.order = static_cast<std::uint8_t>(std::max({i, j, k}));
+                m.index0 = static_cast<std::uint8_t>(i);
+                m.index1 = static_cast<std::uint8_t>(j);
+                m.index2 = static_cast<std::uint8_t>(k);
                 out.push_back({i, j, k, m});
             }
         }
@@ -183,40 +216,160 @@ std::vector<HexRecipe> build_hex(std::uint8_t order) {
     return out;
 }
 
-// A tet mode: vertex v (edge_a<0) or quadratic edge bubble on (edge_a, edge_b).
+// Tet hierarchical recipes.
+// Kind: vertex / edge / face / interior.
+enum class TetKind : std::uint8_t { kVertex, kEdge, kFace, kInterior };
+
 struct TetRecipe {
-    int edge_a; // -1 for a vertex mode
-    int edge_b;
-    int vertex; // valid when edge_a < 0
+    TetKind kind = TetKind::kVertex;
+    int a = 0; // vertex, or edge endpoint a / face vertex a
+    int b = 0; // edge endpoint b / face vertex b
+    int c = 0; // face vertex c
+    int d = 0; // unused, or interior unused
+    int n1 = 0; // edge order (>=2), or face multi-index n1>=0, or interior n1
+    int n2 = 0; // face multi-index n2, or interior n2
+    int n3 = 0; // interior n3
     HpMode mode;
 };
 
+// Face kernels up to order p: all (n1,n2) with n1>=0, n2>=0, n1+n2 <= p-3.
+// Total count = (p-1)(p-2)/2. Ordering: n1 outer, n2 inner for n1+n2 = 0,1,...,p-3.
+// Interior kernels: (n1,n2,n3) with n1,n2,n3>=0, n1+n2+n3 <= p-4.
+// Total = (p-1)(p-2)(p-3)/6.
+
 std::vector<TetRecipe> build_tet(std::uint8_t order) {
-    if (order < 1 || order > 2) {
+    if (order < 1 || order > 4) {
         throw FeaError(std::format(
-            "hierarchical tet: order {} unsupported (1..2; k>=3 kernels are the next increment)",
-            order));
+            "hierarchical tet: order {} unsupported (1..4)", order));
     }
+    const int p = order;
     std::vector<TetRecipe> out;
     for (int v = 0; v < 4; ++v) {
         HpMode m;
         m.entity = HpMode::Entity::kVertex;
         m.entity_index = static_cast<std::uint8_t>(v);
         m.order = 1;
-        out.push_back({-1, -1, v, m});
+        out.push_back({TetKind::kVertex, v, 0, 0, 0, 0, 0, 0, m});
     }
-    if (order >= 2) {
-        for (int e = 0; e < 6; ++e) {
+    // Edges: kernel order l = 2..p. N = 4 λ_a λ_b L_{l-2}(λ_b - λ_a).
+    for (int e = 0; e < 6; ++e) {
+        for (int l = 2; l <= p; ++l) {
             HpMode m;
             m.entity = HpMode::Entity::kEdge;
             m.entity_index = static_cast<std::uint8_t>(e);
-            m.order = 2;
-            // phi_2 is even, so the quadratic edge bubble does not flip.
-            out.push_back({kTetE[static_cast<std::size_t>(e)][0],
-                           kTetE[static_cast<std::size_t>(e)][1], -1, m});
+            m.order = static_cast<std::uint8_t>(l);
+            m.edge_odd = (l % 2 == 1);
+            m.index0 = static_cast<std::uint8_t>(l);
+            out.push_back({TetKind::kEdge, kTetE[static_cast<std::size_t>(e)][0],
+                           kTetE[static_cast<std::size_t>(e)][1], 0, 0, l, 0, 0, m});
         }
     }
+    // Faces: for each face, kernels with n1+n2 <= p-3, n1,n2 >= 0.
+    // Mode order = n1 + n2 + 3 (the λ_a λ_b λ_c factor is degree 3).
+    for (int f = 0; f < 4; ++f) {
+        int face_slot = 0;
+        for (int sum = 0; sum <= p - 3; ++sum) {
+            for (int n1 = 0; n1 <= sum; ++n1) {
+                const int n2 = sum - n1;
+                HpMode m;
+                m.entity = HpMode::Entity::kFace;
+                m.entity_index = static_cast<std::uint8_t>(f);
+                m.order = static_cast<std::uint8_t>(n1 + n2 + 3);
+                m.index0 = static_cast<std::uint8_t>(n1);
+                m.index1 = static_cast<std::uint8_t>(n2);
+                m.index2 = static_cast<std::uint8_t>(face_slot); // slot within face
+                out.push_back({TetKind::kFace, kTetF[static_cast<std::size_t>(f)][0],
+                               kTetF[static_cast<std::size_t>(f)][1],
+                               kTetF[static_cast<std::size_t>(f)][2], 0, n1, n2, face_slot, m});
+                ++face_slot;
+            }
+        }
+    }
+    // Interior: n1+n2+n3 <= p-4.
+    int int_slot = 0;
+    for (int sum = 0; sum <= p - 4; ++sum) {
+        for (int n1 = 0; n1 <= sum; ++n1) {
+            for (int n2 = 0; n1 + n2 <= sum; ++n2) {
+                const int n3 = sum - n1 - n2;
+                HpMode m;
+                m.entity = HpMode::Entity::kInterior;
+                m.entity_index = 0;
+                m.order = static_cast<std::uint8_t>(n1 + n2 + n3 + 4);
+                m.index0 = static_cast<std::uint8_t>(n1);
+                m.index1 = static_cast<std::uint8_t>(n2);
+                m.index2 = static_cast<std::uint8_t>(n3);
+                out.push_back({TetKind::kInterior, 0, 1, 2, 3, n1, n2, n3, m});
+                ++int_slot;
+            }
+        }
+    }
+    (void)int_slot;
     return out;
+}
+
+// Evaluate one tet mode value + gradient in reference coordinates.
+void eval_tet_mode(const TetRecipe& rec, const std::array<double, 4>& lam,
+                   const std::array<Eigen::Vector3d, 4>& glam, double& val,
+                   Eigen::Vector3d& grad) {
+    if (rec.kind == TetKind::kVertex) {
+        const auto v = static_cast<std::size_t>(rec.a);
+        val = lam[v];
+        grad = glam[v];
+        return;
+    }
+    if (rec.kind == TetKind::kEdge) {
+        const auto ia = static_cast<std::size_t>(rec.a);
+        const auto ib = static_cast<std::size_t>(rec.b);
+        const double la = lam[ia], lb = lam[ib];
+        const int l = rec.n1; // order
+        const int deg = l - 2;
+        const double xi = lb - la;
+        const double L = legendre_p(deg, xi);
+        const double dL = legendre_p_deriv(deg, xi);
+        // N = 4 la lb L(lb-la)
+        val = 4.0 * la * lb * L;
+        // dN = 4[(dla) lb L + la (dlb) L + la lb dL (dlb - dla)]
+        grad = 4.0 * (lb * L * glam[ia] + la * L * glam[ib] +
+                      la * lb * dL * (glam[ib] - glam[ia]));
+        return;
+    }
+    if (rec.kind == TetKind::kFace) {
+        const auto ia = static_cast<std::size_t>(rec.a);
+        const auto ib = static_cast<std::size_t>(rec.b);
+        const auto ic = static_cast<std::size_t>(rec.c);
+        const double la = lam[ia], lb = lam[ib], lc = lam[ic];
+        const int n1 = rec.n1, n2 = rec.n2;
+        const double x1 = lb - la;
+        const double x2 = lc - la;
+        const double L1 = legendre_p(n1, x1);
+        const double L2 = legendre_p(n2, x2);
+        const double dL1 = legendre_p_deriv(n1, x1);
+        const double dL2 = legendre_p_deriv(n2, x2);
+        // N = la lb lc L_n1(lb-la) L_n2(lc-la)
+        val = la * lb * lc * L1 * L2;
+        // Product rule over la,lb,lc and the two Legendre arguments.
+        grad = (lb * lc * L1 * L2) * glam[ia] + (la * lc * L1 * L2) * glam[ib] +
+               (la * lb * L1 * L2) * glam[ic] +
+               (la * lb * lc * dL1 * L2) * (glam[ib] - glam[ia]) +
+               (la * lb * lc * L1 * dL2) * (glam[ic] - glam[ia]);
+        return;
+    }
+    // Interior: N = l0 l1 l2 l3 L_n1(l1-l0) L_n2(l2-l0) L_n3(l3-l0)
+    const double l0 = lam[0], l1 = lam[1], l2 = lam[2], l3 = lam[3];
+    const int n1 = rec.n1, n2 = rec.n2, n3 = rec.n3;
+    const double L1 = legendre_p(n1, l1 - l0);
+    const double L2 = legendre_p(n2, l2 - l0);
+    const double L3 = legendre_p(n3, l3 - l0);
+    const double dL1 = legendre_p_deriv(n1, l1 - l0);
+    const double dL2 = legendre_p_deriv(n2, l2 - l0);
+    const double dL3 = legendre_p_deriv(n3, l3 - l0);
+    val = l0 * l1 * l2 * l3 * L1 * L2 * L3;
+    const double base = L1 * L2 * L3;
+    grad = (l1 * l2 * l3 * base) * glam[0] + (l0 * l2 * l3 * base) * glam[1] +
+           (l0 * l1 * l3 * base) * glam[2] + (l0 * l1 * l2 * base) * glam[3] +
+           (l0 * l1 * l2 * l3 * dL1 * L2 * L3) * (glam[1] - glam[0]) +
+           (l0 * l1 * l2 * l3 * L1 * dL2 * L3) * (glam[2] - glam[0]) +
+           (l0 * l1 * l2 * l3 * L1 * L2 * dL3) * (glam[3] - glam[0]);
 }
 
 // Strain-displacement matrix (6 x 3n), Voigt order (xx,yy,zz,yz,xz,xy) with
@@ -294,18 +447,11 @@ HpShape hp_eval(ElementType type, std::uint8_t order, const Eigen::Vector3d& xi)
         out.n.resize(n);
         out.dn.resize(n, 3);
         for (Eigen::Index r = 0; r < n; ++r) {
-            const auto& rec = recipes[static_cast<std::size_t>(r)];
-            if (rec.edge_a < 0) {
-                const auto v = static_cast<std::size_t>(rec.vertex);
-                out.n(r) = lam[v];
-                out.dn.row(r) = glam[v].transpose();
-            } else {
-                const auto a = static_cast<std::size_t>(rec.edge_a);
-                const auto b = static_cast<std::size_t>(rec.edge_b);
-                // Quadratic edge bubble 4*lam_a*lam_b (peaks at 1 at the midpoint).
-                out.n(r) = 4.0 * lam[a] * lam[b];
-                out.dn.row(r) = (4.0 * (lam[b] * glam[a] + lam[a] * glam[b])).transpose();
-            }
+            double val = 0.0;
+            Eigen::Vector3d g = Eigen::Vector3d::Zero();
+            eval_tet_mode(recipes[static_cast<std::size_t>(r)], lam, glam, val, g);
+            out.n(r) = val;
+            out.dn.row(r) = g.transpose();
         }
         return out;
     }
@@ -327,9 +473,11 @@ Eigen::MatrixXd hp_element_stiffness(const Eigen::Matrix<double, Eigen::Dynamic,
     }
 
     // Subparametric geometry: straight-sided map from the p=1 vertex functions.
+    // Stiffness integrand degree ~ 2(p-1) on affine cells; n >= p Gauss points
+    // (hex) / Duffy degree 2p (tet) is enough, with a small overkill margin.
     std::vector<QuadraturePoint> rule;
     if (is_hex) {
-        rule = hex_rule(std::min(5, static_cast<int>(order) + 1));
+        rule = hex_rule(std::min(6, std::max(2, static_cast<int>(order) + 1)));
     } else {
         rule = tet_rule(std::max(2, 2 * static_cast<int>(order)));
     }

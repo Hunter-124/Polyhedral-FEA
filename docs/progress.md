@@ -23,6 +23,22 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: **Curvature-driven refinement + boundary finishing (bore/rim
+  weirdness fixed)** — percentile curvature seed balls replaced by a per-cell
+  turning-angle criterion (`stamp_curvature_cells`: refine where the surface
+  turns > 15° per cell, h·κ > θ; L2 at > 2θ) in both graded tet and hybrid
+  zoo — inert on flats (no more fine islands), contiguous around bores (no
+  more coarse rings). Hybrid v4 latent fan-anchor bug fixed (corner anchor →
+  7399 zero-volume tets at hole-fine h; now anchors at min-id mid node, raw
+  min aspect 0 → 0.125). Free-surface transition cells promoted to fine so
+  fan tets never sit on the wall (hole-fine hybrid M1max 0.0876 → ~1e-11,
+  M6 0 → 0.17). New S6 crease-aware tangential boundary smoothing
+  (`mesh/surface_project::smooth_boundary_nodes`, offender-revert guard,
+  intrinsic normal-cone crease freeze) kills the sawtooth rim at hole edges;
+  degenerate flat caps peeled in both meshers. Scorecard (hex/graded/hybrid):
+  sphere 0.849/0.804/0.896, cylinder 0.860/0.792/0.861, hole
+  0.568/0.530/0.577; hole-fine hybrid 0.424 > hex 0.410. All 149 tests pass.
+  ADR-0012 amended.
 - 2026-07-10: **Hybrid v4 conforming fan transitions + graded S4/S5 repair
   (curved scorecard flipped to pass)** — root causes found & fixed: hybrid v3
   2:1 pyramid transitions were non-conforming (hanging edge-mids → cracked

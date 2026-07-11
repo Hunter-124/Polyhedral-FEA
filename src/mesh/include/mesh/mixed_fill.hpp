@@ -53,6 +53,9 @@ struct MixedFillOutput {
 
 /// Hybrid zoo: hex bulk + optional 2:1 feature fine + pyramid skin/transition.
 /// `skin_layers` ≥ 1 (used only when no feature/seed drivers).
+/// `curvature_turn_deg` > 0 enables the per-cell turning-angle criterion:
+/// cells where the surface turns more than that angle per bulk cell (h·κ)
+/// refine to h/2 — contiguous along curved walls, inert on flats.
 MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                                    const Eigen::Vector3d& bbox_min,
                                    const Eigen::Vector3d& bbox_max, double h,
@@ -60,7 +63,8 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                                    std::span<const geom::SharpEdge> features = {},
                                    double feature_band = 0.0,
                                    std::span<const Eigen::Vector3d> curvature_seeds = {},
-                                   double seed_band = 0.0, bool snap_boundary = true);
+                                   double seed_band = 0.0, bool snap_boundary = true,
+                                   double curvature_turn_deg = 0.0);
 
 /// Expand every hex8 → 6 pyramid5 (centroid apex). Pyramids/tets pass through.
 /// Product FE path for hybrid / hexpyr (constant-strain exact).

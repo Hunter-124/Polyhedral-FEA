@@ -9,6 +9,7 @@
 
 #include <Eigen/Core>
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <set>
@@ -64,6 +65,28 @@ SnapStats snap_boundary_nodes(const geom::TriSurface& surface,
                               const CollectOffendersFn& collect_offenders,
                               double max_move_frac = 0.75, int passes = 4,
                               std::span<const geom::SharpEdge> feature_edges = {});
+
+/// Result of a tangential boundary smoothing pass.
+struct SmoothStats {
+    std::size_t n_moved = 0;    // nodes moved in the final accepted state
+    std::size_t n_reverted = 0; // nodes reverted by the inversion guard
+    double max_residual = 0.0;  // metres, after smoothing
+};
+
+/// Constrained Laplacian smoothing of free-surface nodes: each boundary node
+/// relaxes toward the centroid of its boundary neighbors, then re-projects to
+/// the STL, so travel is tangential (residual stays ~0) while stair/sawtooth
+/// spacing evens out. Crease nodes (within ~0.1 h of a sharp feature edge and
+/// forming a 2-neighbor crease chain) relax along the crease and re-project to
+/// it; corners/junctions and near-crease wall nodes are left untouched so
+/// sharp edges stay sharp. Nodes whose move inverts an element are reverted
+/// via `collect_offenders` (B3-safe like the snap).
+SmoothStats smooth_boundary_nodes(const geom::TriSurface& surface,
+                                  std::vector<Eigen::Vector3d>& nodes,
+                                  std::span<const std::array<std::uint32_t, 4>> boundary_faces,
+                                  double h, const CollectOffendersFn& collect_offenders,
+                                  int passes = 2, double relax = 0.5,
+                                  std::span<const geom::SharpEdge> feature_edges = {});
 
 } // namespace polymesh::mesh
 

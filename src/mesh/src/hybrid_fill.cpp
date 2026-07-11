@@ -84,7 +84,8 @@ GradedTetFillOutput
 graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& bbox_min,
                         const Eigen::Vector3d& bbox_max, double h, int skin_layers,
                         std::span<const geom::SharpEdge> features, double feature_band,
-                        std::span<const Eigen::Vector3d> refine_seeds, double seed_band) {
+                        std::span<const Eigen::Vector3d> refine_seeds, double seed_band,
+                        double curvature_turn_deg) {
     if (!(h > 0.0) || !std::isfinite(h)) {
         throw ValidityError("graded_tet_fill_surface: h must be positive");
     }
@@ -96,6 +97,9 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     }
     if (!(seed_band > 0.0) || refine_seeds.empty()) {
         seed_band = 0.0;
+    }
+    if (!(curvature_turn_deg > 0.0)) {
+        curvature_turn_deg = 0.0;
     }
     const Eigen::Vector3d extent = bbox_max - bbox_min;
     if (extent.minCoeff() <= 0.0) {
@@ -168,7 +172,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     // (everything looks the same size in the free-surface wireframe). Plain
     // graded (no geo drivers) still skins so unit boxes get an L1 shell.
     const int skin_cap = std::max(1, (max_dist + 1) / 2);
-    const bool have_geo_drivers = (feature_band > 0.0) || (seed_band > 0.0);
+    const bool have_geo_drivers =
+        (feature_band > 0.0) || (seed_band > 0.0) || (curvature_turn_deg > 0.0);
     const int skin_thresh = have_geo_drivers ? 0 : std::min(skin_layers, skin_cap);
 
     // refine_level: 0=bulk, 1=L1 (~h/2), 2=L2 (~h/4 near high-κ seeds)
@@ -189,8 +194,14 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     }
     // Features → L1 band (hole rims, creases).
     stamp_feature_cells(is_l1, &is_feature, nx, ny, nz, grid, surface, features, feature_band);
-    // Seeds (curvature / a-posteriori) → L2 superfine.
+    // Seeds (a-posteriori adapt) → L2 superfine.
     stamp_seed_cells(is_l2, &is_seed, nx, ny, nz, grid, refine_seeds, seed_band);
+    // Per-cell turning-angle criterion: h·κ > θ → L1, > 2θ → L2 (angle-adaptive,
+    // contiguous along curved walls, inert on flats).
+    if (curvature_turn_deg > 0.0) {
+        stamp_curvature_cells(is_l1, &is_l2, nullptr, nx, ny, nz, grid, surface,
+                              curvature_turn_deg * 3.14159265358979323846 / 180.0);
+    }
     // Feature core → L2 so hole rims get two LEB levels (~h/4).
     if (feature_band > 0.0 && !features.empty()) {
         std::vector<char> feature_core(inside.size(), 0);
@@ -734,16 +745,34 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         // holes. Peel the tets of those *pre-identified* jut nodes as they gain
         // free faces, until the juts drop out of the mesh. Newly exposed nodes
         // are not juts, so the peel cannot run away into the bulk.
+        // Also peels *flat caps the collapse could not cure* (aspect below the
+        // scorecard floor): a cap that survives S4 is wedged between healthy
+        // tets; with a free face it is a zero-thickness skin flake — removing
+        // it exposes those healthy faces with negligible volume change.
         {
             constexpr int kCarvePasses = 4;
+            constexpr double kPeelAspect = 0.03; // < kKeepAspect: only true flakes
             const double node_thr = 0.15 * hc;
+            const auto aspect_peel = [&](const std::array<std::uint32_t, 4>& n) {
+                const Eigen::Vector3d& a = out.mesh.nodes[n[0]];
+                const Eigen::Vector3d& b = out.mesh.nodes[n[1]];
+                const Eigen::Vector3d& c = out.mesh.nodes[n[2]];
+                const Eigen::Vector3d& d = out.mesh.nodes[n[3]];
+                const double v = std::abs(tet_signed_volume(a, b, c, d));
+                const double emax = std::max({(a - b).norm(), (a - c).norm(), (a - d).norm(),
+                                              (b - c).norm(), (b - d).norm(), (c - d).norm()});
+                if (emax <= 0.0) {
+                    return true;
+                }
+                return 6.0 * 1.4142135623730951 * v / (emax * emax * emax) < kPeelAspect;
+            };
             std::unordered_set<std::uint32_t> jut;
             for (const auto ni : tet_boundary_nodes(out.mesh.tets)) {
                 if (closest_on_surface(surface, out.mesh.nodes[ni]).distance > node_thr) {
                     jut.insert(ni);
                 }
             }
-            for (int pass = 0; !jut.empty() && pass < kCarvePasses; ++pass) {
+            for (int pass = 0; pass < kCarvePasses; ++pass) {
                 // Free faces per tet (faces appearing once across the mesh).
                 struct FKey {
                     std::uint32_t a, b, c;
@@ -788,7 +817,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                             break;
                         }
                     }
-                    if (!has_jut) {
+                    if (!has_jut && !aspect_peel(t)) {
                         continue;
                     }
                     bool has_free_face = false;
@@ -822,6 +851,81 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     // The carve exposes fresh lattice faces that were never snapped — run a
     // second snap + repair round so the new boundary reaches the surface too.
     snap_round();
+    repair_round();
+
+    // S6 tangential smoothing: snap places nodes *on* the surface but keeps
+    // their lattice-stair spacing, which reads as sawtooth on curved walls and
+    // hole rims. Relax boundary nodes toward their boundary-neighbor centroid
+    // and re-project (crease nodes relax along the crease), reverting any move
+    // that inverts a tet.
+    {
+        struct FaceKey {
+            std::uint32_t a, b, c;
+            bool operator==(const FaceKey& o) const {
+                return a == o.a && b == o.b && c == o.c;
+            }
+        };
+        struct FaceHash {
+            std::size_t operator()(const FaceKey& f) const noexcept {
+                std::size_t h2 = f.a;
+                h2 ^= static_cast<std::size_t>(f.b) + 0x9e3779b97f4a7c15ULL + (h2 << 6) +
+                      (h2 >> 2);
+                h2 ^= static_cast<std::size_t>(f.c) + 0x9e3779b97f4a7c15ULL + (h2 << 6) +
+                      (h2 >> 2);
+                return h2;
+            }
+        };
+        static constexpr int kTFaces[4][3] = {{0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}};
+        std::unordered_map<FaceKey, std::array<std::uint32_t, 3>, FaceHash> once;
+        std::unordered_map<FaceKey, int, FaceHash> fcount;
+        fcount.reserve(out.mesh.tets.size() * 2);
+        const auto fkey = [](std::uint32_t x, std::uint32_t y, std::uint32_t z) {
+            std::array<std::uint32_t, 3> v{{x, y, z}};
+            std::sort(v.begin(), v.end());
+            return FaceKey{v[0], v[1], v[2]};
+        };
+        for (const auto& t : out.mesh.tets) {
+            for (const auto& f : kTFaces) {
+                const auto k0 = t[static_cast<std::size_t>(f[0])];
+                const auto k1 = t[static_cast<std::size_t>(f[1])];
+                const auto k2 = t[static_cast<std::size_t>(f[2])];
+                const auto key = fkey(k0, k1, k2);
+                if (++fcount[key] == 1) {
+                    once[key] = {k0, k1, k2};
+                }
+            }
+        }
+        std::vector<std::array<std::uint32_t, 4>> free_faces;
+        free_faces.reserve(once.size() / 2);
+        for (const auto& [key, tri] : once) {
+            if (fcount[key] == 1) {
+                free_faces.push_back({tri[0], tri[1], tri[2], tri[2]});
+            }
+        }
+        const double vol_eps = 1e-14 * hc * hc * hc;
+        smooth_boundary_nodes(
+            surface, out.mesh.nodes, free_faces, hc,
+            [&](std::set<std::uint32_t>& offenders) {
+                for (const auto& n : out.mesh.tets) {
+                    const double v = tet_signed_volume(out.mesh.nodes[n[0]],
+                                                       out.mesh.nodes[n[1]],
+                                                       out.mesh.nodes[n[2]],
+                                                       out.mesh.nodes[n[3]]);
+                    if (v <= vol_eps) {
+                        offenders.insert(n.begin(), n.end());
+                    }
+                }
+            },
+            /*passes=*/3, /*relax=*/0.5, features);
+        for (auto& n : out.mesh.tets) {
+            const double v = tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
+                                               out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
+            if (v < 0.0) {
+                std::swap(n[1], n[2]);
+            }
+        }
+    }
+    // Smoothing can thin an already-marginal cap — one more collapse round.
     repair_round();
 
     // Rebuild boundary quads as exterior tris padded for pipeline display

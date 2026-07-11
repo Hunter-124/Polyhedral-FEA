@@ -70,6 +70,42 @@ Result: graded M1max ≈ 0 on all scorecard fixtures, min boundary aspect
 ≥ ~0.04, composite within 0.9× of hex (all-tet pays the M6 aspect term that a
 pure-hex mesh never does).
 
+## Amendment: curvature-driven refinement + boundary finishing (both meshers)
+
+Percentile-based curvature seed balls were replaced and four defects fixed:
+
+- **Turning-angle refinement criterion** (`stamp_curvature_cells`): a cell is
+  refined when the surface turns more than θ across it, `h·κ > θ` with
+  κ ≈ 2|H| from `geom::estimate_vertex_curvature` (L1 at > θ, L2 at > 2θ;
+  θ = 15° in the pipeline). Deterministic and local: inert on flats (kills the
+  isolated fine islands the percentile threshold produced from tessellation
+  noise) and contiguous around bores (kills the patchy coarse/fine rings the
+  capped seed balls produced).
+- **v4 fan anchor fix** (hybrid): anchoring a transition-face fan at a corner
+  node emits a zero-volume tet when the corner is collinear with the two
+  halves of its split edge — the raw hole-fine lattice held 7399 degenerate
+  tets (M6 = 0). The fan now anchors at the min-id *mid* node (mid-ness is
+  intrinsic to the face, so both sharing cells still build identical fans).
+  Raw min tet aspect: 0 → 0.125.
+- **Free-surface transition promotion** (hybrid): a 2:1 transition cell whose
+  fan tets sit on the wall gets squashed by snap. Transition cells touching
+  the free surface are promoted to fine (fixed-point loop), so fans only ever
+  sit interior. Hole-fine hybrid M1max 0.0876 → ~1e-11, M6 0 → 0.17.
+- **S6 constrained tangential smoothing + peel** (both): after snap/repair, a
+  crease-aware Laplacian pass (`smooth_boundary_nodes`) evens out the
+  lattice-stair spacing that produced the sawtooth rim at hole edges. Crease
+  chains relax along the crease and reproject onto feature curves; free nodes
+  reproject onto the surface; an inversion/offender guard reverts and freezes
+  bad moves. Without CAD feature edges, an intrinsic normal-cone guard
+  (> ~45° incident-face-normal spread) freezes geometric creases so unit-box
+  fills stay conforming. Degenerate flat caps that collapse cannot cure are
+  peeled (graded: aspect < 0.03 with a free face; hybrid: post-snap tet peel
+  with boundary-face rebuild).
+
+Scorecard after: sphere 0.849/0.804/0.896, cylinder 0.860/0.792/0.861, hole
+0.568/0.530/0.577 (hex/graded/hybrid); hole at fine h: hybrid 0.424 > hex
+0.410 with M6 0.17.
+
 ## Related mono paths
 | Mesher | Role |
 |--------|------|

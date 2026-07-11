@@ -273,90 +273,40 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                              std::span<const Eigen::Vector3d> refine_seeds, double seed_band) {
     VolumeMeshOutput out;
     double fill_h = h;
+    // Per-cell turning-angle refinement threshold (feature_refine paths): refine
+    // where the surface turns more than this per bulk cell (h·κ). Angle-based,
+    // so gentle curves / big bores stay coarse and flats never refine — replaces
+    // the capped seed-ball scheme (coarse rings mid-bore, fine islands on flats).
+    constexpr double kCurvatureTurnDeg = 15.0;
     if (mesher == VolumeMesher::kHybrid) {
-        // SPEC hybrid zoo: hex bulk @ h + 2:1 fine @ h/2 on feature/seed bands +
-        // pyramid transitions (no hanging faces). Product FE expands hex→pyramids.
+        // SPEC hybrid zoo: hex bulk @ h + 2:1 fine @ h/2 on feature/curvature
+        // bands + conforming transitions. Product FE expands hex→pyramids.
         std::vector<geom::SharpEdge> edges;
-        std::vector<Eigen::Vector3d> curv_seeds(refine_seeds.begin(), refine_seeds.end());
+        std::vector<Eigen::Vector3d> adapt_seeds(refine_seeds.begin(), refine_seeds.end());
         double feat_band = 0.0;
         double s_band = seed_band;
-        std::size_t n_curv_seeds = 0;
+        double turn_deg = 0.0;
         if (feature_refine) {
             edges = geom::detect_sharp_edges(model.surface, 30.0);
             if (!edges.empty()) {
                 // Feature band ~2 bulk cells so hole rims get a clear h/2 shell.
                 feat_band = 2.0 * h;
             }
-            // Match graded seeding: κ ≳ 1/(12h) or top ~25% of positive κ.
-            const auto curv = geom::estimate_vertex_curvature(model.surface);
-            const double kappa_abs = 1.0 / (12.0 * std::max(h, 1e-12));
-            std::vector<double> pos_kappa;
-            pos_kappa.reserve(curv.kappa.size());
-            for (double k : curv.kappa) {
-                if (k > 1e-9) {
-                    pos_kappa.push_back(k);
-                }
-            }
-            double kappa_rel = kappa_abs;
-            if (!pos_kappa.empty()) {
-                std::sort(pos_kappa.begin(), pos_kappa.end());
-                const std::size_t iq =
-                    std::min(pos_kappa.size() - 1, (pos_kappa.size() * 75) / 100);
-                kappa_rel = std::min(kappa_abs, pos_kappa[iq] * 0.999);
-            }
-            const double kappa_thresh = std::max(kappa_rel, 1e-12);
-            // Collect all high-κ candidates then spatial-thin so a hole wall is
-            // covered all around (index-order cap clustered on one sector).
-            std::vector<Eigen::Vector3d> candidates;
-            candidates.reserve(std::min<std::size_t>(model.surface.vertices.size(), 4096));
-            for (std::size_t i = 0; i < model.surface.vertices.size(); ++i) {
-                if (i < curv.kappa.size() && curv.kappa[i] >= kappa_thresh) {
-                    candidates.push_back(model.surface.vertices[i]);
-                }
-            }
-            for (std::size_t ti = 0; ti < model.surface.triangles.size(); ti += 3) {
-                const auto& tri = model.surface.triangles[ti];
-                for (int e = 0; e < 3; ++e) {
-                    const auto a = tri[static_cast<std::size_t>(e)];
-                    const auto b = tri[static_cast<std::size_t>((e + 1) % 3)];
-                    if (a < curv.kappa.size() && b < curv.kappa.size() &&
-                        0.5 * (curv.kappa[a] + curv.kappa[b]) >= kappa_thresh) {
-                        candidates.push_back(
-                            0.5 * (model.surface.vertices[a] + model.surface.vertices[b]));
-                    }
-                }
-            }
-            constexpr std::size_t kMaxHybridSeeds = 256;
-            const double min_sep = 0.75 * h;
-            const double min_sep2 = min_sep * min_sep;
-            for (const auto& p : candidates) {
-                if (curv_seeds.size() >= kMaxHybridSeeds) {
-                    break;
-                }
-                bool far = true;
-                for (const auto& q : curv_seeds) {
-                    if ((p - q).squaredNorm() < min_sep2) {
-                        far = false;
-                        break;
-                    }
-                }
-                if (far) {
-                    curv_seeds.push_back(p);
-                    ++n_curv_seeds;
-                }
-            }
-            if (s_band <= 0.0 && !curv_seeds.empty()) {
-                s_band = 2.0 * h; // cover hole wall thickness + one bulk cell
-            }
-            if (s_band > 0.0 && curv_seeds.empty()) {
-                s_band = 0.0;
-            }
+            turn_deg = kCurvatureTurnDeg;
+        }
+        // A-posteriori adapt seeds (caller) keep their ball semantics.
+        if (s_band <= 0.0 && !adapt_seeds.empty()) {
+            s_band = 2.0 * h;
+        }
+        if (adapt_seeds.empty()) {
+            s_band = 0.0;
         }
         // Build lattice without snap first; snap after hex→pyramid expand so free
         // surface Jacobian is pyramid-based (hex free-face snap unsnaps too often).
         auto raw = mesh::mixed_fill_surface(model.surface, model.bbox_min, model.bbox_max, h,
                                             std::max(1, skin_layers), edges, feat_band,
-                                            curv_seeds, s_band, /*snap_boundary=*/false);
+                                            adapt_seeds, s_band, /*snap_boundary=*/false,
+                                            turn_deg);
         const std::size_t n_hex_lattice = raw.n_hex;
         const std::size_t n_pyr_raw = raw.n_pyramid;
         auto fill = mesh::expand_mixed_hex_to_pyramids(raw);
@@ -370,11 +320,45 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             std::vector<std::uint32_t> bnodes(bset.begin(), bset.end());
             const double h_snap = fill.h > 0.0 ? fill.h : h;
             const double vol_eps = 1e-14 * h_snap * h_snap * h_snap;
+            // Fan tets must keep a usable shape: the snap used to flatten them
+            // unchecked (only pyramids were guarded), leaving zero-aspect
+            // boundary tets in the product mesh (M6 → 0 at fine h).
+            constexpr double kMinTetAspect = 0.02;
+            const auto tet_aspect_ok = [&](const mesh::MixedCell& cell) {
+                const Eigen::Vector3d& a = fill.nodes[cell.nodes[0]];
+                const Eigen::Vector3d& b = fill.nodes[cell.nodes[1]];
+                const Eigen::Vector3d& c = fill.nodes[cell.nodes[2]];
+                const Eigen::Vector3d& d = fill.nodes[cell.nodes[3]];
+                const double v = (b - a).dot((c - a).cross(d - a)) / 6.0;
+                if (v <= vol_eps) {
+                    return false;
+                }
+                const double emax = std::max({(a - b).norm(), (a - c).norm(), (a - d).norm(),
+                                              (b - c).norm(), (b - d).norm(), (c - d).norm()});
+                if (emax <= 0.0) {
+                    return false;
+                }
+                return 6.0 * 1.4142135623730951 * v / (emax * emax * emax) >= kMinTetAspect;
+            };
             fill.boundary_max_distance =
                 mesh::snap_boundary_nodes(
                     model.surface, fill.nodes, bnodes, h_snap,
                     [&](std::set<std::uint32_t>& offenders) {
                         for (const auto& cell : fill.cells) {
+                            if (cell.kind == mesh::MixedCellKind::kTet4) {
+                                // Volume only: a fan tet flattened by a full
+                                // snap is peeled right after (apex coplanar) —
+                                // cheaper than unsnapping the wall.
+                                const Eigen::Vector3d& a = fill.nodes[cell.nodes[0]];
+                                const Eigen::Vector3d& b = fill.nodes[cell.nodes[1]];
+                                const Eigen::Vector3d& c = fill.nodes[cell.nodes[2]];
+                                const Eigen::Vector3d& d = fill.nodes[cell.nodes[3]];
+                                if ((b - a).dot((c - a).cross(d - a)) < 0.0) {
+                                    offenders.insert(cell.nodes.begin(),
+                                                     cell.nodes.begin() + cell.n_nodes);
+                                }
+                                continue;
+                            }
                             if (cell.kind != mesh::MixedCellKind::kPyramid5) {
                                 continue;
                             }
@@ -400,6 +384,108 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                     },
                     /*max_move_frac=*/1.25, /*passes=*/8, edges)
                     .max_residual;
+            // Peel snap-flattened fan tets: a full wall snap can pull all three
+            // free nodes of a transition fan tet into the apex plane (aspect →
+            // 0). The apex is then coplanar with the wall, so deleting the tet
+            // exposes conforming faces with ~zero residual — better than
+            // unsnapping the wall to save a degenerate element.
+            {
+                struct TriKey {
+                    std::uint32_t a, b, c;
+                    bool operator==(const TriKey& o) const {
+                        return a == o.a && b == o.b && c == o.c;
+                    }
+                };
+                struct TriHash {
+                    std::size_t operator()(const TriKey& f) const noexcept {
+                        std::size_t s = f.a;
+                        s ^= static_cast<std::size_t>(f.b) + 0x9e3779b97f4a7c15ULL +
+                             (s << 6) + (s >> 2);
+                        s ^= static_cast<std::size_t>(f.c) + 0x9e3779b97f4a7c15ULL +
+                             (s << 6) + (s >> 2);
+                        return s;
+                    }
+                };
+                const auto tkey = [](std::uint32_t x, std::uint32_t y, std::uint32_t z) {
+                    std::array<std::uint32_t, 3> v{{x, y, z}};
+                    std::sort(v.begin(), v.end());
+                    return TriKey{v[0], v[1], v[2]};
+                };
+                static constexpr int kTetTris[4][3] = {
+                    {0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}};
+                static constexpr int kPyrTris[4][3] = {
+                    {0, 1, 4}, {1, 2, 4}, {2, 3, 4}, {3, 0, 4}};
+                const auto count_tris = [&]() {
+                    std::unordered_map<TriKey, int, TriHash> tri_count;
+                    tri_count.reserve(fill.cells.size() * 2);
+                    for (const auto& cell : fill.cells) {
+                        const auto& tt =
+                            (cell.kind == mesh::MixedCellKind::kTet4) ? kTetTris : kPyrTris;
+                        for (int f = 0; f < 4; ++f) {
+                            ++tri_count[tkey(cell.nodes[static_cast<std::size_t>(tt[f][0])],
+                                             cell.nodes[static_cast<std::size_t>(tt[f][1])],
+                                             cell.nodes[static_cast<std::size_t>(tt[f][2])])];
+                        }
+                    }
+                    return tri_count;
+                };
+                bool peeled_any = false;
+                for (int pass = 0; pass < 3; ++pass) {
+                    const auto tri_count = count_tris();
+                    std::vector<char> kill(fill.cells.size(), 0);
+                    std::size_t n_kill = 0;
+                    for (std::size_t ci = 0; ci < fill.cells.size(); ++ci) {
+                        const auto& cell = fill.cells[ci];
+                        if (cell.kind != mesh::MixedCellKind::kTet4 || tet_aspect_ok(cell)) {
+                            continue;
+                        }
+                        for (const auto& f : kTetTris) {
+                            const auto it = tri_count.find(
+                                tkey(cell.nodes[static_cast<std::size_t>(f[0])],
+                                     cell.nodes[static_cast<std::size_t>(f[1])],
+                                     cell.nodes[static_cast<std::size_t>(f[2])]));
+                            if (it != tri_count.end() && it->second == 1) {
+                                kill[ci] = 1;
+                                ++n_kill;
+                                break;
+                            }
+                        }
+                    }
+                    if (n_kill == 0 || n_kill >= fill.cells.size()) {
+                        break;
+                    }
+                    std::size_t w = 0;
+                    for (std::size_t ci = 0; ci < fill.cells.size(); ++ci) {
+                        if (!kill[ci]) {
+                            fill.cells[w++] = fill.cells[ci];
+                        }
+                    }
+                    fill.cells.resize(w);
+                    fill.n_tet -= n_kill;
+                    peeled_any = true;
+                }
+                if (peeled_any) {
+                    // Rebuild tri-encoded boundary entries from the surviving
+                    // cells (true quads — pyramid bases — are unaffected by a
+                    // tet peel and are kept as-is).
+                    std::erase_if(fill.boundary_quads,
+                                  [](const auto& q) { return q[2] == q[3]; });
+                    const auto tri_count = count_tris();
+                    for (const auto& cell : fill.cells) {
+                        const auto& tt =
+                            (cell.kind == mesh::MixedCellKind::kTet4) ? kTetTris : kPyrTris;
+                        for (int f = 0; f < 4; ++f) {
+                            const auto n0 = cell.nodes[static_cast<std::size_t>(tt[f][0])];
+                            const auto n1 = cell.nodes[static_cast<std::size_t>(tt[f][1])];
+                            const auto n2 = cell.nodes[static_cast<std::size_t>(tt[f][2])];
+                            const auto it = tri_count.find(tkey(n0, n1, n2));
+                            if (it != tri_count.end() && it->second == 1) {
+                                fill.boundary_quads.push_back({{n0, n1, n2, n2}});
+                            }
+                        }
+                    }
+                }
+            }
             // Per-node outlier re-projection (mirror of graded S3): residual
             // stragglers get a full/partial projection accepted only when every
             // incident cell stays valid. After expand all cells are pyramid/tet.
@@ -412,11 +498,7 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             }
             const auto cell_valid = [&](const mesh::MixedCell& cell) {
                 if (cell.kind == mesh::MixedCellKind::kTet4) {
-                    const Eigen::Vector3d& a = fill.nodes[cell.nodes[0]];
-                    const Eigen::Vector3d& b = fill.nodes[cell.nodes[1]];
-                    const Eigen::Vector3d& c = fill.nodes[cell.nodes[2]];
-                    const Eigen::Vector3d& d = fill.nodes[cell.nodes[3]];
-                    return (b - a).dot((c - a).cross(d - a)) / 6.0 > vol_eps;
+                    return tet_aspect_ok(cell);
                 }
                 if (cell.kind == mesh::MixedCellKind::kPyramid5) {
                     const Eigen::Vector3d& a = fill.nodes[cell.nodes[0]];
@@ -463,6 +545,26 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                 max_resid = std::max(max_resid, resid);
             }
             fill.boundary_max_distance = max_resid;
+            // Tangential smoothing: even out lattice-stair spacing on curved
+            // walls / hole rims (crease nodes relax along the crease). Moves
+            // are re-projected so the residual cannot grow; any move that
+            // invalidates a cell is reverted.
+            const auto smooth_st = mesh::smooth_boundary_nodes(
+                model.surface, fill.nodes, fill.boundary_quads, h_snap,
+                [&](std::set<std::uint32_t>& offenders) {
+                    for (const auto& cell : fill.cells) {
+                        if (cell_valid(cell)) {
+                            continue;
+                        }
+                        for (std::uint8_t m = 0; m < cell.n_nodes; ++m) {
+                            offenders.insert(cell.nodes[m]);
+                        }
+                    }
+                },
+                /*passes=*/3, /*relax=*/0.5, edges);
+            if (smooth_st.n_moved > 0) {
+                fill.boundary_max_distance = smooth_st.max_residual;
+            }
         }
         out.mesh.nodes = std::move(fill.nodes);
         out.mesh.elements.reserve(fill.cells.size());
@@ -492,7 +594,8 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             n_hex_lattice, n_pyr_raw, fill.n_pyramid, fill.n_tet, out.mesh.nodes.size(),
             fill.h, fill.h_fine > 0.0 ? fill.h_fine : fill.h, fill.n_fine_cells,
             fill.n_transition_cells, fill.n_feature_skin_cells, fill.boundary_max_distance,
-            n_curv_seeds > 0 ? std::format(", curv_seeds={}", n_curv_seeds) : std::string{});
+            turn_deg > 0.0 ? std::format(", curv_turn≤{:.0f}°/cell", turn_deg)
+                           : std::string{});
     } else if (mesher == VolumeMesher::kHexFill || mesher == VolumeMesher::kHexVem) {
         auto fill = mesh::hex_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
         fill_h = fill.h;
@@ -561,12 +664,14 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
     } else if (mesher == VolumeMesher::kGradedTet) {
         std::vector<geom::SharpEdge> edges;
         double feature_band = 0.0;
-        // Merge caller seeds with a priori geometry seeds (curvature / thin wall).
-        // Keep this sparse: graded fill is always 2:1 (bulk≈h, fine≈h/2); seeds
-        // only choose *which* blocks are fine — they must not flood the volume.
+        // Caller a-posteriori adapt seeds keep ball semantics; curvature is now
+        // the per-cell turning-angle criterion inside the fill (no caps, no
+        // stray islands). Thin walls (t < 2.5 h) still seed *locally* — but a
+        // globally thin part (most of the surface thin) is an h problem, not a
+        // local feature: seeding it would just scatter capped fine islands.
         std::vector<Eigen::Vector3d> seeds(refine_seeds.begin(), refine_seeds.end());
         double band = seed_band;
-        std::size_t n_curv_seeds = 0;
+        double turn_deg = 0.0;
         std::size_t n_thin_seeds = 0;
         if (feature_refine) {
             edges = geom::detect_sharp_edges(model.surface, 30.0);
@@ -574,105 +679,58 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                 // Crease band ~ two bulk cells so hole rims get a clear L1/L2 shell.
                 feature_band = 2.0 * h;
             }
-            // Curvature / hole grading. Discrete κ is a lower bound on coarse STLs.
-            // Seed when κ ≳ 1/(12 h) (proxy R ≲ 12 h) OR in the top ~25% of
-            // positive κ (relative). Thin walls (t < 2.5 h) also seed. Cap count
-            // below so we never flood the volume with seed balls.
-            const auto curv = geom::estimate_vertex_curvature(model.surface);
+            turn_deg = kCurvatureTurnDeg;
             const auto thick = geom::estimate_local_thickness(model.surface);
-            const double kappa_abs = 1.0 / (12.0 * std::max(h, 1e-12));
-            std::vector<double> pos_kappa;
-            pos_kappa.reserve(curv.kappa.size());
-            for (double k : curv.kappa) {
-                if (k > 1e-9) {
-                    pos_kappa.push_back(k);
-                }
-            }
-            double kappa_rel = kappa_abs;
-            if (!pos_kappa.empty()) {
-                std::sort(pos_kappa.begin(), pos_kappa.end());
-                // 75th percentile of positive κ — densify the most curved quarter.
-                const std::size_t iq =
-                    std::min(pos_kappa.size() - 1, (pos_kappa.size() * 75) / 100);
-                // Take the *less* strict of abs/rel so coarse cylinder facets still seed.
-                kappa_rel = std::min(kappa_abs, pos_kappa[iq] * 0.999);
-            }
-            const double kappa_thresh = std::max(kappa_rel, 1e-12);
-            if (band <= 0.0) {
-                band = 1.6 * h; // seed ball covers hole wall + rim neighborhood
-            }
-            seeds.reserve(seeds.size() + model.surface.vertices.size() / 4 + 16);
+            std::vector<Eigen::Vector3d> thin_pts;
+            std::size_t n_finite = 0;
             for (std::size_t i = 0; i < model.surface.vertices.size(); ++i) {
-                bool seed_here = false;
-                if (i < curv.kappa.size() && curv.kappa[i] >= kappa_thresh) {
-                    seed_here = true;
-                    ++n_curv_seeds;
+                if (i >= thick.thickness.size() ||
+                    !geom::has_finite_thickness(thick.thickness[i])) {
+                    continue;
                 }
-                if (i < thick.thickness.size() &&
-                    geom::has_finite_thickness(thick.thickness[i]) &&
-                    thick.thickness[i] < 2.5 * h) {
-                    seed_here = true;
-                    ++n_thin_seeds;
-                }
-                if (seed_here) {
-                    seeds.push_back(model.surface.vertices[i]);
+                ++n_finite;
+                if (thick.thickness[i] < 2.5 * h) {
+                    thin_pts.push_back(model.surface.vertices[i]);
                 }
             }
-            // Sparse edge midpoints on the highest-κ facets only (stride 3).
-            for (std::size_t ti = 0; ti < model.surface.triangles.size(); ti += 3) {
-                const auto& tri = model.surface.triangles[ti];
-                for (int e = 0; e < 3; ++e) {
-                    const auto a = tri[static_cast<std::size_t>(e)];
-                    const auto b = tri[static_cast<std::size_t>((e + 1) % 3)];
-                    if (a >= curv.kappa.size() || b >= curv.kappa.size()) {
-                        continue;
-                    }
-                    if (0.5 * (curv.kappa[a] + curv.kappa[b]) < kappa_thresh) {
-                        continue;
-                    }
-                    seeds.push_back(0.5 *
-                                    (model.surface.vertices[a] + model.surface.vertices[b]));
-                    ++n_curv_seeds;
+            const bool globally_thin =
+                n_finite > 0 &&
+                thin_pts.size() * 3 > model.surface.vertices.size(); // > ~1/3 thin
+            if (!globally_thin && !thin_pts.empty()) {
+                if (band <= 0.0) {
+                    band = 1.6 * h;
                 }
-            }
-            // Spatial thinning (parity with hybrid): min sep 0.75 h so hole
-            // walls get seeds all around (index-stride clustered one sector).
-            constexpr std::size_t kMaxGeoSeeds = 256;
-            {
-                std::vector<Eigen::Vector3d> kept;
-                kept.reserve(std::min(seeds.size(), kMaxGeoSeeds));
-                // Always keep caller-provided adapt seeds first.
-                const std::size_t n_caller = refine_seeds.size();
-                for (std::size_t i = 0; i < std::min(n_caller, seeds.size()); ++i) {
-                    kept.push_back(seeds[i]);
-                }
-                const double min_sep = 0.75 * h;
-                const double min_sep2 = min_sep * min_sep;
-                for (std::size_t i = n_caller; i < seeds.size() && kept.size() < kMaxGeoSeeds;
-                     ++i) {
-                    const auto& p = seeds[i];
+                // Spatial thinning: min sep 0.75 h, capped, caller seeds first.
+                constexpr std::size_t kMaxGeoSeeds = 256;
+                const double min_sep2 = (0.75 * h) * (0.75 * h);
+                for (const auto& p : thin_pts) {
+                    if (seeds.size() >= kMaxGeoSeeds) {
+                        break;
+                    }
                     bool far = true;
-                    for (const auto& q : kept) {
+                    for (const auto& q : seeds) {
                         if ((p - q).squaredNorm() < min_sep2) {
                             far = false;
                             break;
                         }
                     }
                     if (far) {
-                        kept.push_back(p);
+                        seeds.push_back(p);
+                        ++n_thin_seeds;
                     }
                 }
-                n_curv_seeds = std::min(n_curv_seeds, kept.size());
-                seeds = std::move(kept);
             }
             // Flat solids: free-surface skin alone is enough (no fake seed flood).
             if (band > 0.0 && seeds.empty()) {
                 band = 0.0;
             }
         }
+        if (band <= 0.0 && !seeds.empty()) {
+            band = 1.6 * h;
+        }
         auto graded = mesh::graded_tet_fill_surface(
             model.surface, model.bbox_min, model.bbox_max, h, std::max(1, skin_layers), edges,
-            feature_band, seeds, band);
+            feature_band, seeds, band, turn_deg);
         fill_h = graded.h_fine;
         out.mesh.nodes = std::move(graded.mesh.nodes);
         out.mesh.elements.reserve(graded.mesh.tets.size());
@@ -705,7 +763,8 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             out.mesh.elements.size(), graded.n_coarse_cells, graded.n_fine_cells,
             graded.n_feature_cells, graded.n_seed_cells, graded.h_coarse, graded.h_fine,
             conf.max_distance, conf.mean_distance, budget_note,
-            n_curv_seeds > 0 ? std::format(", curv_seeds={}", n_curv_seeds) : std::string{},
+            turn_deg > 0.0 ? std::format(", curv_turn≤{:.0f}°/cell", turn_deg)
+                           : std::string{},
             n_thin_seeds > 0 ? std::format(", thin_seeds={}", n_thin_seeds) : std::string{});
     } else if (mesher == VolumeMesher::kOctahedral) {
         // Experimental BCC octahedra → tet4 (ADR-0019). Not a product claim.

@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "mesh/surface_project.hpp"
 
+#include <Eigen/Geometry>
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
 #include <unordered_map>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 
 namespace polymesh::mesh {
@@ -394,6 +398,190 @@ SnapStats snap_boundary_nodes(const geom::TriSurface& surface,
         if (ni >= nodes.size()) {
             continue;
         }
+        stats.max_residual =
+            std::max(stats.max_residual, closest_on_surface(surface, nodes[ni]).distance);
+    }
+    return stats;
+}
+
+SmoothStats smooth_boundary_nodes(const geom::TriSurface& surface,
+                                  std::vector<Eigen::Vector3d>& nodes,
+                                  std::span<const std::array<std::uint32_t, 4>> boundary_faces,
+                                  double h, const CollectOffendersFn& collect_offenders,
+                                  int passes, double relax,
+                                  std::span<const geom::SharpEdge> feature_edges) {
+    SmoothStats stats;
+    if (boundary_faces.empty() || !(h > 0.0) || !std::isfinite(h) || !collect_offenders) {
+        return stats;
+    }
+    passes = std::clamp(passes, 1, 10);
+    relax = std::clamp(relax, 0.05, 1.0);
+    (void)grid_for(surface);
+
+    // Boundary graph: unique undirected edges of the free-surface faces
+    // (quads, or tris encoded with a duplicated last node).
+    std::unordered_map<std::uint32_t, std::vector<std::uint32_t>> nbr;
+    {
+        std::set<std::pair<std::uint32_t, std::uint32_t>> seen;
+        auto add_edge = [&](std::uint32_t a, std::uint32_t b) {
+            if (a == b || a >= nodes.size() || b >= nodes.size()) {
+                return;
+            }
+            const auto key = std::minmax(a, b);
+            if (!seen.insert({key.first, key.second}).second) {
+                return;
+            }
+            nbr[a].push_back(b);
+            nbr[b].push_back(a);
+        };
+        for (const auto& q : boundary_faces) {
+            for (int e = 0; e < 4; ++e) {
+                add_edge(q[static_cast<std::size_t>(e)],
+                         q[static_cast<std::size_t>((e + 1) % 4)]);
+            }
+        }
+    }
+
+    // Crease classification: node sits on a sharp CAD edge. Near-crease wall
+    // nodes must not be smoothed across the crease, so anything within the
+    // guard band that is not *on* the crease is frozen.
+    const double on_crease_r = 0.10 * h;
+    const double crease_guard_r = 0.50 * h;
+    enum class Kind : std::uint8_t { kFree, kCrease, kFrozen };
+    std::unordered_map<std::uint32_t, Kind> kind;
+    kind.reserve(nbr.size());
+    for (const auto& [ni, _] : nbr) {
+        Kind k = Kind::kFree;
+        if (!feature_edges.empty()) {
+            const double df =
+                geom::closest_on_features(nodes[ni], surface, feature_edges).distance;
+            if (df <= on_crease_r) {
+                k = Kind::kCrease;
+            } else if (df <= crease_guard_r) {
+                k = Kind::kFrozen;
+            }
+        }
+        kind.emplace(ni, k);
+    }
+    if (feature_edges.empty()) {
+        // No CAD crease info: protect sharp geometry intrinsically — freeze
+        // nodes whose incident boundary-face normals disagree strongly (box
+        // edges/corners). Smoothly curved patches keep a tight normal cone.
+        std::unordered_map<std::uint32_t, Eigen::Vector3d> first_n;
+        std::unordered_set<std::uint32_t> frozen;
+        for (const auto& q : boundary_faces) {
+            const Eigen::Vector3d e1 = nodes[q[1]] - nodes[q[0]];
+            const Eigen::Vector3d e2 = nodes[q[2]] - nodes[q[0]];
+            const Eigen::Vector3d n = e1.cross(e2);
+            const double len = n.norm();
+            if (len <= 0.0) {
+                continue;
+            }
+            const Eigen::Vector3d nn = n / len;
+            for (int e = 0; e < 4; ++e) {
+                const auto ni = q[static_cast<std::size_t>(e)];
+                const auto [it, fresh] = first_n.try_emplace(ni, nn);
+                if (!fresh && std::abs(it->second.dot(nn)) < 0.7071) {
+                    frozen.insert(ni); // > ~45° spread: geometric crease
+                }
+            }
+        }
+        for (const auto ni : frozen) {
+            kind[ni] = Kind::kFrozen;
+        }
+    }
+
+    std::unordered_map<std::uint32_t, Eigen::Vector3d> moved; // pre-pass position
+    for (int pass = 0; pass < passes; ++pass) {
+        // Jacobi targets from the current state.
+        std::vector<std::pair<std::uint32_t, Eigen::Vector3d>> targets;
+        targets.reserve(nbr.size());
+        for (const auto& [ni, nb] : nbr) {
+            const Kind k = kind[ni];
+            if (k == Kind::kFrozen || nb.empty()) {
+                continue;
+            }
+            Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
+            std::size_t n_used = 0;
+            if (k == Kind::kCrease) {
+                // Relax along the crease chain only; corners/junctions
+                // (≠2 crease neighbors) and kinked chains stay put.
+                std::vector<std::uint32_t> cn;
+                for (const auto o : nb) {
+                    if (kind[o] == Kind::kCrease) {
+                        cn.push_back(o);
+                    }
+                }
+                if (cn.size() != 2) {
+                    continue;
+                }
+                const Eigen::Vector3d d0 = (nodes[cn[0]] - nodes[ni]).normalized();
+                const Eigen::Vector3d d1 = (nodes[cn[1]] - nodes[ni]).normalized();
+                if (d0.dot(d1) > -0.5) {
+                    continue; // sharper than 120° in-chain: corner, keep
+                }
+                centroid = 0.5 * (nodes[cn[0]] + nodes[cn[1]]);
+                n_used = 2;
+            } else {
+                for (const auto o : nb) {
+                    centroid += nodes[o];
+                    ++n_used;
+                }
+                centroid /= static_cast<double>(n_used);
+            }
+            if (n_used == 0) {
+                continue;
+            }
+            Eigen::Vector3d p = nodes[ni] + relax * (centroid - nodes[ni]);
+            // Re-project so travel is tangential.
+            if (k == Kind::kCrease) {
+                const auto cf = geom::closest_on_features(p, surface, feature_edges);
+                if (!std::isfinite(cf.distance)) {
+                    continue;
+                }
+                p = cf.point;
+            } else {
+                const auto cp = closest_on_surface(surface, p);
+                if (cp.distance > 0.75 * h) {
+                    continue; // projection ran away — keep the node
+                }
+                p = cp.point;
+            }
+            if ((p - nodes[ni]).squaredNorm() <= 1e-30) {
+                continue;
+            }
+            targets.push_back({ni, p});
+        }
+        if (targets.empty()) {
+            break;
+        }
+        for (const auto& [ni, p] : targets) {
+            moved.try_emplace(ni, nodes[ni]);
+            nodes[ni] = p;
+        }
+        // Inversion guard: revert moved offenders until the mesh is clean.
+        for (int guard = 0; guard < 32; ++guard) {
+            std::set<std::uint32_t> offenders;
+            collect_offenders(offenders);
+            bool reverted = false;
+            for (const auto ni : offenders) {
+                const auto it = moved.find(ni);
+                if (it == moved.end()) {
+                    continue;
+                }
+                nodes[ni] = it->second;
+                moved.erase(it);
+                kind[ni] = Kind::kFrozen; // do not retry in later passes
+                ++stats.n_reverted;
+                reverted = true;
+            }
+            if (!reverted) {
+                break;
+            }
+        }
+    }
+    stats.n_moved = moved.size();
+    for (const auto& [ni, _] : nbr) {
         stats.max_residual =
             std::max(stats.max_residual, closest_on_surface(surface, nodes[ni]).distance);
     }

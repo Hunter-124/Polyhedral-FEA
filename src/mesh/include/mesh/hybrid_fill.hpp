@@ -36,10 +36,14 @@ struct GradedTetFillOutput {
 
 /// Multi-level graded fill. `skin_layers` free-surface hops (skipped on thin
 /// parts). Feature/seed bands drive L1/L2 LEB. Bands in metres; 0 disables.
+/// `curvature_turn_deg` > 0 enables the per-cell turning-angle criterion:
+/// cells where the surface turns more than that angle per bulk cell (h·κ)
+/// go L1; more than twice it go L2 — contiguous, inert on flats.
 GradedTetFillOutput graded_tet_fill_surface(
     const geom::TriSurface& surface, const Eigen::Vector3d& bbox_min,
     const Eigen::Vector3d& bbox_max, double h, int skin_layers = 2,
     std::span<const geom::SharpEdge> features = {}, double feature_band = 0.0,
-    std::span<const Eigen::Vector3d> refine_seeds = {}, double seed_band = 0.0);
+    std::span<const Eigen::Vector3d> refine_seeds = {}, double seed_band = 0.0,
+    double curvature_turn_deg = 0.0);
 
 } // namespace polymesh::mesh

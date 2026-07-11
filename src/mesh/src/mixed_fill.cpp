@@ -238,7 +238,8 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                                    std::span<const geom::SharpEdge> features,
                                    double feature_band,
                                    std::span<const Eigen::Vector3d> curvature_seeds,
-                                   double seed_band, bool snap_boundary) {
+                                   double seed_band, bool snap_boundary,
+                                   double curvature_turn_deg) {
     if (!(h > 0.0) || !std::isfinite(h)) {
         throw ValidityError("mixed_fill_surface: h must be positive");
     }
@@ -250,6 +251,9 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
     }
     if (!(seed_band > 0.0) || curvature_seeds.empty()) {
         seed_band = 0.0;
+    }
+    if (!(curvature_turn_deg > 0.0)) {
+        curvature_turn_deg = 0.0;
     }
 
     // Budget for 2:1 fine subcells (up to 8× in refined bands).
@@ -314,9 +318,11 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
     out.skin_layers = skin_layers;
 
     // Free-surface hop skin only when no geo drivers (unit boxes). With
-    // feature/seed, refine those bands to h/2 instead of flooding the exterior.
+    // feature/seed/curvature, refine those bands to h/2 instead of flooding
+    // the exterior.
     const int skin_cap = std::max(1, (max_dist + 1) / 2);
-    const bool have_geo = (feature_band > 0.0) || (seed_band > 0.0);
+    const bool have_geo =
+        (feature_band > 0.0) || (seed_band > 0.0) || (curvature_turn_deg > 0.0);
     const int skin_use = have_geo ? 0 : std::min(skin_layers, skin_cap);
 
     std::vector<char> is_fine(inside.size(), 0);
@@ -340,6 +346,12 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
     stamp_feature_cells(is_fine, &is_feature_skin, nx, ny, nz, grid, surface, features,
                         feature_band);
     stamp_seed_cells(is_fine, &is_seed_skin, nx, ny, nz, grid, curvature_seeds, seed_band);
+    // Per-cell turning-angle criterion (angle-adaptive; hybrid has one fine
+    // level, so L2 output is unused here).
+    if (curvature_turn_deg > 0.0) {
+        stamp_curvature_cells(is_fine, nullptr, &is_seed_skin, nx, ny, nz, grid, surface,
+                              curvature_turn_deg * 3.14159265358979323846 / 180.0);
+    }
 
     // Outside → not fine.
     for (std::size_t c = 0; c < inside.size(); ++c) {
@@ -428,30 +440,55 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                 }
             }
         }
-        for (int k = 0; k < nz; ++k) {
-            for (int j = 0; j < ny; ++j) {
-                for (int i = 0; i < nx; ++i) {
-                    const auto id = idx(i, j, k);
-                    if (!inside[id] || is_fine[id]) {
-                        continue;
-                    }
-                    bool fan = false;
-                    for (const auto& o : kFaceNbr) {
-                        if (cell_fine(i + o[0], j + o[1], k + o[2])) {
-                            fan = true;
-                            break;
+        // Transition cells host apex-fan tets. A fan at the free surface gets
+        // squashed when the wall snap pulls its base nodes through the apex
+        // plane (degenerate boundary tets, the fan "rings" seen mid-bore) —
+        // promote free-surface transition cells to fine so the 2:1 interface
+        // always sits one cell inside the wall. Promotion hangs new mids, so
+        // iterate to a fixed point (monotone: is_fine only grows).
+        for (int guard = 0; guard < 64; ++guard) {
+            std::fill(is_transition.begin(), is_transition.end(), 0);
+            for (int k = 0; k < nz; ++k) {
+                for (int j = 0; j < ny; ++j) {
+                    for (int i = 0; i < nx; ++i) {
+                        const auto id = idx(i, j, k);
+                        if (!inside[id] || is_fine[id]) {
+                            continue;
                         }
-                    }
-                    // Edge-adjacent fine cells also hang mids on this cell's edges.
-                    for (int eb = 0; !fan && eb < 2; ++eb) {
-                        for (int ec = 0; !fan && ec < 2; ++ec) {
-                            fan = edge_split(i, j + eb, k + ec, 0) ||
-                                  edge_split(i + eb, j, k + ec, 1) ||
-                                  edge_split(i + eb, j + ec, k, 2);
+                        bool fan = false;
+                        for (const auto& o : kFaceNbr) {
+                            if (cell_fine(i + o[0], j + o[1], k + o[2])) {
+                                fan = true;
+                                break;
+                            }
                         }
+                        // Edge-adjacent fine cells also hang mids on this cell's edges.
+                        for (int eb = 0; !fan && eb < 2; ++eb) {
+                            for (int ec = 0; !fan && ec < 2; ++ec) {
+                                fan = edge_split(i, j + eb, k + ec, 0) ||
+                                      edge_split(i + eb, j, k + ec, 1) ||
+                                      edge_split(i + eb, j + ec, k, 2);
+                            }
+                        }
+                        is_transition[id] = fan ? 1 : 0;
                     }
-                    is_transition[id] = fan ? 1 : 0;
                 }
+            }
+            bool changed = false;
+            for (int k = 0; k < nz; ++k) {
+                for (int j = 0; j < ny; ++j) {
+                    for (int i = 0; i < nx; ++i) {
+                        const auto id = idx(i, j, k);
+                        if (is_transition[id] && is_free_surface(i, j, k)) {
+                            is_fine[id] = 1;
+                            is_transition[id] = 0;
+                            changed = true;
+                        }
+                    }
+                }
+            }
+            if (!changed) {
+                break;
             }
         }
         out.h_fine = 0.5 * h_cell;
@@ -599,6 +636,7 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                                                                     2 * (k + corner[2])}};
                         }
                         std::array<std::uint32_t, 8> poly{};
+                        std::array<char, 8> poly_is_mid{};
                         int np = 0;
                         for (int q = 0; q < 4; ++q) {
                             const auto& A = fcoord[static_cast<std::size_t>(q)];
@@ -620,6 +658,7 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                                 ec = sa;
                             }
                             if (edge_split(ea, eb, ec, static_cast<int>(axis))) {
+                                poly_is_mid[static_cast<std::size_t>(np)] = 1;
                                 poly[static_cast<std::size_t>(np++)] = node_fine(
                                     (A[0] + B[0]) / 2, (A[1] + B[1]) / 2, (A[2] + B[2]) / 2);
                             }
@@ -631,14 +670,26 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                                     {{poly[0], poly[1], poly[2], poly[3]}});
                             }
                         } else {
-                            // Canonical fan from the min-node-id vertex: identical
-                            // triangulation on both sides of the shared face.
-                            int ai = 0;
-                            for (int q = 1; q < np; ++q) {
-                                if (poly[static_cast<std::size_t>(q)] <
-                                    poly[static_cast<std::size_t>(ai)]) {
+                            // Canonical fan from the min-node-id *mid* vertex
+                            // (np > 4 ⇒ at least one mid exists). A corner
+                            // anchor sees the two halves of its own split edge
+                            // collinearly and emits a zero-volume tet (the v4
+                            // M6=0 defect); a mid never lies on another split
+                            // edge's line, so every fan facet has real area.
+                            // Mid-ness is intrinsic to the shared face, so both
+                            // cells pick the same anchor — no cracks.
+                            int ai = -1;
+                            for (int q = 0; q < np; ++q) {
+                                if (!poly_is_mid[static_cast<std::size_t>(q)]) {
+                                    continue;
+                                }
+                                if (ai < 0 || poly[static_cast<std::size_t>(q)] <
+                                                  poly[static_cast<std::size_t>(ai)]) {
                                     ai = q;
                                 }
+                            }
+                            if (ai < 0) {
+                                ai = 0; // unreachable: np > 4 has a mid
                             }
                             const std::uint32_t anchor = poly[static_cast<std::size_t>(ai)];
                             for (int q = 0; q < np; ++q) {

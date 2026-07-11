@@ -81,6 +81,22 @@ feedback loop can learn per-condition presets: fraction of surface area with
 per-cell turning angle > 15°, thin-wall flag (t < 2.5 h_ref), smallest
 feature size in units of bulk h.
 
+## 3b. Pareto analysis — `bench/campaigns/<name>/PARETO.{md,json}`
+
+Written by `scripts/analyze_campaign.py` (feedback-loop tooling). Safe on
+**partial** `results.jsonl` while a campaign is still `running`; re-run when
+`checkpoint.state` becomes `finished`.
+
+- **PARETO.md** — human report: weighted ranking, global/per-part/per-geom
+  Pareto (maximize accuracy, minimize mesh_ms+solve_ms), knob suggestions.
+- **PARETO.json** — same content structured for automation (`ranking`,
+  `pareto_global`, `pareto_by_part`, `pareto_by_geom_class`,
+  `recommendations.apply_code_defaults`).
+
+Does not modify checkpoint or results. Product defaults change only when
+`recommendations.apply_code_defaults` is true (finished + solid ok-rate);
+see `docs/process/feedback-loop.md`.
+
 ## 4. Part case — `tests/fixtures/parts/<part>.case.json`
 
 Binds a geometry file to loads/BCs and to its reference truth.

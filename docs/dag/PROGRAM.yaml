@@ -67,9 +67,11 @@ nodes:
     deps: [testlab-harness, part-library]
     scope: [bench/campaigns/]
     note: >
-      No stone unturned: full mesher option grid at tier 0, trimmed
-      aggressively at higher tiers. Output = Pareto frontier per geometric
-      condition class.
+      IN PROGRESS: bench/campaigns/settings-frontier-1 (32 configs × 3 parts,
+      3 successive-halving tiers). Checkpoint still running at tier 0 with
+      partial results.jsonl. Analysis tooling landed: re-run
+      `python3 scripts/analyze_campaign.py settings-frontier-1` → PARETO.md/json
+      when finished; then mark this node done with survivor summary.
 
   # ── Lane B: solver core (lead) ──────────────────────────────────────────
   - id: adr-0019
@@ -164,9 +166,12 @@ nodes:
     deps: [campaign-1, hp-driver]
     scope: [src/pipeline/, bench/campaigns/, docs/]
     note: >
-      Analyse accumulated results.jsonl -> update default knob values +
-      per-condition presets -> rerun affected campaign slices -> document
-      deltas. Re-enter this node every time new sim data accumulates.
+      SCAFFOLDING + PARTIAL PASS: scripts/analyze_campaign.py writes
+      PARETO.md/json (ranking, accuracy-vs-time Pareto, geom/part presets).
+      Docs: docs/process/feedback-loop.md. settings-frontier-1 still running —
+      recommendations only (no product default changes). Re-run analysis when
+      campaign-1 finishes; apply knobs only if finished + solid ok-rate; then
+      flip this node back to todo with the campaign consumed.
 
   - id: gui-sim-controls
     title: GUI live solve progress + pause/play + resource caps wired

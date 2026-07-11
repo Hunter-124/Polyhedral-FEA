@@ -1,0 +1,977 @@
+{
+  "campaign": "settings-frontier-1",
+  "generated_utc": "2026-07-11T05:53:33Z",
+  "partial": true,
+  "checkpoint": {
+    "state": "running",
+    "tier": 0,
+    "completed_runs": 23,
+    "n_survivors": 32,
+    "survivors": [
+      "cfg-02e4c7a5",
+      "cfg-0ea8730d",
+      "cfg-1b696ce7",
+      "cfg-1ea46b97",
+      "cfg-37584704",
+      "cfg-37d684d9",
+      "cfg-3f8ec5a6",
+      "cfg-4ac2a08b",
+      "cfg-50b7a344",
+      "cfg-57701654",
+      "cfg-62b424e2",
+      "cfg-704c6798"
+    ]
+  },
+  "weights": {
+    "accuracy": 0.5,
+    "mesh_ms": 0.25,
+    "solve_ms": 0.25
+  },
+  "n_result_lines": 23,
+  "n_ok": 22,
+  "n_fail": 1,
+  "ok_rate": 0.9565217391304348,
+  "n_configs": 8,
+  "expected_note": "Grid: 32 configs \u00d7 3 parts = 96 tier-0 runs (3 tiers planned).",
+  "ranking": [
+    {
+      "rank": 1,
+      "cfg_id": "cfg-0ea8730d",
+      "config": {
+        "element_tendency": -0.75,
+        "feature_refine": true,
+        "mesher": "hybrid_zoo",
+        "order": 1
+      },
+      "mean_score": 0.6414913913207129,
+      "mean_accuracy": 0.5512206830557674,
+      "mean_total_ms": 1179.0853853333333,
+      "mean_mesh_ms": 849.6164293333333,
+      "mean_solve_ms": 329.468956,
+      "ok_rate": 1.0,
+      "n_ok": 3,
+      "n_fail": 0,
+      "parts": [
+        "cantilever",
+        "plate_hole",
+        "smoke_bar"
+      ],
+      "tiers": [
+        0
+      ]
+    },
+    {
+      "rank": 2,
+      "cfg_id": "cfg-1b696ce7",
+      "config": {
+        "element_tendency": -0.75,
+        "feature_refine": true,
+        "mesher": "graded_tet",
+        "order": 1
+      },
+      "mean_score": 0.6407153340728544,
+      "mean_accuracy": 0.5512206830557674,
+      "mean_total_ms": 1183.393921,
+      "mean_mesh_ms": 851.0378893333333,
+      "mean_solve_ms": 332.35603166666664,
+      "ok_rate": 1.0,
+      "n_ok": 3,
+      "n_fail": 0,
+      "parts": [
+        "cantilever",
+        "plate_hole",
+        "smoke_bar"
+      ],
+      "tiers": [
+        0
+      ]
+    },
+    {
+      "rank": 3,
+      "cfg_id": "cfg-02e4c7a5",
+      "config": {
+        "element_tendency": -0.75,
+        "feature_refine": true,
+        "mesher": "hex",
+        "order": 1
+      },
+      "mean_score": 0.6400693099401731,
+      "mean_accuracy": 0.5512206830557674,
+      "mean_total_ms": 1189.6521943333335,
+      "mean_mesh_ms": 858.4063040000001,
+      "mean_solve_ms": 331.24589033333336,
+      "ok_rate": 1.0,
+      "n_ok": 3,
+      "n_fail": 0,
+      "parts": [
+        "cantilever",
+        "plate_hole",
+        "smoke_bar"
+      ],
+      "tiers": [
+        0
+      ]
+    },
+    {
+      "rank": 4,
+      "cfg_id": "cfg-1ea46b97",
+      "config": {
+        "element_tendency": 0.0,
+        "feature_refine": false,
+        "mesher": "hex",
+        "order": 1
+      },
+      "mean_score": 0.638953878638001,
+      "mean_accuracy": 0.5512206830557674,
+      "mean_total_ms": 1191.018334,
+      "mean_mesh_ms": 846.3433926666667,
+      "mean_solve_ms": 344.6749413333334,
+      "ok_rate": 1.0,
+      "n_ok": 3,
+      "n_fail": 0,
+      "parts": [
+        "cantilever",
+        "plate_hole",
+        "smoke_bar"
+      ],
+      "tiers": [
+        0
+      ]
+    },
+    {
+      "rank": 5,
+      "cfg_id": "cfg-3f8ec5a6",
+      "config": {
+        "element_tendency": 0.5,
+        "feature_refine": false,
+        "mesher": "graded_tet",
+        "order": 1
+      },
+      "mean_score": 0.6181460805605447,
+      "mean_accuracy": 0.5517082497554503,
+      "mean_total_ms": 2289.2861296666665,
+      "mean_mesh_ms": 1955.9643203333335,
+      "mean_solve_ms": 333.3218093333333,
+      "ok_rate": 1.0,
+      "n_ok": 3,
+      "n_fail": 0,
+      "parts": [
+        "cantilever",
+        "plate_hole",
+        "smoke_bar"
+      ],
+      "tiers": [
+        0
+      ]
+    },
+    {
+      "rank": 6,
+      "cfg_id": "cfg-37584704",
+      "config": {
+        "element_tendency": 0.5,
+        "feature_refine": false,
+        "mesher": "hybrid_zoo",
+        "order": 1
+      },
+      "mean_score": 0.6167063112295617,
+      "mean_accuracy": 0.5517082497554503,
+      "mean_total_ms": 2390.1660909999996,
+      "mean_mesh_ms": 2048.712803666667,
+      "mean_solve_ms": 341.4532873333333,
+      "ok_rate": 1.0,
+      "n_ok": 3,
+      "n_fail": 0,
+      "parts": [
+        "cantilever",
+        "plate_hole",
+        "smoke_bar"
+      ],
+      "tiers": [
+        0
+      ]
+    },
+    {
+      "rank": 7,
+      "cfg_id": "cfg-37d684d9",
+      "config": {
+        "element_tendency": 0.0,
+        "feature_refine": false,
+        "mesher": "graded_tet",
+        "order": 1
+      },
+      "mean_score": 0.5302774566882957,
+      "mean_accuracy": 0.4370938207690504,
+      "mean_total_ms": 6614.841885000001,
+      "mean_mesh_ms": 6373.387894,
+      "mean_solve_ms": 241.453991,
+      "ok_rate": 0.6666666666666666,
+      "n_ok": 2,
+      "n_fail": 1,
+      "parts": [
+        "cantilever",
+        "plate_hole",
+        "smoke_bar"
+      ],
+      "tiers": [
+        0
+      ]
+    },
+    {
+      "rank": 8,
+      "cfg_id": "cfg-4ac2a08b",
+      "config": {
+        "element_tendency": 0.9,
+        "feature_refine": true,
+        "mesher": "graded_tet",
+        "order": 1
+      },
+      "mean_score": 0.27546658518076045,
+      "mean_accuracy": 0.428256990073019,
+      "mean_total_ms": 196713.13068449998,
+      "mean_mesh_ms": 14582.42449,
+      "mean_solve_ms": 182130.7061945,
+      "ok_rate": 1.0,
+      "n_ok": 2,
+      "n_fail": 0,
+      "parts": [
+        "plate_hole",
+        "smoke_bar"
+      ],
+      "tiers": [
+        0
+      ]
+    }
+  ],
+  "pareto_global": [
+    {
+      "cfg_id": "cfg-3f8ec5a6",
+      "config": {
+        "element_tendency": 0.5,
+        "feature_refine": false,
+        "mesher": "graded_tet",
+        "order": 1
+      },
+      "accuracy": 0.5517082497554503,
+      "total_ms": 2289.2861296666665,
+      "mesh_ms": 1955.9643203333335,
+      "solve_ms": 333.3218093333333,
+      "score": 0.6181460805605447,
+      "n": 3
+    },
+    {
+      "cfg_id": "cfg-0ea8730d",
+      "config": {
+        "element_tendency": -0.75,
+        "feature_refine": true,
+        "mesher": "hybrid_zoo",
+        "order": 1
+      },
+      "accuracy": 0.5512206830557674,
+      "total_ms": 1179.0853853333333,
+      "mesh_ms": 849.6164293333333,
+      "solve_ms": 329.468956,
+      "score": 0.6414913913207129,
+      "n": 3
+    }
+  ],
+  "pareto_by_part": {
+    "cantilever": [
+      {
+        "cfg_id": "cfg-0ea8730d",
+        "config": {
+          "element_tendency": -0.75,
+          "feature_refine": true,
+          "mesher": "hybrid_zoo",
+          "order": 1
+        },
+        "accuracy": 0.7303346066370723,
+        "total_ms": 387.402076,
+        "mesh_ms": 105.377904,
+        "solve_ms": 282.024172,
+        "score": 0.786338422851356,
+        "n": 1,
+        "part": "cantilever"
+      }
+    ],
+    "plate_hole": [
+      {
+        "cfg_id": "cfg-3f8ec5a6",
+        "config": {
+          "element_tendency": 0.5,
+          "feature_refine": false,
+          "mesher": "graded_tet",
+          "order": 1
+        },
+        "accuracy": 0.18074117533772163,
+        "total_ms": 5946.023092,
+        "mesh_ms": 5511.341558,
+        "solve_ms": 434.681534,
+        "score": 0.30301983300168656,
+        "n": 1,
+        "part": "plate_hole"
+      },
+      {
+        "cfg_id": "cfg-1ea46b97",
+        "config": {
+          "element_tendency": 0.0,
+          "feature_refine": false,
+          "mesher": "hex",
+          "order": 1
+        },
+        "accuracy": 0.1792784752353841,
+        "total_ms": 2777.133865,
+        "mesh_ms": 2347.872368,
+        "solve_ms": 429.261497,
+        "score": 0.33922903741154015,
+        "n": 1,
+        "part": "plate_hole"
+      }
+    ],
+    "smoke_bar": [
+      {
+        "cfg_id": "cfg-37d684d9",
+        "config": {
+          "element_tendency": 0.0,
+          "feature_refine": false,
+          "mesher": "graded_tet",
+          "order": 1
+        },
+        "accuracy": 0.8664171494229496,
+        "total_ms": 989.4630319999999,
+        "mesh_ms": 623.465931,
+        "solve_ms": 365.997101,
+        "score": 0.7702165969240454,
+        "n": 1,
+        "part": "smoke_bar"
+      },
+      {
+        "cfg_id": "cfg-0ea8730d",
+        "config": {
+          "element_tendency": -0.75,
+          "feature_refine": true,
+          "mesher": "hybrid_zoo",
+          "order": 1
+        },
+        "accuracy": 0.744048967294846,
+        "total_ms": 355.420985,
+        "mesh_ms": 80.366449,
+        "solve_ms": 275.054536,
+        "score": 0.7994974938346058,
+        "n": 1,
+        "part": "smoke_bar"
+      }
+    ]
+  },
+  "pareto_by_geom_class": {
+    "curved": [
+      {
+        "cfg_id": "cfg-3f8ec5a6",
+        "config": {
+          "element_tendency": 0.5,
+          "feature_refine": false,
+          "mesher": "graded_tet",
+          "order": 1
+        },
+        "accuracy": 0.18074117533772163,
+        "total_ms": 5946.023092,
+        "mesh_ms": 5511.341558,
+        "solve_ms": 434.681534,
+        "score": 0.30301983300168656,
+        "n": 1,
+        "geom_class": "curved"
+      },
+      {
+        "cfg_id": "cfg-1ea46b97",
+        "config": {
+          "element_tendency": 0.0,
+          "feature_refine": false,
+          "mesher": "hex",
+          "order": 1
+        },
+        "accuracy": 0.1792784752353841,
+        "total_ms": 2777.133865,
+        "mesh_ms": 2347.872368,
+        "solve_ms": 429.261497,
+        "score": 0.33922903741154015,
+        "n": 1,
+        "geom_class": "curved"
+      }
+    ],
+    "prismatic": [
+      {
+        "cfg_id": "cfg-4ac2a08b",
+        "config": {
+          "element_tendency": 0.9,
+          "feature_refine": true,
+          "mesher": "graded_tet",
+          "order": 1
+        },
+        "accuracy": 0.7404838873189216,
+        "total_ms": 355844.436549,
+        "mesh_ms": 1753.532485,
+        "solve_ms": 354090.904064,
+        "score": 0.4617384530852373,
+        "n": 1,
+        "geom_class": "prismatic"
+      },
+      {
+        "cfg_id": "cfg-0ea8730d",
+        "config": {
+          "element_tendency": -0.75,
+          "feature_refine": true,
+          "mesher": "hybrid_zoo",
+          "order": 1
+        },
+        "accuracy": 0.7371917869659592,
+        "total_ms": 371.4115305,
+        "mesh_ms": 92.8721765,
+        "solve_ms": 278.539354,
+        "score": 0.7929179583429808,
+        "n": 2,
+        "geom_class": "prismatic"
+      }
+    ]
+  },
+  "recommendations": {
+    "apply_code_defaults": false,
+    "reason": "Partial or insufficient data \u2014 document recommendations only; do not change product defaults yet.",
+    "overall_ok_rate": 0.9565217391304348,
+    "n_runs": 23,
+    "finished": false,
+    "global_top_cfg": {
+      "cfg_id": "cfg-0ea8730d",
+      "config": {
+        "element_tendency": -0.75,
+        "feature_refine": true,
+        "mesher": "hybrid_zoo",
+        "order": 1
+      },
+      "mean_score": 0.6414913913207129,
+      "mean_accuracy": 0.5512206830557674,
+      "ok_rate": 1.0,
+      "n_ok": 3,
+      "n_fail": 0
+    },
+    "knob_suggestions": [
+      {
+        "knob": "mesher",
+        "suggested": "hex",
+        "mean_score": 0.639511594289087,
+        "ok_rate": 1.0,
+        "n_runs": 6,
+        "n_configs": 2
+      },
+      {
+        "knob": "element_tendency",
+        "suggested": -0.75,
+        "mean_score": 0.6407586784445801,
+        "ok_rate": 1.0,
+        "n_runs": 9,
+        "n_configs": 3
+      },
+      {
+        "knob": "feature_refine",
+        "suggested": false,
+        "mean_score": 0.6010209317791008,
+        "ok_rate": 0.9166666666666666,
+        "n_runs": 12,
+        "n_configs": 4
+      },
+      {
+        "knob": "order",
+        "suggested": 1,
+        "mean_score": 0.575228293453863,
+        "ok_rate": 0.9565217391304348,
+        "n_runs": 23,
+        "n_configs": 8
+      }
+    ],
+    "factor_breakdown": {
+      "element_tendency": {
+        "-0.75": {
+          "mean_score": 0.6407586784445801,
+          "n_configs": 3.0,
+          "n_runs": 9.0,
+          "ok_rate": 1.0
+        },
+        "0.0": {
+          "mean_score": 0.5846156676631484,
+          "n_configs": 2.0,
+          "n_runs": 6.0,
+          "ok_rate": 0.8333333333333334
+        },
+        "0.5": {
+          "mean_score": 0.6174261958950531,
+          "n_configs": 2.0,
+          "n_runs": 6.0,
+          "ok_rate": 1.0
+        },
+        "0.9": {
+          "mean_score": 0.27546658518076045,
+          "n_configs": 1.0,
+          "n_runs": 2.0,
+          "ok_rate": 1.0
+        }
+      },
+      "feature_refine": {
+        "True": {
+          "mean_score": 0.5494356551286252,
+          "n_configs": 4.0,
+          "n_runs": 11.0,
+          "ok_rate": 1.0
+        },
+        "False": {
+          "mean_score": 0.6010209317791008,
+          "n_configs": 4.0,
+          "n_runs": 12.0,
+          "ok_rate": 0.9166666666666666
+        }
+      },
+      "mesher": {
+        "hex": {
+          "mean_score": 0.639511594289087,
+          "n_configs": 2.0,
+          "n_runs": 6.0,
+          "ok_rate": 1.0
+        },
+        "hybrid_zoo": {
+          "mean_score": 0.6290988512751372,
+          "n_configs": 2.0,
+          "n_runs": 6.0,
+          "ok_rate": 1.0
+        },
+        "graded_tet": {
+          "mean_score": 0.5161513641256138,
+          "n_configs": 4.0,
+          "n_runs": 11.0,
+          "ok_rate": 0.9090909090909091
+        }
+      },
+      "order": {
+        "1": {
+          "mean_score": 0.575228293453863,
+          "n_configs": 8.0,
+          "n_runs": 23.0,
+          "ok_rate": 0.9565217391304348
+        }
+      }
+    },
+    "per_condition": {
+      "geom:curved": {
+        "n_runs": 8,
+        "ok_rate": 0.875,
+        "top_configs": [
+          {
+            "cfg_id": "cfg-1ea46b97",
+            "config": {
+              "element_tendency": 0.0,
+              "feature_refine": false,
+              "mesher": "hex",
+              "order": 1
+            },
+            "mean_score": 0.33922903741154015,
+            "n_runs": 1,
+            "ok_rate": 1.0
+          },
+          {
+            "cfg_id": "cfg-0ea8730d",
+            "config": {
+              "element_tendency": -0.75,
+              "feature_refine": true,
+              "mesher": "hybrid_zoo",
+              "order": 1
+            },
+            "mean_score": 0.3386382572761768,
+            "n_runs": 1,
+            "ok_rate": 1.0
+          },
+          {
+            "cfg_id": "cfg-1b696ce7",
+            "config": {
+              "element_tendency": -0.75,
+              "feature_refine": true,
+              "mesher": "graded_tet",
+              "order": 1
+            },
+            "mean_score": 0.3384253077965764,
+            "n_runs": 1,
+            "ok_rate": 1.0
+          },
+          {
+            "cfg_id": "cfg-02e4c7a5",
+            "config": {
+              "element_tendency": -0.75,
+              "feature_refine": true,
+              "mesher": "hex",
+              "order": 1
+            },
+            "mean_score": 0.33736785537665837,
+            "n_runs": 1,
+            "ok_rate": 1.0
+          },
+          {
+            "cfg_id": "cfg-3f8ec5a6",
+            "config": {
+              "element_tendency": 0.5,
+              "feature_refine": false,
+              "mesher": "graded_tet",
+              "order": 1
+            },
+            "mean_score": 0.30301983300168656,
+            "n_runs": 1,
+            "ok_rate": 1.0
+          }
+        ],
+        "factor_best": {
+          "mesher": {
+            "value": "hex",
+            "mean_score": 0.33829844639409923,
+            "n": 2
+          },
+          "element_tendency": {
+            "value": -0.75,
+            "mean_score": 0.33814380681647055,
+            "n": 3
+          },
+          "feature_refine": {
+            "value": false,
+            "mean_score": 0.3018960656817816,
+            "n": 4
+          }
+        }
+      },
+      "geom:prismatic": {
+        "n_runs": 15,
+        "ok_rate": 1.0,
+        "top_configs": [
+          {
+            "cfg_id": "cfg-0ea8730d",
+            "config": {
+              "element_tendency": -0.75,
+              "feature_refine": true,
+              "mesher": "hybrid_zoo",
+              "order": 1
+            },
+            "mean_score": 0.7929179583429808,
+            "n_runs": 2,
+            "ok_rate": 1.0
+          },
+          {
+            "cfg_id": "cfg-1b696ce7",
+            "config": {
+              "element_tendency": -0.75,
+              "feature_refine": true,
+              "mesher": "graded_tet",
+              "order": 1
+            },
+            "mean_score": 0.7918603472109935,
+            "n_runs": 2,
+            "ok_rate": 1.0
+          },
+          {
+            "cfg_id": "cfg-02e4c7a5",
+            "config": {
+              "element_tendency": -0.75,
+              "feature_refine": true,
+              "mesher": "hex",
+              "order": 1
+            },
+            "mean_score": 0.7914200372219304,
+            "n_runs": 2,
+            "ok_rate": 1.0
+          },
+          {
+            "cfg_id": "cfg-1ea46b97",
+            "config": {
+              "element_tendency": 0.0,
+              "feature_refine": false,
+              "mesher": "hex",
+              "order": 1
+            },
+            "mean_score": 0.7888162992512315,
+            "n_runs": 2,
+            "ok_rate": 1.0
+          },
+          {
+            "cfg_id": "cfg-3f8ec5a6",
+            "config": {
+              "element_tendency": 0.5,
+              "feature_refine": false,
+              "mesher": "graded_tet",
+              "order": 1
+            },
+            "mean_score": 0.7757092043399736,
+            "n_runs": 2,
+            "ok_rate": 1.0
+          }
+        ],
+        "factor_best": {
+          "mesher": {
+            "value": "hex",
+            "mean_score": 0.790118168236581,
+            "n": 4
+          },
+          "element_tendency": {
+            "value": -0.75,
+            "mean_score": 0.792066114258635,
+            "n": 6
+          },
+          "feature_refine": {
+            "value": false,
+            "mean_score": 0.7505833648277603,
+            "n": 8
+          }
+        }
+      },
+      "part:cantilever": {
+        "n_runs": 7,
+        "ok_rate": 1.0,
+        "top_configs": [
+          {
+            "cfg_id": "cfg-0ea8730d",
+            "config": {
+              "element_tendency": -0.75,
+              "feature_refine": true,
+              "mesher": "hybrid_zoo",
+              "order": 1
+            },
+            "mean_score": 0.786338422851356,
+            "n_runs": 1,
+            "ok_rate": 1.0
+          },
+          {
+            "cfg_id": "cfg-02e4c7a5",
+            "config": {
+              "element_tendency": -0.75,
+              "feature_refine": true,
+              "mesher": "hex",
+              "order": 1
+            },
+            "mean_score": 0.7856784280443752,
+            "n_runs": 1,
+            "ok_rate": 1.0
+          },
+          {
+            "cfg_id": "cfg-1b696ce7",
+            "config": {
+              "element_tendency": -0.75,
+              "feature_refine": true,
+              "mesher": "graded_tet",
+              "order": 1
+            },
+            "mean_score": 0.7855472981042237,
+            "n_runs": 1,
+            "ok_rate": 1.0
+          },
+          {
+            "cfg_id": "cfg-1ea46b97",
+            "config": {
+              "element_tendency": 0.0,
+              "feature_refine": false,
+              "mesher": "hex",
+              "order": 1
+            },
+            "mean_score": 0.7799439995267443,
+            "n_runs": 1,
+            "ok_rate": 1.0
+          },
+          {
+            "cfg_id": "cfg-37584704",
+            "config": {
+              "element_tendency": 0.5,
+              "feature_refine": false,
+              "mesher": "hybrid_zoo",
+              "order": 1
+            },
+            "mean_score": 0.7721064597671607,
+            "n_runs": 1,
+            "ok_rate": 1.0
+          }
+        ],
+        "factor_best": {
+          "mesher": {
+            "value": "hex",
+            "mean_score": 0.7828112137855597,
+            "n": 2
+          },
+          "element_tendency": {
+            "value": -0.75,
+            "mean_score": 0.7858547163333184,
+            "n": 3
+          },
+          "feature_refine": {
+            "value": true,
+            "mean_score": 0.7858547163333184,
+            "n": 3
+          }
+        }
+      },
+      "part:plate_hole": {
+        "n_runs": 8,
+        "ok_rate": 0.875,
+        "top_configs": [
+          {
+            "cfg_id": "cfg-1ea46b97",
+            "config": {
+              "element_tendency": 0.0,
+              "feature_refine": false,
+              "mesher": "hex",
+              "order": 1
+            },
+            "mean_score": 0.33922903741154015,
+            "n_runs": 1,
+            "ok_rate": 1.0
+          },
+          {
+            "cfg_id": "cfg-0ea8730d",
+            "config": {
+              "element_tendency": -0.75,
+              "feature_refine": true,
+              "mesher": "hybrid_zoo",
+              "order": 1
+            },
+            "mean_score": 0.3386382572761768,
+            "n_runs": 1,
+            "ok_rate": 1.0
+          },
+          {
+            "cfg_id": "cfg-1b696ce7",
+            "config": {
+              "element_tendency": -0.75,
+              "feature_refine": true,
+              "mesher": "graded_tet",
+              "order": 1
+            },
+            "mean_score": 0.3384253077965764,
+            "n_runs": 1,
+            "ok_rate": 1.0
+          },
+          {
+            "cfg_id": "cfg-02e4c7a5",
+            "config": {
+              "element_tendency": -0.75,
+              "feature_refine": true,
+              "mesher": "hex",
+              "order": 1
+            },
+            "mean_score": 0.33736785537665837,
+            "n_runs": 1,
+            "ok_rate": 1.0
+          },
+          {
+            "cfg_id": "cfg-3f8ec5a6",
+            "config": {
+              "element_tendency": 0.5,
+              "feature_refine": false,
+              "mesher": "graded_tet",
+              "order": 1
+            },
+            "mean_score": 0.30301983300168656,
+            "n_runs": 1,
+            "ok_rate": 1.0
+          }
+        ],
+        "factor_best": {
+          "mesher": {
+            "value": "hex",
+            "mean_score": 0.33829844639409923,
+            "n": 2
+          },
+          "element_tendency": {
+            "value": -0.75,
+            "mean_score": 0.33814380681647055,
+            "n": 3
+          },
+          "feature_refine": {
+            "value": false,
+            "mean_score": 0.3018960656817816,
+            "n": 4
+          }
+        }
+      },
+      "part:smoke_bar": {
+        "n_runs": 8,
+        "ok_rate": 1.0,
+        "top_configs": [
+          {
+            "cfg_id": "cfg-0ea8730d",
+            "config": {
+              "element_tendency": -0.75,
+              "feature_refine": true,
+              "mesher": "hybrid_zoo",
+              "order": 1
+            },
+            "mean_score": 0.7994974938346058,
+            "n_runs": 1,
+            "ok_rate": 1.0
+          },
+          {
+            "cfg_id": "cfg-1b696ce7",
+            "config": {
+              "element_tendency": -0.75,
+              "feature_refine": true,
+              "mesher": "graded_tet",
+              "order": 1
+            },
+            "mean_score": 0.7981733963177632,
+            "n_runs": 1,
+            "ok_rate": 1.0
+          },
+          {
+            "cfg_id": "cfg-1ea46b97",
+            "config": {
+              "element_tendency": 0.0,
+              "feature_refine": false,
+              "mesher": "hex",
+              "order": 1
+            },
+            "mean_score": 0.7976885989757188,
+            "n_runs": 1,
+            "ok_rate": 1.0
+          },
+          {
+            "cfg_id": "cfg-02e4c7a5",
+            "config": {
+              "element_tendency": -0.75,
+              "feature_refine": true,
+              "mesher": "hex",
+              "order": 1
+            },
+            "mean_score": 0.7971616463994857,
+            "n_runs": 1,
+            "ok_rate": 1.0
+          },
+          {
+            "cfg_id": "cfg-3f8ec5a6",
+            "config": {
+              "element_tendency": 0.5,
+              "feature_refine": false,
+              "mesher": "graded_tet",
+              "order": 1
+            },
+            "mean_score": 0.782429365699496,
+            "n_runs": 1,
+            "ok_rate": 1.0
+          }
+        ],
+        "factor_best": {
+          "mesher": {
+            "value": "hex",
+            "mean_score": 0.7974251226876022,
+            "n": 2
+          },
+          "element_tendency": {
+            "value": -0.75,
+            "mean_score": 0.7982775121839515,
+            "n": 3
+          },
+          "feature_refine": {
+            "value": false,
+            "mean_score": 0.781570385712888,
+            "n": 4
+          }
+        }
+      }
+    }
+  }
+}

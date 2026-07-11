@@ -1,0 +1,23 @@
+{
+  "name": "settings-frontier-1",
+  "parts": [
+    "tests/fixtures/parts/smoke_bar.case.json",
+    "tests/fixtures/parts/plate_hole.case.json",
+    "tests/fixtures/parts/cantilever.case.json"
+  ],
+  "tiers": [
+    { "h_scale": 2.5, "keep_frac": 0.35 },
+    { "h_scale": 1.5, "keep_frac": 0.5 },
+    { "h_scale": 1.0, "keep_frac": 1.0 }
+  ],
+  "grid": {
+    "mesher": ["hex", "graded_tet", "hybrid_zoo", "hybrid_vem"],
+    "feature_refine": [true, false],
+    "order": [1],
+    "element_tendency": [-0.75, 0.0, 0.5, 0.9]
+  },
+  "score": {
+    "weights": { "accuracy": 0.5, "solve_ms": 0.25, "mesh_ms": 0.25 }
+  },
+  "resources": { "max_threads": 0, "max_mem_gb": 0 }
+}

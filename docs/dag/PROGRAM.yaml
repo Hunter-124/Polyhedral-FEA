@@ -63,7 +63,7 @@ nodes:
 
   - id: campaign-1
     title: First full settings campaign on the part library
-    status: todo
+    status: in_progress
     deps: [testlab-harness, part-library]
     scope: [bench/campaigns/]
     note: >

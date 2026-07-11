@@ -325,6 +325,9 @@ pipeline::VolumeMesher parse_mesher(const std::string& name) {
     if (name == "hybrid_zoo" || name == "hybrid" || name == "zoo") {
         return pipeline::VolumeMesher::kHybrid;
     }
+    if (name == "hybrid_vem" || name == "hybridvem" || name == "hybrid-vem") {
+        return pipeline::VolumeMesher::kHybridVem;
+    }
     if (name == "hexpyr" || name == "transition") {
         return pipeline::VolumeMesher::kHexPyramid;
     }
@@ -388,7 +391,6 @@ std::vector<Config> expand_grid(const json& grid) {
         }
         if (values.contains("element_tendency")) {
             cfg.element_tendency = values["element_tendency"].get<double>();
-            (void)cfg.element_tendency;
         }
         out.push_back(std::move(cfg));
 
@@ -658,8 +660,10 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         out.line["geom_class"] = geom_class_of(model, resolved.h);
 
         const auto t_mesh0 = clock::now();
+        // skin_layers=2, feature_refine from grid; empty refine_seeds; tendency dial.
         auto vol = pipeline::volume_mesh(model, h, cfg.mesher, /*skin_layers=*/2,
-                                         cfg.feature_refine);
+                                         cfg.feature_refine, /*refine_seeds=*/{},
+                                         /*seed_band=*/0.0, cfg.element_tendency);
         // Validity is mandatory before any solve (anti-cheat / engineering rule).
         vol.mesh.check_validity();
         if (cfg.order >= 2) {

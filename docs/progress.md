@@ -23,6 +23,10 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-11: **Campaign-1 settings frontier started** — `bench/campaigns/settings-frontier-1`
+  full factorial (meshers × feature_refine × element_tendency) on smoke_bar /
+  plate_hole / cantilever with successive-halving tiers. Testlab wires
+  hybrid_vem + element_tendency into volume_mesh.
 - 2026-07-11: **Test lab harness + GUI Test Lab (DAG `testlab-harness`, `gui-testlab`)** —
   `apps/testlab/polymesh_testlab` campaign runner (successive-halving, SIGINT
   checkpoint, results.jsonl, progress.json; anti-cheat reference load). Smoke

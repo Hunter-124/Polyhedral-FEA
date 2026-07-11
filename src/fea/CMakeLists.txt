@@ -7,6 +7,7 @@ add_library(fea
     src/boundary_faces.cpp
     src/quadrature.cpp
     src/shape.cpp
+    src/hierarchical.cpp
     src/assembly.cpp
     src/solve.cpp
     src/traction.cpp

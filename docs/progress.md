@@ -23,6 +23,23 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: **Hierarchical arbitrary-p basis foundation (ADR-0019 lane B)** —
+  `fea/hierarchical.{hpp,cpp}`: 1D integrated-Legendre (Lobatto) basis with
+  derivatives (vertex funcs + order-k bubbles φ_k = (P_k−P_{k−2})/√(2(2k−1))),
+  hex full tensor-product hierarchical modes at order 1..4, tet vertex +
+  quadratic edge bubbles at order 1..2, subparametric single-element
+  stiffness. Modes carry entity/order/orientation descriptors (`HpMode`) for
+  the forthcoming per-entity DOF assembler. Tests (`test_hierarchical.cpp`,
+  6 cases): Lobatto endpoint/derivative identities, p=1 stiffness ==
+  frozen nodal hex8/tet4, exactly six rigid-body modes at every order on
+  distorted geometry, SPD. Full suite 155 cases green. Next: per-entity DOF
+  numbering + orientation signs + MMS h/p-convergence (node `p-hierarchical`).
+- 2026-07-10: **Adaptive-core program bootstrapped** — repo-tracked DAG
+  (`docs/dag/PROGRAM.yaml` + interfaces.md + README) as the pick-up-anywhere
+  board; ADR-0019 (mixed FE+VEM, arbitrary-p hierarchical, min-rule
+  conforming, (h,p,shape) driver); CONTRIBUTING §0 AI-agent contributor quick
+  start. Test-lab harness, validation part library, and GUI panel rebuild
+  under way in parallel (DAG lane A).
 - 2026-07-10: **Curvature-driven refinement + boundary finishing (bore/rim
   weirdness fixed)** — percentile curvature seed balls replaced by a per-cell
   turning-angle criterion (`stamp_curvature_cells`: refine where the surface

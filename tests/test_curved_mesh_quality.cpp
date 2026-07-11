@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: BSD-3-Clause
 //
-// Curved-geometry mesher scorecard (T0): authentic geometric metrics M1–M6 so
-// hex can pass (or score far higher) while graded tet / hybrid zoo fail on
-// rounded/circular features until quality fixes land.
+// Curved-geometry mesher scorecard (T0): authentic geometric metrics M1–M6.
 //
-// See plan: curved residual / LEB mid-chords / hole silhouette.
-// Thresholds below are frozen from measured product fills at fixed equal h
-// (not auto-h). ADR-0015: scores measure lattice+snap fidelity, not CAD Delaunay.
+// History: hex used to outrank graded tet / hybrid zoo on rounded features.
+// Root causes fixed 2026-07-10: hybrid v3 emitted non-conforming pyramid
+// transitions (cracked meshes, exposed interior faces) → v4 conforming
+// polygon-fan closure; graded snap left degenerate sliver caps (min boundary
+// aspect ~1e-18) and hole-void jut nodes → S4 cap collapse + S5 void carve +
+// second snap round. The test now *enforces* competitiveness: hybrid must
+// match/beat hex, graded must stay within a fixed fraction with clean
+// residuals. Thresholds from measured product fills at fixed equal h (not
+// auto-h). ADR-0015: scores measure lattice+snap fidelity, not CAD Delaunay.
 
 #include "fea/boundary_faces.hpp"
 #include "fea/nodal_mesh.hpp"
@@ -57,11 +61,11 @@ double nodal_mesh_volume(const fea::NodalMesh& m) {
         case fea::ElementType::kHex20:
             if (n.size() >= 8) {
                 for (const auto& t : kCubeTets) {
-                    vol += std::abs(mesh::tet_signed_volume(
-                        m.nodes[n[static_cast<std::size_t>(t[0])]],
-                        m.nodes[n[static_cast<std::size_t>(t[1])]],
-                        m.nodes[n[static_cast<std::size_t>(t[2])]],
-                        m.nodes[n[static_cast<std::size_t>(t[3])]]));
+                    vol += std::abs(
+                        mesh::tet_signed_volume(m.nodes[n[static_cast<std::size_t>(t[0])]],
+                                                m.nodes[n[static_cast<std::size_t>(t[1])]],
+                                                m.nodes[n[static_cast<std::size_t>(t[2])]],
+                                                m.nodes[n[static_cast<std::size_t>(t[3])]]));
                 }
             }
             break;
@@ -133,8 +137,7 @@ Scorecard score_volume(const pipeline::Model& model, double h, pipeline::VolumeM
 
     const double mesh_vol = nodal_mesh_volume(vol.mesh);
     auto tets = tet_connectivity(vol.mesh);
-    const std::vector<std::array<std::uint32_t, 4>>* tet_ptr =
-        tets.empty() ? nullptr : &tets;
+    const std::vector<std::array<std::uint32_t, 4>>* tet_ptr = tets.empty() ? nullptr : &tets;
 
     sc.m = mesh::evaluate_curved_mesh_quality(model.surface, vol.mesh.nodes, faces, h,
                                               mesh_vol, ref_volume, circ, tet_ptr);
@@ -153,36 +156,42 @@ void dump_score(const Scorecard& sc) {
     CAPTURE(sc.n_elems);
     CAPTURE(sc.n_nodes);
     CAPTURE(sc.h);
-    INFO(std::format(
-        "{}: score={:.4f} M1max={:.4g} M2max={:.4g} M3={:.4g} M4={:.4g} M5={:.4g} "
-        "M6={:.4g} elems={} nodes={} h={:.4g}",
-        sc.mesher, sc.m.composite_score, sc.m.m1_max, sc.m.m2_max, sc.m.m3_rel_volume_err,
-        sc.m.m4_radial_rel, sc.m.m5_max_azimuth_gap, sc.m.m6_min_boundary_aspect, sc.n_elems,
-        sc.n_nodes, sc.h));
+    INFO(
+        std::format("{}: score={:.4f} M1max={:.4g} M2max={:.4g} M3={:.4g} M4={:.4g} M5={:.4g} "
+                    "M6={:.4g} elems={} nodes={} h={:.4g}",
+                    sc.mesher, sc.m.composite_score, sc.m.m1_max, sc.m.m2_max,
+                    sc.m.m3_rel_volume_err, sc.m.m4_radial_rel, sc.m.m5_max_azimuth_gap,
+                    sc.m.m6_min_boundary_aspect, sc.n_elems, sc.n_nodes, sc.h));
 }
 
-// --- Frozen thresholds (calibrated 2026-07-10, product fills, equal h) ---
-// Measured composites (approx):
-//   sphere  h=0.15*ext: hex≈0.849  graded≈0.804
-//   cylinder h=0.12*ext: hex≈0.860  graded≈0.784
-//   hole plate h=0.10*ext: hex≈0.568  graded≈0.462  (strong residual signal)
-//
-// DOCUMENT_BUG pattern: while quality bugs remain, graded/hybrid must sit *below*
-// these bars (test stays green documenting the defect). After quality fix, invert
-// to REQUIRE(score >= kPassFloor*) and raise bars to match hex competitiveness.
+// --- Frozen thresholds (recalibrated 2026-07-10 after quality fixes) ---
+// Measured composites (equal h, product fills):
+//   sphere   h=0.15*ext: hex≈0.849  graded≈0.799  hybrid≈0.896
+//   cylinder h=0.12*ext: hex≈0.860  graded≈0.780  hybrid≈0.860
+//   hole     h=0.10*ext: hex≈0.568  graded≈0.530  hybrid≈0.577
+// Residuals: graded/hybrid M1max ≈ 0 (≤0.06 h worst), min boundary tet
+// aspect ≥ ~0.04 (was ~1e-18 degenerate).
 
 constexpr double kHexFloorSphere = 0.70;
 constexpr double kHexFloorCylinder = 0.70;
 constexpr double kHexFloorHole = 0.40;
 
-// "Still buggy" ceilings — measured graded sits under these; raise after fix.
-constexpr double kBugCeilSphere = 0.83;    // graded≈0.804
-constexpr double kBugCeilCylinder = 0.81; // graded≈0.784
-constexpr double kBugCeilHole = 0.55;     // graded≈0.462
+// Post-fix pass floors (absolute) — margin ~0.03-0.05 under measured.
+constexpr double kGradedFloorSphere = 0.75;
+constexpr double kGradedFloorCylinder = 0.74;
+constexpr double kGradedFloorHole = 0.48;
+constexpr double kHybridFloorSphere = 0.85;
+constexpr double kHybridFloorCylinder = 0.82;
+constexpr double kHybridFloorHole = 0.50;
 
-// Hex must outrank graded (relative). Fraction of hex score graded must stay under.
-constexpr double kGradedLagFraction = 0.98; // 0.804 < 0.849*0.98
-constexpr double kHybridLagFraction = 0.99;
+// Relative competitiveness: graded (all-tet, pays the M6 tet-aspect term hex
+// never does) must stay within 0.88×hex; hybrid must effectively match hex.
+constexpr double kGradedKeepFraction = 0.88; // measured ≥0.906×hex
+constexpr double kHybridKeepFraction = 0.97; // measured ≥0.9999×hex
+
+// Residual hygiene: boundary nodes must sit on the surface (no juts/cracks).
+constexpr double kResidualFrac = 0.08;      // ×h, M1max bound (measured ≤0.053)
+constexpr double kMinBoundaryAspect = 0.02; // measured ≥0.044 (was ~1e-18)
 
 } // namespace
 
@@ -217,18 +226,15 @@ TEST_CASE("curved scorecard: sphere hex passes, graded/hybrid lag or fail bar",
     dump_score(hybrid);
 
     REQUIRE(hex.m.composite_score >= kHexFloorSphere);
-    // DOCUMENT_BUG: graded LEB mid-chords / curved residual lag hex on pure curves.
-    // After quality fix: REQUIRE(graded.m.composite_score >= hex.m.composite_score * 0.95);
-    REQUIRE(graded.m.composite_score < kBugCeilSphere);
-    REQUIRE(graded.m.composite_score < hex.m.composite_score * kGradedLagFraction);
-    // DOCUMENT_BUG: hybrid free-surface stair + size jumps / bloat on pure curves.
-    REQUIRE(hybrid.m.composite_score < kBugCeilSphere);
-    const bool hybrid_lags =
-        hybrid.m.composite_score < hex.m.composite_score * kHybridLagFraction;
-    const bool hybrid_bloated =
-        hybrid.n_elems > hex.n_elems * 4 &&
-        hybrid.m.m2_max + 1e-12 >= hex.m.m2_max * 0.85;
-    REQUIRE((hybrid_lags || hybrid_bloated));
+    // Post-fix: graded competitive (all-tet pays M6; keep-fraction of hex).
+    REQUIRE(graded.m.composite_score >= kGradedFloorSphere);
+    REQUIRE(graded.m.composite_score >= hex.m.composite_score * kGradedKeepFraction);
+    REQUIRE(graded.m.m1_max <= kResidualFrac * h);
+    REQUIRE(graded.m.m6_min_boundary_aspect >= kMinBoundaryAspect);
+    // Post-fix: hybrid v4 (conforming fan transitions) matches or beats hex.
+    REQUIRE(hybrid.m.composite_score >= kHybridFloorSphere);
+    REQUIRE(hybrid.m.composite_score >= hex.m.composite_score * kHybridKeepFraction);
+    REQUIRE(hybrid.m.m1_max <= kResidualFrac * h);
 }
 
 TEST_CASE("curved scorecard: cylinder_prism hex ranks above graded/hybrid",
@@ -265,20 +271,13 @@ TEST_CASE("curved scorecard: cylinder_prism hex ranks above graded/hybrid",
     dump_score(hybrid);
 
     REQUIRE(hex.m.composite_score >= kHexFloorCylinder);
-    REQUIRE(graded.m.composite_score < kBugCeilCylinder);
-    REQUIRE(graded.m.composite_score < hex.m.composite_score * kGradedLagFraction);
-    // Prefer radial error discrimination when circular feature selects nodes.
-    if (hex.m.n_circular_nodes >= 4 && graded.m.n_circular_nodes >= 4) {
-        // Graded should not dominate hex on M4 until fixed; allow equality.
-        REQUIRE(graded.m.m4_radial_rel + 1e-9 >= hex.m.m4_radial_rel * 0.85);
-    }
-    REQUIRE(hybrid.m.composite_score < kBugCeilCylinder);
-    const bool hybrid_lags =
-        hybrid.m.composite_score < hex.m.composite_score * kHybridLagFraction;
-    const bool hybrid_bloated =
-        hybrid.n_elems > hex.n_elems * 4 &&
-        hybrid.m.m2_max + 1e-12 >= hex.m.m2_max * 0.85;
-    REQUIRE((hybrid_lags || hybrid_bloated));
+    REQUIRE(graded.m.composite_score >= kGradedFloorCylinder);
+    REQUIRE(graded.m.composite_score >= hex.m.composite_score * kGradedKeepFraction);
+    REQUIRE(graded.m.m1_max <= kResidualFrac * h);
+    REQUIRE(graded.m.m6_min_boundary_aspect >= kMinBoundaryAspect);
+    REQUIRE(hybrid.m.composite_score >= kHybridFloorCylinder);
+    REQUIRE(hybrid.m.composite_score >= hex.m.composite_score * kHybridKeepFraction);
+    REQUIRE(hybrid.m.m1_max <= kResidualFrac * h);
 }
 
 TEST_CASE("curved scorecard: hole plate test.stl graded residual / ranking",
@@ -298,9 +297,8 @@ TEST_CASE("curved scorecard: hole plate test.stl graded residual / ranking",
     const Eigen::Vector3d c = 0.5 * (model.bbox_min + model.bbox_max);
     // Heuristic hole radius from progress notes Rκ≈9.68 on auto-h path for this
     // fixture; use mid-plate feature band from half min-xy extent * 0.15.
-    const double half_xy =
-        0.5 * std::min(model.bbox_max[0] - model.bbox_min[0],
-                       model.bbox_max[1] - model.bbox_min[1]);
+    const double half_xy = 0.5 * std::min(model.bbox_max[0] - model.bbox_min[0],
+                                          model.bbox_max[1] - model.bbox_min[1]);
     mesh::CircularFeature circ;
     circ.axis_point = c;
     circ.axis_dir = {0.0, 0.0, 1.0};
@@ -323,20 +321,14 @@ TEST_CASE("curved scorecard: hole plate test.stl graded residual / ranking",
 
     REQUIRE(hex.m.composite_score >= kHexFloorHole);
 
-    // Primary documented graded failure: large free-surface residual vs h.
-    // Historical: max|d| ~0.4 h on this part after LEB unsnap (M1 or M2).
-    const bool graded_residual_bad =
-        (graded.m.m1_max > 0.20 * h) || (graded.m.m2_max > 0.30 * h);
-    const bool graded_score_lag =
-        graded.m.composite_score < hex.m.composite_score * kGradedLagFraction;
-    REQUIRE((graded_residual_bad || graded_score_lag));
-    REQUIRE(graded.m.composite_score < kBugCeilHole);
-
-    // Hybrid: may have near-zero node residual but lag composite / efficiency.
-    const bool hybrid_score_lag =
-        hybrid.m.composite_score < hex.m.composite_score * kHybridLagFraction;
-    const bool hybrid_m2_worse = hybrid.m.m2_max > hex.m.m2_max * 1.15 + 1e-12;
-    const bool hybrid_bloated =
-        hybrid.n_elems > hex.n_elems * 8 && hybrid.m.m2_max >= hex.m.m2_max * 0.5;
-    REQUIRE((hybrid_score_lag || hybrid_m2_worse || hybrid_bloated));
+    // Post-fix: the historical graded defect (jut nodes ~0.4 h into the hole
+    // void, degenerate caps) is gone — node residual is bounded and the
+    // composite keeps pace with hex despite the under-resolved hole (R≈2h).
+    REQUIRE(graded.m.composite_score >= kGradedFloorHole);
+    REQUIRE(graded.m.composite_score >= hex.m.composite_score * kGradedKeepFraction);
+    REQUIRE(graded.m.m1_max <= kResidualFrac * h);
+    REQUIRE(graded.m.m6_min_boundary_aspect >= kMinBoundaryAspect);
+    REQUIRE(hybrid.m.composite_score >= kHybridFloorHole);
+    REQUIRE(hybrid.m.composite_score >= hex.m.composite_score * kHybridKeepFraction);
+    REQUIRE(hybrid.m.m1_max <= kResidualFrac * h);
 }

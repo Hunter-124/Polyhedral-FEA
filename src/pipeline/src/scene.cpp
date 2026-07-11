@@ -37,6 +37,7 @@
 #include <queue>
 #include <set>
 #include <span>
+#include <unordered_map>
 
 namespace polymesh::pipeline {
 namespace adapt = polymesh::adapt;
@@ -320,8 +321,8 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                     const auto b = tri[static_cast<std::size_t>((e + 1) % 3)];
                     if (a < curv.kappa.size() && b < curv.kappa.size() &&
                         0.5 * (curv.kappa[a] + curv.kappa[b]) >= kappa_thresh) {
-                        candidates.push_back(0.5 * (model.surface.vertices[a] +
-                                                    model.surface.vertices[b]));
+                        candidates.push_back(
+                            0.5 * (model.surface.vertices[a] + model.surface.vertices[b]));
                     }
                 }
             }
@@ -353,10 +354,9 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         }
         // Build lattice without snap first; snap after hex→pyramid expand so free
         // surface Jacobian is pyramid-based (hex free-face snap unsnaps too often).
-        auto raw =
-            mesh::mixed_fill_surface(model.surface, model.bbox_min, model.bbox_max, h,
-                                     std::max(1, skin_layers), edges, feat_band, curv_seeds,
-                                     s_band, /*snap_boundary=*/false);
+        auto raw = mesh::mixed_fill_surface(model.surface, model.bbox_min, model.bbox_max, h,
+                                            std::max(1, skin_layers), edges, feat_band,
+                                            curv_seeds, s_band, /*snap_boundary=*/false);
         const std::size_t n_hex_lattice = raw.n_hex;
         const std::size_t n_pyr_raw = raw.n_pyramid;
         auto fill = mesh::expand_mixed_hex_to_pyramids(raw);
@@ -378,18 +378,20 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                             if (cell.kind != mesh::MixedCellKind::kPyramid5) {
                                 continue;
                             }
-                            const double v1 = ((fill.nodes[cell.nodes[1]] - fill.nodes[cell.nodes[0]])
-                                                   .dot((fill.nodes[cell.nodes[2]] -
-                                                         fill.nodes[cell.nodes[0]])
-                                                            .cross(fill.nodes[cell.nodes[4]] -
-                                                                   fill.nodes[cell.nodes[0]]))) /
-                                              6.0;
-                            const double v2 = ((fill.nodes[cell.nodes[2]] - fill.nodes[cell.nodes[0]])
-                                                   .dot((fill.nodes[cell.nodes[3]] -
-                                                         fill.nodes[cell.nodes[0]])
-                                                            .cross(fill.nodes[cell.nodes[4]] -
-                                                                   fill.nodes[cell.nodes[0]]))) /
-                                              6.0;
+                            const double v1 =
+                                ((fill.nodes[cell.nodes[1]] - fill.nodes[cell.nodes[0]])
+                                     .dot((fill.nodes[cell.nodes[2]] -
+                                           fill.nodes[cell.nodes[0]])
+                                              .cross(fill.nodes[cell.nodes[4]] -
+                                                     fill.nodes[cell.nodes[0]]))) /
+                                6.0;
+                            const double v2 =
+                                ((fill.nodes[cell.nodes[2]] - fill.nodes[cell.nodes[0]])
+                                     .dot((fill.nodes[cell.nodes[3]] -
+                                           fill.nodes[cell.nodes[0]])
+                                              .cross(fill.nodes[cell.nodes[4]] -
+                                                     fill.nodes[cell.nodes[0]]))) /
+                                6.0;
                             if (std::abs(v1) <= vol_eps || std::abs(v2) <= vol_eps) {
                                 offenders.insert(cell.nodes.begin(),
                                                  cell.nodes.begin() + cell.n_nodes);
@@ -398,20 +400,83 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                     },
                     /*max_move_frac=*/1.25, /*passes=*/8, edges)
                     .max_residual;
+            // Per-node outlier re-projection (mirror of graded S3): residual
+            // stragglers get a full/partial projection accepted only when every
+            // incident cell stays valid. After expand all cells are pyramid/tet.
+            std::unordered_map<std::uint32_t, std::vector<std::size_t>> node_cells;
+            for (std::size_t ci = 0; ci < fill.cells.size(); ++ci) {
+                const auto& cell = fill.cells[ci];
+                for (std::uint8_t m = 0; m < cell.n_nodes; ++m) {
+                    node_cells[cell.nodes[m]].push_back(ci);
+                }
+            }
+            const auto cell_valid = [&](const mesh::MixedCell& cell) {
+                if (cell.kind == mesh::MixedCellKind::kTet4) {
+                    const Eigen::Vector3d& a = fill.nodes[cell.nodes[0]];
+                    const Eigen::Vector3d& b = fill.nodes[cell.nodes[1]];
+                    const Eigen::Vector3d& c = fill.nodes[cell.nodes[2]];
+                    const Eigen::Vector3d& d = fill.nodes[cell.nodes[3]];
+                    return (b - a).dot((c - a).cross(d - a)) / 6.0 > vol_eps;
+                }
+                if (cell.kind == mesh::MixedCellKind::kPyramid5) {
+                    const Eigen::Vector3d& a = fill.nodes[cell.nodes[0]];
+                    const Eigen::Vector3d& b = fill.nodes[cell.nodes[1]];
+                    const Eigen::Vector3d& c = fill.nodes[cell.nodes[2]];
+                    const Eigen::Vector3d& d = fill.nodes[cell.nodes[3]];
+                    const Eigen::Vector3d& e = fill.nodes[cell.nodes[4]];
+                    const double v1 = (b - a).dot((c - a).cross(e - a)) / 6.0;
+                    const double v2 = (c - a).dot((d - a).cross(e - a)) / 6.0;
+                    return std::abs(v1) > vol_eps && std::abs(v2) > vol_eps;
+                }
+                return true;
+            };
+            const double thr = 0.08 * h_snap;
+            double max_resid = 0.0;
+            for (const auto ni : bnodes) {
+                if (ni >= fill.nodes.size()) {
+                    continue;
+                }
+                const auto cp = mesh::closest_on_surface(model.surface, fill.nodes[ni]);
+                double resid = cp.distance;
+                if (resid > thr && resid <= 2.5 * h_snap) {
+                    const Eigen::Vector3d saved = fill.nodes[ni];
+                    static constexpr double kFracs[] = {1.0, 0.6, 0.35};
+                    for (const double frac : kFracs) {
+                        fill.nodes[ni] = saved + frac * (cp.point - saved);
+                        bool ok = true;
+                        const auto it = node_cells.find(ni);
+                        if (it != node_cells.end()) {
+                            for (const auto ci : it->second) {
+                                if (!cell_valid(fill.cells[ci])) {
+                                    ok = false;
+                                    break;
+                                }
+                            }
+                        }
+                        if (ok) {
+                            resid = (1.0 - frac) * resid;
+                            break;
+                        }
+                        fill.nodes[ni] = saved;
+                    }
+                }
+                max_resid = std::max(max_resid, resid);
+            }
+            fill.boundary_max_distance = max_resid;
         }
         out.mesh.nodes = std::move(fill.nodes);
         out.mesh.elements.reserve(fill.cells.size());
         for (const auto& cell : fill.cells) {
             if (cell.kind == mesh::MixedCellKind::kPyramid5) {
-                out.mesh.elements.push_back(fea::NodalElement{
-                    fea::ElementType::kPyramid5,
-                    {cell.nodes[0], cell.nodes[1], cell.nodes[2], cell.nodes[3],
-                     cell.nodes[4]}});
+                out.mesh.elements.push_back(
+                    fea::NodalElement{fea::ElementType::kPyramid5,
+                                      {cell.nodes[0], cell.nodes[1], cell.nodes[2],
+                                       cell.nodes[3], cell.nodes[4]}});
             } else if (cell.kind == mesh::MixedCellKind::kHex8) {
                 out.mesh.elements.push_back(fea::NodalElement{
                     fea::ElementType::kHex8,
-                    {cell.nodes[0], cell.nodes[1], cell.nodes[2], cell.nodes[3],
-                     cell.nodes[4], cell.nodes[5], cell.nodes[6], cell.nodes[7]}});
+                    {cell.nodes[0], cell.nodes[1], cell.nodes[2], cell.nodes[3], cell.nodes[4],
+                     cell.nodes[5], cell.nodes[6], cell.nodes[7]}});
             } else {
                 out.mesh.elements.push_back(fea::NodalElement{
                     fea::ElementType::kTet4,
@@ -420,12 +485,12 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         }
         out.boundary_quads = std::move(fill.boundary_quads);
         out.mesher_note = std::format(
-            "hybrid zoo v3 (hex bulk@h + 2:1 fine@h/2 + pyr transition → all-pyramid FE; "
-            "not Delaunay): {} hex + {} pyr raw → {} pyramid5, {} nodes, "
+            "hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; "
+            "not Delaunay): {} hex + {} pyr raw → {} pyramid5 + {} tet4, {} nodes, "
             "h_bulk={:.4g}/h_fine={:.4g} m, fine_cells={} transition={} feature={}, "
             "snap max|d|={:.3g} m{}",
-            n_hex_lattice, n_pyr_raw, fill.n_pyramid, out.mesh.nodes.size(), fill.h,
-            fill.h_fine > 0.0 ? fill.h_fine : fill.h, fill.n_fine_cells,
+            n_hex_lattice, n_pyr_raw, fill.n_pyramid, fill.n_tet, out.mesh.nodes.size(),
+            fill.h, fill.h_fine > 0.0 ? fill.h_fine : fill.h, fill.n_fine_cells,
             fill.n_transition_cells, fill.n_feature_skin_cells, fill.boundary_max_distance,
             n_curv_seeds > 0 ? std::format(", curv_seeds={}", n_curv_seeds) : std::string{});
     } else if (mesher == VolumeMesher::kHexFill || mesher == VolumeMesher::kHexVem) {
@@ -632,7 +697,8 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                 ? ", h raised to cell budget"
                 : "";
         out.mesher_note = std::format(
-            "graded tet v5 (multi-level LEB geo): {} tets ({} bulk, {} refined L1/L2, "
+            "graded tet v6 (multi-level LEB geo + cap collapse/void carve): {} tets ({} bulk, "
+            "{} refined L1/L2, "
             "{} feature, {} seed), h_bulk={:.4g}/h_L2~{:.4g} m (L0/L1/L2), "
             "snap max|d|={:.3g} m mean|d|={:.3g} m"
             "{}{}{}",
@@ -643,8 +709,7 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             n_thin_seeds > 0 ? std::format(", thin_seeds={}", n_thin_seeds) : std::string{});
     } else if (mesher == VolumeMesher::kOctahedral) {
         // Experimental BCC octahedra → tet4 (ADR-0019). Not a product claim.
-        auto fill =
-            mesh::octa_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
+        auto fill = mesh::octa_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
         fill_h = fill.h;
         out.mesh.nodes = std::move(fill.mesh.nodes);
         out.mesh.elements.reserve(fill.mesh.tets.size());
@@ -653,11 +718,11 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                 fea::NodalElement{fea::ElementType::kTet4, {tet[0], tet[1], tet[2], tet[3]}});
         }
         out.boundary_quads = std::move(fill.mesh.boundary_quads);
-        out.mesher_note = std::format(
-            "octahedral experimental (BCC face-octa → tet4; not product): "
-            "{} tets ({} octa + {} bdy pyr), {} nodes, h={:.4g} m",
-            out.mesh.elements.size(), fill.n_octahedra, fill.n_boundary_pyramids,
-            out.mesh.nodes.size(), fill_h);
+        out.mesher_note =
+            std::format("octahedral experimental (BCC face-octa → tet4; not product): "
+                        "{} tets ({} octa + {} bdy pyr), {} nodes, h={:.4g} m",
+                        out.mesh.elements.size(), fill.n_octahedra, fill.n_boundary_pyramids,
+                        out.mesh.nodes.size(), fill_h);
     } else {
         auto fill = mesh::tet_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
         fill_h = fill.h;
@@ -1020,9 +1085,9 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     return;
                 }
                 if (!p_elevate_allowed()) {
-                    vol.mesher_note = std::format(
-                        "{} | geo-hp skipped (nodes {}>{} budget)", vol.mesher_note,
-                        vol.mesh.nodes.size(), kPElevateMaxNodes);
+                    vol.mesher_note =
+                        std::format("{} | geo-hp skipped (nodes {}>{} budget)",
+                                    vol.mesher_note, vol.mesh.nodes.size(), kPElevateMaxNodes);
                     return;
                 }
                 if (setup.mesher != VolumeMesher::kGradedTet &&
@@ -1050,8 +1115,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     return;
                 }
                 // Cap: never elevate more than 70% of linear elems in one shot.
-                const std::size_t cap =
-                    std::max<std::size_t>(1, (cents.size() * 7) / 10);
+                const std::size_t cap = std::max<std::size_t>(1, (cents.size() * 7) / 10);
                 if (bulk.size() > cap) {
                     bulk.resize(cap);
                 }
@@ -1060,9 +1124,9 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 extend_boundary_regions();
                 apply_bcs();
                 const auto counts = fea::count_element_types(vol.mesh);
-                vol.mesher_note = std::format(
-                    "{} | geo-hp: p-elev bulk {} (tet10={} n+{})", vol.mesher_note,
-                    bulk.size(), counts.tet10, vol.mesh.nodes.size() - before);
+                vol.mesher_note =
+                    std::format("{} | geo-hp: p-elev bulk {} (tet10={} n+{})", vol.mesher_note,
+                                bulk.size(), counts.tet10, vol.mesh.nodes.size() - before);
                 set_status(std::format("geo hp-elevate… ({} bulk → quadratic)", bulk.size()));
             };
             maybe_geo_p_elevate();
@@ -1153,8 +1217,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         }
                     }
                     // Cap so a single pass cannot explode DOF (≤ 30% of mesh).
-                    const std::size_t cap = std::max<std::size_t>(
-                        8, (cents.size() * 3) / 10); // ≤ 30% of mesh
+                    const std::size_t cap =
+                        std::max<std::size_t>(8, (cents.size() * 3) / 10); // ≤ 30% of mesh
                     if (current.size() > cap) {
                         current.resize(cap);
                     }
@@ -1184,22 +1248,20 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     if (!did_local) {
                         // Prefer graded mesher when local seeds are available so
                         // a posteriori balls can refine without global h→0.
-                        const auto mesher_adapt =
-                            (!adapt_seeds.empty() &&
-                             (setup.mesher == VolumeMesher::kTetFill ||
-                              setup.mesher == VolumeMesher::kGradedTet))
-                                ? VolumeMesher::kGradedTet
-                                : setup.mesher;
+                        const auto mesher_adapt = (!adapt_seeds.empty() &&
+                                                   (setup.mesher == VolumeMesher::kTetFill ||
+                                                    setup.mesher == VolumeMesher::kGradedTet))
+                                                      ? VolumeMesher::kGradedTet
+                                                      : setup.mesher;
                         // Remesh: graded always uses ÷2 lattice budget (fine ≈ h/2).
                         const int remesh_sub =
-                            (!adapt_seeds.empty() ||
-                             mesher_adapt == VolumeMesher::kGradedTet)
+                            (!adapt_seeds.empty() || mesher_adapt == VolumeMesher::kGradedTet)
                                 ? 2
                                 : 1;
-                        const double h_remesh = std::max(
-                            h_use, mesh::min_h_for_cell_budget(
-                                       model.bbox_min, model.bbox_max,
-                                       mesh::kDefaultMaxGridCells, remesh_sub));
+                        const double h_remesh =
+                            std::max(h_use, mesh::min_h_for_cell_budget(
+                                                model.bbox_min, model.bbox_max,
+                                                mesh::kDefaultMaxGridCells, remesh_sub));
                         vol = volume_mesh(model, h_remesh, mesher_adapt, setup.skin_layers,
                                           setup.use_feature_grading, adapt_seeds,
                                           adapt_seed_band);

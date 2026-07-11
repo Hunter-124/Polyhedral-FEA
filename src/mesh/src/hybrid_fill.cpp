@@ -41,9 +41,7 @@ std::vector<std::uint32_t>
 tet_boundary_nodes(const std::vector<std::array<std::uint32_t, 4>>& tets) {
     struct FaceKey {
         std::uint32_t a, b, c;
-        bool operator==(const FaceKey& o) const {
-            return a == o.a && b == o.b && c == o.c;
-        }
+        bool operator==(const FaceKey& o) const { return a == o.a && b == o.b && c == o.c; }
     };
     struct FaceHash {
         std::size_t operator()(const FaceKey& f) const noexcept {
@@ -118,7 +116,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     const auto inside = classify_cells_inside(surface, grid);
     const auto idx = [&](int i, int j, int k) { return grid.index(i, j, k); };
     const auto inb = [&](int i, int j, int k) {
-        return i >= 0 && i < nx && j >= 0 && j < ny && k >= 0 && k < nz && inside[idx(i, j, k)];
+        return i >= 0 && i < nx && j >= 0 && j < ny && k >= 0 && k < nz &&
+               inside[idx(i, j, k)];
     };
 
     // Face-only boundary distance (coarse hops).
@@ -170,8 +169,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     // graded (no geo drivers) still skins so unit boxes get an L1 shell.
     const int skin_cap = std::max(1, (max_dist + 1) / 2);
     const bool have_geo_drivers = (feature_band > 0.0) || (seed_band > 0.0);
-    const int skin_thresh =
-        have_geo_drivers ? 0 : std::min(skin_layers, skin_cap);
+    const int skin_thresh = have_geo_drivers ? 0 : std::min(skin_layers, skin_cap);
 
     // refine_level: 0=bulk, 1=L1 (~h/2), 2=L2 (~h/4 near high-κ seeds)
     std::vector<std::uint8_t> refine_level(inside.size(), 0);
@@ -364,9 +362,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         marked.reserve(out.mesh.tets.size() / 4 + 8);
         for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
             const auto& n = out.mesh.tets[ti];
-            const Eigen::Vector3d c =
-                0.25 * (out.mesh.nodes[n[0]] + out.mesh.nodes[n[1]] + out.mesh.nodes[n[2]] +
-                        out.mesh.nodes[n[3]]);
+            const Eigen::Vector3d c = 0.25 * (out.mesh.nodes[n[0]] + out.mesh.nodes[n[1]] +
+                                              out.mesh.nodes[n[2]] + out.mesh.nodes[n[3]]);
             const int cid = cell_of_point(c);
             if (cid >= 0 && static_cast<std::size_t>(cid) < refine_level.size() &&
                 refine_level[static_cast<std::size_t>(cid)] >= min_level) {
@@ -404,9 +401,9 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 [&](std::set<std::uint32_t>& offenders) {
                     for (const auto ti : skin_tets) {
                         const auto& n = out.mesh.tets[ti];
-                        const double v = tet_signed_volume(
-                            out.mesh.nodes[n[0]], out.mesh.nodes[n[1]], out.mesh.nodes[n[2]],
-                            out.mesh.nodes[n[3]]);
+                        const double v =
+                            tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
+                                              out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
                         if (v > vol_eps) {
                             continue;
                         }
@@ -415,9 +412,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 },
                 /*max_move_frac=*/1.05, /*passes=*/5, features);
             for (auto& n : out.mesh.tets) {
-                const double v =
-                    tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
-                                      out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
+                const double v = tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
+                                                   out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
                 if (v < 0.0) {
                     std::swap(n[1], n[2]);
                 }
@@ -435,10 +431,13 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     // CRITICAL: recollect free-surface nodes *after* LEB so mid-edge nodes on
     // the hole rim actually get snapped. Only unpaired-face nodes (S3) — do not
     // merge stale pre-LEB lattice quads (those can include interior/non-skin
-    // corners after refine).
-    std::vector<std::uint32_t> snap_nodes = tet_boundary_nodes(out.mesh.tets);
-
-    if (!snap_nodes.empty()) {
+    // corners after refine). Run as a reusable round: the S5 void carve below
+    // exposes fresh (never-snapped) lattice faces that need a second round.
+    const auto snap_round = [&]() {
+        std::vector<std::uint32_t> snap_nodes = tet_boundary_nodes(out.mesh.tets);
+        if (snap_nodes.empty()) {
+            return;
+        }
         std::vector<std::size_t> skin_tets;
         skin_tets.reserve(snap_nodes.size() * 4);
         {
@@ -480,22 +479,28 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                     continue;
                 }
                 const Eigen::Vector3d saved = out.mesh.nodes[ni];
-                out.mesh.nodes[ni] = cp.point;
-                bool ok = true;
-                for (const auto ti : skin_tets) {
-                    const auto& n = out.mesh.tets[ti];
-                    if (n[0] != ni && n[1] != ni && n[2] != ni && n[3] != ni) {
-                        continue;
+                // Full projection first, then partial fractions — a partial move
+                // still shrinks the residual when the full one inverts a tet.
+                static constexpr double kFracs[] = {1.0, 0.6, 0.35};
+                for (const double frac : kFracs) {
+                    out.mesh.nodes[ni] = saved + frac * (cp.point - saved);
+                    bool ok = true;
+                    for (const auto ti : skin_tets) {
+                        const auto& n = out.mesh.tets[ti];
+                        if (n[0] != ni && n[1] != ni && n[2] != ni && n[3] != ni) {
+                            continue;
+                        }
+                        const double v =
+                            tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
+                                              out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
+                        if (v <= vol_eps) {
+                            ok = false;
+                            break;
+                        }
                     }
-                    const double v =
-                        tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
-                                          out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
-                    if (v <= vol_eps) {
-                        ok = false;
+                    if (ok) {
                         break;
                     }
-                }
-                if (!ok) {
                     out.mesh.nodes[ni] = saved;
                 }
             }
@@ -507,7 +512,317 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 std::swap(n[1], n[2]);
             }
         }
-    }
+    };
+    snap_round();
+
+    // S4 sliver-cap collapse: snapping all four corners of a skin tet onto a
+    // curved surface leaves a near-flat cap that unsnap cannot cure without
+    // reopening the residual. Collapse the cap's shortest edge (conforming;
+    // the dead node merges into the survivor) when every incident tet stays
+    // valid and no new cap appears.
+    const auto repair_round = [&]() {
+        constexpr double kCapAspect = 0.05;  // caps live far below Kuhn ~0.27
+        constexpr double kKeepAspect = 0.04; // incident tets must stay above
+        constexpr int kCollapsePasses = 5;
+        const double vol_eps = 1e-14 * hc * hc * hc;
+        const auto aspect_of = [&](const std::array<std::uint32_t, 4>& n) {
+            const Eigen::Vector3d& a = out.mesh.nodes[n[0]];
+            const Eigen::Vector3d& b = out.mesh.nodes[n[1]];
+            const Eigen::Vector3d& c = out.mesh.nodes[n[2]];
+            const Eigen::Vector3d& d = out.mesh.nodes[n[3]];
+            const double v = std::abs(tet_signed_volume(a, b, c, d));
+            const double emax = std::max({(a - b).norm(), (a - c).norm(), (a - d).norm(),
+                                          (b - c).norm(), (b - d).norm(), (c - d).norm()});
+            if (emax <= 0.0) {
+                return 0.0;
+            }
+            return std::min(1.0, 6.0 * 1.4142135623730951 * v / (emax * emax * emax));
+        };
+        std::vector<std::uint32_t> node_remap(out.mesh.nodes.size());
+        for (std::uint32_t ni = 0; ni < node_remap.size(); ++ni) {
+            node_remap[ni] = ni;
+        }
+        bool collapsed_any = false;
+        for (int pass = 0; pass < kCollapsePasses; ++pass) {
+            const auto bvec = tet_boundary_nodes(out.mesh.tets);
+            const std::unordered_set<std::uint32_t> bset(bvec.begin(), bvec.end());
+            std::unordered_map<std::uint32_t, std::vector<std::size_t>> incident;
+            incident.reserve(out.mesh.nodes.size());
+            for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+                for (const auto ni : out.mesh.tets[ti]) {
+                    incident[ni].push_back(ti);
+                }
+            }
+            std::vector<char> removed(out.mesh.tets.size(), 0);
+            bool any = false;
+            const auto try_collapse = [&](std::uint32_t dead, std::uint32_t surv) {
+                // Never pull the surface inward: a boundary node may only merge
+                // into another boundary node.
+                if (bset.count(dead) && !bset.count(surv)) {
+                    return false;
+                }
+                const auto it = incident.find(dead);
+                if (it == incident.end()) {
+                    return false;
+                }
+                for (const auto tj : it->second) {
+                    if (removed[tj]) {
+                        continue;
+                    }
+                    auto probe = out.mesh.tets[tj];
+                    const double aspect_before = aspect_of(probe);
+                    bool has_surv = false;
+                    for (auto& nn : probe) {
+                        if (nn == surv) {
+                            has_surv = true;
+                        }
+                        if (nn == dead) {
+                            nn = surv;
+                        }
+                    }
+                    if (has_surv) {
+                        continue; // degenerates away with the collapse
+                    }
+                    const double v =
+                        tet_signed_volume(out.mesh.nodes[probe[0]], out.mesh.nodes[probe[1]],
+                                          out.mesh.nodes[probe[2]], out.mesh.nodes[probe[3]]);
+                    // Reject inversions outright; otherwise accept when the
+                    // neighbor stays healthy — or at least does not get worse
+                    // (sliver clusters heal stepwise).
+                    const double aspect_after = aspect_of(probe);
+                    const bool was_healthy = aspect_before >= kKeepAspect;
+                    if (v <= 0.0 || (was_healthy && v <= vol_eps) ||
+                        (aspect_after < kKeepAspect && aspect_after < aspect_before)) {
+                        return false;
+                    }
+                }
+                for (const auto tj : it->second) {
+                    if (removed[tj]) {
+                        continue;
+                    }
+                    auto& t = out.mesh.tets[tj];
+                    bool has_surv = false;
+                    for (const auto nn : t) {
+                        if (nn == surv) {
+                            has_surv = true;
+                            break;
+                        }
+                    }
+                    if (has_surv) {
+                        removed[tj] = 1;
+                        continue;
+                    }
+                    for (auto& nn : t) {
+                        if (nn == dead) {
+                            nn = surv;
+                        }
+                    }
+                    incident[surv].push_back(tj);
+                }
+                node_remap[dead] = surv;
+                any = true;
+                collapsed_any = true;
+                return true;
+            };
+
+            // Phase A — void juts: boundary nodes whose projection the snap had
+            // to reject (hole-rim stair chords poking into the void) merge into
+            // an adjacent on-surface boundary node instead of leaving a spike.
+            for (const auto ni : bvec) {
+                if (node_remap[ni] != ni) {
+                    continue;
+                }
+                const double resid = closest_on_surface(surface, out.mesh.nodes[ni]).distance;
+                if (resid <= 0.15 * hc) {
+                    continue;
+                }
+                const auto it = incident.find(ni);
+                if (it == incident.end()) {
+                    continue;
+                }
+                std::vector<std::pair<double, std::uint32_t>> cand;
+                for (const auto tj : it->second) {
+                    if (removed[tj]) {
+                        continue;
+                    }
+                    for (const auto nn : out.mesh.tets[tj]) {
+                        if (nn == ni || !bset.count(nn)) {
+                            continue;
+                        }
+                        cand.push_back({(out.mesh.nodes[nn] - out.mesh.nodes[ni]).norm(), nn});
+                    }
+                }
+                std::sort(cand.begin(), cand.end());
+                cand.erase(std::unique(cand.begin(), cand.end(),
+                                       [](const auto& x, const auto& y) {
+                                           return x.second == y.second;
+                                       }),
+                           cand.end());
+                for (const auto& [len, surv] : cand) {
+                    if (closest_on_surface(surface, out.mesh.nodes[surv]).distance >
+                        0.05 * hc) {
+                        continue;
+                    }
+                    if (try_collapse(ni, surv)) {
+                        break;
+                    }
+                }
+            }
+
+            // Phase B — sliver caps: collapse the shortest viable edge.
+            for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+                if (removed[ti] || aspect_of(out.mesh.tets[ti]) >= kCapAspect) {
+                    continue;
+                }
+                const auto tet = out.mesh.tets[ti];
+                // Candidate edges by ascending length.
+                std::array<std::pair<double, std::array<std::uint32_t, 2>>, 6> edges_len{};
+                int ne = 0;
+                for (int p = 0; p < 4; ++p) {
+                    for (int q2 = p + 1; q2 < 4; ++q2) {
+                        const auto a = tet[static_cast<std::size_t>(p)];
+                        const auto b = tet[static_cast<std::size_t>(q2)];
+                        edges_len[static_cast<std::size_t>(ne++)] = {
+                            (out.mesh.nodes[a] - out.mesh.nodes[b]).norm(), {a, b}};
+                    }
+                }
+                std::sort(edges_len.begin(), edges_len.end(),
+                          [](const auto& x, const auto& y) { return x.first < y.first; });
+                bool done = false;
+                for (int e = 0; e < ne && !done; ++e) {
+                    for (int dir = 0; dir < 2 && !done; ++dir) {
+                        const std::uint32_t dead = edges_len[static_cast<std::size_t>(e)]
+                                                       .second[static_cast<std::size_t>(dir)];
+                        const std::uint32_t surv =
+                            edges_len[static_cast<std::size_t>(e)]
+                                .second[static_cast<std::size_t>(1 - dir)];
+                        if (node_remap[dead] != dead || node_remap[surv] != surv) {
+                            continue;
+                        }
+                        done = try_collapse(dead, surv);
+                    }
+                }
+            }
+            if (any) {
+                std::size_t w = 0;
+                for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+                    if (!removed[ti]) {
+                        out.mesh.tets[w++] = out.mesh.tets[ti];
+                    }
+                }
+                out.mesh.tets.resize(w);
+            } else {
+                break;
+            }
+        }
+        if (collapsed_any) {
+            const auto resolve = [&](std::uint32_t ni) {
+                while (node_remap[ni] != ni) {
+                    ni = node_remap[ni];
+                }
+                return ni;
+            };
+            for (auto& q : out.mesh.boundary_quads) {
+                for (auto& ni : q) {
+                    ni = resolve(ni);
+                }
+            }
+        }
+
+        // S5 void carve: nodes the snap could not place on the surface (their
+        // projection inverts skin tets — hole-void stair chords) poke into CAD
+        // holes. Peel the tets of those *pre-identified* jut nodes as they gain
+        // free faces, until the juts drop out of the mesh. Newly exposed nodes
+        // are not juts, so the peel cannot run away into the bulk.
+        {
+            constexpr int kCarvePasses = 4;
+            const double node_thr = 0.15 * hc;
+            std::unordered_set<std::uint32_t> jut;
+            for (const auto ni : tet_boundary_nodes(out.mesh.tets)) {
+                if (closest_on_surface(surface, out.mesh.nodes[ni]).distance > node_thr) {
+                    jut.insert(ni);
+                }
+            }
+            for (int pass = 0; !jut.empty() && pass < kCarvePasses; ++pass) {
+                // Free faces per tet (faces appearing once across the mesh).
+                struct FKey {
+                    std::uint32_t a, b, c;
+                    bool operator==(const FKey& o) const {
+                        return a == o.a && b == o.b && c == o.c;
+                    }
+                };
+                struct FHash {
+                    std::size_t operator()(const FKey& f) const noexcept {
+                        std::size_t h2 = f.a;
+                        h2 ^= static_cast<std::size_t>(f.b) + 0x9e3779b97f4a7c15ULL +
+                              (h2 << 6) + (h2 >> 2);
+                        h2 ^= static_cast<std::size_t>(f.c) + 0x9e3779b97f4a7c15ULL +
+                              (h2 << 6) + (h2 >> 2);
+                        return h2;
+                    }
+                };
+                static constexpr int kTFaces[4][3] = {
+                    {0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}};
+                std::unordered_map<FKey, int, FHash> fcount;
+                fcount.reserve(out.mesh.tets.size() * 2);
+                const auto fkey = [](std::uint32_t x, std::uint32_t y, std::uint32_t z) {
+                    std::array<std::uint32_t, 3> v{{x, y, z}};
+                    std::sort(v.begin(), v.end());
+                    return FKey{v[0], v[1], v[2]};
+                };
+                for (const auto& t : out.mesh.tets) {
+                    for (const auto& f : kTFaces) {
+                        ++fcount[fkey(t[static_cast<std::size_t>(f[0])],
+                                      t[static_cast<std::size_t>(f[1])],
+                                      t[static_cast<std::size_t>(f[2])])];
+                    }
+                }
+                std::vector<char> kill(out.mesh.tets.size(), 0);
+                std::size_t n_kill = 0;
+                for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+                    const auto& t = out.mesh.tets[ti];
+                    bool has_jut = false;
+                    for (const auto ni : t) {
+                        if (jut.count(ni)) {
+                            has_jut = true;
+                            break;
+                        }
+                    }
+                    if (!has_jut) {
+                        continue;
+                    }
+                    bool has_free_face = false;
+                    for (const auto& f : kTFaces) {
+                        if (fcount[fkey(t[static_cast<std::size_t>(f[0])],
+                                        t[static_cast<std::size_t>(f[1])],
+                                        t[static_cast<std::size_t>(f[2])])] == 1) {
+                            has_free_face = true;
+                            break;
+                        }
+                    }
+                    if (has_free_face) {
+                        kill[ti] = 1;
+                        ++n_kill;
+                    }
+                }
+                if (n_kill == 0 || n_kill >= out.mesh.tets.size()) {
+                    break;
+                }
+                std::size_t w = 0;
+                for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+                    if (!kill[ti]) {
+                        out.mesh.tets[w++] = out.mesh.tets[ti];
+                    }
+                }
+                out.mesh.tets.resize(w);
+            }
+        }
+    };
+    repair_round();
+    // The carve exposes fresh lattice faces that were never snapped — run a
+    // second snap + repair round so the new boundary reaches the surface too.
+    snap_round();
+    repair_round();
 
     // Rebuild boundary quads as exterior tris padded for pipeline display
     // (quad[3]=quad[2] for pure tris is OK — pipeline may re-extract).

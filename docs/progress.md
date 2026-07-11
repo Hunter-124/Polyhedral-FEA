@@ -23,6 +23,19 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-10: **Hybrid v4 conforming fan transitions + graded S4/S5 repair
+  (curved scorecard flipped to pass)** — root causes found & fixed: hybrid v3
+  2:1 pyramid transitions were non-conforming (hanging edge-mids → cracked
+  meshes, exposed interior apex faces; sphere score 0.46 vs hex 0.85) → v4
+  polygon-fan closure (mid exists iff an incident cell is fine; canonical
+  min-id fan pairs both sides; `mixed_fill.cpp`). Graded snap left degenerate
+  boundary caps (min aspect ~1e-18) and hole-void jut nodes (~0.25 h) → S4
+  conforming cap collapse + S5 jut-star void carve + second snap round
+  (`hybrid_fill.cpp`); hybrid scene snap gained per-node outlier re-projection
+  with partial fractions. Measured (equal h): sphere hex 0.849 / graded 0.799 /
+  hybrid 0.896; cylinder 0.860/0.780/0.860; hole 0.568/0.530/0.577; graded &
+  hybrid M1max ≈ 0. `test_curved_mesh_quality.cpp` inverted from DOCUMENT_BUG
+  ceilings to pass floors + residual/aspect hygiene. ADR-0012 amended.
 - 2026-07-10: **Curved mesh scorecard + graded free-surface fixes (T0/Q1–Q2)** —
   New `mesh/surface_metrics` (M1 node residual, M2 face-sample residual, M3 volume
   error, M4 radial, M5 azimuth gap, M6 boundary aspect + composite). Catch2

@@ -68,9 +68,10 @@ nodes:
   # ── Lane B: solver core (lead) ──────────────────────────────────────────
   - id: adr-0019
     title: "ADR-0019: mixed FE+VEM adaptive-order core"
-    status: in_progress
+    status: done
     deps: [dag-workflow]
     scope: [docs/decisions/]
+    note: docs/decisions/0019-mixed-fe-vem-adaptive-order-core.md (committed).
 
   - id: p-hierarchical
     title: Hierarchical arbitrary-p basis (integrated Legendre) + MMS tests

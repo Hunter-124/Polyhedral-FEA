@@ -108,13 +108,15 @@ nodes:
 
   - id: fe-vem-assembly
     title: Unified mixed FE+VEM assembly (polyhedra unsplit)
-    status: todo
+    status: done
     deps: [adr-0019]
-    scope: [src/fea/, src/pipeline/]
+    scope: [src/fea/, src/pipeline/, src/mesh/]
     note: >
-      Hybrid zoo transition cells stay native polyhedra solved as VEM
-      PolyCells in the same K as FE cells. Patch test across the FE/VEM
-      interface is the gate.
+      LANDED: mixed_fill native_poly_transitions emits one unsplit poly per
+      2:1 cell (kPolyVem); VolumeMesher::kHybridVem keeps hex as FE + poly as
+      VEM in the same assemble_stiffness K. Gate tests in
+      tests/test_fe_vem_assembly.cpp (checkerboard FE/VEM, tet+hex VEM,
+      native-poly hybrid, pipeline hybrid-VEM) — constant-strain max err <1e-9.
 
   - id: mesher-tendency
     title: Element-tendency knob in the meshers (hex/tet/poly preference)
@@ -137,14 +139,12 @@ nodes:
 
   - id: solver-docs
     title: Human-readable solver-core documentation
-    status: in_progress
+    status: done
     deps: [p-hierarchical, fe-vem-assembly]
     scope: [docs/]
     note: >
-      LANDED: docs/solver-core.md — human's guide to the (h,p,shape) core:
-      why three knobs, the hierarchical basis + minimum rule, FE+VEM shape
-      strategy, the driver + branch trimming, and a code map. Expand the
-      FE+VEM section once node fe-vem-assembly lands.
+      LANDED: docs/solver-core.md — (h,p,shape) core + expanded FE+VEM section
+      (kHybridVem, native_poly_transitions, gate tests).
 
   # ── Lane C: recursive improvement (repeats) ─────────────────────────────
   - id: feedback-loop

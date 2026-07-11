@@ -314,5 +314,20 @@
   "312": "run_mesher_scoreboard.py",
   "313": "Verification",
   "314": "case_id",
-  "315": "Context"
+  "315": "Context",
+  "316": "Test-lab interfaces (normative)",
+  "317": "GradedTetFillOutput",
+  "318": "Competitive benchmark harness",
+  "319": "ADR-0019: Mixed FE+VEM adaptive-order core (arbitrary-p hierarchical basis)",
+  "320": "The adaptive solver core, explained",
+  "321": "Holdout geometry audits",
+  "322": "README.md",
+  "323": "test_hierarchical.cpp",
+  "324": "poly_mesh.cpp",
+  "325": "string",
+  "326": "hp_element_stiffness",
+  "327": "HexFace",
+  "328": "schema_version",
+  "329": "wall_time_s",
+  "330": "version"
 }

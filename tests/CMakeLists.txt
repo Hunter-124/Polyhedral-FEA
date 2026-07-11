@@ -32,6 +32,7 @@ add_executable(polymesh_tests
     test_zz.cpp
     test_vtu.cpp
     test_vem.cpp
+    test_fe_vem_assembly.cpp
     test_quality.cpp
     test_hex_vem_pipeline.cpp
     test_prism.cpp

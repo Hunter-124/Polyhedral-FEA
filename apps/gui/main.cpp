@@ -228,13 +228,15 @@ void draw_study_panel(App& app) {
         static const char* kMeshers[] = {
             "tet (grid)",   "hex (grid)",    "hex VEM (grid)", "graded tet",
             "hex+pyramid",  "prism (grid)",  "hybrid zoo",     "octa (exp)",
+            "hybrid VEM",
         };
-        if (iw::selector("mesher", &m, kMeshers, 8)) {
+        if (iw::selector("mesher", &m, kMeshers, 9)) {
             app.setup.mesher = static_cast<VolumeMesher>(m);
         }
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip(
                 "hybrid zoo (default): hex bulk + pyramid skin → all-pyramid FE.\n"
+                "hybrid VEM: hex FE bulk + native poly VEM transitions (ADR-0019).\n"
                 "graded tet: multi-level LEB (bulk / feature / high-κ) size field.\n"
                 "octa: experimental BCC (budget-capped; not product).\n"
                 "Cartesian lattice + surface snap (ADR-0015) — not CAD-fitted Delaunay.");

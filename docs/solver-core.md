@@ -117,6 +117,32 @@ removes both the sliver *and* the element-count blow-up of splitting.
 tet/hex fast path plus a VEM path that treats every other polyhedron as a
 first-class element in the same solve.
 
+### What is implemented (node `fe-vem-assembly`)
+
+- **One assembler.** `fea::assemble_stiffness` already dispatches
+  `ElementType::kPolyVem` to `vem_poly_stiffness` and classic zoo elements to
+  isoparametric quadrature; both scatter into the same sparse K. Body loads
+  follow the same split. No second global system, no mortar.
+- **Native-poly transitions.** `mesh::mixed_fill_surface(..., native_poly_transitions=true)`
+  emits each 2:1 coarse cell as **one** `MixedCellKind::kPolyVem` with faces
+  that match neighbors (single quad vs bulk FE hex, four child quads vs fine
+  2×2×2 hex, n-gon with hanging mids on mixed edges). No centroid apex, no
+  fan of sliver tets.
+- **Product path.** `VolumeMesher::kHybridVem` (CLI `hybridvem`, GUI "hybrid
+  VEM") runs that fill, keeps bulk/fine as `kHex8` FE, converts poly cells to
+  `kPolyVem`, and skips the hex→pyramid expand used by the default
+  `kHybrid` product-FE path.
+- **Gate.** Constant-strain patch test with a **linear** displacement
+  \(u = Gx\) prescribed on the domain boundary: interior FE and VEM nodes must
+  recover \(Gx\) to ~1e-9 m. Covered by `tests/test_fe_vem_assembly.cpp`
+  (checkerboard hex FE + hex-as-poly VEM; tet FE + hex VEM; native-poly hybrid
+  fill; full pipeline hybrid-VEM mesh).
+
+The default `kHybrid` mesher still uses fan transitions + all-pyramid expand
+for the hardened product-FE scorecard. `mesher-tendency` will expose the
+fan-split vs native-poly dial for the tuner; until then pick `kHybridVem`
+explicitly when you want unsplit VEM transitions.
+
 ---
 
 ## 4. The driver: choosing (h, p, shape) together
@@ -161,11 +187,16 @@ Start here and follow the includes:
 - `tests/test_hierarchical.cpp`, `tests/test_hp_assembly.cpp` — the proofs.
   If you change the basis or the assembler, these tell you immediately whether
   conformity and convergence still hold.
+- `src/fea/assembly.cpp` + `src/fea/vem.hpp` — mixed FE+VEM scatter into one K.
+- `src/mesh/mixed_fill.hpp` (`native_poly_transitions`) and
+  `VolumeMesher::kHybridVem` in `src/pipeline/scene.hpp` — unsplit transition
+  cells as VEM PolyCells next to FE hex.
+- `tests/test_fe_vem_assembly.cpp` — FE/VEM interface constant-strain gate.
 - `docs/decisions/0019-mixed-fe-vem-adaptive-order-core.md` — the *why* behind
   every choice above, and the staging plan.
 - `docs/decisions/0012-hybrid-graded-tet.md` — the meshers that produce the
   cells, including the curvature-driven h-refinement and the transition
-  handling the VEM path will keep whole.
+  handling the VEM path keeps whole when native-poly is on.
 
 The current status of each piece — what is built, what is next — is always in
 `docs/dag/PROGRAM.yaml`.

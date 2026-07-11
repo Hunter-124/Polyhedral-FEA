@@ -230,6 +230,180 @@ void emit_subdivided_face_pyramids(MixedFillOutput& out, FineNodeFn&& fn, int i,
     }
 }
 
+/// Closed polyhedron volume via face fans (Newell / divergence). Face loops are
+/// local indices into `coords`. Positive when faces are outward-oriented.
+double closed_poly_volume(const std::vector<Eigen::Vector3d>& coords,
+                          const std::vector<std::vector<std::uint32_t>>& faces) {
+    double vol = 0.0;
+    for (const auto& face : faces) {
+        if (face.size() < 3) {
+            continue;
+        }
+        const Eigen::Vector3d& o = coords[face[0]];
+        for (std::size_t i = 1; i + 1 < face.size(); ++i) {
+            const Eigen::Vector3d& a = coords[face[i]];
+            const Eigen::Vector3d& b = coords[face[i + 1]];
+            vol += o.dot(a.cross(b));
+        }
+    }
+    return vol / 6.0;
+}
+
+/// Build one unsplit polyhedron for a 2:1 transition coarse cell (ADR-0019).
+/// Faces match neighbors: single quad vs bulk, 4 child quads vs fine, n-gon with
+/// hanging mids on mixed edges. No centroid apex / fan slivers.
+template <typename FineNodeFn, typename EdgeSplitFn, typename InbFn, typename FineNbrFn>
+void emit_transition_poly(MixedFillOutput& out, FineNodeFn&& fn, EdgeSplitFn&& edge_split,
+                          InbFn&& inb, FineNbrFn&& fine_nbr, int i, int j, int k) {
+    struct Builder {
+        std::vector<std::uint32_t> nodes;
+        std::map<std::uint32_t, std::uint32_t> local_of;
+        std::vector<std::vector<std::uint32_t>> faces;
+
+        std::uint32_t add(std::uint32_t g) {
+            const auto it = local_of.find(g);
+            if (it != local_of.end()) {
+                return it->second;
+            }
+            const auto L = static_cast<std::uint32_t>(nodes.size());
+            nodes.push_back(g);
+            local_of.emplace(g, L);
+            return L;
+        }
+
+        void add_face_global(const std::vector<std::uint32_t>& gids) {
+            std::vector<std::uint32_t> face;
+            face.reserve(gids.size());
+            for (const auto g : gids) {
+                face.push_back(add(g));
+            }
+            faces.push_back(std::move(face));
+        }
+    } b;
+
+    for (std::size_t f = 0; f < 6; ++f) {
+        const auto& o = kFaceNbr[f];
+        const int ni = i + o[0], nj = j + o[1], nk = k + o[2];
+        const bool free_face = !inb(ni, nj, nk);
+        const bool adj_fine = !free_face && fine_nbr(ni, nj, nk);
+
+        const auto& fl = kHexFaces[f];
+        std::array<std::array<int, 3>, 4> fcoord{};
+        for (int q = 0; q < 4; ++q) {
+            const auto& corner =
+                kHexCornerLocal[static_cast<std::size_t>(fl[static_cast<std::size_t>(q)])];
+            fcoord[static_cast<std::size_t>(q)] = {
+                {2 * (i + corner[0]), 2 * (j + corner[1]), 2 * (k + corner[2])}};
+        }
+
+        if (adj_fine) {
+            // 4 child quads sharing mid-edge + face-center with fine sub-hexes.
+            const int fcx = (fcoord[0][0] + fcoord[1][0] + fcoord[2][0] + fcoord[3][0]) / 4;
+            const int fcy = (fcoord[0][1] + fcoord[1][1] + fcoord[2][1] + fcoord[3][1]) / 4;
+            const int fcz = (fcoord[0][2] + fcoord[1][2] + fcoord[2][2] + fcoord[3][2]) / 4;
+            const auto fc = fn(fcx, fcy, fcz);
+            for (int q = 0; q < 4; ++q) {
+                const auto& A = fcoord[static_cast<std::size_t>(q)];
+                const auto& B = fcoord[static_cast<std::size_t>((q + 1) % 4)];
+                const auto& P = fcoord[static_cast<std::size_t>((q + 3) % 4)];
+                const int mx = (A[0] + B[0]) / 2, my = (A[1] + B[1]) / 2, mz = (A[2] + B[2]) / 2;
+                const int pmx = (A[0] + P[0]) / 2, pmy = (A[1] + P[1]) / 2,
+                          pmz = (A[2] + P[2]) / 2;
+                const auto na = fn(A[0], A[1], A[2]);
+                const auto nm = fn(mx, my, mz);
+                const auto npm = fn(pmx, pmy, pmz);
+                b.add_face_global({na, nm, fc, npm});
+            }
+            continue;
+        }
+
+        // Coarse / free / transition-neighbor face: corners + hanging mids.
+        std::vector<std::uint32_t> poly;
+        poly.reserve(8);
+        for (int q = 0; q < 4; ++q) {
+            const auto& A = fcoord[static_cast<std::size_t>(q)];
+            const auto& B = fcoord[static_cast<std::size_t>((q + 1) % 4)];
+            poly.push_back(fn(A[0], A[1], A[2]));
+            std::size_t axis = 0;
+            for (std::size_t d = 0; d < 3; ++d) {
+                if (A[d] != B[d]) {
+                    axis = d;
+                }
+            }
+            int ea = A[0] / 2, eb = A[1] / 2, ec = A[2] / 2;
+            const int sa = std::min(A[axis], B[axis]) / 2;
+            if (axis == 0) {
+                ea = sa;
+            } else if (axis == 1) {
+                eb = sa;
+            } else {
+                ec = sa;
+            }
+            if (edge_split(ea, eb, ec, static_cast<int>(axis))) {
+                poly.push_back(fn((A[0] + B[0]) / 2, (A[1] + B[1]) / 2, (A[2] + B[2]) / 2));
+            }
+        }
+        if (free_face) {
+            if (poly.size() == 4) {
+                out.boundary_quads.push_back({{poly[0], poly[1], poly[2], poly[3]}});
+            } else {
+                // Fan tris for boundary bookkeeping (tri encoded as q2==q3).
+                const std::uint32_t a0 = poly[0];
+                for (std::size_t t = 1; t + 1 < poly.size(); ++t) {
+                    out.boundary_quads.push_back({{a0, poly[t], poly[t + 1], poly[t + 1]}});
+                }
+            }
+        }
+        b.add_face_global(poly);
+    }
+
+    // Orient faces outward: Newell normal must point away from cell centroid.
+    Eigen::Vector3d ctr = Eigen::Vector3d::Zero();
+    for (const auto g : b.nodes) {
+        ctr += out.nodes[g];
+    }
+    ctr /= static_cast<double>(b.nodes.size());
+    for (auto& face : b.faces) {
+        if (face.size() < 3) {
+            continue;
+        }
+        Eigen::Vector3d n = Eigen::Vector3d::Zero();
+        Eigen::Vector3d fcent = Eigen::Vector3d::Zero();
+        for (std::size_t t = 0; t < face.size(); ++t) {
+            const auto& a = out.nodes[b.nodes[face[t]]];
+            const auto& bb = out.nodes[b.nodes[face[(t + 1) % face.size()]]];
+            n[0] += (a[1] - bb[1]) * (a[2] + bb[2]);
+            n[1] += (a[2] - bb[2]) * (a[0] + bb[0]);
+            n[2] += (a[0] - bb[0]) * (a[1] + bb[1]);
+            fcent += a;
+        }
+        fcent /= static_cast<double>(face.size());
+        n *= 0.5;
+        if (n.dot(fcent - ctr) < 0.0) {
+            std::reverse(face.begin(), face.end());
+        }
+    }
+
+    MixedCell cell;
+    cell.kind = MixedCellKind::kPolyVem;
+    cell.n_nodes = 0;
+    cell.poly_nodes = std::move(b.nodes);
+    cell.poly_faces = std::move(b.faces);
+    if (cell.poly_nodes.size() < 4 || cell.poly_faces.size() < 4) {
+        return;
+    }
+    std::vector<Eigen::Vector3d> coords;
+    coords.reserve(cell.poly_nodes.size());
+    for (const auto g : cell.poly_nodes) {
+        coords.push_back(out.nodes[g]);
+    }
+    if (closed_poly_volume(coords, cell.poly_faces) <= 0.0) {
+        return;
+    }
+    out.cells.push_back(std::move(cell));
+    ++out.n_poly;
+}
+
 } // namespace
 
 MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
@@ -239,7 +413,7 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                                    double feature_band,
                                    std::span<const Eigen::Vector3d> curvature_seeds,
                                    double seed_band, bool snap_boundary,
-                                   double curvature_turn_deg) {
+                                   double curvature_turn_deg, bool native_poly_transitions) {
     if (!(h > 0.0) || !std::isfinite(h)) {
         throw ValidityError("mixed_fill_surface: h must be positive");
     }
@@ -316,6 +490,7 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
     out.h = h_cell;
     out.h_fine = h_cell;
     out.skin_layers = skin_layers;
+    out.native_poly_transitions = native_poly_transitions;
 
     // Free-surface hop skin only when no geo drivers (unit boxes). With
     // feature/seed/curvature, refine those bands to h/2 instead of flooding
@@ -601,11 +776,21 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                 }
 
                 if (size_adaptive && is_transition[id]) {
+                    ++out.n_transition_cells;
+                    if (native_poly_transitions) {
+                        // ADR-0019: one unsplit polyhedron per transition cell → VEM.
+                        emit_transition_poly(
+                            out, node_fine, edge_split, inb,
+                            [&](int ni, int nj, int nk) {
+                                return is_fine[idx(ni, nj, nk)] != 0;
+                            },
+                            i, j, k);
+                        continue;
+                    }
                     // Conforming 2:1 closure (v4): apex fan over each face polygon.
                     // Face polygon = 4 corners + the hanging mid of every split
                     // edge. Both cells sharing a face build the same polygon and
                     // the same canonical fan, so every facet pairs — no cracks.
-                    ++out.n_transition_cells;
                     const auto c = coarse_corners(i, j, k);
                     Eigen::Vector3d ctr = Eigen::Vector3d::Zero();
                     for (int t = 0; t < 8; ++t) {
@@ -710,8 +895,9 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                 }
 
                 // Bulk hex (or plain-mode skin as pyramids at h).
+                // Native-poly mode keeps free-surface skin as hex FE (no fan).
                 const auto c = coarse_corners(i, j, k);
-                if (!size_adaptive && is_fine[id]) {
+                if (!size_adaptive && is_fine[id] && !native_poly_transitions) {
                     // Plain hybrid: free-surface skin pyramids at bulk h.
                     Eigen::Vector3d ctr = Eigen::Vector3d::Zero();
                     for (int t = 0; t < 8; ++t) {
@@ -766,6 +952,13 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                                 pyramid_inverted({cell.nodes[0], cell.nodes[1], cell.nodes[2],
                                                   cell.nodes[3], cell.nodes[4]},
                                                  out.nodes, vol_eps);
+                        } else if (cell.kind == MixedCellKind::kPolyVem) {
+                            std::vector<Eigen::Vector3d> coords;
+                            coords.reserve(cell.poly_nodes.size());
+                            for (const auto g : cell.poly_nodes) {
+                                coords.push_back(out.nodes[g]);
+                            }
+                            bad = closed_poly_volume(coords, cell.poly_faces) <= vol_eps;
                         } else {
                             bad = hex_inverted({cell.nodes[0], cell.nodes[1], cell.nodes[2],
                                                 cell.nodes[3], cell.nodes[4], cell.nodes[5],
@@ -775,8 +968,12 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                         if (!bad) {
                             continue;
                         }
-                        for (std::uint8_t m = 0; m < cell.n_nodes; ++m) {
-                            offenders.insert(cell.nodes[m]);
+                        if (cell.kind == MixedCellKind::kPolyVem) {
+                            offenders.insert(cell.poly_nodes.begin(), cell.poly_nodes.end());
+                        } else {
+                            for (std::uint8_t m = 0; m < cell.n_nodes; ++m) {
+                                offenders.insert(cell.nodes[m]);
+                            }
                         }
                     }
                 },
@@ -796,10 +993,12 @@ MixedFillOutput expand_mixed_hex_to_pyramids(const MixedFillOutput& fill) {
     out.n_feature_skin_cells = fill.n_feature_skin_cells;
     out.n_fine_cells = fill.n_fine_cells;
     out.n_transition_cells = fill.n_transition_cells;
+    out.native_poly_transitions = fill.native_poly_transitions;
     out.nodes = fill.nodes;
     out.n_hex = 0;
     out.n_pyramid = 0;
     out.n_tet = 0;
+    out.n_poly = 0;
     out.cells.reserve(fill.cells.size() + 5 * fill.n_hex);
 
     for (const auto& cell : fill.cells) {
@@ -811,6 +1010,11 @@ MixedFillOutput expand_mixed_hex_to_pyramids(const MixedFillOutput& fill) {
         if (cell.kind == MixedCellKind::kPyramid5) {
             out.cells.push_back(cell);
             ++out.n_pyramid;
+            continue;
+        }
+        if (cell.kind == MixedCellKind::kPolyVem) {
+            out.cells.push_back(cell);
+            ++out.n_poly;
             continue;
         }
         Eigen::Vector3d center = Eigen::Vector3d::Zero();

@@ -367,6 +367,48 @@ TEST_CASE("SolveJob reports phase progress during mesh-only") {
     REQUIRE(std::abs(done.phase_frac - 1.0) < 1e-12);
 }
 
+TEST_CASE("SolveJob publishes live mesh for viewport during mesh-only") {
+    const auto path = write_box_stl(1.0, 1.0, 1.0);
+    const auto model = Model::load(path.string());
+    SimSetup setup;
+    setup.mesh_size = 0.2;
+    setup.mesher = VolumeMesher::kTetFill;
+    setup.use_feature_grading = false;
+    SolveJob job;
+    job.start_mesh(model, setup);
+
+    std::uint64_t seen = 0;
+    bool saw_live = false;
+    for (int i = 0; i < 400; ++i) {
+        if (auto live = job.poll_live_mesh(seen)) {
+            CHECK_FALSE(live->mesh.nodes.empty());
+            CHECK_FALSE(live->boundary_quads.empty());
+            saw_live = true;
+            break;
+        }
+        if (job.state() == SolveJob::State::kFailed) {
+            FAIL(job.status_text());
+        }
+        if (job.state() == SolveJob::State::kMeshDone) {
+            // Still may have a live mesh to poll.
+            if (auto live = job.poll_live_mesh(seen)) {
+                saw_live = true;
+                CHECK_FALSE(live->mesh.nodes.empty());
+            }
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    // Drain.
+    for (int i = 0; i < 200; ++i) {
+        if (job.take_mesh()) {
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    REQUIRE(saw_live);
+}
+
 TEST_CASE("SolveJob elapsed_ms advances while phase is held") {
     // Larger mesh so the worker stays in kMeshing long enough for wall-clock
     // polls to diverge (regression: UI looked frozen mid-mesh/solve).

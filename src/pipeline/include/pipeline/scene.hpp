@@ -6,6 +6,7 @@
 // apps/gui is presentation-only and consumes this library.
 
 #include "fea/nodal_mesh.hpp"
+#include "fea/solve.hpp"
 #include "fea/stress.hpp"
 #include "geom/tri_surface.hpp"
 
@@ -190,6 +191,10 @@ struct JobProgress {
     double elapsed_ms = 0.0;
     int pass = 0;       // adapt pass index (0 = initial)
     int pass_count = 0; // setup.adapt_passes (max extra passes)
+    int cg_iter = 0;
+    double cg_resid = 0.0;
+    std::size_t n_elems = 0;
+    std::size_t n_nodes = 0;
 };
 
 /// Background mesh / solve pipeline. Poll `state` from the UI thread.
@@ -228,6 +233,16 @@ class SolveJob {
     State state() const { return state_.load(); }
     std::string status_text() const;
     JobProgress progress() const;
+
+    /// Poll intermediate volume mesh for viewport (updated after mesh / adapt
+    /// remesh). Returns a copy when generation advanced past `seen_gen` (then
+    /// updates `seen_gen`). Cheap no-op when nothing new. Phase-boundary only —
+    /// not a mid-fill stream — so cost is one mesh copy per mesh event.
+    std::optional<VolumeMeshOutput> poll_live_mesh(std::uint64_t& seen_gen) const;
+    std::uint64_t live_mesh_generation() const {
+        return live_mesh_gen_.load(std::memory_order_relaxed);
+    }
+
     ~SolveJob();
 
   private:
@@ -242,16 +257,24 @@ class SolveJob {
     std::string status_;
     JobProgress progress_;
     std::chrono::steady_clock::time_point t0_{};
+    /// Intermediate mesh for live viewport (worker writes, UI reads).
+    mutable std::mutex live_mesh_mutex_;
+    std::optional<VolumeMeshOutput> live_mesh_;
+    std::atomic<std::uint64_t> live_mesh_gen_{0};
     void set_status(const std::string& s);
     void set_progress(const std::string& phase, double phase_frac, int pass = 0,
                       int pass_count = 0);
     /// Status line + structured progress (same lock).
     void report(const std::string& phase, double phase_frac, const std::string& status_msg,
                 int pass = 0, int pass_count = 0);
+    void publish_live_mesh(const VolumeMeshOutput& vol);
+    void note_mesh_stats(const VolumeMeshOutput& vol);
     /// Between phases: honour pause (spin-sleep) then throw if cancelled.
     void checkpoint();
     void join_worker();
     void reset_control_flags();
+    /// Solve options with CG progress wired into JobProgress (when applicable).
+    fea::SolveOptions solve_options_with_progress(int pass, int pass_count);
 };
 
 } // namespace polymesh::pipeline

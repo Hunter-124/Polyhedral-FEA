@@ -26,6 +26,41 @@ SolveMethod select_solve_method(Eigen::Index nfree, const SolveOptions& options)
 
 namespace {
 
+/// Chunked CG so `on_progress` can fire without rewriting the solver. Warm-starts
+/// each chunk from the previous solution (solveWithGuess).
+template <typename CG>
+Eigen::VectorXd run_cg_chunked(CG& cg, const Eigen::VectorXd& rhs, int max_iters,
+                               int chunk, const std::function<void(int, int, double)>& on_progress) {
+    const int step = std::max(1, chunk);
+    Eigen::VectorXd uf = Eigen::VectorXd::Zero(rhs.size());
+    int total = 0;
+    while (total < max_iters) {
+        const int remain = max_iters - total;
+        const int this_chunk = std::min(step, remain);
+        cg.setMaxIterations(this_chunk);
+        uf = cg.solveWithGuess(rhs, uf);
+        const int took = static_cast<int>(cg.iterations());
+        total += std::max(took, 1); // avoid infinite loop if Eigen reports 0
+        if (on_progress) {
+            on_progress(std::min(total, max_iters), max_iters, cg.error());
+        }
+        if (cg.info() == Eigen::Success) {
+            return uf;
+        }
+        // No progress in this chunk — stop and report failure below.
+        if (took == 0) {
+            break;
+        }
+    }
+    if (cg.info() != Eigen::Success) {
+        throw FeaError(
+            std::format("solve_elastostatics: CG failed to converge after {} iterations "
+                        "(tol estimated error={})",
+                        total, cg.error()));
+    }
+    return uf;
+}
+
 Eigen::VectorXd solve_reduced(const Eigen::SparseMatrix<double>& kff,
                               const Eigen::VectorXd& rhs, const SolveOptions& options) {
     const Eigen::Index nfree = kff.rows();
@@ -45,34 +80,56 @@ Eigen::VectorXd solve_reduced(const Eigen::SparseMatrix<double>& kff,
                 ? options.cg_max_iters
                 : static_cast<int>(std::max<Eigen::Index>(2 * nfree, Eigen::Index{1000}));
 
+        const bool chunked =
+            static_cast<bool>(options.on_progress) && options.cg_progress_chunk > 0;
+
         CG_ILUT cg;
         cg.setTolerance(options.cg_tol);
-        cg.setMaxIterations(max_iters);
         // Drop fill / drop tol: modest fill keeps setup cheap on mid-size systems.
         cg.preconditioner().setDroptol(1e-4);
         cg.preconditioner().setFillfactor(10);
         cg.compute(kff);
         if (cg.info() == Eigen::Success) {
-            const Eigen::VectorXd uf = cg.solve(rhs);
-            if (cg.info() == Eigen::Success) {
-                return uf;
+            try {
+                if (chunked) {
+                    return run_cg_chunked(cg, rhs, max_iters, options.cg_progress_chunk,
+                                          options.on_progress);
+                }
+                cg.setMaxIterations(max_iters);
+                const Eigen::VectorXd uf = cg.solve(rhs);
+                if (cg.info() == Eigen::Success) {
+                    if (options.on_progress) {
+                        options.on_progress(static_cast<int>(cg.iterations()), max_iters,
+                                            cg.error());
+                    }
+                    return uf;
+                }
+            } catch (const FeaError&) {
+                // Fall through to diagonal CG.
             }
         }
 
         CG_Diag cg_d;
         cg_d.setTolerance(options.cg_tol);
-        cg_d.setMaxIterations(max_iters);
         cg_d.compute(kff);
         if (cg_d.info() != Eigen::Success) {
             throw FeaError("solve_elastostatics: CG setup failed — system is singular "
                            "(insufficient constraints?)");
         }
+        if (chunked) {
+            return run_cg_chunked(cg_d, rhs, max_iters, options.cg_progress_chunk,
+                                 options.on_progress);
+        }
+        cg_d.setMaxIterations(max_iters);
         const Eigen::VectorXd uf = cg_d.solve(rhs);
         if (cg_d.info() != Eigen::Success) {
             throw FeaError(
                 std::format("solve_elastostatics: CG failed to converge after {} iterations "
                             "(tol={}, estimated error={})",
                             cg_d.iterations(), options.cg_tol, cg_d.error()));
+        }
+        if (options.on_progress) {
+            options.on_progress(static_cast<int>(cg_d.iterations()), max_iters, cg_d.error());
         }
         return uf;
     }

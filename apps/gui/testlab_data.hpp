@@ -5,6 +5,8 @@
 // docs/dag/interfaces.md. The GUI talks to polymesh_testlab only through
 // these on-disk schemas — never by linking apps/testlab sources.
 
+#include <array>
+#include <cstdint>
 #include <filesystem>
 #include <optional>
 #include <string>
@@ -101,6 +103,8 @@ struct LiveProgress {
     std::string cfg_id;
     std::string part;
     int tier = 0;
+    std::size_t n_elems = 0;
+    std::size_t n_nodes = 0;
 };
 
 struct CampaignSummary {
@@ -127,6 +131,17 @@ std::optional<CampaignSpec> load_campaign(const std::filesystem::path& dir);
 std::optional<Checkpoint> load_checkpoint(const std::filesystem::path& dir);
 std::vector<ResultRow> load_results(const std::filesystem::path& dir);
 std::optional<LiveProgress> load_progress(const std::filesystem::path& dir);
+
+/// Boundary mesh from campaign `mesh_preview.pmp` (interfaces.md §6b).
+struct MeshPreview {
+    std::vector<std::array<double, 3>> nodes;
+    std::vector<std::array<std::uint32_t, 4>> quads;
+    std::size_t n_elems = 0;
+    std::string note;
+};
+
+/// Load campaign mesh_preview.pmp for live viewport. nullopt if missing/bad.
+std::optional<MeshPreview> load_mesh_preview(const std::filesystem::path& dir);
 
 /// List immediate subdirs of `root` that look like campaigns (have
 /// campaign.json and/or checkpoint.json / results.jsonl).

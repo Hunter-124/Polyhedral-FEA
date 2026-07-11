@@ -32,11 +32,13 @@
 #include <filesystem>
 #include <fstream>
 #include <map>
+#include <mutex>
 #include <optional>
 #include <set>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -455,15 +457,141 @@ void write_checkpoint(const fs::path& path, const Checkpoint& cp) {
 
 void write_progress(const fs::path& path, const std::string& phase, double phase_frac,
                     double elapsed_ms, const std::string& cfg_id, const std::string& part,
-                    int tier) {
+                    int tier, int cg_iter = -1, double cg_resid = -1.0, std::size_t n_elems = 0,
+                    std::size_t n_nodes = 0) {
     json j;
     j["phase"] = phase;
     j["phase_frac"] = phase_frac;
     j["elapsed_ms"] = elapsed_ms;
-    j["cg_iter"] = nullptr;
-    j["cg_resid"] = nullptr;
+    if (cg_iter >= 0) {
+        j["cg_iter"] = cg_iter;
+        j["cg_resid"] = cg_resid;
+    } else {
+        j["cg_iter"] = nullptr;
+        j["cg_resid"] = nullptr;
+    }
+    if (n_elems > 0) {
+        j["n_elems"] = n_elems;
+        j["n_nodes"] = n_nodes;
+    }
     j["run"] = {{"cfg_id", cfg_id}, {"part", part}, {"tier", tier}};
     atomic_write(path, j.dump(2) + "\n");
+}
+
+/// Background progress.json heartbeats so the GUI "live progress" box moves
+/// during long mesh/assemble/solve stretches (interfaces.md §6 ~500 ms).
+class ProgressHeartbeat {
+  public:
+    ProgressHeartbeat(fs::path path, std::string phase, std::string cfg_id, std::string part,
+                      int tier, std::chrono::steady_clock::time_point t0)
+        : path_(std::move(path)), phase_(std::move(phase)), cfg_id_(std::move(cfg_id)),
+          part_(std::move(part)), tier_(tier), t0_(t0), stop_(false) {
+        thr_ = std::thread([this] { loop(); });
+    }
+    ProgressHeartbeat(const ProgressHeartbeat&) = delete;
+    ProgressHeartbeat& operator=(const ProgressHeartbeat&) = delete;
+
+    void set_phase(std::string phase, double phase_frac = 0.0) {
+        {
+            const std::lock_guard lock(mu_);
+            phase_ = std::move(phase);
+        }
+        phase_frac_.store(phase_frac, std::memory_order_relaxed);
+        tick_now();
+    }
+    void set_frac(double f) { phase_frac_.store(f, std::memory_order_relaxed); }
+    void set_cg(int iter, double resid) {
+        cg_iter_.store(iter, std::memory_order_relaxed);
+        cg_resid_.store(resid, std::memory_order_relaxed);
+    }
+    void set_mesh_stats(std::size_t n_elems, std::size_t n_nodes) {
+        n_elems_.store(n_elems, std::memory_order_relaxed);
+        n_nodes_.store(n_nodes, std::memory_order_relaxed);
+    }
+
+    ~ProgressHeartbeat() {
+        stop_.store(true, std::memory_order_relaxed);
+        if (thr_.joinable()) {
+            thr_.join();
+        }
+    }
+
+  private:
+    void tick_now() {
+        try {
+            std::string phase;
+            {
+                const std::lock_guard lock(mu_);
+                phase = phase_;
+            }
+            const auto ms = std::chrono::duration<double, std::milli>(
+                                std::chrono::steady_clock::now() - t0_)
+                                .count();
+            const int cg = cg_iter_.load(std::memory_order_relaxed);
+            write_progress(path_, phase, phase_frac_.load(std::memory_order_relaxed), ms,
+                           cfg_id_, part_, tier_, cg, cg_resid_.load(std::memory_order_relaxed),
+                           n_elems_.load(std::memory_order_relaxed),
+                           n_nodes_.load(std::memory_order_relaxed));
+        } catch (...) {
+            // Progress is best-effort; never fail the run for a status write.
+        }
+    }
+    void loop() {
+        while (!stop_.load(std::memory_order_relaxed)) {
+            tick_now();
+            for (int i = 0; i < 10 && !stop_.load(std::memory_order_relaxed); ++i) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            }
+        }
+        tick_now(); // final stamp
+    }
+
+    fs::path path_;
+    std::string phase_;
+    std::string cfg_id_;
+    std::string part_;
+    int tier_ = 0;
+    std::chrono::steady_clock::time_point t0_{};
+    std::mutex mu_;
+    std::atomic<bool> stop_;
+    std::atomic<double> phase_frac_{0.0};
+    std::atomic<int> cg_iter_{-1};
+    std::atomic<double> cg_resid_{-1.0};
+    std::atomic<std::size_t> n_elems_{0};
+    std::atomic<std::size_t> n_nodes_{0};
+    std::thread thr_;
+};
+
+/// Lightweight boundary mesh for GUI live viewport (campaign dir).
+/// Magic "PMP1": nodes float32 xyz, quads uint32×4. No full element dump.
+void write_mesh_preview(const fs::path& path, const pipeline::VolumeMeshOutput& vol) {
+    const auto n_nodes = static_cast<std::uint32_t>(vol.mesh.nodes.size());
+    const auto n_quads = static_cast<std::uint32_t>(vol.boundary_quads.size());
+    const auto n_elems = static_cast<std::uint64_t>(vol.mesh.elements.size());
+    const fs::path tmp = path.string() + ".tmp";
+    {
+        std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
+        if (!out) {
+            return;
+        }
+        const char magic[4] = {'P', 'M', 'P', '1'};
+        out.write(magic, 4);
+        out.write(reinterpret_cast<const char*>(&n_nodes), sizeof(n_nodes));
+        out.write(reinterpret_cast<const char*>(&n_quads), sizeof(n_quads));
+        out.write(reinterpret_cast<const char*>(&n_elems), sizeof(n_elems));
+        for (const auto& p : vol.mesh.nodes) {
+            const float xyz[3] = {static_cast<float>(p[0]), static_cast<float>(p[1]),
+                                  static_cast<float>(p[2])};
+            out.write(reinterpret_cast<const char*>(xyz), sizeof(xyz));
+        }
+        for (const auto& q : vol.boundary_quads) {
+            const std::uint32_t ids[4] = {q[0], q[1], q[2], q[3]};
+            out.write(reinterpret_cast<const char*>(ids), sizeof(ids));
+        }
+        out.flush();
+    }
+    std::error_code ec;
+    fs::rename(tmp, path, ec);
 }
 
 // ── geometry helpers for BC / loads / probes ────────────────────────────────
@@ -641,7 +769,7 @@ struct RunOutcome {
 };
 
 RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_scale,
-                   const fs::path& progress_path) {
+                   const fs::path& progress_path, const fs::path& mesh_preview_path) {
     using clock = std::chrono::steady_clock;
     const auto t_all0 = clock::now();
 
@@ -651,9 +779,9 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
     out.line["part"] = part.part;
     out.line["tier"] = tier;
 
-    try {
-        write_progress(progress_path, "mesh", 0.0, 0.0, cfg.id, part.part, tier);
+    ProgressHeartbeat beat(progress_path, "mesh", cfg.id, part.part, tier, t_all0);
 
+    try {
         const auto model = pipeline::Model::load(part.geometry);
         const auto resolved = pipeline::resolve_mesh_size(model, 0.0);
         const double h = std::max(resolved.h * h_scale, 1e-9);
@@ -680,6 +808,9 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         out.line["n_dof"] = n_dof;
         out.line["quality"] = quality_of(model, vol.mesh, h);
 
+        beat.set_mesh_stats(vol.mesh.elements.size(), vol.mesh.nodes.size());
+        write_mesh_preview(mesh_preview_path, vol);
+
         // Campaign budget: skip pathological meshes so one hybrid_vem case cannot
         // pin the overnight runner for tens of minutes. Tunable later via campaign.json.
         constexpr long long kMaxCampaignDof = 80000;
@@ -693,16 +824,11 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
             out.line["mesh_ms"] = out.mesh_ms;
             out.line["solve_ms"] = 0.0;
             out.accuracy_score = 0.0;
-            write_progress(progress_path, "done", 1.0,
-                           std::chrono::duration<double, std::milli>(clock::now() - t_all0)
-                               .count(),
-                           cfg.id, part.part, tier);
+            beat.set_phase("done", 1.0);
             return out;
         }
 
-        write_progress(progress_path, "assemble", 0.0,
-                       std::chrono::duration<double, std::milli>(clock::now() - t_all0).count(),
-                       cfg.id, part.part, tier);
+        beat.set_phase("assemble", 0.0);
 
         const fea::Material mat{.youngs_modulus = part.E, .poissons_ratio = part.nu};
         const auto bc = make_dirichlet(vol.mesh, part.bcs);
@@ -715,19 +841,25 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
             throw std::runtime_error("zero load vector for part " + part.part);
         }
 
-        write_progress(progress_path, "solve", 0.0,
-                       std::chrono::duration<double, std::milli>(clock::now() - t_all0).count(),
-                       cfg.id, part.part, tier);
+        beat.set_phase("solve", 0.0);
 
         const auto t_solve0 = clock::now();
-        const Eigen::VectorXd u = fea::solve_elastostatics(vol.mesh, mat, bc, loads);
+        fea::SolveOptions sopt;
+        sopt.on_progress = [&](int iter, int max_iters, double resid) {
+            const double frac =
+                max_iters > 0
+                    ? std::clamp(static_cast<double>(iter) / static_cast<double>(max_iters),
+                                 0.0, 1.0)
+                    : 0.0;
+            beat.set_cg(iter, resid);
+            beat.set_frac(frac);
+        };
+        const Eigen::VectorXd u = fea::solve_elastostatics(vol.mesh, mat, bc, loads, sopt);
         const auto t_solve1 = clock::now();
         out.solve_ms =
             std::chrono::duration<double, std::milli>(t_solve1 - t_solve0).count();
 
-        write_progress(progress_path, "recover", 0.5,
-                       std::chrono::duration<double, std::milli>(clock::now() - t_all0).count(),
-                       cfg.id, part.part, tier);
+        beat.set_phase("recover", 0.5);
 
         const ProbeAnswers ans = compute_probes(vol.mesh, mat, u);
         out.line["answers"] = {{"sigma_max", ans.sigma_max},
@@ -769,9 +901,7 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         out.line["solve_ms"] = out.solve_ms;
         out.line["status"] = "ok";
 
-        write_progress(progress_path, "done", 1.0,
-                       std::chrono::duration<double, std::milli>(clock::now() - t_all0).count(),
-                       cfg.id, part.part, tier);
+        beat.set_phase("done", 1.0);
     } catch (const fea::FeaError& e) {
         out.line["status"] = "solve_fail";
         out.line["error"] = e.what();
@@ -954,6 +1084,8 @@ int run_campaign(const fs::path& camp_dir, bool resume) {
     const fs::path results_path = camp_dir / "results.jsonl";
     const fs::path cp_path = camp_dir / "checkpoint.json";
     const fs::path progress_path = camp_dir / "progress.json";
+    // Boundary mesh for GUI live viewport (see interfaces.md §6 / mesh_preview.pmp).
+    const fs::path mesh_preview_path = camp_dir / "mesh_preview.pmp";
 
     Checkpoint cp;
     if (resume) {
@@ -1036,7 +1168,8 @@ int run_campaign(const fs::path& camp_dir, bool resume) {
                 std::printf("  run %s part=%s tier=%d ...\n", cfg_id.c_str(), part.part.c_str(),
                             tier);
                 std::fflush(stdout);
-                const RunOutcome ro = run_one(cfg, part, tier, ts.h_scale, progress_path);
+                const RunOutcome ro =
+                    run_one(cfg, part, tier, ts.h_scale, progress_path, mesh_preview_path);
                 results_app << ro.line.dump() << '\n';
                 results_app.flush();
                 done.insert(key);

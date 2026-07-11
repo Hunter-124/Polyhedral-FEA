@@ -81,11 +81,15 @@ TEST_CASE("forced CG matches direct LDLT on small cantilever") {
     auto setup = make_cantilever_hex(12, 2, 2);
     REQUIRE(setup.nfree < 8000);
 
-    const auto u_direct = solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads,
-                                              SolveOptions{.method = SolveMethod::kDirect});
+    SolveOptions opt_direct;
+    opt_direct.method = SolveMethod::kDirect;
+    SolveOptions opt_cg;
+    opt_cg.method = SolveMethod::kCG;
+    opt_cg.cg_tol = 1e-12;
+    const auto u_direct =
+        solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, opt_direct);
     const auto u_cg =
-        solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads,
-                            SolveOptions{.method = SolveMethod::kCG, .cg_tol = 1e-12});
+        solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, opt_cg);
 
     const double tip_d = mean_tip_uz(setup.mesh, u_direct, setup.length);
     const double tip_cg = mean_tip_uz(setup.mesh, u_cg, setup.length);
@@ -128,10 +132,13 @@ TEST_CASE("forced CG reproduces constant-strain patch within solver tol") {
     const Eigen::VectorXd loads =
         Eigen::VectorXd::Zero(3 * static_cast<Eigen::Index>(mesh.nodes.size()));
 
-    const auto u_direct = solve_elastostatics(mesh, kSteel, bc, loads,
-                                              SolveOptions{.method = SolveMethod::kDirect});
-    const auto u_cg = solve_elastostatics(
-        mesh, kSteel, bc, loads, SolveOptions{.method = SolveMethod::kCG, .cg_tol = 1e-12});
+    SolveOptions opt_direct;
+    opt_direct.method = SolveMethod::kDirect;
+    SolveOptions opt_cg;
+    opt_cg.method = SolveMethod::kCG;
+    opt_cg.cg_tol = 1e-12;
+    const auto u_direct = solve_elastostatics(mesh, kSteel, bc, loads, opt_direct);
+    const auto u_cg = solve_elastostatics(mesh, kSteel, bc, loads, opt_cg);
 
     double max_err_direct = 0.0;
     double max_err_cg = 0.0;

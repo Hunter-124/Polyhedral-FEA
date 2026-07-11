@@ -1050,6 +1050,59 @@ void SolveJob::report(const std::string& phase, double phase_frac,
     progress_.pass_count = pass_count;
 }
 
+void SolveJob::publish_live_mesh(const VolumeMeshOutput& vol) {
+    // Boundary-focused copy for the viewport. Keep elements so face type colors
+    // work; this runs only at mesh/adapt phase boundaries (not mid-fill).
+    {
+        const std::lock_guard lock(live_mesh_mutex_);
+        live_mesh_ = vol;
+    }
+    live_mesh_gen_.fetch_add(1, std::memory_order_release);
+    note_mesh_stats(vol);
+}
+
+void SolveJob::note_mesh_stats(const VolumeMeshOutput& vol) {
+    const std::lock_guard lock(status_mutex_);
+    progress_.n_elems = vol.mesh.elements.size();
+    progress_.n_nodes = vol.mesh.nodes.size();
+}
+
+fea::SolveOptions SolveJob::solve_options_with_progress(int pass, int pass_count) {
+    fea::SolveOptions opt;
+    opt.on_progress = [this, pass, pass_count](int iter, int max_iters, double resid) {
+        const double frac =
+            max_iters > 0 ? std::clamp(static_cast<double>(iter) / static_cast<double>(max_iters),
+                                       0.0, 1.0)
+                          : 0.0;
+        const auto ms = std::chrono::duration<double, std::milli>(
+                            std::chrono::steady_clock::now() - t0_)
+                            .count();
+        const std::lock_guard lock(status_mutex_);
+        progress_.phase = "solve";
+        progress_.phase_frac = frac;
+        progress_.elapsed_ms = ms;
+        progress_.pass = pass;
+        progress_.pass_count = pass_count;
+        progress_.cg_iter = iter;
+        progress_.cg_resid = resid;
+        status_ = std::format("solving… CG {}/{}  resid {:.3g}", iter, max_iters, resid);
+    };
+    return opt;
+}
+
+std::optional<VolumeMeshOutput> SolveJob::poll_live_mesh(std::uint64_t& seen_gen) const {
+    const auto gen = live_mesh_gen_.load(std::memory_order_acquire);
+    if (gen == 0 || gen == seen_gen) {
+        return std::nullopt;
+    }
+    const std::lock_guard lock(live_mesh_mutex_);
+    if (!live_mesh_) {
+        return std::nullopt;
+    }
+    seen_gen = gen;
+    return *live_mesh_;
+}
+
 void SolveJob::checkpoint() {
     bool announced = false;
     std::string resume_phase;
@@ -1091,8 +1144,15 @@ void SolveJob::reset_control_flags() {
     cancel_.store(false, std::memory_order_relaxed);
     pause_.store(false, std::memory_order_relaxed);
     t0_ = std::chrono::steady_clock::now();
-    const std::lock_guard lock(status_mutex_);
-    progress_ = JobProgress{};
+    {
+        const std::lock_guard lock(status_mutex_);
+        progress_ = JobProgress{};
+    }
+    {
+        const std::lock_guard lock(live_mesh_mutex_);
+        live_mesh_.reset();
+    }
+    live_mesh_gen_.store(0, std::memory_order_relaxed);
 }
 
 std::string SolveJob::status_text() const {
@@ -1170,6 +1230,7 @@ void SolveJob::start_mesh(const Model& model, const SimSetup& setup) {
             mesh_only_ = volume_mesh(model, h, setup.mesher, setup.skin_layers,
                                      setup.use_feature_grading, {}, 0.0,
                                      setup.element_tendency);
+            publish_live_mesh(mesh_only_);
             checkpoint();
             mesh_only_.mesher_note =
                 std::format("{} | {}", resolved.note, mesh_only_.mesher_note);
@@ -1251,6 +1312,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
             auto vol = volume_mesh(model, h_use, setup.mesher, setup.skin_layers,
                                    setup.use_feature_grading, adapt_seeds, adapt_seed_band,
                                    setup.element_tendency);
+            publish_live_mesh(vol);
             checkpoint();
             // Keep resolved-h note on mesher_note for solve mesh_note (GUI/CLI).
             vol.mesher_note = std::format("{} | {}", resolved.note, vol.mesher_note);
@@ -1723,7 +1785,10 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         vol = volume_mesh(model, h_remesh, mesher_adapt, setup.skin_layers,
                                           setup.use_feature_grading, adapt_seeds,
                                           adapt_seed_band, setup.element_tendency);
+                        publish_live_mesh(vol);
                         h_use = std::max(h_use, h_remesh);
+                    } else {
+                        publish_live_mesh(vol); // local LEB also changes connectivity
                     }
                     apply_bcs();
                     // Re-apply geometry hp after remesh so bulk stays quadratic.
@@ -1742,7 +1807,9 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                            pass, pass_count);
                 }
                 checkpoint();
-                auto u_try = fea::solve_elastostatics(vol.mesh, material, bc, loads);
+                const auto solve_opt = solve_options_with_progress(pass, pass_count);
+                auto u_try =
+                    fea::solve_elastostatics(vol.mesh, material, bc, loads, solve_opt);
                 report("recover", pass_base + 0.7 * pass_span,
                        std::format("recovering stress… (pass {}/{})", pass, pass_count), pass,
                        pass_count);
@@ -1759,7 +1826,9 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 if (setup.eta_target > 0.0 && zz_try.global_eta <= setup.eta_target) {
                     std::string pnote;
                     if (maybe_p_elevate(hp_plan.p_mark, pnote)) {
-                        u_try = fea::solve_elastostatics(vol.mesh, material, bc, loads);
+                        publish_live_mesh(vol);
+                        u_try = fea::solve_elastostatics(vol.mesh, material, bc, loads,
+                                                        solve_options_with_progress(pass, pass_count));
                         zz_try = fea::recover_zz(vol.mesh, material, u_try);
                     }
                     SolveResult r;
@@ -1786,7 +1855,10 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                             p_idx = adapt::mark_smooth(zz_try.element_eta, 0.3);
                         }
                         if (maybe_p_elevate(p_idx, pnote)) {
-                            u_try = fea::solve_elastostatics(vol.mesh, material, bc, loads);
+                            publish_live_mesh(vol);
+                            u_try = fea::solve_elastostatics(
+                                vol.mesh, material, bc, loads,
+                                solve_options_with_progress(pass, pass_count));
                             zz_try = fea::recover_zz(vol.mesh, material, u_try);
                         }
                         SolveResult r;
@@ -1803,7 +1875,10 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         hp_plan.h_mark.size() * 4 < hp_plan.p_mark.size()) {
                         std::string pnote;
                         if (maybe_p_elevate(hp_plan.p_mark, pnote)) {
-                            u_try = fea::solve_elastostatics(vol.mesh, material, bc, loads);
+                            publish_live_mesh(vol);
+                            u_try = fea::solve_elastostatics(
+                                vol.mesh, material, bc, loads,
+                                solve_options_with_progress(pass, pass_count));
                             zz_try = fea::recover_zz(vol.mesh, material, u_try);
                             vol.mesher_note =
                                 std::format("{} | mid-loop{}", vol.mesher_note, pnote);
@@ -1823,7 +1898,9 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     p_idx = adapt::mark_smooth(zz_try.element_eta, 0.3);
                 }
                 if (maybe_p_elevate(p_idx, pnote)) {
-                    u_try = fea::solve_elastostatics(vol.mesh, material, bc, loads);
+                    publish_live_mesh(vol);
+                    u_try = fea::solve_elastostatics(vol.mesh, material, bc, loads,
+                                                    solve_options_with_progress(pass, pass_count));
                     zz_try = fea::recover_zz(vol.mesh, material, u_try);
                 }
                 SolveResult r;

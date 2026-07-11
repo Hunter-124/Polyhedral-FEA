@@ -131,9 +131,14 @@ nodes:
 
   - id: solver-docs
     title: Human-readable solver-core documentation
-    status: todo
+    status: in_progress
     deps: [p-hierarchical, fe-vem-assembly]
     scope: [docs/]
+    note: >
+      LANDED: docs/solver-core.md — human's guide to the (h,p,shape) core:
+      why three knobs, the hierarchical basis + minimum rule, FE+VEM shape
+      strategy, the driver + branch trimming, and a code map. Expand the
+      FE+VEM section once node fe-vem-assembly lands.
 
   # ── Lane C: recursive improvement (repeats) ─────────────────────────────
   - id: feedback-loop

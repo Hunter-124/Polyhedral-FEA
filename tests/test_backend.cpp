@@ -9,9 +9,11 @@ using polymesh::fea::active_backend;
 using polymesh::fea::Backend;
 using polymesh::fea::backend_description;
 using polymesh::fea::init_runtime_performance;
+using polymesh::fea::openmp_default_threads;
 using polymesh::fea::openmp_enabled;
 using polymesh::fea::openmp_max_threads;
 using polymesh::fea::performance_description;
+using polymesh::fea::set_openmp_threads;
 
 TEST_CASE("backend is consistent with its description") {
     switch (active_backend()) {
@@ -34,6 +36,25 @@ TEST_CASE("performance runtime reports OpenMP thread count") {
     } else {
         CHECK(desc.find("serial") != std::string::npos);
     }
+}
+
+TEST_CASE("set_openmp_threads caps and restores default") {
+    init_runtime_performance();
+    const int def = openmp_default_threads();
+    REQUIRE(def >= 1);
+
+    set_openmp_threads(1);
+    CHECK(openmp_max_threads() == 1);
+
+    // 0 restores the process default captured at init.
+    set_openmp_threads(0);
+    CHECK(openmp_max_threads() == def);
+
+    // Over-large request clamps to default (never above hardware/process max).
+    set_openmp_threads(def + 1000);
+    CHECK(openmp_max_threads() == def);
+
+    set_openmp_threads(0); // leave suite at default
 }
 
 #ifndef POLYMESH_WITH_CUDA

@@ -31,6 +31,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <chrono>
 #include <cmath>
 #include <format>
 #include <limits>
@@ -38,6 +39,8 @@
 #include <queue>
 #include <set>
 #include <span>
+#include <stdexcept>
+#include <thread>
 #include <unordered_map>
 
 namespace polymesh::pipeline {
@@ -1009,14 +1012,113 @@ VolumeMeshOutput voxel_mesh(const Model& model, double h) {
     return volume_mesh(model, h, VolumeMesher::kTetFill, 2);
 }
 
+namespace {
+struct JobCancelled : std::runtime_error {
+    JobCancelled() : std::runtime_error("cancelled") {}
+};
+} // namespace
+
 void SolveJob::set_status(const std::string& s) {
     const std::lock_guard lock(status_mutex_);
     status_ = s;
 }
 
+void SolveJob::set_progress(const std::string& phase, double phase_frac, int pass,
+                            int pass_count) {
+    const auto ms = std::chrono::duration<double, std::milli>(
+                        std::chrono::steady_clock::now() - t0_)
+                        .count();
+    const std::lock_guard lock(status_mutex_);
+    progress_.phase = phase;
+    progress_.phase_frac = std::clamp(phase_frac, 0.0, 1.0);
+    progress_.elapsed_ms = ms;
+    progress_.pass = pass;
+    progress_.pass_count = pass_count;
+}
+
+void SolveJob::report(const std::string& phase, double phase_frac,
+                      const std::string& status_msg, int pass, int pass_count) {
+    const auto ms = std::chrono::duration<double, std::milli>(
+                        std::chrono::steady_clock::now() - t0_)
+                        .count();
+    const std::lock_guard lock(status_mutex_);
+    status_ = status_msg;
+    progress_.phase = phase;
+    progress_.phase_frac = std::clamp(phase_frac, 0.0, 1.0);
+    progress_.elapsed_ms = ms;
+    progress_.pass = pass;
+    progress_.pass_count = pass_count;
+}
+
+void SolveJob::checkpoint() {
+    bool announced = false;
+    std::string resume_phase;
+    while (pause_.load(std::memory_order_relaxed) &&
+           !cancel_.load(std::memory_order_relaxed)) {
+        {
+            const std::lock_guard lock(status_mutex_);
+            if (!announced) {
+                resume_phase = progress_.phase.empty() ? "solve" : progress_.phase;
+                if (status_.rfind("paused", 0) != 0) {
+                    status_ = std::format("paused — {}", status_);
+                }
+                progress_.phase = "paused";
+                announced = true;
+            }
+            progress_.elapsed_ms =
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() -
+                                                          t0_)
+                    .count();
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+    if (cancel_.load(std::memory_order_relaxed)) {
+        throw JobCancelled{};
+    }
+    if (announced) {
+        const std::lock_guard lock(status_mutex_);
+        // Restore phase token so the UI leaves the paused bar.
+        if (progress_.phase == "paused") {
+            progress_.phase = resume_phase.empty() ? "solve" : resume_phase;
+        }
+        if (status_.rfind("paused — ", 0) == 0) {
+            status_ = status_.substr(std::string("paused — ").size());
+        }
+    }
+}
+
+void SolveJob::reset_control_flags() {
+    cancel_.store(false, std::memory_order_relaxed);
+    pause_.store(false, std::memory_order_relaxed);
+    t0_ = std::chrono::steady_clock::now();
+    const std::lock_guard lock(status_mutex_);
+    progress_ = JobProgress{};
+}
+
 std::string SolveJob::status_text() const {
     const std::lock_guard lock(status_mutex_);
     return status_;
+}
+
+JobProgress SolveJob::progress() const {
+    const std::lock_guard lock(status_mutex_);
+    return progress_;
+}
+
+void SolveJob::request_cancel() {
+    cancel_.store(true, std::memory_order_relaxed);
+    // Wake a paused worker so it can observe cancel.
+    pause_.store(false, std::memory_order_relaxed);
+}
+
+void SolveJob::request_pause() {
+    if (state_ == State::kMeshing || state_ == State::kSolving) {
+        pause_.store(true, std::memory_order_relaxed);
+    }
+}
+
+void SolveJob::request_resume() {
+    pause_.store(false, std::memory_order_relaxed);
 }
 
 void SolveJob::join_worker() {
@@ -1026,9 +1128,10 @@ void SolveJob::join_worker() {
 }
 
 void SolveJob::clear_failure() {
-    if (state_ == State::kFailed) {
+    if (state_ == State::kFailed || state_ == State::kCancelled) {
         join_worker();
         state_ = State::kIdle;
+        reset_control_flags();
         set_status("idle");
     }
 }
@@ -1038,8 +1141,9 @@ void SolveJob::start_mesh(const Model& model, const SimSetup& setup) {
         return;
     }
     join_worker();
+    reset_control_flags();
     state_ = State::kMeshing;
-    set_status("meshing…");
+    report("mesh", 0.0, "meshing…");
     worker_ = std::thread([this, model, setup] {
         try {
             // Global scalar h from D5 only. Do NOT min-sample geometry sizing at
@@ -1048,18 +1152,24 @@ void SolveJob::start_mesh(const Model& model, const SimSetup& setup) {
             // Feature grading is applied as feature_refine (graded skin / bands).
             const auto resolved = resolve_mesh_size(model, setup.mesh_size);
             const double h = resolved.h;
-            set_status(std::format("meshing… ({}, h={:.4g} m)", resolved.note, h));
+            report("mesh", 0.15, std::format("meshing… ({}, h={:.4g} m)", resolved.note, h));
+            checkpoint();
             mesh_only_ = volume_mesh(model, h, setup.mesher, setup.skin_layers,
                                      setup.use_feature_grading, {}, 0.0,
                                      setup.element_tendency);
+            checkpoint();
             mesh_only_.mesher_note =
                 std::format("{} | {}", resolved.note, mesh_only_.mesher_note);
-            set_status(std::format("mesh ready — {} elems, {} nodes | {}",
-                                   mesh_only_.mesh.elements.size(),
-                                   mesh_only_.mesh.nodes.size(), mesh_only_.mesher_note));
+            report("done", 1.0,
+                   std::format("mesh ready — {} elems, {} nodes | {}",
+                               mesh_only_.mesh.elements.size(), mesh_only_.mesh.nodes.size(),
+                               mesh_only_.mesher_note));
             state_ = State::kMeshDone;
+        } catch (const JobCancelled&) {
+            report("cancelled", 0.0, "mesh cancelled");
+            state_ = State::kCancelled;
         } catch (const std::exception& e) {
-            set_status(std::format("mesh failed: {}", e.what()));
+            report("done", 0.0, std::format("mesh failed: {}", e.what()));
             state_ = State::kFailed;
         }
     });
@@ -1106,17 +1216,21 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
         return;
     }
     join_worker();
+    reset_control_flags();
     state_ = State::kMeshing;
-    set_status("meshing…");
+    const int pass_count = std::max(0, setup.adapt_passes);
+    report("mesh", 0.0, "meshing…", 0, pass_count);
     // Copy inputs by value into the worker.
-    worker_ = std::thread([this, model, setup] {
+    worker_ = std::thread([this, model, setup, pass_count] {
         try {
             // Global h from D5 only (same as start_mesh). Feature grading is
             // feature_refine on graded fills — not global h→h_min at corners.
             const auto resolved = resolve_mesh_size(model, setup.mesh_size);
             const double h = resolved.h;
             double h_use = h;
-            set_status(std::format("meshing… ({}, h={:.4g} m)", resolved.note, h));
+            report("mesh", 0.15,
+                   std::format("meshing… ({}, h={:.4g} m)", resolved.note, h), 0, pass_count);
+            checkpoint();
             std::vector<Eigen::Vector3d> adapt_seeds;
             double adapt_seed_band = 0.0;
             // D4: Dörfler element indices for optional local LEB before remesh.
@@ -1124,10 +1238,13 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
             auto vol = volume_mesh(model, h_use, setup.mesher, setup.skin_layers,
                                    setup.use_feature_grading, adapt_seeds, adapt_seed_band,
                                    setup.element_tendency);
+            checkpoint();
             // Keep resolved-h note on mesher_note for solve mesh_note (GUI/CLI).
             vol.mesher_note = std::format("{} | {}", resolved.note, vol.mesher_note);
-            set_status(std::format("solving… ({} elements, {} nodes)",
-                                   vol.mesh.elements.size(), vol.mesh.nodes.size()));
+            report("assemble", 0.0,
+                   std::format("assembling… ({} elements, {} nodes)", vol.mesh.elements.size(),
+                               vol.mesh.nodes.size()),
+                   0, pass_count);
             state_ = State::kSolving;
 
             fea::Dirichlet bc;
@@ -1352,8 +1469,9 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 note_suffix =
                     std::format(" p-elev={} n+{} (tet10={} hex20={})", linear.size(),
                                 vol.mesh.nodes.size() - before, counts.tet10, counts.hex20);
-                set_status(std::format("p-elevate… ({} → quadratic via hp-driver)",
-                                       linear.size()));
+                report("recover", 0.5,
+                       std::format("p-elevate… ({} → quadratic via hp-driver)", linear.size()),
+                       /*pass=*/0, pass_count);
                 return true;
             };
 
@@ -1409,9 +1527,12 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 vol.mesher_note =
                     std::format("{} | geo-hp: p-elev bulk {} (tet10={} n+{})", vol.mesher_note,
                                 bulk.size(), counts.tet10, vol.mesh.nodes.size() - before);
-                set_status(std::format("geo hp-elevate… ({} bulk → quadratic)", bulk.size()));
+                report("recover", 0.3,
+                       std::format("geo hp-elevate… ({} bulk → quadratic)", bulk.size()), 0,
+                       pass_count);
             };
             maybe_geo_p_elevate();
+            checkpoint();
 
             auto mesh_is_all_tet4 = [](const fea::NodalMesh& m) {
                 if (m.elements.empty()) {
@@ -1550,6 +1671,11 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
             adapt::ShapeTendency last_shape_vote = adapt::ShapeTendency::kKeep;
 
             for (int pass = 0; pass <= setup.adapt_passes; ++pass) {
+                checkpoint();
+                // Overall progress across adapt passes (pass 0..N).
+                const double pass_base =
+                    static_cast<double>(pass) / static_cast<double>(pass_count + 1);
+                const double pass_span = 1.0 / static_cast<double>(pass_count + 1);
                 if (pass > 0) {
                     // D4: prefer true local LEB on tet meshes when marks exist.
                     const bool tet_path = setup.mesher == VolumeMesher::kTetFill ||
@@ -1576,6 +1702,11 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                             std::max(h_use, mesh::min_h_for_cell_budget(
                                                 model.bbox_min, model.bbox_max,
                                                 mesh::kDefaultMaxGridCells, remesh_sub));
+                        report("mesh", pass_base,
+                               std::format("adapt remesh {}… ({} seeds)", pass,
+                                           adapt_seeds.size()),
+                               pass, pass_count);
+                        checkpoint();
                         vol = volume_mesh(model, h_remesh, mesher_adapt, setup.skin_layers,
                                           setup.use_feature_grading, adapt_seeds,
                                           adapt_seed_band, setup.element_tendency);
@@ -1586,11 +1717,23 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     if (!did_local) {
                         maybe_geo_p_elevate();
                     }
-                    set_status(std::format("adapt pass {}… ({} elems, {} seeds{})", pass,
-                                           vol.mesh.elements.size(), adapt_seeds.size(),
-                                           did_local ? ", local LEB" : ""));
+                    report("solve", pass_base + 0.15 * pass_span,
+                           std::format("adapt pass {}… ({} elems, {} seeds{})", pass,
+                                       vol.mesh.elements.size(), adapt_seeds.size(),
+                                       did_local ? ", local LEB" : ""),
+                           pass, pass_count);
+                } else {
+                    report("solve", pass_base + 0.2 * pass_span,
+                           std::format("solving… ({} elements, {} nodes)",
+                                       vol.mesh.elements.size(), vol.mesh.nodes.size()),
+                           pass, pass_count);
                 }
+                checkpoint();
                 auto u_try = fea::solve_elastostatics(vol.mesh, material, bc, loads);
+                report("recover", pass_base + 0.7 * pass_span,
+                       std::format("recovering stress… (pass {}/{})", pass, pass_count), pass,
+                       pass_count);
+                checkpoint();
                 auto zz_try = fea::recover_zz(vol.mesh, material, u_try);
                 const auto cents = element_centroids(vol.mesh);
                 const auto signals = build_hp_signals(cents, zz_try.element_eta);
@@ -1679,12 +1822,16 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 fill_result_fields(r, zz_try, u_try);
                 result_ = std::move(r);
             } // adapt passes
-            set_status(std::format("done — max von Mises {:.4g} MPa, max deflection {:.4g} mm",
-                                   result_.max_von_mises / 1e6,
-                                   result_.max_displacement * 1e3));
+            report("done", 1.0,
+                   std::format("done — max von Mises {:.4g} MPa, max deflection {:.4g} mm",
+                               result_.max_von_mises / 1e6, result_.max_displacement * 1e3),
+                   pass_count, pass_count);
             state_ = State::kDone;
+        } catch (const JobCancelled&) {
+            report("cancelled", 0.0, "solve cancelled");
+            state_ = State::kCancelled;
         } catch (const std::exception& e) {
-            set_status(std::format("solve failed: {}", e.what()));
+            report("done", 0.0, std::format("solve failed: {}", e.what()));
             state_ = State::kFailed;
         }
     });

@@ -12,6 +12,7 @@
 #include <Eigen/Core>
 
 #include <atomic>
+#include <chrono>
 #include <map>
 #include <mutex>
 #include <optional>
@@ -179,10 +180,30 @@ VolumeMeshOutput volume_mesh(const Model& model, double h,
 /// @param h Target edge length, metres.
 VolumeMeshOutput voxel_mesh(const Model& model, double h);
 
+/// Live solve progress for the GUI (same phase vocabulary as
+/// docs/dag/interfaces.md §6 progress.json). Updated under the status mutex;
+/// poll from the UI thread alongside `state()` / `status_text()`.
+struct JobProgress {
+    /// mesh | assemble | solve | recover | done | cancelled
+    std::string phase;
+    double phase_frac = 0.0; // 0–1 within the current phase
+    double elapsed_ms = 0.0;
+    int pass = 0;       // adapt pass index (0 = initial)
+    int pass_count = 0; // setup.adapt_passes (max extra passes)
+};
+
 /// Background mesh / solve pipeline. Poll `state` from the UI thread.
 class SolveJob {
   public:
-    enum class State { kIdle, kMeshing, kSolving, kDone, kFailed, kMeshDone };
+    enum class State {
+        kIdle,
+        kMeshing,
+        kSolving,
+        kDone,
+        kFailed,
+        kMeshDone,
+        kCancelled,
+    };
 
     void start(const Model& model, const SimSetup& setup);
     /// Mesh only (for viewport preview). Same worker thread rules as start().
@@ -191,23 +212,46 @@ class SolveJob {
     std::optional<SolveResult> take_result();
     /// Joins a finished mesh-only worker.
     std::optional<VolumeMeshOutput> take_mesh();
-    /// Clear kFailed → kIdle so the user can retry.
+    /// Clear kFailed / kCancelled → kIdle so the user can retry.
     void clear_failure();
+
+    /// Cooperative cancel: checked between mesh/adapt/solve phases (not mid-CG).
+    /// Safe from the UI thread. Worker finishes with State::kCancelled.
+    void request_cancel();
+    /// Cooperative pause: worker blocks between phases until resume or cancel.
+    /// Does not interrupt a single `solve_elastostatics` / mesh call.
+    void request_pause();
+    void request_resume();
+    bool cancel_requested() const { return cancel_.load(std::memory_order_relaxed); }
+    bool pause_requested() const { return pause_.load(std::memory_order_relaxed); }
 
     State state() const { return state_.load(); }
     std::string status_text() const;
+    JobProgress progress() const;
     ~SolveJob();
 
   private:
     std::atomic<State> state_{State::kIdle};
+    std::atomic<bool> cancel_{false};
+    std::atomic<bool> pause_{false};
     std::thread worker_;
     SolveResult result_;
     VolumeMeshOutput mesh_only_;
     std::string error_;
     mutable std::mutex status_mutex_;
     std::string status_;
+    JobProgress progress_;
+    std::chrono::steady_clock::time_point t0_{};
     void set_status(const std::string& s);
+    void set_progress(const std::string& phase, double phase_frac, int pass = 0,
+                      int pass_count = 0);
+    /// Status line + structured progress (same lock).
+    void report(const std::string& phase, double phase_frac, const std::string& status_msg,
+                int pass = 0, int pass_count = 0);
+    /// Between phases: honour pause (spin-sleep) then throw if cancelled.
+    void checkpoint();
     void join_worker();
+    void reset_control_flags();
 };
 
 } // namespace polymesh::pipeline

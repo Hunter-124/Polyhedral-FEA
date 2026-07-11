@@ -27,6 +27,15 @@ GATE 0 was approved by owner on 2026-07-09.
   full factorial (meshers × feature_refine × element_tendency) on smoke_bar /
   plate_hole / cantilever with successive-halving tiers. Testlab wires
   hybrid_vem + element_tendency into volume_mesh.
+- 2026-07-11: **GUI sim controls (DAG `gui-sim-controls`)** — interactive
+  `SolveJob` exposes `JobProgress` (phase / phase_frac / elapsed_ms / adapt
+  pass) matching interfaces.md §6 vocabulary; cooperative **pause / resume /
+  cancel** between mesh·adapt·solve phases (not mid-CG). Sim Setup panel:
+  live ProgressBar + elapsed, resource knobs (`max_threads` →
+  `fea::set_openmp_threads`, `max_mem_gb` soft note). Test Lab: play/run +
+  SIGINT pause + force stop; campaign/GUI thread caps set `OMP_NUM_THREADS`
+  for harness children. Gates: `test_gui_pipeline` progress/cancel/pause,
+  `test_backend` thread cap restore.
 - 2026-07-11: **Test lab harness + GUI Test Lab (DAG `testlab-harness`, `gui-testlab`)** —
   `apps/testlab/polymesh_testlab` campaign runner (successive-halving, SIGINT
   checkpoint, results.jsonl, progress.json; anti-cheat reference load). Smoke

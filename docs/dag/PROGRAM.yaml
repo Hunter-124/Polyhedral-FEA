@@ -170,6 +170,13 @@ nodes:
 
   - id: gui-sim-controls
     title: GUI live solve progress + pause/play + resource caps wired
-    status: todo
+    status: done
     deps: [gui-testlab, testlab-harness]
     scope: [apps/gui/]
+    note: >
+      DONE: SolveJob JobProgress (phase/phase_frac/elapsed/pass) + cooperative
+      pause/resume/cancel between mesh/adapt/solve phases. GUI Sim Setup shows
+      live ProgressBar, pause/play/cancel, and resource knobs (max_threads →
+      fea::set_openmp_threads / OMP_NUM_THREADS for campaigns; max_mem_gb soft
+      note). Test Lab: play/run, SIGINT pause, force stop, progress.json polish.
+      Gates: test_gui_pipeline progress/cancel/pause, test_backend thread cap.

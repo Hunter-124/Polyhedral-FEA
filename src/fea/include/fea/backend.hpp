@@ -30,6 +30,16 @@ bool openmp_enabled();
 /// Max OpenMP threads the runtime will use (1 if OpenMP is off).
 int openmp_max_threads();
 
+/// Hardware / process-default OpenMP max captured by `init_runtime_performance`
+/// (1 if OpenMP is off). Used when `set_openmp_threads(0)` restores "unlimited".
+int openmp_default_threads();
+
+/// Cap OpenMP parallelism for assembly / mesh / recovery hot paths.
+/// `n <= 0` restores the process default (see `openmp_default_threads`).
+/// `n >= 1` clamps to at most the hardware default. No-op without OpenMP.
+/// Safe to call repeatedly from the UI thread before starting a job.
+void set_openmp_threads(int n);
+
 /// One-line performance summary: backend + OpenMP thread count.
 /// Example: `"cpu | OpenMP 16 threads | Eigen multi-thread"`.
 std::string performance_description();

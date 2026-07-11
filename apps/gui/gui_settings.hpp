@@ -29,6 +29,14 @@ struct GuiSettings {
     /// How often (seconds) to re-scan campaign files while a run is live.
     float refresh_interval_s = 0.5f;
 
+    /// OpenMP thread cap for interactive mesh/solve (0 = process default / all).
+    /// Applied via `fea::set_openmp_threads` before starting a SolveJob.
+    int max_threads = 0;
+
+    /// Soft memory budget for the UI (GB). 0 = unlimited.
+    /// Displayed as a soft note; not a hard process RSS kill (no existing hook).
+    double max_mem_gb = 0.0;
+
     /// Resolve the harness binary (override, then common build paths, then bare name).
     std::filesystem::path resolved_testlab_binary() const;
 

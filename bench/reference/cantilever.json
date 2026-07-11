@@ -1,0 +1,12 @@
+{
+  "part": "cantilever",
+  "metrics": [
+    {
+      "name": "tip_deflection",
+      "value": 2.0153e-4,
+      "tol": 0.05,
+      "probe": { "kind": "mean_uz_on_face", "select": "x_max" },
+      "derivation": "docs/validation/hand-calcs.md#cantilever"
+    }
+  ]
+}

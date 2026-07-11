@@ -1,0 +1,18 @@
+{
+  "part": "smoke_bar",
+  "geometry": "tests/fixtures/parts/smoke_bar.stl",
+  "material": { "E": 2.0e11, "nu": 0.3, "rho": 7850 },
+  "bcs": [
+    {
+      "select": { "box": [[-1e9, -1e9, -1e9], [1.0e-4, 1e9, 1e9]] },
+      "fix": [true, true, true]
+    }
+  ],
+  "loads": [
+    {
+      "select": { "box": [[0.0999, -1e9, -1e9], [1e9, 1e9, 1e9]] },
+      "traction": [1.0e6, 0.0, 0.0]
+    }
+  ],
+  "reference": "bench/reference/smoke_bar.json"
+}

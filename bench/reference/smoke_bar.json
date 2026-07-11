@@ -1,0 +1,19 @@
+{
+  "part": "smoke_bar",
+  "metrics": [
+    {
+      "name": "sigma_vm",
+      "value": 1.0e6,
+      "tol": 0.02,
+      "probe": { "kind": "max_vm", "region": "gauge" },
+      "derivation": "docs/validation/hand-calcs.md#smoke-bar"
+    },
+    {
+      "name": "tip_ux",
+      "value": 5.0e-7,
+      "tol": 0.02,
+      "probe": { "kind": "mean_ux_on_face", "select": "x_max" },
+      "derivation": "docs/validation/hand-calcs.md#smoke-bar"
+    }
+  ]
+}

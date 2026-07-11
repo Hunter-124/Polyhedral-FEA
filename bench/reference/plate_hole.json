@@ -1,0 +1,12 @@
+{
+  "part": "plate_hole",
+  "metrics": [
+    {
+      "name": "scf",
+      "value": 3.0,
+      "tol": 0.05,
+      "probe": { "kind": "max_vm_over_nominal", "nominal": 1.0e6 },
+      "derivation": "docs/validation/hand-calcs.md#kirsch-plate"
+    }
+  ]
+}

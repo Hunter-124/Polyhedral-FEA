@@ -676,8 +676,29 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
 
         out.line["n_elems"] = vol.mesh.elements.size();
         out.line["n_nodes"] = vol.mesh.nodes.size();
-        out.line["n_dof"] = 3 * vol.mesh.nodes.size();
+        const long long n_dof = 3 * static_cast<long long>(vol.mesh.nodes.size());
+        out.line["n_dof"] = n_dof;
         out.line["quality"] = quality_of(model, vol.mesh, h);
+
+        // Campaign budget: skip pathological meshes so one hybrid_vem case cannot
+        // pin the overnight runner for tens of minutes. Tunable later via campaign.json.
+        constexpr long long kMaxCampaignDof = 80000;
+        constexpr long long kMaxCampaignElems = 60000;
+        if (n_dof > kMaxCampaignDof ||
+            static_cast<long long>(vol.mesh.elements.size()) > kMaxCampaignElems) {
+            out.line["status"] = "over_budget";
+            out.line["error"] = "mesh exceeds campaign DOF/elem budget (" +
+                                std::to_string(n_dof) + " dof, " +
+                                std::to_string(vol.mesh.elements.size()) + " elems)";
+            out.line["mesh_ms"] = out.mesh_ms;
+            out.line["solve_ms"] = 0.0;
+            out.accuracy_score = 0.0;
+            write_progress(progress_path, "done", 1.0,
+                           std::chrono::duration<double, std::milli>(clock::now() - t_all0)
+                               .count(),
+                           cfg.id, part.part, tier);
+            return out;
+        }
 
         write_progress(progress_path, "assemble", 0.0,
                        std::chrono::duration<double, std::milli>(clock::now() - t_all0).count(),

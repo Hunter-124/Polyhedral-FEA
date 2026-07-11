@@ -54,7 +54,7 @@ TEST_CASE("tet rules integrate monomials exactly up to their degree") {
 }
 
 TEST_CASE("hex rules integrate per-axis monomials exactly up to 2n-1") {
-    const int n = GENERATE(1, 2, 3, 4, 5);
+    const int n = GENERATE(1, 2, 3, 4, 5, 6);
     const auto rule = hex_rule(n);
     const int degree = 2 * n - 1;
     for (int a = 0; a <= degree; ++a) {

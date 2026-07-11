@@ -11,21 +11,22 @@
 // no constraint equations.
 //
 // This module provides the reference-element basis + single-element
-// stiffness. Global per-entity DOF numbering and the orientation-sign
-// bookkeeping that assembles a conforming mixed-order system live in the
-// assembler (ADR-0019 lane B, node `fe-vem-assembly`); the HpMode descriptors
-// returned here carry the entity/order/orientation data that assembler needs.
+// stiffness. Global per-entity DOF numbering and the orientation-sign /
+// face-transform bookkeeping that assembles a conforming mixed-order system
+// live in hp_assembly (ADR-0019). The HpMode descriptors returned here carry
+// the entity/order/index data that assembler needs.
 //
 // Geometry is subparametric: the isoparametric map uses the p=1 vertex
 // functions (trilinear hex / linear tet), which is exact for the straight-
 // edged elements the Cartesian meshers produce. Curved-boundary blending is
 // deferred with the CAD-fitted boundary (ADR-0015).
 //
-// Support in this landing:
-//   - Hex: full tensor-product hierarchical basis, order 1..4 (the cap is the
-//     available Gauss rule, hex_rule n<=5 => exact to degree 9 >= 2p).
-//   - Tet: vertex + quadratic edge bubbles, order 1..2 (complete quadratic
-//     space; the k>=3 edge/face/interior kernels are the next increment).
+// Support:
+//   - Hex: full tensor-product hierarchical basis, order 1..6 (Gauss n<=6
+//     integrates stiffness exactly for these orders on affine cells).
+//   - Tet: complete polynomial space order 1..4 — vertices, edge kernels
+//     (Lobatto-style on each edge), triangular face kernels (k>=3), and
+//     interior bubbles (k>=4).
 
 #include "fea/material.hpp"
 #include "fea/nodal_mesh.hpp"
@@ -62,10 +63,22 @@ struct HpMode {
     /// Polynomial order of this mode (1 for vertex modes; >=2 for the rest).
     /// The highest order among an entity's modes is that entity's order.
     std::uint8_t order = 1;
-    /// True if this mode flips sign when the owning edge is traversed against
-    /// global orientation (odd-order edge bubbles). Faces >= order 3 need the
-    /// richer transform the assembler applies; flagged false here.
+    /// True if this mode flips sign when a *tet* edge is traversed against global
+    /// orientation (odd-order edge kernels of (λ_b-λ_a)). Hex tensor-product
+    /// edge modes do not flip with endpoint order. Face modes use the dihedral
+    /// transform in the assembler; flagged false here.
     bool edge_odd = false;
+    /// For edge modes: the Lobatto / edge-kernel index (>=2), equal to `order`.
+    /// For hex face modes: first varying-axis Lobatto index (>=2).
+    /// For tet face modes: first face multi-index (0-based among face kernels).
+    /// For interior: first tensor / multi-index component.
+    std::uint8_t index0 = 0;
+    /// For hex face modes: second varying-axis Lobatto index (>=2).
+    /// For tet face modes: second face multi-index.
+    /// For hex interior: second tensor index. Zero when unused.
+    std::uint8_t index1 = 0;
+    /// For hex interior: third tensor index. Zero when unused.
+    std::uint8_t index2 = 0;
 };
 
 /// Reference-space values and gradients of every hierarchical mode of an

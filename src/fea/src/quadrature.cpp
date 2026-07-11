@@ -31,6 +31,13 @@ Gauss1d gauss_1d(int n) {
     static constexpr std::array<double, 5> w5{0.2369268850561891, 0.4786286704993665,
                                               0.5688888888888889, 0.4786286704993665,
                                               0.2369268850561891};
+    // 6-point Gauss-Legendre (exact for degree <= 11).
+    static constexpr std::array<double, 6> x6{
+        -0.9324695142031521, -0.6612093864662645, -0.2386191860831969,
+         0.2386191860831969,  0.6612093864662645,  0.9324695142031521};
+    static constexpr std::array<double, 6> w6{
+        0.1713244923791704, 0.3607615730481386, 0.4679139345726910,
+        0.4679139345726910, 0.3607615730481386, 0.1713244923791704};
     switch (n) {
     case 1:
         return {x1, w1};
@@ -42,6 +49,8 @@ Gauss1d gauss_1d(int n) {
         return {x4, w4};
     case 5:
         return {x5, w5};
+    case 6:
+        return {x6, w6};
     default:
         throw FeaError(std::format("gauss_1d: unsupported point count {}", n));
     }

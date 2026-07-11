@@ -11,6 +11,7 @@ add_executable(polymesh_tests
     test_spmv.cpp
     test_quadrature.cpp
     test_shape.cpp
+    test_hierarchical.cpp
     test_tier0.cpp
     test_cantilever.cpp
     test_iterative_solve.cpp

@@ -74,13 +74,18 @@ nodes:
 
   - id: p-hierarchical
     title: Hierarchical arbitrary-p basis (integrated Legendre) + MMS tests
-    status: todo
+    status: in_progress
     deps: [adr-0019]
     scope: [src/fea/]
     note: >
-      Per-entity (vertex/edge/face/interior) modes on tet + hex; min-rule
-      conforming transitions between neighbouring orders; MMS convergence
-      p=1..4 must match theory before `done`.
+      LANDED: fea/hierarchical.{hpp,cpp} — 1D Lobatto (integrated Legendre)
+      basis + derivatives; hex full tensor-product modes order 1..4; tet
+      vertex + quadratic edge bubbles (order 1..2); subparametric
+      single-element stiffness. Tests: 1D identities, p=1 == nodal hex8/tet4,
+      6 rigid-body modes at all orders on distorted geometry, SPD.
+      REMAINING before `done`: per-entity global DOF numbering + edge/face
+      orientation signs (assembler), MMS h- and p-convergence p=1..4 matching
+      theory, tet k>=3 edge/face/interior kernels, hex order>4 quadrature.
 
   - id: fe-vem-assembly
     title: Unified mixed FE+VEM assembly (polyhedra unsplit)

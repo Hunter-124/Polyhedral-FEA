@@ -427,6 +427,8 @@ void draw_study_panel(App& app) {
     const bool busy = state == SolveJob::State::kMeshing || state == SolveJob::State::kSolving;
     const bool paused = busy && app.job.pause_requested();
     // Live progress while worker runs (phase / frac / elapsed from SolveJob).
+    // Elapsed is wall-clock polled every frame; phase_frac only advances at
+    // report() boundaries (mesh/solve can sit on one fraction for a long time).
     if (busy) {
         const auto prog = app.job.progress();
         const char* phase =
@@ -441,7 +443,15 @@ void draw_study_panel(App& app) {
             const float span = 1.0f / static_cast<float>(prog.pass_count + 1);
             overall = std::clamp(static_cast<float>(prog.pass) * span + frac * span, 0.0f, 1.0f);
         }
-        ImGui::ProgressBar(overall, ImVec2(-FLT_MIN, 0),
+        // Soft pulse while a long phase holds a fixed fraction so the bar still
+        // reads as "alive" (mesh/CG do not emit mid-phase progress yet).
+        float display = overall;
+        if (!paused && overall < 0.995f) {
+            const float pulse =
+                0.5f + 0.5f * std::sin(static_cast<float>(ImGui::GetTime()) * 2.8f);
+            display = std::clamp(overall + 0.025f * pulse, 0.0f, 0.99f);
+        }
+        ImGui::ProgressBar(display, ImVec2(-FLT_MIN, 0),
                            std::format("{:.0f}%", 100.0 * overall).c_str());
         ImGui::Text("elapsed: %.1f s", prog.elapsed_ms / 1000.0);
         if (prog.pass_count > 0) {

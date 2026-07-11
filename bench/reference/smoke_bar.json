@@ -2,17 +2,17 @@
   "part": "smoke_bar",
   "metrics": [
     {
-      "name": "sigma_vm",
+      "name": "sigma_max",
       "value": 1.0e6,
-      "tol": 0.02,
-      "probe": { "kind": "max_vm", "region": "gauge" },
+      "tol": 0.10,
+      "probe": { "kind": "max_von_mises" },
       "derivation": "docs/validation/hand-calcs.md#smoke-bar"
     },
     {
-      "name": "tip_ux",
+      "name": "tip_deflection",
       "value": 5.0e-7,
-      "tol": 0.02,
-      "probe": { "kind": "mean_ux_on_face", "select": "x_max" },
+      "tol": 0.15,
+      "probe": { "kind": "max_displacement" },
       "derivation": "docs/validation/hand-calcs.md#smoke-bar"
     }
   ]

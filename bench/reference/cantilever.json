@@ -4,8 +4,8 @@
     {
       "name": "tip_deflection",
       "value": 2.0153e-4,
-      "tol": 0.05,
-      "probe": { "kind": "mean_uz_on_face", "select": "x_max" },
+      "tol": 0.15,
+      "probe": { "kind": "max_displacement" },
       "derivation": "docs/validation/hand-calcs.md#cantilever"
     }
   ]

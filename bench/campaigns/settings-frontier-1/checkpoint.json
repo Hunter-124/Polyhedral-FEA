@@ -1,6 +1,6 @@
 {
   "campaign": "settings-frontier-1",
-  "completed_runs": 23,
+  "completed_runs": 33,
   "started_utc": "2026-07-11T05:38:51Z",
   "state": "running",
   "survivors": [
@@ -38,5 +38,5 @@
     "cfg-ff7ccfde"
   ],
   "tier": 0,
-  "updated_utc": "2026-07-11T05:46:39Z"
+  "updated_utc": "2026-07-11T05:53:05Z"
 }

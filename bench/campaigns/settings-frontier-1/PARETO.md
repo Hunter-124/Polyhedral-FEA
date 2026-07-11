@@ -1,6 +1,6 @@
 # Pareto analysis — `settings-frontier-1`
 
-_Generated 2026-07-11T05:53:58Z · campaign state: **running** (PARTIAL)_
+_Generated 2026-07-11T05:54:13Z · campaign state: **running** (PARTIAL)_
 
 > **Partial results.** Re-run `python3 scripts/analyze_campaign.py settings-frontier-1` when the campaign finishes to refresh this report.
 

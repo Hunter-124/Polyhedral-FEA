@@ -1,12 +1,12 @@
 {
   "cg_iter": null,
   "cg_resid": null,
-  "elapsed_ms": 1980.356792,
+  "elapsed_ms": 1235.871617,
   "phase": "solve",
   "phase_frac": 0.0,
   "run": {
-    "cfg_id": "cfg-4ac2a08b",
-    "part": "cantilever",
+    "cfg_id": "cfg-704c6798",
+    "part": "smoke_bar",
     "tier": 0
   }
 }

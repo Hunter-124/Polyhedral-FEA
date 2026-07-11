@@ -1,0 +1,5 @@
+watcher start 2026-07-11T05:54:13Z
+process gone state=running 2026-07-11T05:54:13Z
+settings-frontier-1: 33 rows, ok_rate=90.9%, state=running, configs=11, pareto=2 → /home/hunter/Desktop/Polyhedral-FEA/bench/campaigns/settings-frontier-1/PARETO.md
+  knobs (provisional): mesher='hybrid_zoo', element_tendency=-0.75, feature_refine=False, order=1
+  apply_code_defaults=False

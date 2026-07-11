@@ -85,29 +85,19 @@ GitHub: github.com/Hunter-124/Polyhedral-FEA, default branch master.
   user gave you.
 
 === OPEN NODES (read PROGRAM.yaml for the live list; typical order) ===
-1. Finish + commit any UNCOMMITTED in-flight files (check `git status`): the
-   lane-A nodes testlab-harness (apps/testlab + bench/campaigns +
-   scripts/), part-library (tests/fixtures/parts + bench/reference +
-   docs/validation), gui-testlab (apps/gui/*). Finish each to the `done` bar
-   or remove it if broken — never commit broken work.
-2. fe-vem-assembly: hybrid zoo emits native polyhedral transition cells solved
-   as VEM PolyCells in the SAME global matrix as FE tet/hex (no fan-split into
-   slivers). Gate = constant-strain patch test across the FE/VEM interface.
-   See src/fea/vem.hpp, src/fea/assembly.cpp (already dispatches kPolyVem),
-   src/mesh/mixed_fill.cpp, src/pipeline/scene.cpp.
-3. p-hierarchical-highp: extend src/fea/hp_assembly to p>=3 — odd edge-bubble
-   sign (-1)^m on reversed edges, hex quad-face orientation transform, tet
-   k>=3 kernels, hex order 5..6 Gauss rules; add MMS rate checks for p=3,4.
-4. mesher-tendency: continuous element-shape-preference knob (hex/tet/poly
-   bias, fan-split vs native-poly transitions) the tuner sweeps.
-5. hp-driver: joint (h,p,shape) adaptive loop in src/adapt/ + src/pipeline/ —
-   refine h from geometry (turning angle h·κ), raise p from ZZ/hierarchical
-   smoothness, pick shape from a cost model. Land with tests + docs.
-6. campaign-1: once testlab + part-library are done, run the first settings
-   campaign; record the Pareto frontier per geometric condition.
-7. feedback-loop (repeatable): mine bench/campaigns/*/results.jsonl, update
-   default knobs + per-condition presets, document deltas, reset node to todo.
-8. gui-sim-controls: wire live solve progress + pause/play + resource caps.
+As of 2026-07-11 master: **done** = dag-workflow, adr-0019, p-hierarchical,
+p-hierarchical-highp, fe-vem-assembly, mesher-tendency, hp-driver, solver-docs,
+part-library, testlab-harness, gui-testlab. **in_progress** = campaign-1
+(`bench/campaigns/settings-frontier-1`). **todo** = feedback-loop,
+gui-sim-controls (and any new nodes on the board).
+
+Typical remaining order:
+1. campaign-1: finish settings-frontier-1 (or resume), write Pareto notes under
+   bench/campaigns/settings-frontier-1/, mark node done with survivor summary.
+2. feedback-loop (repeatable): mine results.jsonl → update default knobs +
+   per-condition presets → document deltas → set node back to todo.
+3. gui-sim-controls: live solve progress + pause/play + resource caps in GUI.
+4. Anything still `todo`/`in_progress` on PROGRAM.yaml — claim and land.
 
 === WORKING STYLE ===
 - Quality ahead of speed. Small, verified, pushed increments. Update

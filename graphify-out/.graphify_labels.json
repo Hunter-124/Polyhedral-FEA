@@ -355,5 +355,13 @@
   "353": "elem_quad",
   "354": "solve",
   "355": "timestamp",
-  "356": "pick_region"
+  "356": "pick_region",
+  "357": "size_t",
+  "358": "OctaFillOutput",
+  "359": "Feedback loop — campaign → defaults",
+  "360": "HexFace",
+  "361": "test_quadrature.cpp",
+  "362": "schema_version",
+  "363": "wall_time_s",
+  "364": "JobCancelled"
 }

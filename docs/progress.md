@@ -23,6 +23,14 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-11: **Feedback-loop analysis scaffolding** — `scripts/analyze_campaign.py`
+  mines partial/finished `results.jsonl` → weighted ranking, accuracy-vs-time
+  Pareto (global / part / geom_class), knob suggestions; writes
+  `PARETO.md` + `PARETO.json`. Docs: `docs/process/feedback-loop.md`,
+  interfaces §3b. Ran on smoke (finished, hex wins) and settings-frontier-1
+  (still running tier 0; provisional hex-leaning tendency, no default code
+  changes). PROGRAM: campaign-1 remains in_progress; feedback-loop todo with
+  partial-analysis note.
 - 2026-07-11: **Campaign-1 settings frontier started** — `bench/campaigns/settings-frontier-1`
   full factorial (meshers × feature_refine × element_tendency) on smoke_bar /
   plate_hole / cantilever with successive-halving tiers. Testlab wires

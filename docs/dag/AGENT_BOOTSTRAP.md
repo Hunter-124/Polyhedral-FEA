@@ -92,10 +92,12 @@ part-library, testlab-harness, gui-testlab. **in_progress** = campaign-1
 gui-sim-controls (and any new nodes on the board).
 
 Typical remaining order:
-1. campaign-1: finish settings-frontier-1 (or resume), write Pareto notes under
-   bench/campaigns/settings-frontier-1/, mark node done with survivor summary.
-2. feedback-loop (repeatable): mine results.jsonl → update default knobs +
-   per-condition presets → document deltas → set node back to todo.
+1. campaign-1: finish settings-frontier-1 (or resume). Analysis already:
+   `python3 scripts/analyze_campaign.py settings-frontier-1` → PARETO.md/json.
+   When checkpoint finished, refresh Pareto, mark node done with survivors.
+2. feedback-loop (repeatable): re-run analyze_campaign; apply defaults only if
+   apply_code_defaults (see docs/process/feedback-loop.md); document deltas;
+   set node back to todo.
 3. gui-sim-controls: live solve progress + pause/play + resource caps in GUI.
 4. Anything still `todo`/`in_progress` on PROGRAM.yaml — claim and land.
 

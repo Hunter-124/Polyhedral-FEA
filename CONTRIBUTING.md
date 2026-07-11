@@ -8,6 +8,47 @@ This file is the onboarding map for **fresh agents and humans**. Read it before 
 
 ---
 
+## 0. Contributing with AI agents (quick start)
+
+This repo is built to be worked on by AI coding agents, and agent-driven
+contributions are welcome. Point your agent (Claude Code, Codex, Cursor,
+aider, ...) at the repo and give it this bootstrap:
+
+1. **Read the map**: this file, then `CLAUDE.md` (agent house rules — any
+   agent should follow it, not just Claude).
+2. **Ask the knowledge graph before grepping**: `graphify query "<question>"`
+   against the committed graph in `graphify-out/` (setup: §8). It knows the
+   architecture, god nodes, and file relationships.
+3. **Pick work from the program board**: `docs/dag/PROGRAM.yaml` is the
+   repo-tracked DAG of open work — nodes list dependencies, status, and the
+   directory scope they're allowed to touch. Claim a node whose deps are
+   `done` by flipping it to `in_progress` in your first commit
+   (protocol: `docs/dag/README.md`). Nodes with disjoint scopes can be
+   worked in parallel by different people/agents without stepping on each
+   other. Small fixes outside the board are fine too.
+4. **Interfaces are contracts**: anything crossing the test-lab / GUI /
+   feedback-tooling boundary uses the schemas in `docs/dag/interfaces.md`.
+   Change a schema only in the same commit as both sides of the code.
+5. **Verification bar** (what `done` means): clean `-Werror` build, full
+   Catch2 suite green from the repo root, curved scorecard not regressed,
+   docs/ADR updated, `graphify update .` run if the change is structural.
+6. **Anti-cheat is sacred** (§4): never hardcode benchmark/reference answers
+   in `src/` or `apps/`; truths live only in `bench/reference/*.json`; every
+   mesh must pass validity before it is solved. Agents are notorious for
+   "fixing" a failing benchmark by nudging the expected value — PRs that do
+   this get closed.
+7. **Submit**: external contributors (human or agent) use the clone → branch
+   → PR flow in `CHANGES.md`. Commit as **yourself** (or your agent's
+   identity) — honest authorship, no impersonating other contributors.
+   Describe in the PR body what the agent did and how you verified it.
+
+A good agent prompt to start from: *"Read CONTRIBUTING.md and CLAUDE.md in
+full. Then query graphify for the subsystem you need. Claim a node from
+docs/dag/PROGRAM.yaml, work only inside its scope, and meet the §0
+verification bar before opening a PR per CHANGES.md."*
+
+---
+
 ## 1. What this repo is
 
 **PolyMesh** — adaptive hybrid polyhedral mesher co-designed with a linear-elastostatics FEA solver (C++20). Mesher and solver are optimized for each other; element zoo includes tets/hexes/prisms/pyramids/polyhedra (VEM).

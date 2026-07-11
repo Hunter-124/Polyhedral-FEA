@@ -24,7 +24,7 @@ Declares what to sweep. Written by hand or by the GUI.
     "feature_refine":    [true, false],
     "snap_boundary":     [true],
     "order":             [1, 2],          // grows as p-hierarchical lands
-    "element_tendency":  [0.0]            // grows when mesher-tendency lands
+    "element_tendency":  [-1.0, 0.0, 0.5, 1.0]  // ∈[-1,+1]; see resolve_element_tendency
   },
   "score": {                       // Pareto axes; scalar score for trimming
     "weights": { "accuracy": 0.5, "solve_ms": 0.25, "mesh_ms": 0.25 }

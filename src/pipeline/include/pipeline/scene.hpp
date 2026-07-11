@@ -35,6 +35,34 @@ enum class VolumeMesher : int {
     kHybridVem = 8,  // hex FE bulk + native poly VEM transitions (ADR-0019)
 };
 
+/// Continuous element-shape preference dial the campaign/tuner sweeps
+/// (`element_tendency` ∈ [-1, +1], clamped). See `resolve_element_tendency`.
+///
+/// Canonical hybrid-family map (base = kHybrid / kHybridVem, |t| > 0):
+///   t ≤ -0.50           → kHexFill     (hex bulk)
+///  -0.50 < t ≤ +0.25    → kHybrid      (fan-split product FE transitions)
+///  +0.25 < t ≤ +0.75    → kHybridVem   (native-poly VEM transitions)
+///   t > +0.75           → kGradedTet   (tet bias)
+/// Exact t = 0 preserves the requested base mesher (backward compatible).
+struct ElementTendencyPlan {
+    VolumeMesher mesher = VolumeMesher::kHybrid;
+    int skin_layers = 2;
+    /// Clamped tendency used for the plan.
+    double tendency = 0.0;
+    /// True when the hybrid path should emit unsplit poly VEM transitions.
+    bool native_poly_transitions = false;
+    /// Short label for mesher_note / campaign logs (e.g. "hex", "hybrid-fan").
+    const char* label = "hybrid-fan";
+    /// True when mesher/skin differ from the inputs (non-zero tendency applied).
+    bool remapped = false;
+};
+
+/// Map base mesher + continuous tendency dial → concrete mesher / skin / flags.
+/// `tendency` is clamped to [-1, +1]. Zero leaves `base` and `skin_layers` as-is
+/// (except `native_poly_transitions` is set from whether base is kHybridVem).
+ElementTendencyPlan resolve_element_tendency(VolumeMesher base, double tendency,
+                                             int skin_layers = 2);
+
 /// Imported model: triangle surface segmented into CAD-style "faces"
 /// (regions of triangles separated by sharp edges), so a click can select
 /// a whole planar/smooth face rather than one triangle.
@@ -81,6 +109,11 @@ struct SimSetup {
     int adapt_leb_waves = 2;
     int skin_layers = 2; // graded-tet boundary skin depth (coarse cells)
     VolumeMesher mesher = VolumeMesher::kHybrid;
+    /// Element-shape preference dial ∈ [-1, +1] (clamped). 0 = respect
+    /// `mesher` as-is. Non-zero remaps hybrid-family (and soft-remaps
+    /// hex/tet families) toward hex / fan-split hybrid / native-poly VEM /
+    /// graded tet. Campaign grid key: `element_tendency`.
+    double element_tendency = 0.0;
     std::set<int> fixtures; // region ids with all DOFs fixed
     std::map<int, RegionLoad> loads;
 };
@@ -135,11 +168,12 @@ struct VolumeMeshOutput {
 /// @param feature_refine When true and mesher is graded, also refine near sharp edges.
 /// @param refine_seeds Centroids for a posteriori fine blocks, metres (world coords).
 /// @param seed_band Ball radius around each seed for graded fine cells, metres (0 = off).
+/// @param element_tendency Shape preference ∈ [-1, +1]; see resolve_element_tendency.
 VolumeMeshOutput volume_mesh(const Model& model, double h,
                              VolumeMesher mesher = VolumeMesher::kHybrid, int skin_layers = 2,
                              bool feature_refine = false,
                              std::span<const Eigen::Vector3d> refine_seeds = {},
-                             double seed_band = 0.0);
+                             double seed_band = 0.0, double element_tendency = 0.0);
 
 /// @deprecated name kept as alias during transition; calls volume_mesh.
 /// @param h Target edge length, metres.

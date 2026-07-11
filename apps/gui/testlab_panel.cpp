@@ -11,7 +11,9 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <format>
+#include <system_error>
 
 namespace polymesh::gui {
 namespace {
@@ -115,7 +117,9 @@ void TestLabState::tick(float /*dt_s*/) {
     runner.poll();
 
     const auto now = std::chrono::steady_clock::now();
-    const float interval = std::max(0.15f, settings.refresh_interval_s);
+    // Faster refresh while harness is live so progress.json heartbeats show up promptly.
+    const float interval =
+        runner.is_running() ? 0.25f : std::max(0.15f, settings.refresh_interval_s);
     const bool due = force_refresh ||
                      std::chrono::duration<float>(now - last_refresh).count() >= interval;
     if (!due) {
@@ -139,6 +143,23 @@ void TestLabState::tick(float /*dt_s*/) {
         }
     }
     refresh_selected();
+
+    // Live campaign mesh preview (mesh_preview.pmp) — only reload when mtime changes.
+    const auto dir = selected_dir();
+    if (!dir.empty()) {
+        const auto preview_path = dir / "mesh_preview.pmp";
+        std::error_code ec;
+        if (std::filesystem::is_regular_file(preview_path, ec)) {
+            const auto mt = std::filesystem::last_write_time(preview_path, ec);
+            if (!ec && (campaign_mesh_dirty || !campaign_mesh || mt != campaign_mesh_mtime)) {
+                if (auto mesh = testlab::load_mesh_preview(dir)) {
+                    campaign_mesh = std::move(mesh);
+                    campaign_mesh_mtime = mt;
+                    campaign_mesh_dirty = true; // signal main to upload once
+                }
+            }
+        }
+    }
 }
 
 const testlab::CampaignSummary* TestLabState::selected_summary() const {
@@ -377,26 +398,39 @@ void draw_testlab_panel(TestLabState& tl) {
     if (!tl.progress) {
         ImGui::TextColored(palette.text_dim, "no progress.json");
         ImGui::TextWrapped(
-            "Harness rewrites progress.json (~500 ms) during solves (interfaces.md §6).");
+            "Harness rewrites progress.json (~500 ms) during mesh/solve (interfaces.md §6).");
     } else {
         const auto& p = *tl.progress;
         const bool done = (p.phase == "done");
-        ImGui::TextColored(done ? palette.status_ok : palette.status_warn, "phase: %s",
-                           p.phase.empty() ? "?" : p.phase.c_str());
-        const float frac = static_cast<float>(std::clamp(p.phase_frac, 0.0, 1.0));
-        ImGui::ProgressBar(frac, ImVec2(-FLT_MIN, 0),
+        const bool live = tl.runner.is_running() && !done;
+        ImGui::TextColored(done ? palette.status_ok : palette.status_warn, "phase: %s%s",
+                           p.phase.empty() ? "?" : p.phase.c_str(), live ? " · live" : "");
+        float frac = static_cast<float>(std::clamp(p.phase_frac, 0.0, 1.0));
+        // Soft pulse while a long phase holds a fixed fraction (mesh, LDLT, etc.).
+        float display = frac;
+        if (live && frac < 0.995f) {
+            const float pulse =
+                0.5f + 0.5f * std::sin(static_cast<float>(ImGui::GetTime()) * 2.8f);
+            display = std::clamp(frac + 0.03f * pulse, 0.0f, 0.99f);
+        }
+        ImGui::ProgressBar(display, ImVec2(-FLT_MIN, 0),
                            std::format("{:.0f}%", 100.0 * p.phase_frac).c_str());
         ImGui::Text("elapsed: %.1f s", p.elapsed_ms / 1000.0);
-        if (p.cg_iter > 0 || p.cg_resid > 0.0) {
+        if (p.cg_iter > 0) {
             ImGui::Text("CG: iter %d  resid %.3g", p.cg_iter, p.cg_resid);
+        }
+        if (p.n_elems > 0 || p.n_nodes > 0) {
+            ImGui::Text("mesh: %zu elems  %zu nodes", p.n_elems, p.n_nodes);
         }
         if (!p.cfg_id.empty() || !p.part.empty()) {
             ImGui::TextColored(palette.text_dim, "%s  %s  tier %d", p.cfg_id.c_str(),
                                p.part.c_str(), p.tier);
         }
-        if (tl.runner.is_running()) {
-            ImGui::TextColored(palette.accent, "live · refresh %.1fs",
-                               tl.settings.refresh_interval_s);
+        if (tl.campaign_mesh) {
+            ImGui::TextColored(palette.accent, "viewport: live mesh preview");
+        }
+        if (live) {
+            ImGui::TextColored(palette.accent, "harness live · refresh 0.25s");
         }
     }
     iw::end_group_box();

@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdint>
 #include <format>
 #include <fstream>
 #include <sstream>
@@ -227,6 +228,8 @@ LiveProgress parse_progress(const std::string& json_text) {
         out.elapsed_ms = opt_double(j, "elapsed_ms");
         out.cg_iter = opt_int(j, "cg_iter");
         out.cg_resid = opt_double(j, "cg_resid");
+        out.n_elems = static_cast<std::size_t>(std::max(0, opt_int(j, "n_elems")));
+        out.n_nodes = static_cast<std::size_t>(std::max(0, opt_int(j, "n_nodes")));
         if (j.contains("run") && j["run"].is_object()) {
             const auto& r = j["run"];
             out.cfg_id = opt_string(r, "cfg_id");
@@ -296,6 +299,52 @@ std::optional<LiveProgress> load_progress(const std::filesystem::path& dir) {
         // progress.json is rewritten atomically; a torn read is non-fatal.
         return std::nullopt;
     }
+}
+
+std::optional<MeshPreview> load_mesh_preview(const std::filesystem::path& dir) {
+    const auto path = dir / "mesh_preview.pmp";
+    if (!std::filesystem::is_regular_file(path)) {
+        return std::nullopt;
+    }
+    std::ifstream in(path, std::ios::binary);
+    if (!in) {
+        return std::nullopt;
+    }
+    char magic[4]{};
+    in.read(magic, 4);
+    if (magic[0] != 'P' || magic[1] != 'M' || magic[2] != 'P' || magic[3] != '1') {
+        return std::nullopt;
+    }
+    std::uint32_t n_nodes = 0;
+    std::uint32_t n_quads = 0;
+    std::uint64_t n_elems = 0;
+    in.read(reinterpret_cast<char*>(&n_nodes), sizeof(n_nodes));
+    in.read(reinterpret_cast<char*>(&n_quads), sizeof(n_quads));
+    in.read(reinterpret_cast<char*>(&n_elems), sizeof(n_elems));
+    if (!in || n_nodes > 50'000'000u || n_quads > 50'000'000u) {
+        return std::nullopt;
+    }
+    MeshPreview out;
+    out.n_elems = static_cast<std::size_t>(n_elems);
+    out.nodes.resize(n_nodes);
+    for (std::uint32_t i = 0; i < n_nodes; ++i) {
+        float xyz[3]{};
+        in.read(reinterpret_cast<char*>(xyz), sizeof(xyz));
+        out.nodes[i] = {static_cast<double>(xyz[0]), static_cast<double>(xyz[1]),
+                        static_cast<double>(xyz[2])};
+    }
+    out.quads.resize(n_quads);
+    for (std::uint32_t i = 0; i < n_quads; ++i) {
+        std::uint32_t ids[4]{};
+        in.read(reinterpret_cast<char*>(ids), sizeof(ids));
+        out.quads[i] = {ids[0], ids[1], ids[2], ids[3]};
+    }
+    if (!in) {
+        return std::nullopt;
+    }
+    out.note = std::format("campaign preview · {} nodes · {} faces · {} elems", n_nodes,
+                           n_quads, n_elems);
+    return out;
 }
 
 int count_result_lines(const std::filesystem::path& results_path) {

@@ -9,6 +9,7 @@
 #include "testlab_data.hpp"
 
 #include <chrono>
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <vector>
@@ -27,6 +28,11 @@ struct TestLabState {
     std::optional<testlab::Checkpoint> checkpoint;
     std::optional<testlab::LiveProgress> progress;
     std::vector<testlab::ResultRow> results;
+
+    /// Campaign mesh_preview.pmp — reload when file mtime changes.
+    std::optional<testlab::MeshPreview> campaign_mesh;
+    std::filesystem::file_time_type campaign_mesh_mtime{};
+    bool campaign_mesh_dirty = false;
 
     char campaigns_root_buf[512] = "bench/campaigns";
     char testlab_bin_buf[512] = "";

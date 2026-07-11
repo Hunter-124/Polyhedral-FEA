@@ -6,6 +6,7 @@
 
 #include "fea/assembly.hpp"
 
+#include <functional>
 #include <map>
 
 namespace polymesh::fea {
@@ -48,6 +49,15 @@ struct SolveOptions {
 
     /// CG iteration cap. 0 means max(2 * nfree, 1000).
     int cg_max_iters = 0;
+
+    /// When `on_progress` is set, CG runs in chunks of this many iterations and
+    /// invokes the callback after each chunk (and at completion). 0 = single
+    /// Eigen solve with no mid-iteration callbacks. Keep the callback cheap.
+    int cg_progress_chunk = 64;
+
+    /// Optional progress callback (CG path only). Empty = no callbacks / no
+    /// chunking. Args: (iter, max_iters, relative residual).
+    std::function<void(int, int, double)> on_progress;
 };
 
 /// Returns the concrete method `kAuto` (or an explicit method) will use for the

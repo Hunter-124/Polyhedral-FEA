@@ -31,6 +31,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <format>
 #include <optional>
@@ -101,6 +102,8 @@ struct App {
     float lmb_drag_px = 0.0f;
     bool pick_faces = true; // when true, LMB click assigns selection (CAD pick)
     TestLabState testlab;
+    /// Generation last uploaded from SolveJob::poll_live_mesh.
+    std::uint64_t live_mesh_seen_gen = 0;
 };
 
 bool is_geometry_path(const std::string& path) {
@@ -458,6 +461,13 @@ void draw_study_panel(App& app) {
             ImGui::TextColored(palette.text_dim, "adapt pass %d / %d", prog.pass,
                                prog.pass_count);
         }
+        if (prog.cg_iter > 0) {
+            ImGui::Text("CG: iter %d  resid %.3g", prog.cg_iter, prog.cg_resid);
+        }
+        if (prog.n_elems > 0) {
+            ImGui::TextColored(palette.text_dim, "mesh %zu elems · %zu nodes", prog.n_elems,
+                               prog.n_nodes);
+        }
         ImGui::TextWrapped("%s", app.job.status_text().c_str());
         app.status = app.job.status_text();
     }
@@ -467,11 +477,15 @@ void draw_study_panel(App& app) {
     ImGui::BeginDisabled(!app.model || busy);
     if (iw::button("mesh only", ImVec2(-1, 0))) {
         apply_resource_caps();
+        app.live_mesh_seen_gen = 0;
+        app.result.reset();
         app.status = "meshing…";
         app.job.start_mesh(*app.model, app.setup);
     }
     if (iw::button(busy ? "working…" : "solve", ImVec2(-1, 0), /*primary=*/true)) {
         apply_resource_caps();
+        app.live_mesh_seen_gen = 0;
+        app.result.reset();
         app.status = "solving…";
         app.job.start(*app.model, app.setup);
     }
@@ -953,6 +967,46 @@ int run(int argc, char** argv) {
 
         // Poll harness process + refresh campaign files (chrono-gated inside).
         app.testlab.tick(ImGui::GetIO().DeltaTime);
+
+        // Intermediate mesh from interactive SolveJob (after mesh / adapt remesh).
+        if (auto live = app.job.poll_live_mesh(app.live_mesh_seen_gen)) {
+            app.mesh_preview = std::move(live);
+            app.viewport.set_mesh(*app.mesh_preview);
+            set_mesh_info(app, app.mesh_preview->mesher_note,
+                          app.mesh_preview->mesh.nodes.size(),
+                          app.mesh_preview->mesh.elements.size());
+            // Show mesh while still meshing/solving (results override on take_result).
+            if (app.mode == DisplayMode::kSetup || app.mode == DisplayMode::kMeshPreview) {
+                app.mode = DisplayMode::kMeshPreview;
+            }
+        }
+
+        // Campaign harness mesh_preview.pmp (Test Lab runs). Skip while an
+        // interactive SolveJob owns the viewport.
+        if (app.testlab.campaign_mesh_dirty && app.testlab.campaign_mesh) {
+            app.testlab.campaign_mesh_dirty = false;
+            const auto st = app.job.state();
+            const bool job_busy =
+                st == SolveJob::State::kMeshing || st == SolveJob::State::kSolving;
+            if (!job_busy) {
+                const auto& prev = *app.testlab.campaign_mesh;
+                VolumeMeshOutput vol;
+                vol.mesh.nodes.reserve(prev.nodes.size());
+                for (const auto& p : prev.nodes) {
+                    vol.mesh.nodes.emplace_back(p[0], p[1], p[2]);
+                }
+                vol.boundary_quads = prev.quads;
+                vol.mesher_note = prev.note;
+                app.mesh_preview = std::move(vol);
+                app.viewport.set_mesh(*app.mesh_preview);
+                set_mesh_info(app, app.mesh_preview->mesher_note,
+                              app.mesh_preview->mesh.nodes.size(), prev.n_elems);
+                if (!app.result || app.mode == DisplayMode::kSetup ||
+                    app.mode == DisplayMode::kMeshPreview) {
+                    app.mode = DisplayMode::kMeshPreview;
+                }
+            }
+        }
 
         if (auto mesh = app.job.take_mesh()) {
             app.mesh_preview = std::move(mesh);

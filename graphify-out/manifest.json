@@ -5,8 +5,8 @@
     "semantic_hash": ""
   },
   "apps/gui/main.cpp": {
-    "mtime": 1783790787.794316,
-    "ast_hash": "7afb042edd1f06fb6067bc55062a946c",
+    "mtime": 1783791298.9593322,
+    "ast_hash": "6110f177f91a53cb72d681378200eb5c",
     "semantic_hash": ""
   },
   "apps/gui/theme.cpp": {
@@ -115,8 +115,8 @@
     "semantic_hash": ""
   },
   "src/fea/include/fea/solve.hpp": {
-    "mtime": 1783727444.588343,
-    "ast_hash": "809978eaada16b0108ab49951541028d",
+    "mtime": 1783791113.0671418,
+    "ast_hash": "aa0623f7f195d5df6d4e8511af2c09d2",
     "semantic_hash": ""
   },
   "src/fea/include/fea/stress.hpp": {
@@ -170,8 +170,8 @@
     "semantic_hash": ""
   },
   "src/fea/src/solve.cpp": {
-    "mtime": 1783727444.5888767,
-    "ast_hash": "cfa9107d07cb5828c57741a627cb212d",
+    "mtime": 1783791113.0671418,
+    "ast_hash": "b643b3588e71ac54b755dc0b345acb6e",
     "semantic_hash": ""
   },
   "src/fea/src/stress.cpp": {
@@ -215,13 +215,13 @@
     "semantic_hash": ""
   },
   "src/pipeline/include/pipeline/scene.hpp": {
-    "mtime": 1783749068.5232158,
-    "ast_hash": "99749823251cf7a122d52ac9722acdaf",
+    "mtime": 1783791160.5540287,
+    "ast_hash": "0bb297e8e7f1c093077bc932b6c71e3c",
     "semantic_hash": ""
   },
   "src/pipeline/src/scene.cpp": {
-    "mtime": 1783790787.794316,
-    "ast_hash": "81ba5077c3860dca8530cef296eb089e",
+    "mtime": 1783791178.8019528,
+    "ast_hash": "1c815350366cbe48f018dbe76878e78c",
     "semantic_hash": ""
   },
   "tests/support/mms.cpp": {
@@ -260,8 +260,8 @@
     "semantic_hash": ""
   },
   "tests/test_gui_pipeline.cpp": {
-    "mtime": 1783790802.2872255,
-    "ast_hash": "57903c7177f26fe775f35b96f355c37b",
+    "mtime": 1783791270.4279132,
+    "ast_hash": "3b029362bb8189285f51c9a791002053",
     "semantic_hash": ""
   },
   "tests/test_kirsch_plate.cpp": {
@@ -795,8 +795,8 @@
     "semantic_hash": ""
   },
   "tests/test_iterative_solve.cpp": {
-    "mtime": 1783727444.592227,
-    "ast_hash": "49da895f2fb483f93e9ae37bebe19391",
+    "mtime": 1783791305.3625166,
+    "ast_hash": "8400f9ec4eabfe87fd28f9e7eb98c600",
     "semantic_hash": ""
   },
   "tests/test_kirsch_c5_graded.cpp": {
@@ -1215,8 +1215,8 @@
     "semantic_hash": ""
   },
   "docs/dag/interfaces.md": {
-    "mtime": 1783749234.4343572,
-    "ast_hash": "98e427d24c9ab548c428ced23477b073",
+    "mtime": 1783791257.4187322,
+    "ast_hash": "3dcd662f3798dd432b763ff2b127f600",
     "semantic_hash": ""
   },
   "docs/decisions/0019-mixed-fe-vem-adaptive-order-core.md": {
@@ -1310,28 +1310,28 @@
     "semantic_hash": ""
   },
   "apps/gui/testlab_data.cpp": {
-    "mtime": 1783745111.3756187,
-    "ast_hash": "6022872d3e2a09ee0956e71f3c793fbe",
+    "mtime": 1783791298.9593322,
+    "ast_hash": "7af8532828696f95b04b7c4ac4a0ae22",
     "semantic_hash": ""
   },
   "apps/gui/testlab_data.hpp": {
-    "mtime": 1783745111.3786187,
-    "ast_hash": "7c3dbcfac995834c900338c3609239a9",
+    "mtime": 1783791298.9735892,
+    "ast_hash": "b960e1d52d404adc5c53b88b8f4707b6",
     "semantic_hash": ""
   },
   "apps/gui/testlab_panel.cpp": {
-    "mtime": 1783790787.794506,
-    "ast_hash": "1704be1307bc231c43aa4c94deec3393",
+    "mtime": 1783791257.4187322,
+    "ast_hash": "2e51c3e1dd7c75b74b8f0e06d8e1a76a",
     "semantic_hash": ""
   },
   "apps/gui/testlab_panel.hpp": {
-    "mtime": 1783749068.520216,
-    "ast_hash": "e14eb0e05f5cd44fa022fee999fc5fe5",
+    "mtime": 1783791298.9735892,
+    "ast_hash": "c29dba97aee8820a66cda5e484a8f03a",
     "semantic_hash": ""
   },
   "apps/testlab/main.cpp": {
-    "mtime": 1783749355.9639955,
-    "ast_hash": "cf3661cb81291ce7c0e144e955fe84fd",
+    "mtime": 1783791213.7435563,
+    "ast_hash": "3f084caeeae82ed481cbd9d5c50f58c5",
     "semantic_hash": ""
   },
   "bench/campaigns/settings-frontier-1/campaign.json": {
@@ -1370,13 +1370,13 @@
     "semantic_hash": ""
   },
   "bench/campaigns/settings-frontier-1/checkpoint.json": {
-    "mtime": 1783789692.1789424,
-    "ast_hash": "821c5eb7bec83ca6417ca9cfd386c639",
+    "mtime": 1783790946.3115907,
+    "ast_hash": "7a4ddafffe28a331d502553609921730",
     "semantic_hash": ""
   },
   "bench/campaigns/settings-frontier-1/progress.json": {
-    "mtime": 1783789693.437928,
-    "ast_hash": "03a2d76589db3a0b4762f122ee29074e",
+    "mtime": 1783790947.6355758,
+    "ast_hash": "f45fe417a3ef55f3bd83a58fadf358c6",
     "semantic_hash": ""
   },
   "bench/campaigns/smoke/PARETO.json": {

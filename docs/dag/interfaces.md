@@ -141,15 +141,33 @@ derivation in `docs/validation/hand-calcs.md`).
 
 ## 6. Live solve progress — `<run_dir>/progress.json`
 
-For the GUI progress display. The solver/runner rewrites it (tmp+rename) at
-phase boundaries and every ~500 ms during iterative solves.
+For the GUI progress display. The runner rewrites it (tmp+rename) at phase
+boundaries, on a ~500 ms heartbeat during long mesh/assemble/solve stretches,
+and during CG every progress chunk (`cg_iter` / `cg_resid` / `phase_frac`).
 
 ```jsonc
 {
   "phase": "solve",                // mesh | assemble | solve | recover | done
   "phase_frac": 0.62,              // 0–1 within phase (CG: it/max_it)
   "elapsed_ms": 8400,
-  "cg_iter": 310, "cg_resid": 3.2e-7,
+  "cg_iter": 310, "cg_resid": 3.2e-7,  // null when not in iterative solve
+  "n_elems": 12000, "n_nodes": 4000,  // optional; set once mesh exists
   "run": { "cfg_id": "cfg-0007", "part": "plate_hole", "tier": 1 }
 }
 ```
+
+### 6b. Live mesh preview — `<run_dir>/mesh_preview.pmp`
+
+Binary boundary snapshot written after each successful mesh (for the GUI
+viewport). Little-endian:
+
+| field | type | notes |
+|-------|------|--------|
+| magic | 4 bytes | `PMP1` |
+| n_nodes | u32 | |
+| n_quads | u32 | boundary faces (tri as degenerate quad v2==v3) |
+| n_elems | u64 | element count (info only; connectivity not stored) |
+| nodes | n_nodes × float32×3 | xyz metres |
+| quads | n_quads × u32×4 | node indices |
+
+Writing only the boundary keeps campaign I/O cheap vs dumping the full volume.

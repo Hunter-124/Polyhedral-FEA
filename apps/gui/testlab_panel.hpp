@@ -45,6 +45,8 @@ struct TestLabState {
 
     bool start_run(/*resume=*/bool resume);
     bool pause_run();
+    /// Last-resort SIGKILL of a spawned harness (prefer pause_run / SIGINT).
+    bool force_stop();
 
     const testlab::CampaignSummary* selected_summary() const;
     std::filesystem::path selected_dir() const;

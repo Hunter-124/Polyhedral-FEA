@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "testlab_panel.hpp"
 
+#include "fea/backend.hpp"
 #include "theme.hpp"
 #include "widgets.hpp"
 
@@ -9,6 +10,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <format>
 
 namespace polymesh::gui {
@@ -163,6 +165,29 @@ bool TestLabState::start_run(bool resume) {
         return false;
     }
 
+    // Resource caps for the child: campaign JSON wins when set, else GUI knobs.
+    // Child inherits env; OpenMP reads OMP_NUM_THREADS at process start.
+    int thr_cap = settings.max_threads;
+    double mem_cap = settings.max_mem_gb;
+    if (active_spec) {
+        if (active_spec->resources.max_threads > 0) {
+            thr_cap = active_spec->resources.max_threads;
+        }
+        if (active_spec->resources.max_mem_gb > 0.0) {
+            mem_cap = active_spec->resources.max_mem_gb;
+        }
+    }
+    if (thr_cap > 0) {
+        // Also clamp the GUI process so any linked libs see the same default
+        // if the harness loads them in-process (it does — same binary tree).
+        polymesh::fea::set_openmp_threads(thr_cap);
+#if defined(_WIN32)
+        _putenv_s("OMP_NUM_THREADS", std::to_string(thr_cap).c_str());
+#else
+        ::setenv("OMP_NUM_THREADS", std::to_string(thr_cap).c_str(), /*overwrite=*/1);
+#endif
+    }
+
     const auto binary = settings.resolved_testlab_binary();
     // CLI contract (PROGRAM.yaml): polymesh_testlab run|resume <campaign_dir>
     std::vector<std::string> args;
@@ -174,7 +199,14 @@ bool TestLabState::start_run(bool resume) {
         last_action = status;
         return false;
     }
-    last_action = std::format("{} {}", resume ? "resume" : "run", dir.filename().string());
+    if (thr_cap > 0 || mem_cap > 0.0) {
+        last_action = std::format(
+            "{} {} (threads {}, mem {})", resume ? "resume" : "run", dir.filename().string(),
+            thr_cap > 0 ? std::to_string(thr_cap) : "all",
+            mem_cap > 0.0 ? std::format("{:.1f} GB soft", mem_cap) : "off");
+    } else {
+        last_action = std::format("{} {}", resume ? "resume" : "run", dir.filename().string());
+    }
     status = last_action;
     force_refresh = true;
     return true;
@@ -190,7 +222,19 @@ bool TestLabState::pause_run() {
         status = std::format("pause failed: {}", runner.last_error());
         return false;
     }
-    last_action = "SIGINT sent (pause)";
+    last_action = "SIGINT sent (pause after current run)";
+    status = last_action;
+    force_refresh = true;
+    return true;
+}
+
+bool TestLabState::force_stop() {
+    if (!runner.is_running()) {
+        status = "no live harness process";
+        return false;
+    }
+    runner.force_kill();
+    last_action = "force-killed harness";
     status = last_action;
     force_refresh = true;
     return true;
@@ -252,13 +296,13 @@ void draw_testlab_panel(TestLabState& tl) {
          tl.checkpoint->state == testlab::CheckpointState::kRunning);
 
     ImGui::BeginDisabled(!has_sel || busy);
-    if (iw::button("run", ImVec2(-1, 0), /*primary=*/true)) {
+    if (iw::button("play / run", ImVec2(-1, 0), /*primary=*/true)) {
         tl.start_run(/*resume=*/false);
     }
     ImGui::EndDisabled();
 
     ImGui::BeginDisabled(!has_sel || busy || !can_resume);
-    if (iw::button("resume", ImVec2(-1, 0))) {
+    if (iw::button("play / resume", ImVec2(-1, 0))) {
         tl.start_run(/*resume=*/true);
     }
     ImGui::EndDisabled();
@@ -266,6 +310,9 @@ void draw_testlab_panel(TestLabState& tl) {
     ImGui::BeginDisabled(!busy);
     if (iw::button("pause (SIGINT)", ImVec2(-1, 0))) {
         tl.pause_run();
+    }
+    if (iw::button("force stop", ImVec2(-1, 0))) {
+        tl.force_stop();
     }
     ImGui::EndDisabled();
 
@@ -275,6 +322,26 @@ void draw_testlab_panel(TestLabState& tl) {
         ImGui::TextColored(palette.text_dim, "process: exited (%d)", tl.runner.exit_code());
     } else {
         ImGui::TextColored(palette.text_dim, "process: idle");
+    }
+    // Effective caps for the next/active run.
+    {
+        int thr = tl.settings.max_threads;
+        double mem = tl.settings.max_mem_gb;
+        if (tl.active_spec) {
+            if (tl.active_spec->resources.max_threads > 0) {
+                thr = tl.active_spec->resources.max_threads;
+            }
+            if (tl.active_spec->resources.max_mem_gb > 0.0) {
+                mem = tl.active_spec->resources.max_mem_gb;
+            }
+        }
+        if (thr > 0 || mem > 0.0) {
+            const std::string thr_s = thr > 0 ? std::to_string(thr) : "all";
+            const std::string mem_s =
+                mem > 0.0 ? std::format("{:.1f} GB (soft)", mem) : "off";
+            ImGui::TextColored(palette.text_dim, "caps: threads %s  mem %s", thr_s.c_str(),
+                               mem_s.c_str());
+        }
     }
     if (!tl.last_action.empty()) {
         ImGui::TextWrapped("%s", tl.last_action.c_str());
@@ -309,10 +376,13 @@ void draw_testlab_panel(TestLabState& tl) {
     iw::begin_group_box("live progress");
     if (!tl.progress) {
         ImGui::TextColored(palette.text_dim, "no progress.json");
-        ImGui::TextWrapped("Harness rewrites progress.json (~500 ms) during solves.");
+        ImGui::TextWrapped(
+            "Harness rewrites progress.json (~500 ms) during solves (interfaces.md §6).");
     } else {
         const auto& p = *tl.progress;
-        ImGui::Text("phase: %s", p.phase.empty() ? "?" : p.phase.c_str());
+        const bool done = (p.phase == "done");
+        ImGui::TextColored(done ? palette.status_ok : palette.status_warn, "phase: %s",
+                           p.phase.empty() ? "?" : p.phase.c_str());
         const float frac = static_cast<float>(std::clamp(p.phase_frac, 0.0, 1.0));
         ImGui::ProgressBar(frac, ImVec2(-FLT_MIN, 0),
                            std::format("{:.0f}%", 100.0 * p.phase_frac).c_str());
@@ -323,6 +393,10 @@ void draw_testlab_panel(TestLabState& tl) {
         if (!p.cfg_id.empty() || !p.part.empty()) {
             ImGui::TextColored(palette.text_dim, "%s  %s  tier %d", p.cfg_id.c_str(),
                                p.part.c_str(), p.tier);
+        }
+        if (tl.runner.is_running()) {
+            ImGui::TextColored(palette.accent, "live · refresh %.1fs",
+                               tl.settings.refresh_interval_s);
         }
     }
     iw::end_group_box();

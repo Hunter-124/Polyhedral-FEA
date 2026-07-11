@@ -390,24 +390,98 @@ void draw_study_panel(App& app) {
     }
     iw::end_group_box();
 
+    iw::begin_group_box("resources");
+    {
+        // Cap OpenMP threads for interactive mesh/solve (0 = process default).
+        int hw = fea::openmp_default_threads();
+        int thr = app.testlab.settings.max_threads;
+        ImGui::TextColored(palette.text_dim, "max threads (0=all, hw=%d)", hw);
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        if (ImGui::SliderInt("##max_threads", &thr, 0, std::max(1, hw))) {
+            app.testlab.settings.max_threads = thr;
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(
+                "OpenMP thread cap for mesh/assemble/solve hot paths.\n"
+                "0 keeps the process default (OMP_NUM_THREADS / hardware).");
+        }
+        double mem = app.testlab.settings.max_mem_gb;
+        if (iw::input_double("max mem (GB, 0=off)", &mem, "%.1f")) {
+            app.testlab.settings.max_mem_gb = mem < 0.0 ? 0.0 : mem;
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(
+                "Soft budget note only — no hard process RSS kill is wired yet.\n"
+                "Campaign JSON resources.max_mem_gb is displayed the same way.");
+        }
+        ImGui::TextColored(palette.text_dim, "%s", fea::performance_description().c_str());
+        if (app.testlab.settings.max_mem_gb > 0.0) {
+            ImGui::TextColored(palette.status_warn, "soft mem cap: %.1f GB (not enforced)",
+                               app.testlab.settings.max_mem_gb);
+        }
+    }
+    iw::end_group_box();
+
     iw::begin_group_box("mesh & solve");
     const auto state = app.job.state();
     const bool busy = state == SolveJob::State::kMeshing || state == SolveJob::State::kSolving;
-    // Live status while worker runs (job.status_text updates from the thread).
+    const bool paused = busy && app.job.pause_requested();
+    // Live progress while worker runs (phase / frac / elapsed from SolveJob).
     if (busy) {
-        ImGui::TextColored(palette.status_warn, "%s", app.job.status_text().c_str());
+        const auto prog = app.job.progress();
+        const char* phase =
+            prog.phase.empty() ? (state == SolveJob::State::kMeshing ? "mesh" : "solve")
+                               : prog.phase.c_str();
+        ImGui::TextColored(paused ? palette.accent : palette.status_warn, "phase: %s%s", phase,
+                           paused ? " (paused)" : "");
+        const float frac = static_cast<float>(std::clamp(prog.phase_frac, 0.0, 1.0));
+        // Overall bar: blend adapt pass index when available.
+        float overall = frac;
+        if (prog.pass_count > 0) {
+            const float span = 1.0f / static_cast<float>(prog.pass_count + 1);
+            overall = std::clamp(static_cast<float>(prog.pass) * span + frac * span, 0.0f, 1.0f);
+        }
+        ImGui::ProgressBar(overall, ImVec2(-FLT_MIN, 0),
+                           std::format("{:.0f}%", 100.0 * overall).c_str());
+        ImGui::Text("elapsed: %.1f s", prog.elapsed_ms / 1000.0);
+        if (prog.pass_count > 0) {
+            ImGui::TextColored(palette.text_dim, "adapt pass %d / %d", prog.pass,
+                               prog.pass_count);
+        }
+        ImGui::TextWrapped("%s", app.job.status_text().c_str());
         app.status = app.job.status_text();
     }
+    auto apply_resource_caps = [&]() {
+        fea::set_openmp_threads(app.testlab.settings.max_threads);
+    };
     ImGui::BeginDisabled(!app.model || busy);
     if (iw::button("mesh only", ImVec2(-1, 0))) {
+        apply_resource_caps();
         app.status = "meshing…";
         app.job.start_mesh(*app.model, app.setup);
     }
     if (iw::button(busy ? "working…" : "solve", ImVec2(-1, 0), /*primary=*/true)) {
+        apply_resource_caps();
         app.status = "solving…";
         app.job.start(*app.model, app.setup);
     }
     ImGui::EndDisabled();
+    if (busy) {
+        // Pause / play / cancel — cooperative between mesh/adapt/solve phases.
+        if (paused) {
+            if (iw::button("play (resume)", ImVec2(-1, 0), /*primary=*/true)) {
+                app.job.request_resume();
+                app.status = "resuming…";
+            }
+        } else if (iw::button("pause", ImVec2(-1, 0))) {
+            app.job.request_pause();
+            app.status = "pause requested…";
+        }
+        if (iw::button("cancel", ImVec2(-1, 0))) {
+            app.job.request_cancel();
+            app.status = "cancelling…";
+        }
+    }
     if (state == SolveJob::State::kFailed) {
         ImGui::PushStyleColor(ImGuiCol_Text, palette.status_err);
         ImGui::TextWrapped("%s", app.job.status_text().c_str());
@@ -416,9 +490,19 @@ void draw_study_panel(App& app) {
             app.job.clear_failure();
             app.status = "ready";
         }
+    } else if (state == SolveJob::State::kCancelled) {
+        ImGui::TextColored(palette.status_warn, "%s", app.job.status_text().c_str());
+        if (iw::button("dismiss cancel", ImVec2(-1, 0))) {
+            app.job.clear_failure();
+            app.status = "ready";
+        }
     } else if (!busy &&
                (state != SolveJob::State::kIdle || app.result || !app.mesh_status.empty())) {
         ImGui::TextColored(palette.status_ok, "%s", app.job.status_text().c_str());
+        const auto prog = app.job.progress();
+        if (prog.elapsed_ms > 0.0 && prog.phase == "done") {
+            ImGui::TextColored(palette.text_dim, "last run: %.1f s", prog.elapsed_ms / 1000.0);
+        }
     }
     if (app.dof_count > 0) {
         ImGui::Text("DOF: %zu  (3 × nodes)", app.dof_count);

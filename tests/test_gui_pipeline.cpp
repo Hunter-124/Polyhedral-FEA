@@ -310,3 +310,130 @@ TEST_CASE("D5: mesh_size=0 auto h yields finite mesh and note with auto h") {
     REQUIRE_NOTHROW(mesh.mesh.check_validity());
     REQUIRE(mesh.mesher_note.find("auto h=") != std::string::npos);
 }
+
+TEST_CASE("SolveJob reports phase progress during mesh-only") {
+    const auto path = write_box_stl(1.0, 1.0, 1.0);
+    const auto model = Model::load(path.string());
+    SimSetup setup;
+    setup.mesh_size = 0.25;
+    setup.mesher = VolumeMesher::kTetFill;
+    setup.use_feature_grading = false;
+    SolveJob job;
+    job.start_mesh(model, setup);
+
+    bool saw_mesh_phase = false;
+    VolumeMeshOutput mesh;
+    for (int i = 0; i < 300; ++i) {
+        const auto p = job.progress();
+        if (p.phase == "mesh" || p.phase == "done") {
+            saw_mesh_phase = true;
+        }
+        CHECK(p.phase_frac >= 0.0);
+        CHECK(p.phase_frac <= 1.0);
+        CHECK(p.elapsed_ms >= 0.0);
+        if (auto m = job.take_mesh()) {
+            mesh = std::move(*m);
+            break;
+        }
+        if (job.state() == SolveJob::State::kFailed) {
+            FAIL(job.status_text());
+        }
+        if (job.state() == SolveJob::State::kCancelled) {
+            FAIL("unexpected cancel");
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    REQUIRE_FALSE(mesh.mesh.elements.empty());
+    REQUIRE(saw_mesh_phase);
+    const auto done = job.progress();
+    // After take_mesh the job is idle; last progress should still be "done".
+    REQUIRE(done.phase == "done");
+    REQUIRE(std::abs(done.phase_frac - 1.0) < 1e-12);
+}
+
+TEST_CASE("SolveJob cancel between phases reaches kCancelled") {
+    const auto path = write_box_stl(0.1, 0.02, 0.02);
+    const auto model = Model::load(path.string());
+    auto setup = cantilever_setup(model, 0.008);
+    // Multi-pass adapt so there are checkpoints between remesh / solve phases.
+    setup.adapt_passes = 2;
+    setup.eta_target = 0.0;
+    setup.use_feature_grading = false;
+
+    SolveJob job;
+    job.start(model, setup);
+    // Give the worker a moment to enter meshing, then cancel.
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    job.request_cancel();
+    REQUIRE(job.cancel_requested());
+
+    bool finished = false;
+    for (int i = 0; i < 1000; ++i) {
+        const auto st = job.state();
+        if (st == SolveJob::State::kCancelled) {
+            finished = true;
+            break;
+        }
+        if (st == SolveJob::State::kDone) {
+            // Tiny mesh may finish before cancel is observed — acceptable.
+            finished = true;
+            break;
+        }
+        if (st == SolveJob::State::kFailed) {
+            FAIL(job.status_text());
+        }
+        // take_result only succeeds on kDone; ignore.
+        (void)job.take_result();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    REQUIRE(finished);
+    if (job.state() == SolveJob::State::kCancelled) {
+        REQUIRE(job.progress().phase == "cancelled");
+        REQUIRE(job.status_text().find("cancel") != std::string::npos);
+        job.clear_failure();
+        REQUIRE(job.state() == SolveJob::State::kIdle);
+    }
+}
+
+TEST_CASE("SolveJob pause holds then resume completes") {
+    const auto path = write_box_stl(0.1, 0.02, 0.02);
+    const auto model = Model::load(path.string());
+    auto setup = cantilever_setup(model, 0.012);
+    setup.adapt_passes = 1;
+    setup.eta_target = 0.0;
+    setup.use_feature_grading = false;
+
+    SolveJob job;
+    job.start(model, setup);
+    job.request_pause();
+    // While paused, state stays meshing/solving (cooperative hold).
+    std::this_thread::sleep_for(std::chrono::milliseconds(80));
+    const auto mid = job.state();
+    if (mid == SolveJob::State::kDone) {
+        // Finished too fast to observe pause — skip assertion.
+        SUCCEED("job finished before pause could hold");
+        return;
+    }
+    if (mid == SolveJob::State::kCancelled || mid == SolveJob::State::kFailed) {
+        FAIL(job.status_text());
+    }
+    REQUIRE((mid == SolveJob::State::kMeshing || mid == SolveJob::State::kSolving));
+    job.request_resume();
+
+    std::optional<SolveResult> result;
+    for (int i = 0; i < 800; ++i) {
+        result = job.take_result();
+        if (result) {
+            break;
+        }
+        if (job.state() == SolveJob::State::kFailed) {
+            FAIL(job.status_text());
+        }
+        if (job.state() == SolveJob::State::kCancelled) {
+            FAIL("unexpected cancel");
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    REQUIRE(result.has_value());
+    REQUIRE(result->volume_mesh.elements.size() > 0);
+}

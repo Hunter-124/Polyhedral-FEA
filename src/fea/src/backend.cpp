@@ -3,6 +3,7 @@
 
 #include <Eigen/Core>
 
+#include <algorithm>
 #include <format>
 #include <mutex>
 
@@ -46,11 +47,35 @@ bool openmp_enabled() {
 #endif
 }
 
+namespace {
+/// Captured once at init: process/OpenMP default max (honours OMP_NUM_THREADS).
+int g_openmp_default_threads = 1;
+} // namespace
+
 int openmp_max_threads() {
 #if defined(POLYMESH_WITH_OPENMP)
     return omp_get_max_threads();
 #else
     return 1;
+#endif
+}
+
+int openmp_default_threads() {
+    init_runtime_performance();
+    return g_openmp_default_threads;
+}
+
+void set_openmp_threads(int n) {
+    init_runtime_performance();
+#if defined(POLYMESH_WITH_OPENMP)
+    if (n <= 0) {
+        omp_set_num_threads(std::max(1, g_openmp_default_threads));
+    } else {
+        const int cap = std::max(1, g_openmp_default_threads);
+        omp_set_num_threads(std::clamp(n, 1, cap));
+    }
+#else
+    (void)n;
 #endif
 }
 
@@ -79,8 +104,10 @@ void init_runtime_performance() {
 #else
         omp_set_nested(0);
 #endif
+        g_openmp_default_threads = std::max(1, omp_get_max_threads());
 #else
         Eigen::setNbThreads(1);
+        g_openmp_default_threads = 1;
 #endif
     });
 }

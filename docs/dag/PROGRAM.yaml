@@ -288,10 +288,12 @@ nodes:
 
   - id: V3b
     title: Testlab warehouse writer
-    status: todo
+    status: done
     deps: [V3a]
     scope: [apps/testlab/]
-    note: Write warehouse files after each run when campaign.warehouse true.
+    note: >
+      DONE: runs/<cfg>/<part>/t<tier>/{mesh.vtu,quality.json,result.json};
+      on_finish analyze + write_grok_handoff hooks.
 
   - id: V3c
     title: GUI/app git HEAD + campaign sync state
@@ -394,17 +396,17 @@ nodes:
 
   - id: V10a
     title: write_grok_handoff.py HANDOFF pack
-    status: todo
+    status: done
     deps: [V9a]
     scope: [scripts/, docs/process/]
-    note: HANDOFF.md + handoff.json per interfaces §8.
+    note: DONE scripts/write_grok_handoff.py (trends + shots + open nodes).
 
   - id: V10b
     title: invoke_grok_improve.sh headless grok -p --yolo
-    status: todo
+    status: done
     deps: [V10a]
     scope: [scripts/, apps/gui/]
-    note: bypassPermissions, max-turns, --prompt-file HANDOFF.md.
+    note: DONE scripts/invoke_grok_improve.sh (--yolo, deny force-push).
 
   - id: V10c
     title: Supervised GUI question queue vs autonomous defaults

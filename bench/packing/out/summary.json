@@ -1,0 +1,38 @@
+{
+  "bench": "varyhedron-packing-microbench",
+  "node": "V5",
+  "v1_algorithm": "boundary-edge constrained seed packing + dual poly from refined tet scaffold with CAD edge protect; VEM on polys (ADR-0021)",
+  "research_doc": "docs/research/varyhedron-packing.md",
+  "spacing": 0.1,
+  "relax_iters": 8,
+  "cases": [
+    {
+      "case": "unit_cube",
+      "spacing": 0.1,
+      "relax_iters": 8,
+      "rng_seed": 42,
+      "n_boundary_seeds": 116,
+      "n_volume_seeds": 725,
+      "n_seeds": 841,
+      "domain_volume": 1.0,
+      "fill_fraction_proxy": 0.43974,
+      "boundary_residual": 0.424536,
+      "boundary_residual_note": "placeholder; V6b replaces with CAD edge Hausdorff residual",
+      "wall_ms": 499.498
+    },
+    {
+      "case": "sphere_like",
+      "spacing": 0.1,
+      "relax_iters": 8,
+      "rng_seed": 43,
+      "n_boundary_seeds": 92,
+      "n_volume_seeds": 370,
+      "n_seeds": 462,
+      "domain_volume": 0.5235987755982988,
+      "fill_fraction_proxy": 0.457477,
+      "boundary_residual": 0.170938,
+      "boundary_residual_note": "placeholder; V6b replaces with CAD edge Hausdorff residual",
+      "wall_ms": 131.026
+    }
+  ]
+}

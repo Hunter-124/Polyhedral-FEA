@@ -352,10 +352,19 @@ nodes:
 
   - id: V6c
     title: Interior variable poly packing (v1 algorithm)
-    status: todo
+    status: done
     deps: [V6b, V5]
     scope: [src/mesh/]
-    note: Not pure LEB layers; PolyMesh/mixed cells; validity.
+    note: >
+      DONE 2026-07-12 as packing seed engine (Option B / owner priority on
+      boundary packing quality): denser CAD edge protecting balls (short-edge
+      first, ~0.5 h spacing, min_sep 0.55 h), interior volume bubble seeds on
+      classified inside lattice with collar + deterministic jitter, bubble
+      relax (6 iters) repelling from edge anchors and each other, pack stats
+      (n_volume_seeds, n_pack_relax_iters, pack_fill_frac) on VaryhedronFillOutput
+      and mesher_note. Still exports graded tet scaffold for FE. Dual-of-tet
+      poly / PolyMesh clustering deferred to V11 (Option A not taken — suite
+      risk). Tests: polymesh_tests '*varyhedron*'.
 
   - id: V6d
     title: Order packing (p) on varyhedron meshes

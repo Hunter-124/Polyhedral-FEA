@@ -29,6 +29,11 @@ TEST_CASE("varyhedron_fill_surface unit cube with topology") {
                                 0.0, 15.0, &topo);
     REQUIRE(fill.n_tets > 0);
     REQUIRE(fill.n_edge_seeds > 0);
+    // V6c packing seed engine: interior bubbles + relax stats.
+    REQUIRE(fill.n_volume_seeds > 0);
+    REQUIRE(fill.n_pack_relax_iters > 0);
+    CHECK(fill.pack_fill_frac >= 0.0);
+    CHECK(fill.pack_fill_frac <= 1.0);
     REQUIRE_FALSE(fill.mesh.nodes.empty());
 }
 
@@ -74,4 +79,7 @@ TEST_CASE("volume_mesh varyhedron on plate_hole.step") {
     REQUIRE(out.mesher_note.find("varyhedron") != std::string::npos);
     // Retained BRep should drive topology seeds (not surface-only).
     REQUIRE(out.mesher_note.find("geom_source=brep_topology") != std::string::npos);
+    // V6c packing stats appear in the note (dual deferred).
+    REQUIRE(out.mesher_note.find("vol_seeds=") != std::string::npos);
+    REQUIRE(out.mesher_note.find("dual deferred") != std::string::npos);
 }

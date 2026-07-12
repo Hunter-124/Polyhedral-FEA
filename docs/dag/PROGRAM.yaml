@@ -232,17 +232,24 @@ nodes:
 
   - id: V2a
     title: STEP part generator (no product STL)
-    status: todo
+    status: done
     deps: [V0]
     scope: [scripts/]
-    note: CadQuery/pythonocc or pure STEP writer; --export-stl-compare optional.
+    note: >
+      DONE 2026-07-12: scripts/gen_cad_parts.py via OCP (OpenCASCADE Python).
+      Emits STEP only by default; --export-stl-compare for sibling *_compare.stl.
+      gen_part_library.py soft-deprecated (legacy STL campaigns only).
 
   - id: V2b
     title: "Four STEP shapes: plate_hole, cylinder, sphere, icecream_cone"
-    status: todo
+    status: done
     deps: [V2a]
     scope: [tests/fixtures/parts/]
-    note: Icecream = triangular pyramid + ball intersecting a face.
+    note: >
+      DONE 2026-07-12: plate_hole.step, cylinder.step, sphere.step,
+      icecream_cone.step under tests/fixtures/parts/ (SI metres; plate dims
+      match legacy plate_hole; icecream = triangular pyramid ∪ intersecting ball).
+
 
   - id: V2c
     title: Case JSON + hand-calc references for four shapes

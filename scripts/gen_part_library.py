@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: BSD-3-Clause
-"""Generate validation-part STLs under tests/fixtures/parts/.
+"""Generate *legacy* validation-part STLs under tests/fixtures/parts/.
+
+**Soft-deprecated for the product geometry path (ADR-0020 / DAG V2a).**
+Product fixtures are STEP solids from ``scripts/gen_cad_parts.py``. Keep this
+script only for regenerating older STL campaign fixtures (smoke_bar,
+plate_hole, cantilever) until those cases migrate to STEP.
 
 Deterministic pure-Python ASCII STL writer — no CAD dependency. Run from
 repo root:

@@ -1,28 +1,47 @@
 {
+  "accuracy": {
+    "all": [
+      {
+        "metric": "scf",
+        "rel_err": 0.8574426207848568,
+        "score": 0.05509990257759159,
+        "truth": 3.0,
+        "value": 5.5723278623545704
+      }
+    ],
+    "metric": "scf",
+    "rel_err": 0.8574426207848568,
+    "score": 0.05509990257759159,
+    "truth": 3.0,
+    "value": 5.5723278623545704
+  },
+  "answers": {
+    "sigma_max": 5572327.86235457,
+    "tip_deflection": 3.084667179442436e-06
+  },
   "cfg_id": "cfg-89f62376",
   "config": {
     "feature_refine": true,
     "mesher": "varyhedron",
     "order": 1
   },
-  "error": "solve_elastostatics: factorization failed — system is singular (insufficient constraints?)",
   "geom_class": {
     "curved_frac": 0.9,
-    "min_feature_h": 2.8571428571428577,
+    "min_feature_h": 3.3334,
     "thin": false
   },
-  "mesh_ms": 4345.133049,
-  "n_dof": 1887,
-  "n_elems": 1820,
-  "n_nodes": 629,
+  "mesh_ms": 4831.921059,
+  "n_dof": 2232,
+  "n_elems": 2304,
+  "n_nodes": 744,
   "part": "plate_hole",
   "quality": {
-    "M1max": 0.00012878671338338742,
-    "M2max": 0.008649089030428256,
-    "M6": 0.048131465287326425,
-    "score": 0.5493946213334598
+    "M1max": 7.842222941774162e-05,
+    "M2max": 0.005,
+    "M6": 0.1856805279570126,
+    "score": 0.6684541288024382
   },
-  "solve_ms": 0.0,
-  "status": "solve_fail",
+  "solve_ms": 122.107119,
+  "status": "ok",
   "tier": 0
 }

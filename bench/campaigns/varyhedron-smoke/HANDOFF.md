@@ -12,25 +12,31 @@ Never force-push. Cap scope to open PROGRAM nodes related to varyhedron packing.
 
 ## Campaign snapshot
 - **Campaign:** `varyhedron-smoke`
-- **git HEAD:** `c247c0aebf96c121d266760e3361cec754e5ee2c`
+- **git HEAD:** `2c9482e3cfb06feea0c0cd42d913a1f242452260`
 - **checkpoint:** `finished`
 - **results:** `bench/campaigns/varyhedron-smoke/results.jsonl`
 - **PARETO:** `bench/campaigns/varyhedron-smoke/PARETO.md`
-- **Open PROGRAM nodes:** campaign-1, feedback-loop, V1c, V1d, V2d, V3c, V4, V6c, V6d, V6e, V8, V9a, V9b, V10c, V10d, V11
+- **Open PROGRAM nodes:** campaign-1, feedback-loop, V3c, V6d, V6e, V8, V9a, V10c, V11
 
 ## Trends (mesh/solve/quality vs tier)
 | part | mesher | tier | status | mesh_ms | solve_ms | quality | rel_err |
 |------|--------|-----:|--------|--------:|---------:|--------:|--------:|
-| cylinder | hybrid_zoo | 0 | ok | 8814.60098 | 46931.086012 | 0.9246161294542614 | 39387743565368.13 |
-| cylinder | varyhedron | 0 | solve_fail | 11261.453119 | 0.0 | 0.7681297350178713 |  |
-| plate_hole | hybrid_zoo | 0 | ok | 3102.71569 | 440.636989 | 0.623302664483781 | 0.6287242456556233 |
-| plate_hole | varyhedron | 0 | solve_fail | 4345.133049 | 0.0 | 0.5493946213334598 |  |
+| cylinder | hybrid_zoo | 0 | ok | 8792.70781 | 10701.167185 | 0.9263108670683365 | 641069330416739.4 |
+| cylinder | varyhedron | 0 | ok | 11905.066083 | 1053.855444 | 0.7733821735544429 | 1.383741516390807 |
+| plate_hole | hybrid_zoo | 0 | ok | 4163.668249 | 555.269483 | 0.7642857142857142 | 0.6279460863279877 |
+| plate_hole | varyhedron | 0 | ok | 4831.921059 | 122.107119 | 0.6684541288024382 | 0.8574426207848568 |
 
 ## Warehouse / visuals
 Paths under the repo (use `read_file` on PNGs when present):
 ```
+bench/campaigns/varyhedron-smoke/runs/cfg-028399df/cylinder/t0/wire.png
+bench/campaigns/varyhedron-smoke/runs/cfg-028399df/plate_hole/t0/wire.png
+bench/campaigns/varyhedron-smoke/runs/cfg-89f62376/cylinder/t0/wire.png
+bench/campaigns/varyhedron-smoke/runs/cfg-89f62376/plate_hole/t0/wire.png
 bench/campaigns/varyhedron-smoke/runs/cfg-028399df/cylinder/t0/mesh.vtu
 bench/campaigns/varyhedron-smoke/runs/cfg-028399df/plate_hole/t0/mesh.vtu
+bench/campaigns/varyhedron-smoke/runs/cfg-89f62376/cylinder/t0/mesh.vtu
+bench/campaigns/varyhedron-smoke/runs/cfg-89f62376/plate_hole/t0/mesh.vtu
 ```
 
 ## Autonomous defaults

@@ -2,10 +2,13 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Generate *legacy* validation-part STLs under tests/fixtures/parts/.
 
-**Soft-deprecated for the product geometry path (ADR-0020 / DAG V2a).**
-Product fixtures are STEP solids from ``scripts/gen_cad_parts.py``. Keep this
-script only for regenerating older STL campaign fixtures (smoke_bar,
-plate_hole, cantilever) until those cases migrate to STEP.
+************************************************************************
+SOFT-DEPRECATED — product geometry path is STEP only (ADR-0020 / V2a/V2d).
+  Prefer:  python3 scripts/gen_cad_parts.py
+  This script only regenerates older STL campaign fixtures (smoke_bar,
+  plate_hole, cantilever) until those cases fully migrate to STEP.
+  Do not use its outputs as the product mesh/solve geometry path.
+************************************************************************
 
 Deterministic pure-Python ASCII STL writer — no CAD dependency. Run from
 repo root:
@@ -24,11 +27,21 @@ from __future__ import annotations
 
 import math
 import re
+import sys
 from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "tests" / "fixtures" / "parts"
+
+_DEPRECATION_BANNER = """\
+========================================================================
+SOFT-DEPRECATED (ADR-0020 / V2d): product fixtures are STEP, not STL.
+  Prefer:  python3 scripts/gen_cad_parts.py
+  This run only refreshes *legacy* STL fixtures for older campaigns.
+  Product mesh/solve path must not treat these as primary geometry.
+========================================================================
+"""
 
 
 def _facet(n, a, b, c) -> str:
@@ -299,6 +312,7 @@ def _assert_manifold_facets(faces: list[str]) -> None:
 
 
 def main() -> None:
+    print(_DEPRECATION_BANNER, file=sys.stderr, end="")
     OUT.mkdir(parents=True, exist_ok=True)
 
     # 1. smoke_bar — 0.1 × 0.01 × 0.01 m uniaxial tension bar

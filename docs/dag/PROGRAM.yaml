@@ -232,10 +232,13 @@ nodes:
 
   - id: V1d
     title: OCC-on product builds + CI/docs
-    status: todo
+    status: done
     deps: [V1a]
     scope: [CMakeLists.txt, README.md]
-    note: Campaigns/GUI product path document POLYMESH_WITH_OCC=ON.
+    note: >
+      DONE 2026-07-12: README + CONTRIBUTING document product/campaign path
+      requires -DPOLYMESH_WITH_OCC=ON; Ubuntu libocct-*-dev + Fedora
+      opencascade-devel package names.
 
   - id: V2a
     title: STEP part generator (no product STL)
@@ -273,10 +276,13 @@ nodes:
 
   - id: V2d
     title: STL ban in product generators + CI grep gate
-    status: todo
+    status: done
     deps: [V2a]
     scope: [scripts/]
-    note: Keep load_stl for compare-only.
+    note: >
+      DONE 2026-07-12: gen_cad_parts STEP-only default; gen_part_library
+      soft-deprecated banner; scripts/check_no_product_stl.sh + CI
+      grep-audit step. load_stl kept for compare/legacy.
 
   - id: V3a
     title: Warehouse layout + git-LFS attributes
@@ -392,10 +398,13 @@ nodes:
 
   - id: V9b
     title: Auto mesh wire PNG harness for warehouse runs
-    status: todo
+    status: done
     deps: [V8]
     scope: [scripts/, apps/testlab/]
-    note: vtu_wire_png per run into warehouse wire.png.
+    note: >
+      DONE 2026-07-12: scripts/warehouse_shots.py walks runs/**/mesh.vtu →
+      wire.png via vtu_wire_png.py; testlab on_finish when warehouse=true;
+      bench/campaigns/README.md documents flags.
 
   - id: V10a
     title: write_grok_handoff.py HANDOFF pack
@@ -420,10 +429,13 @@ nodes:
 
   - id: V10d
     title: Safety allow/deny for grok invoke
-    status: todo
+    status: done
     deps: [V10b]
     scope: [scripts/]
-    note: Deny force-push; pull --rebase before push in handoff rules.
+    note: >
+      DONE 2026-07-12: invoke_grok_improve.sh --deny force-push patterns
+      (git push --force* / -f*); write_grok_handoff + AGENT_BOOTSTRAP require
+      pull --rebase and never force-push.
 
   - id: V11
     title: Feedback iterate packing (repeatable)

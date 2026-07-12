@@ -88,6 +88,12 @@ verification bar before opening a PR per CHANGES.md."*
 
 Options: `POLYMESH_WITH_OCC`, `POLYMESH_WITH_CUDA`, `POLYMESH_WITH_GUI`, `POLYMESH_BUILD_TESTS`.
 
+**Product / campaign builds** need **`-DPOLYMESH_WITH_OCC=ON`** (STEP/B-rep;
+ADR-0020). Package names: Ubuntu `libocct-*-dev` set in README; Fedora
+`opencascade-devel`. Product fixtures are **STEP**
+(`scripts/gen_cad_parts.py`); do not add product STL writers — gate:
+`scripts/check_no_product_stl.sh` (`load_stl` remains compare/legacy only).
+
 ---
 
 ## 2. Directory layout (keep it)

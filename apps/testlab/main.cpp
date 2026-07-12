@@ -13,6 +13,7 @@
 #include "fea/solve.hpp"
 #include "fea/stress.hpp"
 #include "fea/traction.hpp"
+#include "fea/vtu.hpp"
 #include "fea/zz.hpp"
 #include "mesh/surface_metrics.hpp"
 #include "pipeline/scene.hpp"
@@ -28,6 +29,7 @@
 #include <cmath>
 #include <csignal>
 #include <cstdio>
+#include <cstdlib>
 #include <ctime>
 #include <filesystem>
 #include <fstream>
@@ -137,6 +139,9 @@ struct Campaign {
     double w_accuracy = 0.5;
     double w_solve_ms = 0.25;
     double w_mesh_ms = 0.25;
+    bool warehouse = false; // ADR-0022 full experiment warehouse
+    bool on_finish_analyze = false;
+    bool on_finish_grok = false;
 };
 
 struct Box3 {
@@ -243,6 +248,11 @@ Campaign load_campaign(const fs::path& path) {
         c.w_accuracy = w.value("accuracy", 0.5);
         c.w_solve_ms = w.value("solve_ms", 0.25);
         c.w_mesh_ms = w.value("mesh_ms", 0.25);
+    }
+    c.warehouse = j.value("warehouse", false);
+    if (j.contains("on_finish") && j["on_finish"].is_object()) {
+        c.on_finish_analyze = j["on_finish"].value("analyze", false);
+        c.on_finish_grok = j["on_finish"].value("grok_handoff", false);
     }
     return c;
 }
@@ -771,8 +781,26 @@ struct RunOutcome {
     double solve_ms = 0.0;
 };
 
+void write_warehouse_run(const fs::path& run_dir, const json& line,
+                         const pipeline::VolumeMeshOutput* vol) {
+    std::error_code ec;
+    fs::create_directories(run_dir, ec);
+    atomic_write(run_dir / "result.json", line.dump(2) + "\n");
+    if (line.contains("quality")) {
+        atomic_write(run_dir / "quality.json", line["quality"].dump(2) + "\n");
+    }
+    if (vol != nullptr) {
+        try {
+            fea::write_vtu(run_dir / "mesh.vtu", vol->mesh);
+        } catch (const std::exception& e) {
+            std::fprintf(stderr, "warehouse: write_vtu failed: %s\n", e.what());
+        }
+    }
+}
+
 RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_scale,
-                   const fs::path& progress_path, const fs::path& mesh_preview_path) {
+                   const fs::path& progress_path, const fs::path& mesh_preview_path,
+                   const fs::path& warehouse_run_dir = {}) {
     using clock = std::chrono::steady_clock;
     const auto t_all0 = clock::now();
 
@@ -827,6 +855,9 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
             out.line["mesh_ms"] = out.mesh_ms;
             out.line["solve_ms"] = 0.0;
             out.accuracy_score = 0.0;
+            if (!warehouse_run_dir.empty()) {
+                write_warehouse_run(warehouse_run_dir, out.line, &vol);
+            }
             beat.set_phase("done", 1.0);
             return out;
         }
@@ -904,6 +935,10 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         out.line["solve_ms"] = out.solve_ms;
         out.line["status"] = "ok";
 
+        if (!warehouse_run_dir.empty()) {
+            write_warehouse_run(warehouse_run_dir, out.line, &vol);
+        }
+
         beat.set_phase("done", 1.0);
     } catch (const fea::FeaError& e) {
         out.line["status"] = "solve_fail";
@@ -911,6 +946,9 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         out.line["mesh_ms"] = out.mesh_ms;
         out.line["solve_ms"] = out.solve_ms;
         out.accuracy_score = 0.0;
+        if (!warehouse_run_dir.empty()) {
+            write_warehouse_run(warehouse_run_dir, out.line, nullptr);
+        }
     } catch (const std::exception& e) {
         // Mesh / I/O / validity failures.
         const std::string msg = e.what();
@@ -922,6 +960,9 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         out.line["mesh_ms"] = out.mesh_ms;
         out.line["solve_ms"] = out.solve_ms;
         out.accuracy_score = 0.0;
+        if (!warehouse_run_dir.empty()) {
+            write_warehouse_run(warehouse_run_dir, out.line, nullptr);
+        }
     }
     return out;
 }
@@ -1171,8 +1212,13 @@ int run_campaign(const fs::path& camp_dir, bool resume) {
                 std::printf("  run %s part=%s tier=%d ...\n", cfg_id.c_str(), part.part.c_str(),
                             tier);
                 std::fflush(stdout);
-                const RunOutcome ro =
-                    run_one(cfg, part, tier, ts.h_scale, progress_path, mesh_preview_path);
+                fs::path wh_dir;
+                if (camp.warehouse) {
+                    wh_dir = camp_dir / "runs" / cfg_id / part.part /
+                             ("t" + std::to_string(tier));
+                }
+                const RunOutcome ro = run_one(cfg, part, tier, ts.h_scale, progress_path,
+                                              mesh_preview_path, wh_dir);
                 results_app << ro.line.dump() << '\n';
                 results_app.flush();
                 done.insert(key);
@@ -1205,6 +1251,21 @@ int run_campaign(const fs::path& camp_dir, bool resume) {
     write_checkpoint(cp_path, cp);
     write_progress(progress_path, "done", 1.0, 0.0, "", "", cp.tier);
     std::printf("finished: %d runs → %s\n", cp.completed_runs, results_path.string().c_str());
+
+    // Optional post-campaign hooks (ADR-0022). Failures here do not fail the campaign.
+    if (camp.on_finish_analyze) {
+        const int rc = std::system(("python3 scripts/analyze_campaign.py " + camp.name).c_str());
+        if (rc != 0) {
+            std::fprintf(stderr, "on_finish analyze exited %d\n", rc);
+        }
+    }
+    if (camp.on_finish_grok) {
+        const int rc =
+            std::system(("python3 scripts/write_grok_handoff.py " + camp.name).c_str());
+        if (rc != 0) {
+            std::fprintf(stderr, "on_finish grok handoff exited %d\n", rc);
+        }
+    }
     return 0;
 }
 

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "mesh/varyhedron_fill.hpp"
 
+#include "mesh/grid_classify.hpp"
 #include "mesh/hybrid_fill.hpp"
 #include "mesh/surface_project.hpp"
 
@@ -8,6 +9,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -17,8 +19,6 @@ namespace {
 
 /// Collect free-boundary node indices from unpaired tet faces.
 std::vector<std::uint32_t> boundary_nodes(const TetFillOutput& mesh) {
-    std::unordered_set<std::uint64_t> face_hash;
-    // Count oriented faces; unpaired are boundary.
     struct FaceKey {
         std::uint32_t a, b, c;
         bool operator==(const FaceKey& o) const {
@@ -63,6 +63,105 @@ std::vector<std::uint32_t> boundary_nodes(const TetFillOutput& mesh) {
     return std::vector<std::uint32_t>(bset.begin(), bset.end());
 }
 
+/// Deterministic unit-interval hash for lattice jitter (no RNG dependency).
+double hash01(std::uint32_t x) {
+    x ^= x >> 16;
+    x *= 0x7feb352du;
+    x ^= x >> 15;
+    x *= 0x846ca68bu;
+    x ^= x >> 16;
+    return static_cast<double>(x) * (1.0 / 4294967295.0);
+}
+
+double hash_signed(int i, int j, int k, int axis) {
+    const std::uint32_t key = static_cast<std::uint32_t>(i * 73856093) ^
+                              static_cast<std::uint32_t>(j * 19349663) ^
+                              static_cast<std::uint32_t>(k * 83492791) ^
+                              static_cast<std::uint32_t>(axis * 2654435761u);
+    return 2.0 * hash01(key) - 1.0; // [-1, 1]
+}
+
+bool far_enough(const Eigen::Vector3d& p, const std::vector<Eigen::Vector3d>& pts,
+                double min_sep2) {
+    for (const auto& q : pts) {
+        if ((p - q).squaredNorm() < min_sep2) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/// Shimada-style bubble relax: movable volume seeds repel from fixed edge
+/// anchors and from each other. Keeps volume seeds inside the bbox collar.
+void bubble_relax_volume(std::vector<Eigen::Vector3d>& volume, const std::vector<Eigen::Vector3d>& edge,
+                         double radius, int iterations, const Eigen::Vector3d& bbox_min,
+                         const Eigen::Vector3d& bbox_max) {
+    if (volume.empty() || iterations <= 0 || !(radius > 0.0)) {
+        return;
+    }
+    const double min_d = 2.0 * radius;
+    const double min_d2 = min_d * min_d;
+    const Eigen::Vector3d lo = bbox_min + Eigen::Vector3d::Constant(0.5 * radius);
+    const Eigen::Vector3d hi = bbox_max - Eigen::Vector3d::Constant(0.5 * radius);
+    for (int it = 0; it < iterations; ++it) {
+        std::vector<Eigen::Vector3d> forces(volume.size(), Eigen::Vector3d::Zero());
+        // Fixed edge anchors repel volume seeds (edge protect wins).
+        for (std::size_t i = 0; i < volume.size(); ++i) {
+            for (const auto& e : edge) {
+                const Eigen::Vector3d d = volume[i] - e;
+                const double d2 = d.squaredNorm();
+                if (d2 < 1e-24) {
+                    forces[i] += Eigen::Vector3d(1e-3, -1e-3, 5e-4);
+                    continue;
+                }
+                if (d2 >= min_d2) {
+                    continue;
+                }
+                const double dist = std::sqrt(d2);
+                const double overlap = (min_d - dist) / min_d;
+                forces[i] += (0.45 * overlap) * (d / dist);
+            }
+        }
+        // Volume–volume mutual repulsion.
+        for (std::size_t i = 0; i < volume.size(); ++i) {
+            for (std::size_t j = i + 1; j < volume.size(); ++j) {
+                const Eigen::Vector3d d = volume[i] - volume[j];
+                const double d2 = d.squaredNorm();
+                if (d2 < 1e-24) {
+                    forces[i] += Eigen::Vector3d(1e-3, 1e-3, -1e-3);
+                    forces[j] -= Eigen::Vector3d(1e-3, 1e-3, -1e-3);
+                    continue;
+                }
+                if (d2 >= min_d2) {
+                    continue;
+                }
+                const double dist = std::sqrt(d2);
+                const double overlap = (min_d - dist) / min_d;
+                const Eigen::Vector3d push = (0.35 * overlap) * (d / dist);
+                forces[i] += push;
+                forces[j] -= push;
+            }
+        }
+        for (std::size_t i = 0; i < volume.size(); ++i) {
+            Eigen::Vector3d p = volume[i] + forces[i] * radius;
+            p = p.cwiseMax(lo).cwiseMin(hi);
+            volume[i] = p;
+        }
+    }
+}
+
+double pack_fill_fraction(const std::vector<Eigen::Vector3d>& edge,
+                          const std::vector<Eigen::Vector3d>& volume, double radius,
+                          double domain_vol) {
+    if (!(domain_vol > 0.0) || !(radius > 0.0)) {
+        return 0.0;
+    }
+    const double ball = (4.0 / 3.0) * 3.14159265358979323846 * radius * radius * radius;
+    // Cheap proxy: raw sum / domain (overlaps ignored → may exceed 1; clamp).
+    const double frac = ball * static_cast<double>(edge.size() + volume.size()) / domain_vol;
+    return std::max(0.0, std::min(1.0, frac));
+}
+
 } // namespace
 
 VaryhedronFillOutput varyhedron_fill_surface(
@@ -74,41 +173,192 @@ VaryhedronFillOutput varyhedron_fill_surface(
 
     VaryhedronFillOutput out;
 
-    // --- Boundary edge seeds from CAD topology (packing constraint) ---
+    // --- Boundary edge seeds from CAD topology (protecting balls) ---
+    // Prefer short CAD edges first (holes/fillets need denser protect).
+    std::vector<Eigen::Vector3d> edge_seeds;
     std::vector<Eigen::Vector3d> seeds(refine_seeds.begin(), refine_seeds.end());
     if (topo != nullptr) {
-        constexpr std::size_t kMaxEdgeSeeds = 512;
-        const double min_sep = 0.75 * std::max(h, 1e-12);
+        constexpr std::size_t kMaxEdgeSeeds = 768;
+        const double min_sep = 0.55 * std::max(h, 1e-12);
         const double min_sep2 = min_sep * min_sep;
+        std::vector<const geom::CadEdge*> edges;
+        edges.reserve(topo->edges.size());
         for (const auto& e : topo->edges) {
-            // Subsample CAD edge polyline into packing seeds.
-            for (std::size_t i = 0; i < e.samples.size(); i += 1) {
-                if (seeds.size() >= kMaxEdgeSeeds) {
-                    break;
-                }
-                const auto& p = e.samples[i];
-                bool far = true;
-                for (const auto& q : seeds) {
-                    if ((p - q).squaredNorm() < min_sep2) {
-                        far = false;
-                        break;
-                    }
-                }
-                if (far) {
-                    seeds.push_back(p);
-                    ++out.n_edge_seeds;
-                }
+            edges.push_back(&e);
+        }
+        std::sort(edges.begin(), edges.end(),
+                  [](const geom::CadEdge* a, const geom::CadEdge* b) {
+                      return a->length < b->length;
+                  });
+        for (const geom::CadEdge* ep : edges) {
+            const auto& e = *ep;
+            if (e.samples.size() < 2) {
+                continue;
             }
-            if (seeds.size() >= kMaxEdgeSeeds) {
+            // Target spacing along edge ≈ 0.5 h (finer on short edges).
+            const double target = std::max(0.35 * h, std::min(0.75 * h, e.length / 6.0));
+            double acc = 0.0;
+            Eigen::Vector3d prev = e.samples.front();
+            auto try_add = [&](const Eigen::Vector3d& p) {
+                if (edge_seeds.size() >= kMaxEdgeSeeds) {
+                    return;
+                }
+                if (!far_enough(p, edge_seeds, min_sep2) || !far_enough(p, seeds, min_sep2)) {
+                    return;
+                }
+                edge_seeds.push_back(p);
+                seeds.push_back(p);
+                ++out.n_edge_seeds;
+            };
+            try_add(prev);
+            for (std::size_t i = 1; i < e.samples.size(); ++i) {
+                const Eigen::Vector3d& p = e.samples[i];
+                acc += (p - prev).norm();
+                if (acc >= target) {
+                    try_add(p);
+                    acc = 0.0;
+                }
+                prev = p;
+            }
+            try_add(e.samples.back());
+            if (edge_seeds.size() >= kMaxEdgeSeeds) {
                 break;
             }
         }
-        if (seed_band <= 0.0 && !seeds.empty()) {
-            seed_band = 1.6 * h;
+    }
+
+    // --- Interior packing seeds (V6c packing engine; dual deferred to V11) ---
+    // Jittered lattice on interior cells of a coarse classify grid, then bubble
+    // relax so volume bubbles clear CAD edge protecting balls.
+    {
+        constexpr std::size_t kMaxVolumeSeeds = 512;
+        constexpr int kRelaxIters = 6;
+        const double hh = std::max(h, 1e-12);
+        const double bubble_r = 0.5 * hh;
+        const double vol_sep = 0.85 * hh;
+        const double vol_sep2 = vol_sep * vol_sep;
+        const double edge_clear2 = (1.05 * hh) * (1.05 * hh);
+
+        // Coarse lattice for inside classification (cheap; auto-coarsens).
+        const CartesianGrid grid = make_bbox_grid(bbox_min, bbox_max, std::max(hh, 1e-9));
+        const auto inside = classify_cells_inside(surface, grid);
+        const int nx = grid.nx, ny = grid.ny, nz = grid.nz;
+
+        // Face-boundary hop distance so we leave a collar for edge protect.
+        std::vector<int> dist(inside.size(), -1);
+        std::vector<std::array<int, 3>> q;
+        q.reserve(static_cast<std::size_t>(nx + ny + nz) * 4);
+        const auto idx = [&](int i, int j, int k) { return grid.index(i, j, k); };
+        const int face_nbr[6][3] = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0},
+                                    {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
+        for (int k = 0; k < nz; ++k) {
+            for (int j = 0; j < ny; ++j) {
+                for (int i = 0; i < nx; ++i) {
+                    if (!inside[idx(i, j, k)]) {
+                        continue;
+                    }
+                    bool boundary = false;
+                    for (const auto& o : face_nbr) {
+                        const int ni = i + o[0], nj = j + o[1], nk = k + o[2];
+                        if (ni < 0 || ni >= nx || nj < 0 || nj >= ny || nk < 0 || nk >= nz ||
+                            !inside[idx(ni, nj, nk)]) {
+                            boundary = true;
+                            break;
+                        }
+                    }
+                    if (boundary) {
+                        dist[idx(i, j, k)] = 0;
+                        q.push_back({i, j, k});
+                    }
+                }
+            }
+        }
+        for (std::size_t qi = 0; qi < q.size(); ++qi) {
+            const auto c = q[qi];
+            const int d0 = dist[idx(c[0], c[1], c[2])];
+            for (const auto& o : face_nbr) {
+                const int ni = c[0] + o[0], nj = c[1] + o[1], nk = c[2] + o[2];
+                if (ni < 0 || ni >= nx || nj < 0 || nj >= ny || nk < 0 || nk >= nz) {
+                    continue;
+                }
+                if (!inside[idx(ni, nj, nk)]) {
+                    continue;
+                }
+                auto& dn = dist[idx(ni, nj, nk)];
+                if (dn < 0 || dn > d0 + 1) {
+                    dn = d0 + 1;
+                    q.push_back({ni, nj, nk});
+                }
+            }
+        }
+
+        std::vector<Eigen::Vector3d> volume;
+        volume.reserve(std::min(kMaxVolumeSeeds, static_cast<std::size_t>(nx * ny * nz)));
+        // Subsample every other cell when the grid is dense to stay under cap.
+        const int stride = (nx * ny * nz > static_cast<int>(kMaxVolumeSeeds) * 4) ? 2 : 1;
+        for (int k = 0; k < nz; k += stride) {
+            for (int j = 0; j < ny; j += stride) {
+                for (int i = 0; i < nx; i += stride) {
+                    if (volume.size() >= kMaxVolumeSeeds) {
+                        break;
+                    }
+                    const auto id = idx(i, j, k);
+                    if (!inside[id] || dist[id] < 1) {
+                        // Skip exterior and one-cell boundary collar.
+                        continue;
+                    }
+                    Eigen::Vector3d p = grid.cell_center(i, j, k);
+                    // Deterministic jitter (~15% of spacing) so packing is not on a
+                    // rigid lattice (Shimada-style seed engine).
+                    p[0] += 0.15 * grid.cell[0] * hash_signed(i, j, k, 0);
+                    p[1] += 0.15 * grid.cell[1] * hash_signed(i, j, k, 1);
+                    p[2] += 0.15 * grid.cell[2] * hash_signed(i, j, k, 2);
+                    if (!far_enough(p, edge_seeds, edge_clear2)) {
+                        continue;
+                    }
+                    if (!far_enough(p, volume, vol_sep2)) {
+                        continue;
+                    }
+                    if (!far_enough(p, seeds, vol_sep2)) {
+                        continue;
+                    }
+                    volume.push_back(p);
+                }
+            }
+        }
+
+        bubble_relax_volume(volume, edge_seeds, bubble_r, kRelaxIters, bbox_min, bbox_max);
+
+        // Drop any seeds that drifted into edge protect after relax.
+        std::vector<Eigen::Vector3d> kept;
+        kept.reserve(volume.size());
+        for (const auto& p : volume) {
+            if (!far_enough(p, edge_seeds, edge_clear2 * 0.85 * 0.85)) {
+                continue;
+            }
+            if (!far_enough(p, kept, vol_sep2 * 0.7 * 0.7)) {
+                continue;
+            }
+            kept.push_back(p);
+        }
+        out.n_volume_seeds = kept.size();
+        out.n_pack_relax_iters = kRelaxIters;
+        const Eigen::Vector3d extent = bbox_max - bbox_min;
+        const double domain_vol =
+            std::max(0.0, extent[0]) * std::max(0.0, extent[1]) * std::max(0.0, extent[2]);
+        out.pack_fill_frac = pack_fill_fraction(edge_seeds, kept, bubble_r, domain_vol);
+
+        for (const auto& p : kept) {
+            seeds.push_back(p);
         }
     }
 
-    // --- Scaffold: multi-level graded tet (dual-poly clustering is V6c) ---
+    if (seed_band <= 0.0 && !seeds.empty()) {
+        // Slightly wider band so edge protect + volume packing mark L2 cells.
+        seed_band = 1.8 * std::max(h, 1e-12);
+    }
+
+    // --- Scaffold: multi-level graded tet (dual-poly clustering → V11) ---
     auto graded = graded_tet_fill_surface(surface, bbox_min, bbox_max, h, skin_layers, features,
                                           feature_band, seeds, seed_band, curvature_turn_deg);
     out.mesh = std::move(graded.mesh);

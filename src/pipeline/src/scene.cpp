@@ -1083,11 +1083,14 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         if (out.boundary_quads.empty()) {
             out.boundary_quads = std::move(fill.mesh.boundary_quads);
         }
+        // V6c packing-seed engine (dual-of-tet poly clustering deferred to V11).
         out.mesher_note = std::format(
-            "varyhedron v1 (CAD edge seeds + graded scaffold + edge-profile snap): "
-            "{} tets, edge_seeds={}, h_bulk={:.4g}/h_fine={:.4g} m, "
-            "edge_profile Hausdorff={:.3g} m (rel={:.3g}){}",
-            out.mesh.elements.size(), fill.n_edge_seeds, fill.h_coarse, fill.h_fine,
+            "varyhedron v1 packing (edge protect + interior bubble seeds + graded "
+            "scaffold + edge-profile snap; dual deferred V11): "
+            "{} tets, edge_seeds={}, vol_seeds={}, pack_relax={}, pack_fill={:.3g}, "
+            "h_bulk={:.4g}/h_fine={:.4g} m, edge_profile Hausdorff={:.3g} m (rel={:.3g}){}",
+            out.mesh.elements.size(), fill.n_edge_seeds, fill.n_volume_seeds,
+            fill.n_pack_relax_iters, fill.pack_fill_frac, fill.h_coarse, fill.h_fine,
             fill.edge_profile_hausdorff_max, fill.edge_profile_rel,
             topo_ptr ? ", geom_source=brep_topology" : ", geom_source=surface_only");
     } else {

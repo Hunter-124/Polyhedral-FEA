@@ -4,6 +4,7 @@ add_executable(polymesh_tests
     test_stl.cpp
     test_step.cpp
     test_cad_model.cpp
+    test_cad_topology.cpp
     test_poly_mesh.cpp
     test_material.cpp
     test_sizing_field.cpp

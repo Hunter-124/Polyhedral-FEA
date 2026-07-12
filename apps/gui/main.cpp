@@ -878,15 +878,18 @@ void draw_frame(App& app) {
     {
         std::string line;
         const char* tl = app.testlab.status.c_str();
+        const char* head =
+            app.testlab.git_head.empty() ? "unknown" : app.testlab.git_head.c_str();
         if (app.dof_count > 0) {
             line = std::format(
-                "polymesh — {} | testlab: {} | DOF {} | lmb orbit, shift+lmb pan, wheel zoom",
-                app.status, tl, app.dof_count);
+                "polymesh @ {} — {} | testlab: {} | DOF {} | lmb orbit, shift+lmb pan, "
+                "wheel zoom",
+                head, app.status, tl, app.dof_count);
         } else {
             line = std::format(
-                "polymesh — {} | testlab: {} | drop .stl/.step | lmb pick/orbit, "
+                "polymesh @ {} — {} | testlab: {} | drop .stl/.step | lmb pick/orbit, "
                 "shift+lmb pan, wheel zoom",
-                app.status, tl);
+                head, app.status, tl);
         }
         ImGui::PushStyleColor(ImGuiCol_Text, palette.text_dim);
         ImGui::TextUnformatted(line.c_str());
@@ -937,6 +940,7 @@ int run(int argc, char** argv) {
     glfwSetWindowUserPointer(window, &app);
     glfwSetDropCallback(window, drop_callback);
     app.viewport.init();
+    app.testlab.cache_git_head(); // V3c: once at startup
     app.testlab.sync_buffers_from_settings();
     app.testlab.force_refresh = true;
     app.testlab.tick(0.0f);

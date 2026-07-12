@@ -8,6 +8,7 @@
 #include "imgui.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -15,8 +16,50 @@
 #include <format>
 #include <system_error>
 
+#if defined(_WIN32)
+#include <stdio.h> // _popen / _pclose
+#endif
+
 namespace polymesh::gui {
 namespace {
+
+/// One-shot `git rev-parse --short HEAD`. Returns "unknown" on any failure.
+std::string query_git_short_head() {
+#if defined(_WIN32)
+    FILE* pipe = _popen("git rev-parse --short HEAD 2>nul", "r");
+#else
+    FILE* pipe = popen("git rev-parse --short HEAD 2>/dev/null", "r");
+#endif
+    if (pipe == nullptr) {
+        return "unknown";
+    }
+    std::array<char, 64> buf{};
+    const char* got = std::fgets(buf.data(), static_cast<int>(buf.size()), pipe);
+#if defined(_WIN32)
+    _pclose(pipe);
+#else
+    pclose(pipe);
+#endif
+    if (got == nullptr) {
+        return "unknown";
+    }
+    std::string s(buf.data());
+    while (!s.empty() && (s.back() == '\n' || s.back() == '\r' || s.back() == ' ')) {
+        s.pop_back();
+    }
+    // Guard against empty / non-hash junk.
+    if (s.empty() || s.size() > 40) {
+        return "unknown";
+    }
+    for (char c : s) {
+        const bool hex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
+                         (c >= 'A' && c <= 'F');
+        if (!hex) {
+            return "unknown";
+        }
+    }
+    return s;
+}
 
 ImVec4 state_color(testlab::CheckpointState s) {
     switch (s) {
@@ -54,6 +97,10 @@ void TestLabState::sync_buffers_from_settings() {
 void TestLabState::apply_buffers_to_settings() {
     settings.campaigns_root = campaigns_root_buf;
     settings.testlab_binary = testlab_bin_buf;
+}
+
+void TestLabState::cache_git_head() {
+    git_head = query_git_short_head();
 }
 
 void TestLabState::refresh_campaign_list() {
@@ -262,6 +309,37 @@ bool TestLabState::force_stop() {
 }
 
 void draw_testlab_panel(TestLabState& tl) {
+    // V3c: workspace sync strip — git HEAD (startup-cached), selected campaign
+    // checkpoint/progress state, and agent sync hint.
+    iw::begin_group_box("workspace");
+    ImGui::Text("git: %s", tl.git_head.empty() ? "unknown" : tl.git_head.c_str());
+    if (tl.checkpoint) {
+        const auto& cp = *tl.checkpoint;
+        ImGui::TextColored(state_color(cp.state), "campaign: %s · %d runs",
+                           testlab::checkpoint_state_cstr(cp.state), cp.completed_runs);
+        if (cp.tier > 0 || !cp.updated_utc.empty()) {
+            ImGui::TextColored(palette.text_dim, "tier %d%s%s", cp.tier,
+                               cp.updated_utc.empty() ? "" : " · ",
+                               cp.updated_utc.empty() ? "" : cp.updated_utc.c_str());
+        }
+    } else if (tl.progress) {
+        // Live harness without a checkpoint yet (or mid-write).
+        const auto& p = *tl.progress;
+        ImGui::TextColored(palette.status_warn, "campaign: progress · %s",
+                           p.phase.empty() ? "?" : p.phase.c_str());
+        if (!p.cfg_id.empty() || p.tier > 0) {
+            ImGui::TextColored(palette.text_dim, "%s  tier %d", p.cfg_id.c_str(), p.tier);
+        }
+    } else if (tl.selected_summary() != nullptr) {
+        const auto* sum = tl.selected_summary();
+        ImGui::TextColored(palette.text_dim, "campaign: %s · no checkpoint",
+                           testlab::checkpoint_state_cstr(sum->state));
+    } else {
+        ImGui::TextColored(palette.text_dim, "campaign: (none selected)");
+    }
+    ImGui::TextColored(palette.accent, "Sync: pull --rebase before agent runs");
+    iw::end_group_box();
+
     iw::begin_group_box("test lab");
     ImGui::TextColored(palette.text_dim, "campaigns (interfaces.md)");
     iw::input_text("campaigns root", tl.campaigns_root_buf, sizeof(tl.campaigns_root_buf),

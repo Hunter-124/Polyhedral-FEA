@@ -306,10 +306,15 @@ nodes:
 
   - id: V3c
     title: GUI/app git HEAD + campaign sync state
-    status: todo
+    status: done
     deps: [V3a]
     scope: [apps/gui/]
-    note: Show HEAD, last checkpoint, open PROGRAM nodes.
+    note: >
+      DONE 2026-07-12: Test Lab "workspace" strip shows short git HEAD
+      (git rev-parse --short HEAD once at startup; "unknown" on failure),
+      selected campaign checkpoint state + completed_runs (testlab_data
+      parsers), and "Sync: pull --rebase before agent runs". Status bar
+      prefixes "polymesh @ <HEAD>".
 
   - id: V4
     title: Auto-h + edge-aware size field from BRep

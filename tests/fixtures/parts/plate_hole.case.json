@@ -1,6 +1,6 @@
 {
   "part": "plate_hole",
-  "geometry": "tests/fixtures/parts/plate_hole.stl",
+  "geometry": "tests/fixtures/parts/plate_hole.step",
   "material": { "E": 2.1e11, "nu": 0.3, "rho": 7850 },
   "bcs": [
     {

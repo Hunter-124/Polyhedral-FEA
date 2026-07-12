@@ -257,10 +257,16 @@ nodes:
 
   - id: V2c
     title: Case JSON + hand-calc references for four shapes
-    status: in_progress
+    status: done
     deps: [V2b]
     scope: [tests/fixtures/parts/, bench/reference/, docs/validation/]
-    note: geometry paths .step; truths only in bench/reference/.
+    note: >
+      DONE 2026-07-12: four .case.json → .step geometry; truths in
+      bench/reference/{plate_hole,cylinder,sphere,icecream_cone}.json;
+      hand-calcs for Kirsch SCF=3, uniaxial cylinder bar, sphere polar-column
+      estimate, icecream order-of-magnitude max_vm. Campaign varyhedron-short-1
+      parts list already pointed at the four cases.
+
 
   - id: V2d
     title: STL ban in product generators + CI grep gate

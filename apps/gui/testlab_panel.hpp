@@ -39,12 +39,18 @@ struct TestLabState {
     std::string status = "select a campaign";
     std::string last_action;
 
+    /// Short git HEAD from `git rev-parse --short HEAD` (once at startup).
+    /// "unknown" if git is unavailable or the query fails.
+    std::string git_head = "unknown";
+
     // Dirty flags / timers for file refresh.
     std::chrono::steady_clock::time_point last_refresh{};
     bool force_refresh = true;
 
     void sync_buffers_from_settings();
     void apply_buffers_to_settings();
+    /// Run `git rev-parse --short HEAD` once; cache into `git_head`.
+    void cache_git_head();
     void refresh_campaign_list();
     void refresh_selected();
     void tick(float dt_s);

@@ -8,6 +8,7 @@
 #include "fea/nodal_mesh.hpp"
 #include "fea/solve.hpp"
 #include "fea/stress.hpp"
+#include "geom/cad_model.hpp"
 #include "geom/tri_surface.hpp"
 
 #include <Eigen/Core>
@@ -66,11 +67,14 @@ struct ElementTendencyPlan {
 ElementTendencyPlan resolve_element_tendency(VolumeMesher base, double tendency,
                                              int skin_layers = 2);
 
-/// Imported model: triangle surface segmented into CAD-style "faces"
-/// (regions of triangles separated by sharp edges), so a click can select
-/// a whole planar/smooth face rather than one triangle.
+/// Imported model: BRep-first when the source is STEP/BREP (ADR-0020).
+/// `cad` retains the live CadModel for product topology/meshing; `surface`
+/// is the derived tessellation for regions, viewport, and legacy hybrid fill.
+/// STL loads leave `cad` empty (compare/legacy only).
 struct Model {
     geom::TriSurface surface;
+    /// Retained BRep when loaded from STEP/BREP; empty for STL.
+    std::optional<geom::CadModel> cad;
     std::vector<int> triangle_region; // region id per triangle
     int region_count = 0;
     Eigen::Vector3d bbox_min = Eigen::Vector3d::Zero();

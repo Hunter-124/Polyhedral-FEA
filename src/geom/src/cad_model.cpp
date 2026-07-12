@@ -67,6 +67,14 @@ Soup triangulate_shape(const TopoDS_Shape& shape, double deflection) {
             const gp_Pnt p1 = tri->Node(n1).Transformed(trsf);
             const gp_Pnt p2 = tri->Node(n2).Transformed(trsf);
             const gp_Pnt p3 = tri->Node(n3).Transformed(trsf);
+            // Skip zero-area facets (OCC tessellation can emit them on spheres).
+            const double ax = p2.X() - p1.X(), ay = p2.Y() - p1.Y(), az = p2.Z() - p1.Z();
+            const double bx = p3.X() - p1.X(), by = p3.Y() - p1.Y(), bz = p3.Z() - p1.Z();
+            const double cx = ay * bz - az * by, cy = az * bx - ax * bz, cz = ax * by - ay * bx;
+            const double area2 = cx * cx + cy * cy + cz * cz;
+            if (area2 < 1e-30) {
+                continue;
+            }
             soup.push_back({static_cast<double>(p1.X()), static_cast<double>(p1.Y()),
                             static_cast<double>(p1.Z()), static_cast<double>(p2.X()),
                             static_cast<double>(p2.Y()), static_cast<double>(p2.Z()),

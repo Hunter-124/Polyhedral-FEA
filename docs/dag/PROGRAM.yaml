@@ -213,10 +213,12 @@ nodes:
 
   - id: V1b
     title: CAD edge/face/vertex topology map + queries
-    status: todo
+    status: done
     deps: [V1a]
     scope: [src/geom/]
-    note: Closest edge, project to edge/face, edge polylines; Catch2 on STEP.
+    note: >
+      DONE: extract_topology, closest_edge, edge_profile_hausdorff;
+      Catch2 unit_cube + plate_hole.step.
 
   - id: V1c
     title: Pipeline Model BRep-first; STL compare/legacy only

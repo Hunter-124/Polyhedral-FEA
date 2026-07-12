@@ -222,10 +222,13 @@ nodes:
 
   - id: V1c
     title: Pipeline Model BRep-first; STL compare/legacy only
-    status: todo
+    status: done
     deps: [V1a]
     scope: [src/pipeline/, apps/cli/, apps/gui/]
-    note: Product mesh/solve requires CadModel.
+    note: >
+      DONE: Model::cad optional CadModel; STEP/STP/BREP load retains BRep +
+      tessellate for regions/legacy; STL leaves cad empty; varyhedron uses
+      extract_topology(*model.cad) when set (path reload fallback).
 
   - id: V1d
     title: OCC-on product builds + CI/docs

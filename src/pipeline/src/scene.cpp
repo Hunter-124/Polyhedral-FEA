@@ -105,22 +105,32 @@ Model Model::load(const std::string& path, double sharp_angle_deg) {
             c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
         return s;
     }();
-    if (lower.ends_with(".step") || lower.ends_with(".stp")) {
-        model.surface = geom::load_step(path);
-    } else {
-        model.surface = geom::load_stl(path);
-    }
-    model.surface.validate();
     model.source_path = path;
     const auto slash = path.find_last_of("/\\");
     model.name = slash == std::string::npos ? path : path.substr(slash + 1);
 
-    model.bbox_min = model.surface.vertices.front();
-    model.bbox_max = model.surface.vertices.front();
-    for (const auto& v : model.surface.vertices) {
-        model.bbox_min = model.bbox_min.cwiseMin(v);
-        model.bbox_max = model.bbox_max.cwiseMax(v);
+    // ADR-0020: STEP/BREP retain CadModel; tessellation is derived for regions
+    // and legacy hybrid fill. STL stays surface-only (compare/legacy).
+    if (lower.ends_with(".step") || lower.ends_with(".stp")) {
+        model.cad = geom::CadModel::load_step(path);
+        model.surface = model.cad->tessellate();
+        model.bbox_min = model.cad->bbox_min();
+        model.bbox_max = model.cad->bbox_max();
+    } else if (lower.ends_with(".brep") || lower.ends_with(".brp")) {
+        model.cad = geom::CadModel::load_brep(path);
+        model.surface = model.cad->tessellate();
+        model.bbox_min = model.cad->bbox_min();
+        model.bbox_max = model.cad->bbox_max();
+    } else {
+        model.surface = geom::load_stl(path);
+        model.bbox_min = model.surface.vertices.front();
+        model.bbox_max = model.surface.vertices.front();
+        for (const auto& v : model.surface.vertices) {
+            model.bbox_min = model.bbox_min.cwiseMin(v);
+            model.bbox_max = model.bbox_max.cwiseMax(v);
+        }
     }
+    model.surface.validate();
 
     // CAD-style face regions: grow across edges whose dihedral angle is
     // below the sharp threshold.
@@ -262,6 +272,53 @@ ResolvedMeshSize resolve_mesh_size(const Model& model, double requested_h,
         }
     }
 
+    // BRep edge lengths (ADR-0020 / V1c): prefer retained Model::cad; fall back
+    // to reloading source_path for surface-only models that still have a CAD path.
+    double cad_min_edge = std::numeric_limits<double>::infinity();
+    if (geom::occ_enabled()) {
+        try {
+            std::optional<geom::CadModel> cad_owned;
+            const geom::CadModel* cad_ptr = nullptr;
+            if (model.cad && !model.cad->empty()) {
+                cad_ptr = &(*model.cad);
+            } else if (!model.source_path.empty()) {
+                cad_owned = geom::load_cad(model.source_path);
+                if (cad_owned && !cad_owned->empty()) {
+                    cad_ptr = &(*cad_owned);
+                }
+            }
+            if (cad_ptr != nullptr) {
+                const geom::CadTopology topo = geom::extract_topology(*cad_ptr, 4);
+                for (const auto& e : topo.edges) {
+                    if (e.length > 1e-12 && e.length > 0.02 * extent) {
+                        cad_min_edge = std::min(cad_min_edge, e.length);
+                    }
+                }
+                // Hole / fillet arcs often appear as single short edges relative
+                // to bbox; still honor them if longer than 1% extent.
+                if (!std::isfinite(cad_min_edge)) {
+                    for (const auto& e : topo.edges) {
+                        if (e.length > 0.01 * extent) {
+                            cad_min_edge = std::min(cad_min_edge, e.length);
+                        }
+                    }
+                }
+            }
+        } catch (...) {
+            // Surface-only auto-h fallback.
+        }
+    }
+    if (std::isfinite(cad_min_edge) && cad_min_edge > 0.0) {
+        out.min_feature_length =
+            (out.min_feature_length > 0.0)
+                ? std::min(out.min_feature_length, cad_min_edge)
+                : cad_min_edge;
+        const double h_cad = 0.3 * cad_min_edge;
+        if (h_cad < h0) {
+            h0 = std::max(h_cad, h_geom * 0.35);
+        }
+    }
+
     // Absolute clamps: coarser floor than before so interactive meshes stay sane.
     if (diagonal > 0.0) {
         h0 = std::clamp(h0, diagonal / 80.0, diagonal / 6.0);
@@ -270,9 +327,11 @@ ResolvedMeshSize resolve_mesh_size(const Model& model, double requested_h,
     out.auto_chosen = true;
     out.note = std::format(
         "auto h={:.4g} m (extent/16∩diag/28, n_sharp={}, min_feat={:.3g} m, dens×{:.2f}"
-        "{})",
+        "{}{})",
         out.h, out.n_sharp_edges, out.min_feature_length, density_scale,
-        std::isfinite(r_curv) ? std::format(", Rκ≈{:.3g}", r_curv) : std::string{});
+        std::isfinite(r_curv) ? std::format(", Rκ≈{:.3g}", r_curv) : std::string{},
+        std::isfinite(cad_min_edge) ? std::format(", CAD_edge≈{:.3g}", cad_min_edge)
+                                    : std::string{});
     return out;
 }
 
@@ -961,11 +1020,20 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             band = 1.6 * h;
         }
 
-        // Prefer live BRep topology by reloading the source CAD path (ADR-0020).
-        std::optional<geom::CadModel> cad;
+        // Prefer retained Model::cad (ADR-0020 / V1c); fall back to reloading
+        // the source CAD path when the model was surface-only (legacy).
+        std::optional<geom::CadModel> cad_reload;
         std::optional<geom::CadTopology> topo;
         const geom::CadTopology* topo_ptr = nullptr;
-        if (geom::occ_enabled()) {
+        if (model.cad && !model.cad->empty()) {
+            try {
+                topo = geom::extract_topology(*model.cad, 10);
+                topo_ptr = &(*topo);
+            } catch (...) {
+                topo.reset();
+                topo_ptr = nullptr;
+            }
+        } else if (geom::occ_enabled()) {
             std::vector<std::string> candidates;
             if (!model.source_path.empty()) {
                 candidates.push_back(model.source_path);
@@ -982,19 +1050,19 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                         c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
                     }
                     if (low.ends_with(".step") || low.ends_with(".stp")) {
-                        cad = geom::CadModel::load_step(cand);
+                        cad_reload = geom::CadModel::load_step(cand);
                     } else if (low.ends_with(".brep") || low.ends_with(".brp")) {
-                        cad = geom::CadModel::load_brep(cand);
+                        cad_reload = geom::CadModel::load_brep(cand);
                     } else {
                         continue;
                     }
-                    if (cad && !cad->empty()) {
-                        topo = geom::extract_topology(*cad, 10);
+                    if (cad_reload && !cad_reload->empty()) {
+                        topo = geom::extract_topology(*cad_reload, 10);
                         topo_ptr = &(*topo);
                         break;
                     }
                 } catch (...) {
-                    cad.reset();
+                    cad_reload.reset();
                     topo.reset();
                     topo_ptr = nullptr;
                 }

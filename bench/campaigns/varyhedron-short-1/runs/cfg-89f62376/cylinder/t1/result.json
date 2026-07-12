@@ -1,0 +1,54 @@
+{
+  "accuracy": {
+    "all": [
+      {
+        "metric": "sigma_max",
+        "rel_err": 1.6881194096651642,
+        "score": 0.0559246767634638,
+        "truth": 1000000.0,
+        "value": 2688119.409665164
+      },
+      {
+        "metric": "tip_deflection",
+        "rel_err": 0.5128413833691449,
+        "score": 0.22629848371501435,
+        "truth": 1e-06,
+        "value": 1.5128413833691448e-06
+      }
+    ],
+    "metric": "sigma_max",
+    "rel_err": 1.6881194096651642,
+    "score": 0.0559246767634638,
+    "truth": 1000000.0,
+    "value": 2688119.409665164
+  },
+  "answers": {
+    "sigma_max": 2688119.409665164,
+    "tip_deflection": 1.5128413833691448e-06
+  },
+  "cfg_id": "cfg-89f62376",
+  "config": {
+    "feature_refine": true,
+    "mesher": "varyhedron",
+    "order": 1
+  },
+  "geom_class": {
+    "curved_frac": 0.9318181818181818,
+    "min_feature_h": 28.577399384028727,
+    "thin": false
+  },
+  "mesh_ms": 420.001827,
+  "n_dof": 20826,
+  "n_elems": 30524,
+  "n_nodes": 6942,
+  "part": "cylinder",
+  "quality": {
+    "M1max": 0.0007131469022866466,
+    "M2max": 0.002605605343358103,
+    "M6": 0.030588548384274876,
+    "score": 0.7032715171477764
+  },
+  "solve_ms": 647.676342,
+  "status": "ok",
+  "tier": 1
+}

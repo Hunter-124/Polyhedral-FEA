@@ -1,0 +1,28 @@
+{
+  "cfg_id": "cfg-89f62376",
+  "config": {
+    "feature_refine": true,
+    "mesher": "varyhedron",
+    "order": 1
+  },
+  "error": "mesh exceeds campaign DOF/elem budget (41505 dof, 64964 elems)",
+  "geom_class": {
+    "curved_frac": 0.9318181818181818,
+    "min_feature_h": 28.577399384028727,
+    "thin": false
+  },
+  "mesh_ms": 818.718481,
+  "n_dof": 41505,
+  "n_elems": 64964,
+  "n_nodes": 13835,
+  "part": "cylinder",
+  "quality": {
+    "M1max": 0.0001896870865489028,
+    "M2max": 0.00205521236497677,
+    "M6": 0.05099899807386071,
+    "score": 0.7019978999555634
+  },
+  "solve_ms": 0.0,
+  "status": "over_budget",
+  "tier": 2
+}

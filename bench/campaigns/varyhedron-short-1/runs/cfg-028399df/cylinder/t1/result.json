@@ -1,0 +1,54 @@
+{
+  "accuracy": {
+    "all": [
+      {
+        "metric": "sigma_max",
+        "rel_err": 554424736750517.4,
+        "score": 1.8036713258160136e-16,
+        "truth": 1000000.0,
+        "value": 5.5442473675051834e+20
+      },
+      {
+        "metric": "tip_deflection",
+        "rel_err": 0.5007769848699265,
+        "score": 0.2304937075025496,
+        "truth": 1e-06,
+        "value": 1.5007769848699264e-06
+      }
+    ],
+    "metric": "sigma_max",
+    "rel_err": 554424736750517.4,
+    "score": 1.8036713258160136e-16,
+    "truth": 1000000.0,
+    "value": 5.5442473675051834e+20
+  },
+  "answers": {
+    "sigma_max": 5.5442473675051834e+20,
+    "tip_deflection": 1.5007769848699264e-06
+  },
+  "cfg_id": "cfg-028399df",
+  "config": {
+    "feature_refine": true,
+    "mesher": "hybrid_zoo",
+    "order": 1
+  },
+  "geom_class": {
+    "curved_frac": 0.9318181818181818,
+    "min_feature_h": 28.577399384028727,
+    "thin": false
+  },
+  "mesh_ms": 258.892482,
+  "n_dof": 50589,
+  "n_elems": 47348,
+  "n_nodes": 16863,
+  "part": "cylinder",
+  "quality": {
+    "M1max": 0.0007312070946121559,
+    "M2max": 0.001089239683920619,
+    "M6": 1.0,
+    "score": 0.9194164135296229
+  },
+  "solve_ms": 9730.602252,
+  "status": "ok",
+  "tier": 1
+}

@@ -1163,6 +1163,14 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             tendency_plan.label,
             tendency_plan.remapped ? " (remapped)" : "");
     }
+    // Graded LEB / packing can leave orphan node slots (no element refs) that
+    // inject zero-stiffness free DOFs and singular K — drop them always.
+    const std::size_t n_orphans = out.mesh.compact_unused_nodes();
+    if (n_orphans > 0) {
+        out.mesher_note += std::format(" | compact_orphans={}", n_orphans);
+        out.boundary_quads = fea::extract_boundary_faces(out.mesh);
+        out.boundary_node_region.clear();
+    }
     out.mesh.check_validity();
     return out;
 }

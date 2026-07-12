@@ -83,6 +83,11 @@ struct NodalMesh {
 
     /// Index ranges and per-element node counts. Throws FeaError.
     void check_validity() const;
+
+    /// Drop nodes not referenced by any element and renumber connectivity.
+    /// Removes orphan DOFs that make K singular (graded LEB / packing debris).
+    /// Returns number of nodes removed.
+    std::size_t compact_unused_nodes();
 };
 
 } // namespace polymesh::fea

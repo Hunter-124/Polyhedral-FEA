@@ -610,16 +610,71 @@ void write_mesh_preview(const fs::path& path, const pipeline::VolumeMeshOutput& 
 // ── geometry helpers for BC / loads / probes ────────────────────────────────
 
 fea::Dirichlet make_dirichlet(const fea::NodalMesh& mesh, const std::vector<BcSpec>& bcs) {
+    // Node-in-box plus free-face centroid-in-box (surface snap can pull end-face
+    // nodes slightly off the CAD plane so pure node-in-box misses fixtures).
     fea::Dirichlet bc;
+    auto fix_node = [&](std::uint32_t i, const BcSpec& b) {
+        for (int a = 0; a < 3; ++a) {
+            if (b.fix[static_cast<std::size_t>(a)]) {
+                bc.dof_values[3 * static_cast<Eigen::Index>(i) + a] = 0.0;
+            }
+        }
+    };
     for (std::uint32_t i = 0; i < static_cast<std::uint32_t>(mesh.nodes.size()); ++i) {
         const Eigen::Vector3d& p = mesh.nodes[i];
         for (const auto& b : bcs) {
-            if (!b.box.contains(p)) {
+            if (b.box.contains(p)) {
+                fix_node(i, b);
+            }
+        }
+    }
+    const auto faces = fea::extract_boundary_faces(mesh);
+    for (const auto& q : faces) {
+        Eigen::Vector3d c = Eigen::Vector3d::Zero();
+        int n = 0;
+        for (int k = 0; k < 4; ++k) {
+            // Degenerate tri quads use q[2]==q[3].
+            if (k == 3 && q[2] == q[3]) {
+                break;
+            }
+            c += mesh.nodes[q[static_cast<std::size_t>(k)]];
+            ++n;
+        }
+        if (n <= 0) {
+            continue;
+        }
+        c /= static_cast<double>(n);
+        for (const auto& b : bcs) {
+            if (!b.box.contains(c)) {
                 continue;
             }
-            for (int a = 0; a < 3; ++a) {
-                if (b.fix[static_cast<std::size_t>(a)]) {
-                    bc.dof_values[3 * static_cast<Eigen::Index>(i) + a] = 0.0;
+            for (int k = 0; k < 4; ++k) {
+                if (k == 3 && q[2] == q[3]) {
+                    break;
+                }
+                fix_node(q[static_cast<std::size_t>(k)], b);
+            }
+        }
+    }
+    // Fallback: if still under-constrained, pin every node inside each BC box
+    // expanded by 2% of mesh bbox diagonal (coarse graded meshes often leave
+    // the CAD face plane by a fraction of h after snap).
+    if (bc.dof_values.size() < 9 && !mesh.nodes.empty()) {
+        Eigen::Vector3d lo = mesh.nodes.front();
+        Eigen::Vector3d hi = lo;
+        for (const auto& p : mesh.nodes) {
+            lo = lo.cwiseMin(p);
+            hi = hi.cwiseMax(p);
+        }
+        const double pad = 0.02 * std::max((hi - lo).norm(), 1e-9);
+        for (std::uint32_t i = 0; i < static_cast<std::uint32_t>(mesh.nodes.size()); ++i) {
+            const Eigen::Vector3d& p = mesh.nodes[i];
+            for (const auto& b : bcs) {
+                Box3 exp = b.box;
+                exp.lo -= Eigen::Vector3d::Constant(pad);
+                exp.hi += Eigen::Vector3d::Constant(pad);
+                if (exp.contains(p)) {
+                    fix_node(i, b);
                 }
             }
         }
@@ -879,6 +934,9 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
 
         const auto t_solve0 = clock::now();
         fea::SolveOptions sopt;
+        // Short campaigns prefer robust direct LDLT; CG was hanging / failing
+        // on poorly conditioned hybrid meshes at moderate free DOF.
+        sopt.method = fea::SolveMethod::kDirect;
         sopt.on_progress = [&](int iter, int max_iters, double resid) {
             const double frac =
                 max_iters > 0

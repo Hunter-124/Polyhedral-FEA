@@ -257,7 +257,7 @@ nodes:
 
   - id: V2c
     title: Case JSON + hand-calc references for four shapes
-    status: todo
+    status: in_progress
     deps: [V2b]
     scope: [tests/fixtures/parts/, bench/reference/, docs/validation/]
     note: geometry paths .step; truths only in bench/reference/.
@@ -303,12 +303,17 @@ nodes:
 
   - id: V5
     title: Packing algorithm survey + microbench harness
-    status: todo
+    status: done
     deps: [V0]
     scope: [docs/research/, bench/packing/]
     note: >
-      docs/research/varyhedron-packing.md; pick v1 dual-of-constrained-tet +
-      boundary seed packing; license gate on any vendored code.
+      DONE 2026-07-12: docs/research/varyhedron-packing.md surveys bubble→Delaunay,
+      dual-of-tet (cfMesh/polyDualMesh), PGP3D hex-dominant, CAD protecting balls/PLC,
+      and BSD-3 vs AGPL (TetGen/Gmsh) license gate. Decision v1 = boundary-edge
+      constrained seed packing + dual poly from refined tet scaffold with CAD edge
+      protect, VEM on polys (ADR-0021). Microbench bench/packing/run_packing_microbench.py
+      writes bench/packing/out/summary.json (unit_cube + sphere_like: fill proxy,
+      boundary residual placeholder, wall_ms).
 
   - id: V6a
     title: VolumeMesher::kVaryhedron stub + CLI/GUI label + tooltip

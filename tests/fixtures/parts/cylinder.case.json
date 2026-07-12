@@ -4,13 +4,13 @@
   "material": { "E": 2.0e11, "nu": 0.3, "rho": 7850 },
   "bcs": [
     {
-      "select": { "box": [[-1e9, -1e9, -1e9], [1e9, 1e9, 1.0e-3]] },
+      "select": { "box": [[-1e9, -1e9, -1e9], [1e9, 1e9, 0.01]] },
       "fix": [true, true, true]
     }
   ],
   "loads": [
     {
-      "select": { "box": [[-1e9, -1e9, 0.199], [1e9, 1e9, 1e9]] },
+      "select": { "box": [[-1e9, -1e9, 0.19], [1e9, 1e9, 1e9]] },
       "traction": [0.0, 0.0, 1.0e6]
     }
   ],

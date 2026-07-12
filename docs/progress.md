@@ -23,6 +23,11 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-12: **Varyhedron v1 path (V6a/V6b/V7)** — `VolumeMesher::kVaryhedron`,
+  `mesh/varyhedron_fill` (CAD edge seeds + graded scaffold + edge-profile snap),
+  GUI label/tooltip (ADR-0021), CLI/testlab `varyhedron`, smoke on
+  `plate_hole.step` with `geom_source=brep_topology`. Catch2
+  `test_varyhedron_fill`.
 - 2026-07-12: **V3a warehouse layout + git-LFS** — `.gitattributes` tracks
   `*.vtu` and `bench/campaigns/**/runs/**/*.png` via git-LFS;
   `bench/campaigns/README.md` documents

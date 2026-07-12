@@ -35,6 +35,7 @@ enum class VolumeMesher : int {
     kHybrid = 6,     // hex bulk + pyramid skin; FE expands hex (ADR-0012 v3)
     kOctahedral = 7, // experimental BCC octahedra → tet4 (ADR-0019)
     kHybridVem = 8,  // hex FE bulk + native poly VEM transitions (ADR-0019)
+    kVaryhedron = 9, // variable poly packing (ADR-0021); v1 edge-seed scaffold
 };
 
 /// Continuous element-shape preference dial the campaign/tuner sweeps
@@ -75,6 +76,8 @@ struct Model {
     Eigen::Vector3d bbox_min = Eigen::Vector3d::Zero();
     Eigen::Vector3d bbox_max = Eigen::Vector3d::Ones();
     std::string name;
+    /// Original filesystem path when loaded from disk (for BRep re-open).
+    std::string source_path;
 
     static Model load(const std::string& path, double sharp_angle_deg = 30.0);
 };

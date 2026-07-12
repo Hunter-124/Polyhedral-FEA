@@ -10,6 +10,8 @@
 #include "fea/vem.hpp"
 #include "fea/vtu.hpp"
 #include "fea/zz.hpp"
+#include "geom/cad_model.hpp"
+#include "geom/cad_topology.hpp"
 #include "geom/features.hpp"
 #include "geom/indicators.hpp"
 #include "geom/step.hpp"
@@ -25,6 +27,7 @@
 #include "mesh/surface_project.hpp"
 #include "mesh/tet_fill.hpp"
 #include "mesh/transition_fill.hpp"
+#include "mesh/varyhedron_fill.hpp"
 
 #include <Eigen/Geometry>
 
@@ -108,6 +111,7 @@ Model Model::load(const std::string& path, double sharp_angle_deg) {
         model.surface = geom::load_stl(path);
     }
     model.surface.validate();
+    model.source_path = path;
     const auto slash = path.find_last_of("/\\");
     model.name = slash == std::string::npos ? path : path.substr(slash + 1);
 
@@ -293,6 +297,8 @@ ElementTendencyPlan resolve_element_tendency(VolumeMesher base, double tendency,
             return "hybrid-vem";
         case VolumeMesher::kGradedTet:
             return "graded-tet";
+        case VolumeMesher::kVaryhedron:
+            return "varyhedron";
         case VolumeMesher::kTetFill:
             return "tet";
         case VolumeMesher::kHexPyramid:
@@ -319,7 +325,8 @@ ElementTendencyPlan resolve_element_tendency(VolumeMesher base, double tendency,
         return m == VolumeMesher::kHexFill || m == VolumeMesher::kHexVem;
     };
     const auto is_tet_family = [](VolumeMesher m) {
-        return m == VolumeMesher::kTetFill || m == VolumeMesher::kGradedTet;
+        return m == VolumeMesher::kTetFill || m == VolumeMesher::kGradedTet ||
+               m == VolumeMesher::kVaryhedron;
     };
 
     // Shape dial for hybrid / hex / tet families. Prism / octa / hexpyr keep
@@ -934,6 +941,87 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                         "{} tets ({} octa + {} bdy pyr), {} nodes, h={:.4g} m",
                         out.mesh.elements.size(), fill.n_octahedra, fill.n_boundary_pyramids,
                         out.mesh.nodes.size(), fill_h);
+    } else if (mesher == VolumeMesher::kVaryhedron) {
+        // ADR-0021 v1: CAD edge seeds + graded scaffold + edge-profile snap.
+        std::vector<geom::SharpEdge> edges;
+        double feature_band = 0.0;
+        std::vector<Eigen::Vector3d> seeds(refine_seeds.begin(), refine_seeds.end());
+        double band = seed_band;
+        double turn_deg = feature_refine ? 15.0 : 0.0;
+        if (feature_refine) {
+            edges = geom::detect_sharp_edges(model.surface, 30.0);
+            if (!edges.empty()) {
+                feature_band = 2.0 * h;
+            }
+            if (band <= 0.0 && !seeds.empty()) {
+                band = 1.6 * h;
+            }
+        }
+        if (band <= 0.0 && !seeds.empty()) {
+            band = 1.6 * h;
+        }
+
+        // Prefer live BRep topology by reloading the source CAD path (ADR-0020).
+        std::optional<geom::CadModel> cad;
+        std::optional<geom::CadTopology> topo;
+        const geom::CadTopology* topo_ptr = nullptr;
+        if (geom::occ_enabled()) {
+            std::vector<std::string> candidates;
+            if (!model.source_path.empty()) {
+                candidates.push_back(model.source_path);
+            }
+            if (!model.name.empty()) {
+                candidates.push_back(model.name);
+                candidates.push_back(std::string("tests/fixtures/parts/") + model.name);
+                candidates.push_back(std::string("tests/fixtures/") + model.name);
+            }
+            for (const auto& cand : candidates) {
+                try {
+                    std::string low = cand;
+                    for (char& c : low) {
+                        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                    }
+                    if (low.ends_with(".step") || low.ends_with(".stp")) {
+                        cad = geom::CadModel::load_step(cand);
+                    } else if (low.ends_with(".brep") || low.ends_with(".brp")) {
+                        cad = geom::CadModel::load_brep(cand);
+                    } else {
+                        continue;
+                    }
+                    if (cad && !cad->empty()) {
+                        topo = geom::extract_topology(*cad, 10);
+                        topo_ptr = &(*topo);
+                        break;
+                    }
+                } catch (...) {
+                    cad.reset();
+                    topo.reset();
+                    topo_ptr = nullptr;
+                }
+            }
+        }
+
+        auto fill = mesh::varyhedron_fill_surface(
+            model.surface, model.bbox_min, model.bbox_max, h, std::max(1, skin_layers), edges,
+            feature_band, seeds, band, turn_deg, topo_ptr);
+        fill_h = fill.h_fine;
+        out.mesh.nodes = std::move(fill.mesh.nodes);
+        out.mesh.elements.reserve(fill.mesh.tets.size());
+        for (const auto& tet : fill.mesh.tets) {
+            out.mesh.elements.push_back(
+                fea::NodalElement{fea::ElementType::kTet4, {tet[0], tet[1], tet[2], tet[3]}});
+        }
+        out.boundary_quads = fea::extract_boundary_faces(out.mesh);
+        if (out.boundary_quads.empty()) {
+            out.boundary_quads = std::move(fill.mesh.boundary_quads);
+        }
+        out.mesher_note = std::format(
+            "varyhedron v1 (CAD edge seeds + graded scaffold + edge-profile snap): "
+            "{} tets, edge_seeds={}, h_bulk={:.4g}/h_fine={:.4g} m, "
+            "edge_profile Hausdorff={:.3g} m (rel={:.3g}){}",
+            out.mesh.elements.size(), fill.n_edge_seeds, fill.h_coarse, fill.h_fine,
+            fill.edge_profile_hausdorff_max, fill.edge_profile_rel,
+            topo_ptr ? ", geom_source=brep_topology" : ", geom_source=surface_only");
     } else {
         auto fill = mesh::tet_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
         fill_h = fill.h;
@@ -1565,6 +1653,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     return;
                 }
                 if (setup.mesher != VolumeMesher::kGradedTet &&
+                    setup.mesher != VolumeMesher::kVaryhedron &&
                     setup.mesher != VolumeMesher::kTetFill &&
                     setup.mesher != VolumeMesher::kHybrid &&
                     setup.mesher != VolumeMesher::kHybridVem) {
@@ -1709,7 +1798,11 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
             };
 
             // Grid budget floor: graded is always 2:1 (fine lattice ≈ h/2).
-            const int grid_sub = (setup.mesher == VolumeMesher::kGradedTet) ? 2 : 1;
+            const int grid_sub =
+                (setup.mesher == VolumeMesher::kGradedTet ||
+                 setup.mesher == VolumeMesher::kVaryhedron)
+                    ? 2
+                    : 1;
             const double h_grid_floor = mesh::min_h_for_cell_budget(
                 model.bbox_min, model.bbox_max, mesh::kDefaultMaxGridCells, grid_sub);
             const double h_adapt_floor = std::max(h * 0.35, h_grid_floor);

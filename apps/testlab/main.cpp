@@ -342,6 +342,9 @@ pipeline::VolumeMesher parse_mesher(const std::string& name) {
     if (name == "octa" || name == "octahedral") {
         return pipeline::VolumeMesher::kOctahedral;
     }
+    if (name == "varyhedron" || name == "vary") {
+        return pipeline::VolumeMesher::kVaryhedron;
+    }
     throw std::runtime_error("unknown mesher '" + name + "'");
 }
 

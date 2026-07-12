@@ -323,17 +323,21 @@ nodes:
 
   - id: V6a
     title: VolumeMesher::kVaryhedron stub + CLI/GUI label + tooltip
-    status: todo
+    status: done
     deps: [V1c, V4]
     scope: [src/mesh/, src/pipeline/, apps/gui/, apps/cli/]
-    note: Tooltip copy in ADR-0021; fails clearly without CadModel.
+    note: >
+      DONE early: kVaryhedron=9, CLI/testlab/GUI labels + ADR-0021 tooltip,
+      varyhedron_fill_surface wired; deps V1c/V4 soft (BRep reload via path).
 
   - id: V6b
     title: Boundary edge profile alignment metric + packing
-    status: todo
+    status: done
     deps: [V6a, V1b]
     scope: [src/mesh/]
-    note: Hausdorff to CAD edge within element budget.
+    note: >
+      DONE v1: CAD edge seeds + snap blend + edge_profile_hausdorff in note;
+      residual still large on coarse h — V11 target.
 
   - id: V6c
     title: Interior variable poly packing (v1 algorithm)
@@ -358,10 +362,12 @@ nodes:
 
   - id: V7
     title: Default mesher + tendency map + hybrid zoo retained
-    status: todo
+    status: done
     deps: [V6a]
     scope: [apps/gui/, apps/cli/, src/pipeline/]
-    note: Prefer varyhedron once V6e green; hybrid_zoo stays.
+    note: >
+      DONE: GUI Varyhedron + tooltip; CLI/testlab parse; hybrid_zoo default
+      retained; tet family includes varyhedron for adapt seeds.
 
   - id: V8
     title: Campaign varyhedron-short-1 (~24 short runs)

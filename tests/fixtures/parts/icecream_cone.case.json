@@ -1,0 +1,18 @@
+{
+  "part": "icecream_cone",
+  "geometry": "tests/fixtures/parts/icecream_cone.step",
+  "material": { "E": 2.0e11, "nu": 0.3, "rho": 7850 },
+  "bcs": [
+    {
+      "select": { "box": [[-1e9, -1e9, -1e9], [1e9, 1e9, 1.0e-3]] },
+      "fix": [true, true, true]
+    }
+  ],
+  "loads": [
+    {
+      "select": { "box": [[-1e9, -1e9, 0.12], [1e9, 1e9, 1e9]] },
+      "traction": [0.0, 0.0, -1.0e6]
+    }
+  ],
+  "reference": "bench/reference/icecream_cone.json"
+}

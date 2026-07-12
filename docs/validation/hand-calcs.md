@@ -10,7 +10,13 @@ Fixture geometry: `tests/fixtures/parts/`. Case bindings (loads/BCs/material):
 `tests/fixtures/parts/<part>.case.json` (schema: `docs/dag/interfaces.md` §4).
 Reference JSON: `bench/reference/<part>.json` (schema: §5).
 
-STL regeneration (geometry only — does **not** write truths):
+Product STEP regeneration (geometry only — does **not** write truths; ADR-0020):
+
+```bash
+python3 scripts/gen_cad_parts.py
+```
+
+Legacy STL fixtures for older campaigns:
 
 ```bash
 python3 scripts/gen_part_library.py
@@ -82,6 +88,8 @@ tolerance \(2\,\%\). Probe = mean \(u_x\) on the \(x=L\) face nodes.
 ## kirsch-plate
 
 **Part:** `plate_hole` · **geometry:** plate with centred circular hole
+(`tests/fixtures/parts/plate_hole.step` from `scripts/gen_cad_parts.py`;
+plate \(0.2\times 0.1\times 0.01\) with hole \(r=0.01\))
 
 | Quantity | Symbol | Value |
 |---|---|---|
@@ -92,8 +100,8 @@ tolerance \(2\,\%\). Probe = mean \(u_x\) on the \(x=L\) face nodes.
 | Young's modulus | \(E\) | \(2.1 \times 10^{11}\,\mathrm{Pa}\) |
 | Poisson's ratio | \(\nu\) | \(0.3\) |
 | Remote / applied tension | \(\sigma_\infty\) | \(1.0 \times 10^{6}\,\mathrm{Pa}\) |
-| Fixed face | \(x \approx -W\) | all three DOFs |
-| Loaded face | \(x \approx +W\) | traction \((\sigma_\infty, 0, 0)\) |
+| Fixed face | \(x \approx -W\) | all three DOFs (case box \(x\le -0.099\)) |
+| Loaded face | \(x \approx +W\) | traction \((\sigma_\infty, 0, 0)\) (case box \(x\ge 0.099\)) |
 
 ### Infinite-plate Kirsch solution
 
@@ -226,14 +234,209 @@ solution is not systematically biased low.
 
 ---
 
+## cylinder
+
+**Part:** `cylinder` · **geometry:** solid right circular cylinder
+(`tests/fixtures/parts/cylinder.step`)
+
+| Quantity | Symbol | Value |
+|---|---|---|
+| Radius | \(R\) | \(0.05\,\mathrm{m}\) |
+| Height | \(H\) | \(0.2\,\mathrm{m}\) (\(z\in[0,H]\), axis \(+z\), base at origin) |
+| Cross-section area | \(A=\pi R^2\) | \(\pi\times 2.5\times 10^{-3}\approx 7.854\times 10^{-3}\,\mathrm{m}^2\) |
+| Young's modulus | \(E\) | \(2.0 \times 10^{11}\,\mathrm{Pa}\) |
+| Poisson's ratio | \(\nu\) | \(0.3\) |
+| Top-face traction | \(\mathbf{t}\) | \((0,\,0,\,10^{6})\,\mathrm{Pa}\) (uniaxial tension) |
+| Fixed face | \(z \approx 0\) | all three DOFs (case box \(z\le 10^{-3}\)) |
+| Loaded face | \(z \approx H\) | case box \(z\ge 0.199\) |
+
+### Stress (uniaxial bar)
+
+Flat ends make this the same continuum problem as the rectangular smoke-bar:
+uniform end traction \(t_z\) on a prismatic (here circular) solid is equilibrated
+by a uniform axial stress field (Saint-Venant; exact for pure end traction on
+a prism):
+
+\[
+\sigma_{zz} = t_z = 1.0 \times 10^{6}\,\mathrm{Pa},
+\quad
+\sigma_{xx} = \sigma_{yy} = \tau_{ij} = 0.
+\]
+
+Von Mises for uniaxial tension:
+
+\[
+\sigma_{\mathrm{vm}} = |\sigma_{zz}| = 1.0 \times 10^{6}\,\mathrm{Pa}.
+\]
+
+**Metric `sigma_max`:** value \(1.0\times 10^{6}\,\mathrm{Pa}\), relative
+tolerance \(10\,\%\). Probe = `max_von_mises`.
+
+### Tip axial displacement
+
+\[
+u_z(H)
+  = \frac{\sigma_{zz}\,H}{E}
+  = \frac{10^{6}\cdot 0.2}{2.0\times 10^{11}}
+  = 1.0 \times 10^{-6}\,\mathrm{m}.
+\]
+
+(Poisson contraction of the radius does not affect \(u_z\).)
+
+**Metric `tip_deflection`:** value \(1.0\times 10^{-6}\,\mathrm{m}\), relative
+tolerance \(15\,\%\). Probe = `max_displacement` (max nodal \(|\mathbf{u}|\);
+for this uniaxial case the max is the free-end axial stretch).
+
+---
+
+## sphere
+
+**Part:** `sphere` · **geometry:** solid sphere centred at the origin
+(`tests/fixtures/parts/sphere.step`)
+
+| Quantity | Symbol | Value |
+|---|---|---|
+| Radius | \(R\) | \(0.05\,\mathrm{m}\) |
+| Young's modulus | \(E\) | \(2.0 \times 10^{11}\,\mathrm{Pa}\) |
+| Poisson's ratio | \(\nu\) | \(0.3\) |
+| Polar plane (fix / load) | \(z_p\) | \(0.04\,\mathrm{m}\) |
+| Cap height | \(h = R - z_p\) | \(0.01\,\mathrm{m}\) |
+| Cap surface area | \(A_{\mathrm{cap}} = 2\pi R h\) | \(2\pi R(R-z_p) = \pi\times 10^{-3}\,\mathrm{m}^2\) |
+| Applied traction | \(\mathbf{t}\) | \((0,\,0,\,-10^{6})\,\mathrm{Pa}\) on north polar faces |
+| Fixed region | \(z \le -z_p\) | all three DOFs (south polar cap of nodes) |
+
+### Why not a classical closed form
+
+A solid sphere under **uniform normal pressure** has the exact hydrostatic
+field \(\sigma_{ij}=-p\,\delta_{ij}\), \(\sigma_{\mathrm{vm}}=0\), and
+\(u_r=-p(1-2\nu)r/E\). The test-lab case schema only supports **fixed-direction
+surface traction** (not \(\mathbf{t}=-p\mathbf{n}\)), so that Lamé-style
+pressure problem is not representable here. Uniaxial far-field tension on a
+free sphere is not an elementary closed form either (no flat ends for clean
+Saint-Venant patches).
+
+### Engineering estimate: polar compression as a short column
+
+Case binding (mesh-independent selectors in the continuum limit):
+
+- Dirichlet on nodes with \(z\le -z_p\) (south polar cap);
+- traction \(\mathbf{t}=(0,0,-t)\) with \(t=10^{6}\,\mathrm{Pa}\) on boundary
+  faces whose centroids satisfy \(z\ge z_p\) (north polar cap).
+
+Spherical-cap surface area is geometric (independent of \(E,\nu\)):
+
+\[
+A_{\mathrm{cap}} = 2\pi R h = 2\pi R(R-z_p)
+  = 2\pi\cdot 0.05\cdot 0.01
+  = \pi\times 10^{-3}
+  \approx 3.1416\times 10^{-3}\,\mathrm{m}^2.
+\]
+
+Resultant polar force (continuum limit of the face traction integral):
+
+\[
+F = t\,A_{\mathrm{cap}}
+  = 10^{6}\cdot \pi\times 10^{-3}
+  = \pi\times 10^{3}
+  \approx 3.1416\times 10^{3}\,\mathrm{N}.
+\]
+
+Approximate the body as a short column of length equal to the distance
+between the polar planes, \(L_{\mathrm{eff}}=2z_p=0.08\,\mathrm{m}\), and
+midspan cross-section \(A=\pi R^2\):
+
+\[
+\delta_{\mathrm{eng}}
+  = \frac{F\,L_{\mathrm{eff}}}{E\,A}
+  = \frac{F\cdot(2z_p)}{E\,\pi R^2}
+  = \frac{4\,t\,(R-z_p)\,z_p}{E\,R}.
+\]
+
+Numerically:
+
+\[
+\delta_{\mathrm{eng}}
+  = \frac{4\cdot 10^{6}\cdot 0.01\cdot 0.04}{2.0\times 10^{11}\cdot 0.05}
+  = \frac{1.6\times 10^{3}}{1.0\times 10^{10}}
+  = 1.6\times 10^{-7}\,\mathrm{m}.
+\]
+
+This omits local Hertz-like compliance under the caps, Poisson effects, and
+the true 3-D stress paths around the free surface. It is an **order-correct
+engineering estimate**, not an exact continuum solution — hence a wide
+tolerance. Max von Mises is **not** used as a campaign truth: the edge of the
+fixed polar patch is a Dirichlet–Neumann transition that can produce mesh-
+dependent peak stresses under refinement.
+
+**Metric `tip_deflection`:** value \(1.6\times 10^{-7}\,\mathrm{m}\), relative
+tolerance \(50\,\%\). Probe = `max_displacement`.
+
+---
+
+## icecream-cone
+
+**Part:** `icecream_cone` · **geometry:** regular triangular pyramid fused with
+an intersecting spherical scoop (`tests/fixtures/parts/icecream_cone.step`
+from `scripts/gen_cad_parts.py`)
+
+| Quantity | Symbol | Value |
+|---|---|---|
+| Pyramid base (equilateral) | \(s\) | \(0.12\,\mathrm{m}\) in plane \(z=0\), centroid at origin |
+| Pyramid height | \(H_p\) | \(0.15\,\mathrm{m}\) (apex at \(z=H_p\)) |
+| Scoop radius | \(R_s\) | \(0.04\,\mathrm{m}\) |
+| Base area | \(A_b=\sqrt{3}\,s^2/4\) | \(\approx 6.235\times 10^{-3}\,\mathrm{m}^2\) |
+| Young's modulus | \(E\) | \(2.0 \times 10^{11}\,\mathrm{Pa}\) |
+| Poisson's ratio | \(\nu\) | \(0.3\) |
+| Fixed region | \(z \approx 0\) | all three DOFs on base nodes (case box \(z\le 10^{-3}\)) |
+| Loaded region | \(z \ge 0.12\) | traction \((0,\,0,\,-10^{6})\,\mathrm{Pa}\) (apex + upper scoop) |
+
+### No closed-form continuum solution
+
+The fused pyramid∪ball has no elementary elasticity solution under this
+partial-surface traction. The case exists so the campaign can exercise
+**non-CAD-primitive topology** (boolean solid, sharp dihedral edges, curved
+scoop) for mesh quality, mesher ranking, and relative convergence across
+tiers — not as a Tier-1 analytic gate.
+
+### Order-of-magnitude stress sanity
+
+Upper-surface traction magnitude \(t=10^{6}\,\mathrm{Pa}\). In the continuum
+limit the selected face set (\(z\ge 0.12\)) carries a resultant force
+\(F=t\,A_{\mathrm{load}}\) with \(A_{\mathrm{load}}\) of the same order as a
+few \(\times 10^{-3}\,\mathrm{m}^2\) (apex facets + upper scoop patch). Base
+area \(A_b\sim 6\times 10^{-3}\,\mathrm{m}^2\) then implies a characteristic
+compressive stress
+
+\[
+\sigma^\ast \sim \frac{F}{A_b} = O(10^{5}\text{–}10^{6})\,\mathrm{Pa}.
+\]
+
+Peak von Mises near re-entrant features (pyramid edges, fusion neck) can
+exceed \(\sigma^\ast\), while a coarse mesh may under-resolve peaks. The
+campaign metric is therefore an **order-of-magnitude sanity band**, not a
+tight SCF-style check:
+
+**Metric `sigma_max`:** value \(1.0\times 10^{6}\,\mathrm{Pa}\), relative
+tolerance \(100\,\%\) (\(1.0\)). Probe = `max_von_mises`.
+
+Interpretation: measured \(\sigma_{\mathrm{vm}}^{\max}\) within roughly
+\([0,\,2\times 10^{6}]\) still scores nontrivially under the harness map
+\(1/(1+|\mathrm{rel}|/\mathrm{tol})\); gross failures (wrong BC box, zero load,
+unit mistakes) fall outside and score near zero. Tighter truths require a
+separate manufactured solution or a peer-code baseline — out of scope for V2c.
+
+---
+
 ## How to add a part
 
-1. Author geometry under `tests/fixtures/parts/<name>.stl` (extend
-   `scripts/gen_part_library.py` or drop a CAD export).
+1. Author **product** geometry under `tests/fixtures/parts/<name>.step`
+   (extend `scripts/gen_cad_parts.py` or drop a CAD STEP export). Legacy STL
+   fixtures remain only for older campaigns (`scripts/gen_part_library.py`).
 2. Write `tests/fixtures/parts/<name>.case.json` binding material, BC/load
    box selectors (with h-independent slack — `interfaces.md` §4), and the
-   reference path.
-3. Derive the closed-form answer in a new section of **this** file.
+   reference path. Geometry path must be `.step` for product campaigns.
+3. Derive the closed-form (or documented engineering) answer in a new section
+   of **this** file.
 4. Commit `bench/reference/<name>.json` with metrics, tolerances, probe
    descriptors, and a `derivation` link to the new section.
 5. Never put the truth numbers in `src/` or `apps/`.

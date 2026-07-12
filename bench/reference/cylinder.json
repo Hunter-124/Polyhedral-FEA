@@ -1,0 +1,19 @@
+{
+  "part": "cylinder",
+  "metrics": [
+    {
+      "name": "sigma_max",
+      "value": 1.0e6,
+      "tol": 0.10,
+      "probe": { "kind": "max_von_mises" },
+      "derivation": "docs/validation/hand-calcs.md#cylinder"
+    },
+    {
+      "name": "tip_deflection",
+      "value": 1.0e-6,
+      "tol": 0.15,
+      "probe": { "kind": "max_displacement" },
+      "derivation": "docs/validation/hand-calcs.md#cylinder"
+    }
+  ]
+}

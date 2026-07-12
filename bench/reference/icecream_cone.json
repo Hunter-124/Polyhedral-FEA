@@ -1,0 +1,12 @@
+{
+  "part": "icecream_cone",
+  "metrics": [
+    {
+      "name": "sigma_max",
+      "value": 1.0e6,
+      "tol": 1.0,
+      "probe": { "kind": "max_von_mises" },
+      "derivation": "docs/validation/hand-calcs.md#icecream-cone"
+    }
+  ]
+}

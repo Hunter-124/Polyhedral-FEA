@@ -1,0 +1,12 @@
+{
+  "part": "sphere",
+  "metrics": [
+    {
+      "name": "tip_deflection",
+      "value": 1.6e-7,
+      "tol": 0.50,
+      "probe": { "kind": "max_displacement" },
+      "derivation": "docs/validation/hand-calcs.md#sphere"
+    }
+  ]
+}

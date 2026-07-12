@@ -2,8 +2,44 @@
 #include "fea/nodal_mesh.hpp"
 
 #include <format>
+#include <vector>
 
 namespace polymesh::fea {
+
+std::size_t NodalMesh::compact_unused_nodes() {
+    if (nodes.empty()) {
+        return 0;
+    }
+    std::vector<char> used(nodes.size(), 0);
+    for (const auto& el : elements) {
+        for (const auto ni : el.nodes) {
+            if (ni < used.size()) {
+                used[ni] = 1;
+            }
+        }
+    }
+    std::vector<std::uint32_t> remap(nodes.size(), std::uint32_t(-1));
+    std::vector<Eigen::Vector3d> compact;
+    compact.reserve(nodes.size());
+    for (std::size_t i = 0; i < nodes.size(); ++i) {
+        if (!used[i]) {
+            continue;
+        }
+        remap[i] = static_cast<std::uint32_t>(compact.size());
+        compact.push_back(nodes[i]);
+    }
+    const std::size_t removed = nodes.size() - compact.size();
+    if (removed == 0) {
+        return 0;
+    }
+    for (auto& el : elements) {
+        for (auto& ni : el.nodes) {
+            ni = remap[ni];
+        }
+    }
+    nodes = std::move(compact);
+    return removed;
+}
 
 void NodalMesh::check_validity() const {
     const auto n = static_cast<std::uint32_t>(nodes.size());

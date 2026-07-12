@@ -313,10 +313,12 @@ nodes:
 
   - id: V4
     title: Auto-h + edge-aware size field from BRep
-    status: todo
+    status: done
     deps: [V1b]
     scope: [src/geom/, src/mesh/, src/pipeline/]
-    note: resolve_mesh_size from CAD edges + face curvature.
+    note: >
+      DONE: resolve_mesh_size uses Model::cad / CAD edge lengths (CAD_edge≈);
+      surface κ/thickness still apply.
 
   - id: V5
     title: Packing algorithm survey + microbench harness

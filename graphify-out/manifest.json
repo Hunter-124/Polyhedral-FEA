@@ -345,8 +345,8 @@
     "semantic_hash": ""
   },
   ".github/workflows/ci.yml": {
-    "mtime": 1783727444.5768604,
-    "ast_hash": "2cb74f78f549866f7b05405d6c927121",
+    "mtime": 1783898967.7561557,
+    "ast_hash": "3fd7bf97210923b2bab7c44441fb9215",
     "semantic_hash": ""
   },
   "CHANGES.md": {
@@ -360,13 +360,13 @@
     "semantic_hash": ""
   },
   "CONTRIBUTING.md": {
-    "mtime": 1783741515.5710602,
-    "ast_hash": "c92198850eaaae01e5afb7c4e9454f67",
+    "mtime": 1783898967.7561557,
+    "ast_hash": "ef571d8af62a22287862710bae8777fd",
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1783727444.5768604,
-    "ast_hash": "a536eba09440d97f727885f112274b38",
+    "mtime": 1783898967.7561557,
+    "ast_hash": "4cba67e7c6e72d989dc06ff36c2d9b38",
     "semantic_hash": ""
   },
   "apps/cli/CMakeLists.txt": {
@@ -450,8 +450,8 @@
     "semantic_hash": ""
   },
   "docs/progress.md": {
-    "mtime": 1783896231.988884,
-    "ast_hash": "71057a176e08a72b382105ac83e48f24",
+    "mtime": 1783898967.7561557,
+    "ast_hash": "4c6b7bbf8fd2d4cd1719558a371178a3",
     "semantic_hash": ""
   },
   "docs/spec.md": {
@@ -1205,8 +1205,8 @@
     "semantic_hash": ""
   },
   "docs/dag/PROGRAM.yaml": {
-    "mtime": 1783898886.040992,
-    "ast_hash": "eacf823fa209c65cf25eb0285c018949",
+    "mtime": 1783898967.7660003,
+    "ast_hash": "f9739233afca5aabfc922fd9bd6216fa",
     "semantic_hash": ""
   },
   "docs/dag/README.md": {
@@ -1245,8 +1245,8 @@
     "semantic_hash": ""
   },
   "scripts/gen_part_library.py": {
-    "mtime": 1783894821.7764277,
-    "ast_hash": "b573a9cfca06027b08c2c4c0a9e785e0",
+    "mtime": 1783898967.7637506,
+    "ast_hash": "2444fb8a566d0b50a61dfbd6a102d1d6",
     "semantic_hash": ""
   },
   "src/adapt/include/adapt/hp_driver.hpp": {
@@ -1330,8 +1330,8 @@
     "semantic_hash": ""
   },
   "apps/testlab/main.cpp": {
-    "mtime": 1783898866.9434733,
-    "ast_hash": "00935c3dc85e4b61a540d2c40637af8d",
+    "mtime": 1783898967.7561557,
+    "ast_hash": "811234439d9292d8c1cbc9563642c3cd",
     "semantic_hash": ""
   },
   "bench/campaigns/settings-frontier-1/campaign.json": {
@@ -1415,8 +1415,8 @@
     "semantic_hash": ""
   },
   "bench/campaigns/README.md": {
-    "mtime": 1783894804.1777136,
-    "ast_hash": "556f5e9146c65b7a3886c5e9c7603979",
+    "mtime": 1783898967.7561557,
+    "ast_hash": "384d0040c895551f09d4096ae2770777",
     "semantic_hash": ""
   },
   "docs/decisions/0020-brep-volume-meshing.md": {
@@ -1435,13 +1435,13 @@
     "semantic_hash": ""
   },
   "docs/process/grok-loop.md": {
-    "mtime": 1783894735.5168428,
-    "ast_hash": "3d5772ed008a62c40eafc540d74bc61a",
+    "mtime": 1783898967.7561557,
+    "ast_hash": "60bd9d95ba1d67ed6413aee8aa9c2f18",
     "semantic_hash": ""
   },
   "bench/campaigns/varyhedron-smoke/PARETO.json": {
-    "mtime": 1783896320.7817452,
-    "ast_hash": "a651f4ee2652aacc709a5ac0eff7b3b7",
+    "mtime": 1783898950.3141189,
+    "ast_hash": "b54ba4a103e770310711e0483168802f",
     "semantic_hash": ""
   },
   "bench/campaigns/varyhedron-smoke/campaign.json": {
@@ -1450,28 +1450,28 @@
     "semantic_hash": ""
   },
   "bench/campaigns/varyhedron-smoke/checkpoint.json": {
-    "mtime": 1783898905.3837807,
-    "ast_hash": "28cfa6fd198f3fe8cd05ce5a7d065a5f",
+    "mtime": 1783898950.214291,
+    "ast_hash": "e4c4ea1cef58012ba48da4032429803d",
     "semantic_hash": ""
   },
   "bench/campaigns/varyhedron-smoke/handoff.json": {
-    "mtime": 1783896320.8070343,
-    "ast_hash": "62f388919e469ad42387603dd6fb2f74",
+    "mtime": 1783898950.4038558,
+    "ast_hash": "2e4c96eac4736650c9ce63ca7e1e7696",
     "semantic_hash": ""
   },
   "bench/campaigns/varyhedron-smoke/progress.json": {
-    "mtime": 1783898922.4135947,
-    "ast_hash": "fff10cc58fabb285eed7b146722ad352",
+    "mtime": 1783898950.214291,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
     "semantic_hash": ""
   },
   "bench/campaigns/varyhedron-smoke/runs/cfg-028399df/cylinder/t0/quality.json": {
-    "mtime": 1783896301.0301647,
-    "ast_hash": "b08cb4303a01f0c81108674d8da989bf",
+    "mtime": 1783898928.1145325,
+    "ast_hash": "682e572561b70d4395f11fee1b5a05ad",
     "semantic_hash": ""
   },
   "bench/campaigns/varyhedron-smoke/runs/cfg-028399df/cylinder/t0/result.json": {
-    "mtime": 1783896301.0301647,
-    "ast_hash": "2254c80a9bbc70ef2caafed97487d513",
+    "mtime": 1783898928.1145325,
+    "ast_hash": "4ed8fdd395fdfdf3f184c7c650e8a2e4",
     "semantic_hash": ""
   },
   "bench/campaigns/varyhedron-smoke/runs/cfg-028399df/plate_hole/t0/quality.json": {
@@ -1485,23 +1485,23 @@
     "semantic_hash": ""
   },
   "bench/campaigns/varyhedron-smoke/runs/cfg-89f62376/cylinder/t0/quality.json": {
-    "mtime": 1783896320.7339506,
-    "ast_hash": "75440970ef8245c7fd481207586a8e81",
+    "mtime": 1783898950.1552918,
+    "ast_hash": "f411acb7ac7133125aa15a6d4d3e3da1",
     "semantic_hash": ""
   },
   "bench/campaigns/varyhedron-smoke/runs/cfg-89f62376/cylinder/t0/result.json": {
-    "mtime": 1783896320.7339506,
-    "ast_hash": "b31d436806565b099db58357e4aec191",
+    "mtime": 1783898950.1542919,
+    "ast_hash": "59d2f39dcafac3365c77e005d8863402",
     "semantic_hash": ""
   },
   "bench/campaigns/varyhedron-smoke/runs/cfg-89f62376/plate_hole/t0/quality.json": {
-    "mtime": 1783896306.421106,
-    "ast_hash": "a0063c2bf9a7700445dcb3f1cb37c147",
+    "mtime": 1783898934.3424644,
+    "ast_hash": "09bc740dfaf0accafd10045fc34b2a94",
     "semantic_hash": ""
   },
   "bench/campaigns/varyhedron-smoke/runs/cfg-89f62376/plate_hole/t0/result.json": {
-    "mtime": 1783896306.421106,
-    "ast_hash": "b5209ad473d4628b81b2f76c1bc48469",
+    "mtime": 1783898934.3424644,
+    "ast_hash": "371cfec9fe1dfb30c292ba501219072c",
     "semantic_hash": ""
   },
   "bench/packing/run_packing_microbench.py": {
@@ -1595,18 +1595,43 @@
     "semantic_hash": ""
   },
   "bench/campaigns/varyhedron-smoke/HANDOFF.md": {
-    "mtime": 1783896320.807116,
-    "ast_hash": "a8858211fdbbeaf4026702279c7ddc2f",
+    "mtime": 1783898950.4073884,
+    "ast_hash": "3bf17338004d39d89aacd6444bbf6af0",
     "semantic_hash": ""
   },
   "bench/campaigns/varyhedron-smoke/PARETO.md": {
-    "mtime": 1783896320.7819657,
-    "ast_hash": "e7f3b837b2bbd7398ec3051e800b340d",
+    "mtime": 1783898950.314527,
+    "ast_hash": "e5a7ee0758e35b4c5e252bf9e8cd390e",
     "semantic_hash": ""
   },
   "docs/research/varyhedron-packing.md": {
     "mtime": 1783894954.8688605,
     "ast_hash": "f442e75a1d9d5d4e668dd30a0c3c9d17",
+    "semantic_hash": ""
+  },
+  "scripts/check_no_product_stl.sh": {
+    "mtime": 1783898967.7559783,
+    "ast_hash": "8bc67d96eb2382a0557aece2a899203e",
+    "semantic_hash": ""
+  },
+  "scripts/warehouse_shots.py": {
+    "mtime": 1783898980.2481709,
+    "ast_hash": "c9410da19df0d5d9ccee5fa5a106659a",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-smoke/runs/cfg-028399df/cylinder/t0/wire.png": {
+    "mtime": 1783898974.8393009,
+    "ast_hash": "080f7885c0201b51c4e7884ef3cf7499",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-smoke/runs/cfg-028399df/plate_hole/t0/wire.png": {
+    "mtime": 1783898974.9108949,
+    "ast_hash": "91d839241493dee965f9a6c2e9e07346",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-smoke/runs/cfg-89f62376/plate_hole/t0/wire.png": {
+    "mtime": 1783898974.976365,
+    "ast_hash": "876a096441443d93a12802a2619cb5a4",
     "semantic_hash": ""
   }
 }

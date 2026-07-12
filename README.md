@@ -204,7 +204,10 @@ ctest --test-dir build --output-on-failure -R "SpMV|spmv"
 
 ### STEP / OpenCASCADE (`POLYMESH_WITH_OCC`)
 
-Default builds are **STL-only**. STEP/B-rep import is optional (ADR-0001):
+Default CI/quickstart builds are **STL-capable without OCC**. **Product
+geometry, Lane V campaigns, and GUI STEP import need OCC ON**
+(`-DPOLYMESH_WITH_OCC=ON`) so B-rep/STEP stays first-class (ADR-0001 / ADR-0020).
+Without OCC, STEP loads and CadModel tests are unavailable / SKIP.
 
 ```sh
 # Ubuntu / Debian (package names vary slightly by release; 7.6+ typical)
@@ -212,13 +215,20 @@ sudo apt install libocct-data-exchange-dev libocct-foundation-dev \
   libocct-modeling-algorithms-dev libocct-modeling-data-dev \
   libocct-ocaf-dev libocct-visualization-dev
 
+# Fedora
+sudo dnf install opencascade-devel
+
 cmake -S . -B build -G Ninja -DPOLYMESH_WITH_OCC=ON
 cmake --build build
-# STEP tests run when OCC is linked; with OCC off they SKIP.
+# STEP / CadModel tests run when OCC is linked; with OCC off they SKIP.
 ```
 
 If CMake cannot find OCCT: `-DOpenCASCADE_DIR=/path/to/cmake/OpenCASCADE` (or the
 prefix that contains `OpenCASCADEConfig.cmake`). See `src/geom/CMakeLists.txt`.
+
+**Product fixtures are STEP** (`scripts/gen_cad_parts.py`). STL write is not
+part of the product path (`scripts/check_no_product_stl.sh`; load_stl remains
+for compare/legacy only).
 
 ### Mesh path caveat
 

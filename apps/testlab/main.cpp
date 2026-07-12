@@ -1253,6 +1253,14 @@ int run_campaign(const fs::path& camp_dir, bool resume) {
     std::printf("finished: %d runs → %s\n", cp.completed_runs, results_path.string().c_str());
 
     // Optional post-campaign hooks (ADR-0022). Failures here do not fail the campaign.
+    if (camp.warehouse) {
+        // V9b: mesh.vtu → wire.png for HANDOFF / review (best-effort).
+        const int rc =
+            std::system(("python3 scripts/warehouse_shots.py " + camp.name).c_str());
+        if (rc != 0) {
+            std::fprintf(stderr, "on_finish warehouse_shots exited %d\n", rc);
+        }
+    }
     if (camp.on_finish_analyze) {
         const int rc = std::system(("python3 scripts/analyze_campaign.py " + camp.name).c_str());
         if (rc != 0) {

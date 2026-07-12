@@ -56,7 +56,10 @@ Flags:
 
 ## Safety
 
-- Scripts should `--deny` force-push patterns where supported.
+- `scripts/invoke_grok_improve.sh` passes `--deny 'Bash(git push --force*)'`
+  and `--deny 'Bash(git push -f*)'` to the grok CLI (V10d).
+- Handoff pack and `AGENT_BOOTSTRAP.md` require `git pull --rebase` before
+  push and forbid force-push.
 - Never `rm -rf` outside the repo; never rewrite published history.
 - Prefer small commits scoped to one DAG node.
 

@@ -27,8 +27,23 @@ bench/campaigns/<name>/
   order in `campaign.json` `tiers[]`).
 
 Warehouse files are written by `polymesh_testlab` when `campaign.json` has
-`"warehouse": true` (see node **V3b**). Until that lands, the directory tree
-is scaffolding only.
+`"warehouse": true` (node **V3b**): `mesh.vtu`, `quality.json`, `result.json`.
+
+### Wireframe PNGs (`wire.png`)
+
+After mesh VTUs exist, render exterior wireframes with:
+
+```sh
+# Campaign name or path under bench/campaigns/
+python3 scripts/warehouse_shots.py varyhedron-short-1
+python3 scripts/warehouse_shots.py bench/campaigns/varyhedron-smoke --force
+python3 scripts/warehouse_shots.py varyhedron-short-1 --hole-zoom   # plate_hole ROI
+```
+
+`warehouse_shots.py` walks `runs/**/mesh.vtu` → sibling `wire.png` via
+[`scripts/vtu_wire_png.py`](../../scripts/vtu_wire_png.py) (pure Python, no
+meshio). Skips existing PNGs unless `--force`. Testlab also runs this
+post-hook when `"warehouse": true` so HANDOFF packs can list shots (V9b).
 
 ## Short-campaign defaults (Lane V)
 

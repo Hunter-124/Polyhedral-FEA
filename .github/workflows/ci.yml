@@ -81,3 +81,5 @@ jobs:
             exit 1
           fi
           echo "grep-audit clean"
+      - name: No product-path STL writers (ADR-0020 / V2d)
+        run: bash scripts/check_no_product_stl.sh

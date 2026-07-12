@@ -1,12 +1,12 @@
 {
   "campaign": "varyhedron-smoke",
   "completed_runs": 4,
-  "started_utc": "2026-07-12T22:43:57Z",
+  "started_utc": "2026-07-12T23:34:39Z",
   "state": "finished",
   "survivors": [
     "cfg-028399df",
     "cfg-89f62376"
   ],
   "tier": 0,
-  "updated_utc": "2026-07-12T22:45:20Z"
+  "updated_utc": "2026-07-12T23:35:30Z"
 }

@@ -1,28 +1,54 @@
 {
+  "accuracy": {
+    "all": [
+      {
+        "metric": "sigma_max",
+        "rel_err": 1.383741516390807,
+        "score": 0.06739718400766291,
+        "truth": 1000000.0,
+        "value": 2383741.516390807
+      },
+      {
+        "metric": "tip_deflection",
+        "rel_err": 0.4427256737045331,
+        "score": 0.25306816737412535,
+        "truth": 1e-06,
+        "value": 1.442725673704533e-06
+      }
+    ],
+    "metric": "sigma_max",
+    "rel_err": 1.383741516390807,
+    "score": 0.06739718400766291,
+    "truth": 1000000.0,
+    "value": 2383741.516390807
+  },
+  "answers": {
+    "sigma_max": 2383741.516390807,
+    "tip_deflection": 1.442725673704533e-06
+  },
   "cfg_id": "cfg-89f62376",
   "config": {
     "feature_refine": true,
     "mesher": "varyhedron",
     "order": 1
   },
-  "error": "solve_elastostatics: factorization failed — system is singular (insufficient constraints?)",
   "geom_class": {
     "curved_frac": 0.9318181818181818,
-    "min_feature_h": 28.551265275628406,
+    "min_feature_h": 28.577399384028727,
     "thin": false
   },
-  "mesh_ms": 11261.453119,
-  "n_dof": 7224,
-  "n_elems": 9995,
-  "n_nodes": 2408,
+  "mesh_ms": 11905.066083,
+  "n_dof": 7383,
+  "n_elems": 10677,
+  "n_nodes": 2461,
   "part": "cylinder",
   "quality": {
-    "M1max": 0.00023953294668977915,
-    "M2max": 0.0021103395103379825,
-    "M6": 0.023800313118391786,
-    "score": 0.7681297350178713
+    "M1max": 0.00023937879343897966,
+    "M2max": 0.001962773985900882,
+    "M6": 0.02484249317750572,
+    "score": 0.7733821735544429
   },
-  "solve_ms": 0.0,
-  "status": "solve_fail",
+  "solve_ms": 1053.855444,
+  "status": "ok",
   "tier": 0
 }

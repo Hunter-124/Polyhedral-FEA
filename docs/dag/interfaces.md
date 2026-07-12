@@ -171,3 +171,84 @@ viewport). Little-endian:
 | quads | n_quads × u32×4 | node indices |
 
 Writing only the boundary keeps campaign I/O cheap vs dumping the full volume.
+
+## 7. Experiment warehouse — `bench/campaigns/<name>/runs/...`
+
+Full warehouse (ADR-0022). Written by `polymesh_testlab` when
+`campaign.json` has `"warehouse": true` (default for new short campaigns).
+
+```
+bench/campaigns/<name>/
+  campaign.json
+  checkpoint.json
+  progress.json
+  results.jsonl
+  PARETO.md / PARETO.json          # after analyze_campaign.py
+  HANDOFF.md / handoff.json        # after write_grok_handoff.py
+  runs/<cfg_id>/<part>/t<tier>/
+    mesh.vtu                       # volume mesh (git-LFS)
+    wire.png                       # wireframe preview (git-LFS when large)
+    quality.json                   # surface/edge metrics
+    result.json                    # single-run mirror of the jsonl line
+```
+
+### 7a. `quality.json`
+
+```jsonc
+{
+  "M1max": 1.0e-11,
+  "M2max": 0.36,
+  "M6": 0.17,
+  "score": 0.42,
+  "edge_profile_hausdorff_max": 0.012,  // metres; vs CAD edge samples
+  "edge_profile_rel": 0.04,             // max / characteristic edge length
+  "geom_source": "brep"                 // brep | brep_tessellate_derived | stl_compare
+}
+```
+
+### 7b. Campaign extensions in `campaign.json`
+
+```jsonc
+{
+  "warehouse": true,
+  "on_finish": { "analyze": true, "grok_handoff": true }
+}
+```
+
+Large binaries: track `*.vtu` and large `*.png` with git-LFS (see
+`.gitattributes`). Pull requires `git lfs install` once per machine.
+
+## 8. Grok handoff — `HANDOFF.md` / `handoff.json`
+
+Written by `scripts/write_grok_handoff.py` after analyze (ADR-0022,
+`docs/process/grok-loop.md`).
+
+### 8a. `handoff.json` (machine)
+
+```jsonc
+{
+  "campaign": "varyhedron-short-1",
+  "git_head": "abc123…",
+  "finished_utc": "2026-07-12T12:00:00Z",
+  "pareto": "bench/campaigns/varyhedron-short-1/PARETO.md",
+  "results": "bench/campaigns/varyhedron-short-1/results.jsonl",
+  "shots": ["runs/cfg-…/plate_hole/t0/wire.png"],
+  "open_program_nodes": ["V6c", "V11"],
+  "mode": "autonomous",           // autonomous | supervised
+  "max_turns": 80
+}
+```
+
+### 8b. `HANDOFF.md` (human / agent prompt)
+
+Markdown body consumed by:
+
+```bash
+grok -p --yolo --permission-mode bypassPermissions \
+  --cwd <repo> --max-turns 80 \
+  --prompt-file bench/campaigns/<name>/HANDOFF.md
+```
+
+Must embed bootstrap sync rules, trend tables, shot paths, and the next
+experiment instruction. Schema changes to handoff fields require this section
+and the writer script in the same commit.

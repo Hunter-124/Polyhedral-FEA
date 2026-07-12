@@ -23,6 +23,13 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-12: **Lane V program board (V0)** — ADRs 0020 (true BRep volume
+  meshing), 0021 (varyhedron packing from day 1), 0022 (full experiment
+  warehouse + headless `grok -p --yolo` loop); ADR-0001 amended (OCC product
+  path, STL compare-only); `docs/dag/PROGRAM.yaml` V0–V11 nodes;
+  interfaces §7–§8 warehouse/handoff; `docs/process/grok-loop.md`;
+  AGENT_BOOTSTRAP open-node list. Owner shapes: plate_hole, cylinder, sphere,
+  icecream_cone; meshers varyhedron + hybrid_zoo; ~3 runs/shape short campaigns.
 - 2026-07-12: **plate_hole outer-corner mesh artifacts** — `write_plate_hole`
   ray-to-rect top/bottom faces chord-cut the four rectangle corners and left
   the STL non-manifold against full-side vertical walls; volume snap then

@@ -5,7 +5,9 @@ compile_commands.json
 # (BENCHMARKS.md anti-cheat rule 1). See audits/README.md for protocol.
 /bench/geometries/holdout/
 /audits/local/
+# VTU dumps generally ignored; campaign warehouse is tracked (git-LFS).
 *.vtu
+!bench/campaigns/**/runs/**/mesh.vtu
 /polymesh-setup/
 
 # machine-local graphify artifacts (committed: graph.json, GRAPH_REPORT.md,

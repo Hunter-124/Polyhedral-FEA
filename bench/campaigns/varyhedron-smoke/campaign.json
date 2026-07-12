@@ -5,7 +5,7 @@
     "tests/fixtures/parts/cylinder.case.json"
   ],
   "tiers": [
-    { "h_scale": 3.0, "keep_frac": 1.0 }
+    { "h_scale": 5.0, "keep_frac": 1.0 }
   ],
   "grid": {
     "mesher": ["varyhedron", "hybrid_zoo"],

@@ -23,6 +23,7 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-12: **Varyhedron Jacobian-safe edge snap + smoke campaign** — soft CAD edge blend with volume-offender revert; first warehouse smoke (4 runs) + HANDOFF pack; coarser short-campaign tiers (h_scale 5/3.5/2.5).
 - 2026-07-12: **Varyhedron v1 path (V6a/V6b/V7)** — `VolumeMesher::kVaryhedron`,
   `mesh/varyhedron_fill` (CAD edge seeds + graded scaffold + edge-profile snap),
   GUI label/tooltip (ADR-0021), CLI/testlab `varyhedron`, smoke on

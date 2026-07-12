@@ -1,0 +1,28 @@
+{
+  "cfg_id": "cfg-89f62376",
+  "config": {
+    "feature_refine": true,
+    "mesher": "varyhedron",
+    "order": 1
+  },
+  "error": "solve_elastostatics: factorization failed — system is singular (insufficient constraints?)",
+  "geom_class": {
+    "curved_frac": 0.9,
+    "min_feature_h": 2.8571428571428577,
+    "thin": false
+  },
+  "mesh_ms": 9919.601503,
+  "n_dof": 4353,
+  "n_elems": 4620,
+  "n_nodes": 1451,
+  "part": "plate_hole",
+  "quality": {
+    "M1max": 3.83259999629842e-14,
+    "M2max": 0.005,
+    "M6": 0.074762200305304,
+    "score": 0.5662476663336868
+  },
+  "solve_ms": 0.0,
+  "status": "solve_fail",
+  "tier": 0
+}

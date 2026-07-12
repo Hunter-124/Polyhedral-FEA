@@ -1,0 +1,28 @@
+{
+  "cfg_id": "cfg-028399df",
+  "config": {
+    "feature_refine": true,
+    "mesher": "hybrid_zoo",
+    "order": 1
+  },
+  "error": "solve_elastostatics: CG failed to converge after 24300 iterations (tol estimated error=8.424930986475584e-06)",
+  "geom_class": {
+    "curved_frac": 0.9,
+    "min_feature_h": 2.8571428571428577,
+    "thin": false
+  },
+  "mesh_ms": 8447.357138,
+  "n_dof": 12339,
+  "n_elems": 9360,
+  "n_nodes": 4113,
+  "part": "plate_hole",
+  "quality": {
+    "M1max": 0.002,
+    "M2max": 0.005,
+    "M6": 1.0,
+    "score": 0.6054421768707482
+  },
+  "solve_ms": 0.0,
+  "status": "solve_fail",
+  "tier": 0
+}

@@ -4,6 +4,8 @@
 #include "mesh/hybrid_fill.hpp"
 #include "mesh/surface_project.hpp"
 
+#include <Eigen/Geometry>
+
 #include <algorithm>
 #include <cmath>
 #include <unordered_map>
@@ -114,10 +116,12 @@ VaryhedronFillOutput varyhedron_fill_surface(
     out.h_fine = graded.h_fine;
     out.n_tets = out.mesh.tets.size();
 
-    // --- Edge-profile attraction: pull free nodes near CAD edges onto profile ---
+    // --- Edge-profile attraction: soft pull toward CAD edges, Jacobian-safe ---
     if (topo != nullptr && !topo->edges.empty()) {
         const auto bnodes = boundary_nodes(out.mesh);
-        const double snap_band = 1.25 * std::max(h, 1e-12);
+        const double snap_band = 0.75 * std::max(h, 1e-12);
+        // Save pre-snap positions for offender revert.
+        std::vector<Eigen::Vector3d> saved = out.mesh.nodes;
         for (std::uint32_t ni : bnodes) {
             if (ni >= out.mesh.nodes.size()) {
                 continue;
@@ -127,21 +131,38 @@ VaryhedronFillOutput varyhedron_fill_surface(
             if (!q || q->distance > snap_band) {
                 continue;
             }
-            // Blend toward CAD edge (keeps volume-ish; full project is aggressive).
-            const double w = 1.0 - (q->distance / snap_band);
+            // Mild blend only (aggressive full project inverts boundary tets).
+            const double w = 0.35 * (1.0 - (q->distance / snap_band));
             p = p + w * (q->closest - p);
         }
-        // Re-project lightly onto discrete surface so nodes stay on the solid.
-        std::vector<std::uint32_t> bvec(bnodes.begin(), bnodes.end());
-        for (std::uint32_t ni : bvec) {
-            if (ni >= out.mesh.nodes.size()) {
-                continue;
+
+        // Revert any tet with non-positive volume after the blend.
+        auto tet_vol6 = [&](const std::array<std::uint32_t, 4>& t) {
+            const Eigen::Vector3d a = out.mesh.nodes[t[0]];
+            const Eigen::Vector3d b = out.mesh.nodes[t[1]];
+            const Eigen::Vector3d c = out.mesh.nodes[t[2]];
+            const Eigen::Vector3d d = out.mesh.nodes[t[3]];
+            const Eigen::Vector3d ab = b - a;
+            const Eigen::Vector3d ac = c - a;
+            const Eigen::Vector3d ad = d - a;
+            return ab.dot(ac.cross(ad));
+        };
+        std::unordered_set<std::uint32_t> offenders;
+        for (const auto& t : out.mesh.tets) {
+            if (tet_vol6(t) <= 0.0) {
+                offenders.insert(t[0]);
+                offenders.insert(t[1]);
+                offenders.insert(t[2]);
+                offenders.insert(t[3]);
             }
-            const auto cp = closest_on_surface(surface, out.mesh.nodes[ni]);
-            out.mesh.nodes[ni] = cp.point;
+        }
+        for (std::uint32_t ni : offenders) {
+            if (ni < out.mesh.nodes.size()) {
+                out.mesh.nodes[ni] = saved[ni];
+            }
         }
 
-        // Metric: Hausdorff of a subsample of boundary nodes vs CAD edges.
+        // Metric: Hausdorff of boundary nodes vs CAD edges.
         std::vector<Eigen::Vector3d> poly;
         poly.reserve(bnodes.size());
         for (std::uint32_t ni : bnodes) {

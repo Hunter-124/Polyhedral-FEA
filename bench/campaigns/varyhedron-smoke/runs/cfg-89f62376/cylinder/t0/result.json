@@ -1,0 +1,28 @@
+{
+  "cfg_id": "cfg-89f62376",
+  "config": {
+    "feature_refine": true,
+    "mesher": "varyhedron",
+    "order": 1
+  },
+  "error": "element_stiffness: non-positive Jacobian (-1.091e-11) — inverted element",
+  "geom_class": {
+    "curved_frac": 0.9318181818181818,
+    "min_feature_h": 28.551265275628406,
+    "thin": false
+  },
+  "mesh_ms": 23194.019944,
+  "n_dof": 14163,
+  "n_elems": 20685,
+  "n_nodes": 4721,
+  "part": "cylinder",
+  "quality": {
+    "M1max": 4.773964048686312e-15,
+    "M2max": 0.0015869511907492821,
+    "M6": 0.0,
+    "score": 0.7492705649749389
+  },
+  "solve_ms": 0.0,
+  "status": "solve_fail",
+  "tier": 0
+}

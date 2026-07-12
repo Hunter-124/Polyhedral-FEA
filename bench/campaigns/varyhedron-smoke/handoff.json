@@ -1,0 +1,31 @@
+{
+  "campaign": "varyhedron-smoke",
+  "git_head": "21b8086268814322a7e18f52ea2d7fee7f28d66b",
+  "finished_utc": "2026-07-12T22:43:02Z",
+  "checkpoint_state": "finished",
+  "pareto": "bench/campaigns/varyhedron-smoke/PARETO.md",
+  "results": "bench/campaigns/varyhedron-smoke/results.jsonl",
+  "shots": [
+    "bench/campaigns/varyhedron-smoke/runs/cfg-028399df/cylinder/t0/mesh.vtu"
+  ],
+  "open_program_nodes": [
+    "campaign-1",
+    "feedback-loop",
+    "V1c",
+    "V1d",
+    "V2d",
+    "V3c",
+    "V4",
+    "V6c",
+    "V6d",
+    "V6e",
+    "V8",
+    "V9a",
+    "V9b",
+    "V10c",
+    "V10d",
+    "V11"
+  ],
+  "mode": "autonomous",
+  "max_turns": 80
+}

@@ -1,12 +1,13 @@
 {
   "campaign": "varyhedron-smoke",
-  "git_head": "21b8086268814322a7e18f52ea2d7fee7f28d66b",
-  "finished_utc": "2026-07-12T22:43:02Z",
+  "git_head": "c247c0aebf96c121d266760e3361cec754e5ee2c",
+  "finished_utc": "2026-07-12T22:45:20Z",
   "checkpoint_state": "finished",
   "pareto": "bench/campaigns/varyhedron-smoke/PARETO.md",
   "results": "bench/campaigns/varyhedron-smoke/results.jsonl",
   "shots": [
-    "bench/campaigns/varyhedron-smoke/runs/cfg-028399df/cylinder/t0/mesh.vtu"
+    "bench/campaigns/varyhedron-smoke/runs/cfg-028399df/cylinder/t0/mesh.vtu",
+    "bench/campaigns/varyhedron-smoke/runs/cfg-028399df/plate_hole/t0/mesh.vtu"
   ],
   "open_program_nodes": [
     "campaign-1",

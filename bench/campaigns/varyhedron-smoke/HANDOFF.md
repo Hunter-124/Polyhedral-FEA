@@ -12,7 +12,7 @@ Never force-push. Cap scope to open PROGRAM nodes related to varyhedron packing.
 
 ## Campaign snapshot
 - **Campaign:** `varyhedron-smoke`
-- **git HEAD:** `21b8086268814322a7e18f52ea2d7fee7f28d66b`
+- **git HEAD:** `c247c0aebf96c121d266760e3361cec754e5ee2c`
 - **checkpoint:** `finished`
 - **results:** `bench/campaigns/varyhedron-smoke/results.jsonl`
 - **PARETO:** `bench/campaigns/varyhedron-smoke/PARETO.md`
@@ -21,15 +21,16 @@ Never force-push. Cap scope to open PROGRAM nodes related to varyhedron packing.
 ## Trends (mesh/solve/quality vs tier)
 | part | mesher | tier | status | mesh_ms | solve_ms | quality | rel_err |
 |------|--------|-----:|--------|--------:|---------:|--------:|--------:|
-| cylinder | hybrid_zoo | 0 | over_budget | 34151.512634 | 0.0 | 0.849986487819873 |  |
-| cylinder | varyhedron | 0 | solve_fail | 23194.019944 | 0.0 | 0.7492705649749389 |  |
-| plate_hole | hybrid_zoo | 0 | solve_fail | 8447.357138 | 0.0 | 0.6054421768707482 |  |
-| plate_hole | varyhedron | 0 | solve_fail | 9919.601503 | 0.0 | 0.5662476663336868 |  |
+| cylinder | hybrid_zoo | 0 | ok | 8814.60098 | 46931.086012 | 0.9246161294542614 | 39387743565368.13 |
+| cylinder | varyhedron | 0 | solve_fail | 11261.453119 | 0.0 | 0.7681297350178713 |  |
+| plate_hole | hybrid_zoo | 0 | ok | 3102.71569 | 440.636989 | 0.623302664483781 | 0.6287242456556233 |
+| plate_hole | varyhedron | 0 | solve_fail | 4345.133049 | 0.0 | 0.5493946213334598 |  |
 
 ## Warehouse / visuals
 Paths under the repo (use `read_file` on PNGs when present):
 ```
 bench/campaigns/varyhedron-smoke/runs/cfg-028399df/cylinder/t0/mesh.vtu
+bench/campaigns/varyhedron-smoke/runs/cfg-028399df/plate_hole/t0/mesh.vtu
 ```
 
 ## Autonomous defaults

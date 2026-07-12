@@ -1,28 +1,54 @@
 {
+  "accuracy": {
+    "all": [
+      {
+        "metric": "sigma_max",
+        "rel_err": 39387743565368.13,
+        "score": 2.538860847259228e-15,
+        "truth": 1000000.0,
+        "value": 3.938774356536913e+19
+      },
+      {
+        "metric": "tip_deflection",
+        "rel_err": 0.044288672155371606,
+        "score": 0.7720470696307287,
+        "truth": 1e-06,
+        "value": 9.557113278446283e-07
+      }
+    ],
+    "metric": "sigma_max",
+    "rel_err": 39387743565368.13,
+    "score": 2.538860847259228e-15,
+    "truth": 1000000.0,
+    "value": 3.938774356536913e+19
+  },
+  "answers": {
+    "sigma_max": 3.938774356536913e+19,
+    "tip_deflection": 9.557113278446283e-07
+  },
   "cfg_id": "cfg-028399df",
   "config": {
     "feature_refine": true,
     "mesher": "hybrid_zoo",
     "order": 1
   },
-  "error": "mesh exceeds campaign DOF/elem budget (64266 dof, 60582 elems)",
   "geom_class": {
     "curved_frac": 0.9318181818181818,
     "min_feature_h": 28.551265275628406,
     "thin": false
   },
-  "mesh_ms": 34151.512634,
-  "n_dof": 64266,
-  "n_elems": 60582,
-  "n_nodes": 21422,
+  "mesh_ms": 8814.60098,
+  "n_dof": 19500,
+  "n_elems": 17512,
+  "n_nodes": 6500,
   "part": "cylinder",
   "quality": {
-    "M1max": 0.0006673559012503688,
-    "M2max": 0.0019371258367998935,
+    "M1max": 0.0010081948324401767,
+    "M2max": 0.0014426801326740582,
     "M6": 1.0,
-    "score": 0.849986487819873
+    "score": 0.9246161294542614
   },
-  "solve_ms": 0.0,
-  "status": "over_budget",
+  "solve_ms": 46931.086012,
+  "status": "ok",
   "tier": 0
 }

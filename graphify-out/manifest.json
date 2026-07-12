@@ -390,8 +390,8 @@
     "semantic_hash": ""
   },
   "docs/decisions/0001-geometry-kernel.md": {
-    "mtime": 1783727444.5817451,
-    "ast_hash": "118ea8cd8133ba817568ce594f27b7b9",
+    "mtime": 1783894735.5168428,
+    "ast_hash": "fad00af8f031dbf0a77db05b0b89892f",
     "semantic_hash": ""
   },
   "docs/decisions/0002-license-bsd3.md": {
@@ -450,8 +450,8 @@
     "semantic_hash": ""
   },
   "docs/progress.md": {
-    "mtime": 1783749234.435357,
-    "ast_hash": "3cfde4031d34e9d72b848457f2fc54c5",
+    "mtime": 1783894804.1777136,
+    "ast_hash": "b11bc3e2bfb633760753c206bd05b428",
     "semantic_hash": ""
   },
   "docs/spec.md": {
@@ -475,7 +475,7 @@
     "semantic_hash": ""
   },
   "src/geom/CMakeLists.txt": {
-    "mtime": 1783727444.5888767,
+    "mtime": 1783894840.9322162,
     "ast_hash": "faa252a92b55587bb8f05de1684e68f5",
     "semantic_hash": ""
   },
@@ -490,7 +490,7 @@
     "semantic_hash": ""
   },
   "tests/CMakeLists.txt": {
-    "mtime": 1783748185.5670426,
+    "mtime": 1783894840.9322162,
     "ast_hash": "1d362d2d0c9df95e882724cb725f8ab7",
     "semantic_hash": ""
   },
@@ -650,7 +650,7 @@
     "semantic_hash": ""
   },
   "src/geom/include/geom/step.hpp": {
-    "mtime": 1783727444.5896487,
+    "mtime": 1783894840.9322162,
     "ast_hash": "191af85f2967b3c43f18494b90018396",
     "semantic_hash": ""
   },
@@ -665,7 +665,7 @@
     "semantic_hash": ""
   },
   "src/geom/src/step.cpp": {
-    "mtime": 1783727444.5898001,
+    "mtime": 1783894840.9322162,
     "ast_hash": "821a7efecf129a9b5393981229f326b7",
     "semantic_hash": ""
   },
@@ -1200,13 +1200,13 @@
     "semantic_hash": ""
   },
   "docs/dag/AGENT_BOOTSTRAP.md": {
-    "mtime": 1783749234.4343572,
-    "ast_hash": "1aa62160ac5aa22b286b1f40acc78467",
+    "mtime": 1783894754.641518,
+    "ast_hash": "38a2d08840662d34b49fdb12bba7d86c",
     "semantic_hash": ""
   },
   "docs/dag/PROGRAM.yaml": {
-    "mtime": 1783749234.4343572,
-    "ast_hash": "a3d8ab947c3766037f38c93accef1699",
+    "mtime": 1783894821.7814276,
+    "ast_hash": "d20d6b6d59ddf7d205d98c3c385a6939",
     "semantic_hash": ""
   },
   "docs/dag/README.md": {
@@ -1215,8 +1215,8 @@
     "semantic_hash": ""
   },
   "docs/dag/interfaces.md": {
-    "mtime": 1783791257.4187322,
-    "ast_hash": "3dcd662f3798dd432b763ff2b127f600",
+    "mtime": 1783894735.5168428,
+    "ast_hash": "6737ab3b11b17c6d5f521773c40d74a4",
     "semantic_hash": ""
   },
   "docs/decisions/0019-mixed-fe-vem-adaptive-order-core.md": {
@@ -1245,8 +1245,8 @@
     "semantic_hash": ""
   },
   "scripts/gen_part_library.py": {
-    "mtime": 1783744077.1264875,
-    "ast_hash": "6d42029045721e3da26cc7bcb3b840fd",
+    "mtime": 1783894821.7764277,
+    "ast_hash": "b573a9cfca06027b08c2c4c0a9e785e0",
     "semantic_hash": ""
   },
   "src/adapt/include/adapt/hp_driver.hpp": {
@@ -1370,13 +1370,13 @@
     "semantic_hash": ""
   },
   "bench/campaigns/settings-frontier-1/checkpoint.json": {
-    "mtime": 1783790946.3115907,
-    "ast_hash": "7a4ddafffe28a331d502553609921730",
+    "mtime": 1783894840.9322162,
+    "ast_hash": "ef83ac9707a40d8cee633cb045011218",
     "semantic_hash": ""
   },
   "bench/campaigns/settings-frontier-1/progress.json": {
-    "mtime": 1783790947.6355758,
-    "ast_hash": "f45fe417a3ef55f3bd83a58fadf358c6",
+    "mtime": 1783894840.9322162,
+    "ast_hash": "bc526b4c7739e307ce22c4bfbffd2321",
     "semantic_hash": ""
   },
   "bench/campaigns/smoke/PARETO.json": {
@@ -1402,6 +1402,41 @@
   "docs/process/feedback-loop.md": {
     "mtime": 1783749234.4343572,
     "ast_hash": "df78b4a51d20570e98127d103792ea6b",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-short-1/campaign.json": {
+    "mtime": 1783894804.1777136,
+    "ast_hash": "dcb24f9bff3eb14f8652125b777abec8",
+    "semantic_hash": ""
+  },
+  "scripts/gen_cad_parts.py": {
+    "mtime": 1783894821.7764277,
+    "ast_hash": "f84a06572138312e29fc3689bb6935ba",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/README.md": {
+    "mtime": 1783894804.1777136,
+    "ast_hash": "556f5e9146c65b7a3886c5e9c7603979",
+    "semantic_hash": ""
+  },
+  "docs/decisions/0020-brep-volume-meshing.md": {
+    "mtime": 1783894709.1436715,
+    "ast_hash": "cafbb07530235e851c38e43d862c60a4",
+    "semantic_hash": ""
+  },
+  "docs/decisions/0021-varyhedron-packing.md": {
+    "mtime": 1783894714.887608,
+    "ast_hash": "3c888541f59aeffe55659be5e8b3ebb2",
+    "semantic_hash": ""
+  },
+  "docs/decisions/0022-experiment-warehouse-grok-loop.md": {
+    "mtime": 1783894720.714455,
+    "ast_hash": "52adbdec5edea050d5cbbf2a00156dfc",
+    "semantic_hash": ""
+  },
+  "docs/process/grok-loop.md": {
+    "mtime": 1783894735.5168428,
+    "ast_hash": "3d5772ed008a62c40eafc540d74bc61a",
     "semantic_hash": ""
   }
 }

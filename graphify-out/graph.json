@@ -170,7 +170,7 @@
       "source_location": "L230",
       "_origin": "ast",
       "id": "apps_bench_d6_tier3_promote_tet4_to_tet10",
-      "community": 25,
+      "community": 20,
       "norm_label": "promote_tet4_to_tet10()"
     },
     {
@@ -310,7 +310,7 @@
       "source_location": "L389",
       "_origin": "ast",
       "id": "apps_bench_d6_tier3_spec",
-      "community": 353,
+      "community": 25,
       "norm_label": "spec"
     },
     {
@@ -320,7 +320,7 @@
       "source_location": "L390",
       "_origin": "ast",
       "id": "apps_bench_d6_tier3_spec_path",
-      "community": 353,
+      "community": 25,
       "norm_label": "path"
     },
     {
@@ -330,7 +330,7 @@
       "source_location": "L391",
       "_origin": "ast",
       "id": "apps_bench_d6_tier3_spec_tag",
-      "community": 353,
+      "community": 25,
       "norm_label": "tag"
     },
     {
@@ -340,7 +340,7 @@
       "source_location": "L393",
       "_origin": "ast",
       "id": "apps_bench_d6_tier3_spec_n",
-      "community": 353,
+      "community": 25,
       "norm_label": "n"
     },
     {
@@ -350,7 +350,7 @@
       "source_location": "L395",
       "_origin": "ast",
       "id": "apps_bench_d6_tier3_spec_h0",
-      "community": 353,
+      "community": 25,
       "norm_label": "h0"
     },
     {
@@ -360,7 +360,7 @@
       "source_location": "L396",
       "_origin": "ast",
       "id": "apps_bench_d6_tier3_spec_rho",
-      "community": 353,
+      "community": 25,
       "norm_label": "rho"
     },
     {
@@ -370,7 +370,7 @@
       "source_location": "L397",
       "_origin": "ast",
       "id": "apps_bench_d6_tier3_spec_layers",
-      "community": 353,
+      "community": 25,
       "norm_label": "layers"
     },
     {
@@ -380,7 +380,7 @@
       "source_location": "L398",
       "_origin": "ast",
       "id": "apps_bench_d6_tier3_spec_n_bg",
-      "community": 353,
+      "community": 25,
       "norm_label": "n_bg"
     },
     {
@@ -390,7 +390,7 @@
       "source_location": "L399",
       "_origin": "ast",
       "id": "apps_bench_d6_tier3_spec_nz",
-      "community": 353,
+      "community": 25,
       "norm_label": "nz"
     },
     {
@@ -550,7 +550,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_gui_gui_settings_hpp_apps_gui_gui_settings",
-      "community": 44,
+      "community": 94,
       "norm_label": "gui_settings.hpp"
     },
     {
@@ -4720,7 +4720,7 @@
       "source_location": "L142",
       "_origin": "ast",
       "id": "apps_testlab_main_box3",
-      "community": 351,
+      "community": 322,
       "norm_label": "box3"
     },
     {
@@ -4730,7 +4730,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "apps_testlab_main_cpp_vector3d",
-      "community": 351,
+      "community": 322,
       "norm_label": "vector3d"
     },
     {
@@ -4740,7 +4740,7 @@
       "source_location": "L143",
       "_origin": "ast",
       "id": "apps_testlab_main_box3_lo",
-      "community": 351,
+      "community": 322,
       "norm_label": "lo"
     },
     {
@@ -4750,7 +4750,7 @@
       "source_location": "L144",
       "_origin": "ast",
       "id": "apps_testlab_main_box3_hi",
-      "community": 351,
+      "community": 322,
       "norm_label": "hi"
     },
     {
@@ -4810,7 +4810,7 @@
       "source_location": "L156",
       "_origin": "ast",
       "id": "apps_testlab_main_loadspec",
-      "community": 351,
+      "community": 322,
       "norm_label": "loadspec"
     },
     {
@@ -4820,7 +4820,7 @@
       "source_location": "L157",
       "_origin": "ast",
       "id": "apps_testlab_main_loadspec_box",
-      "community": 351,
+      "community": 322,
       "norm_label": "box"
     },
     {
@@ -4830,7 +4830,7 @@
       "source_location": "L158",
       "_origin": "ast",
       "id": "apps_testlab_main_loadspec_traction",
-      "community": 351,
+      "community": 307,
       "norm_label": "traction"
     },
     {
@@ -5030,7 +5030,7 @@
       "source_location": "L186",
       "_origin": "ast",
       "id": "apps_testlab_main_config",
-      "community": 318,
+      "community": 158,
       "norm_label": "config"
     },
     {
@@ -5040,7 +5040,7 @@
       "source_location": "L187",
       "_origin": "ast",
       "id": "apps_testlab_main_config_id",
-      "community": 318,
+      "community": 158,
       "norm_label": "id"
     },
     {
@@ -5050,7 +5050,7 @@
       "source_location": "L188",
       "_origin": "ast",
       "id": "apps_testlab_main_config_values",
-      "community": 318,
+      "community": 158,
       "norm_label": "values"
     },
     {
@@ -5060,7 +5060,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "apps_testlab_main_cpp_volumemesher",
-      "community": 318,
+      "community": 158,
       "norm_label": "volumemesher"
     },
     {
@@ -5070,7 +5070,7 @@
       "source_location": "L189",
       "_origin": "ast",
       "id": "apps_testlab_main_config_mesher",
-      "community": 318,
+      "community": 158,
       "norm_label": "mesher"
     },
     {
@@ -5080,7 +5080,7 @@
       "source_location": "L190",
       "_origin": "ast",
       "id": "apps_testlab_main_config_feature_refine",
-      "community": 318,
+      "community": 158,
       "norm_label": "feature_refine"
     },
     {
@@ -5090,7 +5090,7 @@
       "source_location": "L191",
       "_origin": "ast",
       "id": "apps_testlab_main_config_curvature_turn_deg",
-      "community": 318,
+      "community": 158,
       "norm_label": "curvature_turn_deg"
     },
     {
@@ -5100,7 +5100,7 @@
       "source_location": "L192",
       "_origin": "ast",
       "id": "apps_testlab_main_config_snap_boundary",
-      "community": 318,
+      "community": 158,
       "norm_label": "snap_boundary"
     },
     {
@@ -5110,7 +5110,7 @@
       "source_location": "L193",
       "_origin": "ast",
       "id": "apps_testlab_main_config_order",
-      "community": 318,
+      "community": 158,
       "norm_label": "order"
     },
     {
@@ -5120,7 +5120,7 @@
       "source_location": "L194",
       "_origin": "ast",
       "id": "apps_testlab_main_config_element_tendency",
-      "community": 318,
+      "community": 158,
       "norm_label": "element_tendency"
     },
     {
@@ -5210,7 +5210,7 @@
       "source_location": "L209",
       "_origin": "ast",
       "id": "apps_testlab_main_parse_box",
-      "community": 351,
+      "community": 318,
       "norm_label": "parse_box()"
     },
     {
@@ -6278,7 +6278,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "bench_competitive_schema_properties_version",
-      "community": 50,
+      "community": 360,
       "norm_label": "version"
     },
     {
@@ -6288,7 +6288,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "bench_competitive_schema_version_type",
-      "community": 50,
+      "community": 360,
       "norm_label": "type"
     },
     {
@@ -6298,7 +6298,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "bench_competitive_schema_version_description",
-      "community": 50,
+      "community": 360,
       "norm_label": "description"
     },
     {
@@ -6308,7 +6308,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "bench_competitive_schema_properties_case_id",
-      "community": 364,
+      "community": 50,
       "norm_label": "case_id"
     },
     {
@@ -6318,7 +6318,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "bench_competitive_schema_case_id_type",
-      "community": 364,
+      "community": 50,
       "norm_label": "type"
     },
     {
@@ -6328,7 +6328,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "bench_competitive_schema_case_id_description",
-      "community": 364,
+      "community": 50,
       "norm_label": "description"
     },
     {
@@ -7476,6 +7476,246 @@
       "norm_label": "best config factors per geom_class and per part."
     },
     {
+      "label": "gen_cad_parts.py",
+      "file_type": "code",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "scripts_gen_cad_parts",
+      "community": 49,
+      "norm_label": "gen_cad_parts.py"
+    },
+    {
+      "label": "_is_valid()",
+      "file_type": "code",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L75",
+      "_origin": "ast",
+      "id": "scripts_gen_cad_parts_is_valid",
+      "community": 49,
+      "norm_label": "_is_valid()"
+    },
+    {
+      "label": "_volume()",
+      "file_type": "code",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L79",
+      "_origin": "ast",
+      "id": "scripts_gen_cad_parts_volume",
+      "community": 49,
+      "norm_label": "_volume()"
+    },
+    {
+      "label": "_require_solid()",
+      "file_type": "code",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L85",
+      "_origin": "ast",
+      "id": "scripts_gen_cad_parts_require_solid",
+      "community": 49,
+      "norm_label": "_require_solid()"
+    },
+    {
+      "label": "write_step()",
+      "file_type": "code",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L93",
+      "_origin": "ast",
+      "id": "scripts_gen_cad_parts_write_step",
+      "community": 49,
+      "norm_label": "write_step()"
+    },
+    {
+      "label": "Path",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "_origin": "ast",
+      "id": "scripts_gen_cad_parts_py_path",
+      "community": 49,
+      "norm_label": "path"
+    },
+    {
+      "label": "write_stl_compare()",
+      "file_type": "code",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L111",
+      "_origin": "ast",
+      "id": "scripts_gen_cad_parts_write_stl_compare",
+      "community": 49,
+      "norm_label": "write_stl_compare()"
+    },
+    {
+      "label": "make_plate_hole()",
+      "file_type": "code",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L128",
+      "_origin": "ast",
+      "id": "scripts_gen_cad_parts_make_plate_hole",
+      "community": 49,
+      "norm_label": "make_plate_hole()"
+    },
+    {
+      "label": "make_cylinder()",
+      "file_type": "code",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L155",
+      "_origin": "ast",
+      "id": "scripts_gen_cad_parts_make_cylinder",
+      "community": 49,
+      "norm_label": "make_cylinder()"
+    },
+    {
+      "label": "make_sphere()",
+      "file_type": "code",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L161",
+      "_origin": "ast",
+      "id": "scripts_gen_cad_parts_make_sphere",
+      "community": 49,
+      "norm_label": "make_sphere()"
+    },
+    {
+      "label": "_edge()",
+      "file_type": "code",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L166",
+      "_origin": "ast",
+      "id": "scripts_gen_cad_parts_edge",
+      "community": 49,
+      "norm_label": "_edge()"
+    },
+    {
+      "label": "gp_Pnt",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "_origin": "ast",
+      "id": "gp_pnt",
+      "community": 49,
+      "norm_label": "gp_pnt"
+    },
+    {
+      "label": "_wire_triangle()",
+      "file_type": "code",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L170",
+      "_origin": "ast",
+      "id": "scripts_gen_cad_parts_wire_triangle",
+      "community": 49,
+      "norm_label": "_wire_triangle()"
+    },
+    {
+      "label": "_face_triangle()",
+      "file_type": "code",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L174",
+      "_origin": "ast",
+      "id": "scripts_gen_cad_parts_face_triangle",
+      "community": 49,
+      "norm_label": "_face_triangle()"
+    },
+    {
+      "label": "make_triangular_pyramid()",
+      "file_type": "code",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L178",
+      "_origin": "ast",
+      "id": "scripts_gen_cad_parts_make_triangular_pyramid",
+      "community": 49,
+      "norm_label": "make_triangular_pyramid()"
+    },
+    {
+      "label": "make_icecream_cone()",
+      "file_type": "code",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L221",
+      "_origin": "ast",
+      "id": "scripts_gen_cad_parts_make_icecream_cone",
+      "community": 49,
+      "norm_label": "make_icecream_cone()"
+    },
+    {
+      "label": "main()",
+      "file_type": "code",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L257",
+      "_origin": "ast",
+      "id": "scripts_gen_cad_parts_main",
+      "community": 49,
+      "norm_label": "main()"
+    },
+    {
+      "label": "Write a manifold solid as AP214 STEP.",
+      "file_type": "rationale",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L94",
+      "_origin": "ast",
+      "id": "scripts_gen_cad_parts_rationale_94",
+      "community": 49,
+      "norm_label": "write a manifold solid as ap214 step."
+    },
+    {
+      "label": "Tessellate and write an ASCII-friendly STL for visual compare only.",
+      "file_type": "rationale",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L112",
+      "_origin": "ast",
+      "id": "scripts_gen_cad_parts_rationale_112",
+      "community": 49,
+      "norm_label": "tessellate and write an ascii-friendly stl for visual compare only."
+    },
+    {
+      "label": "Centered plate with through-hole along z \u2014 matches legacy plate_hole dims.",
+      "file_type": "rationale",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L135",
+      "_origin": "ast",
+      "id": "scripts_gen_cad_parts_rationale_135",
+      "community": 49,
+      "norm_label": "centered plate with through-hole along z \u2014 matches legacy plate_hole dims."
+    },
+    {
+      "label": "Solid cylinder, axis along +z, base circle in z=0 plane, center at origin.",
+      "file_type": "rationale",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L156",
+      "_origin": "ast",
+      "id": "scripts_gen_cad_parts_rationale_156",
+      "community": 49,
+      "norm_label": "solid cylinder, axis along +z, base circle in z=0 plane, center at origin."
+    },
+    {
+      "label": "Solid sphere centered at the origin.",
+      "file_type": "rationale",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L162",
+      "_origin": "ast",
+      "id": "scripts_gen_cad_parts_rationale_162",
+      "community": 49,
+      "norm_label": "solid sphere centered at the origin."
+    },
+    {
+      "label": "Regular triangular pyramid (tetrahedral apex over equilateral base) on z=0.",
+      "file_type": "rationale",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L183",
+      "_origin": "ast",
+      "id": "scripts_gen_cad_parts_rationale_183",
+      "community": 49,
+      "norm_label": "regular triangular pyramid (tetrahedral apex over equilateral base) on z=0."
+    },
+    {
+      "label": "Triangular pyramid with a ball intersecting one lateral face (boolean union).",
+      "file_type": "rationale",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L227",
+      "_origin": "ast",
+      "id": "scripts_gen_cad_parts_rationale_227",
+      "community": 49,
+      "norm_label": "triangular pyramid with a ball intersecting one lateral face (boolean union)."
+    },
+    {
       "label": "gen_part_library.py",
       "file_type": "code",
       "source_file": "scripts/gen_part_library.py",
@@ -7489,7 +7729,7 @@
       "label": "_facet()",
       "file_type": "code",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L27",
+      "source_location": "L34",
       "_origin": "ast",
       "id": "scripts_gen_part_library_facet",
       "community": 30,
@@ -7499,7 +7739,7 @@
       "label": "_cross()",
       "file_type": "code",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L39",
+      "source_location": "L46",
       "_origin": "ast",
       "id": "scripts_gen_part_library_cross",
       "community": 30,
@@ -7509,7 +7749,7 @@
       "label": "_sub()",
       "file_type": "code",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L47",
+      "source_location": "L54",
       "_origin": "ast",
       "id": "scripts_gen_part_library_sub",
       "community": 30,
@@ -7519,7 +7759,7 @@
       "label": "_norm()",
       "file_type": "code",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L51",
+      "source_location": "L58",
       "_origin": "ast",
       "id": "scripts_gen_part_library_norm",
       "community": 30,
@@ -7529,7 +7769,7 @@
       "label": "tri()",
       "file_type": "code",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L56",
+      "source_location": "L63",
       "_origin": "ast",
       "id": "scripts_gen_part_library_tri",
       "community": 30,
@@ -7539,7 +7779,7 @@
       "label": "write_box()",
       "file_type": "code",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L67",
+      "source_location": "L74",
       "_origin": "ast",
       "id": "scripts_gen_part_library_write_box",
       "community": 30,
@@ -7559,17 +7799,27 @@
       "label": "write_plate_hole()",
       "file_type": "code",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L107",
+      "source_location": "L114",
       "_origin": "ast",
       "id": "scripts_gen_part_library_write_plate_hole",
       "community": 30,
       "norm_label": "write_plate_hole()"
     },
     {
+      "label": "_assert_manifold_facets()",
+      "file_type": "code",
+      "source_file": "scripts/gen_part_library.py",
+      "source_location": "L270",
+      "_origin": "ast",
+      "id": "scripts_gen_part_library_assert_manifold_facets",
+      "community": 30,
+      "norm_label": "_assert_manifold_facets()"
+    },
+    {
       "label": "main()",
       "file_type": "code",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L226",
+      "source_location": "L301",
       "_origin": "ast",
       "id": "scripts_gen_part_library_main",
       "community": 30,
@@ -7579,9 +7829,9 @@
       "label": "Emit one facet with outward-ish normal (right-hand a->b->c, flipped if needed).",
       "file_type": "rationale",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L57",
+      "source_location": "L64",
       "_origin": "ast",
-      "id": "scripts_gen_part_library_rationale_57",
+      "id": "scripts_gen_part_library_rationale_64",
       "community": 30,
       "norm_label": "emit one facet with outward-ish normal (right-hand a->b->c, flipped if needed)."
     },
@@ -7589,9 +7839,9 @@
       "label": "Axis-aligned box [ox,ox+lx] x [oy,oy+ly] x [oz,oz+lz], 12 triangles.",
       "file_type": "rationale",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L69",
+      "source_location": "L76",
       "_origin": "ast",
-      "id": "scripts_gen_part_library_rationale_69",
+      "id": "scripts_gen_part_library_rationale_76",
       "community": 30,
       "norm_label": "axis-aligned box [ox,ox+lx] x [oy,oy+ly] x [oz,oz+lz], 12 triangles."
     },
@@ -7599,11 +7849,21 @@
       "label": "Centered plate with through-hole along z. Origin at plate mid-plane centre.",
       "file_type": "rationale",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L116",
+      "source_location": "L123",
       "_origin": "ast",
-      "id": "scripts_gen_part_library_rationale_116",
+      "id": "scripts_gen_part_library_rationale_123",
       "community": 30,
       "norm_label": "centered plate with through-hole along z. origin at plate mid-plane centre."
+    },
+    {
+      "label": "Parse emitted ASCII facet blocks and require edge multiplicity 2.",
+      "file_type": "rationale",
+      "source_file": "scripts/gen_part_library.py",
+      "source_location": "L271",
+      "_origin": "ast",
+      "id": "scripts_gen_part_library_rationale_271",
+      "community": 30,
+      "norm_label": "parse emitted ascii facet blocks and require edge multiplicity 2."
     },
     {
       "label": "mesh_preview.py",
@@ -8692,7 +8952,7 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "src_adapt_include_adapt_sizing_field_featuresizing_dist",
-      "community": 132,
+      "community": 337,
       "norm_label": "dist_"
     },
     {
@@ -8702,7 +8962,7 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "src_adapt_include_adapt_sizing_field_geometrysizing",
-      "community": 320,
+      "community": 38,
       "norm_label": "geometrysizing"
     },
     {
@@ -8712,7 +8972,7 @@
       "source_location": "L95",
       "_origin": "ast",
       "id": "src_adapt_include_adapt_sizing_field_geometrysizing_size_at",
-      "community": 320,
+      "community": 38,
       "norm_label": "size_at"
     },
     {
@@ -8722,7 +8982,7 @@
       "source_location": "L98",
       "_origin": "ast",
       "id": "src_adapt_include_adapt_sizing_field_geometrysizing_h_min",
-      "community": 320,
+      "community": 38,
       "norm_label": "h_min_"
     },
     {
@@ -8732,7 +8992,7 @@
       "source_location": "L99",
       "_origin": "ast",
       "id": "src_adapt_include_adapt_sizing_field_geometrysizing_h_max",
-      "community": 320,
+      "community": 38,
       "norm_label": "h_max_"
     },
     {
@@ -8742,7 +9002,7 @@
       "source_location": "L100",
       "_origin": "ast",
       "id": "src_adapt_include_adapt_sizing_field_geometrysizing_blend",
-      "community": 320,
+      "community": 38,
       "norm_label": "blend_"
     },
     {
@@ -8752,7 +9012,7 @@
       "source_location": "L101",
       "_origin": "ast",
       "id": "src_adapt_include_adapt_sizing_field_geometrysizing_curv_frac",
-      "community": 320,
+      "community": 38,
       "norm_label": "curv_frac_"
     },
     {
@@ -8762,7 +9022,7 @@
       "source_location": "L102",
       "_origin": "ast",
       "id": "src_adapt_include_adapt_sizing_field_geometrysizing_thick_frac",
-      "community": 320,
+      "community": 38,
       "norm_label": "thick_frac_"
     },
     {
@@ -8772,7 +9032,7 @@
       "source_location": "L103",
       "_origin": "ast",
       "id": "src_adapt_include_adapt_sizing_field_geometrysizing_surface",
-      "community": 320,
+      "community": 38,
       "norm_label": "surface_"
     },
     {
@@ -8782,7 +9042,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_adapt_include_adapt_sizing_field_hpp_vector",
-      "community": 320,
+      "community": 38,
       "norm_label": "vector"
     },
     {
@@ -8792,7 +9052,7 @@
       "source_location": "L104",
       "_origin": "ast",
       "id": "src_adapt_include_adapt_sizing_field_geometrysizing_edges",
-      "community": 320,
+      "community": 38,
       "norm_label": "edges_"
     },
     {
@@ -8802,7 +9062,7 @@
       "source_location": "L105",
       "_origin": "ast",
       "id": "src_adapt_include_adapt_sizing_field_geometrysizing_kappa",
-      "community": 320,
+      "community": 38,
       "norm_label": "kappa_"
     },
     {
@@ -8812,7 +9072,7 @@
       "source_location": "L106",
       "_origin": "ast",
       "id": "src_adapt_include_adapt_sizing_field_geometrysizing_thickness",
-      "community": 320,
+      "community": 38,
       "norm_label": "thickness_"
     },
     {
@@ -9172,7 +9432,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_adapt_src_sizing_field",
-      "community": 132,
+      "community": 337,
       "norm_label": "sizing_field.cpp"
     },
     {
@@ -9182,7 +9442,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "src_adapt_src_sizing_field_clamp_size",
-      "community": 132,
+      "community": 337,
       "norm_label": "clamp_size()"
     },
     {
@@ -9192,7 +9452,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "src_adapt_src_sizing_field_blend_to_max",
-      "community": 132,
+      "community": 337,
       "norm_label": "blend_to_max()"
     },
     {
@@ -9202,7 +9462,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "src_adapt_src_sizing_field_featuresizing_featuresizing",
-      "community": 132,
+      "community": 337,
       "norm_label": "featuresizing::featuresizing()"
     },
     {
@@ -9212,7 +9472,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_adapt_src_sizing_field_cpp_distancefn",
-      "community": 132,
+      "community": 337,
       "norm_label": "distancefn"
     },
     {
@@ -9222,7 +9482,7 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "src_adapt_src_sizing_field_featuresizing_size_at",
-      "community": 132,
+      "community": 337,
       "norm_label": "featuresizing::size_at()"
     },
     {
@@ -9232,7 +9492,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_adapt_src_sizing_field_cpp_vector3d",
-      "community": 132,
+      "community": 337,
       "norm_label": "vector3d"
     },
     {
@@ -9282,7 +9542,7 @@
       "source_location": "L78",
       "_origin": "ast",
       "id": "src_adapt_src_sizing_field_geometrysizing_size_at",
-      "community": 132,
+      "community": 337,
       "norm_label": "geometrysizing::size_at()"
     },
     {
@@ -10082,7 +10342,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "src_fea_include_fea_nodal_mesh_feaerror",
-      "community": 339,
+      "community": 20,
       "norm_label": "feaerror"
     },
     {
@@ -10092,7 +10352,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_include_fea_nodal_mesh_hpp_runtime_error",
-      "community": 339,
+      "community": 20,
       "norm_label": "runtime_error"
     },
     {
@@ -10322,7 +10582,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_fea_include_fea_quadrature",
-      "community": 94,
+      "community": 138,
       "norm_label": "quadrature.hpp"
     },
     {
@@ -10802,7 +11062,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "src_fea_include_fea_vem_polycell",
-      "community": 339,
+      "community": 0,
       "norm_label": "polycell"
     },
     {
@@ -10812,7 +11072,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_include_fea_vem_hpp_vector",
-      "community": 339,
+      "community": 0,
       "norm_label": "vector"
     },
     {
@@ -10822,7 +11082,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_include_fea_vem_hpp_uint32_t",
-      "community": 339,
+      "community": 0,
       "norm_label": "uint32_t"
     },
     {
@@ -10832,7 +11092,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "src_fea_include_fea_vem_polycell_nodes",
-      "community": 339,
+      "community": 0,
       "norm_label": "nodes"
     },
     {
@@ -10842,7 +11102,7 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "src_fea_include_fea_vem_polycell_faces",
-      "community": 339,
+      "community": 0,
       "norm_label": "faces"
     },
     {
@@ -10962,7 +11222,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_fea_include_fea_zz",
-      "community": 49,
+      "community": 76,
       "norm_label": "zz.hpp"
     },
     {
@@ -10972,7 +11232,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "src_fea_include_fea_zz_zzrecovery",
-      "community": 49,
+      "community": 76,
       "norm_label": "zzrecovery"
     },
     {
@@ -10982,7 +11242,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_include_fea_zz_hpp_vector",
-      "community": 49,
+      "community": 76,
       "norm_label": "vector"
     },
     {
@@ -10992,7 +11252,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_include_fea_zz_hpp_stress",
-      "community": 49,
+      "community": 76,
       "norm_label": "stress"
     },
     {
@@ -11002,7 +11262,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "src_fea_include_fea_zz_zzrecovery_nodal_stress",
-      "community": 49,
+      "community": 76,
       "norm_label": "nodal_stress"
     },
     {
@@ -11012,7 +11272,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "src_fea_include_fea_zz_zzrecovery_element_eta",
-      "community": 49,
+      "community": 76,
       "norm_label": "element_eta"
     },
     {
@@ -11022,7 +11282,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "src_fea_include_fea_zz_zzrecovery_global_eta",
-      "community": 49,
+      "community": 76,
       "norm_label": "global_eta"
     },
     {
@@ -11042,7 +11302,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "src_fea_src_assembly_element_coords",
-      "community": 339,
+      "community": 344,
       "norm_label": "element_coords()"
     },
     {
@@ -11052,7 +11312,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_assembly_cpp_matrix",
-      "community": 339,
+      "community": 344,
       "norm_label": "matrix"
     },
     {
@@ -11062,7 +11322,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_assembly_cpp_dynamic",
-      "community": 339,
+      "community": 344,
       "norm_label": "dynamic"
     },
     {
@@ -11072,7 +11332,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "src_fea_src_assembly_b_matrix",
-      "community": 339,
+      "community": 344,
       "norm_label": "b_matrix()"
     },
     {
@@ -11082,7 +11342,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_assembly_cpp_matrixxd",
-      "community": 339,
+      "community": 344,
       "norm_label": "matrixxd"
     },
     {
@@ -11092,7 +11352,7 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "src_fea_src_assembly_element_stiffness",
-      "community": 339,
+      "community": 344,
       "norm_label": "element_stiffness()"
     },
     {
@@ -11152,7 +11412,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_fea_src_backend",
-      "community": 329,
+      "community": 8,
       "norm_label": "backend.cpp"
     },
     {
@@ -11162,7 +11422,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "src_fea_src_backend_active_backend",
-      "community": 329,
+      "community": 8,
       "norm_label": "active_backend()"
     },
     {
@@ -11172,7 +11432,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "backend",
-      "community": 329,
+      "community": 8,
       "norm_label": "backend"
     },
     {
@@ -11182,7 +11442,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "src_fea_src_backend_backend_description",
-      "community": 329,
+      "community": 8,
       "norm_label": "backend_description()"
     },
     {
@@ -11192,7 +11452,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_backend_cpp_string",
-      "community": 329,
+      "community": 8,
       "norm_label": "string"
     },
     {
@@ -11202,7 +11462,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "src_fea_src_backend_openmp_enabled",
-      "community": 329,
+      "community": 8,
       "norm_label": "openmp_enabled()"
     },
     {
@@ -11212,7 +11472,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "src_fea_src_backend_openmp_max_threads",
-      "community": 329,
+      "community": 8,
       "norm_label": "openmp_max_threads()"
     },
     {
@@ -11222,7 +11482,7 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "src_fea_src_backend_openmp_default_threads",
-      "community": 329,
+      "community": 8,
       "norm_label": "openmp_default_threads()"
     },
     {
@@ -11232,7 +11492,7 @@
       "source_location": "L68",
       "_origin": "ast",
       "id": "src_fea_src_backend_set_openmp_threads",
-      "community": 329,
+      "community": 8,
       "norm_label": "set_openmp_threads()"
     },
     {
@@ -11242,7 +11502,7 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "src_fea_src_backend_performance_description",
-      "community": 329,
+      "community": 8,
       "norm_label": "performance_description()"
     },
     {
@@ -11252,7 +11512,7 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "src_fea_src_backend_init_runtime_performance",
-      "community": 329,
+      "community": 8,
       "norm_label": "init_runtime_performance()"
     },
     {
@@ -11632,7 +11892,7 @@
       "source_location": "L139",
       "_origin": "ast",
       "id": "src_fea_src_hierarchical_hexrecipe_k",
-      "community": 65,
+      "community": 344,
       "norm_label": "k"
     },
     {
@@ -11722,7 +11982,7 @@
       "source_location": "L226",
       "_origin": "ast",
       "id": "src_fea_src_hierarchical_tetrecipe_b",
-      "community": 354,
+      "community": 0,
       "norm_label": "b"
     },
     {
@@ -11972,7 +12232,7 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "src_fea_src_hp_assembly_edge_key",
-      "community": 53,
+      "community": 77,
       "norm_label": "edge_key()"
     },
     {
@@ -11982,7 +12242,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_hp_assembly_cpp_edgekey",
-      "community": 53,
+      "community": 77,
       "norm_label": "edgekey"
     },
     {
@@ -11992,7 +12252,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_hp_assembly_cpp_uint32_t",
-      "community": 53,
+      "community": 77,
       "norm_label": "uint32_t"
     },
     {
@@ -12072,7 +12332,7 @@
       "source_location": "L81",
       "_origin": "ast",
       "id": "src_fea_src_hp_assembly_elem_edge",
-      "community": 53,
+      "community": 77,
       "norm_label": "elem_edge()"
     },
     {
@@ -12122,7 +12382,7 @@
       "source_location": "L113",
       "_origin": "ast",
       "id": "src_fea_src_hp_assembly_edgekeyhash",
-      "community": 345,
+      "community": 358,
       "norm_label": "edgekeyhash"
     },
     {
@@ -12132,7 +12392,7 @@
       "source_location": "L114",
       "_origin": "ast",
       "id": "src_fea_src_hp_assembly_edgekeyhash_operator",
-      "community": 345,
+      "community": 358,
       "norm_label": ".operator()()"
     },
     {
@@ -12142,7 +12402,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_hp_assembly_cpp_size_t",
-      "community": 345,
+      "community": 358,
       "norm_label": "size_t"
     },
     {
@@ -12262,7 +12522,7 @@
       "source_location": "L171",
       "_origin": "ast",
       "id": "src_fea_src_hp_assembly_faceorient",
-      "community": 347,
+      "community": 77,
       "norm_label": "faceorient"
     },
     {
@@ -12272,7 +12532,7 @@
       "source_location": "L172",
       "_origin": "ast",
       "id": "src_fea_src_hp_assembly_faceorient_swap",
-      "community": 347,
+      "community": 77,
       "norm_label": "swap"
     },
     {
@@ -12282,7 +12542,7 @@
       "source_location": "L173",
       "_origin": "ast",
       "id": "src_fea_src_hp_assembly_faceorient_sign0",
-      "community": 347,
+      "community": 77,
       "norm_label": "sign0"
     },
     {
@@ -12292,7 +12552,7 @@
       "source_location": "L174",
       "_origin": "ast",
       "id": "src_fea_src_hp_assembly_faceorient_sign1",
-      "community": 347,
+      "community": 77,
       "norm_label": "sign1"
     },
     {
@@ -12342,7 +12602,7 @@
       "source_location": "L285",
       "_origin": "ast",
       "id": "src_fea_src_hp_assembly_map_tet_face_mode",
-      "community": 53,
+      "community": 77,
       "norm_label": "map_tet_face_mode()"
     },
     {
@@ -12352,7 +12612,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_hp_assembly_cpp_array",
-      "community": 53,
+      "community": 77,
       "norm_label": "array"
     },
     {
@@ -12382,7 +12642,7 @@
       "source_location": "L702",
       "_origin": "ast",
       "id": "src_fea_src_hp_assembly_assemble_hp_body_load",
-      "community": 138,
+      "community": 35,
       "norm_label": "assemble_hp_body_load()"
     },
     {
@@ -12392,7 +12652,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_hp_assembly_cpp_vectorxd",
-      "community": 138,
+      "community": 35,
       "norm_label": "vectorxd"
     },
     {
@@ -12402,7 +12662,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_hp_assembly_cpp_bodyforce",
-      "community": 138,
+      "community": 35,
       "norm_label": "bodyforce"
     },
     {
@@ -12442,7 +12702,7 @@
       "source_location": "L794",
       "_origin": "ast",
       "id": "src_fea_src_hp_assembly_hp_energy_error",
-      "community": 138,
+      "community": 35,
       "norm_label": "hp_energy_error()"
     },
     {
@@ -12452,7 +12712,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "strainfield",
-      "community": 138,
+      "community": 35,
       "norm_label": "strainfield"
     },
     {
@@ -12712,7 +12972,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_fea_src_p_elevate",
-      "community": 15,
+      "community": 320,
       "norm_label": "p_elevate.cpp"
     },
     {
@@ -12722,7 +12982,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "src_fea_src_p_elevate_p_elevate_impl",
-      "community": 15,
+      "community": 320,
       "norm_label": "p_elevate_impl()"
     },
     {
@@ -12732,7 +12992,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_p_elevate_cpp_vector",
-      "community": 15,
+      "community": 320,
       "norm_label": "vector"
     },
     {
@@ -12742,7 +13002,7 @@
       "source_location": "L86",
       "_origin": "ast",
       "id": "src_fea_src_p_elevate_promote_to_quadratic",
-      "community": 15,
+      "community": 320,
       "norm_label": "promote_to_quadratic()"
     },
     {
@@ -12752,7 +13012,7 @@
       "source_location": "L91",
       "_origin": "ast",
       "id": "src_fea_src_p_elevate_p_elevate",
-      "community": 15,
+      "community": 320,
       "norm_label": "p_elevate()"
     },
     {
@@ -12762,7 +13022,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_p_elevate_cpp_span",
-      "community": 15,
+      "community": 320,
       "norm_label": "span"
     },
     {
@@ -12772,7 +13032,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_p_elevate_cpp_size_t",
-      "community": 15,
+      "community": 320,
       "norm_label": "size_t"
     },
     {
@@ -12782,7 +13042,7 @@
       "source_location": "L109",
       "_origin": "ast",
       "id": "src_fea_src_p_elevate_count_element_types",
-      "community": 15,
+      "community": 320,
       "norm_label": "count_element_types()"
     },
     {
@@ -13482,7 +13742,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "traction",
-      "community": 49,
+      "community": 307,
       "norm_label": "traction"
     },
     {
@@ -13562,7 +13822,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_vem_cpp_matrix",
-      "community": 354,
+      "community": 0,
       "norm_label": "matrix"
     },
     {
@@ -13592,7 +13852,7 @@
       "source_location": "L95",
       "_origin": "ast",
       "id": "src_fea_src_vem_p2_monomials",
-      "community": 354,
+      "community": 0,
       "norm_label": "p2_monomials()"
     },
     {
@@ -13602,7 +13862,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "kp2mono",
-      "community": 354,
+      "community": 0,
       "norm_label": "kp2mono"
     },
     {
@@ -13612,7 +13872,7 @@
       "source_location": "L103",
       "_origin": "ast",
       "id": "src_fea_src_vem_p2_monomial_grads",
-      "community": 354,
+      "community": 0,
       "norm_label": "p2_monomial_grads()"
     },
     {
@@ -13622,7 +13882,7 @@
       "source_location": "L128",
       "_origin": "ast",
       "id": "src_fea_src_vem_p2_strain_basis",
-      "community": 354,
+      "community": 0,
       "norm_label": "p2_strain_basis()"
     },
     {
@@ -13632,7 +13892,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "kp2vec",
-      "community": 354,
+      "community": 0,
       "norm_label": "kp2vec"
     },
     {
@@ -13652,7 +13912,7 @@
       "source_location": "L167",
       "_origin": "ast",
       "id": "src_fea_src_vem_tetfan",
-      "community": 315,
+      "community": 0,
       "norm_label": "tetfan"
     },
     {
@@ -13662,7 +13922,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_vem_cpp_array",
-      "community": 315,
+      "community": 0,
       "norm_label": "array"
     },
     {
@@ -13672,7 +13932,7 @@
       "source_location": "L169",
       "_origin": "ast",
       "id": "src_fea_src_vem_tetfan_tets",
-      "community": 315,
+      "community": 0,
       "norm_label": "tets"
     },
     {
@@ -13682,7 +13942,7 @@
       "source_location": "L170",
       "_origin": "ast",
       "id": "src_fea_src_vem_tetfan_volume",
-      "community": 315,
+      "community": 0,
       "norm_label": "volume"
     },
     {
@@ -13702,7 +13962,7 @@
       "source_location": "L203",
       "_origin": "ast",
       "id": "src_fea_src_vem_integrate_p2_matrix",
-      "community": 315,
+      "community": 0,
       "norm_label": "integrate_p2_matrix()"
     },
     {
@@ -13712,7 +13972,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "fun",
-      "community": 315,
+      "community": 0,
       "norm_label": "fun"
     },
     {
@@ -13722,7 +13982,7 @@
       "source_location": "L231",
       "_origin": "ast",
       "id": "src_fea_src_vem_integrate_p2_vector",
-      "community": 315,
+      "community": 0,
       "norm_label": "integrate_p2_vector()"
     },
     {
@@ -13732,7 +13992,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_vem_cpp_vectorxd",
-      "community": 315,
+      "community": 0,
       "norm_label": "vectorxd"
     },
     {
@@ -13742,7 +14002,7 @@
       "source_location": "L252",
       "_origin": "ast",
       "id": "src_fea_src_vem_p2projector",
-      "community": 315,
+      "community": 0,
       "norm_label": "p2projector"
     },
     {
@@ -13752,7 +14012,7 @@
       "source_location": "L253",
       "_origin": "ast",
       "id": "src_fea_src_vem_p2projector_xc",
-      "community": 315,
+      "community": 0,
       "norm_label": "xc"
     },
     {
@@ -13762,7 +14022,7 @@
       "source_location": "L254",
       "_origin": "ast",
       "id": "src_fea_src_vem_p2projector_h",
-      "community": 315,
+      "community": 0,
       "norm_label": "h"
     },
     {
@@ -13772,7 +14032,7 @@
       "source_location": "L255",
       "_origin": "ast",
       "id": "src_fea_src_vem_p2projector_dof_eval",
-      "community": 315,
+      "community": 0,
       "norm_label": "dof_eval"
     },
     {
@@ -13782,7 +14042,7 @@
       "source_location": "L256",
       "_origin": "ast",
       "id": "src_fea_src_vem_p2projector_pi",
-      "community": 315,
+      "community": 0,
       "norm_label": "pi"
     },
     {
@@ -13792,7 +14052,7 @@
       "source_location": "L257",
       "_origin": "ast",
       "id": "src_fea_src_vem_p2projector_fan",
-      "community": 315,
+      "community": 0,
       "norm_label": "fan"
     },
     {
@@ -13972,7 +14232,7 @@
       "source_location": "L665",
       "_origin": "ast",
       "id": "src_fea_src_vem_hex8_as_poly",
-      "community": 339,
+      "community": 0,
       "norm_label": "hex8_as_poly()"
     },
     {
@@ -13982,7 +14242,7 @@
       "source_location": "L682",
       "_origin": "ast",
       "id": "src_fea_src_vem_hex20_as_poly",
-      "community": 339,
+      "community": 0,
       "norm_label": "hex20_as_poly()"
     },
     {
@@ -13992,7 +14252,7 @@
       "source_location": "L711",
       "_origin": "ast",
       "id": "src_fea_src_vem_tet4_as_poly",
-      "community": 339,
+      "community": 0,
       "norm_label": "tet4_as_poly()"
     },
     {
@@ -14032,7 +14292,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_fea_src_vtu",
-      "community": 9,
+      "community": 347,
       "norm_label": "vtu.cpp"
     },
     {
@@ -14042,7 +14302,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "src_fea_src_vtu_vtk_cell_type",
-      "community": 9,
+      "community": 347,
       "norm_label": "vtk_cell_type()"
     },
     {
@@ -14052,7 +14312,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_vtu_cpp_elementtype",
-      "community": 9,
+      "community": 347,
       "norm_label": "elementtype"
     },
     {
@@ -14062,7 +14322,7 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "src_fea_src_vtu_tet4_cell_quality",
-      "community": 9,
+      "community": 347,
       "norm_label": "tet4_cell_quality()"
     },
     {
@@ -14072,7 +14332,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_vtu_cpp_vector",
-      "community": 9,
+      "community": 347,
       "norm_label": "vector"
     },
     {
@@ -14082,7 +14342,7 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "src_fea_src_vtu_write_vtu",
-      "community": 9,
+      "community": 347,
       "norm_label": "write_vtu()"
     },
     {
@@ -14092,7 +14352,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_vtu_cpp_path",
-      "community": 9,
+      "community": 347,
       "norm_label": "path"
     },
     {
@@ -14102,7 +14362,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_fea_src_zz",
-      "community": 343,
+      "community": 94,
       "norm_label": "zz.cpp"
     },
     {
@@ -14112,7 +14372,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "src_fea_src_zz_stress_at",
-      "community": 343,
+      "community": 339,
       "norm_label": "stress_at()"
     },
     {
@@ -14122,7 +14382,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_zz_cpp_stress",
-      "community": 343,
+      "community": 339,
       "norm_label": "stress"
     },
     {
@@ -14132,7 +14392,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_zz_cpp_matrix",
-      "community": 343,
+      "community": 339,
       "norm_label": "matrix"
     },
     {
@@ -14142,7 +14402,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_zz_cpp_dynamic",
-      "community": 343,
+      "community": 339,
       "norm_label": "dynamic"
     },
     {
@@ -14152,7 +14412,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_zz_cpp_vectorxd",
-      "community": 343,
+      "community": 339,
       "norm_label": "vectorxd"
     },
     {
@@ -14162,7 +14422,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_zz_cpp_vector3d",
-      "community": 343,
+      "community": 339,
       "norm_label": "vector3d"
     },
     {
@@ -14172,7 +14432,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "src_fea_src_zz_element_centroid",
-      "community": 343,
+      "community": 339,
       "norm_label": "element_centroid()"
     },
     {
@@ -14182,7 +14442,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "src_fea_src_zz_recover_zz",
-      "community": 343,
+      "community": 339,
       "norm_label": "recover_zz()"
     },
     {
@@ -14192,7 +14452,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_geom_include_geom_features",
-      "community": 360,
+      "community": 27,
       "norm_label": "features.hpp"
     },
     {
@@ -14252,7 +14512,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "src_geom_include_geom_features_closestonfeature",
-      "community": 360,
+      "community": 27,
       "norm_label": "closestonfeature"
     },
     {
@@ -14262,7 +14522,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_geom_include_geom_features_hpp_vector3d",
-      "community": 360,
+      "community": 27,
       "norm_label": "vector3d"
     },
     {
@@ -14272,7 +14532,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "src_geom_include_geom_features_closestonfeature_point",
-      "community": 360,
+      "community": 27,
       "norm_label": "point"
     },
     {
@@ -14282,7 +14542,7 @@
       "source_location": "L39",
       "_origin": "ast",
       "id": "src_geom_include_geom_features_closestonfeature_distance",
-      "community": 360,
+      "community": 27,
       "norm_label": "distance"
     },
     {
@@ -14602,7 +14862,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_geom_src_indicators",
-      "community": 33,
+      "community": 31,
       "norm_label": "indicators.cpp"
     },
     {
@@ -14612,7 +14872,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "src_geom_src_indicators_tri_normal",
-      "community": 33,
+      "community": 31,
       "norm_label": "tri_normal()"
     },
     {
@@ -14622,7 +14882,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_geom_src_indicators_cpp_vector3d",
-      "community": 33,
+      "community": 31,
       "norm_label": "vector3d"
     },
     {
@@ -14632,7 +14892,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_geom_src_indicators_cpp_size_t",
-      "community": 33,
+      "community": 31,
       "norm_label": "size_t"
     },
     {
@@ -14642,7 +14902,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "src_geom_src_indicators_tri_area",
-      "community": 33,
+      "community": 31,
       "norm_label": "tri_area()"
     },
     {
@@ -14652,7 +14912,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "src_geom_src_indicators_ray_triangle_hit",
-      "community": 33,
+      "community": 31,
       "norm_label": "ray_triangle_hit()"
     },
     {
@@ -14662,7 +14922,7 @@
       "source_location": "L69",
       "_origin": "ast",
       "id": "src_geom_src_indicators_estimate_vertex_curvature",
-      "community": 33,
+      "community": 31,
       "norm_label": "estimate_vertex_curvature()"
     },
     {
@@ -14672,7 +14932,7 @@
       "source_location": "L129",
       "_origin": "ast",
       "id": "src_geom_src_indicators_estimate_local_thickness",
-      "community": 33,
+      "community": 31,
       "norm_label": "estimate_local_thickness()"
     },
     {
@@ -14682,7 +14942,7 @@
       "source_location": "L190",
       "_origin": "ast",
       "id": "src_geom_src_indicators_nearest_vertex_index",
-      "community": 33,
+      "community": 31,
       "norm_label": "nearest_vertex_index()"
     },
     {
@@ -14692,7 +14952,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_geom_src_indicators_cpp_uint32_t",
-      "community": 33,
+      "community": 31,
       "norm_label": "uint32_t"
     },
     {
@@ -14702,7 +14962,7 @@
       "source_location": "L206",
       "_origin": "ast",
       "id": "src_geom_src_indicators_distance_to_surface_vertices",
-      "community": 33,
+      "community": 31,
       "norm_label": "distance_to_surface_vertices()"
     },
     {
@@ -14712,7 +14972,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_geom_src_step",
-      "community": 32,
+      "community": 354,
       "norm_label": "step.cpp"
     },
     {
@@ -14722,7 +14982,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "src_geom_src_step_bounding_diagonal",
-      "community": 32,
+      "community": 354,
       "norm_label": "bounding_diagonal()"
     },
     {
@@ -14732,7 +14992,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "topods_shape",
-      "community": 32,
+      "community": 354,
       "norm_label": "topods_shape"
     },
     {
@@ -14742,7 +15002,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "src_geom_src_step_triangulate_shape",
-      "community": 32,
+      "community": 354,
       "norm_label": "triangulate_shape()"
     },
     {
@@ -14752,7 +15012,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_geom_src_step_cpp_soup",
-      "community": 32,
+      "community": 354,
       "norm_label": "soup"
     },
     {
@@ -14762,7 +15022,7 @@
       "source_location": "L96",
       "_origin": "ast",
       "id": "src_geom_src_step_load_step",
-      "community": 32,
+      "community": 33,
       "norm_label": "load_step()"
     },
     {
@@ -14772,7 +15032,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_geom_src_step_cpp_path",
-      "community": 32,
+      "community": 33,
       "norm_label": "path"
     },
     {
@@ -15082,7 +15342,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_hex_fill",
-      "community": 58,
+      "community": 94,
       "norm_label": "hex_fill.hpp"
     },
     {
@@ -15322,7 +15582,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_local_refine_localrefinestats",
-      "community": 78,
+      "community": 329,
       "norm_label": "localrefinestats"
     },
     {
@@ -15332,7 +15592,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_local_refine_hpp_size_t",
-      "community": 78,
+      "community": 329,
       "norm_label": "size_t"
     },
     {
@@ -15342,7 +15602,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_local_refine_localrefinestats_n_input_tets",
-      "community": 78,
+      "community": 329,
       "norm_label": "n_input_tets"
     },
     {
@@ -15352,7 +15612,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_local_refine_localrefinestats_n_output_tets",
-      "community": 78,
+      "community": 329,
       "norm_label": "n_output_tets"
     },
     {
@@ -15362,7 +15622,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_local_refine_localrefinestats_n_marked",
-      "community": 78,
+      "community": 329,
       "norm_label": "n_marked"
     },
     {
@@ -15372,7 +15632,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_local_refine_localrefinestats_n_bisections",
-      "community": 78,
+      "community": 329,
       "norm_label": "n_bisections"
     },
     {
@@ -15382,7 +15642,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_local_refine_localrefinestats_n_new_nodes",
-      "community": 78,
+      "community": 329,
       "norm_label": "n_new_nodes"
     },
     {
@@ -15392,7 +15652,7 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_local_refine_localrefinestats_n_surface_mids",
-      "community": 78,
+      "community": 329,
       "norm_label": "n_surface_mids"
     },
     {
@@ -17252,7 +17512,7 @@
       "source_location": "L271",
       "_origin": "ast",
       "id": "src_mesh_src_grid_classify_classify_cells_inside",
-      "community": 12,
+      "community": 5,
       "norm_label": "classify_cells_inside()"
     },
     {
@@ -17342,7 +17602,7 @@
       "source_location": "L78",
       "_origin": "ast",
       "id": "src_mesh_src_hex_fill_hex_fill_surface",
-      "community": 12,
+      "community": 59,
       "norm_label": "hex_fill_surface()"
     },
     {
@@ -17432,7 +17692,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_mesh_src_local_refine",
-      "community": 78,
+      "community": 132,
       "norm_label": "local_refine.cpp"
     },
     {
@@ -17442,7 +17702,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "src_mesh_src_local_refine_edgehash",
-      "community": 78,
+      "community": 132,
       "norm_label": "edgehash"
     },
     {
@@ -17452,7 +17712,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "src_mesh_src_local_refine_edgehash_operator",
-      "community": 78,
+      "community": 132,
       "norm_label": ".operator()()"
     },
     {
@@ -17462,7 +17722,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_src_local_refine_cpp_size_t",
-      "community": 78,
+      "community": 132,
       "norm_label": "size_t"
     },
     {
@@ -17472,7 +17732,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_src_local_refine_cpp_edgekey",
-      "community": 78,
+      "community": 132,
       "norm_label": "edgekey"
     },
     {
@@ -17482,7 +17742,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "src_mesh_src_local_refine_make_edge",
-      "community": 78,
+      "community": 132,
       "norm_label": "make_edge()"
     },
     {
@@ -17492,7 +17752,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_src_local_refine_cpp_uint32_t",
-      "community": 78,
+      "community": 132,
       "norm_label": "uint32_t"
     },
     {
@@ -17502,7 +17762,7 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "src_mesh_src_local_refine_tet_has_edge",
-      "community": 78,
+      "community": 132,
       "norm_label": "tet_has_edge()"
     },
     {
@@ -17512,7 +17772,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_src_local_refine_cpp_array",
-      "community": 78,
+      "community": 132,
       "norm_label": "array"
     },
     {
@@ -17522,7 +17782,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "src_mesh_src_local_refine_longest_edge",
-      "community": 78,
+      "community": 132,
       "norm_label": "longest_edge()"
     },
     {
@@ -17532,7 +17792,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_src_local_refine_cpp_vector",
-      "community": 78,
+      "community": 132,
       "norm_label": "vector"
     },
     {
@@ -17542,7 +17802,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_src_local_refine_cpp_vector3d",
-      "community": 78,
+      "community": 132,
       "norm_label": "vector3d"
     },
     {
@@ -17552,7 +17812,7 @@
       "source_location": "L69",
       "_origin": "ast",
       "id": "src_mesh_src_local_refine_orient_positive",
-      "community": 78,
+      "community": 132,
       "norm_label": "orient_positive()"
     },
     {
@@ -17562,7 +17822,7 @@
       "source_location": "L81",
       "_origin": "ast",
       "id": "src_mesh_src_local_refine_bisect_tet",
-      "community": 78,
+      "community": 132,
       "norm_label": "bisect_tet()"
     },
     {
@@ -17572,7 +17832,7 @@
       "source_location": "L119",
       "_origin": "ast",
       "id": "src_mesh_src_local_refine_tet_edges",
-      "community": 78,
+      "community": 132,
       "norm_label": "tet_edges()"
     },
     {
@@ -17582,7 +17842,7 @@
       "source_location": "L128",
       "_origin": "ast",
       "id": "src_mesh_src_local_refine_erase_tet_from_edge",
-      "community": 78,
+      "community": 132,
       "norm_label": "erase_tet_from_edge()"
     },
     {
@@ -17592,7 +17852,7 @@
       "source_location": "L141",
       "_origin": "ast",
       "id": "src_mesh_src_local_refine_make_free_face",
-      "community": 78,
+      "community": 132,
       "norm_label": "make_free_face()"
     },
     {
@@ -17602,7 +17862,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "freefacekey",
-      "community": 78,
+      "community": 132,
       "norm_label": "freefacekey"
     },
     {
@@ -17612,7 +17872,7 @@
       "source_location": "L155",
       "_origin": "ast",
       "id": "src_mesh_src_local_refine_freefacehash",
-      "community": 78,
+      "community": 132,
       "norm_label": "freefacehash"
     },
     {
@@ -17622,7 +17882,7 @@
       "source_location": "L156",
       "_origin": "ast",
       "id": "src_mesh_src_local_refine_freefacehash_operator",
-      "community": 78,
+      "community": 132,
       "norm_label": ".operator()()"
     },
     {
@@ -17632,7 +17892,7 @@
       "source_location": "L166",
       "_origin": "ast",
       "id": "src_mesh_src_local_refine_local_refine_tets",
-      "community": 78,
+      "community": 132,
       "norm_label": "local_refine_tets()"
     },
     {
@@ -17642,7 +17902,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_src_local_refine_cpp_span",
-      "community": 78,
+      "community": 132,
       "norm_label": "span"
     },
     {
@@ -17652,7 +17912,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_mesh_src_mixed_fill",
-      "community": 19,
+      "community": 53,
       "norm_label": "mixed_fill.cpp"
     },
     {
@@ -17662,7 +17922,7 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "src_mesh_src_mixed_fill_tet_vol",
-      "community": 19,
+      "community": 53,
       "norm_label": "tet_vol()"
     },
     {
@@ -17672,7 +17932,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_src_mixed_fill_cpp_vector3d",
-      "community": 19,
+      "community": 53,
       "norm_label": "vector3d"
     },
     {
@@ -17682,7 +17942,7 @@
       "source_location": "L69",
       "_origin": "ast",
       "id": "src_mesh_src_mixed_fill_hex8_jac_det",
-      "community": 19,
+      "community": 53,
       "norm_label": "hex8_jac_det()"
     },
     {
@@ -17692,7 +17952,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_src_mixed_fill_cpp_array",
-      "community": 19,
+      "community": 53,
       "norm_label": "array"
     },
     {
@@ -17702,7 +17962,7 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "src_mesh_src_mixed_fill_hex_inverted",
-      "community": 19,
+      "community": 53,
       "norm_label": "hex_inverted()"
     },
     {
@@ -17712,7 +17972,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_src_mixed_fill_cpp_uint32_t",
-      "community": 19,
+      "community": 53,
       "norm_label": "uint32_t"
     },
     {
@@ -17722,7 +17982,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_src_mixed_fill_cpp_vector",
-      "community": 19,
+      "community": 53,
       "norm_label": "vector"
     },
     {
@@ -17732,7 +17992,7 @@
       "source_location": "L120",
       "_origin": "ast",
       "id": "src_mesh_src_mixed_fill_tet_inverted",
-      "community": 19,
+      "community": 53,
       "norm_label": "tet_inverted()"
     },
     {
@@ -17742,7 +18002,7 @@
       "source_location": "L125",
       "_origin": "ast",
       "id": "src_mesh_src_mixed_fill_pyramid_inverted",
-      "community": 19,
+      "community": 53,
       "norm_label": "pyramid_inverted()"
     },
     {
@@ -17752,7 +18012,7 @@
       "source_location": "L132",
       "_origin": "ast",
       "id": "src_mesh_src_mixed_fill_emit_pyramid",
-      "community": 19,
+      "community": 53,
       "norm_label": "emit_pyramid()"
     },
     {
@@ -17762,7 +18022,7 @@
       "source_location": "L158",
       "_origin": "ast",
       "id": "src_mesh_src_mixed_fill_emit_cell_pyramids",
-      "community": 19,
+      "community": 53,
       "norm_label": "emit_cell_pyramids()"
     },
     {
@@ -17772,7 +18032,7 @@
       "source_location": "L167",
       "_origin": "ast",
       "id": "src_mesh_src_mixed_fill_emit_hex",
-      "community": 19,
+      "community": 53,
       "norm_label": "emit_hex()"
     },
     {
@@ -17782,7 +18042,7 @@
       "source_location": "L176",
       "_origin": "ast",
       "id": "src_mesh_src_mixed_fill_emit_tet",
-      "community": 19,
+      "community": 53,
       "norm_label": "emit_tet()"
     },
     {
@@ -17792,7 +18052,7 @@
       "source_location": "L195",
       "_origin": "ast",
       "id": "src_mesh_src_mixed_fill_emit_subdivided_face_pyramids",
-      "community": 19,
+      "community": 53,
       "norm_label": "emit_subdivided_face_pyramids()"
     },
     {
@@ -17802,7 +18062,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "finenodefn",
-      "community": 19,
+      "community": 53,
       "norm_label": "finenodefn"
     },
     {
@@ -17812,7 +18072,7 @@
       "source_location": "L235",
       "_origin": "ast",
       "id": "src_mesh_src_mixed_fill_closed_poly_volume",
-      "community": 19,
+      "community": 53,
       "norm_label": "closed_poly_volume()"
     },
     {
@@ -17822,7 +18082,7 @@
       "source_location": "L256",
       "_origin": "ast",
       "id": "src_mesh_src_mixed_fill_emit_transition_poly",
-      "community": 19,
+      "community": 53,
       "norm_label": "emit_transition_poly()"
     },
     {
@@ -17832,7 +18092,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "edgesplitfn",
-      "community": 19,
+      "community": 53,
       "norm_label": "edgesplitfn"
     },
     {
@@ -17842,7 +18102,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "inbfn",
-      "community": 19,
+      "community": 53,
       "norm_label": "inbfn"
     },
     {
@@ -17852,7 +18112,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "finenbrfn",
-      "community": 19,
+      "community": 53,
       "norm_label": "finenbrfn"
     },
     {
@@ -17862,7 +18122,7 @@
       "source_location": "L409",
       "_origin": "ast",
       "id": "src_mesh_src_mixed_fill_mixed_fill_surface",
-      "community": 19,
+      "community": 53,
       "norm_label": "mixed_fill_surface()"
     },
     {
@@ -17872,7 +18132,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_src_mixed_fill_cpp_span",
-      "community": 19,
+      "community": 53,
       "norm_label": "span"
     },
     {
@@ -18652,7 +18912,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_mesh_src_transition_fill",
-      "community": 28,
+      "community": 12,
       "norm_label": "transition_fill.cpp"
     },
     {
@@ -18662,7 +18922,7 @@
       "source_location": "L60",
       "_origin": "ast",
       "id": "src_mesh_src_transition_fill_tet_signed_vol",
-      "community": 28,
+      "community": 12,
       "norm_label": "tet_signed_vol()"
     },
     {
@@ -18672,7 +18932,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_src_transition_fill_cpp_vector3d",
-      "community": 28,
+      "community": 12,
       "norm_label": "vector3d"
     },
     {
@@ -18682,7 +18942,7 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "src_mesh_src_transition_fill_hex8_jacobian_det",
-      "community": 28,
+      "community": 12,
       "norm_label": "hex8_jacobian_det()"
     },
     {
@@ -18692,7 +18952,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_src_transition_fill_cpp_array",
-      "community": 28,
+      "community": 12,
       "norm_label": "array"
     },
     {
@@ -18702,7 +18962,7 @@
       "source_location": "L93",
       "_origin": "ast",
       "id": "src_mesh_src_transition_fill_cell_inverted",
-      "community": 28,
+      "community": 12,
       "norm_label": "cell_inverted()"
     },
     {
@@ -18712,7 +18972,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_src_transition_fill_cpp_vector",
-      "community": 28,
+      "community": 12,
       "norm_label": "vector"
     },
     {
@@ -18882,7 +19142,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_pipeline_include_pipeline_scene_hpp_vector3d",
-      "community": 317,
+      "community": 34,
       "norm_label": "vector3d"
     },
     {
@@ -18942,7 +19202,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "src_pipeline_include_pipeline_scene_regionload",
-      "community": 317,
+      "community": 34,
       "norm_label": "regionload"
     },
     {
@@ -18952,7 +19212,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "src_pipeline_include_pipeline_scene_regionload_force",
-      "community": 317,
+      "community": 34,
       "norm_label": "force"
     },
     {
@@ -19122,7 +19382,7 @@
       "source_location": "L128",
       "_origin": "ast",
       "id": "src_pipeline_include_pipeline_scene_resolvedmeshsize",
-      "community": 100,
+      "community": 14,
       "norm_label": "resolvedmeshsize"
     },
     {
@@ -19132,7 +19392,7 @@
       "source_location": "L129",
       "_origin": "ast",
       "id": "src_pipeline_include_pipeline_scene_resolvedmeshsize_h",
-      "community": 100,
+      "community": 14,
       "norm_label": "h"
     },
     {
@@ -19142,7 +19402,7 @@
       "source_location": "L130",
       "_origin": "ast",
       "id": "src_pipeline_include_pipeline_scene_resolvedmeshsize_auto_chosen",
-      "community": 100,
+      "community": 14,
       "norm_label": "auto_chosen"
     },
     {
@@ -19152,7 +19412,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_pipeline_include_pipeline_scene_hpp_size_t",
-      "community": 100,
+      "community": 14,
       "norm_label": "size_t"
     },
     {
@@ -19162,7 +19422,7 @@
       "source_location": "L131",
       "_origin": "ast",
       "id": "src_pipeline_include_pipeline_scene_resolvedmeshsize_n_sharp_edges",
-      "community": 100,
+      "community": 14,
       "norm_label": "n_sharp_edges"
     },
     {
@@ -19172,7 +19432,7 @@
       "source_location": "L132",
       "_origin": "ast",
       "id": "src_pipeline_include_pipeline_scene_resolvedmeshsize_min_feature_length",
-      "community": 100,
+      "community": 14,
       "norm_label": "min_feature_length"
     },
     {
@@ -19182,7 +19442,7 @@
       "source_location": "L133",
       "_origin": "ast",
       "id": "src_pipeline_include_pipeline_scene_resolvedmeshsize_note",
-      "community": 100,
+      "community": 14,
       "norm_label": "note"
     },
     {
@@ -19762,7 +20022,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_pipeline_include_pipeline_scene_hpp_mutex",
-      "community": 94,
+      "community": 8,
       "norm_label": "mutex"
     },
     {
@@ -19892,7 +20152,7 @@
       "source_location": "L271",
       "_origin": "ast",
       "id": "src_pipeline_include_pipeline_scene_solvejob_note_mesh_stats",
-      "community": 89,
+      "community": 21,
       "norm_label": "note_mesh_stats"
     },
     {
@@ -19912,7 +20172,7 @@
       "source_location": "L274",
       "_origin": "ast",
       "id": "src_pipeline_include_pipeline_scene_solvejob_join_worker",
-      "community": 14,
+      "community": 89,
       "norm_label": "join_worker"
     },
     {
@@ -20012,7 +20272,7 @@
       "source_location": "L169",
       "_origin": "ast",
       "id": "src_pipeline_src_scene_resolve_mesh_size",
-      "community": 100,
+      "community": 14,
       "norm_label": "resolve_mesh_size()"
     },
     {
@@ -20132,7 +20392,7 @@
       "source_location": "L1053",
       "_origin": "ast",
       "id": "src_pipeline_src_scene_solvejob_publish_live_mesh",
-      "community": 89,
+      "community": 21,
       "norm_label": "solvejob::publish_live_mesh()"
     },
     {
@@ -20162,7 +20422,7 @@
       "source_location": "L1093",
       "_origin": "ast",
       "id": "src_pipeline_src_scene_solvejob_poll_live_mesh",
-      "community": 21,
+      "community": 89,
       "norm_label": "solvejob::poll_live_mesh()"
     },
     {
@@ -20172,7 +20432,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_pipeline_src_scene_cpp_optional",
-      "community": 14,
+      "community": 89,
       "norm_label": "optional"
     },
     {
@@ -20182,7 +20442,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_pipeline_src_scene_cpp_uint64_t",
-      "community": 21,
+      "community": 89,
       "norm_label": "uint64_t"
     },
     {
@@ -20322,7 +20582,7 @@
       "source_location": "L1930",
       "_origin": "ast",
       "id": "src_pipeline_src_scene_solvejob_take_result",
-      "community": 14,
+      "community": 89,
       "norm_label": "solvejob::take_result()"
     },
     {
@@ -20332,7 +20592,7 @@
       "source_location": "L1939",
       "_origin": "ast",
       "id": "src_pipeline_src_scene_solvejob_take_mesh",
-      "community": 14,
+      "community": 89,
       "norm_label": "solvejob::take_mesh()"
     },
     {
@@ -20342,7 +20602,7 @@
       "source_location": "L1948",
       "_origin": "ast",
       "id": "src_pipeline_src_scene_solvejob_solvejob",
-      "community": 14,
+      "community": 89,
       "norm_label": "solvejob::~solvejob()"
     },
     {
@@ -20722,7 +20982,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_backend",
-      "community": 329,
+      "community": 8,
       "norm_label": "test_backend.cpp"
     },
     {
@@ -21142,7 +21402,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_goodier_cavity",
-      "community": 15,
+      "community": 76,
       "norm_label": "test_goodier_cavity.cpp"
     },
     {
@@ -21162,7 +21422,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_graded_fill",
-      "community": 94,
+      "community": 33,
       "norm_label": "test_graded_fill.cpp"
     },
     {
@@ -21172,7 +21432,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "tests_test_graded_fill_unit_box",
-      "community": 94,
+      "community": 33,
       "norm_label": "unit_box()"
     },
     {
@@ -21182,7 +21442,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_gui_pipeline",
-      "community": 34,
+      "community": 317,
       "norm_label": "test_gui_pipeline.cpp"
     },
     {
@@ -21192,7 +21452,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "tests_test_gui_pipeline_write_box_stl",
-      "community": 34,
+      "community": 317,
       "norm_label": "write_box_stl()"
     },
     {
@@ -21202,7 +21462,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_gui_pipeline_cpp_path",
-      "community": 34,
+      "community": 317,
       "norm_label": "path"
     },
     {
@@ -21212,7 +21472,7 @@
       "source_location": "L192",
       "_origin": "ast",
       "id": "tests_test_gui_pipeline_cantilever_setup",
-      "community": 34,
+      "community": 317,
       "norm_label": "cantilever_setup()"
     },
     {
@@ -21782,7 +22042,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_kirsch_plate",
-      "community": 49,
+      "community": 144,
       "norm_label": "test_kirsch_plate.cpp"
     },
     {
@@ -21792,7 +22052,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "tests_test_kirsch_plate_param_key",
-      "community": 49,
+      "community": 144,
       "norm_label": "param_key()"
     },
     {
@@ -21802,7 +22062,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_kirsch_plate_cpp_array",
-      "community": 49,
+      "community": 144,
       "norm_label": "array"
     },
     {
@@ -21812,7 +22072,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_kirsch_plate_cpp_int64_t",
-      "community": 49,
+      "community": 144,
       "norm_label": "int64_t"
     },
     {
@@ -21822,7 +22082,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_kirsch_plate_cpp_vector3d",
-      "community": 49,
+      "community": 144,
       "norm_label": "vector3d"
     },
     {
@@ -21832,7 +22092,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "tests_test_kirsch_plate_kirsch_stress",
-      "community": 49,
+      "community": 144,
       "norm_label": "kirsch_stress()"
     },
     {
@@ -21842,7 +22102,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_kirsch_plate_cpp_matrix3d",
-      "community": 49,
+      "community": 144,
       "norm_label": "matrix3d"
     },
     {
@@ -21942,7 +22202,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_lame_cylinder",
-      "community": 49,
+      "community": 307,
       "norm_label": "test_lame_cylinder.cpp"
     },
     {
@@ -21952,7 +22212,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "tests_test_lame_cylinder_param_key",
-      "community": 49,
+      "community": 307,
       "norm_label": "param_key()"
     },
     {
@@ -21962,7 +22222,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_lame_cylinder_cpp_array",
-      "community": 49,
+      "community": 307,
       "norm_label": "array"
     },
     {
@@ -21972,7 +22232,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_lame_cylinder_cpp_int64_t",
-      "community": 49,
+      "community": 307,
       "norm_label": "int64_t"
     },
     {
@@ -21982,7 +22242,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_lame_cylinder_cpp_vector3d",
-      "community": 49,
+      "community": 307,
       "norm_label": "vector3d"
     },
     {
@@ -21992,7 +22252,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_local_refine",
-      "community": 340,
+      "community": 2,
       "norm_label": "test_local_refine.cpp"
     },
     {
@@ -22002,7 +22262,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "tests_test_local_refine_tets_to_nodal",
-      "community": 340,
+      "community": 2,
       "norm_label": "tets_to_nodal()"
     },
     {
@@ -22012,7 +22272,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_local_refine_cpp_vector",
-      "community": 340,
+      "community": 2,
       "norm_label": "vector"
     },
     {
@@ -22022,7 +22282,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_local_refine_cpp_vector3d",
-      "community": 340,
+      "community": 2,
       "norm_label": "vector3d"
     },
     {
@@ -22032,7 +22292,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_local_refine_cpp_array",
-      "community": 340,
+      "community": 2,
       "norm_label": "array"
     },
     {
@@ -22042,7 +22302,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_local_refine_cpp_uint32_t",
-      "community": 340,
+      "community": 2,
       "norm_label": "uint32_t"
     },
     {
@@ -22052,7 +22312,7 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "tests_test_local_refine_extract_tet4",
-      "community": 340,
+      "community": 2,
       "norm_label": "extract_tet4()"
     },
     {
@@ -22062,7 +22322,7 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "tests_test_local_refine_total_volume",
-      "community": 340,
+      "community": 2,
       "norm_label": "total_volume()"
     },
     {
@@ -22072,7 +22332,7 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "tests_test_local_refine_nearest_tet",
-      "community": 340,
+      "community": 2,
       "norm_label": "nearest_tet()"
     },
     {
@@ -22082,7 +22342,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_local_refine_cpp_size_t",
-      "community": 340,
+      "community": 2,
       "norm_label": "size_t"
     },
     {
@@ -22122,7 +22382,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_mixed_fill",
-      "community": 94,
+      "community": 33,
       "norm_label": "test_mixed_fill.cpp"
     },
     {
@@ -22132,7 +22392,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "tests_test_mixed_fill_unit_box",
-      "community": 94,
+      "community": 33,
       "norm_label": "unit_box()"
     },
     {
@@ -22142,7 +22402,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_mms_convergence",
-      "community": 144,
+      "community": 334,
       "norm_label": "test_mms_convergence.cpp"
     },
     {
@@ -22152,7 +22412,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "tests_test_mms_convergence_make_mesh",
-      "community": 144,
+      "community": 334,
       "norm_label": "make_mesh()"
     },
     {
@@ -22162,7 +22422,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_mms_convergence_cpp_elementtype",
-      "community": 144,
+      "community": 334,
       "norm_label": "elementtype"
     },
     {
@@ -22172,7 +22432,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "tests_test_mms_convergence_solve_mms_error",
-      "community": 144,
+      "community": 334,
       "norm_label": "solve_mms_error()"
     },
     {
@@ -22182,7 +22442,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "tests_test_mms_convergence_expectation",
-      "community": 144,
+      "community": 334,
       "norm_label": "expectation"
     },
     {
@@ -22192,7 +22452,7 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "tests_test_mms_convergence_expectation_type",
-      "community": 144,
+      "community": 334,
       "norm_label": "type"
     },
     {
@@ -22202,7 +22462,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "tests_test_mms_convergence_expectation_order",
-      "community": 144,
+      "community": 334,
       "norm_label": "order"
     },
     {
@@ -22212,7 +22472,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "tests_test_mms_convergence_expectation_name",
-      "community": 144,
+      "community": 334,
       "norm_label": "name"
     },
     {
@@ -22512,7 +22772,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_spmv",
-      "community": 350,
+      "community": 8,
       "norm_label": "test_spmv.cpp"
     },
     {
@@ -22522,7 +22782,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "tests_test_spmv_make_spd_test_matrix",
-      "community": 350,
+      "community": 8,
       "norm_label": "make_spd_test_matrix()"
     },
     {
@@ -22532,7 +22792,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_spmv_cpp_sparsematrix",
-      "community": 350,
+      "community": 8,
       "norm_label": "sparsematrix"
     },
     {
@@ -22542,7 +22802,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "tests_test_spmv_random_vector",
-      "community": 350,
+      "community": 8,
       "norm_label": "random_vector()"
     },
     {
@@ -22552,7 +22812,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_spmv_cpp_vector",
-      "community": 350,
+      "community": 8,
       "norm_label": "vector"
     },
     {
@@ -22562,7 +22822,7 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "tests_test_spmv_max_abs_diff",
-      "community": 350,
+      "community": 8,
       "norm_label": "max_abs_diff()"
     },
     {
@@ -22572,7 +22832,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_spmv_cpp_vectorxd",
-      "community": 350,
+      "community": 8,
       "norm_label": "vectorxd"
     },
     {
@@ -22812,7 +23072,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_vtu",
-      "community": 144,
+      "community": 353,
       "norm_label": "test_vtu.cpp"
     },
     {
@@ -22822,7 +23082,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "tests_test_vtu_unique_temp_vtu",
-      "community": 144,
+      "community": 353,
       "norm_label": "unique_temp_vtu()"
     },
     {
@@ -22832,7 +23092,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_vtu_cpp_path",
-      "community": 144,
+      "community": 353,
       "norm_label": "path"
     },
     {
@@ -22852,7 +23112,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_testlab_selfcheck",
-      "community": 94,
+      "community": 353,
       "norm_label": "testlab_selfcheck.cpp"
     },
     {
@@ -22862,7 +23122,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "tests_testlab_selfcheck_write_temp_campaign_tree",
-      "community": 94,
+      "community": 353,
       "norm_label": "write_temp_campaign_tree()"
     },
     {
@@ -22872,7 +23132,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_testlab_selfcheck_cpp_path",
-      "community": 94,
+      "community": 353,
       "norm_label": "path"
     },
     {
@@ -23152,7 +23412,7 @@
       "source_location": "L169",
       "_origin": "ast",
       "id": "contributing_4_engineering_standards_non_negotiable",
-      "community": 61,
+      "community": 340,
       "norm_label": "4. engineering standards (non-negotiable)"
     },
     {
@@ -23162,7 +23422,7 @@
       "source_location": "L171",
       "_origin": "ast",
       "id": "contributing_language_build",
-      "community": 61,
+      "community": 340,
       "norm_label": "language & build"
     },
     {
@@ -23172,7 +23432,7 @@
       "source_location": "L178",
       "_origin": "ast",
       "id": "contributing_eigen_traps",
-      "community": 61,
+      "community": 340,
       "norm_label": "eigen traps"
     },
     {
@@ -23182,7 +23442,7 @@
       "source_location": "L183",
       "_origin": "ast",
       "id": "contributing_anti_cheat_sacred",
-      "community": 61,
+      "community": 340,
       "norm_label": "anti-cheat (sacred)"
     },
     {
@@ -23192,7 +23452,7 @@
       "source_location": "L191",
       "_origin": "ast",
       "id": "contributing_license",
-      "community": 61,
+      "community": 340,
       "norm_label": "license"
     },
     {
@@ -23202,7 +23462,7 @@
       "source_location": "L195",
       "_origin": "ast",
       "id": "contributing_git_identity_owner_agents",
-      "community": 61,
+      "community": 340,
       "norm_label": "git identity (owner agents)"
     },
     {
@@ -23212,7 +23472,7 @@
       "source_location": "L198",
       "_origin": "ast",
       "id": "contributing_cuda",
-      "community": 61,
+      "community": 340,
       "norm_label": "cuda"
     },
     {
@@ -23422,7 +23682,7 @@
       "source_location": "L148",
       "_origin": "ast",
       "id": "readme_building_options",
-      "community": 122,
+      "community": 351,
       "norm_label": "building (options)"
     },
     {
@@ -23432,7 +23692,7 @@
       "source_location": "L157",
       "_origin": "ast",
       "id": "readme_openmp_assembly_polymesh_with_openmp",
-      "community": 122,
+      "community": 351,
       "norm_label": "openmp assembly (`polymesh_with_openmp`)"
     },
     {
@@ -23442,7 +23702,7 @@
       "source_location": "L166",
       "_origin": "ast",
       "id": "readme_linear_solve_direct_cg",
-      "community": 122,
+      "community": 351,
       "norm_label": "linear solve (direct / cg)"
     },
     {
@@ -23452,7 +23712,7 @@
       "source_location": "L180",
       "_origin": "ast",
       "id": "readme_cuda_backends_polymesh_with_cuda",
-      "community": 122,
+      "community": 351,
       "norm_label": "cuda backends (`polymesh_with_cuda`)"
     },
     {
@@ -23462,7 +23722,7 @@
       "source_location": "L205",
       "_origin": "ast",
       "id": "readme_step_opencascade_polymesh_with_occ",
-      "community": 122,
+      "community": 351,
       "norm_label": "step / opencascade (`polymesh_with_occ`)"
     },
     {
@@ -23472,7 +23732,7 @@
       "source_location": "L223",
       "_origin": "ast",
       "id": "readme_mesh_path_caveat",
-      "community": 122,
+      "community": 351,
       "norm_label": "mesh path caveat"
     },
     {
@@ -23512,7 +23772,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "audits_readme",
-      "community": 344,
+      "community": 45,
       "norm_label": "readme.md"
     },
     {
@@ -23522,7 +23782,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "audits_readme_holdout_geometry_audits",
-      "community": 334,
+      "community": 45,
       "norm_label": "holdout geometry audits"
     },
     {
@@ -23532,7 +23792,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "audits_readme_goals",
-      "community": 334,
+      "community": 45,
       "norm_label": "goals"
     },
     {
@@ -23542,7 +23802,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "audits_readme_roles",
-      "community": 334,
+      "community": 45,
       "norm_label": "roles"
     },
     {
@@ -23552,7 +23812,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "audits_readme_owner_supply_private",
-      "community": 334,
+      "community": 45,
       "norm_label": "owner supply (private)"
     },
     {
@@ -23562,7 +23822,7 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "audits_readme_agent_procedure_blind",
-      "community": 334,
+      "community": 45,
       "norm_label": "agent procedure (blind)"
     },
     {
@@ -23572,7 +23832,7 @@
       "source_location": "L72",
       "_origin": "ast",
       "id": "audits_readme_result_json_metrics_only",
-      "community": 334,
+      "community": 45,
       "norm_label": "result json (metrics only)"
     },
     {
@@ -23582,7 +23842,7 @@
       "source_location": "L99",
       "_origin": "ast",
       "id": "audits_readme_what_must_not_be_committed",
-      "community": 334,
+      "community": 45,
       "norm_label": "what must not be committed"
     },
     {
@@ -23592,7 +23852,7 @@
       "source_location": "L112",
       "_origin": "ast",
       "id": "audits_readme_optional_peer_cross_check_owner",
-      "community": 334,
+      "community": 45,
       "norm_label": "optional peer cross-check (owner)"
     },
     {
@@ -23602,8 +23862,58 @@
       "source_location": "L124",
       "_origin": "ast",
       "id": "audits_readme_status",
-      "community": 334,
+      "community": 45,
       "norm_label": "status"
+    },
+    {
+      "label": "README.md",
+      "file_type": "document",
+      "source_file": "bench/campaigns/README.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "bench_campaigns_readme",
+      "community": 159,
+      "norm_label": "readme.md"
+    },
+    {
+      "label": "Campaign warehouse",
+      "file_type": "document",
+      "source_file": "bench/campaigns/README.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "bench_campaigns_readme_campaign_warehouse",
+      "community": 159,
+      "norm_label": "campaign warehouse"
+    },
+    {
+      "label": "Directory layout",
+      "file_type": "document",
+      "source_file": "bench/campaigns/README.md",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "bench_campaigns_readme_directory_layout",
+      "community": 159,
+      "norm_label": "directory layout"
+    },
+    {
+      "label": "Short-campaign defaults (Lane V)",
+      "file_type": "document",
+      "source_file": "bench/campaigns/README.md",
+      "source_location": "L33",
+      "_origin": "ast",
+      "id": "bench_campaigns_readme_short_campaign_defaults_lane_v",
+      "community": 159,
+      "norm_label": "short-campaign defaults (lane v)"
+    },
+    {
+      "label": "git-LFS",
+      "file_type": "document",
+      "source_file": "bench/campaigns/README.md",
+      "source_location": "L45",
+      "_origin": "ast",
+      "id": "bench_campaigns_readme_git_lfs",
+      "community": 159,
+      "norm_label": "git-lfs"
     },
     {
       "label": "PARETO.md",
@@ -23922,7 +24232,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "bench_competitive_readme",
-      "community": 344,
+      "community": 45,
       "norm_label": "readme.md"
     },
     {
@@ -23932,7 +24242,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "bench_competitive_readme_competitive_benchmark_harness",
-      "community": 158,
+      "community": 45,
       "norm_label": "competitive benchmark harness"
     },
     {
@@ -23942,7 +24252,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "bench_competitive_readme_result_format",
-      "community": 158,
+      "community": 45,
       "norm_label": "result format"
     },
     {
@@ -23952,7 +24262,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "bench_competitive_readme_scoreboard",
-      "community": 158,
+      "community": 45,
       "norm_label": "scoreboard"
     },
     {
@@ -23962,7 +24272,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "bench_competitive_readme_polymesh_smoke_internal",
-      "community": 158,
+      "community": 45,
       "norm_label": "polymesh smoke (internal)"
     },
     {
@@ -23972,7 +24282,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "bench_competitive_readme_peer_priority_headless_practicality",
-      "community": 158,
+      "community": 45,
       "norm_label": "peer priority (headless practicality)"
     },
     {
@@ -23982,7 +24292,7 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "bench_competitive_readme_calculix_peer_e1",
-      "community": 158,
+      "community": 45,
       "norm_label": "calculix peer (e1)"
     },
     {
@@ -23992,7 +24302,7 @@
       "source_location": "L86",
       "_origin": "ast",
       "id": "bench_competitive_readme_polymesh_labeled_points_e2",
-      "community": 158,
+      "community": 45,
       "norm_label": "polymesh labeled points (e2)"
     },
     {
@@ -24002,7 +24312,7 @@
       "source_location": "L106",
       "_origin": "ast",
       "id": "bench_competitive_readme_holdout_audits_e3",
-      "community": 158,
+      "community": 45,
       "norm_label": "holdout audits (e3)"
     },
     {
@@ -24012,7 +24322,7 @@
       "source_location": "L112",
       "_origin": "ast",
       "id": "bench_competitive_readme_d6_tier_3_uniform_tet10_vs_graded",
-      "community": 158,
+      "community": 45,
       "norm_label": "d6 tier-3 (uniform tet10 vs graded)"
     },
     {
@@ -24022,7 +24332,7 @@
       "source_location": "L132",
       "_origin": "ast",
       "id": "bench_competitive_readme_adding_a_labeled_polymesh_point",
-      "community": 158,
+      "community": 45,
       "norm_label": "adding a labeled polymesh point"
     },
     {
@@ -24032,7 +24342,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "bench_competitive_peers_calculix_stub",
-      "community": 344,
+      "community": 45,
       "norm_label": "calculix_stub.md"
     },
     {
@@ -24042,7 +24352,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "bench_competitive_peers_calculix_stub_calculix_peer_runner",
-      "community": 344,
+      "community": 45,
       "norm_label": "calculix peer runner"
     },
     {
@@ -24052,7 +24362,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "bench_competitive_peers_calculix_stub_run_ci_safe",
-      "community": 344,
+      "community": 45,
       "norm_label": "run (ci-safe)"
     },
     {
@@ -24062,7 +24372,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "bench_competitive_peers_calculix_stub_common_install_paths_documentation_only",
-      "community": 344,
+      "community": 45,
       "norm_label": "common install paths (documentation only)"
     },
     {
@@ -24072,7 +24382,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "bench_competitive_peers_calculix_stub_runner_contract",
-      "community": 344,
+      "community": 45,
       "norm_label": "runner contract"
     },
     {
@@ -24082,7 +24392,7 @@
       "source_location": "L48",
       "_origin": "ast",
       "id": "bench_competitive_peers_calculix_stub_cases_to_port_next",
-      "community": 344,
+      "community": 45,
       "norm_label": "cases to port next"
     },
     {
@@ -24806,6 +25116,66 @@
       "norm_label": "6b. live mesh preview \u2014 `<run_dir>/mesh_preview.pmp`"
     },
     {
+      "label": "7. Experiment warehouse \u2014 `bench/campaigns/<name>/runs/...`",
+      "file_type": "document",
+      "source_file": "docs/dag/interfaces.md",
+      "source_location": "L175",
+      "_origin": "ast",
+      "id": "docs_dag_interfaces_7_experiment_warehouse_bench_campaigns_name_runs",
+      "community": 159,
+      "norm_label": "7. experiment warehouse \u2014 `bench/campaigns/<name>/runs/...`"
+    },
+    {
+      "label": "7a. `quality.json`",
+      "file_type": "document",
+      "source_file": "docs/dag/interfaces.md",
+      "source_location": "L195",
+      "_origin": "ast",
+      "id": "docs_dag_interfaces_7a_quality_json",
+      "community": 159,
+      "norm_label": "7a. `quality.json`"
+    },
+    {
+      "label": "7b. Campaign extensions in `campaign.json`",
+      "file_type": "document",
+      "source_file": "docs/dag/interfaces.md",
+      "source_location": "L209",
+      "_origin": "ast",
+      "id": "docs_dag_interfaces_7b_campaign_extensions_in_campaign_json",
+      "community": 159,
+      "norm_label": "7b. campaign extensions in `campaign.json`"
+    },
+    {
+      "label": "8. Grok handoff \u2014 `HANDOFF.md` / `handoff.json`",
+      "file_type": "document",
+      "source_file": "docs/dag/interfaces.md",
+      "source_location": "L221",
+      "_origin": "ast",
+      "id": "docs_dag_interfaces_8_grok_handoff_handoff_md_handoff_json",
+      "community": 159,
+      "norm_label": "8. grok handoff \u2014 `handoff.md` / `handoff.json`"
+    },
+    {
+      "label": "8a. `handoff.json` (machine)",
+      "file_type": "document",
+      "source_file": "docs/dag/interfaces.md",
+      "source_location": "L226",
+      "_origin": "ast",
+      "id": "docs_dag_interfaces_8a_handoff_json_machine",
+      "community": 159,
+      "norm_label": "8a. `handoff.json` (machine)"
+    },
+    {
+      "label": "8b. `HANDOFF.md` (human / agent prompt)",
+      "file_type": "document",
+      "source_file": "docs/dag/interfaces.md",
+      "source_location": "L242",
+      "_origin": "ast",
+      "id": "docs_dag_interfaces_8b_handoff_md_human_agent_prompt",
+      "community": 159,
+      "norm_label": "8b. `handoff.md` (human / agent prompt)"
+    },
+    {
       "label": "0001-geometry-kernel.md",
       "file_type": "document",
       "source_file": "docs/decisions/0001-geometry-kernel.md",
@@ -24816,14 +25186,14 @@
       "norm_label": "0001-geometry-kernel.md"
     },
     {
-      "label": "ADR-0001: Geometry kernel \u2014 OpenCASCADE for B-rep/STEP, feature-gated; STL always available",
+      "label": "ADR-0001: Geometry kernel \u2014 OpenCASCADE for B-rep/STEP; STL compare/legacy",
       "file_type": "document",
       "source_file": "docs/decisions/0001-geometry-kernel.md",
       "source_location": "L1",
       "_origin": "ast",
-      "id": "docs_decisions_0001_geometry_kernel_adr_0001_geometry_kernel_opencascade_for_b_rep_step_feature_gated_stl_always_available",
+      "id": "docs_decisions_0001_geometry_kernel_adr_0001_geometry_kernel_opencascade_for_b_rep_step_stl_compare_legacy",
       "community": 148,
-      "norm_label": "adr-0001: geometry kernel \u2014 opencascade for b-rep/step, feature-gated; stl always available"
+      "norm_label": "adr-0001: geometry kernel \u2014 opencascade for b-rep/step; stl compare/legacy"
     },
     {
       "label": "Decision",
@@ -24839,7 +25209,7 @@
       "label": "Alternatives",
       "file_type": "document",
       "source_file": "docs/decisions/0001-geometry-kernel.md",
-      "source_location": "L12",
+      "source_location": "L23",
       "_origin": "ast",
       "id": "docs_decisions_0001_geometry_kernel_alternatives",
       "community": 148,
@@ -24849,7 +25219,7 @@
       "label": "Why",
       "file_type": "document",
       "source_file": "docs/decisions/0001-geometry-kernel.md",
-      "source_location": "L18",
+      "source_location": "L29",
       "_origin": "ast",
       "id": "docs_decisions_0001_geometry_kernel_why",
       "community": 148,
@@ -26106,6 +26476,236 @@
       "norm_label": "alternatives rejected"
     },
     {
+      "label": "0020-brep-volume-meshing.md",
+      "file_type": "document",
+      "source_file": "docs/decisions/0020-brep-volume-meshing.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "docs_decisions_0020_brep_volume_meshing",
+      "community": 350,
+      "norm_label": "0020-brep-volume-meshing.md"
+    },
+    {
+      "label": "ADR-0020: True BRep volume meshing (product path)",
+      "file_type": "document",
+      "source_file": "docs/decisions/0020-brep-volume-meshing.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "docs_decisions_0020_brep_volume_meshing_adr_0020_true_brep_volume_meshing_product_path",
+      "community": 350,
+      "norm_label": "adr-0020: true brep volume meshing (product path)"
+    },
+    {
+      "label": "Context",
+      "file_type": "document",
+      "source_file": "docs/decisions/0020-brep-volume-meshing.md",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "docs_decisions_0020_brep_volume_meshing_context",
+      "community": 350,
+      "norm_label": "context"
+    },
+    {
+      "label": "Decision",
+      "file_type": "document",
+      "source_file": "docs/decisions/0020-brep-volume-meshing.md",
+      "source_location": "L14",
+      "_origin": "ast",
+      "id": "docs_decisions_0020_brep_volume_meshing_decision",
+      "community": 350,
+      "norm_label": "decision"
+    },
+    {
+      "label": "Consequences",
+      "file_type": "document",
+      "source_file": "docs/decisions/0020-brep-volume-meshing.md",
+      "source_location": "L28",
+      "_origin": "ast",
+      "id": "docs_decisions_0020_brep_volume_meshing_consequences",
+      "community": 350,
+      "norm_label": "consequences"
+    },
+    {
+      "label": "Alternatives rejected",
+      "file_type": "document",
+      "source_file": "docs/decisions/0020-brep-volume-meshing.md",
+      "source_location": "L35",
+      "_origin": "ast",
+      "id": "docs_decisions_0020_brep_volume_meshing_alternatives_rejected",
+      "community": 350,
+      "norm_label": "alternatives rejected"
+    },
+    {
+      "label": "0021-varyhedron-packing.md",
+      "file_type": "document",
+      "source_file": "docs/decisions/0021-varyhedron-packing.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "docs_decisions_0021_varyhedron_packing",
+      "community": 343,
+      "norm_label": "0021-varyhedron-packing.md"
+    },
+    {
+      "label": "ADR-0021: Varyhedron \u2014 variable polyhedral packing mesher",
+      "file_type": "document",
+      "source_file": "docs/decisions/0021-varyhedron-packing.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "docs_decisions_0021_varyhedron_packing_adr_0021_varyhedron_variable_polyhedral_packing_mesher",
+      "community": 343,
+      "norm_label": "adr-0021: varyhedron \u2014 variable polyhedral packing mesher"
+    },
+    {
+      "label": "Context",
+      "file_type": "document",
+      "source_file": "docs/decisions/0021-varyhedron-packing.md",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "docs_decisions_0021_varyhedron_packing_context",
+      "community": 343,
+      "norm_label": "context"
+    },
+    {
+      "label": "Decision",
+      "file_type": "document",
+      "source_file": "docs/decisions/0021-varyhedron-packing.md",
+      "source_location": "L14",
+      "_origin": "ast",
+      "id": "docs_decisions_0021_varyhedron_packing_decision",
+      "community": 343,
+      "norm_label": "decision"
+    },
+    {
+      "label": "Research anchors",
+      "file_type": "document",
+      "source_file": "docs/decisions/0021-varyhedron-packing.md",
+      "source_location": "L43",
+      "_origin": "ast",
+      "id": "docs_decisions_0021_varyhedron_packing_research_anchors",
+      "community": 343,
+      "norm_label": "research anchors"
+    },
+    {
+      "label": "Consequences",
+      "file_type": "document",
+      "source_file": "docs/decisions/0021-varyhedron-packing.md",
+      "source_location": "L50",
+      "_origin": "ast",
+      "id": "docs_decisions_0021_varyhedron_packing_consequences",
+      "community": 343,
+      "norm_label": "consequences"
+    },
+    {
+      "label": "Alternatives rejected",
+      "file_type": "document",
+      "source_file": "docs/decisions/0021-varyhedron-packing.md",
+      "source_location": "L56",
+      "_origin": "ast",
+      "id": "docs_decisions_0021_varyhedron_packing_alternatives_rejected",
+      "community": 343,
+      "norm_label": "alternatives rejected"
+    },
+    {
+      "label": "0022-experiment-warehouse-grok-loop.md",
+      "file_type": "document",
+      "source_file": "docs/decisions/0022-experiment-warehouse-grok-loop.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "docs_decisions_0022_experiment_warehouse_grok_loop",
+      "community": 159,
+      "norm_label": "0022-experiment-warehouse-grok-loop.md"
+    },
+    {
+      "label": "ADR-0022: Full experiment warehouse + headless Grok improvement loop",
+      "file_type": "document",
+      "source_file": "docs/decisions/0022-experiment-warehouse-grok-loop.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "docs_decisions_0022_experiment_warehouse_grok_loop_adr_0022_full_experiment_warehouse_headless_grok_improvement_loop",
+      "community": 159,
+      "norm_label": "adr-0022: full experiment warehouse + headless grok improvement loop"
+    },
+    {
+      "label": "Context",
+      "file_type": "document",
+      "source_file": "docs/decisions/0022-experiment-warehouse-grok-loop.md",
+      "source_location": "L6",
+      "_origin": "ast",
+      "id": "docs_decisions_0022_experiment_warehouse_grok_loop_context",
+      "community": 159,
+      "norm_label": "context"
+    },
+    {
+      "label": "Decision",
+      "file_type": "document",
+      "source_file": "docs/decisions/0022-experiment-warehouse-grok-loop.md",
+      "source_location": "L17",
+      "_origin": "ast",
+      "id": "docs_decisions_0022_experiment_warehouse_grok_loop_decision",
+      "community": 159,
+      "norm_label": "decision"
+    },
+    {
+      "label": "Warehouse layout",
+      "file_type": "document",
+      "source_file": "docs/decisions/0022-experiment-warehouse-grok-loop.md",
+      "source_location": "L19",
+      "_origin": "ast",
+      "id": "docs_decisions_0022_experiment_warehouse_grok_loop_warehouse_layout",
+      "community": 159,
+      "norm_label": "warehouse layout"
+    },
+    {
+      "label": "Short campaign shape set",
+      "file_type": "document",
+      "source_file": "docs/decisions/0022-experiment-warehouse-grok-loop.md",
+      "source_location": "L39",
+      "_origin": "ast",
+      "id": "docs_decisions_0022_experiment_warehouse_grok_loop_short_campaign_shape_set",
+      "community": 159,
+      "norm_label": "short campaign shape set"
+    },
+    {
+      "label": "Grok invocation (normative automation)",
+      "file_type": "document",
+      "source_file": "docs/decisions/0022-experiment-warehouse-grok-loop.md",
+      "source_location": "L51",
+      "_origin": "ast",
+      "id": "docs_decisions_0022_experiment_warehouse_grok_loop_grok_invocation_normative_automation",
+      "community": 159,
+      "norm_label": "grok invocation (normative automation)"
+    },
+    {
+      "label": "Safety",
+      "file_type": "document",
+      "source_file": "docs/decisions/0022-experiment-warehouse-grok-loop.md",
+      "source_location": "L66",
+      "_origin": "ast",
+      "id": "docs_decisions_0022_experiment_warehouse_grok_loop_safety",
+      "community": 159,
+      "norm_label": "safety"
+    },
+    {
+      "label": "Consequences",
+      "file_type": "document",
+      "source_file": "docs/decisions/0022-experiment-warehouse-grok-loop.md",
+      "source_location": "L72",
+      "_origin": "ast",
+      "id": "docs_decisions_0022_experiment_warehouse_grok_loop_consequences",
+      "community": 159,
+      "norm_label": "consequences"
+    },
+    {
+      "label": "Alternatives rejected",
+      "file_type": "document",
+      "source_file": "docs/decisions/0022-experiment-warehouse-grok-loop.md",
+      "source_location": "L78",
+      "_origin": "ast",
+      "id": "docs_decisions_0022_experiment_warehouse_grok_loop_alternatives_rejected",
+      "community": 159,
+      "norm_label": "alternatives rejected"
+    },
+    {
       "label": "theme-layout.md",
       "file_type": "document",
       "source_file": "docs/gui/theme-layout.md",
@@ -26856,6 +27456,86 @@
       "norm_label": "procedure after campaign finishes"
     },
     {
+      "label": "grok-loop.md",
+      "file_type": "document",
+      "source_file": "docs/process/grok-loop.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "docs_process_grok_loop",
+      "community": 315,
+      "norm_label": "grok-loop.md"
+    },
+    {
+      "label": "Grok improvement loop",
+      "file_type": "document",
+      "source_file": "docs/process/grok-loop.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "docs_process_grok_loop_grok_improvement_loop",
+      "community": 315,
+      "norm_label": "grok improvement loop"
+    },
+    {
+      "label": "When it runs",
+      "file_type": "document",
+      "source_file": "docs/process/grok-loop.md",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "docs_process_grok_loop_when_it_runs",
+      "community": 315,
+      "norm_label": "when it runs"
+    },
+    {
+      "label": "Headless invoke (default)",
+      "file_type": "document",
+      "source_file": "docs/process/grok-loop.md",
+      "source_location": "L18",
+      "_origin": "ast",
+      "id": "docs_process_grok_loop_headless_invoke_default",
+      "community": 315,
+      "norm_label": "headless invoke (default)"
+    },
+    {
+      "label": "Handoff contents",
+      "file_type": "document",
+      "source_file": "docs/process/grok-loop.md",
+      "source_location": "L36",
+      "_origin": "ast",
+      "id": "docs_process_grok_loop_handoff_contents",
+      "community": 315,
+      "norm_label": "handoff contents"
+    },
+    {
+      "label": "Autonomous vs supervised answers",
+      "file_type": "document",
+      "source_file": "docs/process/grok-loop.md",
+      "source_location": "L50",
+      "_origin": "ast",
+      "id": "docs_process_grok_loop_autonomous_vs_supervised_answers",
+      "community": 315,
+      "norm_label": "autonomous vs supervised answers"
+    },
+    {
+      "label": "Safety",
+      "file_type": "document",
+      "source_file": "docs/process/grok-loop.md",
+      "source_location": "L57",
+      "_origin": "ast",
+      "id": "docs_process_grok_loop_safety",
+      "community": 315,
+      "norm_label": "safety"
+    },
+    {
+      "label": "Manual interactive (optional)",
+      "file_type": "document",
+      "source_file": "docs/process/grok-loop.md",
+      "source_location": "L63",
+      "_origin": "ast",
+      "id": "docs_process_grok_loop_manual_interactive_optional",
+      "community": 315,
+      "norm_label": "manual interactive (optional)"
+    },
+    {
       "label": "progress.md",
       "file_type": "document",
       "source_file": "docs/progress.md",
@@ -26899,7 +27579,7 @@
       "label": "Benchmark table",
       "file_type": "document",
       "source_file": "docs/progress.md",
-      "source_location": "L388",
+      "source_location": "L410",
       "_origin": "ast",
       "id": "docs_progress_benchmark_table",
       "community": 72,
@@ -26909,7 +27589,7 @@
       "label": "Open issues",
       "file_type": "document",
       "source_file": "docs/progress.md",
-      "source_location": "L403",
+      "source_location": "L425",
       "_origin": "ast",
       "id": "docs_progress_open_issues",
       "community": 72,
@@ -45767,8 +46447,441 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L166",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts",
+      "target": "scripts_gen_cad_parts_edge",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L174",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts",
+      "target": "scripts_gen_cad_parts_face_triangle",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L75",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts",
+      "target": "scripts_gen_cad_parts_is_valid",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L257",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts",
+      "target": "scripts_gen_cad_parts_main",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "indirect_call",
+      "confidence": "INFERRED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L251",
+      "weight": 1.0,
+      "context": "collection",
+      "source": "scripts_gen_cad_parts",
+      "target": "scripts_gen_cad_parts_make_cylinder",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "indirect_call",
+      "confidence": "INFERRED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L253",
+      "weight": 1.0,
+      "context": "collection",
+      "source": "scripts_gen_cad_parts",
+      "target": "scripts_gen_cad_parts_make_icecream_cone",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "indirect_call",
+      "confidence": "INFERRED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L250",
+      "weight": 1.0,
+      "context": "collection",
+      "source": "scripts_gen_cad_parts",
+      "target": "scripts_gen_cad_parts_make_plate_hole",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "indirect_call",
+      "confidence": "INFERRED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L252",
+      "weight": 1.0,
+      "context": "collection",
+      "source": "scripts_gen_cad_parts",
+      "target": "scripts_gen_cad_parts_make_sphere",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L178",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts",
+      "target": "scripts_gen_cad_parts_make_triangular_pyramid",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L85",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts",
+      "target": "scripts_gen_cad_parts_require_solid",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L79",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts",
+      "target": "scripts_gen_cad_parts_volume",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L170",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts",
+      "target": "scripts_gen_cad_parts_wire_triangle",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L93",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts",
+      "target": "scripts_gen_cad_parts_write_step",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L111",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts",
+      "target": "scripts_gen_cad_parts_write_stl_compare",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L86",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts_require_solid",
+      "target": "scripts_gen_cad_parts_is_valid",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L88",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts_require_solid",
+      "target": "scripts_gen_cad_parts_volume",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L107",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts_write_step",
+      "target": "scripts_gen_cad_parts_volume",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L95",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts_write_step",
+      "target": "scripts_gen_cad_parts_require_solid",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L279",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts_main",
+      "target": "scripts_gen_cad_parts_write_step",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L94",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts_rationale_94",
+      "target": "scripts_gen_cad_parts_write_step",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L93",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts_write_step",
+      "target": "scripts_gen_cad_parts_py_path",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L111",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts_write_stl_compare",
+      "target": "scripts_gen_cad_parts_py_path",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L281",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts_main",
+      "target": "scripts_gen_cad_parts_write_stl_compare",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L112",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts_rationale_112",
+      "target": "scripts_gen_cad_parts_write_stl_compare",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L143",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts_make_plate_hole",
+      "target": "gp_pnt",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L135",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts_rationale_135",
+      "target": "scripts_gen_cad_parts_make_plate_hole",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L157",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts_make_cylinder",
+      "target": "gp_pnt",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L156",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts_rationale_156",
+      "target": "scripts_gen_cad_parts_make_cylinder",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L162",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts_rationale_162",
+      "target": "scripts_gen_cad_parts_make_sphere",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L166",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts_edge",
+      "target": "gp_pnt",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L171",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts_wire_triangle",
+      "target": "scripts_gen_cad_parts_edge",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L174",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts_face_triangle",
+      "target": "gp_pnt",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L237",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts_make_icecream_cone",
+      "target": "gp_pnt",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L191",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts_make_triangular_pyramid",
+      "target": "gp_pnt",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L170",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts_wire_triangle",
+      "target": "gp_pnt",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L175",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts_face_triangle",
+      "target": "scripts_gen_cad_parts_wire_triangle",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L197",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts_make_triangular_pyramid",
+      "target": "scripts_gen_cad_parts_face_triangle",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L232",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts_make_icecream_cone",
+      "target": "scripts_gen_cad_parts_make_triangular_pyramid",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L183",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts_rationale_183",
+      "target": "scripts_gen_cad_parts_make_triangular_pyramid",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_cad_parts.py",
+      "source_location": "L227",
+      "weight": 1.0,
+      "source": "scripts_gen_cad_parts_rationale_227",
+      "target": "scripts_gen_cad_parts_make_icecream_cone",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L39",
+      "source_location": "L270",
+      "weight": 1.0,
+      "source": "scripts_gen_part_library",
+      "target": "scripts_gen_part_library_assert_manifold_facets",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_part_library.py",
+      "source_location": "L46",
       "weight": 1.0,
       "source": "scripts_gen_part_library",
       "target": "scripts_gen_part_library_cross",
@@ -45778,7 +46891,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L27",
+      "source_location": "L34",
       "weight": 1.0,
       "source": "scripts_gen_part_library",
       "target": "scripts_gen_part_library_facet",
@@ -45788,7 +46901,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L226",
+      "source_location": "L301",
       "weight": 1.0,
       "source": "scripts_gen_part_library",
       "target": "scripts_gen_part_library_main",
@@ -45798,7 +46911,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L51",
+      "source_location": "L58",
       "weight": 1.0,
       "source": "scripts_gen_part_library",
       "target": "scripts_gen_part_library_norm",
@@ -45808,7 +46921,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L47",
+      "source_location": "L54",
       "weight": 1.0,
       "source": "scripts_gen_part_library",
       "target": "scripts_gen_part_library_sub",
@@ -45818,7 +46931,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L56",
+      "source_location": "L63",
       "weight": 1.0,
       "source": "scripts_gen_part_library",
       "target": "scripts_gen_part_library_tri",
@@ -45828,7 +46941,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L67",
+      "source_location": "L74",
       "weight": 1.0,
       "source": "scripts_gen_part_library",
       "target": "scripts_gen_part_library_write_box",
@@ -45838,7 +46951,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L107",
+      "source_location": "L114",
       "weight": 1.0,
       "source": "scripts_gen_part_library",
       "target": "scripts_gen_part_library_write_plate_hole",
@@ -45849,7 +46962,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L64",
+      "source_location": "L71",
       "weight": 1.0,
       "source": "scripts_gen_part_library_tri",
       "target": "scripts_gen_part_library_facet",
@@ -45860,7 +46973,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L58",
+      "source_location": "L65",
       "weight": 1.0,
       "source": "scripts_gen_part_library_tri",
       "target": "scripts_gen_part_library_cross",
@@ -45871,7 +46984,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L58",
+      "source_location": "L65",
       "weight": 1.0,
       "source": "scripts_gen_part_library_tri",
       "target": "scripts_gen_part_library_sub",
@@ -45882,7 +46995,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L58",
+      "source_location": "L65",
       "weight": 1.0,
       "source": "scripts_gen_part_library_tri",
       "target": "scripts_gen_part_library_norm",
@@ -45893,7 +47006,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L189",
+      "source_location": "L241",
       "weight": 1.0,
       "source": "scripts_gen_part_library_write_plate_hole",
       "target": "scripts_gen_part_library_norm",
@@ -45903,9 +47016,9 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L57",
+      "source_location": "L64",
       "weight": 1.0,
-      "source": "scripts_gen_part_library_rationale_57",
+      "source": "scripts_gen_part_library_rationale_64",
       "target": "scripts_gen_part_library_tri",
       "confidence_score": 1.0
     },
@@ -45914,7 +47027,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L85",
+      "source_location": "L92",
       "weight": 1.0,
       "source": "scripts_gen_part_library_write_box",
       "target": "scripts_gen_part_library_tri",
@@ -45925,7 +47038,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L165",
+      "source_location": "L209",
       "weight": 1.0,
       "source": "scripts_gen_part_library_write_plate_hole",
       "target": "scripts_gen_part_library_tri",
@@ -45936,7 +47049,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L230",
+      "source_location": "L305",
       "weight": 1.0,
       "source": "scripts_gen_part_library_main",
       "target": "scripts_gen_part_library_write_box",
@@ -45946,9 +47059,9 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L69",
+      "source_location": "L76",
       "weight": 1.0,
-      "source": "scripts_gen_part_library_rationale_69",
+      "source": "scripts_gen_part_library_rationale_76",
       "target": "scripts_gen_part_library_write_box",
       "confidence_score": 1.0
     },
@@ -45957,7 +47070,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L67",
+      "source_location": "L74",
       "weight": 1.0,
       "source": "scripts_gen_part_library_write_box",
       "target": "scripts_gen_part_library_py_path",
@@ -45968,7 +47081,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L107",
+      "source_location": "L114",
       "weight": 1.0,
       "source": "scripts_gen_part_library_write_plate_hole",
       "target": "scripts_gen_part_library_py_path",
@@ -45979,7 +47092,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L233",
+      "source_location": "L308",
       "weight": 1.0,
       "source": "scripts_gen_part_library_main",
       "target": "scripts_gen_part_library_write_plate_hole",
@@ -45989,10 +47102,31 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "scripts/gen_part_library.py",
-      "source_location": "L116",
+      "source_location": "L123",
       "weight": 1.0,
-      "source": "scripts_gen_part_library_rationale_116",
+      "source": "scripts_gen_part_library_rationale_123",
       "target": "scripts_gen_part_library_write_plate_hole",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_part_library.py",
+      "source_location": "L261",
+      "weight": 1.0,
+      "source": "scripts_gen_part_library_write_plate_hole",
+      "target": "scripts_gen_part_library_assert_manifold_facets",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/gen_part_library.py",
+      "source_location": "L271",
+      "weight": 1.0,
+      "source": "scripts_gen_part_library_rationale_271",
+      "target": "scripts_gen_part_library_assert_manifold_facets",
       "confidence_score": 1.0
     },
     {
@@ -77308,6 +78442,66 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "bench/campaigns/README.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "bench_campaigns_readme",
+      "target": "bench_campaigns_readme_campaign_warehouse",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "bench/campaigns/README.md",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "bench_campaigns_readme",
+      "target": "docs_dag_interfaces",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "bench/campaigns/README.md",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "bench_campaigns_readme",
+      "target": "docs_decisions_0022_experiment_warehouse_grok_loop",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "bench/campaigns/README.md",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "bench_campaigns_readme_campaign_warehouse",
+      "target": "bench_campaigns_readme_directory_layout",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "bench/campaigns/README.md",
+      "source_location": "L45",
+      "weight": 1.0,
+      "source": "bench_campaigns_readme_campaign_warehouse",
+      "target": "bench_campaigns_readme_git_lfs",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "bench/campaigns/README.md",
+      "source_location": "L33",
+      "weight": 1.0,
+      "source": "bench_campaigns_readme_campaign_warehouse",
+      "target": "bench_campaigns_readme_short_campaign_defaults_lane_v",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "bench/campaigns/settings-frontier-1/PARETO.md",
       "source_location": "L1",
       "weight": 1.0,
@@ -78429,6 +79623,26 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/dag/interfaces.md",
+      "source_location": "L175",
+      "weight": 1.0,
+      "source": "docs_dag_interfaces_test_lab_interfaces_normative",
+      "target": "docs_dag_interfaces_7_experiment_warehouse_bench_campaigns_name_runs",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/dag/interfaces.md",
+      "source_location": "L221",
+      "weight": 1.0,
+      "source": "docs_dag_interfaces_test_lab_interfaces_normative",
+      "target": "docs_dag_interfaces_8_grok_handoff_handoff_md_handoff_json",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/dag/interfaces.md",
       "source_location": "L159",
       "weight": 1.0,
       "source": "docs_dag_interfaces_6_live_solve_progress_run_dir_progress_json",
@@ -78438,20 +79652,60 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "docs/decisions/0001-geometry-kernel.md",
-      "source_location": "L1",
+      "source_file": "docs/dag/interfaces.md",
+      "source_location": "L195",
       "weight": 1.0,
-      "source": "docs_decisions_0001_geometry_kernel",
-      "target": "docs_decisions_0001_geometry_kernel_adr_0001_geometry_kernel_opencascade_for_b_rep_step_feature_gated_stl_always_available",
+      "source": "docs_dag_interfaces_7_experiment_warehouse_bench_campaigns_name_runs",
+      "target": "docs_dag_interfaces_7a_quality_json",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/dag/interfaces.md",
+      "source_location": "L209",
+      "weight": 1.0,
+      "source": "docs_dag_interfaces_7_experiment_warehouse_bench_campaigns_name_runs",
+      "target": "docs_dag_interfaces_7b_campaign_extensions_in_campaign_json",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/dag/interfaces.md",
+      "source_location": "L226",
+      "weight": 1.0,
+      "source": "docs_dag_interfaces_8_grok_handoff_handoff_md_handoff_json",
+      "target": "docs_dag_interfaces_8a_handoff_json_machine",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/dag/interfaces.md",
+      "source_location": "L242",
+      "weight": 1.0,
+      "source": "docs_dag_interfaces_8_grok_handoff_handoff_md_handoff_json",
+      "target": "docs_dag_interfaces_8b_handoff_md_human_agent_prompt",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/decisions/0001-geometry-kernel.md",
-      "source_location": "L12",
+      "source_location": "L1",
       "weight": 1.0,
-      "source": "docs_decisions_0001_geometry_kernel_adr_0001_geometry_kernel_opencascade_for_b_rep_step_feature_gated_stl_always_available",
+      "source": "docs_decisions_0001_geometry_kernel",
+      "target": "docs_decisions_0001_geometry_kernel_adr_0001_geometry_kernel_opencascade_for_b_rep_step_stl_compare_legacy",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/decisions/0001-geometry-kernel.md",
+      "source_location": "L23",
+      "weight": 1.0,
+      "source": "docs_decisions_0001_geometry_kernel_adr_0001_geometry_kernel_opencascade_for_b_rep_step_stl_compare_legacy",
       "target": "docs_decisions_0001_geometry_kernel_alternatives",
       "confidence_score": 1.0
     },
@@ -78461,7 +79715,7 @@
       "source_file": "docs/decisions/0001-geometry-kernel.md",
       "source_location": "L6",
       "weight": 1.0,
-      "source": "docs_decisions_0001_geometry_kernel_adr_0001_geometry_kernel_opencascade_for_b_rep_step_feature_gated_stl_always_available",
+      "source": "docs_decisions_0001_geometry_kernel_adr_0001_geometry_kernel_opencascade_for_b_rep_step_stl_compare_legacy",
       "target": "docs_decisions_0001_geometry_kernel_decision",
       "confidence_score": 1.0
     },
@@ -78469,9 +79723,9 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/decisions/0001-geometry-kernel.md",
-      "source_location": "L18",
+      "source_location": "L29",
       "weight": 1.0,
-      "source": "docs_decisions_0001_geometry_kernel_adr_0001_geometry_kernel_opencascade_for_b_rep_step_feature_gated_stl_always_available",
+      "source": "docs_decisions_0001_geometry_kernel_adr_0001_geometry_kernel_opencascade_for_b_rep_step_stl_compare_legacy",
       "target": "docs_decisions_0001_geometry_kernel_why",
       "confidence_score": 1.0
     },
@@ -79548,6 +80802,206 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "docs/decisions/0020-brep-volume-meshing.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "docs_decisions_0020_brep_volume_meshing",
+      "target": "docs_decisions_0020_brep_volume_meshing_adr_0020_true_brep_volume_meshing_product_path",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/decisions/0020-brep-volume-meshing.md",
+      "source_location": "L35",
+      "weight": 1.0,
+      "source": "docs_decisions_0020_brep_volume_meshing_adr_0020_true_brep_volume_meshing_product_path",
+      "target": "docs_decisions_0020_brep_volume_meshing_alternatives_rejected",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/decisions/0020-brep-volume-meshing.md",
+      "source_location": "L28",
+      "weight": 1.0,
+      "source": "docs_decisions_0020_brep_volume_meshing_adr_0020_true_brep_volume_meshing_product_path",
+      "target": "docs_decisions_0020_brep_volume_meshing_consequences",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/decisions/0020-brep-volume-meshing.md",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "docs_decisions_0020_brep_volume_meshing_adr_0020_true_brep_volume_meshing_product_path",
+      "target": "docs_decisions_0020_brep_volume_meshing_context",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/decisions/0020-brep-volume-meshing.md",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "docs_decisions_0020_brep_volume_meshing_adr_0020_true_brep_volume_meshing_product_path",
+      "target": "docs_decisions_0020_brep_volume_meshing_decision",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/decisions/0021-varyhedron-packing.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "docs_decisions_0021_varyhedron_packing",
+      "target": "docs_decisions_0021_varyhedron_packing_adr_0021_varyhedron_variable_polyhedral_packing_mesher",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/decisions/0021-varyhedron-packing.md",
+      "source_location": "L56",
+      "weight": 1.0,
+      "source": "docs_decisions_0021_varyhedron_packing_adr_0021_varyhedron_variable_polyhedral_packing_mesher",
+      "target": "docs_decisions_0021_varyhedron_packing_alternatives_rejected",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/decisions/0021-varyhedron-packing.md",
+      "source_location": "L50",
+      "weight": 1.0,
+      "source": "docs_decisions_0021_varyhedron_packing_adr_0021_varyhedron_variable_polyhedral_packing_mesher",
+      "target": "docs_decisions_0021_varyhedron_packing_consequences",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/decisions/0021-varyhedron-packing.md",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "docs_decisions_0021_varyhedron_packing_adr_0021_varyhedron_variable_polyhedral_packing_mesher",
+      "target": "docs_decisions_0021_varyhedron_packing_context",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/decisions/0021-varyhedron-packing.md",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "docs_decisions_0021_varyhedron_packing_adr_0021_varyhedron_variable_polyhedral_packing_mesher",
+      "target": "docs_decisions_0021_varyhedron_packing_decision",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/decisions/0021-varyhedron-packing.md",
+      "source_location": "L43",
+      "weight": 1.0,
+      "source": "docs_decisions_0021_varyhedron_packing_adr_0021_varyhedron_variable_polyhedral_packing_mesher",
+      "target": "docs_decisions_0021_varyhedron_packing_research_anchors",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/decisions/0022-experiment-warehouse-grok-loop.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "docs_decisions_0022_experiment_warehouse_grok_loop",
+      "target": "docs_decisions_0022_experiment_warehouse_grok_loop_adr_0022_full_experiment_warehouse_headless_grok_improvement_loop",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/decisions/0022-experiment-warehouse-grok-loop.md",
+      "source_location": "L78",
+      "weight": 1.0,
+      "source": "docs_decisions_0022_experiment_warehouse_grok_loop_adr_0022_full_experiment_warehouse_headless_grok_improvement_loop",
+      "target": "docs_decisions_0022_experiment_warehouse_grok_loop_alternatives_rejected",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/decisions/0022-experiment-warehouse-grok-loop.md",
+      "source_location": "L72",
+      "weight": 1.0,
+      "source": "docs_decisions_0022_experiment_warehouse_grok_loop_adr_0022_full_experiment_warehouse_headless_grok_improvement_loop",
+      "target": "docs_decisions_0022_experiment_warehouse_grok_loop_consequences",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/decisions/0022-experiment-warehouse-grok-loop.md",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "docs_decisions_0022_experiment_warehouse_grok_loop_adr_0022_full_experiment_warehouse_headless_grok_improvement_loop",
+      "target": "docs_decisions_0022_experiment_warehouse_grok_loop_context",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/decisions/0022-experiment-warehouse-grok-loop.md",
+      "source_location": "L17",
+      "weight": 1.0,
+      "source": "docs_decisions_0022_experiment_warehouse_grok_loop_adr_0022_full_experiment_warehouse_headless_grok_improvement_loop",
+      "target": "docs_decisions_0022_experiment_warehouse_grok_loop_decision",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/decisions/0022-experiment-warehouse-grok-loop.md",
+      "source_location": "L51",
+      "weight": 1.0,
+      "source": "docs_decisions_0022_experiment_warehouse_grok_loop_decision",
+      "target": "docs_decisions_0022_experiment_warehouse_grok_loop_grok_invocation_normative_automation",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/decisions/0022-experiment-warehouse-grok-loop.md",
+      "source_location": "L66",
+      "weight": 1.0,
+      "source": "docs_decisions_0022_experiment_warehouse_grok_loop_decision",
+      "target": "docs_decisions_0022_experiment_warehouse_grok_loop_safety",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/decisions/0022-experiment-warehouse-grok-loop.md",
+      "source_location": "L39",
+      "weight": 1.0,
+      "source": "docs_decisions_0022_experiment_warehouse_grok_loop_decision",
+      "target": "docs_decisions_0022_experiment_warehouse_grok_loop_short_campaign_shape_set",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/decisions/0022-experiment-warehouse-grok-loop.md",
+      "source_location": "L19",
+      "weight": 1.0,
+      "source": "docs_decisions_0022_experiment_warehouse_grok_loop_decision",
+      "target": "docs_decisions_0022_experiment_warehouse_grok_loop_warehouse_layout",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "docs/gui/theme-layout.md",
       "source_location": "L1",
       "weight": 1.0,
@@ -80248,6 +81702,76 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "docs/process/grok-loop.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "docs_process_grok_loop",
+      "target": "docs_process_grok_loop_grok_improvement_loop",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/process/grok-loop.md",
+      "source_location": "L50",
+      "weight": 1.0,
+      "source": "docs_process_grok_loop_grok_improvement_loop",
+      "target": "docs_process_grok_loop_autonomous_vs_supervised_answers",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/process/grok-loop.md",
+      "source_location": "L36",
+      "weight": 1.0,
+      "source": "docs_process_grok_loop_grok_improvement_loop",
+      "target": "docs_process_grok_loop_handoff_contents",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/process/grok-loop.md",
+      "source_location": "L18",
+      "weight": 1.0,
+      "source": "docs_process_grok_loop_grok_improvement_loop",
+      "target": "docs_process_grok_loop_headless_invoke_default",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/process/grok-loop.md",
+      "source_location": "L63",
+      "weight": 1.0,
+      "source": "docs_process_grok_loop_grok_improvement_loop",
+      "target": "docs_process_grok_loop_manual_interactive_optional",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/process/grok-loop.md",
+      "source_location": "L57",
+      "weight": 1.0,
+      "source": "docs_process_grok_loop_grok_improvement_loop",
+      "target": "docs_process_grok_loop_safety",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/process/grok-loop.md",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "docs_process_grok_loop_grok_improvement_loop",
+      "target": "docs_process_grok_loop_when_it_runs",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "docs/progress.md",
       "source_location": "L1",
       "weight": 1.0,
@@ -80259,7 +81783,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/progress.md",
-      "source_location": "L388",
+      "source_location": "L410",
       "weight": 1.0,
       "source": "docs_progress_progress",
       "target": "docs_progress_benchmark_table",
@@ -80289,7 +81813,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/progress.md",
-      "source_location": "L403",
+      "source_location": "L425",
       "weight": 1.0,
       "source": "docs_progress_progress",
       "target": "docs_progress_open_issues",
@@ -81117,5 +82641,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "791523e70b84c55b918b4c68caccf6256a7b8e0c"
+  "built_at_commit": "cc1179eb4e8ec4db2e08c2059dd9ff1f38d88911"
 }

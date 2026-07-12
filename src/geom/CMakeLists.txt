@@ -3,6 +3,7 @@ add_library(geom
     src/tri_surface.cpp
     src/stl.cpp
     src/step.cpp
+    src/cad_model.cpp
     src/features.cpp
     src/indicators.cpp
 )

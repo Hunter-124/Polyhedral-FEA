@@ -22,10 +22,11 @@ namespace polymesh::geom {
 #endif
 }
 
-/// Loads a STEP file and returns a triangulated surface mesh.
+/// Loads a STEP file and returns a **derived** triangulated surface mesh.
 ///
-/// Uses OpenCASCADE STEPControl_Reader + BRepMesh_IncrementalMesh.
-/// Vertex coordinates are in metres (SI), matching the rest of geom.
+/// Prefer `CadModel::load_step` + `tessellate()` for product paths that need
+/// the live BRep (ADR-0020). This helper is equivalent to
+/// `CadModel::load_step(path).tessellate()` and remains for legacy callers.
 /// Throws GeomError on I/O failure, malformed STEP, empty geometry, or when
 /// OpenCASCADE support was not compiled in.
 TriSurface load_step(const std::filesystem::path& path);

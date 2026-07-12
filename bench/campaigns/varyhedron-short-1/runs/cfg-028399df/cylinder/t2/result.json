@@ -1,0 +1,28 @@
+{
+  "cfg_id": "cfg-028399df",
+  "config": {
+    "feature_refine": true,
+    "mesher": "hybrid_zoo",
+    "order": 1
+  },
+  "error": "mesh exceeds campaign DOF/elem budget (85440 dof, 81428 elems)",
+  "geom_class": {
+    "curved_frac": 0.9318181818181818,
+    "min_feature_h": 28.577399384028727,
+    "thin": false
+  },
+  "mesh_ms": 809.517725,
+  "n_dof": 85440,
+  "n_elems": 81428,
+  "n_nodes": 28480,
+  "part": "cylinder",
+  "quality": {
+    "M1max": 0.0006947358820723825,
+    "M2max": 0.0016885255099279835,
+    "M6": 0.1760392194187194,
+    "score": 0.7332981469839908
+  },
+  "solve_ms": 0.0,
+  "status": "over_budget",
+  "tier": 2
+}

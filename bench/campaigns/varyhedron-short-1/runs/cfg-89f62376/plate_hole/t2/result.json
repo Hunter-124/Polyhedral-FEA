@@ -1,0 +1,47 @@
+{
+  "accuracy": {
+    "all": [
+      {
+        "metric": "scf",
+        "rel_err": 1.5655912843632727,
+        "score": 0.030948421475116897,
+        "truth": 3.0,
+        "value": 7.696773853089818
+      }
+    ],
+    "metric": "scf",
+    "rel_err": 1.5655912843632727,
+    "score": 0.030948421475116897,
+    "truth": 3.0,
+    "value": 7.696773853089818
+  },
+  "answers": {
+    "sigma_max": 7696773.853089818,
+    "tip_deflection": 2.983691092448502e-06
+  },
+  "cfg_id": "cfg-89f62376",
+  "config": {
+    "feature_refine": true,
+    "mesher": "varyhedron",
+    "order": 1
+  },
+  "geom_class": {
+    "curved_frac": 0.9,
+    "min_feature_h": 3.3334,
+    "thin": false
+  },
+  "mesh_ms": 197.27045,
+  "n_dof": 11898,
+  "n_elems": 15493,
+  "n_nodes": 3966,
+  "part": "plate_hole",
+  "quality": {
+    "M1max": 0.00010527874539103112,
+    "M2max": 0.0014046901586184878,
+    "M6": 0.04781634455906585,
+    "score": 0.7319064825874585
+  },
+  "solve_ms": 109.781212,
+  "status": "ok",
+  "tier": 2
+}

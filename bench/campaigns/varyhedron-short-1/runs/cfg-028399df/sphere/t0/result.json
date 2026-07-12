@@ -1,0 +1,47 @@
+{
+  "accuracy": {
+    "all": [
+      {
+        "metric": "tip_deflection",
+        "rel_err": 1.505291985156422,
+        "score": 0.2493402475555188,
+        "truth": 1.6e-07,
+        "value": 4.008467176250275e-07
+      }
+    ],
+    "metric": "tip_deflection",
+    "rel_err": 1.505291985156422,
+    "score": 0.2493402475555188,
+    "truth": 1.6e-07,
+    "value": 4.008467176250275e-07
+  },
+  "answers": {
+    "sigma_max": 3638314.969784805,
+    "tip_deflection": 4.008467176250275e-07
+  },
+  "cfg_id": "cfg-028399df",
+  "config": {
+    "feature_refine": true,
+    "mesher": "hybrid_zoo",
+    "order": 1
+  },
+  "geom_class": {
+    "curved_frac": 0.9957657021877205,
+    "min_feature_h": 18.004820788542474,
+    "thin": false
+  },
+  "mesh_ms": 38.675425,
+  "n_dof": 2043,
+  "n_elems": 1536,
+  "n_nodes": 681,
+  "part": "sphere",
+  "quality": {
+    "M1max": 7.152448122690996e-18,
+    "M2max": 0.0007961062152623152,
+    "M6": 1.0,
+    "score": 0.9795232556185703
+  },
+  "solve_ms": 12.229908,
+  "status": "ok",
+  "tier": 0
+}

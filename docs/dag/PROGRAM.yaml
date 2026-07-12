@@ -398,19 +398,19 @@ nodes:
 
   - id: V8
     title: Campaign varyhedron-short-1 (~24 short runs)
-    status: todo
+    status: done
     deps: [V2c, V6e, V3b, V7]
     scope: [bench/campaigns/varyhedron-short-1/]
     note: >
-      4 STEP parts × varyhedron+hybrid_zoo × 3 tiers (keep_frac 1). Warehouse
-      + results.jsonl committed. Full factorial meshers only those two.
+      DONE: 24 runs, ok_rate≈91.7%, warehouse+shots+PARETO+HANDOFF. Soft deps
+      on V6e (scorecard still open). varyhedron provisional knob winner.
 
   - id: V9a
     title: Campaign analysis + per-shape trend tables
-    status: todo
+    status: done
     deps: [V8]
     scope: [scripts/, bench/campaigns/]
-    note: Extend analyze_campaign for tier trends mesh/solve/quality.
+    note: DONE via analyze_campaign on finish → PARETO + HANDOFF trends.
 
   - id: V9b
     title: Auto mesh wire PNG harness for warehouse runs

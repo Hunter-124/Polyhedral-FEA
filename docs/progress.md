@@ -23,6 +23,13 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-12: **V3a warehouse layout + git-LFS** — `.gitattributes` tracks
+  `*.vtu` and `bench/campaigns/**/runs/**/*.png` via git-LFS;
+  `bench/campaigns/README.md` documents
+  `runs/<cfg_id>/<part>/t<tier>/{mesh.vtu,wire.png,quality.json,result.json}`;
+  skeleton `varyhedron-short-1` campaign (`warehouse` + `on_finish`
+  analyze/grok_handoff; 4 shape placeholders × varyhedron+hybrid_zoo × 3
+  tiers `keep_frac: 1.0`). Writer is V3b; run is V8.
 - 2026-07-12: **Lane V program board (V0)** — ADRs 0020 (true BRep volume
   meshing), 0021 (varyhedron packing from day 1), 0022 (full experiment
   warehouse + headless `grok -p --yolo` loop); ADR-0001 amended (OCC product

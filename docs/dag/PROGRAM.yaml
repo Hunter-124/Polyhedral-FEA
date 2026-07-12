@@ -260,10 +260,14 @@ nodes:
 
   - id: V3a
     title: Warehouse layout + git-LFS attributes
-    status: todo
+    status: done
     deps: [V0]
     scope: [bench/campaigns/, .gitattributes, docs/dag/]
-    note: runs/<cfg>/<part>/t<tier>/{mesh.vtu,wire.png,quality.json,result.json}
+    note: >
+      DONE 2026-07-12: .gitattributes LFS for *.vtu and campaign runs PNGs;
+      bench/campaigns/README.md layout; varyhedron-short-1 skeleton
+      campaign.json (warehouse+on_finish) + runs/.gitkeep.
+
 
   - id: V3b
     title: Testlab warehouse writer

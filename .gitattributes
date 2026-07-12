@@ -10,3 +10,8 @@ bench/results/** linguist-generated
 # after `uv tool install graphifyy` / `pip install graphifyy`).
 graphify-out/graph.json merge=graphify
 graphify-out/manifest.json merge=union
+
+# Experiment warehouse binaries (ADR-0022, docs/dag/interfaces.md §7).
+# Requires once per clone: git lfs install
+*.vtu filter=lfs diff=lfs merge=lfs -text
+bench/campaigns/**/runs/**/*.png filter=lfs diff=lfs merge=lfs -text

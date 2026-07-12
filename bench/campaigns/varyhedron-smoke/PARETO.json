@@ -1,6 +1,6 @@
 {
   "campaign": "varyhedron-smoke",
-  "generated_utc": "2026-07-12T22:42:59Z",
+  "generated_utc": "2026-07-12T22:45:20Z",
   "partial": false,
   "checkpoint": {
     "state": "finished",
@@ -18,24 +18,24 @@
     "solve_ms": 0.25
   },
   "n_result_lines": 4,
-  "n_ok": 0,
-  "n_fail": 4,
-  "ok_rate": 0.0,
+  "n_ok": 2,
+  "n_fail": 2,
+  "ok_rate": 0.5,
   "n_configs": 2,
   "expected_note": "Grid: 2 configs \u00d7 2 parts = 4 tier-0 runs (1 tiers planned).",
   "ranking": [
     {
       "rank": 1,
-      "cfg_id": "cfg-028399df",
+      "cfg_id": "cfg-89f62376",
       "config": {
         "feature_refine": true,
-        "mesher": "hybrid_zoo",
+        "mesher": "varyhedron",
         "order": 1
       },
-      "mean_score": 0.26678724831114903,
+      "mean_score": 0.28358031050548493,
       "mean_accuracy": 0.0,
-      "mean_total_ms": 21299.434886,
-      "mean_mesh_ms": 21299.434886,
+      "mean_total_ms": 7803.293084,
+      "mean_mesh_ms": 7803.293084,
       "mean_solve_ms": 0.0,
       "ok_rate": 0.0,
       "n_ok": 0,
@@ -50,20 +50,20 @@
     },
     {
       "rank": 2,
-      "cfg_id": "cfg-89f62376",
+      "cfg_id": "cfg-028399df",
       "config": {
         "feature_refine": true,
-        "mesher": "varyhedron",
+        "mesher": "hybrid_zoo",
         "order": 1
       },
-      "mean_score": 0.2666138701515144,
-      "mean_accuracy": 0.0,
-      "mean_total_ms": 16556.8107235,
-      "mean_mesh_ms": 16556.8107235,
-      "mean_solve_ms": 0.0,
-      "ok_rate": 0.0,
-      "n_ok": 0,
-      "n_fail": 2,
+      "mean_score": 0.15099574050522874,
+      "mean_accuracy": 0.03683381013721082,
+      "mean_total_ms": 29644.519835500003,
+      "mean_mesh_ms": 5958.658335,
+      "mean_solve_ms": 23685.8615005,
+      "ok_rate": 1.0,
+      "n_ok": 2,
+      "n_fail": 0,
       "parts": [
         "cylinder",
         "plate_hole"
@@ -73,28 +73,91 @@
       ]
     }
   ],
-  "pareto_global": [],
-  "pareto_by_part": {
-    "cylinder": [],
-    "plate_hole": []
-  },
-  "pareto_by_geom_class": {
-    "curved": []
-  },
-  "recommendations": {
-    "apply_code_defaults": false,
-    "reason": "Partial or insufficient data \u2014 document recommendations only; do not change product defaults yet.",
-    "overall_ok_rate": 0.0,
-    "n_runs": 4,
-    "finished": true,
-    "global_top_cfg": {
+  "pareto_global": [
+    {
       "cfg_id": "cfg-028399df",
       "config": {
         "feature_refine": true,
         "mesher": "hybrid_zoo",
         "order": 1
       },
-      "mean_score": 0.26678724831114903,
+      "accuracy": 0.03683381013721082,
+      "total_ms": 29644.519835500003,
+      "mesh_ms": 5958.658335,
+      "solve_ms": 23685.8615005,
+      "score": 0.15099574050522874,
+      "n": 2
+    }
+  ],
+  "pareto_by_part": {
+    "cylinder": [
+      {
+        "cfg_id": "cfg-028399df",
+        "config": {
+          "feature_refine": true,
+          "mesher": "hybrid_zoo",
+          "order": 1
+        },
+        "accuracy": 2.538860847259228e-15,
+        "total_ms": 55745.686992,
+        "mesh_ms": 8814.60098,
+        "solve_ms": 46931.086012,
+        "score": 0.030688074806498156,
+        "n": 1,
+        "part": "cylinder"
+      }
+    ],
+    "plate_hole": [
+      {
+        "cfg_id": "cfg-028399df",
+        "config": {
+          "feature_refine": true,
+          "mesher": "hybrid_zoo",
+          "order": 1
+        },
+        "accuracy": 0.0736676202744191,
+        "total_ms": 3543.352679,
+        "mesh_ms": 3102.71569,
+        "solve_ms": 440.636989,
+        "score": 0.2713034062039593,
+        "n": 1,
+        "part": "plate_hole"
+      }
+    ]
+  },
+  "pareto_by_geom_class": {
+    "curved": [
+      {
+        "cfg_id": "cfg-028399df",
+        "config": {
+          "feature_refine": true,
+          "mesher": "hybrid_zoo",
+          "order": 1
+        },
+        "accuracy": 0.03683381013721082,
+        "total_ms": 29644.519835500003,
+        "mesh_ms": 5958.658335,
+        "solve_ms": 23685.8615005,
+        "score": 0.15099574050522874,
+        "n": 2,
+        "geom_class": "curved"
+      }
+    ]
+  },
+  "recommendations": {
+    "apply_code_defaults": false,
+    "reason": "Partial or insufficient data \u2014 document recommendations only; do not change product defaults yet.",
+    "overall_ok_rate": 0.5,
+    "n_runs": 4,
+    "finished": true,
+    "global_top_cfg": {
+      "cfg_id": "cfg-89f62376",
+      "config": {
+        "feature_refine": true,
+        "mesher": "varyhedron",
+        "order": 1
+      },
+      "mean_score": 0.28358031050548493,
       "mean_accuracy": 0.0,
       "ok_rate": 0.0,
       "n_ok": 0,
@@ -103,8 +166,8 @@
     "knob_suggestions": [
       {
         "knob": "mesher",
-        "suggested": "hybrid_zoo",
-        "mean_score": 0.26678724831114903,
+        "suggested": "varyhedron",
+        "mean_score": 0.28358031050548493,
         "ok_rate": 0.0,
         "n_runs": 2,
         "n_configs": 1
@@ -112,16 +175,16 @@
       {
         "knob": "feature_refine",
         "suggested": true,
-        "mean_score": 0.26670055923133174,
-        "ok_rate": 0.0,
+        "mean_score": 0.21728802550535684,
+        "ok_rate": 0.5,
         "n_runs": 4,
         "n_configs": 2
       },
       {
         "knob": "order",
         "suggested": 1,
-        "mean_score": 0.26670055923133174,
-        "ok_rate": 0.0,
+        "mean_score": 0.21728802550535684,
+        "ok_rate": 0.5,
         "n_runs": 4,
         "n_configs": 2
       }
@@ -129,21 +192,21 @@
     "factor_breakdown": {
       "feature_refine": {
         "True": {
-          "mean_score": 0.26670055923133174,
+          "mean_score": 0.21728802550535684,
           "n_configs": 2.0,
           "n_runs": 4.0,
-          "ok_rate": 0.0
+          "ok_rate": 0.5
         }
       },
       "mesher": {
         "hybrid_zoo": {
-          "mean_score": 0.26678724831114903,
+          "mean_score": 0.15099574050522874,
           "n_configs": 1.0,
           "n_runs": 2.0,
-          "ok_rate": 0.0
+          "ok_rate": 1.0
         },
         "varyhedron": {
-          "mean_score": 0.2666138701515144,
+          "mean_score": 0.28358031050548493,
           "n_configs": 1.0,
           "n_runs": 2.0,
           "ok_rate": 0.0
@@ -151,29 +214,18 @@
       },
       "order": {
         "1": {
-          "mean_score": 0.26670055923133174,
+          "mean_score": 0.21728802550535684,
           "n_configs": 2.0,
           "n_runs": 4.0,
-          "ok_rate": 0.0
+          "ok_rate": 0.5
         }
       }
     },
     "per_condition": {
       "geom:curved": {
         "n_runs": 4,
-        "ok_rate": 0.0,
+        "ok_rate": 0.5,
         "top_configs": [
-          {
-            "cfg_id": "cfg-028399df",
-            "config": {
-              "feature_refine": true,
-              "mesher": "hybrid_zoo",
-              "order": 1
-            },
-            "mean_score": 0.26678724831114903,
-            "n_runs": 2,
-            "ok_rate": 0.0
-          },
           {
             "cfg_id": "cfg-89f62376",
             "config": {
@@ -181,27 +233,38 @@
               "mesher": "varyhedron",
               "order": 1
             },
-            "mean_score": 0.2666138701515144,
+            "mean_score": 0.28358031050548493,
             "n_runs": 2,
             "ok_rate": 0.0
+          },
+          {
+            "cfg_id": "cfg-028399df",
+            "config": {
+              "feature_refine": true,
+              "mesher": "hybrid_zoo",
+              "order": 1
+            },
+            "mean_score": 0.15099574050522874,
+            "n_runs": 2,
+            "ok_rate": 1.0
           }
         ],
         "factor_best": {
           "mesher": {
-            "value": "hybrid_zoo",
-            "mean_score": 0.26678724831114903,
+            "value": "varyhedron",
+            "mean_score": 0.28358031050548493,
             "n": 2
           },
           "feature_refine": {
             "value": true,
-            "mean_score": 0.2667005592313317,
+            "mean_score": 0.21728802550535686,
             "n": 4
           }
         }
       },
       "part:cylinder": {
         "n_runs": 2,
-        "ok_rate": 0.0,
+        "ok_rate": 0.5,
         "top_configs": [
           {
             "cfg_id": "cfg-89f62376",
@@ -210,7 +273,7 @@
               "mesher": "varyhedron",
               "order": 1
             },
-            "mean_score": 0.260333131930066,
+            "mean_score": 0.2703891005065792,
             "n_runs": 1,
             "ok_rate": 0.0
           },
@@ -221,39 +284,28 @@
               "mesher": "hybrid_zoo",
               "order": 1
             },
-            "mean_score": 0.2571120694748763,
+            "mean_score": 0.030688074806498156,
             "n_runs": 1,
-            "ok_rate": 0.0
+            "ok_rate": 1.0
           }
         ],
         "factor_best": {
           "mesher": {
             "value": "varyhedron",
-            "mean_score": 0.260333131930066,
+            "mean_score": 0.2703891005065792,
             "n": 1
           },
           "feature_refine": {
             "value": true,
-            "mean_score": 0.25872260070247116,
+            "mean_score": 0.15053858765653869,
             "n": 2
           }
         }
       },
       "part:plate_hole": {
         "n_runs": 2,
-        "ok_rate": 0.0,
+        "ok_rate": 0.5,
         "top_configs": [
-          {
-            "cfg_id": "cfg-028399df",
-            "config": {
-              "feature_refine": true,
-              "mesher": "hybrid_zoo",
-              "order": 1
-            },
-            "mean_score": 0.27646242714742175,
-            "n_runs": 1,
-            "ok_rate": 0.0
-          },
           {
             "cfg_id": "cfg-89f62376",
             "config": {
@@ -261,20 +313,31 @@
               "mesher": "varyhedron",
               "order": 1
             },
-            "mean_score": 0.2728946083729627,
+            "mean_score": 0.2967715205043907,
             "n_runs": 1,
             "ok_rate": 0.0
+          },
+          {
+            "cfg_id": "cfg-028399df",
+            "config": {
+              "feature_refine": true,
+              "mesher": "hybrid_zoo",
+              "order": 1
+            },
+            "mean_score": 0.2713034062039593,
+            "n_runs": 1,
+            "ok_rate": 1.0
           }
         ],
         "factor_best": {
           "mesher": {
-            "value": "hybrid_zoo",
-            "mean_score": 0.27646242714742175,
+            "value": "varyhedron",
+            "mean_score": 0.2967715205043907,
             "n": 1
           },
           "feature_refine": {
             "value": true,
-            "mean_score": 0.27467851776019225,
+            "mean_score": 0.284037463354175,
             "n": 2
           }
         }

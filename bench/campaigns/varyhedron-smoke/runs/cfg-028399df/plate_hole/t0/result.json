@@ -1,28 +1,47 @@
 {
+  "accuracy": {
+    "all": [
+      {
+        "metric": "scf",
+        "rel_err": 0.6287242456556233,
+        "score": 0.0736676202744191,
+        "truth": 3.0,
+        "value": 1.11382726303313
+      }
+    ],
+    "metric": "scf",
+    "rel_err": 0.6287242456556233,
+    "score": 0.0736676202744191,
+    "truth": 3.0,
+    "value": 1.11382726303313
+  },
+  "answers": {
+    "sigma_max": 1113827.26303313,
+    "tip_deflection": 9.599354301093309e-07
+  },
   "cfg_id": "cfg-028399df",
   "config": {
     "feature_refine": true,
     "mesher": "hybrid_zoo",
     "order": 1
   },
-  "error": "solve_elastostatics: CG failed to converge after 24300 iterations (tol estimated error=8.424930986475584e-06)",
   "geom_class": {
     "curved_frac": 0.9,
     "min_feature_h": 2.8571428571428577,
     "thin": false
   },
-  "mesh_ms": 8447.357138,
-  "n_dof": 12339,
-  "n_elems": 9360,
-  "n_nodes": 4113,
+  "mesh_ms": 3102.71569,
+  "n_dof": 4653,
+  "n_elems": 3456,
+  "n_nodes": 1551,
   "part": "plate_hole",
   "quality": {
-    "M1max": 0.002,
-    "M2max": 0.005,
+    "M1max": 1.3854260627035057e-14,
+    "M2max": 0.009229084720141821,
     "M6": 1.0,
-    "score": 0.6054421768707482
+    "score": 0.623302664483781
   },
-  "solve_ms": 0.0,
-  "status": "solve_fail",
+  "solve_ms": 440.636989,
+  "status": "ok",
   "tier": 0
 }

@@ -3,6 +3,7 @@ add_executable(polymesh_tests
     test_tri_surface.cpp
     test_stl.cpp
     test_step.cpp
+    test_cad_model.cpp
     test_poly_mesh.cpp
     test_material.cpp
     test_sizing_field.cpp

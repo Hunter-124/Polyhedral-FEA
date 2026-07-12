@@ -204,10 +204,12 @@ nodes:
 
   - id: V1a
     title: CadModel type + STEP/BREP load keeping BRep
-    status: todo
+    status: done
     deps: [V0]
     scope: [src/geom/]
-    note: TopoDS_Shape pimpl; tessellate optional for viz/compare only.
+    note: >
+      DONE: CadModel pimpl + load_step/load_brep/load_cad; tessellate() for
+      viz/legacy; load_step() thin wrapper; Catch2 test_cad_model with OCC.
 
   - id: V1b
     title: CAD edge/face/vertex topology map + queries

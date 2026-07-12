@@ -185,3 +185,214 @@ nodes:
       fea::set_openmp_threads / OMP_NUM_THREADS for campaigns; max_mem_gb soft
       note). Test Lab: play/run, SIGINT pause, force stop, progress.json polish.
       Gates: test_gui_pipeline progress/cancel/pause, test_backend thread cap.
+
+  # ── Lane V: Varyhedron + BRep + short campaigns + Grok loop (2026-07-12) ─
+  # Owner program: true BRep meshing, varyhedron packing from day 1, STEP-only
+  # product fixtures (plate_hole/cylinder/sphere/icecream_cone), short campaigns
+  # (varyhedron + hybrid_zoo, ~3 runs/shape), full experiment warehouse, headless
+  # grok -p --yolo improvement loop. Plan: session plan.md / ADRs 0020–0022.
+
+  - id: V0
+    title: "Program board + ADR-0020/21/22 + warehouse/handoff interfaces"
+    status: done
+    deps: [dag-workflow]
+    scope: [docs/dag/, docs/decisions/, docs/process/]
+    note: >
+      DONE 2026-07-12: ADRs 0020 (BRep volume), 0021 (varyhedron), 0022
+      (warehouse+grok), ADR-0001 amendment, interfaces §7–§8, grok-loop.md,
+      Lane V node list V0–V11, AGENT_BOOTSTRAP updated.
+
+  - id: V1a
+    title: CadModel type + STEP/BREP load keeping BRep
+    status: todo
+    deps: [V0]
+    scope: [src/geom/]
+    note: TopoDS_Shape pimpl; tessellate optional for viz/compare only.
+
+  - id: V1b
+    title: CAD edge/face/vertex topology map + queries
+    status: todo
+    deps: [V1a]
+    scope: [src/geom/]
+    note: Closest edge, project to edge/face, edge polylines; Catch2 on STEP.
+
+  - id: V1c
+    title: Pipeline Model BRep-first; STL compare/legacy only
+    status: todo
+    deps: [V1a]
+    scope: [src/pipeline/, apps/cli/, apps/gui/]
+    note: Product mesh/solve requires CadModel.
+
+  - id: V1d
+    title: OCC-on product builds + CI/docs
+    status: todo
+    deps: [V1a]
+    scope: [CMakeLists.txt, README.md]
+    note: Campaigns/GUI product path document POLYMESH_WITH_OCC=ON.
+
+  - id: V2a
+    title: STEP part generator (no product STL)
+    status: todo
+    deps: [V0]
+    scope: [scripts/]
+    note: CadQuery/pythonocc or pure STEP writer; --export-stl-compare optional.
+
+  - id: V2b
+    title: "Four STEP shapes: plate_hole, cylinder, sphere, icecream_cone"
+    status: todo
+    deps: [V2a]
+    scope: [tests/fixtures/parts/]
+    note: Icecream = triangular pyramid + ball intersecting a face.
+
+  - id: V2c
+    title: Case JSON + hand-calc references for four shapes
+    status: todo
+    deps: [V2b]
+    scope: [tests/fixtures/parts/, bench/reference/, docs/validation/]
+    note: geometry paths .step; truths only in bench/reference/.
+
+  - id: V2d
+    title: STL ban in product generators + CI grep gate
+    status: todo
+    deps: [V2a]
+    scope: [scripts/]
+    note: Keep load_stl for compare-only.
+
+  - id: V3a
+    title: Warehouse layout + git-LFS attributes
+    status: todo
+    deps: [V0]
+    scope: [bench/campaigns/, .gitattributes, docs/dag/]
+    note: runs/<cfg>/<part>/t<tier>/{mesh.vtu,wire.png,quality.json,result.json}
+
+  - id: V3b
+    title: Testlab warehouse writer
+    status: todo
+    deps: [V3a]
+    scope: [apps/testlab/]
+    note: Write warehouse files after each run when campaign.warehouse true.
+
+  - id: V3c
+    title: GUI/app git HEAD + campaign sync state
+    status: todo
+    deps: [V3a]
+    scope: [apps/gui/]
+    note: Show HEAD, last checkpoint, open PROGRAM nodes.
+
+  - id: V4
+    title: Auto-h + edge-aware size field from BRep
+    status: todo
+    deps: [V1b]
+    scope: [src/geom/, src/mesh/, src/pipeline/]
+    note: resolve_mesh_size from CAD edges + face curvature.
+
+  - id: V5
+    title: Packing algorithm survey + microbench harness
+    status: todo
+    deps: [V0]
+    scope: [docs/research/, bench/packing/]
+    note: >
+      docs/research/varyhedron-packing.md; pick v1 dual-of-constrained-tet +
+      boundary seed packing; license gate on any vendored code.
+
+  - id: V6a
+    title: VolumeMesher::kVaryhedron stub + CLI/GUI label + tooltip
+    status: todo
+    deps: [V1c, V4]
+    scope: [src/mesh/, src/pipeline/, apps/gui/, apps/cli/]
+    note: Tooltip copy in ADR-0021; fails clearly without CadModel.
+
+  - id: V6b
+    title: Boundary edge profile alignment metric + packing
+    status: todo
+    deps: [V6a, V1b]
+    scope: [src/mesh/]
+    note: Hausdorff to CAD edge within element budget.
+
+  - id: V6c
+    title: Interior variable poly packing (v1 algorithm)
+    status: todo
+    deps: [V6b, V5]
+    scope: [src/mesh/]
+    note: Not pure LEB layers; PolyMesh/mixed cells; validity.
+
+  - id: V6d
+    title: Order packing (p) on varyhedron meshes
+    status: todo
+    deps: [V6c]
+    scope: [src/mesh/, src/fea/, src/adapt/]
+    note: Same-order faces / hierarchical min-rule; MMS or patch smoke.
+
+  - id: V6e
+    title: Varyhedron solve path + curved scorecard on STEP shapes
+    status: todo
+    deps: [V6c]
+    scope: [src/pipeline/, tests/]
+    note: VEM/FE solve; test_curved_mesh_quality on four STEP parts.
+
+  - id: V7
+    title: Default mesher + tendency map + hybrid zoo retained
+    status: todo
+    deps: [V6a]
+    scope: [apps/gui/, apps/cli/, src/pipeline/]
+    note: Prefer varyhedron once V6e green; hybrid_zoo stays.
+
+  - id: V8
+    title: Campaign varyhedron-short-1 (~24 short runs)
+    status: todo
+    deps: [V2c, V6e, V3b, V7]
+    scope: [bench/campaigns/varyhedron-short-1/]
+    note: >
+      4 STEP parts × varyhedron+hybrid_zoo × 3 tiers (keep_frac 1). Warehouse
+      + results.jsonl committed. Full factorial meshers only those two.
+
+  - id: V9a
+    title: Campaign analysis + per-shape trend tables
+    status: todo
+    deps: [V8]
+    scope: [scripts/, bench/campaigns/]
+    note: Extend analyze_campaign for tier trends mesh/solve/quality.
+
+  - id: V9b
+    title: Auto mesh wire PNG harness for warehouse runs
+    status: todo
+    deps: [V8]
+    scope: [scripts/, apps/testlab/]
+    note: vtu_wire_png per run into warehouse wire.png.
+
+  - id: V10a
+    title: write_grok_handoff.py HANDOFF pack
+    status: todo
+    deps: [V9a]
+    scope: [scripts/, docs/process/]
+    note: HANDOFF.md + handoff.json per interfaces §8.
+
+  - id: V10b
+    title: invoke_grok_improve.sh headless grok -p --yolo
+    status: todo
+    deps: [V10a]
+    scope: [scripts/, apps/gui/]
+    note: bypassPermissions, max-turns, --prompt-file HANDOFF.md.
+
+  - id: V10c
+    title: Supervised GUI question queue vs autonomous defaults
+    status: todo
+    deps: [V10b]
+    scope: [apps/gui/, docs/process/]
+    note: Autonomous picks recommended; supervised presents in GUI.
+
+  - id: V10d
+    title: Safety allow/deny for grok invoke
+    status: todo
+    deps: [V10b]
+    scope: [scripts/]
+    note: Deny force-push; pull --rebase before push in handoff rules.
+
+  - id: V11
+    title: Feedback iterate packing (repeatable)
+    status: todo
+    deps: [V10a]
+    scope: [src/mesh/, src/pipeline/, bench/campaigns/, docs/]
+    note: >
+      Apply improvements from Grok/human; re-run short campaign; flip
+      feedback-loop style done/todo. Retire graded when varyhedron wins scorecard.

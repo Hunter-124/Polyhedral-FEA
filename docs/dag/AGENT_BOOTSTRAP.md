@@ -85,21 +85,32 @@ GitHub: github.com/Hunter-124/Polyhedral-FEA, default branch master.
   user gave you.
 
 === OPEN NODES (read PROGRAM.yaml for the live list; typical order) ===
-As of 2026-07-11 master: **done** = dag-workflow, adr-0019, p-hierarchical,
-p-hierarchical-highp, fe-vem-assembly, mesher-tendency, hp-driver, solver-docs,
-part-library, testlab-harness, gui-testlab. **in_progress** = campaign-1
-(`bench/campaigns/settings-frontier-1`). **todo** = feedback-loop,
-gui-sim-controls (and any new nodes on the board).
+As of 2026-07-12: **done** includes adaptive core (p-hierarchical*, fe-vem,
+mesher-tendency, hp-driver, gui-sim-controls, part-library, testlab, …).
+**Active program = Lane V (Varyhedron + BRep + short campaigns + Grok loop).**
+ADRs: 0020 (BRep volume), 0021 (varyhedron packing), 0022 (warehouse + grok).
+Process: docs/process/grok-loop.md, docs/process/feedback-loop.md.
 
-Typical remaining order:
-1. campaign-1: finish settings-frontier-1 (or resume). Analysis already:
-   `python3 scripts/analyze_campaign.py settings-frontier-1` → PARETO.md/json.
-   When checkpoint finished, refresh Pareto, mark node done with survivors.
-2. feedback-loop (repeatable): re-run analyze_campaign; apply defaults only if
-   apply_code_defaults (see docs/process/feedback-loop.md); document deltas;
-   set node back to todo.
-3. gui-sim-controls: live solve progress + pause/play + resource caps in GUI.
-4. Anything still `todo`/`in_progress` on PROGRAM.yaml — claim and land.
+Typical Lane V order (disjoint scopes may run in parallel):
+1. V0 board/docs (coordination) → then parallel:
+   - V1a–d CadModel BRep path (OCC product builds)
+   - V2a–d STEP part library (plate_hole, cylinder, sphere, icecream_cone)
+   - V3a–c experiment warehouse + git-LFS + app sync
+   - V5 packing research / microbench
+2. V4 auto-h from BRep (after V1b)
+3. V6a–e varyhedron mesher (single owner on src/mesh fill) + V7 GUI
+4. V8 campaign `varyhedron-short-1` (~4 shapes × 2 meshers × 3 tiers)
+5. V9 analyze + shots → V10 handoff + `grok -p --yolo` → V11 iterate
+
+Legacy: campaign-1 / feedback-loop still valid for settings-frontier-1; short
+campaigns are the owner-facing measurement loop for packing progress.
+
+Owner product rules (non-negotiable for Lane V):
+- True BRep volume path; no product STL generators (compare-only).
+- Mesher name **Varyhedron** with ADR-0021 tooltip in GUI.
+- Short campaigns: varyhedron + hybrid_zoo only.
+- Full warehouse committed (LFS for VTU/PNG).
+- After campaign: analyze → HANDOFF → headless grok improve (not interactive TUI default).
 
 === WORKING STYLE ===
 - Quality ahead of speed. Small, verified, pushed increments. Update

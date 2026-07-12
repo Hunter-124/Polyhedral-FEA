@@ -41,8 +41,8 @@ int usage() {
                "\n"
                "mesh size: omit -h (or -h 0) for auto h0 from bbox + sharp-edge density\n"
                "mesher names: hybrid|zoo (default), hybridvem|hybrid-vem, tet, hex,\n"
-               "              hexvem|vem, graded, hexpyr|transition, prism|sweep,\n"
-               "              octa|octahedral (experimental)\n"
+               "              hexvem|vem, graded, varyhedron, hexpyr|transition,\n"
+               "              prism|sweep, octa|octahedral (experimental)\n"
                "--skin n: graded-tet fine skin layers (default 2)\n"
                "--feature: refine graded mesh near sharp edges (default off in CLI)\n"
                "--element-tendency t: shape dial in [-1,+1] (hex↔fan hybrid↔poly VEM↔tet)\n"
@@ -72,6 +72,9 @@ polymesh::pipeline::VolumeMesher parse_mesher(const std::string& m) {
     }
     if (m == "graded") {
         return polymesh::pipeline::VolumeMesher::kGradedTet;
+    }
+    if (m == "varyhedron" || m == "vary") {
+        return polymesh::pipeline::VolumeMesher::kVaryhedron;
     }
     if (m == "hexpyr" || m == "transition") {
         return polymesh::pipeline::VolumeMesher::kHexPyramid;

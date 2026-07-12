@@ -231,20 +231,24 @@ void draw_study_panel(App& app) {
         int m = static_cast<int>(app.setup.mesher);
         // Order matches VolumeMesher enum. Hybrid zoo is the SPEC default path.
         static const char* kMeshers[] = {
-            "tet (grid)",   "hex (grid)",    "hex VEM (grid)", "graded tet",
+            "tet (grid)",   "hex (grid)",    "hex VEM (grid)", "graded tet (legacy)",
             "hex+pyramid",  "prism (grid)",  "hybrid zoo",     "octa (exp)",
-            "hybrid VEM",
+            "hybrid VEM",   "Varyhedron",
         };
-        if (iw::selector("mesher", &m, kMeshers, 9)) {
+        if (iw::selector("mesher", &m, kMeshers, 10)) {
             app.setup.mesher = static_cast<VolumeMesher>(m);
         }
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip(
                 "hybrid zoo (default): hex bulk + pyramid skin → all-pyramid FE.\n"
                 "hybrid VEM: hex FE bulk + native poly VEM transitions (ADR-0019).\n"
-                "graded tet: multi-level LEB (bulk / feature / high-κ) size field.\n"
-                "octa: experimental BCC (budget-capped; not product).\n"
-                "Cartesian lattice + surface snap (ADR-0015) — not CAD-fitted Delaunay.");
+                "graded tet (legacy): multi-level LEB size field.\n"
+                "Varyhedron: variable polyhedral packing — cells adapt size/face count\n"
+                "to CAD. Boundary edges match CAD edge profiles within the element\n"
+                "budget (not layered N-hedra). Interior packing follows edge/face\n"
+                "constraints; higher order uses entity packing for clean corners\n"
+                "(ADR-0021).\n"
+                "octa: experimental BCC (budget-capped; not product).");
         }
     }
     {

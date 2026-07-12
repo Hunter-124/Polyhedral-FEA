@@ -14,6 +14,7 @@ add_library(mesh
     src/octa_fill.cpp
     src/transition_fill.cpp
     src/local_refine.cpp
+    src/varyhedron_fill.cpp
 )
 target_include_directories(mesh PUBLIC include)
 target_link_libraries(mesh PUBLIC geom Eigen3::Eigen PRIVATE polymesh_warnings polymesh_perf)

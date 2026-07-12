@@ -18,6 +18,8 @@ the anti-cheat boundary stays explicit.
 from __future__ import annotations
 
 import math
+import re
+from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -116,15 +118,22 @@ def write_plate_hole(
     """Centered plate with through-hole along z. Origin at plate mid-plane centre.
 
     x ∈ [-half_w, half_w], y ∈ [-half_h, half_h], z ∈ [0, thickness].
+
+    Outer boundary is a true rectangle (corners included). Ray-to-rect samples
+    alone would chord-cut each 90° corner and leave the top/bottom faces
+    non-manifold against the vertical walls — that shows up in the volume mesh
+    as fan/notch artifacts at the four outer corners after surface snap.
     """
     assert hole_r < min(half_w, half_h)
     z0, z1 = 0.0, thickness
-    # Outer rectangle corners (CCW looking from +z).
-    outer = [
-        (-half_w, -half_h),
-        (half_w, -half_h),
-        (half_w, half_h),
-        (-half_w, half_h),
+    # Rectangle corners CCW looking from +z, starting at (+w, -h) so that
+    # walking wall 0→1→2→3 (+x → +y → -x → -y) inserts the matching corner.
+    # Wall id: 0=+x, 1=+y, 2=-x, 3=-y.
+    corner_ccw = [
+        (half_w, half_h),    # between +x and +y
+        (-half_w, half_h),   # between +y and -x
+        (-half_w, -half_h),  # between -x and -y
+        (half_w, -half_h),   # between -y and +x
     ]
     # Hole circle samples (CCW looking from +z).
     circle = [
@@ -135,92 +144,153 @@ def write_plate_hole(
 
     faces: list[str] = []
 
-    # --- Top / bottom: radial quads between outer edge projection and hole ---
-    # For each outer edge, fan from outer edge to hole via angular sectors.
-    # Simpler approach: for each circumferential sector, connect hole edge to
-    # the outer boundary by projecting the ray to the rectangle.
     def ray_to_rect(cx: float, cy: float) -> tuple[float, float]:
         """Intersect ray from origin through (cx,cy) with the outer rectangle."""
-        # Parametric: t * (cx, cy) hits the first outer wall.
-        # Handle axis-aligned safely.
         tx = half_w / abs(cx) if abs(cx) > 1e-15 else float("inf")
         ty = half_h / abs(cy) if abs(cy) > 1e-15 else float("inf")
         t = min(tx, ty)
         return (t * cx, t * cy)
 
+    def which_wall(p: tuple[float, float]) -> int:
+        """Wall id for a point on the outer rectangle (not a free corner)."""
+        x, y = p
+        eps = 1e-12 * max(half_w, half_h)
+        # Prefer axis walls by absolute residual (corner → first match is fine;
+        # ray_to_rect only lands on a true corner for rare exact angles).
+        scores = [
+            (abs(x - half_w), 0),
+            (abs(y - half_h), 1),
+            (abs(x + half_w), 2),
+            (abs(y + half_h), 3),
+        ]
+        scores.sort()
+        if scores[0][0] > eps * 10:
+            raise ValueError(f"outer point not on rectangle wall: {p}")
+        return scores[0][1]
+
+    def corners_between(w_from: int, w_to: int) -> list[tuple[float, float]]:
+        """Rectangle corners strictly between w_from and w_to walking CCW."""
+        out: list[tuple[float, float]] = []
+        w = w_from
+        while w != w_to:
+            out.append(corner_ccw[w])
+            w = (w + 1) % 4
+        return out
+
     outer_pts = [ray_to_rect(cx, cy) for cx, cy in circle]
+    # Outer perimeter edges (2D), CCW, including true corners — used for
+    # vertical walls so every top/bottom outer edge has a matching wall edge.
+    outer_edges: list[tuple[tuple[float, float], tuple[float, float]]] = []
 
     for i in range(n_circ):
         j = (i + 1) % n_circ
-        hi = (circle[i][0], circle[i][1])
-        hj = (circle[j][0], circle[j][1])
+        hi = circle[i]
+        hj = circle[j]
         oi = outer_pts[i]
         oj = outer_pts[j]
+        wi = which_wall(oi)
+        wj = which_wall(oj)
+        mids = corners_between(wi, wj) if wi != wj else []
+        # Outer path for this sector: oi → (corners…) → oj
+        outer_path = [oi] + mids + [oj]
+        for a, b in zip(outer_path, outer_path[1:]):
+            if abs(a[0] - b[0]) + abs(a[1] - b[1]) > 1e-15:
+                outer_edges.append((a, b))
 
-        # Top (z=z1), outward +z. Order so normal points +z.
-        a = (oi[0], oi[1], z1)
-        b = (oj[0], oj[1], z1)
-        c = (hj[0], hj[1], z1)
-        d = (hi[0], hi[1], z1)
-        faces.append(tri(a, b, c, (0, 0, 1)))
-        faces.append(tri(a, c, d, (0, 0, 1)))
+        # Top / bottom: polygon oi…oj + hole arc hj←hi. One corner insert is
+        # the common case (adjacent walls); fan through the hole edge.
+        if not mids:
+            # Same wall: two tris (oi, oj, hj, hi).
+            faces.append(tri((oi[0], oi[1], z1), (oj[0], oj[1], z1),
+                             (hj[0], hj[1], z1), (0, 0, 1)))
+            faces.append(tri((oi[0], oi[1], z1), (hj[0], hj[1], z1),
+                             (hi[0], hi[1], z1), (0, 0, 1)))
+            faces.append(tri((oi[0], oi[1], z0), (hi[0], hi[1], z0),
+                             (hj[0], hj[1], z0), (0, 0, -1)))
+            faces.append(tri((oi[0], oi[1], z0), (hj[0], hj[1], z0),
+                             (oj[0], oj[1], z0), (0, 0, -1)))
+        else:
+            # Cross-corner sector: fill oi→C→…→oj against hole edge (hi,hj).
+            # Fan from the hole edge so the corner patch is covered (no chord).
+            chain = outer_path  # oi, corners…, oj
+            for a, b in zip(chain, chain[1:]):
+                faces.append(tri((a[0], a[1], z1), (b[0], b[1], z1),
+                                 (hj[0], hj[1], z1), (0, 0, 1)))
+                faces.append(tri((a[0], a[1], z0), (hj[0], hj[1], z0),
+                                 (b[0], b[1], z0), (0, 0, -1)))
+            # Close remaining strip from oi to hole (hi,hj) not covered by the
+            # last fan that already used hj: triangle oi-hj-hi on top.
+            faces.append(tri((oi[0], oi[1], z1), (hj[0], hj[1], z1),
+                             (hi[0], hi[1], z1), (0, 0, 1)))
+            faces.append(tri((oi[0], oi[1], z0), (hi[0], hi[1], z0),
+                             (hj[0], hj[1], z0), (0, 0, -1)))
 
-        # Bottom (z=z0), outward -z.
-        a = (oi[0], oi[1], z0)
-        b = (hi[0], hi[1], z0)
-        c = (hj[0], hj[1], z0)
-        d = (oj[0], oj[1], z0)
-        faces.append(tri(a, b, c, (0, 0, -1)))
-        faces.append(tri(a, c, d, (0, 0, -1)))
-
-        # Hole wall (cylindrical): outward is into the hole (-radial for solid
-        # with a void? Wait — the solid is OUTSIDE the hole; the free surface
-        # of the hole has outward normal pointing INTO the hole (toward
-        # centre), i.e. -radial. For watertight solid "material exterior",
-        # STL normals point out of the material, so for the hole wall the
-        # outward-from-material normal points into the hole (toward origin).
+        # Hole wall (cylindrical). Material is outside the hole; STL outward
+        # normal points into the hole (toward origin).
         h0b = (hi[0], hi[1], z0)
         h1b = (hj[0], hj[1], z0)
         h0t = (hi[0], hi[1], z1)
         h1t = (hj[0], hj[1], z1)
-        # Mid-sector radial toward centre.
         mx = 0.5 * (hi[0] + hj[0])
         my = 0.5 * (hi[1] + hj[1])
         into_hole = _norm((-mx, -my, 0.0))
         faces.append(tri(h0b, h1b, h1t, into_hole))
         faces.append(tri(h0b, h1t, h0t, into_hole))
 
-    # Outer vertical walls — four sides of the rectangle.
-    # Bottom edge of each side at z0, top at z1.
-    # Side -y (y = -half_h), outward (0,-1,0)
-    x_left, x_right = -half_w, half_w
-    y_bot, y_top = -half_h, half_h
-    # -y face
-    faces.append(tri((x_left, y_bot, z0), (x_right, y_bot, z0), (x_right, y_bot, z1), (0, -1, 0)))
-    faces.append(tri((x_left, y_bot, z0), (x_right, y_bot, z1), (x_left, y_bot, z1), (0, -1, 0)))
-    # +y face
-    faces.append(tri((x_right, y_top, z0), (x_left, y_top, z0), (x_left, y_top, z1), (0, 1, 0)))
-    faces.append(tri((x_right, y_top, z0), (x_left, y_top, z1), (x_right, y_top, z1), (0, 1, 0)))
-    # -x face
-    faces.append(tri((x_left, y_top, z0), (x_left, y_bot, z0), (x_left, y_bot, z1), (-1, 0, 0)))
-    faces.append(tri((x_left, y_top, z0), (x_left, y_bot, z1), (x_left, y_top, z1), (-1, 0, 0)))
-    # +x face
-    faces.append(tri((x_right, y_bot, z0), (x_right, y_top, z0), (x_right, y_top, z1), (1, 0, 0)))
-    faces.append(tri((x_right, y_bot, z0), (x_right, y_top, z1), (x_right, y_bot, z1), (1, 0, 0)))
+    # Outer vertical walls — one quad per outer-perimeter segment so edges
+    # match the top/bottom outer polyline (manifold).
+    for (p0, p1) in outer_edges:
+        p0b = (p0[0], p0[1], z0)
+        p1b = (p1[0], p1[1], z0)
+        p0t = (p0[0], p0[1], z1)
+        p1t = (p1[0], p1[1], z1)
+        dx, dy = p1[0] - p0[0], p1[1] - p0[1]
+        # CCW outer ring → outward is to the right of directed edge.
+        outward = _norm((dy, -dx, 0.0))
+        faces.append(tri(p0b, p1b, p1t, outward))
+        faces.append(tri(p0b, p1t, p0t, outward))
 
-    # The radial-to-rect projection leaves four rectangular "corner" patches
-    # covered only when a ray hits a corner (shared by two walls). Rays that
-    # hit the same wall between consecutive samples form quads fully covering
-    # the flat rim; at corners the outer_pts jump from one wall to the next
-    # and the quad spans the corner correctly (triangle fan across the corner).
-    # No extra fill needed.
+    # Guard: every edge must be shared by exactly two facets. The old ray-only
+    # outer path chord-cut corners and left top/wall edges unpaired → mesh
+    # snap produced the corner fan/notch artifacts on this part.
+    _assert_manifold_facets(faces)
 
-    _ = outer  # reserved for future explicit outer-loop mode
     path.write_text(
         "solid plate_hole\n" + "".join(faces) + "endsolid plate_hole\n",
         encoding="utf-8",
     )
     print(f"wrote {path.relative_to(ROOT)}  ({len(faces)} facets)")
+
+
+def _assert_manifold_facets(faces: list[str]) -> None:
+    """Parse emitted ASCII facet blocks and require edge multiplicity 2."""
+    edge_count: dict[tuple, int] = defaultdict(int)
+    pat = re.compile(
+        r"vertex\s+([-\d.eE+]+)\s+([-\d.eE+]+)\s+([-\d.eE+]+)\s*\n"
+        r"\s*vertex\s+([-\d.eE+]+)\s+([-\d.eE+]+)\s+([-\d.eE+]+)\s*\n"
+        r"\s*vertex\s+([-\d.eE+]+)\s+([-\d.eE+]+)\s+([-\d.eE+]+)"
+    )
+    n_facets = 0
+    for block in faces:
+        m = pat.search(block)
+        if not m:
+            continue
+        n_facets += 1
+        g = list(map(float, m.groups()))
+        v = [
+            (round(g[0], 9), round(g[1], 9), round(g[2], 9)),
+            (round(g[3], 9), round(g[4], 9), round(g[5], 9)),
+            (round(g[6], 9), round(g[7], 9), round(g[8], 9)),
+        ]
+        for a, b in ((v[0], v[1]), (v[1], v[2]), (v[2], v[0])):
+            e = (a, b) if a < b else (b, a)
+            edge_count[e] += 1
+    bad = sum(1 for c in edge_count.values() if c != 2)
+    if bad:
+        raise RuntimeError(
+            f"plate_hole STL not manifold: {bad}/{len(edge_count)} edges "
+            f"have count != 2 ({n_facets} facets)"
+        )
 
 
 def main() -> None:

@@ -23,6 +23,14 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-12: **plate_hole outer-corner mesh artifacts** — `write_plate_hole`
+  ray-to-rect top/bottom faces chord-cut the four rectangle corners and left
+  the STL non-manifold against full-side vertical walls; volume snap then
+  produced fan/notch junk at the outer corners (hole itself was fine). Fix:
+  insert true corners on wall transitions, segment outer walls to match the
+  top/bottom polyline, manifold self-check in the generator. Regenerated
+  `tests/fixtures/parts/plate_hole.stl` (400 tris, edge multiplicity 2).
+  Hex snap max|d| ~0; hybrid corners sharp.
 - 2026-07-11: **Feedback-loop analysis scaffolding** — `scripts/analyze_campaign.py`
   mines partial/finished `results.jsonl` → weighted ranking, accuracy-vs-time
   Pareto (global / part / geom_class), knob suggestions; writes

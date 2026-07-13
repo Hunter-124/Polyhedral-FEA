@@ -22,6 +22,7 @@
 #include "mesh/cvt_sites.hpp"
 #include "mesh/geogram_clip.hpp"
 #include "mesh/grid_classify.hpp"
+#include "mesh/tet_fill.hpp"
 #include "mesh/hex_fill.hpp"
 #include "mesh/hybrid_fill.hpp"
 #include "mesh/local_refine.hpp"
@@ -1234,21 +1235,58 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         for (const auto& s : sites) {
             positions.push_back(s.pos);
         }
-        // M5 dual path:
-        //  1) Domain halfspaces when they keep enough cells (convex Ω) → load_area
-        //  2) Else AABB. Always polish boundary verts onto surface.
-        // Prefer domain when it yields health; SE may need denser free sites.
-        mesh::DomainClipParams dclip;
-        dclip.surface = model.surface.triangles.empty() ? nullptr : &model.surface;
-        auto exp = mesh::export_clipped_voronoi(box, positions, dclip);
-        const bool domain_attempted = exp.stats.domain_clip_used;
-        bool domain_ok = domain_attempted &&
-                         exp.stats.n_cells >= std::max<std::size_t>(4, positions.size() / 3);
-        if (domain_attempted && !domain_ok) {
+
+        // M5 product path: true RVD ∩ Ω via tet scaffold of the solid.
+        // Infinite surface halfspaces cannot represent holes (plate_hole);
+        // clipping each Voronoi cell by nearby interior tets keeps load faces
+        // on the solid for both convex and non-convex parts.
+        std::string clip_mode = "rvd_tet";
+        mesh::ClippedVoronoiExport exp;
+        std::size_t n_domain_tets = 0;
+        try {
+            // Tet scaffold ~ bulk h for RVD domain clip.
+            const double h_tet = std::max(h, 1e-9);
+            auto tet_fill = mesh::tet_fill_surface(model.surface, model.bbox_min,
+                                                   model.bbox_max, h_tet,
+                                                   /*snap_boundary=*/true);
+            std::vector<mesh::DomainTet> dtets;
+            dtets.reserve(tet_fill.tets.size());
+            for (const auto& t : tet_fill.tets) {
+                mesh::DomainTet d;
+                d.v0 = tet_fill.nodes[t[0]];
+                d.v1 = tet_fill.nodes[t[1]];
+                d.v2 = tet_fill.nodes[t[2]];
+                d.v3 = tet_fill.nodes[t[3]];
+                d.centroid = 0.25 * (d.v0 + d.v1 + d.v2 + d.v3);
+                // Skip inverted / degenerate tets.
+                if (mesh::tet_signed_volume(d.v0, d.v1, d.v2, d.v3) <= 0.0) {
+                    continue;
+                }
+                dtets.push_back(d);
+            }
+            n_domain_tets = dtets.size();
+            // Search radius: cover Voronoi cells that spill ~1–2 h into neighbours.
+            const double R = std::max(2.5 * h, 0.08 * diag);
+            exp = mesh::export_rvd_tet_clipped(box, positions, dtets, R);
+            if (exp.stats.n_cells < std::max<std::size_t>(4, positions.size() / 4)) {
+                // Fallback: supporting surface halfspaces + AABB.
+                clip_mode = "fallback_halfspace";
+                mesh::DomainClipParams dclip;
+                dclip.surface =
+                    model.surface.triangles.empty() ? nullptr : &model.surface;
+                exp = mesh::export_clipped_voronoi(box, positions, dclip);
+                if (exp.stats.n_cells < 4) {
+                    clip_mode = "fallback_aabb";
+                    exp = mesh::export_clipped_voronoi(box, positions,
+                                                       mesh::DomainClipParams{});
+                }
+            }
+        } catch (...) {
+            clip_mode = "fallback_aabb";
             exp = mesh::export_clipped_voronoi(box, positions, mesh::DomainClipParams{});
-            domain_ok = false;
         }
 
+        // Light boundary polish onto the surface (helps residual staircasing).
         std::size_t n_bnd_snapped = 0;
         if (!model.surface.triangles.empty() && !exp.mesh.faces.empty()) {
             std::vector<char> is_bnd(exp.mesh.vertices.size(), 0);
@@ -1262,12 +1300,14 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                     }
                 }
             }
-            const double snap_budget = domain_ok ? 0.5 * h : 1.5 * h;
+            const double snap_budget =
+                (clip_mode == "rvd_tet") ? 0.4 * h : 1.25 * h;
             for (std::size_t vi = 0; vi < exp.mesh.vertices.size(); ++vi) {
                 if (!is_bnd[vi]) {
                     continue;
                 }
-                const auto cp = mesh::closest_on_surface(model.surface, exp.mesh.vertices[vi]);
+                const auto cp =
+                    mesh::closest_on_surface(model.surface, exp.mesh.vertices[vi]);
                 if (cp.distance > 0.0 && cp.distance <= snap_budget) {
                     exp.mesh.vertices[vi] = cp.point;
                     ++n_bnd_snapped;
@@ -1280,14 +1320,13 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         fill_h = h;
         out.boundary_quads = fea::extract_boundary_faces(out.mesh);
         out.mesher_note = std::format(
-            "cvt_poly restricted CVT (interior-seeded + domain_clip={} + bnd_snap={} → "
+            "cvt_poly RVD (interior sites + {} tets + clip={} + bnd_snap={} → "
             "kPolyVem): {} polys, {} nodes, sites={}/fixed={}/interior_free={}, "
             "lloyd_iters={}, sum_vol={:.4g}, domain_clips={}, grid={}x{}x{}, h={:.4g} m{}",
-            domain_ok ? "on" : (domain_attempted ? "fallback_aabb" : "off"), n_bnd_snapped,
-            out.mesh.elements.size(), out.mesh.nodes.size(), sites.size(),
-            seeded.n_sharp_fixed, n_interior_free, lr.stats.n_iters,
-            exp.stats.sum_cell_volume, exp.stats.n_domain_plane_clips, grid.nx, grid.ny,
-            grid.nz, h,
+            n_domain_tets, clip_mode, n_bnd_snapped, out.mesh.elements.size(),
+            out.mesh.nodes.size(), sites.size(), seeded.n_sharp_fixed, n_interior_free,
+            lr.stats.n_iters, exp.stats.sum_cell_volume, exp.stats.n_domain_plane_clips,
+            grid.nx, grid.ny, grid.nz, h,
             topo_ptr ? ", geom_source=brep_topology" : ", geom_source=surface_class");
     } else {
         auto fill = mesh::tet_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);

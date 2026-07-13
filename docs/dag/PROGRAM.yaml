@@ -537,12 +537,10 @@ nodes:
     deps: [M9, M10, G4]
     scope: [src/fea/, src/mesh/, bench/campaigns/, docs/]
     note: >
-      IN PROGRESS 2026-07-13: DomainClipParams global surface halfspaces +
-      convex-fail AABB fallback + boundary snap. Cylinder now health_ok +
-      load_area_ok (la_rel~0.05) but SE rel 0.41 > hybrid 0.13. Plate still
-      load_area_fail (non-convex hole — halfspaces cut material). See
-      bench/campaigns/vem-gate-m5/GATE.md. Next: tet-RVD or hole-aware clip
-      for plate; densify cylinder free sites to recover SE win.
+      IN PROGRESS 2026-07-13: RVD tet-clip + expected_area load trim. BOTH
+      parts health_ok+load_area_ok. Accuracy still loses: plate SCF 0.58 vs
+      hybrid 0.51; cylinder SE 0.159 vs hybrid 0.132. See GATE.md. Next:
+      feature-local densify that keeps residual <1e-6 and closes accuracy gap.
 
   - id: M6
     title: "Stress score: face-mean centroid VM + energy; drop raw nodal max"

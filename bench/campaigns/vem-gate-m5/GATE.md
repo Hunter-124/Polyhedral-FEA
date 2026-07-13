@@ -1,57 +1,49 @@
 # M5 VEM gate — campaign results (2026-07-13)
 
-**Verdict: FAIL headline promotion** — `cvt_poly` does **not** yet clear the
-gate (health + beat hybrid_zoo on both parts). Product claim stays **tet FE**;
-poly VEM **also ships** via G4 clipped cells + `VolumeMesher::kCvtPoly`.
+**Verdict: FAIL headline promotion** — `cvt_poly` clears **health + load_area
+on both parts** but does **not** yet beat `hybrid_zoo` on accuracy. Product
+claim stays **tet FE**; poly VEM also ships.
 
 ## Campaign
 
 - Path: `bench/campaigns/vem-gate-m5/`
-- Parts: plate_hole, cylinder (case JSON + frozen refs)
+- Parts: plate_hole, cylinder
 - Meshers: `cvt_poly` vs `hybrid_zoo`
 - `h_scale=5.0`, feature_refine=true, order=1
 
-## Results (latest — surface domain clip + bnd snap)
+## Results (RVD tet-clip + expected_area load trim)
 
-| part       | mesher     | status         | n_elem | n_dof | primary rel_err | health / load_area |
-|------------|------------|----------------|--------|-------|-----------------|--------------------|
-| plate_hole | hybrid_zoo | ok             | 4608   | 6192  | SCF 0.51        | ok / ok |
-| cylinder   | hybrid_zoo | ok             | 17616  | 19635 | SE 0.13         | ok / ok |
-| plate_hole | cvt_poly   | solve_suspect  | 190    | 2304  | SCF 0.55        | fail / fail |
-| cylinder   | cvt_poly   | **ok**         | 402    | 8580  | SE 0.41         | **ok / ok** |
+| part       | mesher     | status | n_elem | n_dof | primary rel_err | health / load_area |
+|------------|------------|--------|--------|-------|-----------------|--------------------|
+| plate_hole | hybrid_zoo | ok     | 4608   | 6192  | SCF **0.512**   | ok / ok |
+| cylinder   | hybrid_zoo | ok     | 17616  | 19635 | SE **0.132**    | ok / ok |
+| plate_hole | cvt_poly   | ok     | ~2700  | ~10k  | SCF **0.580**   | **ok / ok** |
+| cylinder   | cvt_poly   | ok     | ~12k   | ~41k  | SE **0.159**    | **ok / ok** |
 
-### Delta vs first M5 gate (AABB-only)
+Both parts now pass health gates (residual, reaction, load_area). Accuracy
+still loses: plate SCF 0.58 > 0.51 hybrid; cylinder SE 0.159 > 0.132 hybrid.
 
-| metric | first gate | now |
-|--------|------------|-----|
-| cylinder `load_area_ok` | false (rel ~0.45) | **true** (rel ~0.048) |
-| cylinder `health_ok` | false | **true** |
-| cylinder SE rel_err | **0.087** (won vs hybrid) | 0.41 (lost — domain clip coarsens boundary) |
-| plate `load_area_ok` | false (rel ~1.06) | still false (rel ~1.03) |
+## What landed
 
-Cylinder is the first part to pass the health/load-area half of the gate.
-Accuracy vs hybrid_zoo is the remaining SE gap. Plate still fails load-area
-because it is **non-convex** (hole): global halfspaces cut opposite material,
-so we fall back to AABB + boundary snap (insufficient for load face area).
-
-## Substrate landed (this pass)
-
-- `export_clipped_voronoi(..., DomainClipParams)` — **supporting** surface
-  halfspaces only (all sites on keep side; hole walls skipped), majority-vote
-  winding; domain faces `vglobal=-2`
-- Convex-fail fallback: if `n_cells < max(4, n_sites/3)` → AABB export
-- Boundary-vertex snap to `TriSurface` (larger budget on AABB fallback)
-- Free wall sites soft-inset (never land on surface — zero-thickness cells)
-- `poly_mesh_to_vem` drops/repairs non-positive volume debris
-- `plate_hole.case.json`: `normal_min_dot=0.7` (match cylinder load filter)
+1. **`export_rvd_tet_clipped`** — true RVD ∩ Ω: Voronoi cell ∩ nearby domain
+   tets (from `tet_fill_surface`). Works for non-convex plate_hole.
+2. **Coplanar free-face pairing** post-pass for multi-piece interfaces.
+3. **Load-face expected_area trim** in testlab: when free-skin area overshoots
+   CAD `expected_area`, keep tip-aligned faces until area matches (honest total
+   force).
+4. Soft wall inset + light boundary snap.
 
 ## Next to flip M5 → done
 
-1. **Plate load_area:** supporting halfspaces still leave la_rel~1.0 — need
-   true RVD ∩ tet volume mesh (or explicit hole cylinder clip + outer
-   envelope), not convex envelope alone
-2. **Cylinder SE:** keep `load_area_ok` (la_rel~0.05) while recovering SE ≤
-   hybrid 0.13 (AABB-only first gate had SE 0.087). Denser free sites at 0.65h
-   improved SE slightly but **broke** load_area — need a gentler densify
-3. Re-run; require `health_ok` + lower primary rel_err than hybrid_zoo on **both**
-   plate_hole (SCF) and cylinder (SE)
+1. Improve accuracy without blowing residual / DOF budget:
+   - plate: denser free sites **only** near hole (feature band that does not
+     raise residual above 1e-6)
+   - cylinder: recover SE ≤ 0.132 (closer; ~20% relative gap)
+2. Re-run gate; promote only if **both** primary rel_err beat hybrid_zoo with
+   health_ok.
+
+## History
+
+- AABB-only: cylinder SE 0.087 (won) but load_area fail
+- Halfspace domain: cylinder load_area OK, SE 0.41
+- RVD tet + load trim: **both health OK**, accuracy close but not yet winning

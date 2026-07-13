@@ -5,14 +5,20 @@
 #include "mesh/cvt_lloyd.hpp"
 #include "mesh/geogram_clip.hpp"
 
+#include <Eigen/Geometry>
+
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+
+#include <cmath>
 
 using Catch::Approx;
 using polymesh::mesh::CellKind;
 using polymesh::mesh::ClipBox;
 using polymesh::mesh::DomainClipParams;
+using polymesh::mesh::DomainTet;
 using polymesh::mesh::export_clipped_voronoi;
+using polymesh::mesh::export_rvd_tet_clipped;
 using polymesh::mesh::geogram_available;
 using polymesh::mesh::seed_lattice_sites;
 
@@ -93,6 +99,35 @@ TEST_CASE("surface domain clip shrinks cell volume below AABB", "[cvt][g4][m5]")
     // Solid volume = 0.8^3 = 0.512
     REQUIRE(clipped.stats.sum_cell_volume == Approx(0.512).margin(1e-3));
     REQUIRE(clipped.stats.sum_cell_volume < aabb_only.stats.sum_cell_volume * 0.9);
+}
+
+TEST_CASE("rvd tet clip keeps volume inside a cube of tets", "[cvt][m5][rvd]") {
+    if (!geogram_available()) {
+        SKIP("POLYMESH_WITH_GEOGRAM is OFF");
+    }
+    // Unit cube as 5–6 tets is tedious; one tet + site inside should produce
+    // a non-empty piece with volume < tet volume.
+    ClipBox box;
+    box.min = Eigen::Vector3d(0, 0, 0);
+    box.max = Eigen::Vector3d(1, 1, 1);
+    DomainTet tet;
+    tet.v0 = {0, 0, 0};
+    tet.v1 = {1, 0, 0};
+    tet.v2 = {0, 1, 0};
+    tet.v3 = {0, 0, 1};
+    tet.centroid = 0.25 * (tet.v0 + tet.v1 + tet.v2 + tet.v3);
+    const Eigen::Vector3d e1 = tet.v1 - tet.v0;
+    const Eigen::Vector3d e2 = tet.v2 - tet.v0;
+    const Eigen::Vector3d e3 = tet.v3 - tet.v0;
+    const double tet_vol = std::abs(e1.dot(e2.cross(e3))) / 6.0;
+
+    std::vector<Eigen::Vector3d> sites = {tet.centroid};
+    const auto exp = export_rvd_tet_clipped(box, sites, std::span<const DomainTet>(&tet, 1), 2.0);
+    REQUIRE(exp.stats.domain_clip_used);
+    REQUIRE(exp.stats.n_cells >= 1);
+    REQUIRE(exp.stats.sum_cell_volume > 0.0);
+    REQUIRE(exp.stats.sum_cell_volume <= tet_vol * 1.01 + 1e-9);
+    REQUIRE_NOTHROW(exp.mesh.check_validity());
 }
 
 TEST_CASE("lattice CVT sites export covering poly mesh", "[cvt][g4]") {

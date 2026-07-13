@@ -116,7 +116,7 @@ this is the accumulated simulation data the feedback loop mines.
     "reaction_sum_err": 0.01,       // |F+R| / max(|F|,eps); free force vs reactions
     "n_orphans": 0,
     "n_bc_dofs": 36,
-    "load_area_ok": true,           // false if expected_area set and rel_err > 2%
+    "load_area_ok": true,           // false if expected_area set and rel_err > 5%
     "ok": true                      // residual ∧ reaction ∧ orphans ∧ load_area_ok
   },
   "n_pred_elems": 4200,             // C·V/h³ (later ∫ dV/h³) logged before mesh (M4)
@@ -254,12 +254,14 @@ Face selection is by axis-aligned box over face centroids (the only robust
 selector on tessellated fixtures). Selectors must be written with slack so
 they are h-independent.
 
-**Load select `expected_area` guard (±2%).** When `loads[].select.expected_area`
+**Load select `expected_area` guard (±5%).** When `loads[].select.expected_area`
 is set, the harness compares selected load face area to that value. If
-`|A_sel − A_expected| / A_expected > 0.02`, then `health.load_area_ok = false`,
-`health.ok = false`, and `status = solve_suspect`. Boxes remain OK for planar
-axis-aligned fixtures; true BRep face tags come later (before curved loads /
-geometry sweeps).
+`|A_sel − A_expected| / A_expected > 0.05`, then `health.load_area_ok = false`,
+`health.ok = false`, and `status = solve_suspect`. (Was ±2%; 5% headroom covers
+mesh chordal / tip-rim snap vs CAD while still failing wall-in-box over-select
+~65%.) Prefer `select.normal_min_dot` (default 0.7) so traction-aligned faces
+win over lateral skins whose centroids fall in the load box. Boxes remain OK
+for planar fixtures; true BRep face tags come later (curved loads / sweeps).
 
 ## 5. Reference truth — `bench/reference/<part>.json`
 

@@ -40,6 +40,9 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-13: **Cylinder load_area fix** — traction-aligned face select (`|n·t̂|>0.7`,
+  box z≥0.195); load/area/tip probe share filter; guard ±5%. hybrid+vary cylinder
+  `status=ok`, SE ~0.0034 vs 0.00393 (~14%). M12 still open for sphere/icecream.
 - 2026-07-13: **M11 + M14 + G0** — testlab wall-clock kills (`max_run_wall_s`
   tier defaults 900/900/2700, `max_pack_wall_s`, `over_budget_cause=wall_clock`);
   h_min feature flags + `n_features_below_h_min` on results.jsonl (no OCC

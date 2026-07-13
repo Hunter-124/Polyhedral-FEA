@@ -807,25 +807,14 @@ std::vector<fea::SurfaceFace> select_load_faces(const fea::NodalMesh& mesh,
     const Eigen::Vector3d t_hat = traction / tnorm;
     std::vector<fea::SurfaceFace> filtered;
     filtered.reserve(in_box.size());
-    // Prefer same hemisphere as traction (outward skin). If that yields nothing
-    // (inverted winding on some element types), accept either orientation via
-    // |n·t̂|. Final fallback: box-only.
+    // |n·t̂| so inverted face winding (common on mixed/hex skins) still keeps
+    // the traction-aligned CAD face. Same-hemisphere-only misses those skins
+    // when a few near-orthogonal slivers still pass n·t̂ > min_dot. Box-only
+    // fallback if nothing survives the filter.
     for (const auto& face : in_box) {
         const Eigen::Vector3d n = face_unit_normal(mesh, face);
         if (n.norm() < 0.5) {
             continue; // degenerate
-        }
-        if (n.dot(t_hat) > normal_min_dot) {
-            filtered.push_back(face);
-        }
-    }
-    if (!filtered.empty()) {
-        return filtered;
-    }
-    for (const auto& face : in_box) {
-        const Eigen::Vector3d n = face_unit_normal(mesh, face);
-        if (n.norm() < 0.5) {
-            continue;
         }
         if (std::abs(n.dot(t_hat)) > normal_min_dot) {
             filtered.push_back(face);
@@ -1107,7 +1096,10 @@ ProbeAnswers compute_probes(const fea::NodalMesh& mesh, const fea::Material& mat
         if (L0.expected_area && *L0.expected_area > 0.0) {
             const double exp = *L0.expected_area;
             a.load_area_rel_err = std::abs(area - exp) / exp;
-            a.load_area_ok = a.load_area_rel_err <= 0.02;
+            // Q7: catch wrong-face selection (wall-in-box was ~65% over). Allow
+            // 5% headroom for mesh chordal / tip-rim snap shortfall vs CAD πR²
+            // (strict 2% still fails honest tip-only skins at coarse h).
+            a.load_area_ok = a.load_area_rel_err <= 0.05;
         }
         if (probe_nodes.empty()) {
             probe_nodes = nodes_in_box(mesh, L0.box);

@@ -31,6 +31,28 @@ feature-edge sizing hooks. Hybrid VEM/adapt loop still expanding. Tracking:
 [docs/progress.md](docs/progress.md), [docs/phases.md](docs/phases.md),
 [docs/bench/scoreboard.md](docs/bench/scoreboard.md).
 
+### Active program (agents — read this first)
+
+**Lane M / measure-first** on the Lane V BRep + Varyhedron substrate. Normative plan:
+
+| Doc | What |
+|-----|------|
+| **[docs/plans/advisor-measure-first-program.md](docs/plans/advisor-measure-first-program.md)** | **Canonical full plan** (strategy, metrics, order, traps, checklist) |
+| [docs/decisions/0023-measure-first-tet-primary-cvt-path.md](docs/decisions/0023-measure-first-tet-primary-cvt-path.md) | ADR-0023 strategy |
+| [docs/decisions/0024-advisor-measure-answers.md](docs/decisions/0024-advisor-measure-answers.md) | ADR-0024 concrete Q&A rules |
+| [docs/dag/PROGRAM.yaml](docs/dag/PROGRAM.yaml) | Executable board (claim `todo` nodes) |
+| [docs/dag/AGENT_BOOTSTRAP.md](docs/dag/AGENT_BOOTSTRAP.md) | Paste-into-agent autonomous protocol |
+
+**Non-negotiable product rules (compressed):**
+
+1. **Tet FE** = default accuracy claim; **poly VEM** gated until it beats `hybrid_zoo` on frozen refs (M5).  
+2. **Measure before packing loops** — scorecard + health gates; never reward wire PNGs or residual alone; never score raw nodal \(\sigma_{\max}\).  
+3. **Substrate:** sharp-only edge protect + graded tet + live BRep oracle → evolve to **restricted CVT / clipped Voronoi (Geogram BSD-3)**; **hard-block** dual-of-tet until CVT cells; frame-field hex out of near-term horizon.  
+4. **Near-term order:** freeze baseline campaign → wall OCC project → Lloyd CVT (do not reorder).  
+5. Product geometry = **STEP/BRep** (`POLYMESH_WITH_OCC=ON`); STL compare-only.
+
+Short packing campaigns: `varyhedron` + `hybrid_zoo` only; parts `plate_hole` / `cylinder` / `sphere` / `icecream_cone`.
+
 ## Quickstart (Ubuntu)
 
 About ten minutes from clone to a VTU on the public unit box.

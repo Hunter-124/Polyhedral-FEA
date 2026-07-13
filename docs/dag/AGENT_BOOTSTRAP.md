@@ -87,32 +87,38 @@ GitHub: github.com/Hunter-124/Polyhedral-FEA, default branch master.
 === OPEN NODES (read PROGRAM.yaml for the live list; typical order) ===
 As of 2026-07-12: **done** includes adaptive core (p-hierarchical*, fe-vem,
 mesher-tendency, hp-driver, gui-sim-controls, part-library, testlab, …).
-**Active program = Lane M (measure-first) on top of Lane V substrate.**
-ADRs: 0020 (BRep), 0021 (varyhedron), 0022 (warehouse + grok), **0023
-(measure-first / tet primary / restricted CVT)**. Process: docs/process/grok-loop.md.
+**Active program = Lane M (measure-first) + CVT lane on Lane V substrate.**
 
-Normative order (ADR-0023 — do not skip):
-1. **M1** probe hardening + CAD-tag BC/probe + health gates (kills 1e14 "ok")
-2. **M2** min scorecard (edge Hausdorff/h, normal dev, DOF, accuracy, quality)
-3. **M3** sharp-only edge protect + seam skip + wall project
-4. **M4** N_pred sizing + h_min floor / over_budget diagnosis
-5. Packing improvements / V11 only against M1+M2 signals
-6. **M5** VEM headline gate vs hybrid_zoo (plate_hole + cylinder frozen refs)
-7. Frame-field hex-dominant: out of near-term horizon
+**MUST READ FIRST (full plan — do not improvise a different strategy):**
+  docs/plans/advisor-measure-first-program.md
+ADRs: 0020 (BRep), 0021 (varyhedron), 0022 (warehouse+grok), **0023** (strategy),
+**0024** (concrete Q&A: stress score, freeze→project→CVT, Geogram vendor,
+chordal e, lfs balls, dual hard-block, tiers, traps).
+Process: docs/process/grok-loop.md. Board: docs/dag/PROGRAM.yaml.
 
-Substrate to keep: protected seeds + graded tet scaffold + live BRep oracle.
-Poly path target: constrained restricted CVT / clipped Voronoi (not dual-first).
-Tet FE = default accuracy claim; VEM gated.
+Normative order (ADR-0023/0024 — do not skip or reorder):
+1. M1–M4 measure substrate (mostly done): probes, scorecard, sharp-only, N_pred
+2. **M6** stress score = face-mean centroid VM + energy; never raw nodal max
+3. **M7** chordal e = d/(ℓ²κ/8) with OCC κ + true mesh segments
+4. **M8** protecting balls r=min(αh, β·lfs); corner shrink
+5. **M9 FREEZE baseline campaign** on honest scorecard (before projection/CVT)
+6. **M10** wall tangential smooth + OCC surface project
+7. **G1–G4** vendor Geogram → Lloyd CVT → clipped Voronoi poly cells
+8. **M5** VEM headline only if beats hybrid_zoo on frozen plate_hole+cylinder
+9. Dual-of-tet: HARD-BLOCK until G4. Frame fields: out of near-term horizon.
+10. p>1 only with curved/isoparametric boundary in same work item
 
-Lane V already largely landed (V0–V8 warehouse path). V6d p-order and V10c GUI
-Q&A remain open but yield to M1–M2.
+Substrate: sharp protect + graded tet + live BRep oracle.
+Reward: scorecard + accuracy — never wire PNG, never residual alone.
+Cylinder primary = strain_energy; tip = health. Plate SCF = face-mean VM/σ∞.
 
 Owner product rules (non-negotiable):
 - True BRep volume path; no product STL generators (compare-only).
 - Mesher name **Varyhedron** with ADR-0021 tooltip in GUI.
-- Short campaigns: varyhedron + hybrid_zoo only; reward = scorecard not wire PNG.
+- Short campaigns: varyhedron + hybrid_zoo only.
 - Full warehouse committed (LFS for VTU/PNG).
 - After campaign: analyze → HANDOFF → headless grok improve only if health_ok.
+- CVT density = 1/h(x)³ from the **same** h field as N_pred.
 
 === WORKING STYLE ===
 - Quality ahead of speed. Small, verified, pushed increments. Update

@@ -89,7 +89,7 @@ this is the accumulated simulation data the feedback loop mines.
   "over_budget_cause": null,        // null | sizing | mesher | budget
   "scorecard": {
     "edge_hausdorff_over_h": 0.04,  // sharp CAD edges only; null without CAD
-    "chordal_efficiency_max": 1.2,  // d_actual/(h²κ/8); ≫1 wastes budget
+    "chordal_efficiency_max": 1.2,  // d_actual/(ℓ²κ/8); ≫1 wastes budget
     "normal_dev_deg_max": 8.2,      // null if unavailable
     "n_dof": 35805,
     "accuracy_rel_err": 0.02,       // first metric rel_err
@@ -274,7 +274,7 @@ Written by `scripts/write_grok_handoff.py` after analyze (ADR-0022,
   "pareto": "bench/campaigns/varyhedron-short-1/PARETO.md",
   "results": "bench/campaigns/varyhedron-short-1/results.jsonl",
   "shots": ["runs/cfg-…/plate_hole/t0/wire.png"],
-  "open_program_nodes": ["M1", "M2", "M3", "M4", "M5", "V6d", "V6e", "V10c", "V11"],
+  "open_program_nodes": ["M6", "M7", "M8", "M9", "M10", "M11", "M12", "M13", "M14", "M5", "G0", "G1", "G2", "G3", "G4", "V6d", "V6e", "V10c", "V11"],
   "mode": "autonomous",           // autonomous | supervised
   "max_turns": 80
 }

@@ -3,6 +3,14 @@
 Human standards, layout, anti-cheat, and Eigen traps: **[CONTRIBUTING.md](CONTRIBUTING.md)**.  
 Phases / work items: **[docs/ROADMAP.md](docs/ROADMAP.md)** · progress: **[docs/progress.md](docs/progress.md)**.
 
+## Active program (do not skip)
+
+**Canonical plan:** [docs/plans/advisor-measure-first-program.md](docs/plans/advisor-measure-first-program.md)  
+**ADRs:** [0023](docs/decisions/0023-measure-first-tet-primary-cvt-path.md) · [0024](docs/decisions/0024-advisor-measure-answers.md)  
+**Board:** [docs/dag/PROGRAM.yaml](docs/dag/PROGRAM.yaml) · bootstrap: [docs/dag/AGENT_BOOTSTRAP.md](docs/dag/AGENT_BOOTSTRAP.md)
+
+Order: measure → **freeze baseline** → wall OCC project → Geogram/CVT. Tet FE default claim; VEM gated; no dual-first; no frame-field core; no raw nodal max stress as score.
+
 ## graphify
 
 This project has a committed knowledge graph under `graphify-out/` so agents share

@@ -23,6 +23,11 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-12: **Advisor plan fully documented for agents** — canonical
+  `docs/plans/advisor-measure-first-program.md`; ADR-0024 full Q1–Q10;
+  PROGRAM.yaml nodes M6–M14 + G0–G4; README / CLAUDE / CONTRIBUTING /
+  AGENT_BOOTSTRAP / ROADMAP / dag README all point at the plan. Order locked:
+  freeze baseline → wall project → Geogram/CVT; dual hard-blocked; VEM gated.
 - 2026-07-12: **CadTopology sharp/smooth/seam edges** — `CadEdgeFeature` + dihedral
   classify in `extract_topology` (25° from flat); `edge_profile_hausdorff_filtered`,
   `chordal_edge_metrics`, `count_edge_features` for protect-only residual / chordal

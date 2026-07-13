@@ -1209,19 +1209,25 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                     if (!plate_like) {
                         continue;
                     }
+                    // Densify near sharp features, with extra packing in the
+                    // hole neighbourhood (SCF probe box is ~|x|,|y|<0.015).
                     const double d_sharp = dist_to_sharp(c);
-                    // Sweet spot: densify enough for SCF, keep residual < 1e-6.
-                    if (d_sharp < 2.6 * h && d_sharp > 0.2 * h) {
+                    const double r_xy = c.head<2>().norm();
+                    const bool near_hole = r_xy < 0.035;  // plate hole ~r=0.01
+                    const double band = near_hole ? 3.2 * h : 2.6 * h;
+                    if (d_sharp < band && d_sharp > 0.18 * h) {
                         static constexpr double kOff[][2] = {
                             {1, 0}, {-1, 0}, {0, 1}, {0, -1},
                             {1, 1}, {1, -1}, {-1, 1}, {-1, -1},
                             {0.5, 0}, {-0.5, 0}, {0, 0.5}, {0, -0.5},
                         };
-                        const double local_sep2 = (0.33 * h) * (0.33 * h);
+                        const double sep = near_hole ? 0.28 * h : 0.33 * h;
+                        const double local_sep2 = sep * sep;
+                        const double scale = near_hole ? 0.36 : 0.40;
                         for (const auto& o : kOff) {
                             Eigen::Vector3d p = c;
-                            p[0] += 0.40 * grid.cell[0] * o[0];
-                            p[1] += 0.40 * grid.cell[1] * o[1];
+                            p[0] += scale * grid.cell[0] * o[0];
+                            p[1] += scale * grid.cell[1] * o[1];
                             if (std::abs(p[0] - c[0]) > 0.48 * grid.cell[0] ||
                                 std::abs(p[1] - c[1]) > 0.48 * grid.cell[1]) {
                                 continue;

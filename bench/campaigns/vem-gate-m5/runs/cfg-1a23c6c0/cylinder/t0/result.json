@@ -3,41 +3,41 @@
     "all": [
       {
         "metric": "strain_energy",
-        "rel_err": 0.0867571177465196,
-        "score": 0.0,
-        "trusted": false,
+        "rel_err": 0.4073110674372626,
+        "score": 0.26914950871110366,
+        "trusted": true,
         "truth": 0.003926990816987241,
-        "value": 0.0035862964122883776
+        "value": 0.00232748399550384
       },
       {
         "metric": "tip_deflection",
-        "rel_err": 0.37058378782314033,
-        "score": 0.0,
-        "trusted": false,
+        "rel_err": 0.43419757028672734,
+        "score": 0.2567624509742127,
+        "trusted": true,
         "truth": 1e-06,
-        "value": 6.294162121768596e-07
+        "value": 5.658024297132726e-07
       }
     ],
     "metric": "strain_energy",
-    "rel_err": 0.0867571177465196,
-    "score": 0.0,
-    "trusted": false,
+    "rel_err": 0.4073110674372626,
+    "score": 0.26914950871110366,
+    "trusted": true,
     "truth": 0.003926990816987241,
-    "value": 0.0035862964122883776
+    "value": 0.00232748399550384
   },
   "answers": {
-    "load_area_rel_err": 0.44755081174639133,
-    "load_face_area": 0.011369037489701013,
-    "mean_u_component": 6.287968779188187e-07,
-    "n_load_faces": 156,
-    "n_probe_nodes": 99,
+    "load_area_rel_err": 0.04772663997934733,
+    "load_face_area": 0.00822882578782359,
+    "mean_u_component": 5.652736975458945e-07,
+    "n_load_faces": 202,
+    "n_probe_nodes": 142,
     "n_quality_excluded": 0,
-    "sigma_face_mean": 805223.3629219211,
+    "sigma_face_mean": 739834.7764120812,
     "sigma_max": 0.0,
-    "sigma_p99": 810081.2368514474,
-    "strain_energy": 0.0035862964122883776,
-    "tip_deflection": 6.294162121768596e-07,
-    "tip_deflection_max": 6.459677850562203e-07
+    "sigma_p99": 743434.2454743931,
+    "strain_energy": 0.00232748399550384,
+    "tip_deflection": 5.658024297132726e-07,
+    "tip_deflection_max": 5.715840277726097e-07
   },
   "cfg_id": "cfg-1a23c6c0",
   "config": {
@@ -54,22 +54,22 @@
   },
   "h": 0.017496378634069814,
   "health": {
-    "free_residual_rel": 2.287021035841579e-11,
-    "load_area_ok": false,
-    "load_area_rel_err": 0.44755081174639133,
-    "n_bc_dofs": 735,
+    "free_residual_rel": 3.061297929048542e-11,
+    "load_area_ok": true,
+    "load_area_rel_err": 0.04772663997934733,
+    "n_bc_dofs": 1083,
     "n_orphans": 0,
-    "ok": false,
-    "reaction_sum_err": 3.511306547329918e-14
+    "ok": true,
+    "reaction_sum_err": 3.694514208263523e-12
   },
   "max_run_wall_s": 900.0,
-  "mesh_ms": 6764.821242,
+  "mesh_ms": 6811.084165,
   "mesher_note": "auto h=0.003499 m (extent/16∩diag/28, n_sharp=90, min_feat=0.00698 m, dens×0.92, Rκ≈0.0377, CAD_edge≈0.2)",
-  "n_dof": 6309,
+  "n_dof": 8580,
   "n_elems": 402,
   "n_elems_over_pred": 0.17942672957481534,
   "n_features_below_h_min": 0,
-  "n_nodes": 2103,
+  "n_nodes": 2860,
   "n_pred_elems": 2240.468858528565,
   "part": "cylinder",
   "quality": {
@@ -79,17 +79,17 @@
     "score": 0.0
   },
   "scorecard": {
-    "accuracy_rel_err": 0.0867571177465196,
-    "chordal_efficiency_max": 71572.9187982441,
+    "accuracy_rel_err": 0.4073110674372626,
+    "chordal_efficiency_max": 198623446.8695727,
     "edge_hausdorff_over_h": 6.272359524144582,
-    "health_ok": false,
+    "health_ok": true,
     "min_element_quality": 1.0,
-    "n_dof": 6309,
-    "normal_dev_deg_max": 30.000000000000234,
-    "solve_residual_rel": 2.287021035841579e-11
+    "n_dof": 8580,
+    "normal_dev_deg_max": 29.998676302936357,
+    "solve_residual_rel": 3.061297929048542e-11
   },
-  "solve_ms": 472.88623,
-  "status": "solve_suspect",
+  "solve_ms": 690.450981,
+  "status": "ok",
   "tier": 0,
-  "wall_time_s": 7.506442679
+  "wall_time_s": 7.833573981
 }

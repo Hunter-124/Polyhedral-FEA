@@ -18,9 +18,14 @@
 ## M5 state (do not claim done)
 
 - Campaign: `bench/campaigns/vem-gate-m5/` + [GATE.md](../../bench/campaigns/vem-gate-m5/GATE.md)
-- Cylinder SE already **better** than hybrid_zoo at lower DOF, but `load_area_ok=false`
-- Plate SCF not better than hybrid_zoo
-- Next: clip Voronoi cells to BRep/surface interior (not AABB-only), re-run gate
+- **Cylinder:** `health_ok` + `load_area_ok` (domain halfspaces work — convex).
+  SE rel ~0.41 loses to hybrid ~0.13 (earlier AABB-only had SE 0.087 but bad area)
+- **Plate:** still `load_area_ok=false` — hole is non-convex; global halfspaces
+  fall back to AABB+snap
+- Code: `DomainClipParams` in `cvt_export.hpp`, convex-fail fallback + bnd snap
+  in `scene.cpp` kCvtPoly path
+- Next: tet-restricted Voronoi (or hole-aware clip) for plate; densify free
+  sites / tune Lloyd to recover cylinder SE without losing load_area
 
 ## Open board
 

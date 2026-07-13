@@ -2,8 +2,11 @@
 
 #include "mesh/cvt_export.hpp"
 
+#include <Eigen/Geometry>
+
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <map>
 #include <unordered_map>
 #include <utility>
@@ -65,6 +68,36 @@ ClipPlane bisector_keep_site(const Eigen::Vector3d& site,
     return pl;
 }
 
+/// Plane through triangle that keeps `hint` (site) on the ≥0 side.
+bool plane_keep_hint(const Eigen::Vector3d& a, const Eigen::Vector3d& b,
+                     const Eigen::Vector3d& c, const Eigen::Vector3d& hint,
+                     double min_area, ClipPlane& out) {
+    const Eigen::Vector3d e1 = b - a;
+    const Eigen::Vector3d e2 = c - a;
+    Eigen::Vector3d n = e1.cross(e2);
+    const double area2 = n.norm();
+    if (!(area2 > min_area)) {
+        return false;
+    }
+    n /= area2;
+    // ConvexCell keep: n·x + d ≥ 0 with d = -n·p.
+    // Flip if hint is currently on the negative side.
+    double d = -n.dot(a);
+    if (n.dot(hint) + d < 0.0) {
+        n = -n;
+        d = -n.dot(a);
+    }
+    // Site must stay strictly inside (tolerance for coplanar).
+    if (n.dot(hint) + d < -1e-14 * (1.0 + a.norm())) {
+        return false;
+    }
+    out.a = n.x();
+    out.b = n.y();
+    out.c = n.z();
+    out.d = d;
+    return true;
+}
+
 /// Face extracted from one cell before welding / pairing.
 struct RawFace {
     std::vector<Eigen::Vector3d> loop;  // ordered polygon
@@ -80,7 +113,9 @@ struct RawCell {
 
 bool build_cell(VBW::ConvexCell& cell, const ClipBox& box,
                 const Eigen::Vector3d& site,
-                std::span<const Eigen::Vector3d> all_sites, std::size_t self) {
+                std::span<const Eigen::Vector3d> all_sites, std::size_t self,
+                std::span<const ClipPlane> domain_planes,
+                std::size_t& n_domain_clips) {
     if ((box.max.array() <= box.min.array()).any()) {
         return false;
     }
@@ -103,6 +138,29 @@ bool build_cell(VBW::ConvexCell& cell, const ClipBox& box,
                            static_cast<VBW::global_index_t>(j));
         if (cell.empty()) {
             return false;
+        }
+    }
+
+    // M5: *global* solid halfspaces (same planes for every site) so adjacent
+    // cells share a consistent domain. Per-site local triangle subsets caused
+    // gaps/overlaps and destroyed VEM energy. Domain faces: vglobal = -2.
+    // Sites on the wrong side of any plane are dropped (not selectively
+    // clipped) so every surviving cell uses the same plane set.
+    if (!domain_planes.empty()) {
+        constexpr VBW::global_index_t kDomainVGlobal =
+            static_cast<VBW::global_index_t>(-2);
+        for (const ClipPlane& pl : domain_planes) {
+            const double sd =
+                pl.a * site.x() + pl.b * site.y() + pl.c * site.z() + pl.d;
+            if (sd < -1e-10) {
+                return false;  // site outside solid halfspaces
+            }
+            cell.clip_by_plane(VBW::make_vec4(pl.a, pl.b, pl.c, pl.d),
+                               kDomainVGlobal);
+            ++n_domain_clips;
+            if (cell.empty()) {
+                return false;
+            }
         }
     }
     return !cell.empty();
@@ -128,7 +186,7 @@ RawCell extract_raw_cell(VBW::ConvexCell& cell) {
         RawFace face;
         if (cell.has_vglobal()) {
             const auto g = cell.v_global_index(v);
-            // -1 = box / unset; valid site ids are 0..n-1
+            // -1 = box / unset; -2 = domain surface; valid site ids are 0..n-1
             if (g != static_cast<VBW::global_index_t>(-1) &&
                 g != static_cast<VBW::global_index_t>(-2)) {
                 face.neighbour_site = static_cast<std::size_t>(g);
@@ -157,13 +215,58 @@ std::pair<std::size_t, std::size_t> site_pair(std::size_t a, std::size_t b) {
 
 }  // namespace
 
+std::vector<ClipPlane> domain_planes_from_surface(
+    const geom::TriSurface& surface, const Eigen::Vector3d& interior_hint,
+    double min_area) {
+    std::vector<ClipPlane> planes;
+    planes.reserve(surface.triangles.size());
+    for (const auto& tri : surface.triangles) {
+        if (tri[0] >= surface.vertices.size() ||
+            tri[1] >= surface.vertices.size() ||
+            tri[2] >= surface.vertices.size()) {
+            continue;
+        }
+        const Eigen::Vector3d& a = surface.vertices[tri[0]];
+        const Eigen::Vector3d& b = surface.vertices[tri[1]];
+        const Eigen::Vector3d& c = surface.vertices[tri[2]];
+        ClipPlane pl;
+#if defined(POLYMESH_WITH_GEOGRAM) && POLYMESH_WITH_GEOGRAM
+        if (!plane_keep_hint(a, b, c, interior_hint, min_area, pl)) {
+            continue;
+        }
+#else
+        const Eigen::Vector3d e1 = b - a;
+        const Eigen::Vector3d e2 = c - a;
+        Eigen::Vector3d n = e1.cross(e2);
+        const double area2 = n.norm();
+        if (!(area2 > min_area)) {
+            continue;
+        }
+        n /= area2;
+        double d = -n.dot(a);
+        if (n.dot(interior_hint) + d < 0.0) {
+            n = -n;
+            d = -n.dot(a);
+        }
+        pl.a = n.x();
+        pl.b = n.y();
+        pl.c = n.z();
+        pl.d = d;
+#endif
+        planes.push_back(pl);
+    }
+    return planes;
+}
+
 ClippedVoronoiExport export_clipped_voronoi(
-    const ClipBox& domain, std::span<const Eigen::Vector3d> sites) {
+    const ClipBox& domain, std::span<const Eigen::Vector3d> sites,
+    const DomainClipParams& domain_clip) {
     ClippedVoronoiExport out;
     out.stats.n_sites = sites.size();
     out.site_to_cell.assign(sites.size(), static_cast<std::size_t>(-1));
 
 #if !(defined(POLYMESH_WITH_GEOGRAM) && POLYMESH_WITH_GEOGRAM)
+    (void)domain_clip;
     out.stats.geogram_ok = false;
     return out;
 #else
@@ -174,15 +277,71 @@ ClippedVoronoiExport export_clipped_voronoi(
     out.stats.geogram_ok = true;
     geogram_ensure_initialized();
 
+    // Build a *global* set of domain halfspaces from the surface.
+    // Prefer TriSurface outward CCW → keep inward (-n_out). If a plane would
+    // exclude a majority of sites (bad winding / non-manifold), flip it.
+    std::vector<ClipPlane> domain_planes;
+    if (domain_clip.surface && !domain_clip.surface->triangles.empty() &&
+        !domain_clip.surface->vertices.empty() && !sites.empty()) {
+        out.stats.domain_clip_used = true;
+        const auto& surf = *domain_clip.surface;
+
+        // Cap plane count for cost on dense tessellations.
+        const std::size_t n_tri = surf.triangles.size();
+        const std::size_t max_planes = 8000;
+        const std::size_t stride =
+            std::max<std::size_t>(1, (n_tri + max_planes - 1) / max_planes);
+
+        domain_planes.reserve(std::min(n_tri, max_planes) + 8);
+        const std::size_t n_sites = sites.size();
+        for (std::size_t ti = 0; ti < n_tri; ti += stride) {
+            const auto& tri = surf.triangles[ti];
+            if (tri[0] >= surf.vertices.size() || tri[1] >= surf.vertices.size() ||
+                tri[2] >= surf.vertices.size()) {
+                continue;
+            }
+            const Eigen::Vector3d& a = surf.vertices[tri[0]];
+            const Eigen::Vector3d& b = surf.vertices[tri[1]];
+            const Eigen::Vector3d& c = surf.vertices[tri[2]];
+            Eigen::Vector3d n_out = (b - a).cross(c - a);
+            const double area2 = n_out.norm();
+            if (!(area2 > 1e-30)) {
+                continue;
+            }
+            n_out /= area2;
+            // Inward keep halfspace from outward triangle normal.
+            ClipPlane pl = ClipPlane::from_point_normal(a, -n_out);
+            std::size_t n_in = 0;
+            for (const auto& s : sites) {
+                if (pl.a * s.x() + pl.b * s.y() + pl.c * s.z() + pl.d >= -1e-12) {
+                    ++n_in;
+                }
+            }
+            if (n_in * 2 < n_sites) {
+                // Flip: triangle winding disagreed with site cloud.
+                pl.a = -pl.a;
+                pl.b = -pl.b;
+                pl.c = -pl.c;
+                pl.d = -pl.d;
+            }
+            domain_planes.push_back(pl);
+        }
+        (void)domain_clip.clip_radius;  // reserved; global planes ignore local R
+        (void)domain_clip.min_area_frac;
+    }
+
     std::vector<RawCell> raw_cells(sites.size());
     {
         VBW::ConvexCell cell;
         for (std::size_t i = 0; i < sites.size(); ++i) {
-            if (!build_cell(cell, domain, sites[i], sites, i)) {
+            std::size_t n_clips = 0;
+            if (!build_cell(cell, domain, sites[i], sites, i, domain_planes,
+                            n_clips)) {
                 raw_cells[i].empty = true;
                 ++out.stats.n_empty_cells;
                 continue;
             }
+            out.stats.n_domain_plane_clips += n_clips;
             raw_cells[i] = extract_raw_cell(cell);
             if (raw_cells[i].empty) {
                 ++out.stats.n_empty_cells;
@@ -279,7 +438,7 @@ ClippedVoronoiExport export_clipped_voronoi(
                 continue;
             }
 
-            // Boundary face (domain).
+            // Boundary face (AABB domain or solid surface).
             Face face;
             face.vertices = std::move(loop);
             face.owner = cid;
@@ -287,17 +446,6 @@ ClippedVoronoiExport export_clipped_voronoi(
             const FaceId fid = static_cast<FaceId>(out.mesh.faces.size());
             out.mesh.faces.push_back(std::move(face));
             out.mesh.cells[cid].faces.push_back(fid);
-        }
-    }
-
-    // Count face kinds; drop cells that lost too many faces after weld.
-    std::vector<Cell> kept_cells;
-    kept_cells.reserve(out.mesh.cells.size());
-    // Rebuild face owner ids if we drop cells — simpler: just validate faces ≥4.
-    for (std::size_t c = 0; c < out.mesh.cells.size(); ++c) {
-        if (out.mesh.cells[c].faces.size() < 4) {
-            // Leave as-is; check_validity will catch in tests if needed.
-            // Prefer removing broken cells.
         }
     }
 
@@ -315,13 +463,15 @@ ClippedVoronoiExport export_clipped_voronoi(
 }
 
 ClippedVoronoiExport export_clipped_voronoi(const ClipBox& domain,
-                                            std::span<const CvtSite> sites) {
+                                            std::span<const CvtSite> sites,
+                                            const DomainClipParams& domain_clip) {
     std::vector<Eigen::Vector3d> pos;
     pos.reserve(sites.size());
     for (const CvtSite& s : sites) {
         pos.push_back(s.pos);
     }
-    return export_clipped_voronoi(domain, std::span<const Eigen::Vector3d>(pos));
+    return export_clipped_voronoi(domain, std::span<const Eigen::Vector3d>(pos),
+                                  domain_clip);
 }
 
 }  // namespace polymesh::mesh

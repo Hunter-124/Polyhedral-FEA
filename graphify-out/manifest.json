@@ -220,8 +220,8 @@
     "semantic_hash": ""
   },
   "src/pipeline/src/scene.cpp": {
-    "mtime": 1783909339.5469785,
-    "ast_hash": "b31fff56f9bc1d510d2c71089c513601",
+    "mtime": 1783912564.2879426,
+    "ast_hash": "ac059d2ac9982380930cb034ec4e48b4",
     "semantic_hash": ""
   },
   "tests/support/mms.cpp": {
@@ -450,8 +450,8 @@
     "semantic_hash": ""
   },
   "docs/progress.md": {
-    "mtime": 1783909459.8633964,
-    "ast_hash": "dc5818823306493e8a3a7b1c4eeee605",
+    "mtime": 1783912612.2229764,
+    "ast_hash": "c51aba18020593923cdd486eddc0febc",
     "semantic_hash": ""
   },
   "docs/spec.md": {
@@ -1205,8 +1205,8 @@
     "semantic_hash": ""
   },
   "docs/dag/PROGRAM.yaml": {
-    "mtime": 1783909459.8633964,
-    "ast_hash": "2d4e39bd4fba5eec403bb2a27af741dd",
+    "mtime": 1783912594.5166116,
+    "ast_hash": "ec0609a16b472a6a7bcab9fc003edd40",
     "semantic_hash": ""
   },
   "docs/dag/README.md": {
@@ -2280,8 +2280,8 @@
     "semantic_hash": ""
   },
   "docs/plans/SESSION_HANDOFF_g1-cvt.md": {
-    "mtime": 1783906509.394513,
-    "ast_hash": "7a3aff3356e31e0b005a85b45f9090cb",
+    "mtime": 1783912594.5096116,
+    "ast_hash": "ae025f9c3f69d3cdd858be53914b2fca",
     "semantic_hash": ""
   },
   "src/mesh/include/mesh/geogram_clip.hpp": {
@@ -2330,8 +2330,8 @@
     "semantic_hash": ""
   },
   "src/mesh/include/mesh/cvt_export.hpp": {
-    "mtime": 1783909039.831988,
-    "ast_hash": "e38a0a80d6c79ecbaad9b0c4e19cd1ed",
+    "mtime": 1783911413.3724887,
+    "ast_hash": "2b260d7885e3a0fcfc91129c27a929b2",
     "semantic_hash": ""
   },
   "src/mesh/include/mesh/cvt_lloyd.hpp": {
@@ -2345,8 +2345,8 @@
     "semantic_hash": ""
   },
   "src/mesh/src/cvt_export.cpp": {
-    "mtime": 1783909046.9462047,
-    "ast_hash": "3db03ac3861a8af919c7e59d06604b25",
+    "mtime": 1783912333.7984598,
+    "ast_hash": "3bed666aebac8f22240db90544a37757",
     "semantic_hash": ""
   },
   "src/mesh/src/cvt_lloyd.cpp": {
@@ -2355,13 +2355,13 @@
     "semantic_hash": ""
   },
   "src/mesh/src/cvt_sites.cpp": {
-    "mtime": 1783908969.7269974,
-    "ast_hash": "a3a0377a160e32b8ac60c0eb0504420e",
+    "mtime": 1783909709.978347,
+    "ast_hash": "33637f90bbc5673030284d78b38c818b",
     "semantic_hash": ""
   },
   "tests/test_cvt_export.cpp": {
-    "mtime": 1783909039.831988,
-    "ast_hash": "3287f6063cfab13655add03634dd8240",
+    "mtime": 1783911447.1791265,
+    "ast_hash": "6e49478c32532f81d8f696198d659d19",
     "semantic_hash": ""
   },
   "tests/test_cvt_lloyd.cpp": {
@@ -2380,53 +2380,53 @@
     "semantic_hash": ""
   },
   "bench/campaigns/vem-gate-m5/checkpoint.json": {
-    "mtime": 1783909450.3517585,
-    "ast_hash": "fa19cd2148b85260c9fed25bd57c476a",
+    "mtime": 1783912580.1017694,
+    "ast_hash": "6d8efbe4eae81624b5d1643fc55e7b69",
     "semantic_hash": ""
   },
   "bench/campaigns/vem-gate-m5/progress.json": {
-    "mtime": 1783909450.3517585,
+    "mtime": 1783912580.1017694,
     "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
     "semantic_hash": ""
   },
   "bench/campaigns/vem-gate-m5/runs/cfg-028399df/cylinder/t0/quality.json": {
-    "mtime": 1783909444.8628185,
+    "mtime": 1783912571.6788616,
     "ast_hash": "682e572561b70d4395f11fee1b5a05ad",
     "semantic_hash": ""
   },
   "bench/campaigns/vem-gate-m5/runs/cfg-028399df/cylinder/t0/result.json": {
-    "mtime": 1783909444.8628185,
-    "ast_hash": "f8a1819ceab5fd1c6656023762bcf68a",
+    "mtime": 1783912571.6788616,
+    "ast_hash": "a96377d9b20760705e0e1544b971ca64",
     "semantic_hash": ""
   },
   "bench/campaigns/vem-gate-m5/runs/cfg-028399df/plate_hole/t0/quality.json": {
-    "mtime": 1783909443.6158323,
+    "mtime": 1783912570.447875,
     "ast_hash": "d9860c49976231c698b2c35be8f799d5",
     "semantic_hash": ""
   },
   "bench/campaigns/vem-gate-m5/runs/cfg-028399df/plate_hole/t0/result.json": {
-    "mtime": 1783909443.6148322,
-    "ast_hash": "f8a6907260b9e38760e8520378271228",
+    "mtime": 1783912570.447875,
+    "ast_hash": "8f3dce97b71036eebc4aeeb18e20263c",
     "semantic_hash": ""
   },
   "bench/campaigns/vem-gate-m5/runs/cfg-1a23c6c0/cylinder/t0/quality.json": {
-    "mtime": 1783909450.3237588,
-    "ast_hash": "bf805357377770d42c3a9ff07db4bd00",
+    "mtime": 1783912580.0727696,
+    "ast_hash": "2876e03f42f7d6d6d73bb6330be9a55d",
     "semantic_hash": ""
   },
   "bench/campaigns/vem-gate-m5/runs/cfg-1a23c6c0/cylinder/t0/result.json": {
-    "mtime": 1783909450.3237588,
-    "ast_hash": "ec253fd367a4e8ffa8a7fa508ea9ab2d",
+    "mtime": 1783912580.0727696,
+    "ast_hash": "041efff49336d8b509cea687c6ea9347",
     "semantic_hash": ""
   },
   "bench/campaigns/vem-gate-m5/runs/cfg-1a23c6c0/plate_hole/t0/quality.json": {
-    "mtime": 1783909445.0888162,
-    "ast_hash": "e90b35d7b9c29b491ef609007e985d4f",
+    "mtime": 1783912572.207856,
+    "ast_hash": "30b1983c46cecc59b36df2388543e889",
     "semantic_hash": ""
   },
   "bench/campaigns/vem-gate-m5/runs/cfg-1a23c6c0/plate_hole/t0/result.json": {
-    "mtime": 1783909445.0888162,
-    "ast_hash": "26b0dbf3797da04542e62d16eff13aa8",
+    "mtime": 1783912572.207856,
+    "ast_hash": "8bc7165dd201183b0da9f72ee36422b2",
     "semantic_hash": ""
   },
   "src/fea/include/fea/poly_to_vem.hpp": {
@@ -2435,8 +2435,8 @@
     "semantic_hash": ""
   },
   "src/fea/src/poly_to_vem.cpp": {
-    "mtime": 1783909339.5333457,
-    "ast_hash": "d367fcdfe00e823ec3c7c5866e4e693a",
+    "mtime": 1783911888.0310795,
+    "ast_hash": "62a759e488d6cd289fd0c85ba359d61a",
     "semantic_hash": ""
   },
   "tests/test_cvt_poly_mesher.cpp": {
@@ -2445,28 +2445,28 @@
     "semantic_hash": ""
   },
   "bench/campaigns/vem-gate-m5/GATE.md": {
-    "mtime": 1783909459.8633964,
-    "ast_hash": "9b12f16fa9f83682daf19e833923989c",
+    "mtime": 1783912594.5096116,
+    "ast_hash": "414e061ea37646c47d40d088abc69d3e",
     "semantic_hash": ""
   },
   "bench/campaigns/vem-gate-m5/runs/cfg-028399df/cylinder/t0/wire.png": {
-    "mtime": 1783909385.420269,
+    "mtime": 1783912580.325003,
     "ast_hash": "46f8704109d1faf0b3810ab4c1fd541e",
     "semantic_hash": ""
   },
   "bench/campaigns/vem-gate-m5/runs/cfg-028399df/plate_hole/t0/wire.png": {
-    "mtime": 1783909385.5491433,
+    "mtime": 1783912580.4533837,
     "ast_hash": "c05e72941b68b37b651807114ce9986e",
     "semantic_hash": ""
   },
   "bench/campaigns/vem-gate-m5/runs/cfg-1a23c6c0/cylinder/t0/wire.png": {
-    "mtime": 1783909385.8306916,
-    "ast_hash": "cd89e1d3485185b6d38a4c657292986e",
+    "mtime": 1783912580.7382843,
+    "ast_hash": "e81e3c4306a7fb0d0216d33ff8bc9532",
     "semantic_hash": ""
   },
   "bench/campaigns/vem-gate-m5/runs/cfg-1a23c6c0/plate_hole/t0/wire.png": {
-    "mtime": 1783909385.9480295,
-    "ast_hash": "e52eca1082a2461271ef6c50b423b475",
+    "mtime": 1783912580.8796132,
+    "ast_hash": "74d8f80755fc5e78ad02b1d9115bc7ee",
     "semantic_hash": ""
   }
 }

@@ -1117,8 +1117,10 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             topo_ptr ? ", geom_source=brep_topology" : ", geom_source=surface_only");
     } else if (mesher == VolumeMesher::kCvtPoly) {
         // G1–G4 product poly path: constrained restricted CVT → clipped cells → VEM.
-        // Free sites are seeded only at surface-interior cell centres (not the
-        // full AABB lattice) so load faces stay on the solid, not the bbox.
+        // Free sites at surface-interior cell centres (not full AABB lattice).
+        // M5: export clips cells to local surface halfspaces so boundary faces
+        // sit on the solid (not the bbox). Free sites stay strictly interior —
+        // projecting onto the surface creates zero-thickness domain clips.
         if (!mesh::geogram_available()) {
             throw std::runtime_error(
                 "cvt_poly mesher requires POLYMESH_WITH_GEOGRAM (Geogram ConvexCell)");
@@ -1131,9 +1133,7 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
 
         std::optional<geom::CadTopology> topo;
         const geom::CadTopology* topo_ptr = nullptr;
-        const geom::CadModel* cad_ptr = nullptr;
         if (model.cad && !model.cad->empty()) {
-            cad_ptr = &(*model.cad);
             try {
                 topo = geom::extract_topology(*model.cad, 8);
                 topo_ptr = &(*topo);
@@ -1194,9 +1194,39 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                 sites[i].pos = lr.positions[i];
             }
         }
+        // Soft wall pull toward BRep, but keep free sites *interior* (inset).
+        // Sites on the surface make domain halfspaces degenerate.
+        const geom::CadModel* cad_ptr =
+            (model.cad && !model.cad->empty()) ? &(*model.cad) : nullptr;
         if (cad_ptr) {
-            (void)mesh::project_free_wall_sites(*cad_ptr, topo_ptr, box, sites, 0.12 * diag,
-                                                0.04 * diag);
+            const double wall_band = 0.12 * diag;
+            const double inset = std::max(0.15 * h, 1e-4 * diag);
+            const double sharp_guard = 0.04 * diag;
+            for (auto& s : sites) {
+                if (s.fixed) {
+                    continue;
+                }
+                // Skip near sharp fixed protectors.
+                if (topo_ptr && sharp_guard > 0.0) {
+                    if (auto q = geom::closest_edge(*topo_ptr, s.pos, /*sharp_only=*/true)) {
+                        if (q->distance < sharp_guard) {
+                            continue;
+                        }
+                    }
+                }
+                const auto pr = geom::project_point_on_surface(*cad_ptr, s.pos);
+                if (!pr || pr->distance > wall_band) {
+                    continue;
+                }
+                Eigen::Vector3d n = pr->normal;
+                const double nn = n.norm();
+                if (!(nn > 1e-14)) {
+                    continue;
+                }
+                n /= nn;
+                // Outward-ish normal → step inside the solid.
+                s.pos = pr->point - inset * n;
+            }
         }
 
         std::vector<Eigen::Vector3d> positions;
@@ -1204,18 +1234,63 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         for (const auto& s : sites) {
             positions.push_back(s.pos);
         }
-        const auto exp = mesh::export_clipped_voronoi(box, positions);
+        // M5: try global surface halfspaces (good for convex Ω). If most cells
+        // die (non-convex / holes), fall back to AABB. Always snap boundary
+        // vertices onto the surface within a budget so load faces track the
+        // solid better than the raw bbox.
+        mesh::DomainClipParams dclip;
+        dclip.surface = model.surface.triangles.empty() ? nullptr : &model.surface;
+        auto exp = mesh::export_clipped_voronoi(box, positions, dclip);
+        const bool domain_attempted = exp.stats.domain_clip_used;
+        bool domain_ok = domain_attempted &&
+                         exp.stats.n_cells >= std::max<std::size_t>(4, positions.size() / 3);
+        if (domain_attempted && !domain_ok) {
+            exp = mesh::export_clipped_voronoi(box, positions, mesh::DomainClipParams{});
+            domain_ok = false;
+        }
+
+        std::size_t n_bnd_snapped = 0;
+        if (!model.surface.triangles.empty() && !exp.mesh.faces.empty()) {
+            std::vector<char> is_bnd(exp.mesh.vertices.size(), 0);
+            for (const auto& f : exp.mesh.faces) {
+                if (f.neighbour) {
+                    continue;
+                }
+                for (auto v : f.vertices) {
+                    if (v < is_bnd.size()) {
+                        is_bnd[v] = 1;
+                    }
+                }
+            }
+            // AABB fallback needs a larger snap budget (vertices can sit on the
+            // bbox far from the solid). Domain-clipped meshes only need a light
+            // polish. Cap travel so VEM cells stay non-inverted.
+            const double snap_budget = domain_ok ? 0.35 * h : 1.25 * h;
+            for (std::size_t vi = 0; vi < exp.mesh.vertices.size(); ++vi) {
+                if (!is_bnd[vi]) {
+                    continue;
+                }
+                const auto cp = mesh::closest_on_surface(model.surface, exp.mesh.vertices[vi]);
+                if (cp.distance > 0.0 && cp.distance <= snap_budget) {
+                    exp.mesh.vertices[vi] = cp.point;
+                    ++n_bnd_snapped;
+                }
+            }
+        }
+
         out.mesh = fea::poly_mesh_to_vem(exp.mesh);
         out.mesh.compact_unused_nodes();
         fill_h = h;
         out.boundary_quads = fea::extract_boundary_faces(out.mesh);
         out.mesher_note = std::format(
-            "cvt_poly restricted CVT (interior-seeded + G4 clipped Voronoi → kPolyVem): "
-            "{} polys, {} nodes, sites={}/fixed={}/interior_free={}, lloyd_iters={}, "
-            "sum_vol={:.4g}, grid={}x{}x{}, h={:.4g} m{}",
+            "cvt_poly restricted CVT (interior-seeded + domain_clip={} + bnd_snap={} → "
+            "kPolyVem): {} polys, {} nodes, sites={}/fixed={}/interior_free={}, "
+            "lloyd_iters={}, sum_vol={:.4g}, domain_clips={}, grid={}x{}x{}, h={:.4g} m{}",
+            domain_ok ? "on" : (domain_attempted ? "fallback_aabb" : "off"), n_bnd_snapped,
             out.mesh.elements.size(), out.mesh.nodes.size(), sites.size(),
             seeded.n_sharp_fixed, n_interior_free, lr.stats.n_iters,
-            exp.stats.sum_cell_volume, grid.nx, grid.ny, grid.nz, h,
+            exp.stats.sum_cell_volume, exp.stats.n_domain_plane_clips, grid.nx, grid.ny,
+            grid.nz, h,
             topo_ptr ? ", geom_source=brep_topology" : ", geom_source=surface_class");
     } else {
         auto fill = mesh::tet_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);

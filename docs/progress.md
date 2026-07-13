@@ -1,12 +1,30 @@
 # PROGRESS
 
-## Current phase
-**Master plan:** [`docs/ROADMAP.md`](ROADMAP.md) · **Agent loop:**
+## Active (read this first)
+
+**Canonical plan:** [`docs/plans/advisor-measure-first-program.md`](plans/advisor-measure-first-program.md)  
+**ADRs:** [0023](decisions/0023-measure-first-tet-primary-cvt-path.md) ·
+[0024](decisions/0024-advisor-measure-answers.md)  
+**Board:** [`docs/dag/PROGRAM.yaml`](dag/PROGRAM.yaml) ·
+**Bootstrap:** [`docs/dag/AGENT_BOOTSTRAP.md`](dag/AGENT_BOOTSTRAP.md)  
+**Roadmap:** [`docs/ROADMAP.md`](ROADMAP.md) · **Agent loop:**
 [`docs/process/agent-loop.md`](process/agent-loop.md)
 
-**Active:** Track **H** mesher honesty/perf overhaul — wave 2 on Windows.
-Plan: [`docs/plans/mesher-solver-overhaul.md`](plans/mesher-solver-overhaul.md).
-Remaining owner-facing gate: **A9** theme polish ⛔ GATE 6.5.
+| Status | Nodes | Notes |
+|--------|-------|--------|
+| **Done** | **M0–M4, M6–M8** | Probes/health, scorecard, sharp-only, N_pred; stress face-mean/energy (M6); chordal e (M7); lfs balls (M8) |
+| **In progress** | — | (none critical; side M11/M12/M14 open when deps ready) |
+| **Next** | **M9 freeze** → **M10** → **G\*** | Freeze baseline → wall OCC project → Geogram/CVT (G0–G4) → M5 VEM gate |
+
+Order locked (ADR-0024 Q2): **freeze → wall project → CVT**. Dual hard-block until
+G4. No packing “win” loops until M9. Never score raw nodal max stress. Side work
+when deps ready: M11 (h_min flag), M12 (expected_area), M14 (wall-clock kills);
+M13 sphere ref after freeze.
+
+## Background / older phases
+
+**Track H (historical):** mesher honesty/perf overhaul; owner gate **A9** theme
+polish. Plan: [`docs/plans/mesher-solver-overhaul.md`](plans/mesher-solver-overhaul.md).
 
 **Windows (2026-07-10):** Release + GUI builds with MSVC 19.51 / VS 18 + vcpkg
 (`eigen3`, `nlohmann-json`, `glad`). CLI mesh + GUI launch smoke OK. Root
@@ -23,6 +41,13 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-12: **M6–M8 measure substrate complete** — element-centroid face-mean VM +
+  strain_energy scoring (drop raw nodal max); OCC κ + mesh-segment chordal e;
+  protecting balls r=min(αh, β·lfs) + corner shrink. PROGRAM nodes done; next is M9 freeze.
+- 2026-07-12: **Program board notes polished for agents** — every open M6–M14 /
+  G0–G4 note cites ADR-0024 Q# + `docs/plans/advisor-measure-first-program.md`;
+  V11 dual hard-block until G4 + no packing loops until M9; V6d keeps M1 dep +
+  curved boundary before p>1.
 - 2026-07-12: **Advisor plan fully documented for agents** — canonical
   `docs/plans/advisor-measure-first-program.md`; ADR-0024 full Q1–Q10;
   PROGRAM.yaml nodes M6–M14 + G0–G4; README / CLAUDE / CONTRIBUTING /

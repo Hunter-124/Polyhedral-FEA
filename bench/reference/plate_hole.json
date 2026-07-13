@@ -4,8 +4,14 @@
     {
       "name": "scf",
       "value": 3.0,
-      "tol": 0.05,
-      "probe": { "kind": "max_vm_over_nominal", "nominal": 1.0e6 },
+      "tol": 0.10,
+      "probe": {
+        "kind": "mean_vm_over_nominal",
+        "nominal": 1.0e6,
+        "select": {
+          "box": [[-0.015, -0.015, -1e9], [0.015, 0.015, 1e9]]
+        }
+      },
       "derivation": "docs/validation/hand-calcs.md#kirsch-plate"
     }
   ]

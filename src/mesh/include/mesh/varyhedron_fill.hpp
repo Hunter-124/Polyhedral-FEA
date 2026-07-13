@@ -26,6 +26,10 @@ struct VaryhedronFillOutput {
     std::size_t n_tets = 0;
     /// CAD edge protecting-ball samples used as fixed packing anchors (sharp only).
     std::size_t n_edge_seeds = 0;
+    /// Min/max protecting-ball radii used for edge seeds (m); 0 if none.
+    /// Sized by r = min(α h, β lfs) with α=0.45, β=1/3, plus corner shrink.
+    double min_protect_radius = 0.0;
+    double max_protect_radius = 0.0;
     /// CAD edge class counts from topology (diagnostics).
     std::size_t n_sharp_edges = 0;
     std::size_t n_smooth_edges = 0;
@@ -39,7 +43,8 @@ struct VaryhedronFillOutput {
     /// Max Hausdorff residual of free-boundary mesh vs **sharp** CAD edges (m).
     double edge_profile_hausdorff_max = 0.0;
     double edge_profile_rel = 0.0; // max / characteristic sharp CAD edge length
-    /// Chordal efficiency max e = d_actual / (h²κ/8) on sharp edges (ADR-0023).
+    /// Chordal efficiency max e = d_actual / (ℓ²κ/8) on sharp-feature mesh
+    /// segments (ADR-0023). ℓ = mesh edge length; κ from CAD curve curvature.
     double edge_chordal_efficiency_max = 0.0;
     double edge_hausdorff_over_h = 0.0;
 };

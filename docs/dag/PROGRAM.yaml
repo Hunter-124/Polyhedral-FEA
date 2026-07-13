@@ -379,9 +379,11 @@ nodes:
     deps: [V6c, M1]
     scope: [src/mesh/, src/fea/, src/adapt/]
     note: >
-      Hierarchical min-rule (already in hp_assembly); uniform p per campaign
-      first. Feature-local p↑ only after M2 edge residual stable + curved
-      boundary (ADR-0023 §8). Blocked on broken accuracy signal until M1.
+      ADR-0024 Q10 trap #1 + plan docs/plans/advisor-measure-first-program.md §4.6.
+      Deps M1 (honest accuracy signal). Hierarchical min-rule already in
+      hp_assembly; uniform p per campaign first. Feature-local p↑ only after
+      edge residual stable. Curved/isoparametric boundary REQUIRED in the same
+      work item before any p>1 near curved walls (or loop signal inverts).
 
   - id: V6e
     title: Varyhedron solve path + curved scorecard on STEP shapes
@@ -391,6 +393,7 @@ nodes:
     note: >
       Tet FE solve path exists; scorecard must use M2 residual metrics +
       frozen refs. VEM not required for this node (ADR-0023 tet primary).
+      Plan: docs/plans/advisor-measure-first-program.md.
 
   - id: V7
     title: Default mesher + tendency map + hybrid zoo retained
@@ -464,10 +467,11 @@ nodes:
     deps: [V10a, M1, M2]
     scope: [src/mesh/, src/pipeline/, bench/campaigns/, docs/]
     note: >
-      Apply improvements only against M1 health + M2 scorecard (not residual
-      alone, not wire PNGs). Retire graded when varyhedron wins on frozen refs.
-      Prefer constrained restricted CVT over dual-of-tet for poly cells
-      (ADR-0023). VEM promotion is M5, not automatic here.
+      ADR-0024 Q8 + plan docs/plans/advisor-measure-first-program.md §4.4/§9.
+      NO packing "win" loops until M9 freeze exists; then measure delta vs that
+      freeze only (not residual alone, not wire PNGs). Dual-of-tet HARD-BLOCK
+      until G4 (clipped CVT cells). Prefer constrained restricted CVT over dual
+      (ADR-0023). Retire graded when varyhedron wins on frozen refs. VEM is M5.
 
   # ── Lane M: Measure-first (ADR-0023, advisor 2026-07-12) ────────────────
   # Compressed path: harden probes/metrics → edge residuals → CVT poly →
@@ -530,41 +534,46 @@ nodes:
     deps: [M9, M10, G4]
     scope: [src/fea/, src/mesh/, bench/campaigns/, docs/]
     note: >
+      ADR-0024 Q10 trap #2 + plan docs/plans/advisor-measure-first-program.md §2/§4.7.
       Promote poly VEM to primary claim only when energy/DOF and SCF beat
       hybrid_zoo on frozen refs for plate_hole and cylinder. Until then
-      "also ships polyhedra". Prefer clipped/restricted CVT cells over
-      dual-of-tet. Stabilization: D-recipe/trace-scaled + MMS before campaigns
-      (ADR-0024 Q10). Dual hard-blocked until G4.
+      "also ships polyhedra". Prefer clipped/restricted CVT cells over dual.
+      Stabilization: D-recipe/trace-scaled + MMS before campaigns. Dual
+      hard-blocked until G4 (ADR-0024 Q8).
 
   - id: M6
     title: "Stress score: face-mean centroid VM + energy; drop raw nodal max"
-    status: in_progress
+    status: done
     deps: [M1, M2]
     scope: [src/fea/, apps/testlab/, bench/reference/, docs/validation/]
     note: >
-      ADR-0024 Q1/Q5. Element-centroid stress recovery; area-weighted face-mean;
-      p99 quality-filtered dashboard + n_quality_excluded; cylinder primary
-      strain_energy analytic; plate_hole scf = mean_vm_over_nominal on hole box;
-      expected_area ±2% load guard. Never score sigma_max nodal.
+      DONE (ADR-0024 Q1/Q5 + plan docs/plans/advisor-measure-first-program.md §3.2).
+      recover_element_centroid_stress; scorecard face-mean centroid VM + quality-
+      filtered p99 + strain_energy; cylinder ref→strain_energy; plate_hole scf→
+      mean_vm_over_nominal on hole box; tip expected_area ±2% load guard; never
+      score raw nodal max. Probe util tests green.
 
   - id: M7
     title: "Chordal e fix: per-segment ℓ + OCC κ + mesh feature segments"
-    status: in_progress
+    status: done
     deps: [M2, V1b]
     scope: [src/geom/, src/mesh/, apps/testlab/, tests/]
     note: >
-      ADR-0024 Q4. e_i=d_i/(ℓ_i²κ/8); κ from BRepLProp on curves; synthetic
-      circle unit test e≈1; healthy band [0.8,3]. Unordered boundary-node
-      polylines are invalid input — use mesh boundary segments near sharp edges.
+      DONE (ADR-0024 Q4 + plan docs/plans/advisor-measure-first-program.md §3.3).
+      CadEdge::kappa_samples via BRepLProp; chordal_edge_metrics_segments
+      e=d/(ℓ²κ/8); varyhedron free-face boundary segments near sharp edges;
+      synthetic circle unit test e≈1. extract_topology/kappa/chordal tests green.
 
   - id: M8
     title: "Protecting balls r=min(αh, β·lfs) + corner shrink"
-    status: in_progress
+    status: done
     deps: [M3]
     scope: [src/mesh/]
     note: >
-      ADR-0024 Q6. α≈0.45 β≈1/3; lfs to other sharp geometry; shrink near
-      CAD vertices; overlapping balls OK. Priority before cross-case residual trust.
+      DONE (ADR-0024 Q6 + plan docs/plans/advisor-measure-first-program.md §4.2).
+      r=min(αh, β·lfs) α=0.45 β=1/3; lfs to other sharp samples (+verts); corner
+      shrink 0.5r near CAD verts; min_sep 0.55·max(r_i,r_j) overlaps OK;
+      min/max_protect_radius diagnostics. varyhedron unit+cylinder tests green.
 
   - id: M9
     title: "Freeze baseline campaign on honest M1–M8 scorecard"
@@ -572,9 +581,10 @@ nodes:
     deps: [M6, M7, M8]
     scope: [bench/campaigns/, scripts/, docs/]
     note: >
-      ADR-0024 Q2(c). Snapshot warehouse+results as frozen baseline BEFORE wall
-      project or CVT. Commit results/PARETO/HANDOFF; document git SHA + metric
-      schema version. Packing loops measure delta vs this freeze only.
+      ADR-0024 Q2(c) + plan docs/plans/advisor-measure-first-program.md §5.
+      Snapshot warehouse+results as frozen baseline BEFORE wall project or CVT.
+      Commit results/PARETO/HANDOFF; document git SHA + metric schema version.
+      Packing loops (V11) measure delta vs this freeze only — no "wins" before.
 
   - id: M10
     title: Wall tangential smooth + OCC surface project
@@ -582,7 +592,8 @@ nodes:
     deps: [M9]
     scope: [src/mesh/, src/geom/, src/pipeline/]
     note: >
-      ADR-0024 Q2(a). Free-slide on smooth faces; project displacement to tangent;
+      ADR-0024 Q2(a) + plan docs/plans/advisor-measure-first-program.md §4.1/§5.
+      Free-slide on smooth faces; project displacement to tangent;
       GeomAPI_ProjectPointOnSurf re-project. Shared post-pass for future CVT.
       Do not start before M9 freeze.
 
@@ -592,8 +603,9 @@ nodes:
     deps: [M4]
     scope: [src/pipeline/, src/mesh/, apps/testlab/]
     note: >
-      ADR-0024 Q10. Flag features that would push h below tier h_min; route to
-      larger tier. Do NOT start OCC defeaturing/suppression project.
+      ADR-0024 Q10 trap #3 + plan docs/plans/advisor-measure-first-program.md §4.3.
+      Flag features that would push h below tier h_min; route to larger tier.
+      Do NOT start OCC defeaturing/suppression project.
 
   - id: M12
     title: "BC expected_area guard everywhere + face-tag design note"
@@ -601,8 +613,9 @@ nodes:
     deps: [M6]
     scope: [tests/fixtures/parts/, apps/testlab/, docs/]
     note: >
-      Q7. expected_area ±2% on all four STEP cases; design note for BRep face
-      IDs before geometry sweeps (~2–3 days later).
+      ADR-0024 Q7 + plan docs/plans/advisor-measure-first-program.md §3.5.
+      expected_area ±2% on all four STEP cases; design note for BRep face IDs
+      before geometry sweeps (~2–3 days later).
 
   - id: M13
     title: "Sphere Legendre / Hiramatsu–Oka reference (~1 day after freeze)"
@@ -610,8 +623,9 @@ nodes:
     deps: [M9]
     scope: [bench/reference/, docs/validation/, tests/]
     note: >
-      Q5. Timeboxed ~1 day; cut if overruns — rely on Richardson. Best packing
-      discriminator with surface-resolution sensitivity.
+      ADR-0024 Q5 + plan docs/plans/advisor-measure-first-program.md §7.
+      Timeboxed ~1 day after M9 freeze; cut if overruns — rely on Richardson.
+      Best packing discriminator with surface-resolution sensitivity.
 
   - id: M14
     title: "Campaign wall-clock kills + optional 500k top tier"
@@ -619,7 +633,8 @@ nodes:
     deps: [M4]
     scope: [apps/testlab/, bench/campaigns/]
     note: >
-      Q9. Per-run wall-clock (15/15/45 min) + pack ceiling; tet-FE packs may use
+      ADR-0024 Q9 + plan docs/plans/advisor-measure-first-program.md §6.
+      Per-run wall-clock (15/15/45 min) + pack ceiling; tet-FE packs may use
       500k top tier for Richardson.
 
   # ── Lane G: Geogram + constrained restricted CVT (after M9–M10) ─────────
@@ -630,8 +645,9 @@ nodes:
     deps: [M0]
     scope: [docs/decisions/, third_party/]
     note: >
-      Q3/Q8. Document vendoring plan + LICENSE; dual hard-block until G4.
-      Frame fields research-only.
+      ADR-0024 Q3/Q8 + plan docs/plans/advisor-measure-first-program.md §4.4–§4.5.
+      Document vendoring plan + LICENSE; dual hard-block until G4. Frame fields
+      research-only. Docs can land early; G1 still waits on M10.
 
   - id: G1
     title: Vendor Geogram predicates + ConvexCell / clipped Voronoi
@@ -639,8 +655,10 @@ nodes:
     deps: [G0, M10]
     scope: [third_party/, src/mesh/, CMakeLists.txt]
     note: >
-      Namespace hygiene, strip unused modules, LICENSE file. Do not clean-room
-      clipped Voronoi.
+      ADR-0024 Q3 + plan docs/plans/advisor-measure-first-program.md §4.5.
+      Vendor hard parts (predicates, ConvexCell/clipped Voronoi); namespace
+      hygiene, strip unused modules, LICENSE. Do not clean-room clipped Voronoi.
+      After M10 only (freeze→project→CVT order).
 
   - id: G2
     title: "Lloyd CVT loop + 1/h³ density from same size field as N_pred"
@@ -648,15 +666,18 @@ nodes:
     deps: [G1, M4]
     scope: [src/mesh/, src/pipeline/]
     note: >
+      ADR-0024 Q10 trap #4 + plan docs/plans/advisor-measure-first-program.md §4.5.
       Write thin Lloyd ourselves; constrained sharp sites fixed; density MUST
-      be 1/h(x)³ from same h(x) as N_pred (Q10 trap #4).
+      be 1/h(x)³ from same h(x) as N_pred.
 
   - id: G3
     title: Constrained sites + OCC bridge for CVT boundary
     status: todo
     deps: [G2, M10]
     scope: [src/mesh/, src/geom/]
-    note: Sharp fixed sites; smooth wall free with projection; no seam protect.
+    note: >
+      ADR-0024 Q2/Q3 + plan docs/plans/advisor-measure-first-program.md §4.1/§4.5.
+      Sharp fixed sites; smooth wall free with M10 projection; no seam protect.
 
   - id: G4
     title: Clipped Voronoi poly export (product poly path)
@@ -664,5 +685,7 @@ nodes:
     deps: [G3]
     scope: [src/mesh/, src/fea/, src/pipeline/]
     note: >
+      ADR-0024 Q8 + plan docs/plans/advisor-measure-first-program.md §4.4.
       Polyhedra = clipped cells — skip dual. Unblocks M5 VEM experiments on
       real polys. Experimental median-dual only if marketing demand (else never).
+      Dual hard-block lifts only after this node is done.

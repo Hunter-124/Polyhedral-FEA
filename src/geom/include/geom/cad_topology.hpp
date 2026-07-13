@@ -34,6 +34,9 @@ struct CadEdge {
     double length = 0.0;
     /// Sampled polyline along the curve (metres), open chain v0→v1.
     std::vector<Eigen::Vector3d> samples;
+    /// Curvature magnitude κ (1/m) at each sample parameter, same length as
+    /// `samples` when filled (OCC BRepLProp_CLProps). Empty if unavailable.
+    std::vector<double> kappa_samples;
     /// Feature class (sharp / smooth / seam). Default sharp for safety.
     CadEdgeFeature feature = CadEdgeFeature::kSharp;
     /// Dihedral between adjacent faces (rad). Convention: π = flat / coplanar
@@ -77,6 +80,9 @@ struct CadTopology {
 /// - ≥2 faces: dihedral from outward normals; if |dihedral − π| < 25° → kSmooth,
 ///   else kSharp (default sharp threshold: 25° from flat)
 /// - single-face open-shell boundary → kSharp
+///
+/// When OCC is available, each edge's `kappa_samples` is filled with curvature
+/// magnitude at the same parameters as `samples` (empty if unavailable).
 [[nodiscard]] CadTopology extract_topology(const CadModel& model,
                                            int samples_per_edge = 8);
 
@@ -108,16 +114,34 @@ closest_edge(const CadTopology& topo, const Eigen::Vector3d& p, bool sharp_only)
     const CadTopology& topo, const std::vector<Eigen::Vector3d>& polyline,
     bool sharp_only = true);
 
+/// Undirected mesh edge segment used for chordal residual / efficiency metrics.
+struct MeshEdgeSegment {
+    Eigen::Vector3d a = Eigen::Vector3d::Zero();
+    Eigen::Vector3d b = Eigen::Vector3d::Zero();
+};
+
 /// Per-segment chordal residual vs CAD plus chordal-efficiency proxy.
-/// `h` is the local mesh size used for efficiency e = d / max(eps, h²κ/8).
+/// Efficiency uses theoretical sagitta ℓ²κ/8 with segment length ℓ (not global h).
 struct ChordalEdgeMetrics {
-    double hausdorff = 0;        // max distance polyline→CAD (m)
-    double hausdorff_over_h = 0; // / max(h, eps)
-    double max_chordal = 0;      // max midpoint sagitta (m)
-    double max_efficiency = 0;   // max d/(h²κ/8); κ from CAD samples or 0
+    double hausdorff = 0;        // max midpoint distance segment→CAD (m)
+    double hausdorff_over_h = 0; // hausdorff / max(h, eps); set by h-aware APIs
+    double max_chordal = 0;      // max midpoint sagitta (m); same as hausdorff
+    double max_efficiency = 0;   // max d/(ℓ²κ/8); κ from kappa_samples or Menger
     int n_segments = 0;
 };
 
+/// Preferred entry: metrics from true mesh feature edge segments.
+/// For each segment: mid = 0.5*(a+b), ℓ = |b−a|, d = dist(mid, CAD),
+/// theory = ℓ²κ/8, e = d / max(eps, theory). κ from CadEdge::kappa_samples
+/// at the nearest sample (interpolated by t); Menger fallback if empty.
+[[nodiscard]] ChordalEdgeMetrics
+chordal_edge_metrics_segments(const CadTopology& topo,
+                              const std::vector<MeshEdgeSegment>& segs,
+                              bool sharp_edges_only = true);
+
+/// Thin wrapper: consecutive polyline edges → segments, then
+/// chordal_edge_metrics_segments. Sets hausdorff_over_h = hausdorff / max(h,eps).
+/// Prefer chordal_edge_metrics_segments with real mesh edges when available.
 [[nodiscard]] ChordalEdgeMetrics
 chordal_edge_metrics(const CadTopology& topo,
                      const std::vector<Eigen::Vector3d>& mesh_feature_polyline,

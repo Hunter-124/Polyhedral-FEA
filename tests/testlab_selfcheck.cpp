@@ -142,7 +142,7 @@ TEST_CASE("testlab: parse results.jsonl line (interfaces §3)") {
 
 TEST_CASE("testlab: parse results.jsonl with health + scorecard (measure-first)") {
     const auto row = parse_result_line(
-        R"({"cfg_id":"cfg-028399df","config":{"mesher":"varyhedron"},"part":"plate_hole","tier":0,"mesh_ms":100,"solve_ms":200,"n_elems":4608,"n_nodes":2064,"n_dof":6192,"n_pred_elems":355.5,"quality":{"M1max":0,"M2max":0.1,"M6":1.0,"score":0.5},"answers":{"strain_energy":0.0031,"tip_deflection":2.4e-6,"sigma_face_mean":3.75e6,"sigma_max":4.8e6},"health":{"free_residual_rel":1.2e-12,"reaction_sum_err":1e-13,"n_orphans":0,"load_area_ok":true,"ok":true},"scorecard":{"edge_hausdorff_over_h":0.04,"chordal_efficiency_max":1.2,"normal_dev_deg_max":8.2,"n_dof":6192,"accuracy_rel_err":0.02,"min_element_quality":1.0,"solve_residual_rel":1.2e-12,"health_ok":true},"accuracy":{"metric":"scf","value":3.06,"truth":3.0,"rel_err":0.02},"status":"ok"})");
+        R"({"cfg_id":"cfg-028399df","config":{"mesher":"varyhedron"},"part":"plate_hole","tier":0,"mesh_ms":100,"solve_ms":200,"n_elems":4608,"n_nodes":2064,"n_dof":6192,"n_pred_elems":355.5,"quality":{"M1max":0,"M2max":0.1,"M6":1.0,"score":0.5},"answers":{"strain_energy":0.0031,"tip_deflection":2.4e-6,"sigma_face_mean":3.75e6,"sigma_max":4.8e6,"load_face_area":0.001,"load_area_rel_err":0.01},"health":{"free_residual_rel":1.2e-12,"reaction_sum_err":1e-13,"n_orphans":0,"load_area_ok":true,"ok":true},"scorecard":{"edge_hausdorff_over_h":0.04,"chordal_efficiency_max":1.2,"normal_dev_deg_max":8.2,"n_dof":6192,"accuracy_rel_err":0.02,"min_element_quality":1.0,"solve_residual_rel":1.2e-12,"health_ok":true},"accuracy":{"metric":"scf","value":3.06,"truth":3.0,"rel_err":0.02},"status":"ok"})");
     CHECK(row.cfg_id == "cfg-028399df");
     CHECK(row.status == "ok");
     CHECK(row.health.present);
@@ -160,6 +160,8 @@ TEST_CASE("testlab: parse results.jsonl with health + scorecard (measure-first)"
     CHECK_THAT(row.answers.strain_energy, Catch::Matchers::WithinAbs(0.0031, 1e-12));
     CHECK_THAT(row.answers.tip_deflection, Catch::Matchers::WithinAbs(2.4e-6, 1e-15));
     CHECK_THAT(row.answers.sigma_face_mean, Catch::Matchers::WithinAbs(3.75e6, 1.0));
+    CHECK_THAT(row.answers.load_face_area, Catch::Matchers::WithinAbs(0.001, 1e-12));
+    CHECK_THAT(row.answers.load_area_rel_err, Catch::Matchers::WithinAbs(0.01, 1e-12));
     CHECK_THAT(row.n_pred_elems, Catch::Matchers::WithinAbs(355.5, 1e-12));
 }
 

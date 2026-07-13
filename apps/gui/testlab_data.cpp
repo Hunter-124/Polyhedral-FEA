@@ -259,6 +259,8 @@ ResultRow parse_result_line(const std::string& line) {
             out.answers.strain_energy = opt_double_nan(a, "strain_energy");
             out.answers.tip_deflection = opt_double_nan(a, "tip_deflection");
             out.answers.sigma_face_mean = opt_double_nan(a, "sigma_face_mean");
+            out.answers.load_face_area = opt_double_nan(a, "load_face_area");
+            out.answers.load_area_rel_err = opt_double_nan(a, "load_area_rel_err");
         }
         if (j.contains("config")) {
             out.config_summary = summarize_config(j["config"]);

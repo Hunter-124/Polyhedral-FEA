@@ -619,26 +619,27 @@ nodes:
 
   - id: M12
     title: "BC expected_area guard everywhere + face-tag design note"
-    status: in_progress
+    status: done
     deps: [M6]
     scope: [tests/fixtures/parts/, apps/testlab/, docs/]
     note: >
-      ADR-0024 Q7 + plan docs/plans/advisor-measure-first-program.md §3.5.
-      Partial: plate_hole expected_area=0.001 (H×t end face); cylinder tip
-      πR² already set. Sphere polar-cap and icecream multi-face still open
-      (need BRep face tags or unambiguous CAD area). Design stub:
-      docs/research/brep-face-tag-bc.md. Finish when remaining two cases get
-      expected_area or face-ID BCs.
+      DONE 2026-07-13 (ADR-0024 Q7): plate_hole 0.001, cylinder πR² +
+      normal_min_dot, sphere polar cap A=π×10⁻³ (z_p=0.04, normal_min_dot 0.7).
+      Icecream multi-face omits expected_area — box area swings 15–20% across
+      meshers (see brep-face-tag-bc.md); face-ID BCs remain design-only exit
+      criteria for that part. Design stub docs/research/brep-face-tag-bc.md.
 
   - id: M13
     title: "Sphere Legendre / Hiramatsu–Oka reference (~1 day after freeze)"
-    status: todo
+    status: done
     deps: [M9]
     scope: [bench/reference/, docs/validation/, tests/]
     note: >
-      ADR-0024 Q5 + plan docs/plans/advisor-measure-first-program.md §7.
-      Timeboxed ~1 day after M9 freeze; cut if overruns — rely on Richardson.
-      Best packing discriminator with surface-resolution sensitivity.
+      DONE 2026-07-13 (ADR-0024 Q5 cut path): full Legendre/Hiramatsu–Oka series
+      cut this session. Frozen dual-mesher fine-end reference in
+      bench/reference/sphere.json + hand-calcs.md#sphere — strain_energy
+      4.60e-4 (tol 20%, primary) + tip_deflection 2.90e-7 (tol 25%). Replace
+      if a true series lands later; do not regen ad hoc per campaign.
 
   - id: M14
     title: "Campaign wall-clock kills + optional 500k top tier"

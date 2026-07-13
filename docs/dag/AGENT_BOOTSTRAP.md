@@ -103,16 +103,17 @@ Normative order (ADR-0023/0024 — do not skip or reorder):
 3. **M7 done:** chordal e = d/(ℓ²κ/8) with OCC κ + true mesh segments
 4. **M8 done:** protecting balls r=min(αh, β·lfs); corner shrink
 5. **M9 FREEZE baseline campaign** (done) on honest scorecard (before projection/CVT)
-6. **M10** wall tangential smooth + OCC surface project
-7. **G0 done** · **G1–G4** vendor → Lloyd CVT → constrained sites → clipped Voronoi
+6. **M10 done** wall tangential smooth + OCC surface project
+7. **G0 done** · **G1–G4 next** vendor → Lloyd CVT → constrained sites → clipped Voronoi
 8. **M5** VEM headline only if beats hybrid_zoo on frozen plate_hole+cylinder
 9. Dual-of-tet: HARD-BLOCK until G4. Frame fields: out of near-term horizon.
 10. p>1 only with curved/isoparametric boundary in same work item (V6d deps M1)
 11. **V11** packing iterate: no "win" loops until M9; dual hard-block until G4
 
 Side nodes (parallel when deps ready; not ahead of critical path):
-- **M11 done** h_min flag · **M14 done** wall-clock kills · **M12** expected_area
-- **M13** sphere ref after M9 freeze only
+- **M11–M14 done** (h_min, wall-clock, expected_area, sphere freeze-ref)
+- Icecream face-tags still design-only ([brep-face-tag-bc.md](../research/brep-face-tag-bc.md))
+- Start next session: [SESSION_HANDOFF_g1-cvt.md](../plans/SESSION_HANDOFF_g1-cvt.md)
 
 Substrate: sharp protect + graded tet + live BRep oracle.
 Reward: scorecard + accuracy — never wire PNG, never residual alone.

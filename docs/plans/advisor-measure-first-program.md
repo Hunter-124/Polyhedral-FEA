@@ -187,6 +187,7 @@ Shewchuk predicates public domain OK. Verdict BSD for quality. fTetWild MPL plug
 | **8** | **Freeze baseline campaign** on honest scorecard | M9 | **done** (historical 75%; cylinder area fixed later) |
 | **9** | Wall tangential + OCC project | M10 | **done** |
 | **9b** | Cylinder load normal-filter + GUI measure-first | — | **done** (post-m10 smoke 4/4) |
+| **9c** | expected_area sphere + M13 frozen sphere energy/tip | M12, M13 | **done** (icecream face-tags deferred) |
 | **10** | Vendor Geogram + Lloyd CVT + constrained sites | G1–G3 | **next** (G0 done) |
 | **11** | Clipped Voronoi poly export | G4 | after G1–G3 |
 | **12** | VEM gate campaign | M5 | after metrics + poly path |

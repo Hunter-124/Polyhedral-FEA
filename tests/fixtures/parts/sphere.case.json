@@ -4,13 +4,17 @@
   "material": { "E": 2.0e11, "nu": 0.3, "rho": 7850 },
   "bcs": [
     {
-      "select": { "box": [[-1e9, -1e9, -1e9], [1e9, 1e9, -0.015]] },
+      "select": { "box": [[-1e9, -1e9, -1e9], [1e9, 1e9, -0.04]] },
       "fix": [true, true, true]
     }
   ],
   "loads": [
     {
-      "select": { "box": [[-1e9, -1e9, 0.015], [1e9, 1e9, 1e9]] },
+      "select": {
+        "box": [[-1e9, -1e9, 0.04], [1e9, 1e9, 1e9]],
+        "expected_area": 0.003141592653589793,
+        "normal_min_dot": 0.7
+      },
       "traction": [0.0, 0.0, -1.0e6]
     }
   ],

@@ -1,0 +1,12 @@
+{
+  "campaign": "cyl-smoke",
+  "completed_runs": 4,
+  "started_utc": "2026-07-13T01:01:33Z",
+  "state": "finished",
+  "survivors": [
+    "cfg-028399df",
+    "cfg-89f62376"
+  ],
+  "tier": 0,
+  "updated_utc": "2026-07-13T01:01:38Z"
+}

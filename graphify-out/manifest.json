@@ -450,8 +450,8 @@
     "semantic_hash": ""
   },
   "docs/progress.md": {
-    "mtime": 1783904528.63056,
-    "ast_hash": "cff658d54f53c7cb8384bac35ec855a0",
+    "mtime": 1783906509.411181,
+    "ast_hash": "16a807ec20a6eb14e22833ad50918abf",
     "semantic_hash": ""
   },
   "docs/spec.md": {
@@ -1200,13 +1200,13 @@
     "semantic_hash": ""
   },
   "docs/dag/AGENT_BOOTSTRAP.md": {
-    "mtime": 1783904108.6836267,
-    "ast_hash": "068885a02e4de54e04b987dc065f9edf",
+    "mtime": 1783906509.394513,
+    "ast_hash": "923cebeeb8a92cdd779892962040508d",
     "semantic_hash": ""
   },
   "docs/dag/PROGRAM.yaml": {
-    "mtime": 1783904528.650986,
-    "ast_hash": "ae56356b95d0ec86e9e7b5441ee17b36",
+    "mtime": 1783906488.5692961,
+    "ast_hash": "0b9beaa8aae340134ad910987d50d441",
     "semantic_hash": ""
   },
   "docs/dag/README.md": {
@@ -1280,8 +1280,8 @@
     "semantic_hash": ""
   },
   "docs/validation/hand-calcs.md": {
-    "mtime": 1783903079.9379973,
-    "ast_hash": "e0059fde986bd9a8dbedfc35c2424f35",
+    "mtime": 1783906451.1058216,
+    "ast_hash": "30ac5853a297ac23708bfcfe77ccc1fc",
     "semantic_hash": ""
   },
   "tests/test_element_tendency.cpp": {
@@ -1310,23 +1310,23 @@
     "semantic_hash": ""
   },
   "apps/gui/testlab_data.cpp": {
-    "mtime": 1783903909.9236085,
-    "ast_hash": "aeb0b942e73ab1d980bb8e01439f520b",
+    "mtime": 1783906461.0603719,
+    "ast_hash": "d6873c7a979bee087a46cae5668190de",
     "semantic_hash": ""
   },
   "apps/gui/testlab_data.hpp": {
-    "mtime": 1783903896.6469738,
-    "ast_hash": "930930fb8ad66947b0e450074cd0dc09",
+    "mtime": 1783906461.0603719,
+    "ast_hash": "d424cac89b960f6f6be8f952880ee439",
     "semantic_hash": ""
   },
   "apps/gui/testlab_panel.cpp": {
-    "mtime": 1783903964.479223,
-    "ast_hash": "3c5773a3e50c09661f5a5f8798645286",
+    "mtime": 1783906470.626429,
+    "ast_hash": "6213cc04cd75122b525e5fea8d4bf4d6",
     "semantic_hash": ""
   },
   "apps/gui/testlab_panel.hpp": {
-    "mtime": 1783903938.1485143,
-    "ast_hash": "96a11dd71e3ee1c33afce59b9c3d6596",
+    "mtime": 1783906461.0605989,
+    "ast_hash": "1fa940fd947021911e8002f045a5e336",
     "semantic_hash": ""
   },
   "apps/testlab/main.cpp": {
@@ -1355,8 +1355,8 @@
     "semantic_hash": ""
   },
   "tests/testlab_selfcheck.cpp": {
-    "mtime": 1783903959.7622752,
-    "ast_hash": "134a082c8ba518c96808d310b4def874",
+    "mtime": 1783906518.5550804,
+    "ast_hash": "0d94fbb16554e8c38cd1bea51f57cf50",
     "semantic_hash": ""
   },
   "apps/testlab/CMakeLists.txt": {
@@ -1520,8 +1520,8 @@
     "semantic_hash": ""
   },
   "bench/reference/sphere.json": {
-    "mtime": 1783894987.6165965,
-    "ast_hash": "6e8fcdfe835b88a3155d365a81a997c4",
+    "mtime": 1783906547.2531035,
+    "ast_hash": "14afb102eada19c47ddb817e57870812",
     "semantic_hash": ""
   },
   "scripts/invoke_grok_improve.sh": {
@@ -1575,8 +1575,8 @@
     "semantic_hash": ""
   },
   "tests/fixtures/parts/sphere.case.json": {
-    "mtime": 1783901680.6043446,
-    "ast_hash": "b6e2c1a03d6782156073e617d61d121f",
+    "mtime": 1783906417.125298,
+    "ast_hash": "6b2c62de64df762c9ebe1903ddec9ab7",
     "semantic_hash": ""
   },
   "tests/test_cad_model.cpp": {
@@ -2050,8 +2050,8 @@
     "semantic_hash": ""
   },
   "docs/plans/advisor-measure-first-program.md": {
-    "mtime": 1783904437.300738,
-    "ast_hash": "137dcd7b1e4fee5fad97cb2a77bb6619",
+    "mtime": 1783906488.5692961,
+    "ast_hash": "5aaf125f9888556d8a722be5336530c5",
     "semantic_hash": ""
   },
   "bench/campaigns/varyhedron-baseline-m9/PARETO.json": {
@@ -2195,13 +2195,13 @@
     "semantic_hash": ""
   },
   "docs/research/brep-face-tag-bc.md": {
-    "mtime": 1783903156.5948176,
-    "ast_hash": "d5ce59313caf52ed38d3834cfb69ef03",
+    "mtime": 1783906451.1000922,
+    "ast_hash": "87b50ce688b46a301ef98e734506fc25",
     "semantic_hash": ""
   },
   "docs/research/campaign-metrics.md": {
-    "mtime": 1783903156.5948176,
-    "ast_hash": "1b6e5c3bd2f50d0d3ed08df46049edf4",
+    "mtime": 1783906451.1058216,
+    "ast_hash": "50177e78149015dbc8cf461d81520893",
     "semantic_hash": ""
   },
   "docs/research/geogram-cvt-vendoring.md": {
@@ -2277,6 +2277,11 @@
   "bench/campaigns/post-m10-smoke/README.md": {
     "mtime": 1783904528.63056,
     "ast_hash": "97810c6673e6ccece743c5d2a5ea5d0a",
+    "semantic_hash": ""
+  },
+  "docs/plans/SESSION_HANDOFF_g1-cvt.md": {
+    "mtime": 1783906509.394513,
+    "ast_hash": "7a3aff3356e31e0b005a85b45f9090cb",
     "semantic_hash": ""
   }
 }

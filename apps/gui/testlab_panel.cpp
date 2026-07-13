@@ -125,6 +125,12 @@ std::string result_detail_tooltip(const testlab::ResultRow& r) {
         if (is_finite_num(r.scorecard.normal_dev_deg_max)) {
             t += std::format("  normal_dev_max: {:.3g}°\n", r.scorecard.normal_dev_deg_max);
         }
+        if (is_finite_num(r.scorecard.min_element_quality)) {
+            t += std::format("  min_quality: {:.3g}\n", r.scorecard.min_element_quality);
+        }
+        if (r.scorecard.n_dof > 0) {
+            t += std::format("  n_dof: {}\n", r.scorecard.n_dof);
+        }
     }
     if (is_finite_num(r.answers.strain_energy)) {
         t += std::format("strain_energy: {:.4g}\n", r.answers.strain_energy);
@@ -134,6 +140,12 @@ std::string result_detail_tooltip(const testlab::ResultRow& r) {
     }
     if (is_finite_num(r.answers.sigma_face_mean)) {
         t += std::format("sigma_face_mean: {:.4g}\n", r.answers.sigma_face_mean);
+    }
+    if (is_finite_num(r.answers.load_face_area)) {
+        t += std::format("load_face_area: {:.4g}\n", r.answers.load_face_area);
+    }
+    if (is_finite_num(r.answers.load_area_rel_err)) {
+        t += std::format("load_area_rel_err: {:.3g}\n", r.answers.load_area_rel_err);
     }
     if (is_finite_num(r.n_pred_elems)) {
         t += std::format("n_pred_elems: {:.0f}  n_elems: {}\n", r.n_pred_elems, r.n_elems);
@@ -615,7 +627,7 @@ void draw_testlab_panel(TestLabState& tl) {
         iw::end_group_box();
     }
 
-    // V10c stub: supervised open questions from handoff.json when present.
+    // V10c: supervised open questions from handoff.json when present.
     if (tl.handoff && !tl.handoff->open_program_nodes.empty()) {
         iw::begin_group_box("open questions");
         ImGui::TextColored(palette.text_dim, "handoff.json · open program nodes");
@@ -665,8 +677,9 @@ void draw_results_panel(TestLabState& tl) {
     if (tl.results.empty()) {
         ImGui::TextWrapped("No runs recorded yet. Start a campaign from the Test Lab panel.");
     } else {
-        // Summary chips: ok / solve_suspect / fail / over_budget.
+        // Summary chips: ok / solve_suspect / fail / over_budget / load_area.
         int n_ok = 0, n_suspect = 0, n_fail = 0, n_budget = 0;
+        int n_area_bad = 0, n_area_known = 0;
         double best_err = 1e300;
         for (const auto& r : tl.results) {
             if (r.status == "ok") {
@@ -681,6 +694,12 @@ void draw_results_panel(TestLabState& tl) {
             } else {
                 ++n_fail;
             }
+            if (r.health.has_load_area_ok) {
+                ++n_area_known;
+                if (!r.health.load_area_ok) {
+                    ++n_area_bad;
+                }
+            }
         }
         ImGui::TextColored(palette.status_ok, "ok %d", n_ok);
         ImGui::SameLine(0, 10);
@@ -691,6 +710,16 @@ void draw_results_panel(TestLabState& tl) {
         ImGui::SameLine(0, 10);
         ImGui::TextColored(n_budget > 0 ? palette.status_warn : palette.text_dim, "budget %d",
                            n_budget);
+        if (n_area_known > 0) {
+            ImGui::SameLine(0, 10);
+            ImGui::TextColored(n_area_bad > 0 ? palette.status_warn : palette.status_ok,
+                               "area_fail %d/%d", n_area_bad, n_area_known);
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip(
+                    "load_area_ok gate (expected_area ±5%%). area_fail counts runs that\n"
+                    "selected the wrong load faces or under/over-resolved a cap/tip.");
+            }
+        }
         if (n_ok > 0 && best_err < 1e299) {
             ImGui::Text("best |rel_err|: %.4g", best_err);
         }

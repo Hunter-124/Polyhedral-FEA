@@ -446,10 +446,14 @@ nodes:
 
   - id: V10c
     title: Supervised GUI question queue vs autonomous defaults
-    status: todo
+    status: in_progress
     deps: [V10b]
     scope: [apps/gui/, docs/process/]
-    note: Autonomous picks recommended; supervised presents in GUI.
+    note: >
+      PARTIAL 2026-07-12 (Hunter-124): Test Lab loads handoff.json and shows
+      open_program_nodes as an "open questions" info panel (supervised review
+      stub). Full question queue / answer UX still todo. Autonomous remains
+      the recommended default for grok-loop.
 
   - id: V10d
     title: Safety allow/deny for grok invoke

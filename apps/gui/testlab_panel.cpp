@@ -79,10 +79,69 @@ ImVec4 result_status_color(const std::string& status) {
     if (status == "ok") {
         return palette.status_ok;
     }
-    if (status == "over_budget") {
+    // solve_suspect: health gate failed after a successful solve — warn, not hard fail.
+    if (status == "solve_suspect" || status == "over_budget") {
         return palette.status_warn;
     }
     return palette.status_err;
+}
+
+bool is_finite_num(double v) {
+    return std::isfinite(v);
+}
+
+const char* fmt_opt_num(double v, char* buf, std::size_t n, const char* fmt = "%.3g") {
+    if (!is_finite_num(v)) {
+        std::snprintf(buf, n, "—");
+        return buf;
+    }
+    std::snprintf(buf, n, fmt, v);
+    return buf;
+}
+
+std::string result_detail_tooltip(const testlab::ResultRow& r) {
+    std::string t;
+    t += std::format("status: {}\n", r.status);
+    if (r.health.present) {
+        t += std::format("health_ok: {}\n", r.health.ok ? "true" : "false");
+        if (is_finite_num(r.health.free_residual_rel)) {
+            t += std::format("free_residual_rel: {:.3g}\n", r.health.free_residual_rel);
+        }
+        if (is_finite_num(r.health.reaction_sum_err)) {
+            t += std::format("reaction_sum_err: {:.3g}\n", r.health.reaction_sum_err);
+        }
+        if (r.health.has_load_area_ok) {
+            t += std::format("load_area_ok: {}\n", r.health.load_area_ok ? "true" : "false");
+        }
+    }
+    if (r.scorecard.present) {
+        t += "scorecard:\n";
+        if (is_finite_num(r.scorecard.edge_hausdorff_over_h)) {
+            t += std::format("  edge_H/h: {:.3g}\n", r.scorecard.edge_hausdorff_over_h);
+        }
+        if (is_finite_num(r.scorecard.chordal_efficiency_max)) {
+            t += std::format("  chordal_e_max: {:.3g}\n", r.scorecard.chordal_efficiency_max);
+        }
+        if (is_finite_num(r.scorecard.normal_dev_deg_max)) {
+            t += std::format("  normal_dev_max: {:.3g}°\n", r.scorecard.normal_dev_deg_max);
+        }
+    }
+    if (is_finite_num(r.answers.strain_energy)) {
+        t += std::format("strain_energy: {:.4g}\n", r.answers.strain_energy);
+    }
+    if (is_finite_num(r.answers.tip_deflection)) {
+        t += std::format("tip_deflection: {:.4g}\n", r.answers.tip_deflection);
+    }
+    if (is_finite_num(r.answers.sigma_face_mean)) {
+        t += std::format("sigma_face_mean: {:.4g}\n", r.answers.sigma_face_mean);
+    }
+    if (is_finite_num(r.n_pred_elems)) {
+        t += std::format("n_pred_elems: {:.0f}  n_elems: {}\n", r.n_pred_elems, r.n_elems);
+    }
+    if (!r.config_summary.empty()) {
+        t += r.config_summary;
+    }
+    return t;
 }
 
 } // namespace
@@ -126,6 +185,7 @@ void TestLabState::refresh_selected() {
         checkpoint.reset();
         progress.reset();
         results.clear();
+        handoff.reset();
         return;
     }
     try {
@@ -147,6 +207,7 @@ void TestLabState::refresh_selected() {
         status = std::format("results.jsonl: {}", e.what());
     }
     progress = testlab::load_progress(sum->dir);
+    handoff = testlab::load_handoff(sum->dir);
 
     // Mirror process state into a friendly status line.
     if (runner.is_running()) {
@@ -157,6 +218,13 @@ void TestLabState::refresh_selected() {
         status = std::format("{} — tier {} — {} runs",
                              testlab::checkpoint_state_cstr(checkpoint->state), checkpoint->tier,
                              checkpoint->completed_runs);
+    } else {
+        status = std::format("{} campaign", sum->name);
+    }
+    // Measure-first M9 freeze baseline (ADR-0023/24).
+    if (testlab::is_measure_first_baseline(sum->name) ||
+        (active_spec && testlab::is_measure_first_baseline(active_spec->name))) {
+        status += " · measure-first baseline (M9)";
     }
 }
 
@@ -366,6 +434,7 @@ void draw_testlab_panel(TestLabState& tl) {
             for (int i = 0; i < static_cast<int>(tl.campaigns.size()); ++i) {
                 const auto& c = tl.campaigns[static_cast<std::size_t>(i)];
                 const bool sel = (tl.selected == i);
+                const bool m9 = testlab::is_measure_first_baseline(c.name);
                 ImGui::PushID(i);
                 if (ImGui::Selectable(c.name.c_str(), sel)) {
                     tl.selected = i;
@@ -373,10 +442,21 @@ void draw_testlab_panel(TestLabState& tl) {
                     tl.refresh_selected();
                 }
                 if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip("%s\n%d results · %s", c.dir.string().c_str(), c.result_count,
-                                      testlab::checkpoint_state_cstr(c.state));
+                    if (m9) {
+                        ImGui::SetTooltip(
+                            "%s\n%d results · %s\nmeasure-first M9 freeze baseline (ADR-0023/24)",
+                            c.dir.string().c_str(), c.result_count,
+                            testlab::checkpoint_state_cstr(c.state));
+                    } else {
+                        ImGui::SetTooltip("%s\n%d results · %s", c.dir.string().c_str(),
+                                          c.result_count, testlab::checkpoint_state_cstr(c.state));
+                    }
                 }
                 ImGui::SameLine();
+                if (m9) {
+                    ImGui::TextColored(palette.accent, "M9");
+                    ImGui::SameLine();
+                }
                 ImGui::TextColored(state_color(c.state), "%s",
                                    testlab::checkpoint_state_cstr(c.state));
                 ImGui::PopID();
@@ -517,6 +597,10 @@ void draw_testlab_panel(TestLabState& tl) {
         iw::begin_group_box("spec");
         const auto& sp = *tl.active_spec;
         ImGui::TextWrapped("%s", sp.name.c_str());
+        if (testlab::is_measure_first_baseline(sp.name)) {
+            ImGui::TextColored(palette.accent,
+                               "measure-first baseline (M9 · ADR-0023/24)");
+        }
         ImGui::Text("parts: %zu  tiers: %zu", sp.parts.size(), sp.tiers.size());
         ImGui::Text("grid axes: %zu", sp.grid.size());
         for (const auto& ax : sp.grid) {
@@ -528,6 +612,31 @@ void draw_testlab_panel(TestLabState& tl) {
             ImGui::Text("caps: threads %d  mem %.1f GB", sp.resources.max_threads,
                         sp.resources.max_mem_gb);
         }
+        iw::end_group_box();
+    }
+
+    // V10c stub: supervised open questions from handoff.json when present.
+    if (tl.handoff && !tl.handoff->open_program_nodes.empty()) {
+        iw::begin_group_box("open questions");
+        ImGui::TextColored(palette.text_dim, "handoff.json · open program nodes");
+        if (!tl.handoff->mode.empty()) {
+            ImGui::Text("mode: %s", tl.handoff->mode.c_str());
+        }
+        if (!tl.handoff->finished_utc.empty()) {
+            ImGui::TextColored(palette.text_dim, "finished %s",
+                               tl.handoff->finished_utc.c_str());
+        }
+        const auto& nodes = tl.handoff->open_program_nodes;
+        const float oh =
+            std::min(100.0f, 16.0f * static_cast<float>(std::min(nodes.size(), std::size_t{8})) +
+                                 4.0f);
+        if (ImGui::BeginChild("##open_nodes", ImVec2(-FLT_MIN, oh), ImGuiChildFlags_Borders)) {
+            for (const auto& id : nodes) {
+                ImGui::TextUnformatted(id.c_str());
+            }
+        }
+        ImGui::EndChild();
+        ImGui::TextColored(palette.accent, "V10c: queue for supervised review");
         iw::end_group_box();
     }
 }
@@ -556,22 +665,32 @@ void draw_results_panel(TestLabState& tl) {
     if (tl.results.empty()) {
         ImGui::TextWrapped("No runs recorded yet. Start a campaign from the Test Lab panel.");
     } else {
-        // Aggregate quick stats.
-        int n_ok = 0, n_fail = 0;
+        // Summary chips: ok / solve_suspect / fail / over_budget.
+        int n_ok = 0, n_suspect = 0, n_fail = 0, n_budget = 0;
         double best_err = 1e300;
         for (const auto& r : tl.results) {
             if (r.status == "ok") {
                 ++n_ok;
-                if (r.accuracy.rel_err < best_err) {
+                if (!r.accuracy.metric.empty() && r.accuracy.rel_err < best_err) {
                     best_err = r.accuracy.rel_err;
                 }
+            } else if (r.status == "solve_suspect") {
+                ++n_suspect;
+            } else if (r.status == "over_budget") {
+                ++n_budget;
             } else {
                 ++n_fail;
             }
         }
         ImGui::TextColored(palette.status_ok, "ok %d", n_ok);
-        ImGui::SameLine(0, 12);
+        ImGui::SameLine(0, 10);
+        ImGui::TextColored(n_suspect > 0 ? palette.status_warn : palette.text_dim, "suspect %d",
+                           n_suspect);
+        ImGui::SameLine(0, 10);
         ImGui::TextColored(n_fail > 0 ? palette.status_err : palette.text_dim, "fail %d", n_fail);
+        ImGui::SameLine(0, 10);
+        ImGui::TextColored(n_budget > 0 ? palette.status_warn : palette.text_dim, "budget %d",
+                           n_budget);
         if (n_ok > 0 && best_err < 1e299) {
             ImGui::Text("best |rel_err|: %.4g", best_err);
         }
@@ -586,45 +705,64 @@ void draw_results_panel(TestLabState& tl) {
     if (ImGui::BeginChild("##results_table", ImVec2(-FLT_MIN, table_h), ImGuiChildFlags_Borders)) {
         if (tl.results.empty()) {
             ImGui::TextColored(palette.text_dim, "no runs yet");
-        } else if (ImGui::BeginTable("##res", 7,
+        } else if (ImGui::BeginTable("##res", 9,
                                      ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
                                          ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable |
                                          ImGuiTableFlags_SizingStretchProp)) {
             ImGui::TableSetupScrollFreeze(0, 1);
             ImGui::TableSetupColumn("cfg");
             ImGui::TableSetupColumn("part");
-            ImGui::TableSetupColumn("tier");
+            ImGui::TableSetupColumn("status");
+            ImGui::TableSetupColumn("health");
+            ImGui::TableSetupColumn("rel_err");
+            ImGui::TableSetupColumn("tip");
+            ImGui::TableSetupColumn("energy");
             ImGui::TableSetupColumn("mesh ms");
             ImGui::TableSetupColumn("solve ms");
-            ImGui::TableSetupColumn("rel_err");
-            ImGui::TableSetupColumn("status");
             ImGui::TableHeadersRow();
 
+            char num_buf[64];
             // Show newest first (jsonl is append-only).
             for (int i = static_cast<int>(tl.results.size()) - 1; i >= 0; --i) {
                 const auto& r = tl.results[static_cast<std::size_t>(i)];
                 ImGui::TableNextRow();
                 ImGui::TableSetColumnIndex(0);
                 ImGui::TextUnformatted(r.cfg_id.c_str());
-                if (ImGui::IsItemHovered() && !r.config_summary.empty()) {
-                    ImGui::SetTooltip("%s", r.config_summary.c_str());
+                if (ImGui::IsItemHovered()) {
+                    const auto tip = result_detail_tooltip(r);
+                    if (!tip.empty()) {
+                        ImGui::SetTooltip("%s", tip.c_str());
+                    }
                 }
                 ImGui::TableSetColumnIndex(1);
                 ImGui::TextUnformatted(r.part.c_str());
                 ImGui::TableSetColumnIndex(2);
-                ImGui::Text("%d", r.tier);
+                ImGui::TextColored(result_status_color(r.status), "%s", r.status.c_str());
                 ImGui::TableSetColumnIndex(3);
-                ImGui::Text("%.0f", r.mesh_ms);
+                if (r.health.present) {
+                    ImGui::TextColored(r.health.ok ? palette.status_ok : palette.status_warn, "%s",
+                                       r.health.ok ? "ok" : "no");
+                } else if (r.scorecard.has_health_ok) {
+                    ImGui::TextColored(r.scorecard.health_ok ? palette.status_ok
+                                                             : palette.status_warn,
+                                       "%s", r.scorecard.health_ok ? "ok" : "no");
+                } else {
+                    ImGui::TextColored(palette.text_dim, "—");
+                }
                 ImGui::TableSetColumnIndex(4);
-                ImGui::Text("%.0f", r.solve_ms);
-                ImGui::TableSetColumnIndex(5);
                 if (r.accuracy.metric.empty()) {
                     ImGui::TextColored(palette.text_dim, "—");
                 } else {
                     ImGui::Text("%.3g", r.accuracy.rel_err);
                 }
+                ImGui::TableSetColumnIndex(5);
+                ImGui::TextUnformatted(fmt_opt_num(r.answers.tip_deflection, num_buf, sizeof(num_buf)));
                 ImGui::TableSetColumnIndex(6);
-                ImGui::TextColored(result_status_color(r.status), "%s", r.status.c_str());
+                ImGui::TextUnformatted(fmt_opt_num(r.answers.strain_energy, num_buf, sizeof(num_buf)));
+                ImGui::TableSetColumnIndex(7);
+                ImGui::Text("%.0f", r.mesh_ms);
+                ImGui::TableSetColumnIndex(8);
+                ImGui::Text("%.0f", r.solve_ms);
             }
             ImGui::EndTable();
         }

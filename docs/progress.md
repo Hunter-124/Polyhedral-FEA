@@ -40,6 +40,7 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-12: **GUI Test Lab measure-first readiness (Hunter-124)** — ResultRow parses health/scorecard/answers/`solve_suspect`; Results chips (ok/suspect/fail/budget); baseline-m9 badge; handoff open questions (V10c partial); Varyhedron tooltip (ADR-0023/24).
 - 2026-07-13: **M9 baseline freeze** — campaign `bench/campaigns/varyhedron-baseline-m9/`
   (4 STEP × varyhedron+hybrid_zoo × 1 tier h_scale=5.0 = 8 runs; warehouse +
   analyze + HANDOFF). **ok_rate 75%** (6/8); both cylinder runs `solve_suspect`

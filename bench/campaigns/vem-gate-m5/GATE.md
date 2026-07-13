@@ -17,14 +17,15 @@ claim stays **tet FE**; poly VEM also ships.
 |------------|------------|--------|--------|-------|-----------------|--------------------|
 | plate_hole | hybrid_zoo | ok     | 4608   | 6192  | SCF **0.512**   | ok / ok |
 | cylinder   | hybrid_zoo | ok     | 17616  | 19635 | SE **0.132**    | ok / ok |
-| plate_hole | cvt_poly   | ok     | ~2700  | ~10k  | SCF **0.572**   | **ok / ok** |
+| plate_hole | cvt_poly   | ok     | ~3700  | ~16k  | SCF **0.565**   | **ok / ok** |
 | cylinder   | cvt_poly   | ok     | ~13k   | ~46k  | SE **0.138**    | **ok / ok** |
 
 Both parts pass health gates. Accuracy still loses narrowly:
-- plate SCF 0.572 vs hybrid 0.512 (gap ~0.06)
-- cylinder SE 0.138 vs hybrid 0.132 (gap ~0.006 — almost there)
+- plate SCF 0.565 vs hybrid 0.512 (gap ~0.05) — feature-local free densify helps
+- cylinder SE 0.138 vs hybrid 0.132 (gap ~0.006)
 
-Free-site spacing 0.9×h; denser (≤0.88) raises plate residual.
+Free-site spacing 0.9×h + plate-like hole-band densify; global denser (≤0.88)
+or aggressive feature bands raise residual / DOF budget.
 
 ## What landed
 

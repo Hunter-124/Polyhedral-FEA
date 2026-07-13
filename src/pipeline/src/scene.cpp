@@ -1148,39 +1148,92 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         mesh::ConstrainedSiteSeedParams seed_p;
         seed_p.interior_n_side = 0;  // no full-AABB lattice; we inject interior free sites
         seed_p.sharp_sample_stride = 1;
-        seed_p.sharp_min_sep_frac = 0.25 * h / diag;
+        // Slightly denser sharp protectors for hole SCF (0.20 vs 0.25); 0.16
+        // raised plate residual.
+        seed_p.sharp_min_sep_frac = 0.20 * h / diag;
         auto seeded = mesh::seed_constrained_cvt_sites(box, topo_ptr, seed_p);
 
-        // Mild densify of free sites (0.9 h). Cylinder SE 0.138 vs hybrid 0.132
-        // with health OK; denser (≤0.88) raises residual on plate.
+        // Plate-like (high aspect) gets hole-local densify for SCF.
+        const Eigen::Vector3d extent = (box.max - box.min).cwiseMax(1e-30);
+        const double aspect = extent.maxCoeff() / extent.minCoeff();
+        const bool plate_like = aspect > 5.0;  // plate_hole ~10–20; cylinder ~ few
         const double h_site = std::max(0.9 * h, 1e-9);
         mesh::CartesianGrid grid =
             mesh::make_bbox_grid(model.bbox_min, model.bbox_max, h_site);
         const auto inside = mesh::classify_cells_inside(model.surface, grid);
         const double min_sep = seed_p.sharp_min_sep_frac * diag;
         const double min_sep2 = min_sep * min_sep;
+        auto site_far = [&](const Eigen::Vector3d& p, double sep2) {
+            for (const auto& e : seeded.sites) {
+                if ((e.pos - p).squaredNorm() < sep2) {
+                    return false;
+                }
+            }
+            return true;
+        };
+
+        std::vector<Eigen::Vector3d> sharp_pos;
+        for (const auto& s : seeded.sites) {
+            if (s.fixed) {
+                sharp_pos.push_back(s.pos);
+            }
+        }
+        auto dist_to_sharp = [&](const Eigen::Vector3d& p) {
+            double d2 = 1e300;
+            for (const auto& q : sharp_pos) {
+                d2 = std::min(d2, (p - q).squaredNorm());
+            }
+            return std::sqrt(d2);
+        };
+
         std::size_t n_interior_free = 0;
+        std::size_t n_feature_free = 0;
         for (int k = 0; k < grid.nz; ++k) {
             for (int j = 0; j < grid.ny; ++j) {
                 for (int i = 0; i < grid.nx; ++i) {
                     if (!inside[grid.index(i, j, k)]) {
                         continue;
                     }
-                    mesh::CvtSite s;
-                    s.pos = grid.cell_center(i, j, k);
-                    s.fixed = false;
-                    bool far = true;
-                    for (const auto& e : seeded.sites) {
-                        if ((e.pos - s.pos).squaredNorm() < min_sep2) {
-                            far = false;
-                            break;
-                        }
-                    }
-                    if (!far) {
+                    const Eigen::Vector3d c = grid.cell_center(i, j, k);
+                    if (!site_far(c, min_sep2)) {
                         continue;
                     }
+                    mesh::CvtSite s;
+                    s.pos = c;
+                    s.fixed = false;
                     seeded.sites.push_back(s);
                     ++n_interior_free;
+
+                    // Plate-like only: local densify near hole rim for SCF.
+                    if (!plate_like) {
+                        continue;
+                    }
+                    const double d_sharp = dist_to_sharp(c);
+                    if (d_sharp < 2.2 * h && d_sharp > 0.25 * h) {
+                        static constexpr int kOff[6][3] = {
+                            {1, 0, 0}, {-1, 0, 0}, {0, 1, 0},
+                            {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
+                        const double local_sep2 = (0.40 * h) * (0.40 * h);
+                        for (const auto& o : kOff) {
+                            Eigen::Vector3d p = c;
+                            p[0] += 0.45 * grid.cell[0] * static_cast<double>(o[0]);
+                            p[1] += 0.45 * grid.cell[1] * static_cast<double>(o[1]);
+                            p[2] += 0.45 * grid.cell[2] * static_cast<double>(o[2]);
+                            if ((p - c).cwiseAbs().maxCoeff() >
+                                0.48 * grid.cell.maxCoeff()) {
+                                continue;
+                            }
+                            if (!site_far(p, local_sep2)) {
+                                continue;
+                            }
+                            mesh::CvtSite fs;
+                            fs.pos = p;
+                            fs.fixed = false;
+                            seeded.sites.push_back(fs);
+                            ++n_feature_free;
+                            ++n_interior_free;
+                        }
+                    }
                 }
             }
         }
@@ -1239,15 +1292,13 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             positions.push_back(s.pos);
         }
 
-        // M5 product path: true RVD ∩ Ω via tet scaffold of the solid.
-        // Infinite surface halfspaces cannot represent holes (plate_hole);
-        // clipping each Voronoi cell by nearby interior tets keeps load faces
-        // on the solid for both convex and non-convex parts.
+        // RVD ∩ tet scaffold for all solids (holes need it; prismatic SE is
+        // competitive with load_area trim). AABB-only reintroduces bad SE when
+        // free-site counts stay modest.
         std::string clip_mode = "rvd_tet";
         mesh::ClippedVoronoiExport exp;
         std::size_t n_domain_tets = 0;
         try {
-            // Tet scaffold ~ bulk h for RVD domain clip.
             const double h_tet = std::max(h, 1e-9);
             auto tet_fill = mesh::tet_fill_surface(model.surface, model.bbox_min,
                                                    model.bbox_max, h_tet,
@@ -1261,28 +1312,18 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                 d.v2 = tet_fill.nodes[t[2]];
                 d.v3 = tet_fill.nodes[t[3]];
                 d.centroid = 0.25 * (d.v0 + d.v1 + d.v2 + d.v3);
-                // Skip inverted / degenerate tets.
                 if (mesh::tet_signed_volume(d.v0, d.v1, d.v2, d.v3) <= 0.0) {
                     continue;
                 }
                 dtets.push_back(d);
             }
             n_domain_tets = dtets.size();
-            // Search radius: cover Voronoi cells that spill ~1–2 h into neighbours.
             const double R = std::max(2.5 * h, 0.08 * diag);
             exp = mesh::export_rvd_tet_clipped(box, positions, dtets, R);
             if (exp.stats.n_cells < std::max<std::size_t>(4, positions.size() / 4)) {
-                // Fallback: supporting surface halfspaces + AABB.
-                clip_mode = "fallback_halfspace";
-                mesh::DomainClipParams dclip;
-                dclip.surface =
-                    model.surface.triangles.empty() ? nullptr : &model.surface;
-                exp = mesh::export_clipped_voronoi(box, positions, dclip);
-                if (exp.stats.n_cells < 4) {
-                    clip_mode = "fallback_aabb";
-                    exp = mesh::export_clipped_voronoi(box, positions,
-                                                       mesh::DomainClipParams{});
-                }
+                clip_mode = "fallback_aabb";
+                exp = mesh::export_clipped_voronoi(box, positions,
+                                                   mesh::DomainClipParams{});
             }
         } catch (...) {
             clip_mode = "fallback_aabb";
@@ -1304,7 +1345,7 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                 }
             }
             const double snap_budget =
-                (clip_mode == "rvd_tet") ? 0.4 * h : 1.25 * h;
+                (clip_mode == "rvd_tet") ? 0.4 * h : 1.35 * h;
             for (std::size_t vi = 0; vi < exp.mesh.vertices.size(); ++vi) {
                 if (!is_bnd[vi]) {
                     continue;
@@ -1324,12 +1365,13 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         out.boundary_quads = fea::extract_boundary_faces(out.mesh);
         out.mesher_note = std::format(
             "cvt_poly RVD (interior sites + {} tets + clip={} + bnd_snap={} → "
-            "kPolyVem): {} polys, {} nodes, sites={}/fixed={}/interior_free={}, "
+            "kPolyVem): {} polys, {} nodes, sites={}/fixed={}/interior={}/feat={}, "
             "lloyd_iters={}, sum_vol={:.4g}, domain_clips={}, grid={}x{}x{}, h={:.4g} m{}",
             n_domain_tets, clip_mode, n_bnd_snapped, out.mesh.elements.size(),
-            out.mesh.nodes.size(), sites.size(), seeded.n_sharp_fixed, n_interior_free,
-            lr.stats.n_iters, exp.stats.sum_cell_volume, exp.stats.n_domain_plane_clips,
-            grid.nx, grid.ny, grid.nz, h,
+            out.mesh.nodes.size(), sites.size(), seeded.n_sharp_fixed,
+            n_interior_free - n_feature_free, n_feature_free, lr.stats.n_iters,
+            exp.stats.sum_cell_volume, exp.stats.n_domain_plane_clips, grid.nx, grid.ny,
+            grid.nz, h,
             topo_ptr ? ", geom_source=brep_topology" : ", geom_source=surface_class");
     } else {
         auto fill = mesh::tet_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);

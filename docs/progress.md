@@ -12,13 +12,17 @@
 
 | Status | Nodes | Notes |
 |--------|-------|--------|
-| **Done** | **M0–M4, M6–M11, M14, G0** | Measure + freeze + **wall OCC project (M10)** + wall-clock/h_min + Geogram ADR |
+| **Done** | **M0–M4, M6–M11, M14, G0, V6e, V10c** | Measure + freeze + wall OCC + GUI Test Lab measure-first + cylinder load fix |
 | **In progress** | **M12** (partial) | plate_hole + cylinder `expected_area`; sphere/icecream open |
 | **Next** | **G1+** | Vendor Geogram (G1) → CVT → M5 VEM gate |
 
 Order locked (ADR-0024 Q2): **freeze (done) → wall project (done) → CVT**. Dual
 hard-block until G4. Packing “win” loops measure **delta vs M9 freeze only**.
 Never score raw nodal max stress. Side work: M12 finish; M13 sphere ref.
+
+**Post-M10 smoke (2026-07-13):** cylinder+plate_hole × varyhedron+hybrid_zoo
+h_scale=5 → **4/4 `ok`**, `health_ok` + `load_area_ok` true; cylinder SE ~0.0034
+vs truth 0.00393. GUI `polymesh-gui` builds with health/scorecard Results panel.
 
 ## Background / older phases
 

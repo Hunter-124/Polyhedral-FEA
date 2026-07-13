@@ -387,13 +387,13 @@ nodes:
 
   - id: V6e
     title: Varyhedron solve path + curved scorecard on STEP shapes
-    status: todo
+    status: done
     deps: [V6c, M2]
     scope: [src/pipeline/, tests/]
     note: >
-      Tet FE solve path exists; scorecard must use M2 residual metrics +
-      frozen refs. VEM not required for this node (ADR-0023 tet primary).
-      Plan: docs/plans/advisor-measure-first-program.md.
+      DONE 2026-07-13: tet FE varyhedron solve path + M1–M10 scorecard on STEP
+      (Hausdorff/h, chordal e, normal dev, energy/SCF face-mean, health).
+      post-m10-smoke 4/4 ok. VEM not required (ADR-0023 tet primary).
 
   - id: V7
     title: Default mesher + tendency map + hybrid zoo retained
@@ -446,14 +446,15 @@ nodes:
 
   - id: V10c
     title: Supervised GUI question queue vs autonomous defaults
-    status: in_progress
+    status: done
     deps: [V10b]
     scope: [apps/gui/, docs/process/]
     note: >
-      PARTIAL 2026-07-12 (Hunter-124): Test Lab loads handoff.json and shows
-      open_program_nodes as an "open questions" info panel (supervised review
-      stub). Full question queue / answer UX still todo. Autonomous remains
-      the recommended default for grok-loop.
+      DONE 2026-07-13: Test Lab measure-first ready — results parse health/
+      scorecard/answers; ok/suspect/fail chips; solve_suspect amber; HANDOFF
+      open_program_nodes panel (supervised); baseline-m9 badge; Varyhedron
+      tooltip ADR-0023/24. Full interactive Q&A answer queue deferred (autonomous
+      grok-loop remains default).
 
   - id: V10d
     title: Safety allow/deny for grok invoke

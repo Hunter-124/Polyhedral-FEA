@@ -17,6 +17,9 @@ add_library(mesh
     src/varyhedron_fill.cpp
     src/wall_project.cpp
     src/geogram_clip.cpp
+    src/cvt_lloyd.cpp
+    src/cvt_sites.cpp
+    src/cvt_export.cpp
 )
 target_include_directories(mesh PUBLIC include)
 target_link_libraries(mesh PUBLIC geom Eigen3::Eigen PRIVATE polymesh_warnings polymesh_perf)

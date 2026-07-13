@@ -12,9 +12,10 @@
 
 | Status | Nodes | Notes |
 |--------|-------|--------|
-| **Done** | **M0–M14 (all), G0–G1, V6e, V10c** | Measure path + Geogram PSM vendor complete |
-| **Next** | **G2** | Lloyd CVT + \(1/h^3\) density (same \(h\) as N_pred) → G3–G4 → M5 |
-| **Deferred** | icecream face-tags, V6d p>1, V11 packing wins, M5 VEM gate | Need G* / face-tag design |
+| **Done** | **M0–M14 (all), G0–G4, V6e, V10c** | Measure path + full Geogram CVT stack (vendor→Lloyd→sites→export) |
+| **In progress** | **M5** | VEM gate vs hybrid_zoo on plate_hole + cylinder |
+| **Open** | V6d, V11, campaign-1, feedback-loop | After health_ok / campaigns |
+| **Deferred** | icecream face-tags | Face-ID BC design |
 
 Order locked (ADR-0024 Q2): **freeze (done) → wall project (done) → CVT**. Dual
 hard-block until G4. Packing “win” loops measure **delta vs M9 freeze only**.
@@ -46,10 +47,12 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
-- 2026-07-13: **G1 done** — vendored Geogram Delaunay+Predicates PSMs
-  (`third_party/geogram/`, NOTICE pins), `POLYMESH_WITH_GEOGRAM=ON`,
-  `mesh::clip_convex_cell` facade, Catch2 unit-cube smoke (vol=1, midplane
-  half-cell). Full suite green. Next: G2 Lloyd + density.
+- 2026-07-13: **G1–G4 done (CVT critical path)** —
+  - G1: Geogram Delaunay+Predicates PSMs, `clip_convex_cell`, unit-cube smoke
+  - G2: `lloyd_cvt` + ρ=1/h³ (`SizeFieldFn` same contract as N_pred)
+  - G3: sharp-fixed sites + OCC wall project (`constrained_lloyd_cvt`)
+  - G4: `export_clipped_voronoi` → `PolyMesh` kPolyhedron (dual hard-block lifted)
+  Catch2 `[geogram]/`/`[cvt]`/`[g3]`/`[g4]` green. Next: **M5** VEM gate.
 - 2026-07-13: **M12 + M13 closed** — sphere polar cap `expected_area=π×10⁻³`
   (`z_p=0.04`, `normal_min_dot=0.7`); plate/cylinder already guarded. Icecream
   multi-face omits area (15–20% box swing) → face-tag design only. M13: full

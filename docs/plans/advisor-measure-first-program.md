@@ -184,7 +184,7 @@ Shewchuk predicates public domain OK. Verdict BSD for quality. fTetWild MPL plug
 | **5** | Stress score fix (centroid face-mean, drop raw max) + energy cylinder | M6 | **done** |
 | **6** | Chordal e fix (ℓ, OCC κ, true segments) | M7 | **done** |
 | **7** | Protecting-ball lfs clamp | M8 | **done** |
-| **8** | **Freeze baseline campaign** on honest scorecard | M9 | **next** |
+| **8** | **Freeze baseline campaign** on honest scorecard | M9 | **done** (`varyhedron-baseline-m9`, ok 75%) |
 | **9** | Wall tangential + OCC project | M3b / M10 | after freeze |
 | **10** | Vendor Geogram + Lloyd CVT + constrained sites | G1–G3 | after projection |
 | **11** | Clipped Voronoi poly export | G4 | after G1–G3 |

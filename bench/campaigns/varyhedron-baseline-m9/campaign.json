@@ -1,0 +1,23 @@
+{
+  "name": "varyhedron-baseline-m9",
+  "parts": [
+    "tests/fixtures/parts/plate_hole.case.json",
+    "tests/fixtures/parts/cylinder.case.json",
+    "tests/fixtures/parts/sphere.case.json",
+    "tests/fixtures/parts/icecream_cone.case.json"
+  ],
+  "tiers": [
+    { "h_scale": 5.0, "keep_frac": 1.0 }
+  ],
+  "grid": {
+    "mesher": ["varyhedron", "hybrid_zoo"],
+    "feature_refine": [true],
+    "order": [1]
+  },
+  "score": {
+    "weights": { "accuracy": 0.5, "solve_ms": 0.25, "mesh_ms": 0.25 }
+  },
+  "resources": { "max_threads": 0, "max_mem_gb": 0 },
+  "warehouse": true,
+  "on_finish": { "analyze": true, "grok_handoff": true }
+}

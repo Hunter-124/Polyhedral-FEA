@@ -1,0 +1,89 @@
+{
+  "accuracy": {
+    "all": [
+      {
+        "metric": "strain_energy",
+        "rel_err": 1.4285118627095361,
+        "score": 0.0,
+        "trusted": false,
+        "truth": 0.003926990816987241,
+        "value": 0.009536743783804928
+      },
+      {
+        "metric": "tip_deflection",
+        "rel_err": 0.47903598038105477,
+        "score": 0.0,
+        "trusted": false,
+        "truth": 1e-06,
+        "value": 1.4790359803810547e-06
+      }
+    ],
+    "metric": "strain_energy",
+    "rel_err": 1.4285118627095361,
+    "score": 0.0,
+    "trusted": false,
+    "truth": 0.003926990816987241,
+    "value": 0.009536743783804928
+  },
+  "answers": {
+    "load_area_rel_err": 0.6568518725613098,
+    "load_face_area": 0.013012884177312759,
+    "mean_u_component": 1.4716340186777587e-06,
+    "n_load_faces": 224,
+    "n_probe_nodes": 249,
+    "n_quality_excluded": 0,
+    "sigma_face_mean": 2043885.5466228095,
+    "sigma_max": 6.748173156165395e+20,
+    "sigma_p99": 2324629.831161882,
+    "strain_energy": 0.009536743783804928,
+    "tip_deflection": 1.4790359803810547e-06,
+    "tip_deflection_max": 1.6299824721812485e-06
+  },
+  "cfg_id": "cfg-028399df",
+  "config": {
+    "feature_refine": true,
+    "mesher": "hybrid_zoo",
+    "order": 1
+  },
+  "geom_class": {
+    "curved_frac": 0.9318181818181818,
+    "min_feature_h": 28.577399384028727,
+    "thin": false
+  },
+  "h": 0.017496378634069814,
+  "health": {
+    "free_residual_rel": 5.433870277587173e-13,
+    "load_area_ok": false,
+    "load_area_rel_err": 0.6568518725613098,
+    "n_bc_dofs": 1830,
+    "n_orphans": 0,
+    "ok": false,
+    "reaction_sum_err": 1.916132082325452e-13
+  },
+  "mesh_ms": 94.701212,
+  "n_dof": 19635,
+  "n_elems": 17616,
+  "n_elems_over_pred": 7.862639970621759,
+  "n_nodes": 6545,
+  "n_pred_elems": 2240.468858528565,
+  "part": "cylinder",
+  "quality": {
+    "M1max": 0.0010096996066845175,
+    "M2max": 0.001401130316710357,
+    "M6": 1.0,
+    "score": 0.9263108670683365
+  },
+  "scorecard": {
+    "accuracy_rel_err": 1.4285118627095361,
+    "chordal_efficiency_max": 225.6380512909889,
+    "edge_hausdorff_over_h": 5.717860656338731,
+    "health_ok": false,
+    "min_element_quality": 1.0,
+    "n_dof": 19635,
+    "normal_dev_deg_max": 3.948240962486672,
+    "solve_residual_rel": 5.433870277587173e-13
+  },
+  "solve_ms": 1011.227777,
+  "status": "solve_suspect",
+  "tier": 0
+}

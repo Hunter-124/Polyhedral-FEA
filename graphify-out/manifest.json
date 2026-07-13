@@ -450,8 +450,8 @@
     "semantic_hash": ""
   },
   "docs/progress.md": {
-    "mtime": 1783908858.0292878,
-    "ast_hash": "e8a61253510adae82ed33d7768d44fe1",
+    "mtime": 1783909060.0980597,
+    "ast_hash": "bdcaed810a34574abf50efa6c0a22adb",
     "semantic_hash": ""
   },
   "docs/spec.md": {
@@ -480,8 +480,8 @@
     "semantic_hash": ""
   },
   "src/mesh/CMakeLists.txt": {
-    "mtime": 1783908551.9036806,
-    "ast_hash": "d77a6252731b8bef21820891aa26a9a0",
+    "mtime": 1783909039.831988,
+    "ast_hash": "a1d379ff72730549a0dc085b59827629",
     "semantic_hash": ""
   },
   "src/pipeline/CMakeLists.txt": {
@@ -490,8 +490,8 @@
     "semantic_hash": ""
   },
   "tests/CMakeLists.txt": {
-    "mtime": 1783908560.1755717,
-    "ast_hash": "1bb3934a24f2aca1fa0c0ec2ebd3c671",
+    "mtime": 1783909039.8323271,
+    "ast_hash": "a8aa798f16dd47afa48673c5fc5dd2b5",
     "semantic_hash": ""
   },
   "apps/bench/d6_tier3.cpp": {
@@ -1205,8 +1205,8 @@
     "semantic_hash": ""
   },
   "docs/dag/PROGRAM.yaml": {
-    "mtime": 1783908858.0292878,
-    "ast_hash": "2c0bf2107b64c1cb233d916b8cc9eed1",
+    "mtime": 1783909060.107342,
+    "ast_hash": "18507eb09c257509e01034afd8336ea4",
     "semantic_hash": ""
   },
   "docs/dag/README.md": {
@@ -2327,6 +2327,51 @@
   "third_party/geogram/README.polymesh.md": {
     "mtime": 1783908535.2134874,
     "ast_hash": "c218a7499a1f4c4da7f2cca64e3b731f",
+    "semantic_hash": ""
+  },
+  "src/mesh/include/mesh/cvt_export.hpp": {
+    "mtime": 1783909039.831988,
+    "ast_hash": "e38a0a80d6c79ecbaad9b0c4e19cd1ed",
+    "semantic_hash": ""
+  },
+  "src/mesh/include/mesh/cvt_lloyd.hpp": {
+    "mtime": 1783908931.8964543,
+    "ast_hash": "728162fd083cb8102d8e5703ce7d7fa1",
+    "semantic_hash": ""
+  },
+  "src/mesh/include/mesh/cvt_sites.hpp": {
+    "mtime": 1783908969.7269974,
+    "ast_hash": "13d95d9e451a28b9239d7638217e3bd6",
+    "semantic_hash": ""
+  },
+  "src/mesh/src/cvt_export.cpp": {
+    "mtime": 1783909046.9462047,
+    "ast_hash": "3db03ac3861a8af919c7e59d06604b25",
+    "semantic_hash": ""
+  },
+  "src/mesh/src/cvt_lloyd.cpp": {
+    "mtime": 1783908931.8964543,
+    "ast_hash": "b7281642b32d8538253ed89a1f6e31ea",
+    "semantic_hash": ""
+  },
+  "src/mesh/src/cvt_sites.cpp": {
+    "mtime": 1783908969.7269974,
+    "ast_hash": "a3a0377a160e32b8ac60c0eb0504420e",
+    "semantic_hash": ""
+  },
+  "tests/test_cvt_export.cpp": {
+    "mtime": 1783909039.831988,
+    "ast_hash": "3287f6063cfab13655add03634dd8240",
+    "semantic_hash": ""
+  },
+  "tests/test_cvt_lloyd.cpp": {
+    "mtime": 1783908931.8964543,
+    "ast_hash": "6a77c18dc88cefbf6668c22e38df63de",
+    "semantic_hash": ""
+  },
+  "tests/test_cvt_sites.cpp": {
+    "mtime": 1783908999.5597272,
+    "ast_hash": "c2b3504b62cd14f82715ddc65f0bbf75",
     "semantic_hash": ""
   }
 }

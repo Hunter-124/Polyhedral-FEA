@@ -535,16 +535,15 @@ nodes:
 
   - id: M5
     title: "VEM gate: beat hybrid_zoo on plate_hole + cylinder before headline"
-    status: todo
+    status: in_progress
     deps: [M9, M10, G4]
     scope: [src/fea/, src/mesh/, bench/campaigns/, docs/]
     note: >
-      ADR-0024 Q10 trap #2 + plan docs/plans/advisor-measure-first-program.md §2/§4.7.
+      CLAIMED 2026-07-13 after G4. ADR-0024 Q10 trap #2 + plan §2/§4.7.
       Promote poly VEM to primary claim only when energy/DOF and SCF beat
       hybrid_zoo on frozen refs for plate_hole and cylinder. Until then
-      "also ships polyhedra". Prefer clipped/restricted CVT cells over dual.
-      Stabilization: D-recipe/trace-scaled + MMS before campaigns. Dual
-      hard-blocked until G4 (ADR-0024 Q8).
+      "also ships polyhedra". Prefer clipped/restricted CVT cells (G4 export).
+      Stabilization: D-recipe/trace-scaled + MMS before campaigns.
 
   - id: M6
     title: "Stress score: face-mean centroid VM + energy; drop raw nodal max"
@@ -679,31 +678,33 @@ nodes:
 
   - id: G2
     title: "Lloyd CVT loop + 1/h³ density from same size field as N_pred"
-    status: in_progress
+    status: done
     deps: [G1, M4]
     scope: [src/mesh/, src/pipeline/]
     note: >
-      CLAIMED 2026-07-13 after G1. ADR-0024 Q10 trap #4 + plan
-      docs/plans/advisor-measure-first-program.md §4.5. Write thin Lloyd
-      ourselves; constrained sharp sites fixed; density MUST be 1/h(x)³ from
-      same h(x) as N_pred. Uses mesh::clip_convex_cell / Geogram ConvexCell.
+      DONE 2026-07-13: mesh::lloyd_cvt + restricted_voronoi_cell/centroid
+      (Geogram ConvexCell bisectors). Density ρ=1/h³ via SizeFieldFn (same h
+      contract as N_pred). Fixed sites held; free sites → density-weighted
+      centroids. Catch2 [cvt]: bisect, lattice, fixed, graded-h bias. Next G3.
 
   - id: G3
     title: Constrained sites + OCC bridge for CVT boundary
-    status: todo
+    status: done
     deps: [G2, M10]
     scope: [src/mesh/, src/geom/]
     note: >
-      ADR-0024 Q2/Q3 + plan docs/plans/advisor-measure-first-program.md §4.1/§4.5.
-      Sharp fixed sites; smooth wall free with M10 projection; no seam protect.
+      DONE 2026-07-13: mesh::seed_constrained_cvt_sites (sharp fixed only;
+      seams/smooth skipped) + project_free_wall_sites (M10 OCC) +
+      constrained_lloyd_cvt. Catch2 [g3] synthetic + plate_hole STEP. Next G4.
 
   - id: G4
     title: Clipped Voronoi poly export (product poly path)
-    status: todo
+    status: done
     deps: [G3]
     scope: [src/mesh/, src/fea/, src/pipeline/]
     note: >
-      ADR-0024 Q8 + plan docs/plans/advisor-measure-first-program.md §4.4.
-      Polyhedra = clipped cells — skip dual. Unblocks M5 VEM experiments on
-      real polys. Experimental median-dual only if marketing demand (else never).
-      Dual hard-block lifts only after this node is done.
+      DONE 2026-07-13: mesh::export_clipped_voronoi → PolyMesh kPolyhedron
+      cells; welded verts; interior bisector faces owner+neighbour; domain
+      boundary faces. Catch2 [g4] 1-site cube, 2-site split, 2³ lattice cover
+      + check_validity. Dual hard-block LIFTED for product poly = clipped
+      cells. Next: M5 VEM gate on plate_hole+cylinder.

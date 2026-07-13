@@ -539,11 +539,12 @@ nodes:
     deps: [M9, M10, G4]
     scope: [src/fea/, src/mesh/, bench/campaigns/, docs/]
     note: >
-      IN PROGRESS 2026-07-13: substrate landed — VolumeMesher::kCvtPoly,
-      fea::poly_mesh_to_vem, VEM centroid stress LSQ, campaign vem-gate-m5.
-      First gate FAIL headline (GATE.md): cvt_poly SCF/SE worse than hybrid_zoo;
-      cylinder load_area_ok=false. Tet FE remains default claim; poly ships.
-      Next: BRep-interior clip (not bbox), denser sites, re-run gate.
+      IN PROGRESS 2026-07-13: DomainClipParams global surface halfspaces +
+      convex-fail AABB fallback + boundary snap. Cylinder now health_ok +
+      load_area_ok (la_rel~0.05) but SE rel 0.41 > hybrid 0.13. Plate still
+      load_area_fail (non-convex hole — halfspaces cut material). See
+      bench/campaigns/vem-gate-m5/GATE.md. Next: tet-RVD or hole-aware clip
+      for plate; densify cylinder free sites to recover SE win.
 
   - id: M6
     title: "Stress score: face-mean centroid VM + energy; drop raw nodal max"

@@ -13,7 +13,7 @@
 | Status | Nodes | Notes |
 |--------|-------|--------|
 | **Done** | **M0–M14 (all), G0–G4, V6e, V10c** | Measure path + full Geogram CVT stack (vendor→Lloyd→sites→export) |
-| **In progress** | **M5** | Substrate+campaign landed; **gate FAIL** (cvt_poly ≰ hybrid_zoo) — see `bench/campaigns/vem-gate-m5/GATE.md` |
+| **In progress** | **M5** | Domain clip + bnd snap; **cylinder health+load_area OK**, SE loses to hybrid; plate load_area still FAIL (hole/non-convex) — `GATE.md` |
 | **Open** | V6d, V11, campaign-1, feedback-loop | After health_ok / campaigns |
 | **Deferred** | icecream face-tags | Face-ID BC design |
 

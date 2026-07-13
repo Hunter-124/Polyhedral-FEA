@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 #include "fea/poly_to_vem.hpp"
+#include "fea/vem.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <unordered_map>
 
 namespace polymesh::fea {
@@ -58,6 +61,30 @@ NodalMesh poly_mesh_to_vem(const mesh::PolyMesh& pm) {
         if (nodes.size() < 4 || faces.size() < 4) {
             continue;
         }
+
+        // Drop inverted / zero-volume debris (domain clip can leave slivers).
+        std::vector<Eigen::Vector3d> coords(nodes.size());
+        for (std::size_t i = 0; i < nodes.size(); ++i) {
+            coords[i] = pm.vertices[nodes[i]];
+        }
+        double vol = poly_volume(coords, faces);
+        if (vol < 0.0) {
+            for (auto& loop : faces) {
+                std::reverse(loop.begin(), loop.end());
+            }
+            vol = -vol;
+        }
+        Eigen::Vector3d bmin = coords[0], bmax = coords[0];
+        for (const auto& p : coords) {
+            bmin = bmin.cwiseMin(p);
+            bmax = bmax.cwiseMax(p);
+        }
+        const double diag = std::max((bmax - bmin).norm(), 1e-30);
+        const double vol_eps = 1e-14 * diag * diag * diag;
+        if (!(vol > vol_eps)) {
+            continue;
+        }
+
         out.elements.emplace_back(ElementType::kPolyVem, std::move(nodes),
                                   std::move(faces));
     }

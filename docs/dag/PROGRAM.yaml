@@ -63,15 +63,14 @@ nodes:
 
   - id: campaign-1
     title: First full settings campaign on the part library
-    status: in_progress
+    status: done
     deps: [testlab-harness, part-library]
     scope: [bench/campaigns/]
     note: >
-      IN PROGRESS: bench/campaigns/settings-frontier-1 (32 configs × 3 parts,
-      3 successive-halving tiers). Checkpoint still running at tier 0 with
-      partial results.jsonl. Analysis tooling landed: re-run
-      `python3 scripts/analyze_campaign.py settings-frontier-1` → PARETO.md/json
-      when finished; then mark this node done with survivor summary.
+      DONE 2026-07-13: settings-frontier-1 finished (150 runs, tier 2, 6
+      survivors). PARETO.md/json + SURVIVORS.md. Tooling apply_code_defaults
+      true but product defaults NOT flipped to hex (ADR-0023). See
+      bench/campaigns/settings-frontier-1/SURVIVORS.md.
 
   # ── Lane B: solver core (lead) ──────────────────────────────────────────
   - id: adr-0019

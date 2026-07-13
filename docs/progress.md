@@ -14,7 +14,7 @@
 |--------|-------|--------|
 | **Done** | **M0–M14 (all), G0–G4, V6e, V10c** | Measure path + full Geogram CVT stack (vendor→Lloyd→sites→export) |
 | **In progress** | **M5** | Domain clip + bnd snap; **cylinder health+load_area OK**, SE loses to hybrid; plate load_area still FAIL (hole/non-convex) — `GATE.md` |
-| **Open** | V6d, V11, campaign-1, feedback-loop | After health_ok / campaigns |
+| **Open** | V6d, V11, feedback-loop | campaign-1 **done** (settings-frontier-1 finished; defaults not flipped) |
 | **Deferred** | icecream face-tags | Face-ID BC design |
 
 Order locked (ADR-0024 Q2): **freeze (done) → wall project (done) → CVT**. Dual

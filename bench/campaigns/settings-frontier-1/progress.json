@@ -1,12 +1,12 @@
 {
   "cg_iter": null,
   "cg_resid": null,
-  "elapsed_ms": 1276.938327,
-  "phase": "solve",
-  "phase_frac": 0.0,
+  "elapsed_ms": 0.0,
+  "phase": "done",
+  "phase_frac": 1.0,
   "run": {
-    "cfg_id": "cfg-936ead65",
-    "part": "smoke_bar",
-    "tier": 0
+    "cfg_id": "",
+    "part": "",
+    "tier": 2
   }
 }

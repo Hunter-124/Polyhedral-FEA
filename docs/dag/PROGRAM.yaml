@@ -527,10 +527,142 @@ nodes:
   - id: M5
     title: "VEM gate: beat hybrid_zoo on plate_hole + cylinder before headline"
     status: todo
-    deps: [M2, M3]
+    deps: [M9, M10, G4]
     scope: [src/fea/, src/mesh/, bench/campaigns/, docs/]
     note: >
       Promote poly VEM to primary claim only when energy/DOF and SCF beat
       hybrid_zoo on frozen refs for plate_hole and cylinder. Until then
       "also ships polyhedra". Prefer clipped/restricted CVT cells over
-      dual-of-tet when implementing poly export.
+      dual-of-tet. Stabilization: D-recipe/trace-scaled + MMS before campaigns
+      (ADR-0024 Q10). Dual hard-blocked until G4.
+
+  - id: M6
+    title: "Stress score: face-mean centroid VM + energy; drop raw nodal max"
+    status: in_progress
+    deps: [M1, M2]
+    scope: [src/fea/, apps/testlab/, bench/reference/, docs/validation/]
+    note: >
+      ADR-0024 Q1/Q5. Element-centroid stress recovery; area-weighted face-mean;
+      p99 quality-filtered dashboard + n_quality_excluded; cylinder primary
+      strain_energy analytic; plate_hole scf = mean_vm_over_nominal on hole box;
+      expected_area ±2% load guard. Never score sigma_max nodal.
+
+  - id: M7
+    title: "Chordal e fix: per-segment ℓ + OCC κ + mesh feature segments"
+    status: in_progress
+    deps: [M2, V1b]
+    scope: [src/geom/, src/mesh/, apps/testlab/, tests/]
+    note: >
+      ADR-0024 Q4. e_i=d_i/(ℓ_i²κ/8); κ from BRepLProp on curves; synthetic
+      circle unit test e≈1; healthy band [0.8,3]. Unordered boundary-node
+      polylines are invalid input — use mesh boundary segments near sharp edges.
+
+  - id: M8
+    title: "Protecting balls r=min(αh, β·lfs) + corner shrink"
+    status: in_progress
+    deps: [M3]
+    scope: [src/mesh/]
+    note: >
+      ADR-0024 Q6. α≈0.45 β≈1/3; lfs to other sharp geometry; shrink near
+      CAD vertices; overlapping balls OK. Priority before cross-case residual trust.
+
+  - id: M9
+    title: "Freeze baseline campaign on honest M1–M8 scorecard"
+    status: todo
+    deps: [M6, M7, M8]
+    scope: [bench/campaigns/, scripts/, docs/]
+    note: >
+      ADR-0024 Q2(c). Snapshot warehouse+results as frozen baseline BEFORE wall
+      project or CVT. Commit results/PARETO/HANDOFF; document git SHA + metric
+      schema version. Packing loops measure delta vs this freeze only.
+
+  - id: M10
+    title: Wall tangential smooth + OCC surface project
+    status: todo
+    deps: [M9]
+    scope: [src/mesh/, src/geom/, src/pipeline/]
+    note: >
+      ADR-0024 Q2(a). Free-slide on smooth faces; project displacement to tangent;
+      GeomAPI_ProjectPointOnSurf re-project. Shared post-pass for future CVT.
+      Do not start before M9 freeze.
+
+  - id: M11
+    title: "h_min feature flag + virtual-topology detector (no OCC suppress yet)"
+    status: todo
+    deps: [M4]
+    scope: [src/pipeline/, src/mesh/, apps/testlab/]
+    note: >
+      ADR-0024 Q10. Flag features that would push h below tier h_min; route to
+      larger tier. Do NOT start OCC defeaturing/suppression project.
+
+  - id: M12
+    title: "BC expected_area guard everywhere + face-tag design note"
+    status: todo
+    deps: [M6]
+    scope: [tests/fixtures/parts/, apps/testlab/, docs/]
+    note: >
+      Q7. expected_area ±2% on all four STEP cases; design note for BRep face
+      IDs before geometry sweeps (~2–3 days later).
+
+  - id: M13
+    title: "Sphere Legendre / Hiramatsu–Oka reference (~1 day after freeze)"
+    status: todo
+    deps: [M9]
+    scope: [bench/reference/, docs/validation/, tests/]
+    note: >
+      Q5. Timeboxed ~1 day; cut if overruns — rely on Richardson. Best packing
+      discriminator with surface-resolution sensitivity.
+
+  - id: M14
+    title: "Campaign wall-clock kills + optional 500k top tier"
+    status: todo
+    deps: [M4]
+    scope: [apps/testlab/, bench/campaigns/]
+    note: >
+      Q9. Per-run wall-clock (15/15/45 min) + pack ceiling; tet-FE packs may use
+      500k top tier for Richardson.
+
+  # ── Lane G: Geogram + constrained restricted CVT (after M9–M10) ─────────
+
+  - id: G0
+    title: "ADR note: vendor Geogram BSD-3 hard parts; dual hard-block"
+    status: todo
+    deps: [M0]
+    scope: [docs/decisions/, third_party/]
+    note: >
+      Q3/Q8. Document vendoring plan + LICENSE; dual hard-block until G4.
+      Frame fields research-only.
+
+  - id: G1
+    title: Vendor Geogram predicates + ConvexCell / clipped Voronoi
+    status: todo
+    deps: [G0, M10]
+    scope: [third_party/, src/mesh/, CMakeLists.txt]
+    note: >
+      Namespace hygiene, strip unused modules, LICENSE file. Do not clean-room
+      clipped Voronoi.
+
+  - id: G2
+    title: "Lloyd CVT loop + 1/h³ density from same size field as N_pred"
+    status: todo
+    deps: [G1, M4]
+    scope: [src/mesh/, src/pipeline/]
+    note: >
+      Write thin Lloyd ourselves; constrained sharp sites fixed; density MUST
+      be 1/h(x)³ from same h(x) as N_pred (Q10 trap #4).
+
+  - id: G3
+    title: Constrained sites + OCC bridge for CVT boundary
+    status: todo
+    deps: [G2, M10]
+    scope: [src/mesh/, src/geom/]
+    note: Sharp fixed sites; smooth wall free with projection; no seam protect.
+
+  - id: G4
+    title: Clipped Voronoi poly export (product poly path)
+    status: todo
+    deps: [G3]
+    scope: [src/mesh/, src/fea/, src/pipeline/]
+    note: >
+      Polyhedra = clipped cells — skip dual. Unblocks M5 VEM experiments on
+      real polys. Experimental median-dual only if marketing demand (else never).

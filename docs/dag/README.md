@@ -1,7 +1,13 @@
 # Program DAG — how to pick up work
 
 This directory is the coordination point for the adaptive-polyhedral-core
-program. Any agent or human, in any session, resumes work like this:
+program.
+
+**Active strategy (2026-07-12):** measure-first / tet primary / restricted CVT —
+read **[docs/plans/advisor-measure-first-program.md](../plans/advisor-measure-first-program.md)**
+and ADRs **0023–0024** before claiming packing or FEA metric work.
+
+Any agent or human, in any session, resumes work like this:
 
 > For autonomous / overnight agents, paste
 > [AGENT_BOOTSTRAP.md](AGENT_BOOTSTRAP.md) into the harness — it wraps this

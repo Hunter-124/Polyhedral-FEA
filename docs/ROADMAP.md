@@ -3,6 +3,14 @@
 Master execution plan. **PROGRESS.md** tracks what is done; this file is the
 target DAG. Phases map to `docs/phases.md` but GUI is pulled forward (ADR-0006).
 
+> **2026-07-12 active program override:** packing / BRep / campaign work is
+> governed by the **advisor measure-first plan**, not ad-hoc ROADMAP track
+> reordering:
+> [`docs/plans/advisor-measure-first-program.md`](plans/advisor-measure-first-program.md)
+> · ADRs [0023](decisions/0023-measure-first-tet-primary-cvt-path.md) /
+> [0024](decisions/0024-advisor-measure-answers.md) · board
+> [`docs/dag/PROGRAM.yaml`](dag/PROGRAM.yaml) (Lanes **M** + **G**).
+
 ## Agent loop protocol (how to finish this)
 
 Every autonomous session follows:

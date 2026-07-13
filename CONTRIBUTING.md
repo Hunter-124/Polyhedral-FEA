@@ -44,13 +44,14 @@ aider, ...) at the repo and give it this bootstrap:
 2. **Ask the knowledge graph before grepping**: `graphify query "<question>"`
    against the committed graph in `graphify-out/` (setup: §8). It knows the
    architecture, god nodes, and file relationships.
-3. **Pick work from the program board**: `docs/dag/PROGRAM.yaml` is the
-   repo-tracked DAG of open work — nodes list dependencies, status, and the
-   directory scope they're allowed to touch. Claim a node whose deps are
-   `done` by flipping it to `in_progress` in your first commit
+3. **Read the active plan, then pick work from the program board**: the
+   canonical strategy is
+   [`docs/plans/advisor-measure-first-program.md`](docs/plans/advisor-measure-first-program.md)
+   (ADRs 0023–0024). Do not invent a competing packing/FEA roadmap.
+   `docs/dag/PROGRAM.yaml` is the executable DAG — claim a node whose deps
+   are `done` by flipping it to `in_progress` in your first commit
    (protocol: `docs/dag/README.md`). Nodes with disjoint scopes can be
-   worked in parallel by different people/agents without stepping on each
-   other. Small fixes outside the board are fine too.
+   worked in parallel. Small fixes outside the board are fine too.
 4. **Interfaces are contracts**: anything crossing the test-lab / GUI /
    feedback-tooling boundary uses the schemas in `docs/dag/interfaces.md`.
    Change a schema only in the same commit as both sides of the code.

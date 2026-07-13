@@ -12,7 +12,8 @@
     {
       "select": {
         "box": [[0.09, -1e9, -1e9], [1e9, 1e9, 1e9]],
-        "expected_area": 0.001
+        "expected_area": 0.001,
+        "normal_min_dot": 0.7
       },
       "traction": [1.0e6, 0.0, 0.0]
     }

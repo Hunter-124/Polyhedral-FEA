@@ -294,6 +294,11 @@ ClippedVoronoiExport export_clipped_voronoi(
 
         domain_planes.reserve(std::min(n_tri, max_planes) + 8);
         const std::size_t n_sites = sites.size();
+        // Supporting halfspaces only: keep a plane iff (after orient) *all*
+        // sites lie on the keep side. That is the convex envelope of the site
+        // cloud from surface triangles — safe for plate_hole (hole walls are
+        // non-supporting and are skipped). Full halfspaces of a holed solid
+        // incorrectly cut opposite material.
         for (std::size_t ti = 0; ti < n_tri; ti += stride) {
             const auto& tri = surf.triangles[ti];
             if (tri[0] >= surf.vertices.size() || tri[1] >= surf.vertices.size() ||
@@ -313,7 +318,7 @@ ClippedVoronoiExport export_clipped_voronoi(
             ClipPlane pl = ClipPlane::from_point_normal(a, -n_out);
             std::size_t n_in = 0;
             for (const auto& s : sites) {
-                if (pl.a * s.x() + pl.b * s.y() + pl.c * s.z() + pl.d >= -1e-12) {
+                if (pl.a * s.x() + pl.b * s.y() + pl.c * s.z() + pl.d >= -1e-10) {
                     ++n_in;
                 }
             }
@@ -323,6 +328,12 @@ ClippedVoronoiExport export_clipped_voronoi(
                 pl.b = -pl.b;
                 pl.c = -pl.c;
                 pl.d = -pl.d;
+                n_in = n_sites - n_in;
+            }
+            // Require nearly all sites inside (supporting). Small tolerance
+            // for surface-adjacent free sites after soft inset.
+            if (n_in + std::max<std::size_t>(1, n_sites / 50) < n_sites) {
+                continue;
             }
             domain_planes.push_back(pl);
         }

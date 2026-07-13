@@ -23,6 +23,11 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-12: **ADR-0023 measure-first pivot** — tet FE default product claim;
+  poly VEM gated (M5); weighted restricted CVT ranked over dual-of-tet/frame
+  fields; program Lane **M0–M5** (probes → scorecard → sharp-only protect →
+  N_pred sizing → VEM gate); V6d/V6e/V11 rewired to depend on M1/M2. Do not
+  run packing “improvement” loops until M1 health + face-mean probes land.
 - 2026-07-12: **Lane V wave — 100% smoke + orphan compact** — `NodalMesh::compact_unused_nodes` fixes singular K on varyhedron cylinder; testlab face/padded Dirichlet + direct LDLT; V1c BRep Model, V3c GUI HEAD, V4 CAD auto-h, V6c packing seeds, V9b warehouse shots; smoke 4/4 ok; varyhedron-short-1 running.
 - 2026-07-12: **Lane V docs/gates (V1d, V2d, V9b, V10d)** — product OCC docs
   (Ubuntu libocct + Fedora `opencascade-devel`); `check_no_product_stl.sh` +

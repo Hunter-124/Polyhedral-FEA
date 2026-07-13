@@ -87,30 +87,32 @@ GitHub: github.com/Hunter-124/Polyhedral-FEA, default branch master.
 === OPEN NODES (read PROGRAM.yaml for the live list; typical order) ===
 As of 2026-07-12: **done** includes adaptive core (p-hierarchical*, fe-vem,
 mesher-tendency, hp-driver, gui-sim-controls, part-library, testlab, …).
-**Active program = Lane V (Varyhedron + BRep + short campaigns + Grok loop).**
-ADRs: 0020 (BRep volume), 0021 (varyhedron packing), 0022 (warehouse + grok).
-Process: docs/process/grok-loop.md, docs/process/feedback-loop.md.
+**Active program = Lane M (measure-first) on top of Lane V substrate.**
+ADRs: 0020 (BRep), 0021 (varyhedron), 0022 (warehouse + grok), **0023
+(measure-first / tet primary / restricted CVT)**. Process: docs/process/grok-loop.md.
 
-Typical Lane V order (disjoint scopes may run in parallel):
-1. V0 board/docs (coordination) → then parallel:
-   - V1a–d CadModel BRep path (OCC product builds)
-   - V2a–d STEP part library (plate_hole, cylinder, sphere, icecream_cone)
-   - V3a–c experiment warehouse + git-LFS + app sync
-   - V5 packing research / microbench
-2. V4 auto-h from BRep (after V1b)
-3. V6a–e varyhedron mesher (single owner on src/mesh fill) + V7 GUI
-4. V8 campaign `varyhedron-short-1` (~4 shapes × 2 meshers × 3 tiers)
-5. V9 analyze + shots → V10 handoff + `grok -p --yolo` → V11 iterate
+Normative order (ADR-0023 — do not skip):
+1. **M1** probe hardening + CAD-tag BC/probe + health gates (kills 1e14 "ok")
+2. **M2** min scorecard (edge Hausdorff/h, normal dev, DOF, accuracy, quality)
+3. **M3** sharp-only edge protect + seam skip + wall project
+4. **M4** N_pred sizing + h_min floor / over_budget diagnosis
+5. Packing improvements / V11 only against M1+M2 signals
+6. **M5** VEM headline gate vs hybrid_zoo (plate_hole + cylinder frozen refs)
+7. Frame-field hex-dominant: out of near-term horizon
 
-Legacy: campaign-1 / feedback-loop still valid for settings-frontier-1; short
-campaigns are the owner-facing measurement loop for packing progress.
+Substrate to keep: protected seeds + graded tet scaffold + live BRep oracle.
+Poly path target: constrained restricted CVT / clipped Voronoi (not dual-first).
+Tet FE = default accuracy claim; VEM gated.
 
-Owner product rules (non-negotiable for Lane V):
+Lane V already largely landed (V0–V8 warehouse path). V6d p-order and V10c GUI
+Q&A remain open but yield to M1–M2.
+
+Owner product rules (non-negotiable):
 - True BRep volume path; no product STL generators (compare-only).
 - Mesher name **Varyhedron** with ADR-0021 tooltip in GUI.
-- Short campaigns: varyhedron + hybrid_zoo only.
+- Short campaigns: varyhedron + hybrid_zoo only; reward = scorecard not wire PNG.
 - Full warehouse committed (LFS for VTU/PNG).
-- After campaign: analyze → HANDOFF → headless grok improve (not interactive TUI default).
+- After campaign: analyze → HANDOFF → headless grok improve only if health_ok.
 
 === WORKING STYLE ===
 - Quality ahead of speed. Small, verified, pushed increments. Update

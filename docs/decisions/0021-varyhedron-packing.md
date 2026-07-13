@@ -1,8 +1,9 @@
 # ADR-0021: Varyhedron — variable polyhedral packing mesher
 
-- Status: accepted (2026-07-12)
+- Status: accepted (2026-07-12); algorithm ranking refined by **ADR-0023**
 - Decision: D21
-- Related: ADR-0012 (hybrid + graded legacy), ADR-0019 (FE+VEM), ADR-0020 (BRep)
+- Related: ADR-0012 (hybrid + graded legacy), ADR-0019 (FE+VEM), ADR-0020 (BRep),
+  ADR-0023 (measure-first / tet primary / CVT)
 
 ## Context
 
@@ -24,14 +25,13 @@ finish within element budgets.
    > edge/face constraints. Higher order uses entity packing so corners and
    > faces stay conforming.
 
-3. **v1 algorithm** (subject to refinement in `docs/research/varyhedron-packing.md`
-   and agent loops):
-   - Map CAD edges/faces (ADR-0020).
-   - Boundary-edge constrained seed packing (protect CAD edge profiles).
-   - Interior: dual / cluster of a refined tet scaffold into polyhedra when
-     needed; pure packing preferred as quality improves.
-   - Solve arbitrary polys with **VEM** (`kPolyVem`); FE for regular zoo cells.
-   - Order packing: hierarchical min-rule / same-order faces for clean p↑.
+3. **v1 algorithm** (refined by ADR-0023):
+   - Map CAD edges/faces (ADR-0020); **classify sharp / smooth / seam**.
+   - Protecting balls only on **sharp** edges; seams never protected.
+   - Interior seeds: evolve bubble → **constrained restricted CVT**; polyhedra
+     prefer **clipped Voronoi** over dual-of-tet when implemented.
+   - **Tet FE** is the default accuracy claim; **VEM** on polys is gated (M5).
+   - Order packing: hierarchical min-rule; uniform p first.
 
 4. **Legacy `kGradedTet`** remains labeled “graded tet (legacy)” until
    varyhedron wins the curved scorecard; short campaigns **exclude** graded.

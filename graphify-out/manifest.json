@@ -450,8 +450,8 @@
     "semantic_hash": ""
   },
   "docs/progress.md": {
-    "mtime": 1783904445.7509012,
-    "ast_hash": "dbd6d31234e35cd22cf27eed91254f68",
+    "mtime": 1783904528.63056,
+    "ast_hash": "cff658d54f53c7cb8384bac35ec855a0",
     "semantic_hash": ""
   },
   "docs/spec.md": {
@@ -1205,8 +1205,8 @@
     "semantic_hash": ""
   },
   "docs/dag/PROGRAM.yaml": {
-    "mtime": 1783904437.2999754,
-    "ast_hash": "80568d1c137e582c02f06e1546ce9e15",
+    "mtime": 1783904528.650986,
+    "ast_hash": "ae56356b95d0ec86e9e7b5441ee17b36",
     "semantic_hash": ""
   },
   "docs/dag/README.md": {
@@ -2257,6 +2257,26 @@
   "bench/campaigns/varyhedron-baseline-m9/runs/cfg-89f62376/sphere/t0/wire.png": {
     "mtime": 1783903197.761706,
     "ast_hash": "b41207dd9e345fb71bd51a06aee16c44",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/post-m10-smoke/campaign.json": {
+    "mtime": 1783904493.489289,
+    "ast_hash": "a49f08041644a5fdb38d605b159564e7",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/post-m10-smoke/checkpoint.json": {
+    "mtime": 1783904498.0173242,
+    "ast_hash": "d998f02e59c7fee9b8cb79c3ca295b9a",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/post-m10-smoke/progress.json": {
+    "mtime": 1783904498.0173242,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/post-m10-smoke/README.md": {
+    "mtime": 1783904528.63056,
+    "ast_hash": "97810c6673e6ccece743c5d2a5ea5d0a",
     "semantic_hash": ""
   }
 }

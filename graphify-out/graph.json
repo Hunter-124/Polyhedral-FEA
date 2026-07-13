@@ -310,7 +310,7 @@
       "source_location": "L389",
       "_origin": "ast",
       "id": "apps_bench_d6_tier3_spec",
-      "community": 345,
+      "community": 25,
       "norm_label": "spec"
     },
     {
@@ -320,7 +320,7 @@
       "source_location": "L390",
       "_origin": "ast",
       "id": "apps_bench_d6_tier3_spec_path",
-      "community": 345,
+      "community": 25,
       "norm_label": "path"
     },
     {
@@ -330,7 +330,7 @@
       "source_location": "L391",
       "_origin": "ast",
       "id": "apps_bench_d6_tier3_spec_tag",
-      "community": 345,
+      "community": 25,
       "norm_label": "tag"
     },
     {
@@ -340,7 +340,7 @@
       "source_location": "L393",
       "_origin": "ast",
       "id": "apps_bench_d6_tier3_spec_n",
-      "community": 345,
+      "community": 25,
       "norm_label": "n"
     },
     {
@@ -350,7 +350,7 @@
       "source_location": "L395",
       "_origin": "ast",
       "id": "apps_bench_d6_tier3_spec_h0",
-      "community": 345,
+      "community": 25,
       "norm_label": "h0"
     },
     {
@@ -360,7 +360,7 @@
       "source_location": "L396",
       "_origin": "ast",
       "id": "apps_bench_d6_tier3_spec_rho",
-      "community": 345,
+      "community": 25,
       "norm_label": "rho"
     },
     {
@@ -370,7 +370,7 @@
       "source_location": "L397",
       "_origin": "ast",
       "id": "apps_bench_d6_tier3_spec_layers",
-      "community": 345,
+      "community": 25,
       "norm_label": "layers"
     },
     {
@@ -380,7 +380,7 @@
       "source_location": "L398",
       "_origin": "ast",
       "id": "apps_bench_d6_tier3_spec_n_bg",
-      "community": 345,
+      "community": 25,
       "norm_label": "n_bg"
     },
     {
@@ -390,7 +390,7 @@
       "source_location": "L399",
       "_origin": "ast",
       "id": "apps_bench_d6_tier3_spec_nz",
-      "community": 345,
+      "community": 25,
       "norm_label": "nz"
     },
     {
@@ -550,7 +550,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_gui_gui_settings_hpp_apps_gui_gui_settings",
-      "community": 44,
+      "community": 94,
       "norm_label": "gui_settings.hpp"
     },
     {
@@ -1220,7 +1220,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_gui_process_runner_hpp_apps_gui_process_runner",
-      "community": 44,
+      "community": 94,
       "norm_label": "process_runner.hpp"
     },
     {
@@ -1330,7 +1330,7 @@
       "source_location": "L61",
       "_origin": "ast",
       "id": "apps_gui_process_runner_pid",
-      "community": 44,
+      "community": 94,
       "norm_label": "pid()"
     },
     {
@@ -1340,7 +1340,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "pid_t",
-      "community": 44,
+      "community": 94,
       "norm_label": "pid_t"
     },
     {
@@ -3020,7 +3020,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_gui_testlab_panel_hpp_apps_gui_testlab_panel",
-      "community": 44,
+      "community": 94,
       "norm_label": "testlab_panel.hpp"
     },
     {
@@ -3090,7 +3090,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "apps_gui_testlab_panel_hpp_optional",
-      "community": 10,
+      "community": 94,
       "norm_label": "optional"
     },
     {
@@ -4980,7 +4980,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "apps_testlab_main",
-      "community": 319,
+      "community": 339,
       "norm_label": "main.cpp"
     },
     {
@@ -4990,7 +4990,7 @@
       "source_location": "L68",
       "_origin": "ast",
       "id": "apps_testlab_main_on_sigint",
-      "community": 319,
+      "community": 339,
       "norm_label": "on_sigint()"
     },
     {
@@ -5240,7 +5240,7 @@
       "source_location": "L160",
       "_origin": "ast",
       "id": "apps_testlab_main_box3",
-      "community": 36,
+      "community": 96,
       "norm_label": "box3"
     },
     {
@@ -5260,7 +5260,7 @@
       "source_location": "L161",
       "_origin": "ast",
       "id": "apps_testlab_main_box3_lo",
-      "community": 36,
+      "community": 96,
       "norm_label": "lo"
     },
     {
@@ -5270,7 +5270,7 @@
       "source_location": "L162",
       "_origin": "ast",
       "id": "apps_testlab_main_box3_hi",
-      "community": 36,
+      "community": 96,
       "norm_label": "hi"
     },
     {
@@ -5290,7 +5290,7 @@
       "source_location": "L169",
       "_origin": "ast",
       "id": "apps_testlab_main_bcspec",
-      "community": 338,
+      "community": 339,
       "norm_label": "bcspec"
     },
     {
@@ -5300,7 +5300,7 @@
       "source_location": "L170",
       "_origin": "ast",
       "id": "apps_testlab_main_bcspec_box",
-      "community": 338,
+      "community": 339,
       "norm_label": "box"
     },
     {
@@ -5310,7 +5310,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "apps_testlab_main_cpp_array",
-      "community": 338,
+      "community": 339,
       "norm_label": "array"
     },
     {
@@ -5320,7 +5320,7 @@
       "source_location": "L171",
       "_origin": "ast",
       "id": "apps_testlab_main_bcspec_fix",
-      "community": 338,
+      "community": 339,
       "norm_label": "fix"
     },
     {
@@ -5330,7 +5330,7 @@
       "source_location": "L174",
       "_origin": "ast",
       "id": "apps_testlab_main_loadspec",
-      "community": 36,
+      "community": 96,
       "norm_label": "loadspec"
     },
     {
@@ -5340,7 +5340,7 @@
       "source_location": "L175",
       "_origin": "ast",
       "id": "apps_testlab_main_loadspec_box",
-      "community": 36,
+      "community": 96,
       "norm_label": "box"
     },
     {
@@ -5360,7 +5360,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "apps_testlab_main_cpp_optional",
-      "community": 36,
+      "community": 96,
       "norm_label": "optional"
     },
     {
@@ -5370,7 +5370,7 @@
       "source_location": "L178",
       "_origin": "ast",
       "id": "apps_testlab_main_loadspec_expected_area",
-      "community": 36,
+      "community": 96,
       "norm_label": "expected_area"
     },
     {
@@ -5380,7 +5380,7 @@
       "source_location": "L181",
       "_origin": "ast",
       "id": "apps_testlab_main_loadspec_normal_min_dot",
-      "community": 36,
+      "community": 96,
       "norm_label": "normal_min_dot"
     },
     {
@@ -5430,7 +5430,7 @@
       "source_location": "L193",
       "_origin": "ast",
       "id": "apps_testlab_main_metricspec",
-      "community": 96,
+      "community": 338,
       "norm_label": "metricspec"
     },
     {
@@ -5440,7 +5440,7 @@
       "source_location": "L194",
       "_origin": "ast",
       "id": "apps_testlab_main_metricspec_name",
-      "community": 96,
+      "community": 338,
       "norm_label": "name"
     },
     {
@@ -5460,7 +5460,7 @@
       "source_location": "L196",
       "_origin": "ast",
       "id": "apps_testlab_main_metricspec_tol",
-      "community": 96,
+      "community": 338,
       "norm_label": "tol"
     },
     {
@@ -5470,7 +5470,7 @@
       "source_location": "L197",
       "_origin": "ast",
       "id": "apps_testlab_main_metricspec_probe",
-      "community": 96,
+      "community": 338,
       "norm_label": "probe"
     },
     {
@@ -5480,7 +5480,7 @@
       "source_location": "L198",
       "_origin": "ast",
       "id": "apps_testlab_main_metricspec_derivation",
-      "community": 96,
+      "community": 338,
       "norm_label": "derivation"
     },
     {
@@ -5590,7 +5590,7 @@
       "source_location": "L213",
       "_origin": "ast",
       "id": "apps_testlab_main_config",
-      "community": 339,
+      "community": 42,
       "norm_label": "config"
     },
     {
@@ -5600,7 +5600,7 @@
       "source_location": "L214",
       "_origin": "ast",
       "id": "apps_testlab_main_config_id",
-      "community": 339,
+      "community": 42,
       "norm_label": "id"
     },
     {
@@ -5610,7 +5610,7 @@
       "source_location": "L215",
       "_origin": "ast",
       "id": "apps_testlab_main_config_values",
-      "community": 339,
+      "community": 42,
       "norm_label": "values"
     },
     {
@@ -5620,7 +5620,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "apps_testlab_main_cpp_volumemesher",
-      "community": 339,
+      "community": 42,
       "norm_label": "volumemesher"
     },
     {
@@ -5630,7 +5630,7 @@
       "source_location": "L216",
       "_origin": "ast",
       "id": "apps_testlab_main_config_mesher",
-      "community": 339,
+      "community": 42,
       "norm_label": "mesher"
     },
     {
@@ -5640,7 +5640,7 @@
       "source_location": "L217",
       "_origin": "ast",
       "id": "apps_testlab_main_config_feature_refine",
-      "community": 339,
+      "community": 42,
       "norm_label": "feature_refine"
     },
     {
@@ -5650,7 +5650,7 @@
       "source_location": "L218",
       "_origin": "ast",
       "id": "apps_testlab_main_config_curvature_turn_deg",
-      "community": 339,
+      "community": 42,
       "norm_label": "curvature_turn_deg"
     },
     {
@@ -5660,7 +5660,7 @@
       "source_location": "L219",
       "_origin": "ast",
       "id": "apps_testlab_main_config_snap_boundary",
-      "community": 339,
+      "community": 42,
       "norm_label": "snap_boundary"
     },
     {
@@ -5670,7 +5670,7 @@
       "source_location": "L220",
       "_origin": "ast",
       "id": "apps_testlab_main_config_order",
-      "community": 339,
+      "community": 42,
       "norm_label": "order"
     },
     {
@@ -5680,7 +5680,7 @@
       "source_location": "L221",
       "_origin": "ast",
       "id": "apps_testlab_main_config_element_tendency",
-      "community": 339,
+      "community": 42,
       "norm_label": "element_tendency"
     },
     {
@@ -5690,7 +5690,7 @@
       "source_location": "L224",
       "_origin": "ast",
       "id": "apps_testlab_main_checkpoint",
-      "community": 392,
+      "community": 319,
       "norm_label": "checkpoint"
     },
     {
@@ -5700,7 +5700,7 @@
       "source_location": "L225",
       "_origin": "ast",
       "id": "apps_testlab_main_checkpoint_campaign",
-      "community": 392,
+      "community": 319,
       "norm_label": "campaign"
     },
     {
@@ -5710,7 +5710,7 @@
       "source_location": "L226",
       "_origin": "ast",
       "id": "apps_testlab_main_checkpoint_state",
-      "community": 392,
+      "community": 319,
       "norm_label": "state"
     },
     {
@@ -5720,7 +5720,7 @@
       "source_location": "L227",
       "_origin": "ast",
       "id": "apps_testlab_main_checkpoint_tier",
-      "community": 392,
+      "community": 319,
       "norm_label": "tier"
     },
     {
@@ -5730,7 +5730,7 @@
       "source_location": "L228",
       "_origin": "ast",
       "id": "apps_testlab_main_checkpoint_completed_runs",
-      "community": 392,
+      "community": 319,
       "norm_label": "completed_runs"
     },
     {
@@ -5740,7 +5740,7 @@
       "source_location": "L229",
       "_origin": "ast",
       "id": "apps_testlab_main_checkpoint_survivors",
-      "community": 392,
+      "community": 319,
       "norm_label": "survivors"
     },
     {
@@ -5750,7 +5750,7 @@
       "source_location": "L230",
       "_origin": "ast",
       "id": "apps_testlab_main_checkpoint_started_utc",
-      "community": 392,
+      "community": 319,
       "norm_label": "started_utc"
     },
     {
@@ -5760,7 +5760,7 @@
       "source_location": "L231",
       "_origin": "ast",
       "id": "apps_testlab_main_checkpoint_updated_utc",
-      "community": 392,
+      "community": 319,
       "norm_label": "updated_utc"
     },
     {
@@ -5800,7 +5800,7 @@
       "source_location": "L304",
       "_origin": "ast",
       "id": "apps_testlab_main_wallclockbudgetexceeded",
-      "community": 23,
+      "community": 339,
       "norm_label": "wallclockbudgetexceeded"
     },
     {
@@ -5820,7 +5820,7 @@
       "source_location": "L305",
       "_origin": "ast",
       "id": "apps_testlab_main_wallclockbudgetexceeded_wallclockbudgetexceeded",
-      "community": 23,
+      "community": 339,
       "norm_label": ".wallclockbudgetexceeded()"
     },
     {
@@ -5830,7 +5830,7 @@
       "source_location": "L309",
       "_origin": "ast",
       "id": "apps_testlab_main_wallclockbudgetexceeded_elapsed_s",
-      "community": 23,
+      "community": 339,
       "norm_label": "elapsed_s"
     },
     {
@@ -5860,7 +5860,7 @@
       "source_location": "L388",
       "_origin": "ast",
       "id": "apps_testlab_main_parse_mesher",
-      "community": 339,
+      "community": 42,
       "norm_label": "parse_mesher()"
     },
     {
@@ -6180,7 +6180,7 @@
       "source_location": "L641",
       "_origin": "ast",
       "id": "apps_testlab_main_write_mesh_preview",
-      "community": 319,
+      "community": 339,
       "norm_label": "write_mesh_preview()"
     },
     {
@@ -6190,7 +6190,7 @@
       "source_location": "L673",
       "_origin": "ast",
       "id": "apps_testlab_main_make_dirichlet",
-      "community": 36,
+      "community": 339,
       "norm_label": "make_dirichlet()"
     },
     {
@@ -6560,7 +6560,7 @@
       "source_location": "L1315",
       "_origin": "ast",
       "id": "apps_testlab_main_predict_elem_count",
-      "community": 23,
+      "community": 339,
       "norm_label": "predict_elem_count()"
     },
     {
@@ -6570,7 +6570,7 @@
       "source_location": "L1326",
       "_origin": "ast",
       "id": "apps_testlab_main_geom_class_of",
-      "community": 23,
+      "community": 339,
       "norm_label": "geom_class_of()"
     },
     {
@@ -6620,7 +6620,7 @@
       "source_location": "L1384",
       "_origin": "ast",
       "id": "apps_testlab_main_quality_of",
-      "community": 23,
+      "community": 339,
       "norm_label": "quality_of()"
     },
     {
@@ -6680,7 +6680,7 @@
       "source_location": "L1412",
       "_origin": "ast",
       "id": "apps_testlab_main_write_warehouse_run",
-      "community": 319,
+      "community": 36,
       "norm_label": "write_warehouse_run()"
     },
     {
@@ -6690,7 +6690,7 @@
       "source_location": "L1429",
       "_origin": "ast",
       "id": "apps_testlab_main_run_one",
-      "community": 23,
+      "community": 339,
       "norm_label": "run_one()"
     },
     {
@@ -6760,7 +6760,7 @@
       "source_location": "L1853",
       "_origin": "ast",
       "id": "apps_testlab_main_usage",
-      "community": 319,
+      "community": 339,
       "norm_label": "usage()"
     },
     {
@@ -6790,7 +6790,7 @@
       "source_location": "L2094",
       "_origin": "ast",
       "id": "apps_testlab_main_main",
-      "community": 319,
+      "community": 339,
       "norm_label": "main()"
     },
     {
@@ -7348,7 +7348,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "bench_competitive_schema_properties_case_id",
-      "community": 407,
+      "community": 50,
       "norm_label": "case_id"
     },
     {
@@ -7358,7 +7358,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "bench_competitive_schema_case_id_type",
-      "community": 407,
+      "community": 50,
       "norm_label": "type"
     },
     {
@@ -7368,7 +7368,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "bench_competitive_schema_case_id_description",
-      "community": 407,
+      "community": 50,
       "norm_label": "description"
     },
     {
@@ -7798,7 +7798,7 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "bench_competitive_schema_properties_notes",
-      "community": 50,
+      "community": 412,
       "norm_label": "notes"
     },
     {
@@ -7808,7 +7808,7 @@
       "source_location": "L91",
       "_origin": "ast",
       "id": "bench_competitive_schema_notes_type",
-      "community": 50,
+      "community": 412,
       "norm_label": "type"
     },
     {
@@ -7818,7 +7818,7 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "bench_competitive_schema_notes_description",
-      "community": 50,
+      "community": 412,
       "norm_label": "description"
     },
     {
@@ -10408,7 +10408,7 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "src_adapt_include_adapt_sizing_field_geometrysizing",
-      "community": 38,
+      "community": 27,
       "norm_label": "geometrysizing"
     },
     {
@@ -10418,7 +10418,7 @@
       "source_location": "L95",
       "_origin": "ast",
       "id": "src_adapt_include_adapt_sizing_field_geometrysizing_size_at",
-      "community": 38,
+      "community": 27,
       "norm_label": "size_at"
     },
     {
@@ -10428,7 +10428,7 @@
       "source_location": "L98",
       "_origin": "ast",
       "id": "src_adapt_include_adapt_sizing_field_geometrysizing_h_min",
-      "community": 38,
+      "community": 27,
       "norm_label": "h_min_"
     },
     {
@@ -10438,7 +10438,7 @@
       "source_location": "L99",
       "_origin": "ast",
       "id": "src_adapt_include_adapt_sizing_field_geometrysizing_h_max",
-      "community": 38,
+      "community": 27,
       "norm_label": "h_max_"
     },
     {
@@ -10448,7 +10448,7 @@
       "source_location": "L100",
       "_origin": "ast",
       "id": "src_adapt_include_adapt_sizing_field_geometrysizing_blend",
-      "community": 38,
+      "community": 27,
       "norm_label": "blend_"
     },
     {
@@ -10458,7 +10458,7 @@
       "source_location": "L101",
       "_origin": "ast",
       "id": "src_adapt_include_adapt_sizing_field_geometrysizing_curv_frac",
-      "community": 38,
+      "community": 27,
       "norm_label": "curv_frac_"
     },
     {
@@ -10468,7 +10468,7 @@
       "source_location": "L102",
       "_origin": "ast",
       "id": "src_adapt_include_adapt_sizing_field_geometrysizing_thick_frac",
-      "community": 38,
+      "community": 27,
       "norm_label": "thick_frac_"
     },
     {
@@ -10478,7 +10478,7 @@
       "source_location": "L103",
       "_origin": "ast",
       "id": "src_adapt_include_adapt_sizing_field_geometrysizing_surface",
-      "community": 38,
+      "community": 27,
       "norm_label": "surface_"
     },
     {
@@ -10488,7 +10488,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_adapt_include_adapt_sizing_field_hpp_vector",
-      "community": 38,
+      "community": 27,
       "norm_label": "vector"
     },
     {
@@ -10498,7 +10498,7 @@
       "source_location": "L104",
       "_origin": "ast",
       "id": "src_adapt_include_adapt_sizing_field_geometrysizing_edges",
-      "community": 38,
+      "community": 27,
       "norm_label": "edges_"
     },
     {
@@ -10508,7 +10508,7 @@
       "source_location": "L105",
       "_origin": "ast",
       "id": "src_adapt_include_adapt_sizing_field_geometrysizing_kappa",
-      "community": 38,
+      "community": 27,
       "norm_label": "kappa_"
     },
     {
@@ -10518,7 +10518,7 @@
       "source_location": "L106",
       "_origin": "ast",
       "id": "src_adapt_include_adapt_sizing_field_geometrysizing_thickness",
-      "community": 38,
+      "community": 27,
       "norm_label": "thickness_"
     },
     {
@@ -10948,7 +10948,7 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "src_adapt_src_sizing_field_make_feature_sizing",
-      "community": 352,
+      "community": 345,
       "norm_label": "make_feature_sizing()"
     },
     {
@@ -10958,7 +10958,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "unique_ptr",
-      "community": 352,
+      "community": 345,
       "norm_label": "unique_ptr"
     },
     {
@@ -10968,7 +10968,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_adapt_src_sizing_field_cpp_vector",
-      "community": 352,
+      "community": 345,
       "norm_label": "vector"
     },
     {
@@ -10978,7 +10978,7 @@
       "source_location": "L58",
       "_origin": "ast",
       "id": "src_adapt_src_sizing_field_geometrysizing_geometrysizing",
-      "community": 352,
+      "community": 345,
       "norm_label": "geometrysizing::geometrysizing()"
     },
     {
@@ -10998,7 +10998,7 @@
       "source_location": "L116",
       "_origin": "ast",
       "id": "src_adapt_src_sizing_field_make_geometry_sizing",
-      "community": 352,
+      "community": 345,
       "norm_label": "make_geometry_sizing()"
     },
     {
@@ -11148,7 +11148,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_fea_include_fea_assembly",
-      "community": 42,
+      "community": 97,
       "norm_label": "assembly.hpp"
     },
     {
@@ -11178,7 +11178,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_fea_include_fea_element",
-      "community": 42,
+      "community": 97,
       "norm_label": "element.hpp"
     },
     {
@@ -11188,7 +11188,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "src_fea_include_fea_element_element",
-      "community": 42,
+      "community": 97,
       "norm_label": "element"
     },
     {
@@ -11198,7 +11198,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "src_fea_include_fea_element_element_element",
-      "community": 42,
+      "community": 97,
       "norm_label": ".~element()"
     },
     {
@@ -11208,7 +11208,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "src_fea_include_fea_element_element_order",
-      "community": 42,
+      "community": 97,
       "norm_label": "order"
     },
     {
@@ -11218,7 +11218,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "src_fea_include_fea_element_element_num_nodes",
-      "community": 42,
+      "community": 97,
       "norm_label": "num_nodes"
     },
     {
@@ -11228,7 +11228,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "src_fea_include_fea_element_element_stiffness",
-      "community": 42,
+      "community": 97,
       "norm_label": "stiffness"
     },
     {
@@ -11628,7 +11628,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_fea_include_fea_material",
-      "community": 42,
+      "community": 97,
       "norm_label": "material.hpp"
     },
     {
@@ -11638,7 +11638,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "src_fea_include_fea_material_material",
-      "community": 42,
+      "community": 97,
       "norm_label": "material"
     },
     {
@@ -11648,7 +11648,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "src_fea_include_fea_material_material_youngs_modulus",
-      "community": 42,
+      "community": 97,
       "norm_label": "youngs_modulus"
     },
     {
@@ -11658,7 +11658,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "src_fea_include_fea_material_material_poissons_ratio",
-      "community": 42,
+      "community": 97,
       "norm_label": "poissons_ratio"
     },
     {
@@ -11668,7 +11668,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "src_fea_include_fea_material_material_lambda",
-      "community": 42,
+      "community": 97,
       "norm_label": ".lambda()"
     },
     {
@@ -11678,7 +11678,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "src_fea_include_fea_material_material_mu",
-      "community": 42,
+      "community": 97,
       "norm_label": ".mu()"
     },
     {
@@ -11688,7 +11688,7 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "src_fea_include_fea_material_material_d_matrix",
-      "community": 42,
+      "community": 97,
       "norm_label": "d_matrix"
     },
     {
@@ -11778,7 +11778,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_fea_include_fea_nodal_mesh",
-      "community": 354,
+      "community": 76,
       "norm_label": "nodal_mesh.hpp"
     },
     {
@@ -11808,7 +11808,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "src_fea_include_fea_nodal_mesh_element_num_nodes",
-      "community": 354,
+      "community": 76,
       "norm_label": "element_num_nodes()"
     },
     {
@@ -11818,7 +11818,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_include_fea_nodal_mesh_hpp_elementtype",
-      "community": 354,
+      "community": 76,
       "norm_label": "elementtype"
     },
     {
@@ -11828,7 +11828,7 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "src_fea_include_fea_nodal_mesh_nodalelement",
-      "community": 354,
+      "community": 76,
       "norm_label": "nodalelement"
     },
     {
@@ -11838,7 +11838,7 @@
       "source_location": "L68",
       "_origin": "ast",
       "id": "src_fea_include_fea_nodal_mesh_nodalelement_type",
-      "community": 354,
+      "community": 76,
       "norm_label": "type"
     },
     {
@@ -11848,7 +11848,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_include_fea_nodal_mesh_hpp_vector",
-      "community": 354,
+      "community": 76,
       "norm_label": "vector"
     },
     {
@@ -11858,7 +11858,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_include_fea_nodal_mesh_hpp_uint32_t",
-      "community": 354,
+      "community": 76,
       "norm_label": "uint32_t"
     },
     {
@@ -11868,7 +11868,7 @@
       "source_location": "L69",
       "_origin": "ast",
       "id": "src_fea_include_fea_nodal_mesh_nodalelement_nodes",
-      "community": 354,
+      "community": 76,
       "norm_label": "nodes"
     },
     {
@@ -11878,7 +11878,7 @@
       "source_location": "L71",
       "_origin": "ast",
       "id": "src_fea_include_fea_nodal_mesh_nodalelement_faces",
-      "community": 354,
+      "community": 76,
       "norm_label": "faces"
     },
     {
@@ -11888,7 +11888,7 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "src_fea_include_fea_nodal_mesh_nodalelement_nodalelement",
-      "community": 354,
+      "community": 76,
       "norm_label": ".nodalelement()"
     },
     {
@@ -11898,7 +11898,7 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "src_fea_include_fea_nodal_mesh_nodalmesh",
-      "community": 25,
+      "community": 36,
       "norm_label": "nodalmesh"
     },
     {
@@ -11908,7 +11908,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_include_fea_nodal_mesh_hpp_vector3d",
-      "community": 25,
+      "community": 36,
       "norm_label": "vector3d"
     },
     {
@@ -11918,7 +11918,7 @@
       "source_location": "L81",
       "_origin": "ast",
       "id": "src_fea_include_fea_nodal_mesh_nodalmesh_nodes",
-      "community": 25,
+      "community": 36,
       "norm_label": "nodes"
     },
     {
@@ -11928,7 +11928,7 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "src_fea_include_fea_nodal_mesh_nodalmesh_elements",
-      "community": 25,
+      "community": 36,
       "norm_label": "elements"
     },
     {
@@ -11938,7 +11938,7 @@
       "source_location": "L85",
       "_origin": "ast",
       "id": "src_fea_include_fea_nodal_mesh_nodalmesh_check_validity",
-      "community": 25,
+      "community": 15,
       "norm_label": "check_validity"
     },
     {
@@ -11948,7 +11948,7 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "src_fea_include_fea_nodal_mesh_nodalmesh_compact_unused_nodes",
-      "community": 25,
+      "community": 36,
       "norm_label": "compact_unused_nodes"
     },
     {
@@ -12088,7 +12088,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_fea_include_fea_shape",
-      "community": 27,
+      "community": 8,
       "norm_label": "shape.hpp"
     },
     {
@@ -12098,7 +12098,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "src_fea_include_fea_shape_shapeeval",
-      "community": 27,
+      "community": 8,
       "norm_label": "shapeeval"
     },
     {
@@ -12108,7 +12108,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_include_fea_shape_hpp_vectorxd",
-      "community": 27,
+      "community": 8,
       "norm_label": "vectorxd"
     },
     {
@@ -12118,7 +12118,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "src_fea_include_fea_shape_shapeeval_n",
-      "community": 27,
+      "community": 8,
       "norm_label": "n"
     },
     {
@@ -12128,7 +12128,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_include_fea_shape_hpp_matrix",
-      "community": 27,
+      "community": 8,
       "norm_label": "matrix"
     },
     {
@@ -12138,7 +12138,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_include_fea_shape_hpp_dynamic",
-      "community": 27,
+      "community": 8,
       "norm_label": "dynamic"
     },
     {
@@ -12148,7 +12148,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "src_fea_include_fea_shape_shapeeval_dn",
-      "community": 27,
+      "community": 8,
       "norm_label": "dn"
     },
     {
@@ -12208,7 +12208,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "src_fea_include_fea_solve_dirichlet_fix_node",
-      "community": 370,
+      "community": 408,
       "norm_label": ".fix_node()"
     },
     {
@@ -12218,7 +12218,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_include_fea_solve_hpp_uint32_t",
-      "community": 370,
+      "community": 408,
       "norm_label": "uint32_t"
     },
     {
@@ -12418,7 +12418,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_fea_include_fea_stress",
-      "community": 2,
+      "community": 370,
       "norm_label": "stress.hpp"
     },
     {
@@ -12428,7 +12428,7 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "src_fea_include_fea_stress_elementcentroidstress",
-      "community": 2,
+      "community": 370,
       "norm_label": "elementcentroidstress"
     },
     {
@@ -12448,7 +12448,7 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "src_fea_include_fea_stress_elementcentroidstress_stress",
-      "community": 2,
+      "community": 370,
       "norm_label": "stress"
     },
     {
@@ -12458,7 +12458,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_include_fea_stress_hpp_vector3d",
-      "community": 2,
+      "community": 370,
       "norm_label": "vector3d"
     },
     {
@@ -12468,7 +12468,7 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "src_fea_include_fea_stress_elementcentroidstress_centroid",
-      "community": 2,
+      "community": 370,
       "norm_label": "centroid"
     },
     {
@@ -12478,7 +12478,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "src_fea_include_fea_stress_elementcentroidstress_volume",
-      "community": 2,
+      "community": 370,
       "norm_label": "volume"
     },
     {
@@ -12488,7 +12488,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "src_fea_include_fea_stress_elementcentroidstress_quality",
-      "community": 2,
+      "community": 370,
       "norm_label": "quality"
     },
     {
@@ -12498,7 +12498,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_include_fea_stress_hpp_uint32_t",
-      "community": 2,
+      "community": 370,
       "norm_label": "uint32_t"
     },
     {
@@ -12508,7 +12508,7 @@
       "source_location": "L39",
       "_origin": "ast",
       "id": "src_fea_include_fea_stress_elementcentroidstress_element_index",
-      "community": 2,
+      "community": 370,
       "norm_label": "element_index"
     },
     {
@@ -12768,7 +12768,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_fea_include_fea_zz",
-      "community": 76,
+      "community": 370,
       "norm_label": "zz.hpp"
     },
     {
@@ -12778,7 +12778,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "src_fea_include_fea_zz_zzrecovery",
-      "community": 76,
+      "community": 370,
       "norm_label": "zzrecovery"
     },
     {
@@ -12788,7 +12788,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_include_fea_zz_hpp_vector",
-      "community": 76,
+      "community": 370,
       "norm_label": "vector"
     },
     {
@@ -12798,7 +12798,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_include_fea_zz_hpp_stress",
-      "community": 76,
+      "community": 370,
       "norm_label": "stress"
     },
     {
@@ -12808,7 +12808,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "src_fea_include_fea_zz_zzrecovery_nodal_stress",
-      "community": 76,
+      "community": 370,
       "norm_label": "nodal_stress"
     },
     {
@@ -12818,7 +12818,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "src_fea_include_fea_zz_zzrecovery_element_eta",
-      "community": 76,
+      "community": 370,
       "norm_label": "element_eta"
     },
     {
@@ -12828,7 +12828,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "src_fea_include_fea_zz_zzrecovery_global_eta",
-      "community": 76,
+      "community": 370,
       "norm_label": "global_eta"
     },
     {
@@ -12908,7 +12908,7 @@
       "source_location": "L135",
       "_origin": "ast",
       "id": "src_fea_src_assembly_assemble_stiffness",
-      "community": 363,
+      "community": 20,
       "norm_label": "assemble_stiffness()"
     },
     {
@@ -12918,7 +12918,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_assembly_cpp_sparsematrix",
-      "community": 363,
+      "community": 20,
       "norm_label": "sparsematrix"
     },
     {
@@ -12928,7 +12928,7 @@
       "source_location": "L233",
       "_origin": "ast",
       "id": "src_fea_src_assembly_assemble_body_load",
-      "community": 78,
+      "community": 363,
       "norm_label": "assemble_body_load()"
     },
     {
@@ -12938,7 +12938,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_assembly_cpp_vectorxd",
-      "community": 78,
+      "community": 363,
       "norm_label": "vectorxd"
     },
     {
@@ -12948,7 +12948,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_assembly_cpp_bodyforce",
-      "community": 78,
+      "community": 363,
       "norm_label": "bodyforce"
     },
     {
@@ -13168,7 +13168,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_fea_src_boundary_faces",
-      "community": 88,
+      "community": 5,
       "norm_label": "boundary_faces.cpp"
     },
     {
@@ -13178,7 +13178,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "src_fea_src_boundary_faces_make_key",
-      "community": 88,
+      "community": 5,
       "norm_label": "make_key()"
     },
     {
@@ -13188,7 +13188,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_boundary_faces_cpp_uint32_t",
-      "community": 88,
+      "community": 5,
       "norm_label": "uint32_t"
     },
     {
@@ -13198,7 +13198,7 @@
       "source_location": "L58",
       "_origin": "ast",
       "id": "src_fea_src_boundary_faces_facerecord",
-      "community": 88,
+      "community": 5,
       "norm_label": "facerecord"
     },
     {
@@ -13208,7 +13208,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_boundary_faces_cpp_array",
-      "community": 88,
+      "community": 5,
       "norm_label": "array"
     },
     {
@@ -13218,7 +13218,7 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "src_fea_src_boundary_faces_facerecord_verts",
-      "community": 88,
+      "community": 5,
       "norm_label": "verts"
     },
     {
@@ -13228,7 +13228,7 @@
       "source_location": "L60",
       "_origin": "ast",
       "id": "src_fea_src_boundary_faces_facerecord_n",
-      "community": 88,
+      "community": 5,
       "norm_label": "n"
     },
     {
@@ -13238,7 +13238,7 @@
       "source_location": "L61",
       "_origin": "ast",
       "id": "src_fea_src_boundary_faces_facerecord_count",
-      "community": 88,
+      "community": 5,
       "norm_label": "count"
     },
     {
@@ -13248,7 +13248,7 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "src_fea_src_boundary_faces_add_face",
-      "community": 88,
+      "community": 5,
       "norm_label": "add_face()"
     },
     {
@@ -13258,7 +13258,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_boundary_faces_cpp_map",
-      "community": 88,
+      "community": 5,
       "norm_label": "map"
     },
     {
@@ -13268,7 +13268,7 @@
       "source_location": "L93",
       "_origin": "ast",
       "id": "src_fea_src_boundary_faces_emit_element_faces",
-      "community": 88,
+      "community": 5,
       "norm_label": "emit_element_faces()"
     },
     {
@@ -13278,7 +13278,7 @@
       "source_location": "L197",
       "_origin": "ast",
       "id": "src_fea_src_boundary_faces_extract_boundary_faces",
-      "community": 88,
+      "community": 5,
       "norm_label": "extract_boundary_faces()"
     },
     {
@@ -13288,7 +13288,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_boundary_faces_cpp_vector",
-      "community": 88,
+      "community": 5,
       "norm_label": "vector"
     },
     {
@@ -13428,7 +13428,7 @@
       "source_location": "L139",
       "_origin": "ast",
       "id": "src_fea_src_hierarchical_hexrecipe_k",
-      "community": 363,
+      "community": 65,
       "norm_label": "k"
     },
     {
@@ -13538,7 +13538,7 @@
       "source_location": "L228",
       "_origin": "ast",
       "id": "src_fea_src_hierarchical_tetrecipe_d",
-      "community": 42,
+      "community": 97,
       "norm_label": "d"
     },
     {
@@ -14258,7 +14258,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_fea_src_material",
-      "community": 42,
+      "community": 97,
       "norm_label": "material.cpp"
     },
     {
@@ -14268,7 +14268,7 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "src_fea_src_material_material_d_matrix",
-      "community": 42,
+      "community": 97,
       "norm_label": "material::d_matrix()"
     },
     {
@@ -14278,7 +14278,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_material_cpp_matrix",
-      "community": 42,
+      "community": 97,
       "norm_label": "matrix"
     },
     {
@@ -14528,7 +14528,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_fea_src_p_elevate",
-      "community": 141,
+      "community": 36,
       "norm_label": "p_elevate.cpp"
     },
     {
@@ -14538,7 +14538,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "src_fea_src_p_elevate_p_elevate_impl",
-      "community": 141,
+      "community": 36,
       "norm_label": "p_elevate_impl()"
     },
     {
@@ -14548,7 +14548,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_p_elevate_cpp_vector",
-      "community": 141,
+      "community": 36,
       "norm_label": "vector"
     },
     {
@@ -14558,7 +14558,7 @@
       "source_location": "L86",
       "_origin": "ast",
       "id": "src_fea_src_p_elevate_promote_to_quadratic",
-      "community": 141,
+      "community": 36,
       "norm_label": "promote_to_quadratic()"
     },
     {
@@ -14568,7 +14568,7 @@
       "source_location": "L91",
       "_origin": "ast",
       "id": "src_fea_src_p_elevate_p_elevate",
-      "community": 141,
+      "community": 36,
       "norm_label": "p_elevate()"
     },
     {
@@ -14578,7 +14578,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_p_elevate_cpp_span",
-      "community": 141,
+      "community": 36,
       "norm_label": "span"
     },
     {
@@ -14588,7 +14588,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_p_elevate_cpp_size_t",
-      "community": 141,
+      "community": 36,
       "norm_label": "size_t"
     },
     {
@@ -14598,7 +14598,7 @@
       "source_location": "L109",
       "_origin": "ast",
       "id": "src_fea_src_p_elevate_count_element_types",
-      "community": 141,
+      "community": 36,
       "norm_label": "count_element_types()"
     },
     {
@@ -14748,7 +14748,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_fea_src_shape",
-      "community": 27,
+      "community": 8,
       "norm_label": "shape.cpp"
     },
     {
@@ -14758,7 +14758,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "src_fea_src_shape_eval_tet4",
-      "community": 27,
+      "community": 8,
       "norm_label": "eval_tet4()"
     },
     {
@@ -14768,7 +14768,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_shape_cpp_vector3d",
-      "community": 27,
+      "community": 8,
       "norm_label": "vector3d"
     },
     {
@@ -14778,7 +14778,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "src_fea_src_shape_eval_tet10",
-      "community": 27,
+      "community": 8,
       "norm_label": "eval_tet10()"
     },
     {
@@ -14788,7 +14788,7 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "src_fea_src_shape_eval_pyramid5",
-      "community": 27,
+      "community": 8,
       "norm_label": "eval_pyramid5()"
     },
     {
@@ -14798,7 +14798,7 @@
       "source_location": "L99",
       "_origin": "ast",
       "id": "src_fea_src_shape_eval_prism6",
-      "community": 27,
+      "community": 8,
       "norm_label": "eval_prism6()"
     },
     {
@@ -14808,7 +14808,7 @@
       "source_location": "L120",
       "_origin": "ast",
       "id": "src_fea_src_shape_eval_hex8",
-      "community": 27,
+      "community": 8,
       "norm_label": "eval_hex8()"
     },
     {
@@ -14818,7 +14818,7 @@
       "source_location": "L137",
       "_origin": "ast",
       "id": "src_fea_src_shape_eval_hex20",
-      "community": 27,
+      "community": 8,
       "norm_label": "eval_hex20()"
     },
     {
@@ -14828,7 +14828,7 @@
       "source_location": "L185",
       "_origin": "ast",
       "id": "src_fea_src_shape_eval_shape",
-      "community": 27,
+      "community": 8,
       "norm_label": "eval_shape()"
     },
     {
@@ -14838,7 +14838,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_shape_cpp_elementtype",
-      "community": 27,
+      "community": 8,
       "norm_label": "elementtype"
     },
     {
@@ -14848,7 +14848,7 @@
       "source_location": "L205",
       "_origin": "ast",
       "id": "src_fea_src_shape_reference_nodes",
-      "community": 27,
+      "community": 8,
       "norm_label": "reference_nodes()"
     },
     {
@@ -14858,7 +14858,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_shape_cpp_vector",
-      "community": 27,
+      "community": 8,
       "norm_label": "vector"
     },
     {
@@ -15058,7 +15058,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_fea_src_stress",
-      "community": 2,
+      "community": 8,
       "norm_label": "stress.cpp"
     },
     {
@@ -15068,7 +15068,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "src_fea_src_stress_recover_nodal_stress",
-      "community": 2,
+      "community": 8,
       "norm_label": "recover_nodal_stress()"
     },
     {
@@ -15078,7 +15078,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_stress_cpp_vector",
-      "community": 2,
+      "community": 8,
       "norm_label": "vector"
     },
     {
@@ -15088,7 +15088,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_stress_cpp_stress",
-      "community": 2,
+      "community": 8,
       "norm_label": "stress"
     },
     {
@@ -15098,7 +15098,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_stress_cpp_vectorxd",
-      "community": 2,
+      "community": 8,
       "norm_label": "vectorxd"
     },
     {
@@ -15108,7 +15108,7 @@
       "source_location": "L127",
       "_origin": "ast",
       "id": "src_fea_src_stress_von_mises",
-      "community": 2,
+      "community": 8,
       "norm_label": "von_mises()"
     },
     {
@@ -15118,7 +15118,7 @@
       "source_location": "L138",
       "_origin": "ast",
       "id": "src_fea_src_stress_reference_centroid",
-      "community": 2,
+      "community": 8,
       "norm_label": "reference_centroid()"
     },
     {
@@ -15128,7 +15128,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_stress_cpp_vector3d",
-      "community": 2,
+      "community": 8,
       "norm_label": "vector3d"
     },
     {
@@ -15138,7 +15138,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_stress_cpp_elementtype",
-      "community": 2,
+      "community": 8,
       "norm_label": "elementtype"
     },
     {
@@ -15148,7 +15148,7 @@
       "source_location": "L154",
       "_origin": "ast",
       "id": "src_fea_src_stress_tet4_aspect_quality",
-      "community": 2,
+      "community": 8,
       "norm_label": "tet4_aspect_quality()"
     },
     {
@@ -15158,7 +15158,7 @@
       "source_location": "L172",
       "_origin": "ast",
       "id": "src_fea_src_stress_recover_element_centroid_stress",
-      "community": 2,
+      "community": 8,
       "norm_label": "recover_element_centroid_stress()"
     },
     {
@@ -15348,7 +15348,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "traction",
-      "community": 307,
+      "community": 370,
       "norm_label": "traction"
     },
     {
@@ -15428,7 +15428,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_vem_cpp_matrix",
-      "community": 0,
+      "community": 409,
       "norm_label": "matrix"
     },
     {
@@ -15458,7 +15458,7 @@
       "source_location": "L95",
       "_origin": "ast",
       "id": "src_fea_src_vem_p2_monomials",
-      "community": 0,
+      "community": 409,
       "norm_label": "p2_monomials()"
     },
     {
@@ -15468,7 +15468,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "kp2mono",
-      "community": 0,
+      "community": 409,
       "norm_label": "kp2mono"
     },
     {
@@ -15478,7 +15478,7 @@
       "source_location": "L103",
       "_origin": "ast",
       "id": "src_fea_src_vem_p2_monomial_grads",
-      "community": 0,
+      "community": 409,
       "norm_label": "p2_monomial_grads()"
     },
     {
@@ -15488,7 +15488,7 @@
       "source_location": "L128",
       "_origin": "ast",
       "id": "src_fea_src_vem_p2_strain_basis",
-      "community": 0,
+      "community": 409,
       "norm_label": "p2_strain_basis()"
     },
     {
@@ -15498,7 +15498,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "kp2vec",
-      "community": 0,
+      "community": 409,
       "norm_label": "kp2vec"
     },
     {
@@ -15568,7 +15568,7 @@
       "source_location": "L203",
       "_origin": "ast",
       "id": "src_fea_src_vem_integrate_p2_matrix",
-      "community": 326,
+      "community": 78,
       "norm_label": "integrate_p2_matrix()"
     },
     {
@@ -15578,7 +15578,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "fun",
-      "community": 326,
+      "community": 78,
       "norm_label": "fun"
     },
     {
@@ -15588,7 +15588,7 @@
       "source_location": "L231",
       "_origin": "ast",
       "id": "src_fea_src_vem_integrate_p2_vector",
-      "community": 326,
+      "community": 78,
       "norm_label": "integrate_p2_vector()"
     },
     {
@@ -15598,7 +15598,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_fea_src_vem_cpp_vectorxd",
-      "community": 326,
+      "community": 78,
       "norm_label": "vectorxd"
     },
     {
@@ -15968,7 +15968,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_fea_src_zz",
-      "community": 94,
+      "community": 76,
       "norm_label": "zz.cpp"
     },
     {
@@ -16058,7 +16058,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_geom_include_geom_cad_model",
-      "community": 10,
+      "community": 94,
       "norm_label": "cad_model.hpp"
     },
     {
@@ -16298,7 +16298,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_geom_include_geom_cad_topology",
-      "community": 10,
+      "community": 94,
       "norm_label": "cad_topology.hpp"
     },
     {
@@ -16308,7 +16308,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "src_geom_include_geom_cad_topology_cadvertex",
-      "community": 320,
+      "community": 353,
       "norm_label": "cadvertex"
     },
     {
@@ -16318,7 +16318,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_geom_include_geom_cad_topology_hpp_uint32_t",
-      "community": 320,
+      "community": 353,
       "norm_label": "uint32_t"
     },
     {
@@ -16328,7 +16328,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "src_geom_include_geom_cad_topology_cadvertex_id",
-      "community": 320,
+      "community": 353,
       "norm_label": "id"
     },
     {
@@ -16338,7 +16338,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_geom_include_geom_cad_topology_hpp_vector3d",
-      "community": 320,
+      "community": 353,
       "norm_label": "vector3d"
     },
     {
@@ -16348,7 +16348,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "src_geom_include_geom_cad_topology_cadvertex_position",
-      "community": 320,
+      "community": 353,
       "norm_label": "position"
     },
     {
@@ -16528,7 +16528,7 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "src_geom_include_geom_cad_topology_cadtopology",
-      "community": 318,
+      "community": 335,
       "norm_label": "cadtopology"
     },
     {
@@ -16538,7 +16538,7 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "src_geom_include_geom_cad_topology_cadtopology_vertices",
-      "community": 318,
+      "community": 335,
       "norm_label": "vertices"
     },
     {
@@ -16548,7 +16548,7 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "src_geom_include_geom_cad_topology_cadtopology_edges",
-      "community": 318,
+      "community": 335,
       "norm_label": "edges"
     },
     {
@@ -16558,7 +16558,7 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "src_geom_include_geom_cad_topology_cadtopology_faces",
-      "community": 318,
+      "community": 335,
       "norm_label": "faces"
     },
     {
@@ -16568,7 +16568,7 @@
       "source_location": "L69",
       "_origin": "ast",
       "id": "src_geom_include_geom_cad_topology_cadtopology_empty",
-      "community": 318,
+      "community": 335,
       "norm_label": ".empty()"
     },
     {
@@ -16628,7 +16628,7 @@
       "source_location": "L118",
       "_origin": "ast",
       "id": "src_geom_include_geom_cad_topology_meshedgesegment",
-      "community": 320,
+      "community": 353,
       "norm_label": "meshedgesegment"
     },
     {
@@ -16638,7 +16638,7 @@
       "source_location": "L119",
       "_origin": "ast",
       "id": "src_geom_include_geom_cad_topology_meshedgesegment_a",
-      "community": 320,
+      "community": 353,
       "norm_label": "a"
     },
     {
@@ -16648,7 +16648,7 @@
       "source_location": "L120",
       "_origin": "ast",
       "id": "src_geom_include_geom_cad_topology_meshedgesegment_b",
-      "community": 320,
+      "community": 353,
       "norm_label": "b"
     },
     {
@@ -16758,7 +16758,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_geom_include_geom_features",
-      "community": 360,
+      "community": 410,
       "norm_label": "features.hpp"
     },
     {
@@ -16768,7 +16768,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "src_geom_include_geom_features_sharpedge",
-      "community": 360,
+      "community": 345,
       "norm_label": "sharpedge"
     },
     {
@@ -16778,7 +16778,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_geom_include_geom_features_hpp_uint32_t",
-      "community": 360,
+      "community": 345,
       "norm_label": "uint32_t"
     },
     {
@@ -16788,7 +16788,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "src_geom_include_geom_features_sharpedge_v0",
-      "community": 360,
+      "community": 345,
       "norm_label": "v0"
     },
     {
@@ -16798,7 +16798,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "src_geom_include_geom_features_sharpedge_v1",
-      "community": 360,
+      "community": 345,
       "norm_label": "v1"
     },
     {
@@ -16808,7 +16808,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "src_geom_include_geom_features_sharpedge_dihedral",
-      "community": 360,
+      "community": 345,
       "norm_label": "dihedral"
     },
     {
@@ -16818,7 +16818,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "src_geom_include_geom_features_closestonfeature",
-      "community": 360,
+      "community": 410,
       "norm_label": "closestonfeature"
     },
     {
@@ -16828,7 +16828,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_geom_include_geom_features_hpp_vector3d",
-      "community": 360,
+      "community": 410,
       "norm_label": "vector3d"
     },
     {
@@ -16838,7 +16838,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "src_geom_include_geom_features_closestonfeature_point",
-      "community": 360,
+      "community": 410,
       "norm_label": "point"
     },
     {
@@ -16848,7 +16848,7 @@
       "source_location": "L39",
       "_origin": "ast",
       "id": "src_geom_include_geom_features_closestonfeature_distance",
-      "community": 360,
+      "community": 410,
       "norm_label": "distance"
     },
     {
@@ -17338,7 +17338,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "src_geom_src_cad_topology_dist2",
-      "community": 372,
+      "community": 335,
       "norm_label": "dist2()"
     },
     {
@@ -17348,7 +17348,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_geom_src_cad_topology_cpp_vector3d",
-      "community": 372,
+      "community": 378,
       "norm_label": "vector3d"
     },
     {
@@ -17358,7 +17358,7 @@
       "source_location": "L54",
       "_origin": "ast",
       "id": "src_geom_src_cad_topology_closest_on_segment",
-      "community": 372,
+      "community": 335,
       "norm_label": "closest_on_segment()"
     },
     {
@@ -17368,7 +17368,7 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "src_geom_src_cad_topology_edge_passes_filter",
-      "community": 372,
+      "community": 320,
       "norm_label": "edge_passes_filter()"
     },
     {
@@ -17378,7 +17378,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "src_geom_src_cad_topology_menger_kappa",
-      "community": 353,
+      "community": 378,
       "norm_label": "menger_kappa()"
     },
     {
@@ -17388,7 +17388,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_geom_src_cad_topology_cpp_vector",
-      "community": 372,
+      "community": 378,
       "norm_label": "vector"
     },
     {
@@ -17398,7 +17398,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_geom_src_cad_topology_cpp_size_t",
-      "community": 353,
+      "community": 378,
       "norm_label": "size_t"
     },
     {
@@ -17408,7 +17408,7 @@
       "source_location": "L113",
       "_origin": "ast",
       "id": "src_geom_src_cad_topology_kappa_at_t",
-      "community": 353,
+      "community": 378,
       "norm_label": "kappa_at_t()"
     },
     {
@@ -17418,7 +17418,7 @@
       "source_location": "L138",
       "_origin": "ast",
       "id": "src_geom_src_cad_topology_closest_edge_impl",
-      "community": 372,
+      "community": 320,
       "norm_label": "closest_edge_impl()"
     },
     {
@@ -17428,7 +17428,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_geom_src_cad_topology_cpp_optional",
-      "community": 372,
+      "community": 320,
       "norm_label": "optional"
     },
     {
@@ -17548,7 +17548,7 @@
       "source_location": "L487",
       "_origin": "ast",
       "id": "src_geom_src_cad_topology_closest_edge",
-      "community": 372,
+      "community": 320,
       "norm_label": "closest_edge()"
     },
     {
@@ -17558,7 +17558,7 @@
       "source_location": "L498",
       "_origin": "ast",
       "id": "src_geom_src_cad_topology_edge_profile_hausdorff",
-      "community": 372,
+      "community": 378,
       "norm_label": "edge_profile_hausdorff()"
     },
     {
@@ -17568,7 +17568,7 @@
       "source_location": "L503",
       "_origin": "ast",
       "id": "src_geom_src_cad_topology_edge_profile_hausdorff_filtered",
-      "community": 372,
+      "community": 378,
       "norm_label": "edge_profile_hausdorff_filtered()"
     },
     {
@@ -17708,7 +17708,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_geom_src_indicators",
-      "community": 31,
+      "community": 33,
       "norm_label": "indicators.cpp"
     },
     {
@@ -17718,7 +17718,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "src_geom_src_indicators_tri_normal",
-      "community": 31,
+      "community": 33,
       "norm_label": "tri_normal()"
     },
     {
@@ -17728,7 +17728,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_geom_src_indicators_cpp_vector3d",
-      "community": 31,
+      "community": 33,
       "norm_label": "vector3d"
     },
     {
@@ -17738,7 +17738,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_geom_src_indicators_cpp_size_t",
-      "community": 31,
+      "community": 33,
       "norm_label": "size_t"
     },
     {
@@ -17748,7 +17748,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "src_geom_src_indicators_tri_area",
-      "community": 31,
+      "community": 33,
       "norm_label": "tri_area()"
     },
     {
@@ -17758,7 +17758,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "src_geom_src_indicators_ray_triangle_hit",
-      "community": 31,
+      "community": 33,
       "norm_label": "ray_triangle_hit()"
     },
     {
@@ -17768,7 +17768,7 @@
       "source_location": "L69",
       "_origin": "ast",
       "id": "src_geom_src_indicators_estimate_vertex_curvature",
-      "community": 31,
+      "community": 33,
       "norm_label": "estimate_vertex_curvature()"
     },
     {
@@ -17778,7 +17778,7 @@
       "source_location": "L129",
       "_origin": "ast",
       "id": "src_geom_src_indicators_estimate_local_thickness",
-      "community": 31,
+      "community": 33,
       "norm_label": "estimate_local_thickness()"
     },
     {
@@ -17788,7 +17788,7 @@
       "source_location": "L190",
       "_origin": "ast",
       "id": "src_geom_src_indicators_nearest_vertex_index",
-      "community": 31,
+      "community": 33,
       "norm_label": "nearest_vertex_index()"
     },
     {
@@ -17798,7 +17798,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_geom_src_indicators_cpp_uint32_t",
-      "community": 31,
+      "community": 33,
       "norm_label": "uint32_t"
     },
     {
@@ -17808,7 +17808,7 @@
       "source_location": "L206",
       "_origin": "ast",
       "id": "src_geom_src_indicators_distance_to_surface_vertices",
-      "community": 31,
+      "community": 33,
       "norm_label": "distance_to_surface_vertices()"
     },
     {
@@ -18028,7 +18028,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_grid_classify_hpp_vector3d",
-      "community": 137,
+      "community": 12,
       "norm_label": "vector3d"
     },
     {
@@ -18088,7 +18088,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_grid_classify_cartesiangrid_node",
-      "community": 137,
+      "community": 12,
       "norm_label": ".node()"
     },
     {
@@ -18098,7 +18098,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_grid_classify_cartesiangrid_cell_center",
-      "community": 137,
+      "community": 12,
       "norm_label": ".cell_center()"
     },
     {
@@ -18128,7 +18128,7 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_grid_classify_cartesiangrid_cell_count",
-      "community": 5,
+      "community": 137,
       "norm_label": ".cell_count()"
     },
     {
@@ -18838,7 +18838,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_poly_mesh",
-      "community": 10,
+      "community": 94,
       "norm_label": "poly_mesh.hpp"
     },
     {
@@ -19198,7 +19198,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_quality_tetquality",
-      "community": 355,
+      "community": 407,
       "norm_label": "tetquality"
     },
     {
@@ -19208,7 +19208,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_quality_tetquality_min_volume",
-      "community": 355,
+      "community": 407,
       "norm_label": "min_volume"
     },
     {
@@ -19218,7 +19218,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_quality_tetquality_max_volume",
-      "community": 355,
+      "community": 407,
       "norm_label": "max_volume"
     },
     {
@@ -19228,7 +19228,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_quality_tetquality_min_aspect",
-      "community": 355,
+      "community": 407,
       "norm_label": "min_aspect"
     },
     {
@@ -19238,7 +19238,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_quality_tetquality_mean_aspect",
-      "community": 355,
+      "community": 407,
       "norm_label": "mean_aspect"
     },
     {
@@ -19248,7 +19248,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_quality_hpp_size_t",
-      "community": 355,
+      "community": 407,
       "norm_label": "size_t"
     },
     {
@@ -19258,7 +19258,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_quality_tetquality_n_sliver",
-      "community": 355,
+      "community": 407,
       "norm_label": "n_sliver"
     },
     {
@@ -19268,7 +19268,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_quality_faceconformitystats",
-      "community": 355,
+      "community": 376,
       "norm_label": "faceconformitystats"
     },
     {
@@ -19278,7 +19278,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_quality_faceconformitystats_n_tet_faces",
-      "community": 355,
+      "community": 376,
       "norm_label": "n_tet_faces"
     },
     {
@@ -19288,7 +19288,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_quality_faceconformitystats_n_unique_faces",
-      "community": 355,
+      "community": 376,
       "norm_label": "n_unique_faces"
     },
     {
@@ -19298,7 +19298,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_quality_faceconformitystats_n_boundary_faces",
-      "community": 355,
+      "community": 376,
       "norm_label": "n_boundary_faces"
     },
     {
@@ -19308,7 +19308,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_quality_faceconformitystats_n_interior_faces",
-      "community": 355,
+      "community": 376,
       "norm_label": "n_interior_faces"
     },
     {
@@ -19318,7 +19318,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_quality_faceconformitystats_n_nonconforming",
-      "community": 355,
+      "community": 376,
       "norm_label": "n_nonconforming"
     },
     {
@@ -19328,7 +19328,7 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_quality_faceconformitystats_n_hanging_faces",
-      "community": 355,
+      "community": 376,
       "norm_label": "n_hanging_faces"
     },
     {
@@ -19338,7 +19338,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_quality_faceconformitystats_is_conforming",
-      "community": 355,
+      "community": 376,
       "norm_label": "is_conforming"
     },
     {
@@ -19418,7 +19418,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_surface_metrics_curvedmeshmetrics",
-      "community": 47,
+      "community": 2,
       "norm_label": "curvedmeshmetrics"
     },
     {
@@ -19428,7 +19428,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_surface_metrics_curvedmeshmetrics_m1_max",
-      "community": 47,
+      "community": 2,
       "norm_label": "m1_max"
     },
     {
@@ -19438,7 +19438,7 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_surface_metrics_curvedmeshmetrics_m1_mean",
-      "community": 47,
+      "community": 2,
       "norm_label": "m1_mean"
     },
     {
@@ -19448,7 +19448,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_surface_metrics_hpp_size_t",
-      "community": 47,
+      "community": 2,
       "norm_label": "size_t"
     },
     {
@@ -19458,7 +19458,7 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_surface_metrics_curvedmeshmetrics_n_boundary_nodes",
-      "community": 47,
+      "community": 2,
       "norm_label": "n_boundary_nodes"
     },
     {
@@ -19468,7 +19468,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_surface_metrics_curvedmeshmetrics_m2_max",
-      "community": 47,
+      "community": 2,
       "norm_label": "m2_max"
     },
     {
@@ -19478,7 +19478,7 @@
       "source_location": "L39",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_surface_metrics_curvedmeshmetrics_m2_mean",
-      "community": 47,
+      "community": 2,
       "norm_label": "m2_mean"
     },
     {
@@ -19488,7 +19488,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_surface_metrics_curvedmeshmetrics_n_face_samples",
-      "community": 47,
+      "community": 2,
       "norm_label": "n_face_samples"
     },
     {
@@ -19498,7 +19498,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_surface_metrics_curvedmeshmetrics_m3_rel_volume_err",
-      "community": 47,
+      "community": 2,
       "norm_label": "m3_rel_volume_err"
     },
     {
@@ -19508,7 +19508,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_surface_metrics_curvedmeshmetrics_has_volume",
-      "community": 47,
+      "community": 2,
       "norm_label": "has_volume"
     },
     {
@@ -19518,7 +19518,7 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_surface_metrics_curvedmeshmetrics_m4_radial_rel",
-      "community": 47,
+      "community": 2,
       "norm_label": "m4_radial_rel"
     },
     {
@@ -19528,7 +19528,7 @@
       "source_location": "L48",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_surface_metrics_curvedmeshmetrics_n_circular_nodes",
-      "community": 47,
+      "community": 2,
       "norm_label": "n_circular_nodes"
     },
     {
@@ -19538,7 +19538,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_surface_metrics_curvedmeshmetrics_has_circular",
-      "community": 47,
+      "community": 2,
       "norm_label": "has_circular"
     },
     {
@@ -19548,7 +19548,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_surface_metrics_curvedmeshmetrics_m5_max_azimuth_gap",
-      "community": 47,
+      "community": 2,
       "norm_label": "m5_max_azimuth_gap"
     },
     {
@@ -19558,7 +19558,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_surface_metrics_curvedmeshmetrics_m6_min_boundary_aspect",
-      "community": 47,
+      "community": 2,
       "norm_label": "m6_min_boundary_aspect"
     },
     {
@@ -19568,7 +19568,7 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_surface_metrics_curvedmeshmetrics_n_boundary_tets",
-      "community": 47,
+      "community": 2,
       "norm_label": "n_boundary_tets"
     },
     {
@@ -19578,7 +19578,7 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_surface_metrics_curvedmeshmetrics_has_tet_aspect",
-      "community": 47,
+      "community": 2,
       "norm_label": "has_tet_aspect"
     },
     {
@@ -19588,7 +19588,7 @@
       "source_location": "L60",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_surface_metrics_curvedmeshmetrics_composite_score",
-      "community": 47,
+      "community": 2,
       "norm_label": "composite_score"
     },
     {
@@ -19898,7 +19898,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_transition_fill",
-      "community": 94,
+      "community": 28,
       "norm_label": "transition_fill.hpp"
     },
     {
@@ -20358,7 +20358,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_wall_project_wallprojectstats",
-      "community": 88,
+      "community": 388,
       "norm_label": "wallprojectstats"
     },
     {
@@ -20368,7 +20368,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_wall_project_hpp_size_t",
-      "community": 88,
+      "community": 388,
       "norm_label": "size_t"
     },
     {
@@ -20378,7 +20378,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_wall_project_wallprojectstats_n_wall_nodes",
-      "community": 88,
+      "community": 388,
       "norm_label": "n_wall_nodes"
     },
     {
@@ -20388,7 +20388,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_wall_project_wallprojectstats_n_moved",
-      "community": 88,
+      "community": 388,
       "norm_label": "n_moved"
     },
     {
@@ -20398,7 +20398,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_wall_project_wallprojectstats_n_reverted",
-      "community": 88,
+      "community": 388,
       "norm_label": "n_reverted"
     },
     {
@@ -20408,7 +20408,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_wall_project_wallprojectstats_n_iters",
-      "community": 88,
+      "community": 388,
       "norm_label": "n_iters"
     },
     {
@@ -20418,7 +20418,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_wall_project_wallprojectstats_mean_surface_residual",
-      "community": 88,
+      "community": 388,
       "norm_label": "mean_surface_residual"
     },
     {
@@ -20428,7 +20428,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "src_mesh_include_mesh_wall_project_wallprojectstats_max_surface_residual",
-      "community": 88,
+      "community": 388,
       "norm_label": "max_surface_residual"
     },
     {
@@ -20538,7 +20538,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_mesh_src_grid_classify",
-      "community": 5,
+      "community": 137,
       "norm_label": "grid_classify.cpp"
     },
     {
@@ -20548,7 +20548,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "src_mesh_src_grid_classify_validate_h_bbox",
-      "community": 5,
+      "community": 137,
       "norm_label": "validate_h_bbox()"
     },
     {
@@ -20558,7 +20558,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_src_grid_classify_cpp_vector3d",
-      "community": 5,
+      "community": 137,
       "norm_label": "vector3d"
     },
     {
@@ -20568,7 +20568,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "src_mesh_src_grid_classify_cells_for_extent",
-      "community": 5,
+      "community": 137,
       "norm_label": "cells_for_extent()"
     },
     {
@@ -20608,7 +20608,7 @@
       "source_location": "L128",
       "_origin": "ast",
       "id": "src_mesh_src_grid_classify_min_h_for_cell_budget",
-      "community": 5,
+      "community": 137,
       "norm_label": "min_h_for_cell_budget()"
     },
     {
@@ -20618,7 +20618,7 @@
       "source_location": "L145",
       "_origin": "ast",
       "id": "src_mesh_src_grid_classify_set_cell_from_n",
-      "community": 5,
+      "community": 137,
       "norm_label": "set_cell_from_n()"
     },
     {
@@ -20628,7 +20628,7 @@
       "source_location": "L152",
       "_origin": "ast",
       "id": "src_mesh_src_grid_classify_fit_cell_budget",
-      "community": 5,
+      "community": 137,
       "norm_label": "fit_cell_budget()"
     },
     {
@@ -20638,7 +20638,7 @@
       "source_location": "L225",
       "_origin": "ast",
       "id": "src_mesh_src_grid_classify_make_bbox_grid",
-      "community": 5,
+      "community": 137,
       "norm_label": "make_bbox_grid()"
     },
     {
@@ -20648,7 +20648,7 @@
       "source_location": "L241",
       "_origin": "ast",
       "id": "src_mesh_src_grid_classify_make_bbox_grid_even",
-      "community": 5,
+      "community": 137,
       "norm_label": "make_bbox_grid_even()"
     },
     {
@@ -20768,7 +20768,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "src_mesh_src_hybrid_fill_tet_boundary_nodes",
-      "community": 88,
+      "community": 411,
       "norm_label": "tet_boundary_nodes()"
     },
     {
@@ -20778,7 +20778,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_src_hybrid_fill_cpp_vector",
-      "community": 88,
+      "community": 411,
       "norm_label": "vector"
     },
     {
@@ -20788,7 +20788,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_src_hybrid_fill_cpp_uint32_t",
-      "community": 88,
+      "community": 411,
       "norm_label": "uint32_t"
     },
     {
@@ -20798,7 +20798,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_src_hybrid_fill_cpp_array",
-      "community": 88,
+      "community": 411,
       "norm_label": "array"
     },
     {
@@ -20808,7 +20808,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "src_mesh_src_hybrid_fill_graded_tet_fill_surface",
-      "community": 12,
+      "community": 331,
       "norm_label": "graded_tet_fill_surface()"
     },
     {
@@ -20818,7 +20818,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_src_hybrid_fill_cpp_vector3d",
-      "community": 12,
+      "community": 331,
       "norm_label": "vector3d"
     },
     {
@@ -20828,7 +20828,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_src_hybrid_fill_cpp_span",
-      "community": 12,
+      "community": 331,
       "norm_label": "span"
     },
     {
@@ -20848,7 +20848,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "src_mesh_src_local_refine_edgehash",
-      "community": 388,
+      "community": 132,
       "norm_label": "edgehash"
     },
     {
@@ -20858,7 +20858,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "src_mesh_src_local_refine_edgehash_operator",
-      "community": 388,
+      "community": 132,
       "norm_label": ".operator()()"
     },
     {
@@ -20868,7 +20868,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_src_local_refine_cpp_size_t",
-      "community": 388,
+      "community": 132,
       "norm_label": "size_t"
     },
     {
@@ -21008,7 +21008,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "freefacekey",
-      "community": 388,
+      "community": 132,
       "norm_label": "freefacekey"
     },
     {
@@ -21018,7 +21018,7 @@
       "source_location": "L155",
       "_origin": "ast",
       "id": "src_mesh_src_local_refine_freefacehash",
-      "community": 388,
+      "community": 132,
       "norm_label": "freefacehash"
     },
     {
@@ -21028,7 +21028,7 @@
       "source_location": "L156",
       "_origin": "ast",
       "id": "src_mesh_src_local_refine_freefacehash_operator",
-      "community": 388,
+      "community": 132,
       "norm_label": ".operator()()"
     },
     {
@@ -22048,7 +22048,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_mesh_src_transition_fill",
-      "community": 28,
+      "community": 12,
       "norm_label": "transition_fill.cpp"
     },
     {
@@ -22058,7 +22058,7 @@
       "source_location": "L60",
       "_origin": "ast",
       "id": "src_mesh_src_transition_fill_tet_signed_vol",
-      "community": 28,
+      "community": 12,
       "norm_label": "tet_signed_vol()"
     },
     {
@@ -22068,7 +22068,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_src_transition_fill_cpp_vector3d",
-      "community": 28,
+      "community": 12,
       "norm_label": "vector3d"
     },
     {
@@ -22078,7 +22078,7 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "src_mesh_src_transition_fill_hex8_jacobian_det",
-      "community": 28,
+      "community": 12,
       "norm_label": "hex8_jacobian_det()"
     },
     {
@@ -22088,7 +22088,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_src_transition_fill_cpp_array",
-      "community": 28,
+      "community": 12,
       "norm_label": "array"
     },
     {
@@ -22098,7 +22098,7 @@
       "source_location": "L93",
       "_origin": "ast",
       "id": "src_mesh_src_transition_fill_cell_inverted",
-      "community": 28,
+      "community": 12,
       "norm_label": "cell_inverted()"
     },
     {
@@ -22108,7 +22108,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_mesh_src_transition_fill_cpp_vector",
-      "community": 28,
+      "community": 12,
       "norm_label": "vector"
     },
     {
@@ -22118,7 +22118,7 @@
       "source_location": "L118",
       "_origin": "ast",
       "id": "src_mesh_src_transition_fill_transition_fill_surface",
-      "community": 28,
+      "community": 12,
       "norm_label": "transition_fill_surface()"
     },
     {
@@ -24148,7 +24148,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_support_mms_hpp_tests_support_mms",
-      "community": 97,
+      "community": 94,
       "norm_label": "mms.hpp"
     },
     {
@@ -24448,7 +24448,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_support_structured_mesh_hpp_tests_support_structured_mesh",
-      "community": 370,
+      "community": 408,
       "norm_label": "structured_mesh.hpp"
     },
     {
@@ -24488,7 +24488,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_cantilever",
-      "community": 370,
+      "community": 408,
       "norm_label": "test_cantilever.cpp"
     },
     {
@@ -24838,7 +24838,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_fe_vem_assembly",
-      "community": 370,
+      "community": 408,
       "norm_label": "test_fe_vem_assembly.cpp"
     },
     {
@@ -24848,7 +24848,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "tests_test_fe_vem_assembly_constant_strain_max_error",
-      "community": 370,
+      "community": 408,
       "norm_label": "constant_strain_max_error()"
     },
     {
@@ -24858,7 +24858,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_fe_vem_assembly_cpp_matrix3d",
-      "community": 370,
+      "community": 408,
       "norm_label": "matrix3d"
     },
     {
@@ -24868,7 +24868,7 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "tests_test_fe_vem_assembly_sample_strain_gradient",
-      "community": 370,
+      "community": 408,
       "norm_label": "sample_strain_gradient()"
     },
     {
@@ -24878,7 +24878,7 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "tests_test_fe_vem_assembly_unit_box_surface",
-      "community": 33,
+      "community": 408,
       "norm_label": "unit_box_surface()"
     },
     {
@@ -24908,7 +24908,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "tests_test_goodier_cavity_solve_scf",
-      "community": 370,
+      "community": 15,
       "norm_label": "solve_scf()"
     },
     {
@@ -24998,7 +24998,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_hex_vem_pipeline",
-      "community": 42,
+      "community": 97,
       "norm_label": "test_hex_vem_pipeline.cpp"
     },
     {
@@ -25008,7 +25008,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "tests_test_hex_vem_pipeline_write_box",
-      "community": 42,
+      "community": 97,
       "norm_label": "write_box()"
     },
     {
@@ -25018,7 +25018,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_hex_vem_pipeline_cpp_path",
-      "community": 42,
+      "community": 97,
       "norm_label": "path"
     },
     {
@@ -25608,7 +25608,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_l_domain",
-      "community": 370,
+      "community": 372,
       "norm_label": "test_l_domain.cpp"
     },
     {
@@ -25618,7 +25618,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "tests_test_l_domain_make_l_hex_mesh",
-      "community": 370,
+      "community": 372,
       "norm_label": "make_l_hex_mesh()"
     },
     {
@@ -25628,7 +25628,7 @@
       "source_location": "L85",
       "_origin": "ast",
       "id": "tests_test_l_domain_lsolve",
-      "community": 370,
+      "community": 372,
       "norm_label": "lsolve"
     },
     {
@@ -25638,7 +25638,7 @@
       "source_location": "L86",
       "_origin": "ast",
       "id": "tests_test_l_domain_lsolve_energy",
-      "community": 370,
+      "community": 372,
       "norm_label": "energy"
     },
     {
@@ -25648,7 +25648,7 @@
       "source_location": "L87",
       "_origin": "ast",
       "id": "tests_test_l_domain_lsolve_peak_vm_at_corner",
-      "community": 370,
+      "community": 372,
       "norm_label": "peak_vm_at_corner"
     },
     {
@@ -25658,7 +25658,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_l_domain_cpp_vectorxd",
-      "community": 370,
+      "community": 372,
       "norm_label": "vectorxd"
     },
     {
@@ -25668,7 +25668,7 @@
       "source_location": "L88",
       "_origin": "ast",
       "id": "tests_test_l_domain_lsolve_u",
-      "community": 370,
+      "community": 372,
       "norm_label": "u"
     },
     {
@@ -25678,7 +25678,7 @@
       "source_location": "L89",
       "_origin": "ast",
       "id": "tests_test_l_domain_lsolve_mesh",
-      "community": 370,
+      "community": 372,
       "norm_label": "mesh"
     },
     {
@@ -25688,7 +25688,7 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "tests_test_l_domain_solve_l",
-      "community": 370,
+      "community": 372,
       "norm_label": "solve_l()"
     },
     {
@@ -25748,7 +25748,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_local_refine",
-      "community": 376,
+      "community": 97,
       "norm_label": "test_local_refine.cpp"
     },
     {
@@ -25758,7 +25758,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "tests_test_local_refine_tets_to_nodal",
-      "community": 376,
+      "community": 97,
       "norm_label": "tets_to_nodal()"
     },
     {
@@ -25768,7 +25768,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_local_refine_cpp_vector",
-      "community": 376,
+      "community": 97,
       "norm_label": "vector"
     },
     {
@@ -25778,7 +25778,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_local_refine_cpp_vector3d",
-      "community": 376,
+      "community": 97,
       "norm_label": "vector3d"
     },
     {
@@ -25788,7 +25788,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_local_refine_cpp_array",
-      "community": 376,
+      "community": 97,
       "norm_label": "array"
     },
     {
@@ -25798,7 +25798,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_local_refine_cpp_uint32_t",
-      "community": 376,
+      "community": 97,
       "norm_label": "uint32_t"
     },
     {
@@ -25808,7 +25808,7 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "tests_test_local_refine_extract_tet4",
-      "community": 376,
+      "community": 97,
       "norm_label": "extract_tet4()"
     },
     {
@@ -25818,7 +25818,7 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "tests_test_local_refine_total_volume",
-      "community": 376,
+      "community": 97,
       "norm_label": "total_volume()"
     },
     {
@@ -25828,7 +25828,7 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "tests_test_local_refine_nearest_tet",
-      "community": 376,
+      "community": 97,
       "norm_label": "nearest_tet()"
     },
     {
@@ -25838,7 +25838,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_local_refine_cpp_size_t",
-      "community": 376,
+      "community": 97,
       "norm_label": "size_t"
     },
     {
@@ -25848,7 +25848,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_material",
-      "community": 42,
+      "community": 97,
       "norm_label": "test_material.cpp"
     },
     {
@@ -25898,7 +25898,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_mms_convergence",
-      "community": 97,
+      "community": 392,
       "norm_label": "test_mms_convergence.cpp"
     },
     {
@@ -25908,7 +25908,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "tests_test_mms_convergence_make_mesh",
-      "community": 97,
+      "community": 392,
       "norm_label": "make_mesh()"
     },
     {
@@ -25918,7 +25918,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_test_mms_convergence_cpp_elementtype",
-      "community": 97,
+      "community": 392,
       "norm_label": "elementtype"
     },
     {
@@ -25928,7 +25928,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "tests_test_mms_convergence_solve_mms_error",
-      "community": 97,
+      "community": 392,
       "norm_label": "solve_mms_error()"
     },
     {
@@ -25938,7 +25938,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "tests_test_mms_convergence_expectation",
-      "community": 97,
+      "community": 392,
       "norm_label": "expectation"
     },
     {
@@ -25948,7 +25948,7 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "tests_test_mms_convergence_expectation_type",
-      "community": 97,
+      "community": 392,
       "norm_label": "type"
     },
     {
@@ -25958,7 +25958,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "tests_test_mms_convergence_expectation_order",
-      "community": 97,
+      "community": 392,
       "norm_label": "order"
     },
     {
@@ -25968,7 +25968,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "tests_test_mms_convergence_expectation_name",
-      "community": 97,
+      "community": 392,
       "norm_label": "name"
     },
     {
@@ -26008,7 +26008,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_p_elevate",
-      "community": 370,
+      "community": 408,
       "norm_label": "test_p_elevate.cpp"
     },
     {
@@ -26018,7 +26018,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "tests_test_p_elevate_patch_max_error",
-      "community": 370,
+      "community": 408,
       "norm_label": "patch_max_error()"
     },
     {
@@ -26678,7 +26678,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_test_zz",
-      "community": 370,
+      "community": 408,
       "norm_label": "test_zz.cpp"
     },
     {
@@ -26688,7 +26688,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_testlab_selfcheck",
-      "community": 409,
+      "community": 94,
       "norm_label": "testlab_selfcheck.cpp"
     },
     {
@@ -26698,7 +26698,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "tests_testlab_selfcheck_write_temp_campaign_tree",
-      "community": 409,
+      "community": 94,
       "norm_label": "write_temp_campaign_tree()"
     },
     {
@@ -26708,7 +26708,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "tests_testlab_selfcheck_cpp_path",
-      "community": 409,
+      "community": 94,
       "norm_label": "path"
     },
     {
@@ -27520,6 +27520,26 @@
       "id": "bench_campaigns_readme_git_lfs",
       "community": 159,
       "norm_label": "git-lfs"
+    },
+    {
+      "label": "README.md",
+      "file_type": "document",
+      "source_file": "bench/campaigns/post-m10-smoke/README.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "bench_campaigns_post_m10_smoke_readme",
+      "community": 413,
+      "norm_label": "readme.md"
+    },
+    {
+      "label": "post-m10-smoke",
+      "file_type": "document",
+      "source_file": "bench/campaigns/post-m10-smoke/README.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "bench_campaigns_post_m10_smoke_readme_post_m10_smoke",
+      "community": 413,
+      "norm_label": "post-m10-smoke"
     },
     {
       "label": "PARETO.md",
@@ -32755,7 +32775,7 @@
       "label": "Background / older phases",
       "file_type": "document",
       "source_file": "docs/progress.md",
-      "source_location": "L23",
+      "source_location": "L27",
       "_origin": "ast",
       "id": "docs_progress_background_older_phases",
       "community": 383,
@@ -32765,7 +32785,7 @@
       "label": "Done",
       "file_type": "document",
       "source_file": "docs/progress.md",
-      "source_location": "L42",
+      "source_location": "L46",
       "_origin": "ast",
       "id": "docs_progress_done",
       "community": 383,
@@ -32775,7 +32795,7 @@
       "label": "Benchmark table",
       "file_type": "document",
       "source_file": "docs/progress.md",
-      "source_location": "L491",
+      "source_location": "L495",
       "_origin": "ast",
       "id": "docs_progress_benchmark_table",
       "community": 383,
@@ -32785,7 +32805,7 @@
       "label": "Open issues",
       "file_type": "document",
       "source_file": "docs/progress.md",
-      "source_location": "L506",
+      "source_location": "L510",
       "_origin": "ast",
       "id": "docs_progress_open_issues",
       "community": 383,
@@ -91946,6 +91966,16 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "bench/campaigns/post-m10-smoke/README.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "bench_campaigns_post_m10_smoke_readme",
+      "target": "bench_campaigns_post_m10_smoke_readme_post_m10_smoke",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "bench/campaigns/settings-frontier-1/PARETO.md",
       "source_location": "L1",
       "weight": 1.0,
@@ -92297,7 +92327,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "docs/progress.md",
-      "source_location": "L64",
+      "source_location": "L68",
       "weight": 1.0,
       "source": "docs_progress",
       "target": "bench_campaigns_varyhedron_baseline_m9_baseline",
@@ -96567,7 +96597,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "docs/progress.md",
-      "source_location": "L26",
+      "source_location": "L30",
       "weight": 1.0,
       "source": "docs_progress",
       "target": "docs_plans_mesher_solver_overhaul",
@@ -97177,7 +97207,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/progress.md",
-      "source_location": "L23",
+      "source_location": "L27",
       "weight": 1.0,
       "source": "docs_progress_progress",
       "target": "docs_progress_background_older_phases",
@@ -97187,7 +97217,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/progress.md",
-      "source_location": "L491",
+      "source_location": "L495",
       "weight": 1.0,
       "source": "docs_progress_progress",
       "target": "docs_progress_benchmark_table",
@@ -97197,7 +97227,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/progress.md",
-      "source_location": "L42",
+      "source_location": "L46",
       "weight": 1.0,
       "source": "docs_progress_progress",
       "target": "docs_progress_done",
@@ -97207,7 +97237,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/progress.md",
-      "source_location": "L506",
+      "source_location": "L510",
       "weight": 1.0,
       "source": "docs_progress_progress",
       "target": "docs_progress_open_issues",
@@ -98845,5 +98875,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "cf0837b35e39b9ab9b195c744fb1cfe684c5fba4"
+  "built_at_commit": "5c7ab94e8a6fdd776ce442f495e7e056148b976e"
 }

@@ -75,4 +75,25 @@ struct DomainClipParams {
     const geom::TriSurface& surface, const Eigen::Vector3d& interior_hint,
     double min_area = 0.0);
 
+/// One tetrahedron used as a solid domain atom for true RVD ∩ Ω (M5).
+/// Vertices must have positive orientation (same as tet_fill).
+struct DomainTet {
+    Eigen::Vector3d v0, v1, v2, v3;
+    Eigen::Vector3d centroid{0, 0, 0};
+};
+
+/// Restricted Voronoi: for each site, export V_i ∩ t for every domain tet t
+/// near the site as a separate convex poly cell. This is the correct product
+/// path for **non-convex** solids (plate_hole) where infinite halfspaces fail.
+/// Interior faces are paired geometrically (centroid weld); boundary faces land
+/// on tet-mesh faces ≈ solid surface.
+/// Requires POLYMESH_WITH_GEOGRAM.
+[[nodiscard]] ClippedVoronoiExport export_rvd_tet_clipped(
+    const ClipBox& domain, std::span<const Eigen::Vector3d> sites,
+    std::span<const DomainTet> tets, double tet_search_radius = 0.0);
+
+[[nodiscard]] ClippedVoronoiExport export_rvd_tet_clipped(
+    const ClipBox& domain, std::span<const CvtSite> sites,
+    std::span<const DomainTet> tets, double tet_search_radius = 0.0);
+
 }  // namespace polymesh::mesh

@@ -791,10 +791,11 @@ Eigen::Vector3d face_unit_normal(const fea::NodalMesh& mesh, const fea::SurfaceF
 
 /// Boundary faces in `box`, optionally filtered so n·t̂ > min_dot when traction
 /// is nonzero. Falls back to box-only if the normal filter empties the set.
-std::vector<fea::SurfaceFace> select_load_faces(const fea::NodalMesh& mesh,
-                                                const Box3& box,
-                                                const Eigen::Vector3d& traction,
-                                                double normal_min_dot) {
+double surface_face_area(const fea::NodalMesh& mesh, const fea::SurfaceFace& f);
+
+std::vector<fea::SurfaceFace> select_load_faces(
+    const fea::NodalMesh& mesh, const Box3& box, const Eigen::Vector3d& traction,
+    double normal_min_dot, std::optional<double> expected_area = std::nullopt) {
     const auto all_faces = free_faces_as_surface(mesh);
     std::vector<fea::SurfaceFace> in_box;
     in_box.reserve(all_faces.size());
@@ -823,15 +824,72 @@ std::vector<fea::SurfaceFace> select_load_faces(const fea::NodalMesh& mesh,
             filtered.push_back(face);
         }
     }
-    return filtered.empty() ? in_box : filtered;
+    if (filtered.empty()) {
+        filtered = in_box;
+    }
+    // When CAD expected_area is known and the mesh free-skin overshoots (RVD
+    // jagged tip, dual interfaces), keep the faces most aligned with traction
+    // and farthest along t̂ until cumulative area is closest to expected.
+    // Traction magnitude is still applied per-face; this only prunes which
+    // free faces carry the load (same total force if area matches CAD).
+    if (expected_area && *expected_area > 0.0 && filtered.size() > 1) {
+        double total = 0.0;
+        for (const auto& f : filtered) {
+            total += surface_face_area(mesh, f);
+        }
+        const double exp = *expected_area;
+        if (total > 1.05 * exp) {
+            struct Ranked {
+                fea::SurfaceFace face;
+                double score = 0.0;
+                double area = 0.0;
+            };
+            std::vector<Ranked> ranked;
+            ranked.reserve(filtered.size());
+            for (const auto& face : filtered) {
+                const Eigen::Vector3d c = face_centroid(mesh, face);
+                const Eigen::Vector3d n = face_unit_normal(mesh, face);
+                Ranked r;
+                r.face = face;
+                r.area = surface_face_area(mesh, face);
+                // Prefer outer tip: large c·t̂ and strong normal alignment.
+                r.score = c.dot(t_hat) + 0.1 * std::abs(n.dot(t_hat));
+                ranked.push_back(std::move(r));
+            }
+            std::sort(ranked.begin(), ranked.end(),
+                      [](const Ranked& a, const Ranked& b) { return a.score > b.score; });
+            std::vector<fea::SurfaceFace> kept;
+            double acc = 0.0;
+            double best_err = 1e300;
+            std::size_t best_n = 0;
+            for (std::size_t i = 0; i < ranked.size(); ++i) {
+                acc += ranked[i].area;
+                kept.push_back(ranked[i].face);
+                const double err = std::abs(acc - exp);
+                if (err < best_err) {
+                    best_err = err;
+                    best_n = kept.size();
+                }
+                // Stop once we are past expected and error is growing.
+                if (acc > exp && err > best_err) {
+                    break;
+                }
+            }
+            if (best_n > 0 && best_n <= kept.size()) {
+                kept.resize(best_n);
+                return kept;
+            }
+        }
+    }
+    return filtered;
 }
 
 Eigen::VectorXd make_loads(const fea::NodalMesh& mesh, const std::vector<LoadSpec>& loads) {
     Eigen::VectorXd f =
         Eigen::VectorXd::Zero(3 * static_cast<Eigen::Index>(mesh.nodes.size()));
     for (const auto& L : loads) {
-        std::vector<fea::SurfaceFace> selected =
-            select_load_faces(mesh, L.box, L.traction, L.normal_min_dot);
+        std::vector<fea::SurfaceFace> selected = select_load_faces(
+            mesh, L.box, L.traction, L.normal_min_dot, L.expected_area);
         if (selected.empty()) {
             // Fallback: distribute total force F = traction * bbox_area_proxy onto
             // nodes in the box (node-lump). Area proxy is not exact; prefer faces.
@@ -917,8 +975,8 @@ int count_orphan_nodes(const fea::NodalMesh& mesh) {
 std::vector<std::uint32_t> nodes_on_load_faces(const fea::NodalMesh& mesh,
                                                const LoadSpec& load,
                                                int* n_faces_out = nullptr) {
-    const auto faces =
-        select_load_faces(mesh, load.box, load.traction, load.normal_min_dot);
+    const auto faces = select_load_faces(mesh, load.box, load.traction,
+                                         load.normal_min_dot, load.expected_area);
     std::set<std::uint32_t> unique;
     for (const auto& face : faces) {
         for (const auto ni : face.nodes) {
@@ -1091,8 +1149,8 @@ ProbeAnswers compute_probes(const fea::NodalMesh& mesh, const fea::Material& mat
         a.n_load_faces = n_faces;
         // Selected face area for Q7 guard (same filter as traction application).
         double area = 0.0;
-        for (const auto& face :
-             select_load_faces(mesh, L0.box, L0.traction, L0.normal_min_dot)) {
+        for (const auto& face : select_load_faces(mesh, L0.box, L0.traction,
+                                                  L0.normal_min_dot, L0.expected_area)) {
             area += surface_face_area(mesh, face);
         }
         a.load_face_area = area;

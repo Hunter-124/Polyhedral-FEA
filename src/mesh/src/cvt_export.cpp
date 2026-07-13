@@ -485,4 +485,394 @@ ClippedVoronoiExport export_clipped_voronoi(const ClipBox& domain,
                                   domain_clip);
 }
 
+namespace {
+
+#if defined(POLYMESH_WITH_GEOGRAM) && POLYMESH_WITH_GEOGRAM
+
+/// Four halfspaces of a tet that keep the tet interior (and `hint` if possible).
+bool tet_keep_planes(const DomainTet& tet, const Eigen::Vector3d& hint,
+                     ClipPlane out[4]) {
+    // Faces: (1,2,3), (0,3,2), (0,1,3), (0,2,1) with positive tet volume.
+    const Eigen::Vector3d* v[4] = {&tet.v0, &tet.v1, &tet.v2, &tet.v3};
+    static constexpr int kFace[4][3] = {{1, 2, 3}, {0, 3, 2}, {0, 1, 3}, {0, 2, 1}};
+    for (int f = 0; f < 4; ++f) {
+        if (!plane_keep_hint(*v[kFace[f][0]], *v[kFace[f][1]], *v[kFace[f][2]],
+                             hint, 1e-30, out[f])) {
+            // Fall back: orient using tet centroid.
+            if (!plane_keep_hint(*v[kFace[f][0]], *v[kFace[f][1]], *v[kFace[f][2]],
+                                 tet.centroid, 1e-30, out[f])) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+bool build_cell_tet(VBW::ConvexCell& cell, const ClipBox& box,
+                    const Eigen::Vector3d& site,
+                    std::span<const Eigen::Vector3d> all_sites, std::size_t self,
+                    const ClipPlane tet_planes[4], std::size_t& n_clips) {
+    if ((box.max.array() <= box.min.array()).any()) {
+        return false;
+    }
+    cell.clear();
+    cell.init_with_box(box.min.x(), box.min.y(), box.min.z(), box.max.x(),
+                       box.max.y(), box.max.z());
+    cell.create_vglobal();
+    for (std::size_t j = 0; j < all_sites.size(); ++j) {
+        if (j == self) {
+            continue;
+        }
+        if ((site - all_sites[j]).squaredNorm() < 1e-30) {
+            continue;
+        }
+        const ClipPlane pl = bisector_keep_site(site, all_sites[j]);
+        cell.clip_by_plane(VBW::make_vec4(pl.a, pl.b, pl.c, pl.d),
+                           static_cast<VBW::global_index_t>(j));
+        if (cell.empty()) {
+            return false;
+        }
+    }
+    // Clip to tet: site may lie outside this tet — V_i ∩ t can still be
+    // non-empty (restricted Voronoi). Do not require site ∈ tet.
+    constexpr VBW::global_index_t kTetVGlobal = static_cast<VBW::global_index_t>(-2);
+    for (int f = 0; f < 4; ++f) {
+        const ClipPlane& pl = tet_planes[f];
+        cell.clip_by_plane(VBW::make_vec4(pl.a, pl.b, pl.c, pl.d), kTetVGlobal);
+        ++n_clips;
+        if (cell.empty()) {
+            return false;
+        }
+    }
+    return !cell.empty();
+}
+
+/// Geometric face key for pairing coplanar interfaces across pieces.
+struct GeoFaceKey {
+    long long cx = 0, cy = 0, cz = 0;
+    bool operator==(const GeoFaceKey& o) const {
+        return cx == o.cx && cy == o.cy && cz == o.cz;
+    }
+};
+struct GeoFaceHash {
+    std::size_t operator()(const GeoFaceKey& k) const noexcept {
+        std::size_t h = static_cast<std::size_t>(k.cx) * 0x9e3779b97f4a7c15ULL;
+        h ^= static_cast<std::size_t>(k.cy) + 0x9e3779b9 + (h << 6) + (h >> 2);
+        h ^= static_cast<std::size_t>(k.cz) + 0x9e3779b9 + (h << 6) + (h >> 2);
+        return h;
+    }
+};
+
+GeoFaceKey face_centroid_key(const std::vector<Eigen::Vector3d>& loop, double inv_eps) {
+    Eigen::Vector3d c = Eigen::Vector3d::Zero();
+    for (const auto& p : loop) {
+        c += p;
+    }
+    c /= static_cast<double>(std::max<std::size_t>(1, loop.size()));
+    GeoFaceKey k;
+    k.cx = llround(c.x() * inv_eps);
+    k.cy = llround(c.y() * inv_eps);
+    k.cz = llround(c.z() * inv_eps);
+    return k;
+}
+
+#endif  // GEOGRAM
+
+}  // namespace
+
+ClippedVoronoiExport export_rvd_tet_clipped(const ClipBox& domain,
+                                            std::span<const Eigen::Vector3d> sites,
+                                            std::span<const DomainTet> tets,
+                                            double tet_search_radius) {
+    ClippedVoronoiExport out;
+    out.stats.n_sites = sites.size();
+    // site_to_cell: first piece for that site (or npos).
+    out.site_to_cell.assign(sites.size(), static_cast<std::size_t>(-1));
+
+#if !(defined(POLYMESH_WITH_GEOGRAM) && POLYMESH_WITH_GEOGRAM)
+    (void)tets;
+    (void)tet_search_radius;
+    out.stats.geogram_ok = false;
+    return out;
+#else
+    if (!geogram_available() || sites.empty() || tets.empty()) {
+        out.stats.geogram_ok = geogram_available();
+        return out;
+    }
+    out.stats.geogram_ok = true;
+    out.stats.domain_clip_used = true;
+    geogram_ensure_initialized();
+
+    const double diag = std::max((domain.max - domain.min).norm(), 1e-30);
+    double R = tet_search_radius;
+    if (!(R > 0.0)) {
+        // Default: enough to cover a site's Voronoi ball (~ few h).
+        R = 0.25 * diag;
+    }
+    const double R2 = R * R;
+
+    // Precompute tet planes once oriented to tet centroid.
+    struct TetReady {
+        DomainTet tet;
+        ClipPlane planes[4];
+        bool ok = false;
+    };
+    std::vector<TetReady> ready;
+    ready.reserve(tets.size());
+    for (const DomainTet& t : tets) {
+        TetReady tr;
+        tr.tet = t;
+        if (tr.tet.centroid.squaredNorm() < 1e-30 &&
+            (tr.tet.v0 - tr.tet.v1).squaredNorm() > 0.0) {
+            tr.tet.centroid = 0.25 * (tr.tet.v0 + tr.tet.v1 + tr.tet.v2 + tr.tet.v3);
+        }
+        tr.ok = tet_keep_planes(tr.tet, tr.tet.centroid, tr.planes);
+        ready.push_back(tr);
+    }
+
+    // Pieces: (site, raw_cell)
+    struct Piece {
+        std::size_t site = 0;
+        RawCell cell;
+    };
+    std::vector<Piece> pieces;
+    pieces.reserve(sites.size() * 4);
+
+    {
+        VBW::ConvexCell cell;
+        for (std::size_t i = 0; i < sites.size(); ++i) {
+            bool any = false;
+            for (const TetReady& tr : ready) {
+                if (!tr.ok) {
+                    continue;
+                }
+                if ((tr.tet.centroid - sites[i]).squaredNorm() > R2) {
+                    // Also accept if any tet vertex is near the site.
+                    const double d0 = (tr.tet.v0 - sites[i]).squaredNorm();
+                    const double d1 = (tr.tet.v1 - sites[i]).squaredNorm();
+                    const double d2 = (tr.tet.v2 - sites[i]).squaredNorm();
+                    const double d3 = (tr.tet.v3 - sites[i]).squaredNorm();
+                    if (std::min(std::min(d0, d1), std::min(d2, d3)) > R2) {
+                        continue;
+                    }
+                }
+                std::size_t n_clips = 0;
+                if (!build_cell_tet(cell, domain, sites[i], sites, i, tr.planes,
+                                    n_clips)) {
+                    continue;
+                }
+                out.stats.n_domain_plane_clips += n_clips;
+                RawCell raw = extract_raw_cell(cell);
+                if (raw.empty || raw.faces.size() < 4) {
+                    continue;
+                }
+                out.stats.sum_cell_volume += raw.volume;
+                pieces.push_back(Piece{i, std::move(raw)});
+                any = true;
+            }
+            if (!any) {
+                ++out.stats.n_empty_cells;
+            }
+        }
+    }
+
+    // Weld + emit pieces as cells; pair coplanar faces by centroid key.
+    const double eps = 1e-9 * diag;
+    const double inv_eps = 1.0 / eps;
+    std::unordered_map<QuantKey, VertexId, QuantHash> weld;
+    auto weld_point = [&](const Eigen::Vector3d& p) -> VertexId {
+        const QuantKey k = quantize(p, inv_eps);
+        if (auto it = weld.find(k); it != weld.end()) {
+            return it->second;
+        }
+        const auto id = static_cast<VertexId>(out.mesh.vertices.size());
+        out.mesh.vertices.push_back(p);
+        weld.emplace(k, id);
+        return id;
+    };
+
+    std::unordered_map<GeoFaceKey, FaceId, GeoFaceHash> geo_faces;
+    // Slightly coarser key for face pairing than vertex weld.
+    const double inv_face = 1.0 / (5e-9 * diag + 1e-16);
+
+    for (Piece& piece : pieces) {
+        if (piece.cell.empty || piece.cell.faces.size() < 4) {
+            continue;
+        }
+        const CellId cid = static_cast<CellId>(out.mesh.cells.size());
+        out.mesh.cells.push_back(Cell{.kind = CellKind::kPolyhedron, .faces = {}});
+        if (out.site_to_cell[piece.site] == static_cast<std::size_t>(-1)) {
+            out.site_to_cell[piece.site] = cid;
+        }
+        ++out.stats.n_cells;
+
+        for (const RawFace& rf : piece.cell.faces) {
+            std::vector<VertexId> loop;
+            loop.reserve(rf.loop.size());
+            for (const auto& p : rf.loop) {
+                loop.push_back(weld_point(p));
+            }
+            {
+                std::vector<VertexId> dedup;
+                for (VertexId v : loop) {
+                    if (dedup.empty() || dedup.back() != v) {
+                        dedup.push_back(v);
+                    }
+                }
+                if (dedup.size() >= 2 && dedup.front() == dedup.back()) {
+                    dedup.pop_back();
+                }
+                loop = std::move(dedup);
+            }
+            if (loop.size() < 3) {
+                continue;
+            }
+
+            // Prefer site-bisector pairing when both sites have pieces.
+            if (rf.neighbour_site != static_cast<std::size_t>(-1) &&
+                rf.neighbour_site < sites.size()) {
+                // Fall through to geometric pairing — multi-piece makes
+                // site-pair keys non-unique across tets.
+            }
+
+            const GeoFaceKey gk = face_centroid_key(rf.loop, inv_face);
+            if (auto it = geo_faces.find(gk); it != geo_faces.end()) {
+                Face& f = out.mesh.faces[it->second];
+                if (!f.neighbour && f.owner != cid) {
+                    f.neighbour = cid;
+                    out.mesh.cells[cid].faces.push_back(it->second);
+                    continue;
+                }
+            }
+            Face face;
+            face.vertices = std::move(loop);
+            face.owner = cid;
+            face.neighbour = std::nullopt;
+            const FaceId fid = static_cast<FaceId>(out.mesh.faces.size());
+            out.mesh.faces.push_back(std::move(face));
+            out.mesh.cells[cid].faces.push_back(fid);
+            geo_faces.emplace(gk, fid);
+        }
+    }
+
+    // Second-pass: pair remaining free faces that share a centroid (multi-piece
+    // RVD interfaces the first geometric map missed).
+    {
+        const double inv = 1.0 / (1e-8 * diag + 1e-16);
+        struct Item {
+            FaceId fid = 0;
+            CellId owner = 0;
+            Eigen::Vector3d c{0, 0, 0};
+            Eigen::Vector3d n{0, 0, 0};
+            double area = 0.0;
+        };
+        std::vector<Item> free_f;
+        free_f.reserve(out.mesh.faces.size());
+        for (std::size_t fi = 0; fi < out.mesh.faces.size(); ++fi) {
+            Face& f = out.mesh.faces[fi];
+            if (f.neighbour || f.vertices.size() < 3) {
+                continue;
+            }
+            Item it;
+            it.fid = static_cast<FaceId>(fi);
+            it.owner = f.owner;
+            for (auto v : f.vertices) {
+                it.c += out.mesh.vertices[v];
+            }
+            it.c /= static_cast<double>(f.vertices.size());
+            for (std::size_t i = 0; i < f.vertices.size(); ++i) {
+                const auto& p = out.mesh.vertices[f.vertices[i]];
+                const auto& q =
+                    out.mesh.vertices[f.vertices[(i + 1) % f.vertices.size()]];
+                it.n.x() += (p.y() - q.y()) * (p.z() + q.z());
+                it.n.y() += (p.z() - q.z()) * (p.x() + q.x());
+                it.n.z() += (p.x() - q.x()) * (p.y() + q.y());
+            }
+            it.area = 0.5 * it.n.norm();
+            if (it.area > 1e-30) {
+                it.n /= (2.0 * it.area);
+            }
+            free_f.push_back(it);
+        }
+        std::unordered_map<GeoFaceKey, std::vector<std::size_t>, GeoFaceHash> buckets;
+        for (std::size_t i = 0; i < free_f.size(); ++i) {
+            GeoFaceKey k;
+            k.cx = llround(free_f[i].c.x() * inv);
+            k.cy = llround(free_f[i].c.y() * inv);
+            k.cz = llround(free_f[i].c.z() * inv);
+            buckets[k].push_back(i);
+        }
+        std::vector<char> used(free_f.size(), 0);
+        for (auto& kv : buckets) {
+            auto& idxs = kv.second;
+            for (std::size_t a = 0; a < idxs.size(); ++a) {
+                if (used[idxs[a]]) {
+                    continue;
+                }
+                for (std::size_t b = a + 1; b < idxs.size(); ++b) {
+                    if (used[idxs[b]]) {
+                        continue;
+                    }
+                    const Item& A = free_f[idxs[a]];
+                    const Item& B = free_f[idxs[b]];
+                    if (A.owner == B.owner) {
+                        continue;
+                    }
+                    if (A.n.dot(B.n) > -0.5) {
+                        continue;
+                    }
+                    const double arel =
+                        std::abs(A.area - B.area) /
+                        std::max({A.area, B.area, 1e-30});
+                    if (arel > 0.35) {
+                        continue;
+                    }
+                    Face& fa = out.mesh.faces[A.fid];
+                    Face& fb = out.mesh.faces[B.fid];
+                    fa.neighbour = B.owner;
+                    for (auto& fid : out.mesh.cells[B.owner].faces) {
+                        if (fid == B.fid) {
+                            fid = A.fid;
+                            break;
+                        }
+                    }
+                    fb.neighbour = A.owner;
+                    fb.vertices.clear();
+                    used[idxs[a]] = 1;
+                    used[idxs[b]] = 1;
+                    break;
+                }
+            }
+        }
+    }
+
+    out.stats.n_vertices = out.mesh.vertices.size();
+    out.stats.n_faces = out.mesh.faces.size();
+    for (const Face& f : out.mesh.faces) {
+        if (f.vertices.empty()) {
+            continue;
+        }
+        if (f.neighbour) {
+            ++out.stats.n_interior_faces;
+        } else {
+            ++out.stats.n_boundary_faces;
+        }
+    }
+    return out;
+#endif
+}
+
+ClippedVoronoiExport export_rvd_tet_clipped(const ClipBox& domain,
+                                            std::span<const CvtSite> sites,
+                                            std::span<const DomainTet> tets,
+                                            double tet_search_radius) {
+    std::vector<Eigen::Vector3d> pos;
+    pos.reserve(sites.size());
+    for (const CvtSite& s : sites) {
+        pos.push_back(s.pos);
+    }
+    return export_rvd_tet_clipped(domain, std::span<const Eigen::Vector3d>(pos), tets,
+                                  tet_search_radius);
+}
+
 }  // namespace polymesh::mesh

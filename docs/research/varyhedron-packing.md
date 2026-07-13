@@ -13,6 +13,15 @@ This note surveys volume-meshing *packing* families relevant to **varyhedron**
 **v1 algorithm choice**. It is intentionally implementation-oriented: what we
 can reimplement under BSD-3 vs wrap as optional plugins.
 
+### Study / vendor path index (measure-first)
+
+Agent-facing notes that expand the advisor program (read with ADR-0023/0024 and
+[advisor-measure-first-program.md](../plans/advisor-measure-first-program.md)):
+
+- **[geogram-cvt-vendoring.md](geogram-cvt-vendoring.md)** — Why Geogram BSD-3 (not clean-room clipped Voronoi); vendor vs write; M9 freeze + M10 wall before G1; dual hard-block; `third_party/` layout + license PR checklist.
+- **[protecting-balls-lfs.md](protecting-balls-lfs.md)** — CDS formula \(r=\min(\alpha h,\beta\cdot\mathrm{lfs})\), \(\alpha\approx0.45\), \(\beta\approx1/3\); corner shrink; sharp-only; plate_hole / icecream risks.
+- **[campaign-metrics.md](campaign-metrics.md)** — Score vs dashboard vs gate; chordal \(e\); healthy \(e\) band; cylinder energy; plate face-mean SCF; never raw nodal max stress.
+
 ---
 
 ## 0. Normative ranking (ADR-0023 / plan — do not ignore)

@@ -16,6 +16,11 @@
 #include "geom/indicators.hpp"
 #include "geom/step.hpp"
 #include "geom/stl.hpp"
+#include "fea/poly_to_vem.hpp"
+#include "mesh/cvt_export.hpp"
+#include "mesh/cvt_lloyd.hpp"
+#include "mesh/cvt_sites.hpp"
+#include "mesh/geogram_clip.hpp"
 #include "mesh/grid_classify.hpp"
 #include "mesh/hex_fill.hpp"
 #include "mesh/hybrid_fill.hpp"
@@ -27,11 +32,6 @@
 #include "mesh/surface_project.hpp"
 #include "mesh/tet_fill.hpp"
 #include "mesh/transition_fill.hpp"
-#include "mesh/cvt_export.hpp"
-#include "mesh/cvt_lloyd.hpp"
-#include "mesh/cvt_sites.hpp"
-#include "mesh/geogram_clip.hpp"
-#include "fea/poly_to_vem.hpp"
 #include "mesh/varyhedron_fill.hpp"
 
 #include <Eigen/Geometry>
@@ -1117,6 +1117,8 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             topo_ptr ? ", geom_source=brep_topology" : ", geom_source=surface_only");
     } else if (mesher == VolumeMesher::kCvtPoly) {
         // G1–G4 product poly path: constrained restricted CVT → clipped cells → VEM.
+        // Free sites are seeded only at surface-interior cell centres (not the
+        // full AABB lattice) so load faces stay on the solid, not the bbox.
         if (!mesh::geogram_available()) {
             throw std::runtime_error(
                 "cvt_poly mesher requires POLYMESH_WITH_GEOGRAM (Geogram ConvexCell)");
@@ -1126,9 +1128,6 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         box.max = model.bbox_max;
         const Eigen::Vector3d ext = (box.max - box.min).cwiseMax(1e-30);
         const double diag = ext.norm();
-        // Lattice density from h so N ~ V/h³ matches N_pred sizing contract.
-        const int n_side = std::max(
-            2, static_cast<int>(std::lround(std::cbrt(ext.prod()) / std::max(h, 1e-12))));
 
         std::optional<geom::CadTopology> topo;
         const geom::CadTopology* topo_ptr = nullptr;
@@ -1144,22 +1143,65 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             }
         }
 
-        mesh::ConstrainedLloydParams params;
-        params.seed.interior_n_side = n_side;
-        params.seed.sharp_sample_stride = 1;
-        params.seed.sharp_min_sep_frac = 0.25 * h / diag;
-        params.lloyd.max_iters = 24;
-        params.lloyd.move_tol_rel = 1e-3;
-        // Same h field as N_pred crude predictor (uniform campaign h).
-        params.lloyd.size_at = [h](const Eigen::Vector3d&) { return h; };
-        params.project_final = (cad_ptr != nullptr);
-        params.wall_band_frac = 0.12;
-        params.sharp_guard_frac = 0.04;
+        // Sharp fixed protectors + free sites from interior grid cells.
+        mesh::ConstrainedSiteSeedParams seed_p;
+        seed_p.interior_n_side = 0;  // no full-AABB lattice; we inject interior free sites
+        seed_p.sharp_sample_stride = 1;
+        seed_p.sharp_min_sep_frac = 0.25 * h / diag;
+        auto seeded = mesh::seed_constrained_cvt_sites(box, topo_ptr, seed_p);
 
-        const auto cvt = mesh::constrained_lloyd_cvt(box, cad_ptr, topo_ptr, params);
+        mesh::CartesianGrid grid =
+            mesh::make_bbox_grid(model.bbox_min, model.bbox_max, h);
+        const auto inside = mesh::classify_cells_inside(model.surface, grid);
+        const double min_sep = seed_p.sharp_min_sep_frac * diag;
+        const double min_sep2 = min_sep * min_sep;
+        std::size_t n_interior_free = 0;
+        for (int k = 0; k < grid.nz; ++k) {
+            for (int j = 0; j < grid.ny; ++j) {
+                for (int i = 0; i < grid.nx; ++i) {
+                    if (!inside[grid.index(i, j, k)]) {
+                        continue;
+                    }
+                    mesh::CvtSite s;
+                    s.pos = grid.cell_center(i, j, k);
+                    s.fixed = false;
+                    bool far = true;
+                    for (const auto& e : seeded.sites) {
+                        if ((e.pos - s.pos).squaredNorm() < min_sep2) {
+                            far = false;
+                            break;
+                        }
+                    }
+                    if (!far) {
+                        continue;
+                    }
+                    seeded.sites.push_back(s);
+                    ++n_interior_free;
+                }
+            }
+        }
+        seeded.n_interior_free = n_interior_free;
+
+        mesh::CvtLloydParams lloyd;
+        lloyd.max_iters = 24;
+        lloyd.move_tol_rel = 1e-3;
+        lloyd.size_at = [h](const Eigen::Vector3d&) { return h; };
+
+        auto sites = seeded.sites;
+        const auto lr = mesh::lloyd_cvt(box, sites, lloyd);
+        for (std::size_t i = 0; i < sites.size() && i < lr.positions.size(); ++i) {
+            if (!sites[i].fixed) {
+                sites[i].pos = lr.positions[i];
+            }
+        }
+        if (cad_ptr) {
+            (void)mesh::project_free_wall_sites(*cad_ptr, topo_ptr, box, sites, 0.12 * diag,
+                                                0.04 * diag);
+        }
+
         std::vector<Eigen::Vector3d> positions;
-        positions.reserve(cvt.sites.size());
-        for (const auto& s : cvt.sites) {
+        positions.reserve(sites.size());
+        for (const auto& s : sites) {
             positions.push_back(s.pos);
         }
         const auto exp = mesh::export_clipped_voronoi(box, positions);
@@ -1168,13 +1210,13 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         fill_h = h;
         out.boundary_quads = fea::extract_boundary_faces(out.mesh);
         out.mesher_note = std::format(
-            "cvt_poly restricted CVT (G4 clipped Voronoi → kPolyVem): "
-            "{} polys, {} nodes, sites={}/fixed={}, lloyd_iters={}, "
-            "sum_vol={:.4g}, n_side={}, h={:.4g} m{}",
-            out.mesh.elements.size(), out.mesh.nodes.size(), cvt.sites.size(),
-            cvt.seed_stats.n_sharp_fixed, cvt.lloyd_stats.n_iters,
-            exp.stats.sum_cell_volume, n_side, h,
-            topo_ptr ? ", geom_source=brep_topology" : ", geom_source=bbox_only");
+            "cvt_poly restricted CVT (interior-seeded + G4 clipped Voronoi → kPolyVem): "
+            "{} polys, {} nodes, sites={}/fixed={}/interior_free={}, lloyd_iters={}, "
+            "sum_vol={:.4g}, grid={}x{}x{}, h={:.4g} m{}",
+            out.mesh.elements.size(), out.mesh.nodes.size(), sites.size(),
+            seeded.n_sharp_fixed, n_interior_free, lr.stats.n_iters,
+            exp.stats.sum_cell_volume, grid.nx, grid.ny, grid.nz, h,
+            topo_ptr ? ", geom_source=brep_topology" : ", geom_source=surface_class");
     } else {
         auto fill = mesh::tet_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
         fill_h = fill.h;

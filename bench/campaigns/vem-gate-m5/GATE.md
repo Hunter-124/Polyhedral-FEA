@@ -1,7 +1,7 @@
-# M5 VEM gate — first campaign result (2026-07-13)
+# M5 VEM gate — campaign results (2026-07-13)
 
-**Verdict: FAIL headline promotion** — `cvt_poly` does **not** beat `hybrid_zoo`
-on plate_hole SCF or cylinder strain energy. Product claim stays **tet FE**;
+**Verdict: FAIL headline promotion** — `cvt_poly` does **not** yet clear the
+gate (health + beat hybrid_zoo on both parts). Product claim stays **tet FE**;
 poly VEM **also ships** via G4 clipped cells + `VolumeMesher::kCvtPoly`.
 
 ## Campaign
@@ -11,32 +11,29 @@ poly VEM **also ships** via G4 clipped cells + `VolumeMesher::kCvtPoly`.
 - Meshers: `cvt_poly` vs `hybrid_zoo`
 - `h_scale=5.0`, feature_refine=true, order=1
 
-## Results (tier 0)
+## Results (tier 0, interior-seeded cvt_poly)
 
-| part       | mesher     | status         | n_elem | n_dof | primary rel_err | note |
-|------------|------------|----------------|--------|-------|-----------------|------|
-| plate_hole | hybrid_zoo | ok             | 4608   | 6192  | SCF 0.51        | health_ok |
-| cylinder   | hybrid_zoo | ok             | 17616  | 19635 | SE 0.13         | health_ok |
-| plate_hole | cvt_poly   | ok             | 126    | 1350  | SCF 0.81        | coarser; stress via VEM LSQ |
-| cylinder   | cvt_poly   | solve_suspect  | 361    | 5778  | SE 0.28         | load_area_ok=false |
+| part       | mesher     | status         | n_elem | n_dof | primary rel_err | health / load_area |
+|------------|------------|----------------|--------|-------|-----------------|--------------------|
+| plate_hole | hybrid_zoo | ok             | 4608   | 6192  | SCF 0.51        | ok / ok |
+| cylinder   | hybrid_zoo | ok             | 17616  | 19635 | SE 0.13         | ok / ok |
+| plate_hole | cvt_poly   | solve_suspect  | 190    | 2346  | SCF 0.56        | fail / fail |
+| cylinder   | cvt_poly   | solve_suspect  | 402    | 6309  | **SE 0.087**    | fail / fail |
 
-## What landed for the gate substrate
+Note: cylinder **strain energy** already beats hybrid_zoo (0.087 < 0.13) at far
+lower DOF — but `load_area_ok=false` and plate SCF does not win, so gate fails.
 
-- `VolumeMesher::kCvtPoly` — constrained Lloyd + clipped export → `kPolyVem`
-- `fea::poly_mesh_to_vem` — PolyMesh → NodalMesh
-- `recover_element_centroid_stress` for kPolyVem (constant-strain LSQ) so SCF
-  is no longer stuck at 0
-- CLI / testlab parse: `cvt_poly` | `cvt` | `restricted_cvt`
+## Substrate landed
 
-## Why not done
-
-ADR-0024 Q10: promote only when **energy/DOF and SCF beat hybrid_zoo** on
-**both** parts. Neither metric wins; cylinder fails load-area health on the
-bbox-restricted CVT (needs tighter OCC domain clip / more sites — G3/G4 follow-on).
+- `VolumeMesher::kCvtPoly` — sharp fixed sites + **surface-interior** free seeds
+  (`classify_cells_inside`) + Lloyd ρ=1/h³ + clipped Voronoi → `kPolyVem`
+- `fea::poly_mesh_to_vem` + VEM constant-strain LSQ centroid stress
+- CLI / testlab: `cvt_poly` | `cvt` | `restricted_cvt`
 
 ## Next to flip M5 → done
 
-1. Domain = true solid (not bbox): clip sites/cells to BRep interior
-2. Site count / h field matching N_pred more tightly on curved walls
-3. Load-face filtering for cvt_poly boundary facets
-4. Re-run this campaign; require health_ok + lower rel_err than hybrid_zoo on both parts
+1. Clip Voronoi cells to BRep interior (not only AABB) so load faces sit on the
+   solid tip/cap with correct area
+2. Better wall-site density on load faces
+3. Re-run; require `health_ok` + lower primary rel_err than hybrid_zoo on **both**
+   plate_hole (SCF) and cylinder (SE)

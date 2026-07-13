@@ -72,14 +72,18 @@ ConstrainedSiteSeedResult seed_constrained_cvt_sites(
     }
 
     // Free interior lattice; skip points too close to fixed sharp sites.
-    auto lattice = seed_lattice_sites(domain, params.interior_n_side);
-    for (CvtSite& s : lattice) {
-        s.fixed = false;
-        if (!far_enough(s.pos, min_sep2, out.sites)) {
-            continue;
+    // interior_n_side ≤ 0 means caller injects free sites itself (e.g. surface-
+    // interior cell centres for cvt_poly product path).
+    if (params.interior_n_side > 0) {
+        auto lattice = seed_lattice_sites(domain, params.interior_n_side);
+        for (CvtSite& s : lattice) {
+            s.fixed = false;
+            if (!far_enough(s.pos, min_sep2, out.sites)) {
+                continue;
+            }
+            out.sites.push_back(s);
+            ++out.n_interior_free;
         }
-        out.sites.push_back(s);
-        ++out.n_interior_free;
     }
     return out;
 }

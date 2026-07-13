@@ -2,6 +2,8 @@
 
 - Status: accepted for v1 path (2026-07-12); **ranking pivoted** by
   [ADR-0023](../decisions/0023-measure-first-tet-primary-cvt-path.md)
+- **Canonical agent plan:** [docs/plans/advisor-measure-first-program.md](../plans/advisor-measure-first-program.md)
+- **Advisor answers (normative Q&A):** [ADR-0024](../decisions/0024-advisor-measure-answers.md)
 - Related: [ADR-0021](../decisions/0021-varyhedron-packing.md), [ADR-0020](../decisions/0020-brep-volume-meshing.md),
   [ADR-0019](../decisions/0019-mixed-fe-vem-adaptive-order-core.md), [ADR-0002](../decisions/0002-license-bsd3.md)
 - Microbench: [`bench/packing/run_packing_microbench.py`](../../bench/packing/run_packing_microbench.py)
@@ -13,7 +15,12 @@ can reimplement under BSD-3 vs wrap as optional plugins.
 
 ---
 
-## 0. Normative ranking (ADR-0023 — do not ignore)
+## 0. Normative ranking (ADR-0023 / plan — do not ignore)
+
+**Program map:** [advisor-measure-first-program.md](../plans/advisor-measure-first-program.md)
+§4.4–4.5 and [ADR-0024](../decisions/0024-advisor-measure-answers.md). Do not
+start packing-algorithm loops until **M9 baseline freeze** and wall projection
+(M3b/M10); then vendor **Geogram** (BSD-3) for clipped Voronoi — never clean-room.
 
 **Substrate to keep:** protected seeds + graded tet scaffold + live BRep oracle
 (sizing/snapping/conformity query OCC throughout). Algorithm family is
@@ -21,20 +28,21 @@ secondary to the oracle property.
 
 | Rank | Family | Role for us |
 | --- | --- | --- |
-| 1 | **Weighted restricted CVT** + clipped Voronoi (Yan–Wang–Lévy; Geogram BSD-3) | Target seed relaxation + **polyhedra = clipped cells** (skip fragile dual for interior) |
+| 1 | **Weighted restricted CVT** + clipped Voronoi (Yan–Wang–Lévy; **Geogram** BSD-3) | Target seed relaxation + **polyhedra = clipped cells** (skip fragile dual for interior) |
 | 2 | Lattice + clip | Fast bulk fallback |
 | 3 | Advancing front | Boundary layers only if we invest later |
 | 4 | Raw bubble packing | **Keep seeds**; replace dynamics with CVT iterations |
+| deferred | Dual-of-tet → VEM | Hard-block median dual until CVT cells exist; poly export only if external demand |
 | deferred | Frame-field hex-dominant | Multi-year robustness swamp — research, not core bet |
-| gated | Dual-of-tet → VEM | Ship as poly export only; **headline only if M5 gate** beats hybrid_zoo |
+| gated | Poly VEM headline | Ship as poly export only; **headline only if M5 gate** beats hybrid_zoo |
 
 **Protect only sharp CAD edges** (G0). OCC seams and smooth dihedrals must not
 get protecting balls. Walls = free-sliding nodes + tangential smooth + surface
 project.
 
-**Measure before packing loops:** probes, CAD-tagged BC/probe, chordal
-efficiency + normal deviation (program nodes M1–M2). Wireframes are artifacts,
-not rewards.
+**Measure before packing loops:** probes, scorecard, chordal efficiency +
+normal deviation, load-area guard (program nodes M1–M4, M6–M9). Wireframes /
+PNG are artifacts, **not** rewards — reward = scorecard + accuracy metrics.
 
 ---
 

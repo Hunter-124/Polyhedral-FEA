@@ -4,6 +4,14 @@ Repeatable DAG node `feedback-loop` (`docs/dag/PROGRAM.yaml`). After each
 settings campaign accumulates data, mine it, propose (or apply) default
 knob deltas, re-measure.
 
+**Measure-first constraint:** packing / algorithm loops run only after **M9
+baseline freeze** on an honest scorecard. The reward for ranking configs is
+`scorecard` + accuracy probes (`mean_vm_over_nominal` / `strain_energy` /
+`tip_deflection` as appropriate) — **not** wire PNG, residual alone, or raw
+nodal \(\sigma_{\max}\). Normative map:
+[docs/plans/advisor-measure-first-program.md](../plans/advisor-measure-first-program.md);
+result schema: [docs/dag/interfaces.md](../dag/interfaces.md).
+
 ## Tooling
 
 ```bash

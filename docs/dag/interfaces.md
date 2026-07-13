@@ -5,6 +5,11 @@ These file formats are the contract between the test-lab harness
 Change them only by editing this file in the same commit as the code change.
 All units SI (m, Pa, N, kg, s); all times in milliseconds wall clock.
 
+**Agent strategy:** [docs/plans/advisor-measure-first-program.md](../plans/advisor-measure-first-program.md)
+(ADRs [0023](../decisions/0023-measure-first-tet-primary-cvt-path.md),
+[0024](../decisions/0024-advisor-measure-answers.md)). Reward = scorecard +
+honest accuracy probes — never wire PNG, never raw nodal max stress.
+
 ## 1. Campaign spec — `bench/campaigns/<name>/campaign.json`
 
 Declares what to sweep. Written by hand or by the GUI.
@@ -71,30 +76,41 @@ this is the accumulated simulation data the feedback loop mines.
   "n_elems": 31956, "n_nodes": 11935, "n_dof": 35805,
   "quality": { "M1max": 1.0e-11, "M2max": 0.36, "M6": 0.17, "score": 0.42 },
   "answers": {
-    "sigma_max": 9.12e7,
-    "tip_deflection": 1.2e-4,       // PRIMARY: face-mean |u| on load select box
+    // --- stress ---
+    "sigma_max": 9.12e7,            // DIAGNOSTIC only: global nodal max VM (never campaign score)
+    "sigma_face_mean": 3.06e6,      // SCORE: area-wtd face-region VM at element centroids (quality-pass)
+    "sigma_p99": 4.1e6,             // DASHBOARD: p99 element-centroid VM, quality-filtered
+    "n_quality_excluded": 12,       // elems dropped from p99 / face-mean by quality floor
+    // --- energy / displacement ---
+    "strain_energy": 0.00393,       // ½ uᵀKu (J); primary score for cylinder / no closed-form
+    "tip_deflection": 1.2e-4,       // face-mean |u| on load select (BC/RBM health; secondary)
     "tip_deflection_max": 1.5e-4,   // diagnostic global max |u| only
+    // --- load-face selection audit ---
+    "load_face_area": 0.00785,      // selected load face area (m²)
+    "load_area_rel_err": 0.01,      // |A_sel − A_expected| / A_expected when expected_area set
     "n_probe_nodes": 48,
     "n_load_faces": 12
   },
   "health": {
-    "free_residual_rel": 1.2e-12,   // ||(Ku-f)_free|| / ||f||
+    "free_residual_rel": 1.2e-12,   // ||(Ku−f)_free|| / ||f||
     "reaction_sum_err": 0.01,       // |F+R| / max(|F|,eps); free force vs reactions
     "n_orphans": 0,
     "n_bc_dofs": 36,
-    "ok": true
+    "load_area_ok": true,           // false if expected_area set and rel_err > 2%
+    "ok": true                      // residual ∧ reaction ∧ orphans ∧ load_area_ok
   },
-  "n_pred_elems": 4200,             // C·V/h³ before mesh (M4)
+  "n_pred_elems": 4200,             // C·V/h³ (later ∫ dV/h³) logged before mesh (M4)
   "n_elems_over_pred": 1.1,         // actual/pred after mesh
-  "over_budget_cause": null,        // null | sizing | mesher | budget
+  "over_budget_cause": null,        // null | "sizing" | "mesher" | "budget"
+  // sizing: N_pred ≫ tier; mesher: N_pred OK but N_actual ≫ N_pred; budget: hard-kill (≈2× DOF / wall-clock)
   "scorecard": {
     "edge_hausdorff_over_h": 0.04,  // sharp CAD edges only; null without CAD
-    "chordal_efficiency_max": 1.2,  // d_actual/(ℓ²κ/8); ≫1 wastes budget
-    "normal_dev_deg_max": 8.2,      // null if unavailable
+    "chordal_efficiency_max": 1.2,  // d_i/(ℓ_i² κ/8) with OCC κ; healthy ≈ [0.8, 3]
+    "normal_dev_deg_max": 8.2,      // surface normal deviation (deg); null if unavailable
     "n_dof": 35805,
-    "accuracy_rel_err": 0.02,       // first metric rel_err
+    "accuracy_rel_err": 0.02,       // first metric rel_err (case-specific probe)
     "min_element_quality": 0.17,    // quality.M6 when present
-    "solve_residual_rel": 1.2e-12,
+    "solve_residual_rel": 1.2e-12,  // free residual (gate, not score)
     "health_ok": true
   },
   "accuracy": { "metric": "scf", "value": 3.06, "truth": 3.0, "rel_err": 0.02 },
@@ -102,20 +118,67 @@ this is the accumulated simulation data the feedback loop mines.
 }
 ```
 
-**Probe primary.** Displacement metrics (`max_displacement`, `tip_deflection`,
-`mean_ux_on_face`, `mean_uz_on_face`) use the **face-mean** of |u| (or signed
-dominant-load component) over unique nodes of boundary faces whose centroids
-fall in the first load select box — never global max as the primary answer.
-Global max is recorded only as `tip_deflection_max` for diagnostics. If no
-faces match, fall back to nodes in the load box; if still empty, tip = 0
-(fail-closed). Stress probes (`max_von_mises`, SCF) still use global max VM.
+### Answers roles (normative)
 
-**Health.** After every successful mesh+solve the harness rebuilds `K`,
-forms `r = Ku − f`, and reports free residual and reaction balance. Gates:
-`free_residual_rel ≤ 1e-6` (direct), `reaction_sum_err ≤ 0.05`,
-`n_orphans == 0`. Failure → `health.ok = false`, `status = solve_suspect`,
-accuracy scores zeroed (measured values still recorded for debug). Analyze
-should filter on `status == "ok"` and/or `health.ok`.
+| Field | Role |
+|-------|------|
+| `sigma_face_mean` | **Score** stress (area-weighted face-mean VM on tagged region; element-centroid samples of quality-passing elements) |
+| `strain_energy` | **Score** when no closed-form stress (cylinder; analytic or frozen Richardson) |
+| `tip_deflection` | **Secondary health** (BC/RBM; face-mean \|u\| on load select) |
+| `sigma_p99` | **Dashboard** only (quality-filtered p99); log `n_quality_excluded` |
+| `sigma_max` | **Diagnostic only** — raw nodal max VM; **must never** be campaign score |
+| `tip_deflection_max` | Diagnostic global max \|u\| |
+| `load_face_area` / `load_area_rel_err` | Load-select audit; gate via `health.load_area_ok` |
+
+### Probe kinds (scoring)
+
+Declared on reference metrics (`bench/reference/<part>.json` → `probe.kind`):
+
+| `probe.kind` | Returns | Campaign role |
+|--------------|---------|---------------|
+| `mean_vm_over_nominal` / `scf` / `scf_mean` | `sigma_face_mean / nominal` | **Score** SCF (plate_hole hole neighborhood) |
+| `mean_vm` / `mean_von_mises` / `face_mean_vm` | `sigma_face_mean` | **Score** stress magnitude |
+| `strain_energy` / `energy` | `strain_energy` | **Score** energy (cylinder primary) |
+| `tip_deflection` / `max_displacement` / face-mean u components | face-mean \|u\| (or signed load-dir) | **Secondary** health / tip |
+| `sigma_p99` / `p99_vm` | `sigma_p99` | Dashboard only |
+| `max_von_mises` / raw nodal max | `sigma_max` | **Diagnostic only — never campaign score** |
+
+Displacement metrics use the **face-mean** of |u| (or signed dominant-load
+component) over unique nodes of boundary faces whose centroids fall in the
+first load select box — never global max as the primary answer. Global max is
+`tip_deflection_max` only. If no faces match, fall back to nodes in the load
+box; if still empty, tip = 0 (fail-closed).
+
+### Health
+
+After every successful mesh+solve the harness rebuilds `K`, forms `r = Ku − f`,
+and reports free residual and reaction balance. Gates:
+
+- `free_residual_rel ≤ 1e-6` (direct)
+- `reaction_sum_err ≤ 0.05`
+- `n_orphans == 0`
+- `load_area_ok` (see load select below)
+
+Failure → `health.ok = false`, `status = solve_suspect`, accuracy scores
+zeroed (measured values still recorded for debug). Analyze should filter on
+`status == "ok"` and/or `health.ok`. Residual is a **gate**, not a score axis.
+
+### Status values
+
+| `status` | Meaning |
+|----------|---------|
+| `ok` | Mesh + solve + health gates passed |
+| `solve_suspect` | Solved but health failed (residual / reaction / orphans / load area) |
+| `mesh_fail` | Mesher error |
+| `solve_fail` | Solver error / non-convergence |
+| `over_budget` | Hard-kill on DOF (~2× tier) or wall-clock; see `over_budget_cause` |
+
+### Over-budget diagnosis
+
+- Log `n_pred_elems` **before** meshing (`C · V / h³`, later size-field integral).
+- `n_pred` ≫ tier → `over_budget_cause = "sizing"`.
+- `n_pred` OK, `n_elems` ≫ `n_pred` → `"mesher"`.
+- Hard resource kill → `"budget"`.
 
 `geom_class` is computed from the part geometry (not the config) so the
 feedback loop can learn per-condition presets: fraction of surface area with
@@ -152,7 +215,10 @@ Binds a geometry file to loads/BCs and to its reference truth.
       "fix": [true, true, true] }
   ],
   "loads": [
-    { "select": { "box": [[0.049,-1e9,-1e9],[1e9,1e9,1e9]] },
+    { "select": {
+        "box": [[0.049,-1e9,-1e9],[1e9,1e9,1e9]],
+        "expected_area": 0.01        // optional; m² of intended CAD face
+      },
       "traction": [1.0e6, 0, 0] }
   ],
   "reference": "bench/reference/plate_hole.json"
@@ -162,6 +228,13 @@ Binds a geometry file to loads/BCs and to its reference truth.
 Face selection is by axis-aligned box over face centroids (the only robust
 selector on tessellated fixtures). Selectors must be written with slack so
 they are h-independent.
+
+**Load select `expected_area` guard (±2%).** When `loads[].select.expected_area`
+is set, the harness compares selected load face area to that value. If
+`|A_sel − A_expected| / A_expected > 0.02`, then `health.load_area_ok = false`,
+`health.ok = false`, and `status = solve_suspect`. Boxes remain OK for planar
+axis-aligned fixtures; true BRep face tags come later (before curved loads /
+geometry sweeps).
 
 ## 5. Reference truth — `bench/reference/<part>.json`
 
@@ -174,11 +247,19 @@ derivation in `docs/validation/hand-calcs.md`).
   "part": "plate_hole",
   "metrics": [
     { "name": "scf", "value": 3.0, "tol": 0.05,
-      "probe": { "kind": "max_vm_over_nominal", "nominal": 1.0e6 },
+      "probe": {
+        "kind": "mean_vm_over_nominal",   // SCORE: face-mean VM / σ∞ (not max_von_mises)
+        "nominal": 1.0e6,
+        "select": { "box": [[-0.015,-0.015,-1e9],[0.015,0.015,1e9]] }
+      },
       "derivation": "docs/validation/hand-calcs.md#kirsch-plate" }
   ]
 }
 ```
+
+Scoring probe kinds (see §3 answers table): `mean_vm_over_nominal` / `scf`,
+`strain_energy`, `tip_deflection`. **`max_von_mises` is diagnostic-only** and
+must not appear as a campaign score metric.
 
 ## 6. Live solve progress — `<run_dir>/progress.json`
 
@@ -293,3 +374,8 @@ grok -p --yolo --permission-mode bypassPermissions \
 Must embed bootstrap sync rules, trend tables, shot paths, and the next
 experiment instruction. Schema changes to handoff fields require this section
 and the writer script in the same commit.
+
+`open_program_nodes` should list open measure / Geogram / follow-on nodes as
+applicable: **M6–M14**, **G0–G4**, **V6d**, **V6e**, **V10c**, **V11** (plus
+any other still-open board IDs). Do not invent packing-loop work before **M9**
+baseline freeze — see agent strategy plan above.

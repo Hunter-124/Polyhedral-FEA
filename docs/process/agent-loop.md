@@ -1,10 +1,18 @@
 # Agent loop — harness rules for finishing PolyMesh
 
 ## Source of truth
-1. **`docs/ROADMAP.md`** — full epic DAG and exit criteria  
-2. **`docs/progress.md`** — done log + open issues  
-3. **In-session todos** — active epic only (≤12 items)  
-4. **`docs/phases.md`** — formal gates (do not skip ⛔ without owner)
+1. **`docs/plans/advisor-measure-first-program.md`** — active measure-first /
+   CVT program (claim board nodes here first)  
+2. **`docs/ROADMAP.md`** — full epic DAG and exit criteria  
+3. **`docs/progress.md`** — done log + open issues  
+4. **In-session todos** — active epic only (≤12 items)  
+5. **`docs/phases.md`** — formal gates (do not skip ⛔ without owner)
+
+**Packing / CVT loops:** only after **M9 baseline freeze** (and wall
+projection M3b/M10 before Geogram). Reward signal is the five-number
+**scorecard + accuracy probes** in `results.jsonl` / `scorecard` — never wire
+PNG, residual alone, or raw nodal max stress. See the plan and
+`docs/dag/interfaces.md`.
 
 ## Session start checklist
 ```bash

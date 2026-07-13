@@ -4,30 +4,40 @@
 #include "geom/stl.hpp" // detail::weld
 
 #include <cctype>
+#include <cmath>
 #include <format>
+#include <limits>
 #include <utility>
 
 #ifdef POLYMESH_WITH_OCC
 
+#include <BRepAdaptor_Surface.hxx>
 #include <BRepBndLib.hxx>
+#include <BRepExtrema_DistShapeShape.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
 #include <BRepTools.hxx>
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
 #include <Bnd_Box.hxx>
+#include <GeomAPI_ProjectPointOnSurf.hxx>
+#include <Geom_Surface.hxx>
 #include <IFSelect_ReturnStatus.hxx>
 #include <Poly_Triangulation.hxx>
+#include <Precision.hxx>
 #include <STEPControl_Reader.hxx>
+#include <TopAbs.hxx>
 #include <TopAbs_Orientation.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopLoc_Location.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Face.hxx>
 #include <TopoDS_Shape.hxx>
+#include <TopoDS_Vertex.hxx>
+#include <gp_Pnt.hxx>
 #include <gp_Trsf.hxx>
+#include <gp_Vec.hxx>
 
 #include <algorithm>
-#include <cmath>
 #include <fstream>
 
 #endif // POLYMESH_WITH_OCC
@@ -196,6 +206,138 @@ void CadModel::compute_bbox() {
     fill_bbox(impl_->shape, bbox_min_, bbox_max_);
 }
 
+namespace {
+
+/// Outward-ish unit normal on `face` at 3D point `q` (UV via surface project).
+bool face_normal_at(const TopoDS_Face& face, const gp_Pnt& q, gp_Vec& n_out) {
+    const Handle(Geom_Surface) surf = BRep_Tool::Surface(face);
+    if (surf.IsNull()) {
+        return false;
+    }
+    GeomAPI_ProjectPointOnSurf proj(q, surf);
+    if (proj.NbPoints() < 1) {
+        return false;
+    }
+    Standard_Real u = 0.0;
+    Standard_Real v = 0.0;
+    proj.LowerDistanceParameters(u, v);
+    BRepAdaptor_Surface asurf(face, Standard_True);
+    gp_Pnt pnt;
+    gp_Vec d1u, d1v;
+    asurf.D1(u, v, pnt, d1u, d1v);
+    gp_Vec n = d1u.Crossed(d1v);
+    if (n.SquareMagnitude() <= Precision::SquareConfusion()) {
+        return false;
+    }
+    n.Normalize();
+    if (face.Orientation() == TopAbs_REVERSED) {
+        n.Reverse();
+    }
+    n_out = n;
+    return true;
+}
+
+/// Closest point on a single face (trimmed) via BRepExtrema.
+bool project_on_face(const TopoDS_Vertex& vtx, const TopoDS_Face& face, gp_Pnt& closest,
+                     double& dist, gp_Vec& normal) {
+    BRepExtrema_DistShapeShape dss(vtx, face);
+    dss.Perform();
+    if (!dss.IsDone() || dss.NbSolution() < 1) {
+        // Fallback: infinite-surface project (ignores face trim).
+        const Handle(Geom_Surface) surf = BRep_Tool::Surface(face);
+        if (surf.IsNull()) {
+            return false;
+        }
+        const gp_Pnt q = BRep_Tool::Pnt(vtx);
+        GeomAPI_ProjectPointOnSurf proj(q, surf);
+        if (proj.NbPoints() < 1) {
+            return false;
+        }
+        closest = proj.NearestPoint();
+        dist = proj.LowerDistance();
+        return face_normal_at(face, closest, normal);
+    }
+    dist = static_cast<double>(dss.Value());
+    closest = dss.PointOnShape2(1);
+    if (!face_normal_at(face, closest, normal)) {
+        normal = gp_Vec(0, 0, 0);
+    }
+    return true;
+}
+
+} // namespace
+
+std::optional<ProjectResult> project_point_on_surface(const CadModel& model,
+                                                      const Eigen::Vector3d& p) {
+    if (model.empty() || model.shape_handle() == nullptr) {
+        return std::nullopt;
+    }
+    const auto* shape = static_cast<const TopoDS_Shape*>(model.shape_handle());
+
+    BRep_Builder builder;
+    TopoDS_Vertex vtx;
+    builder.MakeVertex(vtx, gp_Pnt(p.x(), p.y(), p.z()), Precision::Confusion());
+
+    double best_dist = std::numeric_limits<double>::infinity();
+    gp_Pnt best_pt;
+    gp_Vec best_n(0, 0, 0);
+    bool found = false;
+
+    // Per-face extrema (respects trim) — preferred over whole-shape when we
+    // need a supporting face for the normal.
+    for (TopExp_Explorer exp(*shape, TopAbs_FACE); exp.More(); exp.Next()) {
+        const TopoDS_Face& face = TopoDS::Face(exp.Current());
+        gp_Pnt closest;
+        double dist = 0.0;
+        gp_Vec n(0, 0, 0);
+        if (!project_on_face(vtx, face, closest, dist, n)) {
+            continue;
+        }
+        if (dist < best_dist) {
+            best_dist = dist;
+            best_pt = closest;
+            best_n = n;
+            found = true;
+        }
+    }
+
+    // Whole-shape fallback if face loop failed (degenerate / empty face map).
+    if (!found) {
+        BRepExtrema_DistShapeShape dss(vtx, *shape);
+        dss.Perform();
+        if (!dss.IsDone() || dss.NbSolution() < 1) {
+            return std::nullopt;
+        }
+        best_dist = static_cast<double>(dss.Value());
+        best_pt = dss.PointOnShape2(1);
+        const TopoDS_Shape support = dss.SupportOnShape2(1);
+        if (support.ShapeType() == TopAbs_FACE) {
+            (void)face_normal_at(TopoDS::Face(support), best_pt, best_n);
+        }
+        found = true;
+    }
+
+    if (!found || !std::isfinite(best_dist)) {
+        return std::nullopt;
+    }
+
+    ProjectResult r;
+    r.point = Eigen::Vector3d(best_pt.X(), best_pt.Y(), best_pt.Z());
+    if (best_n.SquareMagnitude() > Precision::SquareConfusion()) {
+        best_n.Normalize();
+        r.normal = Eigen::Vector3d(best_n.X(), best_n.Y(), best_n.Z());
+    } else {
+        // Fallback geometric normal from query → projected point.
+        const Eigen::Vector3d d = r.point - p;
+        const double len = d.norm();
+        if (len > 1e-15) {
+            r.normal = d / len;
+        }
+    }
+    r.distance = best_dist;
+    return r;
+}
+
 #else // !POLYMESH_WITH_OCC
 
 struct CadModel::Impl {};
@@ -225,6 +367,12 @@ TriSurface CadModel::tessellate(double /*deflection*/) const {
 const void* CadModel::shape_handle() const noexcept { return nullptr; }
 
 void CadModel::compute_bbox() {}
+
+std::optional<ProjectResult> project_point_on_surface(const CadModel& /*model*/,
+                                                      const Eigen::Vector3d& /*p*/) {
+    // Stub without OCC: no BRep oracle (STL-only builds keep surface snap only).
+    return std::nullopt;
+}
 
 #endif // POLYMESH_WITH_OCC
 

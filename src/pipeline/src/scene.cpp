@@ -1069,9 +1069,17 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             }
         }
 
+        // Live BRep for M10 wall free-slide + OCC re-project (optional).
+        const geom::CadModel* cad_ptr = nullptr;
+        if (model.cad && !model.cad->empty()) {
+            cad_ptr = &(*model.cad);
+        } else if (cad_reload && !cad_reload->empty()) {
+            cad_ptr = &(*cad_reload);
+        }
+
         auto fill = mesh::varyhedron_fill_surface(
             model.surface, model.bbox_min, model.bbox_max, h, std::max(1, skin_layers), edges,
-            feature_band, seeds, band, turn_deg, topo_ptr);
+            feature_band, seeds, band, turn_deg, topo_ptr, cad_ptr, /*wall_smooth_iters=*/4);
         fill_h = fill.h_fine;
         out.mesh.nodes = std::move(fill.mesh.nodes);
         out.mesh.elements.reserve(fill.mesh.tets.size());
@@ -1085,18 +1093,20 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         }
         // Packing-seed engine (ADR-0023): sharp-only protect; dual deferred; CVT path later.
         // Protect radii sized by min(α h, β lfs) (CDS / advisor Q6).
+        // M10: wall free-slide + OCC surface re-project after sharp snap.
         out.mesher_note = std::format(
             "varyhedron packing (sharp-only edge protect + interior bubble seeds + graded "
-            "scaffold + sharp snap; dual deferred; CVT target): "
+            "scaffold + sharp snap + wall OCC project; dual deferred; CVT target): "
             "{} tets, edge_seeds={}, r_protect=[{:.3g},{:.3g}], "
             "sharp/smooth/seam={}/{}/{}, vol_seeds={}, pack_relax={}, "
             "pack_fill={:.3g}, h_bulk={:.4g}/h_fine={:.4g} m, edge_Hd={:.3g} m "
-            "(rel={:.3g}, /h={:.3g}, e_chord={:.3g}){}",
+            "(rel={:.3g}, /h={:.3g}, e_chord={:.3g}), wall_nodes={}/moved={}/iters={}{}",
             out.mesh.elements.size(), fill.n_edge_seeds, fill.min_protect_radius,
             fill.max_protect_radius, fill.n_sharp_edges, fill.n_smooth_edges, fill.n_seam_edges,
             fill.n_volume_seeds, fill.n_pack_relax_iters, fill.pack_fill_frac, fill.h_coarse,
             fill.h_fine, fill.edge_profile_hausdorff_max, fill.edge_profile_rel,
-            fill.edge_hausdorff_over_h, fill.edge_chordal_efficiency_max,
+            fill.edge_hausdorff_over_h, fill.edge_chordal_efficiency_max, fill.n_wall_nodes,
+            fill.n_wall_moved, fill.n_wall_iters,
             topo_ptr ? ", geom_source=brep_topology" : ", geom_source=surface_only");
     } else {
         auto fill = mesh::tet_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);

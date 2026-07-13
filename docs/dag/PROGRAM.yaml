@@ -593,14 +593,17 @@ nodes:
 
   - id: M10
     title: Wall tangential smooth + OCC surface project
-    status: todo
+    status: done
     deps: [M9]
     scope: [src/mesh/, src/geom/, src/pipeline/]
     note: >
-      ADR-0024 Q2(a) + plan docs/plans/advisor-measure-first-program.md §4.1/§5.
-      Free-slide on smooth faces; project displacement to tangent;
-      GeomAPI_ProjectPointOnSurf re-project. Shared post-pass for future CVT.
-      Do not start before M9 freeze.
+      DONE 2026-07-12 (ADR-0024 Q2(a)): geom::project_point_on_surface(CadModel,p)
+      → optional ProjectResult{point,normal,distance} via BRepExtrema_DistShapeShape
+      per face + GeomAPI_ProjectPointOnSurf UV/normal; stub nullopt without OCC.
+      mesh::wall_tangential_project shared post-pass (Jacobian-safe); hooked in
+      varyhedron_fill after sharp snap when CadModel present (wall_smooth_iters).
+      Pipeline kVaryhedron passes live cad. Catch2: test_wall_project + project
+      API on cube/cylinder. Next: G0–G4 Geogram/CVT (do not start before this).
 
   - id: M11
     title: "h_min feature flag + virtual-topology detector (no OCC suppress yet)"

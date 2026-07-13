@@ -179,13 +179,13 @@ Shewchuk predicates public domain OK. Verdict BSD for quality. fTetWild MPL plug
 | **0** | Docs/ADRs/board honest | M0, this plan | done |
 | **1** | Probe health + face-mean tip | M1 | done |
 | **2** | Scorecard metrics | M2 | done |
-| **3** | Sharp-only protect + (follow-on wall project) | M3, M3b | M3 done; M3b open |
+| **3** | Sharp-only protect + (follow-on wall project) | M3, M3b | M3 done; M3b/M10 done |
 | **4** | N_pred + over_budget cause | M4 | done (∫h³ / h_min flag follow-on) |
 | **5** | Stress score fix (centroid face-mean, drop raw max) + energy cylinder | M6 | **done** |
 | **6** | Chordal e fix (ℓ, OCC κ, true segments) | M7 | **done** |
 | **7** | Protecting-ball lfs clamp | M8 | **done** |
 | **8** | **Freeze baseline campaign** on honest scorecard | M9 | **done** (`varyhedron-baseline-m9`, ok 75%) |
-| **9** | Wall tangential + OCC project | M3b / M10 | after freeze |
+| **9** | Wall tangential + OCC project | M3b / M10 | **done** |
 | **10** | Vendor Geogram + Lloyd CVT + constrained sites | G1–G3 | after projection |
 | **11** | Clipped Voronoi poly export | G4 | after G1–G3 |
 | **12** | VEM gate campaign | M5 | after metrics + poly path |

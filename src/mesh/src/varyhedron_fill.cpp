@@ -4,6 +4,7 @@
 #include "mesh/grid_classify.hpp"
 #include "mesh/hybrid_fill.hpp"
 #include "mesh/surface_project.hpp"
+#include "mesh/wall_project.hpp"
 
 #include <Eigen/Geometry>
 
@@ -231,7 +232,8 @@ VaryhedronFillOutput varyhedron_fill_surface(
     const Eigen::Vector3d& bbox_max, double h, int skin_layers,
     std::span<const geom::SharpEdge> features, double feature_band,
     std::span<const Eigen::Vector3d> refine_seeds, double seed_band,
-    double curvature_turn_deg, const geom::CadTopology* topo) {
+    double curvature_turn_deg, const geom::CadTopology* topo,
+    const geom::CadModel* cad, int wall_smooth_iters) {
 
     VaryhedronFillOutput out;
 
@@ -712,6 +714,20 @@ VaryhedronFillOutput varyhedron_fill_surface(
         }
         out.edge_profile_rel =
             (char_len > 0.0) ? (out.edge_profile_hausdorff_max / char_len) : 0.0;
+    }
+
+    // --- M10 wall free-slide: tangential smooth + OCC surface re-project ---
+    // After scaffold + sharp snap. Wall nodes = free boundary far from sharp
+    // CAD edges. Requires live CadModel; STL-only path leaves the mesh as-is.
+    if (cad != nullptr && !cad->empty() && wall_smooth_iters > 0 &&
+        !out.mesh.tets.empty()) {
+        const auto wall = wall_tangential_project(*cad, topo, out.mesh.nodes, out.mesh.tets,
+                                                  h, wall_smooth_iters);
+        out.n_wall_nodes = wall.n_wall_nodes;
+        out.n_wall_moved = wall.n_moved;
+        out.n_wall_reverted = wall.n_reverted;
+        out.n_wall_iters = wall.n_iters;
+        out.wall_mean_surface_residual = wall.mean_surface_residual;
     }
 
     return out;

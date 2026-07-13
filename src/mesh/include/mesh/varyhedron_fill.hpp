@@ -7,6 +7,7 @@
 // Poly export target: constrained restricted CVT / clipped Voronoi (M5 path);
 // dual-of-tet deferred. Export remains a tet scaffold for FE today.
 
+#include "geom/cad_model.hpp"
 #include "geom/cad_topology.hpp"
 #include "geom/features.hpp"
 #include "geom/tri_surface.hpp"
@@ -47,17 +48,28 @@ struct VaryhedronFillOutput {
     /// segments (ADR-0023). ℓ = mesh edge length; κ from CAD curve curvature.
     double edge_chordal_efficiency_max = 0.0;
     double edge_hausdorff_over_h = 0.0;
+    /// M10 wall free-slide + OCC re-project diagnostics (0 when skipped).
+    std::size_t n_wall_nodes = 0;
+    std::size_t n_wall_moved = 0;
+    std::size_t n_wall_reverted = 0;
+    int n_wall_iters = 0;
+    double wall_mean_surface_residual = 0.0;
 };
 
 /// Pack volume mesh with varyhedron packing-seed algorithm (ADR-0023).
 /// When `topo` is non-null, **sharp** CAD edge samples become protecting seeds;
 /// seams/smooth edges are never fixed sites. Interior volume seeds pack away
 /// from them; free nodes near sharp edges soft-snap after the tet scaffold.
+/// When `cad` is non-null (live BRep), wall nodes (boundary, far from sharp
+/// edges) get tangential smooth + OCC surface re-project (M10 / ADR-0024 Q2a).
+/// `wall_smooth_iters` ≤ 0 disables that post-pass. STL-only (no cad): existing
+/// surface snap path only — no crash.
 VaryhedronFillOutput varyhedron_fill_surface(
     const geom::TriSurface& surface, const Eigen::Vector3d& bbox_min,
     const Eigen::Vector3d& bbox_max, double h, int skin_layers = 2,
     std::span<const geom::SharpEdge> features = {}, double feature_band = 0.0,
     std::span<const Eigen::Vector3d> refine_seeds = {}, double seed_band = 0.0,
-    double curvature_turn_deg = 15.0, const geom::CadTopology* topo = nullptr);
+    double curvature_turn_deg = 15.0, const geom::CadTopology* topo = nullptr,
+    const geom::CadModel* cad = nullptr, int wall_smooth_iters = 4);
 
 } // namespace polymesh::mesh

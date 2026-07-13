@@ -5,8 +5,8 @@
     "semantic_hash": ""
   },
   "apps/gui/main.cpp": {
-    "mtime": 1783899331.7271042,
-    "ast_hash": "9891e28f3145446374aebacdd3f63173",
+    "mtime": 1783903959.7552752,
+    "ast_hash": "874b25dc2785bbf0d65c11ab2db092c2",
     "semantic_hash": ""
   },
   "apps/gui/theme.cpp": {
@@ -120,7 +120,7 @@
     "semantic_hash": ""
   },
   "src/fea/include/fea/stress.hpp": {
-    "mtime": 1783902960.1973095,
+    "mtime": 1783903079.9419973,
     "ast_hash": "74c685f3f146836322a8e32974c9e49f",
     "semantic_hash": ""
   },
@@ -175,7 +175,7 @@
     "semantic_hash": ""
   },
   "src/fea/src/stress.cpp": {
-    "mtime": 1783902960.1973095,
+    "mtime": 1783903079.9419973,
     "ast_hash": "aeb41fa990a57e44636415b965b1383b",
     "semantic_hash": ""
   },
@@ -220,8 +220,8 @@
     "semantic_hash": ""
   },
   "src/pipeline/src/scene.cpp": {
-    "mtime": 1783903051.7883058,
-    "ast_hash": "b67b485e3b7d16278092bc60858ff534",
+    "mtime": 1783904134.9243364,
+    "ast_hash": "e037b2428529fb5deaa0202d1569d9c9",
     "semantic_hash": ""
   },
   "tests/support/mms.cpp": {
@@ -450,8 +450,8 @@
     "semantic_hash": ""
   },
   "docs/progress.md": {
-    "mtime": 1783903025.1952703,
-    "ast_hash": "a35af480fc3d35fba85ed26a4f38c89f",
+    "mtime": 1783904445.7509012,
+    "ast_hash": "dbd6d31234e35cd22cf27eed91254f68",
     "semantic_hash": ""
   },
   "docs/spec.md": {
@@ -480,8 +480,8 @@
     "semantic_hash": ""
   },
   "src/mesh/CMakeLists.txt": {
-    "mtime": 1783894987.6125965,
-    "ast_hash": "42b915d5c42adde474a8b04edeb86d68",
+    "mtime": 1783904134.9243364,
+    "ast_hash": "a61f11ed8a694a42d4d75917af784551",
     "semantic_hash": ""
   },
   "src/pipeline/CMakeLists.txt": {
@@ -490,8 +490,8 @@
     "semantic_hash": ""
   },
   "tests/CMakeLists.txt": {
-    "mtime": 1783901680.6043446,
-    "ast_hash": "31246e0573a6cb19308c928515dcfaf8",
+    "mtime": 1783904134.9243364,
+    "ast_hash": "10ec29bd1578e19e6dcd8a69d687d099",
     "semantic_hash": ""
   },
   "apps/bench/d6_tier3.cpp": {
@@ -1200,13 +1200,13 @@
     "semantic_hash": ""
   },
   "docs/dag/AGENT_BOOTSTRAP.md": {
-    "mtime": 1783903025.1949253,
-    "ast_hash": "e80c841c1b1d8788ea8ad229ee8f3d75",
+    "mtime": 1783904108.6836267,
+    "ast_hash": "068885a02e4de54e04b987dc065f9edf",
     "semantic_hash": ""
   },
   "docs/dag/PROGRAM.yaml": {
-    "mtime": 1783903011.4937322,
-    "ast_hash": "b47be48c36177e07cb95e15182661aaa",
+    "mtime": 1783904437.2999754,
+    "ast_hash": "80568d1c137e582c02f06e1546ce9e15",
     "semantic_hash": ""
   },
   "docs/dag/README.md": {
@@ -1215,8 +1215,8 @@
     "semantic_hash": ""
   },
   "docs/dag/interfaces.md": {
-    "mtime": 1783902998.1894152,
-    "ast_hash": "77c8f79bd8b11f849007fe2ed611bdc4",
+    "mtime": 1783904273.3167393,
+    "ast_hash": "c4d3a0a58c2fde58b318a3957084cc69",
     "semantic_hash": ""
   },
   "docs/decisions/0019-mixed-fe-vem-adaptive-order-core.md": {
@@ -1235,7 +1235,7 @@
     "semantic_hash": ""
   },
   "bench/reference/plate_hole.json": {
-    "mtime": 1783902960.1963809,
+    "mtime": 1783903079.9369974,
     "ast_hash": "0bd667f2449d72d47521d7ab0aafdac3",
     "semantic_hash": ""
   },
@@ -1265,8 +1265,8 @@
     "semantic_hash": ""
   },
   "tests/fixtures/parts/plate_hole.case.json": {
-    "mtime": 1783896334.1871653,
-    "ast_hash": "a4f5d12c317cf78ead55217d88e9cd4a",
+    "mtime": 1783903156.5930328,
+    "ast_hash": "d40b3b444083febd79843392b2ca5a42",
     "semantic_hash": ""
   },
   "tests/fixtures/parts/smoke_bar.case.json": {
@@ -1280,7 +1280,7 @@
     "semantic_hash": ""
   },
   "docs/validation/hand-calcs.md": {
-    "mtime": 1783902960.1973095,
+    "mtime": 1783903079.9379973,
     "ast_hash": "e0059fde986bd9a8dbedfc35c2424f35",
     "semantic_hash": ""
   },
@@ -1310,28 +1310,28 @@
     "semantic_hash": ""
   },
   "apps/gui/testlab_data.cpp": {
-    "mtime": 1783791298.9593322,
-    "ast_hash": "7af8532828696f95b04b7c4ac4a0ae22",
+    "mtime": 1783903909.9236085,
+    "ast_hash": "aeb0b942e73ab1d980bb8e01439f520b",
     "semantic_hash": ""
   },
   "apps/gui/testlab_data.hpp": {
-    "mtime": 1783791298.9735892,
-    "ast_hash": "b960e1d52d404adc5c53b88b8f4707b6",
+    "mtime": 1783903896.6469738,
+    "ast_hash": "930930fb8ad66947b0e450074cd0dc09",
     "semantic_hash": ""
   },
   "apps/gui/testlab_panel.cpp": {
-    "mtime": 1783899331.7271042,
-    "ast_hash": "82e648ed0895f89e59d3a8f20efb6fb6",
+    "mtime": 1783903964.479223,
+    "ast_hash": "3c5773a3e50c09661f5a5f8798645286",
     "semantic_hash": ""
   },
   "apps/gui/testlab_panel.hpp": {
-    "mtime": 1783899331.7204952,
-    "ast_hash": "6cff2ecad5bde9f1dc67b9cd2852dd72",
+    "mtime": 1783903938.1485143,
+    "ast_hash": "96a11dd71e3ee1c33afce59b9c3d6596",
     "semantic_hash": ""
   },
   "apps/testlab/main.cpp": {
-    "mtime": 1783902960.1963809,
-    "ast_hash": "2e92a27e65ceb0a7c6929f7f9b7a412b",
+    "mtime": 1783904241.713815,
+    "ast_hash": "6ec0f30c9eb73c13fccf5831d00512a8",
     "semantic_hash": ""
   },
   "bench/campaigns/settings-frontier-1/campaign.json": {
@@ -1355,8 +1355,8 @@
     "semantic_hash": ""
   },
   "tests/testlab_selfcheck.cpp": {
-    "mtime": 1783745111.3816187,
-    "ast_hash": "582d2aa54c543d3b949cece3cb1f1880",
+    "mtime": 1783903959.7622752,
+    "ast_hash": "134a082c8ba518c96808d310b4def874",
     "semantic_hash": ""
   },
   "apps/testlab/CMakeLists.txt": {
@@ -1510,7 +1510,7 @@
     "semantic_hash": ""
   },
   "bench/reference/cylinder.json": {
-    "mtime": 1783902960.1963809,
+    "mtime": 1783903079.9369974,
     "ast_hash": "0367940dc6576c3e7de56c0c2fa31061",
     "semantic_hash": ""
   },
@@ -1535,38 +1535,38 @@
     "semantic_hash": ""
   },
   "src/geom/include/geom/cad_model.hpp": {
-    "mtime": 1783894866.3501523,
-    "ast_hash": "944f86a1ec03902e1ea1c5df712759e1",
+    "mtime": 1783904134.9233363,
+    "ast_hash": "a3e3704c4d325ba84cd5439ac1abc7fa",
     "semantic_hash": ""
   },
   "src/geom/include/geom/cad_topology.hpp": {
-    "mtime": 1783902960.1973095,
+    "mtime": 1783903079.9419973,
     "ast_hash": "068912c98b4985e69aa42f0a6fdb67b5",
     "semantic_hash": ""
   },
   "src/geom/src/cad_model.cpp": {
-    "mtime": 1783899384.582522,
-    "ast_hash": "e0b90e6ab8fc1895d4fde52b0b6a32e9",
+    "mtime": 1783904134.9233363,
+    "ast_hash": "73770534a9ef7cb77b26ddbfb3cc129b",
     "semantic_hash": ""
   },
   "src/geom/src/cad_topology.cpp": {
-    "mtime": 1783902960.1973095,
+    "mtime": 1783903079.9419973,
     "ast_hash": "682c7f89b7935d18f389e2480de7e556",
     "semantic_hash": ""
   },
   "src/mesh/include/mesh/varyhedron_fill.hpp": {
-    "mtime": 1783903051.7821333,
-    "ast_hash": "380375922b8a744ea49480481dc658b6",
+    "mtime": 1783904134.9243364,
+    "ast_hash": "430fb2882b44e9f23df88d7eda7d19e2",
     "semantic_hash": ""
   },
   "src/mesh/src/varyhedron_fill.cpp": {
-    "mtime": 1783903051.8014483,
-    "ast_hash": "5db6bdd205e0985ce645327b091fc9aa",
+    "mtime": 1783904134.9243364,
+    "ast_hash": "156148999a89a3ba299af95a8d6b8c27",
     "semantic_hash": ""
   },
   "tests/fixtures/parts/cylinder.case.json": {
-    "mtime": 1783902960.1983094,
-    "ast_hash": "ac614ef19d5f1378e2c22846b50d5485",
+    "mtime": 1783904234.433235,
+    "ast_hash": "eb92f4c13e873cf5793edc6f979e3dbe",
     "semantic_hash": ""
   },
   "tests/fixtures/parts/icecream_cone.case.json": {
@@ -1580,17 +1580,17 @@
     "semantic_hash": ""
   },
   "tests/test_cad_model.cpp": {
-    "mtime": 1783894866.3501523,
-    "ast_hash": "7040669be1c0d74f2840448d190be1f3",
+    "mtime": 1783904134.9253364,
+    "ast_hash": "9008ca2ebe5f139cc39423b0766369b3",
     "semantic_hash": ""
   },
   "tests/test_cad_topology.cpp": {
-    "mtime": 1783902960.1983094,
+    "mtime": 1783903079.9429972,
     "ast_hash": "3c714173704a40f51effc63d3c3c29fb",
     "semantic_hash": ""
   },
   "tests/test_varyhedron_fill.cpp": {
-    "mtime": 1783903051.8014483,
+    "mtime": 1783903118.1835783,
     "ast_hash": "a02932d5d840a75605f9d46ba14210aa",
     "semantic_hash": ""
   },
@@ -1605,8 +1605,8 @@
     "semantic_hash": ""
   },
   "docs/research/varyhedron-packing.md": {
-    "mtime": 1783902998.186035,
-    "ast_hash": "c69fe0fc31f735a549b2a5ea9c790810",
+    "mtime": 1783903079.9009976,
+    "ast_hash": "fe6a4e57d297a5f49fc3b6cffb5296ae",
     "semantic_hash": ""
   },
   "scripts/check_no_product_stl.sh": {
@@ -2050,8 +2050,213 @@
     "semantic_hash": ""
   },
   "docs/plans/advisor-measure-first-program.md": {
-    "mtime": 1783902898.3911073,
-    "ast_hash": "bae15224a033ad59f5a1977101bfa909",
+    "mtime": 1783904437.300738,
+    "ast_hash": "137dcd7b1e4fee5fad97cb2a77bb6619",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/PARETO.json": {
+    "mtime": 1783903197.6973104,
+    "ast_hash": "14000a7a23b28f12d2f8150cd6f0933a",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/campaign.json": {
+    "mtime": 1783903197.6973104,
+    "ast_hash": "56e0d54cead37ac784ea8a4184906b62",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/checkpoint.json": {
+    "mtime": 1783903197.6973104,
+    "ast_hash": "dca35e84ec72ea436776c3407df1308f",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/handoff.json": {
+    "mtime": 1783903197.6973104,
+    "ast_hash": "90985d083d73ddb8a2d9459948f48b08",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/progress.json": {
+    "mtime": 1783903197.697707,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/runs/cfg-028399df/cylinder/t0/quality.json": {
+    "mtime": 1783903197.7447064,
+    "ast_hash": "682e572561b70d4395f11fee1b5a05ad",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/runs/cfg-028399df/cylinder/t0/result.json": {
+    "mtime": 1783903197.7447064,
+    "ast_hash": "305a90a7d85d2333396848cbddfef02a",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/runs/cfg-028399df/icecream_cone/t0/quality.json": {
+    "mtime": 1783903197.748559,
+    "ast_hash": "215678faaab39bb3c60fca95fe901391",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/runs/cfg-028399df/icecream_cone/t0/result.json": {
+    "mtime": 1783903197.748559,
+    "ast_hash": "c37e59165f43e5c595527f280aa16a13",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/runs/cfg-028399df/plate_hole/t0/quality.json": {
+    "mtime": 1783903197.7516782,
+    "ast_hash": "d9860c49976231c698b2c35be8f799d5",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/runs/cfg-028399df/plate_hole/t0/result.json": {
+    "mtime": 1783903197.7517061,
+    "ast_hash": "6a60549acadf10d9be832728fa378cda",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/runs/cfg-028399df/sphere/t0/quality.json": {
+    "mtime": 1783903197.7532132,
+    "ast_hash": "613f0744f5d42285da34a67fb4ade1d5",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/runs/cfg-028399df/sphere/t0/result.json": {
+    "mtime": 1783903197.7532132,
+    "ast_hash": "2cd5f4e6024a7d757ee50a357f128bf0",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/runs/cfg-89f62376/cylinder/t0/quality.json": {
+    "mtime": 1783903197.7577062,
+    "ast_hash": "f411acb7ac7133125aa15a6d4d3e3da1",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/runs/cfg-89f62376/cylinder/t0/result.json": {
+    "mtime": 1783903197.7577062,
+    "ast_hash": "5a2c1aaf524502632e2b660ef0085ea7",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/runs/cfg-89f62376/icecream_cone/t0/quality.json": {
+    "mtime": 1783903197.7596447,
+    "ast_hash": "d5b43e1953e15715b47631bb08c0af1e",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/runs/cfg-89f62376/icecream_cone/t0/result.json": {
+    "mtime": 1783903197.7597063,
+    "ast_hash": "63c0fe46bfa24f16e339505cb821b7ae",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/runs/cfg-89f62376/plate_hole/t0/quality.json": {
+    "mtime": 1783903197.7607062,
+    "ast_hash": "09bc740dfaf0accafd10045fc34b2a94",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/runs/cfg-89f62376/plate_hole/t0/result.json": {
+    "mtime": 1783903197.7607062,
+    "ast_hash": "3a008a2f5ae303a99b0e75d172ad2075",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/runs/cfg-89f62376/sphere/t0/quality.json": {
+    "mtime": 1783903197.761706,
+    "ast_hash": "1288309de46414ee2a282b35aa9760ad",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/runs/cfg-89f62376/sphere/t0/result.json": {
+    "mtime": 1783903197.761706,
+    "ast_hash": "c10ee3d6545191368d429d5ef8b39f09",
+    "semantic_hash": ""
+  },
+  "src/mesh/include/mesh/wall_project.hpp": {
+    "mtime": 1783904134.9403362,
+    "ast_hash": "192d572f4c16f0743b9e5139b88b102b",
+    "semantic_hash": ""
+  },
+  "src/mesh/src/wall_project.cpp": {
+    "mtime": 1783904134.9413362,
+    "ast_hash": "65432819eeacfdc0103b73229de8abfd",
+    "semantic_hash": ""
+  },
+  "tests/test_wall_project.cpp": {
+    "mtime": 1783904134.9413362,
+    "ast_hash": "0df4bbd97268208fd669b7b5cc2a56a4",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/BASELINE.md": {
+    "mtime": 1783903197.6967068,
+    "ast_hash": "98fa1bac9c52b94bdeec2e3327293278",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/HANDOFF.md": {
+    "mtime": 1783903197.6973104,
+    "ast_hash": "65447b84be4a52ad11e6e44c009e3b1e",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/PARETO.md": {
+    "mtime": 1783903197.6973104,
+    "ast_hash": "7e013d980ad40ecceec1b4bd8e01791e",
+    "semantic_hash": ""
+  },
+  "docs/decisions/0025-geogram-cvt-vendor.md": {
+    "mtime": 1783903978.3560693,
+    "ast_hash": "96624b21daa8b5d6c4a4f832aa80aed9",
+    "semantic_hash": ""
+  },
+  "docs/research/brep-face-tag-bc.md": {
+    "mtime": 1783903156.5948176,
+    "ast_hash": "d5ce59313caf52ed38d3834cfb69ef03",
+    "semantic_hash": ""
+  },
+  "docs/research/campaign-metrics.md": {
+    "mtime": 1783903156.5948176,
+    "ast_hash": "1b6e5c3bd2f50d0d3ed08df46049edf4",
+    "semantic_hash": ""
+  },
+  "docs/research/geogram-cvt-vendoring.md": {
+    "mtime": 1783903079.9009976,
+    "ast_hash": "9b1ffbf478fb10647614a222cff548e6",
+    "semantic_hash": ""
+  },
+  "docs/research/protecting-balls-lfs.md": {
+    "mtime": 1783903079.9009976,
+    "ast_hash": "55cd2bb63b1f3622f4eda75cb3a58360",
+    "semantic_hash": ""
+  },
+  "third_party/geogram/README.md": {
+    "mtime": 1783903978.4120686,
+    "ast_hash": "725ab8e25f4af204fcc0c5f739017cd8",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/runs/cfg-028399df/cylinder/t0/wire.png": {
+    "mtime": 1783903197.7457063,
+    "ast_hash": "46f8704109d1faf0b3810ab4c1fd541e",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/runs/cfg-028399df/icecream_cone/t0/wire.png": {
+    "mtime": 1783903197.7487063,
+    "ast_hash": "01467e33fb2aff585d44523237541365",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/runs/cfg-028399df/plate_hole/t0/wire.png": {
+    "mtime": 1783903197.7517061,
+    "ast_hash": "c05e72941b68b37b651807114ce9986e",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/runs/cfg-028399df/sphere/t0/wire.png": {
+    "mtime": 1783903197.7537062,
+    "ast_hash": "2db741955b5960f991e185bc06836e28",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/runs/cfg-89f62376/cylinder/t0/wire.png": {
+    "mtime": 1783903197.7577062,
+    "ast_hash": "ae5c80de340d2c45f5c13d31eb6fdb2c",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/runs/cfg-89f62376/icecream_cone/t0/wire.png": {
+    "mtime": 1783903197.7597063,
+    "ast_hash": "14be50a7a5ee6f98503622bdd6c19921",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/runs/cfg-89f62376/plate_hole/t0/wire.png": {
+    "mtime": 1783903197.7607062,
+    "ast_hash": "b185a6f72a2291833dc2838c70a231a0",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/varyhedron-baseline-m9/runs/cfg-89f62376/sphere/t0/wire.png": {
+    "mtime": 1783903197.761706,
+    "ast_hash": "b41207dd9e345fb71bd51a06aee16c44",
     "semantic_hash": ""
   }
 }

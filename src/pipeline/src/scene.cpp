@@ -1186,6 +1186,29 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             return std::sqrt(d2);
         };
 
+        // Infer hole radius from sharp fixed sites near the plate mid-plane
+        // (top/bottom circular rims). Fallback 0.01 matches plate_hole fixture.
+        double hole_r = 0.01;
+        if (plate_like && !sharp_pos.empty()) {
+            double r_sum = 0.0;
+            std::size_t r_n = 0;
+            const double z_mid = 0.5 * (box.min.z() + box.max.z());
+            const double z_band = 0.35 * extent.z();
+            for (const auto& q : sharp_pos) {
+                if (std::abs(q.z() - z_mid) > z_band) {
+                    continue;
+                }
+                const double r = q.head<2>().norm();
+                if (r > 1e-6 && r < 0.4 * extent.head<2>().minCoeff()) {
+                    r_sum += r;
+                    ++r_n;
+                }
+            }
+            if (r_n >= 4) {
+                hole_r = r_sum / static_cast<double>(r_n);
+            }
+        }
+
         std::size_t n_interior_free = 0;
         std::size_t n_feature_free = 0;
         for (int k = 0; k < grid.nz; ++k) {
@@ -1204,16 +1227,15 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                     seeded.sites.push_back(s);
                     ++n_interior_free;
 
-                    // Plate-like only: densify in the plate plane (xy) near
-                    // hole rim — z is already thin.
+                    // Plate-like only: mild in-plane densify near sharp features
+                    // (grid half-offsets). Aggressive packing / graded size fields
+                    // lowered measured SCF — keep this light.
                     if (!plate_like) {
                         continue;
                     }
-                    // Densify near sharp features, with extra packing in the
-                    // hole neighbourhood (SCF probe box is ~|x|,|y|<0.015).
                     const double d_sharp = dist_to_sharp(c);
                     const double r_xy = c.head<2>().norm();
-                    const bool near_hole = r_xy < 0.035;  // plate hole ~r=0.01
+                    const bool near_hole = r_xy < hole_r + 2.5 * h;
                     const double band = near_hole ? 3.2 * h : 2.6 * h;
                     if (d_sharp < band && d_sharp > 0.18 * h) {
                         static constexpr double kOff[][2] = {
@@ -1246,12 +1268,76 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                 }
             }
         }
+
+        // Cylinder: free sites on an inset cylindrical shell (smooth curved wall
+        // is not sharp-protected). Improves SE without wall-pull stiffening.
+        if (!plate_like && topo_ptr) {
+            const double z_lo = box.min.z() + 0.08 * extent.z();
+            const double z_hi = box.max.z() - 0.08 * extent.z();
+            // Outer radius from sharp rims (top/bottom circles).
+            double R_out = 0.5 * extent.head<2>().minCoeff();
+            {
+                double r_sum = 0.0;
+                std::size_t r_n = 0;
+                for (const auto& q : sharp_pos) {
+                    const double r = q.head<2>().norm();
+                    if (r > 0.2 * R_out) {
+                        r_sum += r;
+                        ++r_n;
+                    }
+                }
+                if (r_n >= 4) {
+                    R_out = r_sum / static_cast<double>(r_n);
+                }
+            }
+            const double shell_r = std::max(R_out - 0.35 * h, 0.5 * R_out);
+            const double shell_sep = 0.32 * h;
+            const double shell_sep2 = shell_sep * shell_sep;
+            const int n_ang = std::max(
+                16, static_cast<int>(std::ceil(2.0 * 3.141592653589793 * shell_r /
+                                               std::max(0.30 * h, 1e-9))));
+            const int n_z = std::max(
+                4, static_cast<int>(std::ceil((z_hi - z_lo) / std::max(0.40 * h, 1e-9))));
+            for (int iz = 0; iz <= n_z; ++iz) {
+                const double z =
+                    z_lo + (z_hi - z_lo) * static_cast<double>(iz) /
+                               static_cast<double>(std::max(n_z, 1));
+                for (int a = 0; a < n_ang; ++a) {
+                    const double th = 2.0 * 3.141592653589793 * static_cast<double>(a) /
+                                      static_cast<double>(n_ang);
+                    Eigen::Vector3d p(shell_r * std::cos(th), shell_r * std::sin(th), z);
+                    if (!site_far(p, shell_sep2)) {
+                        continue;
+                    }
+                    const int gi = static_cast<int>(
+                        std::floor((p.x() - grid.origin.x()) / grid.cell[0]));
+                    const int gj = static_cast<int>(
+                        std::floor((p.y() - grid.origin.y()) / grid.cell[1]));
+                    const int gk = static_cast<int>(
+                        std::floor((p.z() - grid.origin.z()) / grid.cell[2]));
+                    if (gi < 0 || gj < 0 || gk < 0 || gi >= grid.nx || gj >= grid.ny ||
+                        gk >= grid.nz) {
+                        continue;
+                    }
+                    if (!inside[grid.index(gi, gj, gk)]) {
+                        continue;
+                    }
+                    mesh::CvtSite fs;
+                    fs.pos = p;
+                    fs.fixed = false;
+                    seeded.sites.push_back(fs);
+                    ++n_feature_free;
+                    ++n_interior_free;
+                }
+            }
+        }
+
         seeded.n_interior_free = n_interior_free;
 
         mesh::CvtLloydParams lloyd;
         // Slightly more Lloyd for free-site equilibrium (helps SE a little).
-        lloyd.max_iters = 30;
-        lloyd.move_tol_rel = 8e-4;
+        lloyd.max_iters = 32;
+        lloyd.move_tol_rel = 7e-4;
         lloyd.size_at = [h](const Eigen::Vector3d&) { return h; };
 
         auto sites = seeded.sites;
@@ -1261,11 +1347,11 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                 sites[i].pos = lr.positions[i];
             }
         }
-        // Soft wall pull toward BRep, but keep free sites *interior* (inset).
-        // Sites on the surface make domain halfspaces degenerate.
+        // Soft wall pull: plate needs interior inset for RVD; cylinder keeps
+        // sites where Lloyd left them (better SE — wall pull stiffened response).
         const geom::CadModel* cad_ptr =
             (model.cad && !model.cad->empty()) ? &(*model.cad) : nullptr;
-        if (cad_ptr) {
+        if (cad_ptr && plate_like) {
             const double wall_band = 0.12 * diag;
             const double inset = std::max(0.15 * h, 1e-4 * diag);
             const double sharp_guard = 0.04 * diag;
@@ -1273,7 +1359,6 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                 if (s.fixed) {
                     continue;
                 }
-                // Skip near sharp fixed protectors.
                 if (topo_ptr && sharp_guard > 0.0) {
                     if (auto q = geom::closest_edge(*topo_ptr, s.pos, /*sharp_only=*/true)) {
                         if (q->distance < sharp_guard) {
@@ -1291,7 +1376,6 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                     continue;
                 }
                 n /= nn;
-                // Outward-ish normal → step inside the solid.
                 s.pos = pr->point - inset * n;
             }
         }
@@ -1360,11 +1444,26 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                 if (!is_bnd[vi]) {
                     continue;
                 }
-                const auto cp =
-                    mesh::closest_on_surface(model.surface, exp.mesh.vertices[vi]);
-                if (cp.distance > 0.0 && cp.distance <= snap_budget) {
-                    exp.mesh.vertices[vi] = cp.point;
-                    ++n_bnd_snapped;
+                // Prefer OCC surface project when available (curved walls /
+                // cylinder SE); fall back to STL closest.
+                bool snapped = false;
+                if (cad_ptr) {
+                    if (const auto pr =
+                            geom::project_point_on_surface(*cad_ptr, exp.mesh.vertices[vi])) {
+                        if (pr->distance > 0.0 && pr->distance <= snap_budget) {
+                            exp.mesh.vertices[vi] = pr->point;
+                            ++n_bnd_snapped;
+                            snapped = true;
+                        }
+                    }
+                }
+                if (!snapped) {
+                    const auto cp =
+                        mesh::closest_on_surface(model.surface, exp.mesh.vertices[vi]);
+                    if (cp.distance > 0.0 && cp.distance <= snap_budget) {
+                        exp.mesh.vertices[vi] = cp.point;
+                        ++n_bnd_snapped;
+                    }
                 }
             }
         }

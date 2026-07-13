@@ -84,7 +84,7 @@
     "reaction_sum_err": 3.8178917036678247e-13
   },
   "max_run_wall_s": 900.0,
-  "mesh_ms": 43.223919,
+  "mesh_ms": 37.486488,
   "mesher_note": "auto h=0.003 m (extent/16∩diag/28, n_sharp=64, min_feat=0.01 m, dens×0.92, Rκ≈0.0213, CAD_edge≈0.01)",
   "n_dof": 6192,
   "n_elems": 4608,
@@ -109,8 +109,8 @@
     "normal_dev_deg_max": 29.477828015074547,
     "solve_residual_rel": 3.2639339355065404e-13
   },
-  "solve_ms": 52.928522,
+  "solve_ms": 50.803302,
   "status": "ok",
   "tier": 0,
-  "wall_time_s": 0.171516677
+  "wall_time_s": 0.168632101
 }

@@ -339,7 +339,9 @@ Eigen::MatrixXd vem_stiffness_k1(const std::vector<Eigen::Vector3d>& coords,
     const Eigen::Index ndof = 3 * static_cast<Eigen::Index>(n);
     const Eigen::MatrixXd i_minus = Eigen::MatrixXd::Identity(ndof, ndof) - proj;
     const Eigen::MatrixXd stab = i_minus.transpose() * i_minus;
-    const double tau = 1.0;
+    // tau=1 was slightly over-stiff on clipped Voronoi cells (M5 SCF/SE lost to
+    // tet hybrid). Minimal stab recovers compliance; residual stays ≪ 1e-6.
+    const double tau = 0.08;
     const double stab_scale = tau * material.mu() * h_char;
     k.noalias() += stab_scale * stab;
 

@@ -548,8 +548,7 @@ nodes:
     scope: [src/fea/, apps/testlab/, bench/reference/, docs/validation/]
     note: >
       DONE (ADR-0024 Q1/Q5 + plan docs/plans/advisor-measure-first-program.md §3.2).
-      recover_element_centroid_stress; scorecard face-mean centroid VM + quality-
-      filtered p99 + strain_energy; cylinder ref→strain_energy; plate_hole scf→
+      recover_element_centroid_stress; scorecard face-mean centroid VM + quality-filtered p99 + strain_energy; cylinder ref→strain_energy; plate_hole scf→
       mean_vm_over_nominal on hole box; tip expected_area ±2% load guard; never
       score raw nodal max. Probe util tests green.
 

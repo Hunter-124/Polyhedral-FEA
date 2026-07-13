@@ -181,10 +181,10 @@ Shewchuk predicates public domain OK. Verdict BSD for quality. fTetWild MPL plug
 | **2** | Scorecard metrics | M2 | done |
 | **3** | Sharp-only protect + (follow-on wall project) | M3, M3b | M3 done; M3b open |
 | **4** | N_pred + over_budget cause | M4 | done (∫h³ / h_min flag follow-on) |
-| **5** | Stress score fix (centroid face-mean, drop raw max) + energy cylinder | M6 | in flight |
-| **6** | Chordal e fix (ℓ, OCC κ, true segments) | M7 | in flight |
-| **7** | Protecting-ball lfs clamp | M8 | in flight |
-| **8** | **Freeze baseline campaign** on honest scorecard | M9 | **next land** |
+| **5** | Stress score fix (centroid face-mean, drop raw max) + energy cylinder | M6 | **done** |
+| **6** | Chordal e fix (ℓ, OCC κ, true segments) | M7 | **done** |
+| **7** | Protecting-ball lfs clamp | M8 | **done** |
+| **8** | **Freeze baseline campaign** on honest scorecard | M9 | **next** |
 | **9** | Wall tangential + OCC project | M3b / M10 | after freeze |
 | **10** | Vendor Geogram + Lloyd CVT + constrained sites | G1–G3 | after projection |
 | **11** | Clipped Voronoi poly export | G4 | after G1–G3 |

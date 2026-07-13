@@ -13,13 +13,13 @@
 | Status | Nodes | Notes |
 |--------|-------|--------|
 | **Done** | **M0–M4, M6–M8** | Probes/health, scorecard, sharp-only, N_pred; stress face-mean/energy (M6); chordal e (M7); lfs balls (M8) |
-| **In progress** | — | (none critical; side M11/M12/M14 open when deps ready) |
+| **In progress** | **M12** (partial) | plate_hole + cylinder `expected_area`; sphere/icecream open |
 | **Next** | **M9 freeze** → **M10** → **G\*** | Freeze baseline → wall OCC project → Geogram/CVT (G0–G4) → M5 VEM gate |
 
 Order locked (ADR-0024 Q2): **freeze → wall project → CVT**. Dual hard-block until
 G4. No packing “win” loops until M9. Never score raw nodal max stress. Side work
-when deps ready: M11 (h_min flag), M12 (expected_area), M14 (wall-clock kills);
-M13 sphere ref after freeze.
+when deps ready: M11 (h_min flag), M12 finish (sphere/icecream face tags),
+M14 (wall-clock kills); M13 sphere ref after freeze.
 
 ## Background / older phases
 
@@ -41,6 +41,11 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-12: **M12 partial — expected_area on planar STEP loads** —
+  `plate_hole` load `expected_area=0.001` (end face \(H\times t=0.1\times0.01\));
+  cylinder tip \(\pi R^2\) already present. Sphere polar-cap + icecream multi-face
+  deferred. Design stub `docs/research/brep-face-tag-bc.md` (Q7). M12 stays
+  in_progress until those two cases get area or face-ID BCs.
 - 2026-07-12: **M6–M8 measure substrate complete** — element-centroid face-mean VM +
   strain_energy scoring (drop raw nodal max); OCC κ + mesh-segment chordal e;
   protecting balls r=min(αh, β·lfs) + corner shrink. PROGRAM nodes done; next is M9 freeze.

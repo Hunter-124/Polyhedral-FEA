@@ -13,7 +13,7 @@
 | Status | Nodes | Notes |
 |--------|-------|--------|
 | **Done** | **M0–M14 (all), G0–G4, V6e, V10c** | Measure path + full Geogram CVT stack (vendor→Lloyd→sites→export) |
-| **In progress** | **M5** | Domain clip + bnd snap; **cylinder health+load_area OK**, SE loses to hybrid; plate load_area still FAIL (hole/non-convex) — `GATE.md` |
+| **In progress** | **M5** | Both parts **health+load_area OK**; SCF **0.545** vs hybrid 0.512, SE **0.135** vs 0.132 — `GATE.md` (not promoted) |
 | **Open** | V6d, V11, feedback-loop | campaign-1 **done** (settings-frontier-1 finished; defaults not flipped) |
 | **Deferred** | icecream face-tags | Face-ID BC design |
 

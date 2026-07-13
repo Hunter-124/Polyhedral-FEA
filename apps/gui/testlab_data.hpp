@@ -112,6 +112,9 @@ struct AnswersInfo {
     double strain_energy = std::numeric_limits<double>::quiet_NaN();
     double tip_deflection = std::numeric_limits<double>::quiet_NaN();
     double sigma_face_mean = std::numeric_limits<double>::quiet_NaN();
+    /// Load-select free-face area (m²) when present in answers.
+    double load_face_area = std::numeric_limits<double>::quiet_NaN();
+    double load_area_rel_err = std::numeric_limits<double>::quiet_NaN();
 };
 
 struct ResultRow {

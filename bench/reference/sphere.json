@@ -2,10 +2,17 @@
   "part": "sphere",
   "metrics": [
     {
+      "name": "strain_energy",
+      "value": 4.60e-4,
+      "tol": 0.20,
+      "probe": { "kind": "strain_energy" },
+      "derivation": "docs/validation/hand-calcs.md#sphere"
+    },
+    {
       "name": "tip_deflection",
-      "value": 1.6e-7,
-      "tol": 0.50,
-      "probe": { "kind": "max_displacement" },
+      "value": 2.90e-7,
+      "tol": 0.25,
+      "probe": { "kind": "tip_deflection" },
       "derivation": "docs/validation/hand-calcs.md#sphere"
     }
   ]

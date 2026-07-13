@@ -392,13 +392,51 @@ Numerically:
 
 This omits local Hertz-like compliance under the caps, Poisson effects, and
 the true 3-D stress paths around the free surface. It is an **order-correct
-engineering estimate**, not an exact continuum solution — hence a wide
-tolerance. Max von Mises is **not** used as a campaign truth: the edge of the
-fixed polar patch is a Dirichlet–Neumann transition that can produce mesh-
-dependent peak stresses under refinement.
+engineering estimate** only (column model under-predicts by ~1.8× vs fine FE).
+Max von Mises is **not** used as a campaign truth: the edge of the fixed polar
+patch is a Dirichlet–Neumann transition that can produce mesh-dependent peak
+stresses under refinement.
 
-**Metric `tip_deflection`:** value \(1.6\times 10^{-7}\,\mathrm{m}\), relative
-tolerance \(50\,\%\). Probe = `max_displacement`.
+### Load-area guard (M12)
+
+Case select uses polar plane \(z_p=0.04\,\mathrm{m}\) and
+`normal_min_dot: 0.7` (same traction-alignment filter as cylinder). Continuum
+cap area:
+
+\[
+A_{\mathrm{cap}} = 2\pi R(R-z_p) = \pi\times 10^{-3}
+  \approx 3.141592653589793\times 10^{-3}\,\mathrm{m}^2.
+\]
+
+Written as `loads[].select.expected_area`. Hybrid meshes at campaign tiers
+match within ±5%. Coarse varyhedron can under-select the cap (chordal rim) and
+honestly trip `load_area_ok=false` — that is a mesh signal, not a truth bug.
+
+### M13 frozen numerical reference (no closed-form series this pass)
+
+Full **Hiramatsu–Oka / Legendre polar-cap series** was timeboxed per ADR-0024 Q5
+and **cut** this session — not shipped as an analytic formula. Instead, freeze a
+**versioned dual-mesher Richardson-class** reference from the aligned polar
+cap BC (`sphere.case.json` above):
+
+| Source | \(h_{\mathrm{scale}}\) | DOF (approx) | tip face-mean | strain energy |
+|--------|------------------------|--------------|---------------|---------------|
+| hybrid_zoo | 2 | ~27k | \(2.90\times 10^{-7}\,\mathrm{m}\) | \(4.59\times 10^{-4}\,\mathrm{J}\) |
+| varyhedron | 2 | ~12k | \(2.89\times 10^{-7}\,\mathrm{m}\) | \(4.60\times 10^{-4}\,\mathrm{J}\) |
+
+Agreement at the fine end: tip within ~0.1%, energy within ~0.2%. Column
+estimate \(1.6\times 10^{-7}\) is retained only as a lower-bound sanity check.
+
+**Metric `strain_energy` (primary):** value \(4.60\times 10^{-4}\,\mathrm{J}\),
+relative tolerance \(20\,\%\). Probe = `strain_energy`. Best packing
+discriminator among current sphere scalars (surface-resolution sensitive).
+
+**Metric `tip_deflection` (secondary health):** value \(2.90\times 10^{-7}\,\mathrm{m}\),
+relative tolerance \(25\,\%\). Probe = `tip_deflection` (face-mean |u| on
+load faces — not global nodal max).
+
+If a later session lands a true Legendre series, replace these frozen numbers
+and re-freeze the M9-style baseline; do not regenerate ad hoc each campaign.
 
 ---
 

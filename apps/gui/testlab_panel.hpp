@@ -28,7 +28,7 @@ struct TestLabState {
     std::optional<testlab::Checkpoint> checkpoint;
     std::optional<testlab::LiveProgress> progress;
     std::vector<testlab::ResultRow> results;
-    /// Open program nodes from campaign handoff.json (V10c supervised Q&A stub).
+    /// Open program nodes from campaign handoff.json (V10c supervised queue).
     std::optional<testlab::HandoffInfo> handoff;
 
     /// Campaign mesh_preview.pmp — reload when file mtime changes.

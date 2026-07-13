@@ -12,17 +12,19 @@
 
 | Status | Nodes | Notes |
 |--------|-------|--------|
-| **Done** | **M0–M4, M6–M11, M14, G0, V6e, V10c** | Measure + freeze + wall OCC + GUI Test Lab measure-first + cylinder load fix |
-| **In progress** | **M12** (partial) | plate_hole + cylinder `expected_area`; sphere/icecream open |
-| **Next** | **G1+** | Vendor Geogram (G1) → CVT → M5 VEM gate |
+| **Done** | **M0–M14 (all), G0, V6e, V10c** | Measure path complete; sphere M12/M13 closed; GUI Test Lab measure-first ready |
+| **Next** | **G1** | Vendor Geogram predicates + ConvexCell (multi-day) → G2–G4 → M5 |
+| **Deferred** | icecream face-tags, V6d p>1, V11 packing wins, M5 VEM gate | Need G* / face-tag design |
 
 Order locked (ADR-0024 Q2): **freeze (done) → wall project (done) → CVT**. Dual
 hard-block until G4. Packing “win” loops measure **delta vs M9 freeze only**.
-Never score raw nodal max stress. Side work: M12 finish; M13 sphere ref.
+Never score raw nodal max stress.
+
+**Next session handoff:** [`docs/plans/SESSION_HANDOFF_g1-cvt.md`](plans/SESSION_HANDOFF_g1-cvt.md).
 
 **Post-M10 smoke (2026-07-13):** cylinder+plate_hole × varyhedron+hybrid_zoo
 h_scale=5 → **4/4 `ok`**, `health_ok` + `load_area_ok` true; cylinder SE ~0.0034
-vs truth 0.00393. GUI `polymesh-gui` builds with health/scorecard Results panel.
+vs truth 0.00393. GUI `polymesh-gui` builds with health/scorecard/load_area Results panel.
 
 ## Background / older phases
 
@@ -44,6 +46,12 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-13: **M12 + M13 closed** — sphere polar cap `expected_area=π×10⁻³`
+  (`z_p=0.04`, `normal_min_dot=0.7`); plate/cylinder already guarded. Icecream
+  multi-face omits area (15–20% box swing) → face-tag design only. M13: full
+  Legendre series **cut**; frozen dual-mesher fine reference SE `4.60e-4` + tip
+  `2.90e-7` in `bench/reference/sphere.json` + hand-calcs. GUI Results:
+  `load_face_area` / area_fail chip + richer scorecard tooltip.
 - 2026-07-12: **M10 wall tangential smooth + OCC surface project** —
   `geom::project_point_on_surface` + `ProjectResult{point,normal,distance}`
   (BRepExtrema face + GeomAPI UV/normal; nullopt stub without OCC). Shared

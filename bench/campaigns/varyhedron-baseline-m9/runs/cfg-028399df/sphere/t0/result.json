@@ -1,0 +1,81 @@
+{
+  "accuracy": {
+    "all": [
+      {
+        "metric": "tip_deflection",
+        "rel_err": 0.9740873510038534,
+        "score": 0.339192924801573,
+        "trusted": true,
+        "truth": 1.6e-07,
+        "value": 3.1585397616061654e-07
+      }
+    ],
+    "metric": "tip_deflection",
+    "rel_err": 0.9740873510038534,
+    "score": 0.339192924801573,
+    "trusted": true,
+    "truth": 1.6e-07,
+    "value": 3.1585397616061654e-07
+  },
+  "answers": {
+    "load_area_rel_err": 0.0,
+    "load_face_area": 0.01172934226106708,
+    "mean_u_component": -3.0484554685057066e-07,
+    "n_load_faces": 112,
+    "n_probe_nodes": 129,
+    "n_quality_excluded": 0,
+    "sigma_face_mean": 1399237.1456655646,
+    "sigma_max": 2177486.097790757,
+    "sigma_p99": 1923071.8932942227,
+    "strain_energy": 0.001873656234961855,
+    "tip_deflection": 3.1585397616061654e-07,
+    "tip_deflection_max": 3.9338956010897417e-07
+  },
+  "cfg_id": "cfg-028399df",
+  "config": {
+    "feature_refine": true,
+    "mesher": "hybrid_zoo",
+    "order": 1
+  },
+  "geom_class": {
+    "curved_frac": 0.9957657021877205,
+    "min_feature_h": 18.004820788542474,
+    "thin": false
+  },
+  "h": 0.027770395821888994,
+  "health": {
+    "free_residual_rel": 1.9150412271776274e-14,
+    "load_area_ok": true,
+    "load_area_rel_err": 0.0,
+    "n_bc_dofs": 681,
+    "n_orphans": 0,
+    "ok": true,
+    "reaction_sum_err": 2.328742365498599e-15
+  },
+  "mesh_ms": 77.877258,
+  "n_dof": 2043,
+  "n_elems": 1536,
+  "n_elems_over_pred": 5.482562224533905,
+  "n_nodes": 681,
+  "n_pred_elems": 280.1609789537011,
+  "part": "sphere",
+  "quality": {
+    "M1max": 7.152448122690996e-18,
+    "M2max": 0.0007961062152623152,
+    "M6": 1.0,
+    "score": 0.9795232556185703
+  },
+  "scorecard": {
+    "accuracy_rel_err": 0.9740873510038534,
+    "chordal_efficiency_max": null,
+    "edge_hausdorff_over_h": 0.0,
+    "health_ok": true,
+    "min_element_quality": 1.0,
+    "n_dof": 2043,
+    "normal_dev_deg_max": 3.890278084573815,
+    "solve_residual_rel": 1.9150412271776274e-14
+  },
+  "solve_ms": 23.015738,
+  "status": "ok",
+  "tier": 0
+}

@@ -576,13 +576,16 @@ nodes:
 
   - id: M9
     title: "Freeze baseline campaign on honest M1–M8 scorecard"
-    status: in_progress
+    status: done
     deps: [M6, M7, M8]
     scope: [bench/campaigns/, scripts/, docs/]
     note: >
-      IN PROGRESS: 8-run freeze campaign varyhedron-baseline-m9 (4 STEP parts ×
-      varyhedron+hybrid_zoo × 1 tier h_scale=5.0). Prefer fast freeze vs short-1
-      3-tier overnight risk. ADR-0024 Q2(c).
+      DONE 2026-07-13 (ADR-0024 Q2(c)): freeze campaign varyhedron-baseline-m9 —
+      8 runs (4 STEP × varyhedron+hybrid_zoo × h_scale=5.0 only; fast freeze vs
+      24-run short-1 overnight). ok_rate=75% (6/8); both cylinder solve_suspect
+      (load_area gate). polymesh SHA dcb2baa; schema scorecard-m1-m8-v1.
+      Artifacts: results.jsonl, PARETO, HANDOFF, BASELINE.md. Packing loops
+      measure delta vs this freeze only. Next: M10 wall project.
 
   - id: M10
     title: Wall tangential smooth + OCC surface project

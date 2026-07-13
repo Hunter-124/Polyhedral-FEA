@@ -12,14 +12,13 @@
 
 | Status | Nodes | Notes |
 |--------|-------|--------|
-| **Done** | **M0–M4, M6–M8** | Probes/health, scorecard, sharp-only, N_pred; stress face-mean/energy (M6); chordal e (M7); lfs balls (M8) |
+| **Done** | **M0–M4, M6–M9** | Measure substrate + **frozen baseline** `varyhedron-baseline-m9` (ok_rate 75%, code SHA dcb2baa) |
 | **In progress** | **M12** (partial) | plate_hole + cylinder `expected_area`; sphere/icecream open |
-| **Next** | **M9 freeze** → **M10** → **G\*** | Freeze baseline → wall OCC project → Geogram/CVT (G0–G4) → M5 VEM gate |
+| **Next** | **M10** → **G\*** | Wall OCC project → Geogram/CVT (G0–G4) → M5 VEM gate |
 
-Order locked (ADR-0024 Q2): **freeze → wall project → CVT**. Dual hard-block until
-G4. No packing “win” loops until M9. Never score raw nodal max stress. Side work
-when deps ready: M11 (h_min flag), M12 finish (sphere/icecream face tags),
-M14 (wall-clock kills); M13 sphere ref after freeze.
+Order locked (ADR-0024 Q2): **freeze (done) → wall project → CVT**. Dual hard-block
+until G4. Packing “win” loops measure **delta vs M9 freeze only**. Never score raw
+nodal max stress. Side work: M11, M12 finish, M14; M13 sphere ref after freeze.
 
 ## Background / older phases
 
@@ -41,6 +40,12 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-13: **M9 baseline freeze** — campaign `bench/campaigns/varyhedron-baseline-m9/`
+  (4 STEP × varyhedron+hybrid_zoo × 1 tier h_scale=5.0 = 8 runs; warehouse +
+  analyze + HANDOFF). **ok_rate 75%** (6/8); both cylinder runs `solve_suspect`
+  (load_area gate). Code SHA `dcb2baa`; metric schema `scorecard-m1-m8-v1`.
+  Canonical note: [`BASELINE.md`](../bench/campaigns/varyhedron-baseline-m9/BASELINE.md).
+  Packing deltas vs this freeze only; next **M10**.
 - 2026-07-12: **M12 partial — expected_area on planar STEP loads** —
   `plate_hole` load `expected_area=0.001` (end face \(H\times t=0.1\times0.01\));
   cylinder tip \(\pi R^2\) already present. Sphere polar-cap + icecream multi-face

@@ -1,0 +1,89 @@
+{
+  "accuracy": {
+    "all": [
+      {
+        "metric": "strain_energy",
+        "rel_err": 1.4604244133510944,
+        "score": 0.0,
+        "trusted": false,
+        "truth": 0.003926990816987241,
+        "value": 0.009662064077120967
+      },
+      {
+        "metric": "tip_deflection",
+        "rel_err": 0.5355272739752979,
+        "score": 0.0,
+        "trusted": false,
+        "truth": 1e-06,
+        "value": 1.5355272739752978e-06
+      }
+    ],
+    "metric": "strain_energy",
+    "rel_err": 1.4604244133510944,
+    "score": 0.0,
+    "trusted": false,
+    "truth": 0.003926990816987241,
+    "value": 0.009662064077120967
+  },
+  "answers": {
+    "load_area_rel_err": 0.6236469805185836,
+    "load_face_area": 0.012752093565051081,
+    "mean_u_component": 1.5276270448886316e-06,
+    "n_load_faces": 238,
+    "n_probe_nodes": 131,
+    "n_quality_excluded": 0,
+    "sigma_face_mean": 2134806.203805421,
+    "sigma_max": 2654969.292440342,
+    "sigma_p99": 2484774.3441733597,
+    "strain_energy": 0.009662064077120967,
+    "tip_deflection": 1.5355272739752978e-06,
+    "tip_deflection_max": 1.6711367277463878e-06
+  },
+  "cfg_id": "cfg-89f62376",
+  "config": {
+    "feature_refine": true,
+    "mesher": "varyhedron",
+    "order": 1
+  },
+  "geom_class": {
+    "curved_frac": 0.9318181818181818,
+    "min_feature_h": 28.577399384028727,
+    "thin": false
+  },
+  "h": 0.017496378634069814,
+  "health": {
+    "free_residual_rel": 1.2385737627739935e-13,
+    "load_area_ok": false,
+    "load_area_rel_err": 0.6236469805185836,
+    "n_bc_dofs": 684,
+    "n_orphans": 0,
+    "ok": false,
+    "reaction_sum_err": 1.4858906234165658e-14
+  },
+  "mesh_ms": 186.820699,
+  "n_dof": 7383,
+  "n_elems": 10677,
+  "n_elems_over_pred": 4.765520377289311,
+  "n_nodes": 2461,
+  "n_pred_elems": 2240.468858528565,
+  "part": "cylinder",
+  "quality": {
+    "M1max": 0.00023937879343897966,
+    "M2max": 0.001962773985900882,
+    "M6": 0.02484249317750572,
+    "score": 0.7733821735544429
+  },
+  "scorecard": {
+    "accuracy_rel_err": 1.4604244133510944,
+    "chordal_efficiency_max": 133.0654934681996,
+    "edge_hausdorff_over_h": 5.717860656338729,
+    "health_ok": false,
+    "min_element_quality": 0.02484249317750572,
+    "n_dof": 7383,
+    "normal_dev_deg_max": 11.383612554277462,
+    "solve_residual_rel": 1.2385737627739935e-13
+  },
+  "solve_ms": 95.006974,
+  "status": "solve_suspect",
+  "tier": 0
+}

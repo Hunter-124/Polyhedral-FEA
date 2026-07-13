@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-// Varyhedron packing fill (ADR-0021) — v1 packing-seed engine (V6c):
-// CAD edge protecting balls (denser on short features) + interior bubble /
-// packing seeds that repel from edge seeds and each other, then multi-level
-// graded tet scaffold + soft boundary edge-profile snap. Dual-of-tet poly
-// clustering is deferred to V11; export remains a tet scaffold for FE today.
+// Varyhedron packing fill (ADR-0021 / ADR-0023) — packing-seed engine:
+// protecting balls on **sharp** CAD edges only (seams/smooth skipped) +
+// interior bubble seeds + graded tet scaffold + soft snap to sharp features.
+// Poly export target: constrained restricted CVT / clipped Voronoi (M5 path);
+// dual-of-tet deferred. Export remains a tet scaffold for FE today.
 
 #include "geom/cad_topology.hpp"
 #include "geom/features.hpp"
@@ -24,24 +24,30 @@ struct VaryhedronFillOutput {
     double h_coarse = 0.0;
     double h_fine = 0.0;
     std::size_t n_tets = 0;
-    /// CAD edge protecting-ball samples used as fixed packing anchors.
+    /// CAD edge protecting-ball samples used as fixed packing anchors (sharp only).
     std::size_t n_edge_seeds = 0;
+    /// CAD edge class counts from topology (diagnostics).
+    std::size_t n_sharp_edges = 0;
+    std::size_t n_smooth_edges = 0;
+    std::size_t n_seam_edges = 0;
     /// Interior packing seeds (volume bubbles) after edge-protect repulsion.
     std::size_t n_volume_seeds = 0;
     /// Bubble-relax iterations applied to volume seeds.
     int n_pack_relax_iters = 0;
     /// Packed-ball volume proxy / bbox volume (clamped [0,1]); diagnostic only.
     double pack_fill_frac = 0.0;
-    /// Max Hausdorff residual of free-boundary mesh edges vs CAD edge samples
-    /// (metres). 0 if no topology provided.
+    /// Max Hausdorff residual of free-boundary mesh vs **sharp** CAD edges (m).
     double edge_profile_hausdorff_max = 0.0;
-    double edge_profile_rel = 0.0; // max / characteristic CAD edge length
+    double edge_profile_rel = 0.0; // max / characteristic sharp CAD edge length
+    /// Chordal efficiency max e = d_actual / (h²κ/8) on sharp edges (ADR-0023).
+    double edge_chordal_efficiency_max = 0.0;
+    double edge_hausdorff_over_h = 0.0;
 };
 
-/// Pack volume mesh with varyhedron v1 packing-seed algorithm.
-/// When `topo` is non-null, CAD edge samples become protecting seeds, interior
-/// volume seeds are packed away from them, and free nodes near edges are
-/// attracted to the CAD edge profile after the tet scaffold is built.
+/// Pack volume mesh with varyhedron packing-seed algorithm (ADR-0023).
+/// When `topo` is non-null, **sharp** CAD edge samples become protecting seeds;
+/// seams/smooth edges are never fixed sites. Interior volume seeds pack away
+/// from them; free nodes near sharp edges soft-snap after the tet scaffold.
 VaryhedronFillOutput varyhedron_fill_surface(
     const geom::TriSurface& surface, const Eigen::Vector3d& bbox_min,
     const Eigen::Vector3d& bbox_max, double h, int skin_layers = 2,

@@ -485,41 +485,42 @@ nodes:
 
   - id: M1
     title: Probe hardening + CAD-tag BC/probe + health gates
-    status: in_progress
+    status: done
     deps: [M0, V3b]
     scope: [apps/testlab/, docs/dag/interfaces.md, tests/fixtures/parts/]
     note: >
-      Face-mean tip on load/CAD face (not global max); reaction-sum + free
-      residual + orphan checks; status solve_suspect when health fails;
-      scorecard stub. BC/probe by BRep face tags preferred over mesh index.
+      DONE 2026-07-12: face-mean tip on load faces; tip_deflection_max diagnostic;
+      free residual + reaction-sum + orphan health; solve_suspect zeros accuracy;
+      probe_util unit tests; cylinder/sphere BC pad. CAD-face-id select still
+      box-based (tag IDs follow-on).
 
   - id: M2
     title: "Min scorecard: edge Hausdorff/h, normal dev, DOF, accuracy, quality"
-    status: todo
+    status: done
     deps: [M1, V1b]
     scope: [src/geom/, apps/testlab/, src/mesh/]
     note: >
-      Five numbers + residual gate per run (ADR-0023 §5). Chordal efficiency
-      e = d_actual/(h²κ/8) on feature edges. Wire into results.jsonl + warehouse.
+      DONE 2026-07-12: scorecard in results.jsonl (edge_hausdorff_over_h sharp-
+      only, chordal_efficiency_max, normal_dev_deg_max, n_dof, accuracy_rel_err,
+      min quality, solve_residual_rel, health_ok). Chordal metrics in geom.
 
   - id: M3
     title: Sharp-only edge protect + seam skip + wall tangential project
-    status: todo
+    status: in_progress
     deps: [M0, V1b, V6c]
     scope: [src/geom/, src/mesh/]
     note: >
-      Classify CadEdge sharp/smooth/seam; protect only sharp; OCC seams never
-      protected; smooth-face nodes slide + GeomAPI project (ADR-0023 §4).
+      Classification done (CadEdgeFeature). Varyhedron protect/snap sharp-only
+      in flight. Wall tangential + OCC surface project still open.
 
   - id: M4
     title: Sizing N_pred + h_min floor + over_budget diagnosis
-    status: todo
+    status: in_progress
     deps: [M0, V4]
     scope: [src/pipeline/, src/mesh/, apps/testlab/]
     note: >
-      N_pred ≈ C∫dV/h³ before mesh; if N_pred over tier → sizing bug; if
-      N_actual≫N_pred → mesher. Floor: suppress micro-features below h_min
-      (virtual topology) instead of global h collapse. Tier kill ~2× DOF.
+      N_pred + over_budget_cause (sizing|mesher|budget) in testlab. h_min floor /
+      virtual-topology suppression still open.
 
   - id: M5
     title: "VEM gate: beat hybrid_zoo on plate_hole + cylinder before headline"

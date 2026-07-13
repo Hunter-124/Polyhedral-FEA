@@ -34,7 +34,13 @@ Declares what to sweep. Written by hand or by the GUI.
   "score": {                       // Pareto axes; scalar score for trimming
     "weights": { "accuracy": 0.5, "solve_ms": 0.25, "mesh_ms": 0.25 }
   },
-  "resources": { "max_threads": 0, "max_mem_gb": 0 }   // 0 = unlimited
+  "resources": {
+    "max_threads": 0,               // 0 = unlimited
+    "max_mem_gb": 0,                // 0 = unlimited
+    // M14 wall-clock kills (ADR-0024 Q9):
+    "max_run_wall_s": 0,            // 0 → tier defaults: tier0=900, tier1=900, tier2+=2700
+    "max_pack_wall_s": 0            // 0 = unlimited pack ceiling; else stop *starting* new runs
+  }
 }
 ```
 
@@ -42,6 +48,11 @@ Trimming rule (successive halving): at each tier every surviving config runs
 every part; configs rank by weighted score aggregated over parts; the top
 `keep_frac` advance. `accuracy` is the relative error against the case's
 hand-calc truth (§5), mapped to a 0–1 score as `1/(1+|rel_err|/tol)`.
+
+**Wall-clock (M14):** each run records `wall_time_s` / `max_run_wall_s`. If
+elapsed exceeds the limit after mesh (or mid-solve via progress callback),
+`status = over_budget` and `over_budget_cause = wall_clock` (solve skipped when
+still post-mesh). Pack ceiling never aborts an in-flight run.
 
 ## 2. Checkpoint — `bench/campaigns/<name>/checkpoint.json`
 
@@ -71,8 +82,17 @@ this is the accumulated simulation data the feedback loop mines.
   "cfg_id": "cfg-0007",            // stable hash-id of the config values
   "config": { "mesher": "hybrid_zoo", "curvature_turn_deg": 15, "...": "..." },
   "part": "plate_hole", "tier": 1,
-  "geom_class": { "curved_frac": 0.31, "thin": false, "min_feature_h": 2.4 },
+  "geom_class": {
+    "curved_frac": 0.31, "thin": false, "min_feature_h": 2.4,
+    "n_features_below_h_min": 0   // M11: sharp CAD edges with L < 2·h
+  },
+  "n_features_below_h_min": 0,    // same count on the line root (M11)
+  "feature_flags": [              // M11: sharp edges with L/3 < tier h_min (≈0.25·h)
+    // { "edge_id": 3, "reason": "below_h_min", "length": 0.001, "h_edge": 3.3e-4, "h_min": 0.01 }
+  ],
   "mesh_ms": 412, "solve_ms": 1890,
+  "wall_time_s": 12.4,            // M14: full-run wall seconds
+  "max_run_wall_s": 900,          // M14: limit applied this tier
   "n_elems": 31956, "n_nodes": 11935, "n_dof": 35805,
   "quality": { "M1max": 1.0e-11, "M2max": 0.36, "M6": 0.17, "score": 0.42 },
   "answers": {
@@ -101,8 +121,9 @@ this is the accumulated simulation data the feedback loop mines.
   },
   "n_pred_elems": 4200,             // C·V/h³ (later ∫ dV/h³) logged before mesh (M4)
   "n_elems_over_pred": 1.1,         // actual/pred after mesh
-  "over_budget_cause": null,        // null | "sizing" | "mesher" | "budget"
-  // sizing: N_pred ≫ tier; mesher: N_pred OK but N_actual ≫ N_pred; budget: hard-kill (≈2× DOF / wall-clock)
+  "over_budget_cause": null,        // null | "sizing" | "mesher" | "budget" | "wall_clock"
+  // sizing: N_pred ≫ tier; mesher: N_pred OK but N_actual ≫ N_pred;
+  // budget: hard-kill ≈2× DOF/elem; wall_clock: M14 per-run wall exceeded
   "scorecard": {
     "edge_hausdorff_over_h": 0.04,  // sharp CAD edges only; null without CAD
     "chordal_efficiency_max": 1.2,  // d_i/(ℓ_i² κ/8) with OCC κ; healthy ≈ [0.8, 3]
@@ -178,12 +199,16 @@ zeroed (measured values still recorded for debug). Analyze should filter on
 - Log `n_pred_elems` **before** meshing (`C · V / h³`, later size-field integral).
 - `n_pred` ≫ tier → `over_budget_cause = "sizing"`.
 - `n_pred` OK, `n_elems` ≫ `n_pred` → `"mesher"`.
-- Hard resource kill → `"budget"`.
+- Hard DOF/elem resource kill → `"budget"`.
+- Per-run wall-clock exceeded (M14) → `"wall_clock"`.
 
 `geom_class` is computed from the part geometry (not the config) so the
 feedback loop can learn per-condition presets: fraction of surface area with
 per-cell turning angle > 15°, thin-wall flag (t < 2.5 h_ref), smallest
-feature size in units of bulk h.
+feature size in units of bulk h, plus **M11** `n_features_below_h_min` (count of
+sharp CAD edges with \(L < 2h\); `feature_flags` lists edges with
+\(h_{\mathrm{edge}}=L/3\) below tier \(h_{\min}\approx 0.25\,h\)). Flag only —
+no OCC defeaturing.
 
 ## 3b. Pareto analysis — `bench/campaigns/<name>/PARETO.{md,json}`
 

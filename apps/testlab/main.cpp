@@ -17,6 +17,7 @@
 #include "fea/vtu.hpp"
 #include "fea/zz.hpp"
 #include "geom/cad_topology.hpp"
+#include "geom/step.hpp"
 #include "mesh/surface_metrics.hpp"
 #include "pipeline/scene.hpp"
 #include "probe_util.hpp"
@@ -150,6 +151,10 @@ struct Campaign {
     bool warehouse = false; // ADR-0022 full experiment warehouse
     bool on_finish_analyze = false;
     bool on_finish_grok = false;
+    /// M14: per-run wall-clock (s). 0 → tier defaults 900 / 900 / 2700.
+    double max_run_wall_s = 0.0;
+    /// M14: pack-level ceiling (s). 0 = unlimited (do not start new runs past it).
+    double max_pack_wall_s = 0.0;
 };
 
 struct Box3 {
@@ -171,6 +176,9 @@ struct LoadSpec {
     Eigen::Vector3d traction = Eigen::Vector3d::Zero(); // N/m^2
     /// Optional guard (m²): selected face area must match within ±2% (advisor Q7).
     std::optional<double> expected_area;
+    /// Keep faces whose unit normal aligns with traction (n·t̂ > min_dot).
+    /// Default 0.7 when traction is nonzero; ignored when traction ≈ 0.
+    double normal_min_dot = 0.7;
 };
 
 struct ProbeSpec {
@@ -268,8 +276,38 @@ Campaign load_campaign(const fs::path& path) {
         c.on_finish_analyze = j["on_finish"].value("analyze", false);
         c.on_finish_grok = j["on_finish"].value("grok_handoff", false);
     }
+    // M14 resources (interfaces.md §1): wall-clock kills + pack ceiling.
+    if (j.contains("resources") && j["resources"].is_object()) {
+        const auto& r = j["resources"];
+        c.max_run_wall_s = r.value("max_run_wall_s", 0.0);
+        c.max_pack_wall_s = r.value("max_pack_wall_s", 0.0);
+    }
     return c;
 }
+
+/// M14: per-run wall limit (s). Explicit campaign override, else tier defaults
+/// (ADR-0024 Q9): tier0=15min, tier1=15min, tier2+=45min.
+double run_wall_limit_s(const Campaign& camp, int tier) {
+    if (camp.max_run_wall_s > 0.0) {
+        return camp.max_run_wall_s;
+    }
+    if (tier <= 0) {
+        return 900.0;
+    }
+    if (tier == 1) {
+        return 900.0;
+    }
+    return 2700.0;
+}
+
+/// Thrown from solve progress (or after mesh) when max_run_wall_s is exceeded.
+struct WallClockBudgetExceeded : std::runtime_error {
+    explicit WallClockBudgetExceeded(double elapsed_s)
+        : std::runtime_error("wall-clock budget exceeded (" +
+                             std::to_string(elapsed_s) + " s)"),
+          elapsed_s(elapsed_s) {}
+    double elapsed_s = 0.0;
+};
 
 std::vector<MetricSpec> load_metrics(const fs::path& ref_path) {
     const json j = json::parse(read_file(ref_path));
@@ -330,6 +368,9 @@ PartCase load_case(const fs::path& path) {
             ls.box = parse_box(L.at("select").at("box"));
             if (L["select"].contains("expected_area")) {
                 ls.expected_area = L["select"]["expected_area"].get<double>();
+            }
+            if (L["select"].contains("normal_min_dot")) {
+                ls.normal_min_dot = L["select"]["normal_min_dot"].get<double>();
             }
             if (L.contains("traction") && L["traction"].is_array() && L["traction"].size() == 3) {
                 ls.traction = Eigen::Vector3d(L["traction"][0].get<double>(),
@@ -728,17 +769,77 @@ Eigen::Vector3d face_centroid(const fea::NodalMesh& mesh, const fea::SurfaceFace
     return c / static_cast<double>(f.nodes.size());
 }
 
-Eigen::VectorXd make_loads(const fea::NodalMesh& mesh, const std::vector<LoadSpec>& loads) {
+/// Unit normal from first triangle of a surface face (right-hand order of nodes).
+/// Returns zero if the face is degenerate.
+Eigen::Vector3d face_unit_normal(const fea::NodalMesh& mesh, const fea::SurfaceFace& f) {
+    if (f.nodes.size() < 3) {
+        return Eigen::Vector3d::Zero();
+    }
+    const Eigen::Vector3d& p0 = mesh.nodes[f.nodes[0]];
+    const Eigen::Vector3d& p1 = mesh.nodes[f.nodes[1]];
+    const Eigen::Vector3d& p2 = mesh.nodes[f.nodes[2]];
+    Eigen::Vector3d n = (p1 - p0).cross(p2 - p0);
+    const double nn = n.norm();
+    if (!(nn > 1e-30)) {
+        return Eigen::Vector3d::Zero();
+    }
+    return n / nn;
+}
+
+/// Boundary faces in `box`, optionally filtered so n·t̂ > min_dot when traction
+/// is nonzero. Falls back to box-only if the normal filter empties the set.
+std::vector<fea::SurfaceFace> select_load_faces(const fea::NodalMesh& mesh,
+                                                const Box3& box,
+                                                const Eigen::Vector3d& traction,
+                                                double normal_min_dot) {
     const auto all_faces = free_faces_as_surface(mesh);
+    std::vector<fea::SurfaceFace> in_box;
+    in_box.reserve(all_faces.size());
+    for (const auto& face : all_faces) {
+        if (box.contains(face_centroid(mesh, face))) {
+            in_box.push_back(face);
+        }
+    }
+    const double tnorm = traction.norm();
+    if (in_box.empty() || !(tnorm > 1e-30) || !(normal_min_dot > -1.0)) {
+        return in_box;
+    }
+    const Eigen::Vector3d t_hat = traction / tnorm;
+    std::vector<fea::SurfaceFace> filtered;
+    filtered.reserve(in_box.size());
+    // Prefer same hemisphere as traction (outward skin). If that yields nothing
+    // (inverted winding on some element types), accept either orientation via
+    // |n·t̂|. Final fallback: box-only.
+    for (const auto& face : in_box) {
+        const Eigen::Vector3d n = face_unit_normal(mesh, face);
+        if (n.norm() < 0.5) {
+            continue; // degenerate
+        }
+        if (n.dot(t_hat) > normal_min_dot) {
+            filtered.push_back(face);
+        }
+    }
+    if (!filtered.empty()) {
+        return filtered;
+    }
+    for (const auto& face : in_box) {
+        const Eigen::Vector3d n = face_unit_normal(mesh, face);
+        if (n.norm() < 0.5) {
+            continue;
+        }
+        if (std::abs(n.dot(t_hat)) > normal_min_dot) {
+            filtered.push_back(face);
+        }
+    }
+    return filtered.empty() ? in_box : filtered;
+}
+
+Eigen::VectorXd make_loads(const fea::NodalMesh& mesh, const std::vector<LoadSpec>& loads) {
     Eigen::VectorXd f =
         Eigen::VectorXd::Zero(3 * static_cast<Eigen::Index>(mesh.nodes.size()));
     for (const auto& L : loads) {
-        std::vector<fea::SurfaceFace> selected;
-        for (const auto& face : all_faces) {
-            if (L.box.contains(face_centroid(mesh, face))) {
-                selected.push_back(face);
-            }
-        }
+        std::vector<fea::SurfaceFace> selected =
+            select_load_faces(mesh, L.box, L.traction, L.normal_min_dot);
         if (selected.empty()) {
             // Fallback: distribute total force F = traction * bbox_area_proxy onto
             // nodes in the box (node-lump). Area proxy is not exact; prefer faces.
@@ -820,24 +921,20 @@ int count_orphan_nodes(const fea::NodalMesh& mesh) {
     return n;
 }
 
-/// Unique nodes on boundary faces whose centroids fall in `box`.
-std::vector<std::uint32_t> nodes_on_faces_in_box(const fea::NodalMesh& mesh,
-                                                 const Box3& box,
-                                                 int* n_faces_out = nullptr) {
-    const auto all_faces = free_faces_as_surface(mesh);
+/// Unique nodes on traction-selected faces (box + normal filter, same set as loads).
+std::vector<std::uint32_t> nodes_on_load_faces(const fea::NodalMesh& mesh,
+                                               const LoadSpec& load,
+                                               int* n_faces_out = nullptr) {
+    const auto faces =
+        select_load_faces(mesh, load.box, load.traction, load.normal_min_dot);
     std::set<std::uint32_t> unique;
-    int n_faces = 0;
-    for (const auto& face : all_faces) {
-        if (!box.contains(face_centroid(mesh, face))) {
-            continue;
-        }
-        ++n_faces;
+    for (const auto& face : faces) {
         for (const auto ni : face.nodes) {
             unique.insert(ni);
         }
     }
     if (n_faces_out != nullptr) {
-        *n_faces_out = n_faces;
+        *n_faces_out = static_cast<int>(faces.size());
     }
     return std::vector<std::uint32_t>(unique.begin(), unique.end());
 }
@@ -991,27 +1088,29 @@ ProbeAnswers compute_probes(const fea::NodalMesh& mesh, const fea::Material& mat
     }
 
     // Tip / load face mean displacement + optional expected-area guard.
+    // Uses the same box + normal-aligned face set as assemble_traction_load so
+    // lateral wall faces near a tip slab are not counted as load area.
     std::vector<std::uint32_t> probe_nodes;
     if (!loads.empty()) {
-        a.dominant_load_axis = tlab::dominant_axis(loads.front().traction);
+        const LoadSpec& L0 = loads.front();
+        a.dominant_load_axis = tlab::dominant_axis(L0.traction);
         int n_faces = 0;
-        probe_nodes = nodes_on_faces_in_box(mesh, loads.front().box, &n_faces);
+        probe_nodes = nodes_on_load_faces(mesh, L0, &n_faces);
         a.n_load_faces = n_faces;
-        // Selected face area for Q7 guard.
+        // Selected face area for Q7 guard (same filter as traction application).
         double area = 0.0;
-        for (const auto& face : free_faces_as_surface(mesh)) {
-            if (loads.front().box.contains(face_centroid(mesh, face))) {
-                area += surface_face_area(mesh, face);
-            }
+        for (const auto& face :
+             select_load_faces(mesh, L0.box, L0.traction, L0.normal_min_dot)) {
+            area += surface_face_area(mesh, face);
         }
         a.load_face_area = area;
-        if (loads.front().expected_area && *loads.front().expected_area > 0.0) {
-            const double exp = *loads.front().expected_area;
+        if (L0.expected_area && *L0.expected_area > 0.0) {
+            const double exp = *L0.expected_area;
             a.load_area_rel_err = std::abs(area - exp) / exp;
             a.load_area_ok = a.load_area_rel_err <= 0.02;
         }
         if (probe_nodes.empty()) {
-            probe_nodes = nodes_in_box(mesh, loads.front().box);
+            probe_nodes = nodes_in_box(mesh, L0.box);
         }
     }
     a.n_probe_nodes = static_cast<int>(probe_nodes.size());
@@ -1247,6 +1346,49 @@ json geom_class_of(const pipeline::Model& model, double h_ref) {
             {"min_feature_h", min_feature_h}};
 }
 
+/// M11: flag sharp CAD edges that want h_edge = L/3 below tier h_min, and count
+/// features shorter than 2·h. Detector only — no OCC defeaturing (ADR-0024 Q10).
+struct HminFeatureReport {
+    json feature_flags = json::array();
+    int n_features_below_h_min = 0;
+};
+
+HminFeatureReport detect_hmin_features(const pipeline::Model& model, double h) {
+    HminFeatureReport rep;
+    if (!(h > 0.0) || !geom::occ_enabled() || !model.cad || model.cad->empty()) {
+        return rep;
+    }
+    // Tier-implied floor: ~1/4 of campaign h (resolved.h * h_scale).
+    const double h_min = h * 0.25;
+    try {
+        const geom::CadTopology topo = geom::extract_topology(*model.cad, 4);
+        for (const auto& e : topo.edges) {
+            if (e.feature != geom::CadEdgeFeature::kSharp) {
+                continue;
+            }
+            if (!(e.length > 0.0) || !std::isfinite(e.length)) {
+                continue;
+            }
+            // Sharp edges shorter than 2·h → count as below h_min class.
+            if (e.length < 2.0 * h) {
+                ++rep.n_features_below_h_min;
+            }
+            // Would-want h_edge = L/3 under the floor → explicit feature_flags entry.
+            const double h_edge = e.length / 3.0;
+            if (h_edge < h_min) {
+                rep.feature_flags.push_back({{"edge_id", e.id},
+                                             {"reason", "below_h_min"},
+                                             {"length", e.length},
+                                             {"h_edge", h_edge},
+                                             {"h_min", h_min}});
+            }
+        }
+    } catch (...) {
+        // Surface-only / extract failure: leave flags empty.
+    }
+    return rep;
+}
+
 json quality_of(const pipeline::Model& model, const fea::NodalMesh& mesh, double h) {
     const auto quads = fea::extract_boundary_faces(mesh);
     std::vector<mesh::FreeFace> faces(quads.begin(), quads.end());
@@ -1294,9 +1436,17 @@ void write_warehouse_run(const fs::path& run_dir, const json& line,
 
 RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_scale,
                    const fs::path& progress_path, const fs::path& mesh_preview_path,
-                   const fs::path& warehouse_run_dir = {}) {
+                   const fs::path& warehouse_run_dir = {},
+                   double max_run_wall_s = 900.0) {
     using clock = std::chrono::steady_clock;
     const auto t_all0 = clock::now();
+    const auto wall_elapsed_s = [&]() -> double {
+        return std::chrono::duration<double>(clock::now() - t_all0).count();
+    };
+    const auto stamp_wall = [&](json& line) {
+        line["wall_time_s"] = wall_elapsed_s();
+        line["max_run_wall_s"] = max_run_wall_s;
+    };
 
     RunOutcome out;
     out.line["cfg_id"] = cfg.id;
@@ -1310,7 +1460,17 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         const auto model = pipeline::Model::load(part.geometry);
         const auto resolved = pipeline::resolve_mesh_size(model, 0.0);
         const double h = std::max(resolved.h * h_scale, 1e-9);
-        out.line["geom_class"] = geom_class_of(model, resolved.h);
+        json gc = geom_class_of(model, resolved.h);
+
+        // M11: h_min feature flag (virtual-topology detector; no OCC suppress).
+        const HminFeatureReport hmin = detect_hmin_features(model, h);
+        gc["n_features_below_h_min"] = hmin.n_features_below_h_min;
+        out.line["geom_class"] = std::move(gc);
+        out.line["feature_flags"] = hmin.feature_flags;
+        out.line["n_features_below_h_min"] = hmin.n_features_below_h_min;
+        if (!resolved.note.empty()) {
+            out.line["mesher_note"] = resolved.note;
+        }
 
         // M4: predicted element count from bbox volume / h³ before meshing.
         constexpr long long kMaxCampaignDof = 80000;
@@ -1327,11 +1487,17 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
             out.line["mesh_ms"] = 0.0;
             out.line["solve_ms"] = 0.0;
             out.accuracy_score = 0.0;
+            stamp_wall(out.line);
             if (!warehouse_run_dir.empty()) {
                 write_warehouse_run(warehouse_run_dir, out.line, nullptr);
             }
             beat.set_phase("done", 1.0);
             return out;
+        }
+
+        // M14: if already over wall before meshing (unlikely), skip mesh+solve.
+        if (max_run_wall_s > 0.0 && wall_elapsed_s() > max_run_wall_s) {
+            throw WallClockBudgetExceeded(wall_elapsed_s());
         }
 
         const auto t_mesh0 = clock::now();
@@ -1362,6 +1528,24 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         beat.set_mesh_stats(vol.mesh.elements.size(), vol.mesh.nodes.size());
         write_mesh_preview(mesh_preview_path, vol);
 
+        // M14: after mesh — if wall budget blown, skip remaining solve.
+        if (max_run_wall_s > 0.0 && wall_elapsed_s() > max_run_wall_s) {
+            out.line["status"] = "over_budget";
+            out.line["over_budget_cause"] = "wall_clock";
+            out.line["error"] = "wall-clock exceeded after mesh (" +
+                                std::to_string(wall_elapsed_s()) + " s > " +
+                                std::to_string(max_run_wall_s) + " s); solve skipped";
+            out.line["mesh_ms"] = out.mesh_ms;
+            out.line["solve_ms"] = 0.0;
+            out.accuracy_score = 0.0;
+            stamp_wall(out.line);
+            if (!warehouse_run_dir.empty()) {
+                write_warehouse_run(warehouse_run_dir, out.line, &vol);
+            }
+            beat.set_phase("done", 1.0);
+            return out;
+        }
+
         // Campaign budget: skip pathological meshes so one hybrid_vem case cannot
         // pin the overnight runner for tens of minutes. Tunable later via campaign.json.
         if (n_dof > kMaxCampaignDof ||
@@ -1380,6 +1564,7 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
             out.line["mesh_ms"] = out.mesh_ms;
             out.line["solve_ms"] = 0.0;
             out.accuracy_score = 0.0;
+            stamp_wall(out.line);
             if (!warehouse_run_dir.empty()) {
                 write_warehouse_run(warehouse_run_dir, out.line, &vol);
             }
@@ -1408,6 +1593,13 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         // on poorly conditioned hybrid meshes at moderate free DOF.
         sopt.method = fea::SolveMethod::kDirect;
         sopt.on_progress = [&](int iter, int max_iters, double resid) {
+            // M14 mid-solve wall-clock kill (when progress callbacks fire).
+            if (max_run_wall_s > 0.0) {
+                const double elapsed = wall_elapsed_s();
+                if (elapsed > max_run_wall_s) {
+                    throw WallClockBudgetExceeded(elapsed);
+                }
+            }
             const double frac =
                 max_iters > 0
                     ? std::clamp(static_cast<double>(iter) / static_cast<double>(max_iters),
@@ -1512,11 +1704,25 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         // solve_suspect: residual/reaction/orphan gate failed — answers recorded
         // but accuracy scores zeroed so analyze can filter untrusted runs.
         out.line["status"] = health_ok ? "ok" : "solve_suspect";
+        stamp_wall(out.line);
 
         if (!warehouse_run_dir.empty()) {
             write_warehouse_run(warehouse_run_dir, out.line, &vol);
         }
 
+        beat.set_phase("done", 1.0);
+    } catch (const WallClockBudgetExceeded& e) {
+        // M14: mid-solve (or pre-mesh) wall-clock kill.
+        out.line["status"] = "over_budget";
+        out.line["over_budget_cause"] = "wall_clock";
+        out.line["error"] = e.what();
+        out.line["mesh_ms"] = out.mesh_ms;
+        out.line["solve_ms"] = out.solve_ms;
+        out.accuracy_score = 0.0;
+        stamp_wall(out.line);
+        if (!warehouse_run_dir.empty()) {
+            write_warehouse_run(warehouse_run_dir, out.line, nullptr);
+        }
         beat.set_phase("done", 1.0);
     } catch (const fea::FeaError& e) {
         out.line["status"] = "solve_fail";
@@ -1524,6 +1730,7 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         out.line["mesh_ms"] = out.mesh_ms;
         out.line["solve_ms"] = out.solve_ms;
         out.accuracy_score = 0.0;
+        stamp_wall(out.line);
         if (!warehouse_run_dir.empty()) {
             write_warehouse_run(warehouse_run_dir, out.line, nullptr);
         }
@@ -1538,6 +1745,7 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         out.line["mesh_ms"] = out.mesh_ms;
         out.line["solve_ms"] = out.solve_ms;
         out.accuracy_score = 0.0;
+        stamp_wall(out.line);
         if (!warehouse_run_dir.empty()) {
             write_warehouse_run(warehouse_run_dir, out.line, nullptr);
         }
@@ -1756,12 +1964,29 @@ int run_campaign(const fs::path& camp_dir, bool resume) {
 
     std::printf("campaign %s: %zu configs, %zu parts, %zu tiers\n", camp.name.c_str(),
                 all_configs.size(), parts.size(), camp.tiers.size());
+    if (camp.max_run_wall_s > 0.0) {
+        std::printf("  max_run_wall_s=%.0f (override all tiers)\n", camp.max_run_wall_s);
+    } else {
+        std::printf("  max_run_wall_s defaults: tier0/1=900s tier2+=2700s\n");
+    }
+    if (camp.max_pack_wall_s > 0.0) {
+        std::printf("  max_pack_wall_s=%.0f\n", camp.max_pack_wall_s);
+    }
+
+    // M14 pack-level wall clock: do not start new runs once pack elapsed exceeds it.
+    using pack_clock = std::chrono::steady_clock;
+    const auto pack_t0 = pack_clock::now();
+    bool pack_budget_hit = false;
 
     for (int tier = cp.tier; tier < static_cast<int>(camp.tiers.size()); ++tier) {
+        if (pack_budget_hit) {
+            break;
+        }
         cp.tier = tier;
         const TierSpec& ts = camp.tiers[static_cast<std::size_t>(tier)];
-        std::printf("tier %d: h_scale=%.4g keep_frac=%.3g survivors=%zu\n", tier, ts.h_scale,
-                    ts.keep_frac, cp.survivors.size());
+        const double run_limit = run_wall_limit_s(camp, tier);
+        std::printf("tier %d: h_scale=%.4g keep_frac=%.3g survivors=%zu max_run_wall_s=%.0f\n",
+                    tier, ts.h_scale, ts.keep_frac, cp.survivors.size(), run_limit);
 
         // Ensure survivors are still known configs.
         std::vector<std::string> survivors;
@@ -1779,12 +2004,28 @@ int run_campaign(const fs::path& camp_dir, bool resume) {
         write_checkpoint(cp_path, cp);
 
         for (const auto& cfg_id : survivors) {
+            if (pack_budget_hit) {
+                break;
+            }
             const Config& cfg = by_id.at(cfg_id);
             for (const auto& part : parts) {
                 const std::string key =
                     cfg_id + "|" + part.part + "|" + std::to_string(tier);
                 if (done.count(key)) {
                     continue; // resume skip
+                }
+
+                // M14: pack ceiling — stop *starting* new runs (never abort in-flight).
+                if (camp.max_pack_wall_s > 0.0) {
+                    const double pack_elapsed =
+                        std::chrono::duration<double>(pack_clock::now() - pack_t0).count();
+                    if (pack_elapsed > camp.max_pack_wall_s) {
+                        pack_budget_hit = true;
+                        std::printf("  pack wall-clock exceeded (%.0f s > %.0f s); "
+                                    "not starting further runs\n",
+                                    pack_elapsed, camp.max_pack_wall_s);
+                        break;
+                    }
                 }
 
                 std::printf("  run %s part=%s tier=%d ...\n", cfg_id.c_str(), part.part.c_str(),
@@ -1795,8 +2036,9 @@ int run_campaign(const fs::path& camp_dir, bool resume) {
                     wh_dir = camp_dir / "runs" / cfg_id / part.part /
                              ("t" + std::to_string(tier));
                 }
-                const RunOutcome ro = run_one(cfg, part, tier, ts.h_scale, progress_path,
-                                              mesh_preview_path, wh_dir);
+                const RunOutcome ro =
+                    run_one(cfg, part, tier, ts.h_scale, progress_path, mesh_preview_path,
+                            wh_dir, run_limit);
                 results_app << ro.line.dump() << '\n';
                 results_app.flush();
                 done.insert(key);

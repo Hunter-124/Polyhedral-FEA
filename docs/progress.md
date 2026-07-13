@@ -12,13 +12,13 @@
 
 | Status | Nodes | Notes |
 |--------|-------|--------|
-| **Done** | **M0–M4, M6–M9** | Measure substrate + **frozen baseline** `varyhedron-baseline-m9` (ok_rate 75%, code SHA dcb2baa) |
+| **Done** | **M0–M4, M6–M9, M11, M14, G0** | Measure + freeze + wall-clock kills + h_min flags + Geogram ADR |
 | **In progress** | **M12** (partial) | plate_hole + cylinder `expected_area`; sphere/icecream open |
-| **Next** | **M10** → **G\*** | Wall OCC project → Geogram/CVT (G0–G4) → M5 VEM gate |
+| **Next** | **M10** → **G1+** | Wall OCC project → vendor Geogram (G1) → CVT → M5 VEM gate |
 
 Order locked (ADR-0024 Q2): **freeze (done) → wall project → CVT**. Dual hard-block
 until G4. Packing “win” loops measure **delta vs M9 freeze only**. Never score raw
-nodal max stress. Side work: M11, M12 finish, M14; M13 sphere ref after freeze.
+nodal max stress. Side work: M12 finish; M13 sphere ref after freeze.
 
 ## Background / older phases
 
@@ -40,6 +40,11 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-13: **M11 + M14 + G0** — testlab wall-clock kills (`max_run_wall_s`
+  tier defaults 900/900/2700, `max_pack_wall_s`, `over_budget_cause=wall_clock`);
+  h_min feature flags + `n_features_below_h_min` on results.jsonl (no OCC
+  defeaturing); ADR-0025 Geogram vendor note + `third_party/geogram/` placeholder
+  (G1 after M10). interfaces.md updated.
 - 2026-07-12: **GUI Test Lab measure-first readiness (Hunter-124)** — ResultRow parses health/scorecard/answers/`solve_suspect`; Results chips (ok/suspect/fail/budget); baseline-m9 badge; handoff open questions (V10c partial); Varyhedron tooltip (ADR-0023/24).
 - 2026-07-13: **M9 baseline freeze** — campaign `bench/campaigns/varyhedron-baseline-m9/`
   (4 STEP × varyhedron+hybrid_zoo × 1 tier h_scale=5.0 = 8 runs; warehouse +

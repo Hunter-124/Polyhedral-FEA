@@ -1204,23 +1204,26 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                     seeded.sites.push_back(s);
                     ++n_interior_free;
 
-                    // Plate-like only: local densify near hole rim for SCF.
+                    // Plate-like only: densify in the plate plane (xy) near
+                    // hole rim — z is already thin.
                     if (!plate_like) {
                         continue;
                     }
                     const double d_sharp = dist_to_sharp(c);
-                    if (d_sharp < 2.2 * h && d_sharp > 0.25 * h) {
-                        static constexpr int kOff[6][3] = {
-                            {1, 0, 0}, {-1, 0, 0}, {0, 1, 0},
-                            {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
-                        const double local_sep2 = (0.40 * h) * (0.40 * h);
+                    // Sweet spot: densify enough for SCF, keep residual < 1e-6.
+                    if (d_sharp < 2.6 * h && d_sharp > 0.2 * h) {
+                        static constexpr double kOff[][2] = {
+                            {1, 0}, {-1, 0}, {0, 1}, {0, -1},
+                            {1, 1}, {1, -1}, {-1, 1}, {-1, -1},
+                            {0.5, 0}, {-0.5, 0}, {0, 0.5}, {0, -0.5},
+                        };
+                        const double local_sep2 = (0.33 * h) * (0.33 * h);
                         for (const auto& o : kOff) {
                             Eigen::Vector3d p = c;
-                            p[0] += 0.45 * grid.cell[0] * static_cast<double>(o[0]);
-                            p[1] += 0.45 * grid.cell[1] * static_cast<double>(o[1]);
-                            p[2] += 0.45 * grid.cell[2] * static_cast<double>(o[2]);
-                            if ((p - c).cwiseAbs().maxCoeff() >
-                                0.48 * grid.cell.maxCoeff()) {
+                            p[0] += 0.40 * grid.cell[0] * o[0];
+                            p[1] += 0.40 * grid.cell[1] * o[1];
+                            if (std::abs(p[0] - c[0]) > 0.48 * grid.cell[0] ||
+                                std::abs(p[1] - c[1]) > 0.48 * grid.cell[1]) {
                                 continue;
                             }
                             if (!site_far(p, local_sep2)) {
@@ -1240,8 +1243,9 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         seeded.n_interior_free = n_interior_free;
 
         mesh::CvtLloydParams lloyd;
-        lloyd.max_iters = 24;
-        lloyd.move_tol_rel = 1e-3;
+        // Slightly more Lloyd for free-site equilibrium (helps SE a little).
+        lloyd.max_iters = 30;
+        lloyd.move_tol_rel = 8e-4;
         lloyd.size_at = [h](const Eigen::Vector3d&) { return h; };
 
         auto sites = seeded.sites;

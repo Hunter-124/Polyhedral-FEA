@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
 add_executable(polymesh_testlab main.cpp)
+target_include_directories(polymesh_testlab PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(polymesh_testlab
     PRIVATE geom mesh adapt fea pipeline bench_harness
             nlohmann_json::nlohmann_json

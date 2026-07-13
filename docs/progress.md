@@ -12,13 +12,13 @@
 
 | Status | Nodes | Notes |
 |--------|-------|--------|
-| **Done** | **M0–M4, M6–M9, M11, M14, G0** | Measure + freeze + wall-clock kills + h_min flags + Geogram ADR |
+| **Done** | **M0–M4, M6–M11, M14, G0** | Measure + freeze + **wall OCC project (M10)** + wall-clock/h_min + Geogram ADR |
 | **In progress** | **M12** (partial) | plate_hole + cylinder `expected_area`; sphere/icecream open |
-| **Next** | **M10** → **G1+** | Wall OCC project → vendor Geogram (G1) → CVT → M5 VEM gate |
+| **Next** | **G1+** | Vendor Geogram (G1) → CVT → M5 VEM gate |
 
-Order locked (ADR-0024 Q2): **freeze (done) → wall project → CVT**. Dual hard-block
-until G4. Packing “win” loops measure **delta vs M9 freeze only**. Never score raw
-nodal max stress. Side work: M12 finish; M13 sphere ref after freeze.
+Order locked (ADR-0024 Q2): **freeze (done) → wall project (done) → CVT**. Dual
+hard-block until G4. Packing “win” loops measure **delta vs M9 freeze only**.
+Never score raw nodal max stress. Side work: M12 finish; M13 sphere ref.
 
 ## Background / older phases
 
@@ -40,6 +40,14 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-12: **M10 wall tangential smooth + OCC surface project** —
+  `geom::project_point_on_surface` + `ProjectResult{point,normal,distance}`
+  (BRepExtrema face + GeomAPI UV/normal; nullopt stub without OCC). Shared
+  `mesh::wall_tangential_project` post-pass: free-boundary nodes far from sharp
+  edges get Laplacian/tangential smooth + BRep re-project, Jacobian-safe revert.
+  Wired into `varyhedron_fill` / pipeline `kVaryhedron` when CadModel present;
+  STL-only unchanged. Catch2 `test_wall_project.cpp` + project API tests
+  (cylinder mean radial residual not worse).
 - 2026-07-13: **Cylinder load_area fix** — traction-aligned face select (`|n·t̂|>0.7`,
   box z≥0.195); load/area/tip probe share filter; guard ±5%. hybrid+vary cylinder
   `status=ok`, SE ~0.0034 vs 0.00393 (~14%). M12 still open for sphere/icecream.

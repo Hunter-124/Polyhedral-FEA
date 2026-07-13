@@ -11,6 +11,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace polymesh::geom {
@@ -65,6 +66,25 @@ class CadModel {
 
     void compute_bbox();
 };
+
+/// Closest-point projection of a query onto the live BRep surface (ADR-0024 Q2a).
+struct ProjectResult {
+    Eigen::Vector3d point = Eigen::Vector3d::Zero();
+    /// Unit normal at the projected point, oriented outward-ish (face
+    /// orientation with REVERSED flipped). Zero if unavailable.
+    Eigen::Vector3d normal = Eigen::Vector3d::Zero();
+    /// Euclidean distance |p − point| (metres).
+    double distance = 0.0;
+};
+
+/// Project `p` onto the BRep surface of `model`.
+///
+/// OCC path: BRepExtrema_DistShapeShape on faces (trimmed), with
+/// GeomAPI_ProjectPointOnSurf for UV + surface normal. Returns nullopt when
+/// the model is empty, projection fails, or this build has no OCC (stub).
+/// Does not throw for the no-OCC / empty cases so STL-only callers can ignore.
+[[nodiscard]] std::optional<ProjectResult>
+project_point_on_surface(const CadModel& model, const Eigen::Vector3d& p);
 
 /// Convenience: load STEP or BREP by extension; otherwise GeomError.
 [[nodiscard]] CadModel load_cad(const std::filesystem::path& path);

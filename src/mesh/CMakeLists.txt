@@ -15,6 +15,7 @@ add_library(mesh
     src/transition_fill.cpp
     src/local_refine.cpp
     src/varyhedron_fill.cpp
+    src/wall_project.cpp
 )
 target_include_directories(mesh PUBLIC include)
 target_link_libraries(mesh PUBLIC geom Eigen3::Eigen PRIVATE polymesh_warnings polymesh_perf)

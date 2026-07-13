@@ -604,13 +604,14 @@ nodes:
 
   - id: M11
     title: "h_min feature flag + virtual-topology detector (no OCC suppress yet)"
-    status: todo
+    status: done
     deps: [M4]
     scope: [src/pipeline/, src/mesh/, apps/testlab/]
     note: >
-      ADR-0024 Q10 trap #3 + plan docs/plans/advisor-measure-first-program.md §4.3.
-      Flag features that would push h below tier h_min; route to larger tier.
-      Do NOT start OCC defeaturing/suppression project.
+      DONE 2026-07-13 (ADR-0024 Q10 trap #3): testlab after resolve_mesh_size
+      logs feature_flags[{edge_id, reason:below_h_min}] when sharp L/3 <
+      h_min≈0.25·h, plus n_features_below_h_min (sharp L < 2·h) on results.jsonl
+      and geom_class. No OCC defeaturing.
 
   - id: M12
     title: "BC expected_area guard everywhere + face-tag design note"
@@ -637,25 +638,25 @@ nodes:
 
   - id: M14
     title: "Campaign wall-clock kills + optional 500k top tier"
-    status: todo
+    status: done
     deps: [M4]
     scope: [apps/testlab/, bench/campaigns/]
     note: >
-      ADR-0024 Q9 + plan docs/plans/advisor-measure-first-program.md §6.
-      Per-run wall-clock (15/15/45 min) + pack ceiling; tet-FE packs may use
-      500k top tier for Richardson.
+      DONE 2026-07-13 (ADR-0024 Q9): max_run_wall_s (tier defaults 900/900/2700;
+      optional resources override) + max_pack_wall_s (0=unlimited); after mesh /
+      mid-solve → over_budget + wall_clock; wall_time_s on results; interfaces.md.
 
   # ── Lane G: Geogram + constrained restricted CVT (after M9–M10) ─────────
 
   - id: G0
     title: "ADR note: vendor Geogram BSD-3 hard parts; dual hard-block"
-    status: todo
+    status: done
     deps: [M0]
     scope: [docs/decisions/, third_party/]
     note: >
-      ADR-0024 Q3/Q8 + plan docs/plans/advisor-measure-first-program.md §4.4–§4.5.
-      Document vendoring plan + LICENSE; dual hard-block until G4. Frame fields
-      research-only. Docs can land early; G1 still waits on M10.
+      DONE 2026-07-13: ADR-0025 + third_party/geogram/README.md placeholder
+      (not vendored yet — G1 after M10). Points at research/geogram-cvt-vendoring.md;
+      dual hard-block until G4 (ADR-0024 Q3/Q8).
 
   - id: G1
     title: Vendor Geogram predicates + ConvexCell / clipped Voronoi

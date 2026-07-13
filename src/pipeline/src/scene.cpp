@@ -1083,15 +1083,17 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         if (out.boundary_quads.empty()) {
             out.boundary_quads = std::move(fill.mesh.boundary_quads);
         }
-        // V6c packing-seed engine (dual-of-tet poly clustering deferred to V11).
+        // Packing-seed engine (ADR-0023): sharp-only protect; dual deferred; CVT path later.
         out.mesher_note = std::format(
-            "varyhedron v1 packing (edge protect + interior bubble seeds + graded "
-            "scaffold + edge-profile snap; dual deferred V11): "
-            "{} tets, edge_seeds={}, vol_seeds={}, pack_relax={}, pack_fill={:.3g}, "
-            "h_bulk={:.4g}/h_fine={:.4g} m, edge_profile Hausdorff={:.3g} m (rel={:.3g}){}",
-            out.mesh.elements.size(), fill.n_edge_seeds, fill.n_volume_seeds,
-            fill.n_pack_relax_iters, fill.pack_fill_frac, fill.h_coarse, fill.h_fine,
-            fill.edge_profile_hausdorff_max, fill.edge_profile_rel,
+            "varyhedron packing (sharp-only edge protect + interior bubble seeds + graded "
+            "scaffold + sharp snap; dual deferred; CVT target): "
+            "{} tets, edge_seeds={}, sharp/smooth/seam={}/{}/{}, vol_seeds={}, pack_relax={}, "
+            "pack_fill={:.3g}, h_bulk={:.4g}/h_fine={:.4g} m, edge_Hd={:.3g} m "
+            "(rel={:.3g}, /h={:.3g}, e_chord={:.3g}){}",
+            out.mesh.elements.size(), fill.n_edge_seeds, fill.n_sharp_edges, fill.n_smooth_edges,
+            fill.n_seam_edges, fill.n_volume_seeds, fill.n_pack_relax_iters, fill.pack_fill_frac,
+            fill.h_coarse, fill.h_fine, fill.edge_profile_hausdorff_max, fill.edge_profile_rel,
+            fill.edge_hausdorff_over_h, fill.edge_chordal_efficiency_max,
             topo_ptr ? ", geom_source=brep_topology" : ", geom_source=surface_only");
     } else {
         auto fill = mesh::tet_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);

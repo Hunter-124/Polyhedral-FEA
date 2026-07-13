@@ -174,16 +174,25 @@ VaryhedronFillOutput varyhedron_fill_surface(
     VaryhedronFillOutput out;
 
     // --- Boundary edge seeds from CAD topology (protecting balls) ---
-    // Prefer short CAD edges first (holes/fillets need denser protect).
+    // ADR-0023 / M3: protect ONLY sharp (G0) edges. OCC seams and smooth
+    // dihedrals must not get fixed sites — that is the staircasing root cause.
+    // Prefer short sharp edges first (holes/fillets need denser protect).
     std::vector<Eigen::Vector3d> edge_seeds;
     std::vector<Eigen::Vector3d> seeds(refine_seeds.begin(), refine_seeds.end());
     if (topo != nullptr) {
         constexpr std::size_t kMaxEdgeSeeds = 768;
         const double min_sep = 0.55 * std::max(h, 1e-12);
         const double min_sep2 = min_sep * min_sep;
+        const auto counts = geom::count_edge_features(*topo);
+        out.n_sharp_edges = static_cast<std::size_t>(counts.n_sharp);
+        out.n_smooth_edges = static_cast<std::size_t>(counts.n_smooth);
+        out.n_seam_edges = static_cast<std::size_t>(counts.n_seam);
         std::vector<const geom::CadEdge*> edges;
         edges.reserve(topo->edges.size());
         for (const auto& e : topo->edges) {
+            if (e.feature != geom::CadEdgeFeature::kSharp) {
+                continue;
+            }
             edges.push_back(&e);
         }
         std::sort(edges.begin(), edges.end(),
@@ -377,7 +386,8 @@ VaryhedronFillOutput varyhedron_fill_surface(
                 continue;
             }
             auto& p = out.mesh.nodes[ni];
-            const auto q = geom::closest_edge(*topo, p);
+            // Snap only toward sharp protected features (never seams/smooth).
+            const auto q = geom::closest_edge(*topo, p, /*sharp_only=*/true);
             if (!q || q->distance > snap_band) {
                 continue;
             }
@@ -412,7 +422,7 @@ VaryhedronFillOutput varyhedron_fill_surface(
             }
         }
 
-        // Metric: Hausdorff of boundary nodes vs CAD edges.
+        // Metric: boundary nodes vs sharp CAD edges only (protected features).
         std::vector<Eigen::Vector3d> poly;
         poly.reserve(bnodes.size());
         for (std::uint32_t ni : bnodes) {
@@ -420,10 +430,16 @@ VaryhedronFillOutput varyhedron_fill_surface(
                 poly.push_back(out.mesh.nodes[ni]);
             }
         }
-        out.edge_profile_hausdorff_max = geom::edge_profile_hausdorff(*topo, poly);
+        out.edge_profile_hausdorff_max =
+            geom::edge_profile_hausdorff_filtered(*topo, poly, /*sharp_only=*/true);
+        const auto chord = geom::chordal_edge_metrics(*topo, poly, h, /*sharp_edges_only=*/true);
+        out.edge_chordal_efficiency_max = chord.max_efficiency;
+        out.edge_hausdorff_over_h = chord.hausdorff_over_h;
         double char_len = 0.0;
         for (const auto& e : topo->edges) {
-            char_len = std::max(char_len, e.length);
+            if (e.feature == geom::CadEdgeFeature::kSharp) {
+                char_len = std::max(char_len, e.length);
+            }
         }
         if (char_len <= 0.0) {
             char_len = (bbox_max - bbox_min).norm();

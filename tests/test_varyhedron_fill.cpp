@@ -79,7 +79,35 @@ TEST_CASE("volume_mesh varyhedron on plate_hole.step") {
     REQUIRE(out.mesher_note.find("varyhedron") != std::string::npos);
     // Retained BRep should drive topology seeds (not surface-only).
     REQUIRE(out.mesher_note.find("geom_source=brep_topology") != std::string::npos);
-    // V6c packing stats appear in the note (dual deferred).
+    // Packing stats appear in the note (sharp-only protect; dual deferred).
     REQUIRE(out.mesher_note.find("vol_seeds=") != std::string::npos);
+    REQUIRE(out.mesher_note.find("sharp-only") != std::string::npos);
     REQUIRE(out.mesher_note.find("dual deferred") != std::string::npos);
+}
+
+TEST_CASE("varyhedron protects only sharp edges on cylinder (M3)") {
+    if (!occ_enabled()) {
+        SKIP("OpenCASCADE not enabled");
+    }
+    const std::filesystem::path path = "tests/fixtures/parts/cylinder.step";
+    if (!std::filesystem::exists(path)) {
+        SKIP("cylinder.step missing");
+    }
+    const CadModel cad = CadModel::load_step(path);
+    const auto topo = extract_topology(cad, 8);
+    const auto counts = polymesh::geom::count_edge_features(topo);
+    // Cylinder: end rims sharp; at least one seam on the lateral wall.
+    REQUIRE(counts.n_sharp >= 2);
+    REQUIRE(counts.n_seam >= 1);
+
+    const auto surface = cad.tessellate();
+    auto fill = varyhedron_fill_surface(surface, cad.bbox_min(), cad.bbox_max(), 0.04, 1, {}, 0.0,
+                                        {}, 0.0, 15.0, &topo);
+    REQUIRE(fill.n_tets > 0);
+    REQUIRE(fill.n_sharp_edges == static_cast<std::size_t>(counts.n_sharp));
+    REQUIRE(fill.n_seam_edges == static_cast<std::size_t>(counts.n_seam));
+    // Protecting balls only on sharp features — seams never get seeds.
+    REQUIRE(fill.n_edge_seeds > 0);
+    // With only ~2 sharp circles, seed count should stay modest vs protecting all edges.
+    CHECK(fill.n_edge_seeds < 400);
 }

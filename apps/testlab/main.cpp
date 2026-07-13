@@ -935,13 +935,14 @@ double evaluate_probe(const ProbeSpec& probe, const ProbeAnswers& a) {
 json compute_scorecard_geom(const pipeline::Model& model, const fea::NodalMesh& mesh,
                             double h) {
     json edge_hd = nullptr;
+    json chord_eff = nullptr;
     json normal_dev = nullptr;
 
     if (model.cad && !model.cad->empty() && h > 0.0) {
         try {
             const geom::CadTopology topo = geom::extract_topology(*model.cad, 8);
             if (!topo.empty()) {
-                // Boundary nodes as crude sample set vs CAD edge polylines.
+                // Boundary nodes as sample set vs **sharp** CAD edge polylines.
                 std::set<std::uint32_t> bnodes;
                 for (const auto& face : free_faces_as_surface(mesh)) {
                     for (const auto ni : face.nodes) {
@@ -954,12 +955,15 @@ json compute_scorecard_geom(const pipeline::Model& model, const fea::NodalMesh& 
                     samples.push_back(mesh.nodes[ni]);
                 }
                 if (!samples.empty()) {
-                    const double hd = geom::edge_profile_hausdorff(topo, samples);
-                    edge_hd = hd / h;
+                    const auto chord =
+                        geom::chordal_edge_metrics(topo, samples, h, /*sharp_edges_only=*/true);
+                    edge_hd = chord.hausdorff_over_h;
+                    chord_eff = chord.max_efficiency;
                 }
             }
         } catch (...) {
             edge_hd = nullptr;
+            chord_eff = nullptr;
         }
     }
 
@@ -1024,7 +1028,22 @@ json compute_scorecard_geom(const pipeline::Model& model, const fea::NodalMesh& 
         }
     }
 
-    return {{"edge_hausdorff_over_h", edge_hd}, {"normal_dev_deg_max", normal_dev}};
+    return {{"edge_hausdorff_over_h", edge_hd},
+            {"chordal_efficiency_max", chord_eff},
+            {"normal_dev_deg_max", normal_dev}};
+}
+
+/// Crude N_pred ≈ C · V / h³ before meshing (ADR-0023 M4 diagnosis).
+/// If N_pred already busts the tier, blame sizing not the mesher.
+double predict_elem_count(const pipeline::Model& model, double h) {
+    if (!(h > 0.0)) {
+        return 0.0;
+    }
+    const Eigen::Vector3d ext = (model.bbox_max - model.bbox_min).cwiseMax(0.0);
+    const double vol = std::max(ext[0] * ext[1] * ext[2], 0.0);
+    // C~6 for tet packing density in a bounding box (order-of-magnitude only).
+    constexpr double kC = 6.0;
+    return kC * vol / (h * h * h);
 }
 
 json geom_class_of(const pipeline::Model& model, double h_ref) {
@@ -1107,6 +1126,28 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         const double h = std::max(resolved.h * h_scale, 1e-9);
         out.line["geom_class"] = geom_class_of(model, resolved.h);
 
+        // M4: predicted element count from bbox volume / h³ before meshing.
+        constexpr long long kMaxCampaignDof = 80000;
+        constexpr long long kMaxCampaignElems = 60000;
+        const double n_pred = predict_elem_count(model, h);
+        out.line["n_pred_elems"] = n_pred;
+        out.line["h"] = h;
+        if (n_pred > 2.0 * static_cast<double>(kMaxCampaignElems)) {
+            // Sizing field alone already busts budget — do not mesh.
+            out.line["status"] = "over_budget";
+            out.line["over_budget_cause"] = "sizing"; // N_pred ≫ tier → fix auto-h
+            out.line["error"] = "N_pred=" + std::to_string(static_cast<long long>(n_pred)) +
+                                " already exceeds 2× elem budget (sizing, not mesher)";
+            out.line["mesh_ms"] = 0.0;
+            out.line["solve_ms"] = 0.0;
+            out.accuracy_score = 0.0;
+            if (!warehouse_run_dir.empty()) {
+                write_warehouse_run(warehouse_run_dir, out.line, nullptr);
+            }
+            beat.set_phase("done", 1.0);
+            return out;
+        }
+
         const auto t_mesh0 = clock::now();
         // skin_layers=2, feature_refine from grid; empty refine_seeds; tendency dial.
         auto vol = pipeline::volume_mesh(model, h, cfg.mesher, /*skin_layers=*/2,
@@ -1127,20 +1168,29 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         const long long n_dof = 3 * static_cast<long long>(vol.mesh.nodes.size());
         out.line["n_dof"] = n_dof;
         out.line["quality"] = quality_of(model, vol.mesh, h);
+        if (n_pred > 0.0) {
+            out.line["n_elems_over_pred"] =
+                static_cast<double>(vol.mesh.elements.size()) / n_pred;
+        }
 
         beat.set_mesh_stats(vol.mesh.elements.size(), vol.mesh.nodes.size());
         write_mesh_preview(mesh_preview_path, vol);
 
         // Campaign budget: skip pathological meshes so one hybrid_vem case cannot
         // pin the overnight runner for tens of minutes. Tunable later via campaign.json.
-        constexpr long long kMaxCampaignDof = 80000;
-        constexpr long long kMaxCampaignElems = 60000;
         if (n_dof > kMaxCampaignDof ||
             static_cast<long long>(vol.mesh.elements.size()) > kMaxCampaignElems) {
             out.line["status"] = "over_budget";
+            // N_pred OK but N_actual high → mesher (recovery/protect cascades).
+            out.line["over_budget_cause"] =
+                (n_pred > 0.0 &&
+                 static_cast<double>(vol.mesh.elements.size()) > 3.0 * n_pred)
+                    ? "mesher"
+                    : "budget";
             out.line["error"] = "mesh exceeds campaign DOF/elem budget (" +
                                 std::to_string(n_dof) + " dof, " +
-                                std::to_string(vol.mesh.elements.size()) + " elems)";
+                                std::to_string(vol.mesh.elements.size()) + " elems, N_pred=" +
+                                std::to_string(static_cast<long long>(n_pred)) + ")";
             out.line["mesh_ms"] = out.mesh_ms;
             out.line["solve_ms"] = 0.0;
             out.accuracy_score = 0.0;

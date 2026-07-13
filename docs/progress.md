@@ -27,6 +27,10 @@ GATE 0 was approved by owner on 2026-07-09.
   classify in `extract_topology` (25° from flat); `edge_profile_hausdorff_filtered`,
   `chordal_edge_metrics`, `count_edge_features` for protect-only residual / chordal
   efficiency. Catch2: cube sharp, cylinder seam+sharp rims, plate_hole hole rims.
+- 2026-07-12: **M1–M4 measure lane code** — face-mean probes + health/`solve_suspect`;
+  scorecard (sharp Hausdorff/h, chordal e, normal dev); varyhedron protect/snap
+  **sharp-only** (seams skipped); N_pred + `over_budget_cause`. Wall OCC project
+  + h_min virtual-topology still open.
 - 2026-07-12: **ADR-0023 measure-first pivot** — tet FE default product claim;
   poly VEM gated (M5); weighted restricted CVT ranked over dual-of-tet/frame
   fields; program Lane **M0–M5** (probes → scorecard → sharp-only protect →

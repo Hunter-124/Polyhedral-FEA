@@ -233,9 +233,9 @@ void draw_study_panel(App& app) {
         static const char* kMeshers[] = {
             "tet (grid)",   "hex (grid)",    "hex VEM (grid)", "graded tet (legacy)",
             "hex+pyramid",  "prism (grid)",  "hybrid zoo",     "octa (exp)",
-            "hybrid VEM",   "Varyhedron",
+            "hybrid VEM",   "Varyhedron",    "CVT poly (G4)",
         };
-        if (iw::selector("mesher", &m, kMeshers, 10)) {
+        if (iw::selector("mesher", &m, kMeshers, 11)) {
             app.setup.mesher = static_cast<VolumeMesher>(m);
         }
         if (ImGui::IsItemHovered()) {
@@ -247,6 +247,7 @@ void draw_study_panel(App& app) {
                 "tet FE is the default product claim; VEM gated. Measure-first path:\n"
                 "health + scorecard before packing loops (ADR-0023/24). STEP product\n"
                 "CAD path needs OCC build. CAD edge profiles within element budget.\n"
+                "CVT poly: restricted CVT clipped Voronoi → kPolyVem (G1–G4 / M5 gate).\n"
                 "octa: experimental BCC (budget-capped; not product).");
         }
     }
@@ -878,11 +879,11 @@ void draw_frame(App& app) {
         // Mesher name for status (matches VolumeMesher enum order).
         static const char* kMesherShort[] = {
             "tet", "hex", "hex_vem", "graded_tet", "hex_pyr", "prism", "hybrid", "octa",
-            "hybrid_vem", "varyhedron",
+            "hybrid_vem", "varyhedron", "cvt_poly",
         };
         const int mi = static_cast<int>(app.setup.mesher);
         const char* mesher_name =
-            (mi >= 0 && mi < 10) ? kMesherShort[mi] : "?";
+            (mi >= 0 && mi < 11) ? kMesherShort[mi] : "?";
 
         // Last campaign result health when results are loaded (newest row).
         std::string health_bit;

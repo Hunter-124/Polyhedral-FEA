@@ -459,5 +459,17 @@
   "457": "size_type",
   "458": "std::vector<bool>",
   "459": "std::vector<T, Memory::aligned_allocator<T> >",
-  "460": "T1"
+  "460": "T1",
+  "461": "test_kirsch_plate.cpp",
+  "462": "AnswersInfo",
+  "463": "ChordalEdgeMetrics",
+  "464": "mean_lateral_radial_residual",
+  "465": "apply_theme",
+  "466": "elem_edge_oriented",
+  "467": "notes",
+  "468": "PointAlignment",
+  "469": "PointAlignment<3>",
+  "470": "PointAlignment<6>",
+  "471": "poly_to_vem.hpp",
+  "472": "test_cvt_poly_mesher.cpp"
 }

@@ -76,6 +76,9 @@ polymesh::pipeline::VolumeMesher parse_mesher(const std::string& m) {
     if (m == "varyhedron" || m == "vary") {
         return polymesh::pipeline::VolumeMesher::kVaryhedron;
     }
+    if (m == "cvt_poly" || m == "cvt" || m == "restricted_cvt") {
+        return polymesh::pipeline::VolumeMesher::kCvtPoly;
+    }
     if (m == "hexpyr" || m == "transition") {
         return polymesh::pipeline::VolumeMesher::kHexPyramid;
     }

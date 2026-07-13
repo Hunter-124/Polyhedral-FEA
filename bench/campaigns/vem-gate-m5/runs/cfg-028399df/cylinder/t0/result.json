@@ -1,0 +1,95 @@
+{
+  "accuracy": {
+    "all": [
+      {
+        "metric": "strain_energy",
+        "rel_err": 0.1318231421378969,
+        "score": 0.5322486963352518,
+        "trusted": true,
+        "truth": 0.003926990816987241,
+        "value": 0.003409322548345316
+      },
+      {
+        "metric": "tip_deflection",
+        "rel_err": 0.12399468547893382,
+        "score": 0.5474558739626824,
+        "trusted": true,
+        "truth": 1e-06,
+        "value": 8.760053145210662e-07
+      }
+    ],
+    "metric": "strain_energy",
+    "rel_err": 0.1318231421378969,
+    "score": 0.5322486963352518,
+    "trusted": true,
+    "truth": 0.003926990816987241,
+    "value": 0.003409322548345316
+  },
+  "answers": {
+    "load_area_rel_err": 0.011906495268586195,
+    "load_face_area": 0.007760468238810003,
+    "mean_u_component": 8.745264923223749e-07,
+    "n_load_faces": 128,
+    "n_probe_nodes": 153,
+    "n_quality_excluded": 0,
+    "sigma_face_mean": 922428.5779265378,
+    "sigma_max": 7.695088697721966e+19,
+    "sigma_p99": 1022412.108095121,
+    "strain_energy": 0.003409322548345316,
+    "tip_deflection": 8.760053145210662e-07,
+    "tip_deflection_max": 8.87371473115336e-07
+  },
+  "cfg_id": "cfg-028399df",
+  "config": {
+    "feature_refine": true,
+    "mesher": "hybrid_zoo",
+    "order": 1
+  },
+  "feature_flags": [],
+  "geom_class": {
+    "curved_frac": 0.9318181818181818,
+    "min_feature_h": 28.577399384028727,
+    "n_features_below_h_min": 0,
+    "thin": false
+  },
+  "h": 0.017496378634069814,
+  "health": {
+    "free_residual_rel": 4.57104345805824e-13,
+    "load_area_ok": true,
+    "load_area_rel_err": 0.011906495268586195,
+    "n_bc_dofs": 1830,
+    "n_orphans": 0,
+    "ok": true,
+    "reaction_sum_err": 1.9533785317324896e-13
+  },
+  "max_run_wall_s": 900.0,
+  "mesh_ms": 82.021996,
+  "mesher_note": "auto h=0.003499 m (extent/16∩diag/28, n_sharp=90, min_feat=0.00698 m, dens×0.92, Rκ≈0.0377, CAD_edge≈0.2)",
+  "n_dof": 19635,
+  "n_elems": 17616,
+  "n_elems_over_pred": 7.862639970621759,
+  "n_features_below_h_min": 0,
+  "n_nodes": 6545,
+  "n_pred_elems": 2240.468858528565,
+  "part": "cylinder",
+  "quality": {
+    "M1max": 0.0010096996066845175,
+    "M2max": 0.001401130316710357,
+    "M6": 1.0,
+    "score": 0.9263108670683365
+  },
+  "scorecard": {
+    "accuracy_rel_err": 0.1318231421378969,
+    "chordal_efficiency_max": 225.6380512909889,
+    "edge_hausdorff_over_h": 5.717860656338731,
+    "health_ok": true,
+    "min_element_quality": 1.0,
+    "n_dof": 19635,
+    "normal_dev_deg_max": 3.948240962486672,
+    "solve_residual_rel": 4.57104345805824e-13
+  },
+  "solve_ms": 902.542219,
+  "status": "ok",
+  "tier": 0,
+  "wall_time_s": 1.224428509
+}

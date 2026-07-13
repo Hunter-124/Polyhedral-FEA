@@ -416,6 +416,9 @@ pipeline::VolumeMesher parse_mesher(const std::string& name) {
     if (name == "varyhedron" || name == "vary") {
         return pipeline::VolumeMesher::kVaryhedron;
     }
+    if (name == "cvt_poly" || name == "cvt" || name == "restricted_cvt") {
+        return pipeline::VolumeMesher::kCvtPoly;
+    }
     throw std::runtime_error("unknown mesher '" + name + "'");
 }
 

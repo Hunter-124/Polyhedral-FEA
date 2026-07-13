@@ -18,6 +18,7 @@ add_library(fea
     src/zz.cpp
     src/vem.cpp
     src/p_elevate.cpp
+    src/poly_to_vem.cpp
 )
 target_include_directories(fea PUBLIC include)
 target_link_libraries(fea PUBLIC mesh Eigen3::Eigen PRIVATE polymesh_warnings polymesh_perf)

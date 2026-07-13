@@ -1,0 +1,12 @@
+{
+  "campaign": "vem-gate-m5",
+  "completed_runs": 4,
+  "started_utc": "2026-07-13T02:24:03Z",
+  "state": "finished",
+  "survivors": [
+    "cfg-028399df",
+    "cfg-1a23c6c0"
+  ],
+  "tier": 0,
+  "updated_utc": "2026-07-13T02:24:10Z"
+}

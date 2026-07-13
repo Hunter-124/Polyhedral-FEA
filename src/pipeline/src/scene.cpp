@@ -27,6 +27,11 @@
 #include "mesh/surface_project.hpp"
 #include "mesh/tet_fill.hpp"
 #include "mesh/transition_fill.hpp"
+#include "mesh/cvt_export.hpp"
+#include "mesh/cvt_lloyd.hpp"
+#include "mesh/cvt_sites.hpp"
+#include "mesh/geogram_clip.hpp"
+#include "fea/poly_to_vem.hpp"
 #include "mesh/varyhedron_fill.hpp"
 
 #include <Eigen/Geometry>
@@ -358,6 +363,8 @@ ElementTendencyPlan resolve_element_tendency(VolumeMesher base, double tendency,
             return "graded-tet";
         case VolumeMesher::kVaryhedron:
             return "varyhedron";
+        case VolumeMesher::kCvtPoly:
+            return "cvt_poly";
         case VolumeMesher::kTetFill:
             return "tet";
         case VolumeMesher::kHexPyramid:
@@ -1108,6 +1115,66 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             fill.edge_hausdorff_over_h, fill.edge_chordal_efficiency_max, fill.n_wall_nodes,
             fill.n_wall_moved, fill.n_wall_iters,
             topo_ptr ? ", geom_source=brep_topology" : ", geom_source=surface_only");
+    } else if (mesher == VolumeMesher::kCvtPoly) {
+        // G1–G4 product poly path: constrained restricted CVT → clipped cells → VEM.
+        if (!mesh::geogram_available()) {
+            throw std::runtime_error(
+                "cvt_poly mesher requires POLYMESH_WITH_GEOGRAM (Geogram ConvexCell)");
+        }
+        mesh::ClipBox box;
+        box.min = model.bbox_min;
+        box.max = model.bbox_max;
+        const Eigen::Vector3d ext = (box.max - box.min).cwiseMax(1e-30);
+        const double diag = ext.norm();
+        // Lattice density from h so N ~ V/h³ matches N_pred sizing contract.
+        const int n_side = std::max(
+            2, static_cast<int>(std::lround(std::cbrt(ext.prod()) / std::max(h, 1e-12))));
+
+        std::optional<geom::CadTopology> topo;
+        const geom::CadTopology* topo_ptr = nullptr;
+        const geom::CadModel* cad_ptr = nullptr;
+        if (model.cad && !model.cad->empty()) {
+            cad_ptr = &(*model.cad);
+            try {
+                topo = geom::extract_topology(*model.cad, 8);
+                topo_ptr = &(*topo);
+            } catch (...) {
+                topo.reset();
+                topo_ptr = nullptr;
+            }
+        }
+
+        mesh::ConstrainedLloydParams params;
+        params.seed.interior_n_side = n_side;
+        params.seed.sharp_sample_stride = 1;
+        params.seed.sharp_min_sep_frac = 0.25 * h / diag;
+        params.lloyd.max_iters = 24;
+        params.lloyd.move_tol_rel = 1e-3;
+        // Same h field as N_pred crude predictor (uniform campaign h).
+        params.lloyd.size_at = [h](const Eigen::Vector3d&) { return h; };
+        params.project_final = (cad_ptr != nullptr);
+        params.wall_band_frac = 0.12;
+        params.sharp_guard_frac = 0.04;
+
+        const auto cvt = mesh::constrained_lloyd_cvt(box, cad_ptr, topo_ptr, params);
+        std::vector<Eigen::Vector3d> positions;
+        positions.reserve(cvt.sites.size());
+        for (const auto& s : cvt.sites) {
+            positions.push_back(s.pos);
+        }
+        const auto exp = mesh::export_clipped_voronoi(box, positions);
+        out.mesh = fea::poly_mesh_to_vem(exp.mesh);
+        out.mesh.compact_unused_nodes();
+        fill_h = h;
+        out.boundary_quads = fea::extract_boundary_faces(out.mesh);
+        out.mesher_note = std::format(
+            "cvt_poly restricted CVT (G4 clipped Voronoi → kPolyVem): "
+            "{} polys, {} nodes, sites={}/fixed={}, lloyd_iters={}, "
+            "sum_vol={:.4g}, n_side={}, h={:.4g} m{}",
+            out.mesh.elements.size(), out.mesh.nodes.size(), cvt.sites.size(),
+            cvt.seed_stats.n_sharp_fixed, cvt.lloyd_stats.n_iters,
+            exp.stats.sum_cell_volume, n_side, h,
+            topo_ptr ? ", geom_source=brep_topology" : ", geom_source=bbox_only");
     } else {
         auto fill = mesh::tet_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
         fill_h = fill.h;

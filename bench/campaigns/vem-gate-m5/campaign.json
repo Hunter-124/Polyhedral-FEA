@@ -1,0 +1,18 @@
+{
+  "name": "vem-gate-m5",
+  "parts": [
+    "tests/fixtures/parts/plate_hole.case.json",
+    "tests/fixtures/parts/cylinder.case.json"
+  ],
+  "tiers": [{ "h_scale": 5.0, "keep_frac": 1.0 }],
+  "grid": {
+    "mesher": ["cvt_poly", "hybrid_zoo"],
+    "feature_refine": [true],
+    "order": [1]
+  },
+  "score": {
+    "weights": { "accuracy": 0.5, "solve_ms": 0.25, "mesh_ms": 0.25 }
+  },
+  "warehouse": true,
+  "notes": "M5 VEM gate (ADR-0024 Q10): promote poly VEM headline only if cvt_poly beats hybrid_zoo on energy/DOF and SCF for plate_hole+cylinder. Packing wins still measured vs M9 freeze."
+}

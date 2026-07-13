@@ -84,8 +84,12 @@ this is the accumulated simulation data the feedback loop mines.
     "n_bc_dofs": 36,
     "ok": true
   },
+  "n_pred_elems": 4200,             // C·V/h³ before mesh (M4)
+  "n_elems_over_pred": 1.1,         // actual/pred after mesh
+  "over_budget_cause": null,        // null | sizing | mesher | budget
   "scorecard": {
-    "edge_hausdorff_over_h": 0.04,  // null without CAD
+    "edge_hausdorff_over_h": 0.04,  // sharp CAD edges only; null without CAD
+    "chordal_efficiency_max": 1.2,  // d_actual/(h²κ/8); ≫1 wastes budget
     "normal_dev_deg_max": 8.2,      // null if unavailable
     "n_dof": 35805,
     "accuracy_rel_err": 0.02,       // first metric rel_err

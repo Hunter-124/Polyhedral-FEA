@@ -506,21 +506,23 @@ nodes:
 
   - id: M3
     title: Sharp-only edge protect + seam skip + wall tangential project
-    status: in_progress
+    status: done
     deps: [M0, V1b, V6c]
     scope: [src/geom/, src/mesh/]
     note: >
-      Classification done (CadEdgeFeature). Varyhedron protect/snap sharp-only
-      in flight. Wall tangential + OCC surface project still open.
+      DONE 2026-07-12: CadEdgeFeature classify; varyhedron seeds+snap sharp-only;
+      residual filtered + chordal e. FOLLOW-ON: wall tangential smooth + OCC
+      GeomAPI_ProjectPointOnSurf re-project (not blocking M2/M5).
 
   - id: M4
     title: Sizing N_pred + h_min floor + over_budget diagnosis
-    status: in_progress
+    status: done
     deps: [M0, V4]
     scope: [src/pipeline/, src/mesh/, apps/testlab/]
     note: >
-      N_pred + over_budget_cause (sizing|mesher|budget) in testlab. h_min floor /
-      virtual-topology suppression still open.
+      DONE 2026-07-12: N_pred + n_elems_over_pred + over_budget_cause
+      (sizing|mesher|budget); skip mesh when N_pred > 2× tier. FOLLOW-ON:
+      true ∫dV/h³ size field + h_min virtual-topology suppression.
 
   - id: M5
     title: "VEM gate: beat hybrid_zoo on plate_hole + cylinder before headline"

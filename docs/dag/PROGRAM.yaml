@@ -165,12 +165,11 @@ nodes:
     deps: [campaign-1, hp-driver]
     scope: [src/pipeline/, bench/campaigns/, docs/]
     note: >
-      SCAFFOLDING + PARTIAL PASS: scripts/analyze_campaign.py writes
-      PARETO.md/json (ranking, accuracy-vs-time Pareto, geom/part presets).
-      Docs: docs/process/feedback-loop.md. settings-frontier-1 still running —
-      recommendations only (no product default changes). Re-run analysis when
-      campaign-1 finishes; apply knobs only if finished + solid ok-rate; then
-      flip this node back to todo with the campaign consumed.
+      CYCLE 1 DONE (doc-only) 2026-07-13: settings-frontier-1 finished;
+      analyze_campaign → apply_code_defaults=true suggests hex / tendency 0.9.
+      NOT applied — ADR-0023 tet/hybrid accuracy claim + identical tier-2
+      metrics across meshers. Documented in SURVIVORS.md. Node stays todo for
+      next campaign (prefer M9/M5 curved STEP grids).
 
   - id: gui-sim-controls
     title: GUI live solve progress + pause/play + resource caps wired

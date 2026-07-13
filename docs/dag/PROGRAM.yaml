@@ -665,24 +665,28 @@ nodes:
 
   - id: G1
     title: Vendor Geogram predicates + ConvexCell / clipped Voronoi
-    status: todo
+    status: done
     deps: [G0, M10]
     scope: [third_party/, src/mesh/, CMakeLists.txt]
     note: >
-      ADR-0024 Q3 + plan docs/plans/advisor-measure-first-program.md §4.5.
-      Vendor hard parts (predicates, ConvexCell/clipped Voronoi); namespace
-      hygiene, strip unused modules, LICENSE. Do not clean-room clipped Voronoi.
-      After M10 only (freeze→project→CVT order).
+      DONE 2026-07-13: vendored Geogram Delaunay PSM (ConvexCell+predicates+
+      Delaunay) + Predicates PSM under third_party/geogram/; NOTICE pins
+      Delaunay 0bcf18b, Predicates 0cffbef, ref tag v1.10.0. CMake
+      POLYMESH_WITH_GEOGRAM=ON (default) → polymesh_geogram; thin facade
+      mesh::clip_convex_cell / unit_cube_cell (src/mesh/geogram_clip.*).
+      Catch2 [geogram] unit-cube volume+midplane clip green. Full suite 225
+      passed. No clean-room Voronoi; no GUI blob. Next: G2 Lloyd + 1/h³.
 
   - id: G2
     title: "Lloyd CVT loop + 1/h³ density from same size field as N_pred"
-    status: todo
+    status: in_progress
     deps: [G1, M4]
     scope: [src/mesh/, src/pipeline/]
     note: >
-      ADR-0024 Q10 trap #4 + plan docs/plans/advisor-measure-first-program.md §4.5.
-      Write thin Lloyd ourselves; constrained sharp sites fixed; density MUST
-      be 1/h(x)³ from same h(x) as N_pred.
+      CLAIMED 2026-07-13 after G1. ADR-0024 Q10 trap #4 + plan
+      docs/plans/advisor-measure-first-program.md §4.5. Write thin Lloyd
+      ourselves; constrained sharp sites fixed; density MUST be 1/h(x)³ from
+      same h(x) as N_pred. Uses mesh::clip_convex_cell / Geogram ConvexCell.
 
   - id: G3
     title: Constrained sites + OCC bridge for CVT boundary

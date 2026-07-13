@@ -355,8 +355,8 @@
     "semantic_hash": ""
   },
   "CMakeLists.txt": {
-    "mtime": 1783745111.3676362,
-    "ast_hash": "dfad57064c3458e5097411b84bec9d60",
+    "mtime": 1783908551.910663,
+    "ast_hash": "b00e5d1b535d0c110d0ad0214260a0b3",
     "semantic_hash": ""
   },
   "CONTRIBUTING.md": {
@@ -450,8 +450,8 @@
     "semantic_hash": ""
   },
   "docs/progress.md": {
-    "mtime": 1783906509.411181,
-    "ast_hash": "16a807ec20a6eb14e22833ad50918abf",
+    "mtime": 1783908858.0292878,
+    "ast_hash": "e8a61253510adae82ed33d7768d44fe1",
     "semantic_hash": ""
   },
   "docs/spec.md": {
@@ -480,8 +480,8 @@
     "semantic_hash": ""
   },
   "src/mesh/CMakeLists.txt": {
-    "mtime": 1783904134.9243364,
-    "ast_hash": "a61f11ed8a694a42d4d75917af784551",
+    "mtime": 1783908551.9036806,
+    "ast_hash": "d77a6252731b8bef21820891aa26a9a0",
     "semantic_hash": ""
   },
   "src/pipeline/CMakeLists.txt": {
@@ -490,8 +490,8 @@
     "semantic_hash": ""
   },
   "tests/CMakeLists.txt": {
-    "mtime": 1783904134.9243364,
-    "ast_hash": "10ec29bd1578e19e6dcd8a69d687d099",
+    "mtime": 1783908560.1755717,
+    "ast_hash": "1bb3934a24f2aca1fa0c0ec2ebd3c671",
     "semantic_hash": ""
   },
   "apps/bench/d6_tier3.cpp": {
@@ -1205,8 +1205,8 @@
     "semantic_hash": ""
   },
   "docs/dag/PROGRAM.yaml": {
-    "mtime": 1783906488.5692961,
-    "ast_hash": "0b9beaa8aae340134ad910987d50d441",
+    "mtime": 1783908858.0292878,
+    "ast_hash": "2c0bf2107b64c1cb233d916b8cc9eed1",
     "semantic_hash": ""
   },
   "docs/dag/README.md": {
@@ -2205,8 +2205,8 @@
     "semantic_hash": ""
   },
   "docs/research/geogram-cvt-vendoring.md": {
-    "mtime": 1783903079.9009976,
-    "ast_hash": "9b1ffbf478fb10647614a222cff548e6",
+    "mtime": 1783908858.0143554,
+    "ast_hash": "8efa2705b9a930625a799f9b409ee43f",
     "semantic_hash": ""
   },
   "docs/research/protecting-balls-lfs.md": {
@@ -2215,8 +2215,8 @@
     "semantic_hash": ""
   },
   "third_party/geogram/README.md": {
-    "mtime": 1783903978.4120686,
-    "ast_hash": "725ab8e25f4af204fcc0c5f739017cd8",
+    "mtime": 1783908535.2134874,
+    "ast_hash": "5c29ff97767b04f9ace63bb2d7de5ff1",
     "semantic_hash": ""
   },
   "bench/campaigns/varyhedron-baseline-m9/runs/cfg-028399df/cylinder/t0/wire.png": {
@@ -2282,6 +2282,51 @@
   "docs/plans/SESSION_HANDOFF_g1-cvt.md": {
     "mtime": 1783906509.394513,
     "ast_hash": "7a3aff3356e31e0b005a85b45f9090cb",
+    "semantic_hash": ""
+  },
+  "src/mesh/include/mesh/geogram_clip.hpp": {
+    "mtime": 1783908545.4487343,
+    "ast_hash": "5d47f905d24ff264f3e14aa2c65bdfa6",
+    "semantic_hash": ""
+  },
+  "src/mesh/src/geogram_clip.cpp": {
+    "mtime": 1783908564.418525,
+    "ast_hash": "2e2b009487e527eb5c3c78c4a62ad66f",
+    "semantic_hash": ""
+  },
+  "tests/test_geogram_clip.cpp": {
+    "mtime": 1783908560.1755717,
+    "ast_hash": "d59e9ecf565affa75ac9f4afe9f9a290",
+    "semantic_hash": ""
+  },
+  "third_party/geogram/delaunay/Delaunay_psm.cpp": {
+    "mtime": 1783908520.4613035,
+    "ast_hash": "48e07aab0506e204b0fe9550a487cea3",
+    "semantic_hash": ""
+  },
+  "third_party/geogram/delaunay/Delaunay_psm.h": {
+    "mtime": 1783908520.4609842,
+    "ast_hash": "835101136076db1eeb732c263bc21dcb",
+    "semantic_hash": ""
+  },
+  "third_party/geogram/predicates/Predicates_psm.cpp": {
+    "mtime": 1783908520.4630375,
+    "ast_hash": "a164d693838454e1834ac52613a18b4a",
+    "semantic_hash": ""
+  },
+  "third_party/geogram/predicates/Predicates_psm.h": {
+    "mtime": 1783908520.4628704,
+    "ast_hash": "de24ac691a503d8f560941ff9d5aa699",
+    "semantic_hash": ""
+  },
+  "third_party/geogram/CMakeLists.txt": {
+    "mtime": 1783908535.2134874,
+    "ast_hash": "aec03ad6b64cea01caa5edb1a7b6453b",
+    "semantic_hash": ""
+  },
+  "third_party/geogram/README.polymesh.md": {
+    "mtime": 1783908535.2134874,
+    "ast_hash": "c218a7499a1f4c4da7f2cca64e3b731f",
     "semantic_hash": ""
   }
 }

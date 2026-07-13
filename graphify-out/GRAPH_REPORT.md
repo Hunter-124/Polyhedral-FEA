@@ -1,16 +1,16 @@
 # Graph Report - Polyhedral-FEA  (2026-07-12)
 
 ## Corpus Check
-- 396 files · ~327,340 words
+- 404 files · ~526,815 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 3611 nodes · 5848 edges · 412 communities (241 shown, 171 thin omitted)
-- Extraction: 94% EXTRACTED · 6% INFERRED · 0% AMBIGUOUS · INFERRED: 370 edges (avg confidence: 0.8)
+- 5736 nodes · 11383 edges · 461 communities (273 shown, 188 thin omitted)
+- Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 526 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `7541c89d`
+- Built from commit: `15a4a03f`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -409,21 +409,70 @@
 - FaceOrient
 - case_id
 - test_vtu.cpp
+- Matrix
 - ClosestOnFeature
+- coord_index_t
 - notes
 - README.md
+- CurvedMeshMetrics
+- PeriodicVertexArray3d
+- IndexType
+- VtuPointData
+- Scorecard
+- WindowsThreadPoolManager
+- ClippedCell
+- varyhedron_fill_surface
+- Backend
+- main.cpp
+- CDT2d_ConstraintWalker
+- Triangle
+- Environment::find_environment
+- ClipPlane
+- Box
+- Spec
+- CommandLineDesc
+- TerminalProgressClient
+- VertexArray
+- test_kirsch_plate.cpp
+- test_spmv.cpp
+- PredicateStats
+- theme.hpp
+- mean_lateral_radial_residual
+- ComparePointCoord
+- Geogram subset — what PolyMesh takes
+- CadEdgeClassCounts
+- sparse_bits_flip_bit
+- case_id
+- percent
+- PointAlignment
+- PointAlignment<3>
+- PointAlignment<6>
+- PointAlignment<8>
+- A1
+- A2
+- cell_status_t
+- CMP
+- const_pointer
+- const_reference
+- FPTR
+- matrix_type
+- reference
+- size_type
+- std::vector<bool>
+- std::vector<T, Memory::aligned_allocator<T> >
+- T1
 
 ## God Nodes (most connected - your core abstractions)
-1. `NodalMesh` - 76 edges
-2. `TriSurface` - 67 edges
-3. `Viewport` - 58 edges
-4. `SolveJob` - 49 edges
-5. `TestLabState` - 48 edges
-6. `App` - 45 edges
-7. `FeaError` - 45 edges
-8. `Material` - 42 edges
-9. `Palette` - 38 edges
-10. `Model` - 36 edges
+1. `PeriodicDelaunay3dThread` - 125 edges
+2. `Delaunay3dThread` - 109 edges
+3. `NodalMesh` - 76 edges
+4. `Logger` - 69 edges
+5. `TriSurface` - 67 edges
+6. `Viewport` - 58 edges
+7. `vec3` - 57 edges
+8. `geo_argused()` - 56 edges
+9. `SolveJob` - 49 edges
+10. `vector` - 49 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `vem_body_load()` --calls--> `body`  [INFERRED]
@@ -440,19 +489,19 @@
 ## Import Cycles
 - None detected.
 
-## Communities (412 total, 171 thin omitted)
+## Communities (461 total, 188 thin omitted)
 
 ### Community 0 - "VEM & Nodal Mesh"
-Cohesion: 0.23
-Nodes (36): kP2Mono, kP2Vec, b_from_grads(), char_length(), Dynamic, function, Matrix, MatrixXd (+28 more)
+Cohesion: 0.15
+Nodes (50): Fun, kP2Mono, kP2Vec, b_from_grads(), char_length(), array, Dynamic, function (+42 more)
 
 ### Community 1 - "Grid Classification"
 Cohesion: 0.12
 Nodes (37): accuracy_of(), aggregate_configs(), analyze_one(), CfgAgg, config_label(), factor_breakdown(), _fmt_ms(), _fmt_pct() (+29 more)
 
 ### Community 2 - "Element Assembly Core"
-Cohesion: 0.05
-Nodes (50): FreeFace, CircularFeature, axis_dir, axis_point, radius, select_band, CurvedMeshMetrics, composite_score (+42 more)
+Cohesion: 0.19
+Nodes (17): FreeFace, CircularFeature, axis_dir, axis_point, radius, select_band, Vector3d, clamp01() (+9 more)
 
 ### Community 3 - "GUI Viewport GL"
 Cohesion: 0.04
@@ -467,48 +516,48 @@ Cohesion: 0.15
 Nodes (21): Matrix, uint64_t, Vector3d, VectorXd, energy_norm_error(), array, map, ManufacturedSolution (+13 more)
 
 ### Community 6 - "GUI Theme Palette"
-Cohesion: 0.05
-Nodes (40): apply_theme(), ThemeId, ImVec4, make_interwebz_palette(), make_slate_palette(), Palette, accent, accent_dim (+32 more)
+Cohesion: 0.06
+Nodes (36): ImVec4, Palette, accent, accent_dim, accent_mid, accent_soft, accent_soft_top, axis_x (+28 more)
 
 ### Community 7 - "Bench Emit Scripts"
 Cohesion: 0.31
 Nodes (9): fmt_num(), load_results(), main(), Any, Path, Markdown-friendly ASCII sparkline; skips None., Minimal inline SVG polyline for accuracy trend (lower often better)., sparkline() (+1 more)
 
 ### Community 8 - "SpMV CSR Backend"
-Cohesion: 0.05
-Nodes (51): cmd_check(), cmd_mesh(), cmd_solve(), span, string, string_view, VolumeMesher, load_surface() (+43 more)
+Cohesion: 0.18
+Nodes (14): CsrMatrix, col_idx, cols, row_ptr, rows, values, size_t, vector (+6 more)
 
 ### Community 9 - "CLI Mesh Solve"
-Cohesion: 0.13
-Nodes (18): ElementCentroidStress, centroid, element_index, quality, stress, volume, uint32_t, Vector3d (+10 more)
+Cohesion: 0.09
+Nodes (25): ElementCentroidStress, centroid, element_index, quality, stress, volume, Stress, uint32_t (+17 more)
 
 ### Community 10 - "Poly Mesh Topology"
 Cohesion: 0.09
-Nodes (22): optional, CellId, CellKind, FaceId, Cell, faces, kind, Face (+14 more)
+Nodes (26): CellId, CellKind, FaceId, Cell, faces, kind, Face, neighbour (+18 more)
 
 ### Community 11 - "GUI App State"
-Cohesion: 0.06
-Nodes (32): App, deform_auto, deform_scale, deform_true_scale, dof_count, hovered_region, job, live_mesh_seen_gen (+24 more)
+Cohesion: 0.07
+Nodes (30): App, deform_auto, deform_scale, deform_true_scale, dof_count, hovered_region, job, live_mesh_seen_gen (+22 more)
 
 ### Community 12 - "Gmsh MSH Import"
-Cohesion: 0.14
-Nodes (22): size_t, runtime_error, ValidityError, array, span, uint32_t, vector, Vector3d (+14 more)
+Cohesion: 0.10
+Nodes (27): size_t, OctaFillOutput, h, mesh, n_boundary_pyramids, n_octahedra, array, uint32_t (+19 more)
 
 ### Community 13 - "Surface Traction"
-Cohesion: 0.12
+Cohesion: 0.13
 Nodes (26): GmshType, map, string, vector, MshModel, mesh, physical_faces, physical_names (+18 more)
 
 ### Community 14 - "Pipeline Scene Jobs"
-Cohesion: 0.16
-Nodes (18): empty, checkpoint, join_worker, publish_live_mesh, report, reset_control_flags, set_status, solve_options_with_progress (+10 more)
+Cohesion: 0.01
+Nodes (85): EMSCRIPTEN_KEEPALIVE, InvalidInput, LoggerClient, abnormal_program_termination(), AdaptiveKdTree::create_kd_tree_recursive(), AdaptiveKdTree::new_node(), android_app, android_get_number_of_cores() (+77 more)
 
 ### Community 15 - "Structured Mesh Tests"
-Cohesion: 0.14
-Nodes (20): check_validity, box_hex_mesh(), box_tet_mesh(), cell_corners(), array, uint32_t, uint64_t, Vector3d (+12 more)
+Cohesion: 0.13
+Nodes (28): promote_tet4_to_tet10(), solve_l_mesh(), Vector3d, NodalMesh, check_validity, compact_unused_nodes, elements, nodes (+20 more)
 
 ### Community 16 - "Surface Projection"
 Cohesion: 0.07
-Nodes (48): CheckpointState, ImVec4, path, size_t, string, draw_results_panel(), fmt_opt_num(), Checkpoint (+40 more)
+Nodes (49): CheckpointState, ImVec4, path, size_t, string, draw_results_panel(), draw_testlab_panel(), fmt_opt_num() (+41 more)
 
 ### Community 17 - "Shape Functions"
 Cohesion: 0.08
@@ -520,7 +569,7 @@ Nodes (9): AdaptSuggestion, h_next, marked_fraction, n_marked, refine_seeds, see
 
 ### Community 19 - "Mixed Cell Fill"
 Cohesion: 0.07
-Nodes (52): EdgeSplitFn, FineNbrFn, FineNodeFn, InbFn, MixedCellKind, array, size_t, uint32_t (+44 more)
+Nodes (30): MixedCellKind, array, size_t, uint32_t, uint8_t, vector, Vector3d, MixedCell (+22 more)
 
 ### Community 20 - "FEA Solve Methods"
 Cohesion: 0.11
@@ -531,11 +580,11 @@ Cohesion: 0.08
 Nodes (28): array, map, uint32_t, vector, VectorXd, note_mesh_stats, SolveResult, boundary_quads (+20 more)
 
 ### Community 22 - "GUI Widgets"
-Cohesion: 0.17
-Nodes (20): CollectOffendersFn, closest_on_surface(), closest_on_surface_brute(), closest_on_triangle(), array, size_t, span, uint32_t (+12 more)
+Cohesion: 0.13
+Nodes (25): CollectOffendersFn, ClosestPoint, distance, point, triangle, Vector3d, closest_on_surface(), closest_on_surface_brute() (+17 more)
 
 ### Community 23 - "MMS Convergence Tests"
-Cohesion: 0.09
+Cohesion: 0.10
 Nodes (20): atomic, mutex, size_t, thread, time_point, ProgressHeartbeat, cfg_id_, cg_iter_ (+12 more)
 
 ### Community 24 - "Solve Job Pipeline"
@@ -543,20 +592,20 @@ Cohesion: 0.07
 Nodes (31): State, time_point, uint64_t, load, SolveJob, cancel_, clear_failure, error_ (+23 more)
 
 ### Community 25 - "D6 Tier3 Bench"
-Cohesion: 0.09
-Nodes (39): add_node(), array, int64_t, json, map, string, uint32_t, vector (+31 more)
+Cohesion: 0.14
+Nodes (28): add_node(), array, int64_t, json, map, string, uint32_t, vector (+20 more)
 
 ### Community 26 - "Viewport Camera"
-Cohesion: 0.17
-Nodes (17): Camera, distance_, dolly, eye, fov_y_, orbit, pan, pitch_ (+9 more)
+Cohesion: 0.02
+Nodes (106): E, Node, absolute_path(), arg_matches(), base_name(), BooleanExpression::BooleanExpression(), BooleanExpression::cur_char(), BooleanExpression::next_char() (+98 more)
 
 ### Community 27 - "Sizing Field Blend"
-Cohesion: 0.17
-Nodes (12): GeometrySizing, blend_, curv_frac_, edges_, h_max_, h_min_, kappa_, size_at (+4 more)
+Cohesion: 0.04
+Nodes (97): coord_index_t, Sign, SOSMode, det_3d(), det_3d_exact(), det_3d_filter(), det_4d(), det_4d_filter() (+89 more)
 
 ### Community 28 - "Transition Fill"
-Cohesion: 0.12
-Nodes (19): array, size_t, uint32_t, uint8_t, vector, Vector3d, TransitionCell, kind (+11 more)
+Cohesion: 0.10
+Nodes (27): array, size_t, uint32_t, uint8_t, vector, Vector3d, TransitionCell, kind (+19 more)
 
 ### Community 29 - "CMake Project Build"
 Cohesion: 0.20
@@ -567,36 +616,36 @@ Cohesion: 0.24
 Nodes (14): _assert_manifold_facets(), _cross(), _facet(), main(), _norm(), Path, Centered plate with through-hole along z. Origin at plate mid-plane centre., Parse emitted ASCII facet blocks and require edge multiplicity 2. (+6 more)
 
 ### Community 31 - "Geom Indicators"
-Cohesion: 0.33
-Nodes (5): vector, VertexCurvature, kappa, VertexThickness, thickness
+Cohesion: 0.19
+Nodes (15): vector, VertexCurvature, kappa, VertexThickness, thickness, size_t, uint32_t, Vector3d (+7 more)
 
 ### Community 32 - "STL Geometry IO"
-Cohesion: 0.15
-Nodes (12): Impl, shared_ptr, CadModel, bbox_diagonal, compute_bbox, has_brep, impl_, name_ (+4 more)
+Cohesion: 0.10
+Nodes (20): Impl, shared_ptr, CadModel, compute_bbox, has_brep, impl_, load_brep, load_step (+12 more)
 
 ### Community 33 - "TriSurface Geometry"
-Cohesion: 0.10
-Nodes (27): array, uint32_t, vector, Vector3d, TriSurface, triangles, validate, vertices (+19 more)
+Cohesion: 0.11
+Nodes (18): array, uint32_t, vector, Vector3d, TriSurface, triangles, validate, vertices (+10 more)
 
 ### Community 34 - "Sim Setup Loads"
 Cohesion: 0.08
-Nodes (26): ElementTendencyPlan, label, mesher, native_poly_transitions, remapped, skin_layers, tendency, atomic (+18 more)
+Nodes (25): update_overlays, ElementTendencyPlan, label, mesher, native_poly_transitions, remapped, skin_layers, tendency (+17 more)
 
 ### Community 35 - "Kirsch Graded Tests"
-Cohesion: 0.13
-Nodes (16): Index, SparseMatrix, HpSystem, k, local_sign, local_to_global, mode_nodes, n_modes (+8 more)
+Cohesion: 0.08
+Nodes (27): HpModel, elements, nodes, Index, SparseMatrix, vector, Vector3d, HpSystem (+19 more)
 
 ### Community 36 - "P-Elevate Elements"
-Cohesion: 0.11
-Nodes (36): compute_probes(), compute_scorecard_geom(), compute_solve_health(), count_orphan_nodes(), uint32_t, vector, Vector3d, VectorXd (+28 more)
+Cohesion: 0.13
+Nodes (30): Box3, hi, lo, compute_probes(), compute_solve_health(), count_orphan_nodes(), optional, uint32_t (+22 more)
 
 ### Community 37 - "Tet Quality Metrics"
-Cohesion: 0.15
-Nodes (27): boundary_residual_placeholder(), bubble_relax(), _clamp01(), _dedupe(), _dist2(), fill_fraction_proxy(), main(), pack_case() (+19 more)
+Cohesion: 0.23
+Nodes (21): boundary_residual_placeholder(), bubble_relax(), _clamp01(), _dedupe(), _dist2(), fill_fraction_proxy(), main(), pack_case() (+13 more)
 
 ### Community 38 - "Feature Sizing Field"
-Cohesion: 0.15
-Nodes (11): FeatureSizing, blend_, h_max_, h_min_, size_at, DistanceFn, Vector3d, SizingField (+3 more)
+Cohesion: 0.08
+Nodes (23): FeatureSizing, blend_, h_max_, h_min_, size_at, GeometrySizing, blend_, curv_frac_ (+15 more)
 
 ### Community 39 - "GUI Study Panels"
 Cohesion: 0.09
@@ -611,24 +660,24 @@ Cohesion: 0.22
 Nodes (8): ADR-0009: Tier-1 analytical verification setups (Kirsch / Goodier / L-domain), Alternatives, Decision, Gmsh import, Goodier cavity (SCF = 3(9−5ν)/(2(7−5ν))), Kirsch plate (SCF = 3), L-domain (Williams λ ≈ 0.5445), Why
 
 ### Community 42 - "Boundary Faces"
-Cohesion: 0.18
-Nodes (11): Config, curvature_turn_deg, element_tendency, feature_refine, id, mesher, order, snap_boundary (+3 more)
+Cohesion: 0.04
+Nodes (88): CDTBase2d::locate(), CDTBase2d::Tedge_is_Delaunay(), Sign, det_3d(), det_3d_exact(), det_3d_filter(), det_4d(), det_4d_filter() (+80 more)
 
 ### Community 43 - "Schema Mesh Solve"
 Cohesion: 0.15
 Nodes (13): description, minimum, type, mesh, solve, total, description, minimum (+5 more)
 
 ### Community 44 - "Mesh Face Headers"
-Cohesion: 0.10
-Nodes (19): path, GuiSettings, campaigns_root, campaigns_root_path, max_mem_gb, max_threads, refresh_interval_s, resolved_testlab_binary (+11 more)
+Cohesion: 0.15
+Nodes (14): path, GuiSettings, campaigns_root, campaigns_root_path, max_mem_gb, max_threads, refresh_interval_s, resolved_testlab_binary (+6 more)
 
 ### Community 45 - "Competitive Peer Solvers"
 Cohesion: 0.05
 Nodes (37): Agent procedure (blind), Goals, Holdout geometry audits, Optional peer cross-check (owner), Owner supply (private), Result JSON (metrics only), Roles, Status (+29 more)
 
 ### Community 47 - "Geometry Sizing"
-Cohesion: 0.23
-Nodes (17): Dynamic, Matrix, VectorXd, ShapeEval, dn, n, ElementType, vector (+9 more)
+Cohesion: 0.14
+Nodes (25): Dynamic, Matrix, VectorXd, ShapeEval, dn, n, ElementType, vector (+17 more)
 
 ### Community 48 - "Reference Case Bench"
 Cohesion: 0.07
@@ -640,27 +689,27 @@ Nodes (23): _edge(), _face_triangle(), _is_valid(), main(), make_cylinder(), mak
 
 ### Community 50 - "Schema Type Props"
 Cohesion: 0.18
-Nodes (11): description, type, description, type, properties, case_id, host, timestamp (+3 more)
+Nodes (11): description, type, properties, host, timestamp, version, description, format (+3 more)
 
 ### Community 53 - "Cantilever Iterative"
 Cohesion: 0.12
 Nodes (16): Config ranking (weighted mean score), `curved`, `cylinder`, Default-knob recommendations, Factor-level winners (mean config score), Full factor breakdown, Global Pareto frontier (mean accuracy vs mean total time), How to re-run (+8 more)
 
 ### Community 56 - "CUDA SpMV Kernel"
-Cohesion: 0.18
-Nodes (11): array, uint32_t, vector, Vector3d, PrismFillOutput, boundary_max_distance, boundary_quads, h (+3 more)
+Cohesion: 0.15
+Nodes (20): runtime_error, ValidityError, array, uint32_t, vector, Vector3d, PrismFillOutput, boundary_max_distance (+12 more)
 
 ### Community 57 - "Feature Graded Error"
-Cohesion: 0.29
-Nodes (8): gp_Pnt, gp_Vec, optional, TopoDS_Face, face_normal_at(), project_on_face(), project_point_on_surface(), TopoDS_Vertex
+Cohesion: 0.14
+Nodes (21): bbox_diagonal, CadModel::compute_bbox(), CadModel::Impl, shape, CadModel::load_brep(), CadModel::load_step(), CadModel::tessellate(), gp_Pnt (+13 more)
 
 ### Community 58 - "Hex Fill Output"
-Cohesion: 0.20
-Nodes (10): HexFillOutput, boundary_max_distance, boundary_quads, h, hexes, nodes, array, uint32_t (+2 more)
+Cohesion: 0.14
+Nodes (17): HexFillOutput, boundary_max_distance, boundary_quads, h, hexes, nodes, array, uint32_t (+9 more)
 
 ### Community 59 - "Local Refine Tests"
-Cohesion: 0.43
-Nodes (7): array, uint32_t, vector, Vector3d, hex8_jac_det(), hex_fill_surface(), hex_inverted()
+Cohesion: 0.03
+Nodes (55): align(), clear(), copy(), Counted(), ITERATOR, GEOGRAM_API, float32, float64 (+47 more)
 
 ### Community 60 - "Audit Bench Policy"
 Cohesion: 0.67
@@ -695,8 +744,8 @@ Cohesion: 0.19
 Nodes (31): checkpoint_state_cstr(), count_result_lines(), Checkpoint, CheckpointState, json, optional, path, string (+23 more)
 
 ### Community 68 - "Solve Energy Output"
-Cohesion: 0.13
-Nodes (23): bind_line_attr(), fit, compile(), array, DisplayMode, optional, uint32_t, vector (+15 more)
+Cohesion: 0.09
+Nodes (36): bind_line_attr(), Camera, distance_, dolly, eye, fit, fov_y_, orbit (+28 more)
 
 ### Community 69 - "Root Schema JSON"
 Cohesion: 0.25
@@ -715,24 +764,24 @@ Cohesion: 0.29
 Nodes (13): bbox_of(), boundary_edges(), cell_faces(), detect_hole_roi(), draw_line(), face_key(), main(), parse_vtu_ascii() (+5 more)
 
 ### Community 76 - "ZZ Recovery API"
-Cohesion: 0.16
-Nodes (14): Stress, vector, ZzRecovery, element_eta, global_eta, nodal_stress, Dynamic, Matrix (+6 more)
+Cohesion: 0.03
+Nodes (53): condition_variable, Periodic, SFrame, CDT2d::incircle(), CDT2d::orient2d(), CERRStream, mutex, spinlock (+45 more)
 
 ### Community 77 - "STEP Geometry Load"
-Cohesion: 0.22
-Nodes (17): pair, assemble_hp(), ElementType, edge_slot(), elem_edge_oriented(), hex_face_slot(), is_hex(), is_tet() (+9 more)
+Cohesion: 0.07
+Nodes (48): pair, QuadKey, HpElementDef, order, type, vertices, ElementType, uint32_t (+40 more)
 
 ### Community 78 - "Kirsch Plate Tests"
-Cohesion: 0.17
-Nodes (23): Vector3d, QuadraturePoint, weight, xi, assemble_body_load(), BodyForce, VectorXd, assemble_hp_body_load() (+15 more)
+Cohesion: 0.11
+Nodes (28): Vector3d, QuadraturePoint, weight, xi, assemble_body_load(), BodyForce, VectorXd, assemble_hp_body_load() (+20 more)
 
 ### Community 79 - "Theme Apply Palettes"
 Cohesion: 0.33
 Nodes (5): ADR-0018: Graded tet conformity via LEB (not 2:1 hanging Kuhn), Alternatives rejected, Consequences, Context, Decision
 
 ### Community 80 - "GL Shader Bind"
-Cohesion: 0.31
-Nodes (12): byte, path, size_t, Soup, span, T, is_ascii_stl(), load_stl() (+4 more)
+Cohesion: 0.22
+Nodes (15): GeomError, runtime_error, byte, path, size_t, Soup, span, T (+7 more)
 
 ### Community 82 - "GUI Phase ADR"
 Cohesion: 0.50
@@ -743,8 +792,8 @@ Cohesion: 0.22
 Nodes (8): Agent loop — harness rules for finishing PolyMesh, GUI verification (DISPLAY may be missing), `/loop` vs this file, One iteration = one ROADMAP ID (or one vertical story), Parallelism, Session start checklist, Source of truth, Stuck protocol
 
 ### Community 85 - "Quadrature Tests"
-Cohesion: 0.22
-Nodes (20): begin_field(), begin_group_box(), begin_group_box_fill(), button(), checkbox(), ImVec4, draw_accent_fill(), draw_box() (+12 more)
+Cohesion: 0.26
+Nodes (21): begin_field(), begin_group_box(), begin_group_box_fill(), button(), checkbox(), ImVec4, draw_accent_fill(), draw_box() (+13 more)
 
 ### Community 86 - "Shape Function Tests"
 Cohesion: 0.40
@@ -755,12 +804,12 @@ Cohesion: 0.50
 Nodes (4): as_bytes(), byte, string_view, vector
 
 ### Community 88 - "Tet Fill Tests"
-Cohesion: 0.09
-Nodes (40): add_face(), array, map, uint32_t, vector, emit_element_faces(), extract_boundary_faces(), FaceRecord (+32 more)
+Cohesion: 0.10
+Nodes (30): add_face(), array, map, uint32_t, vector, emit_element_faces(), extract_boundary_faces(), FaceRecord (+22 more)
 
 ### Community 89 - "GroupBox Frame UI"
-Cohesion: 0.13
-Nodes (18): runtime_error, size_t, span, string, Vector3d, VolumeMesher, JobCancelled, Model::load() (+10 more)
+Cohesion: 0.08
+Nodes (36): empty, checkpoint, join_worker, publish_live_mesh, report, reset_control_flags, set_status, solve_options_with_progress (+28 more)
 
 ### Community 90 - "Schema DOFs Field"
 Cohesion: 0.50
@@ -775,16 +824,16 @@ Cohesion: 0.07
 Nodes (28): AnswersInfo, load_area_rel_err, load_face_area, sigma_face_mean, strain_energy, tip_deflection, QualityInfo, M1max (+20 more)
 
 ### Community 94 - "Schema Label Field"
-Cohesion: 0.18
-Nodes (7): array, vector, array, uint32_t, vector, Vector3d, mean_lateral_radial_residual()
+Cohesion: 0.10
+Nodes (8): string, array, vector, optional, map, set, path, write_temp_campaign_tree()
 
 ### Community 95 - "Schema Notes Field"
-Cohesion: 0.15
-Nodes (15): HpElementDef, order, type, vertices, HpModel, elements, nodes, ElementType (+7 more)
+Cohesion: 0.05
+Nodes (42): A, B, DIM, DIM2, initializer_list, T, T2, U (+34 more)
 
 ### Community 96 - "Schema Solver Field"
-Cohesion: 0.17
-Nodes (13): Box3, hi, lo, optional, evaluate_probe(), LoadSpec, box, expected_area (+5 more)
+Cohesion: 0.05
+Nodes (47): COORD, KeepInitialValues, MESH, MeshElementsFlags, MeshOrder, NearestNeighbors, AdaptiveKdTree::build_tree(), AdaptiveKdTree::split_kd_node() (+39 more)
 
 ### Community 97 - "Schema Version Meta"
 Cohesion: 0.10
@@ -811,8 +860,8 @@ Cohesion: 0.11
 Nodes (19): Active program (agents — read this first), Benchmark scoreboard, Building (options), CLI examples (public unit box), Clone, configure, build, test, CUDA backends (`POLYMESH_WITH_CUDA`), Dependencies, GUI (+11 more)
 
 ### Community 125 - "cell_stamp.hpp"
-Cohesion: 0.14
-Nodes (17): BenchError, map, runtime_error, string, ReferenceCase, citation, name, values (+9 more)
+Cohesion: 0.22
+Nodes (11): BenchError, runtime_error, string, ReferenceCase, citation, name, values, path (+3 more)
 
 ### Community 126 - "vector"
 Cohesion: 0.18
@@ -831,16 +880,16 @@ Cohesion: 0.27
 Nodes (9): __global__, csr_spmv_kernel(), size_t, string, T, cuda_free(), device_available(), device_name() (+1 more)
 
 ### Community 130 - "VolumeMesher"
-Cohesion: 0.26
-Nodes (14): string, draw_colorbar(), draw_column_splitter(), draw_frame(), draw_study_panel(), draw_viewport_content(), drop_callback(), is_geometry_path() (+6 more)
+Cohesion: 0.22
+Nodes (13): size_t, string, draw_colorbar(), draw_column_splitter(), draw_frame(), draw_study_panel(), draw_viewport_content(), drop_callback() (+5 more)
 
 ### Community 131 - "CLAUDE.md — PolyMesh (working name)"
 Cohesion: 0.22
 Nodes (8): CLAUDE.md — PolyMesh (working name), Definitions of done, Git & attribution, Language & tooling, Licensing, Moved, Non-negotiable engineering rules, Workflow
 
 ### Community 132 - "sizing_field.cpp"
-Cohesion: 0.41
-Nodes (15): bisect_tet(), array, EdgeKey, span, uint32_t, vector, Vector3d, erase_tet_from_edge() (+7 more)
+Cohesion: 0.26
+Nodes (19): FreeFaceKey, bisect_tet(), array, EdgeKey, size_t, span, uint32_t, vector (+11 more)
 
 ### Community 133 - "ADR-0012: Hybrid meshing — graded tet + true mixed zoo"
 Cohesion: 0.18
@@ -859,8 +908,8 @@ Cohesion: 0.25
 Nodes (7): Architecture (pinned), Decisions — ratified at GATE 0 (2026-07-09; full rationale in docs/decisions/), Goals, Key technical positions (pinned unless a phase proves otherwise), Non-goals (v1), Problem statement, SPEC — Adaptive Hybrid Polyhedral Mesher + Co-Designed FEA Solver
 
 ### Community 137 - "prism_fill_surface"
-Cohesion: 0.22
-Nodes (19): CartesianGrid, cell, nx, ny, nz, origin, cells_for_extent(), classify_cells_inside() (+11 more)
+Cohesion: 0.19
+Nodes (20): CartesianGrid, cell, nx, ny, nz, origin, Vector3d, cells_for_extent() (+12 more)
 
 ### Community 139 - "BENCHMARKS — Verification Suite & Anti-Cheat Design"
 Cohesion: 0.29
@@ -871,8 +920,8 @@ Cohesion: 0.29
 Nodes (6): ADR-0010: Mesh data structure — keep face-based; edge index optional, Alternatives, Context, Decision, Rejected for now, Why face-based wins for PolyMesh
 
 ### Community 141 - "string"
-Cohesion: 0.25
-Nodes (7): ElementTypeCounts, hex20, hex8, other, tet10, tet4, size_t
+Cohesion: 0.14
+Nodes (14): ElementTypeCounts, hex20, hex8, other, tet10, tet4, size_t, count_element_types() (+6 more)
 
 ### Community 142 - "run_calculix_cantilever.py"
 Cohesion: 0.53
@@ -947,20 +996,20 @@ Cohesion: 0.12
 Nodes (14): Campaign warehouse, Directory layout, git-LFS, Short-campaign defaults (Lane V), Wireframe PNGs (`wire.png`), ADR-0022: Full experiment warehouse + headless Grok improvement loop, Alternatives rejected, Consequences (+6 more)
 
 ### Community 305 - "mesh_preview.py"
-Cohesion: 0.08
-Nodes (27): AccuracyInfo, metric, rel_err, truth, value, CampaignSummary, dir, has_campaign_json (+19 more)
+Cohesion: 0.11
+Nodes (18): CampaignSummary, dir, has_campaign_json, has_checkpoint, has_results, name, result_count, state (+10 more)
 
 ### Community 306 - "Element"
 Cohesion: 0.20
 Nodes (9): 1. One stiffness matrix, two formulations, 2. Hierarchical (integrated-Legendre) basis for arbitrary p — not nodal, 3. Order caps by shape, 4. The (h, p, shape) driver, ADR-0019: Mixed FE+VEM adaptive-order core (arbitrary-p hierarchical basis), Alternatives rejected, Context, Decision (+1 more)
 
 ### Community 307 - "8. Graphify (for agents)"
-Cohesion: 0.19
-Nodes (18): traction, assemble_traction_load(), Dynamic, FaceType, Matrix, vector, VectorXd, eval_face_shape() (+10 more)
+Cohesion: 0.18
+Nodes (19): traction, assemble_traction_load(), Dynamic, FaceType, Matrix, vector, VectorXd, eval_face_shape() (+11 more)
 
 ### Community 308 - "Implementation notes (for coding agents)"
-Cohesion: 0.22
-Nodes (9): Index, map, uint32_t, uint8_t, vector, Vector3d, homogeneous_boundary(), modes_on_boundary() (+1 more)
+Cohesion: 0.05
+Nodes (60): COORD_T, angle(), CDT2d::create_enclosing_quad(), CDT2d::create_enclosing_triangle(), ConvexCell::barycenter(), ConvexCell::compute_mg(), ConvexCell::compute_triangle_point(), ConvexCell::facet_area() (+52 more)
 
 ### Community 309 - "PROGRESS"
 Cohesion: 0.18
@@ -991,24 +1040,24 @@ Cohesion: 0.25
 Nodes (7): Autonomous vs supervised answers, Grok improvement loop, Handoff contents, Headless invoke (default), Manual interactive (optional), Safety, When it runs
 
 ### Community 316 - "test_lame_cylinder.cpp"
-Cohesion: 0.20
-Nodes (13): path, string, vector, find_testlab_binary(), State, string, is_executable_file(), ProcessRunner (+5 more)
+Cohesion: 0.16
+Nodes (15): path, string, vector, find_testlab_binary(), State, string, is_executable_file(), pid() (+7 more)
 
 ### Community 317 - "test_product_mesh_tier1.cpp"
-Cohesion: 0.11
-Nodes (17): optional, thread, Model, bbox_max, bbox_min, cad, name, region_count (+9 more)
+Cohesion: 0.10
+Nodes (20): optional, pick_region, set_model, optional, thread, Model, bbox_max, bbox_min (+12 more)
 
 ### Community 318 - "schema_version"
-Cohesion: 0.18
-Nodes (11): CadSurfaceKind, CadFace, area, edge_ids, id, kind, CadTopology, edges (+3 more)
+Cohesion: 0.03
+Nodes (42): Delaunay3dThread, b_hint_, cavity_, cond_, dimension_, direction_, e_hint_, END_OF_LIST (+34 more)
 
 ### Community 319 - "wall_time_s"
-Cohesion: 0.14
-Nodes (30): atomic_write(), Checkpoint, campaign, completed_runs, started_utc, state, survivors, tier (+22 more)
+Cohesion: 0.25
+Nodes (8): Checkpoint, campaign, completed_runs, started_utc, state, survivors, tier, updated_utc
 
 ### Community 320 - "FaceOrient"
-Cohesion: 0.12
-Nodes (18): CadEdgeClassCounts, n_seam, n_sharp, n_smooth, CadVertex, id, position, ClosestEdgeQuery (+10 more)
+Cohesion: 0.07
+Nodes (30): CadEdgeFeature, CadSurfaceKind, CadEdge, dihedral_rad, feature, id, kappa_samples, length (+22 more)
 
 ### Community 321 - "version"
 Cohesion: 0.11
@@ -1023,23 +1072,23 @@ Cohesion: 0.53
 Nodes (5): main(), parse_mesh_stdout(), Path, Best-effort wireframe via pure-Python exterior edges, then meshio., try_render_png()
 
 ### Community 324 - "ClosestOnFeature"
-Cohesion: 0.12
-Nodes (19): ClosestPoint, distance, point, triangle, ConformityStats, count, max_distance, mean_distance (+11 more)
+Cohesion: 0.14
+Nodes (14): ConformityStats, count, max_distance, mean_distance, size_t, SmoothStats, max_residual, n_moved (+6 more)
 
 ### Community 325 - "HpDriverPolicy"
 Cohesion: 0.12
 Nodes (16): HpDriverPolicy, cost_h, cost_p, cost_shape, dorfler_theta, eta_rel_floor, geometry_force_h, h_min (+8 more)
 
 ### Community 326 - "Material"
-Cohesion: 0.15
-Nodes (14): Fun, array, VectorXd, integrate_p2_matrix(), integrate_p2_vector(), P2Projector, dof_eval, fan (+6 more)
+Cohesion: 0.07
+Nodes (29): A1, A2, DIM, DIM2, T, T1, T2, vector_type (+21 more)
 
 ### Community 327 - "HpDriverPlan"
 Cohesion: 0.14
 Nodes (14): HpDriverPlan, decisions, global_shape, h_mark, h_suggestion, n_h, n_none, n_p (+6 more)
 
 ### Community 328 - "ElementHpSignal"
-Cohesion: 0.15
+Cohesion: 0.17
 Nodes (12): ElementHpSignal, eta, h, hex_fit, kappa, p, p_max, poly_fit (+4 more)
 
 ### Community 329 - "run_one"
@@ -1048,14 +1097,14 @@ Nodes (14): Config ranking (weighted mean score), `curved`, `cylinder`, Default-
 
 ### Community 330 - "Campaign"
 Cohesion: 0.12
-Nodes (16): Campaign, grid, max_pack_wall_s, max_run_wall_s, name, on_finish_analyze, on_finish_grok, parts (+8 more)
+Nodes (17): Campaign, grid, max_pack_wall_s, max_run_wall_s, name, on_finish_analyze, on_finish_grok, parts (+9 more)
 
 ### Community 331 - "Backend"
-Cohesion: 0.40
-Nodes (9): size_t, span, vector, Vector3d, flat_idx(), stamp_ball(), stamp_curvature_cells(), stamp_feature_cells() (+1 more)
+Cohesion: 0.29
+Nodes (12): size_t, span, vector, Vector3d, flat_idx(), stamp_ball(), stamp_curvature_cells(), stamp_feature_cells() (+4 more)
 
 ### Community 332 - "ElementHpDecision"
-Cohesion: 0.17
+Cohesion: 0.18
 Nodes (11): HpAction, ElementHpDecision, action, h_next, p_next, reason, shape, utility_h (+3 more)
 
 ### Community 333 - "hp_driver.cpp"
@@ -1067,24 +1116,24 @@ Cohesion: 0.67
 Nodes (3): description, type, label
 
 ### Community 335 - "Checkpoint"
-Cohesion: 0.30
-Nodes (11): classify_edges(), gp_Vec, map, TopoDS_Face, TopoDS_Shape, uint32_t, dihedral_from_normals(), extract_topology() (+3 more)
+Cohesion: 0.14
+Nodes (30): CadTopology, edges, faces, vertices, chordal_edge_metrics(), chordal_edge_metrics_segments(), classify_edges(), closest_edge() (+22 more)
 
 ### Community 336 - "CantileverSetup"
 Cohesion: 0.22
 Nodes (10): CantileverSetup, bc, length, loads, mesh, nfree, Index, VectorXd (+2 more)
 
 ### Community 337 - "Config"
-Cohesion: 0.67
-Nodes (3): version, description, type
+Cohesion: 0.06
+Nodes (43): Attribute, ConvexCell, ConvexCellFlags, Frame, global_index_t, IncidentTetrahedra, barycenter(), begin_task() (+35 more)
 
 ### Community 338 - "PartCase"
-Cohesion: 0.13
-Nodes (15): MetricSpec, derivation, name, probe, tol, PartCase, bcs, E (+7 more)
+Cohesion: 0.14
+Nodes (14): BcSpec, box, fix, array, make_dirichlet(), PartCase, bcs, geometry (+6 more)
 
 ### Community 339 - "element_stiffness"
-Cohesion: 0.12
-Nodes (27): BcSpec, box, fix, cfg_id_of(), array, json, detect_hmin_features(), expand_grid() (+19 more)
+Cohesion: 0.07
+Nodes (66): atomic_write(), cfg_id_of(), cmd_pause_status(), completed_keys(), compute_scorecard_geom(), Config, curvature_turn_deg, element_tendency (+58 more)
 
 ### Community 340 - "test_local_refine.cpp"
 Cohesion: 0.17
@@ -1107,16 +1156,16 @@ Cohesion: 0.25
 Nodes (9): dominant_axis(), face_mean_displacement_component(), face_mean_displacement_mag(), global_max_displacement_mag(), size_t, uint32_t, vector, Vector3d (+1 more)
 
 ### Community 345 - "LocalRefineStats"
-Cohesion: 0.27
-Nodes (10): vector, GeometrySizing::GeometrySizing(), make_feature_sizing(), make_geometry_sizing(), uint32_t, SharpEdge, dihedral, v0 (+2 more)
+Cohesion: 0.06
+Nodes (47): interval_nt, mat2, mat3, aligned_3d(), aligned_3d_exact(), approximate(), CDT2d::create_intersection(), vec2E (+39 more)
 
 ### Community 346 - "MetricSpec"
 Cohesion: 0.10
 Nodes (21): ProbeAnswers, dominant_load_axis, free_residual_rel, load_area_ok, load_area_rel_err, load_face_area, mean_u_component, mean_ux (+13 more)
 
 ### Community 347 - "element_stiffness"
-Cohesion: 0.28
-Nodes (10): check_prism_fill_geometry(), Vector3d, pick_sweep_axis(), prism_fill_surface(), prism_signed_volume(), prism_signed_volume_impl(), tet_signed_volume_impl(), set (+2 more)
+Cohesion: 0.06
+Nodes (31): ExactPoint, FILE, ostream, size_t, BalancedKdTree::build_tree(), Cavity(), CDT2d::insert(), CDTBase2d::create_enclosing_quad() (+23 more)
 
 ### Community 348 - "make_hp_signals"
 Cohesion: 0.48
@@ -1131,24 +1180,24 @@ Cohesion: 0.33
 Nodes (5): ADR-0020: True BRep volume meshing (product path), Alternatives rejected, Consequences, Context, Decision
 
 ### Community 351 - "Competitive benchmark harness"
-Cohesion: 0.29
-Nodes (9): Vector3d, cell_inverted(), array, vector, Vector3d, expand_hex_core_to_pyramids(), hex8_jacobian_det(), tet_signed_vol() (+1 more)
+Cohesion: 0.05
+Nodes (38): acquire_spinlock(), BasicSpinLockArray, spinlocks_, CompactSpinLockArray, spinlocks_, Delaunay(), Delaunay2d(), eT() (+30 more)
 
 ### Community 352 - "SharpEdge"
-Cohesion: 0.31
-Nodes (8): dist_, blend_to_max(), clamp_size(), DistanceFn, Vector3d, FeatureSizing::FeatureSizing(), FeatureSizing::size_at(), GeometrySizing::size_at()
+Cohesion: 0.21
+Nodes (13): dist_, blend_to_max(), clamp_size(), DistanceFn, vector, Vector3d, FeatureSizing::FeatureSizing(), FeatureSizing::size_at() (+5 more)
 
 ### Community 353 - "elem_quad"
-Cohesion: 0.15
-Nodes (13): CadEdgeFeature, CadEdge, dihedral_rad, feature, id, kappa_samples, length, samples (+5 more)
+Cohesion: 0.13
+Nodes (20): local_index_t, Delaunay2d::check_geometry(), Delaunay2d::create_first_triangle(), Delaunay2d::find_conflict_zone(), Delaunay2d::insert(), Delaunay2d::locate(), Delaunay2d::locate_inexact(), Delaunay2d::nearest_vertex() (+12 more)
 
 ### Community 354 - "FeaError"
-Cohesion: 0.12
-Nodes (21): element_num_nodes(), FeaError, ElementType, runtime_error, uint32_t, vector, NodalElement, faces (+13 more)
+Cohesion: 0.09
+Nodes (33): element_num_nodes(), FeaError, ElementType, runtime_error, uint32_t, vector, NodalElement, faces (+25 more)
 
 ### Community 355 - "test_local_refine.cpp"
-Cohesion: 0.47
-Nodes (10): array, uint32_t, vector, Vector3d, make_face_key(), summarize_tet4_quality(), tet4_aspect_ratios(), tet4_face_conformity() (+2 more)
+Cohesion: 0.07
+Nodes (50): CDT2d::save(), enable_cancel(), enable_multithreading(), Environment::instance(), ExactCDT2d::save(), expansion::show_all_stats(), geo_abort(), geo_assertion_failed() (+42 more)
 
 ### Community 356 - "Spec"
 Cohesion: 0.20
@@ -1167,8 +1216,8 @@ Cohesion: 0.40
 Nodes (5): Feedback loop — campaign → defaults, Procedure after campaign finishes, Provisional findings (settings-frontier-1, partial), Tooling, When to change product defaults
 
 ### Community 360 - "Checkpoint"
-Cohesion: 0.36
-Nodes (9): closest_on_features(), size_t, span, vector, Vector3d, detect_sharp_edges(), distance_to_features(), point_segment_distance() (+1 more)
+Cohesion: 0.15
+Nodes (18): ClosestOnFeature, distance, point, uint32_t, Vector3d, SharpEdge, dihedral, v0 (+10 more)
 
 ### Community 361 - "Holdout geometry audits"
 Cohesion: 0.22
@@ -1179,8 +1228,8 @@ Cohesion: 0.07
 Nodes (28): 0. Normative ranking (ADR-0023 / plan — do not ignore), 1. Goals (from ADR-0021), 2. Bubble / sphere packing → Delaunay, 3. Dual-of-tet polyhedra (cfMesh / polyDualMesh lineage), 4. Field-aligned hex-dominant (PGP3D-class), 5. CAD edge protecting balls / PLC constraints, 6. Licensing notes (core vs plugin), 7. Decision: v1 algorithm (+20 more)
 
 ### Community 363 - "README.md"
-Cohesion: 0.31
-Nodes (10): assemble_stiffness(), b_matrix(), Dynamic, Matrix, MatrixXd, SparseMatrix, element_coords(), element_stiffness() (+2 more)
+Cohesion: 0.06
+Nodes (45): ArgType, Arg, desc, flags, arg_is_declared(), name, type, arg_value_error() (+37 more)
 
 ### Community 364 - "VaryhedronFillOutput"
 Cohesion: 0.08
@@ -1195,11 +1244,11 @@ Cohesion: 0.44
 Nodes (8): collect_shots(), git_head(), load_results(), main(), open_program_nodes(), Path, resolve_campaign(), trend_table()
 
 ### Community 367 - "Recommended approach (not all alternatives)"
-Cohesion: 0.20
-Nodes (9): array, uint32_t, vector, Vector3d, TetFillOutput, boundary_quads, h, nodes (+1 more)
+Cohesion: 0.06
+Nodes (39): CreatorType, GEO_NODISCARD, int16, int8, Param1, Registry, char_to_string(), create() (+31 more)
 
 ### Community 368 - "p2_strain_basis"
-Cohesion: 0.22
+Cohesion: 0.25
 Nodes (8): size_t, LocalRefineStats, n_bisections, n_input_tets, n_marked, n_new_nodes, n_output_tets, n_surface_mids
 
 ### Community 369 - "TetFillOutput"
@@ -1207,55 +1256,59 @@ Cohesion: 0.57
 Nodes (6): span, vector, Vector3d, marked_centroids(), suggest_refine(), suggest_uniform_refine()
 
 ### Community 370 - "solve_l"
-Cohesion: 0.11
-Nodes (14): Stress, array, int64_t, Matrix3d, Vector3d, kirsch_stress(), param_key(), array (+6 more)
+Cohesion: 0.07
+Nodes (26): uint32_t, constant_strain_max_error(), Matrix3d, sample_strain_gradient(), unit_box_surface(), VectorXd, LSolve, energy (+18 more)
 
 ### Community 371 - "MatrixXd"
 Cohesion: 0.67
 Nodes (3): solver, description, type
 
 ### Community 372 - "cad_topology.cpp"
-Cohesion: 0.28
-Nodes (8): VectorXd, LSolve, energy, mesh, peak_vm_at_corner, u, make_l_hex_mesh(), solve_l()
+Cohesion: 0.10
+Nodes (22): CDTBase2d::insert(), CDTBase2d::insert_constraint(), index_t, std::vector<bool>, Delaunay3d::create_first_tetrahedron(), Delaunay3d::show_list(), Delaunay3d::show_tet(), Delaunay3d::show_tet_adjacent() (+14 more)
 
 ### Community 373 - "OctaFillOutput"
 Cohesion: 0.67
 Nodes (3): main(), Path, resolve_campaign()
 
 ### Community 375 - "compile"
-Cohesion: 0.22
-Nodes (9): GeomError, runtime_error, CadModel::compute_bbox(), CadModel::load_brep(), CadModel::load_step(), path, Vector3d, fill_bbox() (+1 more)
+Cohesion: 0.06
+Nodes (16): Sign2, control_add(), control_check(), control_mul(), control_set(), control_sub(), vec2HE, incircle_2d_SOS() (+8 more)
 
 ### Community 376 - "HexFace"
 Cohesion: 0.13
-Nodes (15): FaceConformityStats, is_conforming, n_boundary_faces, n_hanging_faces, n_interior_faces, n_nonconforming, n_tet_faces, n_unique_faces (+7 more)
+Nodes (25): FaceConformityStats, is_conforming, n_boundary_faces, n_hanging_faces, n_interior_faces, n_nonconforming, n_tet_faces, n_unique_faces (+17 more)
 
 ### Community 377 - "2. Bubble / sphere packing → Delaunay"
-Cohesion: 0.18
-Nodes (12): QuadKey, array, EdgeKey, size_t, uint32_t, edge_key(), EdgeKeyHash, elem_edge() (+4 more)
+Cohesion: 0.06
+Nodes (31): DWORD, LPVOID, siginfo_t, brute_force_kill(), CDTBase2d::locate_naive(), ConsoleLogger::status(), ThreadGroup, Delaunay::region() (+23 more)
 
 ### Community 378 - "3. Dual-of-tet polyhedra (cfMesh / polyDualMesh lineage)"
-Cohesion: 0.29
-Nodes (8): ChordalEdgeMetrics, hausdorff, hausdorff_over_h, max_chordal, max_efficiency, n_segments, chordal_edge_metrics(), chordal_edge_metrics_segments()
+Cohesion: 0.33
+Nodes (6): ChordalEdgeMetrics, hausdorff, hausdorff_over_h, max_chordal, max_efficiency, n_segments
 
 ### Community 379 - "4. Field-aligned hex-dominant (PGP3D-class)"
 Cohesion: 0.22
 Nodes (8): Autonomous defaults, Campaign snapshot, Grok improvement handoff — `varyhedron-baseline-m9`, Invoke (already done if you are reading this from invoke_grok_improve.sh), Sync first, Trends (mesh/solve/quality vs tier), Warehouse / visuals, Your mission this session
 
 ### Community 380 - "PROGRESS"
-Cohesion: 0.29
-Nodes (6): size_t, OctaFillOutput, h, mesh, n_boundary_pyramids, n_octahedra
+Cohesion: 0.07
+Nodes (22): PackedArrays::clear(), aligned_free(), index_t, std::vector<bool>, std::vector<T, Memory::aligned_allocator<T> >, expansion::delete_expansion_on_heap(), expansion::new_expansion_on_heap(), expansion::show_all_stats() (+14 more)
 
 ### Community 381 - "Polyhedral-FEA — agent notes"
 Cohesion: 0.67
 Nodes (3): Active program (do not skip), graphify, Polyhedral-FEA — agent notes
+
+### Community 382 - "test_quadrature.cpp"
+Cohesion: 0.11
+Nodes (14): Delaunay2d::check_combinatorics(), Delaunay2d::set_vertices(), Delaunay3d::check_geometry(), Delaunay3d::set_vertices(), Delaunay::update_neighbors(), parallel_for(), PeriodicDelaunay3d::check_max_t(), PeriodicDelaunay3d::compress() (+6 more)
 
 ### Community 383 - "PROGRESS"
 Cohesion: 0.33
 Nodes (6): Active (read this first), Background / older phases, Benchmark table, Done, Open issues, PROGRESS
 
 ### Community 388 - "size_t"
-Cohesion: 0.22
+Cohesion: 0.25
 Nodes (8): size_t, WallProjectStats, max_surface_residual, mean_surface_residual, n_iters, n_moved, n_reverted, n_wall_nodes
 
 ### Community 389 - "uint32_t"
@@ -1271,16 +1324,16 @@ Cohesion: 0.20
 Nodes (10): 1. What is complete (do not redo), 2. Advisor order (frozen — do not reorder), 3. Next workstream (G1 first), 4. Deferred / side work (not ahead of G1), 5. GUI readiness (current bar), 6. Verify before starting G1, 7. Open PROGRAM nodes after this handoff, 8. Anti-confusion checklist (copy from plan) (+2 more)
 
 ### Community 392 - "Checkpoint"
-Cohesion: 0.36
-Nodes (7): ElementType, Expectation, name, order, type, make_mesh(), solve_mms_error()
+Cohesion: 0.09
+Nodes (37): aligned_3d(), aligned_3d_exact(), det2x2(), det3x3(), det4x4(), geo_clamp(), geo_cmp(), geo_sgn() (+29 more)
 
 ### Community 393 - "WallProjectStats"
-Cohesion: 0.36
-Nodes (10): closest_edge(), closest_edge_impl(), closest_on_segment(), optional, vector, Vector3d, dist2(), edge_passes_filter() (+2 more)
+Cohesion: 0.07
+Nodes (37): DList, IT, CDTBase2d::check_edge_intersections(), CDTBase2d::constrain_edges(), CDTBase2d::constrain_edges_naive(), CDTBase2d::Delaunayize_new_edges(), CDTBase2d::Delaunayize_new_edges_naive(), CDTBase2d::Delaunayize_vertex_neighbors() (+29 more)
 
 ### Community 394 - "HandoffInfo"
-Cohesion: 0.29
-Nodes (7): HandoffInfo, campaign, checkpoint_state, finished_utc, git_head, mode, open_program_nodes
+Cohesion: 0.12
+Nodes (16): AccuracyInfo, metric, rel_err, truth, value, GridAxis, key, values (+8 more)
 
 ### Community 395 - "Protecting balls + local feature size (LFS)"
 Cohesion: 0.33
@@ -1291,84 +1344,208 @@ Cohesion: 0.40
 Nodes (9): array, size_t, uint32_t, vector, Vector3d, extract_tet4(), nearest_tet(), tets_to_nodal() (+1 more)
 
 ### Community 397 - "MatrixXd"
-Cohesion: 0.50
-Nodes (4): elem_tri(), tri_key(), TriKeyHash, TriKey
+Cohesion: 0.08
+Nodes (25): function_pointer, aligned_allocator, ALIGNMENT, aligned_free(), aligned_malloc(), A2, const_pointer, const_reference (+17 more)
 
 ### Community 398 - "mean_lateral_radial_residual"
-Cohesion: 0.33
-Nodes (4): FreeFaceKey, size_t, EdgeHash, FreeFaceHash
+Cohesion: 0.10
+Nodes (21): result, mat4, A1, DIM, FT, initializer_list, matrix_type, T1 (+13 more)
 
 ### Community 399 - "BRep face-tag BCs / probes (design stub)"
 Cohesion: 0.33
 Nodes (6): BRep face-tag BCs / probes (design stub), Exit criteria (future work item), Measured icecream instability (why face tags), Out of scope for this stub, Target model (sketch), Why boxes are temporary
 
 ### Community 400 - "ClosestOnFeature"
-Cohesion: 0.33
-Nodes (5): load_brep, load_step, load_cad(), path, load_step()
+Cohesion: 0.07
+Nodes (27): function, Thread, HilbertSort3d, m0_, m1_, m2_, m3_, m4_ (+19 more)
 
 ### Community 401 - "Geogram (vendored subset) — placeholder"
-Cohesion: 0.67
-Nodes (3): Geogram (vendored subset) — placeholder, Normative docs, When G1 lands
+Cohesion: 0.50
+Nodes (4): CMake, Geogram (vendored subset), Layout, Normative docs
 
 ### Community 402 - "pick_region"
 Cohesion: 0.40
 Nodes (4): Case, path, volume, unit_box()
 
 ### Community 403 - "accuracy"
-Cohesion: 0.40
-Nodes (4): ProjectResult, distance, normal, point
+Cohesion: 0.16
+Nodes (29): ArgFlags, GroupArgs, arg_group(), declare_arg(), declare_arg_group(), declare_arg_percent(), Group, args (+21 more)
 
 ### Community 404 - "solve"
-Cohesion: 0.40
-Nodes (5): CadModel::Impl, shape, Soup, TopoDS_Shape, triangulate_shape()
+Cohesion: 0.25
+Nodes (22): EdgeSplitFn, FineNbrFn, FineNodeFn, InbFn, closed_poly_volume(), array, span, uint32_t (+14 more)
 
 ### Community 405 - "timestamp"
 Cohesion: 0.50
 Nodes (4): schema_version, const, description, type
 
 ### Community 406 - "FaceOrient"
-Cohesion: 0.40
-Nodes (5): FaceOrient, sign0, sign1, swap, hex_face_orient()
+Cohesion: 0.16
+Nodes (11): acquire_spinlock(), BasicSpinLockArray, spinlocks_, CompactSpinLockArray, spinlocks_, geo_pause(), atomic, index_t (+3 more)
 
 ### Community 407 - "case_id"
 Cohesion: 0.50
 Nodes (4): wall_time_s, additionalProperties, required, type
 
 ### Community 408 - "test_vtu.cpp"
-Cohesion: 0.25
-Nodes (6): uint32_t, constant_strain_max_error(), Matrix3d, sample_strain_gradient(), unit_box_surface(), patch_max_error()
+Cohesion: 0.19
+Nodes (20): compress_expansion(), expansion(), expansion::compare(), expansion::is_same_as(), expansion::optimize(), fast_expansion_diff_zeroelim(), fast_expansion_sum_zeroelim(), fast_two_sum() (+12 more)
+
+### Community 409 - "Matrix"
+Cohesion: 0.18
+Nodes (7): FT, initializer_list, matrix_type, Matrix, coeff_, dim, mult()
 
 ### Community 410 - "ClosestOnFeature"
-Cohesion: 0.40
-Nodes (4): ClosestOnFeature, distance, point, Vector3d
+Cohesion: 0.17
+Nodes (20): expansion, compress_expansion(), expansion::compare(), expansion::is_same_as(), expansion::optimize(), fast_expansion_diff_zeroelim(), fast_expansion_sum_zeroelim(), fast_two_sum() (+12 more)
+
+### Community 411 - "coord_index_t"
+Cohesion: 0.11
+Nodes (19): Delaunay, NearestNeighborSearch, AdaptiveKdTree::AdaptiveKdTree(), AdaptiveKdTree::get_node(), BalancedKdTree::BalancedKdTree(), BalancedKdTree::get_node(), coord_index_t, Delaunay2d::Delaunay2d() (+11 more)
 
 ### Community 412 - "notes"
 Cohesion: 0.67
 Nodes (3): description, type, notes
+
+### Community 414 - "CurvedMeshMetrics"
+Cohesion: 0.11
+Nodes (18): CurvedMeshMetrics, composite_score, has_circular, has_tet_aspect, has_volume, m1_max, m1_mean, m2_max (+10 more)
+
+### Community 415 - "PeriodicVertexArray3d"
+Cohesion: 0.14
+Nodes (11): AdaptiveKdTree::plane_split(), Hilbert_vcmp_periodic<COORD, false, PeriodicVertexMesh3d>, Hilbert_vcmp_periodic<COORD, true, PeriodicVertexMesh3d>, PeriodicVertexArray3d, base_, nb_real_vertices_, nb_vertices_, stride_ (+3 more)
+
+### Community 416 - "IndexType"
+Cohesion: 0.21
+Nodes (8): IndexType, KeepOrderType, basic_bindex, indices, basic_quadindex, indices, basic_trindex, indices
+
+### Community 417 - "VtuPointData"
+Cohesion: 0.15
+Nodes (16): string, vector, VectorXd, VtuCellData, name, scalars, VtuPointData, name (+8 more)
+
+### Community 418 - "Scorecard"
+Cohesion: 0.16
+Nodes (15): array, size_t, string, uint32_t, vector, VolumeMesher, dump_score(), nodal_mesh_volume() (+7 more)
+
+### Community 419 - "WindowsThreadPoolManager"
+Cohesion: 0.13
+Nodes (13): LONG, PTP_CALLBACK_INSTANCE, PTP_CLEANUP_GROUP, PTP_POOL, PTP_WORK, PVOID, WindowsThreadPoolManager, cbe_ (+5 more)
+
+### Community 420 - "ClippedCell"
+Cohesion: 0.17
+Nodes (12): ClippedCell, barycenter, empty, n_planes, n_triangles, volume, size_t, clip_convex_cell() (+4 more)
+
+### Community 421 - "varyhedron_fill_surface"
+Cohesion: 0.35
+Nodes (14): boundary_nodes(), bubble_relax_volume(), span, uint32_t, vector, Vector3d, far_enough(), far_enough_protect() (+6 more)
+
+### Community 422 - "Backend"
+Cohesion: 0.24
+Nodes (11): Backend, active_backend(), backend_description(), string, init_runtime_performance(), openmp_default_threads(), openmp_enabled(), openmp_max_threads() (+3 more)
+
+### Community 423 - "main.cpp"
+Cohesion: 0.36
+Nodes (11): cmd_check(), cmd_mesh(), cmd_solve(), span, string, string_view, VolumeMesher, load_surface() (+3 more)
+
+### Community 424 - "CDT2d_ConstraintWalker"
+Cohesion: 0.18
+Nodes (10): CDT2d_ConstraintWalker, i, j, t, t_prev, v, v_cnstr, v_prev (+2 more)
+
+### Community 425 - "Triangle"
+Cohesion: 0.25
+Nodes (10): ConvexCell::connect_triangles(), ushort, make_triangle(), make_triangle_with_flags(), Triangle, i, j, k (+2 more)
+
+### Community 426 - "Environment::find_environment"
+Cohesion: 0.22
+Nodes (7): AssertMode, assert_mode(), Environment::find_environment(), Environment::get_value(), Environment::set_value(), ProcessEnvironment, set_assert_mode()
+
+### Community 427 - "ClipPlane"
+Cohesion: 0.20
+Nodes (9): ClipBox, max, min, ClipPlane, a, b, c, d (+1 more)
+
+### Community 428 - "Box"
+Cohesion: 0.22
+Nodes (8): bbox_union(), bboxes_overlap(), Box, Box2d, xy_max, xy_min, xyz_max, xyz_min
+
+### Community 429 - "Spec"
+Cohesion: 0.22
+Nodes (9): Spec, h0, layers, n, n_bg, nz, path, rho (+1 more)
+
+### Community 430 - "CommandLineDesc"
+Cohesion: 0.25
+Nodes (8): Args, GroupNames, Groups, CommandLineDesc, args, argv0, group_names, groups
+
+### Community 431 - "TerminalProgressClient"
+Cohesion: 0.25
+Nodes (6): ProgressClient, ProgressTask::reset(), ProgressTask::update(), reset_task(), task_progress(), TerminalProgressClient
+
+### Community 432 - "VertexArray"
+Cohesion: 0.25
+Nodes (6): VertexArray, base_, nb_vertices_, stride_, VertexMesh, vertices
+
+### Community 433 - "test_kirsch_plate.cpp"
+Cohesion: 0.33
+Nodes (6): array, int64_t, Matrix3d, Vector3d, kirsch_stress(), param_key()
+
+### Community 434 - "test_spmv.cpp"
+Cohesion: 0.33
+Nodes (6): SparseMatrix, vector, VectorXd, make_spd_test_matrix(), max_abs_diff(), random_vector()
+
+### Community 436 - "theme.hpp"
+Cohesion: 0.47
+Nodes (4): apply_theme(), ThemeId, make_interwebz_palette(), make_slate_palette()
+
+### Community 437 - "mean_lateral_radial_residual"
+Cohesion: 0.33
+Nodes (5): array, uint32_t, vector, Vector3d, mean_lateral_radial_residual()
+
+### Community 438 - "ComparePointCoord"
+Cohesion: 0.33
+Nodes (5): ComparePointCoord, nb_points_, points_, splitting_coord_, stride_
+
+### Community 439 - "Geogram subset — what PolyMesh takes"
+Cohesion: 0.33
+Nodes (6): Dual hard-block, Geogram subset — what PolyMesh takes, How PolyMesh consumes it, Included, Stripped / not vendored, Upgrade path
+
+### Community 440 - "CadEdgeClassCounts"
+Cohesion: 0.40
+Nodes (5): CadEdgeClassCounts, n_seam, n_sharp, n_smooth, count_edge_features()
+
+### Community 441 - "sparse_bits_flip_bit"
+Cohesion: 0.83
+Nodes (4): SparseBits, ExactCDT2d::classify_triangles_union_cnstr_operand_bits_is_operand_id(), sparse_bits_flip_bit(), sparse_bits_is_zero()
+
+### Community 442 - "case_id"
+Cohesion: 0.67
+Nodes (3): description, type, case_id
+
+### Community 443 - "percent"
+Cohesion: 0.67
+Nodes (3): int64, percent(), PredicateStats::show_stats()
 
 ## Ambiguous Edges - Review These
 - `adapt loop (loop.cpp)` → `FEA solve`  [AMBIGUOUS]
   src/adapt/CMakeLists.txt · relation: conceptually_related_to
 
 ## Knowledge Gaps
-- **1567 isolated node(s):** `energy`, `free_dofs`, `nnodes`, `nelems`, `mesh_s` (+1562 more)
+- **1845 isolated node(s):** `energy`, `free_dofs`, `nnodes`, `nelems`, `mesh_s` (+1840 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **171 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **188 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **What is the exact relationship between `adapt loop (loop.cpp)` and `FEA solve`?**
   _Edge tagged AMBIGUOUS (relation: conceptually_related_to) - confidence is low._
-- **Why does `NodalMesh` connect `P-Elevate Elements` to `VEM & Nodal Mesh`, `Element Assembly Core`, `Hybrid Graded Fill`, `SpMV CSR Backend`, `CLI Mesh Solve`, `Checkpoint`, `p2_strain_basis`, `Surface Traction`, `Structured Mesh Tests`, `FEA Solve Methods`, `Scene Solve Result`, `test_vtu.cpp`, `D6 Tier3 Bench`, `8. Graphify (for agents)`, `Implementation notes (for coding agents)`, `Lame Cylinder Tests`, `ZZ Recovery API`, `Kirsch Plate Tests`, `CantileverSetup`, `element_stiffness`, `Tet Fill Tests`, `FeaError`, `README.md`, `cad_topology.cpp`?**
-  _High betweenness centrality (0.044) - this node is a cross-community bridge._
-- **Why does `TriSurface` connect `TriSurface Geometry` to `Element Assembly Core`, `sizing_field.cpp`, `SpMV CSR Backend`, `prism_fill_surface`, `Gmsh MSH Import`, `ClosestOnFeature`, `pick_region`, `Mixed Cell Fill`, `GUI Widgets`, `test_vtu.cpp`, `Sizing Field Blend`, `STL Geometry IO`, `Local Refine Tests`, `test_product_mesh_tier1.cpp`, `Lame Cylinder Tests`, `Backend`, `GL Shader Bind`, `Tet Fill Tests`, `LocalRefineStats`, `GroupBox Frame UI`, `element_stiffness`, `Competitive benchmark harness`, `Checkpoint`, `compile`, `Context`?**
-  _High betweenness centrality (0.037) - this node is a cross-community bridge._
-- **Why does `App` connect `GUI App State` to `VolumeMesher`, `GUI Viewport GL`, `Sim Setup Loads`, `Surface Projection`, `Scene Solve Result`, `Solve Job Pipeline`, `test_product_mesh_tier1.cpp`?**
-  _High betweenness centrality (0.029) - this node is a cross-community bridge._
+- **Why does `TriSurface` connect `TriSurface Geometry` to `Element Assembly Core`, `sizing_field.cpp`, `prism_fill_surface`, `Gmsh MSH Import`, `pick_region`, `solve`, `GUI Widgets`, `Transition Fill`, `Geom Indicators`, `STL Geometry IO`, `varyhedron_fill_surface`, `Feature Sizing Field`, `main.cpp`, `CUDA SpMV Kernel`, `Feature Graded Error`, `Hex Fill Output`, `test_product_mesh_tier1.cpp`, `Lame Cylinder Tests`, `Backend`, `GL Shader Bind`, `GroupBox Frame UI`, `Schema Label Field`, `SharpEdge`, `Checkpoint`, `solve_l`, `Context`?**
+  _High betweenness centrality (0.024) - this node is a cross-community bridge._
+- **Why does `Palette` connect `GUI Theme Palette` to `theme.hpp`?**
+  _High betweenness centrality (0.020) - this node is a cross-community bridge._
+- **Why does `PeriodicDelaunay3dThread` connect `ZZ Recovery API` to `schema_version`, `elem_quad`, `Local Refine Tests`, `WallProjectStats`, `Pipeline Scene Jobs`, `ClosestOnFeature`, `Config`, `cad_topology.cpp`, `Implementation notes (for coding agents)`, `element_stiffness`, `test_quadrature.cpp`?**
+  _High betweenness centrality (0.020) - this node is a cross-community bridge._
 - **What connects `energy`, `free_dofs`, `nnodes` to the rest of the system?**
-  _1623 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _1901 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Should `VEM & Nodal Mesh` be split into smaller, more focused modules?**
+  _Cohesion score 0.1450980392156863 - nodes in this community are weakly interconnected._
 - **Should `Grid Classification` be split into smaller, more focused modules?**
   _Cohesion score 0.11517165005537099 - nodes in this community are weakly interconnected._
-- **Should `Element Assembly Core` be split into smaller, more focused modules?**
-  _Cohesion score 0.05079825834542816 - nodes in this community are weakly interconnected._

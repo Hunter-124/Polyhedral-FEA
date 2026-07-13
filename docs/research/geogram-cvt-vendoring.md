@@ -1,6 +1,6 @@
 # Geogram / restricted CVT — vendoring study path
 
-- Status: study / pre-implementation (do not start coding G1 before freeze + wall project)
+- Status: G1 landed (2026-07-13) — PSMs vendored; G2+ implement Lloyd/export
 - Normative: [ADR-0023](../decisions/0023-measure-first-tet-primary-cvt-path.md),
   [ADR-0024](../decisions/0024-advisor-measure-answers.md) Q3/Q8/Q10
 - Program: [docs/plans/advisor-measure-first-program.md](../plans/advisor-measure-first-program.md)

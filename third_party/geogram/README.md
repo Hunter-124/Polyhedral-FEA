@@ -1,29 +1,33 @@
-# Geogram (vendored subset) — placeholder
+# Geogram (vendored subset)
 
-**Status: not vendored yet.**
+**Status: vendored (G1)** — predicates + ConvexCell via official PSMs.
 
-G0 landed the ADR and this tree stub only. Actual source import is **G1**,
-which must wait until **after M10** (wall tangential smooth + OCC surface
-project). Do not copy Geogram into this directory before that.
+Not the full Geogram tree. Product poly path still waits on G2–G4 (Lloyd,
+constrained sites, clipped export). Dual-of-tet remains hard-blocked until G4.
 
 ## Normative docs
 
-- [ADR-0025](../../docs/decisions/0025-geogram-cvt-vendor.md) — vendor decision,
-  dual hard-block, third_party intent
-- [ADR-0024](../../docs/decisions/0024-advisor-measure-answers.md) Q3 (vendor hard
-  parts) · Q8 (dual hard-block)
+- [ADR-0025](../../docs/decisions/0025-geogram-cvt-vendor.md)
+- [ADR-0024](../../docs/decisions/0024-advisor-measure-answers.md) Q3 / Q8
 - [docs/research/geogram-cvt-vendoring.md](../../docs/research/geogram-cvt-vendoring.md)
-  — full study path, layout, LICENSE checklist
+- [README.polymesh.md](README.polymesh.md) — included vs stripped, upgrade path
+- [NOTICE](NOTICE) — pinned commits / tags
 
-## When G1 lands
+## Layout
 
-Expect under this directory (names may adjust):
+```
+LICENSE                 # BSD-3 (Inria / Bruno Lévy)
+NOTICE                  # pin SHAs
+README.polymesh.md
+CMakeLists.txt          # target polymesh_geogram
+delaunay/               # Delaunay PSM (ConvexCell + predicates + Delaunay)
+predicates/             # Predicates-only PSM
+```
 
-- `LICENSE` — upstream BSD-3, unmodified
-- `NOTICE` — pin: version/tag/commit, date, URL
-- `README.polymesh.md` — what we took / stripped / how to upgrade
-- `src/` / `include/` — predicates + ConvexCell / clipped-Voronoi subset only
+## CMake
 
-Lloyd loop, \(1/h^3\) density, constrained sites, and OCC bridge stay in
-`src/mesh/` / `src/pipeline/` (we write those). Median dual remains hard-blocked
-until G4.
+```bash
+cmake -S . -B build -DPOLYMESH_WITH_GEOGRAM=ON   # default ON
+```
+
+Target `polymesh_geogram` is linked from `mesh` when the option is ON.

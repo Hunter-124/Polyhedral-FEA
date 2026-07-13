@@ -43,6 +43,7 @@ add_executable(polymesh_tests
     test_graded_fill.cpp
     test_varyhedron_fill.cpp
     test_wall_project.cpp
+    test_geogram_clip.cpp
     test_mesh_conformity.cpp
     test_curved_mesh_quality.cpp
     test_pyramid.cpp

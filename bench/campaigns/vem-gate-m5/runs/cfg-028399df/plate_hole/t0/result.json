@@ -1,0 +1,116 @@
+{
+  "accuracy": {
+    "all": [
+      {
+        "metric": "scf",
+        "rel_err": 0.5120875413000389,
+        "score": 0.16337532338528854,
+        "trusted": true,
+        "truth": 3.0,
+        "value": 1.4637373760998835
+      }
+    ],
+    "metric": "scf",
+    "rel_err": 0.5120875413000389,
+    "score": 0.16337532338528854,
+    "trusted": true,
+    "truth": 3.0,
+    "value": 1.4637373760998835
+  },
+  "answers": {
+    "load_area_rel_err": 0.0,
+    "load_face_area": 0.001,
+    "mean_u_component": 9.520120960283113e-07,
+    "n_load_faces": 28,
+    "n_probe_nodes": 45,
+    "n_quality_excluded": 0,
+    "sigma_face_mean": 1463737.3760998836,
+    "sigma_max": 1905032.464892009,
+    "sigma_p99": 1494345.4373457816,
+    "strain_energy": 0.00047612545726925836,
+    "tip_deflection": 9.533242385703821e-07,
+    "tip_deflection_max": 9.677393218653707e-07
+  },
+  "cfg_id": "cfg-028399df",
+  "config": {
+    "feature_refine": true,
+    "mesher": "hybrid_zoo",
+    "order": 1
+  },
+  "feature_flags": [
+    {
+      "edge_id": 0,
+      "h_edge": 0.0033333333333333335,
+      "h_min": 0.0037499999999999994,
+      "length": 0.01,
+      "reason": "below_h_min"
+    },
+    {
+      "edge_id": 2,
+      "h_edge": 0.0033333333333333335,
+      "h_min": 0.0037499999999999994,
+      "length": 0.01,
+      "reason": "below_h_min"
+    },
+    {
+      "edge_id": 6,
+      "h_edge": 0.0033333333333333335,
+      "h_min": 0.0037499999999999994,
+      "length": 0.01,
+      "reason": "below_h_min"
+    },
+    {
+      "edge_id": 11,
+      "h_edge": 0.0033333333333333335,
+      "h_min": 0.0037499999999999994,
+      "length": 0.01,
+      "reason": "below_h_min"
+    }
+  ],
+  "geom_class": {
+    "curved_frac": 0.9,
+    "min_feature_h": 3.3334,
+    "n_features_below_h_min": 4,
+    "thin": false
+  },
+  "h": 0.014999999999999998,
+  "health": {
+    "free_residual_rel": 3.2639339355065404e-13,
+    "load_area_ok": true,
+    "load_area_rel_err": 0.0,
+    "n_bc_dofs": 354,
+    "n_orphans": 0,
+    "ok": true,
+    "reaction_sum_err": 3.8178917036678247e-13
+  },
+  "max_run_wall_s": 900.0,
+  "mesh_ms": 51.223561,
+  "mesher_note": "auto h=0.003 m (extent/16∩diag/28, n_sharp=64, min_feat=0.01 m, dens×0.92, Rκ≈0.0213, CAD_edge≈0.01)",
+  "n_dof": 6192,
+  "n_elems": 4608,
+  "n_elems_over_pred": 12.959701926052192,
+  "n_features_below_h_min": 4,
+  "n_nodes": 2064,
+  "n_pred_elems": 355.56373335537796,
+  "part": "plate_hole",
+  "quality": {
+    "M1max": 0.0004999999999999999,
+    "M2max": 0.00475,
+    "M6": 1.0,
+    "score": 0.7642857142857142
+  },
+  "scorecard": {
+    "accuracy_rel_err": 0.5120875413000389,
+    "chordal_efficiency_max": 2072.0324487005764,
+    "edge_hausdorff_over_h": 2.8571390476190492,
+    "health_ok": true,
+    "min_element_quality": 1.0,
+    "n_dof": 6192,
+    "normal_dev_deg_max": 29.477828015074547,
+    "solve_residual_rel": 3.2639339355065404e-13
+  },
+  "solve_ms": 58.286401,
+  "status": "ok",
+  "tier": 0,
+  "wall_time_s": 0.229762854
+}

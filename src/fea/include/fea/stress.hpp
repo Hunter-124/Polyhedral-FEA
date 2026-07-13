@@ -29,8 +29,9 @@ std::vector<Stress> recover_nodal_stress(const NodalMesh& mesh, const Material& 
                                          const Eigen::VectorXd& u);
 
 /// Per-element stress at the reference centroid (interior / Gauss-like sample).
-/// Skips kPolyVem (no FE shape path). `quality` is tet volume/edge³ aspect in
-/// (0,1] when the element is tet4; 1.0 for other supported types; 0 if skipped.
+/// kPolyVem: constant-strain LSQ fit on nodal u (VEM k=1 projector proxy) so
+/// face-mean SCF is measurable for M5 gate. `quality` is tet volume/edge³
+/// aspect in (0,1] when the element is tet4; 1.0 for other supported types.
 struct ElementCentroidStress {
     Stress stress = Stress::Zero();
     Eigen::Vector3d centroid = Eigen::Vector3d::Zero();

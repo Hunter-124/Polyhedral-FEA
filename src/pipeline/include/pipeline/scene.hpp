@@ -37,6 +37,7 @@ enum class VolumeMesher : int {
     kOctahedral = 7, // experimental BCC octahedra → tet4 (ADR-0019)
     kHybridVem = 8,  // hex FE bulk + native poly VEM transitions (ADR-0019)
     kVaryhedron = 9, // variable poly packing (ADR-0021); v1 edge-seed scaffold
+    kCvtPoly = 10,   // restricted CVT → clipped Voronoi poly VEM (G1–G4 / M5)
 };
 
 /// Continuous element-shape preference dial the campaign/tuner sweeps

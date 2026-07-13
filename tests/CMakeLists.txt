@@ -47,6 +47,7 @@ add_executable(polymesh_tests
     test_cvt_lloyd.cpp
     test_cvt_sites.cpp
     test_cvt_export.cpp
+    test_cvt_poly_mesher.cpp
     test_mesh_conformity.cpp
     test_curved_mesh_quality.cpp
     test_pyramid.cpp

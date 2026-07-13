@@ -8,6 +8,7 @@
 #include <array>
 #include <cstdint>
 #include <filesystem>
+#include <limits>
 #include <optional>
 #include <string>
 #include <utility>
@@ -79,6 +80,40 @@ struct AccuracyInfo {
     double rel_err = 0.0;
 };
 
+/// Health gates from results.jsonl `health` (interfaces.md §3). Absent when
+/// the object is missing; individual doubles are NaN when null/absent.
+struct HealthInfo {
+    bool present = false;
+    bool ok = false;
+    double free_residual_rel = std::numeric_limits<double>::quiet_NaN();
+    double reaction_sum_err = std::numeric_limits<double>::quiet_NaN();
+    bool load_area_ok = true;
+    bool has_load_area_ok = false;
+    int n_orphans = 0;
+};
+
+/// Measure-first scorecard (interfaces.md §3 / ADR-0023). Doubles are NaN when
+/// null or absent (e.g. edge Hausdorff without CAD).
+struct ScorecardInfo {
+    bool present = false;
+    double edge_hausdorff_over_h = std::numeric_limits<double>::quiet_NaN();
+    double chordal_efficiency_max = std::numeric_limits<double>::quiet_NaN();
+    double normal_dev_deg_max = std::numeric_limits<double>::quiet_NaN();
+    double accuracy_rel_err = std::numeric_limits<double>::quiet_NaN();
+    double min_element_quality = std::numeric_limits<double>::quiet_NaN();
+    double solve_residual_rel = std::numeric_limits<double>::quiet_NaN();
+    bool health_ok = false;
+    bool has_health_ok = false;
+    int n_dof = 0;
+};
+
+/// Subset of `answers` used by the Results panel (score / secondary health).
+struct AnswersInfo {
+    double strain_energy = std::numeric_limits<double>::quiet_NaN();
+    double tip_deflection = std::numeric_limits<double>::quiet_NaN();
+    double sigma_face_mean = std::numeric_limits<double>::quiet_NaN();
+};
+
 struct ResultRow {
     std::string cfg_id;
     std::string part;
@@ -88,10 +123,26 @@ struct ResultRow {
     int n_elems = 0;
     int n_nodes = 0;
     int n_dof = 0;
+    /// Predicted element count (M4); NaN if absent. May be fractional (C·V/h³).
+    double n_pred_elems = std::numeric_limits<double>::quiet_NaN();
     QualityInfo quality;
     AccuracyInfo accuracy;
-    std::string status;        // ok | mesh_fail | solve_fail | over_budget
+    HealthInfo health;
+    ScorecardInfo scorecard;
+    AnswersInfo answers;
+    /// ok | solve_suspect | mesh_fail | solve_fail | over_budget
+    std::string status;
     std::string config_summary; // short display of config object
+};
+
+/// Machine handoff pack (interfaces.md §8a) when present under the campaign dir.
+struct HandoffInfo {
+    std::string campaign;
+    std::string git_head;
+    std::string finished_utc;
+    std::string mode; // autonomous | supervised
+    std::vector<std::string> open_program_nodes;
+    std::string checkpoint_state;
 };
 
 struct LiveProgress {
@@ -131,6 +182,11 @@ std::optional<CampaignSpec> load_campaign(const std::filesystem::path& dir);
 std::optional<Checkpoint> load_checkpoint(const std::filesystem::path& dir);
 std::vector<ResultRow> load_results(const std::filesystem::path& dir);
 std::optional<LiveProgress> load_progress(const std::filesystem::path& dir);
+std::optional<HandoffInfo> load_handoff(const std::filesystem::path& dir);
+HandoffInfo parse_handoff(const std::string& json_text);
+
+/// True when a campaign name looks like the measure-first M9 freeze baseline.
+bool is_measure_first_baseline(const std::string& campaign_name);
 
 /// Boundary mesh from campaign `mesh_preview.pmp` (interfaces.md §6b).
 struct MeshPreview {

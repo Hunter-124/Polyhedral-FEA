@@ -9,6 +9,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -134,6 +135,64 @@ TEST_CASE("testlab: parse results.jsonl line (interfaces §3)") {
     CHECK_THAT(row.accuracy.rel_err, Catch::Matchers::WithinAbs(0.02, 1e-12));
     CHECK_THAT(row.quality.score, Catch::Matchers::WithinAbs(0.42, 1e-12));
     CHECK(row.config_summary.find("hybrid_zoo") != std::string::npos);
+    CHECK_FALSE(row.health.present);
+    CHECK_FALSE(row.scorecard.present);
+    CHECK(std::isnan(row.n_pred_elems));
+}
+
+TEST_CASE("testlab: parse results.jsonl with health + scorecard (measure-first)") {
+    const auto row = parse_result_line(
+        R"({"cfg_id":"cfg-028399df","config":{"mesher":"varyhedron"},"part":"plate_hole","tier":0,"mesh_ms":100,"solve_ms":200,"n_elems":4608,"n_nodes":2064,"n_dof":6192,"n_pred_elems":355.5,"quality":{"M1max":0,"M2max":0.1,"M6":1.0,"score":0.5},"answers":{"strain_energy":0.0031,"tip_deflection":2.4e-6,"sigma_face_mean":3.75e6,"sigma_max":4.8e6},"health":{"free_residual_rel":1.2e-12,"reaction_sum_err":1e-13,"n_orphans":0,"load_area_ok":true,"ok":true},"scorecard":{"edge_hausdorff_over_h":0.04,"chordal_efficiency_max":1.2,"normal_dev_deg_max":8.2,"n_dof":6192,"accuracy_rel_err":0.02,"min_element_quality":1.0,"solve_residual_rel":1.2e-12,"health_ok":true},"accuracy":{"metric":"scf","value":3.06,"truth":3.0,"rel_err":0.02},"status":"ok"})");
+    CHECK(row.cfg_id == "cfg-028399df");
+    CHECK(row.status == "ok");
+    CHECK(row.health.present);
+    CHECK(row.health.ok);
+    CHECK(row.health.has_load_area_ok);
+    CHECK(row.health.load_area_ok);
+    CHECK_THAT(row.health.free_residual_rel, Catch::Matchers::WithinAbs(1.2e-12, 1e-20));
+    CHECK_THAT(row.health.reaction_sum_err, Catch::Matchers::WithinAbs(1e-13, 1e-20));
+    CHECK(row.scorecard.present);
+    CHECK(row.scorecard.has_health_ok);
+    CHECK(row.scorecard.health_ok);
+    CHECK_THAT(row.scorecard.edge_hausdorff_over_h, Catch::Matchers::WithinAbs(0.04, 1e-12));
+    CHECK_THAT(row.scorecard.chordal_efficiency_max, Catch::Matchers::WithinAbs(1.2, 1e-12));
+    CHECK_THAT(row.scorecard.normal_dev_deg_max, Catch::Matchers::WithinAbs(8.2, 1e-12));
+    CHECK_THAT(row.answers.strain_energy, Catch::Matchers::WithinAbs(0.0031, 1e-12));
+    CHECK_THAT(row.answers.tip_deflection, Catch::Matchers::WithinAbs(2.4e-6, 1e-15));
+    CHECK_THAT(row.answers.sigma_face_mean, Catch::Matchers::WithinAbs(3.75e6, 1.0));
+    CHECK_THAT(row.n_pred_elems, Catch::Matchers::WithinAbs(355.5, 1e-12));
+}
+
+TEST_CASE("testlab: parse solve_suspect + null scorecard fields") {
+    const auto row = parse_result_line(
+        R"({"cfg_id":"cfg-cyl","part":"cylinder","tier":0,"mesh_ms":10,"solve_ms":20,"n_elems":100,"n_nodes":50,"n_dof":150,"answers":{"strain_energy":0.009,"tip_deflection":1.4e-6,"sigma_face_mean":2e6},"health":{"free_residual_rel":1e-12,"reaction_sum_err":0.01,"load_area_ok":false,"ok":false},"scorecard":{"edge_hausdorff_over_h":null,"chordal_efficiency_max":null,"normal_dev_deg_max":12.0,"health_ok":false},"accuracy":{"metric":"strain_energy","value":0.009,"truth":0.004,"rel_err":1.4},"status":"solve_suspect"})");
+    CHECK(row.status == "solve_suspect");
+    CHECK(row.health.present);
+    CHECK_FALSE(row.health.ok);
+    CHECK(row.health.has_load_area_ok);
+    CHECK_FALSE(row.health.load_area_ok);
+    CHECK(row.scorecard.present);
+    CHECK(row.scorecard.has_health_ok);
+    CHECK_FALSE(row.scorecard.health_ok);
+    CHECK(std::isnan(row.scorecard.edge_hausdorff_over_h));
+    CHECK(std::isnan(row.scorecard.chordal_efficiency_max));
+    CHECK_THAT(row.scorecard.normal_dev_deg_max, Catch::Matchers::WithinAbs(12.0, 1e-12));
+    CHECK_THAT(row.answers.strain_energy, Catch::Matchers::WithinAbs(0.009, 1e-12));
+}
+
+TEST_CASE("testlab: parse handoff.json open_program_nodes") {
+    const auto h = polymesh::gui::testlab::parse_handoff(R"({
+  "campaign": "varyhedron-baseline-m9",
+  "git_head": "abc123",
+  "mode": "autonomous",
+  "open_program_nodes": ["V10c", "M12", "G0"]
+})");
+    CHECK(h.campaign == "varyhedron-baseline-m9");
+    CHECK(h.mode == "autonomous");
+    REQUIRE(h.open_program_nodes.size() == 3);
+    CHECK(h.open_program_nodes[0] == "V10c");
+    CHECK(polymesh::gui::testlab::is_measure_first_baseline("varyhedron-baseline-m9"));
+    CHECK_FALSE(polymesh::gui::testlab::is_measure_first_baseline("varyhedron-short-1"));
 }
 
 TEST_CASE("testlab: parse progress.json (interfaces §6)") {

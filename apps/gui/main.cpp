@@ -243,11 +243,10 @@ void draw_study_panel(App& app) {
                 "hybrid zoo (default): hex bulk + pyramid skin → all-pyramid FE.\n"
                 "hybrid VEM: hex FE bulk + native poly VEM transitions (ADR-0019).\n"
                 "graded tet (legacy): multi-level LEB size field.\n"
-                "Varyhedron: variable polyhedral packing — cells adapt size/face count\n"
-                "to CAD. Boundary edges match CAD edge profiles within the element\n"
-                "budget (not layered N-hedra). Interior packing follows edge/face\n"
-                "constraints; higher order uses entity packing for clean corners\n"
-                "(ADR-0021).\n"
+                "Varyhedron: variable poly packing (ADR-0021). Sharp-only edge protect;\n"
+                "tet FE is the default product claim; VEM gated. Measure-first path:\n"
+                "health + scorecard before packing loops (ADR-0023/24). STEP product\n"
+                "CAD path needs OCC build. CAD edge profiles within element budget.\n"
                 "octa: experimental BCC (budget-capped; not product).");
         }
     }
@@ -876,20 +875,41 @@ void draw_frame(App& app) {
     ImGui::Begin("##status", nullptr,
                  kPanelFlags | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
     {
+        // Mesher name for status (matches VolumeMesher enum order).
+        static const char* kMesherShort[] = {
+            "tet", "hex", "hex_vem", "graded_tet", "hex_pyr", "prism", "hybrid", "octa",
+            "hybrid_vem", "varyhedron",
+        };
+        const int mi = static_cast<int>(app.setup.mesher);
+        const char* mesher_name =
+            (mi >= 0 && mi < 10) ? kMesherShort[mi] : "?";
+
+        // Last campaign result health when results are loaded (newest row).
+        std::string health_bit;
+        if (!app.testlab.results.empty()) {
+            const auto& last = app.testlab.results.back();
+            if (last.health.present) {
+                health_bit = last.health.ok ? "health ok" : "health fail";
+            } else if (!last.status.empty()) {
+                health_bit = last.status;
+            }
+        }
+
         std::string line;
         const char* tl = app.testlab.status.c_str();
         const char* head =
             app.testlab.git_head.empty() ? "unknown" : app.testlab.git_head.c_str();
         if (app.dof_count > 0) {
             line = std::format(
-                "polymesh @ {} — {} | testlab: {} | DOF {} | lmb orbit, shift+lmb pan, "
-                "wheel zoom",
-                head, app.status, tl, app.dof_count);
+                "polymesh @ {} — {} | mesher {}{}{} | testlab: {} | DOF {} | lmb orbit, "
+                "shift+lmb pan, wheel zoom",
+                head, app.status, mesher_name, health_bit.empty() ? "" : " · ", health_bit,
+                tl, app.dof_count);
         } else {
             line = std::format(
-                "polymesh @ {} — {} | testlab: {} | drop .stl/.step | lmb pick/orbit, "
-                "shift+lmb pan, wheel zoom",
-                head, app.status, tl);
+                "polymesh @ {} — {} | mesher {}{}{} | testlab: {} | drop .stl/.step | "
+                "lmb pick/orbit, shift+lmb pan, wheel zoom",
+                head, app.status, mesher_name, health_bit.empty() ? "" : " · ", health_bit, tl);
         }
         ImGui::PushStyleColor(ImGuiCol_Text, palette.text_dim);
         ImGui::TextUnformatted(line.c_str());

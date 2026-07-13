@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <format>
 #include <fstream>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 
@@ -69,11 +70,26 @@ double opt_double(const json& j, const char* key, double def = 0.0) {
     return j.at(key).get<double>();
 }
 
+/// Optional numeric: NaN when key missing or JSON null (scorecard / answers).
+double opt_double_nan(const json& j, const char* key) {
+    if (!j.contains(key) || j[key].is_null()) {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+    return j.at(key).get<double>();
+}
+
 int opt_int(const json& j, const char* key, int def = 0) {
     if (!j.contains(key) || j[key].is_null()) {
         return def;
     }
     return j.at(key).get<int>();
+}
+
+bool opt_bool(const json& j, const char* key, bool def = false) {
+    if (!j.contains(key) || j[key].is_null()) {
+        return def;
+    }
+    return j.at(key).get<bool>();
 }
 
 std::string opt_string(const json& j, const char* key, const std::string& def = {}) {
@@ -195,6 +211,7 @@ ResultRow parse_result_line(const std::string& line) {
         out.n_elems = opt_int(j, "n_elems");
         out.n_nodes = opt_int(j, "n_nodes");
         out.n_dof = opt_int(j, "n_dof");
+        out.n_pred_elems = opt_double_nan(j, "n_pred_elems");
         out.status = opt_string(j, "status", "ok");
         if (j.contains("quality") && j["quality"].is_object()) {
             const auto& q = j["quality"];
@@ -210,6 +227,39 @@ ResultRow parse_result_line(const std::string& line) {
             out.accuracy.truth = opt_double(a, "truth");
             out.accuracy.rel_err = opt_double(a, "rel_err");
         }
+        if (j.contains("health") && j["health"].is_object()) {
+            const auto& h = j["health"];
+            out.health.present = true;
+            out.health.ok = opt_bool(h, "ok", false);
+            out.health.free_residual_rel = opt_double_nan(h, "free_residual_rel");
+            out.health.reaction_sum_err = opt_double_nan(h, "reaction_sum_err");
+            out.health.n_orphans = opt_int(h, "n_orphans", 0);
+            if (h.contains("load_area_ok") && !h["load_area_ok"].is_null()) {
+                out.health.has_load_area_ok = true;
+                out.health.load_area_ok = h["load_area_ok"].get<bool>();
+            }
+        }
+        if (j.contains("scorecard") && j["scorecard"].is_object()) {
+            const auto& sc = j["scorecard"];
+            out.scorecard.present = true;
+            out.scorecard.edge_hausdorff_over_h = opt_double_nan(sc, "edge_hausdorff_over_h");
+            out.scorecard.chordal_efficiency_max = opt_double_nan(sc, "chordal_efficiency_max");
+            out.scorecard.normal_dev_deg_max = opt_double_nan(sc, "normal_dev_deg_max");
+            out.scorecard.accuracy_rel_err = opt_double_nan(sc, "accuracy_rel_err");
+            out.scorecard.min_element_quality = opt_double_nan(sc, "min_element_quality");
+            out.scorecard.solve_residual_rel = opt_double_nan(sc, "solve_residual_rel");
+            out.scorecard.n_dof = opt_int(sc, "n_dof", 0);
+            if (sc.contains("health_ok") && !sc["health_ok"].is_null()) {
+                out.scorecard.has_health_ok = true;
+                out.scorecard.health_ok = sc["health_ok"].get<bool>();
+            }
+        }
+        if (j.contains("answers") && j["answers"].is_object()) {
+            const auto& a = j["answers"];
+            out.answers.strain_energy = opt_double_nan(a, "strain_energy");
+            out.answers.tip_deflection = opt_double_nan(a, "tip_deflection");
+            out.answers.sigma_face_mean = opt_double_nan(a, "sigma_face_mean");
+        }
         if (j.contains("config")) {
             out.config_summary = summarize_config(j["config"]);
         }
@@ -217,6 +267,45 @@ ResultRow parse_result_line(const std::string& line) {
     } catch (const json::exception& e) {
         throw std::runtime_error(std::format("malformed results.jsonl line: {}", e.what()));
     }
+}
+
+HandoffInfo parse_handoff(const std::string& json_text) {
+    try {
+        const json j = json::parse(json_text);
+        HandoffInfo out;
+        out.campaign = opt_string(j, "campaign");
+        out.git_head = opt_string(j, "git_head");
+        out.finished_utc = opt_string(j, "finished_utc");
+        out.mode = opt_string(j, "mode");
+        out.checkpoint_state = opt_string(j, "checkpoint_state");
+        if (j.contains("open_program_nodes") && j["open_program_nodes"].is_array()) {
+            for (const auto& n : j["open_program_nodes"]) {
+                if (n.is_string()) {
+                    out.open_program_nodes.push_back(n.get<std::string>());
+                }
+            }
+        }
+        return out;
+    } catch (const json::exception& e) {
+        throw std::runtime_error(std::format("malformed handoff JSON: {}", e.what()));
+    }
+}
+
+std::optional<HandoffInfo> load_handoff(const std::filesystem::path& dir) {
+    const auto path = dir / "handoff.json";
+    if (!std::filesystem::is_regular_file(path)) {
+        return std::nullopt;
+    }
+    try {
+        return parse_handoff(read_file_text(path));
+    } catch (...) {
+        return std::nullopt;
+    }
+}
+
+bool is_measure_first_baseline(const std::string& campaign_name) {
+    // Match folder or campaign.json name containing baseline-m9 (M9 freeze).
+    return campaign_name.find("baseline-m9") != std::string::npos;
 }
 
 LiveProgress parse_progress(const std::string& json_text) {

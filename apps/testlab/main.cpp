@@ -169,11 +169,17 @@ struct BcSpec {
 struct LoadSpec {
     Box3 box;
     Eigen::Vector3d traction = Eigen::Vector3d::Zero(); // N/m^2
+    /// Optional guard (m²): selected face area must match within ±2% (advisor Q7).
+    std::optional<double> expected_area;
 };
 
 struct ProbeSpec {
-    std::string kind; // max_von_mises | max_vm_over_nominal | max_displacement
+    // Scoring kinds: mean_vm_over_nominal | tip_deflection | strain_energy | ...
+    // Diagnostic-only (not preferred for score): max_von_mises, max_vm_over_nominal
+    std::string kind;
     double nominal = 0.0;
+    /// Optional spatial select for face-mean stress (hole patch, tip face, …).
+    std::optional<Box3> select;
 };
 
 struct MetricSpec {
@@ -278,6 +284,9 @@ std::vector<MetricSpec> load_metrics(const fs::path& ref_path) {
             if (m.contains("probe")) {
                 ms.probe.kind = m["probe"].at("kind").get<std::string>();
                 ms.probe.nominal = m["probe"].value("nominal", 0.0);
+                if (m["probe"].contains("select") && m["probe"]["select"].contains("box")) {
+                    ms.probe.select = parse_box(m["probe"]["select"]["box"]);
+                }
             }
             ms.derivation = m.value("derivation", "");
             out.push_back(std::move(ms));
@@ -319,6 +328,9 @@ PartCase load_case(const fs::path& path) {
         for (const auto& L : j["loads"]) {
             LoadSpec ls;
             ls.box = parse_box(L.at("select").at("box"));
+            if (L["select"].contains("expected_area")) {
+                ls.expected_area = L["select"]["expected_area"].get<double>();
+            }
             if (L.contains("traction") && L["traction"].is_array() && L["traction"].size() == 3) {
                 ls.traction = Eigen::Vector3d(L["traction"][0].get<double>(),
                                               L["traction"][1].get<double>(),
@@ -765,19 +777,26 @@ Eigen::VectorXd make_loads(const fea::NodalMesh& mesh, const std::vector<LoadSpe
 }
 
 struct ProbeAnswers {
-    double sigma_max = 0.0;          // global max von Mises (diagnostic / SCF)
-    double tip_deflection = 0.0;     // PRIMARY: face-mean |u| on tip/load faces
+    double sigma_max = 0.0;          // DIAGNOSTIC only: global nodal max VM
+    double sigma_face_mean = 0.0;    // PRIMARY stress: area-wtd face-region VM (centroid)
+    double sigma_p99 = 0.0;          // DIAGNOSTIC: p99 element-centroid VM, quality-filtered
+    double strain_energy = 0.0;      // 1/2 u^T K u (J)
+    double tip_deflection = 0.0;     // face-mean |u| on tip/load faces
     double tip_deflection_max = 0.0; // diagnostic: global max |u|
     double mean_u_component = 0.0;   // signed mean of dominant load-dir component
-    double mean_ux = 0.0;            // signed mean ux on probe nodes
-    double mean_uz = 0.0;            // signed mean uz on probe nodes
-    int dominant_load_axis = 2;      // 0=x,1=y,2=z
-    double reaction_sum_err = 0.0;   // |F+R| / max(|F|,eps) relative
-    double free_residual_rel = 0.0;  // ||(Ku-f)_free|| / ||f||
-    int n_orphan_nodes = 0;          // nodes never referenced by any element
+    double mean_ux = 0.0;
+    double mean_uz = 0.0;
+    int dominant_load_axis = 2; // 0=x,1=y,2=z
+    double reaction_sum_err = 0.0;
+    double free_residual_rel = 0.0;
+    int n_orphan_nodes = 0;
     int n_bc_dofs = 0;
     int n_load_faces = 0;
     int n_probe_nodes = 0;
+    int n_quality_excluded = 0; // elements below quality floor for p99
+    double load_face_area = 0.0;
+    double load_area_rel_err = 0.0; // |A_sel - A_expected|/A_expected if set
+    bool load_area_ok = true;
 };
 
 int count_orphan_nodes(const fea::NodalMesh& mesh) {
@@ -864,28 +883,134 @@ void compute_solve_health(const fea::NodalMesh& mesh, const fea::Material& mat,
     a.n_bc_dofs = static_cast<int>(bc.dof_values.size());
 }
 
+/// Triangle/quad face area (m²).
+double surface_face_area(const fea::NodalMesh& mesh, const fea::SurfaceFace& f) {
+    if (f.nodes.size() < 3) {
+        return 0.0;
+    }
+    const Eigen::Vector3d& p0 = mesh.nodes[f.nodes[0]];
+    const Eigen::Vector3d& p1 = mesh.nodes[f.nodes[1]];
+    const Eigen::Vector3d& p2 = mesh.nodes[f.nodes[2]];
+    double a = 0.5 * (p1 - p0).cross(p2 - p0).norm();
+    if (f.nodes.size() >= 4 && f.nodes[2] != f.nodes[3]) {
+        const Eigen::Vector3d& p3 = mesh.nodes[f.nodes[3]];
+        a += 0.5 * (p2 - p0).cross(p3 - p0).norm();
+    }
+    return a;
+}
+
+/// Quality floor for p99 / face-mean stress (exclude slivers that invent 1e20 VM).
+constexpr double kStressQualityFloor = 0.02;
+
 ProbeAnswers compute_probes(const fea::NodalMesh& mesh, const fea::Material& mat,
                             const Eigen::VectorXd& u,
                             const std::vector<LoadSpec>& loads,
+                            const std::vector<MetricSpec>& metrics,
                             const fea::Dirichlet& bc, const Eigen::VectorXd& f) {
     ProbeAnswers a;
     a.n_orphan_nodes = count_orphan_nodes(mesh);
     a.tip_deflection_max = tlab::global_max_displacement_mag(u, mesh.nodes.size());
+    a.strain_energy = fea::strain_energy(mesh, mat, u);
 
-    const auto stress = fea::recover_nodal_stress(mesh, mat, u);
-    for (std::size_t i = 0; i < stress.size(); ++i) {
-        a.sigma_max = std::max(a.sigma_max, fea::von_mises(stress[i]));
+    // DIAGNOSTIC: nodal max (can spike on slivers — never the campaign score).
+    const auto nodal = fea::recover_nodal_stress(mesh, mat, u);
+    for (const auto& s : nodal) {
+        a.sigma_max = std::max(a.sigma_max, fea::von_mises(s));
     }
 
-    // PRIMARY tip probe: face-mean |u| on first load-box face set.
+    // Element-centroid (interior) stress samples — scoring path.
+    const auto elem_s = fea::recover_element_centroid_stress(mesh, mat, u);
+    std::vector<double> vm_quality;
+    vm_quality.reserve(elem_s.size());
+    for (const auto& es : elem_s) {
+        if (es.quality < kStressQualityFloor) {
+            ++a.n_quality_excluded;
+            continue;
+        }
+        vm_quality.push_back(fea::von_mises(es.stress));
+    }
+    if (!vm_quality.empty()) {
+        std::sort(vm_quality.begin(), vm_quality.end());
+        const std::size_t idx =
+            std::min(vm_quality.size() - 1,
+                     static_cast<std::size_t>(0.99 * static_cast<double>(vm_quality.size() - 1)));
+        a.sigma_p99 = vm_quality[idx];
+    }
+
+    // Stress select box: first metric probe.select, else first load box.
+    Box3 stress_box;
+    bool have_stress_box = false;
+    for (const auto& m : metrics) {
+        if (m.probe.select) {
+            stress_box = *m.probe.select;
+            have_stress_box = true;
+            break;
+        }
+    }
+    if (!have_stress_box && !loads.empty()) {
+        stress_box = loads.front().box;
+        have_stress_box = true;
+    }
+
+    // Area-weighted mean VM: for each boundary face in stress box, use nearest
+    // quality-passing element-centroid sample (never nodal extrapolation).
+    if (have_stress_box && !elem_s.empty()) {
+        double wsum = 0.0;
+        double vsum = 0.0;
+        for (const auto& face : free_faces_as_surface(mesh)) {
+            const Eigen::Vector3d c = face_centroid(mesh, face);
+            if (!stress_box.contains(c)) {
+                continue;
+            }
+            const double area = surface_face_area(mesh, face);
+            if (!(area > 0.0)) {
+                continue;
+            }
+            double best_d2 = std::numeric_limits<double>::infinity();
+            double best_vm = 0.0;
+            bool found = false;
+            for (const auto& es : elem_s) {
+                if (es.quality < kStressQualityFloor) {
+                    continue;
+                }
+                const double d2 = (es.centroid - c).squaredNorm();
+                if (d2 < best_d2) {
+                    best_d2 = d2;
+                    best_vm = fea::von_mises(es.stress);
+                    found = true;
+                }
+            }
+            if (found) {
+                wsum += area;
+                vsum += area * best_vm;
+            }
+        }
+        if (wsum > 0.0) {
+            a.sigma_face_mean = vsum / wsum;
+        }
+    }
+
+    // Tip / load face mean displacement + optional expected-area guard.
     std::vector<std::uint32_t> probe_nodes;
     if (!loads.empty()) {
         a.dominant_load_axis = tlab::dominant_axis(loads.front().traction);
         int n_faces = 0;
         probe_nodes = nodes_on_faces_in_box(mesh, loads.front().box, &n_faces);
         a.n_load_faces = n_faces;
+        // Selected face area for Q7 guard.
+        double area = 0.0;
+        for (const auto& face : free_faces_as_surface(mesh)) {
+            if (loads.front().box.contains(face_centroid(mesh, face))) {
+                area += surface_face_area(mesh, face);
+            }
+        }
+        a.load_face_area = area;
+        if (loads.front().expected_area && *loads.front().expected_area > 0.0) {
+            const double exp = *loads.front().expected_area;
+            a.load_area_rel_err = std::abs(area - exp) / exp;
+            a.load_area_ok = a.load_area_rel_err <= 0.02;
+        }
         if (probe_nodes.empty()) {
-            // Fall back to nodes in the load box — never global max as primary.
             probe_nodes = nodes_in_box(mesh, loads.front().box);
         }
     }
@@ -897,8 +1022,6 @@ ProbeAnswers compute_probes(const fea::NodalMesh& mesh, const fea::Material& mat
         a.mean_ux = tlab::face_mean_displacement_component(u, probe_nodes, 0);
         a.mean_uz = tlab::face_mean_displacement_component(u, probe_nodes, 2);
     } else {
-        // No load selector match at all — leave tip_deflection at 0 so the
-        // metric fails closed rather than reporting a global-max lie.
         a.tip_deflection = 0.0;
     }
 
@@ -907,22 +1030,39 @@ ProbeAnswers compute_probes(const fea::NodalMesh& mesh, const fea::Material& mat
 }
 
 double evaluate_probe(const ProbeSpec& probe, const ProbeAnswers& a) {
-    // Canonical kinds (interfaces.md §5) plus short aliases used in hand-calcs.
-    // Displacement probes use face-mean primary (not global max).
+    // Score path: face-mean stress, energy, tip face-mean. Raw max is diagnostic.
+    if (probe.kind == "mean_vm" || probe.kind == "mean_von_mises" ||
+        probe.kind == "face_mean_vm") {
+        return a.sigma_face_mean;
+    }
+    if (probe.kind == "mean_vm_over_nominal" || probe.kind == "scf_mean" ||
+        probe.kind == "scf") {
+        // "scf" now means face-mean VM / nominal (not nodal max).
+        if (!(std::abs(probe.nominal) > 0.0)) {
+            throw std::runtime_error("mean_vm_over_nominal requires probe.nominal != 0");
+        }
+        return a.sigma_face_mean / probe.nominal;
+    }
     if (probe.kind == "max_von_mises" || probe.kind == "max_vm") {
+        // Diagnostic only — references should not score this.
         return a.sigma_max;
     }
-    if (probe.kind == "max_vm_over_nominal" || probe.kind == "scf") {
+    if (probe.kind == "max_vm_over_nominal") {
         if (!(std::abs(probe.nominal) > 0.0)) {
             throw std::runtime_error("max_vm_over_nominal requires probe.nominal != 0");
         }
         return a.sigma_max / probe.nominal;
     }
+    if (probe.kind == "sigma_p99" || probe.kind == "p99_vm") {
+        return a.sigma_p99;
+    }
+    if (probe.kind == "strain_energy" || probe.kind == "energy") {
+        return a.strain_energy;
+    }
     if (probe.kind == "max_displacement" || probe.kind == "tip_deflection") {
-        return a.tip_deflection; // face-mean |u| on load select box
+        return a.tip_deflection;
     }
     if (probe.kind == "mean_ux_on_face") {
-        // Prefer signed dominant-load component when traction is primarily x.
         return (a.dominant_load_axis == 0) ? a.mean_u_component : a.mean_ux;
     }
     if (probe.kind == "mean_uz_on_face") {
@@ -942,23 +1082,69 @@ json compute_scorecard_geom(const pipeline::Model& model, const fea::NodalMesh& 
         try {
             const geom::CadTopology topo = geom::extract_topology(*model.cad, 8);
             if (!topo.empty()) {
-                // Boundary nodes as sample set vs **sharp** CAD edge polylines.
+                // Free-boundary undirected edges near sharp CAD features.
+                // (Do not treat unordered node lists as a polyline — that
+                // invents nonsense segments and inflates chordal efficiency.)
+                const auto faces = free_faces_as_surface(mesh);
+                std::set<std::pair<std::uint32_t, std::uint32_t>> bedges;
                 std::set<std::uint32_t> bnodes;
-                for (const auto& face : free_faces_as_surface(mesh)) {
+                auto add_edge = [&](std::uint32_t i, std::uint32_t j) {
+                    if (i > j) {
+                        std::swap(i, j);
+                    }
+                    bedges.insert({i, j});
+                };
+                for (const auto& face : faces) {
                     for (const auto ni : face.nodes) {
                         bnodes.insert(ni);
+                    }
+                    const auto& n = face.nodes;
+                    if (n.size() == 3) {
+                        add_edge(n[0], n[1]);
+                        add_edge(n[1], n[2]);
+                        add_edge(n[2], n[0]);
+                    } else if (n.size() >= 4) {
+                        add_edge(n[0], n[1]);
+                        add_edge(n[1], n[2]);
+                        add_edge(n[2], n[3]);
+                        add_edge(n[3], n[0]);
                     }
                 }
                 std::vector<Eigen::Vector3d> samples;
                 samples.reserve(bnodes.size());
                 for (const auto ni : bnodes) {
-                    samples.push_back(mesh.nodes[ni]);
+                    if (ni < mesh.nodes.size()) {
+                        samples.push_back(mesh.nodes[ni]);
+                    }
+                }
+                const double near_band = 0.75 * h;
+                std::vector<geom::MeshEdgeSegment> segs;
+                segs.reserve(bedges.size());
+                for (const auto& [ia, ib] : bedges) {
+                    if (ia >= mesh.nodes.size() || ib >= mesh.nodes.size()) {
+                        continue;
+                    }
+                    const Eigen::Vector3d& pa = mesh.nodes[ia];
+                    const Eigen::Vector3d& pb = mesh.nodes[ib];
+                    const auto qa = geom::closest_edge(topo, pa, /*sharp_only=*/true);
+                    const auto qb = geom::closest_edge(topo, pb, /*sharp_only=*/true);
+                    if (!qa || !qb || qa->distance > near_band || qb->distance > near_band) {
+                        continue;
+                    }
+                    segs.push_back(geom::MeshEdgeSegment{pa, pb});
                 }
                 if (!samples.empty()) {
-                    const auto chord =
-                        geom::chordal_edge_metrics(topo, samples, h, /*sharp_edges_only=*/true);
-                    edge_hd = chord.hausdorff_over_h;
+                    const double hd =
+                        geom::edge_profile_hausdorff_filtered(topo, samples, /*sharp_only=*/true);
+                    edge_hd = hd / std::max(h, 1e-15);
+                }
+                if (!segs.empty()) {
+                    const auto chord = geom::chordal_edge_metrics_segments(
+                        topo, segs, /*sharp_edges_only=*/true);
                     chord_eff = chord.max_efficiency;
+                    if (edge_hd.is_null() && chord.hausdorff > 0.0) {
+                        edge_hd = chord.hausdorff / std::max(h, 1e-15);
+                    }
                 }
             }
         } catch (...) {
@@ -1238,25 +1424,33 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         beat.set_phase("recover", 0.5);
 
         const ProbeAnswers ans =
-            compute_probes(vol.mesh, mat, u, part.loads, bc, loads);
+            compute_probes(vol.mesh, mat, u, part.loads, part.metrics, bc, loads);
         out.line["answers"] = {{"sigma_max", ans.sigma_max},
+                               {"sigma_face_mean", ans.sigma_face_mean},
+                               {"sigma_p99", ans.sigma_p99},
+                               {"strain_energy", ans.strain_energy},
                                {"tip_deflection", ans.tip_deflection},
                                {"tip_deflection_max", ans.tip_deflection_max},
                                {"mean_u_component", ans.mean_u_component},
                                {"n_probe_nodes", ans.n_probe_nodes},
-                               {"n_load_faces", ans.n_load_faces}};
+                               {"n_load_faces", ans.n_load_faces},
+                               {"n_quality_excluded", ans.n_quality_excluded},
+                               {"load_face_area", ans.load_face_area},
+                               {"load_area_rel_err", ans.load_area_rel_err}};
 
-        // Health gates: residual / reaction / orphans. Fail-closed for accuracy.
+        // Health gates: residual / reaction / orphans / optional load-area guard.
         constexpr double kFreeResidTolDirect = 1e-6;
         constexpr double kReactionSumTol = 0.05;
         const bool health_ok =
             (ans.n_orphan_nodes == 0) &&
             (ans.free_residual_rel <= kFreeResidTolDirect) &&
-            (ans.reaction_sum_err <= kReactionSumTol);
+            (ans.reaction_sum_err <= kReactionSumTol) && ans.load_area_ok;
         out.line["health"] = {{"free_residual_rel", ans.free_residual_rel},
                               {"reaction_sum_err", ans.reaction_sum_err},
                               {"n_orphans", ans.n_orphan_nodes},
                               {"n_bc_dofs", ans.n_bc_dofs},
+                              {"load_area_ok", ans.load_area_ok},
+                              {"load_area_rel_err", ans.load_area_rel_err},
                               {"ok", health_ok}};
 
         // Accuracy vs hand-calc truths (loaded from bench/reference via the case).

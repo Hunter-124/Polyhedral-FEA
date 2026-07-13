@@ -141,15 +141,22 @@ and \(a\):
   = 3.0.
 \]
 
-For the probe used by the harness (`max_vm_over_nominal` with
-`nominal = σ_∞`), note that at the hole poles the stress state is uniaxial
-hoop tension, so \(\sigma_{\mathrm{vm}}^{\max} = \sigma_\theta^{\max}\) and
+Campaign probe is **face-mean** von Mises on the hole-neighborhood patch
+(`mean_vm_over_nominal` with `nominal = σ_∞`), evaluated from
+**element-centroid** stresses of quality-passing elements — never raw nodal
+max (ADR-0023). At the hole poles the continuum stress is uniaxial hoop
+tension, so \(\sigma_{\mathrm{vm}} = \sigma_\theta\) and the face-mean ratio
+still targets
 
 \[
-\frac{\sigma_{\mathrm{vm}}^{\max}}{\sigma_\infty} = 3.0.
+\frac{\langle\sigma_{\mathrm{vm}}\rangle_{\mathrm{hole}}}{\sigma_\infty} = 3.0
 \]
 
-**Metric `scf`:** value \(3.0\), relative tolerance \(5\,\%\).
+on a well-resolved rim (face-mean is slightly softer than continuum peak;
+tolerance widened to \(10\,\%\)).
+
+**Metric `scf`:** value \(3.0\), relative tolerance \(10\,\%\).
+Diagnostic dashboard also records quality-filtered p99 VM and nodal max.
 
 ### Finite-domain note
 
@@ -269,10 +276,32 @@ Von Mises for uniaxial tension:
 \sigma_{\mathrm{vm}} = |\sigma_{zz}| = 1.0 \times 10^{6}\,\mathrm{Pa}.
 \]
 
-**Metric `sigma_max`:** value \(1.0\times 10^{6}\,\mathrm{Pa}\), relative
-tolerance \(10\,\%\). Probe = `max_von_mises`.
+Raw nodal \(\sigma_{\mathrm{vm}}^{\max}\) is **not** a campaign score metric
+(sliver/extrapolation spikes; ADR-0023). It remains a diagnostic only.
 
-### Tip axial displacement
+### Strain energy (primary campaign score)
+
+Uniform uniaxial field \(\sigma_{zz}=t_z\), \(\varepsilon_{zz}=\sigma_{zz}/E\):
+
+\[
+U = \tfrac12 \int_\Omega \boldsymbol{\sigma}:\boldsymbol{\varepsilon}\,dV
+  = \tfrac12 \frac{\sigma_{zz}^2}{E}\,V,
+\quad
+V = \pi R^2 H = \pi\cdot 2.5\times 10^{-3}\cdot 0.2
+  \approx 1.570796\times 10^{-3}\,\mathrm{m}^3.
+\]
+
+\[
+U
+  = \tfrac12 \frac{(10^6)^2}{2\times 10^{11}} \cdot \pi R^2 H
+  = 3.926990816987241\times 10^{-3}\,\mathrm{J}.
+\]
+
+**Metric `strain_energy`:** value \(3.926990816987241\times 10^{-3}\,\mathrm{J}\),
+relative tolerance \(15\,\%\). Probe = `strain_energy` (\(\tfrac12\mathbf{u}^T K\mathbf{u}\)).
+Has gradient w.r.t. mesh quality (unlike tip of a uniaxial bar).
+
+### Tip axial displacement (secondary / health)
 
 \[
 u_z(H)
@@ -284,8 +313,8 @@ u_z(H)
 (Poisson contraction of the radius does not affect \(u_z\).)
 
 **Metric `tip_deflection`:** value \(1.0\times 10^{-6}\,\mathrm{m}\), relative
-tolerance \(15\,\%\). Probe = `max_displacement` (max nodal \(|\mathbf{u}|\);
-for this uniaxial case the max is the free-end axial stretch).
+tolerance \(15\,\%\). Probe = face-mean \(|\mathbf{u}|\) on the loaded end face
+(catches BC/RBM regressions; nearly mesh-insensitive for packing loops).
 
 ---
 

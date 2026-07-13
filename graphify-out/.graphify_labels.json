@@ -374,15 +374,20 @@
   "372": "cad_topology.cpp",
   "373": "OctaFillOutput",
   "374": "varyhedron_fill_surface",
+  "375": "compile",
+  "376": "HexFace",
   "377": "2. Bubble / sphere packing → Delaunay",
   "378": "3. Dual-of-tet polyhedra (cfMesh / polyDualMesh lineage)",
   "379": "4. Field-aligned hex-dominant (PGP3D-class)",
   "380": "PROGRESS",
+  "381": "Polyhedral-FEA — agent notes",
   "382": "test_quadrature.cpp",
-  "383": "FaceOrient",
+  "383": "PROGRESS",
   "384": "invoke_grok_improve.sh",
   "385": "test_cad_model.cpp",
   "386": "test_cad_topology.cpp",
   "387": "test_varyhedron_fill.cpp",
-  "390": "load_step"
+  "388": "size_t",
+  "389": "uint32_t",
+  "390": "elem_edge"
 }

@@ -24,11 +24,17 @@ TEST_CASE("varyhedron_fill_surface unit cube with topology") {
     const CadModel cad = CadModel::load_step("tests/fixtures/unit_cube.step");
     const auto topo = extract_topology(cad, 6);
     const auto surface = cad.tessellate();
+    const double h = 0.25;
     auto fill =
-        varyhedron_fill_surface(surface, cad.bbox_min(), cad.bbox_max(), 0.25, 1, {}, 0.0, {},
-                                0.0, 15.0, &topo);
+        varyhedron_fill_surface(surface, cad.bbox_min(), cad.bbox_max(), h, 1, {}, 0.0, {}, 0.0,
+                                15.0, &topo);
     REQUIRE(fill.n_tets > 0);
     REQUIRE(fill.n_edge_seeds > 0);
+    // CDS protect radii: r ≤ α h (α=0.45), plus corner shrink can go lower.
+    REQUIRE(fill.max_protect_radius > 0.0);
+    REQUIRE(fill.min_protect_radius > 0.0);
+    REQUIRE(fill.min_protect_radius <= fill.max_protect_radius);
+    CHECK(fill.max_protect_radius <= 0.45 * h + 1e-9);
     // V6c packing seed engine: interior bubbles + relax stats.
     REQUIRE(fill.n_volume_seeds > 0);
     REQUIRE(fill.n_pack_relax_iters > 0);
@@ -101,7 +107,8 @@ TEST_CASE("varyhedron protects only sharp edges on cylinder (M3)") {
     REQUIRE(counts.n_seam >= 1);
 
     const auto surface = cad.tessellate();
-    auto fill = varyhedron_fill_surface(surface, cad.bbox_min(), cad.bbox_max(), 0.04, 1, {}, 0.0,
+    const double h = 0.04;
+    auto fill = varyhedron_fill_surface(surface, cad.bbox_min(), cad.bbox_max(), h, 1, {}, 0.0,
                                         {}, 0.0, 15.0, &topo);
     REQUIRE(fill.n_tets > 0);
     REQUIRE(fill.n_sharp_edges == static_cast<std::size_t>(counts.n_sharp));
@@ -110,4 +117,34 @@ TEST_CASE("varyhedron protects only sharp edges on cylinder (M3)") {
     REQUIRE(fill.n_edge_seeds > 0);
     // With only ~2 sharp circles, seed count should stay modest vs protecting all edges.
     CHECK(fill.n_edge_seeds < 400);
+    // CDS: max protect radius never exceeds α h (α=0.45).
+    REQUIRE(fill.max_protect_radius > 0.0);
+    CHECK(fill.max_protect_radius <= 0.45 * h + 1e-9);
+    CHECK(fill.min_protect_radius <= fill.max_protect_radius);
+}
+
+// Temporary diagnostics (remove before commit if still present — actually kept via INFO)
+
+TEST_CASE("varyhedron protect radius diagnostics print") {
+    if (!occ_enabled()) {
+        SKIP("OpenCASCADE not enabled");
+    }
+    struct Case { const char* path; double h; };
+    const Case cases[] = {
+        {"tests/fixtures/unit_cube.step", 0.25},
+        {"tests/fixtures/parts/cylinder.step", 0.04},
+        {"tests/fixtures/parts/plate_hole.step", 0.025},
+    };
+    for (const auto& c : cases) {
+        if (!std::filesystem::exists(c.path)) continue;
+        const CadModel cad = CadModel::load_step(c.path);
+        const auto topo = extract_topology(cad, 8);
+        const auto surface = cad.tessellate();
+        auto fill = varyhedron_fill_surface(surface, cad.bbox_min(), cad.bbox_max(), c.h, 1, {},
+                                            0.0, {}, 0.0, 15.0, &topo);
+        WARN("BEFORE " << c.path << " h=" << c.h << " edge_seeds=" << fill.n_edge_seeds
+                      << " vol=" << fill.n_volume_seeds << " sharp=" << fill.n_sharp_edges
+                      << " tets=" << fill.n_tets);
+        REQUIRE(fill.n_edge_seeds > 0);
+    }
 }

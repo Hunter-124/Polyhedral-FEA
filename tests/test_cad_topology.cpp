@@ -3,6 +3,7 @@
 #include "geom/cad_topology.hpp"
 #include "geom/step.hpp"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
@@ -201,4 +202,98 @@ TEST_CASE("chordal_edge_metrics near-zero on exact CAD samples") {
     const auto m_off = chordal_edge_metrics(topo, offset, 0.1, true);
     CHECK(m_off.hausdorff > 0.04);
     CHECK(m_off.max_chordal > 0.04);
+}
+
+TEST_CASE("chordal_edge_metrics_segments e≈1 on synthetic circle chord") {
+    // Manual CadTopology (no OCC): unit circle in xy, R=1, κ=1.
+    // A chord of length ℓ subtending angle θ has mid-chord sagitta
+    //   d = R (1 − cos(θ/2)) ≈ ℓ²/(8R) for small θ,
+    // so e = d / (ℓ²κ/8) ≈ 1.
+    using polymesh::geom::CadEdge;
+    using polymesh::geom::CadTopology;
+    using polymesh::geom::MeshEdgeSegment;
+    using polymesh::geom::chordal_edge_metrics_segments;
+
+    constexpr double kR = 1.0;
+    constexpr double kKappa = 1.0 / kR;
+    constexpr double kTheta = 30.0 * 3.14159265358979323846 / 180.0; // 30°
+    constexpr int kNSamples = 65;
+
+    CadTopology topo;
+    CadEdge ce;
+    ce.id = 0;
+    ce.feature = CadEdgeFeature::kSharp;
+    ce.samples.reserve(static_cast<std::size_t>(kNSamples));
+    ce.kappa_samples.reserve(static_cast<std::size_t>(kNSamples));
+    for (int i = 0; i < kNSamples; ++i) {
+        const double a = 2.0 * 3.14159265358979323846 * static_cast<double>(i) /
+                         static_cast<double>(kNSamples - 1);
+        // Open chain covering full circle (last ≈ first).
+        ce.samples.emplace_back(kR * std::cos(a), kR * std::sin(a), 0.0);
+        ce.kappa_samples.push_back(kKappa);
+    }
+    ce.length = 0.0;
+    for (std::size_t k = 1; k < ce.samples.size(); ++k) {
+        ce.length += (ce.samples[k] - ce.samples[k - 1]).norm();
+    }
+    topo.edges.push_back(std::move(ce));
+
+    // Chord from −θ/2 to +θ/2 about +x (mid at (1,0) direction).
+    const double half = 0.5 * kTheta;
+    const Eigen::Vector3d a(kR * std::cos(-half), kR * std::sin(-half), 0.0);
+    const Eigen::Vector3d b(kR * std::cos(half), kR * std::sin(half), 0.0);
+    const double ell = (b - a).norm();
+    REQUIRE(ell > 1e-9);
+
+    // Exact circular sagitta and small-angle theory.
+    const Eigen::Vector3d mid = 0.5 * (a + b);
+    const double d_exact = kR - mid.norm(); // mid is on the x-axis inside the circle
+    const double theory = (ell * ell * kKappa) / 8.0;
+    REQUIRE(theory > 1e-12);
+    // Sanity: for 30° the approximation is within a few percent.
+    CHECK(d_exact / theory > 0.9);
+    CHECK(d_exact / theory < 1.15);
+
+    const auto m = chordal_edge_metrics_segments(topo, {MeshEdgeSegment{a, b}}, true);
+    CHECK(m.n_segments == 1);
+    // Residual is vs discrete CAD samples, so allow small sample error vs exact circle.
+    CHECK(m.max_chordal == Catch::Approx(d_exact).margin(1e-3));
+    CHECK(m.hausdorff == Catch::Approx(d_exact).margin(1e-3));
+    // Efficiency e = d/(ℓ²κ/8) should be O(1) ≈ 1 (mission: within 10–15%).
+    REQUIRE(m.max_efficiency > 0.0);
+    CHECK(m.max_efficiency == Catch::Approx(1.0).margin(0.15));
+    CHECK(m.max_efficiency > 0.85);
+    CHECK(m.max_efficiency < 1.20);
+    // Reported residual should track the circular sagitta order of magnitude.
+    CHECK(m.max_chordal / theory == Catch::Approx(1.0).margin(0.15));
+}
+
+TEST_CASE("extract_topology fills kappa_samples on curved edges when OCC") {
+    if (!occ_enabled()) {
+        SKIP("OpenCASCADE not enabled");
+    }
+    const std::filesystem::path path = "tests/fixtures/parts/cylinder.step";
+    if (!std::filesystem::exists(path)) {
+        SKIP("cylinder.step missing");
+    }
+    const CadModel model = CadModel::load_step(path);
+    const auto topo = extract_topology(model, 16);
+    // At least one sharp closed rim should carry positive κ ≈ 1/R.
+    int curved_with_kappa = 0;
+    for (const auto& e : topo.edges) {
+        if (e.feature != CadEdgeFeature::kSharp || e.samples.size() < 4) {
+            continue;
+        }
+        if (e.kappa_samples.size() != e.samples.size()) {
+            continue;
+        }
+        double kmax = 0.0;
+        for (double k : e.kappa_samples) {
+            kmax = std::max(kmax, k);
+        }
+        if (kmax > 1e-6) {
+            ++curved_with_kappa;
+        }
+    }
+    CHECK(curved_with_kappa >= 1);
 }

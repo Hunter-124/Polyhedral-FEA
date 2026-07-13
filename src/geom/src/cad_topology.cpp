@@ -15,10 +15,12 @@
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepGProp.hxx>
 #include <BRepGProp_Face.hxx>
+#include <BRepLProp_CLProps.hxx>
 #include <BRep_Tool.hxx>
 #include <GProp_GProps.hxx>
 #include <Geom2d_Curve.hxx>
 #include <GeomAbs_SurfaceType.hxx>
+#include <Standard_Failure.hxx>
 #include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
@@ -104,6 +106,33 @@ double menger_kappa(const std::vector<Eigen::Vector3d>& samples, std::size_t i) 
     }
     const double area = 0.5 * ab_v.cross(bc_v).norm();
     return 4.0 * area / (ab * bc * ca);
+}
+
+/// κ at arc-length fraction t ∈ [0,1]: prefer kappa_samples (linear in sample
+/// index), else Menger from discrete samples when ≥3 points.
+double kappa_at_t(const CadEdge& ce, double t) {
+    const double tc = std::clamp(t, 0.0, 1.0);
+    if (ce.kappa_samples.size() == ce.samples.size() && ce.kappa_samples.size() >= 1) {
+        if (ce.kappa_samples.size() == 1) {
+            return std::abs(ce.kappa_samples[0]);
+        }
+        const double u = tc * static_cast<double>(ce.kappa_samples.size() - 1);
+        const std::size_t i0 = static_cast<std::size_t>(std::floor(u));
+        const std::size_t i1 = std::min(i0 + 1, ce.kappa_samples.size() - 1);
+        const double f = u - static_cast<double>(i0);
+        const double k0 = std::abs(ce.kappa_samples[i0]);
+        const double k1 = std::abs(ce.kappa_samples[i1]);
+        return (1.0 - f) * k0 + f * k1;
+    }
+    if (ce.samples.size() < 3) {
+        return 0.0;
+    }
+    std::size_t si = static_cast<std::size_t>(
+        std::llround(tc * static_cast<double>(ce.samples.size() - 1)));
+    if (si >= ce.samples.size()) {
+        si = ce.samples.size() - 1;
+    }
+    return menger_kappa(ce.samples, si);
 }
 
 std::optional<ClosestEdgeQuery> closest_edge_impl(const CadTopology& topo,
@@ -335,12 +364,45 @@ CadTopology extract_topology(const CadModel& model, int samples_per_edge) {
         const double u0 = curve.FirstParameter();
         const double u1 = curve.LastParameter();
         const int n_seg = samples_per_edge + 1; // interior samples + end
-        ce.samples.reserve(static_cast<std::size_t>(n_seg + 1));
+        const std::size_t n_samples = static_cast<std::size_t>(n_seg + 1);
+        ce.samples.reserve(n_samples);
+        std::vector<double> us;
+        us.reserve(n_samples);
         for (int s = 0; s <= n_seg; ++s) {
             const double t = static_cast<double>(s) / static_cast<double>(n_seg);
             const double u = u0 + t * (u1 - u0);
+            us.push_back(u);
             const gp_Pnt p = curve.Value(u);
             ce.samples.emplace_back(p.X(), p.Y(), p.Z());
+        }
+        // OCC curve curvature magnitude at the same parameters as samples.
+        // Leave kappa_samples empty if the local props path fails entirely.
+        try {
+            BRepLProp_CLProps props(curve, 2, 1.0e-9);
+            ce.kappa_samples.reserve(n_samples);
+            bool any_ok = false;
+            for (double u : us) {
+                double kappa = 0.0;
+                try {
+                    props.SetParameter(u);
+                    if (props.IsTangentDefined()) {
+                        kappa = std::abs(static_cast<double>(props.Curvature()));
+                        if (std::isfinite(kappa) && kappa > 0.0) {
+                            any_ok = true;
+                        } else if (!std::isfinite(kappa)) {
+                            kappa = 0.0;
+                        }
+                    }
+                } catch (const Standard_Failure&) {
+                    kappa = 0.0;
+                }
+                ce.kappa_samples.push_back(kappa);
+            }
+            if (!any_ok) {
+                ce.kappa_samples.clear();
+            }
+        } catch (const Standard_Failure&) {
+            ce.kappa_samples.clear();
         }
         ce.length = 0.0;
         for (std::size_t k = 1; k < ce.samples.size(); ++k) {
@@ -456,6 +518,44 @@ double edge_profile_hausdorff_filtered(const CadTopology& topo,
     return any ? max_d : 0.0;
 }
 
+ChordalEdgeMetrics chordal_edge_metrics_segments(
+    const CadTopology& topo, const std::vector<MeshEdgeSegment>& segs,
+    bool sharp_edges_only) {
+    ChordalEdgeMetrics out;
+    if (segs.empty() || topo.edges.empty()) {
+        return out;
+    }
+    out.n_segments = static_cast<int>(segs.size());
+
+    for (const MeshEdgeSegment& seg : segs) {
+        const Eigen::Vector3d mid = 0.5 * (seg.a + seg.b);
+        const double ell = (seg.b - seg.a).norm();
+        if (ell < kEps) {
+            continue;
+        }
+        const auto q = closest_edge_impl(topo, mid, sharp_edges_only);
+        if (!q) {
+            continue;
+        }
+        const double d = q->distance;
+        out.max_chordal = std::max(out.max_chordal, d);
+        out.hausdorff = std::max(out.hausdorff, d);
+
+        double kappa = 0.0;
+        if (q->edge_id < topo.edges.size()) {
+            kappa = kappa_at_t(topo.edges[q->edge_id], q->t);
+        }
+        if (kappa > 1e-12) {
+            // Theoretical mid-chord sagitta for circular arc: d ≈ ℓ²κ/8.
+            const double theory = (ell * ell * kappa) / 8.0;
+            const double denom = std::max(kEps, theory);
+            const double eff = d / denom;
+            out.max_efficiency = std::max(out.max_efficiency, eff);
+        }
+    }
+    return out;
+}
+
 ChordalEdgeMetrics chordal_edge_metrics(
     const CadTopology& topo,
     const std::vector<Eigen::Vector3d>& mesh_feature_polyline, double h,
@@ -464,45 +564,14 @@ ChordalEdgeMetrics chordal_edge_metrics(
     if (mesh_feature_polyline.size() < 2 || topo.edges.empty()) {
         return out;
     }
-    const double h_safe = std::max(h, kEps);
-    out.n_segments = static_cast<int>(mesh_feature_polyline.size() - 1);
-
-    // Pointwise Hausdorff (all polyline vertices).
-    out.hausdorff =
-        edge_profile_hausdorff_filtered(topo, mesh_feature_polyline, sharp_edges_only);
-    out.hausdorff_over_h = out.hausdorff / h_safe;
-
-    // Per-segment midpoint residual + efficiency vs theoretical chordal sagitta.
+    std::vector<MeshEdgeSegment> segs;
+    segs.reserve(mesh_feature_polyline.size() - 1);
     for (std::size_t i = 1; i < mesh_feature_polyline.size(); ++i) {
-        const Eigen::Vector3d mid =
-            0.5 * (mesh_feature_polyline[i - 1] + mesh_feature_polyline[i]);
-        const auto q = closest_edge_impl(topo, mid, sharp_edges_only);
-        if (!q) {
-            continue;
-        }
-        out.max_chordal = std::max(out.max_chordal, q->distance);
-
-        double kappa = 0.0;
-        if (q->edge_id < topo.edges.size()) {
-            const CadEdge& ce = topo.edges[q->edge_id];
-            // Sample index near arc-length fraction t.
-            std::size_t si = 0;
-            if (ce.samples.size() >= 2) {
-                si = static_cast<std::size_t>(
-                    std::llround(q->t * static_cast<double>(ce.samples.size() - 1)));
-                if (si >= ce.samples.size()) {
-                    si = ce.samples.size() - 1;
-                }
-            }
-            kappa = menger_kappa(ce.samples, si);
-        }
-        if (kappa > 1e-12) {
-            const double theory = (h_safe * h_safe * kappa) / 8.0;
-            const double denom = std::max(kEps, theory);
-            const double eff = q->distance / denom;
-            out.max_efficiency = std::max(out.max_efficiency, eff);
-        }
+        segs.push_back(MeshEdgeSegment{mesh_feature_polyline[i - 1], mesh_feature_polyline[i]});
     }
+    out = chordal_edge_metrics_segments(topo, segs, sharp_edges_only);
+    // Scorecard compatibility: normalize residual by mesh size h.
+    out.hausdorff_over_h = out.hausdorff / std::max(h, kEps);
     return out;
 }
 

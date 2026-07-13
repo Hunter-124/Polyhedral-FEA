@@ -86,8 +86,8 @@ GitHub: github.com/Hunter-124/Polyhedral-FEA, default branch master.
 
 === OPEN NODES (read PROGRAM.yaml for the live list; typical order) ===
 As of 2026-07-12: **done** includes adaptive core (p-hierarchical*, fe-vem,
-mesher-tendency, hp-driver, gui-sim-controls, part-library, testlab, …).
-**Active program = Lane M (measure-first) + CVT lane on Lane V substrate.**
+mesher-tendency, hp-driver, gui-sim-controls, part-library, testlab, …) and
+**M0–M4, M6–M8**. **Active program = Lane M (measure-first) + G (CVT) on Lane V.**
 
 **MUST READ FIRST (full plan — do not improvise a different strategy):**
   docs/plans/advisor-measure-first-program.md
@@ -95,18 +95,24 @@ ADRs: 0020 (BRep), 0021 (varyhedron), 0022 (warehouse+grok), **0023** (strategy)
 **0024** (concrete Q&A: stress score, freeze→project→CVT, Geogram vendor,
 chordal e, lfs balls, dual hard-block, tiers, traps).
 Process: docs/process/grok-loop.md. Board: docs/dag/PROGRAM.yaml.
+Every open M/G node note cites ADR-0024 Q# + that plan path — trust the notes.
 
 Normative order (ADR-0023/0024 — do not skip or reorder):
-1. M1–M4 measure substrate (mostly done): probes, scorecard, sharp-only, N_pred
-2. **M6** stress score = face-mean centroid VM + energy; never raw nodal max
-3. **M7** chordal e = d/(ℓ²κ/8) with OCC κ + true mesh segments
-4. **M8** protecting balls r=min(αh, β·lfs); corner shrink
-5. **M9 FREEZE baseline campaign** on honest scorecard (before projection/CVT)
+1. **M0–M4 done:** probes, scorecard, sharp-only protect, N_pred
+2. **M6 done:** stress score = face-mean centroid VM + energy; never raw nodal max
+3. **M7 done:** chordal e = d/(ℓ²κ/8) with OCC κ + true mesh segments
+4. **M8 done:** protecting balls r=min(αh, β·lfs); corner shrink
+5. **M9 FREEZE baseline campaign** (next) on honest scorecard (before projection/CVT)
 6. **M10** wall tangential smooth + OCC surface project
-7. **G1–G4** vendor Geogram → Lloyd CVT → clipped Voronoi poly cells
+7. **G0–G4** Geogram ADR → vendor → Lloyd CVT → constrained sites → clipped Voronoi
 8. **M5** VEM headline only if beats hybrid_zoo on frozen plate_hole+cylinder
 9. Dual-of-tet: HARD-BLOCK until G4. Frame fields: out of near-term horizon.
-10. p>1 only with curved/isoparametric boundary in same work item
+10. p>1 only with curved/isoparametric boundary in same work item (V6d deps M1)
+11. **V11** packing iterate: no "win" loops until M9; dual hard-block until G4
+
+Side nodes (parallel when deps ready; not ahead of critical path):
+- **M11** h_min / virtual-topology flag (deps M4) · **M12** expected_area (deps M6)
+- **M14** wall-clock kills (deps M4) · **M13** sphere ref after M9 freeze only
 
 Substrate: sharp protect + graded tet + live BRep oracle.
 Reward: scorecard + accuracy — never wire PNG, never residual alone.

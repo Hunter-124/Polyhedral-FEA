@@ -376,16 +376,21 @@ nodes:
   - id: V6d
     title: Order packing (p) on varyhedron meshes
     status: todo
-    deps: [V6c]
+    deps: [V6c, M1]
     scope: [src/mesh/, src/fea/, src/adapt/]
-    note: Same-order faces / hierarchical min-rule; MMS or patch smoke.
+    note: >
+      Hierarchical min-rule (already in hp_assembly); uniform p per campaign
+      first. Feature-local p↑ only after M2 edge residual stable + curved
+      boundary (ADR-0023 §8). Blocked on broken accuracy signal until M1.
 
   - id: V6e
     title: Varyhedron solve path + curved scorecard on STEP shapes
     status: todo
-    deps: [V6c]
+    deps: [V6c, M2]
     scope: [src/pipeline/, tests/]
-    note: VEM/FE solve; test_curved_mesh_quality on four STEP parts.
+    note: >
+      Tet FE solve path exists; scorecard must use M2 residual metrics +
+      frozen refs. VEM not required for this node (ADR-0023 tet primary).
 
   - id: V7
     title: Default mesher + tendency map + hybrid zoo retained
@@ -456,8 +461,73 @@ nodes:
   - id: V11
     title: Feedback iterate packing (repeatable)
     status: todo
-    deps: [V10a]
+    deps: [V10a, M1, M2]
     scope: [src/mesh/, src/pipeline/, bench/campaigns/, docs/]
     note: >
-      Apply improvements from Grok/human; re-run short campaign; flip
-      feedback-loop style done/todo. Retire graded when varyhedron wins scorecard.
+      Apply improvements only against M1 health + M2 scorecard (not residual
+      alone, not wire PNGs). Retire graded when varyhedron wins on frozen refs.
+      Prefer constrained restricted CVT over dual-of-tet for poly cells
+      (ADR-0023). VEM promotion is M5, not automatic here.
+
+  # ── Lane M: Measure-first (ADR-0023, advisor 2026-07-12) ────────────────
+  # Compressed path: harden probes/metrics → edge residuals → CVT poly →
+  # VEM earns headline. Frame fields out of two-week horizon.
+
+  - id: M0
+    title: "ADR-0023 measure-first / tet primary / CVT path"
+    status: done
+    deps: [V0]
+    scope: [docs/decisions/, docs/dag/, docs/research/]
+    note: >
+      DONE 2026-07-12: ADR-0023 accepted; PROGRAM M0–M5 + V6d/V6e/V11 deps
+      rewired; packing research note pivoted (frame fields deferred, CVT
+      ranked first, tet FE default claim).
+
+  - id: M1
+    title: Probe hardening + CAD-tag BC/probe + health gates
+    status: in_progress
+    deps: [M0, V3b]
+    scope: [apps/testlab/, docs/dag/interfaces.md, tests/fixtures/parts/]
+    note: >
+      Face-mean tip on load/CAD face (not global max); reaction-sum + free
+      residual + orphan checks; status solve_suspect when health fails;
+      scorecard stub. BC/probe by BRep face tags preferred over mesh index.
+
+  - id: M2
+    title: "Min scorecard: edge Hausdorff/h, normal dev, DOF, accuracy, quality"
+    status: todo
+    deps: [M1, V1b]
+    scope: [src/geom/, apps/testlab/, src/mesh/]
+    note: >
+      Five numbers + residual gate per run (ADR-0023 §5). Chordal efficiency
+      e = d_actual/(h²κ/8) on feature edges. Wire into results.jsonl + warehouse.
+
+  - id: M3
+    title: Sharp-only edge protect + seam skip + wall tangential project
+    status: todo
+    deps: [M0, V1b, V6c]
+    scope: [src/geom/, src/mesh/]
+    note: >
+      Classify CadEdge sharp/smooth/seam; protect only sharp; OCC seams never
+      protected; smooth-face nodes slide + GeomAPI project (ADR-0023 §4).
+
+  - id: M4
+    title: Sizing N_pred + h_min floor + over_budget diagnosis
+    status: todo
+    deps: [M0, V4]
+    scope: [src/pipeline/, src/mesh/, apps/testlab/]
+    note: >
+      N_pred ≈ C∫dV/h³ before mesh; if N_pred over tier → sizing bug; if
+      N_actual≫N_pred → mesher. Floor: suppress micro-features below h_min
+      (virtual topology) instead of global h collapse. Tier kill ~2× DOF.
+
+  - id: M5
+    title: "VEM gate: beat hybrid_zoo on plate_hole + cylinder before headline"
+    status: todo
+    deps: [M2, M3]
+    scope: [src/fea/, src/mesh/, bench/campaigns/, docs/]
+    note: >
+      Promote poly VEM to primary claim only when energy/DOF and SCF beat
+      hybrid_zoo on frozen refs for plate_hole and cylinder. Until then
+      "also ships polyhedra". Prefer clipped/restricted CVT cells over
+      dual-of-tet when implementing poly export.

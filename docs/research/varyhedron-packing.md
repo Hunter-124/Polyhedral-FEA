@@ -1,6 +1,7 @@
 # Varyhedron packing — algorithm survey (V5)
 
-- Status: accepted for v1 path (2026-07-12)
+- Status: accepted for v1 path (2026-07-12); **ranking pivoted** by
+  [ADR-0023](../decisions/0023-measure-first-tet-primary-cvt-path.md)
 - Related: [ADR-0021](../decisions/0021-varyhedron-packing.md), [ADR-0020](../decisions/0020-brep-volume-meshing.md),
   [ADR-0019](../decisions/0019-mixed-fe-vem-adaptive-order-core.md), [ADR-0002](../decisions/0002-license-bsd3.md)
 - Microbench: [`bench/packing/run_packing_microbench.py`](../../bench/packing/run_packing_microbench.py)
@@ -12,14 +13,39 @@ can reimplement under BSD-3 vs wrap as optional plugins.
 
 ---
 
+## 0. Normative ranking (ADR-0023 — do not ignore)
+
+**Substrate to keep:** protected seeds + graded tet scaffold + live BRep oracle
+(sizing/snapping/conformity query OCC throughout). Algorithm family is
+secondary to the oracle property.
+
+| Rank | Family | Role for us |
+| --- | --- | --- |
+| 1 | **Weighted restricted CVT** + clipped Voronoi (Yan–Wang–Lévy; Geogram BSD-3) | Target seed relaxation + **polyhedra = clipped cells** (skip fragile dual for interior) |
+| 2 | Lattice + clip | Fast bulk fallback |
+| 3 | Advancing front | Boundary layers only if we invest later |
+| 4 | Raw bubble packing | **Keep seeds**; replace dynamics with CVT iterations |
+| deferred | Frame-field hex-dominant | Multi-year robustness swamp — research, not core bet |
+| gated | Dual-of-tet → VEM | Ship as poly export only; **headline only if M5 gate** beats hybrid_zoo |
+
+**Protect only sharp CAD edges** (G0). OCC seams and smooth dihedrals must not
+get protecting balls. Walls = free-sliding nodes + tangential smooth + surface
+project.
+
+**Measure before packing loops:** probes, CAD-tagged BC/probe, chordal
+efficiency + normal deviation (program nodes M1–M2). Wireframes are artifacts,
+not rewards.
+
+---
+
 ## 1. Goals (from ADR-0021)
 
 | Goal | Implication for packing |
 | --- | --- |
-| Clean CAD edge *profiles* within element budget | Boundary seeds / protecting balls along edges; residual metric later (V6b) |
-| Variable polyhedra, not layered N-hedra | Interior cells come from packing or dual-of-tet, not Cartesian LEB layers |
-| VEM on irregular polys, FE on zoo cells | Dual/cluster output may stay non-hex; no need for pure-hex v1 |
-| BSD-3 core | Prefer reimplementation of *ideas*; AGPL meshing cores stay out of `src/` |
+| Clean CAD edge *profiles* within element budget | Protecting balls on **sharp** edges only; residual metrics M2 |
+| Variable polyhedra, not layered N-hedra | Prefer clipped CVT cells; dual-of-tet is fallback/legacy idea |
+| Tet FE default claim; VEM gated | Poly export optional until M5 |
+| BSD-3 core | Geogram/Shewchuk/Verdict OK; Gmsh/CGAL/TetGen code stay plugins |
 
 ---
 

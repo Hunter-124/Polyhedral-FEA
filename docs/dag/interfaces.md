@@ -233,7 +233,7 @@ Written by `scripts/write_grok_handoff.py` after analyze (ADR-0022,
   "pareto": "bench/campaigns/varyhedron-short-1/PARETO.md",
   "results": "bench/campaigns/varyhedron-short-1/results.jsonl",
   "shots": ["runs/cfg-…/plate_hole/t0/wire.png"],
-  "open_program_nodes": ["V6c", "V11"],
+  "open_program_nodes": ["M1", "M2", "M3", "M4", "M5", "V6d", "V6e", "V10c", "V11"],
   "mode": "autonomous",           // autonomous | supervised
   "max_turns": 80
 }

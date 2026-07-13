@@ -112,7 +112,11 @@ Typical health gates (see interfaces + harness):
 - Free residual relative ≤ threshold (e.g. \(10^{-6}\) direct)
 - Reaction sum error ≤ threshold (e.g. 5%)
 - Zero orphan nodes
-- Load/select face area ≈ expected CAD face area **±2%** (loud fail)
+- Load/select face area ≈ expected CAD face area **±2%** (loud fail). Fixture
+  values today: **cylinder** top \(\pi R^2 \approx 7.854\times 10^{-3}\,\mathrm{m}^2\);
+  **plate_hole** x-max end \(H\times t = 0.1\times 0.01 = 0.001\,\mathrm{m}^2\).
+  **sphere** (polar-cap mesh-centroid box) and **icecream_cone** (fused multi-face)
+  omit `expected_area` until BRep face tags ([brep-face-tag-bc.md](brep-face-tag-bc.md)).
 - Hard-kill ~**2×** tier DOF; wall-clock kills (e.g. 15 / 15 / 45 min tiers) + pack ceiling
 
 **Over-budget diagnosis:**

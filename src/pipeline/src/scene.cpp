@@ -1234,10 +1234,10 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         for (const auto& s : sites) {
             positions.push_back(s.pos);
         }
-        // M5: try global surface halfspaces (good for convex Ω). If most cells
-        // die (non-convex / holes), fall back to AABB. Always snap boundary
-        // vertices onto the surface within a budget so load faces track the
-        // solid better than the raw bbox.
+        // M5 dual path:
+        //  1) Domain halfspaces when they keep enough cells (convex Ω) → load_area
+        //  2) Else AABB. Always polish boundary verts onto surface.
+        // Prefer domain when it yields health; SE may need denser free sites.
         mesh::DomainClipParams dclip;
         dclip.surface = model.surface.triangles.empty() ? nullptr : &model.surface;
         auto exp = mesh::export_clipped_voronoi(box, positions, dclip);
@@ -1262,10 +1262,7 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                     }
                 }
             }
-            // AABB fallback needs a larger snap budget (vertices can sit on the
-            // bbox far from the solid). Domain-clipped meshes only need a light
-            // polish. Cap travel so VEM cells stay non-inverted.
-            const double snap_budget = domain_ok ? 0.35 * h : 1.25 * h;
+            const double snap_budget = domain_ok ? 0.5 * h : 1.5 * h;
             for (std::size_t vi = 0; vi < exp.mesh.vertices.size(); ++vi) {
                 if (!is_bnd[vi]) {
                     continue;

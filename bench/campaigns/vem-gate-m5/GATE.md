@@ -36,19 +36,22 @@ so we fall back to AABB + boundary snap (insufficient for load face area).
 
 ## Substrate landed (this pass)
 
-- `export_clipped_voronoi(..., DomainClipParams)` — global surface halfspaces
-  (majority-vote winding), drop sites outside; domain faces `vglobal=-2`
+- `export_clipped_voronoi(..., DomainClipParams)` — **supporting** surface
+  halfspaces only (all sites on keep side; hole walls skipped), majority-vote
+  winding; domain faces `vglobal=-2`
 - Convex-fail fallback: if `n_cells < max(4, n_sites/3)` → AABB export
 - Boundary-vertex snap to `TriSurface` (larger budget on AABB fallback)
 - Free wall sites soft-inset (never land on surface — zero-thickness cells)
 - `poly_mesh_to_vem` drops/repairs non-positive volume debris
+- `plate_hole.case.json`: `normal_min_dot=0.7` (match cylinder load filter)
 
 ## Next to flip M5 → done
 
-1. **Plate (non-convex):** true restricted Voronoi vs volume tet mesh (or
-   clip only outer envelope + explicit hole walls as cylinders), not global
-   halfspaces of a holed solid
-2. **Cylinder SE:** denser free sites / more Lloyd / restore SE ≤ hybrid while
-   keeping `load_area_ok` (first gate had SE 0.087 without domain clip)
+1. **Plate load_area:** supporting halfspaces still leave la_rel~1.0 — need
+   true RVD ∩ tet volume mesh (or explicit hole cylinder clip + outer
+   envelope), not convex envelope alone
+2. **Cylinder SE:** keep `load_area_ok` (la_rel~0.05) while recovering SE ≤
+   hybrid 0.13 (AABB-only first gate had SE 0.087). Denser free sites at 0.65h
+   improved SE slightly but **broke** load_area — need a gentler densify
 3. Re-run; require `health_ok` + lower primary rel_err than hybrid_zoo on **both**
    plate_hole (SCF) and cylinder (SE)

@@ -70,11 +70,48 @@ this is the accumulated simulation data the feedback loop mines.
   "mesh_ms": 412, "solve_ms": 1890,
   "n_elems": 31956, "n_nodes": 11935, "n_dof": 35805,
   "quality": { "M1max": 1.0e-11, "M2max": 0.36, "M6": 0.17, "score": 0.42 },
-  "answers": { "sigma_max": 9.12e7, "tip_deflection": null },
+  "answers": {
+    "sigma_max": 9.12e7,
+    "tip_deflection": 1.2e-4,       // PRIMARY: face-mean |u| on load select box
+    "tip_deflection_max": 1.5e-4,   // diagnostic global max |u| only
+    "n_probe_nodes": 48,
+    "n_load_faces": 12
+  },
+  "health": {
+    "free_residual_rel": 1.2e-12,   // ||(Ku-f)_free|| / ||f||
+    "reaction_sum_err": 0.01,       // |F+R| / max(|F|,eps); free force vs reactions
+    "n_orphans": 0,
+    "n_bc_dofs": 36,
+    "ok": true
+  },
+  "scorecard": {
+    "edge_hausdorff_over_h": 0.04,  // null without CAD
+    "normal_dev_deg_max": 8.2,      // null if unavailable
+    "n_dof": 35805,
+    "accuracy_rel_err": 0.02,       // first metric rel_err
+    "min_element_quality": 0.17,    // quality.M6 when present
+    "solve_residual_rel": 1.2e-12,
+    "health_ok": true
+  },
   "accuracy": { "metric": "scf", "value": 3.06, "truth": 3.0, "rel_err": 0.02 },
-  "status": "ok"                   // ok | mesh_fail | solve_fail | over_budget
+  "status": "ok"  // ok | solve_suspect | mesh_fail | solve_fail | over_budget
 }
 ```
+
+**Probe primary.** Displacement metrics (`max_displacement`, `tip_deflection`,
+`mean_ux_on_face`, `mean_uz_on_face`) use the **face-mean** of |u| (or signed
+dominant-load component) over unique nodes of boundary faces whose centroids
+fall in the first load select box — never global max as the primary answer.
+Global max is recorded only as `tip_deflection_max` for diagnostics. If no
+faces match, fall back to nodes in the load box; if still empty, tip = 0
+(fail-closed). Stress probes (`max_von_mises`, SCF) still use global max VM.
+
+**Health.** After every successful mesh+solve the harness rebuilds `K`,
+forms `r = Ku − f`, and reports free residual and reaction balance. Gates:
+`free_residual_rel ≤ 1e-6` (direct), `reaction_sum_err ≤ 0.05`,
+`n_orphans == 0`. Failure → `health.ok = false`, `status = solve_suspect`,
+accuracy scores zeroed (measured values still recorded for debug). Analyze
+should filter on `status == "ok"` and/or `health.ok`.
 
 `geom_class` is computed from the part geometry (not the config) so the
 feedback loop can learn per-condition presets: fraction of surface area with

@@ -52,12 +52,15 @@ add_executable(polymesh_tests
     test_hp_driver.cpp
     test_d6_bench_smoke.cpp
     testlab_selfcheck.cpp
+    test_probe_util.cpp
 
     support/structured_mesh.cpp
     support/mms.cpp
 )
 # Headless pipeline is tested via libpipeline — no GUI / display required.
-target_include_directories(polymesh_tests PRIVATE .)
+target_include_directories(polymesh_tests PRIVATE .
+    ${CMAKE_SOURCE_DIR}/apps/testlab
+)
 target_link_libraries(polymesh_tests
     PRIVATE geom mesh adapt fea bench_harness pipeline Catch2::Catch2WithMain polymesh_warnings
 )

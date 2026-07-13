@@ -6,6 +6,7 @@
 // Anti-cheat: reference truths are loaded only from paths declared in case
 // files (bench/reference/*). No numeric answers are embedded here.
 
+#include "fea/assembly.hpp"
 #include "fea/backend.hpp"
 #include "fea/boundary_faces.hpp"
 #include "fea/material.hpp"
@@ -15,12 +16,16 @@
 #include "fea/traction.hpp"
 #include "fea/vtu.hpp"
 #include "fea/zz.hpp"
+#include "geom/cad_topology.hpp"
 #include "mesh/surface_metrics.hpp"
 #include "pipeline/scene.hpp"
+#include "probe_util.hpp"
 
 #include <nlohmann/json.hpp>
 
 #include <Eigen/Core>
+#include <Eigen/Geometry>
+#include <Eigen/SparseCore>
 
 #include <algorithm>
 #include <array>
@@ -33,6 +38,7 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <map>
 #include <mutex>
 #include <optional>
@@ -49,6 +55,8 @@ using json = nlohmann::json;
 namespace fea = polymesh::fea;
 namespace pipeline = polymesh::pipeline;
 namespace mesh = polymesh::mesh;
+namespace geom = polymesh::geom;
+namespace tlab = polymesh::testlab;
 
 namespace {
 
@@ -757,25 +765,150 @@ Eigen::VectorXd make_loads(const fea::NodalMesh& mesh, const std::vector<LoadSpe
 }
 
 struct ProbeAnswers {
-    double sigma_max = 0.0; // max von Mises, Pa
-    double tip_deflection = 0.0; // max |u|, m
+    double sigma_max = 0.0;          // global max von Mises (diagnostic / SCF)
+    double tip_deflection = 0.0;     // PRIMARY: face-mean |u| on tip/load faces
+    double tip_deflection_max = 0.0; // diagnostic: global max |u|
+    double mean_u_component = 0.0;   // signed mean of dominant load-dir component
+    double mean_ux = 0.0;            // signed mean ux on probe nodes
+    double mean_uz = 0.0;            // signed mean uz on probe nodes
+    int dominant_load_axis = 2;      // 0=x,1=y,2=z
+    double reaction_sum_err = 0.0;   // |F+R| / max(|F|,eps) relative
+    double free_residual_rel = 0.0;  // ||(Ku-f)_free|| / ||f||
+    int n_orphan_nodes = 0;          // nodes never referenced by any element
+    int n_bc_dofs = 0;
+    int n_load_faces = 0;
+    int n_probe_nodes = 0;
 };
 
+int count_orphan_nodes(const fea::NodalMesh& mesh) {
+    if (mesh.nodes.empty()) {
+        return 0;
+    }
+    std::vector<char> used(mesh.nodes.size(), 0);
+    for (const auto& el : mesh.elements) {
+        for (const auto ni : el.nodes) {
+            if (ni < used.size()) {
+                used[ni] = 1;
+            }
+        }
+    }
+    int n = 0;
+    for (const char u : used) {
+        if (!u) {
+            ++n;
+        }
+    }
+    return n;
+}
+
+/// Unique nodes on boundary faces whose centroids fall in `box`.
+std::vector<std::uint32_t> nodes_on_faces_in_box(const fea::NodalMesh& mesh,
+                                                 const Box3& box,
+                                                 int* n_faces_out = nullptr) {
+    const auto all_faces = free_faces_as_surface(mesh);
+    std::set<std::uint32_t> unique;
+    int n_faces = 0;
+    for (const auto& face : all_faces) {
+        if (!box.contains(face_centroid(mesh, face))) {
+            continue;
+        }
+        ++n_faces;
+        for (const auto ni : face.nodes) {
+            unique.insert(ni);
+        }
+    }
+    if (n_faces_out != nullptr) {
+        *n_faces_out = n_faces;
+    }
+    return std::vector<std::uint32_t>(unique.begin(), unique.end());
+}
+
+/// Fallback: unique nodes whose coordinates fall in `box`.
+std::vector<std::uint32_t> nodes_in_box(const fea::NodalMesh& mesh, const Box3& box) {
+    std::vector<std::uint32_t> out;
+    for (std::uint32_t i = 0; i < static_cast<std::uint32_t>(mesh.nodes.size()); ++i) {
+        if (box.contains(mesh.nodes[i])) {
+            out.push_back(i);
+        }
+    }
+    return out;
+}
+
+/// Free residual + reaction force balance (health gates for accuracy trust).
+void compute_solve_health(const fea::NodalMesh& mesh, const fea::Material& mat,
+                          const fea::Dirichlet& bc, const Eigen::VectorXd& f,
+                          const Eigen::VectorXd& u, ProbeAnswers& a) {
+    const auto K = fea::assemble_stiffness(mesh, mat);
+    const Eigen::VectorXd r = K * u - f;
+
+    double free_r2 = 0.0;
+    double f2 = 0.0;
+    Eigen::Vector3d F_sum = Eigen::Vector3d::Zero();
+    Eigen::Vector3d R_sum = Eigen::Vector3d::Zero();
+    const Eigen::Index n_dof = u.size();
+    for (Eigen::Index dof = 0; dof < n_dof; ++dof) {
+        f2 += f[dof] * f[dof];
+        const int axis = static_cast<int>(dof % 3);
+        if (bc.dof_values.contains(dof)) {
+            R_sum[axis] += r[dof];
+        } else {
+            free_r2 += r[dof] * r[dof];
+            F_sum[axis] += f[dof];
+        }
+    }
+    constexpr double kEps = 1e-30;
+    a.free_residual_rel = std::sqrt(free_r2) / std::max(std::sqrt(f2), kEps);
+    // Equilibrium: sum(F_applied on free) + sum(reactions on constrained) ≈ 0.
+    a.reaction_sum_err =
+        (F_sum + R_sum).norm() / std::max(F_sum.norm(), kEps);
+    a.n_bc_dofs = static_cast<int>(bc.dof_values.size());
+}
+
 ProbeAnswers compute_probes(const fea::NodalMesh& mesh, const fea::Material& mat,
-                            const Eigen::VectorXd& u) {
+                            const Eigen::VectorXd& u,
+                            const std::vector<LoadSpec>& loads,
+                            const fea::Dirichlet& bc, const Eigen::VectorXd& f) {
     ProbeAnswers a;
+    a.n_orphan_nodes = count_orphan_nodes(mesh);
+    a.tip_deflection_max = tlab::global_max_displacement_mag(u, mesh.nodes.size());
+
     const auto stress = fea::recover_nodal_stress(mesh, mat, u);
     for (std::size_t i = 0; i < stress.size(); ++i) {
         a.sigma_max = std::max(a.sigma_max, fea::von_mises(stress[i]));
-        const double un =
-            u.segment<3>(3 * static_cast<Eigen::Index>(i)).norm();
-        a.tip_deflection = std::max(a.tip_deflection, un);
     }
+
+    // PRIMARY tip probe: face-mean |u| on first load-box face set.
+    std::vector<std::uint32_t> probe_nodes;
+    if (!loads.empty()) {
+        a.dominant_load_axis = tlab::dominant_axis(loads.front().traction);
+        int n_faces = 0;
+        probe_nodes = nodes_on_faces_in_box(mesh, loads.front().box, &n_faces);
+        a.n_load_faces = n_faces;
+        if (probe_nodes.empty()) {
+            // Fall back to nodes in the load box — never global max as primary.
+            probe_nodes = nodes_in_box(mesh, loads.front().box);
+        }
+    }
+    a.n_probe_nodes = static_cast<int>(probe_nodes.size());
+    if (!probe_nodes.empty()) {
+        a.tip_deflection = tlab::face_mean_displacement_mag(u, probe_nodes);
+        a.mean_u_component =
+            tlab::face_mean_displacement_component(u, probe_nodes, a.dominant_load_axis);
+        a.mean_ux = tlab::face_mean_displacement_component(u, probe_nodes, 0);
+        a.mean_uz = tlab::face_mean_displacement_component(u, probe_nodes, 2);
+    } else {
+        // No load selector match at all — leave tip_deflection at 0 so the
+        // metric fails closed rather than reporting a global-max lie.
+        a.tip_deflection = 0.0;
+    }
+
+    compute_solve_health(mesh, mat, bc, f, u, a);
     return a;
 }
 
 double evaluate_probe(const ProbeSpec& probe, const ProbeAnswers& a) {
     // Canonical kinds (interfaces.md §5) plus short aliases used in hand-calcs.
+    // Displacement probes use face-mean primary (not global max).
     if (probe.kind == "max_von_mises" || probe.kind == "max_vm") {
         return a.sigma_max;
     }
@@ -785,12 +918,113 @@ double evaluate_probe(const ProbeSpec& probe, const ProbeAnswers& a) {
         }
         return a.sigma_max / probe.nominal;
     }
-    if (probe.kind == "max_displacement" || probe.kind == "tip_deflection" ||
-        probe.kind == "mean_ux_on_face" || probe.kind == "mean_uz_on_face") {
-        // Face-mean probes collapse to max |u| for smoke/cantilever fixtures.
-        return a.tip_deflection;
+    if (probe.kind == "max_displacement" || probe.kind == "tip_deflection") {
+        return a.tip_deflection; // face-mean |u| on load select box
+    }
+    if (probe.kind == "mean_ux_on_face") {
+        // Prefer signed dominant-load component when traction is primarily x.
+        return (a.dominant_load_axis == 0) ? a.mean_u_component : a.mean_ux;
+    }
+    if (probe.kind == "mean_uz_on_face") {
+        return (a.dominant_load_axis == 2) ? a.mean_u_component : a.mean_uz;
     }
     throw std::runtime_error("unknown probe kind '" + probe.kind + "'");
+}
+
+/// Optional geometry scorecard fields (null when CAD/surface unavailable).
+json compute_scorecard_geom(const pipeline::Model& model, const fea::NodalMesh& mesh,
+                            double h) {
+    json edge_hd = nullptr;
+    json normal_dev = nullptr;
+
+    if (model.cad && !model.cad->empty() && h > 0.0) {
+        try {
+            const geom::CadTopology topo = geom::extract_topology(*model.cad, 8);
+            if (!topo.empty()) {
+                // Boundary nodes as crude sample set vs CAD edge polylines.
+                std::set<std::uint32_t> bnodes;
+                for (const auto& face : free_faces_as_surface(mesh)) {
+                    for (const auto ni : face.nodes) {
+                        bnodes.insert(ni);
+                    }
+                }
+                std::vector<Eigen::Vector3d> samples;
+                samples.reserve(bnodes.size());
+                for (const auto ni : bnodes) {
+                    samples.push_back(mesh.nodes[ni]);
+                }
+                if (!samples.empty()) {
+                    const double hd = geom::edge_profile_hausdorff(topo, samples);
+                    edge_hd = hd / h;
+                }
+            }
+        } catch (...) {
+            edge_hd = nullptr;
+        }
+    }
+
+    // v1 normal deviation: max angle (deg) between boundary face normal and a
+    // nearby, orientation-compatible model.surface triangle. Skip faces with
+    // no good match; leave null if nothing reliable is found.
+    if (!model.surface.triangles.empty() && !model.surface.vertices.empty() && h > 0.0) {
+        try {
+            const double max_match_d2 = (2.0 * h) * (2.0 * h);
+            // Require at least ~cos(30°) alignment to count as same-face match.
+            constexpr double kMinAbsDot = 0.866; // cos 30°
+            double max_deg = 0.0;
+            bool any = false;
+            for (const auto& face : free_faces_as_surface(mesh)) {
+                if (face.nodes.size() < 3) {
+                    continue;
+                }
+                const Eigen::Vector3d& p0 = mesh.nodes[face.nodes[0]];
+                const Eigen::Vector3d& p1 = mesh.nodes[face.nodes[1]];
+                const Eigen::Vector3d& p2 = mesh.nodes[face.nodes[2]];
+                const Eigen::Vector3d e01 = p1 - p0;
+                const Eigen::Vector3d e02 = p2 - p0;
+                Eigen::Vector3d fn = e01.cross(e02);
+                const double fn_n = fn.norm();
+                if (!(fn_n > 1e-30)) {
+                    continue;
+                }
+                fn /= fn_n;
+                const Eigen::Vector3d c = face_centroid(mesh, face);
+                double best_abs_dot = -1.0;
+                for (const auto& tri : model.surface.triangles) {
+                    const Eigen::Vector3d& a = model.surface.vertices[tri[0]];
+                    const Eigen::Vector3d& b = model.surface.vertices[tri[1]];
+                    const Eigen::Vector3d& c3 = model.surface.vertices[tri[2]];
+                    const Eigen::Vector3d tc = (a + b + c3) / 3.0;
+                    if ((tc - c).squaredNorm() > max_match_d2) {
+                        continue;
+                    }
+                    const Eigen::Vector3d ab = b - a;
+                    const Eigen::Vector3d ac = c3 - a;
+                    const Eigen::Vector3d sn = ab.cross(ac);
+                    const double snn = sn.norm();
+                    if (!(snn > 1e-30)) {
+                        continue;
+                    }
+                    best_abs_dot = std::max(best_abs_dot, std::abs(fn.dot(sn / snn)));
+                }
+                // No nearby co-oriented surface triangle → skip (do not report 90°).
+                if (best_abs_dot < kMinAbsDot) {
+                    continue;
+                }
+                const double cosang = std::clamp(best_abs_dot, 0.0, 1.0);
+                const double deg = std::acos(cosang) * (180.0 / 3.14159265358979323846);
+                max_deg = std::max(max_deg, deg);
+                any = true;
+            }
+            if (any) {
+                normal_dev = max_deg;
+            }
+        } catch (...) {
+            normal_dev = nullptr;
+        }
+    }
+
+    return {{"edge_hausdorff_over_h", edge_hd}, {"normal_dev_deg_max", normal_dev}};
 }
 
 json geom_class_of(const pipeline::Model& model, double h_ref) {
@@ -953,11 +1187,31 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
 
         beat.set_phase("recover", 0.5);
 
-        const ProbeAnswers ans = compute_probes(vol.mesh, mat, u);
+        const ProbeAnswers ans =
+            compute_probes(vol.mesh, mat, u, part.loads, bc, loads);
         out.line["answers"] = {{"sigma_max", ans.sigma_max},
-                               {"tip_deflection", ans.tip_deflection}};
+                               {"tip_deflection", ans.tip_deflection},
+                               {"tip_deflection_max", ans.tip_deflection_max},
+                               {"mean_u_component", ans.mean_u_component},
+                               {"n_probe_nodes", ans.n_probe_nodes},
+                               {"n_load_faces", ans.n_load_faces}};
+
+        // Health gates: residual / reaction / orphans. Fail-closed for accuracy.
+        constexpr double kFreeResidTolDirect = 1e-6;
+        constexpr double kReactionSumTol = 0.05;
+        const bool health_ok =
+            (ans.n_orphan_nodes == 0) &&
+            (ans.free_residual_rel <= kFreeResidTolDirect) &&
+            (ans.reaction_sum_err <= kReactionSumTol);
+        out.line["health"] = {{"free_residual_rel", ans.free_residual_rel},
+                              {"reaction_sum_err", ans.reaction_sum_err},
+                              {"n_orphans", ans.n_orphan_nodes},
+                              {"n_bc_dofs", ans.n_bc_dofs},
+                              {"ok", health_ok}};
 
         // Accuracy vs hand-calc truths (loaded from bench/reference via the case).
+        // When health fails, still record measured answers/rel_err but zero scores
+        // so ranking never trusts a singular / residual-broken solve.
         double acc_sum = 0.0;
         int acc_n = 0;
         json acc_detail = json::array();
@@ -968,14 +1222,15 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
                 (std::abs(truth) > 0.0) ? std::abs(measured - truth) / std::abs(truth)
                                         : std::abs(measured);
             const double tol = (m.tol > 0.0) ? m.tol : 1e-12;
-            const double s = 1.0 / (1.0 + rel / tol);
+            const double s = health_ok ? (1.0 / (1.0 + rel / tol)) : 0.0;
             acc_sum += s;
             ++acc_n;
             acc_detail.push_back({{"metric", m.name},
                                   {"value", measured},
                                   {"truth", truth},
                                   {"rel_err", rel},
-                                  {"score", s}});
+                                  {"score", s},
+                                  {"trusted", health_ok}});
         }
         out.accuracy_score = (acc_n > 0) ? (acc_sum / static_cast<double>(acc_n)) : 0.0;
         // Primary metric for results.jsonl (first metric or aggregate).
@@ -989,9 +1244,30 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
                                     {"rel_err", nullptr}};
         }
 
+        // Five-metric campaign scorecard (Q4).
+        json scorecard = compute_scorecard_geom(model, vol.mesh, h);
+        scorecard["n_dof"] = n_dof;
+        if (!acc_detail.empty() && acc_detail.front().contains("rel_err")) {
+            scorecard["accuracy_rel_err"] = acc_detail.front()["rel_err"];
+        } else {
+            scorecard["accuracy_rel_err"] = nullptr;
+        }
+        if (out.line.contains("quality") && out.line["quality"].contains("M6")) {
+            scorecard["min_element_quality"] = out.line["quality"]["M6"];
+        } else if (out.line.contains("quality") && out.line["quality"].contains("score")) {
+            scorecard["min_element_quality"] = out.line["quality"]["score"];
+        } else {
+            scorecard["min_element_quality"] = nullptr;
+        }
+        scorecard["solve_residual_rel"] = ans.free_residual_rel;
+        scorecard["health_ok"] = health_ok;
+        out.line["scorecard"] = std::move(scorecard);
+
         out.line["mesh_ms"] = out.mesh_ms;
         out.line["solve_ms"] = out.solve_ms;
-        out.line["status"] = "ok";
+        // solve_suspect: residual/reaction/orphan gate failed — answers recorded
+        // but accuracy scores zeroed so analyze can filter untrusted runs.
+        out.line["status"] = health_ok ? "ok" : "solve_suspect";
 
         if (!warehouse_run_dir.empty()) {
             write_warehouse_run(warehouse_run_dir, out.line, &vol);

@@ -12,15 +12,15 @@
 
 | Status | Nodes | Notes |
 |--------|-------|--------|
-| **Done** | **M0–M14 (all), G0, V6e, V10c** | Measure path complete; sphere M12/M13 closed; GUI Test Lab measure-first ready |
-| **Next** | **G1** | Vendor Geogram predicates + ConvexCell (multi-day) → G2–G4 → M5 |
+| **Done** | **M0–M14 (all), G0–G1, V6e, V10c** | Measure path + Geogram PSM vendor complete |
+| **Next** | **G2** | Lloyd CVT + \(1/h^3\) density (same \(h\) as N_pred) → G3–G4 → M5 |
 | **Deferred** | icecream face-tags, V6d p>1, V11 packing wins, M5 VEM gate | Need G* / face-tag design |
 
 Order locked (ADR-0024 Q2): **freeze (done) → wall project (done) → CVT**. Dual
 hard-block until G4. Packing “win” loops measure **delta vs M9 freeze only**.
 Never score raw nodal max stress.
 
-**Next session handoff:** [`docs/plans/SESSION_HANDOFF_g1-cvt.md`](plans/SESSION_HANDOFF_g1-cvt.md).
+**Handoff:** [`docs/plans/SESSION_HANDOFF_g1-cvt.md`](plans/SESSION_HANDOFF_g1-cvt.md).
 
 **Post-M10 smoke (2026-07-13):** cylinder+plate_hole × varyhedron+hybrid_zoo
 h_scale=5 → **4/4 `ok`**, `health_ok` + `load_area_ok` true; cylinder SE ~0.0034
@@ -46,6 +46,10 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-07-13: **G1 done** — vendored Geogram Delaunay+Predicates PSMs
+  (`third_party/geogram/`, NOTICE pins), `POLYMESH_WITH_GEOGRAM=ON`,
+  `mesh::clip_convex_cell` facade, Catch2 unit-cube smoke (vol=1, midplane
+  half-cell). Full suite green. Next: G2 Lloyd + density.
 - 2026-07-13: **M12 + M13 closed** — sphere polar cap `expected_area=π×10⁻³`
   (`z_p=0.04`, `normal_min_dot=0.7`); plate/cylinder already guarded. Icecream
   multi-face omits area (15–20% box swing) → face-tag design only. M13: full

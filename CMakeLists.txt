@@ -21,6 +21,8 @@ option(POLYMESH_WITH_OCC "Build B-rep/STEP support via OpenCASCADE (ADR-0001)" O
 option(POLYMESH_WITH_CUDA "Build CUDA backends for parallelizable kernels (ADR-0008)" OFF)
 option(POLYMESH_WITH_OPENMP "Use OpenMP for parallel assembly / mesh / recovery when available" ON)
 option(POLYMESH_WITH_GUI "Build the desktop GUI (GLFW + Dear ImGui + OpenGL)" ON)
+option(POLYMESH_WITH_GEOGRAM
+    "Vendor Geogram PSM (ConvexCell + predicates) for restricted CVT (G1/ADR-0025)" ON)
 option(POLYMESH_BUILD_TESTS "Build the test suite" ON)
 # Host CPU ISA tuning. Default OFF: on some GCC+Eigen combos, -march=x86-64-v3
 # or -march=native has corrupted heaps (double free) in patch/Tier-0 tests.
@@ -108,6 +110,14 @@ if(POLYMESH_WITH_OPENMP)
     else()
         message(STATUS "OpenMP: not found — serial hot paths (build still OK)")
     endif()
+endif()
+
+# --- third_party (vendored) ---
+if(POLYMESH_WITH_GEOGRAM)
+    add_subdirectory(third_party/geogram)
+    message(STATUS "Geogram: vendored PSM (ConvexCell + predicates) enabled")
+else()
+    message(STATUS "Geogram: OFF (POLYMESH_WITH_GEOGRAM=OFF) — no clipped-cell kernel")
 endif()
 
 # --- libraries (core) ---

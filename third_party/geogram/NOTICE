@@ -1,0 +1,49 @@
+Geogram (vendored subset for PolyMesh / Polyhedral-FEA)
+=======================================================
+
+This tree vendors BSD-3-Clause sources extracted from Bruno Lévy's Geogram
+project (Inria / ALICE lineage). We do **not** vendor the full Geogram tree
+(GUI, unused formats, Graphite, etc.).
+
+Pinned sources (G1, 2026-07-13)
+------------------------------
+
+1. **Delaunay pluggable software module** (includes ConvexCell + predicates +
+   Delaunay 2D/3D amalgam)
+
+   - Upstream repo: https://github.com/BrunoLevy/geogram.psm.Delaunay
+   - Commit: 0bcf18b30d828a6840cf573220f88d2fdcf18631
+   - Date: 2026-04-17
+   - Message: "Renamed locks (causes problem under Windows, name crash with
+     global variable called lock)"
+   - Files: `delaunay/Delaunay_psm.{h,cpp}`, `delaunay/LICENSE`
+
+2. **Predicates pluggable software module** (standalone exact predicates;
+   also embedded inside the Delaunay PSM)
+
+   - Upstream repo: https://github.com/BrunoLevy/geogram.psm.Predicates
+   - Commit: 0cffbef77312425cffd01bd03c29281bcfba2664
+   - Date: 2025-02-04
+   - Message: "Extracted from geogram 1.9.3"
+   - Files: `predicates/Predicates_psm.{h,cpp}`, `predicates/LICENSE`
+
+3. **Reference full tree** (not copied as product sources; used for study +
+   LICENSE text alignment)
+
+   - Upstream repo: https://github.com/BrunoLevy/geogram
+   - Tag: v1.10.0
+   - Commit: c8529bb00838186938ab31d96008a59b6a892dee
+   - Date: 2026-05-27 / 2026-05-28
+
+License
+-------
+
+All of the above is BSD-3-Clause (see `LICENSE` and per-module LICENSE files).
+PolyMesh remains BSD-3-Clause (ADR-0002). Do not mix AGPL/GPL kernels into this
+default product tree.
+
+Contact (upstream)
+------------------
+
+Bruno Lévy — https://www.inria.fr/fr/bruno-levy
+Inria, Domaine de Voluceau, 78150 Le Chesnay - Rocquencourt, FRANCE

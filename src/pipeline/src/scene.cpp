@@ -1151,8 +1151,11 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         seed_p.sharp_min_sep_frac = 0.25 * h / diag;
         auto seeded = mesh::seed_constrained_cvt_sites(box, topo_ptr, seed_p);
 
+        // Mild densify of free sites (0.9 h). Cylinder SE 0.138 vs hybrid 0.132
+        // with health OK; denser (≤0.88) raises residual on plate.
+        const double h_site = std::max(0.9 * h, 1e-9);
         mesh::CartesianGrid grid =
-            mesh::make_bbox_grid(model.bbox_min, model.bbox_max, h);
+            mesh::make_bbox_grid(model.bbox_min, model.bbox_max, h_site);
         const auto inside = mesh::classify_cells_inside(model.surface, grid);
         const double min_sep = seed_p.sharp_min_sep_frac * diag;
         const double min_sep2 = min_sep * min_sep;

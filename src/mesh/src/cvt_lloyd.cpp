@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <mutex>
 
@@ -137,6 +138,55 @@ void density_mg(const VBW::ConvexCell& cell, const SizeFieldFn& size_at,
     }
 }
 
+/// Neighbour-restricted RVD cell: clip `positions[self]` against sites gathered
+/// from `grid` ring by ring, stopping when the security radius guarantees no
+/// farther site can cut the cell. Produces the exact restricted Voronoi cell
+/// (same as clipping against all sites) in O(neighbours) instead of O(N).
+bool build_rvd_cell_grid(VBW::ConvexCell& cell, const ClipBox& box,
+                         std::span<const Eigen::Vector3d> positions,
+                         std::size_t self, const SiteGrid& grid,
+                         std::vector<std::uint32_t>& ring_buf) {
+    if ((box.max.array() <= box.min.array()).any()) {
+        return false;
+    }
+    cell.clear();
+    cell.init_with_box(box.min.x(), box.min.y(), box.min.z(), box.max.x(),
+                       box.max.y(), box.max.z());
+    const Eigen::Vector3d& s = positions[self];
+    const VBW::vec3 sc = VBW::make_vec3(s.x(), s.y(), s.z());
+    const double g = grid.cell_edge();
+    const int kmax = grid.max_ring();
+    for (int k = 0; k <= kmax; ++k) {
+        ring_buf.clear();
+        grid.ring(s, k, ring_buf);
+        for (std::uint32_t j : ring_buf) {
+            if (static_cast<std::size_t>(j) == self) {
+                continue;
+            }
+            const Eigen::Vector3d d = s - positions[j];
+            if (d.squaredNorm() < 1e-30) {
+                continue;  // coincident — skip (caller should unique sites)
+            }
+            const ClipPlane pl = bisector_keep_site(s, positions[j]);
+            cell.clip_by_plane(VBW::make_vec4(pl.a, pl.b, pl.c, pl.d));
+            if (cell.empty()) {
+                return false;
+            }
+        }
+        if (k >= 1) {
+            // Any unclipped site is at Euclidean distance ≥ k·g; its bisector
+            // sits ≥ k·g/2 from the site. If that exceeds the cell's farthest
+            // vertex, no farther site can cut it — done (security radius).
+            const double R2 = cell.squared_radius(sc);
+            const double dmin = static_cast<double>(k) * g;
+            if (4.0 * R2 <= dmin * dmin) {
+                break;
+            }
+        }
+    }
+    return !cell.empty();
+}
+
 #endif  // POLYMESH_WITH_GEOGRAM
 
 }  // namespace
@@ -240,43 +290,69 @@ CvtLloydResult lloyd_cvt(const ClipBox& domain, std::span<const CvtSite> sites,
     const int max_iters = std::max(params.max_iters, 0);
 
     std::vector<Eigen::Vector3d> next = result.positions;
-    std::vector<Eigen::Vector3d> others;
-    others.reserve(sites.size() > 0 ? sites.size() - 1 : 0);
+
+    // Bucket edge ≈ mean site spacing so a cell's Voronoi neighbours sit within
+    // a couple of Chebyshev rings. Correctness is independent of this value
+    // (security radius exhausts the grid); it only tunes how much pruning helps.
+    const Eigen::Vector3d ext = (domain.max - domain.min).cwiseMax(1e-30);
+    const double box_vol = ext.x() * ext.y() * ext.z();
+    double g_edge = std::cbrt(box_vol / static_cast<double>(std::max<std::size_t>(1, sites.size())));
+    if (!(g_edge > 0.0)) {
+        g_edge = 0.25 * result.stats.domain_diag;
+    }
+    g_edge = std::max(g_edge, 1e-9 * std::max(result.stats.domain_diag, 1e-30));
 
     for (int it = 0; it < max_iters; ++it) {
         double max_move = 0.0;
         double sum_vol = 0.0;
 
-        for (std::size_t i = 0; i < sites.size(); ++i) {
-            if (sites[i].fixed) {
-                next[i] = result.positions[i];
-                continue;
-            }
+        SiteGrid grid;
+        grid.build(result.positions, g_edge);
+        const auto n = static_cast<std::ptrdiff_t>(sites.size());
 
-            others.clear();
-            for (std::size_t j = 0; j < sites.size(); ++j) {
-                if (j != i) {
-                    others.push_back(result.positions[j]);
+#pragma omp parallel
+        {
+            VBW::ConvexCell cell;
+            std::vector<std::uint32_t> ring_buf;
+#pragma omp for schedule(dynamic, 64) reduction(max : max_move) reduction(+ : sum_vol)
+            for (std::ptrdiff_t ii = 0; ii < n; ++ii) {
+                const auto i = static_cast<std::size_t>(ii);
+                if (sites[i].fixed) {
+                    next[i] = result.positions[i];
+                    continue;
                 }
-            }
+                if (!build_rvd_cell_grid(cell, domain, result.positions, i, grid,
+                                         ring_buf)) {
+                    next[i] = result.positions[i];
+                    continue;
+                }
+                cell.compute_geometry();
+                if (cell.empty()) {
+                    next[i] = result.positions[i];
+                    continue;
+                }
 
-            auto centroid = restricted_voronoi_centroid(
-                domain, result.positions[i], others, params.size_at,
-                params.h_floor);
-            if (!centroid.has_value()) {
-                next[i] = result.positions[i];
-                continue;
-            }
+                Eigen::Vector3d c;
+                if (!params.size_at) {
+                    const VBW::vec3 b = cell.barycenter();
+                    c = Eigen::Vector3d(b.x, b.y, b.z);
+                } else {
+                    double mass = 0.0;
+                    Eigen::Vector3d mg = Eigen::Vector3d::Zero();
+                    density_mg(cell, params.size_at, params.h_floor, mass, mg);
+                    if (mass > 0.0 && std::isfinite(mass)) {
+                        c = mg / mass;
+                    } else {
+                        const VBW::vec3 b = cell.barycenter();
+                        c = Eigen::Vector3d(b.x, b.y, b.z);
+                    }
+                }
 
-            // Keep free sites inside the domain box (restricted CVT).
-            Eigen::Vector3d p = *centroid;
-            p = p.cwiseMax(domain.min).cwiseMin(domain.max);
-            max_move = std::max(max_move, (p - result.positions[i]).norm());
-            next[i] = p;
-
-            if (auto cell = restricted_voronoi_cell(domain, result.positions[i],
-                                                    others)) {
-                sum_vol += cell->volume;
+                // Keep free sites inside the domain box (restricted CVT).
+                c = c.cwiseMax(domain.min).cwiseMin(domain.max);
+                max_move = std::max(max_move, (c - result.positions[i]).norm());
+                next[i] = c;
+                sum_vol += cell.volume();
             }
         }
 

@@ -2,6 +2,8 @@
 
 #include "mesh/geogram_clip.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <mutex>
 
 #if defined(POLYMESH_WITH_GEOGRAM) && POLYMESH_WITH_GEOGRAM
@@ -91,6 +93,102 @@ std::optional<ClippedCell> clip_convex_cell(const ClipBox& box,
 
 std::optional<ClippedCell> unit_cube_cell() {
     return clip_convex_cell(ClipBox{}, {});
+}
+
+// ---- SiteGrid (neighbour-restricted Voronoi clipping) -----------------------
+
+void SiteGrid::build(std::span<const Eigen::Vector3d> pts, double cell_edge) {
+    n_pts_ = pts.size();
+    cell_ = (cell_edge > 1e-30) ? cell_edge : 1.0;
+    inv_cell_ = 1.0 / cell_;
+    cell_start_.clear();
+    items_.clear();
+    if (n_pts_ == 0) {
+        nx_ = ny_ = nz_ = 0;
+        max_ring_ = 0;
+        return;
+    }
+
+    Eigen::Vector3d lo = pts[0];
+    Eigen::Vector3d hi = pts[0];
+    for (const auto& p : pts) {
+        lo = lo.cwiseMin(p);
+        hi = hi.cwiseMax(p);
+    }
+    origin_ = lo;
+    const Eigen::Vector3d ext = (hi - lo).cwiseMax(0.0);
+    nx_ = std::max(1, static_cast<int>(std::floor(ext.x() * inv_cell_)) + 1);
+    ny_ = std::max(1, static_cast<int>(std::floor(ext.y() * inv_cell_)) + 1);
+    nz_ = std::max(1, static_cast<int>(std::floor(ext.z() * inv_cell_)) + 1);
+    max_ring_ = std::max({nx_, ny_, nz_});
+
+    const std::size_t ncells = static_cast<std::size_t>(nx_) *
+                               static_cast<std::size_t>(ny_) *
+                               static_cast<std::size_t>(nz_);
+    // Counting sort into CSR: cell_start_ holds per-bucket counts, then offsets.
+    cell_start_.assign(ncells + 1, 0);
+    auto bucket = [&](const Eigen::Vector3d& p) -> std::size_t {
+        const int ix = clampi(static_cast<int>((p.x() - origin_.x()) * inv_cell_), nx_ - 1);
+        const int iy = clampi(static_cast<int>((p.y() - origin_.y()) * inv_cell_), ny_ - 1);
+        const int iz = clampi(static_cast<int>((p.z() - origin_.z()) * inv_cell_), nz_ - 1);
+        return (static_cast<std::size_t>(iz) * static_cast<std::size_t>(ny_) +
+                static_cast<std::size_t>(iy)) *
+                   static_cast<std::size_t>(nx_) +
+               static_cast<std::size_t>(ix);
+    };
+    for (const auto& p : pts) {
+        ++cell_start_[bucket(p) + 1];
+    }
+    for (std::size_t c = 0; c < ncells; ++c) {
+        cell_start_[c + 1] += cell_start_[c];
+    }
+    items_.resize(n_pts_);
+    std::vector<std::uint32_t> cursor(cell_start_.begin(), cell_start_.end() - 1);
+    for (std::size_t i = 0; i < pts.size(); ++i) {
+        const std::size_t c = bucket(pts[i]);
+        items_[cursor[c]++] = static_cast<std::uint32_t>(i);
+    }
+}
+
+void SiteGrid::ring(const Eigen::Vector3d& p, int r, std::vector<std::uint32_t>& out) const {
+    if (n_pts_ == 0 || r < 0) {
+        return;
+    }
+    const int cx = clampi(static_cast<int>((p.x() - origin_.x()) * inv_cell_), nx_ - 1);
+    const int cy = clampi(static_cast<int>((p.y() - origin_.y()) * inv_cell_), ny_ - 1);
+    const int cz = clampi(static_cast<int>((p.z() - origin_.z()) * inv_cell_), nz_ - 1);
+    auto emit = [&](int ix, int iy, int iz) {
+        if (ix < 0 || ix >= nx_ || iy < 0 || iy >= ny_ || iz < 0 || iz >= nz_) {
+            return;
+        }
+        const std::size_t c = (static_cast<std::size_t>(iz) * static_cast<std::size_t>(ny_) +
+                               static_cast<std::size_t>(iy)) *
+                                  static_cast<std::size_t>(nx_) +
+                              static_cast<std::size_t>(ix);
+        for (std::uint32_t k = cell_start_[c]; k < cell_start_[c + 1]; ++k) {
+            out.push_back(items_[k]);
+        }
+    };
+    if (r == 0) {
+        emit(cx, cy, cz);
+        return;
+    }
+    // Chebyshev shell: buckets with max(|dx|,|dy|,|dz|) == r. Walk the six faces
+    // of the (2r+1)^3 cube without revisiting interior cells.
+    for (int dz = -r; dz <= r; ++dz) {
+        const bool z_face = (dz == -r || dz == r);
+        for (int dy = -r; dy <= r; ++dy) {
+            const bool y_face = (dy == -r || dy == r);
+            if (z_face || y_face) {
+                for (int dx = -r; dx <= r; ++dx) {
+                    emit(cx + dx, cy + dy, cz + dz);
+                }
+            } else {
+                emit(cx - r, cy + dy, cz + dz);
+                emit(cx + r, cy + dy, cz + dz);
+            }
+        }
+    }
 }
 
 }  // namespace polymesh::mesh

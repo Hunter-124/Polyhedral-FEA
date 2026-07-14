@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <map>
 #include <unordered_map>
@@ -508,10 +509,65 @@ bool tet_keep_planes(const DomainTet& tet, const Eigen::Vector3d& hint,
     return true;
 }
 
-bool build_cell_tet(VBW::ConvexCell& cell, const ClipBox& box,
-                    const Eigen::Vector3d& site,
-                    std::span<const Eigen::Vector3d> all_sites, std::size_t self,
-                    const ClipPlane tet_planes[4], std::size_t& n_clips) {
+/// Build the (bisector-only) restricted Voronoi cell of `pos[self]` using a
+/// spatial grid + security radius, and record the neighbour site indices that
+/// were clipped against plus the cell radius `Ri` (max vertex distance from the
+/// site). The neighbour set is a superset of the true Voronoi neighbours, which
+/// is all we need: extra bisectors that miss V_i ∩ tet never cut it.
+bool voronoi_neighbours(VBW::ConvexCell& cell, const ClipBox& box,
+                        std::span<const Eigen::Vector3d> pos, std::size_t self,
+                        const SiteGrid& grid, std::vector<std::uint32_t>& nbr,
+                        std::vector<std::uint32_t>& ring_buf, double& Ri) {
+    nbr.clear();
+    Ri = 0.0;
+    if ((box.max.array() <= box.min.array()).any()) {
+        return false;
+    }
+    cell.clear();
+    cell.init_with_box(box.min.x(), box.min.y(), box.min.z(), box.max.x(),
+                       box.max.y(), box.max.z());
+    const Eigen::Vector3d& s = pos[self];
+    const VBW::vec3 sc = VBW::make_vec3(s.x(), s.y(), s.z());
+    const double g = grid.cell_edge();
+    const int kmax = grid.max_ring();
+    double R2 = 0.0;
+    for (int k = 0; k <= kmax; ++k) {
+        ring_buf.clear();
+        grid.ring(s, k, ring_buf);
+        for (std::uint32_t j : ring_buf) {
+            if (static_cast<std::size_t>(j) == self) {
+                continue;
+            }
+            if ((s - pos[j]).squaredNorm() < 1e-30) {
+                continue;
+            }
+            const ClipPlane pl = bisector_keep_site(s, pos[j]);
+            cell.clip_by_plane(VBW::make_vec4(pl.a, pl.b, pl.c, pl.d));
+            nbr.push_back(j);
+            if (cell.empty()) {
+                return false;
+            }
+        }
+        if (k >= 1) {
+            R2 = cell.squared_radius(sc);
+            const double dmin = static_cast<double>(k) * g;
+            if (4.0 * R2 <= dmin * dmin) {
+                break;
+            }
+        }
+    }
+    Ri = std::sqrt(std::max(R2 > 0.0 ? R2 : cell.squared_radius(sc), 0.0));
+    return !cell.empty();
+}
+
+/// Clip V_i ∩ tet using a precomputed neighbour list. Tet planes are clipped
+/// first (cheap, tags domain faces), then only the neighbour bisectors — never
+/// all N sites. Bisectors carry their site global index for face pairing.
+bool build_cell_tet_nbr(VBW::ConvexCell& cell, const ClipBox& box,
+                        const Eigen::Vector3d& site,
+                        std::span<const Eigen::Vector3d> pos,
+                        std::span<const std::uint32_t> nbr, std::size_t self,
+                        const ClipPlane tet_planes[4], std::size_t& n_clips) {
     if ((box.max.array() <= box.min.array()).any()) {
         return false;
     }
@@ -519,27 +575,25 @@ bool build_cell_tet(VBW::ConvexCell& cell, const ClipBox& box,
     cell.init_with_box(box.min.x(), box.min.y(), box.min.z(), box.max.x(),
                        box.max.y(), box.max.z());
     cell.create_vglobal();
-    for (std::size_t j = 0; j < all_sites.size(); ++j) {
-        if (j == self) {
-            continue;
-        }
-        if ((site - all_sites[j]).squaredNorm() < 1e-30) {
-            continue;
-        }
-        const ClipPlane pl = bisector_keep_site(site, all_sites[j]);
-        cell.clip_by_plane(VBW::make_vec4(pl.a, pl.b, pl.c, pl.d),
-                           static_cast<VBW::global_index_t>(j));
-        if (cell.empty()) {
-            return false;
-        }
-    }
-    // Clip to tet: site may lie outside this tet — V_i ∩ t can still be
-    // non-empty (restricted Voronoi). Do not require site ∈ tet.
     constexpr VBW::global_index_t kTetVGlobal = static_cast<VBW::global_index_t>(-2);
     for (int f = 0; f < 4; ++f) {
         const ClipPlane& pl = tet_planes[f];
         cell.clip_by_plane(VBW::make_vec4(pl.a, pl.b, pl.c, pl.d), kTetVGlobal);
         ++n_clips;
+        if (cell.empty()) {
+            return false;
+        }
+    }
+    for (std::uint32_t j : nbr) {
+        if (static_cast<std::size_t>(j) == self) {
+            continue;
+        }
+        if ((site - pos[j]).squaredNorm() < 1e-30) {
+            continue;
+        }
+        const ClipPlane pl = bisector_keep_site(site, pos[j]);
+        cell.clip_by_plane(VBW::make_vec4(pl.a, pl.b, pl.c, pl.d),
+                           static_cast<VBW::global_index_t>(j));
         if (cell.empty()) {
             return false;
         }
@@ -604,17 +658,14 @@ ClippedVoronoiExport export_rvd_tet_clipped(const ClipBox& domain,
     geogram_ensure_initialized();
 
     const double diag = std::max((domain.max - domain.min).norm(), 1e-30);
-    double R = tet_search_radius;
-    if (!(R > 0.0)) {
-        // Default: enough to cover a site's Voronoi ball (~ few h).
-        R = 0.25 * diag;
-    }
-    const double R2 = R * R;
+    (void)tet_search_radius;  // superseded by the per-site security-radius bound
 
-    // Precompute tet planes once oriented to tet centroid.
+    // Precompute tet planes once oriented to tet centroid; `reach` = max vertex
+    // distance from the centroid (tet bounding radius) for the near-cell test.
     struct TetReady {
         DomainTet tet;
         ClipPlane planes[4];
+        double reach = 0.0;
         bool ok = false;
     };
     std::vector<TetReady> ready;
@@ -626,55 +677,106 @@ ClippedVoronoiExport export_rvd_tet_clipped(const ClipBox& domain,
             (tr.tet.v0 - tr.tet.v1).squaredNorm() > 0.0) {
             tr.tet.centroid = 0.25 * (tr.tet.v0 + tr.tet.v1 + tr.tet.v2 + tr.tet.v3);
         }
+        tr.reach = std::sqrt(std::max({(tr.tet.v0 - tr.tet.centroid).squaredNorm(),
+                                       (tr.tet.v1 - tr.tet.centroid).squaredNorm(),
+                                       (tr.tet.v2 - tr.tet.centroid).squaredNorm(),
+                                       (tr.tet.v3 - tr.tet.centroid).squaredNorm()}));
         tr.ok = tet_keep_planes(tr.tet, tr.tet.centroid, tr.planes);
         ready.push_back(tr);
     }
 
-    // Pieces: (site, raw_cell)
+    // Pieces: (site, tet, raw_cell). `tet` gives a deterministic sort key so the
+    // parallel emit order matches a serial run.
     struct Piece {
         std::size_t site = 0;
+        std::size_t tet = 0;
         RawCell cell;
     };
     std::vector<Piece> pieces;
     pieces.reserve(sites.size() * 4);
 
+    // Neighbour grid over sites: each cell clips only its spatial neighbours
+    // (security radius), never all N sites. Bucket edge ≈ mean site spacing.
+    const Eigen::Vector3d ext = (domain.max - domain.min).cwiseMax(1e-30);
+    const double box_vol = ext.x() * ext.y() * ext.z();
+    double g_edge = std::cbrt(box_vol / static_cast<double>(std::max<std::size_t>(1, sites.size())));
+    if (!(g_edge > 0.0)) {
+        g_edge = 0.25 * diag;
+    }
+    g_edge = std::max(g_edge, 1e-9 * diag);
+    SiteGrid grid;
+    grid.build(sites, g_edge);
+
+    std::size_t n_empty = 0;
+    std::size_t n_clips_total = 0;
+    double sum_vol = 0.0;
+    const auto n = static_cast<std::ptrdiff_t>(sites.size());
+
+#pragma omp parallel
     {
         VBW::ConvexCell cell;
-        for (std::size_t i = 0; i < sites.size(); ++i) {
+        VBW::ConvexCell ncell;
+        std::vector<std::uint32_t> ring_buf;
+        std::vector<std::uint32_t> nbr;
+        std::vector<Piece> loc_pieces;
+        std::size_t loc_empty = 0;
+        std::size_t loc_clips = 0;
+        double loc_vol = 0.0;
+#pragma omp for schedule(dynamic, 32)
+        for (std::ptrdiff_t ii = 0; ii < n; ++ii) {
+            const auto i = static_cast<std::size_t>(ii);
+            double Ri = 0.0;
+            if (!voronoi_neighbours(ncell, domain, sites, i, grid, nbr, ring_buf, Ri)) {
+                ++loc_empty;
+                continue;
+            }
             bool any = false;
-            for (const TetReady& tr : ready) {
+            for (std::size_t ti = 0; ti < ready.size(); ++ti) {
+                const TetReady& tr = ready[ti];
                 if (!tr.ok) {
                     continue;
                 }
-                if ((tr.tet.centroid - sites[i]).squaredNorm() > R2) {
-                    // Also accept if any tet vertex is near the site.
-                    const double d0 = (tr.tet.v0 - sites[i]).squaredNorm();
-                    const double d1 = (tr.tet.v1 - sites[i]).squaredNorm();
-                    const double d2 = (tr.tet.v2 - sites[i]).squaredNorm();
-                    const double d3 = (tr.tet.v3 - sites[i]).squaredNorm();
-                    if (std::min(std::min(d0, d1), std::min(d2, d3)) > R2) {
-                        continue;
-                    }
-                }
-                std::size_t n_clips = 0;
-                if (!build_cell_tet(cell, domain, sites[i], sites, i, tr.planes,
-                                    n_clips)) {
+                // V_i is bounded by radius Ri; a tet can only meet it if its
+                // nearest point is within Ri (centroid distance − tet reach).
+                if ((tr.tet.centroid - sites[i]).norm() > Ri + tr.reach) {
                     continue;
                 }
-                out.stats.n_domain_plane_clips += n_clips;
+                std::size_t n_clips = 0;
+                if (!build_cell_tet_nbr(cell, domain, sites[i], sites, nbr, i,
+                                        tr.planes, n_clips)) {
+                    continue;
+                }
+                loc_clips += n_clips;
                 RawCell raw = extract_raw_cell(cell);
                 if (raw.empty || raw.faces.size() < 4) {
                     continue;
                 }
-                out.stats.sum_cell_volume += raw.volume;
-                pieces.push_back(Piece{i, std::move(raw)});
+                loc_vol += raw.volume;
+                loc_pieces.push_back(Piece{i, ti, std::move(raw)});
                 any = true;
             }
             if (!any) {
-                ++out.stats.n_empty_cells;
+                ++loc_empty;
             }
         }
+#pragma omp critical
+        {
+            for (auto& p : loc_pieces) {
+                pieces.push_back(std::move(p));
+            }
+            n_empty += loc_empty;
+            n_clips_total += loc_clips;
+            sum_vol += loc_vol;
+        }
     }
+
+    // Deterministic emit order (parallel scheduling is nondeterministic).
+    std::sort(pieces.begin(), pieces.end(), [](const Piece& a, const Piece& b) {
+        return a.site != b.site ? a.site < b.site : a.tet < b.tet;
+    });
+    out.stats.n_empty_cells += n_empty;
+    out.stats.n_domain_plane_clips += n_clips_total;
+    out.stats.sum_cell_volume += sum_vol;
 
     // Weld + emit pieces as cells; pair coplanar faces by centroid key.
     const double eps = 1e-9 * diag;

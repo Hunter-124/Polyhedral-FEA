@@ -7,6 +7,7 @@
 #include <Eigen/Core>
 
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <span>
 #include <vector>
@@ -64,5 +65,37 @@ struct ClippedCell {
 
 /// Convenience: unit cube [0,1]³ with no extra planes.
 [[nodiscard]] std::optional<ClippedCell> unit_cube_cell();
+
+/// Uniform bucket grid over site positions for neighbour-restricted Voronoi
+/// clipping. A Voronoi cell only touches its geometric neighbours, so callers
+/// clip ring-by-ring (Chebyshev shells) around a query site and stop via a
+/// security radius (Geogram `ConvexCell::squared_radius`) instead of testing
+/// all N sites — turning per-cell clipping from O(N) into O(neighbours).
+/// Rebuild is O(N) (counting sort); cheap to redo after each Lloyd iteration.
+class SiteGrid {
+  public:
+    /// Build over `pts` with bucket edge `cell_edge` (≈ target site spacing).
+    void build(std::span<const Eigen::Vector3d> pts, double cell_edge);
+    [[nodiscard]] bool empty() const noexcept { return n_pts_ == 0; }
+    [[nodiscard]] double cell_edge() const noexcept { return cell_; }
+    /// Rings that exhaust the grid from any bucket (upper bound for the loop).
+    [[nodiscard]] int max_ring() const noexcept { return max_ring_; }
+    /// Append site indices whose bucket is at Chebyshev distance exactly `ring`
+    /// from `p`'s bucket (ring 0 = home bucket). `out` is NOT cleared.
+    void ring(const Eigen::Vector3d& p, int ring, std::vector<std::uint32_t>& out) const;
+
+  private:
+    [[nodiscard]] int clampi(int v, int hi) const noexcept {
+        return v < 0 ? 0 : (v > hi ? hi : v);
+    }
+    Eigen::Vector3d origin_{0, 0, 0};
+    double cell_ = 1.0;
+    double inv_cell_ = 1.0;
+    int nx_ = 0, ny_ = 0, nz_ = 0;
+    int max_ring_ = 0;
+    std::size_t n_pts_ = 0;
+    std::vector<std::uint32_t> cell_start_;  // CSR offsets, size nx*ny*nz+1
+    std::vector<std::uint32_t> items_;       // site indices bucketed
+};
 
 }  // namespace polymesh::mesh

@@ -3,6 +3,7 @@
 
 #include "fea/backend.hpp"
 #include "fea/shape.hpp"
+#include "fea/vem.hpp"
 
 #include <Eigen/Dense>
 
@@ -68,7 +69,18 @@ ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
         const auto& el = mesh.elements[eu];
         el_cent[eu] = element_centroid(mesh, el);
         if (el.type == ElementType::kPolyVem) {
-            el_stress[eu].setZero();
+            // Constant/centroid VEM projected strain → stress (same projector
+            // as the stiffness). Was previously zeroed, giving von Mises = 0.
+            const int order = vem_infer_order(el.nodes.size(), el.faces);
+            std::vector<Eigen::Vector3d> coords;
+            coords.reserve(el.nodes.size());
+            Eigen::VectorXd u_elem(3 * static_cast<Eigen::Index>(el.nodes.size()));
+            for (std::size_t a = 0; a < el.nodes.size(); ++a) {
+                coords.push_back(mesh.nodes[el.nodes[a]]);
+                u_elem.segment<3>(3 * static_cast<Eigen::Index>(a)) =
+                    u.segment<3>(3 * static_cast<Eigen::Index>(el.nodes[a]));
+            }
+            el_stress[eu] = d * vem_projected_strain(coords, el.faces, u_elem, order);
             continue;
         }
         Eigen::Matrix<double, Eigen::Dynamic, 3> x(el.nodes.size(), 3);

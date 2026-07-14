@@ -199,7 +199,23 @@ Eigen::VectorXd solve_elastostatics(const NodalMesh& mesh, const Material& mater
     Eigen::SparseMatrix<double> kff(nfree, nfree);
     kff.setFromTriplets(triplets.begin(), triplets.end());
 
-    const Eigen::VectorXd uf = solve_reduced(kff, rhs, options);
+    // VEM stabilization makes the poly system ill-conditioned, so CG converges
+    // very slowly (minutes on ~15k DOF). Sparse Cholesky is robust and fast for
+    // it up to ~100k free DOF; prefer direct there when the caller left kAuto.
+    SolveOptions eff = options;
+    if (eff.method == SolveMethod::kAuto) {
+        bool has_poly = false;
+        for (const auto& el : mesh.elements) {
+            if (el.type == ElementType::kPolyVem) {
+                has_poly = true;
+                break;
+            }
+        }
+        if (has_poly) {
+            eff.cg_threshold = std::max(eff.cg_threshold, Eigen::Index{100000});
+        }
+    }
+    const Eigen::VectorXd uf = solve_reduced(kff, rhs, eff);
 
     Eigen::VectorXd u(ndof);
     for (Eigen::Index dof = 0; dof < ndof; ++dof) {

@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 add_library(adapt
     src/error.cpp
+    src/graded_sizing.cpp
     src/loop.cpp
     src/sizing_field.cpp
     src/hp_driver.cpp

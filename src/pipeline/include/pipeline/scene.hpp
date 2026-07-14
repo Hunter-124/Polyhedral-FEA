@@ -103,6 +103,10 @@ struct SimSetup {
     /// (bbox extent/diagonal + sharp-edge feature density).
     double mesh_size = 0.0;
     bool use_feature_grading = true; // sharp edges + curvature + thin-wall sizing
+    /// A-priori grade the mesh toward boundary conditions: refine near loaded
+    /// and fixed faces (loads finest) before any solve. Complements
+    /// `use_feature_grading` (geometry). Off by default to preserve baselines.
+    bool bc_grading = false;
     /// Max solve→ZZ→(LEB|seed-remesh) refine passes after the initial mesh.
     /// **0 = single mesh+solve** (no adapt). Prefer ≥1 with `eta_target` for
     /// fully adaptive product runs (stops early when η is small enough).

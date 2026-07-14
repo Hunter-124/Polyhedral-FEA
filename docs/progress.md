@@ -27,6 +27,21 @@ Never score raw nodal max stress.
 h_scale=5 → **4/4 `ok`**, `health_ok` + `load_area_ok` true; cylinder SE ~0.0034
 vs truth 0.00393. GUI `polymesh-gui` builds with health/scorecard/load_area Results panel.
 
+**CAD-only + geometry/BC-aware meshing (2026-07-14):** `POLYMESH_WITH_OCC` now
+**ON by default**; inputs are **CAD-only** (`.step .stp .brep .brp`) — `Model::load`,
+CLI, GUI, and testlab cases reject STL (parser kept only as internal test
+scaffolding). New `pipeline::build_refinement_plan(model, h, regions, use_geometry)`
+fuses geometry (curvature/thin-wall) + BC/load selection-box sources into one
+gradient-limited seed field (`adapt::seed_plan`) driving the ball-grading meshers
+(graded/hybrid/**varyhedron**). Wired into CLI `mesh`/`solve` (`--fix-box`/`--load-box`,
+geometry grading default-on), the pipeline `SolveJob` bc-grading (now also fuses
+geometry), and testlab (opt-in `"bc_grading": true`, baselines unchanged). Verified
+end-to-end on `CD-601_v2_Seat.step`: import → geometry+BC varyhedron mesh
+(224 geom + 117 BC seeds) → solve → VTU. `test_refinement_plan.cpp` added; full
+suite 257/257 green (OCC on). STL box/smoke tests migrated to in-memory
+`testsupport::box_model` / `model_from_surface(load_stl(...))`; cantilever+smoke_bar
+cases regenerated as STEP.
+
 ## Background / older phases
 
 **Track H (historical):** mesher honesty/perf overhaul; owner gate **A9** theme

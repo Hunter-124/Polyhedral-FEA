@@ -116,7 +116,7 @@ bool is_geometry_path(const std::string& path) {
         return false;
     }
     const auto ext = lower.substr(dot);
-    return ext == ".stl" || ext == ".step" || ext == ".stp";
+    return ext == ".step" || ext == ".stp" || ext == ".brep" || ext == ".brp";
 }
 
 void set_mesh_info(App& app, const std::string& note, std::size_t nnodes, std::size_t nelems) {
@@ -207,8 +207,8 @@ void draw_colorbar(const char* title, float vmin, float vmax, const char* unit) 
 
 void draw_study_panel(App& app) {
     iw::begin_group_box("model");
-    ImGui::TextColored(palette.text_dim, "drop .stl/.step/.stp on window");
-    iw::input_text("path", app.open_path, sizeof(app.open_path), "path/to/part.stl|.step");
+    ImGui::TextColored(palette.text_dim, "drop .step/.stp/.brep on window");
+    iw::input_text("path", app.open_path, sizeof(app.open_path), "path/to/part.step|.brep");
     if (iw::button("open", ImVec2(-1, 0)) && app.open_path[0] != '\0') {
         load_model(app, app.open_path);
     }
@@ -908,7 +908,7 @@ void draw_frame(App& app) {
                 tl, app.dof_count);
         } else {
             line = std::format(
-                "polymesh @ {} — {} | mesher {}{}{} | testlab: {} | drop .stl/.step | "
+                "polymesh @ {} — {} | mesher {}{}{} | testlab: {} | drop .step/.brep | "
                 "lmb pick/orbit, shift+lmb pan, wheel zoom",
                 head, app.status, mesher_name, health_bit.empty() ? "" : " · ", health_bit, tl);
         }
@@ -982,7 +982,7 @@ int run(int argc, char** argv) {
                 }
             }
             if (chosen.empty()) {
-                app.status = std::format("drop ignored (want .stl/.step/.stp): {}",
+                app.status = std::format("drop ignored (want .step/.stp/.brep/.brp): {}",
                                          app.pending_drops.front());
             } else {
                 load_model(app, chosen);

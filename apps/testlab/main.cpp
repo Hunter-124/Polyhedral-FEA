@@ -219,6 +219,10 @@ struct Config {
     bool snap_boundary = true;
     int order = 1;
     double element_tendency = 0.0;
+    /// A-priori geometry+BC grading (ADR-0021): refine toward BC/load boxes and
+    /// geometry features before the solve. OFF by default so frozen campaign
+    /// baselines are unchanged; a campaign opts in via `"bc_grading": true`.
+    bool bc_grading = false;
 };
 
 struct Checkpoint {
@@ -453,6 +457,9 @@ std::vector<Config> expand_grid(const json& grid) {
         }
         if (values.contains("feature_refine")) {
             cfg.feature_refine = values["feature_refine"].get<bool>();
+        }
+        if (values.contains("bc_grading")) {
+            cfg.bc_grading = values["bc_grading"].get<bool>();
         }
         if (values.contains("curvature_turn_deg")) {
             cfg.curvature_turn_deg = values["curvature_turn_deg"].get<double>();
@@ -1554,10 +1561,27 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         }
 
         const auto t_mesh0 = clock::now();
-        // skin_layers=2, feature_refine from grid; empty refine_seeds; tendency dial.
+        // Optional a-priori geometry+BC grading (ADR-0021): refine toward the
+        // load/fixture selection boxes (loads finest) fused with geometry
+        // features, so the mesh reflects the simulation setup. Off by default.
+        std::vector<Eigen::Vector3d> refine_seeds;
+        double refine_band = 0.0;
+        if (cfg.bc_grading) {
+            std::vector<pipeline::RefineRegion> regions;
+            for (const auto& L : part.loads) {
+                regions.push_back({L.box.lo, L.box.hi, 0.25});
+            }
+            for (const auto& b : part.bcs) {
+                regions.push_back({b.box.lo, b.box.hi, 0.5});
+            }
+            const auto plan = pipeline::build_refinement_plan(model, h, regions,
+                                                              cfg.feature_refine);
+            refine_seeds = plan.refine_seeds;
+            refine_band = plan.seed_band;
+        }
         auto vol = pipeline::volume_mesh(model, h, cfg.mesher, /*skin_layers=*/2,
-                                         cfg.feature_refine, /*refine_seeds=*/{},
-                                         /*seed_band=*/0.0, cfg.element_tendency);
+                                         cfg.feature_refine, refine_seeds, refine_band,
+                                         cfg.element_tendency);
         // Validity is mandatory before any solve (anti-cheat / engineering rule).
         vol.mesh.check_validity();
         if (cfg.order >= 2) {

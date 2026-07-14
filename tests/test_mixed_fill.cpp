@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "fea/solve.hpp"
+#include "geom/stl.hpp"
 #include "geom/tri_surface.hpp"
 #include "mesh/mixed_fill.hpp"
 #include "pipeline/scene.hpp"
+#include "support/box_model.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -109,7 +111,7 @@ TEST_CASE("hybrid zoo expanded product path patch test: constant strain") {
 }
 
 TEST_CASE("hybrid zoo cylinder_prism smoke: pyramid FE + snap") {
-    auto model = pipeline::Model::load("bench/geometries/public/cylinder_prism.stl");
+    auto model = polymesh::testsupport::model_from_surface(polymesh::geom::load_stl("bench/geometries/public/cylinder_prism.stl"));
     const double h = 0.12 * (model.bbox_max - model.bbox_min).maxCoeff();
     auto vol = pipeline::volume_mesh(model, h, pipeline::VolumeMesher::kHybrid, 2, true);
     REQUIRE_FALSE(vol.mesh.elements.empty());
@@ -126,7 +128,7 @@ TEST_CASE("hybrid zoo cylinder_prism smoke: pyramid FE + snap") {
 
 TEST_CASE("hybrid zoo 2:1 size adaptivity on feature band") {
     // Open box with a sharp crease band: feature grading must refine to h/2.
-    auto model = pipeline::Model::load("bench/geometries/public/cylinder_prism.stl");
+    auto model = polymesh::testsupport::model_from_surface(polymesh::geom::load_stl("bench/geometries/public/cylinder_prism.stl"));
     const double h = 0.15 * (model.bbox_max - model.bbox_min).maxCoeff();
     auto plain = mixed_fill_surface(model.surface, model.bbox_min, model.bbox_max, h,
                                     /*skin=*/1, {}, 0.0, {}, 0.0, /*snap=*/false);

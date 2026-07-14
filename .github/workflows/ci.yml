@@ -29,14 +29,20 @@ jobs:
             libxinerama-dev \
             libxcursor-dev \
             libxi-dev \
-            libxext-dev
+            libxext-dev \
+            libocct-data-exchange-dev \
+            libocct-foundation-dev \
+            libocct-modeling-algorithms-dev \
+            libocct-modeling-data-dev \
+            libocct-ocaf-dev \
+            libocct-visualization-dev
 
       - name: Configure
         run: |
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Debug \
             -DPOLYMESH_WITH_GUI=ON \
-            -DPOLYMESH_WITH_OCC=OFF \
+            -DPOLYMESH_WITH_OCC=ON \
             -DPOLYMESH_WITH_CUDA=OFF
 
       - name: Build (warnings are errors)

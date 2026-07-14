@@ -14,10 +14,12 @@
 
 #include "fea/boundary_faces.hpp"
 #include "fea/nodal_mesh.hpp"
+#include "geom/stl.hpp"
 #include "geom/tri_surface.hpp"
 #include "mesh/surface_metrics.hpp"
 #include "mesh/tet_fill.hpp"
 #include "pipeline/scene.hpp"
+#include "support/box_model.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -201,7 +203,7 @@ TEST_CASE("curved scorecard: sphere hex passes, graded/hybrid lag or fail bar",
     if (!std::filesystem::exists(geom)) {
         SKIP("sphere.stl missing");
     }
-    const auto model = pipeline::Model::load(geom.string());
+    const auto model = polymesh::testsupport::model_from_surface(polymesh::geom::load_stl(geom.string()));
     const double extent = (model.bbox_max - model.bbox_min).maxCoeff();
     const double h = 0.15 * extent; // coarse CI-friendly; equal for all meshers
     // Low-res unit sphere inscribed in [0,1]^3, R≈0.5 at centre 0.5^3.
@@ -243,7 +245,7 @@ TEST_CASE("curved scorecard: cylinder_prism hex ranks above graded/hybrid",
     if (!std::filesystem::exists(geom)) {
         SKIP("cylinder_prism.stl missing");
     }
-    const auto model = pipeline::Model::load(geom.string());
+    const auto model = polymesh::testsupport::model_from_surface(polymesh::geom::load_stl(geom.string()));
     const double extent = (model.bbox_max - model.bbox_min).maxCoeff();
     const double h = 0.12 * extent;
     // Regular octagonal prism ≈ cylinder R=0.5, H=1 about z; solid volume of
@@ -286,7 +288,7 @@ TEST_CASE("curved scorecard: hole plate test.stl graded residual / ranking",
     if (!std::filesystem::exists(geom)) {
         SKIP("test.stl missing");
     }
-    const auto model = pipeline::Model::load(geom.string());
+    const auto model = polymesh::testsupport::model_from_surface(polymesh::geom::load_stl(geom.string()));
     const double extent = (model.bbox_max - model.bbox_min).maxCoeff();
     // Slightly coarser than GUI auto for CI; equal h for all three.
     const double h = 0.10 * extent;

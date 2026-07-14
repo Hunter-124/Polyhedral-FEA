@@ -3,6 +3,7 @@
 // PolyMesh CLI — geometry check, tet mesh, elastostatic solve + VTU export.
 
 #include "adapt/error.hpp"
+#include "adapt/graded_sizing.hpp"
 #include "adapt/loop.hpp"
 #include "fea/backend.hpp"
 #include "fea/material.hpp"
@@ -11,13 +12,15 @@
 #include "fea/vtu.hpp"
 #include "fea/zz.hpp"
 #include "geom/step.hpp"
-#include "geom/stl.hpp"
 #include "mesh/tet_fill.hpp"
 #include "pipeline/scene.hpp"
 
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <algorithm>
+#include <vector>
 #include <span>
 #include <string>
 #include <string_view>
@@ -28,28 +31,33 @@ int usage() {
     std::fputs("usage: polymesh <command> [args]\n"
                "\n"
                "commands:\n"
-               "  check <file.stl|.step>     validate surface geometry\n"
-               "  mesh  <file> [-h m] [-o out.vtu] [--mesher name] [--skin n] [--feature]\n"
-               "              [--element-tendency t]\n"
-               "                             volume mesh; optional VTU write\n"
-               "  solve <file> -o out.vtu [-h m] [-E Pa] [-nu r]\n"
-               "              [--mesher name] [--skin n] [--feature] [--adapt n]\n"
+               "  check <part.step|.brep>    validate CAD geometry\n"
+               "  mesh  <part> [-h m] [-o out.vtu] [--mesher name] [--skin n]\n"
+               "              [--no-feature] [--element-tendency t]\n"
+               "              [--fix-box x0 y0 z0 x1 y1 z1] [--load-box x0 y0 z0 x1 y1 z1]\n"
+               "                             geometry+BC-aware volume mesh; optional VTU\n"
+               "  solve <part> -o out.vtu [-h m] [-E Pa] [-nu r]\n"
+               "              [--mesher name] [--skin n] [--no-feature] [--adapt n]\n"
                "              [--eta-target η] [--p-elevate] [--element-tendency t]\n"
-               "                             mesh + cantilever-style BCs + VTU\n"
-               "                             (fix min-x face nodes, load +Fy on max-x)\n"
+               "              [--fix-box ...6] [--load-box ...6] [--bc-grade]\n"
+               "                             mesh + BCs + VTU. Default BCs: fix min-x,\n"
+               "                             load +Fy on max-x. Boxes override selection.\n"
                "  backend                    print compute backend + OpenMP/opt summary\n"
                "\n"
-               "mesh size: omit -h (or -h 0) for auto h0 from bbox + sharp-edge density\n"
-               "mesher names: hybrid|zoo (default), hybridvem|hybrid-vem, tet, hex,\n"
-               "              hexvem|vem, graded, varyhedron, hexpyr|transition,\n"
+               "inputs: CAD only (.step .stp .brep .brp). STL is no longer supported.\n"
+               "mesh size: omit -h (or -h 0) for auto h0 from bbox + feature density\n"
+               "mesher names: hybrid|zoo (default), varyhedron|vary (CAD packing),\n"
+               "              hybridvem, tet, hex, hexvem|vem, graded, hexpyr|transition,\n"
                "              prism|sweep, octa|octahedral (experimental)\n"
-               "--skin n: graded-tet fine skin layers (default 2)\n"
-               "--feature: refine graded mesh near sharp edges (default off in CLI)\n"
+               "--skin n: graded fine skin layers (default 2)\n"
+               "--no-feature: disable geometry (curvature/thin-wall) grading (default on)\n"
                "--element-tendency t: shape dial in [-1,+1] (hex↔fan hybrid↔poly VEM↔tet)\n"
+               "--fix-box / --load-box: BC/load selection AABBs; the mesh grades finer\n"
+               "              toward them (loads finest) — geometry + simulation setup\n"
                "--adapt n: ZZ→Dörfler remesh passes (local seeds on graded path)\n"
                "--eta-target η: stop adapt when global ZZ η ≤ η (0=off; needs --adapt)\n"
-               "--p-elevate: promote smooth (non-Dörfler) tet4/hex8 → tet10/hex20\n"
-               "             (auto-on when --adapt n>0)\n",
+               "--p-elevate: promote smooth tet4/hex8 → tet10/hex20 (auto-on --adapt>0)\n"
+               "--bc-grade: force a-priori BC grading from the default cantilever faces\n",
                stderr);
     return 2;
 }
@@ -91,23 +99,49 @@ polymesh::pipeline::VolumeMesher parse_mesher(const std::string& m) {
     return polymesh::pipeline::VolumeMesher::kHybrid;
 }
 
-polymesh::geom::TriSurface load_surface(std::string_view path) {
-    const std::string p(path);
-    std::string lower = p;
-    for (char& c : lower) {
-        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+struct BoxSel {
+    bool set = false;
+    Eigen::Vector3d lo = Eigen::Vector3d::Zero();
+    Eigen::Vector3d hi = Eigen::Vector3d::Zero();
+};
+
+// Parse the 6 numbers following a --fix-box / --load-box flag at args[i].
+// On success advances i past the 6 values and sets `b`; returns false on error.
+bool parse_box6(std::span<char*> args, std::size_t& i, BoxSel& b) {
+    if (i + 6 >= args.size()) {
+        return false;
     }
-    if (lower.ends_with(".step") || lower.ends_with(".stp")) {
-        return polymesh::geom::load_step(p);
+    double v[6];
+    for (int k = 0; k < 6; ++k) {
+        v[static_cast<std::size_t>(k)] =
+            std::atof(args[i + 1 + static_cast<std::size_t>(k)]);
     }
-    return polymesh::geom::load_stl(p);
+    b.lo = Eigen::Vector3d(std::min(v[0], v[3]), std::min(v[1], v[4]), std::min(v[2], v[5]));
+    b.hi = Eigen::Vector3d(std::max(v[0], v[3]), std::max(v[1], v[4]), std::max(v[2], v[5]));
+    b.set = true;
+    i += 6;
+    return true;
+}
+
+// Geometry+BC refine regions from optional fix/load boxes (loads finest).
+std::vector<polymesh::pipeline::RefineRegion> make_regions(const BoxSel& fix, const BoxSel& load) {
+    std::vector<polymesh::pipeline::RefineRegion> regions;
+    if (load.set) {
+        regions.push_back({load.lo, load.hi, 0.25});
+    }
+    if (fix.set) {
+        regions.push_back({fix.lo, fix.hi, 0.5});
+    }
+    return regions;
 }
 
 int cmd_check(std::string_view input) {
-    const auto surface = load_surface(input);
+    const auto model = polymesh::pipeline::Model::load(std::string(input));
+    const auto& surface = model.surface;
     surface.validate();
-    std::printf("%.*s: OK — %zu vertices, %zu triangles\n", static_cast<int>(input.size()),
-                input.data(), surface.vertices.size(), surface.triangles.size());
+    std::printf("%.*s: OK — %zu vertices, %zu triangles%s\n", static_cast<int>(input.size()),
+                input.data(), surface.vertices.size(), surface.triangles.size(),
+                model.cad ? " (CAD BRep retained)" : "");
     return 0;
 }
 
@@ -120,8 +154,9 @@ int cmd_mesh(std::span<char*> args) {
     std::string out_path;
     auto mesher = polymesh::pipeline::VolumeMesher::kHybrid;
     int skin = 2;
-    bool feature = false;
+    bool feature = true; // geometry (curvature/thin-wall) grading on by default
     double element_tendency = 0.0;
+    BoxSel fix_box, load_box;
     for (std::size_t i = 3; i < args.size(); ++i) {
         if (std::strcmp(args[i], "-h") == 0 && i + 1 < args.size()) {
             h = std::atof(args[++i]);
@@ -135,9 +170,19 @@ int cmd_mesh(std::span<char*> args) {
                 skin = 1;
             }
         } else if (std::strcmp(args[i], "--feature") == 0) {
-            feature = true;
+            feature = true; // accepted for back-compat (now the default)
+        } else if (std::strcmp(args[i], "--no-feature") == 0) {
+            feature = false;
         } else if (std::strcmp(args[i], "--element-tendency") == 0 && i + 1 < args.size()) {
             element_tendency = std::atof(args[++i]);
+        } else if (std::strcmp(args[i], "--fix-box") == 0) {
+            if (!parse_box6(args, i, fix_box)) {
+                return usage();
+            }
+        } else if (std::strcmp(args[i], "--load-box") == 0) {
+            if (!parse_box6(args, i, load_box)) {
+                return usage();
+            }
         } else {
             return usage();
         }
@@ -145,11 +190,20 @@ int cmd_mesh(std::span<char*> args) {
     const auto model = polymesh::pipeline::Model::load(path);
     const auto resolved = polymesh::pipeline::resolve_mesh_size(model, h);
     h = resolved.h;
-    auto vol = polymesh::pipeline::volume_mesh(model, h, mesher, skin, feature, {}, 0.0,
+
+    // Geometry + simulation-setup (BC/load box) aware refinement plan → seeds.
+    const auto regions = make_regions(fix_box, load_box);
+    const auto plan = polymesh::pipeline::build_refinement_plan(model, h, regions, feature);
+    auto vol = polymesh::pipeline::volume_mesh(model, h, mesher, skin, feature,
+                                               plan.refine_seeds, plan.seed_band,
                                                element_tendency);
     vol.mesh.check_validity();
-    std::printf("mesh: %zu nodes, %zu elems, h=%.6g m\n%s\n%s\n", vol.mesh.nodes.size(),
-                vol.mesh.elements.size(), h, resolved.note.c_str(), vol.mesher_note.c_str());
+    std::printf("mesh: %zu nodes, %zu elems, h=%.6g m\n"
+                "refine: %zu geometry + %zu BC seeds → %zu seeds, band=%.4g m, h_fine=%.4g m\n"
+                "%s\n%s\n",
+                vol.mesh.nodes.size(), vol.mesh.elements.size(), h, plan.n_geometry_seeds,
+                plan.n_bc_seeds, plan.refine_seeds.size(), plan.seed_band, plan.h_fine,
+                resolved.note.c_str(), vol.mesher_note.c_str());
     if (!out_path.empty()) {
         const auto quality = polymesh::fea::tet4_cell_quality(vol.mesh);
         std::vector<polymesh::fea::VtuCellData> cdata;
@@ -171,11 +225,13 @@ int cmd_solve(std::span<char*> args) {
     std::string out_path;
     auto mesher = polymesh::pipeline::VolumeMesher::kHybrid;
     int skin = 2;
-    bool feature = false;
+    bool feature = true; // geometry grading on by default (CAD)
     int adapt_passes = 0;
     double eta_target = 0.0;
     bool p_elevate = false;
     double element_tendency = 0.0;
+    bool bc_grade = false;
+    BoxSel fix_box, load_box;
     for (std::size_t i = 3; i < args.size(); ++i) {
         if (std::strcmp(args[i], "-h") == 0 && i + 1 < args.size()) {
             h = std::atof(args[++i]);
@@ -193,7 +249,17 @@ int cmd_solve(std::span<char*> args) {
                 skin = 1;
             }
         } else if (std::strcmp(args[i], "--feature") == 0) {
-            feature = true;
+            feature = true; // accepted for back-compat (now the default)
+        } else if (std::strcmp(args[i], "--no-feature") == 0) {
+            feature = false;
+        } else if (std::strcmp(args[i], "--fix-box") == 0) {
+            if (!parse_box6(args, i, fix_box)) {
+                return usage();
+            }
+        } else if (std::strcmp(args[i], "--load-box") == 0) {
+            if (!parse_box6(args, i, load_box)) {
+                return usage();
+            }
         } else if (std::strcmp(args[i], "--element-tendency") == 0 && i + 1 < args.size()) {
             element_tendency = std::atof(args[++i]);
         } else if (std::strcmp(args[i], "--adapt") == 0 && i + 1 < args.size()) {
@@ -208,6 +274,8 @@ int cmd_solve(std::span<char*> args) {
             }
         } else if (std::strcmp(args[i], "--p-elevate") == 0) {
             p_elevate = true;
+        } else if (std::strcmp(args[i], "--bc-grade") == 0) {
+            bc_grade = true;
         } else {
             return usage();
         }
@@ -228,6 +296,37 @@ int cmd_solve(std::span<char*> args) {
     double h_use = h;
     std::vector<Eigen::Vector3d> seeds;
     double seed_band = 0.0;
+    // Geometry + simulation-setup refinement. Explicit --fix-box/--load-box
+    // define the grading (and BC) regions; otherwise --bc-grade derives the
+    // default cantilever slabs (fix min-x, load max-x). Geometry grading
+    // (curvature / thin-wall) applies whenever --feature is on (default).
+    std::vector<polymesh::pipeline::RefineRegion> regions;
+    {
+        const double xmin = model.bbox_min[0];
+        const double xmax = model.bbox_max[0];
+        const double slab = 0.51 * h_use;
+        if (load_box.set) {
+            regions.push_back({load_box.lo, load_box.hi, 0.25});
+        } else if (bc_grade) {
+            Eigen::Vector3d lo = model.bbox_min, hi = model.bbox_max;
+            lo[0] = xmax - slab;
+            regions.push_back({lo, hi, 0.25});
+        }
+        if (fix_box.set) {
+            regions.push_back({fix_box.lo, fix_box.hi, 0.5});
+        } else if (bc_grade) {
+            Eigen::Vector3d lo = model.bbox_min, hi = model.bbox_max;
+            hi[0] = xmin + slab;
+            regions.push_back({lo, hi, 0.5});
+        }
+    }
+    {
+        const auto plan = polymesh::pipeline::build_refinement_plan(model, h_use, regions, feature);
+        seeds = plan.refine_seeds;
+        seed_band = plan.seed_band;
+        std::printf("refine: %zu geometry + %zu BC seeds → %zu seeds, band=%.4g m, h_fine=%.4g m\n",
+                    plan.n_geometry_seeds, plan.n_bc_seeds, seeds.size(), seed_band, plan.h_fine);
+    }
     auto mesh_now = [&](polymesh::pipeline::VolumeMesher m) {
         return polymesh::pipeline::volume_mesh(model, h_use, m, skin, feature, seeds,
                                                seed_band, element_tendency);
@@ -236,6 +335,10 @@ int cmd_solve(std::span<char*> args) {
     vol.mesh.check_validity();
 
     const polymesh::fea::Material mat{.youngs_modulus = E, .poissons_ratio = nu};
+    auto in_box = [](const BoxSel& b, const Eigen::Vector3d& p) {
+        return p.x() >= b.lo.x() && p.x() <= b.hi.x() && p.y() >= b.lo.y() &&
+               p.y() <= b.hi.y() && p.z() >= b.lo.z() && p.z() <= b.hi.z();
+    };
     auto make_bc_loads = [&](const polymesh::pipeline::VolumeMeshOutput& v) {
         const double xmin = model.bbox_min[0];
         const double xmax = model.bbox_max[0];
@@ -243,11 +346,13 @@ int cmd_solve(std::span<char*> args) {
         polymesh::fea::Dirichlet bc;
         std::vector<std::uint32_t> load_nodes;
         for (std::uint32_t i = 0; i < v.mesh.nodes.size(); ++i) {
-            const double x = v.mesh.nodes[i][0];
-            if (x <= xmin + tol) {
+            const Eigen::Vector3d& p = v.mesh.nodes[i];
+            const bool fixed = fix_box.set ? in_box(fix_box, p) : (p.x() <= xmin + tol);
+            const bool loaded = load_box.set ? in_box(load_box, p) : (p.x() >= xmax - tol);
+            if (fixed) {
                 bc.fix_node(i);
             }
-            if (x >= xmax - tol) {
+            if (loaded) {
                 load_nodes.push_back(i);
             }
         }

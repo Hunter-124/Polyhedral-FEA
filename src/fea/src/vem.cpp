@@ -902,4 +902,45 @@ double vem_energy_error_sq(
     return err;
 }
 
+Eigen::Matrix<double, 6, 1> vem_projected_strain(
+    const std::vector<Eigen::Vector3d>& coords,
+    const std::vector<std::vector<std::uint32_t>>& faces, const Eigen::VectorXd& u_elem,
+    int order) {
+    if (order == 1) {
+        const auto n = coords.size();
+        const double vol = poly_volume(coords, faces);
+        if (vol <= 0.0) {
+            return Eigen::Matrix<double, 6, 1>::Zero();
+        }
+        Eigen::Matrix<double, Eigen::Dynamic, 3> grad(static_cast<Eigen::Index>(n), 3);
+        grad.setZero();
+        for (const auto& face : faces) {
+            if (face.size() < 3) {
+                continue;
+            }
+            double area = 0.0;
+            const Eigen::Vector3d nA = face_normal_area(coords, face, area);
+            if (area <= 0.0) {
+                continue;
+            }
+            const double w = 1.0 / static_cast<double>(face.size());
+            for (auto li : face) {
+                grad.row(static_cast<Eigen::Index>(li)) += (w * nA).transpose();
+            }
+        }
+        grad /= vol;
+        const auto b = b_from_grads(grad);
+        return b * u_elem;
+    }
+    if (order != 2) {
+        throw FeaError(std::format("vem_projected_strain: unsupported order {}", order));
+    }
+    const P2Projector proj = make_p2_projector(coords, faces);
+    const Eigen::VectorXd coeffs = proj.pi * u_elem;
+    const Eigen::Vector3d c = poly_centroid(coords, faces);
+    const Eigen::Vector3d xi = (c - proj.xc) / proj.h;
+    const Eigen::Matrix<double, 6, kP2Vec> bb = p2_strain_basis(xi, proj.h);
+    return bb * coeffs;
+}
+
 } // namespace polymesh::fea

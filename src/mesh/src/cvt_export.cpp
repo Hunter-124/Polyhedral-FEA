@@ -801,12 +801,19 @@ ClippedVoronoiExport export_rvd_tet_clipped(const ClipBox& domain,
         if (piece.cell.empty || piece.cell.faces.size() < 4) {
             continue;
         }
-        const CellId cid = static_cast<CellId>(out.mesh.cells.size());
-        out.mesh.cells.push_back(Cell{.kind = CellKind::kPolyhedron, .faces = {}});
+        // One cell per site: all of a site's tet pieces merge into a single
+        // polyhedron (image #3). Faces internal to the merge — the tet-split
+        // faces shared by two same-site pieces — cancel, leaving only real
+        // Voronoi-bisector and domain-boundary faces (a clean manifold).
+        CellId cid;
         if (out.site_to_cell[piece.site] == static_cast<std::size_t>(-1)) {
+            cid = static_cast<CellId>(out.mesh.cells.size());
+            out.mesh.cells.push_back(Cell{.kind = CellKind::kPolyhedron, .faces = {}});
             out.site_to_cell[piece.site] = cid;
+            ++out.stats.n_cells;
+        } else {
+            cid = static_cast<CellId>(out.site_to_cell[piece.site]);
         }
-        ++out.stats.n_cells;
 
         for (const RawFace& rf : piece.cell.faces) {
             std::vector<VertexId> loop;
@@ -830,19 +837,22 @@ ClippedVoronoiExport export_rvd_tet_clipped(const ClipBox& domain,
                 continue;
             }
 
-            // Prefer site-bisector pairing when both sites have pieces.
-            if (rf.neighbour_site != static_cast<std::size_t>(-1) &&
-                rf.neighbour_site < sites.size()) {
-                // Fall through to geometric pairing — multi-piece makes
-                // site-pair keys non-unique across tets.
-            }
-
             const GeoFaceKey gk = face_centroid_key(rf.loop, inv_face);
             if (auto it = geo_faces.find(gk); it != geo_faces.end()) {
-                Face& f = out.mesh.faces[it->second];
+                const FaceId efid = it->second;
+                Face& f = out.mesh.faces[efid];
+                if (f.owner == cid && !f.neighbour) {
+                    // Internal cut face between two pieces of THIS site → cancel.
+                    auto& cf = out.mesh.cells[cid].faces;
+                    cf.erase(std::remove(cf.begin(), cf.end(), efid), cf.end());
+                    f.vertices.clear();
+                    geo_faces.erase(it);
+                    continue;
+                }
                 if (!f.neighbour && f.owner != cid) {
+                    // Shared Voronoi bisector between two cells → interior face.
                     f.neighbour = cid;
-                    out.mesh.cells[cid].faces.push_back(it->second);
+                    out.mesh.cells[cid].faces.push_back(efid);
                     continue;
                 }
             }

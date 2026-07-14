@@ -16,7 +16,6 @@
 #include "geom/features.hpp"
 #include "geom/indicators.hpp"
 #include "geom/step.hpp"
-#include "geom/stl.hpp"
 #include "fea/poly_to_vem.hpp"
 #include "mesh/cvt_export.hpp"
 #include "mesh/cvt_lloyd.hpp"
@@ -117,8 +116,9 @@ Model Model::load(const std::string& path, double sharp_angle_deg) {
     const auto slash = path.find_last_of("/\\");
     model.name = slash == std::string::npos ? path : path.substr(slash + 1);
 
-    // ADR-0020: STEP/BREP retain CadModel; tessellation is derived for regions
-    // and legacy hybrid fill. STL stays surface-only (compare/legacy).
+    // CAD-only inputs (ADR-0020): STEP/BREP retain the live CadModel; the
+    // tessellation is derived for regions, viewport, and legacy hybrid fill.
+    // STL is no longer an accepted input — provide a STEP/BREP CAD file.
     if (lower.ends_with(".step") || lower.ends_with(".stp")) {
         model.cad = geom::CadModel::load_step(path);
         model.surface = model.cad->tessellate();
@@ -130,13 +130,10 @@ Model Model::load(const std::string& path, double sharp_angle_deg) {
         model.bbox_min = model.cad->bbox_min();
         model.bbox_max = model.cad->bbox_max();
     } else {
-        model.surface = geom::load_stl(path);
-        model.bbox_min = model.surface.vertices.front();
-        model.bbox_max = model.surface.vertices.front();
-        for (const auto& v : model.surface.vertices) {
-            model.bbox_min = model.bbox_min.cwiseMin(v);
-            model.bbox_max = model.bbox_max.cwiseMax(v);
-        }
+        throw std::runtime_error(std::format(
+            "unsupported input '{}': only CAD files are accepted "
+            "(.step, .stp, .brep, .brp). STL inputs are no longer supported.",
+            path));
     }
     model.surface.validate();
 
@@ -341,6 +338,56 @@ ResolvedMeshSize resolve_mesh_size(const Model& model, double requested_h,
         std::isfinite(cad_min_edge) ? std::format(", CAD_edge≈{:.3g}", cad_min_edge)
                                     : std::string{});
     return out;
+}
+
+RefinementPlan build_refinement_plan(const Model& model, double h_coarse,
+                                     std::span<const RefineRegion> regions,
+                                     bool use_geometry) {
+    RefinementPlan plan;
+    if (!(h_coarse > 0.0) || !std::isfinite(h_coarse)) {
+        return plan;
+    }
+    std::vector<adapt::SizeSource> sources;
+
+    // Geometry a-priori: curvature + thin-wall surface sources finer than the
+    // bulk h. Flat, thick regions emit nothing, so the source set stays sparse.
+    if (use_geometry) {
+        const double h_min_geo = 0.15 * h_coarse; // floor: avoid runaway fine
+        const auto geo = adapt::geometry_size_sources(model.surface, h_min_geo, h_coarse);
+        plan.n_geometry_seeds = geo.size();
+        sources.insert(sources.end(), geo.begin(), geo.end());
+    }
+
+    // Boundary-condition / load a-priori: surface-face centroids inside each
+    // selection box, at target_fraction * h_coarse (loads finest). This is what
+    // makes the mesh grade toward the simulation setup, not just the geometry.
+    const auto& surf = model.surface;
+    for (const auto& reg : regions) {
+        std::vector<Eigen::Vector3d> pts;
+        for (const auto& t : surf.triangles) {
+            const Eigen::Vector3d c =
+                (surf.vertices[t[0]] + surf.vertices[t[1]] + surf.vertices[t[2]]) / 3.0;
+            if ((c.array() >= reg.lo.array()).all() && (c.array() <= reg.hi.array()).all()) {
+                pts.push_back(c);
+            }
+        }
+        if (pts.empty()) {
+            continue;
+        }
+        const double h_target = std::max(0.1 * h_coarse, reg.target_fraction * h_coarse);
+        const auto bc = adapt::point_size_sources(pts, h_target);
+        plan.n_bc_seeds += bc.size();
+        sources.insert(sources.end(), bc.begin(), bc.end());
+    }
+
+    if (sources.empty()) {
+        return plan;
+    }
+    const auto sp = adapt::seed_plan(sources, h_coarse, /*band_frac=*/1.5);
+    plan.refine_seeds = std::move(sp.refine_seeds);
+    plan.seed_band = sp.seed_band;
+    plan.h_fine = sp.h_fine;
+    return plan;
 }
 
 ElementTendencyPlan resolve_element_tendency(VolumeMesher base, double tendency,
@@ -1891,6 +1938,12 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 std::vector<adapt::SizeSource> src = adapt::point_size_sources(load_pts, 0.25 * h);
                 const auto fix_src = adapt::point_size_sources(fix_pts, 0.5 * h);
                 src.insert(src.end(), fix_src.begin(), fix_src.end());
+                // Fuse geometry (curvature / thin-wall) sources so the a-priori
+                // mesh grades toward both the features and the BCs (ADR-0021).
+                if (setup.use_feature_grading) {
+                    const auto geo = adapt::geometry_size_sources(surf, 0.15 * h, h);
+                    src.insert(src.end(), geo.begin(), geo.end());
+                }
                 const auto plan = adapt::seed_plan(src, h, /*band_frac=*/1.5);
                 adapt_seeds = plan.refine_seeds;
                 adapt_seed_band = plan.seed_band;

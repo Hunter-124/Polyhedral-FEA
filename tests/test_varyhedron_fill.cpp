@@ -8,6 +8,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <filesystem>
+#include <stdexcept>
 
 using polymesh::geom::CadModel;
 using polymesh::geom::extract_topology;
@@ -59,14 +60,10 @@ TEST_CASE("Model::load STEP retains CadModel (V1c)") {
     CHECK((model.bbox_max - model.bbox_min).norm() > 0.5);
 }
 
-TEST_CASE("Model::load STL has no retained CadModel") {
-    const std::filesystem::path path = "bench/geometries/public/unit_box.stl";
-    if (!std::filesystem::exists(path)) {
-        SKIP("unit_box.stl missing");
-    }
-    const Model model = Model::load(path.string());
-    CHECK_FALSE(model.cad.has_value());
-    REQUIRE_FALSE(model.surface.triangles.empty());
+TEST_CASE("Model::load rejects STL inputs (CAD-only)") {
+    REQUIRE_THROWS_AS(Model::load("bench/geometries/public/unit_box.stl"),
+                      std::runtime_error);
+    REQUIRE_THROWS_AS(Model::load("/tmp/nope.stl"), std::runtime_error);
 }
 
 TEST_CASE("volume_mesh varyhedron on plate_hole.step") {

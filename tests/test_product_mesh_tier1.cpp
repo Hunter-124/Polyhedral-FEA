@@ -8,47 +8,20 @@
 #include "fea/solve.hpp"
 #include "fea/stress.hpp"
 #include "pipeline/scene.hpp"
+#include "geom/stl.hpp"
+#include "support/box_model.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <chrono>
 #include <cmath>
 #include <filesystem>
-#include <format>
-#include <fstream>
 #include <thread>
 
 using namespace polymesh::pipeline;
 namespace fea = polymesh::fea;
 
 namespace {
-
-std::filesystem::path write_box_stl(double lx, double ly, double lz, const char* name) {
-    const auto path = std::filesystem::temp_directory_path() / name;
-    std::ofstream out(path);
-    out << "solid box\n";
-    const auto facet = [&](std::array<double, 3> n, std::array<std::array<double, 3>, 3> v) {
-        out << std::format(" facet normal {} {} {}\n  outer loop\n", n[0], n[1], n[2]);
-        for (const auto& p : v) {
-            out << std::format("   vertex {} {} {}\n", p[0] * lx, p[1] * ly, p[2] * lz);
-        }
-        out << "  endloop\n endfacet\n";
-    };
-    facet({0, 0, -1}, {{{0, 0, 0}, {0, 1, 0}, {1, 1, 0}}});
-    facet({0, 0, -1}, {{{0, 0, 0}, {1, 1, 0}, {1, 0, 0}}});
-    facet({0, 0, 1}, {{{0, 0, 1}, {1, 0, 1}, {1, 1, 1}}});
-    facet({0, 0, 1}, {{{0, 0, 1}, {1, 1, 1}, {0, 1, 1}}});
-    facet({0, -1, 0}, {{{0, 0, 0}, {1, 0, 0}, {1, 0, 1}}});
-    facet({0, -1, 0}, {{{0, 0, 0}, {1, 0, 1}, {0, 0, 1}}});
-    facet({0, 1, 0}, {{{0, 1, 0}, {0, 1, 1}, {1, 1, 1}}});
-    facet({0, 1, 0}, {{{0, 1, 0}, {1, 1, 1}, {1, 1, 0}}});
-    facet({-1, 0, 0}, {{{0, 0, 0}, {0, 0, 1}, {0, 1, 1}}});
-    facet({-1, 0, 0}, {{{0, 0, 0}, {0, 1, 1}, {0, 1, 0}}});
-    facet({1, 0, 0}, {{{1, 0, 0}, {1, 1, 0}, {1, 1, 1}}});
-    facet({1, 0, 0}, {{{1, 0, 0}, {1, 1, 1}, {1, 0, 1}}});
-    out << "endsolid box\n";
-    return path;
-}
 
 /// Identify face regions on a box by mean triangle x-coordinate.
 void box_end_regions(const Model& model, double lx, int& fixed, int& loaded) {
@@ -73,8 +46,7 @@ void box_end_regions(const Model& model, double lx, int& fixed, int& loaded) {
 TEST_CASE("E4 product mesh: unit box cantilever, max |u| > 0, finite stress") {
     // Coarse tet product mesh on a unit box; fix x=0, load +Fx on x=1.
     // Smoke: solve succeeds, tip moves, von Mises finite and positive.
-    const auto path = write_box_stl(1.0, 1.0, 1.0, "polymesh_e4_unit_box.stl");
-    const auto model = Model::load(path.string());
+    const auto model = polymesh::testsupport::box_model(1.0, 1.0, 1.0);
     REQUIRE(model.region_count == 6);
 
     int fixed = -1, loaded = -1;
@@ -133,8 +105,7 @@ TEST_CASE("E4 product mesh: unit box cantilever, max |u| > 0, finite stress") {
 TEST_CASE("E4 product mesh: slender box SolveJob finishes with finite stress") {
     // Pipeline SolveJob path (same product mesher) — cantilever-like, coarse.
     const double lx = 0.1, ly = 0.02, lz = 0.02;
-    const auto path = write_box_stl(lx, ly, lz, "polymesh_e4_cantilever.stl");
-    const auto model = Model::load(path.string());
+    const auto model = polymesh::testsupport::box_model(lx, ly, lz);
 
     int fixed = -1, loaded = -1;
     box_end_regions(model, lx, fixed, loaded);
@@ -178,7 +149,7 @@ TEST_CASE("E4 product mesh: public cylinder_prism smoke (mesh+solve, not Lame to
     if (!std::filesystem::exists(geom)) {
         SKIP("cylinder_prism.stl not found (run from repo root)");
     }
-    const auto model = Model::load(geom.string());
+    const auto model = polymesh::testsupport::model_from_surface(polymesh::geom::load_stl(geom.string()));
     REQUIRE(model.surface.triangles.size() >= 8);
 
     // Coarse h from bbox so runtime stays small.

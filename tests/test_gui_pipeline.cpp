@@ -6,7 +6,7 @@
 
 #include "fea/solve.hpp"
 #include "pipeline/scene.hpp"
-
+#include "support/box_model.hpp"
 #include <catch2/catch_test_macros.hpp>
 
 #include <chrono>
@@ -19,42 +19,9 @@
 using namespace polymesh::pipeline;
 namespace fea = polymesh::fea;
 
-namespace {
-
-/// Writes a unit-ish box (lx, ly, lz metres) as ASCII STL.
-std::filesystem::path write_box_stl(double lx, double ly, double lz) {
-    const auto path = std::filesystem::temp_directory_path() / "polymesh_test_box.stl";
-    std::ofstream out(path);
-    out << "solid box\n";
-    const auto facet = [&](std::array<double, 3> n, std::array<std::array<double, 3>, 3> v) {
-        out << std::format(" facet normal {} {} {}\n  outer loop\n", n[0], n[1], n[2]);
-        for (const auto& p : v) {
-            out << std::format("   vertex {} {} {}\n", p[0] * lx, p[1] * ly, p[2] * lz);
-        }
-        out << "  endloop\n endfacet\n";
-    };
-    // 12 triangles, outward normals, unit-cube corner coordinates.
-    facet({0, 0, -1}, {{{0, 0, 0}, {0, 1, 0}, {1, 1, 0}}});
-    facet({0, 0, -1}, {{{0, 0, 0}, {1, 1, 0}, {1, 0, 0}}});
-    facet({0, 0, 1}, {{{0, 0, 1}, {1, 0, 1}, {1, 1, 1}}});
-    facet({0, 0, 1}, {{{0, 0, 1}, {1, 1, 1}, {0, 1, 1}}});
-    facet({0, -1, 0}, {{{0, 0, 0}, {1, 0, 0}, {1, 0, 1}}});
-    facet({0, -1, 0}, {{{0, 0, 0}, {1, 0, 1}, {0, 0, 1}}});
-    facet({0, 1, 0}, {{{0, 1, 0}, {0, 1, 1}, {1, 1, 1}}});
-    facet({0, 1, 0}, {{{0, 1, 0}, {1, 1, 1}, {1, 1, 0}}});
-    facet({-1, 0, 0}, {{{0, 0, 0}, {0, 0, 1}, {0, 1, 1}}});
-    facet({-1, 0, 0}, {{{0, 0, 0}, {0, 1, 1}, {0, 1, 0}}});
-    facet({1, 0, 0}, {{{1, 0, 0}, {1, 1, 0}, {1, 1, 1}}});
-    facet({1, 0, 0}, {{{1, 0, 0}, {1, 1, 1}, {1, 0, 1}}});
-    out << "endsolid box\n";
-    return path;
-}
-
-} // namespace
 
 TEST_CASE("GUI pipeline: box STL segments into six faces and solves end-to-end") {
-    const auto path = write_box_stl(0.1, 0.02, 0.02);
-    const auto model = Model::load(path.string());
+    const auto model = polymesh::testsupport::box_model(0.1, 0.02, 0.02);
     CHECK(model.surface.triangles.size() == 12);
     CHECK(model.region_count == 6);
 
@@ -115,8 +82,7 @@ TEST_CASE("GUI pipeline: box STL segments into six faces and solves end-to-end")
 }
 
 TEST_CASE("mesh-only job produces volume mesh for GUI preview") {
-    const auto path = write_box_stl(1.0, 1.0, 1.0);
-    const auto model = Model::load(path.string());
+    const auto model = polymesh::testsupport::box_model(1.0, 1.0, 1.0);
     SimSetup setup;
     setup.mesh_size = 0.25;
     setup.mesher = VolumeMesher::kTetFill;
@@ -141,8 +107,7 @@ TEST_CASE("mesh-only job produces volume mesh for GUI preview") {
 }
 
 TEST_CASE("solve job fills nodal ZZ eta for error-field display") {
-    const auto path = write_box_stl(0.1, 0.02, 0.02);
-    const auto model = Model::load(path.string());
+    const auto model = polymesh::testsupport::box_model(0.1, 0.02, 0.02);
     SimSetup setup;
     setup.mesh_size = 0.01;
     setup.mesher = VolumeMesher::kTetFill;
@@ -234,8 +199,7 @@ std::optional<SolveResult> run_solve_job(const Model& model, const SimSetup& set
 } // namespace
 
 TEST_CASE("D2: high eta_target early-stops adapt before max passes") {
-    const auto path = write_box_stl(0.1, 0.02, 0.02);
-    const auto model = Model::load(path.string());
+    const auto model = polymesh::testsupport::box_model(0.1, 0.02, 0.02);
     auto setup = cantilever_setup(model, 0.012);
     setup.adapt_passes = 2;
     // Any real ZZ η is finite and ≪ this; stop on pass 0 without remesh.
@@ -251,8 +215,7 @@ TEST_CASE("D2: high eta_target early-stops adapt before max passes") {
 }
 
 TEST_CASE("D2: eta_target=0 leaves adapt path unchanged (no eta-target stop note)") {
-    const auto path = write_box_stl(0.1, 0.02, 0.02);
-    const auto model = Model::load(path.string());
+    const auto model = polymesh::testsupport::box_model(0.1, 0.02, 0.02);
     auto setup = cantilever_setup(model, 0.012);
     setup.adapt_passes = 1;
     setup.eta_target = 0.0; // disabled
@@ -267,8 +230,7 @@ TEST_CASE("D2: eta_target=0 leaves adapt path unchanged (no eta-target stop note
 }
 
 TEST_CASE("D5: mesh_size=0 auto h yields finite mesh and note with auto h") {
-    const auto path = write_box_stl(1.0, 1.0, 1.0);
-    const auto model = Model::load(path.string());
+    const auto model = polymesh::testsupport::box_model(1.0, 1.0, 1.0);
 
     // Direct helper: auto on unit box → positive finite h, note tagged auto.
     const auto resolved = resolve_mesh_size(model, 0.0);
@@ -312,8 +274,7 @@ TEST_CASE("D5: mesh_size=0 auto h yields finite mesh and note with auto h") {
 }
 
 TEST_CASE("SolveJob reports phase progress during mesh-only") {
-    const auto path = write_box_stl(1.0, 1.0, 1.0);
-    const auto model = Model::load(path.string());
+    const auto model = polymesh::testsupport::box_model(1.0, 1.0, 1.0);
     SimSetup setup;
     setup.mesh_size = 0.25;
     setup.mesher = VolumeMesher::kTetFill;
@@ -368,8 +329,7 @@ TEST_CASE("SolveJob reports phase progress during mesh-only") {
 }
 
 TEST_CASE("SolveJob publishes live mesh for viewport during mesh-only") {
-    const auto path = write_box_stl(1.0, 1.0, 1.0);
-    const auto model = Model::load(path.string());
+    const auto model = polymesh::testsupport::box_model(1.0, 1.0, 1.0);
     SimSetup setup;
     setup.mesh_size = 0.2;
     setup.mesher = VolumeMesher::kTetFill;
@@ -412,8 +372,7 @@ TEST_CASE("SolveJob publishes live mesh for viewport during mesh-only") {
 TEST_CASE("SolveJob elapsed_ms advances while phase is held") {
     // Larger mesh so the worker stays in kMeshing long enough for wall-clock
     // polls to diverge (regression: UI looked frozen mid-mesh/solve).
-    const auto path = write_box_stl(1.0, 1.0, 1.0);
-    const auto model = Model::load(path.string());
+    const auto model = polymesh::testsupport::box_model(1.0, 1.0, 1.0);
     SimSetup setup;
     setup.mesh_size = 0.12;
     setup.mesher = VolumeMesher::kTetFill;
@@ -459,8 +418,7 @@ TEST_CASE("SolveJob elapsed_ms advances while phase is held") {
 }
 
 TEST_CASE("SolveJob cancel between phases reaches kCancelled") {
-    const auto path = write_box_stl(0.1, 0.02, 0.02);
-    const auto model = Model::load(path.string());
+    const auto model = polymesh::testsupport::box_model(0.1, 0.02, 0.02);
     auto setup = cantilever_setup(model, 0.008);
     // Multi-pass adapt so there are checkpoints between remesh / solve phases.
     setup.adapt_passes = 2;
@@ -503,8 +461,7 @@ TEST_CASE("SolveJob cancel between phases reaches kCancelled") {
 }
 
 TEST_CASE("SolveJob pause holds then resume completes") {
-    const auto path = write_box_stl(0.1, 0.02, 0.02);
-    const auto model = Model::load(path.string());
+    const auto model = polymesh::testsupport::box_model(0.1, 0.02, 0.02);
     auto setup = cantilever_setup(model, 0.012);
     setup.adapt_passes = 1;
     setup.eta_target = 0.0;

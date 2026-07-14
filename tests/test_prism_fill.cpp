@@ -5,6 +5,7 @@
 #include "geom/tri_surface.hpp"
 #include "mesh/prism_fill.hpp"
 #include "pipeline/scene.hpp"
+#include "support/box_model.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -107,7 +108,7 @@ TEST_CASE("prism_fill chooses longest extent as sweep axis") {
 }
 
 TEST_CASE("pipeline volume_mesh kPrismSweep emits only prism6") {
-    auto model = pipeline::Model::load("bench/geometries/public/unit_box.stl");
+    auto model = polymesh::testsupport::box_model(1.0, 1.0, 1.0);
     auto vol = pipeline::volume_mesh(model, 0.25, pipeline::VolumeMesher::kPrismSweep);
     REQUIRE_FALSE(vol.mesh.elements.empty());
     REQUIRE_NOTHROW(vol.mesh.check_validity());
@@ -133,7 +134,7 @@ TEST_CASE("prism_fill extruded triangle surface: prism6 validity") {
 }
 
 TEST_CASE("prism product mesh solve smoke on unit box") {
-    auto model = pipeline::Model::load("bench/geometries/public/unit_box.stl");
+    auto model = polymesh::testsupport::box_model(1.0, 1.0, 1.0);
     auto vol = pipeline::volume_mesh(model, 0.5, pipeline::VolumeMesher::kPrismSweep);
     REQUIRE_FALSE(vol.mesh.elements.empty());
     for (const auto& el : vol.mesh.elements) {

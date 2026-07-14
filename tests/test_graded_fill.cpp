@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "geom/features.hpp"
+#include "geom/stl.hpp"
 #include "mesh/grid_classify.hpp"
 #include "mesh/hybrid_fill.hpp"
 #include "mesh/surface_project.hpp"
 #include "mesh/tet_fill.hpp"
 #include "pipeline/scene.hpp"
+#include "support/box_model.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -227,8 +229,8 @@ TEST_CASE("graded fill surface-snaps boundary (not pure staircase)") {
 TEST_CASE("cylinder_prism graded+feature notes curvature seeds and snaps") {
     // Hole / curved wall fixture: feature grading should emit curv_seeds and a
     // snap residual line (geometry-variable mesh path).
-    auto model =
-        polymesh::pipeline::Model::load("bench/geometries/public/cylinder_prism.stl");
+    auto model = polymesh::testsupport::model_from_surface(
+        polymesh::geom::load_stl("bench/geometries/public/cylinder_prism.stl"));
     REQUIRE(model.surface.triangles.size() >= 4);
     // volume_mesh needs positive h (auto-h is resolve_mesh_size in the job path).
     const double h = 0.15 * (model.bbox_max - model.bbox_min).maxCoeff();

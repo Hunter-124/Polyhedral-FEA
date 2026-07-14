@@ -149,6 +149,41 @@ struct ResolvedMeshSize {
 ResolvedMeshSize resolve_mesh_size(const Model& model, double requested_h,
                                    double sharp_angle_deg = 30.0);
 
+/// A boundary-condition / load selection region (world AABB) used to grade the
+/// mesh toward the **simulation setup**, not just the geometry (ADR-0021).
+/// `target_fraction` is the desired edge length inside the box as a fraction of
+/// the coarse h: loads finest (e.g. 0.25, stress concentrates under load),
+/// fixtures moderate (e.g. 0.5). A box left at ±inf selects the whole part.
+struct RefineRegion {
+    Eigen::Vector3d lo = Eigen::Vector3d::Constant(-1e300);
+    Eigen::Vector3d hi = Eigen::Vector3d::Constant(1e300);
+    double target_fraction = 0.5;
+};
+
+/// Fused geometry + boundary-condition refinement plan for `volume_mesh`.
+/// Geometry sources (curvature / thin-wall, a priori) and BC/load region
+/// sources (the simulation setup, a priori) are combined into one
+/// gradient-limited seed field (adapt::seed_plan). Feed `refine_seeds` +
+/// `seed_band` straight into `volume_mesh` so the mesh grades toward both
+/// features and boundary conditions.
+struct RefinementPlan {
+    std::vector<Eigen::Vector3d> refine_seeds;
+    double seed_band = 0.0; // ball influence radius, metres
+    double h_fine = 0.0;    // finest requested target, metres
+    std::size_t n_geometry_seeds = 0;
+    std::size_t n_bc_seeds = 0;
+};
+
+/// Build a fused geometry + BC refinement plan for the ball-grading meshers
+/// (graded tet / hybrid / varyhedron). `h_coarse` is the resolved bulk size
+/// (see resolve_mesh_size). When `use_geometry`, surface curvature / thin-wall
+/// sources finer than `h_coarse` are added. Each region contributes the
+/// surface-face centroids inside its box at `target_fraction * h_coarse`.
+/// Returns an empty plan when nothing qualifies (uniform mesh).
+RefinementPlan build_refinement_plan(const Model& model, double h_coarse,
+                                     std::span<const RefineRegion> regions,
+                                     bool use_geometry = true);
+
 /// Solve products, ready for rendering / VTU.
 struct SolveResult {
     fea::NodalMesh volume_mesh;

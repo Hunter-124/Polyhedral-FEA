@@ -13,7 +13,7 @@ other — not glued together after the fact.
 - **Hybrid element zoo** in one conforming mesh: tets, hexes, prisms, pyramids,
   general polyhedra (VEM).
 - **Geometry- and solution-driven adaptivity** (sizing, hp, local remesh).
-- **Linear elastostatics** (3D), STL (STEP via OpenCASCADE option), VTU export.
+- **Linear elastostatics** (3D), CAD input (STEP / B-rep via OpenCASCADE), VTU export.
 - **OpenMP multithreading** (default ON) for stiffness assembly, mesh inside-tests,
   ZZ recovery, stress recovery, and CSR SpMV. Eigen dense kernels stay single-threaded
   to avoid nested OpenMP hangs. Serial path always builds if OpenMP is missing.
@@ -25,7 +25,7 @@ other — not glued together after the fact.
 
 ## Status
 
-P1 solver baseline frozen. Working product path: tet/hex/hex-VEM/graded-tet mesh from STL/STEP, GUI
+P1 solver baseline frozen. Working product path: tet/hex/hex-VEM/graded-tet/varyhedron mesh from STEP/BREP CAD, GUI
 study (fixtures/loads/solve/export), CLI mesh/solve → VTU, ZZ indicators,
 feature-edge sizing hooks. Hybrid VEM/adapt loop still expanding. Tracking:
 [docs/progress.md](docs/progress.md), [docs/phases.md](docs/phases.md),
@@ -49,7 +49,7 @@ feature-edge sizing hooks. Hybrid VEM/adapt loop still expanding. Tracking:
 2. **Measure before packing loops** — scorecard + health gates; never reward wire PNGs or residual alone; never score raw nodal \(\sigma_{\max}\).  
 3. **Substrate:** sharp-only edge protect + graded tet + live BRep oracle → evolve to **restricted CVT / clipped Voronoi (Geogram BSD-3)**; **hard-block** dual-of-tet until CVT cells; frame-field hex out of near-term horizon.  
 4. **Near-term order:** freeze baseline campaign → wall OCC project → Lloyd CVT (do not reorder).  
-5. Product geometry = **STEP/BRep** (`POLYMESH_WITH_OCC=ON`); STL compare-only.
+5. Product geometry = **STEP/BRep** (`POLYMESH_WITH_OCC=ON`, default); inputs are CAD-only (STL dropped).
 
 Short packing campaigns: `varyhedron` + `hybrid_zoo` only; parts `plate_hole` / `cylinder` / `sphere` / `icecream_cone`.
 
@@ -114,7 +114,7 @@ cmake -S . -B build -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DPOLYMESH_WITH_GUI=ON \
   -DPOLYMESH_WITH_OPENMP=ON \
-  -DPOLYMESH_WITH_OCC=OFF \
+  -DPOLYMESH_WITH_OCC=ON \
   -DPOLYMESH_WITH_CUDA=OFF
 
 cmake --build build -j
@@ -130,39 +130,50 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DPOLYMESH_WITH_GUI=ON
 
 ### CLI examples (public unit box)
 
-Fixture: [`bench/geometries/public/unit_box.stl`](bench/geometries/public/unit_box.stl)
-(1 m axis-aligned box).
+Fixture: [`bench/geometries/public/unit_box.step`](bench/geometries/public/unit_box.step)
+(1 m axis-aligned box). Inputs are **CAD only** (`.step .stp .brep .brp`).
 
 ```sh
-# Validate surface
-./build/apps/cli/polymesh check bench/geometries/public/unit_box.stl
+# Validate CAD geometry
+./build/apps/cli/polymesh check bench/geometries/public/unit_box.step
 
-# Mesh — omit -h for auto h0 (bbox + sharp-edge density); or pass -h in metres
-./build/apps/cli/polymesh mesh bench/geometries/public/unit_box.stl \
+# Mesh — geometry-aware (curvature/thin-wall) grading is on by default.
+# Omit -h for auto h0 (bbox + feature density); or pass -h in metres.
+./build/apps/cli/polymesh mesh bench/geometries/public/unit_box.step \
   -o /tmp/unit_box_mesh.vtu
-./build/apps/cli/polymesh mesh bench/geometries/public/unit_box.stl \
-  -h 0.1 -o /tmp/unit_box_mesh.vtu
+./build/apps/cli/polymesh mesh bench/geometries/public/unit_box.step \
+  --mesher varyhedron -h 0.1 -o /tmp/unit_box_mesh.vtu
 
-# Solve — fix min-x face, +Fy on max-x; writes VTU with von Mises + displacement
-./build/apps/cli/polymesh solve bench/geometries/public/unit_box.stl \
+# Geometry + simulation-setup (BC/load) aware mesh: refine toward a load box
+# (finest) and a fixture box. The mesh grades to the boundary conditions.
+./build/apps/cli/polymesh mesh bench/geometries/public/unit_box.step \
+  --mesher varyhedron --fix-box -1 -1 -1 0.01 2 2 --load-box 0.99 -1 -1 2 2 2 \
+  -o /tmp/unit_box_bc.vtu
+
+# Solve — default BCs fix min-x, +Fy on max-x; --fix-box/--load-box override
+# selection (and grade the mesh toward them). Writes von Mises + displacement.
+./build/apps/cli/polymesh solve bench/geometries/public/unit_box.step \
   -o /tmp/unit_box_result.vtu
-./build/apps/cli/polymesh solve bench/geometries/public/unit_box.stl \
+./build/apps/cli/polymesh solve bench/geometries/public/unit_box.step \
   -h 0.08 -o /tmp/unit_box_result.vtu --mesher tet
 ```
 
-Useful flags: `--mesher tet|hex|hexvem|graded|hexpyr|prism`, `--feature`, `--adapt n`,
-`--eta-target η`, `-E`, `-nu`. Run `./build/apps/cli/polymesh` with no args for full help.
+Useful flags: `--mesher varyhedron|tet|hex|hexvem|graded|hexpyr|prism`,
+`--fix-box`/`--load-box` (6 numbers: x0 y0 z0 x1 y1 z1), `--no-feature`,
+`--adapt n`, `--eta-target η`, `-E`, `-nu`. Run `./build/apps/cli/polymesh`
+with no args for full help.
 
 ### GUI
 
 ```sh
 ./build/apps/gui/polymesh-gui
-./build/apps/gui/polymesh-gui bench/geometries/public/unit_box.stl
+./build/apps/gui/polymesh-gui bench/geometries/public/unit_box.step
 ```
 
-Open an STL/STEP (path field, argv, or drag-drop). Set material, **element size
-(mm, 0=auto)** — zero uses the same auto h0 as the CLI. Assign fixtures/loads on
-faces, **Mesh only** for a preview, **Solve** for stress/deflection/ZZ η.
+Open a CAD part `.step`/`.stp`/`.brep` (path field, argv, or drag-drop). Set
+material, **element size (mm, 0=auto)** — zero uses the same auto h0 as the CLI.
+Assign fixtures/loads on faces, **Mesh only** for a preview, **Solve** for
+stress/deflection/ZZ η.
 Mesh note / status shows resolved `auto h=…` when size is automatic. Export VTU
 from the results panel. Needs a display (GLFW); headless CI covers the pipeline
 via Catch2, not the window.
@@ -226,10 +237,10 @@ ctest --test-dir build --output-on-failure -R "SpMV|spmv"
 
 ### STEP / OpenCASCADE (`POLYMESH_WITH_OCC`)
 
-Default CI/quickstart builds are **STL-capable without OCC**. **Product
-geometry, Lane V campaigns, and GUI STEP import need OCC ON**
-(`-DPOLYMESH_WITH_OCC=ON`) so B-rep/STEP stays first-class (ADR-0001 / ADR-0020).
-Without OCC, STEP loads and CadModel tests are unavailable / SKIP.
+OpenCASCADE is **ON by default** — inputs are CAD-only (`.step .stp .brep .brp`).
+Product geometry, Lane V campaigns, and GUI STEP import all require it
+(ADR-0001 / ADR-0020). Build with `-DPOLYMESH_WITH_OCC=OFF` only for a
+geometry-less library/solver build; STEP/CadModel loads then throw.
 
 ```sh
 # Ubuntu / Debian (package names vary slightly by release; 7.6+ typical)
@@ -248,9 +259,9 @@ cmake --build build
 If CMake cannot find OCCT: `-DOpenCASCADE_DIR=/path/to/cmake/OpenCASCADE` (or the
 prefix that contains `OpenCASCADEConfig.cmake`). See `src/geom/CMakeLists.txt`.
 
-**Product fixtures are STEP** (`scripts/gen_cad_parts.py`). STL write is not
-part of the product path (`scripts/check_no_product_stl.sh`; load_stl remains
-for compare/legacy only).
+**Product fixtures are STEP** (`scripts/gen_cad_parts.py`). STL is no longer an
+accepted input (CLI / GUI / pipeline `Model::load` reject it); the `load_stl`
+parser remains only as internal test scaffolding.
 
 ### Mesh path caveat
 

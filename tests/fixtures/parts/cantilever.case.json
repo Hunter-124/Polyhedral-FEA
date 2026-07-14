@@ -1,6 +1,6 @@
 {
   "part": "cantilever",
-  "geometry": "tests/fixtures/parts/cantilever.stl",
+  "geometry": "tests/fixtures/parts/cantilever.step",
   "material": { "E": 2.0e11, "nu": 0.3, "rho": 7850 },
   "bcs": [
     {

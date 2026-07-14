@@ -38,6 +38,7 @@ add_executable(polymesh_tests
     test_fe_vem_assembly.cpp
     test_element_tendency.cpp
     test_refinement_plan.cpp
+    test_geometry_fidelity.cpp
     test_quality.cpp
     test_hex_vem_pipeline.cpp
     test_prism.cpp

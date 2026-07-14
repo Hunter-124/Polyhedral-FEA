@@ -42,6 +42,19 @@ suite 257/257 green (OCC on). STL box/smoke tests migrated to in-memory
 `testsupport::box_model` / `model_from_surface(load_stl(...))`; cantilever+smoke_bar
 cases regenerated as STEP.
 
+**Curved-import fidelity + diagnostics + self-improve loop (2026-07-14):** Fixed
+coarse pipe faceting — CAD tessellation angular deflection 0.5→0.2 rad (+ finer
+linear sag), `CadModel::tessellate(deflection, angular_deflection)`; a cylinder
+wall now tessellates < 1% chord deviation (`test_geometry_fidelity`). Fixed the
+GUI crash `local_refine_tets: non-positive child volume`: LEB now skips a
+terminal edge whose best midpoint would invert a sliver child instead of
+aborting the mesh (sliver-safe, still conforming; `n_skipped_slivers`). New
+`polymesh diag <part> --json` emits fidelity/quality/timing/throughput; new
+`scripts/self_improve.sh [--backend omp|grok]` runs a brief CAD battery →
+report → LLM CLI edits the meshers (GUI "self-improve" buttons launch it). Large
+curved fixture `tests/fixtures/parts/pipe.step` (Ø60×400) added; LEB robustness
+test on it. Full suite 259/259 green (OCC on).
+
 ## Background / older phases
 
 **Track H (historical):** mesher honesty/perf overhaul; owner gate **A9** theme

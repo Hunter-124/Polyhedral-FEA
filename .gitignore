@@ -31,3 +31,6 @@ examples/out/
 /polymesh.exe
 /polymesh-gui
 /polymesh-gui.exe
+
+# Self-improve loop run outputs (machine-local)
+bench/self_improve/

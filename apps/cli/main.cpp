@@ -15,6 +15,7 @@
 #include "mesh/tet_fill.hpp"
 #include "pipeline/scene.hpp"
 
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -42,6 +43,8 @@ int usage() {
                "              [--fix-box ...6] [--load-box ...6] [--bc-grade]\n"
                "                             mesh + BCs + VTU. Default BCs: fix min-x,\n"
                "                             load +Fy on max-x. Boxes override selection.\n"
+               "  diag  <part> [-h m] [--mesher name] [--json out.json] [--no-solve]\n"
+               "                             JSON diagnostics: fidelity, quality, timings\n"
                "  backend                    print compute backend + OpenMP/opt summary\n"
                "\n"
                "inputs: CAD only (.step .stp .brep .brp). STL is no longer supported.\n"
@@ -468,6 +471,157 @@ int cmd_solve(std::span<char*> args) {
     return 0;
 }
 
+// Structured diagnostics: import fidelity, mesh quality, and phase timings as
+// JSON — the profiler output and the measurement feed for the self-improve loop
+// (scripts/self_improve.sh). Optionally runs a default cantilever solve too.
+int cmd_diag(std::span<char*> args) {
+    if (args.size() < 3) {
+        return usage();
+    }
+    const std::string path = args[2];
+    double h = 0.0;
+    auto mesher = polymesh::pipeline::VolumeMesher::kVaryhedron;
+    bool do_solve = true;
+    std::string json_path;
+    for (std::size_t i = 3; i < args.size(); ++i) {
+        if (std::strcmp(args[i], "-h") == 0 && i + 1 < args.size()) {
+            h = std::atof(args[++i]);
+        } else if (std::strcmp(args[i], "--mesher") == 0 && i + 1 < args.size()) {
+            mesher = parse_mesher(args[++i]);
+        } else if (std::strcmp(args[i], "--json") == 0 && i + 1 < args.size()) {
+            json_path = args[++i];
+        } else if (std::strcmp(args[i], "--no-solve") == 0) {
+            do_solve = false;
+        } else {
+            return usage();
+        }
+    }
+    using clock = std::chrono::steady_clock;
+    const auto ms = [](clock::duration d) {
+        return std::chrono::duration<double, std::milli>(d).count();
+    };
+
+    auto t0 = clock::now();
+    const auto model = polymesh::pipeline::Model::load(path);
+    const double import_ms = ms(clock::now() - t0);
+    const double bbox_diag = (model.bbox_max - model.bbox_min).norm();
+
+    const auto resolved = polymesh::pipeline::resolve_mesh_size(model, h);
+    h = resolved.h;
+    // Diagnostics run at a coarse, representative resolution: cap auto-h so a
+    // curvature-fine auto size doesn't explode the quick battery. A user -h is
+    // always respected.
+    if (resolved.auto_chosen && bbox_diag > 0.0 && h < bbox_diag / 12.0) {
+        h = bbox_diag / 12.0;
+    }
+    const auto plan = polymesh::pipeline::build_refinement_plan(model, h, {}, /*use_geometry=*/true);
+
+    t0 = clock::now();
+    auto vol = polymesh::pipeline::volume_mesh(model, h, mesher, 2, true, plan.refine_seeds,
+                                               plan.seed_band);
+    const double mesh_ms = ms(clock::now() - t0);
+    vol.mesh.check_validity();
+
+    const auto quality = polymesh::fea::tet4_cell_quality(vol.mesh);
+    double q_min = 1.0, q_sum = 0.0;
+    std::size_t q_n = 0;
+    for (const double q : quality) {
+        if (q > 0.0) {
+            q_min = std::min(q_min, q);
+            q_sum += q;
+            ++q_n;
+        }
+    }
+    const double q_mean = q_n > 0 ? q_sum / static_cast<double>(q_n) : 0.0;
+
+    double max_vm = 0.0, max_u = 0.0, global_eta = 0.0, solve_ms = 0.0;
+    std::size_t dof = 0;
+    bool solved = false;
+    if (do_solve) {
+        const double xmin = model.bbox_min[0], xmax = model.bbox_max[0];
+        const double tol = 0.51 * h;
+        polymesh::fea::Dirichlet bc;
+        std::vector<std::uint32_t> load_nodes;
+        for (std::uint32_t i = 0; i < vol.mesh.nodes.size(); ++i) {
+            const double x = vol.mesh.nodes[i][0];
+            if (x <= xmin + tol) {
+                bc.fix_node(i);
+            }
+            if (x >= xmax - tol) {
+                load_nodes.push_back(i);
+            }
+        }
+        if (!bc.dof_values.empty() && !load_nodes.empty()) {
+            Eigen::VectorXd loads =
+                Eigen::VectorXd::Zero(3 * static_cast<Eigen::Index>(vol.mesh.nodes.size()));
+            const Eigen::Vector3d f(0.0, 1000.0 / static_cast<double>(load_nodes.size()), 0.0);
+            for (auto n : load_nodes) {
+                loads.segment<3>(3 * static_cast<Eigen::Index>(n)) += f;
+            }
+            const polymesh::fea::Material mat{.youngs_modulus = 200e9, .poissons_ratio = 0.3};
+            t0 = clock::now();
+            const Eigen::VectorXd uu = polymesh::fea::solve_elastostatics(vol.mesh, mat, bc, loads);
+            const auto zz = polymesh::fea::recover_zz(vol.mesh, mat, uu);
+            solve_ms = ms(clock::now() - t0);
+            global_eta = zz.global_eta;
+            dof = 3 * vol.mesh.nodes.size();
+            for (std::size_t i = 0; i < zz.nodal_stress.size(); ++i) {
+                max_vm = std::max(max_vm, polymesh::fea::von_mises(zz.nodal_stress[i]));
+                max_u = std::max(max_u,
+                                 uu.segment<3>(3 * static_cast<Eigen::Index>(i)).norm());
+            }
+            solved = true;
+        }
+    }
+
+    const std::string mesher_name = [&] {
+        switch (mesher) {
+        case polymesh::pipeline::VolumeMesher::kVaryhedron: return "varyhedron";
+        case polymesh::pipeline::VolumeMesher::kGradedTet: return "graded";
+        case polymesh::pipeline::VolumeMesher::kTetFill: return "tet";
+        case polymesh::pipeline::VolumeMesher::kHybrid: return "hybrid";
+        default: return "other";
+        }
+    }();
+    const double mesh_throughput =
+        mesh_ms > 0.0 ? static_cast<double>(vol.mesh.elements.size()) / (mesh_ms / 1000.0) : 0.0;
+
+    const std::string json = std::format(
+        "{{\n"
+        "  \"part\": \"{}\",\n"
+        "  \"mesher\": \"{}\",\n"
+        "  \"import\": {{ \"vertices\": {}, \"triangles\": {}, \"bbox_diag\": {:.6g}, "
+        "\"cad_brep\": {} }},\n"
+        "  \"mesh\": {{ \"h\": {:.6g}, \"nodes\": {}, \"elements\": {}, "
+        "\"quality_min\": {:.4g}, \"quality_mean\": {:.4g}, "
+        "\"geometry_seeds\": {}, \"bc_seeds\": {} }},\n"
+        "  \"timing_ms\": {{ \"import\": {:.3f}, \"mesh\": {:.3f}, \"solve\": {:.3f} }},\n"
+        "  \"mesh_throughput_elem_per_s\": {:.1f},\n"
+        "  \"solve\": {{ \"ran\": {}, \"dof\": {}, \"max_von_mises\": {:.6g}, "
+        "\"max_disp\": {:.6g}, \"global_eta\": {:.6g} }},\n"
+        "  \"mesher_note\": \"{}\"\n"
+        "}}\n",
+        model.name, mesher_name, model.surface.vertices.size(), model.surface.triangles.size(),
+        bbox_diag, model.cad ? "true" : "false", h, vol.mesh.nodes.size(),
+        vol.mesh.elements.size(), q_min, q_mean, plan.n_geometry_seeds, plan.n_bc_seeds,
+        import_ms, mesh_ms, solve_ms, mesh_throughput, solved ? "true" : "false", dof, max_vm,
+        max_u, global_eta,
+        resolved.note);
+
+    if (!json_path.empty()) {
+        std::FILE* f = std::fopen(json_path.c_str(), "w");
+        if (f == nullptr) {
+            std::fprintf(stderr, "diag: cannot write %s\n", json_path.c_str());
+            return 1;
+        }
+        std::fputs(json.c_str(), f);
+        std::fclose(f);
+        std::printf("wrote %s\n", json_path.c_str());
+    }
+    std::fputs(json.c_str(), stdout);
+    return 0;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -486,6 +640,9 @@ int main(int argc, char** argv) {
         }
         if (command == "solve") {
             return cmd_solve(args);
+        }
+        if (command == "diag") {
+            return cmd_diag(args);
         }
         if (command == "backend" && args.size() == 2) {
             polymesh::fea::init_runtime_performance();

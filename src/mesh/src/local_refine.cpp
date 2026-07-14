@@ -390,51 +390,57 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
 
         const std::uint32_t mid = midpoint_of(edge);
 
-        // If free-surface mid was projected and any sharer would invert, fall
-        // back to the Euclidean chord (Jacobian-safe; residual handled by snap).
-        if (surface != nullptr && mid < nodes.size()) {
-            const Eigen::Vector3d chord = 0.5 * (nodes[edge.first] + nodes[edge.second]);
-            const Eigen::Vector3d projected = nodes[mid];
-            if ((projected - chord).squaredNorm() > 1e-30) {
-                auto child_vols_ok = [&](const Eigen::Vector3d& pos) {
-                    nodes[mid] = pos;
-                    for (const auto i : sharers) {
-                        if (i >= alive.size() || !alive[i] || !tet_has_edge(tets[i], edge)) {
-                            continue;
-                        }
-                        // Mirror bisect_tet volume test without throwing.
-                        std::uint32_t c = 0, d = 0;
-                        int found = 0;
-                        for (const auto v : tets[i]) {
-                            if (v == edge.first || v == edge.second) {
-                                continue;
-                            }
-                            if (found == 0) {
-                                c = v;
-                            } else {
-                                d = v;
-                            }
-                            ++found;
-                        }
-                        if (found != 2) {
-                            return false;
-                        }
-                        const auto ch0 = orient_positive({edge.first, mid, c, d}, nodes);
-                        const auto ch1 = orient_positive({mid, edge.second, c, d}, nodes);
-                        const double v0 = tet_signed_volume(nodes[ch0[0]], nodes[ch0[1]],
-                                                            nodes[ch0[2]], nodes[ch0[3]]);
-                        const double v1 = tet_signed_volume(nodes[ch1[0]], nodes[ch1[1]],
-                                                            nodes[ch1[2]], nodes[ch1[3]]);
-                        if (!(v0 > 0.0) || !(v1 > 0.0)) {
-                            return false;
-                        }
+        // Choose a midpoint whose bisection keeps every live sharer's children
+        // strictly positive. Free-surface projection — or a sliver child left by
+        // an earlier split — can invert a tet; fall back to the Euclidean chord,
+        // and if even that degenerates, skip this terminal edge entirely. No
+        // partial split → the mesh stays conforming and valid; the sliver region
+        // just stays coarser instead of crashing the whole mesh (ADR-0016).
+        auto children_ok = [&](const Eigen::Vector3d& pos) {
+            nodes[mid] = pos;
+            for (const auto i : sharers) {
+                if (i >= alive.size() || !alive[i] || !tet_has_edge(tets[i], edge)) {
+                    continue;
+                }
+                std::uint32_t c = 0, d = 0;
+                int found = 0;
+                for (const auto v : tets[i]) {
+                    if (v == edge.first || v == edge.second) {
+                        continue;
                     }
-                    return true;
-                };
-                if (!child_vols_ok(projected)) {
-                    nodes[mid] = chord;
+                    if (found == 0) {
+                        c = v;
+                    } else {
+                        d = v;
+                    }
+                    ++found;
+                }
+                if (found != 2) {
+                    return false;
+                }
+                const auto ch0 = orient_positive({edge.first, mid, c, d}, nodes);
+                const auto ch1 = orient_positive({mid, edge.second, c, d}, nodes);
+                const double v0 = tet_signed_volume(nodes[ch0[0]], nodes[ch0[1]],
+                                                    nodes[ch0[2]], nodes[ch0[3]]);
+                const double v1 = tet_signed_volume(nodes[ch1[0]], nodes[ch1[1]],
+                                                    nodes[ch1[2]], nodes[ch1[3]]);
+                if (!(v0 > 0.0) || !(v1 > 0.0)) {
+                    return false;
                 }
             }
+            return true;
+        };
+        const Eigen::Vector3d chord = 0.5 * (nodes[edge.first] + nodes[edge.second]);
+        const Eigen::Vector3d projected = nodes[mid];
+        bool can_split = children_ok(projected);
+        if (!can_split && (projected - chord).squaredNorm() > 1e-30) {
+            can_split = children_ok(chord); // leaves nodes[mid]=chord when true
+        }
+        if (!can_split) {
+            nodes[mid] = projected; // orphan midpoint node compacted downstream
+            remaining.erase(seed);
+            ++local_stats.n_skipped_slivers;
+            continue;
         }
 
         // Bisect every sharer: replace slot with child0, append child1.

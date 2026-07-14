@@ -29,6 +29,9 @@
 #endif
 
 #include <algorithm>
+#include <atomic>
+#include <cstdlib>
+#include <thread>
 #include <cctype>
 #include <cmath>
 #include <cstdint>
@@ -91,7 +94,7 @@ struct App {
     bool show_undeformed = false;
     bool deform_true_scale = false;
     char open_path[512] = "";
-    std::string status = "drop an STL/STEP on the window, or type a path below";
+    std::string status = "drop a .step / .brep CAD part on the window, or type a path below";
     std::string mesh_status;
     std::string mesh_note; // mesher note (and DOF line) after mesh/solve
     std::size_t dof_count = 0;
@@ -104,6 +107,8 @@ struct App {
     TestLabState testlab;
     /// Generation last uploaded from SolveJob::poll_live_mesh.
     std::uint64_t live_mesh_seen_gen = 0;
+    /// True while a background self-improve (LLM) run is in flight.
+    std::atomic<bool> improve_running{false};
 };
 
 bool is_geometry_path(const std::string& path) {
@@ -539,6 +544,47 @@ void draw_study_panel(App& app) {
         ImGui::TextWrapped("%s", app.mesh_note.c_str());
     } else if (!app.mesh_status.empty()) {
         ImGui::TextWrapped("%s", app.mesh_status.c_str());
+    }
+    iw::end_group_box();
+
+    iw::begin_group_box("diagnostics & self-improve");
+    {
+        const auto prog = app.job.progress();
+        if (prog.n_elems > 0 && prog.elapsed_ms > 0.0) {
+            const double eps = static_cast<double>(prog.n_elems) / (prog.elapsed_ms / 1000.0);
+            ImGui::TextColored(palette.text_dim, "throughput: %.0f elem/s (%zu elems, %.1f s)",
+                               eps, prog.n_elems, prog.elapsed_ms / 1000.0);
+            if (prog.cg_iter > 0) {
+                ImGui::TextColored(palette.text_dim, "CG: %d iters, resid %.2e", prog.cg_iter,
+                                   prog.cg_resid);
+            }
+        }
+        const bool running = app.improve_running.load();
+        ImGui::TextColored(running ? palette.status_warn : palette.text_dim,
+                           running ? "self-improve: running (see terminal)"
+                                   : "self-improve: idle");
+        auto launch_improve = [&app](const char* backend) {
+            if (app.improve_running.exchange(true)) {
+                return;
+            }
+            const std::string cmd =
+                std::string("bash scripts/self_improve.sh --backend ") + backend;
+            std::atomic<bool>* flag = &app.improve_running;
+            std::thread([flag, cmd] {
+                std::system(cmd.c_str());
+                flag->store(false);
+            }).detach();
+            app.status = std::string("self-improve (") + backend + ") launched — see terminal";
+        };
+        ImGui::BeginDisabled(running);
+        if (iw::button("self-improve (omp)", ImVec2(-1, 0))) {
+            launch_improve("omp");
+        }
+        if (iw::button("self-improve (grok)", ImVec2(-1, 0))) {
+            launch_improve("grok");
+        }
+        ImGui::EndDisabled();
+        ImGui::TextColored(palette.text_dim, "runs a CAD diagnostics battery → LLM edits meshers");
     }
     iw::end_group_box();
 

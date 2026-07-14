@@ -33,6 +33,9 @@ struct LocalRefineStats {
     std::size_t n_new_nodes = 0;
     /// Free-surface midpoints projected onto `surface` (S1 curved residual).
     std::size_t n_surface_mids = 0;
+    /// Terminal edges skipped because no midpoint kept all children positive
+    /// (sliver-safe: region stays coarser instead of aborting the mesh).
+    std::size_t n_skipped_slivers = 0;
 };
 
 /// Longest-edge bisection of a pure tet4 mesh.

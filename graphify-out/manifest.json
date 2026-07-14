@@ -1,12 +1,12 @@
 {
   "apps/cli/main.cpp": {
-    "mtime": 1784028733.2278423,
-    "ast_hash": "5467f832a213791344b499a00e66cc75",
+    "mtime": 1784035712.385685,
+    "ast_hash": "f0721a918e9bde0ace18b9e5d78df074",
     "semantic_hash": ""
   },
   "apps/gui/main.cpp": {
-    "mtime": 1784029062.4863863,
-    "ast_hash": "9c895276ee61013a2e63fe332b40e44b",
+    "mtime": 1784035877.1644554,
+    "ast_hash": "57a6425b816609116940279fead9e583",
     "semantic_hash": ""
   },
   "apps/gui/theme.cpp": {
@@ -365,8 +365,8 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1784029396.5608945,
-    "ast_hash": "7c101b0e85202dc237b3d89036a11ce8",
+    "mtime": 1784036201.109034,
+    "ast_hash": "e28fd2b4d65167c2e94086f603020dd5",
     "semantic_hash": ""
   },
   "apps/cli/CMakeLists.txt": {
@@ -450,8 +450,8 @@
     "semantic_hash": ""
   },
   "docs/progress.md": {
-    "mtime": 1784030155.038262,
-    "ast_hash": "15e7e8423de265350d1fa5bedc617a34",
+    "mtime": 1784036169.53927,
+    "ast_hash": "a6c9c320d526f4d151df305e998e47fa",
     "semantic_hash": ""
   },
   "docs/spec.md": {
@@ -490,8 +490,8 @@
     "semantic_hash": ""
   },
   "tests/CMakeLists.txt": {
-    "mtime": 1784029226.8511603,
-    "ast_hash": "dee74d19c35a13889d5ea5a25ef164de",
+    "mtime": 1784033319.0944397,
+    "ast_hash": "eef840dd98b39e61fba2dd79cc25d3a6",
     "semantic_hash": ""
   },
   "apps/bench/d6_tier3.cpp": {
@@ -685,8 +685,8 @@
     "semantic_hash": ""
   },
   "src/mesh/include/mesh/local_refine.hpp": {
-    "mtime": 1783727444.5900607,
-    "ast_hash": "74d9f1006af6dd19e7ab6f9eb1868bbd",
+    "mtime": 1784032869.5637414,
+    "ast_hash": "2665f63f1d4570f3f22edf4a7192a16e",
     "semantic_hash": ""
   },
   "src/mesh/include/mesh/mixed_fill.hpp": {
@@ -735,8 +735,8 @@
     "semantic_hash": ""
   },
   "src/mesh/src/local_refine.cpp": {
-    "mtime": 1783727444.5904958,
-    "ast_hash": "79b60e7d152e91ab9009e47fb104fae6",
+    "mtime": 1784032883.641638,
+    "ast_hash": "77f94563d636e6a536c5c3f48e3c37fd",
     "semantic_hash": ""
   },
   "src/mesh/src/mixed_fill.cpp": {
@@ -1535,8 +1535,8 @@
     "semantic_hash": ""
   },
   "src/geom/include/geom/cad_model.hpp": {
-    "mtime": 1783904134.9233363,
-    "ast_hash": "a3e3704c4d325ba84cd5439ac1abc7fa",
+    "mtime": 1784032997.4328022,
+    "ast_hash": "807e457c7ace5ee62d39f749ceb088dd",
     "semantic_hash": ""
   },
   "src/geom/include/geom/cad_topology.hpp": {
@@ -1545,8 +1545,8 @@
     "semantic_hash": ""
   },
   "src/geom/src/cad_model.cpp": {
-    "mtime": 1783904134.9233363,
-    "ast_hash": "73770534a9ef7cb77b26ddbfb3cc129b",
+    "mtime": 1784032989.2708623,
+    "ast_hash": "558e64bc05b49507efa56db0e0f25bbe",
     "semantic_hash": ""
   },
   "src/geom/src/cad_topology.cpp": {
@@ -2265,7 +2265,7 @@
     "semantic_hash": ""
   },
   "bench/campaigns/post-m10-smoke/checkpoint.json": {
-    "mtime": 1784030293.9372318,
+    "mtime": 1784036253.0654068,
     "ast_hash": "06852973a448f8b25980d68292485a83",
     "semantic_hash": ""
   },
@@ -2380,12 +2380,12 @@
     "semantic_hash": ""
   },
   "bench/campaigns/vem-gate-m5/checkpoint.json": {
-    "mtime": 1784030293.9372318,
+    "mtime": 1784036253.0654068,
     "ast_hash": "6792c1da40f5895763a6c40378ecc0ee",
     "semantic_hash": ""
   },
   "bench/campaigns/vem-gate-m5/progress.json": {
-    "mtime": 1784030293.9392316,
+    "mtime": 1784036253.0676458,
     "ast_hash": "39e7bb10d53c5fa93592f6828499acfd",
     "semantic_hash": ""
   },
@@ -2395,7 +2395,7 @@
     "semantic_hash": ""
   },
   "bench/campaigns/vem-gate-m5/runs/cfg-028399df/cylinder/t0/result.json": {
-    "mtime": 1784030293.9392316,
+    "mtime": 1784036253.0676458,
     "ast_hash": "e6c79af454679fd0ca44f1088dceaa86",
     "semantic_hash": ""
   },
@@ -2405,7 +2405,7 @@
     "semantic_hash": ""
   },
   "bench/campaigns/vem-gate-m5/runs/cfg-028399df/plate_hole/t0/result.json": {
-    "mtime": 1784030293.9392316,
+    "mtime": 1784036253.0676458,
     "ast_hash": "32a79e334f6eb5675ae7a898143226bf",
     "semantic_hash": ""
   },
@@ -2420,12 +2420,12 @@
     "semantic_hash": ""
   },
   "bench/campaigns/vem-gate-m5/runs/cfg-1a23c6c0/plate_hole/t0/quality.json": {
-    "mtime": 1784030293.9482317,
+    "mtime": 1784036253.0766456,
     "ast_hash": "9be4076398875deb8481611d0e7a267a",
     "semantic_hash": ""
   },
   "bench/campaigns/vem-gate-m5/runs/cfg-1a23c6c0/plate_hole/t0/result.json": {
-    "mtime": 1784030293.9482317,
+    "mtime": 1784036253.0766456,
     "ast_hash": "fa7f402c62ebee751925780866a7ca66",
     "semantic_hash": ""
   },
@@ -2460,7 +2460,7 @@
     "semantic_hash": ""
   },
   "bench/campaigns/vem-gate-m5/runs/cfg-1a23c6c0/cylinder/t0/wire.png": {
-    "mtime": 1784030293.9462316,
+    "mtime": 1784036253.0746458,
     "ast_hash": "d58be79bf36c274ead4049dd9d6a90f9",
     "semantic_hash": ""
   },
@@ -2497,6 +2497,16 @@
   "bench/campaigns/settings-frontier-1/SURVIVORS.md": {
     "mtime": 1783913247.6915426,
     "ast_hash": "9b3d78b56cfedcfb54bad394472f0efd",
+    "semantic_hash": ""
+  },
+  "scripts/self_improve.sh": {
+    "mtime": 1784035507.5042088,
+    "ast_hash": "f2083e0e8b49f2dd4271f0960d95d59c",
+    "semantic_hash": ""
+  },
+  "tests/test_geometry_fidelity.cpp": {
+    "mtime": 1784033373.8470376,
+    "ast_hash": "faaf0973723af32183f553d8036b09b9",
     "semantic_hash": ""
   }
 }

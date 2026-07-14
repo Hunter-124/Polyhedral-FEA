@@ -2,6 +2,7 @@
 #include "pipeline/scene.hpp"
 
 #include "adapt/error.hpp"
+#include "adapt/graded_sizing.hpp"
 #include "adapt/hp_driver.hpp"
 #include "adapt/loop.hpp"
 #include "fea/boundary_faces.hpp"
@@ -44,6 +45,7 @@
 #include <cmath>
 #include <format>
 #include <limits>
+#include <memory>
 #include <numbers>
 #include <queue>
 #include <set>
@@ -1338,7 +1340,12 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         // Slightly more Lloyd for free-site equilibrium (helps SE a little).
         lloyd.max_iters = 32;
         lloyd.move_tol_rel = 7e-4;
-        lloyd.size_at = [h](const Eigen::Vector3d&) { return h; };
+        // Geometry-graded density (ADR-0021): curvature / thin-wall drive cell
+        // size and count; gradient-limited (β=1) so grading is smooth. Flat
+        // surfaces emit no source ⇒ falls back to uniform h.
+        auto poly_size = std::make_shared<adapt::GradedSizing>(
+            adapt::geometry_size_sources(model.surface, 0.35 * h, h), 0.35 * h, h, 1.0);
+        lloyd.size_at = [poly_size](const Eigen::Vector3d& p) { return poly_size->size_at(p); };
 
         auto sites = seeded.sites;
         const auto lr = mesh::lloyd_cvt(box, sites, lloyd);
@@ -1863,6 +1870,31 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
             checkpoint();
             std::vector<Eigen::Vector3d> adapt_seeds;
             double adapt_seed_band = 0.0;
+            // A-priori BC grading (ADR-0021): refine near loaded / fixed faces
+            // before the first solve. Loads get the finest target (stress
+            // concentrates under applied load); fixtures a moderate one.
+            if (setup.bc_grading) {
+                std::vector<Eigen::Vector3d> load_pts, fix_pts;
+                const auto& surf = model.surface;
+                for (std::size_t ti = 0; ti < surf.triangles.size(); ++ti) {
+                    const int rg =
+                        ti < model.triangle_region.size() ? model.triangle_region[ti] : -1;
+                    const auto& t = surf.triangles[ti];
+                    const Eigen::Vector3d c =
+                        (surf.vertices[t[0]] + surf.vertices[t[1]] + surf.vertices[t[2]]) / 3.0;
+                    if (setup.loads.count(rg)) {
+                        load_pts.push_back(c);
+                    } else if (setup.fixtures.count(rg)) {
+                        fix_pts.push_back(c);
+                    }
+                }
+                std::vector<adapt::SizeSource> src = adapt::point_size_sources(load_pts, 0.25 * h);
+                const auto fix_src = adapt::point_size_sources(fix_pts, 0.5 * h);
+                src.insert(src.end(), fix_src.begin(), fix_src.end());
+                const auto plan = adapt::seed_plan(src, h, /*band_frac=*/1.5);
+                adapt_seeds = plan.refine_seeds;
+                adapt_seed_band = plan.seed_band;
+            }
             // D4: Dörfler element indices for optional local LEB before remesh.
             std::vector<std::size_t> adapt_marked;
             auto vol = volume_mesh(model, h_use, setup.mesher, setup.skin_layers,

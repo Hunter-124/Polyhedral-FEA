@@ -4,6 +4,9 @@
 #include <Eigen/Geometry>
 
 #include <algorithm>
+#include <array>
+#include <cstdint>
+#include <vector>
 #include <cmath>
 #include <limits>
 #include <map>
@@ -126,6 +129,76 @@ VertexCurvature estimate_vertex_curvature(const TriSurface& surface) {
     return out;
 }
 
+namespace {
+
+// Uniform spatial grid over triangle AABBs for fast inward ray casting.
+// Cell size targets ~1 triangle/cell; a triangle is bucketed into every cell
+// its AABB overlaps so any hit whose intersection lies in a cell is found by
+// testing that cell alone (enables early-out DDA traversal).
+struct TriGrid {
+    Eigen::Vector3d origin{0.0, 0.0, 0.0};
+    Eigen::Vector3d cell{1.0, 1.0, 1.0};
+    std::array<int, 3> res{1, 1, 1};
+    std::vector<std::vector<std::uint32_t>> cells;
+
+    [[nodiscard]] std::size_t flat(int i, int j, int k) const {
+        return (static_cast<std::size_t>(k) * res[1] + j) * res[0] + i;
+    }
+    [[nodiscard]] std::array<int, 3> cell_of(const Eigen::Vector3d& p) const {
+        std::array<int, 3> c{};
+        for (int a = 0; a < 3; ++a) {
+            const int v = static_cast<int>(std::floor((p[a] - origin[a]) / cell[a]));
+            c[a] = std::clamp(v, 0, res[a] - 1);
+        }
+        return c;
+    }
+};
+
+TriGrid build_tri_grid(const TriSurface& s) {
+    TriGrid g;
+    Eigen::Vector3d lo = s.vertices[0];
+    Eigen::Vector3d hi = s.vertices[0];
+    for (const auto& v : s.vertices) {
+        lo = lo.cwiseMin(v);
+        hi = hi.cwiseMax(v);
+    }
+    const Eigen::Vector3d ext = (hi - lo).cwiseMax(1e-9);
+    const double nf = static_cast<double>(s.triangles.size());
+    const double vol = ext.x() * ext.y() * ext.z();
+    double cell_len = std::cbrt(vol / std::max(nf, 1.0));
+    if (!(cell_len > 0.0)) {
+        cell_len = ext.maxCoeff();
+    }
+    for (int a = 0; a < 3; ++a) {
+        const int r = static_cast<int>(std::ceil(ext[a] / cell_len));
+        g.res[a] = std::clamp(r, 1, 256);
+        g.cell[a] = ext[a] / static_cast<double>(g.res[a]);
+    }
+    g.origin = lo;
+    g.cells.assign(static_cast<std::size_t>(g.res[0]) * g.res[1] * g.res[2], {});
+    for (std::uint32_t t = 0; t < s.triangles.size(); ++t) {
+        const auto& tri = s.triangles[t];
+        Eigen::Vector3d tlo = s.vertices[tri[0]];
+        Eigen::Vector3d thi = tlo;
+        for (int k = 1; k < 3; ++k) {
+            tlo = tlo.cwiseMin(s.vertices[tri[k]]);
+            thi = thi.cwiseMax(s.vertices[tri[k]]);
+        }
+        const auto c0 = g.cell_of(tlo);
+        const auto c1 = g.cell_of(thi);
+        for (int k = c0[2]; k <= c1[2]; ++k) {
+            for (int j = c0[1]; j <= c1[1]; ++j) {
+                for (int i = c0[0]; i <= c1[0]; ++i) {
+                    g.cells[g.flat(i, j, k)].push_back(t);
+                }
+            }
+        }
+    }
+    return g;
+}
+
+} // namespace
+
 VertexThickness estimate_local_thickness(const TriSurface& surface, double eps_scale) {
     surface.validate();
     const std::size_t nv = surface.vertices.size();
@@ -155,33 +228,100 @@ VertexThickness estimate_local_thickness(const TriSurface& surface, double eps_s
         edge_count > 0 ? edge_len_sum / static_cast<double>(edge_count) : 1.0;
     const double eps = std::max(eps_scale * mean_edge, 1e-12);
 
-    for (std::size_t i = 0; i < nv; ++i) {
-        Eigen::Vector3d n = vnormal[i];
-        const double nlen = n.norm();
-        if (nlen < 1e-30) {
-            continue;
-        }
-        n /= nlen;
-        // Inward: origin just inside, direction -n (assumes outward normals).
-        const Eigen::Vector3d orig = surface.vertices[i] - n * eps;
-        const Eigen::Vector3d dir = -n;
+    const TriGrid grid = build_tri_grid(surface);
+    const auto& tris = surface.triangles;
+    const auto& verts = surface.vertices;
+    // Ray never needs to travel farther than the bbox diagonal to hit the
+    // opposite wall of a closed solid.
+    double t_cap = 0.0;
+    for (int a = 0; a < 3; ++a) {
+        const double span = grid.cell[a] * static_cast<double>(grid.res[a]);
+        t_cap += span * span;
+    }
+    t_cap = std::sqrt(t_cap);
 
-        double best_t = std::numeric_limits<double>::infinity();
-        for (std::size_t t = 0; t < surface.triangles.size(); ++t) {
-            const auto& tri = surface.triangles[t];
-            // Skip triangles incident to this vertex (self-hit / grazing).
-            if (tri[0] == i || tri[1] == i || tri[2] == i) {
+#if defined(POLYMESH_WITH_OPENMP)
+#pragma omp parallel
+#endif
+    {
+        std::vector<std::uint32_t> seen(tris.size(), 0);
+        std::uint32_t stamp = 0;
+#if defined(POLYMESH_WITH_OPENMP)
+#pragma omp for schedule(dynamic, 256)
+#endif
+        for (std::ptrdiff_t ii = 0; ii < static_cast<std::ptrdiff_t>(nv); ++ii) {
+            const auto i = static_cast<std::size_t>(ii);
+            Eigen::Vector3d n = vnormal[i];
+            const double nlen = n.norm();
+            if (nlen < 1e-30) {
                 continue;
             }
-            double hit_t = 0.0;
-            if (ray_triangle_hit(orig, dir, surface.vertices[tri[0]], surface.vertices[tri[1]],
-                                 surface.vertices[tri[2]], 0.5 * eps, hit_t)) {
-                best_t = std::min(best_t, hit_t);
+            n /= nlen;
+            const Eigen::Vector3d orig = verts[i] - n * eps;
+            const Eigen::Vector3d dir = -n;
+            ++stamp;
+
+            // 3D DDA (Amanatides & Woo) with per-cell triangle tests + early out.
+            std::array<int, 3> cell = grid.cell_of(orig);
+            std::array<int, 3> step{};
+            Eigen::Vector3d t_next(0, 0, 0);
+            Eigen::Vector3d t_delta(0, 0, 0);
+            for (int a = 0; a < 3; ++a) {
+                if (dir[a] > 0.0) {
+                    step[a] = 1;
+                    const double boundary =
+                        grid.origin[a] + static_cast<double>(cell[a] + 1) * grid.cell[a];
+                    t_next[a] = (boundary - orig[a]) / dir[a];
+                    t_delta[a] = grid.cell[a] / dir[a];
+                } else if (dir[a] < 0.0) {
+                    step[a] = -1;
+                    const double boundary =
+                        grid.origin[a] + static_cast<double>(cell[a]) * grid.cell[a];
+                    t_next[a] = (boundary - orig[a]) / dir[a];
+                    t_delta[a] = -grid.cell[a] / dir[a];
+                } else {
+                    step[a] = 0;
+                    t_next[a] = std::numeric_limits<double>::infinity();
+                    t_delta[a] = std::numeric_limits<double>::infinity();
+                }
             }
-        }
-        if (std::isfinite(best_t)) {
-            // Report thickness from the surface vertex (origin was offset by eps).
-            out.thickness[i] = best_t + eps;
+
+            double best_t = std::numeric_limits<double>::infinity();
+            for (;;) {
+                for (const std::uint32_t t : grid.cells[grid.flat(cell[0], cell[1], cell[2])]) {
+                    if (seen[t] == stamp) {
+                        continue;
+                    }
+                    seen[t] = stamp;
+                    const auto& tri = tris[t];
+                    if (tri[0] == i || tri[1] == i || tri[2] == i) {
+                        continue;
+                    }
+                    double hit_t = 0.0;
+                    if (ray_triangle_hit(orig, dir, verts[tri[0]], verts[tri[1]],
+                                         verts[tri[2]], 0.5 * eps, hit_t)) {
+                        best_t = std::min(best_t, hit_t);
+                    }
+                }
+                const int axis = (t_next[0] < t_next[1])
+                                     ? (t_next[0] < t_next[2] ? 0 : 2)
+                                     : (t_next[1] < t_next[2] ? 1 : 2);
+                const double exit_t = t_next[axis];
+                if (best_t <= exit_t) {
+                    break; // nearest hit lies within visited cells
+                }
+                if (exit_t > t_cap) {
+                    break;
+                }
+                cell[axis] += step[axis];
+                if (cell[axis] < 0 || cell[axis] >= grid.res[axis]) {
+                    break;
+                }
+                t_next[axis] += t_delta[axis];
+            }
+            if (std::isfinite(best_t)) {
+                out.thickness[i] = best_t + eps;
+            }
         }
     }
     return out;

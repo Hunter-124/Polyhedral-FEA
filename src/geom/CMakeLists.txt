@@ -11,6 +11,12 @@ add_library(geom
 target_include_directories(geom PUBLIC include)
 target_link_libraries(geom PUBLIC Eigen3::Eigen PRIVATE polymesh_warnings polymesh_perf)
 
+if(POLYMESH_OPENMP_FOUND)
+    # Parallel inward ray casting in estimate_local_thickness (indicators.cpp).
+    target_link_libraries(geom PUBLIC OpenMP::OpenMP_CXX)
+    target_compile_definitions(geom PUBLIC POLYMESH_WITH_OPENMP)
+endif()
+
 if(POLYMESH_WITH_OCC)
     # Optional B-rep/STEP path (ADR-0001). Requires OpenCASCADE (OCCT).
     # Components cover STEP read (DataExchange) + BRepMesh (ModelingAlgorithms)

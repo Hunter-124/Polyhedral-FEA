@@ -55,6 +55,21 @@ report → LLM CLI edits the meshers (GUI "self-improve" buttons launch it). Lar
 curved fixture `tests/fixtures/parts/pipe.step` (Ø60×400) added; LEB robustness
 test on it. Full suite 259/259 green (OCC on).
 
+**Meshing performance (spatial indices) + smooth CAD shading (2026-07-14):**
+Profiled the frame mesh hang — all cost was brute-force closest-point over the
+~112k-triangle surface, per node. Added uniform grids: `estimate_local_thickness`
+O(V·F) inward ray casting → grid + DDA + OpenMP (geom now links OpenMP);
+`geom::closest_on_features` → sharp-edge grid (was brute over ~16k edges/node,
+26%→9% of runtime); the two boundary-region loops in `scene.cpp` now use the
+grid-cached `closest_on_surface` (`.triangle`→region) instead of scanning every
+triangle; `SurfaceGrid` bumped to ~2 tri/bin (res cap 64→128). Geometry refine
+seeds are decimated finest-per-half-h cell (56043→229 on the frame) so the
+gradient limiter / ball meshers don't choke. Net: frame hybrid mesh (28,656
+elems) **25.5 s → 5.1 s (~5×)**, results unchanged, suite 259/259 green. GUI
+viewport now uses crease-aware smooth vertex normals (45° threshold) so imported
+curved walls (tubes/fillets) shade smoothly instead of faceted, sharp edges stay
+crisp (`viewport.cpp set_model`).
+
 ## Background / older phases
 
 **Track H (historical):** mesher honesty/perf overhaul; owner gate **A9** theme

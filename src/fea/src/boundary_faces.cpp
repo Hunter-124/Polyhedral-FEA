@@ -210,4 +210,110 @@ std::vector<std::array<std::uint32_t, 4>> extract_boundary_faces(const NodalMesh
     return out;
 }
 
+namespace {
+
+// Append every face of `el` as a polygon loop of GLOBAL node ids. Poly faces
+// stay polygons; FEM element faces use the same corner-face tables as
+// emit_element_faces (mid-edge nodes ignored for skin topology).
+void collect_element_loops(const NodalElement& el,
+                           std::vector<std::vector<std::uint32_t>>& loops) {
+    const auto& n = el.nodes;
+    auto quad = [&](std::uint32_t a, std::uint32_t b, std::uint32_t c, std::uint32_t d) {
+        loops.push_back({a, b, c, d});
+    };
+    auto tri = [&](std::uint32_t a, std::uint32_t b, std::uint32_t c) {
+        loops.push_back({a, b, c});
+    };
+    switch (el.type) {
+    case ElementType::kTet4:
+    case ElementType::kTet10:
+        if (n.size() < 4) return;
+        tri(n[0], n[2], n[1]);
+        tri(n[0], n[1], n[3]);
+        tri(n[0], n[3], n[2]);
+        tri(n[1], n[2], n[3]);
+        break;
+    case ElementType::kHex8:
+    case ElementType::kHex20:
+        if (n.size() < 8) return;
+        quad(n[0], n[3], n[2], n[1]);
+        quad(n[4], n[5], n[6], n[7]);
+        quad(n[0], n[1], n[5], n[4]);
+        quad(n[1], n[2], n[6], n[5]);
+        quad(n[2], n[3], n[7], n[6]);
+        quad(n[3], n[0], n[4], n[7]);
+        break;
+    case ElementType::kPrism6:
+        if (n.size() < 6) return;
+        tri(n[0], n[2], n[1]);
+        tri(n[3], n[4], n[5]);
+        quad(n[0], n[1], n[4], n[3]);
+        quad(n[1], n[2], n[5], n[4]);
+        quad(n[2], n[0], n[3], n[5]);
+        break;
+    case ElementType::kPyramid5:
+        if (n.size() < 5) return;
+        quad(n[0], n[1], n[2], n[3]);
+        tri(n[0], n[1], n[4]);
+        tri(n[1], n[2], n[4]);
+        tri(n[2], n[3], n[4]);
+        tri(n[3], n[0], n[4]);
+        break;
+    case ElementType::kPolyVem:
+        for (const auto& f : el.faces) {
+            if (f.size() < 3) continue;
+            std::vector<std::uint32_t> loop;
+            loop.reserve(f.size());
+            for (auto li : f) {
+                if (li < n.size()) loop.push_back(n[li]);
+            }
+            if (loop.size() >= 3) loops.push_back(std::move(loop));
+        }
+        break;
+    }
+}
+
+// Canonical key over a loop's node set (sorted, dedup) for owner counting.
+std::vector<std::uint32_t> loop_key(const std::vector<std::uint32_t>& loop) {
+    std::vector<std::uint32_t> k = loop;
+    std::sort(k.begin(), k.end());
+    k.erase(std::unique(k.begin(), k.end()), k.end());
+    return k;
+}
+
+} // namespace
+
+std::vector<std::vector<std::uint32_t>> extract_boundary_polys(const NodalMesh& mesh) {
+    struct Rec {
+        std::vector<std::uint32_t> loop;
+        int count = 0;
+    };
+    std::map<std::vector<std::uint32_t>, Rec> faces;
+    std::vector<std::vector<std::uint32_t>> loops;
+    for (const auto& el : mesh.elements) {
+        loops.clear();
+        collect_element_loops(el, loops);
+        for (auto& lp : loops) {
+            auto key = loop_key(lp);
+            if (key.size() < 3) continue;
+            auto [it, fresh] = faces.try_emplace(std::move(key));
+            if (fresh) {
+                it->second.loop = std::move(lp);
+                it->second.count = 1;
+            } else {
+                ++it->second.count;
+            }
+        }
+    }
+    std::vector<std::vector<std::uint32_t>> out;
+    out.reserve(faces.size() / 2 + 8);
+    for (auto& [key, rec] : faces) {
+        (void)key;
+        if (rec.count == 1) {
+            out.push_back(std::move(rec.loop));
+        }
+    }
+    return out;
+}
+
 } // namespace polymesh::fea

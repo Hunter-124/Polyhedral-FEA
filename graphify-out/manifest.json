@@ -20,8 +20,8 @@
     "semantic_hash": ""
   },
   "apps/gui/viewport.cpp": {
-    "mtime": 1783727444.5774977,
-    "ast_hash": "7855f02ba425fc0fcf2603eb593f2f7f",
+    "mtime": 1784037766.7423534,
+    "ast_hash": "fc60e8c10c46b18197c85345e1e4f1a2",
     "semantic_hash": ""
   },
   "apps/gui/viewport.hpp": {
@@ -220,8 +220,8 @@
     "semantic_hash": ""
   },
   "src/pipeline/src/scene.cpp": {
-    "mtime": 1784028560.1021338,
-    "ast_hash": "8decd7ca7e440e65302b9dbdbf5b471e",
+    "mtime": 1784038590.7041512,
+    "ast_hash": "57dcdb7b98a63625f0a6f37c8b9ee62f",
     "semantic_hash": ""
   },
   "tests/support/mms.cpp": {
@@ -450,8 +450,8 @@
     "semantic_hash": ""
   },
   "docs/progress.md": {
-    "mtime": 1784036169.53927,
-    "ast_hash": "a6c9c320d526f4d151df305e998e47fa",
+    "mtime": 1784039168.5288084,
+    "ast_hash": "53b78b6228a542fd0f0de9eb7cee9c2f",
     "semantic_hash": ""
   },
   "docs/spec.md": {
@@ -475,8 +475,8 @@
     "semantic_hash": ""
   },
   "src/geom/CMakeLists.txt": {
-    "mtime": 1783894913.6619825,
-    "ast_hash": "55dbd77f396128a12543ba6430d345de",
+    "mtime": 1784038114.664738,
+    "ast_hash": "e58ceb5e61c47933b522905ab75469a7",
     "semantic_hash": ""
   },
   "src/mesh/CMakeLists.txt": {
@@ -655,13 +655,13 @@
     "semantic_hash": ""
   },
   "src/geom/src/features.cpp": {
-    "mtime": 1783727812.7917674,
-    "ast_hash": "75a8715d73d5418e0e1fc4f6c04368d5",
+    "mtime": 1784038770.5401728,
+    "ast_hash": "cbf4d96f950631a3b656ca323bf43638",
     "semantic_hash": ""
   },
   "src/geom/src/indicators.cpp": {
-    "mtime": 1783727444.5898001,
-    "ast_hash": "464115f1582aeb3cc0c5c529f0dbe4db",
+    "mtime": 1784038093.2838988,
+    "ast_hash": "d3dac1eee80c932187b44a2c07fea01d",
     "semantic_hash": ""
   },
   "src/geom/src/step.cpp": {
@@ -755,8 +755,8 @@
     "semantic_hash": ""
   },
   "src/mesh/src/surface_project.cpp": {
-    "mtime": 1783736137.367983,
-    "ast_hash": "5a3693857740bb56e76482c93c7c58fa",
+    "mtime": 1784038854.428164,
+    "ast_hash": "621bf786c5d959a5608f91f70cc27a80",
     "semantic_hash": ""
   },
   "src/mesh/src/tet_fill.cpp": {
@@ -2265,12 +2265,12 @@
     "semantic_hash": ""
   },
   "bench/campaigns/post-m10-smoke/checkpoint.json": {
-    "mtime": 1784036253.0654068,
-    "ast_hash": "06852973a448f8b25980d68292485a83",
+    "mtime": 1784039192.036632,
+    "ast_hash": "b96726b5eff9c4ad9f4186e2c5616535",
     "semantic_hash": ""
   },
   "bench/campaigns/post-m10-smoke/progress.json": {
-    "mtime": 1784018186.761192,
+    "mtime": 1784037200.1565754,
     "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
     "semantic_hash": ""
   },
@@ -2380,12 +2380,12 @@
     "semantic_hash": ""
   },
   "bench/campaigns/vem-gate-m5/checkpoint.json": {
-    "mtime": 1784036253.0654068,
+    "mtime": 1784039192.036632,
     "ast_hash": "6792c1da40f5895763a6c40378ecc0ee",
     "semantic_hash": ""
   },
   "bench/campaigns/vem-gate-m5/progress.json": {
-    "mtime": 1784036253.0676458,
+    "mtime": 1784039192.039632,
     "ast_hash": "39e7bb10d53c5fa93592f6828499acfd",
     "semantic_hash": ""
   },
@@ -2395,7 +2395,7 @@
     "semantic_hash": ""
   },
   "bench/campaigns/vem-gate-m5/runs/cfg-028399df/cylinder/t0/result.json": {
-    "mtime": 1784036253.0676458,
+    "mtime": 1784039192.040632,
     "ast_hash": "e6c79af454679fd0ca44f1088dceaa86",
     "semantic_hash": ""
   },
@@ -2405,7 +2405,7 @@
     "semantic_hash": ""
   },
   "bench/campaigns/vem-gate-m5/runs/cfg-028399df/plate_hole/t0/result.json": {
-    "mtime": 1784036253.0676458,
+    "mtime": 1784039192.040632,
     "ast_hash": "32a79e334f6eb5675ae7a898143226bf",
     "semantic_hash": ""
   },
@@ -2420,12 +2420,12 @@
     "semantic_hash": ""
   },
   "bench/campaigns/vem-gate-m5/runs/cfg-1a23c6c0/plate_hole/t0/quality.json": {
-    "mtime": 1784036253.0766456,
+    "mtime": 1784039192.0596318,
     "ast_hash": "9be4076398875deb8481611d0e7a267a",
     "semantic_hash": ""
   },
   "bench/campaigns/vem-gate-m5/runs/cfg-1a23c6c0/plate_hole/t0/result.json": {
-    "mtime": 1784036253.0766456,
+    "mtime": 1784039192.0596318,
     "ast_hash": "fa7f402c62ebee751925780866a7ca66",
     "semantic_hash": ""
   },
@@ -2460,7 +2460,7 @@
     "semantic_hash": ""
   },
   "bench/campaigns/vem-gate-m5/runs/cfg-1a23c6c0/cylinder/t0/wire.png": {
-    "mtime": 1784036253.0746458,
+    "mtime": 1784039192.0566318,
     "ast_hash": "d58be79bf36c274ead4049dd9d6a90f9",
     "semantic_hash": ""
   },

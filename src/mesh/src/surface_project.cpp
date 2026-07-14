@@ -76,11 +76,12 @@ struct SurfaceGrid {
         bmin.array() -= pad;
         bmax.array() += pad;
 
-        // Target ~8 triangles per bin; clamp resolution.
+        // Target ~2 triangles per bin; clamp resolution. Fine parts (10^5 tris
+        // on real CAD) need more bins to keep per-query candidate lists short.
         const std::size_t ntri = surface.triangles.size();
-        const double ntri_d = static_cast<double>(std::max<std::size_t>(1, ntri / 8));
+        const double ntri_d = static_cast<double>(std::max<std::size_t>(1, ntri / 2));
         const int target = std::max(4, static_cast<int>(std::cbrt(ntri_d)));
-        const int res = std::clamp(target, 4, 64);
+        const int res = std::clamp(target, 4, 128);
         nx = ny = nz = res;
         origin = bmin;
         cell = (bmax - bmin).cwiseQuotient(Eigen::Vector3d(nx, ny, nz));

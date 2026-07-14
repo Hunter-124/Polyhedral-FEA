@@ -65,43 +65,6 @@ Eigen::Vector3d triangle_normal(const geom::TriSurface& s, std::size_t t) {
     return ab.cross(ac).normalized();
 }
 
-/// Closest distance from a point to a triangle (Ericson, Real-Time
-/// Collision Detection).
-double point_triangle_distance(const Eigen::Vector3d& p, const Eigen::Vector3d& a,
-                               const Eigen::Vector3d& b, const Eigen::Vector3d& c) {
-    const Eigen::Vector3d ab = b - a, ac = c - a, ap = p - a;
-    const double d1 = ab.dot(ap), d2 = ac.dot(ap);
-    if (d1 <= 0.0 && d2 <= 0.0) {
-        return (p - a).norm();
-    }
-    const Eigen::Vector3d bp = p - b;
-    const double d3 = ab.dot(bp), d4 = ac.dot(bp);
-    if (d3 >= 0.0 && d4 <= d3) {
-        return (p - b).norm();
-    }
-    const double vc = d1 * d4 - d3 * d2;
-    if (vc <= 0.0 && d1 >= 0.0 && d3 <= 0.0) {
-        return (p - (a + ab * (d1 / (d1 - d3)))).norm();
-    }
-    const Eigen::Vector3d cp = p - c;
-    const double d5 = ab.dot(cp), d6 = ac.dot(cp);
-    if (d6 >= 0.0 && d5 <= d6) {
-        return (p - c).norm();
-    }
-    const double vb = d5 * d2 - d1 * d6;
-    if (vb <= 0.0 && d2 >= 0.0 && d6 <= 0.0) {
-        return (p - (a + ac * (d2 / (d2 - d6)))).norm();
-    }
-    const double va = d3 * d6 - d5 * d4;
-    if (va <= 0.0 && (d4 - d3) >= 0.0 && (d5 - d6) >= 0.0) {
-        const double w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
-        return (p - (b + (c - b) * w)).norm();
-    }
-    const double denom = 1.0 / (va + vb + vc);
-    const Eigen::Vector3d closest = a + ab * (vb * denom) + ac * (vc * denom);
-    return (p - closest).norm();
-}
-
 } // namespace
 
 Model Model::load(const std::string& path, double sharp_angle_deg) {
@@ -340,6 +303,51 @@ ResolvedMeshSize resolve_mesh_size(const Model& model, double requested_h,
     return out;
 }
 
+namespace {
+
+/// Finest-wins spatial decimation: keep one source (min h) per cubic cell of
+/// side `cell`. Preserves the size field (where the mesh must be fine) while
+/// capping seed count, so the gradient limiter and ball-grading meshers do not
+/// choke on ~1 seed per surface vertex (tens of thousands on a real CAD part).
+std::vector<adapt::SizeSource> decimate_sources(std::vector<adapt::SizeSource> src,
+                                                double cell) {
+    if (!(cell > 0.0) || src.size() < 2) {
+        return src;
+    }
+    struct Key {
+        long x, y, z;
+        bool operator==(const Key& o) const = default;
+    };
+    struct KeyHash {
+        std::size_t operator()(const Key& k) const noexcept {
+            std::size_t h = std::hash<long>{}(k.x);
+            h ^= std::hash<long>{}(k.y) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+            h ^= std::hash<long>{}(k.z) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+            return h;
+        }
+    };
+    std::unordered_map<Key, std::size_t, KeyHash> best;
+    best.reserve(src.size());
+    const double inv = 1.0 / cell;
+    for (std::size_t i = 0; i < src.size(); ++i) {
+        const Key k{static_cast<long>(std::floor(src[i].x.x() * inv)),
+                    static_cast<long>(std::floor(src[i].x.y() * inv)),
+                    static_cast<long>(std::floor(src[i].x.z() * inv))};
+        auto [it, inserted] = best.try_emplace(k, i);
+        if (!inserted && src[i].h < src[it->second].h) {
+            it->second = i;
+        }
+    }
+    std::vector<adapt::SizeSource> out;
+    out.reserve(best.size());
+    for (const auto& [key, idx] : best) {
+        out.push_back(src[idx]);
+    }
+    return out;
+}
+
+} // namespace
+
 RefinementPlan build_refinement_plan(const Model& model, double h_coarse,
                                      std::span<const RefineRegion> regions,
                                      bool use_geometry) {
@@ -353,7 +361,10 @@ RefinementPlan build_refinement_plan(const Model& model, double h_coarse,
     // bulk h. Flat, thick regions emit nothing, so the source set stays sparse.
     if (use_geometry) {
         const double h_min_geo = 0.15 * h_coarse; // floor: avoid runaway fine
-        const auto geo = adapt::geometry_size_sources(model.surface, h_min_geo, h_coarse);
+        auto geo = adapt::geometry_size_sources(model.surface, h_min_geo, h_coarse);
+        // ~1 seed per vertex on a real CAD part is far more than the grading
+        // needs; keep the finest per half-h cell (field preserved, count bounded).
+        geo = decimate_sources(std::move(geo), 0.5 * h_coarse);
         plan.n_geometry_seeds = geo.size();
         sources.insert(sources.end(), geo.begin(), geo.end());
     }
@@ -1584,20 +1595,9 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         boundary_nodes.insert(quad.begin(), quad.end());
     }
     for (const auto node : boundary_nodes) {
-        const auto& pt = out.mesh.nodes[node];
-        double best = std::numeric_limits<double>::max();
-        int best_region = -1;
-        for (std::size_t ti = 0; ti < surf.triangles.size(); ++ti) {
-            const auto& tri = surf.triangles[ti];
-            const double d = point_triangle_distance(
-                pt, surf.vertices[tri[0]], surf.vertices[tri[1]], surf.vertices[tri[2]]);
-            if (d < best) {
-                best = d;
-                best_region = model.triangle_region[ti];
-            }
-        }
-        if (best <= 1.5 * fill_h) {
-            out.boundary_node_region[node] = best_region;
+        const auto cp = mesh::closest_on_surface(surf, out.mesh.nodes[node]);
+        if (cp.distance <= 1.5 * fill_h && cp.triangle < model.triangle_region.size()) {
+            out.boundary_node_region[node] = model.triangle_region[cp.triangle];
         }
     }
     if (std::abs(tendency_plan.tendency) >= 1e-12 || tendency_plan.remapped) {
@@ -1974,21 +1974,9 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 const auto& surf = model.surface;
                 for (std::uint32_t node = 0;
                      node < static_cast<std::uint32_t>(vol.mesh.nodes.size()); ++node) {
-                    const auto& pt = vol.mesh.nodes[node];
-                    double best = std::numeric_limits<double>::max();
-                    int best_region = -1;
-                    for (std::size_t ti = 0; ti < surf.triangles.size(); ++ti) {
-                        const auto& tri = surf.triangles[ti];
-                        const double d = point_triangle_distance(pt, surf.vertices[tri[0]],
-                                                                 surf.vertices[tri[1]],
-                                                                 surf.vertices[tri[2]]);
-                        if (d < best) {
-                            best = d;
-                            best_region = model.triangle_region[ti];
-                        }
-                    }
-                    if (best <= band) {
-                        vol.boundary_node_region[node] = best_region;
+                    const auto cp = mesh::closest_on_surface(surf, vol.mesh.nodes[node]);
+                    if (cp.distance <= band && cp.triangle < model.triangle_region.size()) {
+                        vol.boundary_node_region[node] = model.triangle_region[cp.triangle];
                     }
                 }
             };

@@ -319,19 +319,52 @@ void Viewport::upload_boundary_edges(const std::vector<Eigen::Vector3d>& nodes,
 }
 
 void Viewport::set_model(const Model& model) {
-    // pos3 normal3 color4 per vertex, one vertex per triangle corner
-    // (duplicated for flat shading and per-triangle overlay colors).
+    // pos3 normal3 color4 per vertex, one vertex per triangle corner. Normals are
+    // crease-aware smoothed: incident faces within kCreaseCos of a corner's own
+    // face are averaged (area-weighted), so curved walls (tubes/fillets) shade
+    // smoothly while sharp CAD edges (caps, mitres) stay crisp.
     model_vertex_data_.clear();
     model_vertex_data_.reserve(model.surface.triangles.size() * 3 * 10);
     const auto& p = palette;
-    for (const auto& tri : model.surface.triangles) {
-        const Eigen::Vector3d& a = model.surface.vertices[tri[0]];
-        const Eigen::Vector3d& b = model.surface.vertices[tri[1]];
-        const Eigen::Vector3d& c = model.surface.vertices[tri[2]];
-        const Eigen::Vector3d n = (b - a).cross(c - a).normalized();
-        for (const auto* v : {&a, &b, &c}) {
+    const auto& verts = model.surface.vertices;
+    const auto& tris = model.surface.triangles;
+    constexpr double kCreaseCos = 0.707; // 45°: smooth within, hard beyond
+
+    // Per-triangle area-weighted normal (unnormalized) + its unit direction.
+    std::vector<Eigen::Vector3d> face_area_n(tris.size());
+    std::vector<Eigen::Vector3d> face_unit_n(tris.size());
+    for (std::size_t t = 0; t < tris.size(); ++t) {
+        const auto& tri = tris[t];
+        const Eigen::Vector3d an = (verts[tri[1]] - verts[tri[0]]).cross(verts[tri[2]] - verts[tri[0]]);
+        face_area_n[t] = an;
+        const double nn = an.norm();
+        face_unit_n[t] = nn > 1e-30 ? (an / nn).eval() : Eigen::Vector3d(0, 0, 1);
+    }
+    // Faces incident to each welded vertex.
+    std::vector<std::vector<std::uint32_t>> incident(verts.size());
+    for (std::size_t t = 0; t < tris.size(); ++t) {
+        for (int k = 0; k < 3; ++k) {
+            incident[tris[t][k]].push_back(static_cast<std::uint32_t>(t));
+        }
+    }
+    const auto corner_normal = [&](std::size_t t, std::uint32_t v) {
+        Eigen::Vector3d acc = face_area_n[t];
+        for (const std::uint32_t f : incident[v]) {
+            if (f != t && face_unit_n[f].dot(face_unit_n[t]) >= kCreaseCos) {
+                acc += face_area_n[f];
+            }
+        }
+        const double nn = acc.norm();
+        return nn > 1e-30 ? (acc / nn).eval() : face_unit_n[t];
+    };
+
+    for (std::size_t t = 0; t < tris.size(); ++t) {
+        const auto& tri = tris[t];
+        for (int k = 0; k < 3; ++k) {
+            const Eigen::Vector3d& v = verts[tri[k]];
+            const Eigen::Vector3d n = corner_normal(t, tri[k]);
             for (int i = 0; i < 3; ++i) {
-                model_vertex_data_.push_back(static_cast<float>((*v)[i]));
+                model_vertex_data_.push_back(static_cast<float>(v[i]));
             }
             for (int i = 0; i < 3; ++i) {
                 model_vertex_data_.push_back(static_cast<float>(n[i]));
@@ -341,7 +374,7 @@ void Viewport::set_model(const Model& model) {
                 {p.part_default.x, p.part_default.y, p.part_default.z, 1.0f});
         }
     }
-    model_vertex_count_ = static_cast<int>(model.surface.triangles.size() * 3);
+    model_vertex_count_ = static_cast<int>(tris.size() * 3);
     glBindBuffer(GL_ARRAY_BUFFER, model_vbo_);
     glBufferData(GL_ARRAY_BUFFER,
                  static_cast<GLsizeiptr>(model_vertex_data_.size() * sizeof(float)),

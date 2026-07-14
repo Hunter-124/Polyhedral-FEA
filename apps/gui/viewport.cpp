@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "viewport.hpp"
 
+#include "fea/boundary_faces.hpp"
 #include "fea/nodal_mesh.hpp"
 #include "theme.hpp"
 
@@ -414,10 +415,11 @@ void Viewport::update_overlays(const Model& model, const SimSetup& setup, int se
 }
 
 void Viewport::set_mesh(const VolumeMeshOutput& mesh_out) {
-    // Exterior faces (from element connectivity when available): quads or
-    // degenerate tri-as-quads, colored by element type with a light checkerboard.
-    // O(nodes + elems + faces) — never scan all elements per face (that froze
-    // the GUI for ~seconds on ~200k-element auto meshes).
+    // Render exterior faces as TRUE polygons (poly-aware): each cell facet is
+    // one flat-shaded polygon (centroid fan for the fill, per-facet normal) and
+    // the wireframe traces only real polygon edges — never fan-triangulation
+    // diagonals. This is what makes polyhedral cells read as clean facets
+    // instead of a triangle soup. FEM faces come back as their quad/tri loops.
     namespace fea = polymesh::fea;
     auto type_color = [](fea::ElementType t) -> std::array<float, 3> {
         switch (t) {
@@ -436,70 +438,102 @@ void Viewport::set_mesh(const VolumeMeshOutput& mesh_out) {
         }
         return {0.6f, 0.6f, 0.6f};
     };
-    // Prefer type of any incident element for a boundary node (majority not needed
-    // for uniform fills; mixed hybrids still get a stable color per face).
     std::vector<fea::ElementType> node_type(mesh_out.mesh.nodes.size(),
                                             fea::ElementType::kTet4);
     std::vector<char> node_set(mesh_out.mesh.nodes.size(), 0);
     for (const auto& el : mesh_out.mesh.elements) {
-        for (auto n : el.nodes) {
-            if (n < node_type.size()) {
-                node_type[n] = el.type;
-                node_set[n] = 1;
+        for (auto nidx : el.nodes) {
+            if (nidx < node_type.size()) {
+                node_type[nidx] = el.type;
+                node_set[nidx] = 1;
             }
         }
     }
-    auto elem_type_for_quad = [&](const std::array<std::uint32_t, 4>& q) {
-        for (auto qn : q) {
-            if (qn < node_set.size() && node_set[qn]) {
-                return node_type[qn];
-            }
-        }
-        return fea::ElementType::kTet4;
-    };
 
-    std::vector<float> data;
-    data.reserve(mesh_out.boundary_quads.size() * 6 * 10);
     const auto& nodes = mesh_out.mesh.nodes;
-    for (std::size_t qi = 0; qi < mesh_out.boundary_quads.size(); ++qi) {
-        const auto& quad = mesh_out.boundary_quads[qi];
-        if (quad[0] >= nodes.size() || quad[1] >= nodes.size() || quad[2] >= nodes.size() ||
-            quad[3] >= nodes.size()) {
+    const auto polys = fea::extract_boundary_polys(mesh_out.mesh);
+
+    std::vector<float> data;         // fill: pos3 + normal3 + rgba4
+    data.reserve(polys.size() * 12 * 10);
+    std::vector<float> edata;        // edges: pos3 + rgba4
+    edata.reserve(polys.size() * 8 * 7);
+    const float er = 0.02f, eg = 0.02f, eb = 0.04f, ea = 1.0f;
+
+    for (std::size_t pi = 0; pi < polys.size(); ++pi) {
+        const auto& lp = polys[pi];
+        if (lp.size() < 3) {
             continue;
         }
-        const Eigen::Vector3d a = nodes[quad[0]];
-        const Eigen::Vector3d b = nodes[quad[1]];
-        const Eigen::Vector3d c = nodes[quad[2]];
-        Eigen::Vector3d n = (b - a).cross(c - a);
-        const double nn = n.norm();
-        if (nn > 1e-30) {
-            n /= nn;
-        } else {
-            n = Eigen::Vector3d::UnitZ();
+        bool ok = true;
+        Eigen::Vector3d c = Eigen::Vector3d::Zero();
+        for (auto vi : lp) {
+            if (vi >= nodes.size()) {
+                ok = false;
+                break;
+            }
+            c += nodes[vi];
         }
-        auto rgb = type_color(elem_type_for_quad(quad));
-        // Deterministic face checker: alternate brightness so edges read clearly
-        // against a uniform sea of Cartesian cells.
-        const std::uint32_t face_hash =
-            quad[0] * 73856093u ^ quad[1] * 19349663u ^ quad[2] * 83492791u ^
-            static_cast<std::uint32_t>(qi) * 2654435761u;
-        const float shade = (face_hash & 1u) ? 1.0f : 0.78f;
+        if (!ok) {
+            continue;
+        }
+        c /= static_cast<double>(lp.size());
+        // Newell normal: robust for non-planar / concave polygons.
+        Eigen::Vector3d nrm = Eigen::Vector3d::Zero();
+        for (std::size_t i = 0; i < lp.size(); ++i) {
+            const auto& p = nodes[lp[i]];
+            const auto& q = nodes[lp[(i + 1) % lp.size()]];
+            nrm.x() += (p.y() - q.y()) * (p.z() + q.z());
+            nrm.y() += (p.z() - q.z()) * (p.x() + q.x());
+            nrm.z() += (p.x() - q.x()) * (p.y() + q.y());
+        }
+        const double nn = nrm.norm();
+        if (nn > 1e-30) {
+            nrm /= nn;
+        } else {
+            nrm = Eigen::Vector3d::UnitZ();
+        }
+        fea::ElementType t = fea::ElementType::kTet4;
+        for (auto vi : lp) {
+            if (vi < node_set.size() && node_set[vi]) {
+                t = node_type[vi];
+                break;
+            }
+        }
+        auto rgb = type_color(t);
+        // Per-facet brightness jitter so adjacent cells stay distinct.
+        const std::uint32_t hsh =
+            static_cast<std::uint32_t>(pi) * 2654435761u ^ lp[0] * 73856093u ^
+            lp[1] * 19349663u;
+        const float shade = (hsh & 1u) ? 1.0f : 0.82f;
         rgb[0] *= shade;
         rgb[1] *= shade;
         rgb[2] *= shade;
-        // Degenerate tri-as-quad (v2==v3): one triangle. Else two tris of the quad.
-        const bool is_tri = (quad[2] == quad[3]);
-        const int corners[] = {0, 1, 2, 0, 2, 3};
-        const int n_idx = is_tri ? 3 : 6;
-        for (int k = 0; k < n_idx; ++k) {
-            const auto& p = nodes[quad[static_cast<std::size_t>(corners[k])]];
-            for (int i = 0; i < 3; ++i) {
-                data.push_back(static_cast<float>(p[i]));
-            }
-            for (int i = 0; i < 3; ++i) {
-                data.push_back(static_cast<float>(n[i]));
-            }
+        auto emit_fill = [&](const Eigen::Vector3d& p) {
+            data.push_back(static_cast<float>(p.x()));
+            data.push_back(static_cast<float>(p.y()));
+            data.push_back(static_cast<float>(p.z()));
+            data.push_back(static_cast<float>(nrm.x()));
+            data.push_back(static_cast<float>(nrm.y()));
+            data.push_back(static_cast<float>(nrm.z()));
             data.insert(data.end(), {rgb[0], rgb[1], rgb[2], 1.0f});
+        };
+        auto emit_edge = [&](const Eigen::Vector3d& p) {
+            edata.push_back(static_cast<float>(p.x()));
+            edata.push_back(static_cast<float>(p.y()));
+            edata.push_back(static_cast<float>(p.z()));
+            edata.push_back(er);
+            edata.push_back(eg);
+            edata.push_back(eb);
+            edata.push_back(ea);
+        };
+        for (std::size_t i = 0; i < lp.size(); ++i) {
+            const Eigen::Vector3d& p = nodes[lp[i]];
+            const Eigen::Vector3d& q = nodes[lp[(i + 1) % lp.size()]];
+            emit_fill(c);
+            emit_fill(p);
+            emit_fill(q);
+            emit_edge(p);
+            emit_edge(q);
         }
     }
     mesh_vertex_count_ = static_cast<int>(data.size() / 10);
@@ -507,9 +541,10 @@ void Viewport::set_mesh(const VolumeMeshOutput& mesh_out) {
     glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(data.size() * sizeof(float)),
                  data.data(), GL_DYNAMIC_DRAW);
 
-    // High-contrast dark wireframe so individual elements stay identifiable.
-    upload_boundary_edges(nodes, mesh_out.boundary_quads, 0.02f, 0.02f, 0.04f, 1.0f,
-                          mesh_edge_vbo_, mesh_edge_vertex_count_);
+    mesh_edge_vertex_count_ = static_cast<int>(edata.size() / 7);
+    glBindBuffer(GL_ARRAY_BUFFER, mesh_edge_vbo_);
+    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(edata.size() * sizeof(float)),
+                 edata.data(), GL_DYNAMIC_DRAW);
 }
 
 void Viewport::set_result(const SolveResult& result) {

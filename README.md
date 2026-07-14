@@ -163,6 +163,25 @@ Useful flags: `--mesher varyhedron|tet|hex|hexvem|graded|hexpyr|prism`,
 `--adapt n`, `--eta-target η`, `-E`, `-nu`. Run `./build/apps/cli/polymesh`
 with no args for full help.
 
+### Diagnostics & the self-improvement loop
+
+`polymesh diag <part> --json out.json` runs import + mesh (+ a default solve) and
+emits a structured report — import fidelity, mesh quality (min/mean), per-phase
+timings, element throughput, and solve stress/η. This is the profiler feed.
+
+```sh
+./build/apps/cli/polymesh diag tests/fixtures/parts/pipe.step --json /tmp/pipe.json
+```
+
+`scripts/self_improve.sh [--backend omp|grok] [--parts "a.step b.step"]` runs that
+diagnostics battery on a couple of CAD parts, writes a report + improvement prompt
+under `bench/self_improve/<stamp>/`, and hands it to an LLM CLI (`omp` or `grok`)
+which edits the meshing / geometry-representation / solver code in place. Re-run to
+measure the effect — the healing loop tightens each pass. `--dry-run` prints the
+command without invoking the LLM. The desktop app exposes the same via the
+**diagnostics & self-improve** panel (throughput readout + `self-improve (omp/grok)`
+buttons).
+
 ### GUI
 
 ```sh

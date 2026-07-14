@@ -44,9 +44,11 @@ class CadModel {
 
     /// Derived surface triangulation for viewport / legacy hybrid bridge /
     /// compare. Does **not** replace the BRep. `deflection` ≤ 0 selects an
-    /// automatic fraction of the bbox diagonal (same policy as historical
-    /// load_step).
-    [[nodiscard]] TriSurface tessellate(double deflection = 0.0) const;
+    /// automatic linear sag (fraction of the bbox diagonal). `angular_deflection`
+    /// ≤ 0 selects the default (~0.2 rad) cap on facet-normal turn across a
+    /// curved face — the knob that controls pipe/fillet smoothness.
+    [[nodiscard]] TriSurface tessellate(double deflection = 0.0,
+                                        double angular_deflection = 0.0) const;
 
     /// Alias used by hybrid_zoo until it is fully BRep-native (ADR-0020).
     [[nodiscard]] TriSurface boundary_surface_for_legacy_fill(double deflection = 0.0) const {

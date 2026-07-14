@@ -48,12 +48,18 @@ namespace polymesh::geom {
 
 namespace {
 
-constexpr double kDeflectionFraction = 1e-3;
+// Linear sag tolerance as a fraction of the bbox diagonal. Tight enough that a
+// curved wall (pipe/fillet) is represented with sub-percent chord deviation.
+constexpr double kDeflectionFraction = 5e-4;
 constexpr double kMinDeflection = 1e-6;
-constexpr double kAngularDeflection = 0.5; // radians
+// Angular deflection (radians) between adjacent facet normals on a curved face.
+// 0.2 rad ≈ 11.5° → a cylinder gets ~30 facets around, killing the coarse
+// ~28° (0.5 rad) faceting on imported pipes. Curved-face fidelity comes first.
+constexpr double kAngularDeflection = 0.2;
 
-Soup triangulate_shape(const TopoDS_Shape& shape, double deflection) {
-    BRepMesh_IncrementalMesh mesher(shape, deflection, Standard_False, kAngularDeflection,
+Soup triangulate_shape(const TopoDS_Shape& shape, double deflection,
+                       double angular_deflection) {
+    BRepMesh_IncrementalMesh mesher(shape, deflection, Standard_False, angular_deflection,
                                     Standard_True);
     (void)mesher;
 
@@ -172,7 +178,7 @@ double CadModel::bbox_diagonal() const noexcept {
     return (bbox_max_ - bbox_min_).norm();
 }
 
-TriSurface CadModel::tessellate(double deflection) const {
+TriSurface CadModel::tessellate(double deflection, double angular_deflection) const {
     if (empty()) {
         throw GeomError("CadModel::tessellate: empty model");
     }
@@ -181,7 +187,8 @@ TriSurface CadModel::tessellate(double deflection) const {
         const double diag = bbox_diagonal();
         defl = std::max(kMinDeflection, kDeflectionFraction * (diag > 0.0 ? diag : 1.0));
     }
-    const Soup soup = triangulate_shape(impl_->shape, defl);
+    const double ang = angular_deflection > 0.0 ? angular_deflection : kAngularDeflection;
+    const Soup soup = triangulate_shape(impl_->shape, defl, ang);
     if (soup.empty()) {
         throw GeomError("CadModel::tessellate: triangulation produced no triangles");
     }

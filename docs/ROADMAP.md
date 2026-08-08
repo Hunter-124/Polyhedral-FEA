@@ -68,7 +68,7 @@ and error, export VTU — without CLI.
 | ID | Task | Acceptance |
 |----|------|------------|
 | B1 | ~~Frontal / constrained Delaunay tet (or documented grid-fill limits)~~ | Documented limits (ADR-0015); not true Delaunay |
-| B2 | ~~Quality metrics in mesh note + VTU cell data~~ | Done (mesher note minQ/slivers; VTU `quality` CellData) |
+| B2 | ~~Quality metrics in mesh note + VTU cell data~~ | Done (mesher note minQ/slivers; VTU `quality` CellData). Since 2026-08-08 the metric is **measured for every cell type**, not tets only — non-tet cells previously reported a fabricated 1.0/0.0 (`docs/progress.md`) |
 | B3 | ~~Surface snap Jacobian safety (tet + hexpyr)~~ | Done (unsnap offenders; Catch2 unit box) |
 | B4 | ~~STEP path: OCC build option CI job or docker note~~ | Done (README Ubuntu packages + cmake flag) |
 | B5 | ~~Fixture geometry suite under `bench/geometries/public/`~~ | Done (≥3 closed STLs + README + load smoke) |
@@ -88,7 +88,7 @@ and error, export VTU — without CLI.
 | ID | Task | Acceptance |
 |----|------|------------|
 | D1 | ~~Dörfler seed remesh~~ | Done (ADR-0014) |
-| D2 | ~~Global η stopping criterion (user target)~~ | Done (η target / early-stop) |
+| D2 | ~~Global η stopping criterion (user target)~~ | Done (η target / early-stop). Since 2026-08-08 `global_eta` is **dimensionless-relative**; the earlier unnormalised Pa RSS grew as √N and could not reach a target (`docs/progress.md`) |
 | D3 | ~~p-elevation on smooth marked elements (tet10/hex20 promote)~~ | Done (`fea::p_elevate`, `mark_smooth`, pipeline/CLI) |
 | D4 | ~~True local h-refine with hanging-node or remesh conformity~~ | Done (ADR-0016 LEB) |
 | D5 | ~~Auto settings: h0 from bbox + feature density~~ | Done (`resolve_mesh_size`, CLI omit -h, GUI note) |
@@ -108,7 +108,7 @@ and error, export VTU — without CLI.
 | ID | Task | Acceptance |
 |----|------|------------|
 | F1 | ~~OpenMP assembly~~ | Done (`POLYMESH_WITH_OPENMP`, parallel `assemble_stiffness`) |
-| F2 | ~~CG + Eigen iterative for large N~~ | Done (auto CG >8k free DOFs; DiagonalPreconditioner; ~15k free DOF test) |
+| F2 | ~~CG + Eigen iterative for large N~~ | Done (auto CG above 50000 free DOFs, uniform for every cell type; incomplete-Cholesky preconditioner with Jacobi fallback; bounded iteration cap; ~15k free DOF test) |
 | F3 | ~~CUDA SpMV / batched Ke parity tests~~ | Done (CSR SpMV CPU+CUDA parity; Ke batch later) |
 
 ## Track G — Release (P7)
@@ -135,7 +135,7 @@ Owner priority: **hybrid + graded** accuracy/speed vs hex; octa experiment secon
 | H-H1 | Hybrid thinner skin defaults | feat_band 1.5h, seed cap 192 |
 | H-H2 | True hex+pyramid+tet FE | Isoparam bulk hex (open) |
 | H-O1 | Octahedral experiment | open |
-| H-V1 | CG preconditioner | open |
+| H-V1 | CG preconditioner | partially addressed — incomplete-Cholesky (Jacobi fallback) + bounded iteration cap landed with the 2026-08-08 auto-policy fix (`docs/progress.md`); a mesh-aware/AMG preconditioner is still open |
 | H-E1 | Scoreboard close-out | open |
 
 ---
@@ -170,6 +170,6 @@ A1 A3 ──> A2 A10 ──> A4 A5 A8 ──> A6 A7
 | C Hybrid | C1/C2/C3/C4/C5 done (hex→pyramids; geometry sizing; prism fill; VEM k=2; Kirsch graded @ equal DOF). Product **geo-hp**: variable h (skin/features) + bulk p=2 / surface p=1. |
 | D Adapt | Seed remesh + η (D2) + auto h0 (D5) + p-elev (D3) + local LEB (D4) + D6 L-domain instrument (5.12× DOF / 12.2× time). Product-path Tier-3 on full public suite still open. |
 | E Verify | E1–E4 done; D6 Tier-3 scoreboard instrument on L-domain. |
-| F Perf | F1–F3 done: OpenMP assembly, auto CG >8k free DOFs, CSR SpMV + optional CUDA parity. |
+| F Perf | F1–F3 done: OpenMP assembly, auto CG above 50000 free DOFs (incomplete-Cholesky, bounded iterations), CSR SpMV + optional CUDA parity. |
 | G Release | G1–G4 done: README, examples/, header units, CI green (format+ctest+grep-audit). |
-| H Mesher | **Active.** Graded LEB conformity (ADR-0018), stamp hybrid, snap hash, plan/scoreboard. Remaining: H2 true hybrid FE, octa, solver precond. |
+| H Mesher | **Active.** Graded LEB conformity (ADR-0018), stamp hybrid, snap hash, plan/scoreboard. Remaining: H2 true hybrid FE, octa; solver precond only partially (H-V1: incomplete-Cholesky + bounded iterations landed 2026-08-08, mesh-aware preconditioner open). |

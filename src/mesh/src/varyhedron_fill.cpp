@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "mesh/varyhedron_fill.hpp"
+#include "mesh/cell_validity.hpp"
 
 #include "mesh/grid_classify.hpp"
 #include "mesh/hybrid_fill.hpp"
@@ -223,6 +224,160 @@ double pack_fill_fraction(const std::vector<Eigen::Vector3d>& edge,
     // Cheap proxy: raw sum / domain (overlaps ignored → may exceed 1; clamp).
     const double frac = ball * static_cast<double>(edge.size() + volume.size()) / domain_vol;
     return std::max(0.0, std::min(1.0, frac));
+}
+
+double tet_quality(const std::vector<Eigen::Vector3d>& nodes,
+                   const std::array<std::uint32_t, 4>& tet) {
+    for (const std::uint32_t ni : tet) {
+        if (ni >= nodes.size()) {
+            return -std::numeric_limits<double>::infinity();
+        }
+    }
+    const double q = validity::tet_shape_quality(
+        nodes[tet[0]], nodes[tet[1]], nodes[tet[2]], nodes[tet[3]]);
+    return std::isfinite(q) ? q : -std::numeric_limits<double>::infinity();
+}
+
+/// Repair the small set of slivers left by clipped/refined scaffold emission.
+/// Prefer moving the vertex opposite a boundary face farther into the volume;
+/// every incident tet must improve, so the repair cannot trade one sliver for
+/// another. A tet for which no deterministic local move works is not emitted.
+void repair_or_drop_sliver_tets(TetFillOutput& mesh) {
+    if (mesh.tets.empty() || mesh.nodes.empty()) {
+        return;
+    }
+
+    std::vector<char> is_boundary(mesh.nodes.size(), 0);
+    for (const std::uint32_t ni : boundary_nodes(mesh)) {
+        if (ni < is_boundary.size()) {
+            is_boundary[ni] = 1;
+        }
+    }
+
+    std::vector<std::vector<std::size_t>> incident(mesh.nodes.size());
+    for (std::size_t ci = 0; ci < mesh.tets.size(); ++ci) {
+        for (const std::uint32_t ni : mesh.tets[ci]) {
+            if (ni < incident.size()) {
+                incident[ni].push_back(ci);
+            }
+        }
+    }
+
+    constexpr std::array<double, 8> kOffsets{{
+        0.005, 0.01, 0.02, 0.04, 0.08, 0.12, 0.20, 0.30,
+    }};
+    for (int pass = 0; pass < 12; ++pass) {
+        bool changed = false;
+        for (std::size_t ci = 0; ci < mesh.tets.size(); ++ci) {
+            const auto& tet = mesh.tets[ci];
+            const double q0 = tet_quality(mesh.nodes, tet);
+            if (q0 >= validity::kCellShapeFloor) {
+                continue;
+            }
+
+            std::array<std::size_t, 4> order{{0, 1, 2, 3}};
+            const int n_boundary = static_cast<int>(is_boundary[tet[0]]) +
+                                   static_cast<int>(is_boundary[tet[1]]) +
+                                   static_cast<int>(is_boundary[tet[2]]) +
+                                   static_cast<int>(is_boundary[tet[3]]);
+            if (n_boundary == 3) {
+                std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
+                    return is_boundary[tet[a]] < is_boundary[tet[b]];
+                });
+            }
+
+            bool have_best = false;
+            std::uint32_t best_node = 0;
+            Eigen::Vector3d best_pos = Eigen::Vector3d::Zero();
+            double best_worst = -std::numeric_limits<double>::infinity();
+            double best_target = q0;
+            double best_step2 = std::numeric_limits<double>::infinity();
+
+            for (const std::size_t lv : order) {
+                const std::uint32_t ni = tet[lv];
+                if (ni >= mesh.nodes.size() || incident[ni].empty()) {
+                    continue;
+                }
+                std::array<std::size_t, 3> opposite{};
+                std::size_t oi = 0;
+                for (std::size_t k = 0; k < 4; ++k) {
+                    if (k != lv) {
+                        opposite[oi++] = k;
+                    }
+                }
+                const Eigen::Vector3d& a = mesh.nodes[tet[opposite[0]]];
+                const Eigen::Vector3d& b = mesh.nodes[tet[opposite[1]]];
+                const Eigen::Vector3d& c = mesh.nodes[tet[opposite[2]]];
+                Eigen::Vector3d normal = (b - a).cross(c - a);
+                const double normal_len = normal.norm();
+                const double scale = validity::max_edge(
+                    mesh.nodes[tet[0]], mesh.nodes[tet[1]],
+                    mesh.nodes[tet[2]], mesh.nodes[tet[3]]);
+                if (!(normal_len > 0.0) || !(scale > 0.0)) {
+                    continue;
+                }
+                normal /= normal_len;
+                if ((mesh.nodes[ni] - a).dot(normal) < 0.0) {
+                    normal = -normal;
+                }
+
+                const Eigen::Vector3d saved = mesh.nodes[ni];
+                double current_worst = std::numeric_limits<double>::infinity();
+                for (const std::size_t cj : incident[ni]) {
+                    current_worst = std::min(
+                        current_worst, tet_quality(mesh.nodes, mesh.tets[cj]));
+                }
+                for (const double offset : kOffsets) {
+                    const Eigen::Vector3d candidate = saved + (offset * scale) * normal;
+                    mesh.nodes[ni] = candidate;
+                    double worst = std::numeric_limits<double>::infinity();
+                    for (const std::size_t cj : incident[ni]) {
+                        worst = std::min(
+                            worst, tet_quality(mesh.nodes, mesh.tets[cj]));
+                    }
+                    const double target = tet_quality(mesh.nodes, tet);
+                    mesh.nodes[ni] = saved;
+                    if (target >= validity::kCellShapeFloor &&
+                        worst >= validity::kCellShapeFloor) {
+                        mesh.nodes[ni] = candidate;
+                        changed = true;
+                        have_best = false;
+                        break;
+                    }
+                    const double step2 = (candidate - saved).squaredNorm();
+                    if (target > q0 && worst > current_worst &&
+                        (!have_best || worst > best_worst ||
+                         (worst == best_worst &&
+                          (target > best_target ||
+                           (target == best_target && step2 < best_step2))))) {
+                        have_best = true;
+                        best_node = ni;
+                        best_pos = candidate;
+                        best_worst = worst;
+                        best_target = target;
+                        best_step2 = step2;
+                    }
+                }
+                if (tet_quality(mesh.nodes, tet) >= validity::kCellShapeFloor) {
+                    break;
+                }
+            }
+            if (tet_quality(mesh.nodes, tet) < validity::kCellShapeFloor &&
+                have_best) {
+                mesh.nodes[best_node] = best_pos;
+                changed = true;
+            }
+        }
+        if (!changed) {
+            break;
+        }
+    }
+
+    mesh.tets.erase(
+        std::remove_if(mesh.tets.begin(), mesh.tets.end(), [&](const auto& tet) {
+            return tet_quality(mesh.nodes, tet) < validity::kCellShapeFloor;
+        }),
+        mesh.tets.end());
 }
 
 } // namespace
@@ -572,20 +727,23 @@ VaryhedronFillOutput varyhedron_fill_surface(
             p = p + w * (q->closest - p);
         }
 
-        // Revert any tet with non-positive volume after the blend.
-        auto tet_vol6 = [&](const std::array<std::uint32_t, 4>& t) {
-            const Eigen::Vector3d a = out.mesh.nodes[t[0]];
-            const Eigen::Vector3d b = out.mesh.nodes[t[1]];
-            const Eigen::Vector3d c = out.mesh.nodes[t[2]];
-            const Eigen::Vector3d d = out.mesh.nodes[t[3]];
-            const Eigen::Vector3d ab = b - a;
-            const Eigen::Vector3d ac = c - a;
-            const Eigen::Vector3d ad = d - a;
-            return ab.dot(ac.cross(ad));
+        // Revert every node participating in an inverted or near-degenerate
+        // tet.  A sign-only gate allowed a positive 1e-18-quality sliver to
+        // survive the sharp-feature attraction.
+        auto tet_bad = [&](const std::array<std::uint32_t, 4>& t) {
+            const Eigen::Vector3d& a = out.mesh.nodes[t[0]];
+            const Eigen::Vector3d& b = out.mesh.nodes[t[1]];
+            const Eigen::Vector3d& c = out.mesh.nodes[t[2]];
+            const Eigen::Vector3d& d = out.mesh.nodes[t[3]];
+            if (validity::tet_signed_volume(a, b, c, d) <= 0.0) {
+                return true;
+            }
+            return validity::tet_shape_quality(a, b, c, d) <
+                   validity::kCellShapeFloor;
         };
         std::unordered_set<std::uint32_t> offenders;
         for (const auto& t : out.mesh.tets) {
-            if (tet_vol6(t) <= 0.0) {
+            if (tet_bad(t)) {
                 offenders.insert(t[0]);
                 offenders.insert(t[1]);
                 offenders.insert(t[2]);
@@ -729,6 +887,9 @@ VaryhedronFillOutput varyhedron_fill_surface(
         out.n_wall_iters = wall.n_iters;
         out.wall_mean_surface_residual = wall.mean_surface_residual;
     }
+
+    repair_or_drop_sliver_tets(out.mesh);
+    out.n_tets = out.mesh.tets.size();
 
     return out;
 }

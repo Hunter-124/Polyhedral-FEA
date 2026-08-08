@@ -41,6 +41,22 @@ struct FaceConformityStats {
 std::vector<double> tet4_aspect_ratios(const std::vector<Eigen::Vector3d>& nodes,
                                        const std::vector<std::array<std::uint32_t, 4>>& tets);
 
+/// Normalized volume/edge³ shape quality of one tet, in [0,1]: 6√2·V/l_max³.
+/// 1 ≈ regular (equilateral) tet, 0 = zero volume. This is the measure behind
+/// `tet4_aspect_ratios` and `TetQuality::min_aspect`.
+double tet4_aspect_quality(const Eigen::Vector3d& a, const Eigen::Vector3d& b,
+                           const Eigen::Vector3d& c, const Eigen::Vector3d& d);
+
+/// Shape quality of one corner of a polygon face, in [0,1]:
+/// |e_prev × e_next| · 2 / ((|e_prev|² + |e_next|²) · sin θ_n), where θ_n is the
+/// interior angle of the regular `n_corners`-gon. 1 at a corner of the regular
+/// polygon (equilateral triangle, square, regular hexagon …), → 0 as the corner
+/// collapses or the face stretches. Minimum over a face's corners is that
+/// face's quality. NaN when `n_corners` < 3 (no polygon) or an incident edge
+/// has zero length (nothing measurable).
+double polygon_corner_quality(const Eigen::Vector3d& prev, const Eigen::Vector3d& corner,
+                              const Eigen::Vector3d& next, std::size_t n_corners);
+
 TetQuality summarize_tet4_quality(const std::vector<Eigen::Vector3d>& nodes,
                                   const std::vector<std::array<std::uint32_t, 4>>& tets,
                                   double sliver_threshold = 0.05);

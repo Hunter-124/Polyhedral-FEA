@@ -8,7 +8,9 @@
 
 #include <Eigen/Core>
 
+#include <cstdint>
 #include <functional>
+#include <span>
 #include <vector>
 
 namespace polymesh::fea {
@@ -48,5 +50,44 @@ using Traction = std::function<Eigen::Vector3d(const Eigen::Vector3d&)>;
 Eigen::VectorXd assemble_traction_load(const NodalMesh& mesh,
                                        const std::vector<SurfaceFace>& faces,
                                        const Traction& traction);
+
+/// Free-surface faces of `mesh` as `SurfaceFace` records ready for
+/// `assemble_traction_load`: tri3/quad4 corner topology, upgraded to
+/// tri6/quad8 when the mesh is quadratic and every edge of the face carries a
+/// mid-edge node — so quadratic meshes get the correct midside load split
+/// instead of a corner-only lump.
+std::vector<SurfaceFace> boundary_surface_faces(const NodalMesh& mesh);
+
+/// Unit normal of a face from its corner loop winding (outward for the
+/// windings produced by `boundary_surface_faces`); zero if degenerate.
+Eigen::Vector3d surface_face_normal(const NodalMesh& mesh, const SurfaceFace& face);
+
+/// Total area of `faces`, m^2, using the same surface quadrature as
+/// `assemble_traction_load` — so a uniform traction of t over `faces` has
+/// resultant exactly t * this area.
+double integrated_face_area(const NodalMesh& mesh, const std::vector<SurfaceFace>& faces);
+
+/// Subset of `faces` whose every node lies in `nodes`: the face set implied by
+/// a nodal selection (box, slab, or surface region). Order is preserved.
+std::vector<SurfaceFace> faces_within(const std::vector<SurfaceFace>& faces,
+                                      std::span<const std::uint32_t> nodes);
+
+/// Result of energy-conjugate load application over a face set.
+struct ConsistentLoad {
+    Eigen::VectorXd loads;                     ///< 3N nodal load vector, N
+    Eigen::Vector3d resultant{0.0, 0.0, 0.0};  ///< sum of nodal loads, N
+    double area = 0.0;                         ///< integrated load area, m^2
+    double conservation_error = 0.0;            ///< |resultant - requested|, N
+};
+
+/// Consistent (energy-conjugate) nodal loads for a uniform traction over
+/// `faces` whose resultant is exactly `total_force` newtons: t =
+/// total_force / area, f = integral of N^T t dS, then rescaled so the nodal
+/// sum matches `total_force` to round-off. A face set of zero area yields a
+/// zero load with `area == 0` so callers can report the degeneracy instead of
+/// silently falling back to mesh-density-dependent even splitting.
+ConsistentLoad consistent_face_load(const NodalMesh& mesh,
+                                    const std::vector<SurfaceFace>& faces,
+                                    const Eigen::Vector3d& total_force);
 
 } // namespace polymesh::fea

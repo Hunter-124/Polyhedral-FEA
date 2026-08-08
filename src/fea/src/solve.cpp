@@ -7,7 +7,9 @@
 #include <Eigen/SparseCholesky>
 
 #include <algorithm>
+#include <cmath>
 #include <format>
+#include <limits>
 #include <vector>
 
 namespace polymesh::fea {
@@ -26,39 +28,77 @@ SolveMethod select_solve_method(Eigen::Index nfree, const SolveOptions& options)
 
 namespace {
 
-/// Chunked CG so `on_progress` can fire without rewriting the solver. Warm-starts
-/// each chunk from the previous solution (solveWithGuess).
-template <typename CG>
-Eigen::VectorXd run_cg_chunked(CG& cg, const Eigen::VectorXd& rhs, int max_iters,
-                               int chunk, const std::function<void(int, int, double)>& on_progress) {
-    const int step = std::max(1, chunk);
-    Eigen::VectorXd uf = Eigen::VectorXd::Zero(rhs.size());
-    int total = 0;
-    while (total < max_iters) {
-        const int remain = max_iters - total;
-        const int this_chunk = std::min(step, remain);
-        cg.setMaxIterations(this_chunk);
-        uf = cg.solveWithGuess(rhs, uf);
-        const int took = static_cast<int>(cg.iterations());
-        total += std::max(took, 1); // avoid infinite loop if Eigen reports 0
-        if (on_progress) {
-            on_progress(std::min(total, max_iters), max_iters, cg.error());
+/// Iteration cap `kAuto` applies when the caller leaves `cg_max_iters` at 0.
+/// Even at ~10 ms per iteration this bounds a hopeless solve to minutes rather
+/// than letting `2 * nfree` grind for hours on a system that will not converge.
+constexpr int kCgAutoIterCap = 20000;
+
+int cg_iteration_budget(Eigen::Index nfree, const SolveOptions& options) {
+    if (options.cg_max_iters > 0) {
+        return options.cg_max_iters;
+    }
+    return static_cast<int>(
+        std::clamp<Eigen::Index>(2 * nfree, Eigen::Index{1000}, Eigen::Index{kCgAutoIterCap}));
+}
+
+/// Preconditioned conjugate gradient that reports progress from inside the
+/// recurrence.
+///
+/// Hand-rolled instead of `Eigen::ConjugateGradient` because progress used to
+/// be produced by restarting Eigen's solver every `cg_progress_chunk`
+/// iterations through `solveWithGuess`. A restart discards the Krylov space, so
+/// the callback-driven path converged far slower than the plain one — the GUI
+/// and the CLI were effectively running different solvers. Reporting from one
+/// uninterrupted recurrence removes that split. `iters` and `rel_error` report
+/// what actually happened; the caller decides whether that counts as success.
+template <typename Precond>
+Eigen::VectorXd run_cg(const Eigen::SparseMatrix<double>& a, const Eigen::VectorXd& rhs,
+                       const Precond& precond, double tol, int max_iters, int report_every,
+                       const std::function<void(int, int, double)>& on_progress, int& iters,
+                       double& rel_error) {
+    Eigen::VectorXd x = Eigen::VectorXd::Zero(rhs.size());
+    iters = 0;
+    const double rhs_norm2 = rhs.squaredNorm();
+    if (!(rhs_norm2 > 0.0)) {
+        rel_error = 0.0;
+        return x;
+    }
+    const double threshold = tol * tol * rhs_norm2;
+
+    Eigen::VectorXd r = rhs; // b − A·x0 with x0 = 0
+    Eigen::VectorXd z = precond.solve(r);
+    Eigen::VectorXd p = z;
+    Eigen::VectorXd ap(rhs.size());
+    double r_norm2 = rhs_norm2;
+    double rz = r.dot(z);
+
+    while (iters < max_iters && r_norm2 > threshold) {
+        ap.noalias() = a * p;
+        const double pap = p.dot(ap);
+        if (!(pap > 0.0)) {
+            break; // breakdown: K_ff is not positive definite along p
         }
-        if (cg.info() == Eigen::Success) {
-            return uf;
-        }
-        // No progress in this chunk — stop and report failure below.
-        if (took == 0) {
+        const double alpha = rz / pap;
+        x += alpha * p;
+        r -= alpha * ap;
+        r_norm2 = r.squaredNorm();
+        ++iters;
+        if (r_norm2 <= threshold) {
             break;
         }
+        z = precond.solve(r);
+        const double rz_next = r.dot(z);
+        if (!(rz_next > 0.0)) {
+            break; // preconditioner lost positive definiteness
+        }
+        p = (rz_next / rz) * p + z;
+        rz = rz_next;
+        if (on_progress && report_every > 0 && iters % report_every == 0) {
+            on_progress(iters, max_iters, std::sqrt(r_norm2 / rhs_norm2));
+        }
     }
-    if (cg.info() != Eigen::Success) {
-        throw FeaError(
-            std::format("solve_elastostatics: CG failed to converge after {} iterations "
-                        "(tol estimated error={})",
-                        total, cg.error()));
-    }
-    return uf;
+    rel_error = std::sqrt(r_norm2 / rhs_norm2);
+    return x;
 }
 
 Eigen::VectorXd solve_reduced(const Eigen::SparseMatrix<double>& kff,
@@ -67,69 +107,37 @@ Eigen::VectorXd solve_reduced(const Eigen::SparseMatrix<double>& kff,
     const SolveMethod method = select_solve_method(nfree, options);
 
     if (method == SolveMethod::kCG) {
-        // V1: IncompleteLUT preconditioner (far better than diagonal on FE
-        // systems). Fall back to diagonal if ILUT setup fails.
-        using CG_ILUT =
-            Eigen::ConjugateGradient<Eigen::SparseMatrix<double>, Eigen::Lower | Eigen::Upper,
-                                     Eigen::IncompleteLUT<double>>;
-        using CG_Diag =
-            Eigen::ConjugateGradient<Eigen::SparseMatrix<double>, Eigen::Lower | Eigen::Upper,
-                                     Eigen::DiagonalPreconditioner<double>>;
-        const int max_iters =
-            options.cg_max_iters > 0
-                ? options.cg_max_iters
-                : static_cast<int>(std::max<Eigen::Index>(2 * nfree, Eigen::Index{1000}));
+        const int max_iters = cg_iteration_budget(nfree, options);
+        const int report_every = std::max(options.cg_progress_chunk, 0);
+        int iters = 0;
+        double rel_error = std::numeric_limits<double>::infinity();
+        Eigen::VectorXd uf;
 
-        const bool chunked =
-            static_cast<bool>(options.on_progress) && options.cg_progress_chunk > 0;
-
-        CG_ILUT cg;
-        cg.setTolerance(options.cg_tol);
-        // Drop fill / drop tol: modest fill keeps setup cheap on mid-size systems.
-        cg.preconditioner().setDroptol(1e-4);
-        cg.preconditioner().setFillfactor(10);
-        cg.compute(kff);
-        if (cg.info() == Eigen::Success) {
-            try {
-                if (chunked) {
-                    return run_cg_chunked(cg, rhs, max_iters, options.cg_progress_chunk,
-                                          options.on_progress);
-                }
-                cg.setMaxIterations(max_iters);
-                const Eigen::VectorXd uf = cg.solve(rhs);
-                if (cg.info() == Eigen::Success) {
-                    if (options.on_progress) {
-                        options.on_progress(static_cast<int>(cg.iterations()), max_iters,
-                                            cg.error());
-                    }
-                    return uf;
-                }
-            } catch (const FeaError&) {
-                // Fall through to diagonal CG.
-            }
+        // K_ff is SPD, so the preconditioner must be too: an incomplete
+        // *Cholesky* keeps the preconditioned operator symmetric, which is what
+        // CG's convergence argument rests on. The previous IncompleteLUT is not
+        // symmetric on a general SPD matrix, which is a large part of why CG
+        // used to crawl here. Eigen's IncompleteCholesky auto-shifts until the
+        // factorisation succeeds; fall back to Jacobi if even that fails.
+        Eigen::IncompleteCholesky<double> ichol;
+        ichol.compute(kff);
+        if (ichol.info() == Eigen::Success) {
+            uf = run_cg(kff, rhs, ichol, options.cg_tol, max_iters, report_every,
+                        options.on_progress, iters, rel_error);
         }
-
-        CG_Diag cg_d;
-        cg_d.setTolerance(options.cg_tol);
-        cg_d.compute(kff);
-        if (cg_d.info() != Eigen::Success) {
-            throw FeaError("solve_elastostatics: CG setup failed — system is singular "
-                           "(insufficient constraints?)");
+        if (rel_error > options.cg_tol) {
+            const Eigen::DiagonalPreconditioner<double> jacobi(kff);
+            uf = run_cg(kff, rhs, jacobi, options.cg_tol, max_iters, report_every,
+                        options.on_progress, iters, rel_error);
         }
-        if (chunked) {
-            return run_cg_chunked(cg_d, rhs, max_iters, options.cg_progress_chunk,
-                                 options.on_progress);
-        }
-        cg_d.setMaxIterations(max_iters);
-        const Eigen::VectorXd uf = cg_d.solve(rhs);
-        if (cg_d.info() != Eigen::Success) {
+        if (rel_error > options.cg_tol) {
             throw FeaError(
                 std::format("solve_elastostatics: CG failed to converge after {} iterations "
-                            "(tol={}, estimated error={})",
-                            cg_d.iterations(), options.cg_tol, cg_d.error()));
+                            "(tol={}, relative residual={})",
+                            iters, options.cg_tol, rel_error));
         }
         if (options.on_progress) {
-            options.on_progress(static_cast<int>(cg_d.iterations()), max_iters, cg_d.error());
+            options.on_progress(iters, max_iters, rel_error);
         }
         return uf;
     }
@@ -199,23 +207,11 @@ Eigen::VectorXd solve_elastostatics(const NodalMesh& mesh, const Material& mater
     Eigen::SparseMatrix<double> kff(nfree, nfree);
     kff.setFromTriplets(triplets.begin(), triplets.end());
 
-    // VEM stabilization makes the poly system ill-conditioned, so CG converges
-    // very slowly (minutes on ~15k DOF). Sparse Cholesky is robust and fast for
-    // it up to ~100k free DOF; prefer direct there when the caller left kAuto.
-    SolveOptions eff = options;
-    if (eff.method == SolveMethod::kAuto) {
-        bool has_poly = false;
-        for (const auto& el : mesh.elements) {
-            if (el.type == ElementType::kPolyVem) {
-                has_poly = true;
-                break;
-            }
-        }
-        if (has_poly) {
-            eff.cg_threshold = std::max(eff.cg_threshold, Eigen::Index{100000});
-        }
-    }
-    const Eigen::VectorXd uf = solve_reduced(kff, rhs, eff);
+    // Solver selection is cell-type independent: `cg_threshold` alone decides.
+    // VEM stabilisation is not what made CG slow here — hex8 and tet4 systems of
+    // the same size were just as bad — so the old kPolyVem-only escape hatch to
+    // a 100k threshold has been folded into the default threshold for everyone.
+    const Eigen::VectorXd uf = solve_reduced(kff, rhs, options);
 
     Eigen::VectorXd u(ndof);
     for (Eigen::Index dof = 0; dof < ndof; ++dof) {

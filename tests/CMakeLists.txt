@@ -40,6 +40,7 @@ add_executable(polymesh_tests
     test_refinement_plan.cpp
     test_geometry_fidelity.cpp
     test_quality.cpp
+    test_cell_quality.cpp
     test_hex_vem_pipeline.cpp
     test_prism.cpp
     test_prism_fill.cpp
@@ -58,6 +59,7 @@ add_executable(polymesh_tests
     test_mixed_fill.cpp
     test_octa_fill.cpp
     test_p_elevate.cpp
+    test_traction_selection.cpp
     test_hp_driver.cpp
     test_d6_bench_smoke.cpp
     testlab_selfcheck.cpp

@@ -30,6 +30,7 @@
 
 #include <Eigen/Core>
 
+#include <cstdint>
 #include <span>
 #include <vector>
 
@@ -58,10 +59,19 @@ class GradedSizing final : public SizingField {
     double h_max() const { return h_max_; }
 
   private:
+    // Uniform hash grid over sources so size_at is O(nearby), not O(all): a
+    // source only lowers the envelope within (h_max - h_min)/beta of the query,
+    // so only that neighbourhood is scanned. Built once in the constructor.
+    void build_grid();
     std::vector<SizeSource> sources_;
     double h_min_;
     double h_max_;
     double beta_;
+    Eigen::Vector3d grid_origin_{0, 0, 0};
+    double grid_cell_ = 1.0;
+    std::int32_t grid_nx_ = 0, grid_ny_ = 0, grid_nz_ = 0;
+    std::vector<std::uint32_t> cell_start_;  // CSR offsets
+    std::vector<std::uint32_t> items_;       // source indices bucketed
 };
 
 /// Geometry-driven size sources: one per surface vertex whose curvature or

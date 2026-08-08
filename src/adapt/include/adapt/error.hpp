@@ -16,6 +16,10 @@ namespace polymesh::adapt {
 
 /// Dörfler marking: mark smallest set of elements whose η² sum ≥ θ * total η².
 /// Returns sorted element indices (descending η). θ in (0,1], default 0.3.
+/// Only η² *shares* matter, so this is invariant to a common scale factor on
+/// `element_eta` and consumes `fea::ZzRecovery::element_eta` (dimensionless,
+/// volume-weighted relative energy-norm shares) directly. Any volume weighting
+/// belongs in the indicator, never here.
 std::vector<std::size_t> dorfler_mark(const std::vector<double>& element_eta,
                                       double theta = 0.3);
 

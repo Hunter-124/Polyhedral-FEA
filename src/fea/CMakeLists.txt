@@ -13,6 +13,7 @@ add_library(fea
     src/solve.cpp
     src/traction.cpp
     src/stress.cpp
+    src/cell_quality.cpp
     src/msh.cpp
     src/vtu.cpp
     src/zz.cpp

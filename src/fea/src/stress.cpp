@@ -2,7 +2,9 @@
 #include "fea/stress.hpp"
 
 #include "fea/backend.hpp"
+#include "fea/cell_quality.hpp"
 #include "fea/shape.hpp"
+#include "fea/vem.hpp"
 
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
@@ -16,6 +18,34 @@
 #endif
 
 namespace polymesh::fea {
+
+namespace {
+
+/// Stress of one polyhedral VEM cell from its own projected strain.
+///
+/// The VEM k=1 space has no per-node shape-function gradient to differentiate,
+/// so the cell-wise polynomial projection is the strain: exactly the operator
+/// the consistency term of `vem_poly_stiffness` integrates, so σ = D ε(Π u) is
+/// the stress the element actually carries. Scattering it to every vertex of the
+/// cell and averaging there matches what the isoparametric path does with its
+/// nodal samples, so an all-VEM mesh gets the same nodal-averaged field instead
+/// of the zeros it used to report.
+Stress poly_vem_cell_stress(const NodalMesh& mesh, const NodalElement& element,
+                            const Eigen::Matrix<double, 6, 6>& d, const Eigen::VectorXd& u) {
+    const auto n = element.nodes.size();
+    std::vector<Eigen::Vector3d> coords;
+    coords.reserve(n);
+    Eigen::VectorXd u_elem(3 * static_cast<Eigen::Index>(n));
+    for (std::size_t a = 0; a < n; ++a) {
+        coords.push_back(mesh.nodes[element.nodes[a]]);
+        u_elem.segment<3>(3 * static_cast<Eigen::Index>(a)) =
+            u.segment<3>(3 * static_cast<Eigen::Index>(element.nodes[a]));
+    }
+    const int order = vem_infer_order(n, element.faces);
+    return d * vem_projected_strain(coords, element.faces, u_elem, order);
+}
+
+} // namespace
 
 std::vector<Stress> recover_nodal_stress(const NodalMesh& mesh, const Material& material,
                                          const Eigen::VectorXd& u) {
@@ -44,7 +74,18 @@ std::vector<Stress> recover_nodal_stress(const NodalMesh& mesh, const Material& 
         for (std::ptrdiff_t e = 0; e < static_cast<std::ptrdiff_t>(n_elem); ++e) {
             const auto& element = mesh.elements[static_cast<std::size_t>(e)];
             if (element.type == ElementType::kPolyVem) {
-                continue; // constant-strain VEM stress recovered via ZZ path later
+                if (element.nodes.empty() || element.faces.empty()) {
+                    continue;
+                }
+                const Stress s = poly_vem_cell_stress(mesh, element, d, u);
+                if (!s.allFinite()) {
+                    continue;
+                }
+                for (std::uint32_t nid : element.nodes) {
+                    local_s[nid] += s;
+                    ++local_h[nid];
+                }
+                continue;
             }
             const auto ref = reference_nodes(element.type);
             Eigen::Matrix<double, Eigen::Dynamic, 3> x(element.nodes.size(), 3);
@@ -85,7 +126,18 @@ std::vector<Stress> recover_nodal_stress(const NodalMesh& mesh, const Material& 
 #else
     for (const auto& element : mesh.elements) {
         if (element.type == ElementType::kPolyVem) {
-            continue; // constant-strain VEM stress recovered via ZZ path later
+            if (element.nodes.empty() || element.faces.empty()) {
+                continue;
+            }
+            const Stress s = poly_vem_cell_stress(mesh, element, d, u);
+            if (!s.allFinite()) {
+                continue;
+            }
+            for (std::uint32_t nid : element.nodes) {
+                stress[nid] += s;
+                ++hits[nid];
+            }
+            continue;
         }
         const auto ref = reference_nodes(element.type);
         Eigen::Matrix<double, Eigen::Dynamic, 3> x(element.nodes.size(), 3);
@@ -151,20 +203,12 @@ Eigen::Vector3d reference_centroid(ElementType type) {
     }
 }
 
-double tet4_aspect_quality(const Eigen::Vector3d& a, const Eigen::Vector3d& b,
-                           const Eigen::Vector3d& c, const Eigen::Vector3d& d) {
-    const double v = std::abs((b - a).dot((c - a).cross(d - a)) / 6.0);
-    if (v <= 0.0) {
-        return 0.0;
-    }
-    const double e[6] = {(a - b).norm(), (a - c).norm(), (a - d).norm(),
-                         (b - c).norm(), (b - d).norm(), (c - d).norm()};
-    const double emax = *std::max_element(e, e + 6);
-    if (emax <= 0.0) {
-        return 0.0;
-    }
-    constexpr double kNorm = 6.0 * 1.4142135623730951;
-    return std::min(1.0, kNorm * v / (emax * emax * emax));
+/// Measured shape quality for stress-sample filtering: `cell_quality`, with an
+/// unmeasurable cell reported as 0 so a quality floor never trusts a cell nobody
+/// measured (a NaN would silently pass every `q < floor` test).
+double sample_quality(const NodalMesh& mesh, const NodalElement& element) {
+    const double q = cell_quality(mesh, element);
+    return std::isfinite(q) ? q : 0.0;
 }
 
 } // namespace
@@ -244,7 +288,7 @@ recover_element_centroid_stress(const NodalMesh& mesh, const Material& material,
             sample.stress = dmat * eps;
             sample.centroid = centroid;
             sample.element_index = ei;
-            sample.quality = 1.0;
+            sample.quality = sample_quality(mesh, element);
             sample.volume = 0.0;
             if (!element.faces.empty()) {
                 // Volume via divergence on face fan (same poly_volume idea).
@@ -301,10 +345,8 @@ recover_element_centroid_stress(const NodalMesh& mesh, const Material& material,
         sample.centroid = centroid;
         sample.element_index = ei;
         sample.volume = std::abs(det); // reference-weight proxy; ok for ranking filters
+        sample.quality = sample_quality(mesh, element);
         if (element.type == ElementType::kTet4 && element.nodes.size() >= 4) {
-            sample.quality = tet4_aspect_quality(
-                mesh.nodes[element.nodes[0]], mesh.nodes[element.nodes[1]],
-                mesh.nodes[element.nodes[2]], mesh.nodes[element.nodes[3]]);
             // True tet volume for area-weight-ish volume metrics.
             sample.volume = std::abs((mesh.nodes[element.nodes[1]] - mesh.nodes[element.nodes[0]])
                                          .dot((mesh.nodes[element.nodes[2]] -
@@ -312,8 +354,6 @@ recover_element_centroid_stress(const NodalMesh& mesh, const Material& material,
                                                   .cross(mesh.nodes[element.nodes[3]] -
                                                          mesh.nodes[element.nodes[0]]))) /
                             6.0;
-        } else {
-            sample.quality = 1.0;
         }
         out.push_back(sample);
     }

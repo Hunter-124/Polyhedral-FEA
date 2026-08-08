@@ -38,6 +38,50 @@ Eigen::Vector3d face_normal_area(const std::vector<Eigen::Vector3d>& coords,
     return n; // area-weighted normal (magnitude = area)
 }
 
+/// Weights `w_i` on a face's vertices with `Σ w_i u(v_i) = (1/|F|)∫_F u dA`
+/// exact for every affine `u` — i.e. the vertex weights reproduce the face's
+/// *area* centroid. Signed fan about the vertex mean `p`, where each triangle
+/// integral is exact for affine `u`:
+///     ∫_F u = Σ_i A_i (u(p) + u_i + u_{i+1}) / 3,   u(p) = Σ_j u_j / n
+///   ⇒ w_j = 1/(3n) + (A_{j-1} + A_j) / (3 Σ A).
+/// The uniform `1/n` this replaced is exact only when the vertex centroid
+/// already *is* the area centroid — true for triangles and rectangles (so
+/// structured-grid stiffness is unchanged bit-for-bit), false the moment a face
+/// carries a hanging mid-edge vertex. A 2:1 transition polyhedron (ADR-0019)
+/// has exactly such faces: a square face with one edge mid has vertex centroid
+/// (0.5, 0.4)·s against area centroid (0.5, 0.5)·s, so the k=1 consistency term
+/// lost linear exactness and the FE/VEM constant-strain patch read ~1.7e-5
+/// instead of machine zero (measured 2026-08-08).
+void face_vertex_weights(const std::vector<Eigen::Vector3d>& coords,
+                         const std::vector<std::uint32_t>& face,
+                         const Eigen::Vector3d& unit_normal, std::vector<double>& w_out) {
+    const auto nf = face.size();
+    w_out.assign(nf, 1.0 / static_cast<double>(nf));
+    if (nf < 4) {
+        return; // triangle: 1/3 is already exact
+    }
+    Eigen::Vector3d p = Eigen::Vector3d::Zero();
+    for (const auto li : face) {
+        p += coords[li];
+    }
+    p /= static_cast<double>(nf);
+    std::vector<double> fan(nf, 0.0);
+    double sum = 0.0;
+    for (std::size_t i = 0; i < nf; ++i) {
+        const Eigen::Vector3d a = coords[face[i]] - p;
+        const Eigen::Vector3d b = coords[face[(i + 1) % nf]] - p;
+        fan[i] = 0.5 * a.cross(b).dot(unit_normal);
+        sum += fan[i];
+    }
+    if (!(std::abs(sum) > 1e-30)) {
+        return;
+    }
+    const double inv3n = 1.0 / (3.0 * static_cast<double>(nf));
+    for (std::size_t j = 0; j < nf; ++j) {
+        w_out[j] = inv3n + (fan[(j + nf - 1) % nf] + fan[j]) / (3.0 * sum);
+    }
+}
+
 Eigen::MatrixXd b_from_grads(const Eigen::Matrix<double, Eigen::Dynamic, 3>& dndx) {
     const Eigen::Index n = dndx.rows();
     Eigen::MatrixXd b = Eigen::MatrixXd::Zero(6, 3 * n);
@@ -278,22 +322,30 @@ P2Projector make_p2_projector(const std::vector<Eigen::Vector3d>& coords,
     return p;
 }
 
-double char_length(const std::vector<Eigen::Vector3d>& coords,
-                   const std::vector<std::vector<std::uint32_t>>& faces, double vol) {
-    double area_sum = 0.0;
-    for (const auto& face : faces) {
-        if (face.size() < 3) {
-            continue;
-        }
-        double area = 0.0;
-        face_normal_area(coords, face, area);
-        area_sum += area;
+/// Stabilisation weight for the "dofi-dofi" term α (I−Π)ᵀ(I−Π).
+///
+/// `stab` is an orthogonal projector onto the non-polynomial DOF complement, so
+/// tr(stab) counts exactly the DOFs the consistency term leaves unstiffened and
+/// α is the average stiffness handed to each of them. Scaling α off tr(K_c)
+/// makes the weight automatically correct in cell size, material and cell
+/// aspect — the previous `τ μ h` form used h = √(A/6V), which carries units of
+/// length^(−1/2): it happened to be right only on a unit-sized cell and grew as
+/// h⁻¹ᐟ² on every real mesh (0.02 m cells were stabilised ~350× too hard, which
+/// is the hexvem over-stiffness reported in the M-audit).
+///
+/// `kStabTraceRatio` = 7/9 is not a tuning knob: for any rectangular hex brick
+/// the VEM k=1 consistency term is exactly the one-point-quadrature hex8, and
+/// tr(K_hex8) / tr(K_1pt) = 16/9 independent of ν, size and aspect ratio. Using
+/// 7/9 therefore reproduces the isoparametric hex8 trace exactly on structured
+/// grids and keeps the 12 hourglass modes at the right average energy.
+constexpr double kStabTraceRatio = 7.0 / 9.0;
+
+double stab_weight(const Eigen::MatrixXd& k_consistency, const Eigen::MatrixXd& stab) {
+    const double tr_stab = stab.trace();
+    if (!(tr_stab > 1e-12)) {
+        return 0.0; // projector spans every DOF (e.g. tet4): no hourglass modes.
     }
-    double h = std::sqrt(area_sum / (6.0 * vol + 1e-30));
-    if (h <= 0.0) {
-        h = std::cbrt(vol);
-    }
-    return h;
+    return kStabTraceRatio * k_consistency.trace() / tr_stab;
 }
 
 Eigen::MatrixXd vem_stiffness_k1(const std::vector<Eigen::Vector3d>& coords,
@@ -310,6 +362,7 @@ Eigen::MatrixXd vem_stiffness_k1(const std::vector<Eigen::Vector3d>& coords,
 
     Eigen::Matrix<double, Eigen::Dynamic, 3> grad(static_cast<Eigen::Index>(n), 3);
     grad.setZero();
+    std::vector<double> w;
     for (const auto& face : faces) {
         if (face.size() < 3) {
             continue;
@@ -319,14 +372,12 @@ Eigen::MatrixXd vem_stiffness_k1(const std::vector<Eigen::Vector3d>& coords,
         if (area <= 0.0) {
             continue;
         }
-        const double w = 1.0 / static_cast<double>(face.size());
-        for (auto li : face) {
-            grad.row(static_cast<Eigen::Index>(li)) += (w * nA).transpose();
+        face_vertex_weights(coords, face, nA / area, w);
+        for (std::size_t fi = 0; fi < face.size(); ++fi) {
+            grad.row(static_cast<Eigen::Index>(face[fi])) += (w[fi] * nA).transpose();
         }
     }
     grad /= vol;
-    const double h_char = char_length(coords, faces, vol);
-
     const auto b = b_from_grads(grad);
     const auto d = material.d_matrix();
     Eigen::MatrixXd k = vol * (b.transpose() * d * b);
@@ -339,11 +390,8 @@ Eigen::MatrixXd vem_stiffness_k1(const std::vector<Eigen::Vector3d>& coords,
     const Eigen::Index ndof = 3 * static_cast<Eigen::Index>(n);
     const Eigen::MatrixXd i_minus = Eigen::MatrixXd::Identity(ndof, ndof) - proj;
     const Eigen::MatrixXd stab = i_minus.transpose() * i_minus;
-    // tau=1 was slightly over-stiff on clipped Voronoi cells (M5 SCF/SE lost to
-    // tet hybrid). Minimal stab recovers compliance; residual stays ≪ 1e-6.
-    const double tau = 0.08;
-    const double stab_scale = tau * material.mu() * h_char;
-    k.noalias() += stab_scale * stab;
+    const double alpha = stab_weight(k, stab);
+    k.noalias() += alpha * stab;
 
     k = 0.5 * (k + k.transpose()).eval();
     return k;
@@ -513,9 +561,11 @@ Eigen::MatrixXd vem_stiffness_k2(const std::vector<Eigen::Vector3d>& coords,
     const Eigen::MatrixXd nod_proj = proj.dof_eval * proj.pi;
     const Eigen::MatrixXd i_minus = Eigen::MatrixXd::Identity(ndof, ndof) - nod_proj;
     const Eigen::MatrixXd stab = i_minus.transpose() * i_minus;
-    const double h_char = char_length(coords, faces, vol);
-    const double tau = 1.0;
-    k.noalias() += (tau * material.mu() * h_char) * stab;
+    // Same trace scaling as k=1: `τ μ h` with h = √(A/6V) is dimensionally wrong
+    // and blows up as the cell shrinks. The hex-serendipity path above is exact,
+    // so this branch only ever sees general polyhedra.
+    const double alpha = stab_weight(k, stab);
+    k.noalias() += alpha * stab;
 
     k = 0.5 * (k + k.transpose()).eval();
     return k;

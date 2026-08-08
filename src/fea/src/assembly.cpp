@@ -6,6 +6,8 @@
 #include "fea/shape.hpp"
 #include "fea/vem.hpp"
 
+#include "mesh/cell_validity.hpp"
+
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 
@@ -67,11 +69,11 @@ Eigen::MatrixXd element_stiffness(const NodalMesh& mesh, const NodalElement& ele
         cell.faces = element.faces;
         return vem_poly_stiffness(mesh, cell, material);
     }
-    // Pyramid5: two tet4s (base diagonal 0-2 + apex). Flip-aware scatter keeps
-    // local DOF order consistent with the stiffness matrix.
-    //
-    // Pyramid5: tet-split (base diagonal 0-2 + apex). ADR-0013 product expand
-    // path remains available; hybrid zoo prefers hex+tet (below).
+    // Pyramid5: two tet4s split along the base diagonal chosen by
+    // mesh::validity::pyramid_split_diagonal — a base-quad-only rule (apex-
+    // dependent per-cell choices made the shared-face triangulations mismatch:
+    // non-conforming field, constant-strain patch test 1e-12 → 2e-5). The snap
+    // validity gates use the same function, so gate and integrator agree.
     if (element.type == ElementType::kPyramid5 && element.nodes.size() == 5) {
         const auto& n = element.nodes;
         Eigen::MatrixXd k = Eigen::MatrixXd::Zero(15, 15);
@@ -101,8 +103,15 @@ Eigen::MatrixXd element_stiffness(const NodalMesh& mesh, const NodalElement& ele
                 }
             }
         };
-        add_tet({{0, 1, 2, 4}});
-        add_tet({{0, 2, 3, 4}});
+        // TEMP-DIAG removed; choose the shared-face-consistent diagonal.
+        if (mesh::validity::pyramid_split_diagonal(
+                mesh.nodes[n[0]], mesh.nodes[n[1]], mesh.nodes[n[2]], mesh.nodes[n[3]]) == 1) {
+            add_tet({{1, 2, 3, 4}});
+            add_tet({{1, 3, 0, 4}});
+        } else {
+            add_tet({{0, 1, 2, 4}});
+            add_tet({{0, 2, 3, 4}});
+        }
         return k;
     }
     // Hex8: always GATE-1 isoparametric trilinear. Hybrid zoo product FE expands

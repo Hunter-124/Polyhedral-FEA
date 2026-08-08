@@ -8,6 +8,7 @@
 #include "fea/boundary_faces.hpp"
 #include "fea/p_elevate.hpp"
 #include "fea/solve.hpp"
+#include "fea/traction.hpp"
 #include "fea/vem.hpp"
 #include "fea/vtu.hpp"
 #include "fea/zz.hpp"
@@ -17,6 +18,7 @@
 #include "geom/indicators.hpp"
 #include "geom/step.hpp"
 #include "fea/poly_to_vem.hpp"
+#include "mesh/cell_validity.hpp"
 #include "mesh/cvt_export.hpp"
 #include "mesh/cvt_lloyd.hpp"
 #include "mesh/cvt_sites.hpp"
@@ -38,6 +40,8 @@
 #include <Eigen/Geometry>
 
 #include <algorithm>
+#include <cstdlib>
+#include <cstdio>
 #include <array>
 #include <cctype>
 #include <chrono>
@@ -543,7 +547,17 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         const std::size_t n_hex_lattice = raw.n_hex;
         const std::size_t n_pyr_raw = raw.n_pyramid;
         const std::size_t n_poly_raw = raw.n_poly;
-        auto fill = native_poly ? std::move(raw) : mesh::expand_mixed_hex_to_pyramids(raw);
+        // ADR-0013: the hex→pyramid product expansion exists so an
+        // isoparametric hex8 never shares a face with a tet-split pyramid5 /
+        // tet4 (the mixed-zoo patch test fails otherwise). A lattice that came
+        // out pure hex — no 2:1 interface, so no fans — has no such face, and
+        // expanding it only multiplies the element count by six while
+        // downgrading hex8 to split-pyramid accuracy.
+        const bool pure_hex_lattice =
+            raw.n_pyramid == 0 && raw.n_tet == 0 && raw.n_poly == 0;
+        auto fill = (native_poly || pure_hex_lattice)
+                        ? std::move(raw)
+                        : mesh::expand_mixed_hex_to_pyramids(raw);
         fill_h = fill.h;
         // Post-expand free-surface snap (boundary quads from lattice).
         if (!fill.boundary_quads.empty()) {
@@ -557,7 +571,8 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             // Fan tets must keep a usable shape: the snap used to flatten them
             // unchecked (only pyramids were guarded), leaving zero-aspect
             // boundary tets in the product mesh (M6 → 0 at fine h).
-            constexpr double kMinTetAspect = 0.02;
+            const double kMinTetAspect = mesh::validity::kCellShapeFloor;
+            const double kMinShape = mesh::validity::kCellShapeFloor;
             const auto tet_aspect_ok = [&](const mesh::MixedCell& cell) {
                 const Eigen::Vector3d& a = fill.nodes[cell.nodes[0]];
                 const Eigen::Vector3d& b = fill.nodes[cell.nodes[1]];
@@ -573,6 +588,30 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                     return false;
                 }
                 return 6.0 * 1.4142135623730951 * v / (emax * emax * emax) >= kMinTetAspect;
+            };
+            // SIGNED split volumes (the old test compared |v| to vol_eps, so a
+            // pyramid whose apex had crossed its base plane read as perfectly
+            // valid and shipped inverted to the solver and the VTU) plus a
+            // sliver floor, since vol_eps ~1e-14·h³ never rejected anything.
+            const auto pyramid_ok = [&](const mesh::MixedCell& cell) {
+                const Eigen::Vector3d& p0 = fill.nodes[cell.nodes[0]];
+                const Eigen::Vector3d& p1 = fill.nodes[cell.nodes[1]];
+                const Eigen::Vector3d& p2 = fill.nodes[cell.nodes[2]];
+                const Eigen::Vector3d& p3 = fill.nodes[cell.nodes[3]];
+                const Eigen::Vector3d& p4 = fill.nodes[cell.nodes[4]];
+                return mesh::validity::pyramid_min_split_volume(p0, p1, p2, p3, p4) >
+                           vol_eps &&
+                       mesh::validity::pyramid_shape_quality(p0, p1, p2, p3, p4) >= kMinShape;
+            };
+            // The hex8 check `cell_valid` used to only promise: min detJ over
+            // the centre and the 2×2×2 Gauss points the assembly integrates at.
+            const auto hex_ok = [&](const mesh::MixedCell& cell) {
+                std::array<Eigen::Vector3d, 8> x{};
+                for (std::size_t i = 0; i < 8; ++i) {
+                    x[i] = fill.nodes[cell.nodes[i]];
+                }
+                return mesh::validity::hex8_min_jacobian(x) > 0.0 &&
+                       mesh::validity::hex8_shape_quality(x) >= kMinShape;
             };
             fill.boundary_max_distance =
                 mesh::snap_boundary_nodes(
@@ -606,27 +645,16 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                                 continue;
                             }
                             if (cell.kind == mesh::MixedCellKind::kHex8) {
-                                // Native-poly path: reject inverted hex free faces.
-                                continue; // hex8 Jacobian checked via cell_valid later
+                                if (!hex_ok(cell)) {
+                                    offenders.insert(cell.nodes.begin(),
+                                                     cell.nodes.begin() + cell.n_nodes);
+                                }
+                                continue;
                             }
                             if (cell.kind != mesh::MixedCellKind::kPyramid5) {
                                 continue;
                             }
-                            const double v1 =
-                                ((fill.nodes[cell.nodes[1]] - fill.nodes[cell.nodes[0]])
-                                     .dot((fill.nodes[cell.nodes[2]] -
-                                           fill.nodes[cell.nodes[0]])
-                                              .cross(fill.nodes[cell.nodes[4]] -
-                                                     fill.nodes[cell.nodes[0]]))) /
-                                6.0;
-                            const double v2 =
-                                ((fill.nodes[cell.nodes[2]] - fill.nodes[cell.nodes[0]])
-                                     .dot((fill.nodes[cell.nodes[3]] -
-                                           fill.nodes[cell.nodes[0]])
-                                              .cross(fill.nodes[cell.nodes[4]] -
-                                                     fill.nodes[cell.nodes[0]]))) /
-                                6.0;
-                            if (std::abs(v1) <= vol_eps || std::abs(v2) <= vol_eps) {
+                            if (!pyramid_ok(cell)) {
                                 offenders.insert(cell.nodes.begin(),
                                                  cell.nodes.begin() + cell.n_nodes);
                             }
@@ -757,14 +785,7 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                     return tet_aspect_ok(cell);
                 }
                 if (cell.kind == mesh::MixedCellKind::kPyramid5) {
-                    const Eigen::Vector3d& a = fill.nodes[cell.nodes[0]];
-                    const Eigen::Vector3d& b = fill.nodes[cell.nodes[1]];
-                    const Eigen::Vector3d& c = fill.nodes[cell.nodes[2]];
-                    const Eigen::Vector3d& d = fill.nodes[cell.nodes[3]];
-                    const Eigen::Vector3d& e = fill.nodes[cell.nodes[4]];
-                    const double v1 = (b - a).dot((c - a).cross(e - a)) / 6.0;
-                    const double v2 = (c - a).dot((d - a).cross(e - a)) / 6.0;
-                    return std::abs(v1) > vol_eps && std::abs(v2) > vol_eps;
+                    return pyramid_ok(cell);
                 }
                 if (cell.kind == mesh::MixedCellKind::kPolyVem) {
                     std::vector<Eigen::Vector3d> coords;
@@ -773,6 +794,9 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                         coords.push_back(fill.nodes[g]);
                     }
                     return fea::poly_volume(coords, cell.poly_faces) > vol_eps;
+                }
+                if (cell.kind == mesh::MixedCellKind::kHex8) {
+                    return hex_ok(cell);
                 }
                 return true;
             };
@@ -1223,27 +1247,90 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         const auto inside = mesh::classify_cells_inside(model.surface, grid);
         const double min_sep = seed_p.sharp_min_sep_frac * diag;
         const double min_sep2 = min_sep * min_sep;
-        auto site_far = [&](const Eigen::Vector3d& p, double sep2) {
-            for (const auto& e : seeded.sites) {
-                if ((e.pos - p).squaredNorm() < sep2) {
-                    return false;
+        // Spatial hash over site positions so min-separation and nearest-sharp
+        // queries are O(1) per grid cell, not O(N). The frame has ~16k sharp
+        // sites; the old linear scans made cvt_poly seeding O(N^2) → it hung.
+        const double hg = std::max(0.35 * h, 1e-12);
+        const double inv_hg = 1.0 / hg;
+        struct BKey {
+            long long a, b, c;
+            bool operator==(const BKey& o) const { return a == o.a && b == o.b && c == o.c; }
+        };
+        struct BKeyHash {
+            std::size_t operator()(const BKey& k) const noexcept {
+                std::size_t h = static_cast<std::size_t>(k.a) * 73856093ull;
+                h ^= static_cast<std::size_t>(k.b) * 19349663ull + 0x9e3779b9 + (h << 6) + (h >> 2);
+                h ^= static_cast<std::size_t>(k.c) * 83492791ull + 0x9e3779b9 + (h << 6) + (h >> 2);
+                return h;
+            }
+        };
+        auto bkey = [&](const Eigen::Vector3d& p) -> BKey {
+            return BKey{static_cast<long long>(std::floor(p.x() * inv_hg)),
+                        static_cast<long long>(std::floor(p.y() * inv_hg)),
+                        static_cast<long long>(std::floor(p.z() * inv_hg))};
+        };
+        std::unordered_map<BKey, std::vector<Eigen::Vector3d>, BKeyHash> site_hash;
+        // Sharp hash uses a coarser cell (≈ the densify band) so nearest-sharp is
+        // a fixed 27-bucket lookup, not a deep ring search in sharp-free regions.
+        const double sg = std::max(3.2 * h, 1e-12);
+        const double inv_sg = 1.0 / sg;
+        auto skey = [&](const Eigen::Vector3d& p) -> BKey {
+            return BKey{static_cast<long long>(std::floor(p.x() * inv_sg)),
+                        static_cast<long long>(std::floor(p.y() * inv_sg)),
+                        static_cast<long long>(std::floor(p.z() * inv_sg))};
+        };
+        std::unordered_map<BKey, std::vector<Eigen::Vector3d>, BKeyHash> sharp_hash;
+        std::vector<Eigen::Vector3d> sharp_pos;
+        for (const auto& s : seeded.sites) {
+            site_hash[bkey(s.pos)].push_back(s.pos);
+            if (s.fixed) {
+                sharp_hash[skey(s.pos)].push_back(s.pos);
+                sharp_pos.push_back(s.pos);
+            }
+        }
+        auto site_far = [&](const Eigen::Vector3d& p, double sep2) -> bool {
+            const int R = std::max(1, static_cast<int>(std::ceil(std::sqrt(sep2) * inv_hg)));
+            const BKey k0 = bkey(p);
+            for (int dz = -R; dz <= R; ++dz) {
+                for (int dy = -R; dy <= R; ++dy) {
+                    for (int dx = -R; dx <= R; ++dx) {
+                        auto it = site_hash.find(BKey{k0.a + dx, k0.b + dy, k0.c + dz});
+                        if (it == site_hash.end()) {
+                            continue;
+                        }
+                        for (const auto& q : it->second) {
+                            if ((q - p).squaredNorm() < sep2) {
+                                return false;
+                            }
+                        }
+                    }
                 }
             }
             return true;
         };
-
-        std::vector<Eigen::Vector3d> sharp_pos;
-        for (const auto& s : seeded.sites) {
-            if (s.fixed) {
-                sharp_pos.push_back(s.pos);
+        auto add_site = [&](const mesh::CvtSite& s) {
+            seeded.sites.push_back(s);
+            site_hash[bkey(s.pos)].push_back(s.pos);
+        };
+        auto dist_to_sharp = [&](const Eigen::Vector3d& p) -> double {
+            // Coarse cell = band, so all sharps within the densify band lie in the
+            // 3×3×3 neighbourhood — a fixed 27-bucket scan, exact for d ≤ band.
+            const BKey k0 = skey(p);
+            double best2 = 1e300;
+            for (int dz = -1; dz <= 1; ++dz) {
+                for (int dy = -1; dy <= 1; ++dy) {
+                    for (int dx = -1; dx <= 1; ++dx) {
+                        auto it = sharp_hash.find(BKey{k0.a + dx, k0.b + dy, k0.c + dz});
+                        if (it == sharp_hash.end()) {
+                            continue;
+                        }
+                        for (const auto& q : it->second) {
+                            best2 = std::min(best2, (q - p).squaredNorm());
+                        }
+                    }
+                }
             }
-        }
-        auto dist_to_sharp = [&](const Eigen::Vector3d& p) {
-            double d2 = 1e300;
-            for (const auto& q : sharp_pos) {
-                d2 = std::min(d2, (p - q).squaredNorm());
-            }
-            return std::sqrt(d2);
+            return std::sqrt(best2);
         };
 
         // Infer hole radius from sharp fixed sites near the plate mid-plane
@@ -1284,7 +1371,7 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                     mesh::CvtSite s;
                     s.pos = c;
                     s.fixed = false;
-                    seeded.sites.push_back(s);
+                    add_site(s);
                     ++n_interior_free;
 
                     // Plate-like only: mild in-plane densify near sharp features
@@ -1320,7 +1407,7 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                             mesh::CvtSite fs;
                             fs.pos = p;
                             fs.fixed = false;
-                            seeded.sites.push_back(fs);
+                            add_site(fs);
                             ++n_feature_free;
                             ++n_interior_free;
                         }
@@ -1358,6 +1445,12 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                                                std::max(0.30 * h, 1e-9))));
             const int n_z = std::max(
                 4, static_cast<int>(std::ceil((z_hi - z_lo) / std::max(0.40 * h, 1e-9))));
+            // A genuine inset-cylinder shell is modest; a bogus cylinder fit on a
+            // non-cylinder part (e.g. a frame) or an over-fine h explodes n_ang·n_z
+            // into millions of shell candidates. Skip when it isn't cylinder-scale.
+            const long long shell_budget =
+                static_cast<long long>(n_ang) * static_cast<long long>(n_z + 1);
+            if (shell_budget <= 200000) {
             for (int iz = 0; iz <= n_z; ++iz) {
                 const double z =
                     z_lo + (z_hi - z_lo) * static_cast<double>(iz) /
@@ -1385,10 +1478,11 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                     mesh::CvtSite fs;
                     fs.pos = p;
                     fs.fixed = false;
-                    seeded.sites.push_back(fs);
+                    add_site(fs);
                     ++n_feature_free;
                     ++n_interior_free;
                 }
+            }
             }
         }
 
@@ -1589,17 +1683,24 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         }
     }
 
+    // CAD-face → boundary-node map. Fixtures / loads are picked on CAD faces,
+    // so every mesh handed to the solver has to carry this map; rebuild it from
+    // scratch whenever the node numbering changes below.
     const auto& surf = model.surface;
-    std::set<std::uint32_t> boundary_nodes;
-    for (const auto& quad : out.boundary_quads) {
-        boundary_nodes.insert(quad.begin(), quad.end());
-    }
-    for (const auto node : boundary_nodes) {
-        const auto cp = mesh::closest_on_surface(surf, out.mesh.nodes[node]);
-        if (cp.distance <= 1.5 * fill_h && cp.triangle < model.triangle_region.size()) {
-            out.boundary_node_region[node] = model.triangle_region[cp.triangle];
+    auto map_boundary_regions = [&] {
+        out.boundary_node_region.clear();
+        std::set<std::uint32_t> boundary_nodes;
+        for (const auto& quad : out.boundary_quads) {
+            boundary_nodes.insert(quad.begin(), quad.end());
         }
-    }
+        for (const auto node : boundary_nodes) {
+            const auto cp = mesh::closest_on_surface(surf, out.mesh.nodes[node]);
+            if (cp.distance <= 1.5 * fill_h && cp.triangle < model.triangle_region.size()) {
+                out.boundary_node_region[node] = model.triangle_region[cp.triangle];
+            }
+        }
+    };
+    map_boundary_regions();
     if (std::abs(tendency_plan.tendency) >= 1e-12 || tendency_plan.remapped) {
         out.mesher_note = std::format(
             "{} | element_tendency={:.3g}→{}{}", out.mesher_note, tendency_plan.tendency,
@@ -1612,7 +1713,11 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
     if (n_orphans > 0) {
         out.mesher_note += std::format(" | compact_orphans={}", n_orphans);
         out.boundary_quads = fea::extract_boundary_faces(out.mesh);
-        out.boundary_node_region.clear();
+        // compact_unused_nodes() renumbered the nodes, so the map built above
+        // keys on dead ids. Re-map onto the compacted mesh — dropping it here
+        // silently stripped every fixture/load from the solve ("no fixtures:
+        // fix at least one face before solving" with faces plainly assigned).
+        map_boundary_regions();
     }
     out.mesh.check_validity();
     return out;
@@ -1678,6 +1783,12 @@ void SolveJob::note_mesh_stats(const VolumeMeshOutput& vol) {
 }
 
 fea::SolveOptions SolveJob::solve_options_with_progress(int pass, int pass_count) {
+    // Everything except the progress hook stays at SolveOptions defaults, so
+    // the GUI runs exactly the CLI's policy: kAuto → LDLT up to cg_threshold,
+    // bounded incomplete-Cholesky CG above it. Attaching on_progress no longer
+    // switches the solver onto a restarted "chunked" CG — it only sets how
+    // often the one uninterrupted recurrence reports — so a job that shows
+    // progress and a job that does not converge identically.
     fea::SolveOptions opt;
     opt.on_progress = [this, pass, pass_count](int iter, int max_iters, double resid) {
         const double frac =
@@ -1981,7 +2092,9 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 }
             };
 
-            auto apply_bcs = [&]() {
+            // Collect the CAD-face node sets and the Dirichlet set from whatever
+            // face map the current mesh carries.
+            auto collect_bcs = [&]() {
                 bc = fea::Dirichlet{};
                 region_nodes.clear();
                 for (const auto& [node, region] : vol.boundary_node_region) {
@@ -1994,16 +2107,55 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         }
                     }
                 }
+            };
+
+            auto apply_bcs = [&]() {
+                collect_bcs();
+                // Fixtures and loads live on CAD faces and outlive every mesh:
+                // when the mesh in hand cannot show them (a remesh renumbered
+                // nodes, a mesher dropped its face map), re-snap the faces onto
+                // the current mesh instead of reporting an empty setup.
+                const bool fixtures_lost = !setup.fixtures.empty() && bc.dof_values.empty();
+                const bool loads_lost =
+                    std::any_of(setup.loads.begin(), setup.loads.end(), [&](const auto& kv) {
+                        return !region_nodes.contains(kv.first);
+                    });
+                if (fixtures_lost || loads_lost) {
+                    assign_boundary_regions(1.5 * h_use);
+                    collect_bcs();
+                }
                 if (bc.dof_values.empty()) {
                     throw fea::FeaError("no fixtures: fix at least one face before solving");
                 }
                 loads = Eigen::VectorXd::Zero(
                     3 * static_cast<Eigen::Index>(vol.mesh.nodes.size()));
+                // Consistent (energy-conjugate) load application: the region's
+                // boundary faces carry a uniform traction whose resultant is the
+                // requested force. Even splitting over region nodes made the
+                // distribution mesh-density dependent on graded faces.
+                const auto all_faces = fea::boundary_surface_faces(vol.mesh);
                 for (const auto& [region, load] : setup.loads) {
                     const auto it = region_nodes.find(region);
                     if (it == region_nodes.end() || it->second.empty()) {
                         continue;
                     }
+                    const auto faces = fea::faces_within(all_faces, it->second);
+                    const auto applied = fea::consistent_face_load(vol.mesh, faces, load.force);
+                    if (applied.area > 0.0) {
+                        if (applied.conservation_error >
+                            1e-9 * std::max(1.0, load.force.norm())) {
+                            throw fea::FeaError(std::format(
+                                "load on region {}: traction assembly lost {:.3g} N of the "
+                                "requested {:.6g} N resultant",
+                                region, applied.conservation_error, load.force.norm()));
+                        }
+                        loads += applied.loads;
+                        continue;
+                    }
+                    // The region's nodes do not span a single complete boundary
+                    // face (a one-triangle region on a coarse mesh). No surface
+                    // to integrate over — split the resultant over its nodes so
+                    // the total force is still right.
                     const Eigen::Vector3d per_node =
                         load.force / static_cast<double>(it->second.size());
                     for (const auto node : it->second) {

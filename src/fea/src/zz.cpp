@@ -2,11 +2,13 @@
 #include "fea/zz.hpp"
 
 #include "fea/backend.hpp"
+#include "fea/quadrature.hpp"
 #include "fea/shape.hpp"
 #include "fea/vem.hpp"
 
 #include <Eigen/Dense>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <map>
@@ -49,6 +51,39 @@ Eigen::Vector3d element_centroid(const NodalMesh& mesh, const NodalElement& el) 
     return c / static_cast<double>(el.nodes.size());
 }
 
+/// Element volume, m³. FEM types integrate |det J| with the same rule the
+/// stiffness uses; polyhedral (VEM) cells use the divergence theorem over their
+/// outward faces. Volume is what turns the raw stress-jump norm into an energy,
+/// so it must be a real volume, not a reference-space proxy.
+double element_volume(const NodalMesh& mesh, const NodalElement& el,
+                      const std::vector<QuadraturePoint>& rule) {
+    if (el.type == ElementType::kPolyVem) {
+        double volume = 0.0;
+        for (const auto& face : el.faces) {
+            if (face.size() < 3) {
+                continue;
+            }
+            const Eigen::Vector3d& a = mesh.nodes[el.nodes[face[0]]];
+            for (std::size_t k = 1; k + 1 < face.size(); ++k) {
+                const Eigen::Vector3d& b = mesh.nodes[el.nodes[face[k]]];
+                const Eigen::Vector3d& c = mesh.nodes[el.nodes[face[k + 1]]];
+                volume += a.dot(b.cross(c)) / 6.0;
+            }
+        }
+        return std::abs(volume);
+    }
+    Eigen::Matrix<double, Eigen::Dynamic, 3> x(el.nodes.size(), 3);
+    for (std::size_t a = 0; a < el.nodes.size(); ++a) {
+        x.row(static_cast<Eigen::Index>(a)) = mesh.nodes[el.nodes[a]].transpose();
+    }
+    double volume = 0.0;
+    for (const auto& qp : rule) {
+        const auto shape = eval_shape(el.type, qp.xi);
+        volume += qp.weight * std::abs((shape.dn.transpose() * x).determinant());
+    }
+    return volume;
+}
+
 } // namespace
 
 ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
@@ -58,9 +93,19 @@ ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
     const auto n_nodes = mesh.nodes.size();
     const auto n_elem = mesh.elements.size();
 
-    // Element centroid stress (superconvergent sampling points for linear elements).
+    // Element centroid stress (superconvergent sampling points for linear elements)
+    // and element volume (the weight that makes η an energy, not a stress norm).
     std::vector<Stress> el_stress(n_elem, Stress::Zero());
     std::vector<Eigen::Vector3d> el_cent(n_elem);
+    std::vector<double> el_vol(n_elem, 0.0);
+    // One quadrature rule per element type present, built once up front.
+    std::array<std::vector<QuadraturePoint>, 7> rules;
+    for (const auto& el : mesh.elements) {
+        const auto ti = static_cast<std::size_t>(el.type);
+        if (el.type != ElementType::kPolyVem && rules[ti].empty()) {
+            rules[ti] = default_rule(el.type);
+        }
+    }
 #if defined(POLYMESH_WITH_OPENMP)
 #pragma omp parallel for schedule(static)
 #endif
@@ -68,6 +113,7 @@ ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
         const auto eu = static_cast<std::size_t>(e);
         const auto& el = mesh.elements[eu];
         el_cent[eu] = element_centroid(mesh, el);
+        el_vol[eu] = element_volume(mesh, el, rules[static_cast<std::size_t>(el.type)]);
         if (el.type == ElementType::kPolyVem) {
             // Constant/centroid VEM projected strain → stress (same projector
             // as the stiffness). Was previously zeroed, giving von Mises = 0.
@@ -148,11 +194,20 @@ ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
         out.nodal_stress[nu] = (row * coeff).transpose();
     }
 
-    // Element indicators: ||σ* - σ_h||_energy-ish via stress L2 at centroid.
+    // Element indicators, energy norm of the recovered stress jump (ZZ):
+    //   η_e² = ∫_e (σ*−σ_h)ᵀ D⁻¹ (σ*−σ_h) dV ≈ V_e · dᵀ D⁻¹ d   (centroid rule)
+    // divided by the same norm of the FE stress itself so both the per-element
+    // indicator and the global number are dimensionless *relative* errors:
+    //   η_e = sqrt(η_e² / Σ_f V_f σ_hᵀ D⁻¹ σ_h),  η = sqrt(Σ_e η_e²).
+    // Volume weighting is what removes the old bias toward small elements, and
+    // Dörfler marking is invariant to the common denominator, so the marking
+    // ordering stays a pure energy-share ranking.
+    const Eigen::Matrix<double, 6, 6> d_inv = d.inverse();
     out.element_eta.assign(n_elem, 0.0);
     double sum_sq = 0.0;
+    double ref_sq = 0.0;
 #if defined(POLYMESH_WITH_OPENMP)
-#pragma omp parallel for schedule(static) reduction(+ : sum_sq)
+#pragma omp parallel for schedule(static) reduction(+ : sum_sq, ref_sq)
 #endif
     for (std::ptrdiff_t e = 0; e < static_cast<std::ptrdiff_t>(n_elem); ++e) {
         const auto eu = static_cast<std::size_t>(e);
@@ -163,12 +218,21 @@ ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
         }
         star /= static_cast<double>(el.nodes.size());
         const Stress diff = star - el_stress[eu];
-        // Energy-like: (1/2) e : C^{-1} : e ≈ use ||diff||^2 scaled (C positive definite).
-        const double eta = diff.norm();
-        out.element_eta[eu] = eta;
-        sum_sq += eta * eta;
+        const double e_sq = el_vol[eu] * diff.dot(d_inv * diff);
+        out.element_eta[eu] = e_sq; // squared; normalized below
+        sum_sq += e_sq;
+        ref_sq += el_vol[eu] * el_stress[eu].dot(d_inv * el_stress[eu]);
     }
-    out.global_eta = std::sqrt(sum_sq);
+    if (ref_sq > 0.0) {
+        for (auto& eta : out.element_eta) {
+            eta = std::sqrt(std::max(0.0, eta) / ref_sq);
+        }
+        out.global_eta = std::sqrt(std::max(0.0, sum_sq) / ref_sq);
+    } else {
+        // No strain energy in the solution (u ≡ 0): no relative error to report.
+        std::fill(out.element_eta.begin(), out.element_eta.end(), 0.0);
+        out.global_eta = 0.0;
+    }
     return out;
 }
 

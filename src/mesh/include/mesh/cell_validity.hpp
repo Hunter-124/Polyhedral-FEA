@@ -1,0 +1,270 @@
+// SPDX-License-Identifier: BSD-3-Clause
+#pragma once
+
+// Sign-aware cell validity + scale-free shape quality for every fill path.
+//
+// The mesher gates used to ask `std::abs(volume) <= 1e-14 * h^3`. That single
+// expression hides two independent defects:
+//
+//   * `std::abs` makes the test sign-blind, so a *fully inverted* cell passes
+//     as valid. Inverted pyramids therefore shipped to the solver and the VTU
+//     (the FE assembly quietly re-flipped the negative halves, so nothing ever
+//     complained) — 1712/44536 pyramids on sphere @ h=0.008.
+//   * `1e-14 * h^3` is ~13 orders of magnitude below a healthy cell volume
+//     (h=0.008 → eps≈5e-21 vs. a healthy tet at ~8.5e-8), so it is a
+//     machine-degeneracy test, not a shape floor. Slivers of quality 1e-17
+//     were accepted and the snap line-search never unsnapped them.
+//
+// Everything here is signed (negative ⇒ inverted) and every `*_shape_quality`
+// is normalized so that 1.0 is the ideal cell of that kind — one dimensionless
+// floor (`kCellShapeFloor`) is therefore meaningful across the whole zoo.
+
+#include <Eigen/Core>
+#include <Eigen/Geometry>
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstddef>
+#include <limits>
+
+namespace polymesh::mesh::validity {
+
+/// Minimum normalized shape quality a cell must keep through boundary snapping
+/// and smoothing. Well below every nominal lattice cell (tet fans ≈ 0.1-0.2,
+/// lattice pyramids/prisms/hexes ≈ 0.8-1.0) but far above the sliver band the
+/// machine-epsilon gates used to accept.
+inline constexpr double kCellShapeFloor = 0.02;
+
+/// Signed volume of tet (a,b,c,d); positive for a right-handed ordering.
+inline double tet_signed_volume(const Eigen::Vector3d& a, const Eigen::Vector3d& b,
+                                const Eigen::Vector3d& c, const Eigen::Vector3d& d) {
+    return (b - a).dot((c - a).cross(d - a)) / 6.0;
+}
+
+inline double max_edge(const Eigen::Vector3d& a, const Eigen::Vector3d& b,
+                       const Eigen::Vector3d& c, const Eigen::Vector3d& d) {
+    return std::max({(a - b).norm(), (a - c).norm(), (a - d).norm(), (b - c).norm(),
+                     (b - d).norm(), (c - d).norm()});
+}
+
+/// 6·√2·V / L_max³ — 1.0 for a regular tet, 0 for a flat one, negative when
+/// inverted. Same metric the hybrid fan-tet gate already used, made signed.
+inline double tet_shape_quality(const Eigen::Vector3d& a, const Eigen::Vector3d& b,
+                                const Eigen::Vector3d& c, const Eigen::Vector3d& d) {
+    const double emax = max_edge(a, b, c, d);
+    if (!(emax > 0.0)) {
+        return 0.0;
+    }
+    return 8.485281374238570 * tet_signed_volume(a, b, c, d) / (emax * emax * emax);
+}
+
+/// A quad base admits two tet splits: diagonal 0-2 → (0,1,2,4)+(0,2,3,4),
+/// diagonal 1-3 → (1,2,3,4)+(1,3,0,4). The FE assembly picks the split with
+/// the larger min half-volume, so validity must bless a pyramid when EITHER
+/// diagonal works — testing only 0-2 rejects cells that are perfectly valid
+/// under 1-3 and the snap gate then retreats nodes for zero validity gain.
+inline double pyramid_split_volume_diag02(const Eigen::Vector3d& p0, const Eigen::Vector3d& p1,
+                                          const Eigen::Vector3d& p2, const Eigen::Vector3d& p3,
+                                          const Eigen::Vector3d& p4) {
+    return std::min(tet_signed_volume(p0, p1, p2, p4), tet_signed_volume(p0, p2, p3, p4));
+}
+
+inline double pyramid_split_volume_diag13(const Eigen::Vector3d& p0, const Eigen::Vector3d& p1,
+                                          const Eigen::Vector3d& p2, const Eigen::Vector3d& p3,
+                                          const Eigen::Vector3d& p4) {
+    return std::min(tet_signed_volume(p1, p2, p3, p4), tet_signed_volume(p1, p3, p0, p4));
+}
+
+/// Max over both base diagonals of the min half-volume — negative only when
+/// the pyramid is inverted under BOTH splits (truly broken).
+inline double pyramid_best_split_volume(const Eigen::Vector3d& p0, const Eigen::Vector3d& p1,
+                                        const Eigen::Vector3d& p2, const Eigen::Vector3d& p3,
+                                        const Eigen::Vector3d& p4) {
+    return std::max(pyramid_split_volume_diag02(p0, p1, p2, p3, p4),
+                    pyramid_split_volume_diag13(p0, p1, p2, p3, p4));
+}
+
+/// Base diagonal the FE assembly splits along: 0 for 0-2, 1 for 1-3.
+///
+/// Two pyramids sharing a quad face MUST split it along the same diagonal or
+/// the implied face triangulations mismatch and the assembled field goes
+/// non-conforming (measured: constant-strain patch test degrades from <1e-12
+/// to ~2e-5 when the choice is made per-cell from apex-dependent volumes).
+/// The choice therefore depends ONLY on the four base nodes: the Newell mean
+/// normal n̄ of the quad is compared against each triangulation's two triangle
+/// normals, and the diagonal whose worst-aligned triangle is better aligned
+/// wins. The metric is invariant under winding reversal (n̄ and every triangle
+/// normal flip together), so both cells across a shared face always agree.
+/// For a planar quad this reduces to the larger-min-triangle-area rule, which
+/// is exactly the larger-min-half-volume rule (the apex height is common).
+inline int pyramid_split_diagonal(const Eigen::Vector3d& p0, const Eigen::Vector3d& p1,
+                                  const Eigen::Vector3d& p2, const Eigen::Vector3d& p3) {
+    const Eigen::Vector3d n012 = (p1 - p0).cross(p2 - p0);
+    const Eigen::Vector3d n023 = (p2 - p0).cross(p3 - p0);
+    const Eigen::Vector3d n123 = (p2 - p1).cross(p3 - p1);
+    const Eigen::Vector3d n130 = (p3 - p1).cross(p0 - p1);
+    const Eigen::Vector3d nbar = n012 + n023; // Newell mean (either triangulation sums to it)
+    const double m02 = std::min(n012.dot(nbar), n023.dot(nbar));
+    const double m13 = std::min(n123.dot(nbar), n130.dot(nbar));
+    return m13 > m02 ? 1 : 0;
+}
+
+/// Min signed half-volume of the split the FE assembly actually integrates.
+/// Negative ⇒ that half is inverted.
+inline double pyramid_min_split_volume(const Eigen::Vector3d& p0, const Eigen::Vector3d& p1,
+                                       const Eigen::Vector3d& p2, const Eigen::Vector3d& p3,
+                                       const Eigen::Vector3d& p4) {
+    return pyramid_split_diagonal(p0, p1, p2, p3) == 1
+               ? pyramid_split_volume_diag13(p0, p1, p2, p3, p4)
+               : pyramid_split_volume_diag02(p0, p1, p2, p3, p4);
+}
+
+/// Normalized pyramid shape: min quality of the two assembly split tets scaled
+/// by the lattice nominal (square base, apex over the centre at half the base
+/// width — the hex→pyramid expand cell — whose split tets score exactly 0.25),
+/// over the SAME diagonal the assembly splits (pyramid_split_diagonal), so the
+/// gate and the integrator always agree.
+inline double pyramid_shape_quality(const Eigen::Vector3d& p0, const Eigen::Vector3d& p1,
+                                    const Eigen::Vector3d& p2, const Eigen::Vector3d& p3,
+                                    const Eigen::Vector3d& p4) {
+    const double q02 =
+        std::min(tet_shape_quality(p0, p1, p2, p4), tet_shape_quality(p0, p2, p3, p4));
+    const double q13 =
+        std::min(tet_shape_quality(p1, p2, p3, p4), tet_shape_quality(p1, p3, p0, p4));
+    return 4.0 * (pyramid_split_diagonal(p0, p1, p2, p3) == 1 ? q13 : q02);
+}
+
+inline constexpr std::array<std::array<double, 3>, 8> kHexCornerSigns{{
+    {{-1, -1, -1}},
+    {{1, -1, -1}},
+    {{1, 1, -1}},
+    {{-1, 1, -1}},
+    {{-1, -1, 1}},
+    {{1, -1, 1}},
+    {{1, 1, 1}},
+    {{-1, 1, 1}},
+}};
+
+/// 2×2×2 Gauss points of the trilinear hex — the points the FE assembly
+/// integrates at, so these are exactly the detJ values that can make the
+/// solver report a non-positive Jacobian.
+inline constexpr double kGauss2 = 0.5773502691896257;
+inline constexpr std::array<std::array<double, 3>, 8> kHexGauss2x2x2{{
+    {{-kGauss2, -kGauss2, -kGauss2}},
+    {{kGauss2, -kGauss2, -kGauss2}},
+    {{-kGauss2, kGauss2, -kGauss2}},
+    {{kGauss2, kGauss2, -kGauss2}},
+    {{-kGauss2, -kGauss2, kGauss2}},
+    {{kGauss2, -kGauss2, kGauss2}},
+    {{-kGauss2, kGauss2, kGauss2}},
+    {{kGauss2, kGauss2, kGauss2}},
+}};
+
+inline double hex8_jacobian_det(const std::array<Eigen::Vector3d, 8>& x,
+                                const Eigen::Vector3d& xi) {
+    Eigen::Matrix3d jac = Eigen::Matrix3d::Zero();
+    for (int a = 0; a < 8; ++a) {
+        const auto& s = kHexCornerSigns[static_cast<std::size_t>(a)];
+        const double dxi = 0.125 * s[0] * (1.0 + s[1] * xi[1]) * (1.0 + s[2] * xi[2]);
+        const double deta = 0.125 * s[1] * (1.0 + s[0] * xi[0]) * (1.0 + s[2] * xi[2]);
+        const double dzeta = 0.125 * s[2] * (1.0 + s[0] * xi[0]) * (1.0 + s[1] * xi[1]);
+        const auto& xa = x[static_cast<std::size_t>(a)];
+        jac(0, 0) += dxi * xa[0];
+        jac(0, 1) += dxi * xa[1];
+        jac(0, 2) += dxi * xa[2];
+        jac(1, 0) += deta * xa[0];
+        jac(1, 1) += deta * xa[1];
+        jac(1, 2) += deta * xa[2];
+        jac(2, 0) += dzeta * xa[0];
+        jac(2, 1) += dzeta * xa[1];
+        jac(2, 2) += dzeta * xa[2];
+    }
+    return jac.determinant();
+}
+
+/// Min detJ over the centre and the eight 2×2×2 Gauss points. ≤ 0 ⇒ the hex
+/// would produce a non-positive Jacobian during assembly.
+inline double hex8_min_jacobian(const std::array<Eigen::Vector3d, 8>& x) {
+    double lo = hex8_jacobian_det(x, Eigen::Vector3d::Zero());
+    for (const auto& gp : kHexGauss2x2x2) {
+        lo = std::min(lo, hex8_jacobian_det(x, Eigen::Vector3d(gp[0], gp[1], gp[2])));
+    }
+    return lo;
+}
+
+/// Corner triples of the trilinear hex (VTK/Verdict ordering).
+inline constexpr std::array<std::array<int, 4>, 8> kHexCornerTriples{{
+    {{0, 1, 3, 4}},
+    {{1, 2, 0, 5}},
+    {{2, 3, 1, 6}},
+    {{3, 0, 2, 7}},
+    {{4, 7, 5, 0}},
+    {{5, 4, 6, 1}},
+    {{6, 5, 7, 2}},
+    {{7, 6, 4, 3}},
+}};
+
+/// Min corner scaled Jacobian — 1.0 for a cube, ≤ 0 when a corner folds.
+inline double hex8_shape_quality(const std::array<Eigen::Vector3d, 8>& x) {
+    double lo = 1.0;
+    for (const auto& t : kHexCornerTriples) {
+        const Eigen::Vector3d& o = x[static_cast<std::size_t>(t[0])];
+        const Eigen::Vector3d e1 = x[static_cast<std::size_t>(t[1])] - o;
+        const Eigen::Vector3d e2 = x[static_cast<std::size_t>(t[2])] - o;
+        const Eigen::Vector3d e3 = x[static_cast<std::size_t>(t[3])] - o;
+        const double den = e1.norm() * e2.norm() * e3.norm();
+        if (!(den > 0.0)) {
+            return 0.0;
+        }
+        lo = std::min(lo, e1.dot(e2.cross(e3)) / den);
+    }
+    return lo;
+}
+
+/// Corner triples of the linear prism (base 0-1-2, top 3-4-5, node k+3 above
+/// node k). All six dets are positive iff the prism is right-handed under the
+/// same convention as `prism_signed_volume`.
+inline constexpr std::array<std::array<int, 4>, 6> kPrismCornerTriples{{
+    {{0, 1, 2, 3}},
+    {{1, 2, 0, 4}},
+    {{2, 0, 1, 5}},
+    {{3, 5, 4, 0}},
+    {{4, 3, 5, 1}},
+    {{5, 4, 3, 2}},
+}};
+
+/// Min per-corner detJ of the prism. The summed prism volume stays positive
+/// while a single corner has already folded, so this is the value the assembly
+/// Gauss loop actually sees.
+inline double prism_min_corner_jacobian(const std::array<Eigen::Vector3d, 6>& p) {
+    double lo = std::numeric_limits<double>::infinity();
+    for (const auto& t : kPrismCornerTriples) {
+        const Eigen::Vector3d& o = p[static_cast<std::size_t>(t[0])];
+        const Eigen::Vector3d e1 = p[static_cast<std::size_t>(t[1])] - o;
+        const Eigen::Vector3d e2 = p[static_cast<std::size_t>(t[2])] - o;
+        const Eigen::Vector3d e3 = p[static_cast<std::size_t>(t[3])] - o;
+        lo = std::min(lo, e1.dot(e2.cross(e3)));
+    }
+    return lo;
+}
+
+/// Min corner scaled Jacobian normalized so an equilateral right prism is 1.0.
+inline double prism_shape_quality(const std::array<Eigen::Vector3d, 6>& p) {
+    double lo = 1.0;
+    for (const auto& t : kPrismCornerTriples) {
+        const Eigen::Vector3d& o = p[static_cast<std::size_t>(t[0])];
+        const Eigen::Vector3d e1 = p[static_cast<std::size_t>(t[1])] - o;
+        const Eigen::Vector3d e2 = p[static_cast<std::size_t>(t[2])] - o;
+        const Eigen::Vector3d e3 = p[static_cast<std::size_t>(t[3])] - o;
+        const double den = e1.norm() * e2.norm() * e3.norm();
+        if (!(den > 0.0)) {
+            return 0.0;
+        }
+        lo = std::min(lo, e1.dot(e2.cross(e3)) / den);
+    }
+    // sin(60°) — the best a triangular cross-section can do.
+    return lo / 0.8660254037844386;
+}
+
+} // namespace polymesh::mesh::validity

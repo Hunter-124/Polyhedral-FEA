@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "mesh/tet_fill.hpp"
 
+#include "mesh/cell_validity.hpp"
 #include "mesh/grid_classify.hpp"
 #include "mesh/surface_project.hpp"
 
@@ -158,9 +159,17 @@ TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
             surface, out.nodes, bnodes, h_snap,
             [&](std::set<std::uint32_t>& offenders) {
                 for (const auto& n : out.tets) {
-                    const double v = tet_signed_volume_impl(
-                        out.nodes[n[0]], out.nodes[n[1]], out.nodes[n[2]], out.nodes[n[3]]);
-                    if (v > vol_eps) {
+                    const Eigen::Vector3d& a = out.nodes[n[0]];
+                    const Eigen::Vector3d& b = out.nodes[n[1]];
+                    const Eigen::Vector3d& c = out.nodes[n[2]];
+                    const Eigen::Vector3d& d = out.nodes[n[3]];
+                    // vol_eps alone is a machine-degeneracy test (~1e-14·h³,
+                    // thirteen orders under a healthy tet), so the snap was
+                    // free to flatten skin tets into slivers. Add the shape
+                    // floor the unsnap line-search was supposed to defend.
+                    if (tet_signed_volume_impl(a, b, c, d) > vol_eps &&
+                        validity::tet_shape_quality(a, b, c, d) >=
+                            validity::kCellShapeFloor) {
                         continue;
                     }
                     offenders.insert(n.begin(), n.end());

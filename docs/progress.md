@@ -70,6 +70,78 @@ viewport now uses crease-aware smooth vertex normals (45° threshold) so importe
 curved walls (tubes/fillets) shade smoothly instead of faceted, sharp edges stay
 crisp (`viewport.cpp set_model`).
 
+**Audit-driven hardening wave (2026-08-08):** A 50-run mesher × part audit
+(every product mesher against the public part suite, meshing + solving + diag,
+scratch artifacts under `/tmp/mesh_audit` with per-run rows collated into MASTER
+CSVs — not committed) ranked **13 defects** by severity, most of them
+correctness or honesty failures rather than performance:
+
+| # | Defect | Status |
+|---|--------|--------|
+| 1 | `kAuto` abandons direct LDLT at 8000 free DOF → 149–177× slowdowns, 240 s timeouts, GUI `solve_fail` | fixed + verified |
+| 2 | Quality metrics hard-coded perfect for non-tet → falsified diag/campaign output, 1e22 Pa stresses trusted | fixed + verified |
+| 3 | `hexvem` ~3.6× over-stiff, σ_max identically 0 | fixed + verified |
+| 4 | Inverted pyramid5 cells ship to solver/VTU via a sign-blind predicate | fixed + verified |
+| 5 | Inverted hex8/prism6 reach the solver → hard `solve_fail` on 3 configs | fixed + verified |
+| 6 | Boundary-snap guards `vol_eps = 1e-14·h³` with no shape floor → quality collapse to 1e-17 on curved parts | fixed (slivers now caught) |
+| 7 | Default hybrid mesher 12.34× over element budget on plate_hole | fixed + verified (20352 elems) |
+| 8 | `global_eta` unnormalised Pa RSS → `--eta-target` dead | fixed + verified (dimensionless) |
+| 9 | VEM cells exported as `VTK_CONVEX_POINT_SET`, face stream discarded | fixed + verified (`VTK_POLYHEDRON`) |
+| 10 | Every prism6 inside-out per `VTK_WEDGE` winding | fixed + verified |
+| 11 | CLI loads hardcoded 1000 N +Y; consistent-traction integrator dead | fixed + verified (`--load-dir`/`--force`/`--traction` + conservation check) |
+| 12 | Default CLI BCs degenerate on curved parts (3 fixed nodes on icecream_cone) | **partially fixed** — sane-selection minimum + face-normal fallback |
+| 13 | `varyhedron` 20–100× slower via brute-force OCC extrema | fixed + verified (~5–6×) |
+
+Measured outcomes, all on this machine on 2026-08-08:
+
+- **Solve auto-policy was mis-tuned by ~6×.** `SolveOptions::cg_threshold` was
+  8000 free DOFs with a `kPolyVem`-only escape hatch at 100000, so ordinary hex
+  and tet product meshes were pushed onto CG far below the size where the
+  direct factor stops fitting. It is now **50000 for every cell type** — one
+  uniform rule, no element-type special case. plate_hole hex, 11040 free DOFs:
+  diag+solve **179.25 s → 1.4 s**. cantilever tet, 8232 free DOFs:
+  **37.9 s → <1 s**. Above 50000 free DOFs CG still runs, now with an
+  incomplete-Cholesky preconditioner (Jacobi fallback) and enforced
+  iteration/tolerance bounds so a non-converging system fails instead of
+  grinding.
+- **Loads are now specifiable and conservative.** `solve` and `diag` accept
+  `--load-dir x y z` (default `0 1 0`), `--force N` (total resultant, default
+  1000 N) and `--traction Pa` (pressure; resultant = Pa × loaded-face area);
+  the last of `--force` / `--traction` wins. Both are applied as a consistent
+  traction ∫Nᵀt dS over the selected boundary faces, and each run prints a
+  conservation check (Σ nodal load vs requested resultant, error ~1e-13).
+  `diag` also takes `--fix-box` / `--load-box`, so a diagnostics run can
+  reproduce a solve's boundary conditions exactly.
+- **ZZ `global_eta` is dimensionless-relative.** It was an unnormalised Pa RSS
+  that grew as √N, so `--eta-target` could never be reached and the adapt loop
+  always ran to its pass budget. plate_hole hex now reports **η = 0.108**.
+- **hex-VEM stiffness corrected.** The hex-as-polyhedron VEM path was ~3.6×
+  over-stiff; cantilever tip deflection is now **1.969e-04 m** (hexvem) against
+  **1.965e-04 m** (hex FE).
+- **`kPolyVem` stress recovery implemented.** Poly-VEM cells previously exported
+  σ ≡ 0; recovered σ_max is now **9.14e6 Pa**, matching the hex FE result. VEM
+  cells also export as **VTK_POLYHEDRON (42) with a face stream** instead of
+  VTK_CONVEX_POINT_SET, so polyhedral surfaces render correctly in ParaView.
+- **Mesh-validity predicates fixed.** The pyramid inversion predicate is now
+  sign-aware and prism/hex cells are gated per Gauss point; the sphere hybrid
+  mesh ships **0 inverted cells (was 1712)**. prism6 VTK winding was corrected
+  (previously 100% inside-out).
+- **Quality metrics are measured, not fabricated.** Non-tet cells used to report
+  a hardcoded 1.0/0.0; quality is now computed for every cell type — sphere hex
+  reports **quality_min 0.028 / mean 0.663**.
+- **Hybrid element budget back in range, varyhedron 5–6× faster.** plate_hole at
+  `-h 0.005` hybrid now emits **20352 elements (was 118448**, 12.34× over the
+  predicted budget; now ≈2.1×). `geom::project_point_on_surface` gained
+  face-proximity indexing: plate_hole varyhedron **19–24 s → 3.9 s**.
+
+Still open from the list: **#12** only has a sane-selection minimum plus a
+face-normal fallback, so degenerate default BCs on strongly curved parts are
+mitigated, not solved — a real face-tag BC path is still the fix.
+
+Gating is unchanged: poly-VEM is still **not** the product default (M5 remains
+not promoted) — these fixes make the VEM path correct where it is used, they do
+not promote it. Tet FE remains the default accuracy claim.
+
 ## Background / older phases
 
 **Track H (historical):** mesher honesty/perf overhaul; owner gate **A9** theme
@@ -467,6 +539,9 @@ GATE 0 was approved by owner on 2026-07-09.
   (else `SimplicialLDLT`). `select_solve_method` for diagnostics. Catch2:
   forced-CG vs direct cantilever + patch, auto CG on ~15k free-DOF hex
   cantilever. README + `solve.hpp` docs. Patch-test direct path unchanged.
+  *(Superseded 2026-08-08: threshold is 50000 for every cell type, with an
+  incomplete-Cholesky preconditioner and bounded iterations — see "Audit-driven
+  hardening wave".)*
 - 2026-07-10: G2+G3+G4 — `examples/` README + `run_mesh_public.sh` /
   `run_solve_public.sh` (auto-h CLI on `bench/geometries/public/*.stl`, symlink
   geometries); public-header SI units/doxygen spot-check (SimSetup, volume_mesh,

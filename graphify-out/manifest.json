@@ -1,42 +1,42 @@
 {
   "apps/cli/main.cpp": {
-    "mtime": 1784035712.385685,
-    "ast_hash": "f0721a918e9bde0ace18b9e5d78df074",
+    "mtime": 1786192552.2621717,
+    "ast_hash": "7e4e02b69ff324578c42d5c4763eebe8",
     "semantic_hash": ""
   },
   "apps/gui/main.cpp": {
-    "mtime": 1784035877.1644554,
-    "ast_hash": "57a6425b816609116940279fead9e583",
+    "mtime": 1786185351.1507614,
+    "ast_hash": "67b8d73e4facc1bdfa0effc0409501ca",
     "semantic_hash": ""
   },
   "apps/gui/theme.cpp": {
-    "mtime": 1783727444.5774977,
-    "ast_hash": "5831acf551482e25e0478040482d0138",
+    "mtime": 1786183626.2669313,
+    "ast_hash": "31d84fa3a29531a71262629b65a9a892",
     "semantic_hash": ""
   },
   "apps/gui/theme.hpp": {
-    "mtime": 1783727444.5774977,
-    "ast_hash": "1c71904a59482c03716133aff2468671",
+    "mtime": 1786182840.2814002,
+    "ast_hash": "1f2fbc0ca8364c04af126fbf18d6df89",
     "semantic_hash": ""
   },
   "apps/gui/viewport.cpp": {
-    "mtime": 1784037766.7423534,
-    "ast_hash": "fc60e8c10c46b18197c85345e1e4f1a2",
+    "mtime": 1786185188.600056,
+    "ast_hash": "73c6112e8402e2876369104d816d1748",
     "semantic_hash": ""
   },
   "apps/gui/viewport.hpp": {
-    "mtime": 1783727444.5774977,
-    "ast_hash": "3026e905ff649048419879b44961c854",
+    "mtime": 1786185005.4463875,
+    "ast_hash": "6c41eba42124f4270a752541937874e3",
     "semantic_hash": ""
   },
   "apps/gui/widgets.cpp": {
-    "mtime": 1783790787.8083913,
-    "ast_hash": "c8135667d0d5c3fc89061b612c78ca0c",
+    "mtime": 1786182933.7362256,
+    "ast_hash": "4066ed7c3e0505034fd0ac077a170ee4",
     "semantic_hash": ""
   },
   "apps/gui/widgets.hpp": {
-    "mtime": 1783790787.7941222,
-    "ast_hash": "ee61a9032da4dee169cc5aa19d09a96c",
+    "mtime": 1786182950.109195,
+    "ast_hash": "33e81241a121729f060a8eae00ab5eb6",
     "semantic_hash": ""
   },
   "bench/reference/goodier-cavity.json": {
@@ -115,23 +115,23 @@
     "semantic_hash": ""
   },
   "src/fea/include/fea/solve.hpp": {
-    "mtime": 1783791113.0671418,
-    "ast_hash": "aa0623f7f195d5df6d4e8511af2c09d2",
+    "mtime": 1786187405.6530652,
+    "ast_hash": "07cf1d774f6d3b7d5ab7e74ab381a5f5",
     "semantic_hash": ""
   },
   "src/fea/include/fea/stress.hpp": {
-    "mtime": 1783909418.4245582,
-    "ast_hash": "a512b106305081e1aad7d1da28798825",
+    "mtime": 1786188009.3820014,
+    "ast_hash": "367c0b734cae925dc916c9ead9feec20",
     "semantic_hash": ""
   },
   "src/fea/include/fea/traction.hpp": {
-    "mtime": 1783727444.588343,
-    "ast_hash": "4a04854987ab224c52c2c964327ff6ec",
+    "mtime": 1786187466.7539575,
+    "ast_hash": "fae62f465958cf03d9e33f9ea28910e1",
     "semantic_hash": ""
   },
   "src/fea/src/assembly.cpp": {
-    "mtime": 1783727444.588343,
-    "ast_hash": "8d57a4653a51e3144a56ed72aec11e30",
+    "mtime": 1786196963.6297932,
+    "ast_hash": "526568b94fa7c64d2bfdfc1eca0d7f87",
     "semantic_hash": ""
   },
   "src/fea/src/backend.cpp": {
@@ -170,18 +170,18 @@
     "semantic_hash": ""
   },
   "src/fea/src/solve.cpp": {
-    "mtime": 1783791113.0671418,
-    "ast_hash": "b643b3588e71ac54b755dc0b345acb6e",
+    "mtime": 1786188532.0110762,
+    "ast_hash": "0722bc96b2ac42e0f9a8f88692ec1209",
     "semantic_hash": ""
   },
   "src/fea/src/stress.cpp": {
-    "mtime": 1783909418.4245582,
-    "ast_hash": "ced0aecef068b1498b51b9f937c0dfb0",
+    "mtime": 1786187999.479019,
+    "ast_hash": "caaf01d55c0727de3cb1c8e584be357b",
     "semantic_hash": ""
   },
   "src/fea/src/traction.cpp": {
-    "mtime": 1783727444.5888767,
-    "ast_hash": "c30d3abe39b2f5f2301100a90ee31e6c",
+    "mtime": 1786187514.9518726,
+    "ast_hash": "7f1896e8701b62921a131f619a87e313",
     "semantic_hash": ""
   },
   "src/geom/include/geom/stl.hpp": {
@@ -220,8 +220,8 @@
     "semantic_hash": ""
   },
   "src/pipeline/src/scene.cpp": {
-    "mtime": 1784038590.7041512,
-    "ast_hash": "57dcdb7b98a63625f0a6f37c8b9ee62f",
+    "mtime": 1786197088.2610831,
+    "ast_hash": "f50a48be12b4c54b874bf7d19c67d86a",
     "semantic_hash": ""
   },
   "tests/support/mms.cpp": {
@@ -365,8 +365,8 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1784036201.109034,
-    "ast_hash": "e28fd2b4d65167c2e94086f603020dd5",
+    "mtime": 1786192006.8091898,
+    "ast_hash": "326175095f6a255f485520b7728129c3",
     "semantic_hash": ""
   },
   "apps/cli/CMakeLists.txt": {
@@ -450,8 +450,8 @@
     "semantic_hash": ""
   },
   "docs/progress.md": {
-    "mtime": 1784039168.5288084,
-    "ast_hash": "53b78b6228a542fd0f0de9eb7cee9c2f",
+    "mtime": 1786191993.8512623,
+    "ast_hash": "c941939d8d1f32de0dcd9e8e0d742456",
     "semantic_hash": ""
   },
   "docs/spec.md": {
@@ -470,8 +470,8 @@
     "semantic_hash": ""
   },
   "src/fea/CMakeLists.txt": {
-    "mtime": 1783909339.5337665,
-    "ast_hash": "10ea50b822dfd42d9db9215fbb6fb506",
+    "mtime": 1786187953.6811001,
+    "ast_hash": "bd19a9983c32095732cd0c018c0718b9",
     "semantic_hash": ""
   },
   "src/geom/CMakeLists.txt": {
@@ -490,8 +490,8 @@
     "semantic_hash": ""
   },
   "tests/CMakeLists.txt": {
-    "mtime": 1784033319.0944397,
-    "ast_hash": "eef840dd98b39e61fba2dd79cc25d3a6",
+    "mtime": 1786188486.2911572,
+    "ast_hash": "9e0ffeec821a727e4790b0b099978bb9",
     "semantic_hash": ""
   },
   "apps/bench/d6_tier3.cpp": {
@@ -555,8 +555,8 @@
     "semantic_hash": ""
   },
   "src/adapt/include/adapt/error.hpp": {
-    "mtime": 1783727444.5878215,
-    "ast_hash": "a2e25d7e3ad591949c17ca2f6f08ef72",
+    "mtime": 1786188090.440858,
+    "ast_hash": "ad02b4804e0bebbc86df362e246db8c4",
     "semantic_hash": ""
   },
   "src/adapt/include/adapt/loop.hpp": {
@@ -580,8 +580,8 @@
     "semantic_hash": ""
   },
   "src/fea/include/fea/boundary_faces.hpp": {
-    "mtime": 1783727444.588343,
-    "ast_hash": "4ac557b8e9b69bd55860ca72c0d1d16f",
+    "mtime": 1784047225.744579,
+    "ast_hash": "0576d3db567c0362bbcd37b440c506e5",
     "semantic_hash": ""
   },
   "src/fea/include/fea/p_elevate.hpp": {
@@ -595,8 +595,8 @@
     "semantic_hash": ""
   },
   "src/fea/include/fea/vem.hpp": {
-    "mtime": 1783727444.588343,
-    "ast_hash": "1bcb08ffe9d0562cd654662948a65884",
+    "mtime": 1784048190.9823854,
+    "ast_hash": "38551a6c117bd47a320a295da0579836",
     "semantic_hash": ""
   },
   "src/fea/include/fea/vtu.hpp": {
@@ -605,13 +605,13 @@
     "semantic_hash": ""
   },
   "src/fea/include/fea/zz.hpp": {
-    "mtime": 1783727444.588343,
-    "ast_hash": "ad41fa9414449b8c3eded9f08af81192",
+    "mtime": 1786188079.4838774,
+    "ast_hash": "4649c0fac839e8995ff9b635281a5fff",
     "semantic_hash": ""
   },
   "src/fea/src/boundary_faces.cpp": {
-    "mtime": 1783727444.5888767,
-    "ast_hash": "ddf742d0c4ac49fd52da01966bae28ec",
+    "mtime": 1784047256.1903522,
+    "ast_hash": "8a4a1093775a70b5f993bfd9bed40317",
     "semantic_hash": ""
   },
   "src/fea/src/p_elevate.cpp": {
@@ -625,18 +625,18 @@
     "semantic_hash": ""
   },
   "src/fea/src/vem.cpp": {
-    "mtime": 1783968117.1887422,
-    "ast_hash": "24413a586b14e79549356d8c3965686e",
+    "mtime": 1786192895.9402926,
+    "ast_hash": "34ea90d5d483d3ec2de0559198124193",
     "semantic_hash": ""
   },
   "src/fea/src/vtu.cpp": {
-    "mtime": 1783727444.5888767,
-    "ast_hash": "a1aab92b6c6888cd9e4ba9e05b15f574",
+    "mtime": 1786188104.044834,
+    "ast_hash": "08aadcdb2789ee5c79068bf9c929920e",
     "semantic_hash": ""
   },
   "src/fea/src/zz.cpp": {
-    "mtime": 1783727444.5888767,
-    "ast_hash": "bf7cbb354f1ad53f9e7eec15f61d09af",
+    "mtime": 1786188069.1448956,
+    "ast_hash": "510d3cf2bc421858687317dfff5c8519",
     "semantic_hash": ""
   },
   "src/geom/include/geom/features.hpp": {
@@ -700,8 +700,8 @@
     "semantic_hash": ""
   },
   "src/mesh/include/mesh/quality.hpp": {
-    "mtime": 1783727444.5900607,
-    "ast_hash": "c82d1a75ceddc3aeb15aa20cd854fce5",
+    "mtime": 1786187836.9383056,
+    "ast_hash": "945517d9bd6c936ba4c97e7a9d1c6cc8",
     "semantic_hash": ""
   },
   "src/mesh/include/mesh/surface_project.hpp": {
@@ -740,33 +740,33 @@
     "semantic_hash": ""
   },
   "src/mesh/src/mixed_fill.cpp": {
-    "mtime": 1783744077.1604872,
-    "ast_hash": "bee5c70cc349bc898afab604a75cb55e",
+    "mtime": 1786212489.5286548,
+    "ast_hash": "cdf1c7e4b13826ee14d3d15d69104f0d",
     "semantic_hash": ""
   },
   "src/mesh/src/prism_fill.cpp": {
-    "mtime": 1783727444.5904958,
-    "ast_hash": "62c58b9a88e8af45db60f699ffe9fc15",
+    "mtime": 1786192570.8410692,
+    "ast_hash": "2b4657a8e597bf84408cc068088a0a47",
     "semantic_hash": ""
   },
   "src/mesh/src/quality.cpp": {
-    "mtime": 1783727444.5904958,
-    "ast_hash": "518d94a5e752e90b28eec14058c85e0b",
+    "mtime": 1786187857.4122696,
+    "ast_hash": "2ff670bdba1d34f9718027340f1a981b",
     "semantic_hash": ""
   },
   "src/mesh/src/surface_project.cpp": {
-    "mtime": 1784038854.428164,
-    "ast_hash": "621bf786c5d959a5608f91f70cc27a80",
+    "mtime": 1786197621.725044,
+    "ast_hash": "305826be5920c256dc1b73b228b54449",
     "semantic_hash": ""
   },
   "src/mesh/src/tet_fill.cpp": {
-    "mtime": 1783727444.5904958,
-    "ast_hash": "26634ccd06cc7dca1c37eeca50d71f2b",
+    "mtime": 1786188115.6568134,
+    "ast_hash": "f52fe0949f32cbe19adfa7a3c2c77939",
     "semantic_hash": ""
   },
   "src/mesh/src/transition_fill.cpp": {
-    "mtime": 1783727444.5904958,
-    "ast_hash": "8be89d85e5c1ae42e074326704683d69",
+    "mtime": 1786188078.9848783,
+    "ast_hash": "cda2b90a3d98a6e23efe4bb92d75d9f4",
     "semantic_hash": ""
   },
   "tests/test_d6_bench_smoke.cpp": {
@@ -795,8 +795,8 @@
     "semantic_hash": ""
   },
   "tests/test_iterative_solve.cpp": {
-    "mtime": 1783791305.3625166,
-    "ast_hash": "8400f9ec4eabfe87fd28f9e7eb98c600",
+    "mtime": 1786187633.6626637,
+    "ast_hash": "f724e52faa4872729d7cf41ed3f79785",
     "semantic_hash": ""
   },
   "tests/test_kirsch_c5_graded.cpp": {
@@ -910,8 +910,8 @@
     "semantic_hash": ""
   },
   "docs/ROADMAP.md": {
-    "mtime": 1783902936.0355744,
-    "ast_hash": "2ceeea2614726a13429a0a68953ff99c",
+    "mtime": 1786191860.309011,
+    "ast_hash": "ee606bb6f4b9c427227a968124a838c8",
     "semantic_hash": ""
   },
   "docs/bench/d6-tier3.md": {
@@ -965,8 +965,8 @@
     "semantic_hash": ""
   },
   "docs/gui/theme-layout.md": {
-    "mtime": 1783727444.5818534,
-    "ast_hash": "bbf502d2c24bd1dc92eb1743af73d0e2",
+    "mtime": 1786183578.0280216,
+    "ast_hash": "bb2b7998ded5ef699d0aa3fcb67f30f6",
     "semantic_hash": ""
   },
   "docs/process/agent-loop.md": {
@@ -1095,18 +1095,18 @@
     "semantic_hash": ""
   },
   "src/mesh/include/mesh/surface_metrics.hpp": {
-    "mtime": 1783727444.5900607,
-    "ast_hash": "86bea65b4ea747cc3ddb66a207a99837",
+    "mtime": 1786188149.5797532,
+    "ast_hash": "83af5b8c3bfe1b4d266ef74252a8deb4",
     "semantic_hash": ""
   },
   "src/mesh/src/surface_metrics.cpp": {
-    "mtime": 1783727444.5904958,
-    "ast_hash": "edea8016a59959aba042ade6d94e6922",
+    "mtime": 1786188137.7427742,
+    "ast_hash": "a9ae4fd92449b5177a1537a23b12f67a",
     "semantic_hash": ""
   },
   "tests/test_curved_mesh_quality.cpp": {
-    "mtime": 1784029329.9523914,
-    "ast_hash": "941d275929d62c5fae855bf2b44acad2",
+    "mtime": 1786212247.525074,
+    "ast_hash": "d5862e97f6cb95eecf96da73f5c62e1f",
     "semantic_hash": ""
   },
   "bench/mesher/shots/cylinder_prism_graded.png": {
@@ -1185,7 +1185,7 @@
     "semantic_hash": ""
   },
   "tests/test_fe_vem_assembly.cpp": {
-    "mtime": 1783744077.1644871,
+    "mtime": 1786193379.7506518,
     "ast_hash": "3e13af80d96d8f96fbeb23f0d764555c",
     "semantic_hash": ""
   },
@@ -1295,8 +1295,8 @@
     "semantic_hash": ""
   },
   "apps/gui/gui_settings.hpp": {
-    "mtime": 1783749068.5196693,
-    "ast_hash": "0f6202ea9763d87f80ff6574b14ecba7",
+    "mtime": 1786182953.6451883,
+    "ast_hash": "5387c3abe6826aedded84a5c56ebbe5b",
     "semantic_hash": ""
   },
   "apps/gui/process_runner.cpp": {
@@ -1330,8 +1330,8 @@
     "semantic_hash": ""
   },
   "apps/testlab/main.cpp": {
-    "mtime": 1784028931.4953635,
-    "ast_hash": "2c1e52e2748bb87e19b5da31e643e290",
+    "mtime": 1786188191.1536796,
+    "ast_hash": "cca5607813dd14538bf1fa9ce830a57f",
     "semantic_hash": ""
   },
   "bench/campaigns/settings-frontier-1/campaign.json": {
@@ -1545,8 +1545,8 @@
     "semantic_hash": ""
   },
   "src/geom/src/cad_model.cpp": {
-    "mtime": 1784032989.2708623,
-    "ast_hash": "558e64bc05b49507efa56db0e0f25bbe",
+    "mtime": 1786188471.7931828,
+    "ast_hash": "549cbeb0fa70bbe0ce735efd94a5f2b1",
     "semantic_hash": ""
   },
   "src/geom/src/cad_topology.cpp": {
@@ -2285,13 +2285,13 @@
     "semantic_hash": ""
   },
   "src/mesh/include/mesh/geogram_clip.hpp": {
-    "mtime": 1783908545.4487343,
-    "ast_hash": "5d47f905d24ff264f3e14aa2c65bdfa6",
+    "mtime": 1784045152.897033,
+    "ast_hash": "5a94c2c368a76cb77e360845c07b043b",
     "semantic_hash": ""
   },
   "src/mesh/src/geogram_clip.cpp": {
-    "mtime": 1783908564.418525,
-    "ast_hash": "2e2b009487e527eb5c3c78c4a62ad66f",
+    "mtime": 1784045185.5527894,
+    "ast_hash": "b0c22acf9c63208592fcc2bd72a71174",
     "semantic_hash": ""
   },
   "tests/test_geogram_clip.cpp": {
@@ -2345,13 +2345,13 @@
     "semantic_hash": ""
   },
   "src/mesh/src/cvt_export.cpp": {
-    "mtime": 1783960294.9274087,
-    "ast_hash": "1d383d46015274fb9eacc200c00277d7",
+    "mtime": 1784046988.320349,
+    "ast_hash": "f66eedf3f553ce04711e112b4eec8c0e",
     "semantic_hash": ""
   },
   "src/mesh/src/cvt_lloyd.cpp": {
-    "mtime": 1783908931.8964543,
-    "ast_hash": "b7281642b32d8538253ed89a1f6e31ea",
+    "mtime": 1784045358.7084987,
+    "ast_hash": "3e1e2ae52b60c4310de83cc223675a15",
     "semantic_hash": ""
   },
   "src/mesh/src/cvt_sites.cpp": {
@@ -2470,13 +2470,13 @@
     "semantic_hash": ""
   },
   "src/adapt/include/adapt/graded_sizing.hpp": {
-    "mtime": 1784012752.294165,
-    "ast_hash": "3e63ca8ff23c907d379961ca6e1c1f11",
+    "mtime": 1784051271.827446,
+    "ast_hash": "0427a7984f1b417fc8df9a42a08cc40d",
     "semantic_hash": ""
   },
   "src/adapt/src/graded_sizing.cpp": {
-    "mtime": 1784012721.5023386,
-    "ast_hash": "18990ee60d47ccb71451c239efe6ce69",
+    "mtime": 1784051342.2879226,
+    "ast_hash": "69f0450abcd084442a10c83e18f16dbf",
     "semantic_hash": ""
   },
   "tests/support/box_model.hpp": {
@@ -2507,6 +2507,136 @@
   "tests/test_geometry_fidelity.cpp": {
     "mtime": 1784033373.8470376,
     "ast_hash": "faaf0973723af32183f553d8036b09b9",
+    "semantic_hash": ""
+  },
+  "apps/gui/colormap.hpp": {
+    "mtime": 1786182750.7725713,
+    "ast_hash": "d8b216040b10e97444bb4a343cd233e0",
+    "semantic_hash": ""
+  },
+  "apps/gui/png_writer.hpp": {
+    "mtime": 1786182795.8184834,
+    "ast_hash": "cbd788c59a23289f2e13c9a5a44de8ce",
+    "semantic_hash": ""
+  },
+  "build.sh": {
+    "mtime": 1784027751.3412302,
+    "ast_hash": "95ef8ca8e4b2b6a26c7764f39927512a",
+    "semantic_hash": ""
+  },
+  "docs/assets/showcase/manifest.json": {
+    "mtime": 1786210729.490298,
+    "ast_hash": "963e636b192e274643ae2437fc7a42ac",
+    "semantic_hash": ""
+  },
+  "scripts/make_compare_grid.py": {
+    "mtime": 1786210447.9035342,
+    "ast_hash": "fb4eb45f9db6b90f5949e267a455ca92",
+    "semantic_hash": ""
+  },
+  "scripts/plot_benchmarks.py": {
+    "mtime": 1786183454.777252,
+    "ast_hash": "8812400f1af8133142d4e3aa3ab76036",
+    "semantic_hash": ""
+  },
+  "scripts/render_showcase.py": {
+    "mtime": 1786210711.2387037,
+    "ast_hash": "8762e250122418ca1431175987309a64",
+    "semantic_hash": ""
+  },
+  "src/fea/include/fea/cell_quality.hpp": {
+    "mtime": 1786192442.0357802,
+    "ast_hash": "94bcae30bfa69936b79a581349bbcd61",
+    "semantic_hash": ""
+  },
+  "src/fea/src/cell_quality.cpp": {
+    "mtime": 1786192425.1918733,
+    "ast_hash": "0067c924d4c2914ec31d0446e4240a9d",
+    "semantic_hash": ""
+  },
+  "src/mesh/include/mesh/cell_validity.hpp": {
+    "mtime": 1786196925.0760128,
+    "ast_hash": "add7976e3f7e75957ec60cf4ac0e6578",
+    "semantic_hash": ""
+  },
+  "tests/test_cell_quality.cpp": {
+    "mtime": 1786192458.0856917,
+    "ast_hash": "1d3407a12a50dfc0dd018c454909b490",
+    "semantic_hash": ""
+  },
+  "tests/test_traction_selection.cpp": {
+    "mtime": 1786188426.3162634,
+    "ast_hash": "4b7d51c77e5933dfd9c724c4b0b07565",
+    "semantic_hash": ""
+  },
+  "docs/SHOWCASE.md": {
+    "mtime": 1786186808.5011222,
+    "ast_hash": "fc0cefd84e7ee633d791fee82d138c61",
+    "semantic_hash": ""
+  },
+  "docs/assets/showcase/OVERVIEW.md": {
+    "mtime": 1786186840.4800644,
+    "ast_hash": "313194278ca9d9bdf18da189b36490b4",
+    "semantic_hash": ""
+  },
+  "docs/assets/showcase/architecture.png": {
+    "mtime": 1786210620.3863354,
+    "ast_hash": "2d6489a5465987ad0725bb95ec632f85",
+    "semantic_hash": ""
+  },
+  "docs/assets/showcase/bench_dof_time.png": {
+    "mtime": 1786210620.884332,
+    "ast_hash": "92b2373ebefc1e419dff97c314b952b5",
+    "semantic_hash": ""
+  },
+  "docs/assets/showcase/bench_mms.png": {
+    "mtime": 1786210621.2033296,
+    "ast_hash": "0911e025c5d242404b9581c03bbdefb9",
+    "semantic_hash": ""
+  },
+  "docs/assets/showcase/bench_tier1.png": {
+    "mtime": 1786210621.023331,
+    "ast_hash": "a6dd5417f3c55a6cf72c6c796b946ce4",
+    "semantic_hash": ""
+  },
+  "docs/assets/showcase/compare_grading.png": {
+    "mtime": 1786210620.2163365,
+    "ast_hash": "097385a7e406a8775e1261d6cdd71cef",
+    "semantic_hash": ""
+  },
+  "docs/assets/showcase/compare_meshers.png": {
+    "mtime": 1786210729.477577,
+    "ast_hash": "2ef3a138d38fdf9f34ee175753ba6d23",
+    "semantic_hash": ""
+  },
+  "docs/assets/showcase/gallery_cantilever.png": {
+    "mtime": 1786210610.4444044,
+    "ast_hash": "aa9a0d014cde3e77562c24daae839d7b",
+    "semantic_hash": ""
+  },
+  "docs/assets/showcase/gallery_cylinder.png": {
+    "mtime": 1786210611.635396,
+    "ast_hash": "982783da22a3e3d423d915e66a749a07",
+    "semantic_hash": ""
+  },
+  "docs/assets/showcase/gallery_icecream_cone.png": {
+    "mtime": 1786210615.0963721,
+    "ast_hash": "a11eb494a953029e25fd91b6a93e47da",
+    "semantic_hash": ""
+  },
+  "docs/assets/showcase/gallery_plate_hole.png": {
+    "mtime": 1786210608.9744146,
+    "ast_hash": "2db3f34d686aec8e2b588c07f2448f85",
+    "semantic_hash": ""
+  },
+  "docs/assets/showcase/gallery_sphere.png": {
+    "mtime": 1786210613.3463843,
+    "ast_hash": "650a188f05a9158b50782e677ceca5d5",
+    "semantic_hash": ""
+  },
+  "docs/assets/showcase/hero.png": {
+    "mtime": 1786210609.5954103,
+    "ast_hash": "bea663cc13a17bc9390d66d4feea4c4e",
     "semantic_hash": ""
   }
 }

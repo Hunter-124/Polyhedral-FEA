@@ -11,7 +11,6 @@
 #include <Eigen/LU>
 
 #include <algorithm>
-#include <cstdlib>
 #include <array>
 #include <cmath>
 #include <format>
@@ -103,30 +102,97 @@ bool pyramid_bad(const std::array<std::uint32_t, 5>& n,
            validity::pyramid_shape_quality(p0, p1, p2, p3, p4) < shape_floor;
 }
 
+void orient_pyramid_winding(MixedCell& pyr, const std::vector<Eigen::Vector3d>& nodes);
+void normalize_pyramid_diagonal(MixedCell& pyr, const std::vector<Eigen::Vector3d>& nodes);
+
 void emit_pyramid(MixedFillOutput& out, std::uint32_t n0, std::uint32_t n1, std::uint32_t n2,
                   std::uint32_t n3, std::uint32_t apex) {
     MixedCell pyr;
     pyr.kind = MixedCellKind::kPyramid5;
     pyr.n_nodes = 5;
-    const Eigen::Vector3d& p0 = out.nodes[n0];
-    const Eigen::Vector3d& p1 = out.nodes[n1];
-    const Eigen::Vector3d& p2 = out.nodes[n2];
-    const Eigen::Vector3d nrm = (p1 - p0).cross(p2 - p0);
-    const bool apex_on_positive = nrm.dot(out.nodes[apex] - p0) > 0.0;
-    if (apex_on_positive) {
-        pyr.nodes[0] = n0;
-        pyr.nodes[1] = n1;
-        pyr.nodes[2] = n2;
-        pyr.nodes[3] = n3;
-    } else {
-        pyr.nodes[0] = n0;
-        pyr.nodes[1] = n3;
-        pyr.nodes[2] = n2;
-        pyr.nodes[3] = n1;
-    }
+    pyr.nodes[0] = n0;
+    pyr.nodes[1] = n1;
+    pyr.nodes[2] = n2;
+    pyr.nodes[3] = n3;
     pyr.nodes[4] = apex;
+    orient_pyramid_winding(pyr, out.nodes);
+    normalize_pyramid_diagonal(pyr, out.nodes);
     out.cells.push_back(pyr);
     ++out.n_pyramid;
+}
+
+/// Choose the better cyclic winding once, when a pyramid is emitted. A
+/// first-triangle normal is insufficient for a warped quad, so compare the
+/// minimum signed half-volume of the conformity-selected split in both
+/// directions. Post-snap normalization must NOT repeat this operation: changing
+/// winding after deformation would hide an inversion rather than repair it.
+void orient_pyramid_winding(MixedCell& pyr, const std::vector<Eigen::Vector3d>& nodes) {
+    const auto split_min = [&](std::uint32_t n0, std::uint32_t n1, std::uint32_t n2,
+                               std::uint32_t n3) {
+        return validity::pyramid_min_split_volume(nodes[n0], nodes[n1], nodes[n2], nodes[n3],
+                                                  nodes[pyr.nodes[4]]);
+    };
+    const double forward =
+        split_min(pyr.nodes[0], pyr.nodes[1], pyr.nodes[2], pyr.nodes[3]);
+    const double reversed =
+        split_min(pyr.nodes[0], pyr.nodes[3], pyr.nodes[2], pyr.nodes[1]);
+    if (reversed > forward) {
+        std::swap(pyr.nodes[1], pyr.nodes[3]);
+    }
+}
+
+/// Rotate a cyclic pyramid base so the conformity-safe selected geometric
+/// diagonal is local 0-2 for VTK/PyVista, validity, and FE assembly.
+void normalize_pyramid_diagonal(MixedCell& pyr, const std::vector<Eigen::Vector3d>& nodes) {
+    if (pyr.kind != MixedCellKind::kPyramid5 || pyr.n_nodes != 5 ||
+        validity::pyramid_split_diagonal(nodes[pyr.nodes[0]], nodes[pyr.nodes[1]],
+                                         nodes[pyr.nodes[2]], nodes[pyr.nodes[3]]) == 0) {
+        return;
+    }
+    const auto n0 = pyr.nodes[0];
+    pyr.nodes[0] = pyr.nodes[1];
+    pyr.nodes[1] = pyr.nodes[2];
+    pyr.nodes[2] = pyr.nodes[3];
+    pyr.nodes[3] = n0;
+}
+
+/// Search the interior natural-coordinate lattice for the least-displaced fan
+/// apex that clears the requested cell-quality floor. If the floor cannot be
+/// reached, retain the best improving candidate.
+template <typename WorstQualityFn>
+bool search_fan_apex(const std::array<Eigen::Vector3d, 8>& lattice,
+                     const Eigen::Vector3d& ctr, WorstQualityFn&& worst,
+                     double q_reference, double shape_floor, Eigen::Vector3d& best) {
+    best = ctr;
+    double best_q = q_reference;
+    double best_d2 = std::numeric_limits<double>::max();
+    constexpr std::array<double, 7> kAxis{{-0.75, -0.5, -0.25, 0.0, 0.25, 0.5, 0.75}};
+    for (const double zeta : kAxis) {
+        for (const double eta : kAxis) {
+            for (const double xi : kAxis) {
+                Eigen::Vector3d a = Eigen::Vector3d::Zero();
+                for (std::size_t t = 0; t < 8; ++t) {
+                    const auto& s = validity::kHexCornerSigns[t];
+                    a += 0.125 * (1.0 + s[0] * xi) * (1.0 + s[1] * eta) *
+                         (1.0 + s[2] * zeta) * lattice[t];
+                }
+                const double q = worst(a);
+                const double d2 = (a - ctr).squaredNorm();
+                if (best_q >= shape_floor) {
+                    if (q >= shape_floor && d2 < best_d2) {
+                        best_q = q;
+                        best_d2 = d2;
+                        best = a;
+                    }
+                } else if (q >= shape_floor || q > best_q) {
+                    best_q = q;
+                    best_d2 = d2;
+                    best = a;
+                }
+            }
+        }
+    }
+    return best_q > q_reference;
 }
 
 void emit_cell_pyramids(MixedFillOutput& out, const std::array<std::uint32_t, 8>& c,
@@ -164,13 +230,9 @@ void emit_tet(MixedFillOutput& out, std::uint32_t a, std::uint32_t b, std::uint3
 }
 
 /// Emit 4 child quads for a hex face (local corner indices 0..7) using mid-edge
-/// + face-center nodes already present in the fine index map via `fn`. When the
-/// fine neighbour's quarter sub-cell does not exist (dropped shell sub-cell,
-/// centre outside the surface), the pyramid base is the material boundary and
-/// is registered as a boundary quad.
-template <typename FineNodeFn, typename SubExistsFn>
-void emit_subdivided_face_pyramids(MixedFillOutput& out, FineNodeFn&& fn,
-                                   SubExistsFn&& sub_exists, int i, int j, int k,
+/// + face-center nodes already present in the fine index map via `fn`.
+template <typename FineNodeFn>
+void emit_subdivided_face_pyramids(MixedFillOutput& out, FineNodeFn&& fn, int i, int j, int k,
                                    int face, std::uint32_t apex) {
     // Local unit coords of face corners (0 or 2 in fine steps of a coarse cell).
     const auto& fl = kHexFaces[static_cast<std::size_t>(face)];
@@ -205,17 +267,6 @@ void emit_subdivided_face_pyramids(MixedFillOutput& out, FineNodeFn&& fn,
         const auto npm = fn(2 * i + pmx, 2 * j + pmy, 2 * k + pmz);
         (void)nb;
         emit_pyramid(out, na, nm, fc, npm, apex);
-        // Fine-neighbour sub-cell adjacent to this quarter: along the face
-        // axis it is the layer touching the shared face; in the face plane it
-        // is the quarter's own quadrant. Dropped ⇒ the base is boundary.
-        const auto& o = kFaceNbr[static_cast<std::size_t>(face)];
-        const int ax = o[0] != 0 ? 0 : (o[1] != 0 ? 1 : 2);
-        int s[3] = {a[0] / 2, a[1] / 2, a[2] / 2};
-        s[ax] = o[ax] > 0 ? 0 : 1;
-        if (!sub_exists(2 * (i + o[0]) + s[0], 2 * (j + o[1]) + s[1],
-                        2 * (k + o[2]) + s[2])) {
-            out.boundary_quads.push_back({{na, nm, fc, npm}});
-        }
     }
 }
 
@@ -402,7 +453,8 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                                    double feature_band,
                                    std::span<const Eigen::Vector3d> curvature_seeds,
                                    double seed_band, bool snap_boundary,
-                                   double curvature_turn_deg, bool native_poly_transitions) {
+                                   double curvature_turn_deg, bool native_poly_transitions,
+                                   const std::function<void()>& cancel_check) {
     if (!(h > 0.0) || !std::isfinite(h)) {
         throw ValidityError("mixed_fill_surface: h must be positive");
     }
@@ -418,14 +470,21 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
     if (!(curvature_turn_deg > 0.0)) {
         curvature_turn_deg = 0.0;
     }
+    const auto poll_cancel = [&] {
+        if (cancel_check) {
+            cancel_check();
+        }
+    };
+    poll_cancel();
 
     // Budget for 2:1 fine subcells (up to 8× in refined bands).
-    constexpr long kHybridMaxCoarse = 48 * 1024;
+    constexpr long kHybridMaxCoarse = static_cast<long>(kHybridMaxElems);
     const double h_budget =
         min_h_for_cell_budget(bbox_min, bbox_max, kHybridMaxCoarse, /*subdivision=*/1);
     const double h_use = (h_budget > 0.0) ? std::max(h, h_budget) : h;
     const CartesianGrid grid = make_bbox_grid(bbox_min, bbox_max, h_use);
     const auto inside = classify_cells_inside(surface, grid);
+    poll_cancel();
     const int nx = grid.nx, ny = grid.ny, nz = grid.nz;
     const double h_cell = grid.max_edge();
     const auto idx = [&](int i, int j, int k) { return grid.index(i, j, k); };
@@ -438,6 +497,7 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
     std::queue<std::array<int, 3>> q;
     int max_dist = 0;
     for (int k = 0; k < nz; ++k) {
+        poll_cancel();
         for (int j = 0; j < ny; ++j) {
             for (int i = 0; i < nx; ++i) {
                 if (!inside[idx(i, j, k)]) {
@@ -458,6 +518,9 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
         }
     }
     while (!q.empty()) {
+        if ((q.size() & 1023U) == 0U) {
+            poll_cancel();
+        }
         const auto c = q.front();
         q.pop();
         const int d0 = dist[idx(c[0], c[1], c[2])];
@@ -494,6 +557,7 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
     std::vector<char> is_seed_skin(inside.size(), 0);
 
     for (int k = 0; k < nz; ++k) {
+        poll_cancel();
         for (int j = 0; j < ny; ++j) {
             for (int i = 0; i < nx; ++i) {
                 if (!inside[idx(i, j, k)]) {
@@ -584,6 +648,7 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
         const auto mark_transitions = [&] {
             std::fill(is_transition.begin(), is_transition.end(), 0);
             for (int k = 0; k < nz; ++k) {
+                poll_cancel();
                 for (int j = 0; j < ny; ++j) {
                     for (int i = 0; i < nx; ++i) {
                         const auto id = idx(i, j, k);
@@ -617,6 +682,7 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
         for (int pass = 0; pass < kFsGapHops; ++pass) {
             std::vector<char> promote(inside.size(), 0);
             for (int k = 0; k < nz; ++k) {
+                poll_cancel();
                 for (int j = 0; j < ny; ++j) {
                     for (int i = 0; i < nx; ++i) {
                         const auto id = idx(i, j, k);
@@ -655,8 +721,10 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
         // fixed point on a long thin wall and leave transition fans sitting on
         // the surface for the snap to squash.
         for (long guard = 0; guard <= n_interior; ++guard) {
+            poll_cancel();
             bool changed = false;
             for (int k = 0; k < nz; ++k) {
+                poll_cancel();
                 for (int j = 0; j < ny; ++j) {
                     for (int i = 0; i < nx; ++i) {
                         const auto id = idx(i, j, k);
@@ -700,7 +768,7 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
         // cylinder and the sphere, 26 on plate_hole (fan size grows with the
         // number of fine neighbours), so 24 is a representative upper-middle.
         constexpr long kFanElemsPerTransition = 24;
-        constexpr long kHybridMaxElems = kHybridMaxCoarse;
+        const long max_hybrid_elems = static_cast<long>(kHybridMaxElems);
         long n_fine_cells = 0, n_trans_cells = 0;
         for (std::size_t c = 0; c < inside.size(); ++c) {
             n_fine_cells += (is_fine[c] != 0);
@@ -711,7 +779,7 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
             native_poly_transitions
                 ? n_lattice_hex + n_trans_cells
                 : 6 * n_lattice_hex + kFanElemsPerTransition * n_trans_cells;
-        if (est_graded > kHybridMaxElems && 8 * n_interior <= kHybridMaxElems) {
+        if (est_graded > max_hybrid_elems && 8 * n_interior <= max_hybrid_elems) {
             std::fill(is_transition.begin(), is_transition.end(), 0);
             for (std::size_t c = 0; c < is_fine.size(); ++c) {
                 is_fine[c] = (inside[c] != 0) ? 1 : 0;
@@ -720,55 +788,10 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
         }
     }
 
-    // h/2-resolution inside test for the boundary shell (fan path only). The
-    // coarse classification emits fine cells whole, so a free-face sub-hex can
-    // sit up to ~0.7h outside the surface; the post-expand snap then pulls its
-    // boundary quad past the sub-hex centre and crushes the expand pyramid
-    // (413 cells on sphere, hole_plate m1_max 1.9h — the snap-fidelity
-    // regression). Classify at h/2 and treat shell sub-cells whose centre is
-    // outside the surface as absent: their volume belongs to the void, the
-    // boundary stair moves one sub-level deeper, and no snapped quad ever
-    // travels more than the sub-cell depth.
-    std::vector<bool> fine_inside;
-    CartesianGrid fgrid;
-    if (size_adaptive && !native_poly_transitions) {
-        fgrid.origin = grid.origin;
-        fgrid.nx = 2 * nx;
-        fgrid.ny = 2 * ny;
-        fgrid.nz = 2 * nz;
-        fgrid.cell = 0.5 * grid.cell;
-        fine_inside = classify_cells_inside(surface, fgrid);
-    }
-    // Does fine sub-cell (I,J,K) (coarse cell (I/2,J/2,K/2), sub-index I%2 …)
-    // exist as mesh volume?
-    const auto sub_exists = [&](int I, int J, int K) {
-        if (I < 0 || I >= 2 * nx || J < 0 || J >= 2 * ny || K < 0 || K >= 2 * nz) {
-            return false;
-        }
-        const int ci = I / 2, cj = J / 2, ck = K / 2;
-        if (!inside[idx(ci, cj, ck)]) {
-            return false;
-        }
-        if (!is_fine[idx(ci, cj, ck)]) {
-            return true; // coarse hex / transition cell fills its whole volume
-        }
-        if (fine_inside[fgrid.index(I, J, K)]) {
-            return true;
-        }
-        // Outside-centre sub-cells survive only when fully interior (a thin
-        // wall threading a coarse cell); boundary-shell ones are dropped.
-        const int a = I % 2, b = J % 2, c = K % 2;
-        const bool shell = (a == 0 && !inb(ci - 1, cj, ck)) ||
-                           (a == 1 && !inb(ci + 1, cj, ck)) ||
-                           (b == 0 && !inb(ci, cj - 1, ck)) ||
-                           (b == 1 && !inb(ci, cj + 1, ck)) ||
-                           (c == 0 && !inb(ci, cj, ck - 1)) ||
-                           (c == 1 && !inb(ci, cj, ck + 1));
-        return !shell;
-    };
 
     // Fine-index node map: I∈[0,2nx], J∈[0,2ny], K∈[0,2nz].
-    std::map<std::array<int, 3>, std::uint32_t> node_ids;    const auto node_fine = [&](int I, int J, int K) -> std::uint32_t {
+    std::map<std::array<int, 3>, std::uint32_t> node_ids;
+    const auto node_fine = [&](int I, int J, int K) -> std::uint32_t {
         const auto [it, fresh] = node_ids.try_emplace(
             std::array<int, 3>{I, J, K}, static_cast<std::uint32_t>(out.nodes.size()));
         if (fresh) {
@@ -828,6 +851,7 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
     std::vector<FanSpan> fan_spans;
 
     for (int k = 0; k < nz; ++k) {
+        poll_cancel();
         for (int j = 0; j < ny; ++j) {
             for (int i = 0; i < nx; ++i) {
                 const auto id = idx(i, j, k);
@@ -840,76 +864,51 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                     // Free-surface pyramids here would break face match with interior
                     // fine hexes and show as jagged exterior patches in the wireframe.
                     ++out.n_fine_cells;
-                    if (native_poly_transitions) {
-                        for (int c = 0; c < 2; ++c) {
-                            for (int b = 0; b < 2; ++b) {
-                                for (int a = 0; a < 2; ++a) {
-                                    emit_hex(out, fine_sub_corners(i, j, k, a, b, c));
-                                }
-                            }
-                        }
-                        // Boundary quads at h/2 on free faces.
-                        for (std::size_t f = 0; f < 6; ++f) {
-                            const auto& o = kFaceNbr[f];
-                            if (inb(i + o[0], j + o[1], k + o[2])) {
-                                continue;
-                            }
-                            // 4 child quads on this coarse face.
-                            const auto& fl = kHexFaces[f];
-                            std::array<std::array<int, 3>, 4> lc{};
-                            for (int qn = 0; qn < 4; ++qn) {
-                                const auto& corner = kHexCornerLocal[static_cast<std::size_t>(
-                                    fl[static_cast<std::size_t>(qn)])];
-                                lc[static_cast<std::size_t>(qn)] = {
-                                    {2 * corner[0], 2 * corner[1], 2 * corner[2]}};
-                            }
-                            const int fcx = (lc[0][0] + lc[1][0] + lc[2][0] + lc[3][0]) / 4;
-                            const int fcy = (lc[0][1] + lc[1][1] + lc[2][1] + lc[3][1]) / 4;
-                            const int fcz = (lc[0][2] + lc[1][2] + lc[2][2] + lc[3][2]) / 4;
-                            for (int q = 0; q < 4; ++q) {
-                                const int qn = (q + 1) % 4;
-                                const int qp = (q + 3) % 4;
-                                const auto& A = lc[static_cast<std::size_t>(q)];
-                                const auto& B = lc[static_cast<std::size_t>(qn)];
-                                const auto& P = lc[static_cast<std::size_t>(qp)];
-                                const int mx = (A[0] + B[0]) / 2, my = (A[1] + B[1]) / 2,
-                                          mz = (A[2] + B[2]) / 2;
-                                const int pmx = (A[0] + P[0]) / 2, pmy = (A[1] + P[1]) / 2,
-                                          pmz = (A[2] + P[2]) / 2;
-                                emit_boundary_quad_fine(2 * i + A[0], 2 * j + A[1], 2 * k + A[2],
-                                                        2 * i + mx, 2 * j + my, 2 * k + mz,
-                                                        2 * i + fcx, 2 * j + fcy, 2 * k + fcz,
-                                                        2 * i + pmx, 2 * j + pmy, 2 * k + pmz);
-                            }
-                        }
-                        continue;
-                    }
-                    // Fan path: drop boundary-shell sub-hexes whose centre is
-                    // outside the surface (see sub_exists) and derive boundary
-                    // quads per surviving sub-hex face — the stair then tracks
-                    // the surface at h/2 and the snap can never crush a cell.
                     for (int c = 0; c < 2; ++c) {
                         for (int b = 0; b < 2; ++b) {
                             for (int a = 0; a < 2; ++a) {
-                                if (!sub_exists(2 * i + a, 2 * j + b, 2 * k + c)) {
-                                    continue;
-                                }
-                                const auto sc = fine_sub_corners(i, j, k, a, b, c);
-                                emit_hex(out, sc);
-                                for (std::size_t f = 0; f < 6; ++f) {
-                                    const auto& o = kFaceNbr[f];
-                                    if (sub_exists(2 * i + a + o[0], 2 * j + b + o[1],
-                                                   2 * k + c + o[2])) {
-                                        continue;
-                                    }
-                                    const auto& fl = kHexFaces[f];
-                                    out.boundary_quads.push_back(
-                                        {{sc[static_cast<std::size_t>(fl[0])],
-                                          sc[static_cast<std::size_t>(fl[1])],
-                                          sc[static_cast<std::size_t>(fl[2])],
-                                          sc[static_cast<std::size_t>(fl[3])]}});
-                                }
+                                emit_hex(out, fine_sub_corners(i, j, k, a, b, c));
                             }
+                        }
+                    }
+                    // Boundary quads at h/2 on free faces.
+                    for (std::size_t f = 0; f < 6; ++f) {
+                        const auto& o = kFaceNbr[f];
+                        if (inb(i + o[0], j + o[1], k + o[2])) {
+                            continue;
+                        }
+                        // 4 child quads on this coarse face.
+                        const auto& fl = kHexFaces[f];
+                        std::array<std::array<int, 3>, 4> lc{};
+                        for (int qn = 0; qn < 4; ++qn) {
+                            const auto& corner = kHexCornerLocal[static_cast<std::size_t>(
+                                fl[static_cast<std::size_t>(qn)])];
+                            lc[static_cast<std::size_t>(qn)] = {
+                                {2 * corner[0], 2 * corner[1], 2 * corner[2]}};
+                        }
+                        const int fcx =
+                            (lc[0][0] + lc[1][0] + lc[2][0] + lc[3][0]) / 4;
+                        const int fcy =
+                            (lc[0][1] + lc[1][1] + lc[2][1] + lc[3][1]) / 4;
+                        const int fcz =
+                            (lc[0][2] + lc[1][2] + lc[2][2] + lc[3][2]) / 4;
+                        for (int q = 0; q < 4; ++q) {
+                            const int qn = (q + 1) % 4;
+                            const int qp = (q + 3) % 4;
+                            const auto& A = lc[static_cast<std::size_t>(q)];
+                            const auto& B = lc[static_cast<std::size_t>(qn)];
+                            const auto& P = lc[static_cast<std::size_t>(qp)];
+                            const int mx = (A[0] + B[0]) / 2;
+                            const int my = (A[1] + B[1]) / 2;
+                            const int mz = (A[2] + B[2]) / 2;
+                            const int pmx = (A[0] + P[0]) / 2;
+                            const int pmy = (A[1] + P[1]) / 2;
+                            const int pmz = (A[2] + P[2]) / 2;
+                            emit_boundary_quad_fine(
+                                2 * i + A[0], 2 * j + A[1], 2 * k + A[2],
+                                2 * i + mx, 2 * j + my, 2 * k + mz,
+                                2 * i + fcx, 2 * j + fcy, 2 * k + fcz,
+                                2 * i + pmx, 2 * j + pmy, 2 * k + pmz);
                         }
                     }
                     continue;
@@ -947,7 +946,7 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                         if (inb(ni, nj, nk) && is_fine[idx(ni, nj, nk)]) {
                             // Fine face-neighbor: 4 quarter-quad pyramids (mid +
                             // face-center nodes shared with the fine sub-hexes).
-                            emit_subdivided_face_pyramids(out, node_fine, sub_exists, i, j, k,
+                            emit_subdivided_face_pyramids(out, node_fine, i, j, k,
                                                           static_cast<int>(f), apex);
                             continue;
                         }
@@ -1033,6 +1032,7 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                         }
                     }
                     fan_spans.push_back({apex, c, fan_first, out.cells.size()});
+                    out.movable_fans.push_back({apex, c});
                     continue;
                 }
 
@@ -1051,6 +1051,7 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                     const std::size_t fan_first = out.cells.size();
                     emit_cell_pyramids(out, c, apex);
                     fan_spans.push_back({apex, c, fan_first, out.cells.size()});
+                    out.movable_fans.push_back({apex, c});
                 } else {
                     emit_hex(out, c);
                 }
@@ -1115,17 +1116,29 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
         for (const auto& q : out.boundary_quads) {
             bnode_set.insert(q.begin(), q.end());
         }
-        // Predicted post-snap site of every boundary node (the snap caps total
-        // travel at 1.25 h — see snap_boundary_nodes / scene.cpp).
+        // Predicted post-snap site of every boundary node. Mirror
+        // snap_boundary_nodes exactly: true crease/rim nodes prefer the
+        // detected feature when it is as close as the surface target, then the
+        // total travel is capped at 1.25h.
         const double travel_cap = 1.25 * h_cell;
+        const double edge_prefer_r = 0.55 * h_cell;
         std::map<std::uint32_t, Eigen::Vector3d> predicted;
         for (const auto g : bnode_set) {
             const Eigen::Vector3d& p = out.nodes[g];
             const auto cp = closest_on_surface(surface, p);
-            const Eigen::Vector3d d = cp.point - p;
+            Eigen::Vector3d target = cp.point;
+            if (!features.empty()) {
+                const auto cf = geom::closest_on_features(p, surface, features);
+                if (std::isfinite(cf.distance) && cf.distance > 1e-15 &&
+                    cf.distance <= edge_prefer_r &&
+                    cf.distance <= cp.distance + 0.08 * h_cell) {
+                    target = cf.point;
+                }
+            }
+            const Eigen::Vector3d d = target - p;
             const double len = d.norm();
             predicted.emplace(g, len > travel_cap ? Eigen::Vector3d(p + d * (travel_cap / len))
-                                                  : cp.point);
+                                                  : target);
         }
         const double shape_floor = validity::kCellShapeFloor;
         // Post-snap site of a node: its prediction when the snap will move it,
@@ -1149,44 +1162,13 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
         // only approximate, so ±0.75 in steps of 0.25 was picked as the best of
         // ±0.6/0.3 (sphere 0.068 h) and ±0.8/0.2 (0.0104 h) on the three curved
         // scorecards; all three keep cylinder_prism and plate at their bounds.
-        const auto search_apex = [&](const std::array<Eigen::Vector3d, 8>& lattice,
-                                     const Eigen::Vector3d& ctr, const auto& worst,
-                                     double q_centroid, Eigen::Vector3d& best) {
-            best = ctr;
-            double best_q = q_centroid;
-            double best_d2 = std::numeric_limits<double>::max();
-            constexpr std::array<double, 7> kAxis{{-0.75, -0.5, -0.25, 0.0, 0.25, 0.5, 0.75}};
-            for (const double zeta : kAxis) {
-                for (const double eta : kAxis) {
-                    for (const double xi : kAxis) {
-                        Eigen::Vector3d a = Eigen::Vector3d::Zero();
-                        for (std::size_t t = 0; t < 8; ++t) {
-                            const auto& s = validity::kHexCornerSigns[t];
-                            a += 0.125 * (1.0 + s[0] * xi) * (1.0 + s[1] * eta) *
-                                 (1.0 + s[2] * zeta) * lattice[t];
-                        }
-                        const double q = worst(a);
-                        const double d2 = (a - ctr).squaredNorm();
-                        if (best_q >= shape_floor) {
-                            if (q >= shape_floor && d2 < best_d2) {
-                                best_q = q;
-                                best_d2 = d2;
-                                best = a;
-                            }
-                        } else if (q >= shape_floor || q > best_q) {
-                            best_q = q;
-                            best_d2 = d2;
-                            best = a;
-                        }
-                    }
-                }
-            }
-            return best_q > q_centroid;
-        };
         const std::size_t n_emitted = out.cells.size();
         std::vector<char> replaced(n_emitted, 0);
         std::size_t n_replaced = 0;
         for (std::size_t ci = 0; ci < n_emitted; ++ci) {
+            if ((ci & 255U) == 0U) {
+                poll_cancel();
+            }
             if (out.cells[ci].kind != MixedCellKind::kHex8) {
                 continue;
             }
@@ -1234,12 +1216,13 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                 continue; // the caller's centroid apex survives its own snap
             }
             Eigen::Vector3d best;
-            if (!search_apex(lattice, ctr, worst_split, q_centroid, best)) {
+            if (!search_fan_apex(lattice, ctr, worst_split, q_centroid, shape_floor, best)) {
                 continue; // no apex does better; leave the cell to the caller
             }
             const auto apex = static_cast<std::uint32_t>(out.nodes.size());
             out.nodes.push_back(best);
             emit_cell_pyramids(out, cn, apex);
+            out.movable_fans.push_back({apex, cn});
             replaced[ci] = 1;
             ++n_replaced;
             --out.n_hex;
@@ -1252,6 +1235,7 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
         // rather peel them than unsnap the wall. Re-placing the apex costs
         // nothing: it is an interior node of the fan, shared by no other cell.
         for (const auto& fan : fan_spans) {
+            poll_cancel();
             std::array<Eigen::Vector3d, 8> lattice{};
             Eigen::Vector3d ctr = Eigen::Vector3d::Zero();
             for (std::size_t t = 0; t < 8; ++t) {
@@ -1295,7 +1279,7 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                 continue;
             }
             Eigen::Vector3d best;
-            if (search_apex(lattice, ctr, worst_fan, q_centroid, best)) {
+            if (search_fan_apex(lattice, ctr, worst_fan, q_centroid, shape_floor, best)) {
                 out.nodes[fan.apex] = best;
             }
         }
@@ -1314,6 +1298,7 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
 
     if (snap_boundary && !out.boundary_quads.empty()) {
         std::set<std::uint32_t> bnode_set;
+        poll_cancel();
         for (const auto& q : out.boundary_quads) {
             bnode_set.insert(q.begin(), q.end());
         }
@@ -1322,16 +1307,12 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
         // Sliver floor: vol_eps is a machine-degeneracy test, so on its own the
         // snap was free to flatten skin cells to ~1e-17 quality and the unsnap
         // line-search never fired. Nominal lattice cells score ~0.8-1.0 here.
-        const double shape_floor = std::getenv("PM_SHAPE_FLOOR")
-                                       ? std::atof(std::getenv("PM_SHAPE_FLOOR"))
-                                       : validity::kCellShapeFloor;
+        const double shape_floor = validity::kCellShapeFloor;
         // Use bulk h as move/search budget (fine nodes still reproject within it).
         out.boundary_max_distance =
             snap_boundary_nodes(
                 surface, out.nodes, bnodes, h_cell,
                 [&](std::set<std::uint32_t>& offenders) {
-                    static const bool kNoOff = std::getenv("PM_NO_OFFENDERS") != nullptr;
-                    if (kNoOff) { return; }
                     for (const auto& cell : out.cells) {
                         bool bad = false;
                         if (cell.kind == MixedCellKind::kTet4) {
@@ -1369,8 +1350,139 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                 },
                 /*max_move_frac=*/1.25, /*passes=*/8, features)
                 .max_residual;
+        // The closest-point prediction above is intentionally conservative,
+        // but the real multi-pass projection plus per-node rollback can finish
+        // at a different site. Re-evaluate every private transition/skin fan
+        // against the ACTUAL snapped bases and move only its interior apex.
+        // This cannot change boundary conformity or the measured residual.
+        if (!fan_spans.empty()) {
+            std::map<std::uint32_t, std::vector<const MixedCell*>> live_fan_cells;
+            for (const auto& fan : fan_spans) {
+                live_fan_cells.try_emplace(fan.apex);
+            }
+            for (const auto& cell : out.cells) {
+                if (cell.kind != MixedCellKind::kPyramid5 &&
+                    cell.kind != MixedCellKind::kTet4) {
+                    continue;
+                }
+                const auto apex = cell.nodes[static_cast<std::size_t>(cell.n_nodes - 1)];
+                const auto it = live_fan_cells.find(apex);
+                if (it != live_fan_cells.end()) {
+                    it->second.push_back(&cell);
+                }
+            }
+            for (const auto& fan : fan_spans) {
+                poll_cancel();
+                const auto fit = live_fan_cells.find(fan.apex);
+                if (fit == live_fan_cells.end() || fit->second.empty()) {
+                    continue;
+                }
+                std::array<Eigen::Vector3d, 8> lattice{};
+                Eigen::Vector3d ctr = Eigen::Vector3d::Zero();
+                for (std::size_t t = 0; t < 8; ++t) {
+                    lattice[t] = out.nodes[fan.corners[t]];
+                    ctr += lattice[t];
+                }
+                ctr /= 8.0;
+                const auto worst_actual = [&](const Eigen::Vector3d& a) {
+                    double q = std::numeric_limits<double>::max();
+                    for (const auto* cell : fit->second) {
+                        if (cell->kind == MixedCellKind::kPyramid5) {
+                            q = std::min(
+                                q, validity::pyramid_shape_quality(
+                                       out.nodes[cell->nodes[0]], out.nodes[cell->nodes[1]],
+                                       out.nodes[cell->nodes[2]], out.nodes[cell->nodes[3]], a));
+                        } else {
+                            q = std::min(q, validity::tet_shape_quality(
+                                                out.nodes[cell->nodes[0]],
+                                                out.nodes[cell->nodes[1]],
+                                                out.nodes[cell->nodes[2]], a));
+                        }
+                    }
+                    return q;
+                };
+                const double q_current = worst_actual(out.nodes[fan.apex]);
+                if (q_current >= shape_floor) {
+                    continue;
+                }
+                Eigen::Vector3d best;
+                if (search_fan_apex(lattice, ctr, worst_actual, q_current, shape_floor, best)) {
+                    out.nodes[fan.apex] = best;
+                }
+            }
+        }
+    }
+    // Snapping can change which geometric base diagonal is preferred; rotate
+    // again so any direct MixedFillOutput consumer sees the chosen split in
+    // VTK/PyVista's fixed local 0-2 slot.
+    for (auto& cell : out.cells) {
+        normalize_pyramid_diagonal(cell, out.nodes);
     }
     return out;
+}
+
+std::size_t repair_mixed_fan_apices(MixedFillOutput& fill, double shape_floor) {
+    if (fill.movable_fans.empty()) {
+        return 0;
+    }
+    std::map<std::uint32_t, std::vector<MixedCell*>> live_fan_cells;
+    for (const auto& fan : fill.movable_fans) {
+        live_fan_cells.try_emplace(fan.apex);
+    }
+    for (auto& cell : fill.cells) {
+        if (cell.kind != MixedCellKind::kPyramid5 && cell.kind != MixedCellKind::kTet4) {
+            continue;
+        }
+        const auto apex = cell.nodes[static_cast<std::size_t>(cell.n_nodes - 1)];
+        const auto it = live_fan_cells.find(apex);
+        if (it != live_fan_cells.end()) {
+            it->second.push_back(&cell);
+        }
+    }
+
+    std::size_t n_moved = 0;
+    for (const auto& fan : fill.movable_fans) {
+        const auto fit = live_fan_cells.find(fan.apex);
+        if (fit == live_fan_cells.end() || fit->second.empty()) {
+            continue;
+        }
+        std::array<Eigen::Vector3d, 8> lattice{};
+        Eigen::Vector3d ctr = Eigen::Vector3d::Zero();
+        for (std::size_t t = 0; t < 8; ++t) {
+            lattice[t] = fill.nodes[fan.corners[t]];
+            ctr += lattice[t];
+        }
+        ctr /= 8.0;
+        const auto worst_actual = [&](const Eigen::Vector3d& a) {
+            double q = std::numeric_limits<double>::max();
+            for (const auto* cell : fit->second) {
+                if (cell->kind == MixedCellKind::kPyramid5) {
+                    q = std::min(
+                        q, validity::pyramid_shape_quality(
+                               fill.nodes[cell->nodes[0]], fill.nodes[cell->nodes[1]],
+                               fill.nodes[cell->nodes[2]], fill.nodes[cell->nodes[3]], a));
+                } else {
+                    q = std::min(q, validity::tet_shape_quality(
+                                        fill.nodes[cell->nodes[0]], fill.nodes[cell->nodes[1]],
+                                        fill.nodes[cell->nodes[2]], a));
+                }
+            }
+            return q;
+        };
+        const double q_current = worst_actual(fill.nodes[fan.apex]);
+        if (q_current >= shape_floor) {
+            continue;
+        }
+        Eigen::Vector3d best;
+        if (search_fan_apex(lattice, ctr, worst_actual, q_current, shape_floor, best)) {
+            fill.nodes[fan.apex] = best;
+            ++n_moved;
+        }
+    }
+    for (auto& cell : fill.cells) {
+        normalize_pyramid_diagonal(cell, fill.nodes);
+    }
+    return n_moved;
 }
 
 MixedFillOutput expand_mixed_hex_to_pyramids(const MixedFillOutput& fill) {
@@ -1378,6 +1490,7 @@ MixedFillOutput expand_mixed_hex_to_pyramids(const MixedFillOutput& fill) {
     out.h = fill.h;
     out.h_fine = fill.h_fine;
     out.boundary_quads = fill.boundary_quads;
+    out.movable_fans = fill.movable_fans;
     out.boundary_max_distance = fill.boundary_max_distance;
     out.skin_layers = fill.skin_layers;
     out.n_feature_skin_cells = fill.n_feature_skin_cells;
@@ -1398,7 +1511,9 @@ MixedFillOutput expand_mixed_hex_to_pyramids(const MixedFillOutput& fill) {
             continue;
         }
         if (cell.kind == MixedCellKind::kPyramid5) {
-            out.cells.push_back(cell);
+            MixedCell pyr = cell;
+            normalize_pyramid_diagonal(pyr, out.nodes);
+            out.cells.push_back(std::move(pyr));
             ++out.n_pyramid;
             continue;
         }
@@ -1414,30 +1529,18 @@ MixedFillOutput expand_mixed_hex_to_pyramids(const MixedFillOutput& fill) {
         center /= 8.0;
         const auto apex = static_cast<std::uint32_t>(out.nodes.size());
         out.nodes.push_back(center);
+        out.movable_fans.push_back({apex, cell.nodes});
         for (const auto& face : kHexFaces) {
             MixedCell pyr;
             pyr.kind = MixedCellKind::kPyramid5;
             pyr.n_nodes = 5;
-            const Eigen::Vector3d& p0 =
-                out.nodes[cell.nodes[static_cast<std::size_t>(face[0])]];
-            const Eigen::Vector3d& p1 =
-                out.nodes[cell.nodes[static_cast<std::size_t>(face[1])]];
-            const Eigen::Vector3d& p2 =
-                out.nodes[cell.nodes[static_cast<std::size_t>(face[2])]];
-            const Eigen::Vector3d n = (p1 - p0).cross(p2 - p0);
-            const bool apex_on_positive = n.dot(center - p0) > 0.0;
-            if (apex_on_positive) {
-                pyr.nodes[0] = cell.nodes[static_cast<std::size_t>(face[0])];
-                pyr.nodes[1] = cell.nodes[static_cast<std::size_t>(face[1])];
-                pyr.nodes[2] = cell.nodes[static_cast<std::size_t>(face[2])];
-                pyr.nodes[3] = cell.nodes[static_cast<std::size_t>(face[3])];
-            } else {
-                pyr.nodes[0] = cell.nodes[static_cast<std::size_t>(face[0])];
-                pyr.nodes[1] = cell.nodes[static_cast<std::size_t>(face[3])];
-                pyr.nodes[2] = cell.nodes[static_cast<std::size_t>(face[2])];
-                pyr.nodes[3] = cell.nodes[static_cast<std::size_t>(face[1])];
-            }
+            pyr.nodes[0] = cell.nodes[static_cast<std::size_t>(face[0])];
+            pyr.nodes[1] = cell.nodes[static_cast<std::size_t>(face[1])];
+            pyr.nodes[2] = cell.nodes[static_cast<std::size_t>(face[2])];
+            pyr.nodes[3] = cell.nodes[static_cast<std::size_t>(face[3])];
             pyr.nodes[4] = apex;
+            orient_pyramid_winding(pyr, out.nodes);
+            normalize_pyramid_diagonal(pyr, out.nodes);
             out.cells.push_back(pyr);
             ++out.n_pyramid;
         }

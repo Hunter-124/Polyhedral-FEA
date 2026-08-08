@@ -123,6 +123,35 @@ TEST_CASE("forced CG matches direct LDLT on small cantilever") {
     CHECK(rel_l2 < 1e-8);
 }
 
+TEST_CASE("CG progress reporting does not restart the recurrence") {
+    auto setup = make_cantilever_hex(12, 2, 2);
+    SolveOptions plain;
+    plain.method = SolveMethod::kCG;
+    plain.cg_tol = 1e-12;
+    const auto u_plain =
+        solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, plain);
+
+    SolveOptions reported = plain;
+    reported.cg_progress_chunk = 1; // stress the old pathological case
+    int callback_count = 0;
+    int last_iter = 0;
+    reported.on_progress = [&](int iter, int max_iters, double residual) {
+        ++callback_count;
+        CHECK(iter >= last_iter);
+        CHECK(iter <= max_iters);
+        CHECK(std::isfinite(residual));
+        last_iter = iter;
+    };
+    const auto u_reported =
+        solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, reported);
+
+    CHECK(callback_count > 1);
+    CHECK(last_iter > 0);
+    // Reporting is an observer of one uninterrupted recurrence. It must not
+    // alter arithmetic or discard the Krylov space as the old chunked path did.
+    CHECK(u_reported == u_plain);
+}
+
 TEST_CASE("forced CG reproduces constant-strain patch within solver tol") {
     // Distorted hex8 unit box; boundary u = G x. Direct is exact; CG within tol.
     Eigen::Matrix3d g;

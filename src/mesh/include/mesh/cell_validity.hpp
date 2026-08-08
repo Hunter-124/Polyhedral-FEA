@@ -60,10 +60,10 @@ inline double tet_shape_quality(const Eigen::Vector3d& a, const Eigen::Vector3d&
 }
 
 /// A quad base admits two tet splits: diagonal 0-2 → (0,1,2,4)+(0,2,3,4),
-/// diagonal 1-3 → (1,2,3,4)+(1,3,0,4). The FE assembly picks the split with
-/// the larger min half-volume, so validity must bless a pyramid when EITHER
-/// diagonal works — testing only 0-2 rejects cells that are perfectly valid
-/// under 1-3 and the snap gate then retreats nodes for zero validity gain.
+/// diagonal 1-3 → (1,2,3,4)+(1,3,0,4). `pyramid_best_split_volume`
+/// diagnoses whether either split is geometrically usable. The conformity-safe
+/// gate and FE assembly below instead use `pyramid_split_diagonal`, whose
+/// base-only choice is identical on both sides of a shared quad.
 inline double pyramid_split_volume_diag02(const Eigen::Vector3d& p0, const Eigen::Vector3d& p1,
                                           const Eigen::Vector3d& p2, const Eigen::Vector3d& p3,
                                           const Eigen::Vector3d& p4) {
@@ -205,9 +205,12 @@ inline constexpr std::array<std::array<int, 4>, 8> kHexCornerTriples{{
     {{7, 6, 4, 3}},
 }};
 
-/// Min corner scaled Jacobian — 1.0 for a cube, ≤ 0 when a corner folds.
+/// Min corner scaled Jacobian AND signed volume / mean-edge³. Both terms are
+/// normalized so a cube is 1.0; taking their minimum catches complementary
+/// defects: corner skew/folding and dimensional collapse/stretch. In
+/// particular, the corner term alone calls a 1×1×1e-4 pancake perfect.
 inline double hex8_shape_quality(const std::array<Eigen::Vector3d, 8>& x) {
-    double lo = 1.0;
+    double corner = 1.0;
     for (const auto& t : kHexCornerTriples) {
         const Eigen::Vector3d& o = x[static_cast<std::size_t>(t[0])];
         const Eigen::Vector3d e1 = x[static_cast<std::size_t>(t[1])] - o;
@@ -217,9 +220,46 @@ inline double hex8_shape_quality(const std::array<Eigen::Vector3d, 8>& x) {
         if (!(den > 0.0)) {
             return 0.0;
         }
-        lo = std::min(lo, e1.dot(e2.cross(e3)) / den);
+        corner = std::min(corner, e1.dot(e2.cross(e3)) / den);
     }
-    return lo;
+
+    // Same topological edges and outward face-centroid fan used by
+    // fea::cell_quality's volume_collapse_term.
+    static constexpr std::array<std::array<int, 2>, 12> kEdges{{
+        {{0, 1}}, {{1, 2}}, {{2, 3}}, {{3, 0}}, {{4, 5}}, {{5, 6}},
+        {{6, 7}}, {{7, 4}}, {{0, 4}}, {{1, 5}}, {{2, 6}}, {{3, 7}},
+    }};
+    static constexpr std::array<std::array<int, 4>, 6> kFaces{{
+        {{0, 3, 2, 1}}, {{4, 5, 6, 7}}, {{0, 1, 5, 4}},
+        {{1, 2, 6, 5}}, {{2, 3, 7, 6}}, {{3, 0, 4, 7}},
+    }};
+    double edge_sum = 0.0;
+    for (const auto& e : kEdges) {
+        edge_sum +=
+            (x[static_cast<std::size_t>(e[1])] - x[static_cast<std::size_t>(e[0])]).norm();
+    }
+    const double mean_edge = edge_sum / static_cast<double>(kEdges.size());
+    if (!(mean_edge > 0.0)) {
+        return 0.0;
+    }
+    const Eigen::Vector3d& origin = x[0];
+    double volume = 0.0;
+    for (const auto& face : kFaces) {
+        Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
+        for (const int i : face) {
+            centroid += x[static_cast<std::size_t>(i)];
+        }
+        centroid = centroid / 4.0 - origin;
+        for (std::size_t k = 0; k < face.size(); ++k) {
+            const Eigen::Vector3d a = x[static_cast<std::size_t>(face[k])] - origin;
+            const Eigen::Vector3d b =
+                x[static_cast<std::size_t>(face[(k + 1) % face.size()])] - origin;
+            volume += a.dot(b.cross(centroid)) / 6.0;
+        }
+    }
+    const double volume_collapse =
+        volume / (mean_edge * mean_edge * mean_edge); // cube ideal = 1
+    return std::clamp(std::min(corner, volume_collapse), -1.0, 1.0);
 }
 
 /// Corner triples of the linear prism (base 0-1-2, top 3-4-5, node k+3 above

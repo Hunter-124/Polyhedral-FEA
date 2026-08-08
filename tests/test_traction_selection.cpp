@@ -44,7 +44,7 @@ Eigen::Vector3d nodal_sum(const Eigen::VectorXd& f) {
 
 } // namespace
 
-TEST_CASE("boundary_surface_faces covers the exact box surface", "[traction]") {
+TEST_CASE("traction: boundary_surface_faces covers the exact box surface", "[traction]") {
     const Eigen::Vector3d size(2.0, 3.0, 5.0);
     const auto mesh = box_hex_mesh(2, 3, 4, size);
     const auto faces = fea::boundary_surface_faces(mesh);
@@ -59,7 +59,7 @@ TEST_CASE("boundary_surface_faces covers the exact box surface", "[traction]") {
     CHECK(fea::integrated_face_area(mesh, faces) == Approx(expected).epsilon(1e-12));
 }
 
-TEST_CASE("boundary_surface_faces upgrades quadratic meshes", "[traction]") {
+TEST_CASE("traction: boundary_surface_faces upgrades quadratic meshes", "[traction]") {
     const Eigen::Vector3d size(1.0, 1.0, 1.0);
     const auto linear = box_tet_mesh(1, 1, 1, size);
     const auto quadratic = promote_to_quadratic(linear);
@@ -76,7 +76,7 @@ TEST_CASE("boundary_surface_faces upgrades quadratic meshes", "[traction]") {
           Approx(fea::integrated_face_area(linear, lin_faces)).epsilon(1e-12));
 }
 
-TEST_CASE("faces_within keeps only fully contained faces", "[traction]") {
+TEST_CASE("traction: faces_within keeps only fully contained faces", "[traction]") {
     const Eigen::Vector3d size(1.0, 1.0, 1.0);
     const auto mesh = box_hex_mesh(4, 4, 1, size);
     const auto faces = fea::boundary_surface_faces(mesh);
@@ -97,7 +97,7 @@ TEST_CASE("faces_within keeps only fully contained faces", "[traction]") {
     }
 }
 
-TEST_CASE("surface_face_normal is a unit vector normal to the face", "[traction]") {
+TEST_CASE("traction: surface_face_normal is a unit vector normal to the face", "[traction]") {
     const Eigen::Vector3d size(1.0, 2.0, 3.0);
     const auto mesh = box_hex_mesh(1, 1, 1, size);
     const auto faces = fea::boundary_surface_faces(mesh);
@@ -114,7 +114,7 @@ TEST_CASE("surface_face_normal is a unit vector normal to the face", "[traction]
     }
 }
 
-TEST_CASE("consistent_face_load conserves the requested resultant", "[traction]") {
+TEST_CASE("traction: consistent_face_load conserves the requested resultant", "[traction]") {
     const Eigen::Vector3d size(1.0, 1.0, 1.0);
     const auto mesh = box_hex_mesh(4, 4, 1, size);
     const auto faces = fea::boundary_surface_faces(mesh);
@@ -131,7 +131,8 @@ TEST_CASE("consistent_face_load conserves the requested resultant", "[traction]"
     CHECK(load.resultant.y() == Approx(0.0).margin(1e-9));
 }
 
-TEST_CASE("consistent load is tributary-area weighted, not evenly split", "[traction]") {
+TEST_CASE("traction: consistent load is tributary-area weighted, not evenly split",
+          "[traction]") {
     const Eigen::Vector3d size(1.0, 1.0, 1.0);
     const auto mesh = box_hex_mesh(4, 4, 1, size);
     const auto faces = fea::boundary_surface_faces(mesh);
@@ -166,7 +167,8 @@ TEST_CASE("consistent load is tributary-area weighted, not evenly split", "[trac
     CHECK(corner != Approx(total.z() / 25.0).epsilon(1e-3));
 }
 
-TEST_CASE("quadratic faces load the mid-side nodes, not the corners", "[traction]") {
+TEST_CASE("traction: quadratic faces load the mid-side nodes, not the corners",
+          "[traction]") {
     const Eigen::Vector3d size(1.0, 1.0, 1.0);
     const auto linear = box_tet_mesh(2, 2, 1, size);
     const auto n_corner_nodes = linear.nodes.size();
@@ -199,7 +201,8 @@ TEST_CASE("quadratic faces load the mid-side nodes, not the corners", "[traction
     CHECK(mid_load > 0.0);
 }
 
-TEST_CASE("an empty face set is reported as zero area, not silently loaded", "[traction]") {
+TEST_CASE("traction: an empty face set is reported as zero area, not silently loaded",
+          "[traction]") {
     const auto mesh = box_hex_mesh(1, 1, 1, Eigen::Vector3d(1.0, 1.0, 1.0));
     const auto load = fea::consistent_face_load(mesh, {}, Eigen::Vector3d(0.0, 0.0, 100.0));
     CHECK(load.area == 0.0);

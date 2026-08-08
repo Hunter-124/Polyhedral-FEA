@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <format>
 #include <fstream>
+#include <iomanip>
 #include <vector>
 
 namespace polymesh::fea {
@@ -108,6 +109,10 @@ void write_vtu(const std::filesystem::path& path, const NodalMesh& mesh,
     if (!out) {
         throw FeaError(std::format("write_vtu: cannot open {}", path.string()));
     }
+    // Float64 ASCII must carry enough significant digits to round-trip node
+    // coordinates. The stream default (6) can flatten valid boundary cells on
+    // export and make independent signed-volume checks report zero.
+    out << std::setprecision(17);
 
     const auto n_pts = mesh.nodes.size();
     const auto n_cells = mesh.elements.size();

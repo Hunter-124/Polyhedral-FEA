@@ -9,8 +9,6 @@
 #include <limits>
 #include <utility>
 #include <vector>
-#include <chrono>
-#include <cstdio>
 #include <cstdlib>
 
 #ifdef POLYMESH_WITH_OCC
@@ -220,31 +218,6 @@ void CadModel::compute_bbox() {
 }
 
 namespace {
-// TEMP PROFILING (removed before delivery).
-struct ProjProf {
-    long long calls = 0;
-    long long extrema = 0;
-    long long normals = 0;
-    double t_total = 0.0;
-    double t_extrema = 0.0;
-    double t_normal = 0.0;
-    ~ProjProf() {
-        if (std::getenv("POLYMESH_PROJ_STATS") == nullptr || calls == 0) {
-            return;
-        }
-        std::fprintf(stderr,
-                     "[projprof] calls=%lld extrema=%lld normals=%lld ex/call=%.3f "
-                     "t_total=%.3fs t_extrema=%.3fs t_normal=%.3fs us/call=%.2f "
-                     "us/extrema=%.2f us/normal=%.2f\n",
-                     calls, extrema, normals, double(extrema) / double(calls), t_total,
-                     t_extrema, t_normal, 1e6 * t_total / double(calls),
-                     1e6 * t_extrema / double(extrema), 1e6 * t_normal / double(normals));
-    }
-};
-ProjProf g_pp;
-using pclock = std::chrono::steady_clock;
-double psecs(pclock::duration d) { return std::chrono::duration<double>(d).count(); }
-
 
 /// Conservative axis-aligned bound of one BRep face. Culls faces that cannot
 /// hold the closest point before paying for an exact extrema solve.
@@ -442,11 +415,7 @@ struct BrepFaceIndex {
     }
 
     bool face_normal(std::size_t f, const gp_Pnt& q, gp_Vec& n_out) const {
-        ++g_pp.normals;
-        const auto t0 = pclock::now();
-        const bool ok = face_normal_at(surfaces[f], *adaptors[f], faces[f].Orientation(), q, n_out);
-        g_pp.t_normal += psecs(pclock::now() - t0);
-        return ok;
+        return face_normal_at(surfaces[f], *adaptors[f], faces[f].Orientation(), q, n_out);
     }
 
     /// Closest point on one trimmed face via the face's persistent extrema
@@ -455,11 +424,8 @@ struct BrepFaceIndex {
     bool project_on_face(std::size_t f, const TopoDS_Vertex& vtx, gp_Pnt& closest, double& dist,
                          bool& untrimmed) const {
         BRepExtrema_DistShapeShape& dss = *solvers[f];
-        ++g_pp.extrema;
-        const auto t0 = pclock::now();
         dss.LoadS1(vtx);
         dss.Perform();
-        g_pp.t_extrema += psecs(pclock::now() - t0);
         if (dss.IsDone() && dss.NbSolution() >= 1) {
             dist = static_cast<double>(dss.Value());
             closest = dss.PointOnShape2(1);
@@ -583,16 +549,13 @@ const BrepFaceIndex& face_index_for(const CadModel& model, const TopoDS_Shape& s
     return cached;
 }
 
-// TEMP A/B REFERENCE (removed before delivery): the pre-index implementation,
-// byte-for-byte, reachable via POLYMESH_PROJ_BRUTE=1 so before/after can be
-// measured in one binary under identical machine load.
+/// Brute-force reference for verifying the spatial index against the original
+/// O(queries * faces) algorithm. Set POLYMESH_PROJ_BRUTE=1 before process
+/// startup to disable culling and compare output bytes/quality deterministically.
 bool project_on_face_brute(const TopoDS_Vertex& vtx, const TopoDS_Face& face, gp_Pnt& closest,
                            double& dist, gp_Vec& normal) {
-    ++g_pp.extrema;
-    const auto t0 = pclock::now();
     BRepExtrema_DistShapeShape dss(vtx, face);
     dss.Perform();
-    g_pp.t_extrema += psecs(pclock::now() - t0);
     if (!dss.IsDone() || dss.NbSolution() < 1) {
         const Handle(Geom_Surface) surf = BRep_Tool::Surface(face);
         if (surf.IsNull()) {
@@ -608,10 +571,7 @@ bool project_on_face_brute(const TopoDS_Vertex& vtx, const TopoDS_Face& face, gp
     }
     dist = static_cast<double>(dss.Value());
     closest = dss.PointOnShape2(1);
-    ++g_pp.normals;
-    const auto t1 = pclock::now();
     const bool ok = face_normal_at(face, closest, normal);
-    g_pp.t_normal += psecs(pclock::now() - t1);
     if (!ok) {
         normal = gp_Vec(0, 0, 0);
     }
@@ -631,11 +591,6 @@ std::optional<ProjectResult> project_point_on_surface(const CadModel& model,
         return std::nullopt;
     }
     const auto* shape = static_cast<const TopoDS_Shape*>(model.shape_handle());
-    ++g_pp.calls;
-    struct ProfScope {
-        pclock::time_point t0 = pclock::now();
-        ~ProfScope() { g_pp.t_total += psecs(pclock::now() - t0); }
-    } prof_scope;
     const BrepFaceIndex& index = face_index_for(model, *shape);
 
     BRep_Builder builder;
@@ -649,7 +604,7 @@ std::optional<ProjectResult> project_point_on_surface(const CadModel& model,
 
     // Per-face extrema (respects trim) — preferred over whole-shape when we
     // need a supporting face for the normal.
-    if (proj_brute_enabled()) { // TEMP A/B
+    if (proj_brute_enabled()) {
         for (TopExp_Explorer exp(*shape, TopAbs_FACE); exp.More(); exp.Next()) {
             const TopoDS_Face& face = TopoDS::Face(exp.Current());
             gp_Pnt closest;

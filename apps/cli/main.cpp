@@ -13,6 +13,7 @@
 #include "fea/traction.hpp"
 #include "fea/vtu.hpp"
 #include "fea/zz.hpp"
+#include "geom/cad_topology.hpp"
 #include "geom/step.hpp"
 #include "mesh/tet_fill.hpp"
 #include "pipeline/scene.hpp"
@@ -26,6 +27,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <format>
+#include <limits>
+#include <optional>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -42,16 +45,19 @@ int usage() {
                "  check <part.step|.brep>    validate CAD geometry\n"
                "  mesh  <part> [-h m] [-o out.vtu] [--mesher name] [--skin n]\n"
                "              [--no-feature] [--element-tendency t]\n"
+               "              [--max-elems N] [--max-dof N]\n"
                "              [--fix-box x0 y0 z0 x1 y1 z1] [--load-box x0 y0 z0 x1 y1 z1]\n"
                "                             geometry+BC-aware volume mesh; optional VTU\n"
                "  solve <part> -o out.vtu [-h m] [-E Pa] [-nu r]\n"
                "              [--mesher name] [--skin n] [--no-feature] [--adapt n]\n"
                "              [--eta-target η] [--p-elevate] [--element-tendency t]\n"
+               "              [--max-elems N] [--max-dof N] [--max-mem GB]\n"
                "              [--fix-box ...6] [--load-box ...6] [--bc-grade]\n"
                "              [--load-dir x y z] [--force N] [--traction Pa]\n"
                "                             mesh + BCs + VTU. Default BCs: fix min-x,\n"
                "                             load max-x. Boxes override selection.\n"
                "  diag  <part> [-h m] [--mesher name] [--json out.json] [--no-solve]\n"
+               "              [--max-elems N] [--max-dof N] [--max-mem GB]\n"
                "              [--fix-box ...6] [--load-box ...6]\n"
                "              [--load-dir x y z] [--force N] [--traction Pa]\n"
                "                             JSON diagnostics: fidelity, quality, timings\n"
@@ -70,12 +76,18 @@ int usage() {
                "--load-dir x y z: load direction (normalized; default 0 1 0)\n"
                "--force N: total resultant force in newtons over the loaded faces\n"
                "              (default 1000); applied as a consistent traction ∫Nᵗt dS\n"
-               "--traction Pa: pressure magnitude instead of a total force — resultant\n"
-               "              is Pa × loaded-face area. Last of --force/--traction wins\n"
+               "--traction Pa: pressure magnitude instead of a total force; faces in the\n"
+               "              load selection are filtered by normal alignment with\n"
+               "              --load-dir, and resultant is Pa × their area. Last of\n"
+               "              --force/--traction wins\n"
+               "--max-mem GB: enforced preflight solve cap; 0=auto (70% of currently\n"
+               "              available system memory)\n"
                "--adapt n: ZZ→Dörfler remesh passes (local seeds on graded path)\n"
                "--eta-target η: stop adapt when global ZZ η ≤ η (0=off; needs --adapt)\n"
                "--p-elevate: promote smooth tet4/hex8 → tet10/hex20 (auto-on --adapt>0)\n"
                "--bc-grade: force a-priori BC grading from the default cantilever faces\n"
+               "--max-elems N: pre-flight element ceiling (0=589824 default)\n"
+               "--max-dof N: pre-flight/adapt DOF ceiling (0=1769472 default)\n"
                "\n"
                "default BC selection: nodes in a 0.51·h slab at min-x (fixed) / max-x\n"
                "              (loaded). If a slab captures too few nodes to act as a\n"
@@ -84,6 +96,24 @@ int usage() {
                stderr);
     return 2;
 }
+bool parse_ceiling(std::span<char*> args, std::size_t& i, std::size_t& value) {
+    if (i + 1 >= args.size()) {
+        return false;
+    }
+    const char* text = args[++i];
+    if (text[0] == '-') {
+        return false;
+    }
+    char* end = nullptr;
+    const unsigned long long parsed = std::strtoull(text, &end, 10);
+    if (end == text || *end != '\0' ||
+        parsed > static_cast<unsigned long long>(std::numeric_limits<std::size_t>::max())) {
+        return false;
+    }
+    value = static_cast<std::size_t>(parsed);
+    return true;
+}
+
 
 polymesh::pipeline::VolumeMesher parse_mesher(const std::string& m) {
     if (m == "hybrid" || m == "zoo" || m == "mixed") {
@@ -162,7 +192,8 @@ std::vector<polymesh::pipeline::RefineRegion> make_regions(const BoxSel& fix, co
 struct LoadSpec {
     Eigen::Vector3d dir{0.0, 1.0, 0.0}; // unit, default +y (historical CLI load)
     double force = 1000.0;              // total resultant, N (historical default)
-    double traction_pa = 0.0;           // > 0: pressure mode, resultant = Pa * area
+    double traction_pa = 0.0;           // pressure magnitude, Pa
+    bool traction_mode = false;          // last of --force/--traction wins
 };
 
 // Parse --load-dir / --force / --traction at args[i]; advances i past values.
@@ -185,23 +216,26 @@ bool parse_load_flag(std::span<char*> args, std::size_t& i, LoadSpec& spec) {
     }
     if (std::strcmp(args[i], "--force") == 0 && i + 1 < args.size()) {
         spec.force = std::atof(args[++i]);
-        spec.traction_pa = 0.0; // last of --force/--traction wins
-        return true;
+        spec.traction_mode = false;
+        return std::isfinite(spec.force);
     }
     if (std::strcmp(args[i], "--traction") == 0 && i + 1 < args.size()) {
         spec.traction_pa = std::atof(args[++i]);
-        return true;
+        spec.traction_mode = true;
+        return spec.traction_pa >= 0.0 && std::isfinite(spec.traction_pa);
     }
     return false;
 }
 
 // A default BC slab must be broad enough to behave like a face. 12 nodes is
 // ~4 boundary faces — the smallest patch that carries a traction instead of a
-// point force — and 0.5% of the boundary nodes keeps that true on fine meshes,
-// where 12 nodes is still a pinpoint. Below either bound the 0.51·h x-slab has
-// degenerated (icecream_cone: 3 of 1890 nodes) and we switch to face selection.
+// point force — and 2% of the boundary nodes keeps that true on fine meshes,
+// where even a few dozen nodes can still be a pinpoint. The 2% threshold
+// separates curved closed parts (cone/sphere end slabs: <=1.6%) from the broad
+// planar cantilever/plate ends (>=7.7%) on the default meshes. Below either
+// bound the 0.51*h x-slab has degenerated and we switch to face selection.
 constexpr std::size_t kMinSelNodes = 12;
-constexpr double kMinSelFrac = 0.005;
+constexpr double kMinSelFrac = 0.02;
 // cos(~45°): a face counts as end-facing when its outward normal is within
 // 45° of ±x. Matches the normal-aligned region machinery in scene.cpp.
 constexpr double kNormalMinDot = 0.7;
@@ -315,6 +349,75 @@ std::size_t count_boundary_nodes(const std::vector<polymesh::fea::SurfaceFace>& 
     return ids.size();
 }
 
+// Pressure is a normal surface load: when a box includes a strip of adjacent
+// side wall (for example z>=0.195 on a cylinder ending at z=0.2), keep only
+// faces whose normal aligns with the requested pressure direction. Use |dot|
+// because mixed-element boundary windings are not uniformly outward.
+std::vector<polymesh::fea::SurfaceFace> pressure_faces(
+    const polymesh::fea::NodalMesh& mesh,
+    const std::vector<polymesh::fea::SurfaceFace>& box_faces,
+    const Eigen::Vector3d& direction) {
+    std::vector<polymesh::fea::SurfaceFace> out;
+    out.reserve(box_faces.size());
+    for (const auto& f : box_faces) {
+        const Eigen::Vector3d n = polymesh::fea::surface_face_normal(mesh, f);
+        if (std::abs(n.dot(direction)) >= kNormalMinDot) {
+            out.push_back(f);
+        }
+    }
+    return out;
+}
+
+// Exact CAD area of planar faces wholly selected by `box` and aligned with the
+// pressure direction. The nodal integrator still supplies the energy-conjugate
+// distribution, but its resultant is pressure times the BRep area rather than
+// the inscribed polygon area of a coarse boundary mesh. If no unambiguous CAD
+// face matches, callers use the integrated mesh area.
+std::optional<double> cad_pressure_area(const polymesh::pipeline::Model& model,
+                                        const BoxSel& box,
+                                        const Eigen::Vector3d& direction) {
+    if (!box.set || !model.cad.has_value()) {
+        return std::nullopt;
+    }
+    const auto topo = polymesh::geom::extract_topology(*model.cad, 16);
+    double area = 0.0;
+    for (const auto& face : topo.faces) {
+        if (face.kind != polymesh::geom::CadSurfaceKind::kPlane) {
+            continue;
+        }
+        std::vector<Eigen::Vector3d> points;
+        for (const auto edge_id : face.edge_ids) {
+            if (edge_id < topo.edges.size()) {
+                const auto& samples = topo.edges[edge_id].samples;
+                points.insert(points.end(), samples.begin(), samples.end());
+            }
+        }
+        if (points.size() < 3) {
+            continue;
+        }
+        const bool in_box = std::all_of(points.begin(), points.end(), [&](const auto& p) {
+            return p.x() >= box.lo.x() && p.x() <= box.hi.x() &&
+                   p.y() >= box.lo.y() && p.y() <= box.hi.y() &&
+                   p.z() >= box.lo.z() && p.z() <= box.hi.z();
+        });
+        if (!in_box) {
+            continue;
+        }
+        Eigen::Vector3d n = Eigen::Vector3d::Zero();
+        for (std::size_t i = 1; i + 1 < points.size(); ++i) {
+            n = (points[i] - points[0]).cross(points[i + 1] - points[0]);
+            if (n.norm() > 1e-15) {
+                n.normalize();
+                break;
+            }
+        }
+        if (std::abs(n.dot(direction)) >= kNormalMinDot) {
+            area += face.area;
+        }
+    }
+    return area > 0.0 ? std::optional<double>(area) : std::nullopt;
+}
+
 // Fully fixing 3 non-collinear nodes gives 9 constraints and removes all six
 // rigid-body modes; 2 nodes (or any collinear set) leaves the rotation about
 // their axis free and the stiffness matrix singular. Returns an empty string
@@ -350,37 +453,71 @@ std::string constraint_defect(const polymesh::fea::NodalMesh& mesh,
     return {};
 }
 
-// Consistent (energy-conjugate) nodal loads for `spec` over `faces`, with the
-// total-force conservation check reported to `report` (diag keeps stdout pure
-// JSON). Throws when the selection cannot carry a surface load at all.
+// Energy-conjugate nodal loads for `spec`: integrate complete boundary faces,
+// or, when a legitimate coarse selection has nodes but no complete face,
+// preserve the requested resultant with a documented per-node fallback.
 Eigen::VectorXd build_loads(const polymesh::fea::NodalMesh& mesh,
                             const std::vector<polymesh::fea::SurfaceFace>& faces,
-                            const LoadSpec& spec, const char* what, std::FILE* report) {
-    const double area = polymesh::fea::integrated_face_area(mesh, faces);
-    if (!(area > 0.0)) {
+                            std::span<const std::uint32_t> fallback_nodes,
+                            const LoadSpec& spec, const char* what, std::FILE* report,
+                            std::optional<double> exact_pressure_area = std::nullopt) {
+    const double mesh_area = polymesh::fea::integrated_face_area(mesh, faces);
+    if (fallback_nodes.empty() && !(mesh_area > 0.0)) {
         throw std::runtime_error(std::format(
-            "{}: the load selection contains no complete boundary face (area 0) — a "
-            "consistent traction cannot be applied. Widen --load-box or refine with -h.",
+            "{}: the load selection is empty — widen --load-box or refine with -h.", what));
+    }
+    if (spec.traction_mode && !(mesh_area > 0.0) && !exact_pressure_area.has_value()) {
+        throw std::runtime_error(std::format(
+            "{}: pressure selection has nodes but no integrable face or CAD area; widen "
+            "--load-box or use --force for a known resultant.",
             what));
     }
-    const double magnitude = spec.traction_pa > 0.0 ? spec.traction_pa * area : spec.force;
+    const double pressure_area =
+        exact_pressure_area.has_value() ? *exact_pressure_area : mesh_area;
+    const double magnitude =
+        spec.traction_mode ? spec.traction_pa * pressure_area : spec.force;
     const Eigen::Vector3d total = magnitude * spec.dir;
-    auto load = polymesh::fea::consistent_face_load(mesh, faces, total);
-    std::fprintf(report,
-                 "load: %zu faces, area=%.9g m², %s → |F|=%.9g N along (%.4g %.4g %.4g) | "
-                 "Σf=(%.9g %.9g %.9g) N, conservation err=%.3g N\n",
-                 faces.size(), area,
-                 spec.traction_pa > 0.0 ? std::format("t={:.6g} Pa", spec.traction_pa).c_str()
-                                        : "total force",
-                 total.norm(), spec.dir.x(), spec.dir.y(), spec.dir.z(), load.resultant.x(),
-                 load.resultant.y(), load.resultant.z(), load.conservation_error);
-    if (load.conservation_error > 1e-9 * std::max(1.0, total.norm())) {
-        throw std::runtime_error(
-            std::format("{}: traction assembly lost {:.3g} N of the requested {:.6g} N "
-                        "resultant (total-force conservation check failed)",
-                        what, load.conservation_error, total.norm()));
+    Eigen::VectorXd loads =
+        Eigen::VectorXd::Zero(3 * static_cast<Eigen::Index>(mesh.nodes.size()));
+    Eigen::Vector3d resultant = Eigen::Vector3d::Zero();
+    double conservation_error = total.norm();
+    const bool node_fallback = !(mesh_area > 0.0);
+    if (!node_fallback) {
+        auto applied = polymesh::fea::consistent_face_load(mesh, faces, total);
+        loads = std::move(applied.loads);
+        resultant = applied.resultant;
+        conservation_error = applied.conservation_error;
+    } else {
+        const Eigen::Vector3d per_node =
+            total / static_cast<double>(fallback_nodes.size());
+        for (const auto node : fallback_nodes) {
+            loads.segment<3>(3 * static_cast<Eigen::Index>(node)) += per_node;
+            resultant += per_node;
+        }
+        conservation_error = (resultant - total).norm();
     }
-    return std::move(load.loads);
+    const std::string area_note =
+        node_fallback
+            ? std::format("node fallback={}", fallback_nodes.size())
+            : (exact_pressure_area.has_value()
+                   ? std::format("mesh area={:.9g} m², CAD area={:.9g} m²", mesh_area,
+                                 pressure_area)
+                   : std::format("area={:.9g} m²", mesh_area));
+    std::fprintf(report,
+                 "load: %zu faces, %s, %s → |F|=%.9g N along (%.4g %.4g %.4g) | "
+                 "Σf=(%.9g %.9g %.9g) N, conservation err=%.3g N\n",
+                 faces.size(), area_note.c_str(),
+                 spec.traction_mode ? std::format("t={:.6g} Pa", spec.traction_pa).c_str()
+                                    : "total force",
+                 total.norm(), spec.dir.x(), spec.dir.y(), spec.dir.z(), resultant.x(),
+                 resultant.y(), resultant.z(), conservation_error);
+    if (conservation_error > 1e-9) {
+        throw std::runtime_error(std::format(
+            "{}: load assembly lost {:.3g} N of the requested {:.6g} N resultant "
+            "(total-force conservation check failed)",
+            what, conservation_error, total.norm()));
+    }
+    return loads;
 }
 
 int cmd_check(std::string_view input) {
@@ -404,6 +541,8 @@ int cmd_mesh(std::span<char*> args) {
     int skin = 2;
     bool feature = true; // geometry (curvature/thin-wall) grading on by default
     double element_tendency = 0.0;
+    std::size_t max_elems = 0;
+    std::size_t max_dof = 0;
     BoxSel fix_box, load_box;
     for (std::size_t i = 3; i < args.size(); ++i) {
         if (std::strcmp(args[i], "-h") == 0 && i + 1 < args.size()) {
@@ -423,6 +562,14 @@ int cmd_mesh(std::span<char*> args) {
             feature = false;
         } else if (std::strcmp(args[i], "--element-tendency") == 0 && i + 1 < args.size()) {
             element_tendency = std::atof(args[++i]);
+        } else if (std::strcmp(args[i], "--max-elems") == 0) {
+            if (!parse_ceiling(args, i, max_elems)) {
+                return usage();
+            }
+        } else if (std::strcmp(args[i], "--max-dof") == 0) {
+            if (!parse_ceiling(args, i, max_dof)) {
+                return usage();
+            }
         } else if (std::strcmp(args[i], "--fix-box") == 0) {
             if (!parse_box6(args, i, fix_box)) {
                 return usage();
@@ -436,15 +583,16 @@ int cmd_mesh(std::span<char*> args) {
         }
     }
     const auto model = polymesh::pipeline::Model::load(path);
-    const auto resolved = polymesh::pipeline::resolve_mesh_size(model, h);
+    const auto resolved =
+        polymesh::pipeline::resolve_mesh_size(model, h, 30.0, max_elems, max_dof);
     h = resolved.h;
 
     // Geometry + simulation-setup (BC/load box) aware refinement plan → seeds.
     const auto regions = make_regions(fix_box, load_box);
     const auto plan = polymesh::pipeline::build_refinement_plan(model, h, regions, feature);
-    auto vol = polymesh::pipeline::volume_mesh(model, h, mesher, skin, feature,
-                                               plan.refine_seeds, plan.seed_band,
-                                               element_tendency);
+    auto vol = polymesh::pipeline::volume_mesh(
+        model, h, mesher, skin, feature, plan.refine_seeds, plan.seed_band, element_tendency,
+        resolved.element_ceiling, resolved.dof_ceiling, resolved.auto_chosen ? 3 : 0);
     vol.mesh.check_validity();
     std::printf("mesh: %zu nodes, %zu elems, h=%.6g m\n"
                 "refine: %zu geometry + %zu BC seeds → %zu seeds, band=%.4g m, h_fine=%.4g m\n"
@@ -479,6 +627,9 @@ int cmd_solve(std::span<char*> args) {
     bool p_elevate = false;
     double element_tendency = 0.0;
     bool bc_grade = false;
+    std::size_t max_elems = 0;
+    std::size_t max_dof = 0;
+    double max_mem_gb = 0.0;
     BoxSel fix_box, load_box;
     LoadSpec load_spec;
     for (std::size_t i = 3; i < args.size(); ++i) {
@@ -511,6 +662,16 @@ int cmd_solve(std::span<char*> args) {
             }
         } else if (std::strcmp(args[i], "--element-tendency") == 0 && i + 1 < args.size()) {
             element_tendency = std::atof(args[++i]);
+        } else if (std::strcmp(args[i], "--max-elems") == 0) {
+            if (!parse_ceiling(args, i, max_elems)) {
+                return usage();
+            }
+        } else if (std::strcmp(args[i], "--max-dof") == 0) {
+            if (!parse_ceiling(args, i, max_dof)) {
+                return usage();
+            }
+        } else if (std::strcmp(args[i], "--max-mem") == 0 && i + 1 < args.size()) {
+            max_mem_gb = std::max(0.0, std::atof(args[++i]));
         } else if (std::strcmp(args[i], "--adapt") == 0 && i + 1 < args.size()) {
             adapt_passes = std::atoi(args[++i]);
             if (adapt_passes < 0) {
@@ -545,7 +706,11 @@ int cmd_solve(std::span<char*> args) {
     }
 
     const auto model = polymesh::pipeline::Model::load(path);
-    const auto resolved = polymesh::pipeline::resolve_mesh_size(model, h);
+    const auto exact_pressure_area =
+        load_spec.traction_mode ? cad_pressure_area(model, load_box, load_spec.dir)
+                                : std::nullopt;
+    const auto resolved =
+        polymesh::pipeline::resolve_mesh_size(model, h, 30.0, max_elems, max_dof);
     h = resolved.h;
 
     double h_use = h;
@@ -583,8 +748,9 @@ int cmd_solve(std::span<char*> args) {
                     plan.n_geometry_seeds, plan.n_bc_seeds, seeds.size(), seed_band, plan.h_fine);
     }
     auto mesh_now = [&](polymesh::pipeline::VolumeMesher m) {
-        return polymesh::pipeline::volume_mesh(model, h_use, m, skin, feature, seeds,
-                                               seed_band, element_tendency);
+        return polymesh::pipeline::volume_mesh(
+            model, h_use, m, skin, feature, seeds, seed_band, element_tendency,
+            resolved.element_ceiling, resolved.dof_ceiling, resolved.auto_chosen ? 3 : 0);
     };
     auto vol = mesh_now(mesher);
     vol.mesh.check_validity();
@@ -600,10 +766,13 @@ int cmd_solve(std::span<char*> args) {
             select_end(v.mesh, all_faces, n_bnd, fix_box, xmin, xmax, tol, -1);
         const auto load_sel =
             select_end(v.mesh, all_faces, n_bnd, load_box, xmin, xmax, tol, +1);
+        const auto load_faces = load_spec.traction_mode
+                                    ? pressure_faces(v.mesh, load_sel.faces, load_spec.dir)
+                                    : load_sel.faces;
         std::printf("bc: fix %zu nodes%s | load %zu nodes, %zu faces%s | %zu boundary nodes "
                     "(sane-selection minimum %zu)\n",
                     fix_sel.nodes.size(), selection_note(fix_sel, true).c_str(),
-                    load_sel.nodes.size(), load_sel.faces.size(),
+                    load_sel.nodes.size(), load_faces.size(),
                     selection_note(load_sel, false).c_str(), n_bnd,
                     sane_selection_minimum(n_bnd));
         polymesh::fea::Dirichlet bc;
@@ -616,8 +785,15 @@ int cmd_solve(std::span<char*> args) {
                 "real face with --fix-box x0 y0 z0 x1 y1 z1.",
                 defect));
         }
-        auto loads = build_loads(v.mesh, load_sel.faces, load_spec, "solve", stdout);
+        auto loads = build_loads(v.mesh, load_faces, load_sel.nodes, load_spec, "solve",
+                                 stdout, exact_pressure_area);
         return std::pair{std::move(bc), std::move(loads)};
+    };
+
+    polymesh::fea::SolveOptions solve_options;
+    solve_options.max_mem_gb = max_mem_gb;
+    solve_options.on_note = [](std::string_view note) {
+        std::printf("solve: %.*s\n", static_cast<int>(note.size()), note.data());
     };
 
     Eigen::VectorXd u;
@@ -636,7 +812,7 @@ int cmd_solve(std::span<char*> args) {
             std::fputs("solve: no fixture nodes found\n", stderr);
             return 1;
         }
-        u = polymesh::fea::solve_elastostatics(vol.mesh, mat, bc, loads);
+        u = polymesh::fea::solve_elastostatics(vol.mesh, mat, bc, loads, solve_options);
         zz = polymesh::fea::recover_zz(vol.mesh, mat, u);
         const bool last_pass =
             (pass == adapt_passes) || (eta_target > 0.0 && zz.global_eta <= eta_target);
@@ -656,7 +832,8 @@ int cmd_solve(std::span<char*> args) {
                         std::fputs("solve: no fixture nodes after p-elevate\n", stderr);
                         return 1;
                     }
-                    u = polymesh::fea::solve_elastostatics(vol.mesh, mat, bc2, loads2);
+                    u = polymesh::fea::solve_elastostatics(vol.mesh, mat, bc2, loads2,
+                                                           solve_options);
                     zz = polymesh::fea::recover_zz(vol.mesh, mat, u);
                     const auto counts = polymesh::fea::count_element_types(vol.mesh);
                     std::printf("p-elevate: %zu smooth, nodes %zu→%zu (tet10=%zu hex20=%zu)\n",
@@ -685,7 +862,8 @@ int cmd_solve(std::span<char*> args) {
                         vol.mesh = polymesh::fea::p_elevate(vol.mesh, smooth);
                         vol.mesh.check_validity();
                         auto [bc2, loads2] = make_bc_loads(vol);
-                        u = polymesh::fea::solve_elastostatics(vol.mesh, mat, bc2, loads2);
+                        u = polymesh::fea::solve_elastostatics(vol.mesh, mat, bc2, loads2,
+                                                               solve_options);
                         zz = polymesh::fea::recover_zz(vol.mesh, mat, u);
                     }
                 }
@@ -699,11 +877,29 @@ int cmd_solve(std::span<char*> args) {
 
     std::vector<double> vm(zz.nodal_stress.size());
     double max_vm = 0.0, max_u = 0.0;
+    double max_principal = -std::numeric_limits<double>::infinity();
+    double diag_energy = 0.0, zz_energy = 0.0;
+    Eigen::Vector3d max_principal_dir = Eigen::Vector3d::Zero();
     for (std::size_t i = 0; i < vm.size(); ++i) {
         vm[i] = polymesh::fea::von_mises(zz.nodal_stress[i]);
         max_vm = std::max(max_vm, vm[i]);
         max_u = std::max(max_u, u.segment<3>(3 * static_cast<Eigen::Index>(i)).norm());
+        const auto& s = zz.nodal_stress[i];
+        diag_energy += s[0] * s[0] + s[1] * s[1] + s[2] * s[2];
+        zz_energy += s[2] * s[2];
+        Eigen::Matrix3d sigma;
+        sigma << s[0], s[5], s[4], s[5], s[1], s[3], s[4], s[3], s[2];
+        const Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> es(sigma);
+        for (Eigen::Index k = 0; k < 3; ++k) {
+            const double principal = es.eigenvalues()[k];
+            if (principal > max_principal) {
+                max_principal = principal;
+                max_principal_dir = es.eigenvectors().col(k);
+            }
+        }
     }
+    const double sigma_zz_share =
+        diag_energy > 0.0 ? std::sqrt(zz_energy / diag_energy) : 0.0;
 
     std::vector<polymesh::fea::VtuPointData> pdata;
     pdata.push_back({.name = "von_Mises", .scalars = vm, .vectors = {}});
@@ -717,6 +913,10 @@ int cmd_solve(std::span<char*> args) {
                 "ZZ η %.4g | h=%.4g | seeds=%zu\n%s\n%s\n",
                 vol.mesh.nodes.size(), vol.mesh.elements.size(), max_vm, max_u, zz.global_eta,
                 h_use, seeds.size(), resolved.note.c_str(), vol.mesher_note.c_str());
+    std::printf("stress direction: max principal %.6g Pa along (%.4f %.4f %.4f); "
+                "σzz RMS share of normal stress = %.6f\n",
+                max_principal, max_principal_dir.x(), max_principal_dir.y(),
+                max_principal_dir.z(), sigma_zz_share);
     std::printf("wrote %s\n", out_path.c_str());
     return 0;
 }
@@ -732,6 +932,9 @@ int cmd_diag(std::span<char*> args) {
     double h = 0.0;
     auto mesher = polymesh::pipeline::VolumeMesher::kVaryhedron;
     bool do_solve = true;
+    std::size_t max_elems = 0;
+    std::size_t max_dof = 0;
+    double max_mem_gb = 0.0;
     std::string json_path;
     BoxSel fix_box, load_box;
     LoadSpec load_spec;
@@ -744,6 +947,16 @@ int cmd_diag(std::span<char*> args) {
             json_path = args[++i];
         } else if (std::strcmp(args[i], "--no-solve") == 0) {
             do_solve = false;
+        } else if (std::strcmp(args[i], "--max-elems") == 0) {
+            if (!parse_ceiling(args, i, max_elems)) {
+                return usage();
+            }
+        } else if (std::strcmp(args[i], "--max-dof") == 0) {
+            if (!parse_ceiling(args, i, max_dof)) {
+                return usage();
+            }
+        } else if (std::strcmp(args[i], "--max-mem") == 0 && i + 1 < args.size()) {
+            max_mem_gb = std::max(0.0, std::atof(args[++i]));
         } else if (std::strcmp(args[i], "--fix-box") == 0) {
             if (!parse_box6(args, i, fix_box)) {
                 return usage();
@@ -769,10 +982,14 @@ int cmd_diag(std::span<char*> args) {
 
     auto t0 = clock::now();
     const auto model = polymesh::pipeline::Model::load(path);
+    const auto exact_pressure_area =
+        load_spec.traction_mode ? cad_pressure_area(model, load_box, load_spec.dir)
+                                : std::nullopt;
     const double import_ms = ms(clock::now() - t0);
     const double bbox_diag = (model.bbox_max - model.bbox_min).norm();
 
-    const auto resolved = polymesh::pipeline::resolve_mesh_size(model, h);
+    const auto resolved =
+        polymesh::pipeline::resolve_mesh_size(model, h, 30.0, max_elems, max_dof);
     h = resolved.h;
     // Diagnostics run at a coarse, representative resolution: cap auto-h so a
     // curvature-fine auto size doesn't explode the quick battery. A user -h is
@@ -786,8 +1003,9 @@ int cmd_diag(std::span<char*> args) {
         model, h, make_regions(fix_box, load_box), /*use_geometry=*/true);
 
     t0 = clock::now();
-    auto vol = polymesh::pipeline::volume_mesh(model, h, mesher, 2, true, plan.refine_seeds,
-                                               plan.seed_band);
+    auto vol = polymesh::pipeline::volume_mesh(
+        model, h, mesher, 2, true, plan.refine_seeds, plan.seed_band, 0.0,
+        resolved.element_ceiling, resolved.dof_ceiling, resolved.auto_chosen ? 3 : 0);
     const double mesh_ms = ms(clock::now() - t0);
     vol.mesh.check_validity();
 
@@ -811,6 +1029,9 @@ int cmd_diag(std::span<char*> args) {
             select_end(vol.mesh, all_faces, n_bnd, fix_box, xmin, xmax, tol, -1);
         const auto load_sel =
             select_end(vol.mesh, all_faces, n_bnd, load_box, xmin, xmax, tol, +1);
+        const auto load_faces = load_spec.traction_mode
+                                    ? pressure_faces(vol.mesh, load_sel.faces, load_spec.dir)
+                                    : load_sel.faces;
         polymesh::fea::Dirichlet bc;
         for (const auto n : fix_sel.nodes) {
             bc.fix_node(n);
@@ -821,12 +1042,19 @@ int cmd_diag(std::span<char*> args) {
                 "real face with --fix-box x0 y0 z0 x1 y1 z1.",
                 defect));
         }
-        if (!bc.dof_values.empty() && !load_sel.faces.empty()) {
+        if (!bc.dof_values.empty() && !load_sel.nodes.empty()) {
             Eigen::VectorXd loads =
-                build_loads(vol.mesh, load_sel.faces, load_spec, "diag", stderr);
+                build_loads(vol.mesh, load_faces, load_sel.nodes, load_spec, "diag", stderr,
+                            exact_pressure_area);
             const polymesh::fea::Material mat{.youngs_modulus = 200e9, .poissons_ratio = 0.3};
             t0 = clock::now();
-            const Eigen::VectorXd uu = polymesh::fea::solve_elastostatics(vol.mesh, mat, bc, loads);
+            polymesh::fea::SolveOptions solve_options;
+            solve_options.max_mem_gb = max_mem_gb;
+            solve_options.on_note = [](std::string_view note) {
+                std::fprintf(stderr, "diag: %.*s\n", static_cast<int>(note.size()), note.data());
+            };
+            const Eigen::VectorXd uu =
+                polymesh::fea::solve_elastostatics(vol.mesh, mat, bc, loads, solve_options);
             const auto zz = polymesh::fea::recover_zz(vol.mesh, mat, uu);
             solve_ms = ms(clock::now() - t0);
             global_eta = zz.global_eta;

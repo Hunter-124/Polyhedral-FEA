@@ -10,11 +10,13 @@
 #include "fea/stress.hpp"
 #include "geom/cad_model.hpp"
 #include "geom/tri_surface.hpp"
+#include "mesh/mixed_fill.hpp"
 
 #include <Eigen/Core>
 
 #include <atomic>
 #include <chrono>
+#include <functional>
 #include <map>
 #include <mutex>
 #include <optional>
@@ -25,6 +27,13 @@
 #include <vector>
 
 namespace polymesh::pipeline {
+/// Product defaults derive from the hybrid fill's established 48k work budget.
+/// Twelve such units sit 25% above the measured legitimate maximum (468,924
+/// elements on the public plate+hole auto solve); three displacement DOFs per
+/// element is the conservative DOF proxy. CLI/config value 0 selects these.
+inline constexpr std::size_t kDefaultMaxMeshElems = 12 * mesh::kHybridMaxElems;
+inline constexpr std::size_t kDefaultMaxMeshDof = 3 * kDefaultMaxMeshElems;
+
 
 enum class VolumeMesher : int {
     kTetFill = 0,
@@ -102,6 +111,13 @@ struct SimSetup {
     /// Target element size \(h\), metres. **0 = auto** via `resolve_mesh_size`
     /// (bbox extent/diagonal + sharp-edge feature density).
     double mesh_size = 0.0;
+    /// Maximum solve footprint in decimal GB. 0 = automatic safety cap
+    /// (70% of currently available system memory).
+    double max_mem_gb = 0.0;
+    /// Hard pre-flight ceilings. 0 selects kDefaultMaxMeshElems / Dof.
+    /// Set higher explicitly for deliberate large runs.
+    std::size_t max_elems = 0;
+    std::size_t max_dof = 0;
     bool use_feature_grading = true; // sharp edges + curvature + thin-wall sizing
     /// A-priori grade the mesh toward boundary conditions: refine near loaded
     /// and fixed faces (loads finest) before any solve. Complements
@@ -132,22 +148,31 @@ struct SimSetup {
     std::map<int, RegionLoad> loads;
 };
 
+/// Same pre-flight estimator used by mesh, solve, and diagnostics:
+/// \(N_{pred} \approx 6 V_{bbox}/h^3\).
+double predict_mesh_elements(const Model& model, double h);
 /// Resolved mesh size for product mesh / solve paths (D5).
 /// When `requested_h > 0`, returns that value. When `requested_h <= 0` (or
 /// SimSetup::mesh_size == 0), chooses h0 from bbox extent and diagonal, then
 /// tightens using sharp-edge count and shortest feature length so dense CAD
 /// creases get a slightly finer default without exploding DOF.
 struct ResolvedMeshSize {
+
     double h = 0.0; // metres
     bool auto_chosen = false;
     std::size_t n_sharp_edges = 0;
     double min_feature_length = 0.0; // metres; 0 if none
     std::string note;                // e.g. "auto h=0.0417 m (extent/24, n_sharp=12)"
+    double predicted_elements = 0.0;
+    std::size_t element_ceiling = kDefaultMaxMeshElems;
+    std::size_t dof_ceiling = kDefaultMaxMeshDof;
+    bool ceiling_clamped = false;
 };
 
 /// Single source of truth for default h0 (mesh-only, solve, CLI when -h omitted).
 ResolvedMeshSize resolve_mesh_size(const Model& model, double requested_h,
-                                   double sharp_angle_deg = 30.0);
+                                   double sharp_angle_deg = 30.0,
+                                   std::size_t max_elems = 0, std::size_t max_dof = 0);
 
 /// A boundary-condition / load selection region (world AABB) used to grade the
 /// mesh toward the **simulation setup**, not just the geometry (ADR-0021).
@@ -218,11 +243,16 @@ struct VolumeMeshOutput {
 /// @param refine_seeds Centroids for a posteriori fine blocks, metres (world coords).
 /// @param seed_band Ball radius around each seed for graded fine cells, metres (0 = off).
 /// @param element_tendency Shape preference ∈ [-1, +1]; see resolve_element_tendency.
-VolumeMeshOutput volume_mesh(const Model& model, double h,
-                             VolumeMesher mesher = VolumeMesher::kHybrid, int skin_layers = 2,
-                             bool feature_refine = false,
-                             std::span<const Eigen::Vector3d> refine_seeds = {},
-                             double seed_band = 0.0, double element_tendency = 0.0);
+/// @param max_elems/max_dof Hard ceilings; 0 disables the low-level guard.
+/// Product callers pass the resolved nonzero SimSetup ceilings.
+/// @param cancel_check Optional cooperative poll; may throw to cancel meshing.
+/// @param auto_retry_budget Bounded coarsen-and-retry count for auto-h callers.
+VolumeMeshOutput volume_mesh(
+    const Model& model, double h, VolumeMesher mesher = VolumeMesher::kHybrid,
+    int skin_layers = 2, bool feature_refine = false,
+    std::span<const Eigen::Vector3d> refine_seeds = {}, double seed_band = 0.0,
+    double element_tendency = 0.0, std::size_t max_elems = 0, std::size_t max_dof = 0,
+    int auto_retry_budget = 0, const std::function<void()>& cancel_check = {});
 
 /// @deprecated name kept as alias during transition; calls volume_mesh.
 /// @param h Target edge length, metres.
@@ -267,11 +297,9 @@ class SolveJob {
     /// Clear kFailed / kCancelled → kIdle so the user can retry.
     void clear_failure();
 
-    /// Cooperative cancel: checked between mesh/adapt/solve phases (not mid-CG).
-    /// Safe from the UI thread. Worker finishes with State::kCancelled.
+    /// Cooperative cancel/pause: checked between phases and every few
+    /// uninterrupted CG iterations. Safe from the UI thread.
     void request_cancel();
-    /// Cooperative pause: worker blocks between phases until resume or cancel.
-    /// Does not interrupt a single `solve_elastostatics` / mesh call.
     void request_pause();
     void request_resume();
     bool cancel_requested() const { return cancel_.load(std::memory_order_relaxed); }
@@ -304,6 +332,8 @@ class SolveJob {
     std::string status_;
     JobProgress progress_;
     std::chrono::steady_clock::time_point t0_{};
+    /// Copied from SimSetup before the worker starts; read only by that worker.
+    double active_max_mem_gb_ = 0.0;
     /// Intermediate mesh for live viewport (worker writes, UI reads).
     mutable std::mutex live_mesh_mutex_;
     std::optional<VolumeMeshOutput> live_mesh_;

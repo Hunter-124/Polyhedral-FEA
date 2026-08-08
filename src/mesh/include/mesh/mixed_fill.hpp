@@ -27,9 +27,15 @@
 #include <array>
 #include <cstdint>
 #include <span>
+#include <cstddef>
+#include <functional>
 #include <vector>
 
 namespace polymesh::mesh {
+/// Established hybrid-work budget. Public so pipeline pre-flight guards and
+/// the fill's internal graded-lattice fallback use one ceiling convention.
+inline constexpr std::size_t kHybridMaxElems = 48 * 1024;
+
 
 enum class MixedCellKind : std::uint8_t {
     kHex8 = 0,
@@ -48,10 +54,19 @@ struct MixedCell {
     std::vector<std::vector<std::uint32_t>> poly_faces;
 };
 
+/// Private interior apex and its parent lattice cell. Transition/plain-skin
+/// fans expose this so a caller that snaps after product expansion can repair
+/// the apex against the actual final base positions without moving the wall.
+struct MixedMovableFan {
+    std::uint32_t apex = 0;
+    std::array<std::uint32_t, 8> corners{};
+};
+
 struct MixedFillOutput {
     std::vector<Eigen::Vector3d> nodes; // metres
     std::vector<MixedCell> cells;
     std::vector<std::array<std::uint32_t, 4>> boundary_quads;
+    std::vector<MixedMovableFan> movable_fans;
     double h = 0.0;      // bulk cell edge (metres)
     double h_fine = 0.0; // fine cell edge when 2:1 active (≈ h/2), else = h
     std::size_t n_hex = 0;
@@ -74,6 +89,8 @@ struct MixedFillOutput {
 /// `native_poly_transitions`: when true, each 2:1 transition coarse cell is
 /// one unsplit polyhedron (for VEM) instead of a fan of pyramids/tets, and
 /// plain free-surface skin stays hex (no pyramid expand required).
+/// `cancel_check`, when supplied, is polled inside lattice classification,
+/// transition closure, and emission loops and may throw to cancel the fill.
 MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                                    const Eigen::Vector3d& bbox_min,
                                    const Eigen::Vector3d& bbox_max, double h,
@@ -83,10 +100,15 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                                    std::span<const Eigen::Vector3d> curvature_seeds = {},
                                    double seed_band = 0.0, bool snap_boundary = true,
                                    double curvature_turn_deg = 0.0,
-                                   bool native_poly_transitions = false);
+                                   bool native_poly_transitions = false,
+                                   const std::function<void()>& cancel_check = {});
 
 /// Expand every hex8 → 6 pyramid5 (centroid apex). Pyramids/tets/polys pass
 /// through. Product FE path for hybrid / hexpyr (constant-strain exact).
 MixedFillOutput expand_mixed_hex_to_pyramids(const MixedFillOutput& fill);
+
+/// Re-place private transition/skin fan apexes against their current bases.
+/// Boundary nodes and connectivity are unchanged. Returns the number moved.
+std::size_t repair_mixed_fan_apices(MixedFillOutput& fill, double shape_floor);
 
 } // namespace polymesh::mesh

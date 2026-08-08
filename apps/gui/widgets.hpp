@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-// Interwebz-v2-styled interactive controls, clean-room implemented on public
-// Dear ImGui APIs (InvisibleButton + DrawList): plum group boxes with header
-// strips and floating titles, rose gradient-filled checkboxes and sliders,
-// bordered flat buttons, lavender labels. Visual reference: the Interwebz v2
-// menu; no third-party code is copied (that source carries no license).
+// Custom interactive controls, clean-room implemented on public Dear ImGui APIs
+// (InvisibleButton + DrawList): group boxes with an accent-edged header strip,
+// gradient-filled checkboxes and sliders, bordered flat buttons, dim labels.
+// Every color comes from the active palette (theme.hpp) — the widgets carry no
+// literals. Visual reference: the Interwebz v2 menu; no third-party code is
+// copied (that source carries no license).
 
 #include "imgui.h"
 
@@ -20,18 +21,18 @@ void begin_group_box(const char* title);
 void begin_group_box_fill(const char* title, float outer_height);
 void end_group_box();
 
-/// Rose-gradient checkbox with label to the right.
+/// Accent-gradient checkbox with label to the right.
 bool checkbox(const char* label, bool* value);
 
 /// Fill-style slider: label above-left, value above-right, gradient fill.
 bool slider_double(const char* label, double* value, double min, double max,
                    const char* format);
 
-/// Flat bordered button; `primary` gets the rose gradient fill.
+/// Flat bordered button; `primary` gets the accent gradient fill.
 /// size.x <= 0 (or -1) fills available width; size.y <= 0 uses text + padding.
 bool button(const char* label, const ImVec2& size = ImVec2(0, 0), bool primary = false);
 
-/// Lavender field label followed by a dark input box (stacked if the label is
+/// Dim field label followed by a recessed input box (stacked if the label is
 /// too wide for a single row).
 bool input_double(const char* label, double* value, const char* format);
 bool input_float3(const char* label, float value[3]);

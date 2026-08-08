@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "viewport.hpp"
 
+#include "colormap.hpp"
 #include "fea/boundary_faces.hpp"
 #include "fea/nodal_mesh.hpp"
 #include "theme.hpp"
@@ -123,15 +124,6 @@ GLuint link(const char* vs, const char* fs) {
     return program;
 }
 
-/// Maps a scalar in [0,1] to a blue->cyan->green->yellow->red FEA colormap.
-std::array<float, 3> fea_colormap(float t) {
-    t = std::clamp(t, 0.0f, 1.0f);
-    const float r = std::clamp(std::min(4.0f * t - 2.0f, 4.0f - 4.0f * t) + 1.0f, 0.0f, 1.0f);
-    const float g = std::clamp(std::min(4.0f * t, 3.4f - 3.0f * t), 0.0f, 1.0f);
-    const float b = std::clamp(2.0f - 4.0f * t, 0.0f, 1.0f);
-    return {t > 0.75f ? 1.0f : r * 0.9f, g * 0.85f, b};
-}
-
 void bind_line_attr(GLuint vao, GLuint vbo) {
     glBindVertexArray(vao);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
@@ -148,9 +140,13 @@ void bind_line_attr(GLuint vao, GLuint vbo) {
 // ---- Camera ---------------------------------------------------------------
 
 void Camera::fit(const Eigen::Vector3d& bbox_min, const Eigen::Vector3d& bbox_max) {
-    target_ = 0.5f * (bbox_min + bbox_max).cast<float>();
-    const float radius = 0.5f * static_cast<float>((bbox_max - bbox_min).norm());
-    distance_ = std::max(1e-6f, radius / std::tan(0.5f * fov_y_) * 1.15f);
+    target_ = (0.5 * (bbox_min + bbox_max)).cast<float>();
+    const float diagonal = static_cast<float>((bbox_max - bbox_min).norm());
+    // 1.9x the diagonal clears the bounding sphere at the 40 deg vertical FOV
+    // with margin to spare, including the aspect < 1 (tall, narrow) viewport
+    // where the horizontal field is the tighter of the two. Degenerate box
+    // (single point / empty content) → a neutral 1 m standoff.
+    distance_ = diagonal > 1e-9f ? 1.9f * diagonal : 1.0f;
 }
 
 void Camera::orbit(float dx, float dy) {
@@ -326,6 +322,7 @@ void Viewport::set_model(const Model& model) {
     // smoothly while sharp CAD edges (caps, mitres) stay crisp.
     model_vertex_data_.clear();
     model_vertex_data_.reserve(model.surface.triangles.size() * 3 * 10);
+    model_bounds_.reset();
     const auto& p = palette;
     const auto& verts = model.surface.vertices;
     const auto& tris = model.surface.triangles;
@@ -364,6 +361,7 @@ void Viewport::set_model(const Model& model) {
         for (int k = 0; k < 3; ++k) {
             const Eigen::Vector3d& v = verts[tri[k]];
             const Eigen::Vector3d n = corner_normal(t, tri[k]);
+            model_bounds_.add(v);
             for (int i = 0; i < 3; ++i) {
                 model_vertex_data_.push_back(static_cast<float>(v[i]));
             }
@@ -414,6 +412,15 @@ void Viewport::update_overlays(const Model& model, const SimSetup& setup, int se
                     model_vertex_data_.data());
 }
 
+void Viewport::invalidate_colors() {
+    // Results-mode vertex colors are baked into GL buffers; force a rebake on
+    // the next render by clearing the bake signature (a plain dirty flag would
+    // be dropped by the mode/scale/max comparison when nothing else changed).
+    result_dirty_ = true;
+    baked_scale_ = -1.0f;
+    baked_max_ = -1.0f;
+}
+
 void Viewport::set_mesh(const VolumeMeshOutput& mesh_out) {
     // Render exterior faces as TRUE polygons (poly-aware): each cell facet is
     // one flat-shaded polygon (centroid fan for the fill, per-facet normal) and
@@ -458,6 +465,7 @@ void Viewport::set_mesh(const VolumeMeshOutput& mesh_out) {
     std::vector<float> edata;        // edges: pos3 + rgba4
     edata.reserve(polys.size() * 8 * 7);
     const float er = 0.02f, eg = 0.02f, eb = 0.04f, ea = 1.0f;
+    mesh_bounds_.reset();
 
     for (std::size_t pi = 0; pi < polys.size(); ++pi) {
         const auto& lp = polys[pi];
@@ -475,6 +483,9 @@ void Viewport::set_mesh(const VolumeMeshOutput& mesh_out) {
         }
         if (!ok) {
             continue;
+        }
+        for (auto vi : lp) {
+            mesh_bounds_.add(nodes[vi]);
         }
         c /= static_cast<double>(lp.size());
         // Newell normal: robust for non-planar / concave polygons.
@@ -573,6 +584,44 @@ void Viewport::set_result(const SolveResult& result) {
     preview.mesher_note = result.mesh_note;
     set_mesh(preview);
     result_dirty_ = true;
+    result_bounds_.reset();
+    // The deformed shape only exists after the first bake (it needs the caller's
+    // exaggeration scale), so framing has to wait for it.
+    frame_on_bake_ = true;
+}
+
+bool Viewport::frame_content(DisplayMode mode) {
+    const Bounds* bounds = nullptr;
+    switch (mode) {
+    case DisplayMode::kSetup:
+        bounds = &model_bounds_;
+        break;
+    case DisplayMode::kMeshPreview:
+        bounds = &mesh_bounds_;
+        break;
+    case DisplayMode::kResultsVonMises:
+    case DisplayMode::kResultsDisplacement:
+    case DisplayMode::kResultsError:
+        // Results are only bounded after the first bake; the undeformed mesh
+        // uploaded alongside them is the right stand-in until then.
+        bounds = result_bounds_.valid ? &result_bounds_ : &mesh_bounds_;
+        break;
+    }
+    // A frame request must never leave the user staring at an empty gradient:
+    // if the requested mode has nothing, frame whatever else is uploaded.
+    if (bounds == nullptr || !bounds->valid) {
+        for (const Bounds* alt : {&model_bounds_, &mesh_bounds_, &result_bounds_}) {
+            if (alt->valid) {
+                bounds = alt;
+                break;
+            }
+        }
+    }
+    if (bounds == nullptr || !bounds->valid) {
+        return false; // nothing uploaded — keep the current camera
+    }
+    camera.fit(bounds->min, bounds->max);
+    return true;
 }
 
 void Viewport::bake_result(DisplayMode mode, float deform_scale, float result_max) {
@@ -593,10 +642,12 @@ void Viewport::bake_result(DisplayMode mode, float deform_scale, float result_ma
         }
         return result_disp_.segment<3>(base);
     };
+    result_bounds_.reset();
     const auto emit = [&](std::uint32_t node, const Eigen::Vector3d& normal) {
         // Apply exaggerated displacement so the deformed shape is visible.
         const Eigen::Vector3d pos =
             result_rest_[node] + static_cast<double>(deform_scale) * disp_at(node);
+        result_bounds_.add(pos);
         for (int i = 0; i < 3; ++i) {
             data.push_back(static_cast<float>(pos[i]));
         }
@@ -647,6 +698,15 @@ void Viewport::bake_result(DisplayMode mode, float deform_scale, float result_ma
     baked_scale_ = deform_scale;
     baked_max_ = result_max;
     result_dirty_ = false;
+
+    // First bake of a fresh result: frame the deformed shape once, then leave
+    // the camera to the user (later bakes only re-scale the exaggeration).
+    if (frame_on_bake_) {
+        frame_on_bake_ = false;
+        if (result_bounds_.valid) {
+            camera.fit(result_bounds_.min, result_bounds_.max);
+        }
+    }
 }
 
 void Viewport::render(int width, int height, DisplayMode mode, float deform_scale,

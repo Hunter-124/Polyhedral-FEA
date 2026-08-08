@@ -4,7 +4,7 @@
 namespace polymesh::gui {
 
 Palette palette;
-ThemeId active_theme = ThemeId::kInterwebz;
+ThemeId active_theme = ThemeId::kStudio;
 
 Palette make_interwebz_palette() {
     return Palette{}; // defaults in theme.hpp are Interwebz
@@ -42,26 +42,84 @@ Palette make_slate_palette() {
     return p;
 }
 
+/// Studio: graphite chrome (#0E1116 / #161B22 / #1C2330), cyan accent #4CC2FF,
+/// dark viewport gradient. Default theme and the palette every showcase render
+/// is captured in — keep it in sync with docs/gui/theme-layout.md.
+Palette make_studio_palette() {
+    Palette p;
+    p.window_bg = {0.055f, 0.067f, 0.086f, 1};   // #0E1116 chrome
+    p.panel_bg = {0.086f, 0.106f, 0.133f, 1};    // #161B22
+    p.header_bg = {0.110f, 0.137f, 0.188f, 1};   // #1C2330
+    p.popup_bg = {0.102f, 0.125f, 0.165f, 1};    // #1A2029
+    p.border = {0.165f, 0.196f, 0.251f, 1};      // #2A3240
+    p.status_bg = {0.039f, 0.051f, 0.071f, 1};   // #0A0D12
+    p.text = {0.902f, 0.918f, 0.941f, 1};        // #E6EAF0
+    p.text_dim = {0.541f, 0.576f, 0.639f, 1};    // #8A93A3
+    p.text_disabled = {0.353f, 0.384f, 0.447f, 1}; // #5A6272
+    p.accent = {0.298f, 0.761f, 1.000f, 1};      // #4CC2FF
+    p.accent_soft_top = {0.498f, 0.831f, 1.000f, 1}; // #7FD4FF (gradient top)
+    p.accent_dim = {0.165f, 0.431f, 0.588f, 1};  // #2A6E96
+    p.accent_soft = {0.298f, 0.761f, 1.000f, 0.20f};
+    p.accent_mid = {0.298f, 0.761f, 1.000f, 0.38f};
+    p.button = {0.102f, 0.129f, 0.169f, 1};
+    p.button_hovered = {0.133f, 0.169f, 0.220f, 1};
+    p.button_active = {0.169f, 0.212f, 0.275f, 1};
+    p.frame_bg = {0.063f, 0.082f, 0.110f, 1}; // inputs sit below the panel plane
+    p.frame_bg_hovered = {0.086f, 0.114f, 0.149f, 1};
+    p.frame_bg_active = {0.114f, 0.145f, 0.192f, 1};
+    p.viewport_top = {0.106f, 0.125f, 0.157f, 1};    // #1B2028
+    p.viewport_mid = {0.078f, 0.098f, 0.133f, 1};    // #141922
+    p.viewport_bottom = {0.059f, 0.075f, 0.102f, 1}; // #0F131A
+    p.part_default = {0.545f, 0.584f, 0.647f, 1};    // #8B95A5
+    p.sim_fixture = {0.180f, 0.800f, 0.443f, 0.65f}; // #2ECC71
+    p.sim_load = {0.941f, 0.263f, 0.227f, 0.65f};    // #F0433A
+    p.selection = {0.298f, 0.761f, 1.000f, 0.60f};
+    p.hover = {0.298f, 0.761f, 1.000f, 0.30f};
+    p.axis_x = {0.961f, 0.427f, 0.404f, 1};
+    p.axis_y = {0.400f, 0.855f, 0.478f, 1};
+    p.axis_z = {0.298f, 0.761f, 1.000f, 1};
+    p.status_ok = {0.176f, 0.831f, 0.749f, 1};  // #2DD4BF
+    p.status_warn = {0.961f, 0.773f, 0.259f, 1}; // #F5C542
+    p.status_err = {0.961f, 0.529f, 0.416f, 1};  // #F5876C
+    return p;
+}
+
 void apply_theme(ThemeId id) {
     active_theme = id;
-    palette = (id == ThemeId::kSlate) ? make_slate_palette() : make_interwebz_palette();
+    switch (id) {
+    case ThemeId::kInterwebz:
+        palette = make_interwebz_palette();
+        break;
+    case ThemeId::kSlate:
+        palette = make_slate_palette();
+        break;
+    case ThemeId::kStudio:
+    default: // out-of-range persisted value falls back to the default theme
+        palette = make_studio_palette();
+        break;
+    }
 
     ImGuiStyle& s = ImGui::GetStyle();
     const Palette& p = palette;
 
-    s.WindowRounding = 2.0f;
-    s.ChildRounding = 2.0f;
-    s.FrameRounding = 2.0f;
-    s.PopupRounding = 2.0f;
-    s.GrabRounding = 2.0f;
-    s.TabRounding = 2.0f;
+    // Studio breathes a little more than the older two (softer rounding, taller
+    // frames) — the rest of the metrics are shared.
+    const bool studio = id == ThemeId::kStudio;
+    const float rounding = studio ? 4.0f : 2.0f;
+    s.WindowRounding = rounding;
+    s.ChildRounding = rounding;
+    s.FrameRounding = rounding;
+    s.PopupRounding = rounding;
+    s.GrabRounding = rounding;
+    s.TabRounding = rounding;
     s.WindowBorderSize = 1.0f;
     s.FrameBorderSize = 1.0f;
     s.WindowPadding = {12, 12};
-    s.FramePadding = {8, 5}; // enough room for frame labels without clipping
-    s.ItemSpacing = {8, 8};
+    // Enough room for frame labels without clipping.
+    s.FramePadding = studio ? ImVec2{9, 6} : ImVec2{8, 5};
+    s.ItemSpacing = studio ? ImVec2{8, 7} : ImVec2{8, 8};
     s.ItemInnerSpacing = {6, 4};
-    s.ScrollbarSize = 12.0f;
+    s.ScrollbarSize = studio ? 13.0f : 12.0f;
     s.WindowMinSize = {320, 240};
 
     ImVec4* c = s.Colors;

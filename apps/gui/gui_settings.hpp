@@ -24,7 +24,7 @@ struct GuiSettings {
     float sim_width = 340.0f;
     float results_width = 300.0f;
 
-    ThemeId theme = ThemeId::kInterwebz;
+    ThemeId theme = ThemeId::kStudio;
 
     /// How often (seconds) to re-scan campaign files while a run is live.
     float refresh_interval_s = 0.5f;

@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
-// PolyMesh desktop app: import geometry, click faces to assign fixtures and
-// loads, tune mesher/solver settings, solve, and inspect stress/deflection
-// results. Interwebz-v2-styled chrome with a fixed, constrained layout:
+// PolyMesh Studio desktop app: import geometry, click faces to assign fixtures
+// and loads, tune mesher/solver settings, solve, and inspect stress/deflection
+// results. Studio-themed chrome with a fixed, constrained layout:
 // Test Lab | Sim Setup | viewport | Results — panels cannot be dragged out
 // of the frame, collapsed, or lost. Test Lab talks to the harness only via
 // docs/dag/interfaces.md file formats (no apps/testlab link).
+// F12 / File menu / POLYMESH_GUI_SHOT capture the window to a PNG.
 
+#include "colormap.hpp"
 #include "fea/backend.hpp"
 #include "fea/vtu.hpp"
 #include "pipeline/scene.hpp"
+#include "png_writer.hpp"
 #include "testlab_panel.hpp"
 #include "theme.hpp"
 #include "viewport.hpp"
@@ -36,6 +39,8 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <ctime>
+#include <filesystem>
 #include <format>
 #include <optional>
 #include <string>
@@ -109,6 +114,21 @@ struct App {
     std::uint64_t live_mesh_seen_gen = 0;
     /// True while a background self-improve (LLM) run is in flight.
     std::atomic<bool> improve_running{false};
+    /// Screenshot plumbing (png_writer.hpp). Frames still to wait before the
+    /// capture, -1 = idle. F12 asks for 0 (this frame); the File menu asks for
+    /// 1 so the still-drawn popup stays out of the shot. Serviced at the end of
+    /// the frame, after render, before the swap.
+    int shot_countdown = -1;
+    /// POLYMESH_GUI_SHOT target — rewritten at most once a second while set,
+    /// so a headless Xvfb run can grab a frame and then kill the app.
+    std::string shot_env_path;
+    double shot_env_last = -1.0e9;
+    /// Transient capture toast shown in the status strip.
+    std::string shot_msg;
+    float shot_msg_ttl = 0.0f;
+    bool shot_msg_ok = true;
+    /// True when a TTF UI face loaded (else ImGui's stock bitmap font).
+    bool custom_font = false;
 };
 
 bool is_geometry_path(const std::string& path) {
@@ -133,6 +153,29 @@ void set_mesh_info(App& app, const std::string& note, std::size_t nnodes, std::s
         std::format("mesh: {} elems, {} nodes, {} DOF", nelems, nnodes, app.dof_count);
 }
 
+/// Keeps `app.mode` on something that actually has geometry behind it. A stale
+/// mode (results selected before a solve was cleared, mesh preview dropped by a
+/// re-import, …) otherwise renders the bare background gradient over content
+/// the status strip claims is loaded.
+void sanitize_display_mode(App& app) {
+    const bool has_result = app.result.has_value();
+    const bool has_mesh = app.viewport.has_mesh_preview();
+    const bool results_mode = app.mode == DisplayMode::kResultsVonMises ||
+                              app.mode == DisplayMode::kResultsDisplacement ||
+                              app.mode == DisplayMode::kResultsError;
+    if (results_mode && !has_result) {
+        app.mode = has_mesh ? DisplayMode::kMeshPreview : DisplayMode::kSetup;
+    } else if (app.mode == DisplayMode::kMeshPreview && !has_mesh) {
+        app.mode = DisplayMode::kSetup;
+    } else if (app.mode == DisplayMode::kSetup && !app.model) {
+        if (has_result) {
+            app.mode = DisplayMode::kResultsVonMises;
+        } else if (has_mesh) {
+            app.mode = DisplayMode::kMeshPreview;
+        }
+    }
+}
+
 void load_model(App& app, const std::string& path) {
     try {
         app.model = Model::load(path);
@@ -147,7 +190,7 @@ void load_model(App& app, const std::string& path) {
         app.mode = DisplayMode::kSetup;
         app.selected_region = -1;
         app.viewport.set_model(*app.model);
-        app.viewport.camera.fit(app.model->bbox_min, app.model->bbox_max);
+        app.viewport.frame_content(DisplayMode::kSetup);
         app.overlays_dirty = true;
         std::snprintf(app.open_path, sizeof(app.open_path), "%s", path.c_str());
         app.status = std::format("{}: {} triangles, {} faces", app.model->name,
@@ -169,6 +212,156 @@ void drop_callback(GLFWwindow* window, int count, const char** paths) {
     }
 }
 
+// ---- screenshots ----------------------------------------------------------
+// Frame capture with no new dependencies (png_writer.hpp).
+
+/// UTC-stamped capture name, written into the process CWD.
+std::string timestamped_shot_name() {
+    const std::time_t now = std::time(nullptr);
+    std::tm utc{};
+#if defined(_WIN32)
+    gmtime_s(&utc, &now);
+#else
+    gmtime_r(&now, &utc);
+#endif
+    char buf[64];
+    if (std::strftime(buf, sizeof(buf), "polymesh_shot_%Y%m%dT%H%M%SZ.png", &utc) == 0) {
+        return "polymesh_shot.png";
+    }
+    return std::string(buf);
+}
+
+/// Reads the default framebuffer and writes it as an RGBA PNG. MUST run after
+/// every draw call of the frame and before glfwSwapBuffers: the back buffer
+/// still holds the finished image there, and the offscreen viewport FBO is
+/// already unbound (Viewport::render restores 0).
+bool capture_screenshot(GLFWwindow* window, const std::string& path) {
+    int fb_w = 0, fb_h = 0;
+    glfwGetFramebufferSize(window, &fb_w, &fb_h);
+    if (fb_w <= 0 || fb_h <= 0 || path.empty()) {
+        return false;
+    }
+    std::vector<unsigned char> pixels(static_cast<std::size_t>(fb_w) *
+                                      static_cast<std::size_t>(fb_h) * 4u);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadPixels(0, 0, fb_w, fb_h, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+    // glReadPixels hands back rows bottom-up; the writer flips them.
+    return png::write_png_rgba(path.c_str(), fb_w, fb_h, pixels.data());
+}
+
+/// Services a pending capture and records the toast text.
+void service_screenshot(App& app, GLFWwindow* window) {
+    if (app.shot_countdown > 0) {
+        --app.shot_countdown;
+    } else if (app.shot_countdown == 0) {
+        app.shot_countdown = -1;
+        const std::string name = timestamped_shot_name();
+        app.shot_msg_ok = capture_screenshot(window, name);
+        app.shot_msg = app.shot_msg_ok ? std::format("saved {}", name)
+                                       : std::format("screenshot failed: {}", name);
+        app.shot_msg_ttl = 4.0f;
+    }
+    if (!app.shot_env_path.empty()) {
+        const double now = glfwGetTime();
+        if (now - app.shot_env_last >= 1.0) {
+            app.shot_env_last = now;
+            capture_screenshot(window, app.shot_env_path);
+        }
+    }
+}
+
+// ---- chrome bootstrap -----------------------------------------------------
+
+/// Loads a proportional UI face at 16 px: $POLYMESH_GUI_FONT first, then the
+/// usual distro locations. Returns false when none exist — ImGui's stock
+/// bitmap font stays in place and everything still works. Existence is checked
+/// first because AddFontFromFileTTF asserts on a missing file in debug builds.
+bool load_ui_font() {
+    ImGuiIO& io = ImGui::GetIO();
+    auto try_load = [&io](const char* path) {
+        std::error_code ec;
+        if (path == nullptr || path[0] == '\0' ||
+            !std::filesystem::is_regular_file(std::filesystem::path{path}, ec)) {
+            return false;
+        }
+        return io.Fonts->AddFontFromFileTTF(path, 16.0f) != nullptr;
+    };
+    if (try_load(std::getenv("POLYMESH_GUI_FONT"))) {
+        return true;
+    }
+    static constexpr const char* kFallbacks[] = {
+        "/usr/share/fonts/liberation-sans-fonts/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/google-noto/NotoSans-Regular.ttf",
+        "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+    };
+    for (const char* path : kFallbacks) {
+        if (try_load(path)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/// Signed distance to a regular hexagon of circumradius `r` centered on the
+/// origin (negative inside). Icon drawing only — no scene math.
+float hexagon_sdf(float px, float py, float r) {
+    constexpr float kx = -0.8660254f;
+    constexpr float ky = 0.5f;
+    constexpr float kz = 0.5773503f;
+    px = std::fabs(px);
+    py = std::fabs(py);
+    const float fold = 2.0f * std::min(kx * px + ky * py, 0.0f);
+    px -= fold * kx;
+    py -= fold * ky;
+    px -= std::clamp(px, -kz * r, kz * r);
+    py -= r;
+    return std::sqrt(px * px + py * py) * (py < 0.0f ? -1.0f : 1.0f);
+}
+
+/// Runtime-generated 64x64 window icon: a hexagonal cell stroked in the Studio
+/// accent over a graphite body, fully transparent outside the cell. Procedural
+/// so the app ships no image assets.
+void set_window_icon(GLFWwindow* window) {
+    constexpr int kSize = 64;
+    constexpr float kHalf = 32.0f;
+    constexpr float kOuter = 24.0f; // apothem; half-width is 24/cos30 = 27.7 px
+    constexpr float kInner = 12.0f; // inner ring reads as a graded cell
+    unsigned char pixels[kSize * kSize * 4];
+    // Analytic one-pixel coverage from a signed distance (1 inside, 0 outside).
+    auto coverage = [](float d) { return std::clamp(0.5f - d, 0.0f, 1.0f); };
+    for (int y = 0; y < kSize; ++y) {
+        for (int x = 0; x < kSize; ++x) {
+            const float px = static_cast<float>(x) + 0.5f - kHalf;
+            const float py = static_cast<float>(y) + 0.5f - kHalf;
+            const float d_out = hexagon_sdf(px, py, kOuter);
+            const float d_in = hexagon_sdf(px, py, kInner);
+            const float body = coverage(d_out);
+            const float ring = coverage(std::fabs(d_out) - 1.3f);        // accent stroke
+            const float ring_in = coverage(std::fabs(d_in) - 0.9f) * body; // dim stroke
+            float r = 0.086f, g = 0.106f, b = 0.133f; // #161B22 cell body
+            float a = body * 0.92f;
+            r = r * (1.0f - ring_in) + 0.165f * ring_in; // #2A6E96
+            g = g * (1.0f - ring_in) + 0.431f * ring_in;
+            b = b * (1.0f - ring_in) + 0.588f * ring_in;
+            a = std::max(a, ring_in);
+            r = r * (1.0f - ring) + 0.298f * ring; // #4CC2FF
+            g = g * (1.0f - ring) + 0.761f * ring;
+            b = b * (1.0f - ring) + 1.000f * ring;
+            a = std::max(a, ring);
+            const std::size_t i = (static_cast<std::size_t>(y) * static_cast<std::size_t>(kSize) +
+                                   static_cast<std::size_t>(x)) *
+                                  4u;
+            pixels[i + 0] = static_cast<unsigned char>(std::lround(r * 255.0f));
+            pixels[i + 1] = static_cast<unsigned char>(std::lround(g * 255.0f));
+            pixels[i + 2] = static_cast<unsigned char>(std::lround(b * 255.0f));
+            pixels[i + 3] =
+                static_cast<unsigned char>(std::lround(std::clamp(a, 0.0f, 1.0f) * 255.0f));
+        }
+    }
+    const GLFWimage image{kSize, kSize, pixels};
+    glfwSetWindowIcon(window, 1, &image);
+}
+
 void draw_colorbar(const char* title, float vmin, float vmax, const char* unit) {
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const ImVec2 p0 = ImGui::GetCursorScreenPos();
@@ -177,27 +370,12 @@ void draw_colorbar(const char* title, float vmin, float vmax, const char* unit) 
     for (int i = 0; i < 32; ++i) {
         const float t0 = static_cast<float>(i) / 32.0f;
         const float t1 = static_cast<float>(i + 1) / 32.0f;
-        // Match fea_colormap: blue→cyan→green→yellow→red
-        auto col = [](float t) {
-            t = std::clamp(t, 0.0f, 1.0f);
-            ImVec4 c;
-            if (t < 0.25f) {
-                const float u = t / 0.25f;
-                c = ImVec4(0, u, 1, 1);
-            } else if (t < 0.5f) {
-                const float u = (t - 0.25f) / 0.25f;
-                c = ImVec4(0, 1, 1 - u, 1);
-            } else if (t < 0.75f) {
-                const float u = (t - 0.5f) / 0.25f;
-                c = ImVec4(u, 1, 0, 1);
-            } else {
-                const float u = (t - 0.75f) / 0.25f;
-                c = ImVec4(1, 1 - u, 0, 1);
-            }
-            return ImGui::ColorConvertFloat4ToU32(c);
-        };
+        // Same ramp the viewport bakes into result vertex colors (colormap.hpp)
+        // — one source of truth so the legend can never drift from the render.
+        const auto rgb = fea_colormap(0.5f * (t0 + t1));
+        const ImU32 col = ImGui::ColorConvertFloat4ToU32(ImVec4(rgb[0], rgb[1], rgb[2], 1.0f));
         dl->AddRectFilled(ImVec2(p0.x, p0.y + h * (1.0f - t1)),
-                          ImVec2(p0.x + w, p0.y + h * (1.0f - t0)), col(0.5f * (t0 + t1)));
+                          ImVec2(p0.x + w, p0.y + h * (1.0f - t0)), col);
     }
     dl->AddRect(p0, ImVec2(p0.x + w, p0.y + h), IM_COL32(255, 255, 255, 80));
     ImGui::Dummy(ImVec2(w + 8, h));
@@ -721,11 +899,21 @@ void draw_viewport_content(App& app) {
         ImGui::EndChild();
     }
 
+    // "frame" affordance, top-right of the 3D image (the F key does the same
+    // from anywhere). Its own rect is excluded from the camera/pick handling
+    // below so pressing it never orbits or deselects a face.
+    constexpr float kFrameBtnW = 84.0f;
+    ImGui::SetCursorScreenPos(ImVec2(item_max.x - kFrameBtnW - 12.0f, item_min.y + 12.0f));
+    if (ImGui::Button("frame (F)", ImVec2(kFrameBtnW, 0))) {
+        app.viewport.frame_content(app.mode);
+    }
+    const bool over_frame_button = ImGui::IsItemHovered();
+
     // Camera works whenever the cursor is over the 3D image (all display modes).
     const ImGuiIO& io = ImGui::GetIO();
     const bool mouse_over_view = io.MousePos.x >= item_min.x && io.MousePos.x <= item_max.x &&
                                  io.MousePos.y >= item_min.y && io.MousePos.y <= item_max.y;
-    if (viewport_hovered || mouse_over_view) {
+    if ((viewport_hovered || mouse_over_view) && !over_frame_button) {
         const float u = (io.MousePos.x - item_min.x) / size.x;
         const float v = (io.MousePos.y - item_min.y) / size.y;
         const float aspect = size.x / size.y;
@@ -798,41 +986,74 @@ void draw_frame(App& app) {
     const ImGuiViewport* vp = ImGui::GetMainViewport();
     auto& gs = app.testlab.settings;
 
+    // Theme swap must drop palette-baked GL vertex colors, or setup overlays
+    // keep the previous theme's greens/reds until the next selection change.
+    auto pick_theme = [&app, &gs](ThemeId id) {
+        if (active_theme == id) {
+            return;
+        }
+        apply_theme(id);
+        gs.theme = id;
+        app.viewport.invalidate_colors();
+        app.overlays_dirty = true;
+    };
+
     float menu_height = 0.0f;
     if (ImGui::BeginMainMenuBar()) {
         menu_height = ImGui::GetWindowSize().y;
         if (ImGui::BeginMenu("file")) {
+            if (ImGui::MenuItem("save screenshot (F12)")) {
+                app.shot_countdown = 1;
+            }
+            ImGui::Separator();
             if (ImGui::MenuItem("quit")) {
                 glfwSetWindowShouldClose(glfwGetCurrentContext(), GLFW_TRUE);
             }
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("view")) {
+            if (ImGui::MenuItem("theme: studio", nullptr, active_theme == ThemeId::kStudio)) {
+                pick_theme(ThemeId::kStudio);
+            }
             if (ImGui::MenuItem("theme: interwebz", nullptr,
                                 active_theme == ThemeId::kInterwebz)) {
-                apply_theme(ThemeId::kInterwebz);
-                gs.theme = ThemeId::kInterwebz;
+                pick_theme(ThemeId::kInterwebz);
             }
             if (ImGui::MenuItem("theme: slate", nullptr, active_theme == ThemeId::kSlate)) {
-                apply_theme(ThemeId::kSlate);
-                gs.theme = ThemeId::kSlate;
+                pick_theme(ThemeId::kSlate);
             }
+            ImGui::Separator();
             ImGui::MenuItem("wireframe edges", nullptr, &app.show_wireframe);
             if (app.result) {
                 ImGui::MenuItem("undeformed outline", nullptr, &app.show_undeformed);
             }
             ImGui::EndMenu();
         }
-        ImGui::TextColored(palette.text_dim, "  %s", app.status.c_str());
+        // Status text lives in the status strip — the menu bar stays file/view.
         ImGui::EndMainMenuBar();
     }
 
-    constexpr float kStatusHeight = 28.0f;
+    // F12 (capture) and F (frame content) anywhere, except while a text field
+    // owns the keyboard.
+    if (!ImGui::GetIO().WantTextInput) {
+        if (ImGui::IsKeyPressed(ImGuiKey_F12, false)) {
+            app.shot_countdown = 0;
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_F, false)) {
+            app.viewport.frame_content(app.mode);
+        }
+    }
+    if (app.shot_msg_ttl > 0.0f) {
+        app.shot_msg_ttl -= ImGui::GetIO().DeltaTime;
+    }
+
+    // Tall enough for a 16 px TTF face plus the 5 px vertical window padding.
+    const float status_h = std::floor(std::max(28.0f, ImGui::GetTextLineHeight() + 12.0f));
     constexpr float kSplitter = 6.0f;
     // Floor positions so subpixel seams never expose glClear window_bg.
     const float content_y = std::floor(vp->Pos.y + menu_height);
     const float content_h =
-        std::floor(vp->Pos.y + vp->Size.y - kStatusHeight) - content_y;
+        std::floor(vp->Pos.y + vp->Size.y - status_h) - content_y;
     const float content_w = std::floor(vp->Size.x);
 
     // Clamp panel widths so the viewport keeps a usable center band.
@@ -915,8 +1136,8 @@ void draw_frame(App& app) {
 
     // Status strip.
     ImGui::SetNextWindowPos(
-        ImVec2(std::floor(vp->Pos.x), std::floor(vp->Pos.y + vp->Size.y - kStatusHeight)));
-    ImGui::SetNextWindowSize(ImVec2(content_w, kStatusHeight));
+        ImVec2(std::floor(vp->Pos.x), std::floor(vp->Pos.y + vp->Size.y - status_h)));
+    ImGui::SetNextWindowSize(ImVec2(content_w, status_h));
     ImGui::PushStyleColor(ImGuiCol_WindowBg, palette.status_bg);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10, 5));
     ImGui::Begin("##status", nullptr,
@@ -942,25 +1163,35 @@ void draw_frame(App& app) {
             }
         }
 
-        std::string line;
         const char* tl = app.testlab.status.c_str();
         const char* head =
             app.testlab.git_head.empty() ? "unknown" : app.testlab.git_head.c_str();
-        if (app.dof_count > 0) {
-            line = std::format(
-                "polymesh @ {} — {} | mesher {}{}{} | testlab: {} | DOF {} | lmb orbit, "
-                "shift+lmb pan, wheel zoom",
-                head, app.status, mesher_name, health_bit.empty() ? "" : " · ", health_bit,
-                tl, app.dof_count);
-        } else {
-            line = std::format(
-                "polymesh @ {} — {} | mesher {}{}{} | testlab: {} | drop .step/.brep | "
-                "lmb pick/orbit, shift+lmb pan, wheel zoom",
-                head, app.status, mesher_name, health_bit.empty() ? "" : " · ", health_bit, tl);
+
+        // Everything the strip used to carry, segmented with " · ".
+        std::string info = std::format("polymesh @ {} · {} · mesher {}", head, app.status,
+                                       mesher_name);
+        if (!health_bit.empty()) {
+            info += " · " + health_bit;
         }
-        ImGui::PushStyleColor(ImGuiCol_Text, palette.text_dim);
-        ImGui::TextUnformatted(line.c_str());
-        ImGui::PopStyleColor();
+        info += std::format(" · testlab: {}", tl);
+        info += app.dof_count > 0 ? std::format(" · DOF {}", app.dof_count)
+                                  : std::string(" · drop .step/.brep");
+        const char* hint = app.dof_count > 0
+                               ? "lmb orbit · shift+lmb pan · wheel zoom · F12 screenshot"
+                               : "lmb pick/orbit · shift+lmb pan · wheel zoom · F12 screenshot";
+
+        // Transient capture toast leads the line while it lives.
+        if (app.shot_msg_ttl > 0.0f && !app.shot_msg.empty()) {
+            ImGui::TextColored(app.shot_msg_ok ? palette.status_ok : palette.status_err, "%s",
+                               app.shot_msg.c_str());
+            ImGui::SameLine(0.0f, 0.0f);
+            ImGui::TextColored(palette.text_dim, " · ");
+            ImGui::SameLine(0.0f, 0.0f);
+        }
+        ImGui::TextColored(palette.text, "%s", info.c_str());
+        ImGui::SameLine(0.0f, 0.0f);
+        // Control hints are reference material — dimmed so the state reads first.
+        ImGui::TextColored(palette.text_dim, " · %s", hint);
     }
     ImGui::End();
     ImGui::PopStyleVar();
@@ -981,12 +1212,15 @@ int run(int argc, char** argv) {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    GLFWwindow* window = glfwCreateWindow(1600, 1000, "PolyMesh", nullptr, nullptr);
+    GLFWwindow* window = glfwCreateWindow(1600, 1000,
+                                          "PolyMesh Studio — Adaptive Polyhedral FEA", nullptr,
+                                          nullptr);
     if (!window) {
         glfwTerminate();
         return 1;
     }
     glfwSetWindowSizeLimits(window, 960, 640, GLFW_DONT_CARE, GLFW_DONT_CARE);
+    set_window_icon(window);
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);
 #if defined(_WIN32)
@@ -1000,12 +1234,18 @@ int run(int argc, char** argv) {
     ImGui::CreateContext();
     ImGui::GetIO().IniFilename = nullptr; // fixed layout — nothing to persist
     apply_theme();
+    const bool ttf_loaded = load_ui_font();
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
 
     App app;
     glfwSetWindowUserPointer(window, &app);
     glfwSetDropCallback(window, drop_callback);
+    app.custom_font = ttf_loaded;
+    if (const char* shot_env = std::getenv("POLYMESH_GUI_SHOT");
+        shot_env != nullptr && shot_env[0] != '\0') {
+        app.shot_env_path = shot_env;
+    }
     app.viewport.init();
     app.testlab.cache_git_head(); // V3c: once at startup
     app.testlab.sync_buffers_from_settings();
@@ -1045,6 +1285,7 @@ int run(int argc, char** argv) {
 
         // Intermediate mesh from interactive SolveJob (after mesh / adapt remesh).
         if (auto live = app.job.poll_live_mesh(app.live_mesh_seen_gen)) {
+            const bool was_mesh = app.mode == DisplayMode::kMeshPreview;
             app.mesh_preview = std::move(live);
             app.viewport.set_mesh(*app.mesh_preview);
             set_mesh_info(app, app.mesh_preview->mesher_note,
@@ -1054,16 +1295,28 @@ int run(int argc, char** argv) {
             if (app.mode == DisplayMode::kSetup || app.mode == DisplayMode::kMeshPreview) {
                 app.mode = DisplayMode::kMeshPreview;
             }
+            // Frame the first mesh of a run only: later adapt passes remesh the
+            // same part, and refitting then would yank the user's zoom away.
+            if (!was_mesh) {
+                app.viewport.frame_content(DisplayMode::kMeshPreview);
+            }
         }
 
-        // Campaign harness mesh_preview.pmp (Test Lab runs). Skip while an
-        // interactive SolveJob owns the viewport.
+        // Campaign harness mesh_preview.pmp (Test Lab runs). Skipped while an
+        // interactive SolveJob owns the viewport — and a campaign artifact left
+        // on disk by an earlier run must never take the viewport away from a
+        // part the user opened (argv / drag-drop / "open"): that is what made a
+        // startup with a model argument render an empty gradient while the
+        // status strip reported some other campaign's element counts. Only a
+        // live harness run may take over; each rewrite of the .pmp re-dirties
+        // this, so the live preview still works.
         if (app.testlab.campaign_mesh_dirty && app.testlab.campaign_mesh) {
             app.testlab.campaign_mesh_dirty = false;
             const auto st = app.job.state();
             const bool job_busy =
                 st == SolveJob::State::kMeshing || st == SolveJob::State::kSolving;
-            if (!job_busy) {
+            const bool may_take_view = !app.model || app.testlab.runner.is_running();
+            if (!job_busy && may_take_view) {
                 const auto& prev = *app.testlab.campaign_mesh;
                 VolumeMeshOutput vol;
                 vol.mesh.nodes.reserve(prev.nodes.size());
@@ -1072,6 +1325,7 @@ int run(int argc, char** argv) {
                 }
                 vol.boundary_quads = prev.quads;
                 vol.mesher_note = prev.note;
+                const bool was_mesh = app.mode == DisplayMode::kMeshPreview;
                 app.mesh_preview = std::move(vol);
                 app.viewport.set_mesh(*app.mesh_preview);
                 set_mesh_info(app, app.mesh_preview->mesher_note,
@@ -1080,16 +1334,25 @@ int run(int argc, char** argv) {
                     app.mode == DisplayMode::kMeshPreview) {
                     app.mode = DisplayMode::kMeshPreview;
                 }
+                // A campaign part is unrelated to anything else on screen, so
+                // the camera has to move with it the first time it appears.
+                if (!was_mesh) {
+                    app.viewport.frame_content(DisplayMode::kMeshPreview);
+                }
             }
         }
 
         if (auto mesh = app.job.take_mesh()) {
+            const bool was_mesh = app.mode == DisplayMode::kMeshPreview;
             app.mesh_preview = std::move(mesh);
             app.viewport.set_mesh(*app.mesh_preview);
             set_mesh_info(app, app.mesh_preview->mesher_note,
                           app.mesh_preview->mesh.nodes.size(),
                           app.mesh_preview->mesh.elements.size());
             app.mode = DisplayMode::kMeshPreview;
+            if (!was_mesh) {
+                app.viewport.frame_content(DisplayMode::kMeshPreview);
+            }
         }
         if (auto result = app.job.take_result()) {
             app.result = std::move(result);
@@ -1114,6 +1377,7 @@ int run(int argc, char** argv) {
                                      app.result->max_von_mises / 1e6);
         }
 
+        sanitize_display_mode(app);
         draw_frame(app);
 
         ImGui::Render();
@@ -1123,6 +1387,8 @@ int run(int argc, char** argv) {
         glClearColor(palette.window_bg.x, palette.window_bg.y, palette.window_bg.z, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        // Capture after every draw call, before the swap discards the back buffer.
+        service_screenshot(app, window);
         glfwSwapBuffers(window);
     }
 

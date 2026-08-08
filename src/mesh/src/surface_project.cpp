@@ -267,7 +267,9 @@ SnapStats snap_boundary_nodes(const geom::TriSurface& surface,
                               std::vector<Eigen::Vector3d>& nodes,
                               const std::vector<std::uint32_t>& boundary_nodes, double h,
                               const CollectOffendersFn& collect_offenders, double max_move_frac,
-                              int passes, std::span<const geom::SharpEdge> feature_edges) {
+                              int passes, std::span<const geom::SharpEdge> feature_edges,
+                              const RepairInteriorFn& repair_interior,
+                              const NodeOffendsFn& node_offends, bool defer_coupled) {
     SnapStats stats;
     if (boundary_nodes.empty() || !(h > 0.0) || !std::isfinite(h) || !collect_offenders) {
         return stats;
@@ -343,74 +345,274 @@ SnapStats snap_boundary_nodes(const geom::TriSurface& surface,
             moved[ni] = already + move;
         }
     }
+    // Some product meshes expose private fan apexes that can be re-placed
+    // after the wall reaches its actual endpoint. Repair them before deciding
+    // that a boundary node must retreat.
+    if (repair_interior) {
+        repair_interior();
+    }
     stats.n_moved = moved.size();
 
-    // Culprit-aware line-search unsnap (descending scan): retreat the most-
-    // moved snapped node toward its lattice site, keeping as much projection
-    // as possible (0.75→0.5→0.25→full restore). A node whose cell STILL
-    // offends at fraction 0 is not the culprit — a different node broke the
-    // cell — so restore its snapped position and never reconsider it instead
-    // of destroying its surface fidelity for zero validity gain. (A pure
-    // bisection search was measured worse: the predicate is not monotone in
-    // the move fraction — retreating one node of a fully-snapped patch can
-    // dimple the cell — so the descending ladder stays.)
-    std::unordered_set<std::uint32_t> exonerated;
-    while (!original.empty()) {
+    // Line-search projected nodes back toward their original lattice sites.
+    //
+    // The culprit-aware implementation used to call the GLOBAL offender
+    // collector at every scan and every one of twelve bisection steps. On the
+    // hybrid sphere that is ~O(boundary nodes × 16 × 47k cells): 3.1 s became
+    // 240.5 s, and icecream hybrid-VEM did not finish in 19 minutes.
+    //
+    // Callers that provide `node_offends` inspect only the cells incident to
+    // the trial node. A cached global snapshot selects candidates; it is
+    // refreshed only after coupled restores and at the final proof, preserving
+    // whole-mesh validity without the quadratic global-rescan loop.
+    if (node_offends) {
+        std::unordered_map<std::uint32_t, Eigen::Vector3d> snapped;
+        snapped.reserve(original.size());
+        std::unordered_map<std::uint32_t, double> fraction;
+        fraction.reserve(original.size());
+        for (const auto& [ni, _] : original) {
+            snapped.emplace(ni, nodes[ni]);
+            fraction.emplace(ni, 1.0);
+        }
+        struct RestoredMove {
+            std::uint32_t node;
+            Eigen::Vector3d original;
+            Eigen::Vector3d snapped;
+        };
+        std::vector<RestoredMove> recover;
+        recover.reserve(original.size());
+        std::unordered_set<std::uint32_t> deferred;
+        deferred.reserve(original.size());
+
+        constexpr int kBisectSteps = 6;
+        const double bracket_tol = 1e-6 * h;
+        // One global offender snapshot drives local trials until a coupled
+        // full restore changes the neighbourhood. Stale entries are cheap:
+        // `node_offends` discards them in O(node degree). A successful trial
+        // cannot create an unlisted bad cell because its complete incident
+        // star was validated before commit.
         std::set<std::uint32_t> offenders;
         collect_offenders(offenders);
-        std::uint32_t worst = 0xffffffffu;
-        double worst_move = -1.0;
-        for (const auto ni : offenders) {
-            if (exonerated.count(ni)) {
+        const std::size_t max_steps = 8 * original.size() + 1;
+        for (std::size_t step = 0; step < max_steps && !original.empty(); ++step) {
+            const auto pick_worst = [&](bool skip_deferred) {
+                std::uint32_t picked = 0xffffffffu;
+                double picked_move = -1.0;
+                for (const auto ni : offenders) {
+                    const auto it = moved.find(ni);
+                    if (it == moved.end() ||
+                        (skip_deferred && deferred.count(ni) != 0) ||
+                        !node_offends(ni)) {
+                        continue;
+                    }
+                    if (it->second > picked_move) {
+                        picked = ni;
+                        picked_move = it->second;
+                    }
+                }
+                return picked;
+            };
+
+            std::uint32_t worst = pick_worst(/*skip_deferred=*/true);
+            if (worst == 0xffffffffu) {
+                // Refresh only at the coupled boundary: either the cached set
+                // is fully stale/clean or every live candidate is deferred.
+                offenders.clear();
+                collect_offenders(offenders);
+                worst = pick_worst(/*skip_deferred=*/true);
+            }
+            if (worst == 0xffffffffu) {
+                worst = pick_worst(/*skip_deferred=*/false);
+                if (worst == 0xffffffffu) {
+                    break; // globally clean or only pre-existing offenders
+                }
+                const Eigen::Vector3d orig = original.at(worst);
+                recover.push_back({worst, orig, snapped.at(worst)});
+                nodes[worst] = orig;
+                original.erase(worst);
+                snapped.erase(worst);
+                fraction.erase(worst);
+                moved.erase(worst);
+                deferred.clear();
+                ++stats.n_unsnapped;
+                offenders.clear();
+                collect_offenders(offenders);
                 continue;
             }
-            const auto it = moved.find(ni);
-            if (it == moved.end()) {
+
+            const Eigen::Vector3d orig = original.at(worst);
+            const Eigen::Vector3d full = snapped.at(worst);
+            const double from = fraction.at(worst);
+            const double span = (full - orig).norm();
+            double bad = from;
+            double good = -1.0;
+            static constexpr double kKeep[] = {0.75, 0.5, 0.25, 0.0};
+            for (const double keep : kKeep) {
+                const double f = from * keep;
+                nodes[worst] = orig + f * (full - orig);
+                if (!node_offends(worst)) {
+                    good = f;
+                    break;
+                }
+                bad = f;
+            }
+            if (good < 0.0) {
+                if (!defer_coupled) {
+                    // Hex/poly stars do not need fan-corner deferral. Restore
+                    // immediately; this keeps curved pure-hex cases linear.
+                    nodes[worst] = orig;
+                    recover.push_back({worst, orig, full});
+                    original.erase(worst);
+                    snapped.erase(worst);
+                    fraction.erase(worst);
+                    moved.erase(worst);
+                    deferred.clear();
+                    ++stats.n_unsnapped;
+                    offenders.clear();
+                    collect_offenders(offenders);
+                    continue;
+                }
+                nodes[worst] = orig + from * (full - orig);
+                deferred.insert(worst);
                 continue;
             }
-            if (it->second > worst_move) {
-                worst_move = it->second;
-                worst = ni;
+            for (int i = 0; i < kBisectSteps && (bad - good) * span > bracket_tol; ++i) {
+                const double mid = 0.5 * (good + bad);
+                nodes[worst] = orig + mid * (full - orig);
+                if (node_offends(worst)) {
+                    bad = mid;
+                } else {
+                    good = mid;
+                }
             }
+            nodes[worst] = orig + good * (full - orig);
+            if (good <= 0.0) {
+                recover.push_back({worst, orig, full});
+                original.erase(worst);
+                snapped.erase(worst);
+                fraction.erase(worst);
+                moved.erase(worst);
+                ++stats.n_unsnapped;
+            } else {
+                fraction[worst] = good;
+                moved[worst] = good * span;
+            }
+            deferred.clear();
         }
-        if (worst == 0xffffffffu || worst_move < 0.0) {
-            break; // inverted cell not caused by a still-snapped node
-        }
-        const auto oit = original.find(worst);
-        if (oit == original.end()) {
-            break;
-        }
-        const Eigen::Vector3d cur = nodes[worst];
-        const Eigen::Vector3d orig = oit->second;
-        bool fixed = false;
-        static constexpr double kFracs[] = {0.75, 0.5, 0.25};
-        for (const double f : kFracs) {
-            // f = fraction of *remaining* snap kept (toward surface from orig).
-            nodes[worst] = orig + f * (cur - orig);
-            std::set<std::uint32_t> still;
-            collect_offenders(still);
-            if (!still.count(worst)) {
-                moved[worst] = (nodes[worst] - orig).norm();
-                fixed = true;
+
+        offenders.clear();
+        collect_offenders(offenders);
+        for (int cleanup = 0; cleanup < 2 && !offenders.empty(); ++cleanup) {
+            bool restored = false;
+            for (const auto ni : offenders) {
+                const auto oit = original.find(ni);
+                if (oit == original.end()) {
+                    continue;
+                }
+                nodes[ni] = oit->second;
+                recover.push_back({ni, oit->second, snapped.at(ni)});
+                original.erase(oit);
+                snapped.erase(ni);
+                fraction.erase(ni);
+                moved.erase(ni);
+                ++stats.n_unsnapped;
+                restored = true;
+            }
+            if (!restored) {
                 break;
             }
+            offenders.clear();
+            collect_offenders(offenders);
         }
-        if (fixed) {
-            continue;
+
+        // Recover as much surface projection as each fully restored node can
+        // keep in the now-clean coupled neighbourhood.
+        if (offenders.empty()) {
+            for (const auto& r : recover) {
+                if (node_offends(r.node)) {
+                    nodes[r.node] = r.original;
+                    continue;
+                }
+                const double span = (r.snapped - r.original).norm();
+                if (!(span > 0.0)) {
+                    continue;
+                }
+                double good = 0.0;
+                double bad = 1.0;
+                nodes[r.node] = r.snapped;
+                if (!node_offends(r.node)) {
+                    good = 1.0;
+                } else {
+                    static constexpr double kKeep[] = {0.75, 0.5, 0.25};
+                    for (const double f : kKeep) {
+                        nodes[r.node] = r.original + f * (r.snapped - r.original);
+                        if (!node_offends(r.node)) {
+                            good = f;
+                            break;
+                        }
+                        bad = f;
+                    }
+                    for (int i = 0;
+                         i < kBisectSteps && (bad - good) * span > bracket_tol; ++i) {
+                        const double mid = 0.5 * (good + bad);
+                        nodes[r.node] = r.original + mid * (r.snapped - r.original);
+                        if (node_offends(r.node)) {
+                            bad = mid;
+                        } else {
+                            good = mid;
+                        }
+                    }
+                }
+                nodes[r.node] = r.original + good * (r.snapped - r.original);
+                if (good > 0.0) {
+                    moved[r.node] = good * span;
+                }
+            }
+            offenders.clear();
+            collect_offenders(offenders); // mandatory final whole-mesh proof
         }
-        // Full restore — but only keep it when it actually clears the cell.
-        nodes[worst] = orig;
-        std::set<std::uint32_t> still0;
-        collect_offenders(still0);
-        if (!still0.count(worst)) {
+    } else {
+        // Compatibility path for legacy fill callers: the old bounded
+        // 0.75/0.5/0.25 ladder (at most four global scans per restored node).
+        // It is intentionally boring; the former 12-step culprit loop made
+        // every existing callsite pay for an incident map it did not have.
+        while (!original.empty()) {
+            std::set<std::uint32_t> offenders;
+            collect_offenders(offenders);
+            std::uint32_t worst = 0xffffffffu;
+            double worst_move = -1.0;
+            for (const auto ni : offenders) {
+                const auto it = moved.find(ni);
+                if (it != moved.end() && it->second > worst_move) {
+                    worst_move = it->second;
+                    worst = ni;
+                }
+            }
+            if (worst == 0xffffffffu) {
+                break;
+            }
+            const auto oit = original.find(worst);
+            const Eigen::Vector3d cur = nodes[worst];
+            const Eigen::Vector3d orig = oit->second;
+            bool fixed = false;
+            static constexpr double kKeep[] = {0.75, 0.5, 0.25};
+            for (const double keep : kKeep) {
+                nodes[worst] = orig + keep * (cur - orig);
+                std::set<std::uint32_t> still;
+                collect_offenders(still);
+                if (still.count(worst) == 0) {
+                    moved[worst] = (nodes[worst] - orig).norm();
+                    fixed = true;
+                    break;
+                }
+            }
+            if (fixed) {
+                continue;
+            }
+            nodes[worst] = orig;
             original.erase(oit);
             moved.erase(worst);
             ++stats.n_unsnapped;
-            continue;
         }
-        // Not the culprit: keep the snap, move on to the other offenders.
-        nodes[worst] = cur;
-        exonerated.insert(worst);
     }
 
     stats.max_residual = 0.0;

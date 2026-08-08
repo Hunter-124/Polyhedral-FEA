@@ -26,6 +26,27 @@ SolveMethod select_solve_method(Eigen::Index nfree, const SolveOptions& options)
     return SolveMethod::kDirect;
 }
 
+SolveDecision decide_solve_method(Eigen::Index nfree, const SolveOptions& options,
+                                  const SolveResourceEstimate& estimate,
+                                  std::uint64_t effective_cap_bytes) {
+    SolveDecision decision;
+    decision.method = select_solve_method(nfree, options);
+    if (options.method == SolveMethod::kAuto && decision.method == SolveMethod::kDirect &&
+        estimate.direct_peak_bytes > effective_cap_bytes &&
+        estimate.cg_peak_bytes <= effective_cap_bytes) {
+        decision.method = SolveMethod::kCG;
+        decision.note = std::format(
+            "memory budget: LDLT estimate {} exceeds cap {}; using CG estimate {}",
+            format_memory_bytes(estimate.direct_peak_bytes),
+            format_memory_bytes(effective_cap_bytes),
+            format_memory_bytes(estimate.cg_peak_bytes));
+    }
+    decision.estimated_bytes = decision.method == SolveMethod::kDirect
+                                   ? estimate.direct_peak_bytes
+                                   : estimate.cg_peak_bytes;
+    return decision;
+}
+
 namespace {
 
 /// Iteration cap `kAuto` applies when the caller leaves `cg_max_iters` at 0.
@@ -159,7 +180,6 @@ Eigen::VectorXd solve_reduced(const Eigen::SparseMatrix<double>& kff,
 Eigen::VectorXd solve_elastostatics(const NodalMesh& mesh, const Material& material,
                                     const Dirichlet& dirichlet, const Eigen::VectorXd& loads,
                                     const SolveOptions& options) {
-    init_runtime_performance();
     const Eigen::Index ndof = 3 * static_cast<Eigen::Index>(mesh.nodes.size());
     if (loads.size() != ndof) {
         throw FeaError(std::format("solve_elastostatics: load vector size {} != 3N = {}",
@@ -173,19 +193,43 @@ Eigen::VectorXd solve_elastostatics(const NodalMesh& mesh, const Material& mater
         (void)value;
     }
 
+    const Eigen::Index nfree =
+        ndof - static_cast<Eigen::Index>(dirichlet.dof_values.size());
+    const auto estimate = estimate_solve_resources(mesh, nfree);
+    const auto budget = effective_memory_budget(options.max_mem_gb);
+    const auto decision =
+        decide_solve_method(nfree, options, estimate, budget.effective_cap_bytes);
+    if (decision.estimated_bytes > budget.effective_cap_bytes) {
+        const bool direct = decision.method == SolveMethod::kDirect;
+        throw FeaError(std::format(
+            "solve_elastostatics: estimated {} solve footprint {} exceeds effective memory cap "
+            "{} (limiting term: {}); raise --max-mem <GB> or free system memory",
+            direct ? "LDLT" : "CG", format_memory_bytes(decision.estimated_bytes),
+            format_memory_bytes(budget.effective_cap_bytes),
+            limiting_resource_term(estimate, direct)));
+    }
+    if (!decision.note.empty() && options.on_note) {
+        options.on_note(decision.note);
+    }
+    init_runtime_performance();
+
+    SolveOptions selected_options = options;
+    selected_options.method = decision.method;
+
+
     // Map global DOFs to reduced (free) indices; -1 marks constrained.
     std::vector<Eigen::Index> reduced(static_cast<std::size_t>(ndof), -1);
-    Eigen::Index nfree = 0;
+    Eigen::Index reduced_count = 0;
     for (Eigen::Index dof = 0; dof < ndof; ++dof) {
         if (!dirichlet.dof_values.contains(dof)) {
-            reduced[static_cast<std::size_t>(dof)] = nfree++;
+            reduced[static_cast<std::size_t>(dof)] = reduced_count++;
         }
     }
 
     const auto k = assemble_stiffness(mesh, material);
 
     // Reduced system: K_ff u_f = f_f - K_fc u_c.
-    Eigen::VectorXd rhs(nfree);
+    Eigen::VectorXd rhs(reduced_count);
     for (Eigen::Index dof = 0; dof < ndof; ++dof) {
         const auto r = reduced[static_cast<std::size_t>(dof)];
         if (r >= 0) {
@@ -204,14 +248,13 @@ Eigen::VectorXd solve_elastostatics(const NodalMesh& mesh, const Material& mater
             }
         }
     }
-    Eigen::SparseMatrix<double> kff(nfree, nfree);
+    Eigen::SparseMatrix<double> kff(reduced_count, reduced_count);
     kff.setFromTriplets(triplets.begin(), triplets.end());
 
-    // Solver selection is cell-type independent: `cg_threshold` alone decides.
-    // VEM stabilisation is not what made CG slow here — hex8 and tet4 systems of
-    // the same size were just as bad — so the old kPolyVem-only escape hatch to
-    // a 100k threshold has been folded into the default threshold for everyone.
-    const Eigen::VectorXd uf = solve_reduced(kff, rhs, options);
+    // The allocation-free preflight above preserves the normal cell-independent
+    // threshold policy, except that kAuto may downgrade LDLT to CG when only the
+    // iterative footprint fits. Explicit method choices remain authoritative.
+    const Eigen::VectorXd uf = solve_reduced(kff, rhs, selected_options);
 
     Eigen::VectorXd u(ndof);
     for (Eigen::Index dof = 0; dof < ndof; ++dof) {

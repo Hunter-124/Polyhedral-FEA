@@ -19,6 +19,7 @@ add_executable(polymesh_tests
     test_tier0.cpp
     test_cantilever.cpp
     test_iterative_solve.cpp
+    test_resource_budget.cpp
     test_mms_convergence.cpp
     test_lame_cylinder.cpp
     test_kirsch_plate.cpp
@@ -57,6 +58,7 @@ add_executable(polymesh_tests
     test_pyramid.cpp
     test_transition_fill.cpp
     test_mixed_fill.cpp
+    test_mesh_budget.cpp
     test_octa_fill.cpp
     test_p_elevate.cpp
     test_traction_selection.cpp

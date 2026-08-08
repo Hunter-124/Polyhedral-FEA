@@ -11,6 +11,7 @@ add_library(fea
     src/hp_assembly.cpp
     src/assembly.cpp
     src/solve.cpp
+    src/resource_budget.cpp
     src/traction.cpp
     src/stress.cpp
     src/cell_quality.cpp

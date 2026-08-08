@@ -46,8 +46,14 @@ struct SnapStats {
     double max_residual = 0.0; // metres, after snap/unsnap
 };
 
-/// Collect node indices that participate in inverted / non-positive elements.
+/// Collect every node that participates in an invalid element. Used for the
+/// initial/final global validity sweeps.
 using CollectOffendersFn = std::function<void(std::set<std::uint32_t>& offenders)>;
+using RepairInteriorFn = std::function<void()>;
+/// Fast local validity query used while line-searching one moved node. The
+/// caller should inspect only elements incident to `node`; omitting it keeps the
+/// compatibility global-scan path.
+using NodeOffendsFn = std::function<bool(std::uint32_t node)>;
 
 /// Pull boundary lattice nodes toward the STL in multi-pass steps, then unsnap
 /// any node that participates in an inverted element (B3 / ADR-0015).
@@ -59,12 +65,17 @@ using CollectOffendersFn = std::function<void(std::set<std::uint32_t>& offenders
 /// @param feature_edges Optional sharp CAD edges: true crease nodes (as close
 ///        to a feature as to the surface) project to the edge first; free-face
 ///        / hole-wall nodes still project to the surface.
+/// @param defer_coupled Keep locally irreparable fan nodes for a coupled
+///        restore; pure hex/poly meshes leave this false for a linear scan.
 SnapStats snap_boundary_nodes(const geom::TriSurface& surface,
                               std::vector<Eigen::Vector3d>& nodes,
                               const std::vector<std::uint32_t>& boundary_nodes, double h,
                               const CollectOffendersFn& collect_offenders,
                               double max_move_frac = 0.75, int passes = 4,
-                              std::span<const geom::SharpEdge> feature_edges = {});
+                              std::span<const geom::SharpEdge> feature_edges = {},
+                              const RepairInteriorFn& repair_interior = {},
+                              const NodeOffendsFn& node_offends = {},
+                              bool defer_coupled = false);
 
 /// Result of a tangential boundary smoothing pass.
 struct SmoothStats {

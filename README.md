@@ -247,6 +247,10 @@ resulting nodal-load sum next to the requested resultant as a conservation
 check. `diag` accepts `--fix-box` / `--load-box` too, so a diagnostics run can
 reproduce the exact boundary conditions of a solve.
 
+Resource flags (all subcommands): `--max-mem <GB>` caps the estimated solve
+footprint, `--max-elems N` and `--max-dof N` cap mesh size (`0` = auto on all
+three). Defaults are enforced, not advisory — see *Resource limits* below.
+
 ### GUI
 
 ![PolyMesh Studio](docs/assets/showcase/gui_studio.png)
@@ -287,6 +291,19 @@ cmake -B build -DPOLYMESH_WITH_GUI=OFF    # libs + CLI + tests only
   choice depends only on free-DOF count, never on element type. Patch tests
   and verification meshes stay on the direct path so constant-strain exactness
   is preserved. See `src/fea/include/fea/solve.hpp`.
+- **Resource limits** — runs are budgeted before they allocate. A solve
+  estimates its footprint (CSR nnz from the real connectivity, plus the LDLT
+  factor fill-in or the CG working set) and refuses with the estimate, the cap,
+  and the limiting term when it would exceed `min(--max-mem, 70% of available
+  system memory)`; under `kAuto` a solve that fits CG but not LDLT is
+  downgraded rather than failed. Meshing predicts its element count first and
+  caps it at 589,824 elements / 1,769,472 DOF by default: with an explicit `-h`
+  it refuses up front, while auto sizing clamps h upward (reported in the mesh
+  note as `auto h clamped from … (element ceiling …)`) and coarsens-and-retries
+  rather than failing. Adapt passes stop when the next pass would breach the
+  ceiling. Mesh and CG loops poll cancellation every iteration, so **Cancel**
+  returns in milliseconds instead of at the next phase boundary. See
+  `src/fea/include/fea/resource_budget.hpp`.
 - **CUDA** (default OFF) — `fea::spmv_cpu` / `csr_from_eigen` always build; the
   CUDA SpMV in `backend_cuda.cu` runs only with a device present and is parity-
   tested against the CPU path. `polymesh backend` reports `cpu` or

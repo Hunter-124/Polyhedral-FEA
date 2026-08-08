@@ -5,9 +5,12 @@
 // partitioning, then sparse direct LDLT or iterative CG.
 
 #include "fea/assembly.hpp"
+#include "fea/resource_budget.hpp"
 
 #include <functional>
 #include <map>
+#include <string>
+#include <string_view>
 
 namespace polymesh::fea {
 
@@ -40,6 +43,10 @@ enum class SolveMethod {
 struct SolveOptions {
     SolveMethod method = SolveMethod::kAuto;
 
+    /// Maximum estimated solve footprint in decimal GB. 0 = automatic cap at
+    /// 70% of the operating system's currently available memory.
+    double max_mem_gb = 0.0;
+
     /// Free-DOF count above which `kAuto` selects CG.
     ///
     /// The selection is deliberately cell-type independent: what makes a system
@@ -64,18 +71,38 @@ struct SolveOptions {
     /// When `on_progress` is set, CG invokes the callback every this many
     /// iterations (and at completion). 0 = completion callback only. The
     /// recurrence is never restarted, so this only affects reporting rate.
-    /// Keep the callback cheap.
-    int cg_progress_chunk = 64;
+    /// Four iterations keeps cooperative GUI cancellation comfortably below a
+    /// second even on large systems; keep the callback cheap.
+    int cg_progress_chunk = 4;
 
     /// Optional progress callback (CG path only). Empty = no callbacks.
     /// Args: (iter, max_iters, relative residual).
     std::function<void(int, int, double)> on_progress;
+
+    /// Optional method-selection note (for example an LDLT→CG memory
+    /// downgrade). The callback runs during preflight, before assembly.
+    std::function<void(std::string_view)> on_note;
+};
+
+/// Concrete method and memory estimate chosen during allocation-free preflight.
+struct SolveDecision {
+    SolveMethod method = SolveMethod::kDirect;
+    std::uint64_t estimated_bytes = 0;
+    std::string note;
 };
 
 /// Returns the concrete method `kAuto` (or an explicit method) will use for the
 /// given free-DOF count. Useful for tests and diagnostics.
 [[nodiscard]] SolveMethod select_solve_method(Eigen::Index nfree,
                                               const SolveOptions& options = {});
+
+/// Apply the normal DOF threshold plus the effective memory cap. Explicit
+/// kDirect/kCG requests remain authoritative; only kAuto may downgrade LDLT to
+/// CG when the direct footprint does not fit and CG does.
+[[nodiscard]] SolveDecision decide_solve_method(Eigen::Index nfree,
+                                                const SolveOptions& options,
+                                                const SolveResourceEstimate& estimate,
+                                                std::uint64_t effective_cap_bytes);
 
 /// Solves K u = f with the given constraints. `loads` is the full-size global
 /// load vector (3N); returns the full-size displacement vector with

@@ -152,13 +152,29 @@ Model Model::load(const std::string& path, double sharp_angle_deg) {
     return model;
 }
 
+double predict_mesh_elements(const Model& model, double h) {
+    if (!(h > 0.0) || !std::isfinite(h)) {
+        return 0.0;
+    }
+    const Eigen::Vector3d ext = (model.bbox_max - model.bbox_min).cwiseMax(0.0);
+    const double bbox_volume = std::max(ext[0] * ext[1] * ext[2], 0.0);
+    // ADR-0023 M4: a conservative tet-equivalent packing estimate.
+    constexpr double kElementsPerCell = 6.0;
+    return kElementsPerCell * bbox_volume / (h * h * h);
+}
+
 ResolvedMeshSize resolve_mesh_size(const Model& model, double requested_h,
-                                   double sharp_angle_deg) {
+                                   double sharp_angle_deg, std::size_t max_elems,
+                                   std::size_t max_dof) {
     ResolvedMeshSize out;
+    out.element_ceiling = max_elems == 0 ? kDefaultMaxMeshElems : max_elems;
+    out.dof_ceiling = max_dof == 0 ? kDefaultMaxMeshDof : max_dof;
     if (requested_h > 0.0) {
         out.h = requested_h;
         out.auto_chosen = false;
-        out.note = std::format("h={:.4g} m (user)", out.h);
+        out.predicted_elements = predict_mesh_elements(model, out.h);
+        out.note = std::format("h={:.4g} m (user, predicted {:.0f} elems)", out.h,
+                               out.predicted_elements);
         return out;
     }
 
@@ -295,15 +311,50 @@ ResolvedMeshSize resolve_mesh_size(const Model& model, double requested_h,
     if (diagonal > 0.0) {
         h0 = std::clamp(h0, diagonal / 80.0, diagonal / 6.0);
     }
+    const double h_before_ceiling = h0;
+    // The ADR-0023 bbox estimator intentionally ignores feature/transition
+    // amplification. Measured public hybrid auto meshes reach ~3.1× N_pred;
+    // use 4× headroom so the ceiling binds before fill rather than after it.
+    constexpr double kAutoPredictionSafety = 4.0;
+    const std::size_t dof_elem_ceiling = std::max<std::size_t>(1, out.dof_ceiling / 3);
+    const std::size_t effective_elem_ceiling =
+        std::min(out.element_ceiling, dof_elem_ceiling);
+    const Eigen::Vector3d positive_extent = extent_vec.cwiseMax(0.0);
+    const double bbox_volume =
+        std::max(positive_extent[0] * positive_extent[1] * positive_extent[2], 0.0);
+    const double h_ceiling = std::cbrt(
+        6.0 * kAutoPredictionSafety * bbox_volume /
+        static_cast<double>(effective_elem_ceiling));
+    if (h_ceiling > h0 && std::isfinite(h_ceiling)) {
+        h0 = std::nextafter(h_ceiling, std::numeric_limits<double>::infinity());
+        out.ceiling_clamped = true;
+    }
     out.h = h0;
     out.auto_chosen = true;
-    out.note = std::format(
-        "auto h={:.4g} m (extent/16∩diag/28, n_sharp={}, min_feat={:.3g} m, dens×{:.2f}"
-        "{}{})",
-        out.h, out.n_sharp_edges, out.min_feature_length, density_scale,
+    out.predicted_elements = kAutoPredictionSafety * predict_mesh_elements(model, out.h);
+    const std::string detail = std::format(
+        "extent/16∩diag/28, prediction safety×4, n_sharp={}, min_feat={:.3g} m, dens×{:.2f}{}{}",
+        out.n_sharp_edges, out.min_feature_length, density_scale,
         std::isfinite(r_curv) ? std::format(", Rκ≈{:.3g}", r_curv) : std::string{},
         std::isfinite(cad_min_edge) ? std::format(", CAD_edge≈{:.3g}", cad_min_edge)
                                     : std::string{});
+    if (out.ceiling_clamped) {
+        if (effective_elem_ceiling == out.element_ceiling) {
+            out.note = std::format(
+                "auto h clamped from {:.4g} to {:.4g} m (element ceiling {}) | "
+                "predicted {:.0f} elems ({})",
+                h_before_ceiling, out.h, out.element_ceiling, out.predicted_elements, detail);
+        } else {
+            out.note = std::format(
+                "auto h clamped from {:.4g} to {:.4g} m (DOF ceiling {}) | "
+                "predicted {:.0f} elems / {:.0f} DOF ({})",
+                h_before_ceiling, out.h, out.dof_ceiling, out.predicted_elements,
+                3.0 * out.predicted_elements, detail);
+        }
+    } else {
+        out.note = std::format("auto h={:.4g} m (predicted {:.0f} elems ≤ ceiling {}; {})",
+                               out.h, out.predicted_elements, out.element_ceiling, detail);
+    }
     return out;
 }
 
@@ -496,11 +547,34 @@ ElementTendencyPlan resolve_element_tendency(VolumeMesher base, double tendency,
     return plan;
 }
 
-VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
-                             int skin_layers, bool feature_refine,
-                             std::span<const Eigen::Vector3d> refine_seeds, double seed_band,
-                             double element_tendency) {
+VolumeMeshOutput volume_mesh(
+    const Model& model, double h, VolumeMesher mesher, int skin_layers,
+    bool feature_refine, std::span<const Eigen::Vector3d> refine_seeds, double seed_band,
+    double element_tendency, std::size_t max_elems, std::size_t max_dof,
+    int auto_retry_budget, const std::function<void()>& cancel_check) {
+    const auto poll_cancel = [&] {
+        if (cancel_check) {
+            cancel_check();
+        }
+    };
+    poll_cancel();
+    const double predicted_elems = predict_mesh_elements(model, h);
+    const double predicted_dof = 3.0 * predicted_elems;
+    if (max_elems > 0 && predicted_elems > static_cast<double>(max_elems)) {
+        throw std::runtime_error(std::format(
+            "mesh element ceiling {} exceeded: predicted {:.0f} elements at h={:.6g} m; "
+            "increase -h or raise --max-elems",
+            max_elems, std::ceil(predicted_elems), h));
+    }
+    if (max_dof > 0 && predicted_dof > static_cast<double>(max_dof)) {
+        throw std::runtime_error(std::format(
+            "mesh DOF ceiling {} exceeded: predicted {:.0f} DOF ({:.0f} elements) at "
+            "h={:.6g} m; increase -h or raise --max-dof",
+            max_dof, std::ceil(predicted_dof), std::ceil(predicted_elems), h));
+    }
     VolumeMeshOutput out;
+    const VolumeMesher requested_mesher = mesher;
+    const int requested_skin_layers = skin_layers;
     double fill_h = h;
     const auto tendency_plan = resolve_element_tendency(mesher, element_tendency, skin_layers);
     mesher = tendency_plan.mesher;
@@ -540,10 +614,10 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         // Build lattice without snap first; product FE snaps after hex→pyramid
         // expand so free-surface Jacobian is pyramid-based. Native-poly path
         // keeps hex FE + poly VEM and snaps on that mesh.
-        auto raw = mesh::mixed_fill_surface(model.surface, model.bbox_min, model.bbox_max, h,
-                                            std::max(1, skin_layers), edges, feat_band,
-                                            adapt_seeds, s_band, /*snap_boundary=*/false,
-                                            turn_deg, native_poly);
+        auto raw = mesh::mixed_fill_surface(
+            model.surface, model.bbox_min, model.bbox_max, h, std::max(1, skin_layers), edges,
+            feat_band, adapt_seeds, s_band, /*snap_boundary=*/false, turn_deg, native_poly,
+            cancel_check);
         const std::size_t n_hex_lattice = raw.n_hex;
         const std::size_t n_pyr_raw = raw.n_pyramid;
         const std::size_t n_poly_raw = raw.n_poly;
@@ -558,6 +632,7 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         auto fill = (native_poly || pure_hex_lattice)
                         ? std::move(raw)
                         : mesh::expand_mixed_hex_to_pyramids(raw);
+        poll_cancel();
         fill_h = fill.h;
         // Post-expand free-surface snap (boundary quads from lattice).
         if (!fill.boundary_quads.empty()) {
@@ -589,19 +664,45 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                 }
                 return 6.0 * 1.4142135623730951 * v / (emax * emax * emax) >= kMinTetAspect;
             };
-            // SIGNED split volumes (the old test compared |v| to vol_eps, so a
-            // pyramid whose apex had crossed its base plane read as perfectly
-            // valid and shipped inverted to the solver and the VTU) plus a
-            // sliver floor, since vol_eps ~1e-14·h³ never rejected anything.
+            // A pyramid is a single cell, not two independently quality-scored
+            // tetrahedra. Require both halves of the conformity-safe assembly
+            // split to stay positively oriented, then apply the shared shape
+            // floor to VTK/PyVista's signed pyramid volume (the mean of both
+            // base-diagonal volume sums). Using the minimum split-tet aspect
+            // here made a healthy asymmetric pyramid fail and forced boundary
+            // nodes back off the surface.
             const auto pyramid_ok = [&](const mesh::MixedCell& cell) {
                 const Eigen::Vector3d& p0 = fill.nodes[cell.nodes[0]];
                 const Eigen::Vector3d& p1 = fill.nodes[cell.nodes[1]];
                 const Eigen::Vector3d& p2 = fill.nodes[cell.nodes[2]];
                 const Eigen::Vector3d& p3 = fill.nodes[cell.nodes[3]];
                 const Eigen::Vector3d& p4 = fill.nodes[cell.nodes[4]];
-                return mesh::validity::pyramid_min_split_volume(p0, p1, p2, p3, p4) >
-                           vol_eps &&
-                       mesh::validity::pyramid_shape_quality(p0, p1, p2, p3, p4) >= kMinShape;
+                const double v02a = mesh::validity::tet_signed_volume(p0, p1, p2, p4);
+                const double v02b = mesh::validity::tet_signed_volume(p0, p2, p3, p4);
+                const double v13a = mesh::validity::tet_signed_volume(p1, p2, p3, p4);
+                const double v13b = mesh::validity::tet_signed_volume(p1, p3, p0, p4);
+                double v0 = v02a;
+                double v1 = v02b;
+                if (mesh::validity::pyramid_split_diagonal(p0, p1, p2, p3) == 1) {
+                    v0 = v13a;
+                    v1 = v13b;
+                }
+                if (v0 <= vol_eps || v1 <= vol_eps) {
+                    return false;
+                }
+                const double mean_edge =
+                    ((p1 - p0).norm() + (p2 - p1).norm() + (p3 - p2).norm() +
+                     (p0 - p3).norm() + (p4 - p0).norm() + (p4 - p1).norm() +
+                     (p4 - p2).norm() + (p4 - p3).norm()) /
+                    8.0;
+                constexpr double kRegularPyramidVolumeRatio = 0.23570226039551587;
+                const double volume = 0.5 * (v02a + v02b + v13a + v13b);
+                const double collapse =
+                    mean_edge > 0.0
+                        ? volume / (mean_edge * mean_edge * mean_edge) /
+                              kRegularPyramidVolumeRatio
+                        : 0.0;
+                return volume > vol_eps && collapse >= kMinShape;
             };
             // The hex8 check `cell_valid` used to only promise: min detJ over
             // the centre and the 2×2×2 Gauss points the assembly integrates at.
@@ -613,55 +714,98 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                 return mesh::validity::hex8_min_jacobian(x) > 0.0 &&
                        mesh::validity::hex8_shape_quality(x) >= kMinShape;
             };
+            // One canonical snap predicate feeds both the global audit and the
+            // per-node incident-cell query below. Keeping these identical is
+            // what lets surface_project avoid full-mesh scans during a trial
+            // move without weakening the final global validity sweep.
+            const auto snap_cell_valid = [&](const mesh::MixedCell& cell) {
+                if (cell.kind == mesh::MixedCellKind::kTet4) {
+                    // Volume only: a fan tet flattened by a full snap is peeled
+                    // right after (apex coplanar), cheaper than unsnapping wall.
+                    const Eigen::Vector3d& a = fill.nodes[cell.nodes[0]];
+                    const Eigen::Vector3d& b = fill.nodes[cell.nodes[1]];
+                    const Eigen::Vector3d& c = fill.nodes[cell.nodes[2]];
+                    const Eigen::Vector3d& d = fill.nodes[cell.nodes[3]];
+                    return (b - a).dot((c - a).cross(d - a)) >= 0.0;
+                }
+                if (cell.kind == mesh::MixedCellKind::kPolyVem) {
+                    std::vector<Eigen::Vector3d> coords;
+                    coords.reserve(cell.poly_nodes.size());
+                    for (const auto g : cell.poly_nodes) {
+                        coords.push_back(fill.nodes[g]);
+                    }
+                    return fea::poly_volume(coords, cell.poly_faces) > vol_eps;
+                }
+                if (cell.kind == mesh::MixedCellKind::kHex8) {
+                    return hex_ok(cell);
+                }
+                return cell.kind != mesh::MixedCellKind::kPyramid5 || pyramid_ok(cell);
+            };
+
+            // Boundary-node → incident-cell map. Trial line-search checks are
+            // O(local degree), not O(all 47k cells). The global collector still
+            // runs before/after bounded rounds to prove whole-mesh validity.
+            std::vector<std::vector<std::size_t>> snap_node_cells(fill.nodes.size());
+            std::vector<char> is_snap_node(fill.nodes.size(), 0);
+            for (const auto ni : bnodes) {
+                if (ni < is_snap_node.size()) {
+                    is_snap_node[ni] = 1;
+                }
+            }
+            for (std::size_t ci = 0; ci < fill.cells.size(); ++ci) {
+                const auto& cell = fill.cells[ci];
+                if (cell.kind == mesh::MixedCellKind::kPolyVem) {
+                    for (const auto ni : cell.poly_nodes) {
+                        if (ni < is_snap_node.size() && is_snap_node[ni]) {
+                            snap_node_cells[ni].push_back(ci);
+                        }
+                    }
+                } else {
+                    for (std::uint8_t m = 0; m < cell.n_nodes; ++m) {
+                        const auto ni = cell.nodes[m];
+                        if (ni < is_snap_node.size() && is_snap_node[ni]) {
+                            snap_node_cells[ni].push_back(ci);
+                        }
+                    }
+                }
+            }
+
+            std::size_t validity_poll = 0;
+            const auto collect_snap_offenders = [&](std::set<std::uint32_t>& offenders) {
+                for (const auto& cell : fill.cells) {
+                    if ((validity_poll++ & 255U) == 0U) {
+                        poll_cancel();
+                    }
+                    if (snap_cell_valid(cell)) {
+                        continue;
+                    }
+                    if (cell.kind == mesh::MixedCellKind::kPolyVem) {
+                        offenders.insert(cell.poly_nodes.begin(), cell.poly_nodes.end());
+                    } else {
+                        offenders.insert(cell.nodes.begin(), cell.nodes.begin() + cell.n_nodes);
+                    }
+                }
+            };
+            const auto snap_node_offends = [&](std::uint32_t ni) {
+                if (ni >= snap_node_cells.size()) {
+                    return false;
+                }
+                for (const auto ci : snap_node_cells[ni]) {
+                    if (!snap_cell_valid(fill.cells[ci])) {
+                        return true;
+                    }
+                }
+                return false;
+            };
             fill.boundary_max_distance =
                 mesh::snap_boundary_nodes(
-                    model.surface, fill.nodes, bnodes, h_snap,
-                    [&](std::set<std::uint32_t>& offenders) {
-                        for (const auto& cell : fill.cells) {
-                            if (cell.kind == mesh::MixedCellKind::kTet4) {
-                                // Volume only: a fan tet flattened by a full
-                                // snap is peeled right after (apex coplanar) —
-                                // cheaper than unsnapping the wall.
-                                const Eigen::Vector3d& a = fill.nodes[cell.nodes[0]];
-                                const Eigen::Vector3d& b = fill.nodes[cell.nodes[1]];
-                                const Eigen::Vector3d& c = fill.nodes[cell.nodes[2]];
-                                const Eigen::Vector3d& d = fill.nodes[cell.nodes[3]];
-                                if ((b - a).dot((c - a).cross(d - a)) < 0.0) {
-                                    offenders.insert(cell.nodes.begin(),
-                                                     cell.nodes.begin() + cell.n_nodes);
-                                }
-                                continue;
-                            }
-                            if (cell.kind == mesh::MixedCellKind::kPolyVem) {
-                                std::vector<Eigen::Vector3d> coords;
-                                coords.reserve(cell.poly_nodes.size());
-                                for (const auto g : cell.poly_nodes) {
-                                    coords.push_back(fill.nodes[g]);
-                                }
-                                if (fea::poly_volume(coords, cell.poly_faces) <= vol_eps) {
-                                    offenders.insert(cell.poly_nodes.begin(),
-                                                     cell.poly_nodes.end());
-                                }
-                                continue;
-                            }
-                            if (cell.kind == mesh::MixedCellKind::kHex8) {
-                                if (!hex_ok(cell)) {
-                                    offenders.insert(cell.nodes.begin(),
-                                                     cell.nodes.begin() + cell.n_nodes);
-                                }
-                                continue;
-                            }
-                            if (cell.kind != mesh::MixedCellKind::kPyramid5) {
-                                continue;
-                            }
-                            if (!pyramid_ok(cell)) {
-                                offenders.insert(cell.nodes.begin(),
-                                                 cell.nodes.begin() + cell.n_nodes);
-                            }
-                        }
-                    },
-                    /*max_move_frac=*/1.25, /*passes=*/8, edges)
+                    model.surface, fill.nodes, bnodes, h_snap, collect_snap_offenders,
+                    /*max_move_frac=*/1.25, /*passes=*/8, edges,
+                    [&] { mesh::repair_mixed_fan_apices(fill, kMinShape); },
+                    snap_node_offends,
+                    /*defer_coupled=*/fill.n_pyramid > 0 || fill.n_tet > 0)
                     .max_residual;
+            poll_cancel();
             // Peel snap-flattened fan tets: a full wall snap can pull all three
             // free nodes of a transition fan tet into the apex plane (aspect →
             // 0). The apex is then coplanar with the wall, so deleting the tet
@@ -768,7 +912,11 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             // stragglers get a full/partial projection accepted only when every
             // incident cell stays valid. After expand all cells are pyramid/tet.
             std::unordered_map<std::uint32_t, std::vector<std::size_t>> node_cells;
+            poll_cancel();
             for (std::size_t ci = 0; ci < fill.cells.size(); ++ci) {
+                if ((ci & 255U) == 0U) {
+                    poll_cancel();
+                }
                 const auto& cell = fill.cells[ci];
                 if (cell.kind == mesh::MixedCellKind::kPolyVem) {
                     for (const auto g : cell.poly_nodes) {
@@ -802,7 +950,11 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             };
             const double thr = 0.08 * h_snap;
             double max_resid = 0.0;
+            std::size_t reprojection_poll = 0;
             for (const auto ni : bnodes) {
+                if ((reprojection_poll++ & 63U) == 0U) {
+                    poll_cancel();
+                }
                 if (ni >= fill.nodes.size()) {
                     continue;
                 }
@@ -833,14 +985,19 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                 max_resid = std::max(max_resid, resid);
             }
             fill.boundary_max_distance = max_resid;
+            poll_cancel();
             // Tangential smoothing: even out lattice-stair spacing on curved
             // walls / hole rims (crease nodes relax along the crease). Moves
             // are re-projected so the residual cannot grow; any move that
             // invalidates a cell is reverted.
+            validity_poll = 0;
             const auto smooth_st = mesh::smooth_boundary_nodes(
                 model.surface, fill.nodes, fill.boundary_quads, h_snap,
                 [&](std::set<std::uint32_t>& offenders) {
                     for (const auto& cell : fill.cells) {
+                        if ((validity_poll++ & 255U) == 0U) {
+                            poll_cancel();
+                        }
                         if (cell_valid(cell)) {
                             continue;
                         }
@@ -854,21 +1011,51 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                     }
                 },
                 /*passes=*/3, /*relax=*/0.5, edges);
+            poll_cancel();
             if (smooth_st.n_moved > 0) {
                 fill.boundary_max_distance = smooth_st.max_residual;
             }
         }
         out.mesh.nodes = std::move(fill.nodes);
         out.mesh.elements.reserve(fill.cells.size());
+        std::size_t conversion_poll = 0;
         for (const auto& cell : fill.cells) {
+            if ((conversion_poll++ & 255U) == 0U) {
+                poll_cancel();
+            }
             if (cell.kind == mesh::MixedCellKind::kPolyVem) {
                 out.mesh.elements.emplace_back(fea::ElementType::kPolyVem, cell.poly_nodes,
                                                cell.poly_faces);
             } else if (cell.kind == mesh::MixedCellKind::kPyramid5) {
-                out.mesh.elements.push_back(
-                    fea::NodalElement{fea::ElementType::kPyramid5,
-                                      {cell.nodes[0], cell.nodes[1], cell.nodes[2],
-                                       cell.nodes[3], cell.nodes[4]}});
+                std::array<std::uint32_t, 5> p{
+                    {cell.nodes[0], cell.nodes[1], cell.nodes[2], cell.nodes[3], cell.nodes[4]}};
+                // Normalize winding at the final coordinates: snap rollback and
+                // smoothing happen after mixed-cell emission, so a pre-existing
+                // all-negative winding can otherwise survive as an offender
+                // with no moved node to restore. VTK's signed pyramid volume is
+                // the mean of the two base-diagonal tet-volume sums.
+                const auto& x0 = out.mesh.nodes[p[0]];
+                const auto& x1 = out.mesh.nodes[p[1]];
+                const auto& x2 = out.mesh.nodes[p[2]];
+                const auto& x3 = out.mesh.nodes[p[3]];
+                const auto& xa = out.mesh.nodes[p[4]];
+                const double vtk_volume =
+                    0.5 * (mesh::validity::tet_signed_volume(x0, x1, x2, xa) +
+                           mesh::validity::tet_signed_volume(x0, x2, x3, xa) +
+                           mesh::validity::tet_signed_volume(x1, x2, x3, xa) +
+                           mesh::validity::tet_signed_volume(x1, x3, x0, xa));
+                if (vtk_volume < 0.0) {
+                    std::swap(p[1], p[3]);
+                }
+                // VTK/PyVista triangulate pyramid5 along local 0-2. Rotate the
+                // cyclic base so it is the conformity-safe assembly diagonal.
+                if (mesh::validity::pyramid_split_diagonal(
+                        out.mesh.nodes[p[0]], out.mesh.nodes[p[1]], out.mesh.nodes[p[2]],
+                        out.mesh.nodes[p[3]]) == 1) {
+                    std::rotate(p.begin(), p.begin() + 1, p.begin() + 4);
+                }
+                out.mesh.elements.push_back(fea::NodalElement{
+                    fea::ElementType::kPyramid5, {p[0], p[1], p[2], p[3], p[4]}});
             } else if (cell.kind == mesh::MixedCellKind::kHex8) {
                 out.mesh.elements.push_back(fea::NodalElement{
                     fea::ElementType::kHex8,
@@ -1689,11 +1876,15 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
     const auto& surf = model.surface;
     auto map_boundary_regions = [&] {
         out.boundary_node_region.clear();
+        std::size_t boundary_poll = 0;
         std::set<std::uint32_t> boundary_nodes;
         for (const auto& quad : out.boundary_quads) {
             boundary_nodes.insert(quad.begin(), quad.end());
         }
         for (const auto node : boundary_nodes) {
+            if ((boundary_poll++ & 255U) == 0U) {
+                poll_cancel();
+            }
             const auto cp = mesh::closest_on_surface(surf, out.mesh.nodes[node]);
             if (cp.distance <= 1.5 * fill_h && cp.triangle < model.triangle_region.size()) {
                 out.boundary_node_region[node] = model.triangle_region[cp.triangle];
@@ -1718,6 +1909,57 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         // silently stripped every fixture/load from the solve ("no fixtures:
         // fix at least one face before solving" with faces plainly assigned).
         map_boundary_regions();
+    }
+    poll_cancel();
+    const std::size_t actual_elems = out.mesh.elements.size();
+    const std::size_t actual_dof =
+        out.mesh.nodes.size() > std::numeric_limits<std::size_t>::max() / 3
+            ? std::numeric_limits<std::size_t>::max()
+            : 3 * out.mesh.nodes.size();
+    const bool elem_over = max_elems > 0 && actual_elems > max_elems;
+    const bool dof_over = max_dof > 0 && actual_dof > max_dof;
+    if ((elem_over || dof_over) && auto_retry_budget > 0) {
+        double scale = 1.0;
+        if (elem_over) {
+            scale = std::max(
+                scale, std::cbrt(static_cast<double>(actual_elems) /
+                                 static_cast<double>(max_elems)));
+        }
+        if (dof_over) {
+            scale = std::max(scale, std::cbrt(static_cast<double>(actual_dof) /
+                                              static_cast<double>(max_dof)));
+        }
+        const double retry_h = std::nextafter(
+            h * scale * 1.05, std::numeric_limits<double>::infinity());
+        auto retry = volume_mesh(
+            model, retry_h, requested_mesher, requested_skin_layers, feature_refine,
+            refine_seeds, seed_band, element_tendency, max_elems, max_dof,
+            auto_retry_budget - 1, cancel_check);
+        const std::string ceiling_note =
+            elem_over
+                ? std::format("element ceiling {}, actual {}", max_elems, actual_elems)
+                : std::format("DOF ceiling {}, actual {}", max_dof, actual_dof);
+        retry.mesher_note =
+            std::format("auto h clamped from {:.4g} to {:.4g} m ({}) | {}", h, retry_h,
+                        ceiling_note, retry.mesher_note);
+        return retry;
+    }
+    if (elem_over) {
+        throw std::runtime_error(std::format(
+            "mesh element ceiling {} exceeded after fill: actual {} elements "
+            "(predicted {:.0f}); increase -h or raise --max-elems",
+            max_elems, actual_elems, predicted_elems));
+    }
+    if (dof_over) {
+        throw std::runtime_error(std::format(
+            "mesh DOF ceiling {} exceeded after fill: actual {} DOF / {} elements "
+            "(predicted {:.0f} DOF); increase -h or raise --max-dof",
+            max_dof, actual_dof, actual_elems, predicted_dof));
+    }
+    if (max_elems > 0 || max_dof > 0) {
+        out.mesher_note += std::format(
+            " | budget predicted={:.0f} elems/{:.0f} DOF ceilings={}/{}", predicted_elems,
+            predicted_dof, max_elems, max_dof);
     }
     out.mesh.check_validity();
     return out;
@@ -1783,14 +2025,15 @@ void SolveJob::note_mesh_stats(const VolumeMeshOutput& vol) {
 }
 
 fea::SolveOptions SolveJob::solve_options_with_progress(int pass, int pass_count) {
-    // Everything except the progress hook stays at SolveOptions defaults, so
-    // the GUI runs exactly the CLI's policy: kAuto → LDLT up to cg_threshold,
-    // bounded incomplete-Cholesky CG above it. Attaching on_progress no longer
-    // switches the solver onto a restarted "chunked" CG — it only sets how
-    // often the one uninterrupted recurrence reports — so a job that shows
-    // progress and a job that does not converge identically.
+    // Keep the shared default method/tolerance policy. The per-run memory cap
+    // is enforced during solve preflight; four-iteration callbacks make the
+    // same hook a low-latency cooperative pause/cancel point without restarting
+    // the PCG recurrence.
     fea::SolveOptions opt;
+    opt.max_mem_gb = active_max_mem_gb_;
+    opt.on_note = [this](std::string_view note) { set_status(std::string(note)); };
     opt.on_progress = [this, pass, pass_count](int iter, int max_iters, double resid) {
+        checkpoint();
         const double frac =
             max_iters > 0 ? std::clamp(static_cast<double>(iter) / static_cast<double>(max_iters),
                                        0.0, 1.0)
@@ -1944,13 +2187,16 @@ void SolveJob::start_mesh(const Model& model, const SimSetup& setup) {
             // sharp corners for uniform meshers — that forced h→h_min on every
             // CAD box and ~8× DOF, which freezes interactive "mesh only".
             // Feature grading is applied as feature_refine (graded skin / bands).
-            const auto resolved = resolve_mesh_size(model, setup.mesh_size);
+            const auto resolved = resolve_mesh_size(model, setup.mesh_size, 30.0,
+                                                    setup.max_elems, setup.max_dof);
             const double h = resolved.h;
             report("mesh", 0.15, std::format("meshing… ({}, h={:.4g} m)", resolved.note, h));
             checkpoint();
-            mesh_only_ = volume_mesh(model, h, setup.mesher, setup.skin_layers,
-                                     setup.use_feature_grading, {}, 0.0,
-                                     setup.element_tendency);
+            const std::function<void()> mesh_cancel_check = [this] { checkpoint(); };
+            mesh_only_ = volume_mesh(
+                model, h, setup.mesher, setup.skin_layers, setup.use_feature_grading, {}, 0.0,
+                setup.element_tendency, resolved.element_ceiling, resolved.dof_ceiling,
+                resolved.auto_chosen ? 3 : 0, mesh_cancel_check);
             publish_live_mesh(mesh_only_);
             checkpoint();
             mesh_only_.mesher_note =
@@ -2012,6 +2258,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
     }
     join_worker();
     reset_control_flags();
+    active_max_mem_gb_ = setup.max_mem_gb;
     state_ = State::kMeshing;
     const int pass_count = std::max(0, setup.adapt_passes);
     report("mesh", 0.0, "meshing…", 0, pass_count);
@@ -2020,12 +2267,14 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
         try {
             // Global h from D5 only (same as start_mesh). Feature grading is
             // feature_refine on graded fills — not global h→h_min at corners.
-            const auto resolved = resolve_mesh_size(model, setup.mesh_size);
+            const auto resolved = resolve_mesh_size(model, setup.mesh_size, 30.0,
+                                                    setup.max_elems, setup.max_dof);
             const double h = resolved.h;
             double h_use = h;
             report("mesh", 0.15,
                    std::format("meshing… ({}, h={:.4g} m)", resolved.note, h), 0, pass_count);
             checkpoint();
+            const std::function<void()> mesh_cancel_check = [this] { checkpoint(); };
             std::vector<Eigen::Vector3d> adapt_seeds;
             double adapt_seed_band = 0.0;
             // A-priori BC grading (ADR-0021): refine near loaded / fixed faces
@@ -2061,9 +2310,10 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
             }
             // D4: Dörfler element indices for optional local LEB before remesh.
             std::vector<std::size_t> adapt_marked;
-            auto vol = volume_mesh(model, h_use, setup.mesher, setup.skin_layers,
-                                   setup.use_feature_grading, adapt_seeds, adapt_seed_band,
-                                   setup.element_tendency);
+            auto vol = volume_mesh(
+                model, h_use, setup.mesher, setup.skin_layers, setup.use_feature_grading,
+                adapt_seeds, adapt_seed_band, setup.element_tendency, resolved.element_ceiling,
+                resolved.dof_ceiling, resolved.auto_chosen ? 3 : 0, mesh_cancel_check);
             publish_live_mesh(vol);
             checkpoint();
             // Keep resolved-h note on mesher_note for solve mesh_note (GUI/CLI).
@@ -2137,13 +2387,33 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 for (const auto& [region, load] : setup.loads) {
                     const auto it = region_nodes.find(region);
                     if (it == region_nodes.end() || it->second.empty()) {
-                        continue;
+                        throw fea::FeaError(
+                            std::format("load on region {} has no boundary nodes", region));
                     }
-                    const auto faces = fea::faces_within(all_faces, it->second);
-                    const auto applied = fea::consistent_face_load(vol.mesh, faces, load.force);
+                    auto faces = fea::faces_within(all_faces, it->second);
+                    if (faces.empty()) {
+                        // CAD region boundaries rarely coincide with a coarse
+                        // volume-mesh face. Prefer a complete face when a
+                        // majority of its nodes maps to the region; if even that
+                        // does not exist, the resultant-preserving node fallback
+                        // below handles the legitimate sub-face load region.
+                        for (const auto& face : all_faces) {
+                            const std::size_t in_region = static_cast<std::size_t>(
+                                std::count_if(face.nodes.begin(), face.nodes.end(),
+                                              [&](std::uint32_t node) {
+                                                  return std::find(it->second.begin(),
+                                                                   it->second.end(),
+                                                                   node) != it->second.end();
+                                              }));
+                            if (2 * in_region >= face.nodes.size() && in_region > 0) {
+                                faces.push_back(face);
+                            }
+                        }
+                    }
+                    const auto applied =
+                        fea::consistent_face_load(vol.mesh, faces, load.force);
                     if (applied.area > 0.0) {
-                        if (applied.conservation_error >
-                            1e-9 * std::max(1.0, load.force.norm())) {
+                        if (applied.conservation_error > 1e-9) {
                             throw fea::FeaError(std::format(
                                 "load on region {}: traction assembly lost {:.3g} N of the "
                                 "requested {:.6g} N resultant",
@@ -2152,15 +2422,24 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         loads += applied.loads;
                         continue;
                     }
-                    // The region's nodes do not span a single complete boundary
-                    // face (a one-triangle region on a coarse mesh). No surface
-                    // to integrate over — split the resultant over its nodes so
-                    // the total force is still right.
                     const Eigen::Vector3d per_node =
                         load.force / static_cast<double>(it->second.size());
+                    Eigen::Vector3d fallback_sum = Eigen::Vector3d::Zero();
                     for (const auto node : it->second) {
                         loads.segment<3>(3 * static_cast<Eigen::Index>(node)) += per_node;
+                        fallback_sum += per_node;
                     }
+                    const double conservation_error = (fallback_sum - load.force).norm();
+                    if (conservation_error > 1e-9) {
+                        throw fea::FeaError(std::format(
+                            "load on region {}: nodal fallback lost {:.3g} N of the "
+                            "requested {:.6g} N resultant",
+                            region, conservation_error, load.force.norm()));
+                    }
+                    vol.mesher_note += std::format(
+                        " | load region {} node fallback={} Σf=({:.6g},{:.6g},{:.6g}) N",
+                        region, it->second.size(), fallback_sum.x(), fallback_sum.y(),
+                        fallback_sum.z());
                 }
             };
             apply_bcs();
@@ -2568,9 +2847,12 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                                            adapt_seeds.size()),
                                pass, pass_count);
                         checkpoint();
-                        vol = volume_mesh(model, h_remesh, mesher_adapt, setup.skin_layers,
-                                          setup.use_feature_grading, adapt_seeds,
-                                          adapt_seed_band, setup.element_tendency);
+                        vol = volume_mesh(
+                            model, h_remesh, mesher_adapt, setup.skin_layers,
+                            setup.use_feature_grading, adapt_seeds, adapt_seed_band,
+                            setup.element_tendency, resolved.element_ceiling,
+                            resolved.dof_ceiling, resolved.auto_chosen ? 3 : 0,
+                            mesh_cancel_check);
                         publish_live_mesh(vol);
                         h_use = std::max(h_use, h_remesh);
                     } else {
@@ -2629,6 +2911,41 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     break;
                 }
                 if (pass < setup.adapt_passes) {
+                    const double growth = std::max(1.0, hp_plan.predicted_dof_factor);
+                    const double next_elems =
+                        std::ceil(growth * static_cast<double>(vol.mesh.elements.size()));
+                    const double next_dof =
+                        std::ceil(growth * 3.0 * static_cast<double>(vol.mesh.nodes.size()));
+                    const bool elem_cap =
+                        next_elems > static_cast<double>(resolved.element_ceiling);
+                    const bool dof_cap =
+                        next_dof > static_cast<double>(resolved.dof_ceiling);
+                    if (elem_cap || dof_cap) {
+                        const std::string reason =
+                            elem_cap && dof_cap
+                                ? std::format(
+                                      "adapt growth cap stop: next pass predicted {:.0f} elems / "
+                                      "{:.0f} DOF exceeds element ceiling {} and DOF ceiling {}",
+                                      next_elems, next_dof, resolved.element_ceiling,
+                                      resolved.dof_ceiling)
+                                : elem_cap
+                                      ? std::format(
+                                            "adapt growth cap stop: next pass predicted {:.0f} "
+                                            "elems exceeds element ceiling {}",
+                                            next_elems, resolved.element_ceiling)
+                                      : std::format(
+                                            "adapt growth cap stop: next pass predicted {:.0f} "
+                                            "DOF exceeds DOF ceiling {}",
+                                            next_dof, resolved.dof_ceiling);
+                        SolveResult r;
+                        r.mesh_note =
+                            std::format("{} | {} | {}", vol.mesher_note, hp_note, reason);
+                        r.volume_mesh = std::move(vol.mesh);
+                        r.boundary_quads = std::move(vol.boundary_quads);
+                        fill_result_fields(r, zz_try, u_try);
+                        result_ = std::move(r);
+                        break;
+                    }
                     const auto& sug = hp_plan.h_suggestion;
                     // Early stop only when neither h nor p wants work.
                     if (sug.n_marked == 0 && sug.h_next >= h_use * 0.98 &&

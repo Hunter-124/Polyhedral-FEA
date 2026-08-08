@@ -112,6 +112,9 @@ struct App {
     TestLabState testlab;
     /// Generation last uploaded from SolveJob::poll_live_mesh.
     std::uint64_t live_mesh_seen_gen = 0;
+    /// Last worker state observed by the UI, used to restore a retained result
+    /// exactly once when a replacement solve is cancelled.
+    SolveJob::State observed_job_state = SolveJob::State::kIdle;
     /// True while a background self-improve (LLM) run is in flight.
     std::atomic<bool> improve_running{false};
     /// Screenshot plumbing (png_writer.hpp). Frames still to wait before the
@@ -596,19 +599,68 @@ void draw_study_panel(App& app) {
                 "0 keeps the process default (OMP_NUM_THREADS / hardware).");
         }
         double mem = app.testlab.settings.max_mem_gb;
-        if (iw::input_double("max mem (GB, 0=off)", &mem, "%.1f")) {
-            app.testlab.settings.max_mem_gb = mem < 0.0 ? 0.0 : mem;
+        if (iw::input_double("max mem (GB, 0=auto)", &mem, "%.2f")) {
+            app.testlab.settings.max_mem_gb = std::max(0.0, mem);
         }
+        app.setup.max_mem_gb = app.testlab.settings.max_mem_gb;
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip(
-                "Soft budget note only — no hard process RSS kill is wired yet.\n"
-                "Campaign JSON resources.max_mem_gb is displayed the same way.");
+                "Enforced before stiffness assembly/factorization.\n"
+                "0 uses 70%% of currently available system memory.");
+        }
+
+        static fea::EffectiveMemoryBudget shown_budget;
+        static double budget_refresh_time = -1.0e9;
+        static double shown_user_cap = -1.0;
+        const double now = ImGui::GetTime();
+        if (now - budget_refresh_time >= 1.0 ||
+            shown_user_cap != app.setup.max_mem_gb) {
+            shown_budget = fea::effective_memory_budget(app.setup.max_mem_gb);
+            shown_user_cap = app.setup.max_mem_gb;
+            budget_refresh_time = now;
+        }
+        const auto cap_text = fea::format_memory_bytes(shown_budget.effective_cap_bytes);
+        ImGui::TextColored(palette.status_ok, "ENFORCED cap: %s%s", cap_text.c_str(),
+                           app.setup.max_mem_gb > 0.0 ? " (user/system minimum)"
+                                                      : " (70% MemAvailable)");
+
+        const fea::NodalMesh* projected_mesh = nullptr;
+        if (app.mesh_preview) {
+            projected_mesh = &app.mesh_preview->mesh;
+        } else if (app.result) {
+            projected_mesh = &app.result->volume_mesh;
+        }
+        if (projected_mesh != nullptr) {
+            static const fea::NodalMesh* cached_mesh = nullptr;
+            static std::size_t cached_nodes = 0;
+            static std::size_t cached_elements = 0;
+            static fea::SolveResourceEstimate projected;
+            if (cached_mesh != projected_mesh || cached_nodes != projected_mesh->nodes.size() ||
+                cached_elements != projected_mesh->elements.size()) {
+                const auto projected_free =
+                    3 * static_cast<Eigen::Index>(projected_mesh->nodes.size());
+                projected = fea::estimate_solve_resources(*projected_mesh, projected_free);
+                cached_mesh = projected_mesh;
+                cached_nodes = projected_mesh->nodes.size();
+                cached_elements = projected_mesh->elements.size();
+            }
+            fea::SolveOptions projection_options;
+            projection_options.max_mem_gb = app.setup.max_mem_gb;
+            const auto projected_decision =
+                fea::decide_solve_method(projected.nfree, projection_options, projected,
+                                         shown_budget.effective_cap_bytes);
+            const bool projected_over =
+                projected_decision.estimated_bytes > shown_budget.effective_cap_bytes;
+            const char* method =
+                projected_decision.method == fea::SolveMethod::kDirect ? "LDLT" : "CG";
+            const auto footprint = fea::format_memory_bytes(projected_decision.estimated_bytes);
+            ImGui::TextColored(projected_over ? palette.status_warn : palette.text_dim,
+                               "projected solve: %s (%s, conservative)", footprint.c_str(),
+                               method);
+        } else {
+            ImGui::TextColored(palette.text_dim, "projected solve: mesh required");
         }
         ImGui::TextColored(palette.text_dim, "%s", fea::performance_description().c_str());
-        if (app.testlab.settings.max_mem_gb > 0.0) {
-            ImGui::TextColored(palette.status_warn, "soft mem cap: %.1f GB (not enforced)",
-                               app.testlab.settings.max_mem_gb);
-        }
     }
     iw::end_group_box();
 
@@ -665,14 +717,12 @@ void draw_study_panel(App& app) {
     if (iw::button("mesh only", ImVec2(-1, 0))) {
         apply_resource_caps();
         app.live_mesh_seen_gen = 0;
-        app.result.reset();
         app.status = "meshing…";
         app.job.start_mesh(*app.model, app.setup);
     }
     if (iw::button(busy ? "working…" : "solve", ImVec2(-1, 0), /*primary=*/true)) {
         apply_resource_caps();
         app.live_mesh_seen_gen = 0;
-        app.result.reset();
         app.status = "solving…";
         app.job.start(*app.model, app.setup);
     }
@@ -1171,7 +1221,7 @@ void draw_frame(App& app) {
         std::string info = std::format("polymesh @ {} · {} · mesher {}", head, app.status,
                                        mesher_name);
         if (!health_bit.empty()) {
-            info += " · " + health_bit;
+            info += " · campaign: " + health_bit;
         }
         info += std::format(" · testlab: {}", tl);
         info += app.dof_count > 0 ? std::format(" · DOF {}", app.dof_count)
@@ -1291,8 +1341,13 @@ int run(int argc, char** argv) {
             set_mesh_info(app, app.mesh_preview->mesher_note,
                           app.mesh_preview->mesh.nodes.size(),
                           app.mesh_preview->mesh.elements.size());
-            // Show mesh while still meshing/solving (results override on take_result).
-            if (app.mode == DisplayMode::kSetup || app.mode == DisplayMode::kMeshPreview) {
+            // Show each live mesh while a replacement job is active. The
+            // previous completed result remains retained and is restored if
+            // this run is cancelled.
+            const auto live_state = app.job.state();
+            if (live_state == SolveJob::State::kMeshing ||
+                live_state == SolveJob::State::kSolving ||
+                app.mode == DisplayMode::kSetup || app.mode == DisplayMode::kMeshPreview) {
                 app.mode = DisplayMode::kMeshPreview;
             }
             // Frame the first mesh of a run only: later adapt passes remesh the
@@ -1376,6 +1431,20 @@ int run(int argc, char** argv) {
                                      app.result->volume_mesh.elements.size(), app.dof_count,
                                      app.result->max_von_mises / 1e6);
         }
+
+        const auto current_job_state = app.job.state();
+        if (current_job_state == SolveJob::State::kCancelled &&
+            app.observed_job_state != SolveJob::State::kCancelled && app.result) {
+            // A cancelled adapt/re-solve must not strand the viewport on its
+            // last intermediate mesh. The last successfully taken solution is
+            // still valid and remains the authoritative result.
+            app.viewport.set_result(*app.result);
+            set_mesh_info(app, app.result->mesh_note, app.result->volume_mesh.nodes.size(),
+                          app.result->volume_mesh.elements.size());
+            app.mode = DisplayMode::kResultsVonMises;
+            app.status = "cancelled — showing retained solve result";
+        }
+        app.observed_job_state = current_job_state;
 
         sanitize_display_mode(app);
         draw_frame(app);

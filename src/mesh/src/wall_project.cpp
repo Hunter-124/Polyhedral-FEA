@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "mesh/wall_project.hpp"
+#include "mesh/cell_validity.hpp"
 
 #include <Eigen/Geometry>
 
@@ -41,17 +42,17 @@ FaceKey sorted_face(std::uint32_t i, std::uint32_t j, std::uint32_t k) {
     return FaceKey{i, j, k};
 }
 
-double tet_vol6(const std::vector<Eigen::Vector3d>& nodes,
-                const std::array<std::uint32_t, 4>& t) {
-    const Eigen::Vector3d a = nodes[t[0]];
-    const Eigen::Vector3d b = nodes[t[1]];
-    const Eigen::Vector3d c = nodes[t[2]];
-    const Eigen::Vector3d d = nodes[t[3]];
-    // Materialize diffs: Eigen expression templates do not nest .cross() safely.
-    const Eigen::Vector3d ba = b - a;
-    const Eigen::Vector3d ca = c - a;
-    const Eigen::Vector3d da = d - a;
-    return ba.dot(ca.cross(da));
+bool tet_bad(const std::vector<Eigen::Vector3d>& nodes,
+             const std::array<std::uint32_t, 4>& t) {
+    const Eigen::Vector3d& a = nodes[t[0]];
+    const Eigen::Vector3d& b = nodes[t[1]];
+    const Eigen::Vector3d& c = nodes[t[2]];
+    const Eigen::Vector3d& d = nodes[t[3]];
+    if (validity::tet_signed_volume(a, b, c, d) <= 0.0) {
+        return true;
+    }
+    return validity::tet_shape_quality(a, b, c, d) <
+           validity::kCellShapeFloor;
 }
 
 } // namespace
@@ -229,7 +230,7 @@ WallProjectStats wall_tangential_project(
         for (int guard = 0; guard < 32; ++guard) {
             std::unordered_set<std::uint32_t> offenders;
             for (const auto* tp : guard_tets) {
-                if (tet_vol6(nodes, *tp) <= 0.0) {
+                if (tet_bad(nodes, *tp)) {
                     for (int k = 0; k < 4; ++k) {
                         offenders.insert((*tp)[static_cast<std::size_t>(k)]);
                     }

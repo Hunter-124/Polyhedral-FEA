@@ -29,24 +29,6 @@ double clamp01(double x) {
     return x;
 }
 
-double tet_aspect_local(const Eigen::Vector3d& a, const Eigen::Vector3d& b,
-                        const Eigen::Vector3d& c, const Eigen::Vector3d& d) {
-    const Eigen::Vector3d ab = b - a;
-    const Eigen::Vector3d ac = c - a;
-    const Eigen::Vector3d ad = d - a;
-    const double v = std::abs(ab.dot(ac.cross(ad)) / 6.0);
-    if (v <= 0.0) {
-        return 0.0;
-    }
-    const double emax = std::max({(a - b).norm(), (a - c).norm(), (a - d).norm(),
-                                  (b - c).norm(), (b - d).norm(), (c - d).norm()});
-    if (emax <= 0.0) {
-        return 0.0;
-    }
-    constexpr double kNorm = 6.0 * 1.4142135623730951;
-    return std::min(1.0, kNorm * v / (emax * emax * emax));
-}
-
 Eigen::Vector3d unit_or_z(const Eigen::Vector3d& d) {
     const double n = d.norm();
     if (n < 1e-15) {
@@ -211,18 +193,50 @@ CurvedMeshMetrics evaluate_curved_mesh_quality(
                 continue;
             }
             const double asp =
-                tet_aspect_local(nodes[t[0]], nodes[t[1]], nodes[t[2]], nodes[t[3]]);
+                tet4_aspect_quality(nodes[t[0]], nodes[t[1]], nodes[t[2]], nodes[t[3]]);
             m.m6_min_boundary_aspect = std::min(m.m6_min_boundary_aspect, asp);
             ++m.n_boundary_tets;
         }
-        if (m.n_boundary_tets == 0) {
-            m.m6_min_boundary_aspect = 1.0;
-        } else {
+        if (m.n_boundary_tets > 0) {
             m.has_tet_aspect = true;
             if (!std::isfinite(m.m6_min_boundary_aspect)) {
                 m.m6_min_boundary_aspect = 0.0;
             }
         }
+    }
+    if (!m.has_tet_aspect) {
+        // No boundary-touching tets (hex/prism/poly fill, or no tet connectivity
+        // passed): measure the free-surface faces themselves. Reporting 1.0 here
+        // would be a fabricated perfect score for cells nobody looked at; an
+        // unmeasurable boundary stays NaN (n/a).
+        double worst = std::numeric_limits<double>::infinity();
+        std::size_t n_corners_measured = 0;
+        for (const auto& f : free_faces) {
+            const bool tri = (f[3] == f[2]);
+            const std::size_t nv = tri ? 3 : 4;
+            bool ok = true;
+            for (std::size_t i = 0; i < nv; ++i) {
+                if (f[i] >= nodes.size()) {
+                    ok = false;
+                    break;
+                }
+            }
+            if (!ok) {
+                continue;
+            }
+            for (std::size_t k = 0; k < nv; ++k) {
+                const double q = polygon_corner_quality(nodes[f[(k + nv - 1) % nv]], nodes[f[k]],
+                                                        nodes[f[(k + 1) % nv]], nv);
+                if (std::isfinite(q)) {
+                    worst = std::min(worst, q);
+                    ++n_corners_measured;
+                }
+            }
+        }
+        m.m6_min_boundary_aspect = (n_corners_measured > 0)
+                                       ? worst
+                                       : std::numeric_limits<double>::quiet_NaN();
+        m.m6_from_free_faces = n_corners_measured > 0;
     }
 
     // Composite: weights favor face-sample residual (M2) and radial error (M4).

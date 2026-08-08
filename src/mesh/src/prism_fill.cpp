@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "mesh/prism_fill.hpp"
 
+#include "mesh/cell_validity.hpp"
 #include "mesh/grid_classify.hpp"
 #include "mesh/surface_project.hpp"
 
@@ -203,15 +204,41 @@ PrismFillOutput prism_fill_surface(const geom::TriSurface& surface,
         }
         std::vector<std::uint32_t> bnodes(bnode_set.begin(), bnode_set.end());
         const double vol_eps = 1e-14 * out.h * out.h * out.h;
+        // Lattice positions, kept so a cell the line-search cannot rescue can be
+        // un-snapped wholesale (see the fallback below) instead of being dropped:
+        // an axis-aligned lattice prism is always positive, so restoring every
+        // node of a still-folded cell is a repair that provably terminates and
+        // leaves the domain fully covered.
+        const std::vector<Eigen::Vector3d> lattice = out.nodes;
+
+        const auto corners = [&](const std::array<std::uint32_t, 6>& n) {
+            return std::array<Eigen::Vector3d, 6>{out.nodes[n[0]], out.nodes[n[1]],
+                                                  out.nodes[n[2]], out.nodes[n[3]],
+                                                  out.nodes[n[4]], out.nodes[n[5]]};
+        };
+        // Hard validity: everything `check_prism_fill_geometry` and the assembly
+        // Gauss loop insist on. Per-corner detJ alone is not enough — the summed
+        // volume can already be negative while all six corner dets are (barely)
+        // positive, and that cell used to slip past the snap offender set.
+        const auto prism_sound = [&](const std::array<Eigen::Vector3d, 6>& p) {
+            return validity::prism_min_corner_jacobian(p) > 0.0 &&
+                   prism_signed_volume_impl(p[0], p[1], p[2], p[3], p[4], p[5]) > vol_eps;
+        };
+
         out.boundary_max_distance =
             snap_boundary_nodes(
                 surface, out.nodes, bnodes, out.h,
                 [&](std::set<std::uint32_t>& offenders) {
                     for (const auto& n : out.prisms) {
-                        const double v = prism_signed_volume_impl(
-                            out.nodes[n[0]], out.nodes[n[1]], out.nodes[n[2]],
-                            out.nodes[n[3]], out.nodes[n[4]], out.nodes[n[5]]);
-                        if (v > vol_eps) {
+                        // Per-corner detJ, not just the SUMMED volume: a prism
+                        // keeps a comfortably positive total while one corner
+                        // has already folded, which is exactly the Gauss point
+                        // the assembly then reports as a non-positive Jacobian.
+                        // The signed volume is checked too (see `prism_sound`),
+                        // plus a shape floor so slivers get pulled back as well.
+                        const auto p = corners(n);
+                        if (prism_sound(p) &&
+                            validity::prism_shape_quality(p) >= validity::kCellShapeFloor) {
                             continue;
                         }
                         offenders.insert(n.begin(), n.end());
@@ -219,15 +246,45 @@ PrismFillOutput prism_fill_surface(const geom::TriSurface& surface,
                 },
                 /*max_move_frac=*/0.75, /*passes=*/4)
                 .max_residual;
-        // Re-orient any prisms flipped by residual geometry (rare).
-        for (auto& n : out.prisms) {
-            const double v =
-                prism_signed_volume_impl(out.nodes[n[0]], out.nodes[n[1]], out.nodes[n[2]],
-                                         out.nodes[n[3]], out.nodes[n[4]], out.nodes[n[5]]);
-            if (v < 0.0) {
-                std::swap(n[1], n[2]);
-                std::swap(n[4], n[5]);
+
+        // Fallback for cells the line-search left folded (it gives up once no
+        // node of the offending cell is still snapped, and its per-node retreat
+        // cannot always untangle a corner shared by two bad prisms): restore
+        // every displaced node of a still-invalid prism to its lattice site.
+        // Each round strictly grows the restored-node set, so this terminates,
+        // and its fixed point is a cell sitting on the pristine lattice.
+        // NOTE: no re-orientation pass here. Swapping 1↔2 / 4↔5 mirrors a
+        // *lattice* prism exactly, but for a snapped, warped one it re-cuts the
+        // three-tet decomposition and can turn a marginally negative cell into a
+        // badly inverted one (icecream_cone h=0.008: v=-1.1e-9 → -8.8e-8). A
+        // negative volume after snapping means folded, not mis-labelled.
+        std::size_t n_relaxed = 0;
+        for (;;) {
+            bool changed = false;
+            for (const auto& n : out.prisms) {
+                if (prism_sound(corners(n))) {
+                    continue;
+                }
+                for (const auto idx : n) {
+                    if (out.nodes[idx] != lattice[idx]) {
+                        out.nodes[idx] = lattice[idx];
+                        ++n_relaxed;
+                        changed = true;
+                    }
+                }
             }
+            if (!changed) {
+                break;
+            }
+        }
+        if (n_relaxed > 0) {
+            // The residual reported to the caller must reflect the retreat.
+            double max_resid = 0.0;
+            for (const auto ni : bnodes) {
+                max_resid =
+                    std::max(max_resid, closest_on_surface(surface, out.nodes[ni]).distance);
+            }
+            out.boundary_max_distance = max_resid;
         }
         check_prism_fill_geometry(out, vol_eps);
         return out;

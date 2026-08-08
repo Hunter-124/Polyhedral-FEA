@@ -12,6 +12,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <vector>
 
 namespace polymesh::mesh {
@@ -51,10 +52,19 @@ struct CurvedMeshMetrics {
     // M5 — max azimuthal gap among circular-feature nodes (radians in [0, π])
     double m5_max_azimuth_gap = 0.0;
 
-    // M6 — min tet aspect on free-surface-touching tets in (0,1]; 1 if N/A
-    double m6_min_boundary_aspect = 1.0;
+    // M6 — min boundary shape quality in [0,1], 1 = ideal cell, NaN = n/a.
+    // Measured as the min tet aspect over free-surface-touching tets when tet
+    // connectivity is supplied (`has_tet_aspect`), else as the min free-surface
+    // face-corner quality (`m6_from_free_faces`, mesh::polygon_corner_quality) so
+    // hex/prism/poly fills report a real number instead of a fabricated 1.0.
+    // NaN when neither could be measured — never silently "perfect".
+    double m6_min_boundary_aspect = std::numeric_limits<double>::quiet_NaN();
     std::size_t n_boundary_tets = 0;
+    /// M6 came from boundary-touching tets (volumetric aspect); feeds `composite_score`.
     bool has_tet_aspect = false;
+    /// M6 came from free-surface faces instead (different measure, so it is
+    /// reported but deliberately NOT folded into `composite_score`).
+    bool m6_from_free_faces = false;
 
     /// Composite in [0,1], higher better. Weights favor M2/M4 (curved silhouette).
     double composite_score = 0.0;

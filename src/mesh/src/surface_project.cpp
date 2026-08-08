@@ -345,14 +345,25 @@ SnapStats snap_boundary_nodes(const geom::TriSurface& surface,
     }
     stats.n_moved = moved.size();
 
-    // Line-search unsnap: try keeping as much projection as possible (0.75→0.5→
-    // 0.25→full restore). Soft half-restore alone left cylinder/hole residual.
+    // Culprit-aware line-search unsnap (descending scan): retreat the most-
+    // moved snapped node toward its lattice site, keeping as much projection
+    // as possible (0.75→0.5→0.25→full restore). A node whose cell STILL
+    // offends at fraction 0 is not the culprit — a different node broke the
+    // cell — so restore its snapped position and never reconsider it instead
+    // of destroying its surface fidelity for zero validity gain. (A pure
+    // bisection search was measured worse: the predicate is not monotone in
+    // the move fraction — retreating one node of a fully-snapped patch can
+    // dimple the cell — so the descending ladder stays.)
+    std::unordered_set<std::uint32_t> exonerated;
     while (!original.empty()) {
         std::set<std::uint32_t> offenders;
         collect_offenders(offenders);
         std::uint32_t worst = 0xffffffffu;
         double worst_move = -1.0;
         for (const auto ni : offenders) {
+            if (exonerated.count(ni)) {
+                continue;
+            }
             const auto it = moved.find(ni);
             if (it == moved.end()) {
                 continue;
@@ -387,11 +398,19 @@ SnapStats snap_boundary_nodes(const geom::TriSurface& surface,
         if (fixed) {
             continue;
         }
-        // Full restore.
+        // Full restore — but only keep it when it actually clears the cell.
         nodes[worst] = orig;
-        original.erase(oit);
-        moved.erase(worst);
-        ++stats.n_unsnapped;
+        std::set<std::uint32_t> still0;
+        collect_offenders(still0);
+        if (!still0.count(worst)) {
+            original.erase(oit);
+            moved.erase(worst);
+            ++stats.n_unsnapped;
+            continue;
+        }
+        // Not the culprit: keep the snap, move on to the other offenders.
+        nodes[worst] = cur;
+        exonerated.insert(worst);
     }
 
     stats.max_residual = 0.0;

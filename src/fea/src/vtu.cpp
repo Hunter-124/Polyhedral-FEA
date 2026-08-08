@@ -4,11 +4,17 @@
 #include "mesh/quality.hpp"
 
 #include <array>
+#include <cstdint>
 #include <format>
 #include <fstream>
+#include <vector>
 
 namespace polymesh::fea {
 namespace {
+
+constexpr int kVtkWedge = 13;
+constexpr int kVtkConvexPointSet = 41;
+constexpr int kVtkPolyhedron = 42;
 
 int vtk_cell_type(ElementType t) {
     switch (t) {
@@ -21,14 +27,55 @@ int vtk_cell_type(ElementType t) {
     case ElementType::kHex20:
         return 25;
     case ElementType::kPrism6:
-        return 13; // VTK_WEDGE
+        return kVtkWedge;
     case ElementType::kPyramid5:
         return 14; // VTK_PYRAMID
     case ElementType::kPolyVem:
-        // VTK_POLYHEDRON = 42 needs face stream; export as VTK_CONVEX_POINT_SET=41
-        return 41;
+        return kVtkPolyhedron; // carries a faces/faceoffsets stream
     }
     return 0;
+}
+
+/// vtkWedge winds the base triangle so its right-hand normal points AWAY from
+/// the opposite triangle. PolyMesh's kPrism6 puts base (0,1,2) at ζ = −1, whose
+/// right-hand normal points at the top face (3,4,5) — the opposite convention,
+/// which made every exported prism inside-out (negative signed cell volume,
+/// inverted surface normals in every viewer). Reversing the winding of both
+/// triangles is export-only: the mesher's emission order and therefore FE
+/// assembly and `reference_nodes(kPrism6)` are untouched.
+constexpr std::array<std::size_t, 6> kPrism6ToVtkWedge{0, 2, 1, 3, 5, 4};
+
+/// Face loops of a polyhedral cell with at least 3 distinct corners.
+std::vector<const std::vector<std::uint32_t>*> usable_faces(const NodalElement& e) {
+    std::vector<const std::vector<std::uint32_t>*> out;
+    out.reserve(e.faces.size());
+    for (const auto& f : e.faces) {
+        if (f.size() >= 3) {
+            out.push_back(&f);
+        }
+    }
+    return out;
+}
+
+/// Local node indices the face stream references, in first-appearance order.
+/// k=2 VEM cells keep mid-edge nodes in `nodes` that no face loop mentions
+/// (loops index the vertex block only) and VTK_POLYHEDRON has no quadratic
+/// variant, so the exported cell is the linear hull of the same geometry.
+std::vector<std::uint32_t>
+poly_face_locals(const NodalElement& e,
+                 const std::vector<const std::vector<std::uint32_t>*>& faces) {
+    std::vector<char> seen(e.nodes.size(), 0);
+    std::vector<std::uint32_t> out;
+    out.reserve(e.nodes.size());
+    for (const auto* f : faces) {
+        for (const auto li : *f) {
+            if (!seen[li]) {
+                seen[li] = 1;
+                out.push_back(li);
+            }
+        }
+    }
+    return out;
 }
 
 } // namespace
@@ -78,26 +125,89 @@ void write_vtu(const std::filesystem::path& path, const NodalMesh& mesh,
     }
     out << "</DataArray>\n</Points>\n";
 
+    // Built up-front: a polyhedral cell's connectivity length is not
+    // nodes.size(), and its faces go into a separate VTK face stream.
+    std::vector<std::uint32_t> connectivity;
+    std::vector<std::int32_t> offsets;
+    std::vector<int> types;
+    std::vector<std::int64_t> face_stream;
+    std::vector<std::int64_t> face_offsets; // one per cell, −1 when not polyhedral
+    connectivity.reserve(8 * n_cells);
+    offsets.reserve(n_cells);
+    types.reserve(n_cells);
+    face_offsets.reserve(n_cells);
+    bool any_polyhedron = false;
+
+    for (const auto& e : mesh.elements) {
+        int type = vtk_cell_type(e.type);
+        std::int64_t face_offset = -1;
+        if (e.type == ElementType::kPolyVem) {
+            const auto faces = usable_faces(e);
+            if (faces.size() >= 4) {
+                // [numFaces, (numPointsInFace, global point ids...) × numFaces]
+                face_stream.push_back(static_cast<std::int64_t>(faces.size()));
+                for (const auto* f : faces) {
+                    face_stream.push_back(static_cast<std::int64_t>(f->size()));
+                    for (const auto li : *f) {
+                        face_stream.push_back(static_cast<std::int64_t>(e.nodes[li]));
+                    }
+                }
+                face_offset = static_cast<std::int64_t>(face_stream.size());
+                any_polyhedron = true;
+                for (const auto li : poly_face_locals(e, faces)) {
+                    connectivity.push_back(e.nodes[li]);
+                }
+            } else {
+                // No closed face stream to describe: fall back to a point set so
+                // the cell still renders as its convex hull.
+                type = kVtkConvexPointSet;
+                connectivity.insert(connectivity.end(), e.nodes.begin(), e.nodes.end());
+            }
+        } else if (e.type == ElementType::kPrism6 && e.nodes.size() == 6) {
+            for (const auto k : kPrism6ToVtkWedge) {
+                connectivity.push_back(e.nodes[k]);
+            }
+        } else {
+            connectivity.insert(connectivity.end(), e.nodes.begin(), e.nodes.end());
+        }
+        offsets.push_back(static_cast<std::int32_t>(connectivity.size()));
+        types.push_back(type);
+        face_offsets.push_back(face_offset);
+    }
+
     out << "<Cells>\n"
            "<DataArray type=\"Int32\" Name=\"connectivity\" format=\"ascii\">\n";
-    for (const auto& e : mesh.elements) {
-        for (std::size_t i = 0; i < e.nodes.size(); ++i) {
-            out << e.nodes[i] << (i + 1 == e.nodes.size() ? '\n' : ' ');
+    std::size_t written = 0;
+    for (std::size_t c = 0; c < n_cells; ++c) {
+        const auto end = static_cast<std::size_t>(offsets[c]);
+        for (; written < end; ++written) {
+            out << connectivity[written] << (written + 1 == end ? '\n' : ' ');
         }
     }
     out << "</DataArray>\n"
            "<DataArray type=\"Int32\" Name=\"offsets\" format=\"ascii\">\n";
-    int off = 0;
-    for (const auto& e : mesh.elements) {
-        off += static_cast<int>(e.nodes.size());
-        out << off << '\n';
+    for (const auto o : offsets) {
+        out << o << '\n';
     }
     out << "</DataArray>\n"
            "<DataArray type=\"UInt8\" Name=\"types\" format=\"ascii\">\n";
-    for (const auto& e : mesh.elements) {
-        out << vtk_cell_type(e.type) << '\n';
+    for (const auto t : types) {
+        out << t << '\n';
     }
-    out << "</DataArray>\n</Cells>\n";
+    out << "</DataArray>\n";
+    if (any_polyhedron) {
+        out << "<DataArray type=\"Int64\" Name=\"faces\" format=\"ascii\">\n";
+        for (const auto v : face_stream) {
+            out << v << '\n';
+        }
+        out << "</DataArray>\n"
+               "<DataArray type=\"Int64\" Name=\"faceoffsets\" format=\"ascii\">\n";
+        for (const auto v : face_offsets) {
+            out << v << '\n';
+        }
+        out << "</DataArray>\n";
+    }
+    out << "</Cells>\n";
 
     if (!point_data.empty()) {
         out << "<PointData>\n";

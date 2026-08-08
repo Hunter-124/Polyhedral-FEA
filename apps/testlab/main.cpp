@@ -1054,6 +1054,11 @@ double surface_face_area(const fea::NodalMesh& mesh, const fea::SurfaceFace& f) 
 }
 
 /// Quality floor for p99 / face-mean stress (exclude slivers that invent 1e20 VM).
+/// `ElementCentroidStress::quality` is now a measured shape quality for EVERY
+/// element type (fea::cell_quality) and is 0 for a cell that could not be
+/// measured, so this floor finally bites on hex/prism/pyramid/poly meshes — it
+/// used to be a no-op there because non-tet samples were hard-assigned 1.0.
+/// 0.02 on the scaled-Jacobian / aspect scale ≈ a 50:1 degenerate cell.
 constexpr double kStressQualityFloor = 0.02;
 
 ProbeAnswers compute_probes(const fea::NodalMesh& mesh, const fea::Material& mat,
@@ -1666,9 +1671,11 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
 
         const auto t_solve0 = clock::now();
         fea::SolveOptions sopt;
-        // Short campaigns prefer robust direct LDLT; CG was hanging / failing
-        // on poorly conditioned hybrid meshes at moderate free DOF.
-        sopt.method = fea::SolveMethod::kDirect;
+        // kAuto is fine now: the direct/CG cliff that used to force kDirect here
+        // ("CG was hanging / failing on poorly conditioned hybrid meshes at
+        // moderate free DOF") sat at 8000 free DOF. kAuto keeps LDLT to 50000
+        // and bounds CG above that, so campaign meshes take the same direct path
+        // they did before without the unbounded factorisation on the huge ones.
         sopt.on_progress = [&](int iter, int max_iters, double resid) {
             // M14 mid-solve wall-clock kill (when progress callbacks fire).
             if (max_run_wall_s > 0.0) {

@@ -18,22 +18,6 @@ double tet_volume(const Eigen::Vector3d& a, const Eigen::Vector3d& b, const Eige
     return (b - a).dot((c - a).cross(d - a)) / 6.0;
 }
 
-double tet_aspect(const Eigen::Vector3d& a, const Eigen::Vector3d& b, const Eigen::Vector3d& c,
-                  const Eigen::Vector3d& d) {
-    const double v = std::abs(tet_volume(a, b, c, d));
-    if (v <= 0.0) {
-        return 0.0;
-    }
-    const std::array<double, 6> e{(a - b).norm(), (a - c).norm(), (a - d).norm(),
-                                  (b - c).norm(), (b - d).norm(), (c - d).norm()};
-    const double emax = *std::max_element(e.begin(), e.end());
-    if (emax <= 0.0) {
-        return 0.0;
-    }
-    constexpr double kNorm = 6.0 * 1.4142135623730951;
-    return std::min(1.0, kNorm * v / (emax * emax * emax));
-}
-
 // Canonical face key: sorted node triple.
 using FaceKey = std::array<std::uint32_t, 3>;
 
@@ -53,12 +37,50 @@ FaceKey make_face_key(std::uint32_t a, std::uint32_t b, std::uint32_t c) {
 
 } // namespace
 
+double tet4_aspect_quality(const Eigen::Vector3d& a, const Eigen::Vector3d& b,
+                           const Eigen::Vector3d& c, const Eigen::Vector3d& d) {
+    const double v = std::abs(tet_volume(a, b, c, d));
+    if (v <= 0.0) {
+        return 0.0;
+    }
+    const std::array<double, 6> e{(a - b).norm(), (a - c).norm(), (a - d).norm(),
+                                  (b - c).norm(), (b - d).norm(), (c - d).norm()};
+    const double emax = *std::max_element(e.begin(), e.end());
+    if (emax <= 0.0) {
+        return 0.0;
+    }
+    // 6√2 V / l_max³ = 1 for the regular tet.
+    constexpr double kNorm = 6.0 * 1.4142135623730951;
+    return std::min(1.0, kNorm * v / (emax * emax * emax));
+}
+
+double polygon_corner_quality(const Eigen::Vector3d& prev, const Eigen::Vector3d& corner,
+                              const Eigen::Vector3d& next, std::size_t n_corners) {
+    if (n_corners < 3) {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+    const Eigen::Vector3d ea = prev - corner;
+    const Eigen::Vector3d eb = next - corner;
+    const double la2 = ea.squaredNorm();
+    const double lb2 = eb.squaredNorm();
+    if (!(la2 > 0.0) || !(lb2 > 0.0)) {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+    constexpr double kPi = 3.14159265358979323846;
+    // Interior angle of the regular n-gon: (n-2)π/n. Its sine normalizes the
+    // regular polygon to exactly 1.
+    const double ideal =
+        std::sin(kPi * static_cast<double>(n_corners - 2) / static_cast<double>(n_corners));
+    const double raw = 2.0 * ea.cross(eb).norm() / (la2 + lb2);
+    return std::min(1.0, raw / ideal);
+}
+
 std::vector<double> tet4_aspect_ratios(const std::vector<Eigen::Vector3d>& nodes,
                                        const std::vector<std::array<std::uint32_t, 4>>& tets) {
     std::vector<double> out;
     out.reserve(tets.size());
     for (const auto& t : tets) {
-        out.push_back(tet_aspect(nodes[t[0]], nodes[t[1]], nodes[t[2]], nodes[t[3]]));
+        out.push_back(tet4_aspect_quality(nodes[t[0]], nodes[t[1]], nodes[t[2]], nodes[t[3]]));
     }
     return out;
 }
@@ -73,7 +95,8 @@ TetQuality summarize_tet4_quality(const std::vector<Eigen::Vector3d>& nodes,
     for (const auto& t : tets) {
         const double vol =
             std::abs(tet_volume(nodes[t[0]], nodes[t[1]], nodes[t[2]], nodes[t[3]]));
-        const double asp = tet_aspect(nodes[t[0]], nodes[t[1]], nodes[t[2]], nodes[t[3]]);
+        const double asp =
+            tet4_aspect_quality(nodes[t[0]], nodes[t[1]], nodes[t[2]], nodes[t[3]]);
         q.min_volume = std::min(q.min_volume, vol);
         q.max_volume = std::max(q.max_volume, vol);
         q.min_aspect = std::min(q.min_aspect, asp);

@@ -77,6 +77,28 @@ TEST_CASE("select_solve_method respects auto threshold and overrides") {
     CHECK(select_solve_method(1, opt) == SolveMethod::kCG);
 }
 
+TEST_CASE("default auto threshold keeps mid-size systems on the direct path") {
+    // Regression guard for the 8000-free-DOF cliff: kAuto used to hand 8k-50k
+    // systems to CG, which was 100-200x slower than LDLT on exactly these
+    // sparsities (11040-DOF plate-with-hole hex: 158 s CG vs 0.9 s LDLT).
+    const SolveOptions defaults;
+    CHECK(defaults.method == SolveMethod::kAuto);
+    CHECK(select_solve_method(8001, defaults) == SolveMethod::kDirect);
+    CHECK(select_solve_method(50000, defaults) == SolveMethod::kDirect);
+    CHECK(select_solve_method(50001, defaults) == SolveMethod::kCG);
+}
+
+TEST_CASE("CG honours its iteration cap instead of grinding") {
+    // A cap the system cannot possibly meet must fail fast, not run to 2*nfree.
+    auto setup = make_cantilever_hex(12, 2, 2);
+    SolveOptions opt;
+    opt.method = SolveMethod::kCG;
+    opt.cg_tol = 1e-14;
+    opt.cg_max_iters = 2;
+    CHECK_THROWS_AS(solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, opt),
+                    polymesh::fea::FeaError);
+}
+
 TEST_CASE("forced CG matches direct LDLT on small cantilever") {
     auto setup = make_cantilever_hex(12, 2, 2);
     REQUIRE(setup.nfree < 8000);
@@ -162,7 +184,10 @@ TEST_CASE("auto path selects CG above threshold and solves large free system") {
     INFO("nfree=" << setup.nfree << " nodes=" << setup.mesh.nodes.size());
     REQUIRE(setup.nfree > 10000);
 
-    SolveOptions auto_opt; // kAuto, default threshold 8000
+    // This size is below the default threshold now, so drive the CG branch of
+    // kAuto through the documented override instead of the old default.
+    SolveOptions auto_opt;
+    auto_opt.cg_threshold = setup.nfree - 1;
     CHECK(select_solve_method(setup.nfree, auto_opt) == SolveMethod::kCG);
 
     const auto u = solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, auto_opt);
@@ -173,4 +198,11 @@ TEST_CASE("auto path selects CG above threshold and solves large free system") {
     CHECK(tip < 0.0);
     CHECK(std::abs(tip) > 1e-12);
     CHECK(std::abs(tip) < 1.0); // steel, short beam — not metres of tip drop
+
+    // Same system with plain defaults must take the direct path and agree.
+    const SolveOptions defaults;
+    REQUIRE(select_solve_method(setup.nfree, defaults) == SolveMethod::kDirect);
+    const auto u_direct =
+        solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, defaults);
+    CHECK((u - u_direct).norm() / u_direct.norm() < 1e-6);
 }

@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-// PolyMesh UI theme — Interwebz-v2-inspired plum/rose chrome (owner pivot,
-// 2026-07-10): deep purple panels, header-strip group boxes, rose gradient
-// accents, lavender labels. The 3D viewport keeps the light studio gradient
-// (SolidWorks-style canvas). Panels read ONLY these tokens; never hardcode
-// color literals.
+// PolyMesh UI theme tokens. Three selectable chrome palettes:
+//   Studio (default) — graphite/cyan dark studio chrome with a dark viewport
+//                      gradient; the palette the showcase renders are shot in.
+//   Interwebz        — plum/rose chrome with a light studio viewport.
+//   Slate            — neutral blue-grey chrome with a light studio viewport.
+// Panels read ONLY these tokens; never hardcode color literals.
 
 #include "imgui.h"
 
@@ -56,15 +57,17 @@ struct Palette {
     ImVec4 status_err{0.961f, 0.549f, 0.420f, 1};
 };
 
-enum class ThemeId : int { kInterwebz = 0, kSlate = 1, kCount };
+// Values are persisted in GuiSettings — APPEND new themes, never renumber.
+enum class ThemeId : int { kInterwebz = 0, kSlate = 1, kStudio = 2, kCount };
 
 /// Active chrome palette (read by widgets; never hardcode colors).
 extern Palette palette;
 extern ThemeId active_theme;
 
 /// Load a named palette into `palette` and push it into ImGuiStyle.
-void apply_theme(ThemeId id = ThemeId::kInterwebz);
+void apply_theme(ThemeId id = ThemeId::kStudio);
 Palette make_interwebz_palette();
 Palette make_slate_palette();
+Palette make_studio_palette();
 
 } // namespace polymesh::gui

@@ -168,6 +168,11 @@ void end_group_box() {
     dl->AddRectFilled(box_min, ImVec2(box_max.x, box_min.y + kGroupHeader), u32(palette.header_bg),
                       3.0f, ImDrawFlags_RoundCornersTop);
     dl->AddRect(box_min, box_max, u32(palette.border), 3.0f);
+    // 2px accent rule down the left of the header strip. Inset by 1px so the
+    // border stays visible around it, and palette-driven so it reads correctly
+    // in every theme (Studio cyan, Interwebz rose, Slate blue).
+    dl->AddRectFilled(ImVec2(box_min.x + 1.0f, box_min.y + 1.0f),
+                      ImVec2(box_min.x + 3.0f, box_min.y + kGroupHeader), u32(palette.accent));
     dl->PushClipRect(box_min, ImVec2(box_max.x - 4.0f, box_min.y + kGroupHeader), true);
     dl->AddText(ImVec2(box_min.x + 12.0f, box_min.y + 3.0f), u32(palette.text), frame.title);
     dl->PopClipRect();

@@ -151,7 +151,28 @@ ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
         }
     }
 
-    // Per-node least-squares fit of stress components: σ(x) ≈ a0 + a1 x + a2 y + a3 z
+    // Per-node least-squares fit of stress components: σ(x) ≈ a0 + a·(x − x̄).
+    //
+    // The fit is written in the patch's OWN frame — coordinates measured from
+    // the patch's mean sample point and divided by the patch radius — not in
+    // absolute metres. That is not cosmetic. In absolute coordinates the design
+    // matrix [1, x, y, z] of a patch of diameter h sitting at distance R from
+    // the origin has columns that are constant to within h/R, so A is
+    // numerically rank-deficient by construction (measured on plate+hole at
+    // h = 8 mm: AᵀA eigenvalues 6e-18 … 4.0), the unpivoted LDLᵀ that used to
+    // solve it returned an arbitrary point of the null space, and evaluating
+    // that at |x| ≈ R multiplied the excursion by R/h. Every node on a flat
+    // lattice face makes it EXACTLY singular — its incident element centroids
+    // are coplanar, so the column normal to that plane is a multiple of the
+    // constant column. Result: von Mises 1.6e12 Pa and ZZ η 4793 on a mesh
+    // whose true recovered maximum is 1.7e7 Pa, on a perfectly conforming
+    // well-shaped hex lattice with a sane displacement field.
+    //
+    // In the patch frame the constant column is orthogonal to the three
+    // coordinate columns, so a0 is the patch mean whatever the rank is, and the
+    // SVD's minimum-norm solve zeroes the linear part along any direction the
+    // patch cannot resolve. A degenerate patch therefore degrades to the plain
+    // patch average — the honest answer — instead of diverging.
     ZzRecovery out;
     out.nodal_stress.assign(n_nodes, Stress::Zero());
 #if defined(POLYMESH_WITH_OPENMP)
@@ -163,13 +184,21 @@ ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
         if (patch.empty()) {
             continue;
         }
-        // Need ≥4 samples for linear fit; fall back to average.
-        if (patch.size() < 4) {
-            Stress acc = Stress::Zero();
-            for (auto e : patch) {
-                acc += el_stress[e];
-            }
-            out.nodal_stress[nu] = acc / static_cast<double>(patch.size());
+        const Eigen::Vector3d& p = mesh.nodes[nu];
+        Stress mean_stress = Stress::Zero();
+        Eigen::Vector3d mean_off = Eigen::Vector3d::Zero();
+        double radius = 0.0;
+        for (auto e : patch) {
+            mean_stress += el_stress[e];
+            const Eigen::Vector3d off = el_cent[e] - p;
+            mean_off += off;
+            radius = std::max(radius, off.norm());
+        }
+        const auto count = static_cast<double>(patch.size());
+        mean_stress /= count;
+        mean_off /= count;
+        if (patch.size() < 4 || !(radius > 0.0)) {
+            out.nodal_stress[nu] = mean_stress; // no linear part to resolve
             continue;
         }
         const auto m = static_cast<Eigen::Index>(patch.size());
@@ -177,21 +206,29 @@ ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
         Eigen::MatrixXd B(m, 6);
         for (Eigen::Index i = 0; i < m; ++i) {
             const auto e = patch[static_cast<std::size_t>(i)];
-            const auto& c = el_cent[e];
+            const Eigen::Vector3d off = (el_cent[e] - p - mean_off) / radius;
             A(i, 0) = 1.0;
-            A(i, 1) = c[0];
-            A(i, 2) = c[1];
-            A(i, 3) = c[2];
+            A(i, 1) = off[0];
+            A(i, 2) = off[1];
+            A(i, 3) = off[2];
             B.row(i) = el_stress[e].transpose();
         }
-        // Solve (A^T A) X = A^T B for 4x6 coefficient matrix.
-        const Eigen::MatrixXd ata = A.transpose() * A;
-        const Eigen::MatrixXd atb = A.transpose() * B;
-        const Eigen::MatrixXd coeff = ata.ldlt().solve(atb);
-        const Eigen::Vector3d& p = mesh.nodes[nu];
+        Eigen::JacobiSVD<Eigen::MatrixXd> svd(A, Eigen::ComputeThinU | Eigen::ComputeThinV);
+        // Rank tolerance, relative to the largest singular value: a direction
+        // counts as sampled only when the patch spreads in it by ~1% of its own
+        // radius. Anything thinner is the flat-face / thin-layer null space and
+        // its slope is pure noise divided by ~0 — retaining it is what produced
+        // the 1e12 Pa readings. Measured on plate+hole h=8 mm: 1e-8 → 1.6e12 Pa
+        // (η 4790), 1e-6 → 1.8e10, 1e-4 → 1.2e9, 1e-3 and 1e-2 → 1.52e7
+        // (η 0.208, matching the h/2-refined answer), 5e-2 → starts discarding
+        // real slopes. The 1e-3…1e-2 plateau is the safe operating point.
+        svd.setThreshold(1e-2);
+        const Eigen::MatrixXd coeff = svd.solve(B);
+        // Extrapolate from the patch mean point back to the node itself.
         Eigen::RowVector4d row;
-        row << 1.0, p[0], p[1], p[2];
-        out.nodal_stress[nu] = (row * coeff).transpose();
+        row << 1.0, -mean_off[0] / radius, -mean_off[1] / radius, -mean_off[2] / radius;
+        const Stress fit = (row * coeff).transpose();
+        out.nodal_stress[nu] = fit.allFinite() ? fit : mean_stress;
     }
 
     // Element indicators, energy norm of the recovered stress jump (ZZ):

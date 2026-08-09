@@ -1,7 +1,7 @@
 {
   "apps/cli/main.cpp": {
-    "mtime": 1786218675.7850826,
-    "ast_hash": "4030c40de1104d0a5a413ad96a9d8680",
+    "mtime": 1786236816.5669823,
+    "ast_hash": "9dd6b52d9dd80f2aa704146cfb7cbdb5",
     "semantic_hash": ""
   },
   "apps/gui/main.cpp": {
@@ -170,8 +170,8 @@
     "semantic_hash": ""
   },
   "src/fea/src/solve.cpp": {
-    "mtime": 1786217801.499851,
-    "ast_hash": "ae185974d1276ed8332cdc1c3f89fa4c",
+    "mtime": 1786234960.8186598,
+    "ast_hash": "46fd0b17a5a916379ba2cfd1deeab048",
     "semantic_hash": ""
   },
   "src/fea/src/stress.cpp": {
@@ -220,8 +220,8 @@
     "semantic_hash": ""
   },
   "src/pipeline/src/scene.cpp": {
-    "mtime": 1786224781.5056884,
-    "ast_hash": "eb09532d94bc6e8ed82c5e4af1381f82",
+    "mtime": 1786235328.4518769,
+    "ast_hash": "d4acb114816ad452dd28cd33c57637c5",
     "semantic_hash": ""
   },
   "tests/support/mms.cpp": {
@@ -365,8 +365,8 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1786222498.1050334,
-    "ast_hash": "0812c42d3026cba5771a78ee8eeb5d81",
+    "mtime": 1786236501.9063928,
+    "ast_hash": "9ab6e60a4117050ff5f198a269b63688",
     "semantic_hash": ""
   },
   "apps/cli/CMakeLists.txt": {
@@ -480,8 +480,8 @@
     "semantic_hash": ""
   },
   "src/mesh/CMakeLists.txt": {
-    "mtime": 1783909339.5333457,
-    "ast_hash": "a1d379ff72730549a0dc085b59827629",
+    "mtime": 1786231699.7001138,
+    "ast_hash": "40d8d967b6e49fb7021c502b9493e399",
     "semantic_hash": ""
   },
   "src/pipeline/CMakeLists.txt": {
@@ -490,8 +490,8 @@
     "semantic_hash": ""
   },
   "tests/CMakeLists.txt": {
-    "mtime": 1786217964.0235517,
-    "ast_hash": "564a1d4bdf63dfee2b31234571736c9d",
+    "mtime": 1786233913.1660018,
+    "ast_hash": "1de1981d83db6329abd054455bee44f5",
     "semantic_hash": ""
   },
   "apps/bench/d6_tier3.cpp": {
@@ -680,8 +680,8 @@
     "semantic_hash": ""
   },
   "src/mesh/include/mesh/hybrid_fill.hpp": {
-    "mtime": 1783732475.796624,
-    "ast_hash": "1dd67fae1ece430c787e5078dc619f36",
+    "mtime": 1786233099.1118753,
+    "ast_hash": "1f605900ec17f71248d1f42515ea72c6",
     "semantic_hash": ""
   },
   "src/mesh/include/mesh/local_refine.hpp": {
@@ -705,8 +705,8 @@
     "semantic_hash": ""
   },
   "src/mesh/include/mesh/surface_project.hpp": {
-    "mtime": 1786225017.3901784,
-    "ast_hash": "ae23ec4388d611b07b18e54d838dde7b",
+    "mtime": 1786235125.8703241,
+    "ast_hash": "524fff490cb64d643756d96d29e9a520",
     "semantic_hash": ""
   },
   "src/mesh/include/mesh/tet_fill.hpp": {
@@ -730,8 +730,8 @@
     "semantic_hash": ""
   },
   "src/mesh/src/hybrid_fill.cpp": {
-    "mtime": 1783732571.704866,
-    "ast_hash": "64f6ada7e918b49a1119c05dc1d019c0",
+    "mtime": 1786234428.9958458,
+    "ast_hash": "e3e1d86f946ff8e556936299c9bb2d19",
     "semantic_hash": ""
   },
   "src/mesh/src/local_refine.cpp": {
@@ -755,8 +755,8 @@
     "semantic_hash": ""
   },
   "src/mesh/src/surface_project.cpp": {
-    "mtime": 1786225017.3591783,
-    "ast_hash": "871a8075385a841ef70827b5c0f74a21",
+    "mtime": 1786235053.8034618,
+    "ast_hash": "b1ac10c15397f909bfeb3b5a2580f26f",
     "semantic_hash": ""
   },
   "src/mesh/src/tet_fill.cpp": {
@@ -795,8 +795,8 @@
     "semantic_hash": ""
   },
   "tests/test_iterative_solve.cpp": {
-    "mtime": 1786217588.6400094,
-    "ast_hash": "b88cd68e81c1b5bd413f39f4ead38b8a",
+    "mtime": 1786234960.844058,
+    "ast_hash": "9fd43b0d4f4132ff01baa1bc355b9e80",
     "semantic_hash": ""
   },
   "tests/test_kirsch_c5_graded.cpp": {
@@ -1280,8 +1280,8 @@
     "semantic_hash": ""
   },
   "docs/validation/hand-calcs.md": {
-    "mtime": 1783906451.1058216,
-    "ast_hash": "30ac5853a297ac23708bfcfe77ccc1fc",
+    "mtime": 1786233034.4580243,
+    "ast_hash": "d4eaf1c423bc8f312ac9ed65c4c1e02b",
     "semantic_hash": ""
   },
   "tests/test_element_tendency.cpp": {
@@ -1410,8 +1410,8 @@
     "semantic_hash": ""
   },
   "scripts/gen_cad_parts.py": {
-    "mtime": 1783894821.7764277,
-    "ast_hash": "f84a06572138312e29fc3689bb6935ba",
+    "mtime": 1786234873.4868498,
+    "ast_hash": "8f985c8f2ca56e314ee04716c2c352d2",
     "semantic_hash": ""
   },
   "bench/campaigns/README.md": {
@@ -1535,8 +1535,8 @@
     "semantic_hash": ""
   },
   "src/geom/include/geom/cad_model.hpp": {
-    "mtime": 1784032997.4328022,
-    "ast_hash": "807e457c7ace5ee62d39f749ceb088dd",
+    "mtime": 1786236644.8770921,
+    "ast_hash": "5236c25ac5ac8f9e9f64bccacb958595",
     "semantic_hash": ""
   },
   "src/geom/include/geom/cad_topology.hpp": {
@@ -1545,8 +1545,8 @@
     "semantic_hash": ""
   },
   "src/geom/src/cad_model.cpp": {
-    "mtime": 1786225320.5695226,
-    "ast_hash": "a59f71897323a05d27dac468e8ae69dd",
+    "mtime": 1786236816.5257163,
+    "ast_hash": "8d45bea5a0fd204ec60e639e910f7e8d",
     "semantic_hash": ""
   },
   "src/geom/src/cad_topology.cpp": {
@@ -1555,13 +1555,13 @@
     "semantic_hash": ""
   },
   "src/mesh/include/mesh/varyhedron_fill.hpp": {
-    "mtime": 1783904134.9243364,
-    "ast_hash": "430fb2882b44e9f23df88d7eda7d19e2",
+    "mtime": 1786233145.9717674,
+    "ast_hash": "a43c012fdd75c6ec67a8adef517125e4",
     "semantic_hash": ""
   },
   "src/mesh/src/varyhedron_fill.cpp": {
-    "mtime": 1786225722.2976763,
-    "ast_hash": "f2181633b580c125b2baad075b80502c",
+    "mtime": 1786235125.9139938,
+    "ast_hash": "c5de815f880fe1b5fc64cc43c8db5231",
     "semantic_hash": ""
   },
   "tests/fixtures/parts/cylinder.case.json": {
@@ -1570,8 +1570,8 @@
     "semantic_hash": ""
   },
   "tests/fixtures/parts/icecream_cone.case.json": {
-    "mtime": 1783899174.272838,
-    "ast_hash": "702889275620191bda09d1d5b66d62ca",
+    "mtime": 1786231594.6183882,
+    "ast_hash": "45faa076d0018ac9c1e17204015d4593",
     "semantic_hash": ""
   },
   "tests/fixtures/parts/sphere.case.json": {
@@ -1580,8 +1580,8 @@
     "semantic_hash": ""
   },
   "tests/test_cad_model.cpp": {
-    "mtime": 1783904134.9253364,
-    "ast_hash": "9008ca2ebe5f139cc39423b0766369b3",
+    "mtime": 1786233917.9778504,
+    "ast_hash": "4263e2e5a624bc5accd8dd32145bd54b",
     "semantic_hash": ""
   },
   "tests/test_cad_topology.cpp": {
@@ -2160,18 +2160,18 @@
     "semantic_hash": ""
   },
   "src/mesh/include/mesh/wall_project.hpp": {
-    "mtime": 1783904134.9403362,
-    "ast_hash": "192d572f4c16f0743b9e5139b88b102b",
+    "mtime": 1786235125.8721585,
+    "ast_hash": "ba3ece91c02e89e4515fe7198ecf7c70",
     "semantic_hash": ""
   },
   "src/mesh/src/wall_project.cpp": {
-    "mtime": 1786225554.868016,
-    "ast_hash": "0eaa025b0a6c177405912e676a195818",
+    "mtime": 1786235125.8941672,
+    "ast_hash": "e876e4a5f0ceb684317061cd64ed621c",
     "semantic_hash": ""
   },
   "tests/test_wall_project.cpp": {
-    "mtime": 1783904134.9413362,
-    "ast_hash": "0df4bbd97268208fd669b7b5cc2a56a4",
+    "mtime": 1786235125.9217846,
+    "ast_hash": "f4dd2cfed778722422526c63ba90de3a",
     "semantic_hash": ""
   },
   "bench/campaigns/varyhedron-baseline-m9/BASELINE.md": {
@@ -2195,8 +2195,8 @@
     "semantic_hash": ""
   },
   "docs/research/brep-face-tag-bc.md": {
-    "mtime": 1783906451.1000922,
-    "ast_hash": "87b50ce688b46a301ef98e734506fc25",
+    "mtime": 1786233138.2227852,
+    "ast_hash": "8e50dc5190978b7f0953a43103335ae6",
     "semantic_hash": ""
   },
   "docs/research/campaign-metrics.md": {
@@ -2505,8 +2505,8 @@
     "semantic_hash": ""
   },
   "tests/test_geometry_fidelity.cpp": {
-    "mtime": 1784033373.8470376,
-    "ast_hash": "faaf0973723af32183f553d8036b09b9",
+    "mtime": 1786236816.5771494,
+    "ast_hash": "4050a9f5547b43a110cef34245852c8c",
     "semantic_hash": ""
   },
   "apps/gui/colormap.hpp": {
@@ -2525,8 +2525,8 @@
     "semantic_hash": ""
   },
   "docs/assets/showcase/manifest.json": {
-    "mtime": 1786210729.490298,
-    "ast_hash": "963e636b192e274643ae2437fc7a42ac",
+    "mtime": 1786234676.746644,
+    "ast_hash": "598165a2c60d8009c3102e1eb5f1e6a9",
     "semantic_hash": ""
   },
   "scripts/make_compare_grid.py": {
@@ -2540,8 +2540,8 @@
     "semantic_hash": ""
   },
   "scripts/render_showcase.py": {
-    "mtime": 1786210711.2387037,
-    "ast_hash": "8762e250122418ca1431175987309a64",
+    "mtime": 1786234559.5565534,
+    "ast_hash": "53d855f09a2519125ecf2f95dd5c70a4",
     "semantic_hash": ""
   },
   "src/fea/include/fea/cell_quality.hpp": {
@@ -2570,13 +2570,13 @@
     "semantic_hash": ""
   },
   "docs/SHOWCASE.md": {
-    "mtime": 1786186808.5011222,
-    "ast_hash": "fc0cefd84e7ee633d791fee82d138c61",
+    "mtime": 1786236917.6625185,
+    "ast_hash": "5a4594bf4f78558a634292f23b16951d",
     "semantic_hash": ""
   },
   "docs/assets/showcase/OVERVIEW.md": {
-    "mtime": 1786186840.4800644,
-    "ast_hash": "313194278ca9d9bdf18da189b36490b4",
+    "mtime": 1786234724.1761844,
+    "ast_hash": "910ebd1d72914a382e5aa5d243ef01b6",
     "semantic_hash": ""
   },
   "docs/assets/showcase/architecture.png": {
@@ -2600,13 +2600,13 @@
     "semantic_hash": ""
   },
   "docs/assets/showcase/compare_grading.png": {
-    "mtime": 1786210620.2163365,
-    "ast_hash": "097385a7e406a8775e1261d6cdd71cef",
+    "mtime": 1786234581.1775048,
+    "ast_hash": "58c71477e549d4cd91ceed0c341a1db1",
     "semantic_hash": ""
   },
   "docs/assets/showcase/compare_meshers.png": {
-    "mtime": 1786210729.477577,
-    "ast_hash": "2ef3a138d38fdf9f34ee175753ba6d23",
+    "mtime": 1786234506.6166718,
+    "ast_hash": "eb48e4b94a426507935e71af8525c312",
     "semantic_hash": ""
   },
   "docs/assets/showcase/gallery_cantilever.png": {
@@ -2620,13 +2620,13 @@
     "semantic_hash": ""
   },
   "docs/assets/showcase/gallery_icecream_cone.png": {
-    "mtime": 1786210615.0963721,
-    "ast_hash": "a11eb494a953029e25fd91b6a93e47da",
+    "mtime": 1786234635.522383,
+    "ast_hash": "da45b42c900502c3a1da9cccab403e22",
     "semantic_hash": ""
   },
   "docs/assets/showcase/gallery_plate_hole.png": {
-    "mtime": 1786210608.9744146,
-    "ast_hash": "2db3f34d686aec8e2b588c07f2448f85",
+    "mtime": 1786234663.4263206,
+    "ast_hash": "464a98f125a9a478630a687b3520f8cc",
     "semantic_hash": ""
   },
   "docs/assets/showcase/gallery_sphere.png": {
@@ -2635,8 +2635,8 @@
     "semantic_hash": ""
   },
   "docs/assets/showcase/hero.png": {
-    "mtime": 1786210609.5954103,
-    "ast_hash": "bea663cc13a17bc9390d66d4feea4c4e",
+    "mtime": 1786234676.7402906,
+    "ast_hash": "0cb8c9631b713ce1e84308863fcca4ec",
     "semantic_hash": ""
   },
   "src/fea/include/fea/resource_budget.hpp": {
@@ -2662,6 +2662,46 @@
   "docs/assets/showcase/gui_studio.png": {
     "mtime": 1786217270.581774,
     "ast_hash": "0680f5840f9edc702560ba377305592f",
+    "semantic_hash": ""
+  },
+  "bench/results/brep-roundtrip-plate-hole-current.json": {
+    "mtime": 1786236585.3801713,
+    "ast_hash": "0a149d6c77223006c756ac15f567a4be",
+    "semantic_hash": ""
+  },
+  "bench/results/mesher-fidelity-plate-hole-baseline.json": {
+    "mtime": 1786232323.7525816,
+    "ast_hash": "51cb9ea6dbe71342d2ae387960e7421b",
+    "semantic_hash": ""
+  },
+  "bench/results/mesher-fidelity-plate-hole-current.json": {
+    "mtime": 1786236918.1964269,
+    "ast_hash": "e3a2de5fee04b93c7abad69c0ae3b6c4",
+    "semantic_hash": ""
+  },
+  "scripts/evaluate_brep_roundtrip.py": {
+    "mtime": 1786237132.4330688,
+    "ast_hash": "4c3627200bba7f42876560198df93d54",
+    "semantic_hash": ""
+  },
+  "scripts/measure_mesh_fidelity.py": {
+    "mtime": 1786236886.3495843,
+    "ast_hash": "455e332c7dc2fdcc3e22d49ef2b295ce",
+    "semantic_hash": ""
+  },
+  "src/mesh/include/mesh/brep_fidelity.hpp": {
+    "mtime": 1786236679.3320198,
+    "ast_hash": "453854bd45dcc11a156e8d45cad12040",
+    "semantic_hash": ""
+  },
+  "src/mesh/src/brep_fidelity.cpp": {
+    "mtime": 1786236816.5355806,
+    "ast_hash": "5c908a17956f1fabf9404b14f5f8989c",
+    "semantic_hash": ""
+  },
+  "tests/test_surface_project.cpp": {
+    "mtime": 1786233917.9802074,
+    "ast_hash": "ba0990fc0a453bc2619c2bd1204b4142",
     "semantic_hash": ""
   }
 }

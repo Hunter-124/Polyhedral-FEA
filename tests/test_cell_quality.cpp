@@ -43,8 +43,8 @@ NodalMesh one_cell(ElementType type, const std::vector<Eigen::Vector3d>& nodes,
 }
 
 std::vector<Eigen::Vector3d> box_nodes(double sx, double sy, double sz) {
-    return {{0, 0, 0},    {sx, 0, 0},   {sx, sy, 0},   {0, sy, 0},
-            {0, 0, sz},   {sx, 0, sz},  {sx, sy, sz},  {0, sy, sz}};
+    return {{0, 0, 0},  {sx, 0, 0},  {sx, sy, 0},  {0, sy, 0},
+            {0, 0, sz}, {sx, 0, sz}, {sx, sy, sz}, {0, sy, sz}};
 }
 
 /// Outward quad faces of the canonical hex node ordering.
@@ -109,39 +109,33 @@ TEST_CASE("cell_quality: regular cells score 1, degenerate cells do not") {
     REQUIRE(q_skew < 0.75);
 
     // tet4: regular tet scores 1, sliver collapses toward 0.
-    const auto reg_tet = one_cell(ElementType::kTet4, {{0, 0, 0},
-                                                       {1, 0, 0},
-                                                       {0.5, 0.8660254037844386, 0},
-                                                       {0.5, 0.28867513459481287,
-                                                        0.816496580927726}});
+    const auto reg_tet =
+        one_cell(ElementType::kTet4, {{0, 0, 0},
+                                      {1, 0, 0},
+                                      {0.5, 0.8660254037844386, 0},
+                                      {0.5, 0.28867513459481287, 0.816496580927726}});
     REQUIRE(cell_quality(reg_tet, reg_tet.elements[0]) == Approx(1.0).margin(1e-9));
-    const auto sliver = one_cell(ElementType::kTet4,
-                                 {{0, 0, 0}, {1, 0, 0}, {0.5, 1, 0}, {0.5, 0.5, 1e-4}});
+    const auto sliver =
+        one_cell(ElementType::kTet4, {{0, 0, 0}, {1, 0, 0}, {0.5, 1, 0}, {0.5, 0.5, 1e-4}});
     REQUIRE(cell_quality(sliver, sliver.elements[0]) < 0.01);
 
     // prism6: equilateral-base prism is the ideal; the right-triangle prism the
     // hybrid fills emit is sin45/sin60 = 0.8165.
     const double s3 = 0.8660254037844386;
     const auto equi_prism =
-        one_cell(ElementType::kPrism6, {{0, 0, 0},
-                                        {1, 0, 0},
-                                        {0.5, s3, 0},
-                                        {0, 0, 1},
-                                        {1, 0, 1},
-                                        {0.5, s3, 1}});
+        one_cell(ElementType::kPrism6,
+                 {{0, 0, 0}, {1, 0, 0}, {0.5, s3, 0}, {0, 0, 1}, {1, 0, 1}, {0.5, s3, 1}});
     REQUIRE(cell_quality(equi_prism, equi_prism.elements[0]) == Approx(1.0).margin(1e-12));
-    const auto right_prism = one_cell(
-        ElementType::kPrism6,
-        {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {1, 0, 1}, {0, 1, 1}});
+    const auto right_prism =
+        one_cell(ElementType::kPrism6,
+                 {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {1, 0, 1}, {0, 1, 1}});
     REQUIRE(cell_quality(right_prism, right_prism.elements[0]) ==
             Approx(0.816496580927726).margin(1e-9));
 
     // pyramid5: all-edges-equal pyramid is the ideal (apex at a/√2).
-    const auto reg_pyr = one_cell(ElementType::kPyramid5, {{0, 0, 0},
-                                                          {1, 0, 0},
-                                                          {1, 1, 0},
-                                                          {0, 1, 0},
-                                                          {0.5, 0.5, 0.7071067811865476}});
+    const auto reg_pyr =
+        one_cell(ElementType::kPyramid5,
+                 {{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}, {0.5, 0.5, 0.7071067811865476}});
     REQUIRE(cell_quality(reg_pyr, reg_pyr.elements[0]) == Approx(1.0).margin(1e-12));
     // Squashed pyramid: apex almost in the base plane.
     auto flat_pyr = reg_pyr;
@@ -149,9 +143,38 @@ TEST_CASE("cell_quality: regular cells score 1, degenerate cells do not") {
     REQUIRE(cell_quality(flat_pyr, flat_pyr.elements[0]) < 0.01);
 
     // kPolyVem: cube-shaped cell ideal, stretched box penalized, inverted zeroed.
-    const auto vem_cube = one_cell(ElementType::kPolyVem, box_nodes(1.0, 1.0, 1.0), box_faces());
+    const auto vem_cube =
+        one_cell(ElementType::kPolyVem, box_nodes(1.0, 1.0, 1.0), box_faces());
     REQUIRE(cell_quality(vem_cube, vem_cube.elements[0]) == Approx(1.0).margin(1e-12));
-    const auto vem_slab = one_cell(ElementType::kPolyVem, box_nodes(1.0, 1.0, 0.1), box_faces());
+    auto split_edge_nodes = box_nodes(1.0, 1.0, 1.0);
+    split_edge_nodes.push_back({0.5, 0.0, 0.0});
+    auto split_edge_faces = box_faces();
+    split_edge_faces[0] = {0, 3, 2, 1, 8};
+    split_edge_faces[2] = {0, 8, 1, 5, 4};
+    const auto vem_split_edge =
+        one_cell(ElementType::kPolyVem, split_edge_nodes, split_edge_faces);
+    REQUIRE(cell_quality(vem_split_edge, vem_split_edge.elements[0]) ==
+            Approx(1.0).margin(1e-12));
+    auto zero_edge_nodes = box_nodes(1.0, 1.0, 1.0);
+    zero_edge_nodes.push_back(zero_edge_nodes[0]);
+    auto zero_edge_faces = box_faces();
+    zero_edge_faces[0] = {0, 8, 3, 2, 1};
+    const auto vem_zero_edge =
+        one_cell(ElementType::kPolyVem, zero_edge_nodes, zero_edge_faces);
+    REQUIRE(cell_quality(vem_zero_edge, vem_zero_edge.elements[0]) ==
+            Approx(0.0).margin(1e-12));
+    auto collapsed_face_nodes = box_nodes(1.0, 1.0, 1.0);
+    collapsed_face_nodes.push_back({1.0 / 3.0, 0.0, 0.0});
+    collapsed_face_nodes.push_back({2.0 / 3.0, 0.0, 0.0});
+    collapsed_face_nodes.push_back({1.0 / 3.0, 0.0, 0.0});
+    auto collapsed_face_faces = box_faces();
+    collapsed_face_faces.push_back({0, 8, 9, 10});
+    const auto vem_collapsed_face =
+        one_cell(ElementType::kPolyVem, collapsed_face_nodes, collapsed_face_faces);
+    REQUIRE(cell_quality(vem_collapsed_face, vem_collapsed_face.elements[0]) ==
+            Approx(0.0).margin(1e-12));
+    const auto vem_slab =
+        one_cell(ElementType::kPolyVem, box_nodes(1.0, 1.0, 0.1), box_faces());
     const double q_slab = cell_quality(vem_slab, vem_slab.elements[0]);
     REQUIRE(q_slab > 0.0);
     REQUIRE(q_slab < 0.25);

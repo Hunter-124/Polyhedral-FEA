@@ -10,6 +10,7 @@
 #include <cmath>
 #include <limits>
 #include <span>
+#include <vector>
 
 namespace polymesh::fea {
 namespace {
@@ -21,14 +22,8 @@ constexpr double kNaN = std::numeric_limits<double>::quiet_NaN();
 using CornerEdges = std::array<std::size_t, 3>;
 
 /// Hex node order (nodal_mesh.hpp): bottom 0..3 CCW, top 4..7 CCW.
-constexpr std::array<CornerEdges, 8> kHexCorners{{{1, 3, 4},
-                                                  {2, 0, 5},
-                                                  {3, 1, 6},
-                                                  {0, 2, 7},
-                                                  {7, 5, 0},
-                                                  {4, 6, 1},
-                                                  {5, 7, 2},
-                                                  {6, 4, 3}}};
+constexpr std::array<CornerEdges, 8> kHexCorners{
+    {{1, 3, 4}, {2, 0, 5}, {3, 1, 6}, {0, 2, 7}, {7, 5, 0}, {4, 6, 1}, {5, 7, 2}, {6, 4, 3}}};
 
 /// Prism: bottom tri 0,1,2 then top tri 3,4,5. Bottom corners use
 /// (next, prev, top), top corners (prev, next, bottom) to stay right-handed.
@@ -190,11 +185,47 @@ double poly_cell_quality(const NodalMesh& mesh, const NodalElement& element) {
             const Eigen::Vector3d& c = mesh.nodes[element.nodes[face[k + 1]]];
             volume += a.dot(b.cross(c)) / 6.0;
         }
+        // RVD face coalescing can leave exact straight-through vertices where
+        // several tet-clipped fragments met.  They do not change the polygon's
+        // geometry, so exclude them from the corner-angle score.  Degenerate
+        // zero-length edges remain measurable as bad quality.
+        std::vector<std::size_t> corners;
+        corners.reserve(n);
+        bool has_zero_length_edge = false;
         for (std::size_t k = 0; k < n; ++k) {
+            const Eigen::Vector3d& previous = mesh.nodes[element.nodes[face[(k + n - 1) % n]]];
+            const Eigen::Vector3d& current = mesh.nodes[element.nodes[face[k]]];
+            const Eigen::Vector3d& next = mesh.nodes[element.nodes[face[(k + 1) % n]]];
+            const Eigen::Vector3d incoming = current - previous;
+            const Eigen::Vector3d outgoing = next - current;
+            const double scale = incoming.norm() * outgoing.norm();
+            has_zero_length_edge = has_zero_length_edge || !(scale > 0.0);
+            const bool straight_through = scale > 0.0 && incoming.dot(outgoing) > 0.0 &&
+                                          incoming.cross(outgoing).norm() <= 1e-12 * scale;
+            if (!straight_through) {
+                corners.push_back(k);
+            }
+        }
+        if (has_zero_length_edge) {
+            q = 0.0;
+            measured = true;
+            continue;
+        }
+        if (corners.size() < 3) {
+            // Fewer than three geometric corners is a collapsed/backtracking
+            // face, not an unmeasurable decoration on an otherwise good cell.
+            q = 0.0;
+            measured = true;
+            continue;
+        }
+        for (std::size_t j = 0; j < corners.size(); ++j) {
+            const std::size_t previous = corners[(j + corners.size() - 1) % corners.size()];
+            const std::size_t current = corners[j];
+            const std::size_t next = corners[(j + 1) % corners.size()];
             const double fq = mesh::polygon_corner_quality(
-                mesh.nodes[element.nodes[face[(k + n - 1) % n]]],
-                mesh.nodes[element.nodes[face[k]]],
-                mesh.nodes[element.nodes[face[(k + 1) % n]]], n);
+                mesh.nodes[element.nodes[face[previous]]],
+                mesh.nodes[element.nodes[face[current]]],
+                mesh.nodes[element.nodes[face[next]]], corners.size());
             if (std::isfinite(fq)) {
                 q = std::min(q, fq);
                 measured = true;

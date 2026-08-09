@@ -29,7 +29,7 @@ TEST_CASE("poly_mesh_to_vem maps unit-cube Voronoi cell", "[cvt][m5]") {
     const auto nodal = poly_mesh_to_vem(exp.mesh);
     REQUIRE(nodal.elements.size() == 1);
     REQUIRE(nodal.elements[0].type == ElementType::kPolyVem);
-    REQUIRE(nodal.elements[0].nodes.size() >= 8);  // cube corners
+    REQUIRE(nodal.elements[0].nodes.size() >= 8); // cube corners
     REQUIRE(nodal.elements[0].faces.size() >= 6);
     REQUIRE_NOTHROW(nodal.check_validity());
 }
@@ -46,8 +46,7 @@ TEST_CASE("volume_mesh cvt_poly on unit surface produces poly VEM", "[cvt][m5]")
     model.name = "unit_box";
     // 12 triangles for a unit cube (two per face).
     model.surface.vertices = {
-        {0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0},
-        {0, 0, 1}, {1, 0, 1}, {1, 1, 1}, {0, 1, 1},
+        {0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}, {0, 0, 1}, {1, 0, 1}, {1, 1, 1}, {0, 1, 1},
     };
     model.surface.triangles = {
         {0, 1, 2}, {0, 2, 3}, {4, 6, 5}, {4, 7, 6}, {0, 4, 5}, {0, 5, 1},
@@ -56,9 +55,9 @@ TEST_CASE("volume_mesh cvt_poly on unit surface produces poly VEM", "[cvt][m5]")
     model.region_count = 1;
     model.triangle_region.assign(model.surface.triangles.size(), 0);
 
-    const double h = 0.5;  // → n_side ~ 2
-    auto out = polymesh::pipeline::volume_mesh(
-        model, h, polymesh::pipeline::VolumeMesher::kCvtPoly);
+    const double h = 0.5; // → n_side ~ 2
+    auto out =
+        polymesh::pipeline::volume_mesh(model, h, polymesh::pipeline::VolumeMesher::kCvtPoly);
     REQUIRE(out.mesh.elements.size() >= 4);
     std::size_t n_poly = 0;
     for (const auto& el : out.mesh.elements) {
@@ -68,5 +67,8 @@ TEST_CASE("volume_mesh cvt_poly on unit surface produces poly VEM", "[cvt][m5]")
     }
     REQUIRE(n_poly == out.mesh.elements.size());
     REQUIRE(out.mesher_note.find("cvt_poly") != std::string::npos);
+    REQUIRE(out.mesher_note.find("clip=rvd_tet") != std::string::npos);
+    REQUIRE(out.mesher_note.find("unpaired_bisectors=0") != std::string::npos);
+    REQUIRE(out.mesher_note.find("unpaired_scaffold=0") != std::string::npos);
     REQUIRE_NOTHROW(out.mesh.check_validity());
 }

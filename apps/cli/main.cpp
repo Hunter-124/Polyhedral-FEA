@@ -70,7 +70,8 @@ int usage() {
                "inputs: CAD only (.step .stp .brep .brp). STL is no longer supported.\n"
                "mesh size: omit -h (or -h 0) for auto h0 from bbox + feature density\n"
                "mesher names: hybrid|zoo (default), varyhedron|vary (CAD packing),\n"
-               "              hybridvem, tet, hex, hexvem|vem, graded, hexpyr|transition,\n"
+               "              hybridvem, cvt_poly|cvt (experimental packed-poly VEM),\n"
+               "              tet, hex, hexvem|vem, graded, hexpyr|transition,\n"
                "              prism|sweep, octa|octahedral (experimental)\n"
                "--skin n: graded fine skin layers (default 2)\n"
                "--no-feature: disable geometry (curvature/thin-wall) grading (default on)\n"
@@ -1067,11 +1068,14 @@ int cmd_diag(std::span<char*> args) {
     const auto resolved =
         polymesh::pipeline::resolve_mesh_size(model, h, 30.0, max_elems, max_dof);
     h = resolved.h;
+    std::string mesh_size_note = resolved.note;
     // Diagnostics run at a coarse, representative resolution: cap auto-h so a
     // curvature-fine auto size doesn't explode the quick battery. A user -h is
-    // always respected.
+    // always respected, and the note records the effective cap explicitly.
     if (resolved.auto_chosen && bbox_diag > 0.0 && h < bbox_diag / 12.0) {
         h = bbox_diag / 12.0;
+        mesh_size_note = std::format("h={:.6g} m (diagnostic auto cap from {:.6g} m; {})", h,
+                                     resolved.h, resolved.note);
     }
     // BC/load boxes feed the refinement plan too, so bc_seeds is a real
     // measurement instead of a structural zero.
@@ -1255,13 +1259,15 @@ int cmd_diag(std::span<char*> args) {
         "  \"fidelity\": {},\n"
         "  \"solve\": {{ \"ran\": {}, \"dof\": {}, \"max_von_mises\": {:.6g}, "
         "\"max_disp\": {:.6g}, \"global_eta\": {:.6g} }},\n"
+        "  \"mesh_size_note\": \"{}\",\n"
         "  \"mesher_note\": \"{}\"\n"
         "}}\n",
         model.name, mesher_name, model.surface.vertices.size(), model.surface.triangles.size(),
         bbox_diag, model.cad ? "true" : "false", h, vol.mesh.nodes.size(),
         vol.mesh.elements.size(), q_min, q_mean, plan.n_geometry_seeds, plan.n_bc_seeds,
         import_ms, mesh_ms, solve_ms, mesh_throughput, fidelity_json,
-        solved ? "true" : "false", dof, max_vm, max_u, global_eta, resolved.note);
+        solved ? "true" : "false", dof, max_vm, max_u, global_eta, mesh_size_note,
+        vol.mesher_note);
 
     if (!json_path.empty()) {
         std::FILE* f = std::fopen(json_path.c_str(), "w");

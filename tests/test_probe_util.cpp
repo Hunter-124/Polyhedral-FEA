@@ -10,9 +10,20 @@
 #include <cstdint>
 #include <vector>
 
+using polymesh::testlab::combine_mesher_notes;
 using polymesh::testlab::face_mean_displacement_component;
 using polymesh::testlab::face_mean_displacement_mag;
 using polymesh::testlab::global_max_displacement_mag;
+
+TEST_CASE("probe_util: campaign mesher note preserves sizing and volume evidence") {
+    const std::string resolved = "auto h=0.01 m";
+    const std::string volume = "cvt_poly RVD raw_clip_volume=0.99999999999999989 "
+                               "scaffold_volume=1 post_vem_volume=1";
+    CHECK(combine_mesher_notes(resolved, volume) == resolved + " | " + volume);
+    CHECK(combine_mesher_notes("", volume) == volume);
+    CHECK(combine_mesher_notes(resolved, resolved + " | " + volume) ==
+          resolved + " | " + volume);
+}
 
 TEST_CASE("probe_util: face-mean |u| != global max on synthetic 2-node field") {
     // Node 0: |u| = 1.0; node 1: |u| = 100.0. Face-mean of {0,1} = 50.5;

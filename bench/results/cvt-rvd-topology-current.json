@@ -1,0 +1,605 @@
+{
+  "schema": "polymesh.cvt-rvd-topology.v1",
+  "generated_utc": "2026-08-09T05:29:42.809852+00:00",
+  "label": "local-frame-exact-rvd-cross-cell-volume-admission",
+  "scope": {
+    "part": "tests/fixtures/parts/plate_hole.step",
+    "h_m": 0.006,
+    "mesher": "cvt_poly",
+    "status": "experimental",
+    "default_mesher_unchanged": true
+  },
+  "provenance": {
+    "git": {
+      "base_commit": "894ede751a5fe77e4a944eab65e48e08d4254965",
+      "baseline_checkout": "origin/master at base_commit",
+      "candidate_working_tree_dirty": true,
+      "candidate_tracked_diff": {
+        "base_commit": "894ede751a5fe77e4a944eab65e48e08d4254965",
+        "sha256": "1e7c26c0fe61008dfdee0b32b826d22cdf38a35ae05096415ad50228fdd38478",
+        "bytes": 253764,
+        "command": [
+          "git",
+          "diff",
+          "--binary",
+          "894ede751a5fe77e4a944eab65e48e08d4254965",
+          "--",
+          "README.md",
+          "apps/cli/main.cpp",
+          "apps/testlab/main.cpp",
+          "apps/testlab/probe_util.hpp",
+          "docs/SHOWCASE.md",
+          "docs/decisions/0025-geogram-cvt-vendor.md",
+          "docs/research/geogram-cvt-vendoring.md",
+          "src/fea/src/boundary_faces.cpp",
+          "src/fea/src/cell_quality.cpp",
+          "src/fea/src/poly_to_vem.cpp",
+          "src/mesh/include/mesh/cvt_export.hpp",
+          "src/mesh/include/mesh/poly_mesh.hpp",
+          "src/mesh/src/cvt_export.cpp",
+          "src/mesh/src/poly_mesh.cpp",
+          "src/pipeline/src/scene.cpp",
+          "tests/test_cell_quality.cpp",
+          "tests/test_cvt_export.cpp",
+          "tests/test_cvt_poly_mesher.cpp",
+          "tests/test_fe_vem_assembly.cpp",
+          "tests/test_poly_mesh.cpp",
+          "tests/test_probe_util.cpp"
+        ],
+        "paths": [
+          "README.md",
+          "apps/cli/main.cpp",
+          "apps/testlab/main.cpp",
+          "apps/testlab/probe_util.hpp",
+          "docs/SHOWCASE.md",
+          "docs/decisions/0025-geogram-cvt-vendor.md",
+          "docs/research/geogram-cvt-vendoring.md",
+          "src/fea/src/boundary_faces.cpp",
+          "src/fea/src/cell_quality.cpp",
+          "src/fea/src/poly_to_vem.cpp",
+          "src/mesh/include/mesh/cvt_export.hpp",
+          "src/mesh/include/mesh/poly_mesh.hpp",
+          "src/mesh/src/cvt_export.cpp",
+          "src/mesh/src/poly_mesh.cpp",
+          "src/pipeline/src/scene.cpp",
+          "tests/test_cell_quality.cpp",
+          "tests/test_cvt_export.cpp",
+          "tests/test_cvt_poly_mesher.cpp",
+          "tests/test_fe_vem_assembly.cpp",
+          "tests/test_poly_mesh.cpp",
+          "tests/test_probe_util.cpp"
+        ],
+        "excludes": [
+          "bench/results/cvt-rvd-topology-current.json",
+          "generated graphify metadata",
+          "unrelated dirty benchmark artifacts"
+        ]
+      }
+    },
+    "source": {
+      "path": "tests/fixtures/parts/plate_hole.step",
+      "sha256": "a482377fd70a3a28de4972b375b47b7a2b82fd14f51475940f596ff67dc7a350",
+      "bytes": 19267,
+      "mtime_ns": 1783894868938906930
+    },
+    "baseline_executable": {
+      "path": "/tmp/polyfea-rvd-baseline/build/apps/cli/polymesh",
+      "sha256": "e56942f5d54248dbe4519aede76279e70f5658ffd5d97f949527e3cbca1e8c5b",
+      "bytes": 2929744,
+      "mtime_ns": 1786248058098557160
+    },
+    "candidate_executable": {
+      "path": "build/apps/cli/polymesh",
+      "sha256": "4303f7a6733de14e93a19c7313ae06fc0303f580a339c8ebbc5242c25f51bbfd",
+      "bytes": 3079312,
+      "mtime_ns": 1786253236923995313
+    },
+    "python": "3.14.6 (main, Jun 11 2026, 00:00:00) [GCC 16.1.1 20260515 (Red Hat 16.1.1-2)]",
+    "platform": "Linux-6.19.10-300.fc44.x86_64-x86_64-with-glibc2.43",
+    "cwd": "/home/hunter/Desktop/Polyhedral-FEA",
+    "candidate_testlab_executable": {
+      "path": "build/apps/testlab/polymesh_testlab",
+      "sha256": "da82383cb599306f3d573591fbb8872b564e3dc32b7d07ea5e48ccf79e0ee063",
+      "bytes": 3347176,
+      "mtime_ns": 1786253237024995103
+    },
+    "candidate_test_executable": {
+      "path": "build/tests/polymesh_tests",
+      "sha256": "b72446ebb5f2f29526a38ad52fc17dc10b2b62f4458c54c0cc1acc5516218756",
+      "bytes": 6288184,
+      "mtime_ns": 1786253237364994393
+    }
+  },
+  "resource_limits": {
+    "max_elems": 50000,
+    "max_dof": 300000,
+    "brep_surface_sample_ceiling": 10000
+  },
+  "commands": {
+    "baseline_diag": [
+      "/tmp/polyfea-rvd-baseline/build/apps/cli/polymesh",
+      "diag",
+      "tests/fixtures/parts/plate_hole.step",
+      "-h",
+      "0.006",
+      "--mesher",
+      "cvt",
+      "--json",
+      "/tmp/cvt-origin-h006.json",
+      "--no-solve",
+      "--max-elems",
+      "50000",
+      "--max-dof",
+      "300000"
+    ],
+    "candidate_diag": [
+      "build/apps/cli/polymesh",
+      "diag",
+      "tests/fixtures/parts/plate_hole.step",
+      "-h",
+      "0.006",
+      "--mesher",
+      "cvt",
+      "--json",
+      "/tmp/cvt-candidate-final-h006.json",
+      "--no-solve",
+      "--max-elems",
+      "50000",
+      "--max-dof",
+      "300000"
+    ],
+    "determinism_template": [
+      "<executable>",
+      "mesh",
+      "tests/fixtures/parts/plate_hole.step",
+      "-h",
+      "0.006",
+      "--mesher",
+      "cvt",
+      "--max-elems",
+      "50000",
+      "--max-dof",
+      "300000",
+      "-o",
+      "<run>.vtu"
+    ],
+    "candidate_solve_campaign": [
+      "build/apps/testlab/polymesh_testlab",
+      "run",
+      "/tmp/polyfea-cvt-final-accuracy"
+    ],
+    "candidate_source_diff_fingerprint": [
+      "git",
+      "diff",
+      "--binary",
+      "894ede751a5fe77e4a944eab65e48e08d4254965",
+      "--",
+      "<provenance.git.candidate_tracked_diff.paths...>"
+    ]
+  },
+  "topology_and_complexity": {
+    "before": {
+      "cells": 4246,
+      "vertices_with_displacement_dofs": 85104,
+      "whole_polygon_boundary_ownership": false,
+      "face_pairing": "pre-change pairing; no invalid exact-claim gate"
+    },
+    "after": {
+      "cells": 4246,
+      "vertices_with_displacement_dofs": 69279,
+      "whole_polygon_boundary_ownership": true,
+      "connected_site_components": true,
+      "invalid_face_claims": 0,
+      "unpaired_bisectors": 0,
+      "split_site_components": 0,
+      "coalesced_interface_components": 20871,
+      "removed_interface_fragments": 85123,
+      "boundary_projection": "full CAD target rejected by geometry/volume admission; exact pre-projection scaffold coordinates restored",
+      "geometry_admission": [
+        "translation-stable local-frame clipping and Euclidean tolerance welding",
+        "explicit domain-skin versus internal-scaffold provenance",
+        "unique simple planar source faces before triangulation",
+        "closed connected consistently oriented positive-volume cell shells",
+        "intra-cell and cross-cell intersection/overlap/containment rejection",
+        "closed manifold exterior",
+        "raw RVD coverage of the positive tetra scaffold",
+        "post-projection VEM volume coverage with rollback on failure",
+        "whole-polygon oriented partition ownership before display triangulation"
+      ],
+      "unpaired_scaffold_faces": 0,
+      "post_admission_faces": 147029,
+      "raw_clip_volume_m3": 0.00019688605864431118,
+      "positive_scaffold_volume_m3": 0.0001968860586443314,
+      "post_vem_volume_m3": 0.00019688605864430898,
+      "raw_to_scaffold_relative_error": 1.027008750953877e-13,
+      "post_to_scaffold_relative_error": 1.138520424985062e-13,
+      "projection_outcome": "rolled_back",
+      "mesher_note": "cvt_poly RVD (interior sites + 6840 tets + clip=rvd_tet + projection=rolled_back + bnd_snap=0@0 → kPolyVem): 4246 post_polys, 69279 post_nodes, post_faces=147029, sites=4284/fixed=102/interior=1420/feat=2762, lloyd_iters=32, raw_split_components=0, raw_unpaired_bisectors=0, raw_unpaired_scaffold=0, raw_invalid_face_claims=0, raw_coalesced_faces/fragments=20871/85123, raw_clip_volume=0.00019688605864431118, scaffold_volume=0.0001968860586443314, post_vem_volume=0.00019688605864430898, raw_domain_clips=240168, grid=38x19x2, h=0.006 m, geom_source=brep_topology | budget predicted=5556 elems/16667 DOF ceilings=50000/300000"
+    },
+    "deltas": {
+      "cell_count_change": 0,
+      "vertex_and_dof_change_percent": -18.5948956570784,
+      "vertex_and_dof_reduction_percent": 18.5948956570784,
+      "single_run_mesh_time_change_percent": 111.78891393901438
+    }
+  },
+  "determinism": {
+    "baseline": {
+      "run_a_sha256": "59a6c5cad07a258e948f9ace00bc7af7186329d7b936e99006504920370e6a26",
+      "run_b_sha256": "59a6c5cad07a258e948f9ace00bc7af7186329d7b936e99006504920370e6a26",
+      "byte_identical": true
+    },
+    "candidate": {
+      "run_a_sha256": "bf90884aa36413a36f90ebaf3aeede7aef61a3c9d657e285a15df39cf7f15aa7",
+      "run_b_sha256": "bf90884aa36413a36f90ebaf3aeede7aef61a3c9d657e285a15df39cf7f15aa7",
+      "byte_identical": true
+    },
+    "unit_gate": "64-site RVD is compared field-for-field after an OpenMP runtime probe forms an actual parallel team (requested 4 threads) versus a forced 1-thread run; unavailable or serialized OpenMP is reported as skipped"
+  },
+  "fidelity": {
+    "semantics": {
+      "mesh_to_brep": "samples the emitted free-boundary triangulation and projects to exact trimmed BRep entities",
+      "brep_to_mesh": "10000 deterministic exact trimmed-face UV samples measured to the emitted free-boundary triangulation",
+      "warning": "These are sampled directional distributions, not a Hausdorff-distance claim."
+    },
+    "before": {
+      "mesh": {
+        "h": 0.006,
+        "nodes": 85104,
+        "elements": 4246,
+        "quality_min": 0,
+        "quality_mean": 0.01997,
+        "geometry_seeds": 64,
+        "bc_seeds": 0
+      },
+      "timing_ms": {
+        "import": 10.643,
+        "mesh": 7811.449,
+        "solve": 0.0
+      },
+      "mesh_boundary_to_brep": {
+        "count": 544247,
+        "rms_m": 0.00356994216,
+        "p95_m": 0.00498940168,
+        "p99_m": 0.005,
+        "max_m": 0.005,
+        "p95_over_h": 0.831566946,
+        "p99_over_h": 0.833333333,
+        "max_over_h": 0.833333333,
+        "p99_over_bbox": 0.0223383249
+      },
+      "brep_surface_samples_to_mesh_boundary": {
+        "count": 10000,
+        "rms_m": 3.86486411e-05,
+        "p95_m": 3.46944695e-18,
+        "p99_m": 2.4176529e-05,
+        "max_m": 0.00132327204,
+        "p95_over_h": 5.78241159e-16,
+        "p99_over_h": 0.0040294215,
+        "max_over_h": 0.22054534,
+        "p99_over_bbox": 0.000108012632
+      },
+      "mesh_feature_to_sharp_brep_edge": {
+        "count": 224850,
+        "rms_m": 0.0170607335,
+        "p95_m": 0.0331530142,
+        "p99_m": 0.040955433,
+        "max_m": 0.0452916841,
+        "p95_over_h": 5.52550237,
+        "p99_over_h": 6.8259055,
+        "max_over_h": 7.54861402,
+        "p99_over_bbox": 0.182975154
+      },
+      "sharp_brep_edge_to_mesh_feature": {
+        "count": 364,
+        "rms_m": 0.000279903442,
+        "p95_m": 0.000485258613,
+        "p99_m": 0.00155031217,
+        "max_m": 0.0017001292,
+        "p95_over_h": 0.0808764354,
+        "p99_over_h": 0.258385362,
+        "max_over_h": 0.283354866,
+        "p99_over_bbox": 0.0069262754
+      },
+      "brep_vertex_to_mesh_node": {
+        "count": 10,
+        "rms_m": 0.000894559902,
+        "p95_m": 0.00200660109,
+        "p99_m": 0.00206306501,
+        "max_m": 0.00207718099,
+        "p95_over_h": 0.334433515,
+        "p99_over_h": 0.343844168,
+        "max_over_h": 0.346196831,
+        "p99_over_bbox": 0.0092170833
+      },
+      "normal_angle": {
+        "count": 198408,
+        "rms_deg": 58.6585931,
+        "p95_deg": 90,
+        "p99_deg": 90,
+        "max_deg": 90
+      },
+      "relative_volume_error": 0.000107381671,
+      "mesh_feature_segments": 74950
+    },
+    "after": {
+      "mesh": {
+        "h": 0.006,
+        "nodes": 69279,
+        "elements": 4246,
+        "quality_min": 1.741e-15,
+        "quality_mean": 0.00708,
+        "geometry_seeds": 64,
+        "bc_seeds": 0
+      },
+      "timing_ms": {
+        "import": 9.821,
+        "mesh": 16543.783,
+        "solve": 0.0
+      },
+      "mesh_boundary_to_brep": {
+        "count": 112488,
+        "rms_m": 8.72996442e-05,
+        "p95_m": 1.38777878e-17,
+        "p99_m": 0.000202480283,
+        "max_m": 0.00257050086,
+        "p95_over_h": 2.31296463e-15,
+        "p99_over_h": 0.0337467138,
+        "max_over_h": 0.42841681,
+        "p99_over_bbox": 0.000904614069
+      },
+      "brep_surface_samples_to_mesh_boundary": {
+        "count": 10000,
+        "rms_m": 7.12294972e-05,
+        "p95_m": 1.04083409e-17,
+        "p99_m": 0.000121215671,
+        "max_m": 0.0016294086,
+        "p95_over_h": 1.73472348e-15,
+        "p99_over_h": 0.0202026118,
+        "max_over_h": 0.2715681,
+        "p99_over_bbox": 0.00054155101
+      },
+      "mesh_feature_to_sharp_brep_edge": {
+        "count": 2124,
+        "rms_m": 0.00113549172,
+        "p95_m": 0.00272997896,
+        "p99_m": 0.00500042085,
+        "max_m": 0.00527080062,
+        "p95_over_h": 0.454996493,
+        "p99_over_h": 0.833403475,
+        "max_over_h": 0.878466769,
+        "p99_over_bbox": 0.0223402052
+      },
+      "sharp_brep_edge_to_mesh_feature": {
+        "count": 364,
+        "rms_m": 0.00033977844,
+        "p95_m": 0.000532091751,
+        "p99_m": 0.001802855,
+        "max_m": 0.00184357063,
+        "p95_over_h": 0.0886819584,
+        "p99_over_h": 0.300475833,
+        "max_over_h": 0.307261772,
+        "p99_over_bbox": 0.00805455214
+      },
+      "brep_vertex_to_mesh_node": {
+        "count": 10,
+        "rms_m": 0.000994362446,
+        "p95_m": 0.00222727698,
+        "p99_m": 0.00225762059,
+        "max_m": 0.0022652065,
+        "p95_over_h": 0.37121283,
+        "p99_over_h": 0.376270099,
+        "max_over_h": 0.377534416,
+        "p99_over_bbox": 0.0100862925
+      },
+      "normal_angle": {
+        "count": 37496,
+        "rms_deg": 4.11861036,
+        "p95_deg": 0,
+        "p99_deg": 15.6220051,
+        "max_deg": 90
+      },
+      "relative_volume_error": 0.000140462875,
+      "mesh_feature_segments": 708
+    },
+    "selected_deltas": {
+      "mesh_to_brep_p99_over_h_change_percent": -95.95039434238015,
+      "mesh_to_brep_p99_over_h_reduction_percent": 95.95039434238015,
+      "brep_to_mesh_p99_over_h_change_percent": 401.3774756500406,
+      "normal_p99_deg_change_percent": -82.64221655555556,
+      "mesh_feature_to_brep_edge_p99_over_h_change_percent": -87.7905799457669,
+      "brep_edge_to_mesh_feature_p99_over_h_change_percent": 16.289804760689197,
+      "relative_volume_error_change_percent": 30.807123498757996
+    }
+  },
+  "solve_context_at_h_0_015": {
+    "candidate_current": {
+      "campaign": "cfg-1a23c6c0",
+      "status": "ok",
+      "h_m": 0.014999999999999998,
+      "mesher": "cvt_poly",
+      "order": 1,
+      "feature_refine": true,
+      "elements": 643,
+      "nodes": 8037,
+      "dof": 24111,
+      "mesh_ms": 3347.278237,
+      "solve_ms": 5185.153194,
+      "accuracy": {
+        "all": [
+          {
+            "metric": "scf",
+            "rel_err": 0.3826708472399783,
+            "score": 0.2071805259667592,
+            "trusted": true,
+            "truth": 3.0,
+            "value": 1.851987458280065
+          }
+        ],
+        "metric": "scf",
+        "rel_err": 0.3826708472399783,
+        "score": 0.2071805259667592,
+        "trusted": true,
+        "truth": 3.0,
+        "value": 1.851987458280065
+      },
+      "health": {
+        "free_residual_rel": 9.459271221993755e-14,
+        "load_area_ok": true,
+        "load_area_rel_err": 8.673617379884035e-16,
+        "n_bc_dofs": 1674,
+        "n_orphans": 0,
+        "ok": true,
+        "reaction_sum_err": 2.0508624384740716e-15
+      },
+      "quality": {
+        "M1max": 0.004970280301969883,
+        "M2max": 0.004746057040205776,
+        "M6": 6.253724959940519e-05,
+        "score": 0.6793252780479178
+      },
+      "mesher_note": "auto h=0.003 m (predicted 177782 elems ≤ ceiling 589824; extent/16∩diag/28, prediction safety×4, n_sharp=138, min_feat=0.01 m, dens×0.88, Rκ≈0.02, CAD_edge≈0.01) | cvt_poly RVD (interior sites + 576 tets + clip=rvd_tet + projection=rolled_back + bnd_snap=0@0 → kPolyVem): 643 post_polys, 8037 post_nodes, post_faces=19189, sites=652/fixed=98/interior=118/feat=436, lloyd_iters=32, raw_split_components=0, raw_unpaired_bisectors=0, raw_unpaired_scaffold=0, raw_invalid_face_claims=0, raw_coalesced_faces/fragments=2515/7277, raw_clip_volume=0.00019510520199079635, scaffold_volume=0.00019510520199079716, post_vem_volume=0.00019510520199079716, raw_domain_clips=21424, grid=15x8x1, h=0.015 m, geom_source=brep_topology"
+    },
+    "frozen_m9_hybrid_zoo": {
+      "campaign": "cfg-028399df",
+      "status": "ok",
+      "h_m": 0.014999999999999998,
+      "mesher": "hybrid_zoo",
+      "order": 1,
+      "feature_refine": true,
+      "elements": 4608,
+      "nodes": 2064,
+      "dof": 6192,
+      "mesh_ms": 55.358709,
+      "solve_ms": 63.235421,
+      "accuracy": {
+        "all": [
+          {
+            "metric": "scf",
+            "rel_err": 0.25010906978831765,
+            "score": 0.2856252768900327,
+            "trusted": true,
+            "truth": 3.0,
+            "value": 3.750327209364953
+          }
+        ],
+        "metric": "scf",
+        "rel_err": 0.25010906978831765,
+        "score": 0.2856252768900327,
+        "trusted": true,
+        "truth": 3.0,
+        "value": 3.750327209364953
+      },
+      "health": {
+        "free_residual_rel": 4.461432833135217e-13,
+        "load_area_ok": true,
+        "load_area_rel_err": 0.0,
+        "n_bc_dofs": 354,
+        "n_orphans": 0,
+        "ok": true,
+        "reaction_sum_err": 3.813099862421054e-13
+      },
+      "quality": {
+        "M1max": 0.0004999999999999999,
+        "M2max": 0.00475,
+        "M6": 1.0,
+        "score": 0.7642857142857142
+      }
+    },
+    "frozen_m9_varyhedron": {
+      "campaign": "cfg-89f62376",
+      "status": "ok",
+      "h_m": 0.014999999999999998,
+      "mesher": "varyhedron",
+      "order": 1,
+      "feature_refine": true,
+      "elements": 2304,
+      "nodes": 744,
+      "dof": 2232,
+      "mesh_ms": 78.399845,
+      "solve_ms": 16.260522,
+      "accuracy": {
+        "all": [
+          {
+            "metric": "scf",
+            "rel_err": 0.6212357589594882,
+            "score": 0.13865091789717682,
+            "trusted": true,
+            "truth": 3.0,
+            "value": 4.863707276878465
+          }
+        ],
+        "metric": "scf",
+        "rel_err": 0.6212357589594882,
+        "score": 0.13865091789717682,
+        "trusted": true,
+        "truth": 3.0,
+        "value": 4.863707276878465
+      },
+      "health": {
+        "free_residual_rel": 1.154965906852438e-13,
+        "load_area_ok": true,
+        "load_area_rel_err": 0.0,
+        "n_bc_dofs": 204,
+        "n_orphans": 0,
+        "ok": true,
+        "reaction_sum_err": 8.470519418170689e-15
+      },
+      "quality": {
+        "M1max": 7.842222941774162e-05,
+        "M2max": 0.005,
+        "M6": 0.1856805279570126,
+        "score": 0.6684541288024382
+      }
+    },
+    "candidate_ratios": {
+      "dof_over_hybrid_zoo": 3.8938953488372094,
+      "solve_time_over_hybrid_zoo": 81.99760691084828,
+      "dof_over_varyhedron": 10.80241935483871,
+      "solve_time_over_varyhedron": 318.879873229162
+    },
+    "comparison_warning": "The M9 rows are frozen historical context, not same-executable causal A/B timings. All three use the same plate-hole case and h=0.015.",
+    "candidate_campaign_definition": {
+      "name": "cvt-packed-poly-final-accuracy",
+      "parts": [
+        "tests/fixtures/parts/plate_hole.case.json"
+      ],
+      "tiers": [
+        {
+          "h_scale": 5.0,
+          "keep_frac": 1.0
+        }
+      ],
+      "grid": {
+        "mesher": [
+          "cvt_poly"
+        ],
+        "feature_refine": [
+          true
+        ],
+        "order": [
+          1
+        ]
+      },
+      "resources": {
+        "max_threads": 0,
+        "max_mem_gb": 4
+      },
+      "warehouse": false
+    }
+  },
+  "conclusions": [
+    "Exact whole-polygon ownership removes false free-surface interfaces; the forward boundary p99/h improves substantially versus the base checkout.",
+    "Interior coalescing keeps the same h=0.006 cell count while reducing vertex displacement DOFs by 18.6%.",
+    "All exact-claim counters are zero and raw/post VEM volumes match the positive scaffold to about 1e-13 relative; the attempted CAD projection was rolled back.",
+    "The admitted mesh worsens reverse surface p99/h, reverse sharp-edge p99/h, mean quality, and admission-inclusive single-run mesh time versus the base checkout; no blanket geometry or speed win is claimed.",
+    "At h=0.015 the candidate is solve-healthy and its SCF error is lower than frozen varyhedron but higher than frozen hybrid_zoo, while using materially more DOF and solve time than both.",
+    "cvt_poly remains experimental and is not the default mesher."
+  ],
+  "limitations": {
+    "timing": "All diagnostic and solve timings are single-run dashboard measurements, not statistically controlled speed claims; candidate mesh time includes repeated strong source/triangulated/projected geometry admission.",
+    "thermal": "This repository has no thermal solver path; no thermal accuracy or thermal performance claim is made.",
+    "quality": "Boundary-incident triangulation exposes near-degenerate face angles in the current poly quality metric; quality_min and quality_mean are reported rather than hidden.",
+    "projection": "The full post-RVD CAD projection target failed geometry/volume admission for this fixture, so the accepted mesh restores the already surface-snapped tetrahedral scaffold coordinates."
+  }
+}

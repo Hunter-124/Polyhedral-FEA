@@ -62,18 +62,14 @@ NodalMesh poly_mesh_to_vem(const mesh::PolyMesh& pm) {
             continue;
         }
 
-        // Drop inverted / zero-volume debris (domain clip can leave slivers).
+        // Reject inverted / zero-volume debris. PolyMesh geometry admission
+        // owns orientation; conversion must never repair a failed cell by
+        // silently reversing every face.
         std::vector<Eigen::Vector3d> coords(nodes.size());
         for (std::size_t i = 0; i < nodes.size(); ++i) {
             coords[i] = pm.vertices[nodes[i]];
         }
-        double vol = poly_volume(coords, faces);
-        if (vol < 0.0) {
-            for (auto& loop : faces) {
-                std::reverse(loop.begin(), loop.end());
-            }
-            vol = -vol;
-        }
+        const double vol = poly_volume(coords, faces);
         Eigen::Vector3d bmin = coords[0], bmax = coords[0];
         for (const auto& p : coords) {
             bmin = bmin.cwiseMin(p);
@@ -85,10 +81,9 @@ NodalMesh poly_mesh_to_vem(const mesh::PolyMesh& pm) {
             continue;
         }
 
-        out.elements.emplace_back(ElementType::kPolyVem, std::move(nodes),
-                                  std::move(faces));
+        out.elements.emplace_back(ElementType::kPolyVem, std::move(nodes), std::move(faces));
     }
     return out;
 }
 
-}  // namespace polymesh::fea
+} // namespace polymesh::fea

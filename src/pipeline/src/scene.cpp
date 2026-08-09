@@ -1844,9 +1844,10 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         // RVD ∩ tet scaffold for all solids (holes need it; prismatic SE is
         // competitive with load_area trim). AABB-only reintroduces bad SE when
         // free-site counts stay modest.
-        std::string clip_mode = "rvd_tet";
+        const std::string clip_mode = "rvd_tet";
         mesh::ClippedVoronoiExport exp;
         std::size_t n_domain_tets = 0;
+        double scaffold_tet_volume = 0.0;
         try {
             const double h_tet = std::max(h, 1e-9);
             auto tet_fill =
@@ -1861,22 +1862,73 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                 d.v2 = tet_fill.nodes[t[2]];
                 d.v3 = tet_fill.nodes[t[3]];
                 d.centroid = 0.25 * (d.v0 + d.v1 + d.v2 + d.v3);
-                if (mesh::tet_signed_volume(d.v0, d.v1, d.v2, d.v3) <= 0.0) {
+                const double tet_volume = mesh::tet_signed_volume(d.v0, d.v1, d.v2, d.v3);
+                if (!(tet_volume > 0.0)) {
                     continue;
                 }
+                scaffold_tet_volume += tet_volume;
                 dtets.push_back(d);
             }
             n_domain_tets = dtets.size();
             const double R = std::max(2.5 * h, 0.08 * diag);
             exp = mesh::export_rvd_tet_clipped(box, positions, dtets, R);
-            if (exp.stats.n_cells < std::max<std::size_t>(4, positions.size() / 4)) {
-                clip_mode = "fallback_aabb";
-                exp = mesh::export_clipped_voronoi(box, positions, mesh::DomainClipParams{});
-            }
-        } catch (...) {
-            clip_mode = "fallback_aabb";
-            exp = mesh::export_clipped_voronoi(box, positions, mesh::DomainClipParams{});
+        } catch (const std::exception& error) {
+            throw std::runtime_error(
+                std::format("cvt_poly RVD construction failed: {}", error.what()));
         }
+        const double volume_scale =
+            std::max({std::abs(scaffold_tet_volume), std::abs(exp.stats.sum_cell_volume),
+                      std::numeric_limits<double>::min()});
+        const double coverage_tol =
+            (1e-9 + 128.0 * std::numeric_limits<double>::epsilon()) * volume_scale;
+        if (!std::isfinite(scaffold_tet_volume) || !std::isfinite(exp.stats.sum_cell_volume) ||
+            std::abs(exp.stats.sum_cell_volume - scaffold_tet_volume) > coverage_tol) {
+            throw std::runtime_error(std::format(
+                "cvt_poly RVD raw clip volume {:.17g} does not cover positive scaffold tetra "
+                "volume {:.17g} within scale-aware tolerance {:.3e}",
+                exp.stats.sum_cell_volume, scaffold_tet_volume, coverage_tol));
+        }
+        const std::size_t min_admitted_sites =
+            std::min(positions.size(), std::max<std::size_t>(1, positions.size() / 4));
+        const std::size_t n_admitted_sites = static_cast<std::size_t>(std::count_if(
+            exp.site_to_cell.begin(), exp.site_to_cell.end(),
+            [](std::size_t cell) { return cell != static_cast<std::size_t>(-1); }));
+        if (n_admitted_sites < min_admitted_sites) {
+            throw std::runtime_error(
+                std::format("cvt_poly RVD admitted only {} sites; at least {} are required",
+                            n_admitted_sites, min_admitted_sites));
+        }
+
+        if (exp.stats.n_invalid_face_claims != 0) {
+            throw std::runtime_error(
+                std::format("cvt_poly RVD is nonmanifold: {} exact face claims have invalid "
+                            "multiplicity, site ownership, or winding",
+                            exp.stats.n_invalid_face_claims));
+        }
+        if (exp.stats.n_unpaired_bisector_faces != 0) {
+            throw std::runtime_error(
+                std::format("cvt_poly RVD is nonconforming: {} Voronoi interface fragments "
+                            "lack an opposite owner",
+                            exp.stats.n_unpaired_bisector_faces));
+        }
+        if (exp.stats.n_unpaired_scaffold_faces != 0) {
+            throw std::runtime_error(std::format(
+                "cvt_poly RVD is incomplete: {} internal scaffold-cut faces lack an "
+                "opposite owner",
+                exp.stats.n_unpaired_scaffold_faces));
+        }
+        // Admit the exact exported polygons before triangulation.  Otherwise a
+        // warped source n-gon could be replaced by valid triangles and escape
+        // the original geometry contract.
+        exp.mesh.check_validity();
+        exp.mesh.check_geometry();
+        // Any face incident to a projected exterior vertex is triangulated
+        // first. Independent CAD projection can then preserve face planarity
+        // while deep-interior coalesced Voronoi n-gons remain intact.
+        exp.mesh.triangulate_boundary_incident_faces();
+        exp.mesh.check_validity();
+        exp.mesh.check_geometry();
+        const std::vector<Eigen::Vector3d> pre_projection_vertices = exp.mesh.vertices;
 
         // Light boundary polish onto the surface (helps residual staircasing).
         std::size_t n_bnd_snapped = 0;
@@ -1921,19 +1973,112 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             }
         }
 
-        out.mesh = fea::poly_mesh_to_vem(exp.mesh);
+        // Projection is all-or-nothing. In addition to local shell validity,
+        // preserve the authoritative positive scaffold volume. A 1e-4 relative
+        // allowance is large compared with summation/welding roundoff but small
+        // enough to reject a coherent CAD-projection shrink or expansion.
+        constexpr double kProjectionVolumeRelTol = 1e-4;
+        const auto convert_and_measure = [&]() {
+            fea::NodalMesh converted = fea::poly_mesh_to_vem(exp.mesh);
+            if (converted.elements.size() != exp.mesh.cells.size()) {
+                throw std::runtime_error(std::format(
+                    "cvt_poly VEM conversion changed admitted cell count from {} to {}",
+                    exp.mesh.cells.size(), converted.elements.size()));
+            }
+            double volume = 0.0;
+            for (const fea::NodalElement& element : converted.elements) {
+                const Eigen::Vector3d origin = converted.nodes[element.nodes.front()];
+                for (const auto& face : element.faces) {
+                    if (face.size() < 3) {
+                        continue;
+                    }
+                    const Eigen::Vector3d a = converted.nodes[element.nodes[face[0]]] - origin;
+                    for (std::size_t i = 1; i + 1 < face.size(); ++i) {
+                        const Eigen::Vector3d b =
+                            converted.nodes[element.nodes[face[i]]] - origin;
+                        const Eigen::Vector3d c =
+                            converted.nodes[element.nodes[face[i + 1]]] - origin;
+                        volume += a.dot(b.cross(c)) / 6.0;
+                    }
+                }
+            }
+            return std::pair{std::move(converted), volume};
+        };
+        const auto admitted_volume_matches_scaffold = [&](double volume) {
+            const double scale = std::max({std::abs(scaffold_tet_volume), std::abs(volume),
+                                           std::numeric_limits<double>::min()});
+            return std::isfinite(volume) &&
+                   std::abs(volume - scaffold_tet_volume) <= kProjectionVolumeRelTol * scale;
+        };
+
+        double snap_scale = 0.0;
+        double post_admission_vem_volume = 0.0;
+        std::string projection_outcome = "not_applied";
+        fea::NodalMesh admitted_mesh;
+        if (n_bnd_snapped == 0) {
+            exp.mesh.check_geometry();
+            auto [converted, volume] = convert_and_measure();
+            if (!admitted_volume_matches_scaffold(volume)) {
+                throw std::runtime_error(std::format(
+                    "cvt_poly admitted VEM volume {:.17g} differs from scaffold volume "
+                    "{:.17g} beyond projection-relative tolerance {:.3e}",
+                    volume, scaffold_tet_volume, kProjectionVolumeRelTol));
+            }
+            admitted_mesh = std::move(converted);
+            post_admission_vem_volume = volume;
+        } else {
+            try {
+                exp.mesh.check_geometry();
+                auto [projected, projected_volume] = convert_and_measure();
+                if (!admitted_volume_matches_scaffold(projected_volume)) {
+                    throw mesh::ValidityError(std::format(
+                        "CAD projection changed VEM volume from scaffold {:.17g} to {:.17g}",
+                        scaffold_tet_volume, projected_volume));
+                }
+                admitted_mesh = std::move(projected);
+                post_admission_vem_volume = projected_volume;
+                snap_scale = 1.0;
+                projection_outcome = "accepted";
+            } catch (const mesh::ValidityError&) {
+                exp.mesh.vertices = pre_projection_vertices;
+                exp.mesh.check_geometry();
+                auto [restored, restored_volume] = convert_and_measure();
+                if (!admitted_volume_matches_scaffold(restored_volume)) {
+                    throw std::runtime_error(std::format(
+                        "cvt_poly restored VEM volume {:.17g} differs from scaffold volume "
+                        "{:.17g} beyond projection-relative tolerance {:.3e}",
+                        restored_volume, scaffold_tet_volume, kProjectionVolumeRelTol));
+                }
+                admitted_mesh = std::move(restored);
+                post_admission_vem_volume = restored_volume;
+                n_bnd_snapped = 0;
+                projection_outcome = "rolled_back";
+            }
+        }
+
+        out.mesh = std::move(admitted_mesh);
+        const std::size_t post_admission_face_count = exp.mesh.faces.size();
         out.mesh.compact_unused_nodes();
         fill_h = h;
         out.boundary_quads = fea::extract_boundary_faces(out.mesh);
         out.mesher_note = std::format(
-            "cvt_poly RVD (interior sites + {} tets + clip={} + bnd_snap={} → "
-            "kPolyVem): {} polys, {} nodes, sites={}/fixed={}/interior={}/feat={}, "
-            "lloyd_iters={}, sum_vol={:.4g}, domain_clips={}, grid={}x{}x{}, h={:.4g} m{}",
-            n_domain_tets, clip_mode, n_bnd_snapped, out.mesh.elements.size(),
-            out.mesh.nodes.size(), sites.size(), seeded.n_sharp_fixed,
-            n_interior_free - n_feature_free, n_feature_free, lr.stats.n_iters,
-            exp.stats.sum_cell_volume, exp.stats.n_domain_plane_clips, grid.nx, grid.ny,
-            grid.nz, h,
+            "cvt_poly RVD (interior sites + {} tets + clip={} + projection={} + "
+            "bnd_snap={}@{:.4g} → kPolyVem): {} post_polys, {} post_nodes, post_faces={}, "
+            "sites={}/fixed={}/interior={}/feat={}, lloyd_iters={}, "
+            "raw_split_components={}, raw_unpaired_bisectors={}, "
+            "raw_unpaired_scaffold={}, raw_invalid_face_claims={}, "
+            "raw_coalesced_faces/fragments={}/{}, raw_clip_volume={:.17g}, "
+            "scaffold_volume={:.17g}, post_vem_volume={:.17g}, raw_domain_clips={}, "
+            "grid={}x{}x{}, h={:.4g} m{}",
+            n_domain_tets, clip_mode, projection_outcome, n_bnd_snapped, snap_scale,
+            out.mesh.elements.size(), out.mesh.nodes.size(), post_admission_face_count,
+            sites.size(), seeded.n_sharp_fixed, n_interior_free - n_feature_free,
+            n_feature_free, lr.stats.n_iters, exp.stats.n_split_site_components,
+            exp.stats.n_unpaired_bisector_faces, exp.stats.n_unpaired_scaffold_faces,
+            exp.stats.n_invalid_face_claims, exp.stats.n_coalesced_faces,
+            exp.stats.n_coalesced_face_fragments, exp.stats.sum_cell_volume,
+            scaffold_tet_volume, post_admission_vem_volume, exp.stats.n_domain_plane_clips,
+            grid.nx, grid.ny, grid.nz, h,
             topo_ptr ? ", geom_source=brep_topology" : ", geom_source=surface_class");
     } else {
         auto fill = mesh::tet_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);

@@ -51,6 +51,18 @@ slivers to keep the solver happy.
   ([docs/solver-core.md](docs/solver-core.md),
   [ADR-0012](docs/decisions/0012-hybrid-graded-tet.md),
   [ADR-0019](docs/decisions/0019-mixed-fe-vem-adaptive-order-core.md)).
+- **Experimental packed-poly topology cleanup.** In RVD-tet mode, `cvt_poly`
+  clips in a translation-stable local frame, tolerance-welds with Euclidean
+  neighbour-bucket checks, distinguishes domain skin from internal scaffold
+  cuts, and rejects invalid ownership/winding or incomplete volume coverage.
+  Disconnected restricted regions split into cells; edge-connected interfaces
+  coalesce before VEM assembly. Original and triangulated polygons, cross-cell
+  intersections, and post-projection volume are admitted fail-closed. Whole
+  n-gon ownership is resolved before display/fidelity triangulation. These are
+  topology and admission rules only; bidirectional BRep fidelity, analytical
+  error, DOF, and wall time remain unpromoted benchmark gates
+  ([ADR-0025](docs/decisions/0025-geogram-cvt-vendor.md),
+  [implementation study](docs/research/geogram-cvt-vendoring.md)).
 - **The benchmark harness is adversarial by design.** Git-ignored holdout
   geometries the implementation loop never sees, random rigid-transform
   invariance checks (stress is objective — coordinate hacks die here), material
@@ -229,8 +241,9 @@ $CLI backend
 ```
 
 Mesher names (`--mesher`): `hybrid|zoo` (default), `varyhedron|vary` (CAD
-packing), `hybridvem`, `tet`, `hex`, `hexvem|vem`, `graded`,
-`hexpyr|transition`, `prism|sweep`, `octa|octahedral` (experimental).
+packing), `cvt_poly|cvt` (experimental packed-poly VEM), `hybridvem`, `tet`,
+`hex`, `hexvem|vem`, `graded`, `hexpyr|transition`, `prism|sweep`,
+`octa|octahedral` (experimental).
 
 Other useful flags: `--skin n` (graded fine skin layers, default 2),
 `--no-feature` (disable curvature/thin-wall grading), `--element-tendency t`

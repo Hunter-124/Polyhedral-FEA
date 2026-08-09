@@ -1,6 +1,6 @@
 # Geogram / restricted CVT — vendoring study path
 
-- Status: G1 landed (2026-07-13) — PSMs vendored; G2+ implement Lloyd/export
+- Status: G1–G4 implemented; opt-in `cvt_poly` remains experimental (2026-08-09)
 - Normative: [ADR-0023](../decisions/0023-measure-first-tet-primary-cvt-path.md),
   [ADR-0024](../decisions/0024-advisor-measure-answers.md) Q3/Q8/Q10
 - Program: [docs/plans/advisor-measure-first-program.md](../plans/advisor-measure-first-program.md)
@@ -9,10 +9,9 @@
   [protecting-balls-lfs.md](protecting-balls-lfs.md),
   [campaign-metrics.md](campaign-metrics.md)
 
-This note is the agent-facing **full study + vendor path** for weighted restricted
-CVT with clipped Voronoi cells. It freezes *what* we take from Geogram, *what*
-we write, *when* we start, and the license/PR checklist. It is **not** a CMake
-implementation PR.
+This note records both the historical vendoring study and the as-built weighted
+restricted-CVT integration: what was taken from Geogram, what remains project
+glue, the topology/admission contract, and the reproducibility/license record.
 
 ---
 
@@ -65,10 +64,9 @@ blob. Prefer a minimal subset under a clear namespace (see §5).
 
 ### 2.3 Dual hard-block
 
-**Do not** land median / polyDualMesh-style dual-of-tet as the product poly path
-until **G4** clipped cells exist. Optional ~2-day experimental dual export only
-if external/marketing demand, flagged experimental; otherwise skip the dualizer
-entirely (ADR-0024 Q8). Clipped restricted-Voronoi cells *are* the polyhedra.
+Median / polyDualMesh-style dual-of-tet remains excluded from the product path.
+G4's clipped restricted-Voronoi cells are available only through the
+experimental `cvt_poly` mesher (ADR-0024 Q8); no median-dual fallback is used.
 
 ---
 
@@ -111,58 +109,99 @@ Target ranking (ADR-0023):
 3. Advancing front (layers later)  
 4. Raw bubble dynamics (seeds only)
 
-Tet FE remains the default accuracy claim until M5.
+Tet FE remains the default accuracy claim until the packed-poly promotion gate passes.
+
+### As-built RVD assembly and admission contract
+
+In `clip=rvd_tet` mode, `cvt_poly` treats the tetrahedral domain as an
+integration scaffold rather than permanent packed-cell topology:
+
+1. Intersections \(V_i \cap T_j\) are emitted in deterministic `(site,tet)`
+   order after parallel clipping. Floating aggregates are reduced in that same
+   order, and a regression verifies an actual multi-thread OpenMP team against
+   one-thread output field-for-field.
+2. Clipping runs in a domain-local coordinate frame. Vertices are Euclidean
+   tolerance-welded (`1e-9` of the domain diagonal) through the 27 neighbouring
+   quantization buckets, with range-checked coordinates and deterministic
+   lowest-ID selection.
+3. Exact tetra-face multiplicity classifies domain skin separately from internal
+   scaffold cuts. Shared faces use canonical welded vertex-ID sets: a valid
+   second claim must have the expected provenance/site pair and opposite
+   winding. Third claims, unmatched cuts/bisectors, or other ownership failures
+   are rejected.
+4. Exact same-site internal cuts define connected components and then cancel.
+   Disconnected components of one restricted site region become separate VEM
+   cells instead of one invalid disconnected shell. Edge-connected fragments
+   between the same two cells are unioned into polygon loops.
+5. Raw clipped volume must cover the positive tetra scaffold. Empty face/vertex
+   tombstones are compacted, but referenced vertices still carry three \(k=1\)
+   VEM displacement DOFs, so net DOF is measured rather than inferred.
+6. Original polygons are admitted before faces incident to exterior vertices
+   are triangulated. Source and triangulated meshes must have unique simple
+   planar faces, closed connected consistently oriented positive-volume cells,
+   no intra- or cross-cell intersection/overlap/containment, and a closed
+   manifold exterior.
+7. Optional CAD projection is all-or-nothing. It must retain the geometry
+   contract and post-VEM volume within \(10^{-4}\) relative to the authoritative
+   scaffold; otherwise the already surface-snapped scaffold coordinates are
+   restored and rechecked.
+8. Exterior ownership is resolved on whole polygons before rendering/fidelity
+   triangulation. Exact owner groups survive only when singly claimed; n-gons
+   cancel against any coplanar, oppositely oriented, non-overlapping partition
+   using atomized directed edges, including straight-through split-edge nodes.
+
+This is a topology cleanup, not a DOF or accuracy claim. It removes artificial
+same-site tet-cut faces and compacts only vertices that become unreferenced. The
+exporter itself preserves exterior coordinates; later boundary projection may
+move them only through the admission rule above. Analytical error, DOF, solve
+time, and bidirectional BRep evidence remain joint promotion gates.
 
 ---
 
-## 5. Suggested `third_party/` layout (not full CMake yet)
+## 5. Vendored `third_party/` layout
 
-Illustrative tree for the G1 PR — adjust names when vendoring, keep the
-invariants: **LICENSE visible**, **namespace isolated**, **subset only**.
+The implemented, reproducible subset is:
 
 ```
-third_party/
-  geogram/                    # or geogram_clip/ for a stripped subset
-    LICENSE                   # upstream BSD-3 text, unmodified
-    NOTICE                    # our pin: version/tag/commit, date, URL
-    README.polymesh.md        # what we took, what we stripped, how to upgrade
-    src/                      # vendored sources (predicates, ConvexCell, …)
-    include/                  # public headers we consume
-  shewchuk_predicates/        # optional; public domain — if used instead of/with Geogram
-    README.polymesh.md
-    predicates.*
+third_party/geogram/
+  CMakeLists.txt
+  LICENSE
+  NOTICE
+  README.md
+  README.polymesh.md
+  delaunay/
+    LICENSE
+    Delaunay_psm.cpp
+    Delaunay_psm.h
+  predicates/
+    LICENSE
+    Predicates_psm.cpp
+    Predicates_psm.h
 ```
 
-**CMake note (when G1 lands — not this doc’s job to implement):**
-
-- Add an optional or hard internal target, e.g. `polymesh_geogram_clip`, built
-  only from the vendored subset.
-- Prefer `add_subdirectory(third_party/geogram …)` or explicit file lists over
-  system Geogram (reproducible builds).
-- Do **not** link GPL/LGPL mesh kernels into the default core binary.
-- Expose a thin C++ facade in `src/mesh/` (e.g. clipped cell API) so callers
-  never include Geogram headers across the whole tree.
-- Namespace: wrap or rename if needed to avoid ODR clashes; document in
-  `README.polymesh.md`.
+`third_party/geogram/CMakeLists.txt` builds the internal static
+`polymesh_geogram` target and exports the `polymesh::geogram` alias. The optional
+`polymesh_geogram_predicates` target isolates the predicates-only PSM. Project
+callers use the thin `mesh` facade; vendored headers do not spread through the
+pipeline. Exact-rounding compiler flags are scoped to these third-party targets.
 
 ---
 
-## 6. License checklist for the vendoring PR
+## 6. License and integration record
 
 Project license: **BSD-3-Clause** ([ADR-0002](../decisions/0002-license-bsd3.md)).
 
-Before merge of G1 (or any Geogram-touching PR):
-
-- [ ] Upstream **LICENSE** (BSD-3) copied into `third_party/geogram/LICENSE`
-- [ ] **NOTICE** with exact upstream tag/commit SHA, fetch URL, and date
-- [ ] `README.polymesh.md` lists included vs excluded modules
-- [ ] No AGPL/GPL sources mixed into the vendored tree
-- [ ] SPDX on *our* glue files remains BSD-3; do not relicense upstream files
-- [ ] Root or `THIRD_PARTY.md` (if present) mentions Geogram + Shewchuk if used
-- [ ] CI builds with the vendored subset on the default OCC-on configuration
-- [ ] Dual/export path still **hard-blocked** or explicitly experimental flag
-- [ ] Density path documented: same \(h(x)\) as N_pred
-- [ ] No force-push; no AI attribution trailers on the commit
+- [x] Upstream BSD-3 `LICENSE` is present at the subset root and in both PSM
+  directories.
+- [x] `NOTICE` records the upstream version/source and vendoring context.
+- [x] `README.polymesh.md` records included and excluded modules.
+- [x] No AGPL/GPL mesh kernel is linked into the default core binary.
+- [x] Project glue retains BSD-3 SPDX headers; upstream headers retain upstream
+  notices.
+- [x] Default OCC-on builds compile the vendored `polymesh::geogram` target.
+- [x] The density path and shared \(h(x)\) / `N_pred` rule are documented.
+- [ ] Any future upstream refresh must repeat the license/source audit and the
+  deterministic topology regression suite.
 
 ---
 
@@ -179,9 +218,10 @@ Before merge of G1 (or any Geogram-touching PR):
 
 ## 8. Agent anti-confusion
 
-- G1 is **not** “rewrite Voronoi.”  
-- G2 without shared \(h(x)\) with N_pred is a **bug**.  
-- Dual-first poly is **blocked** until G4.  
-- Frame-field hex is research-only (ADR-0023).  
-- Measure deltas only against **M9** frozen baseline.  
-- Wireframe PNGs are never the reward signal.  
+- G1 is **not** “rewrite Voronoi.”
+- G2 without shared \(h(x)\) with `N_pred` is a **bug**.
+- Median dual remains excluded; G4's clipped-cell path is available only as
+  experimental `cvt_poly`.
+- Frame-field hex is research-only (ADR-0023).
+- Measure deltas only against the **M9** frozen baseline.
+- Wireframe PNGs are never the reward signal.

@@ -12,6 +12,7 @@
 #include <array>
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <set>
 #include <span>
 #include <vector>
@@ -37,6 +38,48 @@ struct ConformityStats {
 ConformityStats surface_conformity(const geom::TriSurface& surface,
                                    const std::vector<Eigen::Vector3d>& points,
                                    const std::vector<std::uint32_t>& point_indices);
+
+/// Compact persistent owner for one boundary node. IDs are exact BRep topology
+/// ids supplied by the callback; unknown is the STL/legacy heuristic state.
+enum class BoundarySupportKind : std::uint8_t {
+    kUnknown = 0,
+    kCadVertex,
+    kCadEdge,
+    kCadFace,
+};
+
+struct BoundarySupport {
+    BoundarySupportKind kind = BoundarySupportKind::kUnknown;
+    std::uint32_t id = 0;
+};
+
+struct BoundaryTarget {
+    Eigen::Vector3d point = Eigen::Vector3d::Zero();
+    double distance = 0.0;
+};
+
+using BoundaryTargetFn = std::function<std::optional<BoundaryTarget>(
+    const Eigen::Vector3d& query, BoundarySupport& support)>;
+
+/// Optional exact projection oracle and persistent global-node-indexed owners.
+/// The vector is grown, never reset, when new/refined nodes first reach snap.
+struct BoundaryProjectionContext {
+    std::vector<BoundarySupport>* provenance = nullptr;
+    BoundaryTargetFn target;
+};
+
+/// Resolve only through the exact owner-aware oracle. Returns nullopt when no
+/// oracle is installed or the immutable owner cannot be projected. This is the
+/// no-triangle-fallback entry point for later wall/CVT passes.
+[[nodiscard]] std::optional<BoundaryTarget>
+owned_boundary_projection_target(const Eigen::Vector3d& p, std::uint32_t node,
+                                 BoundaryProjectionContext* context);
+
+/// Resolve a node target through the exact owner-aware oracle when present,
+/// otherwise through the legacy TriSurface closest-point path.
+[[nodiscard]] std::optional<BoundaryTarget>
+boundary_projection_target(const geom::TriSurface& surface, const Eigen::Vector3d& p,
+                           std::uint32_t node, BoundaryProjectionContext* context = nullptr);
 
 /// Result of a Jacobian-safe boundary snap.
 struct SnapStats {
@@ -67,15 +110,14 @@ using NodeOffendsFn = std::function<bool(std::uint32_t node)>;
 ///        / hole-wall nodes still project to the surface.
 /// @param defer_coupled Keep locally irreparable fan nodes for a coupled
 ///        restore; pure hex/poly meshes leave this false for a linear scan.
-SnapStats snap_boundary_nodes(const geom::TriSurface& surface,
-                              std::vector<Eigen::Vector3d>& nodes,
-                              const std::vector<std::uint32_t>& boundary_nodes, double h,
-                              const CollectOffendersFn& collect_offenders,
-                              double max_move_frac = 0.75, int passes = 4,
-                              std::span<const geom::SharpEdge> feature_edges = {},
-                              const RepairInteriorFn& repair_interior = {},
-                              const NodeOffendsFn& node_offends = {},
-                              bool defer_coupled = false);
+SnapStats
+snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d>& nodes,
+                    const std::vector<std::uint32_t>& boundary_nodes, double h,
+                    const CollectOffendersFn& collect_offenders, double max_move_frac = 0.75,
+                    int passes = 4, std::span<const geom::SharpEdge> feature_edges = {},
+                    const RepairInteriorFn& repair_interior = {},
+                    const NodeOffendsFn& node_offends = {}, bool defer_coupled = false,
+                    BoundaryProjectionContext* projection = nullptr);
 
 /// Result of a tangential boundary smoothing pass.
 struct SmoothStats {
@@ -97,7 +139,7 @@ SmoothStats smooth_boundary_nodes(const geom::TriSurface& surface,
                                   std::span<const std::array<std::uint32_t, 4>> boundary_faces,
                                   double h, const CollectOffendersFn& collect_offenders,
                                   int passes = 2, double relax = 0.5,
-                                  std::span<const geom::SharpEdge> feature_edges = {});
+                                  std::span<const geom::SharpEdge> feature_edges = {},
+                                  BoundaryProjectionContext* projection = nullptr);
 
 } // namespace polymesh::mesh
-

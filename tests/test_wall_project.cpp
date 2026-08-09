@@ -26,8 +26,8 @@ using polymesh::geom::project_point_on_surface;
 using polymesh::mesh::varyhedron_fill_surface;
 using polymesh::mesh::wall_tangential_project;
 using polymesh::pipeline::Model;
-using polymesh::pipeline::VolumeMesher;
 using polymesh::pipeline::volume_mesh;
+using polymesh::pipeline::VolumeMesher;
 
 namespace {
 
@@ -109,6 +109,42 @@ TEST_CASE("wall_tangential_project no-ops without CadModel BRep") {
     CHECK(st.n_iters == 0);
 }
 
+TEST_CASE("wall projection with an owner oracle never falls back globally") {
+    if (!occ_enabled()) {
+        SKIP("OpenCASCADE not enabled");
+    }
+    const std::filesystem::path path = "tests/fixtures/parts/cylinder.step";
+    if (!std::filesystem::exists(path)) {
+        SKIP("cylinder.step missing");
+    }
+    const CadModel cad = CadModel::load_step(path);
+    const auto topo = extract_topology(cad, 6);
+    std::vector<Eigen::Vector3d> nodes = {
+        {0.050, 0.000, 0.100},
+        {0.045, 0.010, 0.090},
+        {0.045, -0.010, 0.090},
+        {0.045, 0.000, 0.110},
+    };
+    const auto before = nodes;
+    const std::vector<std::array<std::uint32_t, 4>> tets = {{{0, 1, 2, 3}}};
+    std::vector<polymesh::mesh::BoundarySupport> provenance(
+        nodes.size(), {polymesh::mesh::BoundarySupportKind::kCadFace, 0});
+    polymesh::mesh::BoundaryProjectionContext projection;
+    projection.provenance = &provenance;
+    projection.target = [](const Eigen::Vector3d&, polymesh::mesh::BoundarySupport&)
+        -> std::optional<polymesh::mesh::BoundaryTarget> { return std::nullopt; };
+
+    const auto stats =
+        wall_tangential_project(cad, &topo, nodes, tets, 0.02, 3, 0.45, 0.4, &projection);
+    REQUIRE(stats.n_wall_nodes > 0);
+    CHECK(stats.n_moved == 0);
+    for (std::size_t i = 0; i < nodes.size(); ++i) {
+        CHECK((nodes[i] - before[i]).norm() == 0.0);
+        CHECK(provenance[i].kind == polymesh::mesh::BoundarySupportKind::kCadFace);
+        CHECK(provenance[i].id == 0);
+    }
+}
+
 TEST_CASE("varyhedron cylinder wall residual does not worsen with OCC project (M10)") {
     if (!occ_enabled()) {
         SKIP("OpenCASCADE not enabled");
@@ -127,11 +163,11 @@ TEST_CASE("varyhedron cylinder wall residual does not worsen with OCC project (M
     const double z_hi = 0.14;
 
     auto fill_off =
-        varyhedron_fill_surface(surface, cad.bbox_min(), cad.bbox_max(), h, 1, {}, 0.0, {}, 0.0,
-                                15.0, &topo, &cad, /*wall_smooth_iters=*/0);
+        varyhedron_fill_surface(surface, cad.bbox_min(), cad.bbox_max(), h, 1, {}, 0.0, {},
+                                0.0, 15.0, &topo, &cad, /*wall_smooth_iters=*/0);
     auto fill_on =
-        varyhedron_fill_surface(surface, cad.bbox_min(), cad.bbox_max(), h, 1, {}, 0.0, {}, 0.0,
-                                15.0, &topo, &cad, /*wall_smooth_iters=*/4);
+        varyhedron_fill_surface(surface, cad.bbox_min(), cad.bbox_max(), h, 1, {}, 0.0, {},
+                                0.0, 15.0, &topo, &cad, /*wall_smooth_iters=*/4);
 
     REQUIRE(fill_off.n_tets > 0);
     REQUIRE(fill_on.n_tets > 0);
@@ -163,9 +199,8 @@ TEST_CASE("varyhedron sphere wall OCC project runs (M10)") {
     const auto topo = extract_topology(cad, 6);
     const auto surface = cad.tessellate();
     const double h = 0.03;
-    auto fill =
-        varyhedron_fill_surface(surface, cad.bbox_min(), cad.bbox_max(), h, 1, {}, 0.0, {}, 0.0,
-                                15.0, &topo, &cad, /*wall_smooth_iters=*/3);
+    auto fill = varyhedron_fill_surface(surface, cad.bbox_min(), cad.bbox_max(), h, 1, {}, 0.0,
+                                        {}, 0.0, 15.0, &topo, &cad, /*wall_smooth_iters=*/3);
     REQUIRE(fill.n_tets > 0);
     // Sphere STEP may still have seams; wall pass should find free-face nodes.
     CHECK(fill.n_wall_nodes > 0);
@@ -182,17 +217,15 @@ TEST_CASE("varyhedron unit cube still meshes; sharp corners protected (M10)") {
     const auto topo = extract_topology(cad, 6);
     const auto surface = cad.tessellate();
     const double h = 0.25;
-    auto fill =
-        varyhedron_fill_surface(surface, cad.bbox_min(), cad.bbox_max(), h, 1, {}, 0.0, {}, 0.0,
-                                15.0, &topo, &cad, /*wall_smooth_iters=*/4);
+    auto fill = varyhedron_fill_surface(surface, cad.bbox_min(), cad.bbox_max(), h, 1, {}, 0.0,
+                                        {}, 0.0, 15.0, &topo, &cad, /*wall_smooth_iters=*/4);
     REQUIRE(fill.n_tets > 0);
     REQUIRE(fill.n_edge_seeds > 0);
     // Cube: all edges sharp → wall band is face-interior only; corners stay near CAD verts.
     const double corner_tol = 0.55 * h; // soft; protect band is 0.4 h
     int corners_near = 0;
     const std::vector<Eigen::Vector3d> corners = {
-        {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0},
-        {0, 0, 1}, {1, 0, 1}, {0, 1, 1}, {1, 1, 1},
+        {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0}, {0, 0, 1}, {1, 0, 1}, {0, 1, 1}, {1, 1, 1},
     };
     // Use CAD bbox corners (unit cube may be [0,1]^3).
     std::vector<Eigen::Vector3d> cad_corners;
@@ -201,8 +234,8 @@ TEST_CASE("varyhedron unit cube still meshes; sharp corners protected (M10)") {
     for (int i = 0; i < 2; ++i) {
         for (int j = 0; j < 2; ++j) {
             for (int k = 0; k < 2; ++k) {
-                cad_corners.push_back({i ? hi.x() : lo.x(), j ? hi.y() : lo.y(),
-                                       k ? hi.z() : lo.z()});
+                cad_corners.push_back(
+                    {i ? hi.x() : lo.x(), j ? hi.y() : lo.y(), k ? hi.z() : lo.z()});
             }
         }
     }
@@ -234,8 +267,8 @@ TEST_CASE("varyhedron STL-only path has no CadModel wall project (no crash)") {
         hi = hi.cwiseMax(v);
     }
     const double h = 0.3 * (hi - lo).norm();
-    auto fill =
-        varyhedron_fill_surface(surface, lo, hi, h, 1, {}, 0.0, {}, 0.0, 0.0, nullptr, nullptr, 4);
+    auto fill = varyhedron_fill_surface(surface, lo, hi, h, 1, {}, 0.0, {}, 0.0, 0.0, nullptr,
+                                        nullptr, 4);
     REQUIRE(fill.n_tets > 0);
     CHECK(fill.n_wall_nodes == 0);
     CHECK(fill.n_wall_moved == 0);

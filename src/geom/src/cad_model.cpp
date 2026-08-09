@@ -5,22 +5,26 @@
 
 #include <cctype>
 #include <cmath>
+#include <cstdlib>
 #include <format>
 #include <limits>
 #include <utility>
 #include <vector>
-#include <cstdlib>
 
 #ifdef POLYMESH_WITH_OCC
 
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepBndLib.hxx>
+#include <BRepCheck_Analyzer.hxx>
+#include <BRepClass_FaceClassifier.hxx>
 #include <BRepExtrema_DistShapeShape.hxx>
+#include <BRepGProp.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
 #include <BRepTools.hxx>
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
 #include <Bnd_Box.hxx>
+#include <GProp_GProps.hxx>
 #include <GeomAPI_ProjectPointOnSurf.hxx>
 #include <Geom_Surface.hxx>
 #include <IFSelect_ReturnStatus.hxx>
@@ -29,13 +33,18 @@
 #include <STEPControl_Reader.hxx>
 #include <TopAbs.hxx>
 #include <TopAbs_Orientation.hxx>
+#include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopLoc_Location.hxx>
+#include <TopTools_IndexedMapOfShape.hxx>
 #include <TopoDS.hxx>
+#include <TopoDS_Edge.hxx>
 #include <TopoDS_Face.hxx>
 #include <TopoDS_Shape.hxx>
+#include <TopoDS_Shell.hxx>
 #include <TopoDS_Vertex.hxx>
 #include <gp_Pnt.hxx>
+#include <gp_Pnt2d.hxx>
 #include <gp_Trsf.hxx>
 #include <gp_Vec.hxx>
 
@@ -90,7 +99,8 @@ Soup triangulate_shape(const TopoDS_Shape& shape, double deflection,
             // Skip zero-area facets (OCC tessellation can emit them on spheres).
             const double ax = p2.X() - p1.X(), ay = p2.Y() - p1.Y(), az = p2.Z() - p1.Z();
             const double bx = p3.X() - p1.X(), by = p3.Y() - p1.Y(), bz = p3.Z() - p1.Z();
-            const double cx = ay * bz - az * by, cy = az * bx - ax * bz, cz = ax * by - ay * bx;
+            const double cx = ay * bz - az * by, cy = az * bx - ax * bz,
+                         cz = ax * by - ay * bx;
             const double area2 = cx * cx + cy * cy + cz * cz;
             if (area2 < 1e-30) {
                 continue;
@@ -172,15 +182,11 @@ CadModel CadModel::load_brep(const std::filesystem::path& path) {
     return model;
 }
 
-bool CadModel::empty() const noexcept {
-    return !impl_ || impl_->shape.IsNull();
-}
+bool CadModel::empty() const noexcept { return !impl_ || impl_->shape.IsNull(); }
 
 bool CadModel::has_brep() const noexcept { return !empty(); }
 
-double CadModel::bbox_diagonal() const noexcept {
-    return (bbox_max_ - bbox_min_).norm();
-}
+double CadModel::bbox_diagonal() const noexcept { return (bbox_max_ - bbox_min_).norm(); }
 
 TriSurface CadModel::tessellate(double deflection, double angular_deflection) const {
     if (empty()) {
@@ -228,15 +234,14 @@ struct FaceBox {
 
 /// Exact lower bound on |p - q| over every q inside `b` (0 when p is inside).
 double box_lower_bound(const Eigen::Vector3d& p, const FaceBox& b) {
-    const Eigen::Vector3d d =
-        (b.lo - p).cwiseMax(p - b.hi).cwiseMax(Eigen::Vector3d::Zero());
+    const Eigen::Vector3d d = (b.lo - p).cwiseMax(p - b.hi).cwiseMax(Eigen::Vector3d::Zero());
     return d.norm();
 }
 
 /// Outward-ish unit normal at 3D point `q` from a face's surface + orientation
 /// (UV via surface project). Split from the face so the cached index can hand
 /// over a pre-built surface handle and adaptor.
-bool face_normal_at(const Handle(Geom_Surface)& surf, const BRepAdaptor_Surface& asurf,
+bool face_normal_at(const Handle(Geom_Surface) & surf, const BRepAdaptor_Surface& asurf,
                     TopAbs_Orientation orientation, const gp_Pnt& q, gp_Vec& n_out) {
     if (surf.IsNull()) {
         return false;
@@ -292,9 +297,17 @@ struct BrepFaceIndex {
         std::size_t face = kNoFace;
         double dist = std::numeric_limits<double>::infinity();
         gp_Pnt point;
+        TopoDS_Shape support;
     };
 
     std::vector<TopoDS_Face> faces;
+    TopTools_IndexedMapOfShape face_map;
+    TopTools_IndexedMapOfShape edge_map;
+    TopTools_IndexedMapOfShape vertex_map;
+    std::vector<TopoDS_Edge> edges;
+    std::vector<TopoDS_Vertex> vertices;
+    /// OCC edge-map index → nondegenerate CadEdge::id, or invalid.
+    std::vector<std::uint32_t> edge_ids;
     std::vector<FaceBox> boxes;
     std::vector<Handle(Geom_Surface)> surfaces;
     std::vector<Handle(BRepAdaptor_Surface)> adaptors;
@@ -311,12 +324,16 @@ struct BrepFaceIndex {
     mutable std::vector<std::uint32_t> seen; ///< per-query dedupe stamps
     mutable std::uint32_t epoch = 0;
 
-    int flat(int i, int j, int k) const {
-        return (k * ny + j) * nx + i;
-    }
+    int flat(int i, int j, int k) const { return (k * ny + j) * nx + i; }
 
     void build(const TopoDS_Shape& shape) {
         faces.clear();
+        face_map.Clear();
+        edge_map.Clear();
+        vertex_map.Clear();
+        edges.clear();
+        vertices.clear();
+        edge_ids.clear();
         boxes.clear();
         surfaces.clear();
         adaptors.clear();
@@ -326,10 +343,26 @@ struct BrepFaceIndex {
         seen.clear();
         epoch = 0;
 
-        // Explorer order defines the face ids, so culled and unculled scans
-        // break distance ties exactly like the original in-order scan.
-        for (TopExp_Explorer exp(shape, TopAbs_FACE); exp.More(); exp.Next()) {
-            faces.push_back(TopoDS::Face(exp.Current()));
+        // Stable zero-based ids mirror CadTopology's TopExp::MapShapes order.
+        TopExp::MapShapes(shape, TopAbs_FACE, face_map);
+        TopExp::MapShapes(shape, TopAbs_EDGE, edge_map);
+        TopExp::MapShapes(shape, TopAbs_VERTEX, vertex_map);
+        faces.reserve(static_cast<std::size_t>(face_map.Extent()));
+        for (Standard_Integer i = 1; i <= face_map.Extent(); ++i) {
+            faces.push_back(TopoDS::Face(face_map(i)));
+        }
+        edge_ids.assign(static_cast<std::size_t>(edge_map.Extent() + 1), kInvalidCadSupportId);
+        for (Standard_Integer i = 1; i <= edge_map.Extent(); ++i) {
+            const TopoDS_Edge& edge = TopoDS::Edge(edge_map(i));
+            if (BRep_Tool::Degenerated(edge)) {
+                continue;
+            }
+            edge_ids[static_cast<std::size_t>(i)] = static_cast<std::uint32_t>(edges.size());
+            edges.push_back(edge);
+        }
+        vertices.reserve(static_cast<std::size_t>(vertex_map.Extent()));
+        for (Standard_Integer i = 1; i <= vertex_map.Extent(); ++i) {
+            vertices.push_back(TopoDS::Vertex(vertex_map(i)));
         }
         const std::size_t nf = faces.size();
         if (nf == 0) {
@@ -370,7 +403,8 @@ struct BrepFaceIndex {
 
         // Pad so boundary queries land inside the hash and a hair-tight OCC
         // bound can never cull the true closest face.
-        const Eigen::Vector3d extent = (gmax - gmin).cwiseMax(Eigen::Vector3d::Constant(1e-12));
+        const Eigen::Vector3d extent =
+            (gmax - gmin).cwiseMax(Eigen::Vector3d::Constant(1e-12));
         const double pad = 1e-6 * extent.norm() + 1e-12;
         gmin.array() -= pad;
         gmax.array() += pad;
@@ -391,8 +425,8 @@ struct BrepFaceIndex {
         bins.assign(static_cast<std::size_t>(nx * ny * nz), {});
 
         for (std::size_t f = 0; f < nf; ++f) {
-            if (std::find(unbounded.begin(), unbounded.end(),
-                          static_cast<std::uint32_t>(f)) != unbounded.end()) {
+            if (std::find(unbounded.begin(), unbounded.end(), static_cast<std::uint32_t>(f)) !=
+                unbounded.end()) {
                 continue;
             }
             const Eigen::Vector3d lomin = (boxes[f].lo - origin).cwiseQuotient(cell);
@@ -419,36 +453,52 @@ struct BrepFaceIndex {
     }
 
     /// Closest point on one trimmed face via the face's persistent extrema
-    /// solver. `untrimmed` reports the degenerate path whose distance comes
-    /// from the untrimmed surface and may therefore undercut the face's box.
-    bool project_on_face(std::size_t f, const TopoDS_Vertex& vtx, gp_Pnt& closest, double& dist,
-                         bool& untrimmed) const {
+    /// solver. Failure is reported instead of falling back to the untrimmed
+    /// underlying surface.
+    bool project_on_face(std::size_t f, const TopoDS_Vertex& vtx, gp_Pnt& closest,
+                         double& dist, bool& untrimmed,
+                         TopoDS_Shape* support = nullptr) const {
+        untrimmed = false;
+        if (f >= solvers.size()) {
+            return false;
+        }
         BRepExtrema_DistShapeShape& dss = *solvers[f];
         dss.LoadS1(vtx);
         dss.Perform();
-        if (dss.IsDone() && dss.NbSolution() >= 1) {
-            dist = static_cast<double>(dss.Value());
-            closest = dss.PointOnShape2(1);
-            untrimmed = false;
-            return true;
-        }
-        // Fallback: infinite-surface project (ignores face trim). Only usable
-        // with a real normal, matching the pre-index behaviour.
-        if (surfaces[f].IsNull()) {
+        if (!dss.IsDone() || dss.NbSolution() < 1) {
             return false;
         }
-        GeomAPI_ProjectPointOnSurf proj(BRep_Tool::Pnt(vtx), surfaces[f]);
-        if (proj.NbPoints() < 1) {
-            return false;
+        dist = static_cast<double>(dss.Value());
+        closest = dss.PointOnShape2(1);
+        if (support != nullptr) {
+            *support = dss.SupportOnShape2(1);
         }
-        gp_Vec n(0, 0, 0);
-        if (!face_normal(f, proj.NearestPoint(), n)) {
-            return false;
+        return std::isfinite(dist);
+    }
+
+    std::pair<CadSupportKind, std::uint32_t>
+    stable_support(const TopoDS_Shape& support) const {
+        if (support.IsNull()) {
+            return {CadSupportKind::kUnknown, kInvalidCadSupportId};
         }
-        closest = proj.NearestPoint();
-        dist = proj.LowerDistance();
-        untrimmed = true;
-        return true;
+        if (support.ShapeType() == TopAbs_VERTEX) {
+            const Standard_Integer i = vertex_map.FindIndex(support);
+            if (i > 0) {
+                return {CadSupportKind::kVertex, static_cast<std::uint32_t>(i - 1)};
+            }
+        } else if (support.ShapeType() == TopAbs_EDGE) {
+            const Standard_Integer i = edge_map.FindIndex(support);
+            if (i > 0 && static_cast<std::size_t>(i) < edge_ids.size() &&
+                edge_ids[static_cast<std::size_t>(i)] != kInvalidCadSupportId) {
+                return {CadSupportKind::kEdge, edge_ids[static_cast<std::size_t>(i)]};
+            }
+        } else if (support.ShapeType() == TopAbs_FACE) {
+            const Standard_Integer i = face_map.FindIndex(support);
+            if (i > 0) {
+                return {CadSupportKind::kFace, static_cast<std::uint32_t>(i - 1)};
+            }
+        }
+        return {CadSupportKind::kUnknown, kInvalidCadSupportId};
     }
 
     /// Exact closest face for `p`. With `cull` the grid is walked outward and
@@ -463,13 +513,15 @@ struct BrepFaceIndex {
             gp_Pnt q;
             double d = 0.0;
             bool untrimmed = false;
-            if (!project_on_face(f, vtx, q, d, untrimmed)) {
+            TopoDS_Shape support;
+            if (!project_on_face(f, vtx, q, d, untrimmed, &support)) {
                 return;
             }
             out_untrimmed = out_untrimmed || untrimmed;
             if (d < w.dist || (d == w.dist && f < w.face)) {
                 w.dist = d;
                 w.point = q;
+                w.support = support;
                 w.face = f;
             }
         };
@@ -553,29 +605,20 @@ const BrepFaceIndex& face_index_for(const CadModel& model, const TopoDS_Shape& s
 /// O(queries * faces) algorithm. Set POLYMESH_PROJ_BRUTE=1 before process
 /// startup to disable culling and compare output bytes/quality deterministically.
 bool project_on_face_brute(const TopoDS_Vertex& vtx, const TopoDS_Face& face, gp_Pnt& closest,
-                           double& dist, gp_Vec& normal) {
+                           double& dist, gp_Vec& normal, TopoDS_Shape& support) {
     BRepExtrema_DistShapeShape dss(vtx, face);
     dss.Perform();
     if (!dss.IsDone() || dss.NbSolution() < 1) {
-        const Handle(Geom_Surface) surf = BRep_Tool::Surface(face);
-        if (surf.IsNull()) {
-            return false;
-        }
-        GeomAPI_ProjectPointOnSurf proj(BRep_Tool::Pnt(vtx), surf);
-        if (proj.NbPoints() < 1) {
-            return false;
-        }
-        closest = proj.NearestPoint();
-        dist = proj.LowerDistance();
-        return face_normal_at(face, closest, normal);
+        return false;
     }
     dist = static_cast<double>(dss.Value());
     closest = dss.PointOnShape2(1);
+    support = dss.SupportOnShape2(1);
     const bool ok = face_normal_at(face, closest, normal);
     if (!ok) {
         normal = gp_Vec(0, 0, 0);
     }
-    return true;
+    return std::isfinite(dist);
 }
 
 bool proj_brute_enabled() {
@@ -583,7 +626,223 @@ bool proj_brute_enabled() {
     return on;
 }
 
+ProjectResult make_project_result(const Eigen::Vector3d& query, const gp_Pnt& point,
+                                  double distance, gp_Vec normal, CadSupportKind support_kind,
+                                  std::uint32_t support_id, std::uint32_t face_id) {
+    ProjectResult r;
+    r.point = Eigen::Vector3d(point.X(), point.Y(), point.Z());
+    if (normal.SquareMagnitude() > Precision::SquareConfusion()) {
+        normal.Normalize();
+        r.normal = Eigen::Vector3d(normal.X(), normal.Y(), normal.Z());
+    } else {
+        const Eigen::Vector3d d = r.point - query;
+        const double len = d.norm();
+        if (len > 1e-15) {
+            r.normal = d / len;
+        }
+    }
+    r.support_kind = support_kind;
+    r.support_id = support_id;
+    r.face_id = face_id;
+    r.distance = distance;
+    return r;
+}
+
 } // namespace
+
+BRepInspection inspect_brep(const CadModel& model) {
+    BRepInspection out;
+    if (model.empty() || model.shape_handle() == nullptr) {
+        return out;
+    }
+
+    const auto& shape = *static_cast<const TopoDS_Shape*>(model.shape_handle());
+    out.available = true;
+    out.valid = BRepCheck_Analyzer(shape).IsValid();
+
+    TopTools_IndexedMapOfShape solids;
+    TopTools_IndexedMapOfShape shells;
+    TopTools_IndexedMapOfShape faces;
+    TopTools_IndexedMapOfShape edges;
+    TopTools_IndexedMapOfShape vertices;
+    TopExp::MapShapes(shape, TopAbs_SOLID, solids);
+    TopExp::MapShapes(shape, TopAbs_SHELL, shells);
+    TopExp::MapShapes(shape, TopAbs_FACE, faces);
+    TopExp::MapShapes(shape, TopAbs_EDGE, edges);
+    TopExp::MapShapes(shape, TopAbs_VERTEX, vertices);
+    out.solid_count = static_cast<std::size_t>(solids.Extent());
+    out.shell_count = static_cast<std::size_t>(shells.Extent());
+    out.face_count = static_cast<std::size_t>(faces.Extent());
+    out.edge_count = static_cast<std::size_t>(edges.Extent());
+    out.vertex_count = static_cast<std::size_t>(vertices.Extent());
+
+    for (Standard_Integer i = 1; i <= shells.Extent(); ++i) {
+        if (BRep_Tool::IsClosed(TopoDS::Shell(shells(i)))) {
+            ++out.closed_shell_count;
+        }
+    }
+    out.closed = out.shell_count > 0 && out.closed_shell_count == out.shell_count;
+
+    GProp_GProps volume_props;
+    BRepGProp::VolumeProperties(shape, volume_props);
+    out.volume = std::abs(static_cast<double>(volume_props.Mass()));
+
+    GProp_GProps surface_props;
+    BRepGProp::SurfaceProperties(shape, surface_props);
+    out.surface_area = std::abs(static_cast<double>(surface_props.Mass()));
+    return out;
+}
+
+BRepSurfaceSamples sample_brep_surface(const CadModel& model, std::size_t max_samples) {
+    BRepSurfaceSamples result;
+    if (model.empty() || model.shape_handle() == nullptr) {
+        return result;
+    }
+    const auto& shape = *static_cast<const TopoDS_Shape*>(model.shape_handle());
+    TopTools_IndexedMapOfShape mapped_faces;
+    TopExp::MapShapes(shape, TopAbs_FACE, mapped_faces);
+    const std::size_t face_count = static_cast<std::size_t>(mapped_faces.Extent());
+    result.face_count = face_count;
+    if (face_count == 0) {
+        return result;
+    }
+    if (max_samples < face_count) {
+        throw GeomError(
+            std::format("sample_brep_surface: max_samples={} cannot cover {} BRep faces",
+                        max_samples, face_count));
+    }
+
+    // Give every face one point, then distribute the remaining budget by exact
+    // surface area. Stable fractional-remainder ordering makes the allocation
+    // deterministic while approximating an area-weighted surface distribution.
+    std::vector<std::size_t> quotas(face_count, 1);
+    std::vector<double> areas(face_count, 0.0);
+    double total_area = 0.0;
+    for (std::size_t i = 0; i < face_count; ++i) {
+        GProp_GProps properties;
+        BRepGProp::SurfaceProperties(TopoDS::Face(mapped_faces(static_cast<int>(i + 1))),
+                                     properties);
+        const double area = std::abs(static_cast<double>(properties.Mass()));
+        if (std::isfinite(area) && area > 0.0) {
+            areas[i] = area;
+            total_area += area;
+        }
+    }
+    const std::size_t remaining = max_samples - face_count;
+    if (remaining > 0 && total_area > 0.0 && std::isfinite(total_area)) {
+        std::vector<double> fractions(face_count, 0.0);
+        std::size_t allocated = 0;
+        for (std::size_t i = 0; i < face_count; ++i) {
+            const long double exact =
+                static_cast<long double>(remaining) *
+                (static_cast<long double>(areas[i]) / static_cast<long double>(total_area));
+            const std::size_t available = remaining - allocated;
+            const long double floored = std::floor(exact);
+            const std::size_t whole =
+                !std::isfinite(exact) || floored >= static_cast<long double>(available)
+                    ? available
+                    : static_cast<std::size_t>(std::max(0.0L, floored));
+            quotas[i] += whole;
+            allocated += whole;
+            fractions[i] = std::isfinite(exact) ? static_cast<double>(exact - floored) : 0.0;
+        }
+        std::vector<std::size_t> order(face_count);
+        for (std::size_t i = 0; i < face_count; ++i) {
+            order[i] = i;
+        }
+        std::stable_sort(order.begin(), order.end(),
+                         [&fractions](std::size_t a, std::size_t b) {
+                             return fractions[a] > fractions[b];
+                         });
+        for (std::size_t i = 0; i < remaining - allocated; ++i) {
+            ++quotas[order[i % face_count]];
+        }
+    } else if (remaining > 0) {
+        for (std::size_t i = 0; i < face_count; ++i) {
+            quotas[i] += remaining / face_count;
+            if (i < remaining % face_count) {
+                ++quotas[i];
+            }
+        }
+    }
+
+    std::vector<Eigen::Vector3d>& samples = result.points;
+    samples.reserve(max_samples);
+    for (std::size_t i = 0; i < face_count; ++i) {
+        const TopoDS_Face face =
+            TopoDS::Face(mapped_faces(static_cast<Standard_Integer>(i + 1)));
+        const std::size_t quota = quotas[i];
+        const std::size_t before = samples.size();
+
+        Standard_Real u_min = 0.0;
+        Standard_Real u_max = 0.0;
+        Standard_Real v_min = 0.0;
+        Standard_Real v_max = 0.0;
+        BRepTools::UVBounds(face, u_min, u_max, v_min, v_max);
+        const bool finite_bounds = std::isfinite(static_cast<double>(u_min)) &&
+                                   std::isfinite(static_cast<double>(u_max)) &&
+                                   std::isfinite(static_cast<double>(v_min)) &&
+                                   std::isfinite(static_cast<double>(v_max)) &&
+                                   u_max > u_min && v_max > v_min;
+        if (finite_bounds) {
+            // A ceil(2*sqrt(quota)) grid attempts at most 9*quota points.
+            // Cell centres avoid over-counting coincident face boundaries.
+            const std::size_t grid_side = static_cast<std::size_t>(
+                std::ceil(2.0 * std::sqrt(static_cast<double>(quota))));
+            BRepAdaptor_Surface surface(face, Standard_True);
+            for (std::size_t v = 0; v < grid_side && samples.size() - before < quota; ++v) {
+                const double fv =
+                    (static_cast<double>(v) + 0.5) / static_cast<double>(grid_side);
+                const Standard_Real param_v =
+                    v_min + static_cast<Standard_Real>(fv) * (v_max - v_min);
+                for (std::size_t u = 0; u < grid_side && samples.size() - before < quota;
+                     ++u) {
+                    const double fu =
+                        (static_cast<double>(u) + 0.5) / static_cast<double>(grid_side);
+                    const Standard_Real param_u =
+                        u_min + static_cast<Standard_Real>(fu) * (u_max - u_min);
+                    BRepClass_FaceClassifier classifier(face, gp_Pnt2d(param_u, param_v),
+                                                        Precision::Confusion());
+                    ++result.uv_attempt_count;
+                    const TopAbs_State state = classifier.State();
+                    if (state != TopAbs_IN && state != TopAbs_ON) {
+                        continue;
+                    }
+                    const gp_Pnt point = surface.Value(param_u, param_v);
+                    if (std::isfinite(static_cast<double>(point.X())) &&
+                        std::isfinite(static_cast<double>(point.Y())) &&
+                        std::isfinite(static_cast<double>(point.Z()))) {
+                        samples.emplace_back(point.X(), point.Y(), point.Z());
+                    }
+                }
+            }
+        }
+
+        if (samples.size() == before) {
+            // Thin/degenerate trims can miss every bounded cell centre. A BRep
+            // vertex remains an exact point on the trimmed face.
+            TopExp_Explorer vertices(face, TopAbs_VERTEX);
+            bool found_finite_vertex = false;
+            while (vertices.More()) {
+                const gp_Pnt point = BRep_Tool::Pnt(TopoDS::Vertex(vertices.Current()));
+                if (std::isfinite(static_cast<double>(point.X())) &&
+                    std::isfinite(static_cast<double>(point.Y())) &&
+                    std::isfinite(static_cast<double>(point.Z()))) {
+                    samples.emplace_back(point.X(), point.Y(), point.Z());
+                    found_finite_vertex = true;
+                    ++result.fallback_vertex_count;
+                    break;
+                }
+                vertices.Next();
+            }
+            if (!found_finite_vertex) {
+                throw GeomError(std::format(
+                    "sample_brep_surface: face {} yielded no finite bounded exact sample", i));
+            }
+        }
+    }
+    return result;
+}
 
 std::optional<ProjectResult> project_point_on_surface(const CadModel& model,
                                                       const Eigen::Vector3d& p) {
@@ -600,39 +859,37 @@ std::optional<ProjectResult> project_point_on_surface(const CadModel& model,
     double best_dist = std::numeric_limits<double>::infinity();
     gp_Pnt best_pt;
     gp_Vec best_n(0, 0, 0);
+    TopoDS_Shape best_support;
+    std::uint32_t best_face = kInvalidCadSupportId;
     bool found = false;
 
-    // Per-face extrema (respects trim) — preferred over whole-shape when we
-    // need a supporting face for the normal.
+    // Per-face extrema respects wires and supplies a stable supporting face.
     if (proj_brute_enabled()) {
-        for (TopExp_Explorer exp(*shape, TopAbs_FACE); exp.More(); exp.Next()) {
-            const TopoDS_Face& face = TopoDS::Face(exp.Current());
+        for (std::size_t f = 0; f < index.faces.size(); ++f) {
             gp_Pnt closest;
             double dist = 0.0;
             gp_Vec n(0, 0, 0);
-            if (!project_on_face_brute(vtx, face, closest, dist, n)) {
+            TopoDS_Shape support;
+            if (!project_on_face_brute(vtx, index.faces[f], closest, dist, n, support)) {
                 continue;
             }
             if (dist < best_dist) {
                 best_dist = dist;
                 best_pt = closest;
                 best_n = n;
+                best_support = support;
+                best_face = static_cast<std::uint32_t>(f);
                 found = true;
             }
         }
     } else {
         bool untrimmed = false;
-        BrepFaceIndex::Winner win = index.closest(vtx, p, /*cull=*/true, untrimmed);
-        if (untrimmed) {
-            // An untrimmed-surface distance can dip below the face's own box,
-            // so the culled walk may have discarded the true winner: redo it.
-            bool ignored = false;
-            win = index.closest(vtx, p, /*cull=*/false, ignored);
-        }
+        const BrepFaceIndex::Winner win = index.closest(vtx, p, /*cull=*/true, untrimmed);
         if (win.face != BrepFaceIndex::kNoFace) {
             best_dist = win.dist;
             best_pt = win.point;
-            // Normal only for the winner: the losing faces never needed one.
+            best_support = win.support;
+            best_face = static_cast<std::uint32_t>(win.face);
             if (!index.face_normal(win.face, best_pt, best_n)) {
                 best_n = gp_Vec(0, 0, 0);
             }
@@ -640,40 +897,98 @@ std::optional<ProjectResult> project_point_on_surface(const CadModel& model,
         }
     }
 
-    // Whole-shape fallback if face loop failed (degenerate / empty face map).
+    // Whole-shape fallback if the face map is empty or every trimmed solve
+    // failed. It is still exact, but cannot always name an owning face.
     if (!found) {
         BRepExtrema_DistShapeShape dss(vtx, *shape);
+        dss.Perform();
         if (!dss.IsDone() || dss.NbSolution() < 1) {
             return std::nullopt;
         }
         best_dist = static_cast<double>(dss.Value());
         best_pt = dss.PointOnShape2(1);
-        const TopoDS_Shape support = dss.SupportOnShape2(1);
-        if (support.ShapeType() == TopAbs_FACE) {
-            (void)face_normal_at(TopoDS::Face(support), best_pt, best_n);
+        best_support = dss.SupportOnShape2(1);
+        if (best_support.ShapeType() == TopAbs_FACE) {
+            (void)face_normal_at(TopoDS::Face(best_support), best_pt, best_n);
         }
         found = true;
     }
-
     if (!found || !std::isfinite(best_dist)) {
         return std::nullopt;
     }
 
-    ProjectResult r;
-    r.point = Eigen::Vector3d(best_pt.X(), best_pt.Y(), best_pt.Z());
-    if (best_n.SquareMagnitude() > Precision::SquareConfusion()) {
-        best_n.Normalize();
-        r.normal = Eigen::Vector3d(best_n.X(), best_n.Y(), best_n.Z());
-    } else {
-        // Fallback geometric normal from query → projected point.
-        const Eigen::Vector3d d = r.point - p;
-        const double len = d.norm();
-        if (len > 1e-15) {
-            r.normal = d / len;
-        }
+    auto [kind, id] = index.stable_support(best_support);
+    if (kind == CadSupportKind::kUnknown && best_face != kInvalidCadSupportId) {
+        kind = CadSupportKind::kFace;
+        id = best_face;
     }
-    r.distance = best_dist;
-    return r;
+    return make_project_result(p, best_pt, best_dist, best_n, kind, id, best_face);
+}
+
+std::optional<ProjectResult>
+project_point_on_face(const CadModel& model, std::uint32_t face_id, const Eigen::Vector3d& p) {
+    if (model.empty() || model.shape_handle() == nullptr) {
+        return std::nullopt;
+    }
+    const auto* shape = static_cast<const TopoDS_Shape*>(model.shape_handle());
+    const BrepFaceIndex& index = face_index_for(model, *shape);
+    if (face_id >= index.faces.size()) {
+        return std::nullopt;
+    }
+    BRep_Builder builder;
+    TopoDS_Vertex vtx;
+    builder.MakeVertex(vtx, gp_Pnt(p.x(), p.y(), p.z()), Precision::Confusion());
+    gp_Pnt closest;
+    double distance = 0.0;
+    bool untrimmed = false;
+    if (!index.project_on_face(face_id, vtx, closest, distance, untrimmed)) {
+        return std::nullopt;
+    }
+    gp_Vec normal(0, 0, 0);
+    (void)index.face_normal(face_id, closest, normal);
+    return make_project_result(p, closest, distance, normal, CadSupportKind::kFace, face_id,
+                               face_id);
+}
+
+std::optional<ProjectResult>
+project_point_on_edge(const CadModel& model, std::uint32_t edge_id, const Eigen::Vector3d& p) {
+    if (model.empty() || model.shape_handle() == nullptr) {
+        return std::nullopt;
+    }
+    const auto* shape = static_cast<const TopoDS_Shape*>(model.shape_handle());
+    const BrepFaceIndex& index = face_index_for(model, *shape);
+    if (edge_id >= index.edges.size()) {
+        return std::nullopt;
+    }
+    BRep_Builder builder;
+    TopoDS_Vertex vtx;
+    builder.MakeVertex(vtx, gp_Pnt(p.x(), p.y(), p.z()), Precision::Confusion());
+    BRepExtrema_DistShapeShape dss(vtx, index.edges[edge_id]);
+    dss.Perform();
+    if (!dss.IsDone() || dss.NbSolution() < 1 ||
+        !std::isfinite(static_cast<double>(dss.Value()))) {
+        return std::nullopt;
+    }
+    return make_project_result(p, dss.PointOnShape2(1), static_cast<double>(dss.Value()),
+                               gp_Vec(0, 0, 0), CadSupportKind::kEdge, edge_id,
+                               kInvalidCadSupportId);
+}
+
+std::optional<ProjectResult> project_point_on_vertex(const CadModel& model,
+                                                     std::uint32_t vertex_id,
+                                                     const Eigen::Vector3d& p) {
+    if (model.empty() || model.shape_handle() == nullptr) {
+        return std::nullopt;
+    }
+    const auto* shape = static_cast<const TopoDS_Shape*>(model.shape_handle());
+    const BrepFaceIndex& index = face_index_for(model, *shape);
+    if (vertex_id >= index.vertices.size()) {
+        return std::nullopt;
+    }
+    const gp_Pnt point = BRep_Tool::Pnt(index.vertices[vertex_id]);
+    return make_project_result(p, point, gp_Pnt(p.x(), p.y(), p.z()).Distance(point),
+                               gp_Vec(0, 0, 0), CadSupportKind::kVertex, vertex_id,
+                               kInvalidCadSupportId);
 }
 
 #else // !POLYMESH_WITH_OCC
@@ -694,11 +1009,9 @@ bool CadModel::empty() const noexcept { return true; }
 
 bool CadModel::has_brep() const noexcept { return false; }
 
-double CadModel::bbox_diagonal() const noexcept {
-    return (bbox_max_ - bbox_min_).norm();
-}
+double CadModel::bbox_diagonal() const noexcept { return (bbox_max_ - bbox_min_).norm(); }
 
-TriSurface CadModel::tessellate(double /*deflection*/) const {
+TriSurface CadModel::tessellate(double /*deflection*/, double /*angular_deflection*/) const {
     throw GeomError("OpenCASCADE not enabled");
 }
 
@@ -706,9 +1019,34 @@ const void* CadModel::shape_handle() const noexcept { return nullptr; }
 
 void CadModel::compute_bbox() {}
 
+BRepInspection inspect_brep(const CadModel& /*model*/) { return {}; }
+
+BRepSurfaceSamples sample_brep_surface(const CadModel& /*model*/,
+                                       std::size_t /*max_samples*/) {
+    return {};
+}
+
 std::optional<ProjectResult> project_point_on_surface(const CadModel& /*model*/,
                                                       const Eigen::Vector3d& /*p*/) {
     // Stub without OCC: no BRep oracle (STL-only builds keep surface snap only).
+    return std::nullopt;
+}
+
+std::optional<ProjectResult> project_point_on_face(const CadModel& /*model*/,
+                                                   std::uint32_t /*face_id*/,
+                                                   const Eigen::Vector3d& /*p*/) {
+    return std::nullopt;
+}
+
+std::optional<ProjectResult> project_point_on_edge(const CadModel& /*model*/,
+                                                   std::uint32_t /*edge_id*/,
+                                                   const Eigen::Vector3d& /*p*/) {
+    return std::nullopt;
+}
+
+std::optional<ProjectResult> project_point_on_vertex(const CadModel& /*model*/,
+                                                     std::uint32_t /*vertex_id*/,
+                                                     const Eigen::Vector3d& /*p*/) {
     return std::nullopt;
 }
 
@@ -727,8 +1065,8 @@ CadModel load_cad(const std::filesystem::path& path) {
     if (lower == ".brep" || lower == ".brp") {
         return CadModel::load_brep(path);
     }
-    throw GeomError(std::format("load_cad: unsupported extension '{}' (use .step/.stp/.brep)",
-                                ext));
+    throw GeomError(
+        std::format("load_cad: unsupported extension '{}' (use .step/.stp/.brep)", ext));
 }
 
 } // namespace polymesh::geom

@@ -12,6 +12,7 @@
 #include "geom/features.hpp"
 #include "geom/tri_surface.hpp"
 #include "mesh/tet_fill.hpp"
+#include "mesh/surface_project.hpp"
 
 #include <Eigen/Core>
 
@@ -70,6 +71,7 @@ VaryhedronFillOutput varyhedron_fill_surface(
     std::span<const geom::SharpEdge> features = {}, double feature_band = 0.0,
     std::span<const Eigen::Vector3d> refine_seeds = {}, double seed_band = 0.0,
     double curvature_turn_deg = 15.0, const geom::CadTopology* topo = nullptr,
-    const geom::CadModel* cad = nullptr, int wall_smooth_iters = 4);
+    const geom::CadModel* cad = nullptr, int wall_smooth_iters = 4,
+    BoundaryProjectionContext* projection = nullptr);
 
 } // namespace polymesh::mesh

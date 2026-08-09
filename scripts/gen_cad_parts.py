@@ -10,9 +10,11 @@ Requires the ``OCP`` OpenCASCADE Python bindings (pythonocc-core / OCP).
 Run from repo root:
 
     python3 scripts/gen_cad_parts.py
+    python3 scripts/gen_cad_parts.py --part icecream_cone
     python3 scripts/gen_cad_parts.py --export-stl-compare
 
-Produces (always):
+Without ``--part`` the command writes all four product fixtures. Repeat
+``--part`` to regenerate a selected subset:
   tests/fixtures/parts/plate_hole.step
   tests/fixtures/parts/cylinder.step
   tests/fixtures/parts/sphere.step
@@ -37,18 +39,12 @@ OUT = ROOT / "tests" / "fixtures" / "parts"
 
 try:
     from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut, BRepAlgoAPI_Fuse
-    from OCP.BRepBuilderAPI import (
-        BRepBuilderAPI_MakeEdge,
-        BRepBuilderAPI_MakeFace,
-        BRepBuilderAPI_MakeSolid,
-        BRepBuilderAPI_MakeWire,
-        BRepBuilderAPI_Sewing,
-    )
     from OCP.BRepCheck import BRepCheck_Analyzer
     from OCP.BRepGProp import BRepGProp
     from OCP.BRepMesh import BRepMesh_IncrementalMesh
     from OCP.BRepPrimAPI import (
         BRepPrimAPI_MakeBox,
+        BRepPrimAPI_MakeCone,
         BRepPrimAPI_MakeCylinder,
         BRepPrimAPI_MakeSphere,
     )
@@ -59,9 +55,8 @@ try:
     from OCP.ShapeFix import ShapeFix_Shape
     from OCP.STEPControl import STEPControl_AsIs, STEPControl_Writer
     from OCP.StlAPI import StlAPI_Writer
-    from OCP.TopAbs import TopAbs_SHELL
+    from OCP.TopAbs import TopAbs_SOLID
     from OCP.TopExp import TopExp_Explorer
-    from OCP.TopoDS import TopoDS
 except ImportError as exc:  # pragma: no cover
     print(
         "error: OCP (OpenCASCADE Python bindings) is required to generate STEP.\n"
@@ -85,6 +80,13 @@ def _volume(shape) -> float:
 def _require_solid(shape, name: str) -> None:
     if not _is_valid(shape):
         raise RuntimeError(f"{name}: BRep not valid after construction")
+    solids = TopExp_Explorer(shape, TopAbs_SOLID)
+    solid_count = 0
+    while solids.More():
+        solid_count += 1
+        solids.Next()
+    if solid_count != 1:
+        raise RuntimeError(f"{name}: expected one connected solid, got {solid_count}")
     vol = _volume(shape)
     if vol <= 0.0:
         raise RuntimeError(f"{name}: non-positive volume ({vol})")
@@ -104,6 +106,14 @@ def write_step(shape, path: Path, *, name: str) -> None:
     status = writer.Write(str(path))
     if status != IFSelect_RetDone:
         raise RuntimeError(f"{name}: STEP write failed ({status})")
+    # OpenCASCADE emits a space before some STEP line endings. Normalize only
+    # trailing whitespace so generated fixtures pass patch-integrity checks
+    # without changing entity ordering or numeric data.
+    text = path.read_text(encoding="utf-8")
+    path.write_text(
+        "\n".join(line.rstrip() for line in text.splitlines()) + "\n",
+        encoding="utf-8",
+    )
     vol = _volume(shape)
     print(f"wrote {path.relative_to(ROOT)}  (volume={vol:.6g} m^3)")
 
@@ -163,87 +173,36 @@ def make_sphere(*, radius: float = 0.05):
     return BRepPrimAPI_MakeSphere(radius).Shape()
 
 
-def _edge(a: gp_Pnt, b: gp_Pnt):
-    return BRepBuilderAPI_MakeEdge(a, b).Edge()
-
-
-def _wire_triangle(a: gp_Pnt, b: gp_Pnt, c: gp_Pnt):
-    return BRepBuilderAPI_MakeWire(_edge(a, b), _edge(b, c), _edge(c, a)).Wire()
-
-
-def _face_triangle(a: gp_Pnt, b: gp_Pnt, c: gp_Pnt):
-    return BRepBuilderAPI_MakeFace(_wire_triangle(a, b, c)).Face()
-
-
-def make_triangular_pyramid(
-    *,
-    base_side: float = 0.12,
-    height: float = 0.15,
-):
-    """Regular triangular pyramid (tetrahedral apex over equilateral base) on z=0."""
-    # Equilateral triangle in xy, centroid at origin.
-    h_tri = base_side * (3.0**0.5) * 0.5
-    # Centroid is 2/3 of median from a vertex; place base centroid at (0,0).
-    # Vertices relative to centroid:
-    y0 = -h_tri / 3.0
-    y1 = y0
-    y2 = 2.0 * h_tri / 3.0
-    p0 = gp_Pnt(-0.5 * base_side, y0, 0.0)
-    p1 = gp_Pnt(0.5 * base_side, y1, 0.0)
-    p2 = gp_Pnt(0.0, y2, 0.0)
-    apex = gp_Pnt(0.0, 0.0, height)
-
-    faces = [
-        _face_triangle(p0, p1, p2),  # base
-        _face_triangle(p0, p1, apex),
-        _face_triangle(p1, p2, apex),
-        _face_triangle(p2, p0, apex),
-    ]
-    sew = BRepBuilderAPI_Sewing(1e-7)
-    for f in faces:
-        sew.Add(f)
-    sew.Perform()
-    sewn = sew.SewedShape()
-
-    shells: list = []
-    exp = TopExp_Explorer(sewn, TopAbs_SHELL)
-    while exp.More():
-        shells.append(TopoDS.Shell_s(exp.Current()))
-        exp.Next()
-    if not shells:
-        raise RuntimeError("pyramid: sewing produced no shell")
-    solid = BRepBuilderAPI_MakeSolid(shells[0]).Solid()
-    fixer = ShapeFix_Shape(solid)
-    fixer.Perform()
-    return fixer.Shape()
-
-
 def make_icecream_cone(
     *,
-    base_side: float = 0.12,
-    pyramid_height: float = 0.15,
-    scoop_radius: float = 0.04,
+    bottom_radius: float = 0.006,
+    top_radius: float = 0.032,
+    cone_height: float = 0.100,
+    scoop_radius: float = 0.035,
+    scoop_center_z: float = 0.112,
 ):
-    """Triangular pyramid with a ball intersecting one lateral face (boolean union).
+    """Upright round truncated cone fused to an overlapping spherical scoop."""
+    if not 0.0 < bottom_radius < top_radius:
+        raise ValueError("cone radii must satisfy 0 < bottom_radius < top_radius")
+    if cone_height <= 0.0 or scoop_radius <= 0.0:
+        raise ValueError("cone height and scoop radius must be positive")
 
-    The scoop center sits outside the pyramid so the sphere penetrates one face
-    (icecream-on-cone look) rather than sitting fully inside.
-    """
-    pyramid = make_triangular_pyramid(base_side=base_side, height=pyramid_height)
+    axis = gp_Ax2(gp_Pnt(0.0, 0.0, 0.0), gp_Dir(0.0, 0.0, 1.0))
+    cone = BRepPrimAPI_MakeCone(axis, bottom_radius, top_radius, cone_height).Shape()
+    scoop = BRepPrimAPI_MakeSphere(
+        gp_Pnt(0.0, 0.0, scoop_center_z), scoop_radius
+    ).Shape()
 
-    # Lateral face toward +y (vertex p2 side). Place scoop so it crosses that face.
-    # Face roughly faces +y; put center slightly outside mid-face height.
-    face_y = base_side * (3.0**0.5) / 6.0  # distance centroid→side, approximate
-    scoop_center = gp_Pnt(
-        0.0,
-        face_y + 0.55 * scoop_radius,
-        0.55 * pyramid_height,
-    )
-    scoop = BRepPrimAPI_MakeSphere(scoop_center, scoop_radius).Shape()
-    fused = BRepAlgoAPI_Fuse(pyramid, scoop).Shape()
-    fixer = ShapeFix_Shape(fused)
+    fusion = BRepAlgoAPI_Fuse(cone, scoop)
+    fusion.Build()
+    if not fusion.IsDone():
+        raise RuntimeError("icecream_cone: cone/scoop boolean fuse failed")
+
+    fixer = ShapeFix_Shape(fusion.Shape())
     fixer.Perform()
-    return fixer.Shape()
+    result = fixer.Shape()
+    _require_solid(result, "icecream_cone")
+    return result
 
 
 PARTS = (
@@ -264,6 +223,12 @@ def main(argv: list[str] | None = None) -> int:
         help="Also write tests/fixtures/parts/<name>_compare.stl (compare only, not product).",
     )
     parser.add_argument(
+        "--part",
+        action="append",
+        choices=[name for name, _ in PARTS],
+        help="Generate only this fixture (repeatable); default generates all fixtures.",
+    )
+    parser.add_argument(
         "--out-dir",
         type=Path,
         default=OUT,
@@ -273,8 +238,11 @@ def main(argv: list[str] | None = None) -> int:
 
     out_dir: Path = args.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
+    selected = set(args.part or (name for name, _ in PARTS))
 
     for name, factory in PARTS:
+        if name not in selected:
+            continue
         shape = factory()
         write_step(shape, out_dir / f"{name}.step", name=name)
         if args.export_stl_compare:

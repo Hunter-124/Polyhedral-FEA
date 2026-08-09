@@ -51,17 +51,18 @@ bool tet_bad(const std::vector<Eigen::Vector3d>& nodes,
     if (validity::tet_signed_volume(a, b, c, d) <= 0.0) {
         return true;
     }
-    return validity::tet_shape_quality(a, b, c, d) <
-           validity::kCellShapeFloor;
+    return validity::tet_shape_quality(a, b, c, d) < validity::kCellShapeFloor;
 }
 
 } // namespace
 
-WallProjectStats wall_tangential_project(
-    const geom::CadModel& cad, const geom::CadTopology* topo,
-    std::vector<Eigen::Vector3d>& nodes,
-    std::span<const std::array<std::uint32_t, 4>> tets, double h, int iters,
-    double relax, double sharp_guard_frac) {
+WallProjectStats wall_tangential_project(const geom::CadModel& cad,
+                                         const geom::CadTopology* topo,
+                                         std::vector<Eigen::Vector3d>& nodes,
+                                         std::span<const std::array<std::uint32_t, 4>> tets,
+                                         double h, int iters, double relax,
+                                         double sharp_guard_frac,
+                                         BoundaryProjectionContext* projection) {
     WallProjectStats stats;
     if (cad.empty() || !cad.has_brep() || tets.empty() || nodes.empty() || !(h > 0.0) ||
         !std::isfinite(h) || iters <= 0) {
@@ -73,6 +74,17 @@ WallProjectStats wall_tangential_project(
     const double hh = std::max(h, 1e-12);
     const double sharp_band = sharp_guard_frac * hh;
     const double max_step = 0.5 * hh;
+    const auto project_target = [&](const Eigen::Vector3d& p,
+                                    std::uint32_t node) -> std::optional<BoundaryTarget> {
+        if (projection != nullptr && projection->target) {
+            return owned_boundary_projection_target(p, node, projection);
+        }
+        const auto global = geom::project_point_on_surface(cad, p);
+        if (!global) {
+            return std::nullopt;
+        }
+        return BoundaryTarget{global->point, global->distance};
+    };
 
     // Free-face map (count == 1) and undirected boundary graph.
     std::unordered_map<FaceKey, int, FaceHash> fcounts;
@@ -200,8 +212,9 @@ WallProjectStats wall_tangential_project(
                 }
             }
 
-            // Re-project onto live BRep (core of free-slide wall).
-            const auto proj = geom::project_point_on_surface(cad, p);
+            // Re-project through the persistent exact owner. Never fall back
+            // globally when an owner-aware oracle is installed.
+            const auto proj = project_target(p, ni);
             if (!proj) {
                 continue;
             }
@@ -272,7 +285,7 @@ WallProjectStats wall_tangential_project(
     double sum = 0.0;
     std::size_t n_res = 0;
     for (std::uint32_t ni : wall_set) {
-        if (const auto pr = geom::project_point_on_surface(cad, nodes[ni])) {
+        if (const auto pr = project_target(nodes[ni], ni)) {
             sum += pr->distance;
             stats.max_surface_residual = std::max(stats.max_surface_residual, pr->distance);
             ++n_res;

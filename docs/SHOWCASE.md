@@ -23,13 +23,12 @@ A one-line index of the same assets lives in
 ![Hero stress render](assets/showcase/hero.png)
 
 **`hero.png`** — `plate_hole` solved on the feature-graded mesher, shot from a
-low oblique angle across the whole plate (h = 6 mm, 4,629 nodes / 18,887
-elements, 13,887 DOF; min-x face fixed, traction on max-x, the CLI default BC
-set). von Mises on the surface with displacement warped ×200. The colour range
-is 0 – 1.24e7 Pa, clipped at the 99.5th percentile of the visible surface: the
-true peak nodal value is 3.6e13 Pa at the clamped face, which is a boundary
-condition singularity rather than a physical stress, so an unclipped range would
-show one hot node and a uniformly blue part. Exact values per image live in
+low oblique angle across the whole plate (h = 6 mm, 9,568 nodes / 44,316
+elements, 28,704 DOF; min-x face fixed, conserved +x resultant on max-x).
+von Mises is shown on the surface with displacement warped ×5000. The colour
+range is 0 – 3.08e6 Pa, clipped at the 99.9th percentile of the visible
+surface; the true peak nodal value is 5.16e6 Pa at the clamped-face stress
+singularity. Exact values per image live in
 [`manifest.json`](assets/showcase/manifest.json).
 
 ```sh
@@ -54,7 +53,7 @@ solve` invocation per part is in the manifest too.
 
 Flat plate with a central hole — the canonical stress-riser benchmark geometry.
 Feature-aware grading concentrates elements around the hole where the gradient
-lives. h = 6 mm, 4,629 nodes / 18,887 elements, 13,887 DOF.
+lives. h = 6 mm, 9,568 nodes / 44,316 elements, 28,704 DOF.
 
 ```sh
 python3 scripts/render_showcase.py --only plate_hole
@@ -102,10 +101,10 @@ python3 scripts/render_showcase.py --only sphere
 
 ![icecream_cone](assets/showcase/gallery_icecream_cone.png)
 
-Mixed curvature plus a sharp apex in one part: a smooth dome blended into a
-converging cone, so a single sizing field has to handle both a curvature-driven
-and a feature-driven length scale. h = 10 mm, 5,410 nodes / 25,255 elements,
-16,230 DOF.
+One watertight 3D Boolean solid: a round truncated cone fused into an
+overlapping spherical scoop. The committed STEP is reloaded through
+OpenCASCADE, meshed at h = 10 mm, and solved with a conserved downward
+resultant on the scoop: 3,280 nodes / 15,411 elements, 9,840 DOF.
 
 ```sh
 python3 scripts/render_showcase.py --only icecream_cone
@@ -116,14 +115,36 @@ python3 scripts/render_showcase.py --only icecream_cone
 ![Mesher comparison](assets/showcase/compare_meshers.png)
 
 **`compare_meshers.png`** — the same plate at h = 6 mm through three meshers:
-`tet` (1,884 nodes / 6,840 cells), `graded` (4,629 / 18,887) and `hybrid`
-(21,100 / 54,720), the default element zoo. Labels and counts are burned into
+`tet` (1,884 nodes / 6,840 cells), `graded` (9,568 / 44,316) and `hybrid`
+(11,980 / 9,120), the default element zoo. Labels and counts are burned into
 the tiles. All three are Cartesian grid-fill topologies, not Delaunay
 ([ADR-0015](decisions/0015-grid-fill-limits.md)). This is the visual form of the
 `--mesher` dial documented in the [README CLI section](../README.md#cli); the
 element menu and transition strategy are described in
 [docs/solver-core.md](solver-core.md) and
 [ADR-0012](decisions/0012-hybrid-graded-tet.md).
+
+The committed h = 6 mm fidelity matrix also measures `graded`, `hybrid`, and
+`varyhedron` against the **live** plate-hole BRep. Mesh→BRep distances use exact
+trimmed projection; BRep→mesh uses 10,000 deterministic exact trimmed-face
+samples under a hard attempt/storage ceiling; sharp mesh edges are classified
+independently by a ≥30° boundary dihedral. These are sampled directional
+distributions, not a Hausdorff-distance claim.
+
+| Mesher | mesh→BRep p99 / h | BRep→mesh p99 / h | sharp BRep edge→mesh p99 / h | normal p99 |
+|---|---:|---:|---:|---:|
+| graded | 0.0175 | 0.00392 | 0.322 | 20.9° |
+| hybrid | 0.00999 | 0.0201 | 0.311 | 4.67° |
+| varyhedron | 0.0174 | 0.00361 | 0.322 | 20.9° |
+
+Source and executable provenance:
+[`mesher-fidelity-plate-hole-current.json`](../bench/results/mesher-fidelity-plate-hole-current.json).
+
+The separate faceted round-trip evaluator closes and orients the exported skin,
+sews 10,976 planar faces into one BRepCheck-valid solid, and measures exact
+point-to-shape distances in both directions. Its exact trimmed-face reverse
+sample has p99 = 0.118 h under a 500-point / 2,000-attempt ceiling:
+[`brep-roundtrip-plate-hole-current.json`](../bench/results/brep-roundtrip-plate-hole-current.json).
 
 ```sh
 python3 scripts/render_showcase.py --only compare_meshers
@@ -133,13 +154,14 @@ python3 scripts/render_showcase.py --only compare_meshers
 
 ![Grading comparison](assets/showcase/compare_grading.png)
 
-**`compare_grading.png`** — uniform (`--no-feature`) versus feature-graded
-sizing on the same part and mesher, with `h` tuned so the two legs land on a
-**matched element budget**: 18,912 vs 18,944 cells, 0.2% apart (12,426 vs 13,719
-DOF — the grid quantizes too hard to hit equal DOF exactly, so the honest
-control is element count; both figures are printed in the tile footers and the
-manifest). The comparison is therefore about *where* the elements went, not how
-many there are. Same principle as the Kirsch equal-DOF result, which had the
+**`compare_grading.png`** — uniform (`--no-feature`, h = 3.8 mm) versus
+feature-graded sizing (h = 5.6 mm) on the same part and mesher, with `h` tuned
+so the two legs land on a **matched element budget**: 43,360 vs 45,308 cells,
+4.5% apart (26,988 vs 29,055 DOF — the grid quantizes too hard to hit equal DOF
+exactly, so the honest control is element count; both figures are printed in
+the tile footers and the manifest). The comparison is therefore about *where*
+the elements went, not how many there are. Same principle as the Kirsch
+equal-DOF result, which had the
 finer control of a structured annular mesh: at an identical 648 free DOFs,
 logarithmic radial grading cut SCF error from **3.06%** to **0.70%**
 ([docs/progress.md](progress.md)).
@@ -264,7 +286,7 @@ POLYMESH_GUI_SHOT=$PWD/docs/assets/showcase/gui_studio.png \
   file. Nothing is synthesized, retouched, or drawn by hand. The stress colormap
   is the solver's own `fea_colormap` (blue → cyan → green → yellow → red) so
   colours mean the same thing in the GUI, the CLI output, and these images.
-  Displacement is warped by a stated factor (×200 to ×2000) so deflection is
+  Displacement is warped by a stated factor (×200 to ×5000) so deflection is
   visible, and the colour range is clipped at a stated percentile of the visible
   surface. Both the percentile and the true unclipped peak nodal value are in
   every caption: clamped faces are stress singularities under point-fixed

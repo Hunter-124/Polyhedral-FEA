@@ -25,25 +25,27 @@ Boxes **fail** when:
 | Failure mode | Example |
 |--------------|---------|
 | Curved / non-planar load region | Sphere polar cap (mesh faces, not one CAD face) — **mitigated** with continuum \(A_{\mathrm{cap}}\) + `normal_min_dot` |
-| Multi-face or boolean topology | Icecream scoop ∪ pyramid lateral faces — **still open** |
+| Multi-face or boolean topology | Ice-cream scoop ∪ round-cone support surfaces — **still open** |
 | Geometry sweeps / parametric family | Face index or bounding box drifts with parameter |
 | BC-adjacent stress metrics | Need the true loaded CAD face, not “whatever fell in the box” |
 
-### Measured icecream instability (why face tags)
+### Historical icecream instability (superseded fixture; why face tags)
 
-Partial-face box `z ≥ 0.10` on `icecream_cone` (no `expected_area`), hybrid vs
-varyhedron at two tiers (2026-07-13 probe):
+The 2026-07-13 probe below used the superseded pyramid/sphere fixture and its
+partial-face box `z ≥ 0.10`. Keep it as historical evidence for the face-tag
+requirement, not as a baseline for the current round-cone/scoop STEP:
 
-| tier / mesher | `load_face_area` (m²) |
-|---------------|------------------------|
-| t0 hybrid | ~0.00348 |
-| t0 varyhedron | ~0.00376 |
-| t1 hybrid | ~0.00303 |
-| t1 varyhedron | ~0.00341 |
+| mesher | tier | selected load area (m²) |
+|---|---:|---:|
+| hybrid | 0 | 0.00376 |
+| hybrid | 1 | 0.00303 |
+| varyhedron | 0 | 0.00361 |
+| varyhedron | 1 | 0.00319 |
 
-Swing ≈ **15–20%** — any single frozen `expected_area` false-fails honest
-meshes. OCC topology has 5 faces (3 pyramid laterals + base + scoop sphere
-≈ 0.019 m²); the load is a **partial** scoop/apex patch, not a whole CAD face.
+The 15–20% swing demonstrated that a single box-derived `expected_area` can
+false-fail honest meshes. The current fused round-cone/scoop geometry likewise
+loads only a partial curved scoop cap, not a whole CAD face, so it remains
+research-gated until mesh boundary faces retain stable CAD-face ownership.
 
 Q7: keep boxes for planar + sphere-cap fixtures **with** `expected_area`;
 invest **~2–3 days** in face tags before icecream/curved multi-face loads,

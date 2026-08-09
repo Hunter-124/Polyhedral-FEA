@@ -12,6 +12,7 @@
 #include "geom/features.hpp"
 #include "geom/tri_surface.hpp"
 #include "mesh/tet_fill.hpp"
+#include "mesh/surface_project.hpp"
 
 #include <Eigen/Core>
 
@@ -44,6 +45,7 @@ GradedTetFillOutput graded_tet_fill_surface(
     const Eigen::Vector3d& bbox_max, double h, int skin_layers = 2,
     std::span<const geom::SharpEdge> features = {}, double feature_band = 0.0,
     std::span<const Eigen::Vector3d> refine_seeds = {}, double seed_band = 0.0,
-    double curvature_turn_deg = 0.0);
+    double curvature_turn_deg = 0.0,
+    BoundaryProjectionContext* projection = nullptr);
 
 } // namespace polymesh::mesh

@@ -171,6 +171,8 @@ class Part:
     margin: float = 1.12
     fix_box: tuple[float, ...] | None = None
     load_box: tuple[float, ...] | None = None
+    load_dir: tuple[float, float, float] = (0.0, 1.0, 0.0)
+    force_n: float = 1000.0
     # Target peak displacement as a fraction of the bbox diagonal. Kept small:
     # warping a 10 mm-thick plate by 18 mm to "show" bending shears the hole
     # rim into something the solve never predicted.
@@ -179,9 +181,9 @@ class Part:
     clip_pct: float | None = None
 
 
-# fix/load boxes come from the *.case.json BC contracts in tests/fixtures/parts.
-# plate_hole/cantilever use the CLI default selection (fix min-x face, traction
-# on the max-x face), which matches their contract's fixed face.
+# Selection boxes and load directions follow the *.case.json contracts. The
+# renderer uses an explicit conserved resultant so every gallery command is
+# independent of surface-facet count.
 PARTS: list[Part] = [
     Part(
         name="plate_hole",
@@ -197,7 +199,8 @@ PARTS: list[Part] = [
         # horizontal on screen instead of rolling off-axis.
         up=(0.0, 1.00, 0.60),
         margin=1.03,
-        bc_note="min-x face fixed, traction on max-x face (CLI default BC set)",
+        bc_note="min-x face fixed, +x resultant on max-x face",
+        load_dir=(1.0, 0.0, 0.0),
     ),
     Part(
         name="cantilever",
@@ -213,7 +216,8 @@ PARTS: list[Part] = [
         # A cantilever's story is its tip deflection, so it gets a larger warp
         # target than the plate; x200 on a 1 m beam is ~36 mm of droop.
         warp_frac=0.05,
-        bc_note="root face (x < 1e-3 m) fixed, tip face loaded",
+        bc_note="root face fixed, -z resultant on tip face",
+        load_dir=(0.0, 0.0, -1.0),
     ),
     Part(
         name="cylinder",
@@ -228,7 +232,9 @@ PARTS: list[Part] = [
         margin=1.04,
         fix_box=(-1, -1, -1, 1, 1, 0.015),
         load_box=(-1, -1, 0.195, 1, 1, 1),
-        bc_note="base z < 0.015 m fixed, cap z > 0.195 m loaded",
+        bc_note="base z < 0.015 m fixed, +z resultant on cap",
+        load_dir=(0.0, 0.0, 1.0),
+        force_n=7853.981633974483,
     ),
     Part(
         name="sphere",
@@ -243,22 +249,25 @@ PARTS: list[Part] = [
         margin=1.06,
         fix_box=(-1, -1, -1, 1, 1, -0.04),
         load_box=(-1, -1, 0.04, 1, 1, 1),
-        bc_note="cap z < -0.04 m fixed, cap z > 0.04 m loaded",
+        bc_note="lower cap fixed, -z resultant on upper cap",
+        load_dir=(0.0, 0.0, -1.0),
+        force_n=3141.592653589793,
     ),
     Part(
         name="icecream_cone",
-        title="Cone and ball",
+        title="Round ice-cream cone",
         step="icecream_cone.step",
         mesher="graded",
         h=0.010,
         E=2.0e11,
         nu=0.3,
-        view=(1.00, -1.00, 0.30),
+        view=(1.00, -1.00, 0.55),
         up=(0.0, 0.0, 1.0),
         margin=1.05,
-        fix_box=(-1, -1, -1, 1, 1, 0.02),
-        load_box=(-1, -1, 0.10, 1, 1, 1),
-        bc_note="base z < 0.02 m fixed, ball z > 0.10 m loaded",
+        fix_box=(-1, -1, -1, 1, 1, 0.012),
+        load_box=(-1, -1, 0.120, 1, 1, 1),
+        bc_note="foot z <= 0.012 m fixed, -z resultant on scoop",
+        load_dir=(0.0, 0.0, -1.0),
     ),
 ]
 
@@ -325,7 +334,7 @@ GRADE_VIEW = (0.15, -0.35, 1.00)
 GRADE_UP = (0.0, 1.00, 0.35)
 GRADING_TILES = [
     MeshTile("grade_uniform", "uniform sizing field  (--no-feature)", "plate_hole",
-             "graded", 0.0051, no_feature=True, size=(GRADE_W, GRADE_H),
+             "graded", 0.0038, no_feature=True, size=(GRADE_W, GRADE_H),
              view=GRADE_VIEW, up=GRADE_UP, focus=GRADE_FOCUS, window=GRADE_WINDOW),
     MeshTile("grade_feature", "feature-graded sizing field", "plate_hole",
              "graded", 0.0056, size=(GRADE_W, GRADE_H),
@@ -379,6 +388,12 @@ def solve_argv(part: Part, out: Path) -> list[str]:
         argv += ["--fix-box", *[f"{v:g}" for v in part.fix_box]]
     if part.load_box:
         argv += ["--load-box", *[f"{v:g}" for v in part.load_box]]
+    argv += [
+        "--load-dir",
+        *[f"{v:g}" for v in part.load_dir],
+        "--force",
+        f"{part.force_n:g}",
+    ]
     return argv
 
 

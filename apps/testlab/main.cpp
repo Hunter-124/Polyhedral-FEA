@@ -244,8 +244,10 @@ Box3 parse_box(const json& j) {
         throw std::runtime_error("box must be [[xmin,ymin,zmin],[xmax,ymax,zmax]]");
     }
     Box3 b;
-    b.lo = Eigen::Vector3d(j[0][0].get<double>(), j[0][1].get<double>(), j[0][2].get<double>());
-    b.hi = Eigen::Vector3d(j[1][0].get<double>(), j[1][1].get<double>(), j[1][2].get<double>());
+    b.lo =
+        Eigen::Vector3d(j[0][0].get<double>(), j[0][1].get<double>(), j[0][2].get<double>());
+    b.hi =
+        Eigen::Vector3d(j[1][0].get<double>(), j[1][1].get<double>(), j[1][2].get<double>());
     return b;
 }
 
@@ -307,8 +309,8 @@ double run_wall_limit_s(const Campaign& camp, int tier) {
 /// Thrown from solve progress (or after mesh) when max_run_wall_s is exceeded.
 struct WallClockBudgetExceeded : std::runtime_error {
     explicit WallClockBudgetExceeded(double elapsed_s)
-        : std::runtime_error("wall-clock budget exceeded (" +
-                             std::to_string(elapsed_s) + " s)"),
+        : std::runtime_error("wall-clock budget exceeded (" + std::to_string(elapsed_s) +
+                             " s)"),
           elapsed_s(elapsed_s) {}
     double elapsed_s = 0.0;
 };
@@ -361,7 +363,7 @@ PartCase load_case(const fs::path& path) {
             bc.box = parse_box(b.at("select").at("box"));
             if (b.contains("fix") && b["fix"].is_array() && b["fix"].size() == 3) {
                 bc.fix = {b["fix"][0].get<bool>(), b["fix"][1].get<bool>(),
-                           b["fix"][2].get<bool>()};
+                          b["fix"][2].get<bool>()};
             }
             c.bcs.push_back(bc);
         }
@@ -376,7 +378,8 @@ PartCase load_case(const fs::path& path) {
             if (L["select"].contains("normal_min_dot")) {
                 ls.normal_min_dot = L["select"]["normal_min_dot"].get<double>();
             }
-            if (L.contains("traction") && L["traction"].is_array() && L["traction"].size() == 3) {
+            if (L.contains("traction") && L["traction"].is_array() &&
+                L["traction"].size() == 3) {
                 ls.traction = Eigen::Vector3d(L["traction"][0].get<double>(),
                                               L["traction"][1].get<double>(),
                                               L["traction"][2].get<double>());
@@ -541,8 +544,8 @@ void write_checkpoint(const fs::path& path, const Checkpoint& cp) {
 
 void write_progress(const fs::path& path, const std::string& phase, double phase_frac,
                     double elapsed_ms, const std::string& cfg_id, const std::string& part,
-                    int tier, int cg_iter = -1, double cg_resid = -1.0, std::size_t n_elems = 0,
-                    std::size_t n_nodes = 0) {
+                    int tier, int cg_iter = -1, double cg_resid = -1.0,
+                    std::size_t n_elems = 0, std::size_t n_nodes = 0) {
     json j;
     j["phase"] = phase;
     j["phase_frac"] = phase_frac;
@@ -613,7 +616,8 @@ class ProgressHeartbeat {
                                 .count();
             const int cg = cg_iter_.load(std::memory_order_relaxed);
             write_progress(path_, phase, phase_frac_.load(std::memory_order_relaxed), ms,
-                           cfg_id_, part_, tier_, cg, cg_resid_.load(std::memory_order_relaxed),
+                           cfg_id_, part_, tier_, cg,
+                           cg_resid_.load(std::memory_order_relaxed),
                            n_elems_.load(std::memory_order_relaxed),
                            n_nodes_.load(std::memory_order_relaxed));
         } catch (...) {
@@ -800,9 +804,9 @@ Eigen::Vector3d face_unit_normal(const fea::NodalMesh& mesh, const fea::SurfaceF
 /// is nonzero. Falls back to box-only if the normal filter empties the set.
 double surface_face_area(const fea::NodalMesh& mesh, const fea::SurfaceFace& f);
 
-std::vector<fea::SurfaceFace> select_load_faces(
-    const fea::NodalMesh& mesh, const Box3& box, const Eigen::Vector3d& traction,
-    double normal_min_dot, std::optional<double> expected_area = std::nullopt) {
+std::vector<fea::SurfaceFace>
+select_load_faces(const fea::NodalMesh& mesh, const Box3& box, const Eigen::Vector3d& traction,
+                  double normal_min_dot, std::optional<double> expected_area = std::nullopt) {
     const auto all_faces = free_faces_as_surface(mesh);
     std::vector<fea::SurfaceFace> in_box;
     in_box.reserve(all_faces.size());
@@ -895,8 +899,8 @@ Eigen::VectorXd make_loads(const fea::NodalMesh& mesh, const std::vector<LoadSpe
     Eigen::VectorXd f =
         Eigen::VectorXd::Zero(3 * static_cast<Eigen::Index>(mesh.nodes.size()));
     for (const auto& L : loads) {
-        std::vector<fea::SurfaceFace> selected = select_load_faces(
-            mesh, L.box, L.traction, L.normal_min_dot, L.expected_area);
+        std::vector<fea::SurfaceFace> selected =
+            select_load_faces(mesh, L.box, L.traction, L.normal_min_dot, L.expected_area);
         if (selected.empty()) {
             // Fallback: distribute total force F = traction * bbox_area_proxy onto
             // nodes in the box (node-lump). Area proxy is not exact; prefer faces.
@@ -918,8 +922,8 @@ Eigen::VectorXd make_loads(const fea::NodalMesh& mesh, const std::vector<LoadSpe
             }
             const Eigen::Vector3d ext = (hi - lo).cwiseMax(1e-30);
             // Smallest extent is the face normal direction; area ≈ product of other two.
-            const double area = ext[0] * ext[1] * ext[2] /
-                                std::max({ext[0], ext[1], ext[2], 1e-30});
+            const double area =
+                ext[0] * ext[1] * ext[2] / std::max({ext[0], ext[1], ext[2], 1e-30});
             const Eigen::Vector3d total = L.traction * area;
             const Eigen::Vector3d per = total / static_cast<double>(nodes.size());
             for (auto n : nodes) {
@@ -982,8 +986,8 @@ int count_orphan_nodes(const fea::NodalMesh& mesh) {
 std::vector<std::uint32_t> nodes_on_load_faces(const fea::NodalMesh& mesh,
                                                const LoadSpec& load,
                                                int* n_faces_out = nullptr) {
-    const auto faces = select_load_faces(mesh, load.box, load.traction,
-                                         load.normal_min_dot, load.expected_area);
+    const auto faces = select_load_faces(mesh, load.box, load.traction, load.normal_min_dot,
+                                         load.expected_area);
     std::set<std::uint32_t> unique;
     for (const auto& face : faces) {
         for (const auto ni : face.nodes) {
@@ -1032,8 +1036,7 @@ void compute_solve_health(const fea::NodalMesh& mesh, const fea::Material& mat,
     constexpr double kEps = 1e-30;
     a.free_residual_rel = std::sqrt(free_r2) / std::max(std::sqrt(f2), kEps);
     // Equilibrium: sum(F_applied on free) + sum(reactions on constrained) ≈ 0.
-    a.reaction_sum_err =
-        (F_sum + R_sum).norm() / std::max(F_sum.norm(), kEps);
+    a.reaction_sum_err = (F_sum + R_sum).norm() / std::max(F_sum.norm(), kEps);
     a.n_bc_dofs = static_cast<int>(bc.dof_values.size());
 }
 
@@ -1062,10 +1065,9 @@ double surface_face_area(const fea::NodalMesh& mesh, const fea::SurfaceFace& f) 
 constexpr double kStressQualityFloor = 0.02;
 
 ProbeAnswers compute_probes(const fea::NodalMesh& mesh, const fea::Material& mat,
-                            const Eigen::VectorXd& u,
-                            const std::vector<LoadSpec>& loads,
-                            const std::vector<MetricSpec>& metrics,
-                            const fea::Dirichlet& bc, const Eigen::VectorXd& f) {
+                            const Eigen::VectorXd& u, const std::vector<LoadSpec>& loads,
+                            const std::vector<MetricSpec>& metrics, const fea::Dirichlet& bc,
+                            const Eigen::VectorXd& f) {
     ProbeAnswers a;
     a.n_orphan_nodes = count_orphan_nodes(mesh);
     a.tip_deflection_max = tlab::global_max_displacement_mag(u, mesh.nodes.size());
@@ -1090,9 +1092,9 @@ ProbeAnswers compute_probes(const fea::NodalMesh& mesh, const fea::Material& mat
     }
     if (!vm_quality.empty()) {
         std::sort(vm_quality.begin(), vm_quality.end());
-        const std::size_t idx =
-            std::min(vm_quality.size() - 1,
-                     static_cast<std::size_t>(0.99 * static_cast<double>(vm_quality.size() - 1)));
+        const std::size_t idx = std::min(
+            vm_quality.size() - 1,
+            static_cast<std::size_t>(0.99 * static_cast<double>(vm_quality.size() - 1)));
         a.sigma_p99 = vm_quality[idx];
     }
 
@@ -1161,8 +1163,8 @@ ProbeAnswers compute_probes(const fea::NodalMesh& mesh, const fea::Material& mat
         a.n_load_faces = n_faces;
         // Selected face area for Q7 guard (same filter as traction application).
         double area = 0.0;
-        for (const auto& face : select_load_faces(mesh, L0.box, L0.traction,
-                                                  L0.normal_min_dot, L0.expected_area)) {
+        for (const auto& face : select_load_faces(mesh, L0.box, L0.traction, L0.normal_min_dot,
+                                                  L0.expected_area)) {
             area += surface_face_area(mesh, face);
         }
         a.load_face_area = area;
@@ -1298,8 +1300,8 @@ json compute_scorecard_geom(const pipeline::Model& model, const fea::NodalMesh& 
                     segs.push_back(geom::MeshEdgeSegment{pa, pb});
                 }
                 if (!samples.empty()) {
-                    const double hd =
-                        geom::edge_profile_hausdorff_filtered(topo, samples, /*sharp_only=*/true);
+                    const double hd = geom::edge_profile_hausdorff_filtered(
+                        topo, samples, /*sharp_only=*/true);
                     edge_hd = hd / std::max(h, 1e-15);
                 }
                 if (!segs.empty()) {
@@ -1406,9 +1408,7 @@ json geom_class_of(const pipeline::Model& model, double h_ref) {
     const bool thin = (h_ref > 0.0) && (min_ext < 2.5 * h_ref);
     const double min_feature_h = (h_ref > 0.0) ? (min_ext / h_ref) : 0.0;
     (void)max_ext;
-    return {{"curved_frac", curved_frac},
-            {"thin", thin},
-            {"min_feature_h", min_feature_h}};
+    return {{"curved_frac", curved_frac}, {"thin", thin}, {"min_feature_h", min_feature_h}};
 }
 
 /// M11: flag sharp CAD edges that want h_edge = L/3 below tier h_min, and count
@@ -1464,9 +1464,8 @@ json quality_of(const pipeline::Model& model, const fea::NodalMesh& mesh, double
         }
     }
     const auto* tet_ptr = tets.empty() ? nullptr : &tets;
-    const auto m =
-        mesh::evaluate_curved_mesh_quality(model.surface, mesh.nodes, faces, h, -1.0, -1.0,
-                                           nullptr, tet_ptr);
+    const auto m = mesh::evaluate_curved_mesh_quality(model.surface, mesh.nodes, faces, h,
+                                                      -1.0, -1.0, nullptr, tet_ptr);
     return {{"M1max", m.m1_max},
             {"M2max", m.m2_max},
             {"M6", m.m6_min_boundary_aspect},
@@ -1476,7 +1475,7 @@ json quality_of(const pipeline::Model& model, const fea::NodalMesh& mesh, double
 // ── single run ──────────────────────────────────────────────────────────────
 
 struct RunOutcome {
-    json line; // results.jsonl object
+    json line;                   // results.jsonl object
     double accuracy_score = 0.0; // 0..1 mean over metrics
     double mesh_ms = 0.0;
     double solve_ms = 0.0;
@@ -1501,8 +1500,7 @@ void write_warehouse_run(const fs::path& run_dir, const json& line,
 
 RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_scale,
                    const fs::path& progress_path, const fs::path& mesh_preview_path,
-                   const fs::path& warehouse_run_dir = {},
-                   double max_run_wall_s = 900.0) {
+                   const fs::path& warehouse_run_dir = {}, double max_run_wall_s = 900.0) {
     using clock = std::chrono::steady_clock;
     const auto t_all0 = clock::now();
     const auto wall_elapsed_s = [&]() -> double {
@@ -1579,14 +1577,19 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
             for (const auto& b : part.bcs) {
                 regions.push_back({b.box.lo, b.box.hi, 0.5});
             }
-            const auto plan = pipeline::build_refinement_plan(model, h, regions,
-                                                              cfg.feature_refine);
+            const auto plan =
+                pipeline::build_refinement_plan(model, h, regions, cfg.feature_refine);
             refine_seeds = plan.refine_seeds;
             refine_band = plan.seed_band;
         }
-        auto vol = pipeline::volume_mesh(model, h, cfg.mesher, /*skin_layers=*/2,
-                                         cfg.feature_refine, refine_seeds, refine_band,
-                                         cfg.element_tendency);
+        auto vol =
+            pipeline::volume_mesh(model, h, cfg.mesher, /*skin_layers=*/2, cfg.feature_refine,
+                                  refine_seeds, refine_band, cfg.element_tendency);
+        const std::string combined_mesher_note =
+            tlab::combine_mesher_notes(resolved.note, vol.mesher_note);
+        if (!combined_mesher_note.empty()) {
+            out.line["mesher_note"] = combined_mesher_note;
+        }
         // Validity is mandatory before any solve (anti-cheat / engineering rule).
         vol.mesh.check_validity();
         if (cfg.order >= 2) {
@@ -1594,8 +1597,7 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
             vol.mesh.check_validity();
         }
         const auto t_mesh1 = clock::now();
-        out.mesh_ms =
-            std::chrono::duration<double, std::milli>(t_mesh1 - t_mesh0).count();
+        out.mesh_ms = std::chrono::duration<double, std::milli>(t_mesh1 - t_mesh0).count();
 
         out.line["n_elems"] = vol.mesh.elements.size();
         out.line["n_nodes"] = vol.mesh.nodes.size();
@@ -1635,14 +1637,13 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
             out.line["status"] = "over_budget";
             // N_pred OK but N_actual high → mesher (recovery/protect cascades).
             out.line["over_budget_cause"] =
-                (n_pred > 0.0 &&
-                 static_cast<double>(vol.mesh.elements.size()) > 3.0 * n_pred)
+                (n_pred > 0.0 && static_cast<double>(vol.mesh.elements.size()) > 3.0 * n_pred)
                     ? "mesher"
                     : "budget";
-            out.line["error"] = "mesh exceeds campaign DOF/elem budget (" +
-                                std::to_string(n_dof) + " dof, " +
-                                std::to_string(vol.mesh.elements.size()) + " elems, N_pred=" +
-                                std::to_string(static_cast<long long>(n_pred)) + ")";
+            out.line["error"] =
+                "mesh exceeds campaign DOF/elem budget (" + std::to_string(n_dof) + " dof, " +
+                std::to_string(vol.mesh.elements.size()) +
+                " elems, N_pred=" + std::to_string(static_cast<long long>(n_pred)) + ")";
             out.line["mesh_ms"] = out.mesh_ms;
             out.line["solve_ms"] = 0.0;
             out.accuracy_score = 0.0;
@@ -1694,8 +1695,7 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         };
         const Eigen::VectorXd u = fea::solve_elastostatics(vol.mesh, mat, bc, loads, sopt);
         const auto t_solve1 = clock::now();
-        out.solve_ms =
-            std::chrono::duration<double, std::milli>(t_solve1 - t_solve0).count();
+        out.solve_ms = std::chrono::duration<double, std::milli>(t_solve1 - t_solve0).count();
 
         beat.set_phase("recover", 0.5);
 
@@ -1717,10 +1717,9 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         // Health gates: residual / reaction / orphans / optional load-area guard.
         constexpr double kFreeResidTolDirect = 1e-6;
         constexpr double kReactionSumTol = 0.05;
-        const bool health_ok =
-            (ans.n_orphan_nodes == 0) &&
-            (ans.free_residual_rel <= kFreeResidTolDirect) &&
-            (ans.reaction_sum_err <= kReactionSumTol) && ans.load_area_ok;
+        const bool health_ok = (ans.n_orphan_nodes == 0) &&
+                               (ans.free_residual_rel <= kFreeResidTolDirect) &&
+                               (ans.reaction_sum_err <= kReactionSumTol) && ans.load_area_ok;
         out.line["health"] = {{"free_residual_rel", ans.free_residual_rel},
                               {"reaction_sum_err", ans.reaction_sum_err},
                               {"n_orphans", ans.n_orphan_nodes},
@@ -1738,9 +1737,9 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         for (const auto& m : part.metrics) {
             const double measured = evaluate_probe(m.probe, ans);
             const double truth = m.value;
-            const double rel =
-                (std::abs(truth) > 0.0) ? std::abs(measured - truth) / std::abs(truth)
-                                        : std::abs(measured);
+            const double rel = (std::abs(truth) > 0.0)
+                                   ? std::abs(measured - truth) / std::abs(truth)
+                                   : std::abs(measured);
             const double tol = (m.tol > 0.0) ? m.tol : 1e-12;
             const double s = health_ok ? (1.0 / (1.0 + rel / tol)) : 0.0;
             acc_sum += s;
@@ -1821,10 +1820,10 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
     } catch (const std::exception& e) {
         // Mesh / I/O / validity failures.
         const std::string msg = e.what();
-        out.line["status"] =
-            (msg.find("mesh") != std::string::npos || msg.find("validity") != std::string::npos)
-                ? "mesh_fail"
-                : "solve_fail";
+        out.line["status"] = (msg.find("mesh") != std::string::npos ||
+                              msg.find("validity") != std::string::npos)
+                                 ? "mesh_fail"
+                                 : "solve_fail";
         out.line["error"] = msg;
         out.line["mesh_ms"] = out.mesh_ms;
         out.line["solve_ms"] = out.solve_ms;
@@ -1922,14 +1921,15 @@ std::map<std::string, double> scores_from_results(const fs::path& results_path,
 std::vector<std::string> trim_survivors(std::vector<std::string> candidates,
                                         const std::map<std::string, double>& scores,
                                         double keep_frac) {
-    std::sort(candidates.begin(), candidates.end(), [&](const std::string& a, const std::string& b) {
-        const double sa = scores.count(a) ? scores.at(a) : 0.0;
-        const double sb = scores.count(b) ? scores.at(b) : 0.0;
-        if (sa != sb) {
-            return sa > sb;
-        }
-        return a < b;
-    });
+    std::sort(candidates.begin(), candidates.end(),
+              [&](const std::string& a, const std::string& b) {
+                  const double sa = scores.count(a) ? scores.at(a) : 0.0;
+                  const double sb = scores.count(b) ? scores.at(b) : 0.0;
+                  if (sa != sb) {
+                      return sa > sb;
+                  }
+                  return a < b;
+              });
     auto n_keep = static_cast<std::size_t>(
         std::ceil(keep_frac * static_cast<double>(candidates.size())));
     if (n_keep < 1 && !candidates.empty()) {
@@ -1943,16 +1943,15 @@ std::vector<std::string> trim_survivors(std::vector<std::string> candidates,
 }
 
 int usage() {
-    std::fputs(
-        "usage: polymesh_testlab run|resume|pause-status <campaign_dir>\n"
-        "\n"
-        "  run           start (or restart) a campaign from campaign.json\n"
-        "  resume        continue from checkpoint.json after pause / SIGINT\n"
-        "  pause-status  print checkpoint state (running|paused|finished)\n"
-        "\n"
-        "Schemas: docs/dag/interfaces.md. Run from the repo root so case and\n"
-        "bench/reference paths resolve. SIGINT after a run finishes → paused.\n",
-        stderr);
+    std::fputs("usage: polymesh_testlab run|resume|pause-status <campaign_dir>\n"
+               "\n"
+               "  run           start (or restart) a campaign from campaign.json\n"
+               "  resume        continue from checkpoint.json after pause / SIGINT\n"
+               "  pause-status  print checkpoint state (running|paused|finished)\n"
+               "\n"
+               "Schemas: docs/dag/interfaces.md. Run from the repo root so case and\n"
+               "bench/reference paths resolve. SIGINT after a run finishes → paused.\n",
+               stderr);
     return 2;
 }
 
@@ -2021,9 +2020,7 @@ int run_campaign(const fs::path& camp_dir, bool resume) {
         cp.state = "running";
     } else {
         // Fresh run: truncate results, seed survivors = all configs.
-        {
-            std::ofstream trunc(results_path, std::ios::trunc);
-        }
+        { std::ofstream trunc(results_path, std::ios::trunc); }
         cp.campaign = camp.name;
         cp.state = "running";
         cp.tier = 0;
@@ -2093,8 +2090,7 @@ int run_campaign(const fs::path& camp_dir, bool resume) {
             }
             const Config& cfg = by_id.at(cfg_id);
             for (const auto& part : parts) {
-                const std::string key =
-                    cfg_id + "|" + part.part + "|" + std::to_string(tier);
+                const std::string key = cfg_id + "|" + part.part + "|" + std::to_string(tier);
                 if (done.count(key)) {
                     continue; // resume skip
                 }
@@ -2112,17 +2108,16 @@ int run_campaign(const fs::path& camp_dir, bool resume) {
                     }
                 }
 
-                std::printf("  run %s part=%s tier=%d ...\n", cfg_id.c_str(), part.part.c_str(),
-                            tier);
+                std::printf("  run %s part=%s tier=%d ...\n", cfg_id.c_str(),
+                            part.part.c_str(), tier);
                 std::fflush(stdout);
                 fs::path wh_dir;
                 if (camp.warehouse) {
-                    wh_dir = camp_dir / "runs" / cfg_id / part.part /
-                             ("t" + std::to_string(tier));
+                    wh_dir =
+                        camp_dir / "runs" / cfg_id / part.part / ("t" + std::to_string(tier));
                 }
-                const RunOutcome ro =
-                    run_one(cfg, part, tier, ts.h_scale, progress_path, mesh_preview_path,
-                            wh_dir, run_limit);
+                const RunOutcome ro = run_one(cfg, part, tier, ts.h_scale, progress_path,
+                                              mesh_preview_path, wh_dir, run_limit);
                 results_app << ro.line.dump() << '\n';
                 results_app.flush();
                 done.insert(key);
@@ -2166,7 +2161,8 @@ int run_campaign(const fs::path& camp_dir, bool resume) {
         }
     }
     if (camp.on_finish_analyze) {
-        const int rc = std::system(("python3 scripts/analyze_campaign.py " + camp.name).c_str());
+        const int rc =
+            std::system(("python3 scripts/analyze_campaign.py " + camp.name).c_str());
         if (rc != 0) {
             std::fprintf(stderr, "on_finish analyze exited %d\n", rc);
         }

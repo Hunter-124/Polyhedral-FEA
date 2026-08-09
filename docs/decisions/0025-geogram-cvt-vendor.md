@@ -1,6 +1,6 @@
 # ADR-0025: Vendor Geogram hard parts for restricted CVT (dual hard-block)
 
-- Status: accepted (2026-07-13)
+- Status: accepted; G1–G4 implemented, `cvt_poly` remains experimental (2026-08-09)
 - Decision: D25
 - Related: ADR-0023 (strategy), ADR-0024 Q3/Q8 (normative answers), ADR-0002 (BSD-3)
 - Full study path: [docs/research/geogram-cvt-vendoring.md](../research/geogram-cvt-vendoring.md)
@@ -14,8 +14,9 @@ clean-room reimplementation is multi-week risk for a small team. Advisor
 answers (ADR-0024) freeze vendoring Geogram BSD-3 hard parts and hard-blocking
 median dual until clipped cells exist.
 
-G0 is **docs + LICENSE intent only**. Code vendoring is **G1** and still waits
-on **M10** (wall tangential project) after the **M9** baseline freeze.
+The original dependency gate was M9 baseline freeze → M10 owner-aware wall
+projection → G1–G4. Those nodes have landed. The clipped-RVD path is exposed as
+the opt-in `cvt_poly` mesher while its accuracy/efficiency gate remains active.
 
 ## Decision
 
@@ -43,8 +44,9 @@ the dualizer entirely. Clipped cells *are* the polyhedra.
 Layout and checklist live in the research note (normative for G1 PR):
 
 - **Study + vendor path:** [docs/research/geogram-cvt-vendoring.md](../research/geogram-cvt-vendoring.md)
-- **Placeholder:** `third_party/geogram/README.md` — **not vendored yet**; G1
-  after M10 only.
+- **Vendored subset:** `third_party/geogram/` contains the BSD-3 license,
+  pinned NOTICE, integration README, predicates, ConvexCell support, and the
+  Delaunay subset used by the experimental path.
 - G1 PR must copy upstream **LICENSE** (BSD-3), **NOTICE** (pin tag/commit/URL),
   and `README.polymesh.md` (included vs stripped modules). Project remains
   BSD-3-Clause (ADR-0002); no AGPL/GPL mesh kernels in the default core binary.
@@ -63,10 +65,21 @@ against the M9 freeze.
 
 ## Consequences
 
-- G0 (this ADR + placeholder tree) may land early; **G1 code still deps M10**.
-- Product poly path waits for G4; dual remains blocked until then.
-- VEM headline claim stays gated on M5 (beat `hybrid_zoo` on frozen plate_hole +
-  cylinder).
+- Geogram hard parts are isolated behind the `mesh` facade; project code does
+  not spread vendor headers through the pipeline.
+- RVD clipping and welding use a domain-local frame. Canonical welded vertex-ID
+  topology pairs faces, while explicit tetra-face provenance distinguishes
+  domain skin from internal scaffold cuts. Invalid multiplicity, site
+  ownership, winding, unmatched bisectors/cuts, incomplete scaffold-volume
+  coverage, and disconnected single-cell shells are hard failures;
+  disconnected restricted regions become separate cells.
+- Simple planar source faces, consistently oriented closed shells, cross-cell
+  intersections/containment, positive volume, and post-projection domain-volume
+  preservation are checked fail-closed. Failed or implausibly sparse RVD
+  assembly never replaces the requested solid with its axis-aligned bounding
+  box.
+- VEM headline promotion remains gated on beating `hybrid_zoo` on frozen
+  plate-hole and cylinder evidence. `cvt_poly` is therefore still experimental.
 
 ## Alternatives rejected
 
@@ -77,7 +90,8 @@ against the M9 freeze.
 | Full Geogram blob / system package only | Non-reproducible; unused modules bloat |
 | GPL meshers (Gmsh, CGAL Mesh_3) in core | Forbidden — compare plugins only |
 
-## Status of G0
+## Implementation status
 
-**Done** when this ADR is committed and `third_party/geogram/README.md` states
-the not-yet-vendored placeholder. Implementation = G1+.
+G0–G4 are implemented. Promotion still requires reporting topology invariants,
+exact directional BRep/mesh fidelity metrics, load-area health, analytical
+error, DOF, and wall time together; a lower polyhedron count alone is not a win.

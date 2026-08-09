@@ -59,8 +59,14 @@ struct PolyMesh {
     /// topology. Throws ValidityError on the first violation.
     void check_validity() const;
 
-    /// Geometric validity (P2): manifold boundary edges appear once, interior
-    /// face pairs match, tet cells have positive volume. Throws ValidityError.
+    /// Triangulate every polygon incident to an exterior vertex while
+    /// preserving owner/neighbour identity. A later independent boundary
+    /// projection can then move those vertices without warping an n-gon.
+    void triangulate_boundary_incident_faces();
+
+    /// Geometric admission: simple planar faces, closed consistently oriented
+    /// cell shells, positive cell volume, non-intersecting faces, and a closed
+    /// manifold exterior. Throws ValidityError on the first violation.
     void check_geometry() const;
 };
 

@@ -10,9 +10,30 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace polymesh::testlab {
+
+/// Preserve both the sizing decision and the mesher's construction/admission
+/// evidence in the campaign result. Avoid duplicating a note when a caller has
+/// already prefixed one with the other.
+inline std::string combine_mesher_notes(const std::string& resolved_note,
+                                        const std::string& volume_note) {
+    if (resolved_note.empty()) {
+        return volume_note;
+    }
+    if (volume_note.empty()) {
+        return resolved_note;
+    }
+    if (volume_note.find(resolved_note) != std::string::npos) {
+        return volume_note;
+    }
+    if (resolved_note.find(volume_note) != std::string::npos) {
+        return resolved_note;
+    }
+    return resolved_note + " | " + volume_note;
+}
 
 /// Mean of |u| over unique node indices. Returns 0 if `nodes` is empty.
 inline double face_mean_displacement_mag(const Eigen::VectorXd& u,

@@ -140,6 +140,35 @@ distributions, not a Hausdorff-distance claim.
 Source and executable provenance:
 [`mesher-fidelity-plate-hole-current.json`](../bench/results/mesher-fidelity-plate-hole-current.json).
 
+The opt-in `cvt_poly` path has a separate, non-promotional RVD-tet audit; it is
+not included in `compare_meshers.png` and does not change the default mesher.
+At the same h = 6 mm, exact whole-n-gon ownership and scaffold-face coalescing
+keep 4,246 cells while reducing displacement vertices by 18.6%. Original-face,
+cross-cell, and volume admission rejected the full CAD projection target and
+restored the already surface-snapped scaffold coordinates.
+
+| RVD-tet audit | cells | nodes | mesh→BRep p99 / h | BRep→mesh p99 / h | normal p99 | one-run mesh time |
+|---|---:|---:|---:|---:|---:|---:|
+| base checkout | 4,246 | 85,104 | 0.833 | 0.00403 | 90.0° | 7.81 s |
+| admitted candidate | 4,246 | 69,279 | 0.0337 | 0.0202 | 15.6° | 16.54 s |
+
+The forward metric improves because false interior interfaces are no longer
+reported as free boundary. The reverse metric and admission-inclusive one-run
+mesh time worsen substantially, so this is not a blanket fidelity or speed win.
+The distributions are directional samples, not Hausdorff distances. At h =
+15 mm, solve-backed historical context also keeps the promotion gate closed:
+
+| Mesher / evidence source | plate-hole SCF error | DOF | solve time | health |
+|---|---:|---:|---:|---|
+| frozen M9 `hybrid_zoo` | 25.0% | 6,192 | 63.2 ms | ok |
+| frozen M9 `varyhedron` | 62.1% | 2,232 | 16.3 ms | ok |
+| current experimental `cvt_poly` | 38.3% | 24,111 | 5.19 s | ok |
+
+The M9 timings are historical context rather than a same-executable causal A/B.
+Commands, executable/source hashes, deterministic VTU hashes, exact directional
+metrics, topology counters, and solve records are committed in
+[`cvt-rvd-topology-current.json`](../bench/results/cvt-rvd-topology-current.json).
+
 The separate faceted round-trip evaluator closes and orients the exported skin,
 sews 10,976 planar faces into one BRepCheck-valid solid, and measures exact
 point-to-shape distances in both directions. Its exact trimmed-face reverse

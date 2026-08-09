@@ -10,6 +10,7 @@ add_executable(polymesh_tests
     test_material.cpp
     test_sizing_field.cpp
     test_graded_sizing.cpp
+    test_metric_field.cpp
     test_reference_case.cpp
     test_backend.cpp
     test_spmv.cpp
@@ -33,6 +34,7 @@ add_executable(polymesh_tests
     test_tet_fill.cpp
     test_local_refine.cpp
     test_features.cpp
+    test_case_features.cpp
     test_indicators.cpp
     test_zz.cpp
     test_vtu.cpp
@@ -47,6 +49,7 @@ add_executable(polymesh_tests
     test_prism.cpp
     test_prism_fill.cpp
     test_graded_fill.cpp
+    test_size_field_fill.cpp
     test_varyhedron_fill.cpp
     test_wall_project.cpp
     test_geogram_clip.cpp
@@ -62,6 +65,7 @@ add_executable(polymesh_tests
     test_mesh_budget.cpp
     test_octa_fill.cpp
     test_p_elevate.cpp
+    test_p_conformity.cpp
     test_traction_selection.cpp
     test_hp_driver.cpp
     test_d6_bench_smoke.cpp

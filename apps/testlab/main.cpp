@@ -223,6 +223,12 @@ struct Config {
     /// geometry features before the solve. OFF by default so frozen campaign
     /// baselines are unchanged; a campaign opts in via `"bc_grading": true`.
     bool bc_grading = false;
+    int skin_layers = 2;
+    int adapt_passes = 0;
+    double eta_target = 0.0;
+    bool p_elevate = false;
+    int adapt_leb_waves = 2;
+    std::optional<double> h_rel;
 };
 
 struct Checkpoint {
@@ -271,6 +277,19 @@ Campaign load_campaign(const fs::path& path) {
         throw std::runtime_error("campaign needs at least one tier");
     }
     c.grid = j.at("grid");
+    if (!c.grid.is_object()) {
+        throw std::runtime_error("grid must be an object");
+    }
+    static const std::set<std::string> kGridKeys{
+        "mesher",          "feature_refine", "order",          "element_tendency",
+        "bc_grading",      "curvature_turn_deg", "snap_boundary", "skin_layers",
+        "adapt_passes",    "eta_target",      "p_elevate",     "adapt_leb_waves",
+        "h_rel"};
+    for (auto it = c.grid.begin(); it != c.grid.end(); ++it) {
+        if (!kGridKeys.contains(it.key())) {
+            throw std::runtime_error("unknown grid key '" + it.key() + "'");
+        }
+    }
     if (j.contains("score") && j["score"].contains("weights")) {
         const auto& w = j["score"]["weights"];
         c.w_accuracy = w.value("accuracy", 0.5);
@@ -429,6 +448,34 @@ pipeline::VolumeMesher parse_mesher(const std::string& name) {
     throw std::runtime_error("unknown mesher '" + name + "'");
 }
 
+std::string mesher_name(pipeline::VolumeMesher mesher) {
+    switch (mesher) {
+    case pipeline::VolumeMesher::kTetFill:
+        return "tet";
+    case pipeline::VolumeMesher::kHexFill:
+        return "hex";
+    case pipeline::VolumeMesher::kHexVem:
+        return "hex_vem";
+    case pipeline::VolumeMesher::kGradedTet:
+        return "graded_tet";
+    case pipeline::VolumeMesher::kHexPyramid:
+        return "hexpyr";
+    case pipeline::VolumeMesher::kPrismSweep:
+        return "prism";
+    case pipeline::VolumeMesher::kHybrid:
+        return "hybrid_zoo";
+    case pipeline::VolumeMesher::kOctahedral:
+        return "octa";
+    case pipeline::VolumeMesher::kHybridVem:
+        return "hybrid_vem";
+    case pipeline::VolumeMesher::kVaryhedron:
+        return "varyhedron";
+    case pipeline::VolumeMesher::kCvtPoly:
+        return "cvt_poly";
+    }
+    return "unknown";
+}
+
 // Full-factorial expansion of campaign.grid → Config list.
 std::vector<Config> expand_grid(const json& grid) {
     // Collect keys and value lists.
@@ -480,6 +527,40 @@ std::vector<Config> expand_grid(const json& grid) {
         }
         if (values.contains("element_tendency")) {
             cfg.element_tendency = values["element_tendency"].get<double>();
+        }
+        if (values.contains("skin_layers")) {
+            cfg.skin_layers = values["skin_layers"].get<int>();
+            if (cfg.skin_layers < 1) {
+                throw std::runtime_error("grid.skin_layers values must be >= 1");
+            }
+        }
+        if (values.contains("adapt_passes")) {
+            cfg.adapt_passes = values["adapt_passes"].get<int>();
+            if (cfg.adapt_passes < 0) {
+                throw std::runtime_error("grid.adapt_passes values must be >= 0");
+            }
+        }
+        if (values.contains("eta_target")) {
+            cfg.eta_target = values["eta_target"].get<double>();
+            if (!(cfg.eta_target >= 0.0) || !std::isfinite(cfg.eta_target)) {
+                throw std::runtime_error("grid.eta_target values must be finite and >= 0");
+            }
+        }
+        if (values.contains("p_elevate")) {
+            cfg.p_elevate = values["p_elevate"].get<bool>();
+        }
+        if (values.contains("adapt_leb_waves")) {
+            cfg.adapt_leb_waves = values["adapt_leb_waves"].get<int>();
+            if (cfg.adapt_leb_waves < 1 || cfg.adapt_leb_waves > 4) {
+                throw std::runtime_error("grid.adapt_leb_waves values must be in [1,4]");
+            }
+        }
+        if (values.contains("h_rel")) {
+            const double value = values["h_rel"].get<double>();
+            if (!(value > 0.0) || !std::isfinite(value)) {
+                throw std::runtime_error("grid.h_rel values must be finite and > 0");
+            }
+            cfg.h_rel = value;
         }
         out.push_back(std::move(cfg));
 
@@ -1411,6 +1492,122 @@ json geom_class_of(const pipeline::Model& model, double h_ref) {
     return {{"curved_frac", curved_frac}, {"thin", thin}, {"min_feature_h", min_feature_h}};
 }
 
+json case_features_json(const pipeline::CaseFeatures& f) {
+    return {{"bbox_dx", f.bbox_dx},
+            {"bbox_dy", f.bbox_dy},
+            {"bbox_dz", f.bbox_dz},
+            {"diag", f.diag},
+            {"volume", f.volume},
+            {"surface_area", f.surface_area},
+            {"sa_over_v23", f.sa_over_v23},
+            {"n_faces", f.n_faces},
+            {"n_sharp_edges", f.n_sharp_edges},
+            {"sharp_edge_len_total", f.sharp_edge_len_total},
+            {"curved_frac", f.curved_frac},
+            {"kappa_max_h", f.kappa_max_h},
+            {"kappa_mean_h", f.kappa_mean_h},
+            {"thin_min_over_diag", f.thin_min_over_diag},
+            {"thin_p10_over_diag", f.thin_p10_over_diag},
+            {"min_feature_h", f.min_feature_h},
+            {"n_fix_faces", f.n_fix_faces},
+            {"n_load_faces", f.n_load_faces},
+            {"fix_area_frac", f.fix_area_frac},
+            {"load_area_frac", f.load_area_frac},
+            {"load_dir_x", f.load_dir_x},
+            {"load_dir_y", f.load_dir_y},
+            {"load_dir_z", f.load_dir_z},
+            {"fix_load_dist_over_diag", f.fix_load_dist_over_diag},
+            {"load_axis_alignment", f.load_axis_alignment},
+            {"poisson", f.poisson}};
+}
+
+json action_json(const Config& cfg, double h, double h_rel) {
+    return {{"h", h},
+            {"h_rel", h_rel},
+            {"mesher", mesher_name(cfg.mesher)},
+            {"element_tendency", cfg.element_tendency},
+            {"skin_layers", cfg.skin_layers},
+            {"feature_refine", cfg.feature_refine},
+            {"bc_grading", cfg.bc_grading},
+            {"adapt_passes", cfg.adapt_passes},
+            {"eta_target", cfg.eta_target},
+            {"p_elevate", cfg.p_elevate},
+            {"adapt_leb_waves", cfg.adapt_leb_waves},
+            {"order", cfg.order}};
+}
+
+pipeline::SimSetup adaptive_setup(const pipeline::Model& model, const PartCase& part,
+                                  const Config& cfg, double h) {
+    pipeline::SimSetup setup;
+    setup.youngs_modulus = part.E;
+    setup.poissons_ratio = part.nu;
+    setup.mesh_size = h;
+    setup.use_feature_grading = cfg.feature_refine;
+    setup.bc_grading = cfg.bc_grading;
+    setup.adapt_passes = cfg.adapt_passes;
+    setup.eta_target = cfg.eta_target;
+    setup.p_elevate = cfg.p_elevate || cfg.order >= 2;
+    setup.adapt_leb_waves = cfg.adapt_leb_waves;
+    setup.skin_layers = cfg.skin_layers;
+    setup.mesher = cfg.mesher;
+    setup.element_tendency = cfg.element_tendency;
+    const auto& surface = model.surface;
+    for (std::size_t ti = 0; ti < surface.triangles.size(); ++ti) {
+        if (ti >= model.triangle_region.size() || model.triangle_region[ti] < 0) {
+            continue;
+        }
+        const auto& tri = surface.triangles[ti];
+        const Eigen::Vector3d centroid =
+            (surface.vertices[tri[0]] + surface.vertices[tri[1]] + surface.vertices[tri[2]]) /
+            3.0;
+        for (const auto& bc : part.bcs) {
+            if (bc.box.contains(centroid)) {
+                setup.fixtures.insert(model.triangle_region[ti]);
+                break;
+            }
+        }
+    }
+    for (const auto& load : part.loads) {
+        std::map<int, double> box_area;
+        std::map<int, double> aligned_area;
+        const double traction_norm = load.traction.norm();
+        Eigen::Vector3d direction = Eigen::Vector3d::Zero();
+        if (traction_norm > 0.0) {
+            direction = load.traction / traction_norm;
+        }
+        for (std::size_t ti = 0; ti < surface.triangles.size(); ++ti) {
+            if (ti >= model.triangle_region.size() || model.triangle_region[ti] < 0) {
+                continue;
+            }
+            const auto& tri = surface.triangles[ti];
+            const Eigen::Vector3d& a = surface.vertices[tri[0]];
+            const Eigen::Vector3d& b = surface.vertices[tri[1]];
+            const Eigen::Vector3d& c = surface.vertices[tri[2]];
+            const Eigen::Vector3d centroid = (a + b + c) / 3.0;
+            if (!load.box.contains(centroid)) {
+                continue;
+            }
+            const Eigen::Vector3d cross = (b - a).cross(c - a);
+            const double twice_area = cross.norm();
+            if (!(twice_area > 0.0)) {
+                continue;
+            }
+            const int region = model.triangle_region[ti];
+            const double area = 0.5 * twice_area;
+            box_area[region] += area;
+            if (traction_norm <= 0.0 ||
+                std::abs((cross / twice_area).dot(direction)) > load.normal_min_dot) {
+                aligned_area[region] += area;
+            }
+        }
+        const auto& selected = aligned_area.empty() ? box_area : aligned_area;
+        for (const auto& [region, area] : selected) {
+            setup.loads[region].force += load.traction * area;
+        }
+    }
+    return setup;
+}
+
 /// M11: flag sharp CAD edges that want h_edge = L/3 below tier h_min, and count
 /// features shorter than 2·h. Detector only — no OCC defeaturing (ADR-0024 Q10).
 struct HminFeatureReport {
@@ -1498,6 +1695,36 @@ void write_warehouse_run(const fs::path& run_dir, const json& line,
     }
 }
 
+void write_adapt_trace(const fs::path& run_dir,
+                       const std::vector<pipeline::PassTrace>& traces) {
+    if (run_dir.empty() || traces.empty()) {
+        return;
+    }
+    static constexpr std::array<const char*, 4> kShapeNames{"keep", "hex", "tet", "poly"};
+    std::ostringstream text;
+    for (const auto& trace : traces) {
+        const std::size_t shape = static_cast<std::size_t>(std::clamp(trace.global_shape, 0, 3));
+        const json row{{"pass", trace.pass},
+                       {"n_elems", trace.n_elems},
+                       {"n_nodes", trace.n_nodes},
+                       {"n_dof", trace.n_dof},
+                       {"global_eta", trace.global_eta},
+                       {"eta_p50", trace.eta_p50},
+                       {"eta_p90", trace.eta_p90},
+                       {"eta_max", trace.eta_max},
+                       {"n_h_mark", trace.n_h_mark},
+                       {"n_p_mark", trace.n_p_mark},
+                       {"n_shape_mark", trace.n_shape_mark},
+                       {"global_shape", kShapeNames[shape]},
+                       {"predicted_dof_factor", trace.predicted_dof_factor},
+                       {"mesh_ms", trace.mesh_ms},
+                       {"solve_ms", trace.solve_ms}};
+        text << row.dump() << '\n';
+    }
+    fs::create_directories(run_dir);
+    atomic_write(run_dir / "adapt_trace.jsonl", text.str());
+}
+
 RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_scale,
                    const fs::path& progress_path, const fs::path& mesh_preview_path,
                    const fs::path& warehouse_run_dir = {}, double max_run_wall_s = 900.0) {
@@ -1515,15 +1742,39 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
     out.line["cfg_id"] = cfg.id;
     out.line["config"] = cfg.values;
     out.line["part"] = part.part;
+    out.line["schema"] = "advisor-row-v2";
+    out.line["action"] = action_json(cfg, 0.0, cfg.h_rel.value_or(0.0));
+    out.line["features"] = case_features_json(pipeline::CaseFeatures{});
     out.line["tier"] = tier;
 
     ProgressHeartbeat beat(progress_path, "mesh", cfg.id, part.part, tier, t_all0);
 
     try {
         const auto model = pipeline::Model::load(part.geometry);
-        const auto resolved = pipeline::resolve_mesh_size(model, 0.0);
-        const double h = std::max(resolved.h * h_scale, 1e-9);
-        json gc = geom_class_of(model, resolved.h);
+        const auto auto_resolved = pipeline::resolve_mesh_size(model, 0.0);
+        const double bbox_diag = (model.bbox_max - model.bbox_min).norm();
+        const double h = cfg.h_rel
+                             ? std::max(*cfg.h_rel * bbox_diag, 1e-9)
+                             : std::max(auto_resolved.h * h_scale, 1e-9);
+        const auto resolved =
+            cfg.h_rel ? pipeline::resolve_mesh_size(model, h) : auto_resolved;
+        json gc = geom_class_of(model, auto_resolved.h);
+        std::vector<pipeline::RefineRegion> fix_regions;
+        std::vector<pipeline::RefineRegion> load_regions;
+        fix_regions.reserve(part.bcs.size());
+        load_regions.reserve(part.loads.size());
+        for (const auto& bc : part.bcs) {
+            fix_regions.push_back({bc.box.lo, bc.box.hi, 0.5});
+        }
+        Eigen::Vector3d load_dir = Eigen::Vector3d::Zero();
+        for (const auto& load : part.loads) {
+            load_regions.push_back({load.box.lo, load.box.hi, 0.25});
+            load_dir += load.traction;
+        }
+        out.line["features"] = case_features_json(pipeline::extract_case_features(
+            model, fix_regions, load_regions, load_dir, part.nu));
+        const double actual_h_rel = bbox_diag > 0.0 ? h / bbox_diag : 0.0;
+        out.line["action"] = action_json(cfg, h, actual_h_rel);
 
         // M11: h_min feature flag (virtual-topology detector; no OCC suppress).
         const HminFeatureReport hmin = detect_hmin_features(model, h);
@@ -1569,35 +1820,75 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         // features, so the mesh reflects the simulation setup. Off by default.
         std::vector<Eigen::Vector3d> refine_seeds;
         double refine_band = 0.0;
+        mesh::SizeFieldFn size_field;
         if (cfg.bc_grading) {
-            std::vector<pipeline::RefineRegion> regions;
-            for (const auto& L : part.loads) {
-                regions.push_back({L.box.lo, L.box.hi, 0.25});
-            }
-            for (const auto& b : part.bcs) {
-                regions.push_back({b.box.lo, b.box.hi, 0.5});
-            }
+            std::vector<pipeline::RefineRegion> regions = load_regions;
+            regions.insert(regions.end(), fix_regions.begin(), fix_regions.end());
             const auto plan =
                 pipeline::build_refinement_plan(model, h, regions, cfg.feature_refine);
             refine_seeds = plan.refine_seeds;
             refine_band = plan.seed_band;
+            size_field = plan.size_field;
         }
-        auto vol =
-            pipeline::volume_mesh(model, h, cfg.mesher, /*skin_layers=*/2, cfg.feature_refine,
-                                  refine_seeds, refine_band, cfg.element_tendency);
-        const std::string combined_mesher_note =
-            tlab::combine_mesher_notes(resolved.note, vol.mesher_note);
-        if (!combined_mesher_note.empty()) {
-            out.line["mesher_note"] = combined_mesher_note;
+        pipeline::VolumeMeshOutput vol;
+        std::vector<pipeline::PassTrace> adapt_traces;
+        if (cfg.adapt_passes > 0) {
+            pipeline::SimSetup setup = adaptive_setup(model, part, cfg, h);
+            setup.max_elems = static_cast<std::size_t>(kMaxCampaignElems);
+            setup.max_dof = static_cast<std::size_t>(kMaxCampaignDof);
+            pipeline::SolveJob job;
+            job.on_pass = [&](const pipeline::PassTrace& trace) {
+                adapt_traces.push_back(trace);
+                write_adapt_trace(warehouse_run_dir, adapt_traces);
+            };
+            job.start(model, setup);
+            bool wall_exceeded = false;
+            while (job.state() == pipeline::SolveJob::State::kMeshing ||
+                   job.state() == pipeline::SolveJob::State::kSolving) {
+                if (max_run_wall_s > 0.0 && wall_elapsed_s() > max_run_wall_s) {
+                    wall_exceeded = true;
+                    job.request_cancel();
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+            if (wall_exceeded) {
+                throw WallClockBudgetExceeded(wall_elapsed_s());
+            }
+            auto result = job.take_result();
+            if (!result) {
+                throw std::runtime_error("adaptive SolveJob failed: " + job.status_text());
+            }
+            vol.mesh = std::move(result->volume_mesh);
+            vol.boundary_quads = std::move(result->boundary_quads);
+            vol.mesher_note = std::move(result->mesh_note);
+            for (const auto& trace : adapt_traces) {
+                out.mesh_ms += trace.mesh_ms;
+                out.solve_ms += trace.solve_ms;
+            }
+            write_adapt_trace(warehouse_run_dir, adapt_traces);
+        } else {
+            vol = pipeline::volume_mesh(
+                model, h, cfg.mesher, cfg.skin_layers, cfg.feature_refine, refine_seeds,
+                refine_band, cfg.element_tendency, 0, 0, 0, {}, size_field);
+            const std::string combined_mesher_note =
+                tlab::combine_mesher_notes(resolved.note, vol.mesher_note);
+            if (!combined_mesher_note.empty()) {
+                out.line["mesher_note"] = combined_mesher_note;
+            }
+            vol.mesh.check_validity();
+            if (cfg.order >= 2 || cfg.p_elevate) {
+                vol.mesh = fea::promote_to_quadratic(vol.mesh);
+                vol.mesh.check_validity();
+            }
+            const auto t_mesh1 = clock::now();
+            out.mesh_ms =
+                std::chrono::duration<double, std::milli>(t_mesh1 - t_mesh0).count();
+        }
+        if (!vol.mesher_note.empty()) {
+            out.line["mesher_note"] = vol.mesher_note;
         }
         // Validity is mandatory before any solve (anti-cheat / engineering rule).
         vol.mesh.check_validity();
-        if (cfg.order >= 2) {
-            vol.mesh = fea::promote_to_quadratic(vol.mesh);
-            vol.mesh.check_validity();
-        }
-        const auto t_mesh1 = clock::now();
-        out.mesh_ms = std::chrono::duration<double, std::milli>(t_mesh1 - t_mesh0).count();
 
         out.line["n_elems"] = vol.mesh.elements.size();
         out.line["n_nodes"] = vol.mesh.nodes.size();
@@ -1695,7 +1986,7 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         };
         const Eigen::VectorXd u = fea::solve_elastostatics(vol.mesh, mat, bc, loads, sopt);
         const auto t_solve1 = clock::now();
-        out.solve_ms = std::chrono::duration<double, std::milli>(t_solve1 - t_solve0).count();
+        out.solve_ms += std::chrono::duration<double, std::milli>(t_solve1 - t_solve0).count();
 
         beat.set_phase("recover", 0.5);
 
@@ -1943,10 +2234,11 @@ std::vector<std::string> trim_survivors(std::vector<std::string> candidates,
 }
 
 int usage() {
-    std::fputs("usage: polymesh_testlab run|resume|pause-status <campaign_dir>\n"
+    std::fputs("usage: polymesh_testlab run|resume|validate|pause-status <campaign_dir>\n"
                "\n"
                "  run           start (or restart) a campaign from campaign.json\n"
                "  resume        continue from checkpoint.json after pause / SIGINT\n"
+               "  validate      parse campaign, grid, cases, and print maximum run count\n"
                "  pause-status  print checkpoint state (running|paused|finished)\n"
                "\n"
                "Schemas: docs/dag/interfaces.md. Run from the repo root so case and\n"
@@ -1971,6 +2263,18 @@ int cmd_pause_status(const fs::path& camp_dir) {
                 "updated_utc: %s\n",
                 cp.state.c_str(), cp.campaign.c_str(), cp.tier, cp.completed_runs,
                 cp.survivors.size(), cp.started_utc.c_str(), cp.updated_utc.c_str());
+    return 0;
+}
+
+int cmd_validate(const fs::path& camp_dir) {
+    const Campaign camp = load_campaign(camp_dir / "campaign.json");
+    const auto configs = expand_grid(camp.grid);
+    for (const auto& path : camp.parts) {
+        (void)load_case(path);
+    }
+    const std::size_t max_runs = configs.size() * camp.parts.size() * camp.tiers.size();
+    std::printf("valid: %s configs=%zu parts=%zu tiers=%zu max_runs=%zu\n", camp.name.c_str(),
+                configs.size(), camp.parts.size(), camp.tiers.size(), max_runs);
     return 0;
 }
 
@@ -2112,7 +2416,7 @@ int run_campaign(const fs::path& camp_dir, bool resume) {
                             part.part.c_str(), tier);
                 std::fflush(stdout);
                 fs::path wh_dir;
-                if (camp.warehouse) {
+                if (camp.warehouse || cfg.adapt_passes > 0) {
                     wh_dir =
                         camp_dir / "runs" / cfg_id / part.part / ("t" + std::to_string(tier));
                 }
@@ -2192,6 +2496,9 @@ int main(int argc, char** argv) {
         }
         if (cmd == "resume") {
             return run_campaign(camp_dir, /*resume=*/true);
+        }
+        if (cmd == "validate") {
+            return cmd_validate(camp_dir);
         }
         if (cmd == "pause-status") {
             return cmd_pause_status(camp_dir);

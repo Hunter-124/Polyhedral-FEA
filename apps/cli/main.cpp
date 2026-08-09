@@ -592,7 +592,8 @@ int cmd_mesh(std::span<char*> args) {
     const auto plan = polymesh::pipeline::build_refinement_plan(model, h, regions, feature);
     auto vol = polymesh::pipeline::volume_mesh(
         model, h, mesher, skin, feature, plan.refine_seeds, plan.seed_band, element_tendency,
-        resolved.element_ceiling, resolved.dof_ceiling, resolved.auto_chosen ? 3 : 0);
+        resolved.element_ceiling, resolved.dof_ceiling, resolved.auto_chosen ? 3 : 0, {},
+        plan.size_field);
     vol.mesh.check_validity();
     std::printf("mesh: %zu nodes, %zu elems, h=%.6g m\n"
                 "refine: %zu geometry + %zu BC seeds → %zu seeds, band=%.4g m, h_fine=%.4g m\n"
@@ -716,6 +717,7 @@ int cmd_solve(std::span<char*> args) {
     double h_use = h;
     std::vector<Eigen::Vector3d> seeds;
     double seed_band = 0.0;
+    polymesh::mesh::SizeFieldFn size_field;
     // Geometry + simulation-setup refinement. Explicit --fix-box/--load-box
     // define the grading (and BC) regions; otherwise --bc-grade derives the
     // default cantilever slabs (fix min-x, load max-x). Geometry grading
@@ -745,6 +747,7 @@ int cmd_solve(std::span<char*> args) {
             polymesh::pipeline::build_refinement_plan(model, h_use, regions, feature);
         seeds = plan.refine_seeds;
         seed_band = plan.seed_band;
+        size_field = plan.size_field;
         std::printf(
             "refine: %zu geometry + %zu BC seeds → %zu seeds, band=%.4g m, h_fine=%.4g m\n",
             plan.n_geometry_seeds, plan.n_bc_seeds, seeds.size(), seed_band, plan.h_fine);
@@ -752,7 +755,8 @@ int cmd_solve(std::span<char*> args) {
     auto mesh_now = [&](polymesh::pipeline::VolumeMesher m) {
         return polymesh::pipeline::volume_mesh(
             model, h_use, m, skin, feature, seeds, seed_band, element_tendency,
-            resolved.element_ceiling, resolved.dof_ceiling, resolved.auto_chosen ? 3 : 0);
+            resolved.element_ceiling, resolved.dof_ceiling, resolved.auto_chosen ? 3 : 0, {},
+            size_field);
     };
     auto vol = mesh_now(mesher);
     vol.mesh.check_validity();
@@ -1085,7 +1089,8 @@ int cmd_diag(std::span<char*> args) {
     t0 = clock::now();
     auto vol = polymesh::pipeline::volume_mesh(
         model, h, mesher, 2, true, plan.refine_seeds, plan.seed_band, 0.0,
-        resolved.element_ceiling, resolved.dof_ceiling, resolved.auto_chosen ? 3 : 0);
+        resolved.element_ceiling, resolved.dof_ceiling, resolved.auto_chosen ? 3 : 0, {},
+        plan.size_field);
     const double mesh_ms = ms(clock::now() - t0);
     vol.mesh.check_validity();
 

@@ -83,6 +83,13 @@ if(POLYMESH_NATIVE_ARCH)
     )
 endif()
 
+if(WIN32)
+    # windows.h's min/max macros break every `std::max(...)` compiled after it
+    # (MSVC C2589). Any transitive include of windows.h anywhere in the tree
+    # must not be able to do that.
+    add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
+endif()
+
 if(POLYMESH_ENABLE_LTO)
     include(CheckIPOSupported)
     check_ipo_supported(RESULT _polymesh_ipo_ok OUTPUT _polymesh_ipo_msg)

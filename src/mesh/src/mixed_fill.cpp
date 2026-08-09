@@ -454,7 +454,8 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                                    std::span<const Eigen::Vector3d> curvature_seeds,
                                    double seed_band, bool snap_boundary,
                                    double curvature_turn_deg, bool native_poly_transitions,
-                                   const std::function<void()>& cancel_check) {
+                                   const std::function<void()>& cancel_check,
+                                   const SizeFieldFn& size_field) {
     if (!(h > 0.0) || !std::isfinite(h)) {
         throw ValidityError("mixed_fill_surface: h must be positive");
     }
@@ -548,8 +549,8 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
     // feature/seed/curvature, refine those bands to h/2 instead of flooding
     // the exterior.
     const int skin_cap = std::max(1, (max_dist + 1) / 2);
-    const bool have_geo =
-        (feature_band > 0.0) || (seed_band > 0.0) || (curvature_turn_deg > 0.0);
+    const bool have_geo = (feature_band > 0.0) || (seed_band > 0.0) ||
+                          (curvature_turn_deg > 0.0) || static_cast<bool>(size_field);
     const int skin_use = have_geo ? 0 : std::min(skin_layers, skin_cap);
 
     std::vector<char> is_fine(inside.size(), 0);
@@ -569,6 +570,46 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                 }
             }
         }
+    }
+    double field_h_min = std::numeric_limits<double>::infinity();
+    double field_h_max = 0.0;
+    std::size_t n_field_budget_clamped = 0;
+    if (size_field) {
+        const double h_floor = (h_budget > 0.0) ? h_budget : h_cell;
+        for (int k = 0; k < nz; ++k) {
+            poll_cancel();
+            for (int j = 0; j < ny; ++j) {
+                for (int i = 0; i < nx; ++i) {
+                    const auto id = idx(i, j, k);
+                    if (!inside[id]) {
+                        continue;
+                    }
+                    const Eigen::Vector3d centroid =
+                        grid.origin +
+                        Eigen::Vector3d{(static_cast<double>(i) + 0.5) * grid.cell[0],
+                                        (static_cast<double>(j) + 0.5) * grid.cell[1],
+                                        (static_cast<double>(k) + 0.5) * grid.cell[2]};
+                    double requested = size_field(centroid);
+                    if (!(requested > 0.0) || !std::isfinite(requested)) {
+                        requested = h_floor;
+                        ++n_field_budget_clamped;
+                    } else {
+                        field_h_min = std::min(field_h_min, requested);
+                        field_h_max = std::max(field_h_max, requested);
+                        if (requested < h_floor) {
+                            ++n_field_budget_clamped;
+                        }
+                    }
+                    const double h_target = std::max(requested, h_floor);
+                    const int level = std::clamp(
+                        static_cast<int>(std::lround(std::log2(h_cell / h_target))), 0, 1);
+                    if (level >= 1) {
+                        is_fine[id] = 1;
+                    }
+                }
+            }
+        }
+        // TODO(size-field): 4x4x4 needs the 2:1 closure generalised.
     }
     // Feature/seed → fine (h/2 via 2×2×2). stamp writes into is_fine.
     stamp_feature_cells(is_fine, &is_feature_skin, nx, ny, nz, grid, surface, features,
@@ -785,6 +826,19 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                 is_fine[c] = (inside[c] != 0) ? 1 : 0;
             }
             out.n_feature_skin_cells = 0;
+        }
+    }
+    out.field_h_min = std::isfinite(field_h_min) ? field_h_min : 0.0;
+    out.field_h_max = field_h_max;
+    out.n_field_budget_clamped = n_field_budget_clamped;
+    for (std::size_t c = 0; c < inside.size(); ++c) {
+        if (!inside[c]) {
+            continue;
+        }
+        if (is_fine[c]) {
+            ++out.n_level1_cells;
+        } else {
+            ++out.n_level0_cells;
         }
     }
 

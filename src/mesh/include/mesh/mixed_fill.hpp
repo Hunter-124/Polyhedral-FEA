@@ -21,6 +21,7 @@
 
 #include "geom/features.hpp"
 #include "geom/tri_surface.hpp"
+#include "mesh/cvt_lloyd.hpp"
 
 #include <Eigen/Core>
 
@@ -78,11 +79,19 @@ struct MixedFillOutput {
     std::size_t n_feature_skin_cells = 0;
     std::size_t n_fine_cells = 0;       // coarse cells refined to 2×2×2
     std::size_t n_transition_cells = 0; // 2:1 interface cells (fan or poly)
+    std::size_t n_level0_cells = 0;
+    std::size_t n_level1_cells = 0;
+    /// Observed requested field range at interior cell centroids (metres).
+    double field_h_min = 0.0;
+    double field_h_max = 0.0;
+    std::size_t n_field_budget_clamped = 0;
     bool native_poly_transitions = false;
 };
 
 /// Hybrid zoo: hex bulk + optional 2:1 feature fine + pyramid skin/transition.
-/// `skin_layers` ≥ 1 (used only when no feature/seed drivers).
+/// `skin_layers` ≥ 1 (used only when no feature/seed/size-field drivers).
+/// The optional scalar size field requests edge length in metres. It selects
+/// only L0 or 2×2×2 L1 cells: 4×4×4 needs the 2:1 closure generalised.
 /// `curvature_turn_deg` > 0 enables the per-cell turning-angle criterion:
 /// cells where the surface turns more than that angle per bulk cell (h·κ)
 /// refine to h/2 — contiguous along curved walls, inert on flats.
@@ -101,7 +110,8 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                                    double seed_band = 0.0, bool snap_boundary = true,
                                    double curvature_turn_deg = 0.0,
                                    bool native_poly_transitions = false,
-                                   const std::function<void()>& cancel_check = {});
+                                   const std::function<void()>& cancel_check = {},
+                                   const SizeFieldFn& size_field = {});
 
 /// Expand every hex8 → 6 pyramid5 (centroid apex). Pyramids/tets/polys pass
 /// through. Product FE path for hybrid / hexpyr (constant-strain exact).

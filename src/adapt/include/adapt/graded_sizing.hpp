@@ -21,11 +21,12 @@
 //     carry a load or a fixture, finest under applied loads where stress
 //     concentrates (see point_size_sources).
 //
-// The same field feeds the CVT/Voronoi poly path (as `SizeFieldFn`) so cell
-// size and count grade with the field, and emits refine seeds for the
-// ball-grading meshers via seed_plan().
+// The same field feeds every variable-density mesher through `SizeFieldFn`;
+// `seed_plan` remains available for the legacy ball-grading path and for
+// a-posteriori refinement marks.
 
 #include "adapt/sizing_field.hpp"
+#include "mesh/cvt_lloyd.hpp"
 #include "geom/tri_surface.hpp"
 
 #include <Eigen/Core>
@@ -52,6 +53,8 @@ class GradedSizing final : public SizingField {
     GradedSizing(std::vector<SizeSource> sources, double h_min, double h_max, double beta = 1.0);
 
     double size_at(const Eigen::Vector3d& point) const override;
+    /// Non-owning field view. The GradedSizing object must outlive the callable.
+    mesh::SizeFieldFn as_size_field() const;
 
     const std::vector<SizeSource>& sources() const { return sources_; }
     double beta() const { return beta_; }
@@ -88,6 +91,11 @@ std::vector<SizeSource> geometry_size_sources(const geom::TriSurface& surface, d
 /// Loads should pass a finer `h` than fixtures — error concentrates where the
 /// load is applied.
 std::vector<SizeSource> point_size_sources(std::span<const Eigen::Vector3d> points, double h);
+/// Owning gradient-limited size field. Source h and bounds are edge lengths
+/// in metres; the returned callable is safe after `sources` goes out of scope.
+mesh::SizeFieldFn size_field_from_sources(std::span<const SizeSource> sources, double h_min,
+                                          double h_max, double beta = 1.0);
+
 
 /// Refine-seed plan for the ball-grading meshers (pipeline::volume_mesh):
 /// seeds = source points that ask for a size finer than `h_coarse`;

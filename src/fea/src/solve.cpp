@@ -177,9 +177,10 @@ Eigen::VectorXd solve_reduced(const Eigen::SparseMatrix<double>& kff,
 
 } // namespace
 
-Eigen::VectorXd solve_elastostatics(const NodalMesh& mesh, const Material& material,
-                                    const Dirichlet& dirichlet, const Eigen::VectorXd& loads,
-                                    const SolveOptions& options) {
+Eigen::VectorXd solve_elastostatics(
+    const NodalMesh& mesh, const Material& material, const Dirichlet& dirichlet,
+    const Eigen::VectorXd& loads, const SolveOptions& options,
+    const LinearConstraints* constraints) {
     const Eigen::Index ndof = 3 * static_cast<Eigen::Index>(mesh.nodes.size());
     if (loads.size() != ndof) {
         throw FeaError(std::format("solve_elastostatics: load vector size {} != 3N = {}",
@@ -191,6 +192,16 @@ Eigen::VectorXd solve_elastostatics(const NodalMesh& mesh, const Material& mater
     if (!loads.allFinite()) {
         throw FeaError("solve_elastostatics: load vector contains a non-finite value");
     }
+    const bool has_linear_constraints = constraints != nullptr && !constraints->empty();
+    if (has_linear_constraints) {
+        constraints->validate(ndof);
+    }
+    const auto is_slave = [&](Eigen::Index dof) {
+        return has_linear_constraints && dof >= 0 &&
+               static_cast<std::uint64_t>(dof) <=
+                   static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()) &&
+               constraints->is_slave(static_cast<std::uint32_t>(dof));
+    };
     for (const auto& [dof, value] : dirichlet.dof_values) {
         if (dof < 0 || dof >= ndof) {
             throw FeaError(
@@ -200,9 +211,19 @@ Eigen::VectorXd solve_elastostatics(const NodalMesh& mesh, const Material& mater
             throw FeaError(std::format(
                 "solve_elastostatics: constrained DOF {} has a non-finite value", dof));
         }
+        if (is_slave(dof)) {
+            throw FeaError(std::format(
+                "solve_elastostatics: Dirichlet-prescribed DOF {} is a linear-constraint "
+                "slave; prescribe its unconstrained masters instead",
+                dof));
+        }
     }
 
-    const Eigen::Index nfree = ndof - static_cast<Eigen::Index>(dirichlet.dof_values.size());
+    const Eigen::Index constrained_dofs =
+        has_linear_constraints ? static_cast<Eigen::Index>(constraints->size()) : 0;
+    const Eigen::Index system_dofs = ndof - constrained_dofs;
+    const Eigen::Index nfree =
+        system_dofs - static_cast<Eigen::Index>(dirichlet.dof_values.size());
     const auto estimate = estimate_solve_resources(mesh, nfree);
     const auto budget = effective_memory_budget(options.max_mem_gb);
     const auto decision =
@@ -225,51 +246,74 @@ Eigen::VectorXd solve_elastostatics(const NodalMesh& mesh, const Material& mater
     SolveOptions selected_options = options;
     selected_options.method = decision.method;
 
-    // Map global DOFs to reduced (free) indices; -1 marks constrained.
-    std::vector<Eigen::Index> reduced(static_cast<std::size_t>(ndof), -1);
-    Eigen::Index reduced_count = 0;
+    // Map original unconstrained DOFs to T columns in ascending original order.
+    std::vector<Eigen::Index> original_to_system(static_cast<std::size_t>(ndof), -1);
+    Eigen::Index system_index = 0;
     for (Eigen::Index dof = 0; dof < ndof; ++dof) {
-        if (!dirichlet.dof_values.contains(dof)) {
+        if (!is_slave(dof)) {
+            original_to_system[static_cast<std::size_t>(dof)] = system_index++;
+        }
+    }
+    std::map<Eigen::Index, double> system_dirichlet;
+    for (const auto& [dof, value] : dirichlet.dof_values) {
+        system_dirichlet.emplace(original_to_system[static_cast<std::size_t>(dof)], value);
+    }
+
+    auto k = assemble_stiffness(mesh, material);
+    Eigen::SparseMatrix<double> k_system;
+    Eigen::VectorXd f_system;
+    if (has_linear_constraints) {
+        const auto t = constraints->transform(ndof);
+        Eigen::SparseMatrix<double> left = t.transpose() * k;
+        k_system = left * t;
+        f_system = t.transpose() * loads;
+    } else {
+        k_system = std::move(k);
+        f_system = loads;
+    }
+
+    // Map constrained-system DOFs to Dirichlet-free indices; -1 is prescribed.
+    std::vector<Eigen::Index> reduced(static_cast<std::size_t>(system_dofs), -1);
+    Eigen::Index reduced_count = 0;
+    for (Eigen::Index dof = 0; dof < system_dofs; ++dof) {
+        if (!system_dirichlet.contains(dof)) {
             reduced[static_cast<std::size_t>(dof)] = reduced_count++;
         }
     }
 
-    const auto k = assemble_stiffness(mesh, material);
-
     // Reduced system: K_ff u_f = f_f - K_fc u_c.
     Eigen::VectorXd rhs(reduced_count);
-    for (Eigen::Index dof = 0; dof < ndof; ++dof) {
+    for (Eigen::Index dof = 0; dof < system_dofs; ++dof) {
         const auto r = reduced[static_cast<std::size_t>(dof)];
         if (r >= 0) {
-            rhs[r] = loads[dof];
+            rhs[r] = f_system[dof];
         }
     }
     std::vector<Eigen::Triplet<double>> triplets;
-    for (int outer = 0; outer < k.outerSize(); ++outer) {
-        for (Eigen::SparseMatrix<double>::InnerIterator it(k, outer); it; ++it) {
+    for (int outer = 0; outer < k_system.outerSize(); ++outer) {
+        for (Eigen::SparseMatrix<double>::InnerIterator it(k_system, outer); it; ++it) {
             const auto row = reduced[static_cast<std::size_t>(it.row())];
             const auto col = reduced[static_cast<std::size_t>(it.col())];
             if (row >= 0 && col >= 0) {
                 triplets.emplace_back(row, col, it.value());
             } else if (row >= 0 && col < 0) {
-                rhs[row] -= it.value() * dirichlet.dof_values.at(it.col());
+                rhs[row] -= it.value() * system_dirichlet.at(it.col());
             }
         }
     }
     Eigen::SparseMatrix<double> kff(reduced_count, reduced_count);
     kff.setFromTriplets(triplets.begin(), triplets.end());
 
-    // The allocation-free preflight above preserves the normal cell-independent
-    // threshold policy, except that kAuto may downgrade LDLT to CG when only the
-    // iterative footprint fits. Explicit method choices remain authoritative.
+    // The allocation-free preflight above uses the post-constraint free count;
+    // kAuto may downgrade LDLT to CG when only the iterative footprint fits.
     const Eigen::VectorXd uf = solve_reduced(kff, rhs, selected_options);
 
-    Eigen::VectorXd u(ndof);
-    for (Eigen::Index dof = 0; dof < ndof; ++dof) {
+    Eigen::VectorXd u_system(system_dofs);
+    for (Eigen::Index dof = 0; dof < system_dofs; ++dof) {
         const auto r = reduced[static_cast<std::size_t>(dof)];
-        u[dof] = r >= 0 ? uf[r] : dirichlet.dof_values.at(dof);
+        u_system[dof] = r >= 0 ? uf[r] : system_dirichlet.at(dof);
     }
-    return u;
+    return has_linear_constraints ? constraints->recover(u_system, ndof) : u_system;
 }
 
 double strain_energy(const NodalMesh& mesh, const Material& material,

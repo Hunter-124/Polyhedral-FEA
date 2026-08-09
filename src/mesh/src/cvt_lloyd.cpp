@@ -302,9 +302,17 @@ CvtLloydResult lloyd_cvt(const ClipBox& domain, std::span<const CvtSite> sites,
     }
     g_edge = std::max(g_edge, 1e-9 * std::max(result.stats.domain_diag, 1e-30));
 
+    // Per-site scratch: each index is written exactly once by its owning
+    // thread, then reduced serially in index order below. This replaces
+    // `reduction(max:)` (unsupported by MSVC's OpenMP 2.0 without
+    // `-openmp:llvm`) and makes the sum bit-reproducible regardless of thread
+    // count or schedule — floating-point `reduction(+)` is order-dependent.
+    std::vector<double> site_move(sites.size(), 0.0);
+    std::vector<double> site_vol(sites.size(), 0.0);
+
     for (int it = 0; it < max_iters; ++it) {
-        double max_move = 0.0;
-        double sum_vol = 0.0;
+        std::fill(site_move.begin(), site_move.end(), 0.0);
+        std::fill(site_vol.begin(), site_vol.end(), 0.0);
 
         SiteGrid grid;
         grid.build(result.positions, g_edge);
@@ -314,7 +322,7 @@ CvtLloydResult lloyd_cvt(const ClipBox& domain, std::span<const CvtSite> sites,
         {
             VBW::ConvexCell cell;
             std::vector<std::uint32_t> ring_buf;
-#pragma omp for schedule(dynamic, 64) reduction(max : max_move) reduction(+ : sum_vol)
+#pragma omp for schedule(dynamic, 64)
             for (std::ptrdiff_t ii = 0; ii < n; ++ii) {
                 const auto i = static_cast<std::size_t>(ii);
                 if (sites[i].fixed) {
@@ -350,10 +358,17 @@ CvtLloydResult lloyd_cvt(const ClipBox& domain, std::span<const CvtSite> sites,
 
                 // Keep free sites inside the domain box (restricted CVT).
                 c = c.cwiseMax(domain.min).cwiseMin(domain.max);
-                max_move = std::max(max_move, (c - result.positions[i]).norm());
+                site_move[i] = (c - result.positions[i]).norm();
                 next[i] = c;
-                sum_vol += cell.volume();
+                site_vol[i] = cell.volume();
             }
+        }
+
+        double max_move = 0.0;
+        double sum_vol = 0.0;
+        for (std::size_t i = 0; i < sites.size(); ++i) {
+            max_move = std::max(max_move, site_move[i]);
+            sum_vol += site_vol[i];
         }
 
         result.positions.swap(next);

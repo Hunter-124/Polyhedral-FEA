@@ -10,6 +10,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <limits>
 
 using namespace polymesh::fea;
 using namespace polymesh::test_support;
@@ -99,6 +100,34 @@ TEST_CASE("CG honours its iteration cap instead of grinding") {
                     polymesh::fea::FeaError);
 }
 
+TEST_CASE("solve rejects invalid CG tolerances and non-finite inputs") {
+    auto setup = make_cantilever_hex(4, 1, 1);
+    SolveOptions options;
+    options.method = SolveMethod::kCG;
+
+    for (const double invalid : {0.0, -1.0, std::numeric_limits<double>::infinity(),
+                                 std::numeric_limits<double>::quiet_NaN()}) {
+        options.cg_tol = invalid;
+        CHECK_THROWS_AS(
+            solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, options),
+            polymesh::fea::FeaError);
+    }
+
+    options.cg_tol = 1e-8;
+    CHECK_NOTHROW(solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, options));
+
+    Eigen::VectorXd invalid_loads = setup.loads;
+    invalid_loads[0] = std::numeric_limits<double>::quiet_NaN();
+    CHECK_THROWS_AS(solve_elastostatics(setup.mesh, kSteel, setup.bc, invalid_loads, options),
+                    polymesh::fea::FeaError);
+
+    Dirichlet invalid_bc = setup.bc;
+    REQUIRE_FALSE(invalid_bc.dof_values.empty());
+    invalid_bc.dof_values.begin()->second = std::numeric_limits<double>::infinity();
+    CHECK_THROWS_AS(solve_elastostatics(setup.mesh, kSteel, invalid_bc, setup.loads, options),
+                    polymesh::fea::FeaError);
+}
+
 TEST_CASE("forced CG matches direct LDLT on small cantilever") {
     auto setup = make_cantilever_hex(12, 2, 2);
     REQUIRE(setup.nfree < 8000);
@@ -110,8 +139,7 @@ TEST_CASE("forced CG matches direct LDLT on small cantilever") {
     opt_cg.cg_tol = 1e-12;
     const auto u_direct =
         solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, opt_direct);
-    const auto u_cg =
-        solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, opt_cg);
+    const auto u_cg = solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, opt_cg);
 
     const double tip_d = mean_tip_uz(setup.mesh, u_direct, setup.length);
     const double tip_cg = mean_tip_uz(setup.mesh, u_cg, setup.length);
@@ -128,8 +156,7 @@ TEST_CASE("CG progress reporting does not restart the recurrence") {
     SolveOptions plain;
     plain.method = SolveMethod::kCG;
     plain.cg_tol = 1e-12;
-    const auto u_plain =
-        solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, plain);
+    const auto u_plain = solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, plain);
 
     SolveOptions reported = plain;
     reported.cg_progress_chunk = 1; // stress the old pathological case

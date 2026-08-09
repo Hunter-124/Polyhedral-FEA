@@ -35,11 +35,11 @@ SolveDecision decide_solve_method(Eigen::Index nfree, const SolveOptions& option
         estimate.direct_peak_bytes > effective_cap_bytes &&
         estimate.cg_peak_bytes <= effective_cap_bytes) {
         decision.method = SolveMethod::kCG;
-        decision.note = std::format(
-            "memory budget: LDLT estimate {} exceeds cap {}; using CG estimate {}",
-            format_memory_bytes(estimate.direct_peak_bytes),
-            format_memory_bytes(effective_cap_bytes),
-            format_memory_bytes(estimate.cg_peak_bytes));
+        decision.note =
+            std::format("memory budget: LDLT estimate {} exceeds cap {}; using CG estimate {}",
+                        format_memory_bytes(estimate.direct_peak_bytes),
+                        format_memory_bytes(effective_cap_bytes),
+                        format_memory_bytes(estimate.cg_peak_bytes));
     }
     decision.estimated_bytes = decision.method == SolveMethod::kDirect
                                    ? estimate.direct_peak_bytes
@@ -185,28 +185,37 @@ Eigen::VectorXd solve_elastostatics(const NodalMesh& mesh, const Material& mater
         throw FeaError(std::format("solve_elastostatics: load vector size {} != 3N = {}",
                                    loads.size(), ndof));
     }
+    if (!std::isfinite(options.cg_tol) || options.cg_tol <= 0.0) {
+        throw FeaError("solve_elastostatics: cg_tol must be finite and positive");
+    }
+    if (!loads.allFinite()) {
+        throw FeaError("solve_elastostatics: load vector contains a non-finite value");
+    }
     for (const auto& [dof, value] : dirichlet.dof_values) {
         if (dof < 0 || dof >= ndof) {
             throw FeaError(
                 std::format("solve_elastostatics: constrained DOF {} out of range", dof));
         }
-        (void)value;
+        if (!std::isfinite(value)) {
+            throw FeaError(std::format(
+                "solve_elastostatics: constrained DOF {} has a non-finite value", dof));
+        }
     }
 
-    const Eigen::Index nfree =
-        ndof - static_cast<Eigen::Index>(dirichlet.dof_values.size());
+    const Eigen::Index nfree = ndof - static_cast<Eigen::Index>(dirichlet.dof_values.size());
     const auto estimate = estimate_solve_resources(mesh, nfree);
     const auto budget = effective_memory_budget(options.max_mem_gb);
     const auto decision =
         decide_solve_method(nfree, options, estimate, budget.effective_cap_bytes);
     if (decision.estimated_bytes > budget.effective_cap_bytes) {
         const bool direct = decision.method == SolveMethod::kDirect;
-        throw FeaError(std::format(
-            "solve_elastostatics: estimated {} solve footprint {} exceeds effective memory cap "
-            "{} (limiting term: {}); raise --max-mem <GB> or free system memory",
-            direct ? "LDLT" : "CG", format_memory_bytes(decision.estimated_bytes),
-            format_memory_bytes(budget.effective_cap_bytes),
-            limiting_resource_term(estimate, direct)));
+        throw FeaError(
+            std::format("solve_elastostatics: estimated {} solve footprint {} exceeds "
+                        "effective memory cap "
+                        "{} (limiting term: {}); raise --max-mem <GB> or free system memory",
+                        direct ? "LDLT" : "CG", format_memory_bytes(decision.estimated_bytes),
+                        format_memory_bytes(budget.effective_cap_bytes),
+                        limiting_resource_term(estimate, direct)));
     }
     if (!decision.note.empty() && options.on_note) {
         options.on_note(decision.note);
@@ -215,7 +224,6 @@ Eigen::VectorXd solve_elastostatics(const NodalMesh& mesh, const Material& mater
 
     SolveOptions selected_options = options;
     selected_options.method = decision.method;
-
 
     // Map global DOFs to reduced (free) indices; -1 marks constrained.
     std::vector<Eigen::Index> reduced(static_cast<std::size_t>(ndof), -1);

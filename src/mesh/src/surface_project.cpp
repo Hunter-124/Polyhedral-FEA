@@ -55,9 +55,7 @@ struct SurfaceGrid {
     int nx = 1, ny = 1, nz = 1;
     std::vector<std::vector<std::size_t>> bins;
 
-    int flat(int i, int j, int k) const {
-        return (k * ny + j) * nx + i;
-    }
+    int flat(int i, int j, int k) const { return (k * ny + j) * nx + i; }
 
     void build(const geom::TriSurface& surface) {
         if (surface.triangles.empty() || surface.vertices.empty()) {
@@ -71,7 +69,8 @@ struct SurfaceGrid {
             bmax = bmax.cwiseMax(v);
         }
         // Pad slightly so boundary queries land inside the hash.
-        const Eigen::Vector3d extent = (bmax - bmin).cwiseMax(Eigen::Vector3d::Constant(1e-12));
+        const Eigen::Vector3d extent =
+            (bmax - bmin).cwiseMax(Eigen::Vector3d::Constant(1e-12));
         const double pad = 1e-6 * extent.norm() + 1e-12;
         bmin.array() -= pad;
         bmax.array() += pad;
@@ -122,8 +121,9 @@ struct SurfaceGrid {
 
         auto consider = [&](std::size_t t) {
             const auto& tri = surface.triangles[t];
-            const Eigen::Vector3d q = closest_on_triangle(
-                p, surface.vertices[tri[0]], surface.vertices[tri[1]], surface.vertices[tri[2]]);
+            const Eigen::Vector3d q =
+                closest_on_triangle(p, surface.vertices[tri[0]], surface.vertices[tri[1]],
+                                    surface.vertices[tri[2]]);
             const double d = (p - q).norm();
             if (d < best.distance) {
                 best.distance = d;
@@ -170,7 +170,8 @@ struct SurfaceGrid {
                     // After a few shells, also do a small safety ring once more then stop
                     // if distance is finite. For correctness under AABB over-approx,
                     // expand until best.distance^2 cannot beat next shell.
-                    const double next_lb = static_cast<double>(r) * std::min({cell[0], cell[1], cell[2]});
+                    const double next_lb =
+                        static_cast<double>(r) * std::min({cell[0], cell[1], cell[2]});
                     if (r > 0 && best.distance <= next_lb) {
                         break;
                     }
@@ -207,7 +208,8 @@ const SurfaceGrid& grid_for(const geom::TriSurface& surface) {
     return cached;
 }
 
-ClosestPoint closest_on_surface_brute(const geom::TriSurface& surface, const Eigen::Vector3d& p) {
+ClosestPoint closest_on_surface_brute(const geom::TriSurface& surface,
+                                      const Eigen::Vector3d& p) {
     ClosestPoint best;
     best.distance = std::numeric_limits<double>::infinity();
     for (std::size_t t = 0; t < surface.triangles.size(); ++t) {
@@ -245,6 +247,52 @@ ClosestPoint closest_on_surface(const geom::TriSurface& surface, const Eigen::Ve
     return best;
 }
 
+std::optional<BoundaryTarget>
+owned_boundary_projection_target(const Eigen::Vector3d& p, std::uint32_t node,
+                                 BoundaryProjectionContext* context) {
+    if (context == nullptr || !context->target) {
+        return std::nullopt;
+    }
+    BoundarySupport transient;
+    BoundarySupport* support = &transient;
+    if (context->provenance != nullptr) {
+        if (context->provenance->size() <= node) {
+            context->provenance->resize(static_cast<std::size_t>(node) + 1);
+        }
+        support = &(*context->provenance)[node];
+    }
+    const BoundarySupport owner = *support;
+    auto target = context->target(p, *support);
+    // A classified owner is immutable. In particular, vertex and protected
+    // edge ownership can never silently fall back to a face.
+    if (owner.kind != BoundarySupportKind::kUnknown &&
+        (support->kind != owner.kind || support->id != owner.id)) {
+        *support = owner;
+        return std::nullopt;
+    }
+    if (target && target->point.allFinite()) {
+        target->distance = (target->point - p).norm();
+        if (std::isfinite(target->distance)) {
+            return target;
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<BoundaryTarget> boundary_projection_target(const geom::TriSurface& surface,
+                                                         const Eigen::Vector3d& p,
+                                                         std::uint32_t node,
+                                                         BoundaryProjectionContext* context) {
+    if (context != nullptr && context->target) {
+        return owned_boundary_projection_target(p, node, context);
+    }
+    const ClosestPoint cp = closest_on_surface(surface, p);
+    if (!std::isfinite(cp.distance)) {
+        return std::nullopt;
+    }
+    return BoundaryTarget{cp.point, cp.distance};
+}
+
 ConformityStats surface_conformity(const geom::TriSurface& surface,
                                    const std::vector<Eigen::Vector3d>& points,
                                    const std::vector<std::uint32_t>& point_indices) {
@@ -263,13 +311,13 @@ ConformityStats surface_conformity(const geom::TriSurface& surface,
     return s;
 }
 
-SnapStats snap_boundary_nodes(const geom::TriSurface& surface,
-                              std::vector<Eigen::Vector3d>& nodes,
-                              const std::vector<std::uint32_t>& boundary_nodes, double h,
-                              const CollectOffendersFn& collect_offenders, double max_move_frac,
-                              int passes, std::span<const geom::SharpEdge> feature_edges,
-                              const RepairInteriorFn& repair_interior,
-                              const NodeOffendsFn& node_offends, bool defer_coupled) {
+SnapStats
+snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d>& nodes,
+                    const std::vector<std::uint32_t>& boundary_nodes, double h,
+                    const CollectOffendersFn& collect_offenders, double max_move_frac,
+                    int passes, std::span<const geom::SharpEdge> feature_edges,
+                    const RepairInteriorFn& repair_interior, const NodeOffendsFn& node_offends,
+                    bool defer_coupled, BoundaryProjectionContext* projection) {
     SnapStats stats;
     if (boundary_nodes.empty() || !(h > 0.0) || !std::isfinite(h) || !collect_offenders) {
         return stats;
@@ -300,26 +348,40 @@ SnapStats snap_boundary_nodes(const geom::TriSurface& surface,
                 continue;
             }
             const Eigen::Vector3d p = nodes[ni];
-            const auto cp = closest_on_surface(surface, p);
             Eigen::Vector3d target = p;
             double dist = 0.0;
             bool have = false;
-            // Feature prefer only when the node is *as close* to a crease as to
-            // the surface (true rim). Hole-wall / free-face nodes often sit near
-            // a rim in 3D (thin walls) but their closest surface is the wall —
-            // those must project to the wall, not collapse onto the rim edge.
-            if (!feature_edges.empty()) {
-                const auto cf = geom::closest_on_features(p, surface, feature_edges);
-                if (std::isfinite(cf.distance) && cf.distance > 1e-15 &&
-                    cf.distance <= edge_prefer_r &&
-                    cf.distance <= cp.distance + 0.08 * h) {
-                    target = cf.point;
-                    dist = cf.distance;
+            // Exact CAD ownership wins. Unknown nodes are classified once by
+            // the callback; known vertex/edge/face ids persist across passes.
+            // Once an exact oracle is installed, never fall back to a triangle
+            // or sampled feature target: doing so could move an owned node
+            // across a trimmed face or sharp edge when its exact projection
+            // temporarily fails.
+            if (projection != nullptr && projection->target) {
+                const auto exact = boundary_projection_target(surface, p, ni, projection);
+                if (exact && exact->distance > 1e-15 && exact->distance <= search_r) {
+                    target = exact->point;
+                    dist = exact->distance;
                     have = true;
                 }
-            }
-            if (!have) {
-                if (cp.distance > 1e-15 && cp.distance <= search_r) {
+                if (!have) {
+                    continue;
+                }
+            } else {
+                // Legacy tessellation heuristic for contexts without a live
+                // CAD projection oracle.
+                const auto cp = closest_on_surface(surface, p);
+                if (!feature_edges.empty()) {
+                    const auto cf = geom::closest_on_features(p, surface, feature_edges);
+                    if (std::isfinite(cf.distance) && cf.distance > 1e-15 &&
+                        cf.distance <= edge_prefer_r &&
+                        cf.distance <= cp.distance + 0.08 * h) {
+                        target = cf.point;
+                        dist = cf.distance;
+                        have = true;
+                    }
+                }
+                if (!have && cp.distance > 1e-15 && cp.distance <= search_r) {
                     target = cp.point;
                     dist = cp.distance;
                     have = true;
@@ -399,8 +461,7 @@ SnapStats snap_boundary_nodes(const geom::TriSurface& surface,
                 double picked_move = -1.0;
                 for (const auto ni : offenders) {
                     const auto it = moved.find(ni);
-                    if (it == moved.end() ||
-                        (skip_deferred && deferred.count(ni) != 0) ||
+                    if (it == moved.end() || (skip_deferred && deferred.count(ni) != 0) ||
                         !node_offends(ni)) {
                         continue;
                     }
@@ -551,8 +612,8 @@ SnapStats snap_boundary_nodes(const geom::TriSurface& surface,
                         }
                         bad = f;
                     }
-                    for (int i = 0;
-                         i < kBisectSteps && (bad - good) * span > bracket_tol; ++i) {
+                    for (int i = 0; i < kBisectSteps && (bad - good) * span > bracket_tol;
+                         ++i) {
                         const double mid = 0.5 * (good + bad);
                         nodes[r.node] = r.original + mid * (r.snapped - r.original);
                         if (node_offends(r.node)) {
@@ -631,7 +692,8 @@ SmoothStats smooth_boundary_nodes(const geom::TriSurface& surface,
                                   std::span<const std::array<std::uint32_t, 4>> boundary_faces,
                                   double h, const CollectOffendersFn& collect_offenders,
                                   int passes, double relax,
-                                  std::span<const geom::SharpEdge> feature_edges) {
+                                  std::span<const geom::SharpEdge> feature_edges,
+                                  BoundaryProjectionContext* projection) {
     SmoothStats stats;
     if (boundary_faces.empty() || !(h > 0.0) || !std::isfinite(h) || !collect_offenders) {
         return stats;
@@ -672,9 +734,22 @@ SmoothStats smooth_boundary_nodes(const geom::TriSurface& surface,
     enum class Kind : std::uint8_t { kFree, kCrease, kFrozen };
     std::unordered_map<std::uint32_t, Kind> kind;
     kind.reserve(nbr.size());
+    const bool exact_owners = projection != nullptr && projection->target;
     for (const auto& [ni, _] : nbr) {
         Kind k = Kind::kFree;
-        if (!feature_edges.empty()) {
+        if (exact_owners) {
+            // Classification is a side effect of the first exact target query;
+            // the point itself is not moved during this setup pass.
+            (void)boundary_projection_target(surface, nodes[ni], ni, projection);
+            if (projection->provenance != nullptr && ni < projection->provenance->size()) {
+                const BoundarySupport owner = (*projection->provenance)[ni];
+                if (owner.kind == BoundarySupportKind::kCadVertex) {
+                    k = Kind::kFrozen;
+                } else if (owner.kind == BoundarySupportKind::kCadEdge) {
+                    k = Kind::kCrease;
+                }
+            }
+        } else if (!feature_edges.empty()) {
             const double df =
                 geom::closest_on_features(nodes[ni], surface, feature_edges).distance;
             if (df <= on_crease_r) {
@@ -685,7 +760,7 @@ SmoothStats smooth_boundary_nodes(const geom::TriSurface& surface,
         }
         kind.emplace(ni, k);
     }
-    if (feature_edges.empty()) {
+    if (!exact_owners && feature_edges.empty()) {
         // No CAD crease info: protect sharp geometry intrinsically — freeze
         // nodes whose incident boundary-face normals disagree strongly (box
         // edges/corners). Smoothly curved patches keep a tight normal cone.
@@ -755,8 +830,15 @@ SmoothStats smooth_boundary_nodes(const geom::TriSurface& surface,
                 continue;
             }
             Eigen::Vector3d p = nodes[ni] + relax * (centroid - nodes[ni]);
-            // Re-project so travel is tangential.
-            if (k == Kind::kCrease) {
+            // Re-project so travel is tangential. Exact owners are always
+            // resolved through the same constrained oracle used by snap.
+            if (exact_owners) {
+                const auto target = boundary_projection_target(surface, p, ni, projection);
+                if (!target || target->distance > 0.75 * h) {
+                    continue;
+                }
+                p = target->point;
+            } else if (k == Kind::kCrease) {
                 const auto cf = geom::closest_on_features(p, surface, feature_edges);
                 if (!std::isfinite(cf.distance)) {
                     continue;

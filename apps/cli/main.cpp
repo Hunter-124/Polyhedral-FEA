@@ -6,6 +6,7 @@
 #include "adapt/graded_sizing.hpp"
 #include "adapt/loop.hpp"
 #include "fea/backend.hpp"
+#include "fea/boundary_faces.hpp"
 #include "fea/cell_quality.hpp"
 #include "fea/material.hpp"
 #include "fea/p_elevate.hpp"
@@ -15,6 +16,7 @@
 #include "fea/zz.hpp"
 #include "geom/cad_topology.hpp"
 #include "geom/step.hpp"
+#include "mesh/brep_fidelity.hpp"
 #include "mesh/tet_fill.hpp"
 #include "pipeline/scene.hpp"
 
@@ -28,7 +30,9 @@
 #include <cstring>
 #include <format>
 #include <limits>
+#include <map>
 #include <optional>
+#include <set>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -114,7 +118,6 @@ bool parse_ceiling(std::span<char*> args, std::size_t& i, std::size_t& value) {
     return true;
 }
 
-
 polymesh::pipeline::VolumeMesher parse_mesher(const std::string& m) {
     if (m == "hybrid" || m == "zoo" || m == "mixed") {
         return polymesh::pipeline::VolumeMesher::kHybrid;
@@ -166,8 +169,7 @@ bool parse_box6(std::span<char*> args, std::size_t& i, BoxSel& b) {
     }
     double v[6];
     for (int k = 0; k < 6; ++k) {
-        v[static_cast<std::size_t>(k)] =
-            std::atof(args[i + 1 + static_cast<std::size_t>(k)]);
+        v[static_cast<std::size_t>(k)] = std::atof(args[i + 1 + static_cast<std::size_t>(k)]);
     }
     b.lo = Eigen::Vector3d(std::min(v[0], v[3]), std::min(v[1], v[4]), std::min(v[2], v[5]));
     b.hi = Eigen::Vector3d(std::max(v[0], v[3]), std::max(v[1], v[4]), std::max(v[2], v[5]));
@@ -177,7 +179,8 @@ bool parse_box6(std::span<char*> args, std::size_t& i, BoxSel& b) {
 }
 
 // Geometry+BC refine regions from optional fix/load boxes (loads finest).
-std::vector<polymesh::pipeline::RefineRegion> make_regions(const BoxSel& fix, const BoxSel& load) {
+std::vector<polymesh::pipeline::RefineRegion> make_regions(const BoxSel& fix,
+                                                           const BoxSel& load) {
     std::vector<polymesh::pipeline::RefineRegion> regions;
     if (load.set) {
         regions.push_back({load.lo, load.hi, 0.25});
@@ -193,7 +196,7 @@ struct LoadSpec {
     Eigen::Vector3d dir{0.0, 1.0, 0.0}; // unit, default +y (historical CLI load)
     double force = 1000.0;              // total resultant, N (historical default)
     double traction_pa = 0.0;           // pressure magnitude, Pa
-    bool traction_mode = false;          // last of --force/--traction wins
+    bool traction_mode = false;         // last of --force/--traction wins
 };
 
 // Parse --load-dir / --force / --traction at args[i]; advances i past values.
@@ -243,9 +246,9 @@ constexpr double kNormalMinDot = 0.7;
 struct BcSelection {
     std::vector<std::uint32_t> nodes;
     std::vector<polymesh::fea::SurfaceFace> faces;
-    std::size_t slab_nodes = 0;    // what the plain 0.51·h slab captured
-    bool face_fallback = false;    // slab was degenerate → normal-aligned faces
-    double fallback_band = 0.0;    // end band as a fraction of the x extent
+    std::size_t slab_nodes = 0; // what the plain 0.51·h slab captured
+    bool face_fallback = false; // slab was degenerate → normal-aligned faces
+    double fallback_band = 0.0; // end band as a fraction of the x extent
     bool from_box = false;
 };
 
@@ -353,10 +356,10 @@ std::size_t count_boundary_nodes(const std::vector<polymesh::fea::SurfaceFace>& 
 // side wall (for example z>=0.195 on a cylinder ending at z=0.2), keep only
 // faces whose normal aligns with the requested pressure direction. Use |dot|
 // because mixed-element boundary windings are not uniformly outward.
-std::vector<polymesh::fea::SurfaceFace> pressure_faces(
-    const polymesh::fea::NodalMesh& mesh,
-    const std::vector<polymesh::fea::SurfaceFace>& box_faces,
-    const Eigen::Vector3d& direction) {
+std::vector<polymesh::fea::SurfaceFace>
+pressure_faces(const polymesh::fea::NodalMesh& mesh,
+               const std::vector<polymesh::fea::SurfaceFace>& box_faces,
+               const Eigen::Vector3d& direction) {
     std::vector<polymesh::fea::SurfaceFace> out;
     out.reserve(box_faces.size());
     for (const auto& f : box_faces) {
@@ -374,8 +377,7 @@ std::vector<polymesh::fea::SurfaceFace> pressure_faces(
 // the inscribed polygon area of a coarse boundary mesh. If no unambiguous CAD
 // face matches, callers use the integrated mesh area.
 std::optional<double> cad_pressure_area(const polymesh::pipeline::Model& model,
-                                        const BoxSel& box,
-                                        const Eigen::Vector3d& direction) {
+                                        const BoxSel& box, const Eigen::Vector3d& direction) {
     if (!box.set || !model.cad.has_value()) {
         return std::nullopt;
     }
@@ -396,9 +398,8 @@ std::optional<double> cad_pressure_area(const polymesh::pipeline::Model& model,
             continue;
         }
         const bool in_box = std::all_of(points.begin(), points.end(), [&](const auto& p) {
-            return p.x() >= box.lo.x() && p.x() <= box.hi.x() &&
-                   p.y() >= box.lo.y() && p.y() <= box.hi.y() &&
-                   p.z() >= box.lo.z() && p.z() <= box.hi.z();
+            return p.x() >= box.lo.x() && p.x() <= box.hi.x() && p.y() >= box.lo.y() &&
+                   p.y() <= box.hi.y() && p.z() >= box.lo.z() && p.z() <= box.hi.z();
         });
         if (!in_box) {
             continue;
@@ -488,8 +489,7 @@ Eigen::VectorXd build_loads(const polymesh::fea::NodalMesh& mesh,
         resultant = applied.resultant;
         conservation_error = applied.conservation_error;
     } else {
-        const Eigen::Vector3d per_node =
-            total / static_cast<double>(fallback_nodes.size());
+        const Eigen::Vector3d per_node = total / static_cast<double>(fallback_nodes.size());
         for (const auto node : fallback_nodes) {
             loads.segment<3>(3 * static_cast<Eigen::Index>(node)) += per_node;
             resultant += per_node;
@@ -497,12 +497,11 @@ Eigen::VectorXd build_loads(const polymesh::fea::NodalMesh& mesh,
         conservation_error = (resultant - total).norm();
     }
     const std::string area_note =
-        node_fallback
-            ? std::format("node fallback={}", fallback_nodes.size())
-            : (exact_pressure_area.has_value()
-                   ? std::format("mesh area={:.9g} m², CAD area={:.9g} m²", mesh_area,
-                                 pressure_area)
-                   : std::format("area={:.9g} m²", mesh_area));
+        node_fallback ? std::format("node fallback={}", fallback_nodes.size())
+                      : (exact_pressure_area.has_value()
+                             ? std::format("mesh area={:.9g} m², CAD area={:.9g} m²",
+                                           mesh_area, pressure_area)
+                             : std::format("area={:.9g} m²", mesh_area));
     std::fprintf(report,
                  "load: %zu faces, %s, %s → |F|=%.9g N along (%.4g %.4g %.4g) | "
                  "Σf=(%.9g %.9g %.9g) N, conservation err=%.3g N\n",
@@ -512,10 +511,10 @@ Eigen::VectorXd build_loads(const polymesh::fea::NodalMesh& mesh,
                  total.norm(), spec.dir.x(), spec.dir.y(), spec.dir.z(), resultant.x(),
                  resultant.y(), resultant.z(), conservation_error);
     if (conservation_error > 1e-9) {
-        throw std::runtime_error(std::format(
-            "{}: load assembly lost {:.3g} N of the requested {:.6g} N resultant "
-            "(total-force conservation check failed)",
-            what, conservation_error, total.norm()));
+        throw std::runtime_error(
+            std::format("{}: load assembly lost {:.3g} N of the requested {:.6g} N resultant "
+                        "(total-force conservation check failed)",
+                        what, conservation_error, total.norm()));
     }
     return loads;
 }
@@ -706,9 +705,9 @@ int cmd_solve(std::span<char*> args) {
     }
 
     const auto model = polymesh::pipeline::Model::load(path);
-    const auto exact_pressure_area =
-        load_spec.traction_mode ? cad_pressure_area(model, load_box, load_spec.dir)
-                                : std::nullopt;
+    const auto exact_pressure_area = load_spec.traction_mode
+                                         ? cad_pressure_area(model, load_box, load_spec.dir)
+                                         : std::nullopt;
     const auto resolved =
         polymesh::pipeline::resolve_mesh_size(model, h, 30.0, max_elems, max_dof);
     h = resolved.h;
@@ -741,11 +740,13 @@ int cmd_solve(std::span<char*> args) {
         }
     }
     {
-        const auto plan = polymesh::pipeline::build_refinement_plan(model, h_use, regions, feature);
+        const auto plan =
+            polymesh::pipeline::build_refinement_plan(model, h_use, regions, feature);
         seeds = plan.refine_seeds;
         seed_band = plan.seed_band;
-        std::printf("refine: %zu geometry + %zu BC seeds → %zu seeds, band=%.4g m, h_fine=%.4g m\n",
-                    plan.n_geometry_seeds, plan.n_bc_seeds, seeds.size(), seed_band, plan.h_fine);
+        std::printf(
+            "refine: %zu geometry + %zu BC seeds → %zu seeds, band=%.4g m, h_fine=%.4g m\n",
+            plan.n_geometry_seeds, plan.n_bc_seeds, seeds.size(), seed_band, plan.h_fine);
     }
     auto mesh_now = [&](polymesh::pipeline::VolumeMesher m) {
         return polymesh::pipeline::volume_mesh(
@@ -898,8 +899,7 @@ int cmd_solve(std::span<char*> args) {
             }
         }
     }
-    const double sigma_zz_share =
-        diag_energy > 0.0 ? std::sqrt(zz_energy / diag_energy) : 0.0;
+    const double sigma_zz_share = diag_energy > 0.0 ? std::sqrt(zz_energy / diag_energy) : 0.0;
 
     std::vector<polymesh::fea::VtuPointData> pdata;
     pdata.push_back({.name = "von_Mises", .scalars = vm, .vectors = {}});
@@ -919,6 +919,82 @@ int cmd_solve(std::span<char*> args) {
                 max_principal_dir.z(), sigma_zz_share);
     std::printf("wrote %s\n", out_path.c_str());
     return 0;
+}
+
+double boundary_surface_volume(const std::vector<Eigen::Vector3d>& nodes,
+                               const std::vector<std::array<std::uint32_t, 4>>& faces) {
+    if (nodes.empty()) {
+        return 0.0;
+    }
+    const Eigen::Vector3d origin = nodes.front();
+    const auto tri_volume = [&](std::uint32_t ia, std::uint32_t ib, std::uint32_t ic) {
+        if (ia >= nodes.size() || ib >= nodes.size() || ic >= nodes.size()) {
+            return 0.0;
+        }
+        const Eigen::Vector3d a = nodes[ia] - origin;
+        const Eigen::Vector3d b = nodes[ib] - origin;
+        const Eigen::Vector3d c = nodes[ic] - origin;
+        return a.dot(b.cross(c)) / 6.0;
+    };
+    double signed_volume = 0.0;
+    for (const auto& face : faces) {
+        signed_volume += tri_volume(face[0], face[1], face[2]);
+        if (face[3] != face[2]) {
+            signed_volume += tri_volume(face[0], face[2], face[3]);
+        }
+    }
+    return std::abs(signed_volume);
+}
+
+std::vector<polymesh::geom::MeshEdgeSegment>
+mesh_dihedral_feature_segments(const std::vector<Eigen::Vector3d>& nodes,
+                               const std::vector<std::array<std::uint32_t, 4>>& faces,
+                               double sharp_angle_deg = 30.0) {
+    using Edge = std::pair<std::uint32_t, std::uint32_t>;
+    std::map<Edge, std::vector<Eigen::Vector3d>> edge_normals;
+    for (const auto& face : faces) {
+        const std::size_t count = face[3] == face[2] ? 3 : 4;
+        bool valid = true;
+        for (std::size_t i = 0; i < count; ++i) {
+            valid = valid && face[i] < nodes.size();
+        }
+        if (!valid) {
+            continue;
+        }
+        Eigen::Vector3d normal =
+            (nodes[face[1]] - nodes[face[0]]).cross(nodes[face[2]] - nodes[face[0]]);
+        const double norm = normal.norm();
+        if (!(norm > 1e-15)) {
+            continue;
+        }
+        normal /= norm;
+        for (std::size_t i = 0; i < count; ++i) {
+            std::uint32_t a = face[i];
+            std::uint32_t b = face[(i + 1) % count];
+            if (a == b) {
+                continue;
+            }
+            if (a > b) {
+                std::swap(a, b);
+            }
+            edge_normals[{a, b}].push_back(normal);
+        }
+    }
+
+    const double threshold = sharp_angle_deg * 3.14159265358979323846 / 180.0;
+    std::vector<polymesh::geom::MeshEdgeSegment> segments;
+    segments.reserve(edge_normals.size());
+    for (const auto& [edge, normals] : edge_normals) {
+        if (normals.size() != 2) {
+            continue;
+        }
+        const double cosine = std::clamp(normals[0].dot(normals[1]), -1.0, 1.0);
+        if (std::acos(cosine) < threshold) {
+            continue;
+        }
+        segments.push_back({nodes[edge.first], nodes[edge.second]});
+    }
+    return segments;
 }
 
 // Structured diagnostics: import fidelity, mesh quality, and phase timings as
@@ -982,9 +1058,9 @@ int cmd_diag(std::span<char*> args) {
 
     auto t0 = clock::now();
     const auto model = polymesh::pipeline::Model::load(path);
-    const auto exact_pressure_area =
-        load_spec.traction_mode ? cad_pressure_area(model, load_box, load_spec.dir)
-                                : std::nullopt;
+    const auto exact_pressure_area = load_spec.traction_mode
+                                         ? cad_pressure_area(model, load_box, load_spec.dir)
+                                         : std::nullopt;
     const double import_ms = ms(clock::now() - t0);
     const double bbox_diag = (model.bbox_max - model.bbox_min).norm();
 
@@ -1016,6 +1092,18 @@ int cmd_diag(std::span<char*> args) {
     const auto q = polymesh::fea::summarize_cell_quality(vol.mesh);
     const double q_min = q.min;
     const double q_mean = q.mean;
+
+    const auto fidelity_faces = polymesh::fea::extract_boundary_faces(vol.mesh);
+    constexpr std::size_t kBRepSurfaceSampleCeiling = 10'000;
+    polymesh::mesh::BRepGeometryFidelity fidelity;
+    if (model.cad && !model.cad->empty()) {
+        const auto feature_segments =
+            mesh_dihedral_feature_segments(vol.mesh.nodes, fidelity_faces);
+        const double mesh_volume = boundary_surface_volume(vol.mesh.nodes, fidelity_faces);
+        fidelity = polymesh::mesh::evaluate_brep_geometry_fidelity(
+            *model.cad, vol.mesh.nodes, fidelity_faces, feature_segments, h, mesh_volume,
+            kBRepSurfaceSampleCeiling);
+    }
 
     double max_vm = 0.0, max_u = 0.0, global_eta = 0.0, solve_ms = 0.0;
     std::size_t dof = 0;
@@ -1051,7 +1139,8 @@ int cmd_diag(std::span<char*> args) {
             polymesh::fea::SolveOptions solve_options;
             solve_options.max_mem_gb = max_mem_gb;
             solve_options.on_note = [](std::string_view note) {
-                std::fprintf(stderr, "diag: %.*s\n", static_cast<int>(note.size()), note.data());
+                std::fprintf(stderr, "diag: %.*s\n", static_cast<int>(note.size()),
+                             note.data());
             };
             const Eigen::VectorXd uu =
                 polymesh::fea::solve_elastostatics(vol.mesh, mat, bc, loads, solve_options);
@@ -1061,8 +1150,8 @@ int cmd_diag(std::span<char*> args) {
             dof = 3 * vol.mesh.nodes.size();
             for (std::size_t i = 0; i < zz.nodal_stress.size(); ++i) {
                 max_vm = std::max(max_vm, polymesh::fea::von_mises(zz.nodal_stress[i]));
-                max_u = std::max(max_u,
-                                 uu.segment<3>(3 * static_cast<Eigen::Index>(i)).norm());
+                max_u =
+                    std::max(max_u, uu.segment<3>(3 * static_cast<Eigen::Index>(i)).norm());
             }
             solved = true;
         }
@@ -1076,22 +1165,81 @@ int cmd_diag(std::span<char*> args) {
     // here: a new mesher must fail the -Wswitch build, not report "other".
     const std::string mesher_name = [&]() -> const char* {
         switch (mesher) {
-        case polymesh::pipeline::VolumeMesher::kTetFill: return "tet";
-        case polymesh::pipeline::VolumeMesher::kHexFill: return "hex";
-        case polymesh::pipeline::VolumeMesher::kHexVem: return "hexvem";
-        case polymesh::pipeline::VolumeMesher::kGradedTet: return "graded";
-        case polymesh::pipeline::VolumeMesher::kHexPyramid: return "hexpyr";
-        case polymesh::pipeline::VolumeMesher::kPrismSweep: return "prism";
-        case polymesh::pipeline::VolumeMesher::kHybrid: return "hybrid";
-        case polymesh::pipeline::VolumeMesher::kOctahedral: return "octa";
-        case polymesh::pipeline::VolumeMesher::kHybridVem: return "hybridvem";
-        case polymesh::pipeline::VolumeMesher::kVaryhedron: return "varyhedron";
-        case polymesh::pipeline::VolumeMesher::kCvtPoly: return "cvt_poly";
+        case polymesh::pipeline::VolumeMesher::kTetFill:
+            return "tet";
+        case polymesh::pipeline::VolumeMesher::kHexFill:
+            return "hex";
+        case polymesh::pipeline::VolumeMesher::kHexVem:
+            return "hexvem";
+        case polymesh::pipeline::VolumeMesher::kGradedTet:
+            return "graded";
+        case polymesh::pipeline::VolumeMesher::kHexPyramid:
+            return "hexpyr";
+        case polymesh::pipeline::VolumeMesher::kPrismSweep:
+            return "prism";
+        case polymesh::pipeline::VolumeMesher::kHybrid:
+            return "hybrid";
+        case polymesh::pipeline::VolumeMesher::kOctahedral:
+            return "octa";
+        case polymesh::pipeline::VolumeMesher::kHybridVem:
+            return "hybridvem";
+        case polymesh::pipeline::VolumeMesher::kVaryhedron:
+            return "varyhedron";
+        case polymesh::pipeline::VolumeMesher::kCvtPoly:
+            return "cvt_poly";
         }
         return "unknown"; // only reachable from an out-of-range int cast
     }();
     const double mesh_throughput =
-        mesh_ms > 0.0 ? static_cast<double>(vol.mesh.elements.size()) / (mesh_ms / 1000.0) : 0.0;
+        mesh_ms > 0.0 ? static_cast<double>(vol.mesh.elements.size()) / (mesh_ms / 1000.0)
+                      : 0.0;
+
+    const auto distance_json = [](const polymesh::mesh::DistanceDistribution& d) {
+        return std::format("{{\"count\":{},\"rms_m\":{:.9g},\"p95_m\":{:.9g},"
+                           "\"p99_m\":{:.9g},\"max_m\":{:.9g},\"p95_over_h\":{:.9g},"
+                           "\"p99_over_h\":{:.9g},\"max_over_h\":{:.9g},"
+                           "\"p99_over_bbox\":{:.9g}}}",
+                           d.metres.count, d.metres.rms, d.metres.p95, d.metres.p99,
+                           d.metres.max, d.over_h.p95, d.over_h.p99, d.over_h.max,
+                           d.over_bbox_diagonal.p99);
+    };
+    constexpr double kRadiansToDegrees = 57.2957795130823208768;
+    const auto& normal = fidelity.mesh_boundary_normal_angle_to_brep_normal;
+    const std::string normal_json = std::format(
+        "{{\"count\":{},\"rms_deg\":{:.9g},\"p95_deg\":{:.9g},"
+        "\"p99_deg\":{:.9g},\"max_deg\":{:.9g}}}",
+        normal.count, normal.rms * kRadiansToDegrees, normal.p95 * kRadiansToDegrees,
+        normal.p99 * kRadiansToDegrees, normal.max * kRadiansToDegrees);
+    const std::string relative_volume =
+        fidelity.has_relative_volume_error
+            ? std::format("{:.9g}", fidelity.mesh_vs_brep_relative_volume_error)
+            : "null";
+    const std::string fidelity_json = std::format(
+        "{{\"available\":{},\"brep_valid\":{},\"brep_closed\":{},"
+        "\"brep_volume_m3\":{:.9g},\"brep_surface_area_m2\":{:.9g},"
+        "\"mesh_boundary_to_brep\":{},"
+        "\"brep_surface_samples_to_mesh_boundary\":{},"
+        "\"brep_surface_sampler\":\"exact_trimmed_face_uv_grid\","
+        "\"brep_surface_sample_ceiling\":{},\"brep_surface_sample_faces\":{},"
+        "\"brep_surface_uv_attempts\":{},\"brep_surface_fallback_vertices\":{},"
+        "\"normal_angle\":{},"
+        "\"mesh_feature_classifier\":\"boundary_dihedral_ge_30_deg\","
+        "\"mesh_feature_to_sharp_brep_edge\":{},"
+        "\"sharp_brep_edge_to_mesh_feature\":{},\"brep_vertex_to_mesh_node\":{},"
+        "\"mesh_feature_segments\":{},\"max_chordal_efficiency\":{:.9g},"
+        "\"relative_volume_error\":{}}}",
+        fidelity.available ? "true" : "false", fidelity.brep.valid ? "true" : "false",
+        fidelity.brep.closed ? "true" : "false", fidelity.brep.volume,
+        fidelity.brep.surface_area,
+        distance_json(fidelity.mesh_boundary_samples_to_brep_surface),
+        distance_json(fidelity.brep_surface_samples_to_mesh_boundary),
+        kBRepSurfaceSampleCeiling, fidelity.brep_surface_sample_face_count,
+        fidelity.brep_surface_uv_attempt_count, fidelity.brep_surface_fallback_vertex_count,
+        normal_json, distance_json(fidelity.mesh_feature_segment_samples_to_sharp_brep_edges),
+        distance_json(fidelity.sharp_brep_edge_samples_to_mesh_feature_segments),
+        distance_json(fidelity.brep_vertices_to_mesh_boundary_nodes),
+        fidelity.mesh_feature_segment_count, fidelity.max_sharp_edge_chordal_efficiency,
+        relative_volume);
 
     const std::string json = std::format(
         "{{\n"
@@ -1104,6 +1252,7 @@ int cmd_diag(std::span<char*> args) {
         "\"geometry_seeds\": {}, \"bc_seeds\": {} }},\n"
         "  \"timing_ms\": {{ \"import\": {:.3f}, \"mesh\": {:.3f}, \"solve\": {:.3f} }},\n"
         "  \"mesh_throughput_elem_per_s\": {:.1f},\n"
+        "  \"fidelity\": {},\n"
         "  \"solve\": {{ \"ran\": {}, \"dof\": {}, \"max_von_mises\": {:.6g}, "
         "\"max_disp\": {:.6g}, \"global_eta\": {:.6g} }},\n"
         "  \"mesher_note\": \"{}\"\n"
@@ -1111,9 +1260,8 @@ int cmd_diag(std::span<char*> args) {
         model.name, mesher_name, model.surface.vertices.size(), model.surface.triangles.size(),
         bbox_diag, model.cad ? "true" : "false", h, vol.mesh.nodes.size(),
         vol.mesh.elements.size(), q_min, q_mean, plan.n_geometry_seeds, plan.n_bc_seeds,
-        import_ms, mesh_ms, solve_ms, mesh_throughput, solved ? "true" : "false", dof, max_vm,
-        max_u, global_eta,
-        resolved.note);
+        import_ms, mesh_ms, solve_ms, mesh_throughput, fidelity_json,
+        solved ? "true" : "false", dof, max_vm, max_u, global_eta, resolved.note);
 
     if (!json_path.empty()) {
         std::FILE* f = std::fopen(json_path.c_str(), "w");

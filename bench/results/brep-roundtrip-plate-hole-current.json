@@ -1,0 +1,222 @@
+{
+  "schema": "polymesh.faceted-brep-roundtrip.v2",
+  "generated_utc": "2026-08-09T01:03:50.101473+00:00",
+  "representation": {
+    "kind": "faceted_brep",
+    "description": "planar triangular BRep faces sewn from the exterior VTU skin",
+    "smooth_or_analytic_surface_fitting": false
+  },
+  "commands": [
+    {
+      "kind": "invocation",
+      "argv": [
+        "/usr/bin/python3",
+        "/home/hunter/Desktop/Polyhedral-FEA/scripts/evaluate_brep_roundtrip.py",
+        "--source",
+        "tests/fixtures/parts/plate_hole.step",
+        "--mesh",
+        "/tmp/plate-hole-current.vtu",
+        "--out-brep",
+        "/tmp/plate-hole-current-faceted.brep",
+        "--out-json",
+        "bench/results/brep-roundtrip-plate-hole-current.json",
+        "--h",
+        "0.006",
+        "--max-faces",
+        "50000",
+        "--max-samples",
+        "500",
+        "--max-mesh-bytes",
+        "2000000",
+        "--max-mesh-points",
+        "20000",
+        "--max-mesh-cells",
+        "50000"
+      ],
+      "display": "/usr/bin/python3 /home/hunter/Desktop/Polyhedral-FEA/scripts/evaluate_brep_roundtrip.py --source tests/fixtures/parts/plate_hole.step --mesh /tmp/plate-hole-current.vtu --out-brep /tmp/plate-hole-current-faceted.brep --out-json bench/results/brep-roundtrip-plate-hole-current.json --h 0.006 --max-faces 50000 --max-samples 500 --max-mesh-bytes 2000000 --max-mesh-points 20000 --max-mesh-cells 50000",
+      "cwd": "/home/hunter/Desktop/Polyhedral-FEA"
+    }
+  ],
+  "provenance": {
+    "script": {
+      "path": "/home/hunter/Desktop/Polyhedral-FEA/scripts/evaluate_brep_roundtrip.py",
+      "sha256": "823fac56bf53933eb26060b895c751bdcce79a3c2a9e2ee51e1f23c6c9e38525",
+      "bytes": 37657,
+      "mtime_ns": 1786237132433068724
+    },
+    "python": "3.14.6 (main, Jun 11 2026, 00:00:00) [GCC 16.1.1 20260515 (Red Hat 16.1.1-2)]",
+    "platform": "Linux-6.19.10-300.fc44.x86_64-x86_64-with-glibc2.43",
+    "dependencies": {
+      "numpy": "2.4.6",
+      "pyvista": "0.48.4",
+      "vtk": "9.6.2",
+      "cadquery-ocp": null
+    },
+    "source": {
+      "path": "/home/hunter/Desktop/Polyhedral-FEA/tests/fixtures/parts/plate_hole.step",
+      "format": "STEP",
+      "sha256": "a482377fd70a3a28de4972b375b47b7a2b82fd14f51475940f596ff67dc7a350",
+      "bytes": 19267,
+      "mtime_ns": 1783894868938906930
+    },
+    "mesh": {
+      "path": "/tmp/plate-hole-current.vtu",
+      "format": "VTU",
+      "sha256": "d03b7ca176b7351d2e3551dc8defc8b048a8d87d94d47301b53c704ed3cf674c",
+      "bytes": 1152139,
+      "mtime_ns": 1786234310905110495
+    },
+    "output": {
+      "path": "/tmp/plate-hole-current-faceted.brep",
+      "format": "BREP_NATIVE",
+      "sha256": "28cec46df9041bf3a3d0dcb18cd388d5359f256349db2d33b172e50d52c0e259",
+      "bytes": 8848075,
+      "mtime_ns": 1786237430084446408
+    }
+  },
+  "parameters": {
+    "h": 0.006,
+    "max_faces": 50000,
+    "max_samples_per_direction": 500,
+    "max_mesh_bytes": 2000000,
+    "max_mesh_points": 20000,
+    "max_mesh_cells": 50000,
+    "mesh_sample_order": "exact-coordinate lexicographic order",
+    "mesh_subsampling": "evenly spaced integer indices including both endpoints; no randomness",
+    "source_sample_order": "TopExp face order, then cell-centered UV grid order; no randomness"
+  },
+  "source_brep": {
+    "brepcheck_valid": true,
+    "topology": {
+      "solids": 1,
+      "shells": 1,
+      "faces": 7,
+      "edges": 30,
+      "vertices": 60
+    },
+    "bbox": {
+      "minimum": [
+        -0.10000010000000001,
+        -0.050000100000000006,
+        -1e-07
+      ],
+      "maximum": [
+        0.10000010000000001,
+        0.050000100000000006,
+        0.0100001
+      ],
+      "diagonal": 0.2238305698516626
+    }
+  },
+  "volume_mesh": {
+    "points": 11980,
+    "cells": 9120,
+    "cell_types": [
+      {
+        "vtk_type_id": 12,
+        "vtk_class": "vtkHexahedron",
+        "dimension": 3,
+        "count": 9120
+      }
+    ],
+    "skin_points": 5488,
+    "preflight": {
+      "piece_count": 1,
+      "declared_points": 11980,
+      "declared_cells": 9120,
+      "header_scan_byte_limit": 1048576
+    }
+  },
+  "mesh_skin_closure": {
+    "closed": true,
+    "polygon_faces": 5488,
+    "faceted_brep_faces": 10976,
+    "unique_edges": 10976,
+    "boundary_edges": 0,
+    "nonmanifold_edges": 0,
+    "inconsistent_orientation_edges": 0
+  },
+  "faceted_brep": {
+    "sewing_tolerance": 2.2383056985166262e-11,
+    "sewing_free_edges": 0,
+    "sewing_multiple_edges": 0,
+    "sewn_shell_count": 1,
+    "solid_attempted": true,
+    "result_brepcheck_valid": true,
+    "result_topology": {
+      "solids": 1,
+      "shells": 1,
+      "faces": 10976,
+      "edges": 32928,
+      "vertices": 65856
+    }
+  },
+  "directional_sampled_distances": {
+    "query_method": "OpenCASCADE BRepExtrema_DistShapeShape exact point-to-shape minimum",
+    "mesh_boundary_samples_to_source_live_brep": {
+      "direction": "exterior VTU boundary sample point -> source live BRep",
+      "sample_basis": "exterior skin vertices and original polygon centroids",
+      "candidate_points": 10976,
+      "evaluated_samples": 500,
+      "statistics": {
+        "absolute": {
+          "rms": 3.517652502264694e-05,
+          "p95": 0.0,
+          "p99": 0.000137127631244111,
+          "max": 0.00046106735836788594
+        },
+        "over_bbox_diagonal": {
+          "rms": 0.0001571569292164122,
+          "p95": 0.0,
+          "p99": 0.0006126403168923194,
+          "max": 0.0020598944937389265
+        },
+        "over_h": {
+          "rms": 0.005862754170441157,
+          "p95": 0.0,
+          "p99": 0.022854605207351834,
+          "max": 0.07684455972798099
+        }
+      }
+    },
+    "source_exact_trimmed_face_samples_to_faceted_brep": {
+      "direction": "source exact trimmed-face sample point -> constructed faceted BRep",
+      "sample_basis": "bounded cell-centered UV points classified IN/ON each exact trimmed face, with exact face-vertex fallback only when none are accepted",
+      "sampling": {
+        "sampler": "deterministic_bounded_exact_trimmed_face_uv",
+        "face_count": 7,
+        "quota_allocation": "one sample per face, then equal quotient/remainder distribution in deterministic TopExp face order",
+        "uv_grid": "cell-centered rectangular parameter-space grid",
+        "max_uv_attempts": 2000,
+        "uv_attempt_multiplier": 4,
+        "attempted_uv_points": 500,
+        "accepted_trimmed_uv_points": 500,
+        "fallback_exact_face_vertex_points": 0,
+        "accepted_point_storage_limit": 500,
+        "accepted_points": 500,
+        "max_budget": 500
+      },
+      "evaluated_samples": 500,
+      "statistics": {
+        "absolute": {
+          "rms": 0.00014725113331659015,
+          "p95": 0.0002852491351082995,
+          "p99": 0.0007060413542312495,
+          "max": 0.0009388529695713103
+        },
+        "over_bbox_diagonal": {
+          "rms": 0.0006578687326497748,
+          "p95": 0.001274397573563523,
+          "p99": 0.0031543562378416787,
+          "max": 0.004194480540318995
+        },
+        "over_h": {
+          "rms": 0.024541855552765026,
+          "p95": 0.04754152251804992,
+          "p99": 0.11767355903854158,
+          "max": 0.1564754949285517
+        }
+      }
+    }
+  }
+}

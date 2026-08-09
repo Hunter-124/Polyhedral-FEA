@@ -85,7 +85,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                         const Eigen::Vector3d& bbox_max, double h, int skin_layers,
                         std::span<const geom::SharpEdge> features, double feature_band,
                         std::span<const Eigen::Vector3d> refine_seeds, double seed_band,
-                        double curvature_turn_deg) {
+                        double curvature_turn_deg, BoundaryProjectionContext* projection) {
     if (!(h > 0.0) || !std::isfinite(h)) {
         throw ValidityError("graded_tet_fill_surface: h must be positive");
     }
@@ -176,12 +176,14 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         (feature_band > 0.0) || (seed_band > 0.0) || (curvature_turn_deg > 0.0);
     const int skin_thresh = have_geo_drivers ? 0 : std::min(skin_layers, skin_cap);
 
-    // refine_level: 0=bulk, 1=L1 (~h/2), 2=L2 (~h/4 near high-κ seeds)
+    // refine_level: 0=bulk, 1=L1, 2=L2, 3=deep protected-feature core.
+    // Level 3 adds bisection waves without deepening a-posteriori/BC seed balls.
     std::vector<std::uint8_t> refine_level(inside.size(), 0);
     std::vector<char> is_feature(inside.size(), 0);
     std::vector<char> is_seed(inside.size(), 0);
     std::vector<char> is_l1(inside.size(), 0);
     std::vector<char> is_l2(inside.size(), 0);
+    std::vector<char> is_deep_feature(inside.size(), 0);
 
     for (std::size_t c = 0; c < inside.size(); ++c) {
         if (!inside[c]) {
@@ -202,16 +204,13 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         stamp_curvature_cells(is_l1, &is_l2, nullptr, nx, ny, nz, grid, surface,
                               curvature_turn_deg * 3.14159265358979323846 / 180.0);
     }
-    // Feature core → L2 so hole rims get two LEB levels (~h/4).
+    // Protected feature core gets two extra LEB waves so hole rims are not
+    // visibly polygonal. Keep this tag distinct from curvature/adapt seeds:
+    // deepening every seed ball inflated routine CAD solves by an order of
+    // magnitude without improving sharp-edge fidelity.
     if (feature_band > 0.0 && !features.empty()) {
-        std::vector<char> feature_core(inside.size(), 0);
-        stamp_feature_cells(feature_core, nullptr, nx, ny, nz, grid, surface, features,
+        stamp_feature_cells(is_deep_feature, nullptr, nx, ny, nz, grid, surface, features,
                             0.75 * feature_band);
-        for (std::size_t c = 0; c < inside.size(); ++c) {
-            if (feature_core[c]) {
-                is_l2[c] = 1;
-            }
-        }
     }
 
     for (std::size_t c = 0; c < inside.size(); ++c) {
@@ -221,6 +220,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             is_seed[c] = 0;
             is_l1[c] = 0;
             is_l2[c] = 0;
+            is_deep_feature[c] = 0;
             continue;
         }
         if (is_l1[c] || is_feature[c]) {
@@ -229,14 +229,16 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         if (is_l2[c] || is_seed[c]) {
             refine_level[c] = 2;
         }
+        if (is_deep_feature[c]) {
+            refine_level[c] = 3;
+        }
     }
 
     bool any_l2 = false;
+    bool any_deep_feature = false;
     for (auto lv : refine_level) {
-        if (lv >= 2) {
-            any_l2 = true;
-            break;
-        }
+        any_l2 = any_l2 || lv >= 2;
+        any_deep_feature = any_deep_feature || lv >= 3;
     }
 
     GradedTetFillOutput out;
@@ -421,7 +423,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                         offenders.insert(n.begin(), n.end());
                     }
                 },
-                /*max_move_frac=*/1.05, /*passes=*/5, features);
+                /*max_move_frac=*/1.05, /*passes=*/5, features, {}, {},
+                /*defer_coupled=*/false, projection);
             for (auto& n : out.mesh.tets) {
                 const double v = tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
                                                    out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
@@ -436,6 +439,13 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         run_leb_for_min_level(1);
         if (any_l2) {
             run_leb_for_min_level(2);
+        }
+        if (any_deep_feature) {
+            // A single longest-edge split halves volume, not edge length.
+            // Additional feature-only waves provide enough curve segments for
+            // exact BRep rim projection without deepening ordinary seed balls.
+            run_leb_for_min_level(3);
+            run_leb_for_min_level(3);
         }
     }
 
@@ -476,7 +486,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         // Strong budget so LEB mid-edges on holes leave the Cartesian stair.
         // Use max(hc, ~cell diagonal) scale via frac>1; soft-unsnap keeps quality.
         snap_boundary_nodes(surface, out.mesh.nodes, snap_nodes, hc, collect_invert,
-                            /*max_move_frac=*/1.15, /*passes=*/7, features);
+                            /*max_move_frac=*/1.15, /*passes=*/7, features, {}, {},
+                            /*defer_coupled=*/false, projection);
         // Per-node accept/reject re-project for residual outliers (hole kinks).
         // Full projection; keep only if no skin tet inverts.
         {
@@ -485,8 +496,9 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 if (ni >= out.mesh.nodes.size()) {
                     continue;
                 }
-                const auto cp = closest_on_surface(surface, out.mesh.nodes[ni]);
-                if (!(cp.distance > thr) || cp.distance > 2.5 * hc) {
+                const auto target =
+                    boundary_projection_target(surface, out.mesh.nodes[ni], ni, projection);
+                if (!target || !(target->distance > thr) || target->distance > 2.5 * hc) {
                     continue;
                 }
                 const Eigen::Vector3d saved = out.mesh.nodes[ni];
@@ -494,7 +506,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 // still shrinks the residual when the full one inverts a tet.
                 static constexpr double kFracs[] = {1.0, 0.6, 0.35};
                 for (const double frac : kFracs) {
-                    out.mesh.nodes[ni] = saved + frac * (cp.point - saved);
+                    out.mesh.nodes[ni] = saved + frac * (target->point - saved);
                     bool ok = true;
                     for (const auto ti : skin_tets) {
                         const auto& n = out.mesh.tets[ti];
@@ -907,16 +919,15 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             surface, out.mesh.nodes, free_faces, hc,
             [&](std::set<std::uint32_t>& offenders) {
                 for (const auto& n : out.mesh.tets) {
-                    const double v = tet_signed_volume(out.mesh.nodes[n[0]],
-                                                       out.mesh.nodes[n[1]],
-                                                       out.mesh.nodes[n[2]],
-                                                       out.mesh.nodes[n[3]]);
+                    const double v =
+                        tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
+                                          out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
                     if (v <= vol_eps) {
                         offenders.insert(n.begin(), n.end());
                     }
                 }
             },
-            /*passes=*/3, /*relax=*/0.5, features);
+            /*passes=*/3, /*relax=*/0.5, features, projection);
         for (auto& n : out.mesh.tets) {
             const double v = tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
                                                out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);

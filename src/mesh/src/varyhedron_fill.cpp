@@ -25,9 +25,7 @@ namespace {
 std::vector<std::uint32_t> boundary_nodes(const TetFillOutput& mesh) {
     struct FaceKey {
         std::uint32_t a, b, c;
-        bool operator==(const FaceKey& o) const {
-            return a == o.a && b == o.b && c == o.c;
-        }
+        bool operator==(const FaceKey& o) const { return a == o.a && b == o.b && c == o.c; }
     };
     struct FaceHash {
         std::size_t operator()(const FaceKey& f) const {
@@ -116,12 +114,11 @@ bool far_enough_protect(const Eigen::Vector3d& p, double r_p,
 /// Samples within `skip_endpoint_eps2` of either current-edge endpoint are
 /// ignored so shared vertices on incident edges do not force lfs→0 at corners
 /// (sampled approximation; true medial-axis lfs deferred).
-double min_dist2_other_edges(
-    const Eigen::Vector3d& p, std::uint32_t exclude_edge_id,
-    const std::vector<Eigen::Vector3d>& samples,
-    const std::vector<std::uint32_t>& sample_edge_ids,
-    const Eigen::Vector3d* end_a, const Eigen::Vector3d* end_b,
-    double skip_endpoint_eps2) {
+double min_dist2_other_edges(const Eigen::Vector3d& p, std::uint32_t exclude_edge_id,
+                             const std::vector<Eigen::Vector3d>& samples,
+                             const std::vector<std::uint32_t>& sample_edge_ids,
+                             const Eigen::Vector3d* end_a, const Eigen::Vector3d* end_b,
+                             double skip_endpoint_eps2) {
     double best = std::numeric_limits<double>::infinity();
     const std::size_t n = samples.size();
     for (std::size_t i = 0; i < n; ++i) {
@@ -143,8 +140,7 @@ double min_dist2_other_edges(
     return best;
 }
 
-double min_dist2_points(const Eigen::Vector3d& p,
-                        const std::vector<Eigen::Vector3d>& pts) {
+double min_dist2_points(const Eigen::Vector3d& p, const std::vector<Eigen::Vector3d>& pts) {
     double best = std::numeric_limits<double>::infinity();
     for (const auto& q : pts) {
         const double d2 = (p - q).squaredNorm();
@@ -157,8 +153,9 @@ double min_dist2_points(const Eigen::Vector3d& p,
 
 /// Shimada-style bubble relax: movable volume seeds repel from fixed edge
 /// anchors and from each other. Keeps volume seeds inside the bbox collar.
-void bubble_relax_volume(std::vector<Eigen::Vector3d>& volume, const std::vector<Eigen::Vector3d>& edge,
-                         double radius, int iterations, const Eigen::Vector3d& bbox_min,
+void bubble_relax_volume(std::vector<Eigen::Vector3d>& volume,
+                         const std::vector<Eigen::Vector3d>& edge, double radius,
+                         int iterations, const Eigen::Vector3d& bbox_min,
                          const Eigen::Vector3d& bbox_max) {
     if (volume.empty() || iterations <= 0 || !(radius > 0.0)) {
         return;
@@ -233,8 +230,8 @@ double tet_quality(const std::vector<Eigen::Vector3d>& nodes,
             return -std::numeric_limits<double>::infinity();
         }
     }
-    const double q = validity::tet_shape_quality(
-        nodes[tet[0]], nodes[tet[1]], nodes[tet[2]], nodes[tet[3]]);
+    const double q = validity::tet_shape_quality(nodes[tet[0]], nodes[tet[1]], nodes[tet[2]],
+                                                 nodes[tet[3]]);
     return std::isfinite(q) ? q : -std::numeric_limits<double>::infinity();
 }
 
@@ -264,7 +261,14 @@ void repair_or_drop_sliver_tets(TetFillOutput& mesh) {
     }
 
     constexpr std::array<double, 8> kOffsets{{
-        0.005, 0.01, 0.02, 0.04, 0.08, 0.12, 0.20, 0.30,
+        0.005,
+        0.01,
+        0.02,
+        0.04,
+        0.08,
+        0.12,
+        0.20,
+        0.30,
     }};
     for (int pass = 0; pass < 12; ++pass) {
         bool changed = false;
@@ -276,14 +280,14 @@ void repair_or_drop_sliver_tets(TetFillOutput& mesh) {
             }
 
             std::array<std::size_t, 4> order{{0, 1, 2, 3}};
-            const int n_boundary = static_cast<int>(is_boundary[tet[0]]) +
-                                   static_cast<int>(is_boundary[tet[1]]) +
-                                   static_cast<int>(is_boundary[tet[2]]) +
-                                   static_cast<int>(is_boundary[tet[3]]);
+            const int n_boundary =
+                static_cast<int>(is_boundary[tet[0]]) + static_cast<int>(is_boundary[tet[1]]) +
+                static_cast<int>(is_boundary[tet[2]]) + static_cast<int>(is_boundary[tet[3]]);
             if (n_boundary == 3) {
-                std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
-                    return is_boundary[tet[a]] < is_boundary[tet[b]];
-                });
+                std::stable_sort(order.begin(), order.end(),
+                                 [&](std::size_t a, std::size_t b) {
+                                     return is_boundary[tet[a]] < is_boundary[tet[b]];
+                                 });
             }
 
             bool have_best = false;
@@ -310,9 +314,9 @@ void repair_or_drop_sliver_tets(TetFillOutput& mesh) {
                 const Eigen::Vector3d& c = mesh.nodes[tet[opposite[2]]];
                 Eigen::Vector3d normal = (b - a).cross(c - a);
                 const double normal_len = normal.norm();
-                const double scale = validity::max_edge(
-                    mesh.nodes[tet[0]], mesh.nodes[tet[1]],
-                    mesh.nodes[tet[2]], mesh.nodes[tet[3]]);
+                const double scale =
+                    validity::max_edge(mesh.nodes[tet[0]], mesh.nodes[tet[1]],
+                                       mesh.nodes[tet[2]], mesh.nodes[tet[3]]);
                 if (!(normal_len > 0.0) || !(scale > 0.0)) {
                     continue;
                 }
@@ -324,16 +328,15 @@ void repair_or_drop_sliver_tets(TetFillOutput& mesh) {
                 const Eigen::Vector3d saved = mesh.nodes[ni];
                 double current_worst = std::numeric_limits<double>::infinity();
                 for (const std::size_t cj : incident[ni]) {
-                    current_worst = std::min(
-                        current_worst, tet_quality(mesh.nodes, mesh.tets[cj]));
+                    current_worst =
+                        std::min(current_worst, tet_quality(mesh.nodes, mesh.tets[cj]));
                 }
                 for (const double offset : kOffsets) {
                     const Eigen::Vector3d candidate = saved + (offset * scale) * normal;
                     mesh.nodes[ni] = candidate;
                     double worst = std::numeric_limits<double>::infinity();
                     for (const std::size_t cj : incident[ni]) {
-                        worst = std::min(
-                            worst, tet_quality(mesh.nodes, mesh.tets[cj]));
+                        worst = std::min(worst, tet_quality(mesh.nodes, mesh.tets[cj]));
                     }
                     const double target = tet_quality(mesh.nodes, tet);
                     mesh.nodes[ni] = saved;
@@ -362,8 +365,7 @@ void repair_or_drop_sliver_tets(TetFillOutput& mesh) {
                     break;
                 }
             }
-            if (tet_quality(mesh.nodes, tet) < validity::kCellShapeFloor &&
-                have_best) {
+            if (tet_quality(mesh.nodes, tet) < validity::kCellShapeFloor && have_best) {
                 mesh.nodes[best_node] = best_pos;
                 changed = true;
             }
@@ -373,22 +375,24 @@ void repair_or_drop_sliver_tets(TetFillOutput& mesh) {
         }
     }
 
-    mesh.tets.erase(
-        std::remove_if(mesh.tets.begin(), mesh.tets.end(), [&](const auto& tet) {
-            return tet_quality(mesh.nodes, tet) < validity::kCellShapeFloor;
-        }),
-        mesh.tets.end());
+    mesh.tets.erase(std::remove_if(mesh.tets.begin(), mesh.tets.end(),
+                                   [&](const auto& tet) {
+                                       return tet_quality(mesh.nodes, tet) <
+                                              validity::kCellShapeFloor;
+                                   }),
+                    mesh.tets.end());
 }
 
 } // namespace
 
-VaryhedronFillOutput varyhedron_fill_surface(
-    const geom::TriSurface& surface, const Eigen::Vector3d& bbox_min,
-    const Eigen::Vector3d& bbox_max, double h, int skin_layers,
-    std::span<const geom::SharpEdge> features, double feature_band,
-    std::span<const Eigen::Vector3d> refine_seeds, double seed_band,
-    double curvature_turn_deg, const geom::CadTopology* topo,
-    const geom::CadModel* cad, int wall_smooth_iters) {
+VaryhedronFillOutput
+varyhedron_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& bbox_min,
+                        const Eigen::Vector3d& bbox_max, double h, int skin_layers,
+                        std::span<const geom::SharpEdge> features, double feature_band,
+                        std::span<const Eigen::Vector3d> refine_seeds, double seed_band,
+                        double curvature_turn_deg, const geom::CadTopology* topo,
+                        const geom::CadModel* cad, int wall_smooth_iters,
+                        BoundaryProjectionContext* projection) {
 
     VaryhedronFillOutput out;
 
@@ -408,7 +412,7 @@ VaryhedronFillOutput varyhedron_fill_surface(
     std::vector<Eigen::Vector3d> seeds(refine_seeds.begin(), refine_seeds.end());
     if (topo != nullptr) {
         constexpr std::size_t kMaxEdgeSeeds = 768;
-        constexpr double kAlpha = 0.45; // r ≤ α h
+        constexpr double kAlpha = 0.45;     // r ≤ α h
         constexpr double kBeta = 1.0 / 3.0; // r ≤ β lfs
         const double hh = std::max(h, 1e-12);
         const auto counts = geom::count_edge_features(*topo);
@@ -475,10 +479,9 @@ VaryhedronFillOutput varyhedron_fill_surface(
 
         auto protect_radius_at = [&](const Eigen::Vector3d& p, const geom::CadEdge& e) {
             const Eigen::Vector3d* ea = e.samples.empty() ? nullptr : &e.samples.front();
-            const Eigen::Vector3d* eb =
-                e.samples.size() < 2 ? nullptr : &e.samples.back();
+            const Eigen::Vector3d* eb = e.samples.size() < 2 ? nullptr : &e.samples.back();
             double lfs2 = min_dist2_other_edges(p, e.id, lfs_samples, lfs_edge_ids, ea, eb,
-                                               skip_end_eps2);
+                                                skip_end_eps2);
             // Optional: non-incident sharp vertices tighten lfs near junctions
             // of many edges that sample sparsely away from the candidate.
             for (std::size_t vi = 0; vi < topo->vertices.size(); ++vi) {
@@ -490,8 +493,7 @@ VaryhedronFillOutput varyhedron_fill_surface(
                     lfs2 = d2;
                 }
             }
-            const double lfs =
-                std::isfinite(lfs2) ? std::sqrt(std::max(0.0, lfs2)) : 1e300;
+            const double lfs = std::isfinite(lfs2) ? std::sqrt(std::max(0.0, lfs2)) : 1e300;
             double r = std::min(kAlpha * hh, kBeta * lfs);
             // Corner-ball-first: shrink when near any CAD vertex.
             if (!all_sharp_verts.empty()) {
@@ -589,8 +591,8 @@ VaryhedronFillOutput varyhedron_fill_surface(
         std::vector<std::array<int, 3>> q;
         q.reserve(static_cast<std::size_t>(nx + ny + nz) * 4);
         const auto idx = [&](int i, int j, int k) { return grid.index(i, j, k); };
-        const int face_nbr[6][3] = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0},
-                                    {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
+        const int face_nbr[6][3] = {{1, 0, 0},  {-1, 0, 0}, {0, 1, 0},
+                                    {0, -1, 0}, {0, 0, 1},  {0, 0, -1}};
         for (int k = 0; k < nz; ++k) {
             for (int j = 0; j < ny; ++j) {
                 for (int i = 0; i < nx; ++i) {
@@ -699,8 +701,9 @@ VaryhedronFillOutput varyhedron_fill_surface(
     }
 
     // --- Scaffold: multi-level graded tet (dual-poly clustering → V11) ---
-    auto graded = graded_tet_fill_surface(surface, bbox_min, bbox_max, h, skin_layers, features,
-                                          feature_band, seeds, seed_band, curvature_turn_deg);
+    auto graded = graded_tet_fill_surface(surface, bbox_min, bbox_max, h, skin_layers,
+                                          features, feature_band, seeds, seed_band,
+                                          curvature_turn_deg, projection);
     out.mesh = std::move(graded.mesh);
     out.h_coarse = graded.h_coarse;
     out.h_fine = graded.h_fine;
@@ -717,14 +720,33 @@ VaryhedronFillOutput varyhedron_fill_surface(
                 continue;
             }
             auto& p = out.mesh.nodes[ni];
-            // Snap only toward sharp protected features (never seams/smooth).
-            const auto q = geom::closest_edge(*topo, p, /*sharp_only=*/true);
-            if (!q || q->distance > snap_band) {
+            Eigen::Vector3d edge_target = Eigen::Vector3d::Zero();
+            double edge_distance = std::numeric_limits<double>::infinity();
+            bool have_edge_target = false;
+            if (projection != nullptr && projection->target &&
+                projection->provenance != nullptr && ni < projection->provenance->size() &&
+                (*projection->provenance)[ni].kind == BoundarySupportKind::kCadEdge) {
+                const auto target = boundary_projection_target(surface, p, ni, projection);
+                if (target) {
+                    edge_target = target->point;
+                    edge_distance = target->distance;
+                    have_edge_target = true;
+                }
+            } else if (projection == nullptr || !projection->target) {
+                // STL/legacy behavior: sampled sharp-edge attraction.
+                const auto q = geom::closest_edge(*topo, p, /*sharp_only=*/true);
+                if (q) {
+                    edge_target = q->closest;
+                    edge_distance = q->distance;
+                    have_edge_target = true;
+                }
+            }
+            if (!have_edge_target || edge_distance > snap_band) {
                 continue;
             }
             // Mild blend only (aggressive full project inverts boundary tets).
-            const double w = 0.35 * (1.0 - (q->distance / snap_band));
-            p = p + w * (q->closest - p);
+            const double w = 0.35 * (1.0 - (edge_distance / snap_band));
+            p = p + w * (edge_target - p);
         }
 
         // Revert every node participating in an inverted or near-degenerate
@@ -738,8 +760,7 @@ VaryhedronFillOutput varyhedron_fill_surface(
             if (validity::tet_signed_volume(a, b, c, d) <= 0.0) {
                 return true;
             }
-            return validity::tet_shape_quality(a, b, c, d) <
-                   validity::kCellShapeFloor;
+            return validity::tet_shape_quality(a, b, c, d) < validity::kCellShapeFloor;
         };
         std::unordered_set<std::uint32_t> offenders;
         for (const auto& t : out.mesh.tets) {
@@ -853,8 +874,7 @@ VaryhedronFillOutput varyhedron_fill_surface(
             const auto chord =
                 geom::chordal_edge_metrics_segments(*topo, segs, /*sharp_edges_only=*/true);
             out.edge_chordal_efficiency_max = chord.max_efficiency;
-            out.edge_hausdorff_over_h =
-                chord.hausdorff / std::max(h, 1e-15);
+            out.edge_hausdorff_over_h = chord.hausdorff / std::max(h, 1e-15);
             // Prefer free-boundary node Hausdorff/h when available (more points).
             if (out.edge_profile_hausdorff_max > 0.0) {
                 out.edge_hausdorff_over_h =
@@ -877,10 +897,10 @@ VaryhedronFillOutput varyhedron_fill_surface(
     // --- M10 wall free-slide: tangential smooth + OCC surface re-project ---
     // After scaffold + sharp snap. Wall nodes = free boundary far from sharp
     // CAD edges. Requires live CadModel; STL-only path leaves the mesh as-is.
-    if (cad != nullptr && !cad->empty() && wall_smooth_iters > 0 &&
-        !out.mesh.tets.empty()) {
-        const auto wall = wall_tangential_project(*cad, topo, out.mesh.nodes, out.mesh.tets,
-                                                  h, wall_smooth_iters);
+    if (cad != nullptr && !cad->empty() && wall_smooth_iters > 0 && !out.mesh.tets.empty()) {
+        const auto wall = wall_tangential_project(
+            *cad, topo, out.mesh.nodes, out.mesh.tets, h, wall_smooth_iters,
+            /*relax=*/0.45, /*sharp_guard_frac=*/0.4, projection);
         out.n_wall_nodes = wall.n_wall_nodes;
         out.n_wall_moved = wall.n_moved;
         out.n_wall_reverted = wall.n_reverted;

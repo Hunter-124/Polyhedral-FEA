@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 add_executable(polymesh_tests
     test_tri_surface.cpp
+    test_surface_project.cpp
     test_stl.cpp
     test_step.cpp
     test_cad_model.cpp

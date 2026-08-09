@@ -94,7 +94,7 @@ Source: [bench/reports/p1-gate1-convergence.md](bench/reports/p1-gate1-convergen
 | | |
 |---|---|
 | ![Plate with hole](docs/assets/showcase/gallery_plate_hole.png) <br> **plate_hole** — von Mises around the stress riser; the mesh grades into the hole. | ![Cylinder](docs/assets/showcase/gallery_cylinder.png) <br> **cylinder** — curved-wall part solved from STEP with curvature-driven sizing. |
-| ![Sphere](docs/assets/showcase/gallery_sphere.png) <br> **sphere** — closed curved B-rep, stair-cased grid fill with feature-graded skin. | ![Icecream cone](docs/assets/showcase/gallery_icecream_cone.png) <br> **icecream_cone** — mixed curvature and a sharp apex in one part. |
+| ![Sphere](docs/assets/showcase/gallery_sphere.png) <br> **sphere** — closed curved B-rep, stair-cased grid fill with feature-graded skin. | ![Ice-cream cone](docs/assets/showcase/gallery_icecream_cone.png) <br> **icecream_cone** — one watertight fused round cone and spherical scoop, solved from the committed STEP. |
 | ![Mesher comparison](docs/assets/showcase/compare_meshers.png) <br> **compare_meshers** — same part through `tet`, `graded`, and `hybrid`. | ![DOF/time benchmark](docs/assets/showcase/bench_dof_time.png) <br> **bench_dof_time** — the D6 L-domain result: 6384 → 1248 DOF, 2.762 s → 0.227 s. |
 
 Stress renders come from real solver VTU output; displacement is warped for
@@ -220,7 +220,8 @@ $CLI solve $BOX --mesher graded --adapt 3 --eta-target 0.05 -o /tmp/box_adapt.vt
 $CLI solve $BOX --load-box 0.99 -1 -1 2 2 2 --load-dir 0 -1 0 --traction 2e6 \
   -o /tmp/box_pressure.vtu
 
-# JSON diagnostics: import fidelity, mesh quality, per-phase timings, η
+# JSON diagnostics: exact live-BRep directional fidelity (hard-bounded reverse
+# sampling), mesh quality, per-phase timings, and η.
 $CLI diag tests/fixtures/parts/pipe.step --json /tmp/pipe.json
 
 # Runtime stack: e.g. "cpu | OpenMP 16 threads | Eigen serial (no nest)"

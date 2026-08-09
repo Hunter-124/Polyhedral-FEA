@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-// Linear elastostatics solve: assemble, apply Dirichlet constraints by
-// partitioning, then sparse direct LDLT or iterative CG.
+// Linear elastostatics solve: assemble, apply optional homogeneous multi-point
+// constraints, partition Dirichlet DOFs, then sparse direct LDLT or iterative CG.
 
+#include "fea/constraints.hpp"
 #include "fea/assembly.hpp"
 #include "fea/resource_budget.hpp"
 
@@ -104,19 +105,20 @@ struct SolveDecision {
                                                 const SolveResourceEstimate& estimate,
                                                 std::uint64_t effective_cap_bytes);
 
-/// Solves K u = f with the given constraints. `loads` is the full-size global
-/// load vector (3N); returns the full-size displacement vector with
-/// prescribed values in place. Throws FeaError if the reduced system is
-/// singular (insufficient constraints leave rigid-body modes) or if CG fails
-/// to converge.
+/// Solves K u = f with the given Dirichlet and optional linear constraints.
+/// `loads` is the full-size global load vector (3N); returns the full-size
+/// displacement vector with prescribed and slave values in place. A prescribed
+/// Dirichlet DOF must not also be a slave. Throws FeaError if the reduced system
+/// is singular (insufficient constraints leave rigid-body modes) or CG fails.
 ///
 /// Default `options` use sparse LDLT for nfree ≤ `cg_threshold` (50000) and
 /// bounded CG above that; the choice never depends on element type.
 /// Force `SolveMethod::kDirect` for exact patch-test path; force `kCG` to
 /// exercise the iterative solver on small systems.
-Eigen::VectorXd solve_elastostatics(const NodalMesh& mesh, const Material& material,
-                                    const Dirichlet& dirichlet, const Eigen::VectorXd& loads,
-                                    const SolveOptions& options = {});
+Eigen::VectorXd solve_elastostatics(
+    const NodalMesh& mesh, const Material& material, const Dirichlet& dirichlet,
+    const Eigen::VectorXd& loads, const SolveOptions& options = {},
+    const LinearConstraints* constraints = nullptr);
 
 /// Strain energy 1/2 u^T K u, joules.
 double strain_energy(const NodalMesh& mesh, const Material& material,

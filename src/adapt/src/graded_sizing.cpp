@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <stdexcept>
 
 namespace polymesh::adapt {
@@ -22,6 +23,10 @@ GradedSizing::GradedSizing(std::vector<SizeSource> sources, double h_min, double
         s.h = std::clamp(s.h, h_min_, h_max_);
     }
     build_grid();
+}
+
+mesh::SizeFieldFn GradedSizing::as_size_field() const {
+    return [this](const Eigen::Vector3d& point) { return size_at(point); };
 }
 
 void GradedSizing::build_grid() {
@@ -167,6 +172,16 @@ std::vector<SizeSource> point_size_sources(std::span<const Eigen::Vector3d> poin
         out.push_back(SizeSource{p, h});
     }
     return out;
+}
+
+mesh::SizeFieldFn size_field_from_sources(std::span<const SizeSource> sources, double h_min,
+                                          double h_max, double beta) {
+    auto field =
+        std::make_shared<GradedSizing>(std::vector<SizeSource>(sources.begin(), sources.end()),
+                                       h_min, h_max, beta);
+    return [field = std::move(field)](const Eigen::Vector3d& point) {
+        return field->size_at(point);
+    };
 }
 
 SeedPlan seed_plan(std::span<const SizeSource> sources, double h_coarse, double band_frac) {

@@ -15,6 +15,12 @@
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
+// windows.h defines min/max as macros, which turns every later `std::max(...)`
+// into `std::(...)` (MSVC C2589). Anything that transitively includes this
+// header must keep <algorithm> usable.
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #else
 #include <sys/types.h>

@@ -34,3 +34,13 @@ examples/out/
 
 # Self-improve loop run outputs (machine-local)
 bench/self_improve/
+
+
+# Training corpora for the learned mesh advisor (ADR-0027). Multi-GB; licence
+# provenance lives in bench/advisor/corpus_manifest.json, never committed.
+/bench/geometries/corpus/
+/bench/advisor/dataset.csv
+/bench/advisor/runs/
+# Python bytecode from scripts/
+__pycache__/
+*.pyc

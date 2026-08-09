@@ -355,6 +355,167 @@ ResolvedMeshSize resolve_mesh_size(const Model& model, double requested_h,
     return out;
 }
 
+CaseFeatures extract_case_features(const Model& model,
+                                  std::span<const RefineRegion> fix_regions,
+                                  std::span<const RefineRegion> load_regions,
+                                  const Eigen::Vector3d& load_dir, double poisson) {
+    CaseFeatures out;
+    const Eigen::Vector3d ext = (model.bbox_max - model.bbox_min).cwiseMax(0.0);
+    const double bbox_diag = ext.norm();
+    const double inv_diag =
+        bbox_diag > 0.0 && std::isfinite(bbox_diag) ? 1.0 / bbox_diag : 0.0;
+    out.bbox_dx = ext.x() * inv_diag;
+    out.bbox_dy = ext.y() * inv_diag;
+    out.bbox_dz = ext.z() * inv_diag;
+    out.diag = inv_diag > 0.0 ? 1.0 : 0.0;
+    out.n_faces = model.surface.triangles.size();
+    out.poisson = std::isfinite(poisson) ? poisson : 0.0;
+
+    double surface_area_m2 = 0.0;
+    double signed_volume_m3 = 0.0;
+    struct RegionMeasure {
+        std::size_t n_faces = 0;
+        double area = 0.0;
+        Eigen::Vector3d area_centroid = Eigen::Vector3d::Zero();
+    };
+    RegionMeasure fix;
+    RegionMeasure load;
+    const auto contains = [](const RefineRegion& region, const Eigen::Vector3d& point) {
+        return (region.lo.array() <= region.hi.array()).all() &&
+               (point.array() >= region.lo.array()).all() &&
+               (point.array() <= region.hi.array()).all();
+    };
+    const auto selected = [&](std::span<const RefineRegion> regions,
+                              const Eigen::Vector3d& point) {
+        return std::any_of(regions.begin(), regions.end(),
+                           [&](const RefineRegion& region) { return contains(region, point); });
+    };
+    for (const auto& tri : model.surface.triangles) {
+        if (tri[0] >= model.surface.vertices.size() ||
+            tri[1] >= model.surface.vertices.size() ||
+            tri[2] >= model.surface.vertices.size()) {
+            continue;
+        }
+        const Eigen::Vector3d& a = model.surface.vertices[tri[0]];
+        const Eigen::Vector3d& b = model.surface.vertices[tri[1]];
+        const Eigen::Vector3d& c = model.surface.vertices[tri[2]];
+        const double area = 0.5 * (b - a).cross(c - a).norm();
+        if (!(area > 0.0) || !std::isfinite(area)) {
+            continue;
+        }
+        const Eigen::Vector3d centroid = (a + b + c) / 3.0;
+        surface_area_m2 += area;
+        signed_volume_m3 += a.dot(b.cross(c)) / 6.0;
+        if (selected(fix_regions, centroid)) {
+            ++fix.n_faces;
+            fix.area += area;
+            fix.area_centroid += area * centroid;
+        }
+        if (selected(load_regions, centroid)) {
+            ++load.n_faces;
+            load.area += area;
+            load.area_centroid += area * centroid;
+        }
+    }
+    const double volume_m3 = std::abs(signed_volume_m3);
+    out.surface_area = surface_area_m2 * inv_diag * inv_diag;
+    out.volume = volume_m3 * inv_diag * inv_diag * inv_diag;
+    if (out.volume > 0.0) {
+        out.sa_over_v23 = out.surface_area / std::pow(out.volume, 2.0 / 3.0);
+    }
+    out.n_fix_faces = fix.n_faces;
+    out.n_load_faces = load.n_faces;
+    if (surface_area_m2 > 0.0) {
+        out.fix_area_frac = fix.area / surface_area_m2;
+        out.load_area_frac = load.area / surface_area_m2;
+    }
+
+    try {
+        const auto sharp = geom::detect_sharp_edges(model.surface, 30.0);
+        out.n_sharp_edges = sharp.size();
+        double min_sharp = std::numeric_limits<double>::infinity();
+        for (const auto& edge : sharp) {
+            if (edge.v0 >= model.surface.vertices.size() ||
+                edge.v1 >= model.surface.vertices.size()) {
+                continue;
+            }
+            const double length =
+                (model.surface.vertices[edge.v1] - model.surface.vertices[edge.v0]).norm();
+            if (length > 0.0 && std::isfinite(length)) {
+                out.sharp_edge_len_total += length * inv_diag;
+                min_sharp = std::min(min_sharp, length);
+            }
+        }
+        if (std::isfinite(min_sharp)) {
+            out.min_feature_h = min_sharp * inv_diag;
+        }
+    } catch (...) {
+        // Malformed or empty surfaces retain the finite zero defaults.
+    }
+
+    try {
+        const auto curvature = geom::estimate_vertex_curvature(model.surface);
+        double sum = 0.0;
+        std::size_t n = 0;
+        std::size_t curved = 0;
+        for (const double kappa : curvature.kappa) {
+            if (!(kappa >= 0.0) || !std::isfinite(kappa)) {
+                continue;
+            }
+            const double scaled = kappa * bbox_diag;
+            out.kappa_max_h = std::max(out.kappa_max_h, scaled);
+            sum += scaled;
+            ++n;
+            if (scaled > 1e-8) {
+                ++curved;
+            }
+        }
+        if (n > 0) {
+            out.kappa_mean_h = sum / static_cast<double>(n);
+            out.curved_frac = static_cast<double>(curved) / static_cast<double>(n);
+        }
+    } catch (...) {
+        // Malformed or empty surfaces retain the finite zero defaults.
+    }
+
+    try {
+        const auto thickness = geom::estimate_local_thickness(model.surface);
+        std::vector<double> finite;
+        finite.reserve(thickness.thickness.size());
+        for (const double value : thickness.thickness) {
+            if (geom::has_finite_thickness(value) && value >= 0.0) {
+                finite.push_back(value * inv_diag);
+            }
+        }
+        if (!finite.empty()) {
+            std::sort(finite.begin(), finite.end());
+            out.thin_min_over_diag = finite.front();
+            const std::size_t p10 =
+                static_cast<std::size_t>(0.1 * static_cast<double>(finite.size() - 1));
+            out.thin_p10_over_diag = finite[p10];
+        }
+    } catch (...) {
+        // Malformed or empty surfaces retain the finite zero defaults.
+    }
+
+    Eigen::Vector3d direction = Eigen::Vector3d::Zero();
+    if (load_dir.allFinite() && load_dir.norm() > 0.0) {
+        direction = load_dir.normalized();
+    }
+    out.load_dir_x = direction.x();
+    out.load_dir_y = direction.y();
+    out.load_dir_z = direction.z();
+    if (fix.area > 0.0 && load.area > 0.0) {
+        const Eigen::Vector3d delta =
+            load.area_centroid / load.area - fix.area_centroid / fix.area;
+        out.fix_load_dist_over_diag = delta.norm() * inv_diag;
+        if (delta.norm() > 0.0 && direction.norm() > 0.0) {
+            out.load_axis_alignment = std::abs(direction.dot(delta.normalized()));
+        }
+    }
+    return out;
+}
+
 namespace {
 
 /// Finest-wins spatial decimation: keep one source (min h) per cubic cell of
@@ -395,6 +556,19 @@ std::vector<adapt::SizeSource> decimate_sources(std::vector<adapt::SizeSource> s
     for (const auto& [key, idx] : best) {
         out.push_back(src[idx]);
     }
+    std::sort(out.begin(), out.end(), [](const adapt::SizeSource& a,
+                                         const adapt::SizeSource& b) {
+        if (a.x.x() != b.x.x()) {
+            return a.x.x() < b.x.x();
+        }
+        if (a.x.y() != b.x.y()) {
+            return a.x.y() < b.x.y();
+        }
+        if (a.x.z() != b.x.z()) {
+            return a.x.z() < b.x.z();
+        }
+        return a.h < b.h;
+    });
     return out;
 }
 
@@ -447,8 +621,11 @@ RefinementPlan build_refinement_plan(const Model& model, double h_coarse,
         return plan;
     }
     const auto sp = adapt::seed_plan(sources, h_coarse, /*band_frac=*/1.5);
+    plan.size_field =
+        adapt::size_field_from_sources(sources, sp.h_fine, h_coarse, /*beta=*/1.0);
     plan.refine_seeds = std::move(sp.refine_seeds);
     plan.seed_band = sp.seed_band;
+    plan.h_min = sp.h_fine;
     plan.h_fine = sp.h_fine;
     return plan;
 }
@@ -549,7 +726,8 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                              std::span<const Eigen::Vector3d> refine_seeds, double seed_band,
                              double element_tendency, std::size_t max_elems,
                              std::size_t max_dof, int auto_retry_budget,
-                             const std::function<void()>& cancel_check) {
+                             const std::function<void()>& cancel_check,
+                             const mesh::SizeFieldFn& size_field) {
     const auto poll_cancel = [&] {
         if (cancel_check) {
             cancel_check();
@@ -721,7 +899,7 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         auto raw = mesh::mixed_fill_surface(model.surface, model.bbox_min, model.bbox_max, h,
                                             std::max(1, skin_layers), edges, feat_band,
                                             adapt_seeds, s_band, /*snap_boundary=*/false,
-                                            turn_deg, native_poly, cancel_check);
+                                            turn_deg, native_poly, cancel_check, size_field);
         const std::size_t n_hex_lattice = raw.n_hex;
         const std::size_t n_pyr_raw = raw.n_pyramid;
         const std::size_t n_poly_raw = raw.n_poly;
@@ -1199,6 +1377,15 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                 turn_deg > 0.0 ? std::format(", curv_turn≤{:.0f}°/cell", turn_deg)
                                : std::string{});
         }
+        if (size_field) {
+            out.mesher_note += std::format(
+                " | size_field h_min={:.4g} h_max={:.4g} m, levels L0={} L1={}{}",
+                fill.field_h_min, fill.field_h_max, fill.n_level0_cells, fill.n_level1_cells,
+                fill.n_field_budget_clamped > 0
+                    ? std::format(", {} cells clamped at budget floor",
+                                  fill.n_field_budget_clamped)
+                    : std::string{});
+        }
     } else if (mesher == VolumeMesher::kHexFill || mesher == VolumeMesher::kHexVem) {
         auto fill = mesh::hex_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
         fill_h = fill.h;
@@ -1333,7 +1520,7 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         }
         auto graded = mesh::graded_tet_fill_surface(
             model.surface, model.bbox_min, model.bbox_max, h, std::max(1, skin_layers), edges,
-            feature_band, seeds, band, turn_deg, projection);
+            feature_band, seeds, band, turn_deg, projection, size_field);
         fill_h = graded.h_fine;
         out.mesh.nodes = std::move(graded.mesh.nodes);
         out.mesh.elements.reserve(graded.mesh.tets.size());
@@ -1368,6 +1555,16 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             conf.max_distance, conf.mean_distance, budget_note,
             turn_deg > 0.0 ? std::format(", curv_turn≤{:.0f}°/cell", turn_deg) : std::string{},
             n_thin_seeds > 0 ? std::format(", thin_seeds={}", n_thin_seeds) : std::string{});
+        if (size_field) {
+            out.mesher_note += std::format(
+                " | size_field h_min={:.4g} h_max={:.4g} m, levels L0={} L1={} L2={}{}",
+                graded.field_h_min, graded.field_h_max, graded.n_level0_cells,
+                graded.n_level1_cells, graded.n_level2_cells,
+                graded.n_field_budget_clamped > 0
+                    ? std::format(", {} cells clamped at budget floor",
+                                  graded.n_field_budget_clamped)
+                    : std::string{});
+        }
     } else if (mesher == VolumeMesher::kOctahedral) {
         // Experimental BCC octahedra → tet4 (ADR-0019). Not a product claim.
         auto fill = mesh::octa_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
@@ -2183,7 +2380,8 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             std::nextafter(h * scale * 1.05, std::numeric_limits<double>::infinity());
         auto retry = volume_mesh(model, retry_h, requested_mesher, requested_skin_layers,
                                  feature_refine, refine_seeds, seed_band, element_tendency,
-                                 max_elems, max_dof, auto_retry_budget - 1, cancel_check);
+                                 max_elems, max_dof, auto_retry_budget - 1, cancel_check,
+                                 size_field);
         const std::string ceiling_note =
             elem_over ? std::format("element ceiling {}, actual {}", max_elems, actual_elems)
                       : std::format("DOF ceiling {}, actual {}", max_dof, actual_dof);
@@ -2438,10 +2636,13 @@ void SolveJob::start_mesh(const Model& model, const SimSetup& setup) {
             report("mesh", 0.15, std::format("meshing… ({}, h={:.4g} m)", resolved.note, h));
             checkpoint();
             const std::function<void()> mesh_cancel_check = [this] { checkpoint(); };
+            const auto refinement =
+                build_refinement_plan(model, h, {}, setup.use_feature_grading);
             mesh_only_ = volume_mesh(
-                model, h, setup.mesher, setup.skin_layers, setup.use_feature_grading, {}, 0.0,
-                setup.element_tendency, resolved.element_ceiling, resolved.dof_ceiling,
-                resolved.auto_chosen ? 3 : 0, mesh_cancel_check);
+                model, h, setup.mesher, setup.skin_layers, setup.use_feature_grading,
+                refinement.refine_seeds, refinement.seed_band, setup.element_tendency,
+                resolved.element_ceiling, resolved.dof_ceiling, resolved.auto_chosen ? 3 : 0,
+                mesh_cancel_check, refinement.size_field);
             publish_live_mesh(mesh_only_);
             checkpoint();
             mesh_only_.mesher_note =
@@ -2495,6 +2696,44 @@ void fill_result_fields(SolveResult& r, const fea::ZzRecovery& zz, const Eigen::
         r.max_displacement = std::max(r.max_displacement, r.u_magnitude[i]);
     }
 }
+
+PassTrace make_pass_trace(int pass, const fea::NodalMesh& mesh,
+                          const fea::ZzRecovery& recovery,
+                          const adapt::HpDriverPlan& plan, double mesh_ms,
+                          double solve_ms) {
+    PassTrace trace;
+    trace.pass = pass;
+    trace.n_elems = mesh.elements.size();
+    trace.n_nodes = mesh.nodes.size();
+    trace.n_dof = 3 * mesh.nodes.size();
+    trace.global_eta = recovery.global_eta;
+    std::vector<double> eta;
+    eta.reserve(recovery.element_eta.size());
+    for (const double value : recovery.element_eta) {
+        if (std::isfinite(value)) {
+            eta.push_back(value);
+        }
+    }
+    if (!eta.empty()) {
+        std::sort(eta.begin(), eta.end());
+        const auto percentile = [&](double q) {
+            const std::size_t index = static_cast<std::size_t>(
+                q * static_cast<double>(eta.size() - 1));
+            return eta[index];
+        };
+        trace.eta_p50 = percentile(0.5);
+        trace.eta_p90 = percentile(0.9);
+        trace.eta_max = eta.back();
+    }
+    trace.n_h_mark = plan.h_mark.size();
+    trace.n_p_mark = plan.p_mark.size();
+    trace.n_shape_mark = plan.shape_mark.size();
+    trace.global_shape = static_cast<int>(plan.global_shape);
+    trace.predicted_dof_factor = plan.predicted_dof_factor;
+    trace.mesh_ms = mesh_ms;
+    trace.solve_ms = solve_ms;
+    return trace;
+}
 } // namespace
 
 void SolveJob::start(const Model& model, const SimSetup& setup) {
@@ -2508,7 +2747,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
     const int pass_count = std::max(0, setup.adapt_passes);
     report("mesh", 0.0, "meshing…", 0, pass_count);
     // Copy inputs by value into the worker.
-    worker_ = std::thread([this, model, setup, pass_count] {
+    const auto pass_callback = on_pass;
+    worker_ = std::thread([this, model, setup, pass_count, pass_callback] {
         try {
             // Global h from D5 only (same as start_mesh). Feature grading is
             // feature_refine on graded fills — not global h→h_min at corners.
@@ -2522,6 +2762,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
             const std::function<void()> mesh_cancel_check = [this] { checkpoint(); };
             std::vector<Eigen::Vector3d> adapt_seeds;
             double adapt_seed_band = 0.0;
+            mesh::SizeFieldFn adapt_size_field;
+            std::vector<adapt::SizeSource> src;
             // A-priori BC grading (ADR-0021): refine near loaded / fixed faces
             // before the first solve. Loads get the finest target (stress
             // concentrates under applied load); fixtures a moderate one.
@@ -2541,26 +2783,34 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         fix_pts.push_back(c);
                     }
                 }
-                std::vector<adapt::SizeSource> src =
-                    adapt::point_size_sources(load_pts, 0.25 * h);
+                src = adapt::point_size_sources(load_pts, 0.25 * h);
                 const auto fix_src = adapt::point_size_sources(fix_pts, 0.5 * h);
                 src.insert(src.end(), fix_src.begin(), fix_src.end());
-                // Fuse geometry (curvature / thin-wall) sources so the a-priori
-                // mesh grades toward both the features and the BCs (ADR-0021).
-                if (setup.use_feature_grading) {
-                    const auto geo = adapt::geometry_size_sources(surf, 0.15 * h, h);
-                    src.insert(src.end(), geo.begin(), geo.end());
-                }
+            }
+            // Geometry and BC sources share one continuous min-plus field.
+            if (setup.use_feature_grading) {
+                auto geo = adapt::geometry_size_sources(model.surface, 0.15 * h, h);
+                geo = decimate_sources(std::move(geo), 0.5 * h);
+                src.insert(src.end(), geo.begin(), geo.end());
+            }
+            if (!src.empty()) {
                 const auto plan = adapt::seed_plan(src, h, /*band_frac=*/1.5);
+                adapt_size_field =
+                    adapt::size_field_from_sources(src, plan.h_fine, h, /*beta=*/1.0);
                 adapt_seeds = plan.refine_seeds;
                 adapt_seed_band = plan.seed_band;
             }
             // D4: Dörfler element indices for optional local LEB before remesh.
             std::vector<std::size_t> adapt_marked;
+            const auto initial_mesh_t0 = std::chrono::steady_clock::now();
             auto vol = volume_mesh(
                 model, h_use, setup.mesher, setup.skin_layers, setup.use_feature_grading,
                 adapt_seeds, adapt_seed_band, setup.element_tendency, resolved.element_ceiling,
-                resolved.dof_ceiling, resolved.auto_chosen ? 3 : 0, mesh_cancel_check);
+                resolved.dof_ceiling, resolved.auto_chosen ? 3 : 0, mesh_cancel_check,
+                adapt_size_field);
+            double pass_mesh_ms = std::chrono::duration<double, std::milli>(
+                                      std::chrono::steady_clock::now() - initial_mesh_t0)
+                                      .count();
             publish_live_mesh(vol);
             checkpoint();
             // Keep resolved-h note on mesher_note for solve mesh_note (GUI/CLI).
@@ -2713,6 +2963,16 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 return want_p_elevate && vol.mesh.nodes.size() <= kPElevateMaxNodes;
             };
             const bool do_p_elevate = want_p_elevate; // gate per-call via p_elevate_allowed
+            fea::LinearConstraints p_constraints;
+            const auto active_p_constraints = [&]() -> const fea::LinearConstraints* {
+                return p_constraints.empty() ? nullptr : &p_constraints;
+            };
+            const auto remove_slave_dirichlet = [&]() {
+                for (const auto& constraint : p_constraints.entries()) {
+                    bc.dof_values.erase(
+                        static_cast<Eigen::Index>(constraint.slave_dof));
+                }
+            };
 
             // After mid-edge insertion, assign boundary regions to new nodes that
             // sit between two existing boundary nodes of the same region so
@@ -2843,13 +3103,17 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     return false;
                 }
                 const auto before = vol.mesh.nodes.size();
-                vol.mesh = fea::p_elevate(vol.mesh, linear);
+                auto elevated = fea::p_elevate_with_constraints(vol.mesh, linear);
+                vol.mesh = std::move(elevated.mesh);
+                p_constraints = std::move(elevated.constraints);
                 extend_boundary_regions();
                 apply_bcs();
+                remove_slave_dirichlet();
                 const auto counts = fea::count_element_types(vol.mesh);
-                note_suffix =
-                    std::format(" p-elev={} n+{} (tet10={} hex20={})", linear.size(),
-                                vol.mesh.nodes.size() - before, counts.tet10, counts.hex20);
+                note_suffix = std::format(
+                    " p-elev={} n+{} constrained-mid={} (tet10={} hex20={})", linear.size(),
+                    vol.mesh.nodes.size() - before, elevated.n_constrained_midside,
+                    counts.tet10, counts.hex20);
                 report("recover", 0.5,
                        std::format("p-elevate… ({} → quadratic via hp-driver)", linear.size()),
                        /*pass=*/0, pass_count);
@@ -2902,9 +3166,12 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     bulk.resize(cap);
                 }
                 const auto before = vol.mesh.nodes.size();
-                vol.mesh = fea::p_elevate(vol.mesh, bulk);
+                auto elevated = fea::p_elevate_with_constraints(vol.mesh, bulk);
+                vol.mesh = std::move(elevated.mesh);
+                p_constraints = std::move(elevated.constraints);
                 extend_boundary_regions();
                 apply_bcs();
+                remove_slave_dirichlet();
                 const auto counts = fea::count_element_types(vol.mesh);
                 vol.mesher_note =
                     std::format("{} | geo-hp: p-elev bulk {} (tet10={} n+{})", vol.mesher_note,
@@ -3062,6 +3329,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     static_cast<double>(pass) / static_cast<double>(pass_count + 1);
                 const double pass_span = 1.0 / static_cast<double>(pass_count + 1);
                 if (pass > 0) {
+                    const auto adapt_mesh_t0 = std::chrono::steady_clock::now();
                     // D4: prefer true local LEB on tet meshes when marks exist.
                     const bool tet_path = setup.mesher == VolumeMesher::kTetFill ||
                                           setup.mesher == VolumeMesher::kGradedTet;
@@ -3096,7 +3364,9 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                                           setup.use_feature_grading, adapt_seeds,
                                           adapt_seed_band, setup.element_tendency,
                                           resolved.element_ceiling, resolved.dof_ceiling,
-                                          resolved.auto_chosen ? 3 : 0, mesh_cancel_check);
+                                          resolved.auto_chosen ? 3 : 0, mesh_cancel_check,
+                                          adapt_size_field);
+                        p_constraints = {};
                         publish_live_mesh(vol);
                         h_use = std::max(h_use, h_remesh);
                     } else {
@@ -3107,6 +3377,9 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     if (!did_local) {
                         maybe_geo_p_elevate();
                     }
+                    pass_mesh_ms = std::chrono::duration<double, std::milli>(
+                                       std::chrono::steady_clock::now() - adapt_mesh_t0)
+                                       .count();
                     report("solve", pass_base + 0.15 * pass_span,
                            std::format("adapt pass {}… ({} elems, {} seeds{})", pass,
                                        vol.mesh.elements.size(), adapt_seeds.size(),
@@ -3120,8 +3393,12 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 }
                 checkpoint();
                 const auto solve_opt = solve_options_with_progress(pass, pass_count);
-                auto u_try =
-                    fea::solve_elastostatics(vol.mesh, material, bc, loads, solve_opt);
+                const auto solve_t0 = std::chrono::steady_clock::now();
+                auto u_try = fea::solve_elastostatics(
+                    vol.mesh, material, bc, loads, solve_opt, active_p_constraints());
+                const double pass_solve_ms = std::chrono::duration<double, std::milli>(
+                                                 std::chrono::steady_clock::now() - solve_t0)
+                                                 .count();
                 report("recover", pass_base + 0.7 * pass_span,
                        std::format("recovering stress… (pass {}/{})", pass, pass_count), pass,
                        pass_count);
@@ -3132,6 +3409,10 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 const auto hp_plan = adapt::drive_hp(signals, hp_policy, cents, h_use);
                 last_shape_vote = hp_plan.global_shape;
                 const std::string hp_note = adapt::summarize_hp_plan(hp_plan);
+                if (setup.adapt_passes > 0 && pass_callback) {
+                    pass_callback(make_pass_trace(pass, vol.mesh, zz_try, hp_plan,
+                                                  pass_mesh_ms, pass_solve_ms));
+                }
 
                 // D2: global η target — stop when η is small enough (0 = disabled).
                 if (setup.eta_target > 0.0 && zz_try.global_eta <= setup.eta_target) {
@@ -3140,7 +3421,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         publish_live_mesh(vol);
                         u_try = fea::solve_elastostatics(
                             vol.mesh, material, bc, loads,
-                            solve_options_with_progress(pass, pass_count));
+                            solve_options_with_progress(pass, pass_count),
+                            active_p_constraints());
                         zz_try = fea::recover_zz(vol.mesh, material, u_try);
                     }
                     SolveResult r;
@@ -3205,7 +3487,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                             publish_live_mesh(vol);
                             u_try = fea::solve_elastostatics(
                                 vol.mesh, material, bc, loads,
-                                solve_options_with_progress(pass, pass_count));
+                                solve_options_with_progress(pass, pass_count),
+                                active_p_constraints());
                             zz_try = fea::recover_zz(vol.mesh, material, u_try);
                         }
                         SolveResult r;
@@ -3225,7 +3508,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                             publish_live_mesh(vol);
                             u_try = fea::solve_elastostatics(
                                 vol.mesh, material, bc, loads,
-                                solve_options_with_progress(pass, pass_count));
+                                solve_options_with_progress(pass, pass_count),
+                                active_p_constraints());
                             zz_try = fea::recover_zz(vol.mesh, material, u_try);
                             vol.mesher_note =
                                 std::format("{} | mid-loop{}", vol.mesher_note, pnote);
@@ -3248,7 +3532,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     publish_live_mesh(vol);
                     u_try = fea::solve_elastostatics(
                         vol.mesh, material, bc, loads,
-                        solve_options_with_progress(pass, pass_count));
+                        solve_options_with_progress(pass, pass_count),
+                        active_p_constraints());
                     zz_try = fea::recover_zz(vol.mesh, material, u_try);
                 }
                 SolveResult r;

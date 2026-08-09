@@ -2,6 +2,7 @@
 add_library(adapt
     src/error.cpp
     src/graded_sizing.cpp
+    src/metric_field.cpp
     src/loop.cpp
     src/sizing_field.cpp
     src/hp_driver.cpp

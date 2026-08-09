@@ -15,6 +15,7 @@
 #include <map>
 #include <queue>
 #include <set>
+#include <limits>
 #include <span>
 #include <unordered_map>
 #include <unordered_set>
@@ -85,7 +86,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                         const Eigen::Vector3d& bbox_max, double h, int skin_layers,
                         std::span<const geom::SharpEdge> features, double feature_band,
                         std::span<const Eigen::Vector3d> refine_seeds, double seed_band,
-                        double curvature_turn_deg, BoundaryProjectionContext* projection) {
+                        double curvature_turn_deg, BoundaryProjectionContext* projection,
+                        const SizeFieldFn& size_field) {
     if (!(h > 0.0) || !std::isfinite(h)) {
         throw ValidityError("graded_tet_fill_surface: h must be positive");
     }
@@ -172,8 +174,9 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     // (everything looks the same size in the free-surface wireframe). Plain
     // graded (no geo drivers) still skins so unit boxes get an L1 shell.
     const int skin_cap = std::max(1, (max_dist + 1) / 2);
-    const bool have_geo_drivers =
-        (feature_band > 0.0) || (seed_band > 0.0) || (curvature_turn_deg > 0.0);
+    const bool have_geo_drivers = (feature_band > 0.0) || (seed_band > 0.0) ||
+                                  (curvature_turn_deg > 0.0) ||
+                                  static_cast<bool>(size_field);
     const int skin_thresh = have_geo_drivers ? 0 : std::min(skin_layers, skin_cap);
 
     // refine_level: 0=bulk, 1=L1, 2=L2, 3=deep protected-feature core.
@@ -192,6 +195,45 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         if (skin_thresh > 0 && dist[c] >= 0 && dist[c] < skin_thresh) {
             is_l1[c] = 1;
             refine_level[c] = 1;
+        }
+    }
+    double field_h_min = std::numeric_limits<double>::infinity();
+    double field_h_max = 0.0;
+    std::size_t n_field_budget_clamped = 0;
+    if (size_field) {
+        // h_floor is the coarse-lattice budget floor. Requests below it cannot
+        // create another lattice scale; LEB remains bounded by its own budget.
+        const double h_floor = (h_budget > 0.0) ? h_budget : hc;
+        for (int k = 0; k < nz; ++k) {
+            for (int j = 0; j < ny; ++j) {
+                for (int i = 0; i < nx; ++i) {
+                    const auto id = idx(i, j, k);
+                    if (!inside[id]) {
+                        continue;
+                    }
+                    const Eigen::Vector3d centroid =
+                        grid.origin +
+                        Eigen::Vector3d{(static_cast<double>(i) + 0.5) * grid.cell[0],
+                                        (static_cast<double>(j) + 0.5) * grid.cell[1],
+                                        (static_cast<double>(k) + 0.5) * grid.cell[2]};
+                    double requested = size_field(centroid);
+                    if (!(requested > 0.0) || !std::isfinite(requested)) {
+                        requested = h_floor;
+                        ++n_field_budget_clamped;
+                    } else {
+                        field_h_min = std::min(field_h_min, requested);
+                        field_h_max = std::max(field_h_max, requested);
+                        if (requested < h_floor) {
+                            ++n_field_budget_clamped;
+                        }
+                    }
+                    const double h_target = std::max(requested, h_floor);
+                    const int level = std::clamp(
+                        static_cast<int>(std::lround(std::log2(hc / h_target))), 0, subdiv);
+                    refine_level[id] =
+                        std::max(refine_level[id], static_cast<std::uint8_t>(level));
+                }
+            }
         }
     }
     // Features → L1 band (hole rims, creases).
@@ -234,20 +276,25 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         }
     }
 
+    bool any_l1 = false;
     bool any_l2 = false;
     bool any_deep_feature = false;
     for (auto lv : refine_level) {
+        any_l1 = any_l1 || lv >= 1;
         any_l2 = any_l2 || lv >= 2;
         any_deep_feature = any_deep_feature || lv >= 3;
     }
 
     GradedTetFillOutput out;
     out.h_coarse = hc;
-    // L1 → ~h/2, L2 → ~h/4 (report deepest active level).
-    out.h_fine = any_l2 ? 0.25 * hc : 0.5 * hc;
+    // Report the deepest active level; an all-L0 field remains at h_coarse.
+    out.h_fine = any_l2 ? 0.25 * hc : (any_l1 ? 0.5 * hc : hc);
     out.skin_layers = skin_layers;
     out.subdivision = subdiv;
     out.mesh.h = out.h_fine;
+    out.field_h_min = std::isfinite(field_h_min) ? field_h_min : 0.0;
+    out.field_h_max = field_h_max;
+    out.n_field_budget_clamped = n_field_budget_clamped;
 
     // Uniform coarse Kuhn lattice, then multi-level LEB (ADR-0018).
     std::map<std::array<int, 3>, std::uint32_t> node_ids;
@@ -339,6 +386,13 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                     }
                 } else {
                     ++out.n_coarse_cells;
+                }
+                if (refine_level[id] == 0) {
+                    ++out.n_level0_cells;
+                } else if (refine_level[id] == 1) {
+                    ++out.n_level1_cells;
+                } else {
+                    ++out.n_level2_cells;
                 }
                 for (int f = 0; f < 6; ++f) {
                     if (!inb(i + kFaceNbr[f][0], j + kFaceNbr[f][1], k + kFaceNbr[f][2])) {

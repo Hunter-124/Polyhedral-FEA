@@ -184,27 +184,66 @@ struct RefineRegion {
     Eigen::Vector3d hi = Eigen::Vector3d::Constant(1e300);
     double target_fraction = 0.5;
 };
+/// Scale-free geometry and boundary-condition context for learned mesh advice.
+/// All geometric measures are normalized by the model bbox diagonal: lengths
+/// by diag, areas by diag², volumes by diag³, and curvatures multiplied by diag.
+/// Consequently `diag` is 1 for a non-degenerate model (0 otherwise). Counts
+/// and Poisson's ratio are dimensionless. Invalid/empty regions contribute zero.
+struct CaseFeatures {
+    double bbox_dx = 0.0;
+    double bbox_dy = 0.0;
+    double bbox_dz = 0.0;
+    double diag = 0.0;
+    double volume = 0.0;
+    double surface_area = 0.0;
+    double sa_over_v23 = 0.0;
+    std::size_t n_faces = 0;
+    std::size_t n_sharp_edges = 0;
+    double sharp_edge_len_total = 0.0;
+    double curved_frac = 0.0;
+    double kappa_max_h = 0.0;
+    double kappa_mean_h = 0.0;
+    double thin_min_over_diag = 0.0;
+    double thin_p10_over_diag = 0.0;
+    double min_feature_h = 0.0;
+    std::size_t n_fix_faces = 0;
+    std::size_t n_load_faces = 0;
+    double fix_area_frac = 0.0;
+    double load_area_frac = 0.0;
+    double load_dir_x = 0.0;
+    double load_dir_y = 0.0;
+    double load_dir_z = 0.0;
+    double fix_load_dist_over_diag = 0.0;
+    double load_axis_alignment = 0.0;
+    double poisson = 0.0;
+};
+
+/// Extract cheap, deterministic advisor context without meshing or solving.
+CaseFeatures extract_case_features(const Model& model,
+                                  std::span<const RefineRegion> fix_regions,
+                                  std::span<const RefineRegion> load_regions,
+                                  const Eigen::Vector3d& load_dir, double poisson);
 
 /// Fused geometry + boundary-condition refinement plan for `volume_mesh`.
 /// Geometry sources (curvature / thin-wall, a priori) and BC/load region
 /// sources (the simulation setup, a priori) are combined into one
-/// gradient-limited seed field (adapt::seed_plan). Feed `refine_seeds` +
-/// `seed_band` straight into `volume_mesh` so the mesh grades toward both
-/// features and boundary conditions.
+/// gradient-limited size field. Legacy refine seeds remain available so
+/// a-posteriori ball refinement keeps its existing contract.
 struct RefinementPlan {
+    mesh::SizeFieldFn size_field;
     std::vector<Eigen::Vector3d> refine_seeds;
     double seed_band = 0.0; // ball influence radius, metres
-    double h_fine = 0.0;    // finest requested target, metres
+    double h_min = 0.0;     // finest field target, metres
+    double h_fine = 0.0;    // legacy alias for finest requested target, metres
     std::size_t n_geometry_seeds = 0;
     std::size_t n_bc_seeds = 0;
 };
 
-/// Build a fused geometry + BC refinement plan for the ball-grading meshers
-/// (graded tet / hybrid / varyhedron). `h_coarse` is the resolved bulk size
-/// (see resolve_mesh_size). When `use_geometry`, surface curvature / thin-wall
-/// sources finer than `h_coarse` are added. Each region contributes the
-/// surface-face centroids inside its box at `target_fraction * h_coarse`.
-/// Returns an empty plan when nothing qualifies (uniform mesh).
+/// Build a fused geometry + BC size field for the graded tet and hybrid
+/// meshers. `h_coarse` is the resolved bulk size (see resolve_mesh_size).
+/// When `use_geometry`, surface curvature / thin-wall sources finer than
+/// `h_coarse` are added. Each region contributes surface-face centroids at
+/// `target_fraction * h_coarse`. Empty sources produce an empty field/plan.
 RefinementPlan build_refinement_plan(const Model& model, double h_coarse,
                                      std::span<const RefineRegion> regions,
                                      bool use_geometry = true);
@@ -242,6 +281,8 @@ struct VolumeMeshOutput {
 /// @param feature_refine When true and mesher is graded, also refine near sharp edges.
 /// @param refine_seeds Centroids for a posteriori fine blocks, metres (world coords).
 /// @param seed_band Ball radius around each seed for graded fine cells, metres (0 = off).
+/// @param size_field Optional desired edge length h(x), metres. Forwarded only
+/// to the graded tet and hybrid meshers; empty preserves legacy output.
 /// @param element_tendency Shape preference ∈ [-1, +1]; see resolve_element_tendency.
 /// @param max_elems/max_dof Hard ceilings; 0 disables the low-level guard.
 /// Product callers pass the resolved nonzero SimSetup ceilings.
@@ -252,7 +293,8 @@ VolumeMeshOutput volume_mesh(
     int skin_layers = 2, bool feature_refine = false,
     std::span<const Eigen::Vector3d> refine_seeds = {}, double seed_band = 0.0,
     double element_tendency = 0.0, std::size_t max_elems = 0, std::size_t max_dof = 0,
-    int auto_retry_budget = 0, const std::function<void()>& cancel_check = {});
+    int auto_retry_budget = 0, const std::function<void()>& cancel_check = {},
+    const mesh::SizeFieldFn& size_field = {});
 
 /// @deprecated name kept as alias during transition; calls volume_mesh.
 /// @param h Target edge length, metres.
@@ -273,6 +315,26 @@ struct JobProgress {
     std::size_t n_elems = 0;
     std::size_t n_nodes = 0;
 };
+/// One completed solve/recovery pass from the adaptive pipeline.
+/// Indicators and shape/cost predictions are dimensionless; timings are ms.
+struct PassTrace {
+    int pass = 0;
+    std::size_t n_elems = 0;
+    std::size_t n_nodes = 0;
+    std::size_t n_dof = 0;
+    double global_eta = 0.0;
+    double eta_p50 = 0.0;
+    double eta_p90 = 0.0;
+    double eta_max = 0.0;
+    std::size_t n_h_mark = 0;
+    std::size_t n_p_mark = 0;
+    std::size_t n_shape_mark = 0;
+    int global_shape = 0;
+    double predicted_dof_factor = 1.0;
+    double mesh_ms = 0.0;
+    double solve_ms = 0.0;
+};
+
 
 /// Background mesh / solve pipeline. Poll `state` from the UI thread.
 class SolveJob {
@@ -308,6 +370,9 @@ class SolveJob {
     State state() const { return state_.load(); }
     std::string status_text() const;
     JobProgress progress() const;
+    /// Optional worker-thread callback after each recovered adaptive pass.
+    /// Set before `start`; callbacks are serialized in deterministic pass order.
+    std::function<void(const PassTrace&)> on_pass;
 
     /// Poll intermediate volume mesh for viewport (updated after mesh / adapt
     /// remesh). Returns a copy when generation advanced past `seen_gen` (then

@@ -7,26 +7,39 @@ Research: [`docs/research/ideabank/`](../research/ideabank/)
 
 ## State
 
-Commit `ba06b23` on `master`, **local only** — `git push` returned 403:
-git is authenticated as `CharlesEdmonds`, the remote is `Hunter-124/Polyhedral-FEA`.
-Fix the credential and push; nothing else is blocking.
+Commits `ba06b23`, `18631c1`, `58c04d5` on `master`, **local only** — `git push`
+returned 403: git is authenticated as `CharlesEdmonds`, the remote is
+`Hunter-124/Polyhedral-FEA`. Fix the credential and push; nothing else blocks.
 
-Suite: **347 cases / 318 passed / 29 skipped (all OCC-gated) / 41,881 assertions / 0 failures.**
+Suite (OCC ON): **347 cases / 344 passed / 3 skipped / 42,224 assertions / 0 failures.**
+The 3 skips are two stub-path tests that skip *because* OCC is enabled, plus
+CUDA SpMV.
 Build: `cmd.exe /c "scripts\msvcbuild.bat cmake --build build -j 4"`.
 A bare shell has no MSVC env and dies with `Cannot open include file: 'cmath'` —
 that wrapper is now the way to build here.
 
-## Blocked on the machine, not on code
+Product smoke, `polymesh solve bench/geometries/public/unit_box.step -h 0.1`:
+STEP import → hybrid mesh (10,648 elems, 12,167 nodes, snap max|d| 3.04e-16 m)
+→ solve (max von Mises 6146 Pa, max |u| 3.686e-08 m, ZZ η 0.1146) → VTU.
+Load conservation error 6.82e-13 N. At auto-`h` the same part trips the solver
+memory guard (1011 MiB estimated vs a 716.8 MiB effective cap) — the guard
+working, not a defect; pass `--max-mem` or free RAM.
 
-1. **OpenCASCADE.** `vcpkg install opencascade:x64-windows` is running detached
-   (`occt-install2`, `VCPKG_MAX_CONCURRENCY=5`). It was killed once mid-debug-build
-   and restarted; vcpkg resumes. Until it finishes, `POLYMESH_WITH_OCC` stays OFF
-   and **the product CAD path cannot run at all** — the CLI is CAD-only and 29
-   tests skip. Reconfigure with `-DPOLYMESH_WITH_OCC=ON` afterwards.
+## Blocked on you, not on code
+
+1. **Push credential** — see above.
 2. **SFEM corpus.** `scripts/fetch_advisor_corpus.py --source sfem` gets HTTP 429
    then `LocalEntryNotFoundError` — Hugging Face rate-limits anonymous IPs pulling
    ~16k small files. Set `HF_TOKEN` (any free account) and re-run; the script
    backs off, resumes, and is idempotent. Nothing was downloaded yet.
+3. **Procedural part generator** — needs `pip install cadquery` (`scripts/gen_cad_parts.py`
+   already imports OCP).
+
+**OpenCASCADE is done.** vcpkg `opencascade:x64-windows` 8.0.0#1 installed and
+`POLYMESH_WITH_OCC=ON` is now the configured state of `build/`. OCCT 8 deleted
+`TopTools_ListIteratorOfListOfShape.hxx` (the iterator is a typedef in
+`TopTools_ListOfShape.hxx` now); that stale include was the only breakage in the
+whole tree.
 
 ## What is real now that was not
 

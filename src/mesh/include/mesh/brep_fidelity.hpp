@@ -17,6 +17,7 @@ namespace polymesh::mesh {
 /// sorted samples at q * (n - 1). Empty input has count == 0 and zero values.
 struct SampleDistribution {
     std::size_t count = 0;
+    double mean = 0.0;
     double rms = 0.0;
     double p95 = 0.0;
     double p99 = 0.0;
@@ -78,12 +79,82 @@ struct BRepGeometryFidelity {
 /// reference tessellation. `max_reference_samples` is both the storage ceiling
 /// and the input to the bounded UV-attempt budget.
 ///
+/// `max_boundary_samples` caps the mesh-to-BRep direction, whose cost is one
+/// exact BRep projection per sample. 0 (the diagnostic default) projects every
+/// boundary node, face centroid, and boundary-edge midpoint. A positive cap
+/// derives ONE stride from the largest of those three sources and applies it to
+/// all three, so their ~1:2:3 mix — and therefore the reported mean and
+/// quantiles — stays fixed as the mesh is refined. Per-source caps would let
+/// the sources saturate at different mesh sizes and make the metric
+/// incomparable across h. The total sample count is bounded by 3*(cap + 1).
+///
 /// Empty models and builds without OpenCASCADE return the deterministic default
 /// (`available == false`). Invalid indices/degenerate faces are skipped.
 [[nodiscard]] BRepGeometryFidelity evaluate_brep_geometry_fidelity(
     const geom::CadModel& model, const std::vector<Eigen::Vector3d>& nodes,
     const std::vector<FreeFace>& free_faces,
     const std::vector<geom::MeshEdgeSegment>& mesh_feature_segments, double h,
-    double mesh_volume, std::size_t max_reference_samples = 10'000);
+    double mesh_volume, std::size_t max_reference_samples = 10'000,
+    std::size_t max_boundary_samples = 0);
+
+/// Absolute enclosed volume of a closed boundary-face shell (divergence form).
+/// Quads are split on the 0-2 diagonal; out-of-range indices contribute zero.
+/// Empty input returns 0.
+[[nodiscard]] double boundary_surface_volume(const std::vector<Eigen::Vector3d>& nodes,
+                                             const std::vector<FreeFace>& free_faces);
+
+/// Candidate mesh feature segments: boundary edges shared by exactly two faces
+/// whose dihedral angle meets `sharp_angle_deg`. This is the classified-edge
+/// input `evaluate_brep_geometry_fidelity` expects; polygon diagonals are never
+/// invented here.
+[[nodiscard]] std::vector<geom::MeshEdgeSegment>
+mesh_dihedral_feature_segments(const std::vector<Eigen::Vector3d>& nodes,
+                               const std::vector<FreeFace>& free_faces,
+                               double sharp_angle_deg = 30.0);
+
+/// Scale-free condensation of `BRepGeometryFidelity` into the columns the
+/// learned mesh advisor trains on. Every distance is a fraction of the BRep
+/// bounding-box diagonal, so values are comparable across parts of any size.
+///
+/// `chamfer_mean` is the symmetric mean point-to-surface distance, averaged
+/// over whichever of the two directions produced samples; the quantiles and
+/// max are the worse of the two directions. A mesh that hugs the BRep where it
+/// has faces but leaves whole faces uncovered therefore still scores badly,
+/// because the BRep→mesh direction carries equal weight.
+///
+/// Both quantiles are reported because `dist_p95` is measured to be
+/// degenerate: a conforming mesh has its boundary nodes projected onto the
+/// BRep, so well over 95% of the samples are exactly zero and p95 collapses to
+/// ~1e-17 on every real part. `dist_p99` is the tail statistic that actually
+/// varies with h, and is the one the advisor learns.
+struct BrepFidelitySummary {
+    bool available = false;
+    double chamfer_mean = 0.0;
+    double dist_p95 = 0.0;
+    double dist_p99 = 0.0;
+    double dist_max = 0.0;
+    double normal_angle_p95_rad = 0.0;
+    double rel_volume_err = 0.0;
+    std::size_t n_samples = 0;
+};
+
+/// Condense an already-evaluated report. Reports with no samples in either
+/// direction stay `available == false`.
+[[nodiscard]] BrepFidelitySummary summarize_brep_fidelity(const BRepGeometryFidelity& report);
+
+/// Default per-direction sample budget for the campaign metric. The full
+/// diagnostic sweep projects every boundary node, face centroid and edge
+/// midpoint onto the exact BRep — thousands of BRepExtrema queries. This cap
+/// holds the estimate steady while keeping the metric a small fraction of a
+/// campaign run.
+inline constexpr std::size_t kCampaignFidelitySamples = 1500;
+
+/// One-call campaign metric: derive feature segments and shell volume from the
+/// boundary faces, evaluate against the live BRep under a bounded budget, and
+/// condense. Empty faces / empty model return an unavailable summary.
+[[nodiscard]] BrepFidelitySummary
+brep_fidelity_summary(const geom::CadModel& model, const std::vector<Eigen::Vector3d>& nodes,
+                      const std::vector<FreeFace>& free_faces, double h,
+                      std::size_t max_samples = kCampaignFidelitySamples);
 
 } // namespace polymesh::mesh

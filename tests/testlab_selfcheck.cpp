@@ -86,7 +86,7 @@ std::filesystem::path write_temp_campaign_tree() {
 
 } // namespace
 
-TEST_CASE("testlab: parse campaign.json (interfaces §1)") {
+TEST_CASE("testlab: parse campaign.json (interfaces sec 1)") {
     const auto spec = parse_campaign(R"({
   "name": "demo",
   "parts": ["a.case.json", "b.case.json"],
@@ -105,7 +105,7 @@ TEST_CASE("testlab: parse campaign.json (interfaces §1)") {
     CHECK_THAT(spec.resources.max_mem_gb, Catch::Matchers::WithinAbs(8.0, 1e-12));
 }
 
-TEST_CASE("testlab: parse checkpoint.json (interfaces §2)") {
+TEST_CASE("testlab: parse checkpoint.json (interfaces sec 2)") {
     const auto cp = parse_checkpoint(R"({
   "campaign": "hole-plate-frontier-1",
   "state": "running",
@@ -123,7 +123,7 @@ TEST_CASE("testlab: parse checkpoint.json (interfaces §2)") {
     CHECK(cp.survivors[0] == "cfg-0007");
 }
 
-TEST_CASE("testlab: parse results.jsonl line (interfaces §3)") {
+TEST_CASE("testlab: parse results.jsonl line (interfaces sec 3)") {
     const auto row = parse_result_line(
         R"({"cfg_id":"cfg-0007","config":{"mesher":"hybrid_zoo","curvature_turn_deg":15},"part":"plate_hole","tier":1,"mesh_ms":412,"solve_ms":1890,"n_elems":31956,"n_nodes":11935,"n_dof":35805,"quality":{"M1max":1.0e-11,"M2max":0.36,"M6":0.17,"score":0.42},"accuracy":{"metric":"scf","value":3.06,"truth":3.0,"rel_err":0.02},"status":"ok"})");
     CHECK(row.cfg_id == "cfg-0007");
@@ -197,7 +197,7 @@ TEST_CASE("testlab: parse handoff.json open_program_nodes") {
     CHECK_FALSE(polymesh::gui::testlab::is_measure_first_baseline("varyhedron-short-1"));
 }
 
-TEST_CASE("testlab: parse progress.json (interfaces §6)") {
+TEST_CASE("testlab: parse progress.json (interfaces sec 6)") {
     const auto p = parse_progress(R"({
   "phase": "solve",
   "phase_frac": 0.62,

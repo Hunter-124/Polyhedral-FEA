@@ -25,6 +25,7 @@ inline constexpr std::uint64_t kUnknownMemoryFallbackBytes = 1ULL << 30;
 enum class MemoryAvailabilitySource {
     kProcMeminfo,
     kSysinfo,
+    kGlobalMemoryStatus,
     kConservativeDefault,
 };
 
@@ -63,8 +64,9 @@ struct EffectiveMemoryBudget {
 };
 
 /// Read memory currently available to new allocations.  Linux uses
-/// /proc/meminfo's MemAvailable first and sysinfo(2) as a fallback.  Other
-/// platforms, or unreadable Linux sources, use kUnknownMemoryFallbackBytes.
+/// /proc/meminfo's MemAvailable first and sysinfo(2) as a fallback. Windows
+/// uses GlobalMemoryStatusEx's ullAvailPhys. Other platforms, or unreadable
+/// sources, use kUnknownMemoryFallbackBytes.
 [[nodiscard]] MemoryAvailability system_memory_available();
 
 /// Resolve max_mem_gb (decimal GB, 0 = auto) against 70% of MemAvailable.

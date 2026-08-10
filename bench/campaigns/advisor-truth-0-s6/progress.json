@@ -1,0 +1,12 @@
+{
+  "cg_iter": null,
+  "cg_resid": null,
+  "elapsed_ms": 84849.2066,
+  "phase": "mesh",
+  "phase_frac": 0.0,
+  "run": {
+    "cfg_id": "cfg-d99fcd7c",
+    "part": "l_bracket_s1_c2",
+    "tier": 0
+  }
+}

@@ -2,6 +2,9 @@
 
 // PolyMesh CLI — geometry check, tet mesh, elastostatic solve + VTU export.
 
+#ifdef POLYMESH_WITH_ADVISOR
+#include "advisor/advisor.hpp"
+#endif
 #include "adapt/error.hpp"
 #include "adapt/graded_sizing.hpp"
 #include "adapt/loop.hpp"
@@ -30,7 +33,6 @@
 #include <cstring>
 #include <format>
 #include <limits>
-#include <map>
 #include <optional>
 #include <set>
 #include <span>
@@ -58,6 +60,7 @@ int usage() {
                "              [--max-elems N] [--max-dof N] [--max-mem GB]\n"
                "              [--fix-box ...6] [--load-box ...6] [--bc-grade]\n"
                "              [--load-dir x y z] [--force N] [--traction Pa]\n"
+               "              [--advisor <model_dir>]\n"
                "                             mesh + BCs + VTU. Default BCs: fix min-x,\n"
                "                             load max-x. Boxes override selection.\n"
                "  diag  <part> [-h m] [--mesher name] [--json out.json] [--no-solve]\n"
@@ -91,6 +94,9 @@ int usage() {
                "--eta-target η: stop adapt when global ZZ η ≤ η (0=off; needs --adapt)\n"
                "--p-elevate: promote smooth tet4/hex8 → tet10/hex20 (auto-on --adapt>0)\n"
                "--bc-grade: force a-priori BC grading from the default cantilever faces\n"
+               "--advisor DIR: pick mesher/h/adapt/p-order with the learned mesh advisor\n"
+               "               (DIR holds model.onnx, normalization.json, clamps.json);\n"
+               "               every value is clamped and the decision is logged as JSON\n"
                "--max-elems N: pre-flight element ceiling (0=589824 default)\n"
                "--max-dof N: pre-flight/adapt DOF ceiling (0=1769472 default)\n"
                "\n"
@@ -119,23 +125,29 @@ bool parse_ceiling(std::span<char*> args, std::size_t& i, std::size_t& value) {
     return true;
 }
 
-polymesh::pipeline::VolumeMesher parse_mesher(const std::string& m) {
-    if (m == "hybrid" || m == "zoo" || m == "mixed") {
+/// Accepts both the CLI's historical short names and the canonical spellings
+/// `testlab`'s `mesher_name()` emits, because the advisor's `mesher_choices`
+/// vocabulary is the latter. `graded_tet`, `hex_vem` and `hybrid_zoo` used to
+/// miss every branch and fall through to the hybrid default, so an advisor
+/// recommending `graded_tet` silently got a hybrid mesh while the logged
+/// decision still said `graded_tet`.
+std::optional<polymesh::pipeline::VolumeMesher> try_parse_mesher(const std::string& m) {
+    if (m == "hybrid" || m == "zoo" || m == "mixed" || m == "hybrid_zoo") {
         return polymesh::pipeline::VolumeMesher::kHybrid;
     }
     if (m == "hybridvem" || m == "hybrid-vem" || m == "hybrid_vem") {
         return polymesh::pipeline::VolumeMesher::kHybridVem;
     }
-    if (m == "tet") {
+    if (m == "tet" || m == "tet_fill") {
         return polymesh::pipeline::VolumeMesher::kTetFill;
     }
     if (m == "hex") {
         return polymesh::pipeline::VolumeMesher::kHexFill;
     }
-    if (m == "hexvem" || m == "vem") {
+    if (m == "hexvem" || m == "vem" || m == "hex_vem") {
         return polymesh::pipeline::VolumeMesher::kHexVem;
     }
-    if (m == "graded") {
+    if (m == "graded" || m == "graded_tet") {
         return polymesh::pipeline::VolumeMesher::kGradedTet;
     }
     if (m == "varyhedron" || m == "vary") {
@@ -153,7 +165,12 @@ polymesh::pipeline::VolumeMesher parse_mesher(const std::string& m) {
     if (m == "octa" || m == "octahedral") {
         return polymesh::pipeline::VolumeMesher::kOctahedral;
     }
-    return polymesh::pipeline::VolumeMesher::kHybrid;
+    return std::nullopt;
+}
+
+/// Lenient form kept for the `--mesher` flag's historical behaviour.
+polymesh::pipeline::VolumeMesher parse_mesher(const std::string& m) {
+    return try_parse_mesher(m).value_or(polymesh::pipeline::VolumeMesher::kHybrid);
 }
 
 struct BoxSel {
@@ -633,6 +650,7 @@ int cmd_solve(std::span<char*> args) {
     double max_mem_gb = 0.0;
     BoxSel fix_box, load_box;
     LoadSpec load_spec;
+    std::string advisor_dir;
     for (std::size_t i = 3; i < args.size(); ++i) {
         if (std::strcmp(args[i], "-h") == 0 && i + 1 < args.size()) {
             h = std::atof(args[++i]);
@@ -687,6 +705,8 @@ int cmd_solve(std::span<char*> args) {
             p_elevate = true;
         } else if (std::strcmp(args[i], "--bc-grade") == 0) {
             bc_grade = true;
+        } else if (std::strcmp(args[i], "--advisor") == 0 && i + 1 < args.size()) {
+            advisor_dir = args[++i];
         } else if (std::strcmp(args[i], "--load-dir") == 0 ||
                    std::strcmp(args[i], "--force") == 0 ||
                    std::strcmp(args[i], "--traction") == 0) {
@@ -707,6 +727,60 @@ int cmd_solve(std::span<char*> args) {
     }
 
     const auto model = polymesh::pipeline::Model::load(path);
+
+    // Learned mesh advisor (ADR-0027). It runs before size resolution and
+    // grading so its action is the one that actually meshes: h, mesher, adapt
+    // schedule and p-order all come from the model, inside the clamp box.
+    // The decision is printed in full — a mesh chosen by a network must be as
+    // auditable as one chosen by a flag.
+    if (!advisor_dir.empty()) {
+#ifdef POLYMESH_WITH_ADVISOR
+        std::vector<polymesh::pipeline::RefineRegion> advisor_fix;
+        std::vector<polymesh::pipeline::RefineRegion> advisor_load;
+        if (fix_box.set) {
+            advisor_fix.push_back({fix_box.lo, fix_box.hi, 0.5});
+        }
+        if (load_box.set) {
+            advisor_load.push_back({load_box.lo, load_box.hi, 0.25});
+        }
+        const auto features = polymesh::pipeline::extract_case_features(
+            model, advisor_fix, advisor_load, load_spec.dir, nu);
+        const auto decision = polymesh::advisor::advisor_recommend(advisor_dir, features);
+        std::printf("advisor: %s\n", polymesh::advisor::to_json(decision).c_str());
+        const double diag = (model.bbox_max - model.bbox_min).norm();
+        const auto resolved_mesher = try_parse_mesher(decision.mesher);
+        if (!resolved_mesher) {
+            std::fprintf(stderr,
+                         "solve: advisor recommended mesher '%s', which this build cannot "
+                         "parse. Refusing to silently mesh something else — re-export the "
+                         "model with a mesher_choices vocabulary the CLI accepts.\n",
+                         decision.mesher.c_str());
+            return 2;
+        }
+        mesher = *resolved_mesher;
+        h = std::max(decision.h_rel * diag, 1e-9);
+        adapt_passes = decision.adapt_passes;
+        eta_target = decision.eta_target;
+        // The solve path has one p-elevation step (tet4/hex8 -> tet10/hex20),
+        // so orders above 2 are executed as quadratic. Say so rather than let
+        // the decision JSON claim an order the mesh never had.
+        p_elevate = decision.p_elevate || decision.order >= 2;
+        std::printf("advisor: applied mesher=%s h=%.6g m (h_rel=%.4g) adapt=%d eta=%.4g "
+                    "order=%d p_elevate=%d%s\n",
+                    decision.mesher.c_str(), h, decision.h_rel, adapt_passes, eta_target,
+                    decision.order, p_elevate ? 1 : 0,
+                    decision.vetoed ? " [VETOED -> defaults]" : "");
+        if (decision.order > 2) {
+            std::printf("advisor: order %d executed as quadratic — this solve path has a "
+                        "single p-elevation step\n",
+                        decision.order);
+        }
+#else
+        std::fputs("solve: --advisor needs a build with POLYMESH_WITH_ADVISOR=ON\n", stderr);
+        return 2;
+#endif
+    }
+
     const auto exact_pressure_area = load_spec.traction_mode
                                          ? cad_pressure_area(model, load_box, load_spec.dir)
                                          : std::nullopt;
@@ -926,82 +1000,6 @@ int cmd_solve(std::span<char*> args) {
     return 0;
 }
 
-double boundary_surface_volume(const std::vector<Eigen::Vector3d>& nodes,
-                               const std::vector<std::array<std::uint32_t, 4>>& faces) {
-    if (nodes.empty()) {
-        return 0.0;
-    }
-    const Eigen::Vector3d origin = nodes.front();
-    const auto tri_volume = [&](std::uint32_t ia, std::uint32_t ib, std::uint32_t ic) {
-        if (ia >= nodes.size() || ib >= nodes.size() || ic >= nodes.size()) {
-            return 0.0;
-        }
-        const Eigen::Vector3d a = nodes[ia] - origin;
-        const Eigen::Vector3d b = nodes[ib] - origin;
-        const Eigen::Vector3d c = nodes[ic] - origin;
-        return a.dot(b.cross(c)) / 6.0;
-    };
-    double signed_volume = 0.0;
-    for (const auto& face : faces) {
-        signed_volume += tri_volume(face[0], face[1], face[2]);
-        if (face[3] != face[2]) {
-            signed_volume += tri_volume(face[0], face[2], face[3]);
-        }
-    }
-    return std::abs(signed_volume);
-}
-
-std::vector<polymesh::geom::MeshEdgeSegment>
-mesh_dihedral_feature_segments(const std::vector<Eigen::Vector3d>& nodes,
-                               const std::vector<std::array<std::uint32_t, 4>>& faces,
-                               double sharp_angle_deg = 30.0) {
-    using Edge = std::pair<std::uint32_t, std::uint32_t>;
-    std::map<Edge, std::vector<Eigen::Vector3d>> edge_normals;
-    for (const auto& face : faces) {
-        const std::size_t count = face[3] == face[2] ? 3 : 4;
-        bool valid = true;
-        for (std::size_t i = 0; i < count; ++i) {
-            valid = valid && face[i] < nodes.size();
-        }
-        if (!valid) {
-            continue;
-        }
-        Eigen::Vector3d normal =
-            (nodes[face[1]] - nodes[face[0]]).cross(nodes[face[2]] - nodes[face[0]]);
-        const double norm = normal.norm();
-        if (!(norm > 1e-15)) {
-            continue;
-        }
-        normal /= norm;
-        for (std::size_t i = 0; i < count; ++i) {
-            std::uint32_t a = face[i];
-            std::uint32_t b = face[(i + 1) % count];
-            if (a == b) {
-                continue;
-            }
-            if (a > b) {
-                std::swap(a, b);
-            }
-            edge_normals[{a, b}].push_back(normal);
-        }
-    }
-
-    const double threshold = sharp_angle_deg * 3.14159265358979323846 / 180.0;
-    std::vector<polymesh::geom::MeshEdgeSegment> segments;
-    segments.reserve(edge_normals.size());
-    for (const auto& [edge, normals] : edge_normals) {
-        if (normals.size() != 2) {
-            continue;
-        }
-        const double cosine = std::clamp(normals[0].dot(normals[1]), -1.0, 1.0);
-        if (std::acos(cosine) < threshold) {
-            continue;
-        }
-        segments.push_back({nodes[edge.first], nodes[edge.second]});
-    }
-    return segments;
-}
-
 // Structured diagnostics: import fidelity, mesh quality, and phase timings as
 // JSON — the profiler output and the measurement feed for the self-improve loop
 // (scripts/self_improve.sh). Optionally runs a default cantilever solve too.
@@ -1107,8 +1105,9 @@ int cmd_diag(std::span<char*> args) {
     polymesh::mesh::BRepGeometryFidelity fidelity;
     if (model.cad && !model.cad->empty()) {
         const auto feature_segments =
-            mesh_dihedral_feature_segments(vol.mesh.nodes, fidelity_faces);
-        const double mesh_volume = boundary_surface_volume(vol.mesh.nodes, fidelity_faces);
+            polymesh::mesh::mesh_dihedral_feature_segments(vol.mesh.nodes, fidelity_faces);
+        const double mesh_volume =
+            polymesh::mesh::boundary_surface_volume(vol.mesh.nodes, fidelity_faces);
         fidelity = polymesh::mesh::evaluate_brep_geometry_fidelity(
             *model.cad, vol.mesh.nodes, fidelity_faces, feature_segments, h, mesh_volume,
             kBRepSurfaceSampleCeiling);

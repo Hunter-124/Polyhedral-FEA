@@ -1,6 +1,7 @@
 {
   "schema": "advisor-dataset-schema-v1",
   "source_row_schemas": [
+    "advisor-row-v2",
     "legacy"
   ],
   "columns": [
@@ -271,7 +272,7 @@
     {
       "name": "bc_grading",
       "role": "action",
-      "dtype": "number",
+      "dtype": "boolean",
       "description": "Swept mesh-advisor action 'bc_grading'."
     },
     {
@@ -289,7 +290,7 @@
     {
       "name": "p_elevate",
       "role": "action",
-      "dtype": "number",
+      "dtype": "boolean",
       "description": "Swept mesh-advisor action 'p_elevate'."
     },
     {
@@ -309,6 +310,12 @@
       "role": "outcome",
       "dtype": "string",
       "description": "Campaign run completion or failure status."
+    },
+    {
+      "name": "error",
+      "role": "outcome",
+      "dtype": "string",
+      "description": "Top-level failure message; empty when the run produced no error. Primary signal for the advisor feasibility head."
     },
     {
       "name": "mesh_ms",
@@ -447,6 +454,54 @@
       "role": "outcome",
       "dtype": "number",
       "description": "Flattened measured answer 'tip_deflection_max'."
+    },
+    {
+      "name": "geo_fidelity_available",
+      "role": "outcome",
+      "dtype": "boolean",
+      "description": "Campaign outcome 'geo_fidelity_available'."
+    },
+    {
+      "name": "geo_fidelity_chamfer_mean",
+      "role": "outcome",
+      "dtype": "number",
+      "description": "Campaign outcome 'geo_fidelity_chamfer_mean'."
+    },
+    {
+      "name": "geo_fidelity_dist_max",
+      "role": "outcome",
+      "dtype": "number",
+      "description": "Campaign outcome 'geo_fidelity_dist_max'."
+    },
+    {
+      "name": "geo_fidelity_dist_p95",
+      "role": "outcome",
+      "dtype": "number",
+      "description": "Campaign outcome 'geo_fidelity_dist_p95'."
+    },
+    {
+      "name": "geo_fidelity_dist_p99",
+      "role": "outcome",
+      "dtype": "number",
+      "description": "Campaign outcome 'geo_fidelity_dist_p99'."
+    },
+    {
+      "name": "geo_fidelity_n_samples",
+      "role": "outcome",
+      "dtype": "number",
+      "description": "Campaign outcome 'geo_fidelity_n_samples'."
+    },
+    {
+      "name": "geo_fidelity_normal_angle_p95_rad",
+      "role": "outcome",
+      "dtype": "number",
+      "description": "Campaign outcome 'geo_fidelity_normal_angle_p95_rad'."
+    },
+    {
+      "name": "geo_fidelity_rel_volume_err",
+      "role": "outcome",
+      "dtype": "number",
+      "description": "Campaign outcome 'geo_fidelity_rel_volume_err'."
     },
     {
       "name": "health_free_residual_rel",

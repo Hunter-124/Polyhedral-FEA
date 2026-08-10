@@ -8,6 +8,7 @@ import argparse
 import csv
 import json
 from collections import Counter
+from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -16,7 +17,17 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 CAMPAIGNS = ROOT / "bench" / "campaigns"
 CASE_DIR = ROOT / "tests" / "fixtures" / "parts"
+# Procedural advisor corpus (scripts/gen_primitive_corpus.py) keeps its case JSON next
+# to the generated STEP, so both directories must be scanned.
+CORPUS_CASE_DIR = ROOT / "bench" / "geometries" / "corpus" / "primitives"
+CASE_DIRS = (CASE_DIR, CORPUS_CASE_DIR)
 OUTPUT_DIR = ROOT / "bench" / "advisor"
+
+# promote_truth.py DEFINES each case's reference truth from the rows of the
+# advisor-truth-* campaigns, so their own accuracy_rel_err is ~0 by
+# construction. Training on them would teach the model that the overkill config
+# has zero error -- definitionally true and completely non-generalizable.
+TRUTH_CAMPAIGN_GLOB = "advisor-truth-*"
 
 FEATURE_COLUMNS = [
     "bbox_dx", "bbox_dy", "bbox_dz", "diag", "volume", "surface_area",
@@ -35,7 +46,10 @@ CASE_COLUMNS = [
     "case_poisson", "case_n_fix_regions", "case_n_load_regions", "case_load_dir_x",
     "case_load_dir_y", "case_load_dir_z", "case_traction_magnitude",
 ]
-TOP_OUTCOMES = ["status", "mesh_ms", "solve_ms", "n_dof", "n_elems", "n_nodes"]
+# ``error`` is the row's top-level failure string; it is the first signal
+# dataset.py::_failure_flag looks at, so it has to reach the CSV.
+TOP_OUTCOMES = ["status", "error", "mesh_ms", "solve_ms", "n_dof", "n_elems", "n_nodes"]
+STRING_OUTCOMES = frozenset({"status", "error"})
 
 
 def parse_args() -> argparse.Namespace:
@@ -73,12 +87,20 @@ def campaign_records(campaign_dir: Path) -> Iterable[tuple[tuple[Any, ...], dict
 
 def load_cases() -> dict[str, dict[str, Any]]:
     cases: dict[str, dict[str, Any]] = {}
-    for path in sorted(CASE_DIR.glob("*.case.json")):
-        case = read_json(path)
-        part = case.get("part")
-        if isinstance(part, str):
-            cases[part] = case
+    for case_dir in CASE_DIRS:
+        for path in sorted(case_dir.glob("*.case.json")):
+            case = read_json(path)
+            part = case.get("part")
+            if isinstance(part, str):
+                cases[part] = case
     return cases
+
+
+def case_counts() -> str:
+    return ", ".join(
+        f"{case_dir.relative_to(ROOT).as_posix()}={len(list(case_dir.glob('*.case.json')))}"
+        for case_dir in CASE_DIRS
+    )
 
 
 def case_context(case: dict[str, Any] | None) -> dict[str, Any]:
@@ -142,8 +164,11 @@ def flatten_row(campaign: str, row: dict[str, Any], case: dict[str, Any] | None)
             flat[name] = action.get(name, np.nan)
     flat.update(case_context(case))
     for name in TOP_OUTCOMES:
-        flat[name] = row.get(name, np.nan)
-    for group in ("accuracy", "answers", "health", "quality", "scorecard"):
+        # `status`/`error` are strings: an absent one means "no error", not
+        # "unknown". A NaN here would reach the CSV as the literal "nan" and
+        # dataset.py::_failure_flag would score every row as a failure.
+        flat[name] = row.get(name, "" if name in STRING_OUTCOMES else np.nan)
+    for group in ("accuracy", "answers", "health", "quality", "geo_fidelity", "scorecard"):
         value = row.get(group)
         if isinstance(value, dict):
             flatten_scalars(group, value, flat)
@@ -177,6 +202,9 @@ def description_of(column: str) -> str:
         return f"Swept mesh-advisor action '{column}'."
     if column == "status":
         return "Campaign run completion or failure status."
+    if column == "error":
+        return ("Top-level failure message; empty when the run produced no "
+                "error. Primary signal for the advisor feasibility head.")
     if column.startswith("accuracy_"):
         return f"Flattened accuracy outcome field '{column.removeprefix('accuracy_')}'."
     if column.startswith("answers_"):
@@ -204,28 +232,43 @@ def dtype_of(values: list[Any]) -> str:
 def main() -> int:
     args = parse_args()
     cases = load_cases()
+    print(f"Cases loaded: {len(cases)} ({case_counts()})")
     records_scanned = 0
+    skipped_truth: list[str] = []
     unique: dict[tuple[Any, ...], dict[str, Any]] = {}
     for campaign_dir in sorted(path for path in CAMPAIGNS.iterdir() if path.is_dir()):
+        if fnmatch(campaign_dir.name, TRUTH_CAMPAIGN_GLOB):
+            # promote_truth.py DEFINES each case's reference truth from these
+            # rows, so their accuracy_rel_err is ~0 by construction. Training on
+            # them would teach the model that the overkill config has zero
+            # error: definitionally true, completely non-generalizable.
+            skipped_truth.append(campaign_dir.name)
+            continue
         for key, row in campaign_records(campaign_dir):
             records_scanned += 1
             unique[key] = row  # warehouse rows are visited last and win exact duplicates
 
     schema_counts: Counter[str] = Counter()
-    dropped: Counter[str] = Counter()
+    failure_signal: Counter[str] = Counter()
     kept: list[dict[str, Any]] = []
     for key in sorted(unique, key=lambda item: tuple("" if value is None else str(value) for value in item)):
         campaign, _, part, _ = key
         row = unique[key]
         schema = row.get("schema") if row.get("schema") == "advisor-row-v2" else "legacy"
         schema_counts[schema] += 1
+        # Unhealthy and untrusted rows are KEPT: they are the only supervision
+        # the feasibility head has, and dataset.py masks them out of every
+        # regression head via _failure_flag. Dropping them here made two of the
+        # three failure signals dead by construction.
         health = row.get("health")
-        if isinstance(health, dict) and health.get("ok") is False:
-            dropped["health_not_ok"] += 1
-            continue
-        if trusted(row) is False:
-            dropped["accuracy_untrusted"] += 1
-            continue
+        unhealthy = isinstance(health, dict) and health.get("ok") is False
+        untrusted = trusted(row) is False
+        if unhealthy:
+            failure_signal["health_not_ok"] += 1
+        if untrusted:
+            failure_signal["accuracy_untrusted"] += 1
+        if unhealthy or untrusted:
+            failure_signal["rows"] += 1
         kept.append(flatten_row(campaign, row, cases.get(str(part))))
 
     fixed = IDENTITY_COLUMNS + FEATURE_COLUMNS + CASE_COLUMNS + ACTION_COLUMNS + TOP_OUTCOMES
@@ -235,8 +278,12 @@ def main() -> int:
     print(f"Rows in: {len(unique)} unique ({records_scanned} records scanned, "
           f"{records_scanned - len(unique)} duplicates)")
     print(f"Rows kept: {len(kept)}")
-    print("Rows dropped: " + ", ".join(
-        f"{reason}={dropped[reason]}" for reason in ("health_not_ok", "accuracy_untrusted")))
+    print(f"Truth campaigns skipped ({TRUTH_CAMPAIGN_GLOB}): "
+          + (", ".join(skipped_truth) if skipped_truth else "none")
+          + "  [their rel_err is ~0 by construction; promote_truth.py defines truth from them]")
+    print(f"Rows retained for the failure head: {failure_signal['rows']} "
+          f"(health_not_ok={failure_signal['health_not_ok']}, "
+          f"accuracy_untrusted={failure_signal['accuracy_untrusted']})")
     print("Schemas: " + ", ".join(f"{name}={schema_counts[name]}" for name in sorted(schema_counts)))
 
     if args.dry_run:

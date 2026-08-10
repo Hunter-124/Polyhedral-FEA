@@ -1,0 +1,52 @@
+{
+  "part": "stepped_shaft_s0_c1",
+  "geometry": "bench/geometries/corpus/primitives/stepped_shaft_s0.step",
+  "family": "stepped_shaft",
+  "truth_source": "analytic",
+  "metrics": [
+    {
+      "name": "tip_deflection",
+      "value": 7.721241271e-06,
+      "tol": 0.15,
+      "probe": {
+        "kind": "tip_deflection"
+      },
+      "derivation": "docs/validation/hand-calcs.md#corpus-primitives-cantilever",
+      "source": "analytic",
+      "inputs": {
+        "E": 210000000000.0,
+        "nu": 0.3,
+        "G": 80769230770.0,
+        "kappa_cowper": 0.8863636364,
+        "length": 0.06,
+        "step_x": 0.03088108959,
+        "free_length": 0.02911891041,
+        "r_root": 0.003381779602,
+        "r_tip": 0.002122523593,
+        "A_root": 3.592861476e-05,
+        "A_tip": 1.415320918e-05,
+        "I_root": 1.027238014e-10,
+        "I_tip": 1.594042832e-11,
+        "traction_magnitude": 100000.0,
+        "resultant_load_N": 1.415320918,
+        "delta_bending_m": 7.663575054e-06,
+        "delta_shear_m": 5.766621712e-08
+      }
+    },
+    {
+      "name": "strain_energy",
+      "value": 5.464017141e-06,
+      "tol": 0.15,
+      "probe": {
+        "kind": "strain_energy"
+      },
+      "derivation": "docs/validation/hand-calcs.md#corpus-primitives-cantilever",
+      "source": "analytic",
+      "inputs": {
+        "resultant_load_N": 1.415320918,
+        "tip_deflection_m": 7.721241271e-06,
+        "relation": "U = 0.5 * P * delta"
+      }
+    }
+  ]
+}

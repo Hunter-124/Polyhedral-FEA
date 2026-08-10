@@ -72,11 +72,21 @@ PASSTHROUGH_COLUMNS: list[str] = list(CATEGORICAL_INDEX_COLUMNS)
 
 # --- heads ------------------------------------------------------------------
 
-REGRESSION_HEADS: list[str] = ["rel_err", "geo_chamfer", "geo_p99", "dof", "mesh_ms", "solve_ms"]
-ACCURACY_HEADS: list[str] = ["rel_err", "geo_chamfer", "geo_p99"]
+REGRESSION_HEADS: list[str] = [
+    "rel_err", "rel_err_rel", "geo_chamfer", "geo_p99", "dof", "mesh_ms", "solve_ms",
+]
+ACCURACY_HEADS: list[str] = ["rel_err", "rel_err_rel", "geo_chamfer", "geo_p99"]
 COST_HEADS: list[str] = ["dof", "mesh_ms", "solve_ms"]
 OUTPUT_NAMES: list[str] = REGRESSION_HEADS + ["failure_logit", "policy"]
 HEAD_NAMES: list[str] = REGRESSION_HEADS + ["failure"]
+
+#: Heads whose target is the raw value minus that case's median over the
+#: actions actually run. The absolute level of `rel_err` is set largely by how
+#: good a case's reference truth is -- an offset a held-out part never shows
+#: the model, which is why the absolute head does not generalize. Choosing a
+#: mesh only ever needs the ORDERING of actions within one case, and that
+#: ordering survives the centring.
+CENTRED_HEADS: dict[str, str] = {"rel_err_rel": "rel_err"}
 
 #: head -> (source csv column, floor applied before log10)
 TARGET_SOURCES: dict[str, tuple[str, float]] = {
@@ -251,8 +261,16 @@ class AdvisorData:
 
 def model_config(input_columns: list[str], action_dims: list[str],
                  order_choices: list[int], mesher_choices: list[str],
-                 hidden: int = 64, emb_dim: int = 4) -> dict[str, Any]:
-    """Build the ``AdvisorNet`` construction descriptor."""
+                 hidden: int = 96, emb_dim: int = 4) -> dict[str, Any]:
+    """Build the ``AdvisorNet`` construction descriptor.
+
+    ``hidden`` is deliberately small. `capacity_sweep.py` measured widths from
+    32 to 512 and depths 2 to 4 on this data: on the centred accuracy target
+    validation MAE stays in 0.29-0.38 across a 320x parameter range, so extra
+    capacity buys nothing, and on the *absolute* target it actively hurts
+    (val 0.99 at 2.5k params, 1.11 at 811k, while train falls 0.093 -> 0.007).
+    96 keeps the neuron map in the dashboard legible.
+    """
     return {
         "input_columns": list(input_columns),
         "action_dims": list(action_dims),
@@ -380,6 +398,25 @@ def _raw_matrix(rows: list[dict[str, str]], mesher_choices: list[str]) -> np.nda
     return x
 
 
+def centre_by_case(target: np.ndarray, mask: np.ndarray,
+                   parts: list[str]) -> np.ndarray:
+    """``target`` minus the per-case median over that case's masked rows.
+
+    Masked-out rows are left untouched; they carry no target anyway. The median
+    (not the mean) so one blown-up action cannot drag a whole case's offset.
+    """
+    out = target.astype(np.float64).copy()
+    by_case: dict[str, list[int]] = {}
+    for i, part in enumerate(parts):
+        if mask[i]:
+            by_case.setdefault(part, []).append(i)
+    for indices in by_case.values():
+        offset = float(np.median(out[indices]))
+        for i in indices:
+            out[i] -= offset
+    return out.astype(np.float32)
+
+
 def _raw_targets(rows: list[dict[str, str]]) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray]]:
     """log10 targets plus their presence masks (before the failure veto)."""
     n = len(rows)
@@ -394,6 +431,13 @@ def _raw_targets(rows: list[dict[str, str]]) -> tuple[dict[str, np.ndarray], dic
         finite = present & np.isfinite(values)
         targets[head] = values.astype(np.float32)
         masks[head] = finite
+    # Centring happens over the WHOLE table, before the split: a case lives
+    # entirely on one side of a part-hash split, so its median is identical
+    # either way, and doing it here keeps train and val definitions identical.
+    parts = [row.get("part", "") for row in rows]
+    for head, source in CENTRED_HEADS.items():
+        masks[head] = masks[source].copy()
+        targets[head] = centre_by_case(targets[source], masks[head], parts)
     return targets, masks
 
 

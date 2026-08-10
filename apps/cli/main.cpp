@@ -765,10 +765,15 @@ int cmd_solve(std::span<char*> args) {
         // so orders above 2 are executed as quadratic. Say so rather than let
         // the decision JSON claim an order the mesh never had.
         p_elevate = decision.p_elevate || decision.order >= 2;
+        // `rel_err_rel` is the score that actually drove the choice: the
+        // absolute `rel_err` level does not generalize across parts, so the
+        // ranking the policy learned is the centred one. Printing it lets the
+        // operator see what the model was optimizing, not just its output.
         std::printf("advisor: applied mesher=%s h=%.6g m (h_rel=%.4g) adapt=%d eta=%.4g "
-                    "order=%d p_elevate=%d%s\n",
+                    "order=%d p_elevate=%d rel_err_rel=%+.4g (per-case score, lower is "
+                    "better)%s\n",
                     decision.mesher.c_str(), h, decision.h_rel, adapt_passes, eta_target,
-                    decision.order, p_elevate ? 1 : 0,
+                    decision.order, p_elevate ? 1 : 0, decision.predicted_rel_err_rel,
                     decision.vetoed ? " [VETOED -> defaults]" : "");
         if (decision.order > 2) {
             std::printf("advisor: order %d executed as quadratic — this solve path has a "

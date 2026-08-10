@@ -188,3 +188,116 @@ tolerating GEMM accumulation order, which is not a defect.
 3. Grow the corpus past 24 geometries — the binding constraint on every
    accuracy-side head.
 4. Recover the 5 `l_bracket` truths.
+
+---
+
+## M-A2 — the accuracy head, fixed (2026-08-10)
+
+M-A1 shipped an advisor that predicted cost well and accuracy not at all. This
+entry closes that.
+
+### Capacity was not the problem
+
+`scripts/advisor/capacity_sweep.py` fits the accuracy head alone across a 320x
+parameter range on the same part-hash split:
+
+| width x depth | params | absolute train -> val | centred val |
+| --- | --- | --- | --- |
+| 32 x 2 | 2,529 | 0.093 -> **0.989** | **0.301** |
+| 128 x 2 | 22,401 | 0.040 -> **1.355** | 0.328 |
+| 512 x 2 | 286,209 | 0.011 -> **1.219** | 0.353 |
+| 512 x 4 | 811,521 | 0.007 -> **1.109** | **0.292** |
+
+Adding capacity drove training error down 13x and validation error *up*. That
+is overfitting, not underfitting; no width or depth rescues the absolute target.
+
+### What did work: centre the target per case
+
+`rel_err_rel` = `log10(rel_err)` minus that case's median over the actions
+actually run. The absolute level of `rel_err` is dominated by how good a case's
+reference truth happens to be — an offset a held-out part never shows the
+model. Choosing a mesh only needs the *ordering* of actions within one case, and
+that ordering survives centring. Validation MAE 1.07 -> **0.30**, and flat
+across every capacity, so the production trunk stays small (96 wide, 16k params)
+and the neuron map stays legible.
+
+### Data
+
+Batches 1-3: **3456 advisor rows over all 72 cases**, now with real variation on
+every action dial the policy head predicts — `h_rel` {0.12, 0.16, 0.20},
+`order` {1, 2}, `mesher` {hybrid_zoo, graded_tet}, `element_tendency`
+{-0.6, 0, +0.6}, `eta_target` {0.005, 0.02, 0.05}, `adapt_passes` {0, 1}.
+Batch 1 had pinned `element_tendency` and `eta_target` to one value each, so the
+policy head had no signal on the shape and adaptivity dials at all.
+
+### Validation MAE (log10), 30 runs
+
+| head | run 1 | run 30 | LightGBM |
+| --- | --- | --- | --- |
+| `rel_err` | 0.815 | 0.809 | 0.768 |
+| `rel_err_rel` | 0.301 | 0.312 | 0.255 |
+| `geo_chamfer` | 0.118 | 0.099 | 0.023 |
+| `geo_p99` | 0.125 | 0.097 | 0.033 |
+| `dof` | 3.707 | 0.150 | 0.017 |
+| `mesh_ms` | 2.695 | 0.132 | 0.071 |
+| `solve_ms` | 1.713 | 0.171 | 0.080 |
+
+### Does it choose a better mesh than the default?
+
+This is the only metric that scores a *decision* rather than a prediction.
+`scripts/advisor/evaluate.py` replays every held-out case: the campaign ran a
+known set of actions, so the best achievable outcome is known exactly, and
+regret is how much worse the chosen action is, in log10 units.
+
+| outcome | advisor | default | oracle | gain |
+| --- | --- | --- | --- | --- |
+| `rel_err` | **0.3313** | 0.7609 | 0.0000 | **+0.4296** |
+| `geo_p99` | **0.1306** | 0.2254 | 0.0637 | **+0.0948** |
+| `solve_ms` | 1.8703 | 0.3475 | 1.2598 | -1.5229 |
+
+Split by how good the case's ground truth is — the finding that matters:
+
+| truth quality | cases | advisor | default | gain | wins |
+| --- | --- | --- | --- | --- | --- |
+| analytic | 2 | 0.216 | 0.988 | **+0.771** | 1/2 |
+| promoted overkill solve | 6 | 0.378 | 1.145 | **+0.767** | 5/6 |
+| provisional beam surrogate | 4 | 0.203 | 0.072 | -0.131 | 0/4 |
+
+**Where the reference truth is real, the advisor picks meshes ~0.77 decades —
+about 6x — more accurate than the default, winning 6 of 8 cases. Every loss is
+one of the four `l_bracket` cases whose "truth" is still a first-order beam
+surrogate**, i.e. cases where the label itself is wrong and beating it means
+nothing. That is the strongest argument yet for finishing those five truths.
+
+The advisor buys that accuracy with time: `solve_ms` regret is worse than the
+default's. That is the Stage-A weighting doing exactly what it is told, and it
+is a dial (`bench/advisor/weights.json`), not a defect.
+
+Mean Spearman rho between predicted and actual within-case action ordering is
+0.094 — near zero. Regret improves anyway because regret only
+depends on the top pick, while rho is dominated by mid-pack noise across 32
+near-equivalent actions. Honest reading: the model finds good actions more often
+than chance, but it does not rank the whole action set.
+
+### Figures
+
+All regenerated from the final model by `report.py` / `figures.py`:
+
+| figure | what it shows |
+| --- | --- |
+| `network_layout.png` | the trained architecture, read live from the checkpoint |
+| `training_curves.png` | per-head convergence, first vs latest run |
+| `activation_map.png` | neuron activations for a canonical input |
+| `mesh_progress.png` | best-so-far accuracy and fidelity vs cumulative solver time |
+| `accuracy_vs_cost.png` | accuracy vs DOF and vs solve time, Pareto front, by mesher |
+| `fidelity_vs_h.png` | mesh-vs-BRep fidelity improving with resolution |
+| `mesh_before_after.png` | real warehouse renders, coarsest run beside best-accuracy run |
+
+Measured mesh improvement, coarsest run -> best-accuracy run for the same part:
+
+- `sphere_box_s2_c2`: rel_err 1.0 -> 7.2e-4 (**1389x**), 675 -> 62,472 DOF
+- `stepped_shaft_s0_c1`: rel_err 0.512 -> 2.47e-3 (**207x**), 297 -> 1,683 DOF
+- `plate_notch_s2_c1`: rel_err 0.458 -> 5.84e-3 (**78x**), 693 -> 7,041 DOF
+
+Across the corpus the anytime curve improves median accuracy 1.50x and median
+geometric fidelity 2.02x as solver time is spent.

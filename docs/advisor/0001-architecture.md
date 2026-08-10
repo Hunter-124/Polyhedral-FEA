@@ -16,7 +16,7 @@ A small multi-head MLP that maps
 ```
 
 plus a policy head that proposes an action. Per ADR-0027 §1 it is an
-**action-conditioned outcome model**, not a "best config" classifier: the six
+**action-conditioned outcome model**, not a "best config" classifier: the seven
 regression heads answer *what would happen if you meshed it this way*, and only
 the policy head expresses a preference. That split is what makes the thing
 auditable — a recommendation always comes with the predicted consequences of the
@@ -79,14 +79,15 @@ defined instead of quietly wrong.
 
 ## Heads
 
-Trunk: `Linear(D_eff -> 64) -> GELU -> Linear(64 -> 64) -> GELU`, where `D_eff`
-is the 42 continuous columns plus the two 4-dim embeddings. Around 9k
+Trunk: `Linear(D_eff -> 96) -> GELU -> Linear(96 -> 96) -> GELU`, where `D_eff`
+is the 42 continuous columns plus the two 4-dim embeddings. Around 16k
 parameters. It is deliberately small: the activation view in the dashboard has
 to stay legible, and 5k rows do not support anything larger.
 
 | Output | Meaning | Units |
 | --- | --- | --- |
 | `rel_err` | relative error vs the case's truth metric | log10 |
+| `rel_err_rel` | `rel_err` minus that case's median over the actions run | log10 difference |
 | `geo_chamfer` | symmetric mean mesh<->B-rep distance / bbox diag | log10 |
 | `geo_p99` | worse of the two directions' p99 distance / bbox diag | log10 |
 | `dof` | solve degrees of freedom | log10 |
@@ -94,6 +95,27 @@ to stay legible, and 5k rows do not support anything larger.
 | `solve_ms` | solve wall time | log10 |
 | `failure_logit` | feasibility (mesh/solve failed, over budget, or untrusted) | logit |
 | `policy` | proposed action, `A` dims | mixed, see below |
+
+### Why `rel_err_rel` exists
+
+The absolute level of `rel_err` does not generalize across parts. Measured on a
+held-out part, val MAE is ~1.0 — a full decade — for **both** the MLP and a
+LightGBM baseline, at **every** capacity from 2.5k to 811k parameters. Capacity
+is therefore not the bottleneck: the target is dominated by a per-case
+reference-truth offset, set by how `promote_truth.py` defined that case's
+truth, and a held-out part never shows the model its own offset. No amount of
+fitting recovers a constant the input does not contain.
+
+Centring removes exactly that constant. `rel_err_rel` is `log10(rel_err)` minus
+the case's median over the actions actually run
+(`dataset.py::centre_by_case`, wired by `CENTRED_HEADS`), and it reaches ~0.30
+val MAE — a better than threefold reduction. Nothing is lost for the
+advisor's purpose: choosing a mesh only needs the **ordering** of actions within
+one case, and a per-case constant subtraction preserves ordering exactly. Lower
+`rel_err_rel` is the better action for that case. The uncentred `rel_err` head
+is kept because a calibrated absolute error estimate is still what a report
+wants to show, but `rel_err_rel` is the number the choice is made on, and it is
+meaningless compared across cases.
 
 ### Why `geo_p99` and not `geo_p95`
 
@@ -175,10 +197,20 @@ Public API (`src/advisor/include/advisor/advisor.hpp`):
 - `apply_action(FeatureColumns&, AdvisorDecision)` — overwrite the action columns
 - `defaults()` — the clamp-box defaults, i.e. what a veto returns
 
-The graph is validated at load: exactly one input, exactly eight outputs with
-exactly the expected names in the expected order, and an input width matching
-`input_columns`. A mismatch throws `AdvisorError` at construction rather than
-producing plausible nonsense at inference.
+The graph is validated at load: exactly one input, exactly nine outputs, in this
+order and under exactly these names —
+
+```
+rel_err, rel_err_rel, geo_chamfer, geo_p99, dof, mesh_ms, solve_ms,
+failure_logit, policy
+```
+
+— and an input width matching `input_columns`. `kOutputNames` in
+`src/advisor/src/advisor.cpp` mirrors `dataset.py:OUTPUT_NAMES`, and the check is
+positional as well as by name, so inserting a head anywhere but the end is a
+load-time error rather than a silent relabelling of every prediction. A mismatch
+throws `AdvisorError` at construction rather than producing plausible nonsense at
+inference.
 
 ### CLI
 

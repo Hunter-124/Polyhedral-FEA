@@ -339,6 +339,9 @@ TINY_PARTS = ["tiny_bar", "tiny_bracket", "tiny_plate", "tiny_shaft"]
 TINY_CASE_NAMES = ["nominal", "clamped_low_h_rel", "vetoed_failure", "imputed_defaults"]
 TINY_FORCED: dict[str, list[float]] = {
     "rel_err": [-2.13, -1.42, -0.35, -1.90],
+    # Per-case-centred, so it straddles zero by construction: negative means
+    # this action is better than that case's median action.
+    "rel_err_rel": [-0.42, 0.18, 0.95, -0.27],
     "geo_chamfer": [-3.01, -2.45, -1.10, -2.80],
     "geo_p99": [-2.40, -1.95, -0.80, -2.20],
     "dof": [4.20, 5.10, 3.40, 4.55],

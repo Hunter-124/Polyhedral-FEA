@@ -199,6 +199,7 @@
   ],
   "output_names": [
     "rel_err",
+    "rel_err_rel",
     "geo_chamfer",
     "geo_p99",
     "dof",
@@ -209,6 +210,7 @@
   ],
   "regression_heads": {
     "rel_err": "log10",
+    "rel_err_rel": "log10",
     "geo_chamfer": "log10",
     "geo_p99": "log10",
     "dof": "log10",

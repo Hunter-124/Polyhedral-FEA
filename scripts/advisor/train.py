@@ -71,8 +71,15 @@ BASELINE_JSON = ADVISOR_DIR / "baseline_metrics.json"
 SEED = 1234
 HUBER_DELTA = 1.0
 
+# `rel_err_rel` carries the weight the absolute head used to: measured, the
+# absolute level of rel_err does not generalize across parts (val MAE ~1.0 for
+# both this net and LightGBM, at every capacity from 2.5k to 811k parameters),
+# while the per-case-centred version reaches ~0.30. The absolute head is kept
+# at a low weight because it is still what reports a human-readable predicted
+# error; the centred head is what ranks actions.
 STAGE_A_WEIGHTS: dict[str, float] = {
-    "rel_err": 1.0,
+    "rel_err": 0.25,
+    "rel_err_rel": 1.0,
     "geo_chamfer": 0.5,
     "geo_p99": 0.5,
     "dof": 0.0,
@@ -756,7 +763,7 @@ def run_self_test(args: argparse.Namespace) -> int:
         weights_path = root / "weights.json"
         config = load_weights_config(weights_path)
         check(weights_path.is_file(), "weights.json created with Stage A defaults")
-        check(config["stage_a"]["dof"] == 0.0 and config["stage_a"]["rel_err"] == 1.0,
+        check(config["stage_a"]["dof"] == 0.0 and config["stage_a"]["rel_err_rel"] == 1.0,
               "Stage A zeroes the cost heads and keeps rel_err at 1.0")
 
         history_path = root / "history.jsonl"

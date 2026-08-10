@@ -93,9 +93,13 @@ double from_log10(double value) {
     return std::pow(10.0, std::clamp(value, -30.0, 30.0));
 }
 
-constexpr std::array<const char*, 8> kOutputNames{"rel_err",  "geo_chamfer", "geo_p99",
-                                                  "dof",      "mesh_ms",     "solve_ms",
-                                                  "failure_logit", "policy"};
+// Must match `scripts/advisor/dataset.py:OUTPUT_NAMES` exactly, names and
+// order. `rel_err_rel` is `rel_err` centred on its per-case median and is
+// deliberately adjacent to it, so a future head insertion cannot separate the
+// pair without this list failing the load-time check.
+constexpr std::array<const char*, 9> kOutputNames{
+    "rel_err", "rel_err_rel", "geo_chamfer",   "geo_p99", "dof",
+    "mesh_ms", "solve_ms",    "failure_logit", "policy"};
 
 } // namespace
 
@@ -378,15 +382,18 @@ void Advisor::apply_action(FeatureColumns& columns, const AdvisorDecision& actio
 
 AdvisorRawOutputs Advisor::evaluate(const FeatureColumns& columns) const {
     const auto raw = impl_->run(impl_->encode(columns));
+    // Index i is `kOutputNames[i]`, and construction has already proven the
+    // graph agrees with that list name-by-name, so these are not a guess.
     AdvisorRawOutputs out;
     out.rel_err_log10 = static_cast<double>(raw[0][0]);
-    out.geo_chamfer_log10 = static_cast<double>(raw[1][0]);
-    out.geo_p99_log10 = static_cast<double>(raw[2][0]);
-    out.dof_log10 = static_cast<double>(raw[3][0]);
-    out.mesh_ms_log10 = static_cast<double>(raw[4][0]);
-    out.solve_ms_log10 = static_cast<double>(raw[5][0]);
-    out.failure_logit = static_cast<double>(raw[6][0]);
-    out.policy.assign(raw[7].begin(), raw[7].end());
+    out.rel_err_rel = static_cast<double>(raw[1][0]);
+    out.geo_chamfer_log10 = static_cast<double>(raw[2][0]);
+    out.geo_p99_log10 = static_cast<double>(raw[3][0]);
+    out.dof_log10 = static_cast<double>(raw[4][0]);
+    out.mesh_ms_log10 = static_cast<double>(raw[5][0]);
+    out.solve_ms_log10 = static_cast<double>(raw[6][0]);
+    out.failure_logit = static_cast<double>(raw[7][0]);
+    out.policy.assign(raw[8].begin(), raw[8].end());
     return out;
 }
 
@@ -434,11 +441,21 @@ AdvisorDecision Advisor::recommend(const FeatureColumns& columns) const {
     decision.predicted_dof = from_log10(scored.dof_log10);
     decision.predicted_mesh_ms = from_log10(scored.mesh_ms_log10);
     decision.predicted_solve_ms = from_log10(scored.solve_ms_log10);
+    // Reported RAW. This head is a log10 difference, not a log10 level, so
+    // de-logging it would turn a per-case score into a meaningless ratio. A
+    // non-finite output becomes NaN for the same reason `from_log10` does it:
+    // lower is better here, so minus infinity would read as the best action
+    // ever proposed, produced by exactly the condition where the prediction is
+    // worthless.
+    decision.predicted_rel_err_rel = std::isfinite(scored.rel_err_rel)
+                                         ? scored.rel_err_rel
+                                         : std::numeric_limits<double>::quiet_NaN();
     decision.failure_prob = sigmoid(scored.failure_logit);
 
     if (decision.failure_prob > impl.veto_threshold) {
         AdvisorDecision vetoed = impl.default_decision;
         vetoed.predicted_rel_err = decision.predicted_rel_err;
+        vetoed.predicted_rel_err_rel = decision.predicted_rel_err_rel;
         vetoed.predicted_chamfer_mean = decision.predicted_chamfer_mean;
         vetoed.predicted_dof = decision.predicted_dof;
         vetoed.predicted_mesh_ms = decision.predicted_mesh_ms;
@@ -468,6 +485,7 @@ std::string to_json(const AdvisorDecision& d) {
                    {"eta_target", d.eta_target},
                    {"p_elevate", d.p_elevate},
                    {"predicted_rel_err", d.predicted_rel_err},
+                   {"predicted_rel_err_rel", d.predicted_rel_err_rel},
                    {"predicted_chamfer_mean", d.predicted_chamfer_mean},
                    {"predicted_dof", d.predicted_dof},
                    {"predicted_mesh_ms", d.predicted_mesh_ms},

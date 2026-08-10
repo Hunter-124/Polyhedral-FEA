@@ -1,0 +1,49 @@
+{
+  "h_rel": [
+    0.005,
+    0.2
+  ],
+  "eta_target": [
+    0.0,
+    0.3
+  ],
+  "adapt_passes": [
+    0,
+    6
+  ],
+  "order_choices": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "p_elevate_choices": [
+    0,
+    1
+  ],
+  "mesher_choices": [
+    "graded_tet",
+    "hybrid_zoo"
+  ],
+  "action_dims": [
+    "h_rel",
+    "adapt_passes",
+    "eta_target",
+    "p_elevate_logit",
+    "order_logit_1",
+    "order_logit_2",
+    "order_logit_3",
+    "order_logit_4",
+    "mesher_logit_graded_tet",
+    "mesher_logit_hybrid_zoo"
+  ],
+  "veto_threshold": 0.5,
+  "defaults": {
+    "mesher": "hybrid_zoo",
+    "h_rel": 0.1,
+    "order": 1,
+    "adapt_passes": 0,
+    "eta_target": 0.0,
+    "p_elevate": false
+  }
+}

@@ -8,6 +8,9 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <map>
+#include <numbers>
+#include <numeric>
 #include <set>
 #include <utility>
 
@@ -78,6 +81,14 @@ std::vector<std::uint32_t> valid_boundary_nodes(const std::vector<Eigen::Vector3
     return result;
 }
 
+/// Walk step that keeps at most `cap` of `n` items. 0/oversized caps walk all.
+std::size_t sample_stride(std::size_t n, std::size_t cap) {
+    if (cap == 0 || n <= cap) {
+        return 1;
+    }
+    return (n + cap - 1) / cap;
+}
+
 } // namespace
 
 SampleDistribution summarize_samples(std::span<const double> samples) {
@@ -109,6 +120,10 @@ SampleDistribution summarize_samples(std::span<const double> samples) {
     std::sort(finite.begin(), finite.end());
     SampleDistribution out;
     out.count = finite.size();
+    // Sorted ascending: summing smallest-first keeps the mean stable for the
+    // heavily skewed distance samples this feeds (many ~0, a few large).
+    out.mean = std::accumulate(finite.begin(), finite.end(), 0.0) /
+               static_cast<double>(finite.size());
     out.rms = rms_scale == 0.0
                   ? 0.0
                   : rms_scale * std::sqrt(rms_sum / static_cast<double>(finite.size()));
@@ -150,7 +165,7 @@ BRepGeometryFidelity evaluate_brep_geometry_fidelity(
     const geom::CadModel& model, const std::vector<Eigen::Vector3d>& nodes,
     const std::vector<FreeFace>& free_faces,
     const std::vector<geom::MeshEdgeSegment>& mesh_feature_segments, double h,
-    double mesh_volume, std::size_t max_reference_samples) {
+    double mesh_volume, std::size_t max_reference_samples, std::size_t max_boundary_samples) {
     BRepGeometryFidelity out;
     out.brep = geom::inspect_brep(model);
     if (!out.brep.available) {
@@ -159,31 +174,55 @@ BRepGeometryFidelity evaluate_brep_geometry_fidelity(
     out.available = true;
     const double bbox_diagonal = model.bbox_diagonal();
 
+    // The mesh-to-BRep direction draws from three sources — boundary nodes,
+    // face centroids, boundary-edge midpoints — whose counts sit at roughly
+    // 1:2:3 on a closed triangulated boundary. Node samples are ~0 by
+    // construction (the mesher projects boundary nodes onto the BRep) while
+    // centroid and midpoint samples carry the real deviation, so the MIX
+    // decides the reported mean and quantiles. Striding each source against
+    // the same cap independently would let them cross the cap at different
+    // mesh sizes and silently change that mix with h — exactly the variable
+    // these numbers have to be comparable across. One stride, taken from the
+    // largest source, keeps the mix fixed at every resolution.
     const std::vector<std::uint32_t> boundary_nodes = valid_boundary_nodes(nodes, free_faces);
+
+    std::set<std::pair<std::uint32_t, std::uint32_t>> boundary_edges;
+    for (const auto& face : free_faces) {
+        const int count = (face[3] == face[2]) ? 3 : 4;
+        for (int i = 0; i < count; ++i) {
+            const std::uint32_t a = face[i];
+            const std::uint32_t b = face[(i + 1) % count];
+            if (valid_node(a, nodes) && valid_node(b, nodes) && a != b) {
+                boundary_edges.emplace(std::min(a, b), std::max(a, b));
+            }
+        }
+    }
+
+    const std::size_t stride = sample_stride(
+        std::max({boundary_nodes.size(), free_faces.size(), boundary_edges.size()}),
+        max_boundary_samples);
+
     std::vector<double> mesh_to_brep;
-    mesh_to_brep.reserve(boundary_nodes.size() + free_faces.size() * 5);
-    for (const std::uint32_t i : boundary_nodes) {
-        if (const auto projected = geom::project_point_on_surface(model, nodes[i])) {
+    mesh_to_brep.reserve(boundary_nodes.size() / stride + free_faces.size() / stride +
+                         boundary_edges.size() / stride + 3);
+    for (std::size_t i = 0; i < boundary_nodes.size(); i += stride) {
+        if (const auto projected =
+                geom::project_point_on_surface(model, nodes[boundary_nodes[i]])) {
             mesh_to_brep.push_back(projected->distance);
         }
     }
 
-    std::set<std::pair<std::uint32_t, std::uint32_t>> boundary_edges;
     std::vector<double> normal_angles;
-    normal_angles.reserve(free_faces.size());
-    for (const auto& face : free_faces) {
+    normal_angles.reserve(free_faces.size() / stride + 1);
+    for (std::size_t face_index = 0; face_index < free_faces.size(); face_index += stride) {
+        const auto& face = free_faces[face_index];
         const int count = (face[3] == face[2]) ? 3 : 4;
         bool valid = true;
         Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
         for (int i = 0; i < count; ++i) {
             valid = valid && valid_node(face[i], nodes);
-            if (valid_node(face[i], nodes)) {
+            if (valid) {
                 centroid += nodes[face[i]];
-            }
-            const std::uint32_t a = face[i];
-            const std::uint32_t b = face[(i + 1) % count];
-            if (valid_node(a, nodes) && valid_node(b, nodes) && a != b) {
-                boundary_edges.emplace(std::min(a, b), std::max(a, b));
             }
         }
         if (!valid) {
@@ -207,7 +246,12 @@ BRepGeometryFidelity evaluate_brep_geometry_fidelity(
             normal_angles.push_back(std::acos(cosine));
         }
     }
+
+    std::size_t edge_index = 0;
     for (const auto& [a, b] : boundary_edges) {
+        if (edge_index++ % stride != 0) {
+            continue;
+        }
         const Eigen::Vector3d midpoint = 0.5 * (nodes[a] + nodes[b]);
         if (const auto projected = geom::project_point_on_surface(model, midpoint)) {
             mesh_to_brep.push_back(projected->distance);
@@ -300,6 +344,128 @@ BRepGeometryFidelity evaluate_brep_geometry_fidelity(
             std::abs(mesh_volume - out.brep.volume) / out.brep.volume;
     }
     return out;
+}
+
+double boundary_surface_volume(const std::vector<Eigen::Vector3d>& nodes,
+                               const std::vector<FreeFace>& free_faces) {
+    if (nodes.empty()) {
+        return 0.0;
+    }
+    // Divergence form about nodes.front(): the origin shift keeps the signed
+    // tetra volumes small for parts far from the world origin.
+    const Eigen::Vector3d origin = nodes.front();
+    const auto tri_volume = [&](std::uint32_t ia, std::uint32_t ib, std::uint32_t ic) {
+        if (ia >= nodes.size() || ib >= nodes.size() || ic >= nodes.size()) {
+            return 0.0;
+        }
+        const Eigen::Vector3d a = nodes[ia] - origin;
+        const Eigen::Vector3d b = nodes[ib] - origin;
+        const Eigen::Vector3d c = nodes[ic] - origin;
+        return a.dot(b.cross(c)) / 6.0;
+    };
+    double signed_volume = 0.0;
+    for (const auto& face : free_faces) {
+        signed_volume += tri_volume(face[0], face[1], face[2]);
+        if (face[3] != face[2]) {
+            signed_volume += tri_volume(face[0], face[2], face[3]);
+        }
+    }
+    return std::abs(signed_volume);
+}
+
+std::vector<geom::MeshEdgeSegment>
+mesh_dihedral_feature_segments(const std::vector<Eigen::Vector3d>& nodes,
+                               const std::vector<FreeFace>& free_faces,
+                               double sharp_angle_deg) {
+    using Edge = std::pair<std::uint32_t, std::uint32_t>;
+    std::map<Edge, std::vector<Eigen::Vector3d>> edge_normals;
+    for (const auto& face : free_faces) {
+        const std::size_t count = face[3] == face[2] ? 3 : 4;
+        bool valid = true;
+        for (std::size_t i = 0; i < count; ++i) {
+            valid = valid && face[i] < nodes.size();
+        }
+        if (!valid) {
+            continue;
+        }
+        Eigen::Vector3d normal =
+            (nodes[face[1]] - nodes[face[0]]).cross(nodes[face[2]] - nodes[face[0]]);
+        const double norm = normal.norm();
+        if (!(norm > 1e-15)) {
+            continue;
+        }
+        normal /= norm;
+        for (std::size_t i = 0; i < count; ++i) {
+            std::uint32_t a = face[i];
+            std::uint32_t b = face[(i + 1) % count];
+            if (a == b) {
+                continue;
+            }
+            if (a > b) {
+                std::swap(a, b);
+            }
+            edge_normals[{a, b}].push_back(normal);
+        }
+    }
+
+    const double threshold = sharp_angle_deg * std::numbers::pi / 180.0;
+    std::vector<geom::MeshEdgeSegment> segments;
+    segments.reserve(edge_normals.size());
+    for (const auto& [edge, normals] : edge_normals) {
+        // Exactly two incident faces: a manifold edge with a defined dihedral.
+        if (normals.size() != 2) {
+            continue;
+        }
+        const double cosine = std::clamp(normals[0].dot(normals[1]), -1.0, 1.0);
+        if (std::acos(cosine) < threshold) {
+            continue;
+        }
+        segments.push_back({nodes[edge.first], nodes[edge.second]});
+    }
+    return segments;
+}
+
+BrepFidelitySummary summarize_brep_fidelity(const BRepGeometryFidelity& report) {
+    BrepFidelitySummary out;
+    if (!report.available) {
+        return out;
+    }
+    const auto& forward = report.mesh_boundary_samples_to_brep_surface.over_bbox_diagonal;
+    const auto& reverse = report.brep_surface_samples_to_mesh_boundary.over_bbox_diagonal;
+    out.n_samples = forward.count + reverse.count;
+    if (out.n_samples == 0) {
+        return out;
+    }
+    double mean_sum = 0.0;
+    std::size_t directions = 0;
+    for (const SampleDistribution* d : {&forward, &reverse}) {
+        if (d->count > 0) {
+            mean_sum += d->mean;
+            ++directions;
+        }
+    }
+    out.available = true;
+    out.chamfer_mean = mean_sum / static_cast<double>(directions);
+    out.dist_p95 = std::max(forward.p95, reverse.p95);
+    out.dist_p99 = std::max(forward.p99, reverse.p99);
+    out.dist_max = std::max(forward.max, reverse.max);
+    out.normal_angle_p95_rad = report.mesh_boundary_normal_angle_to_brep_normal.p95;
+    out.rel_volume_err =
+        report.has_relative_volume_error ? report.mesh_vs_brep_relative_volume_error : 0.0;
+    return out;
+}
+
+BrepFidelitySummary brep_fidelity_summary(const geom::CadModel& model,
+                                          const std::vector<Eigen::Vector3d>& nodes,
+                                          const std::vector<FreeFace>& free_faces, double h,
+                                          std::size_t max_samples) {
+    if (free_faces.empty()) {
+        return {};
+    }
+    const auto segments = mesh_dihedral_feature_segments(nodes, free_faces);
+    const double mesh_volume = boundary_surface_volume(nodes, free_faces);
+    return summarize_brep_fidelity(evaluate_brep_geometry_fidelity(
+        model, nodes, free_faces, segments, h, mesh_volume, max_samples, max_samples));
 }
 
 } // namespace polymesh::mesh

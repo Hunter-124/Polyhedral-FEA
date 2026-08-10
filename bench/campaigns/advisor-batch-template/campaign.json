@@ -1,0 +1,114 @@
+{
+  "name": "advisor-batch-template",
+  "comment": "Advisor training batch template: 32 configs x 48 cases = 1536 pairs. Trimmed from advisor-pilot-1's 288-config grid, which would have been 20736 pairs (~65 h). Varies every action dimension the policy head predicts except eta_target/element_tendency/p_elevate, which are held constant in batch 1 and opened up in a later batch.",
+  "warehouse": true,
+  "parts": [
+    "bench/geometries/corpus/primitives/box_hole_s0_c0.case.json",
+    "bench/geometries/corpus/primitives/box_hole_s0_c1.case.json",
+    "bench/geometries/corpus/primitives/box_hole_s1_c0.case.json",
+    "bench/geometries/corpus/primitives/box_hole_s1_c1.case.json",
+    "bench/geometries/corpus/primitives/box_hole_s2_c0.case.json",
+    "bench/geometries/corpus/primitives/box_hole_s2_c1.case.json",
+    "bench/geometries/corpus/primitives/box_hole_s3_c0.case.json",
+    "bench/geometries/corpus/primitives/box_hole_s3_c1.case.json",
+    "bench/geometries/corpus/primitives/channel_s0_c0.case.json",
+    "bench/geometries/corpus/primitives/channel_s0_c1.case.json",
+    "bench/geometries/corpus/primitives/channel_s1_c0.case.json",
+    "bench/geometries/corpus/primitives/channel_s1_c1.case.json",
+    "bench/geometries/corpus/primitives/channel_s2_c0.case.json",
+    "bench/geometries/corpus/primitives/channel_s2_c1.case.json",
+    "bench/geometries/corpus/primitives/channel_s3_c0.case.json",
+    "bench/geometries/corpus/primitives/channel_s3_c1.case.json",
+    "bench/geometries/corpus/primitives/l_bracket_s0_c0.case.json",
+    "bench/geometries/corpus/primitives/l_bracket_s0_c1.case.json",
+    "bench/geometries/corpus/primitives/l_bracket_s1_c0.case.json",
+    "bench/geometries/corpus/primitives/l_bracket_s1_c1.case.json",
+    "bench/geometries/corpus/primitives/l_bracket_s2_c0.case.json",
+    "bench/geometries/corpus/primitives/l_bracket_s2_c1.case.json",
+    "bench/geometries/corpus/primitives/l_bracket_s3_c0.case.json",
+    "bench/geometries/corpus/primitives/l_bracket_s3_c1.case.json",
+    "bench/geometries/corpus/primitives/plate_notch_s0_c0.case.json",
+    "bench/geometries/corpus/primitives/plate_notch_s0_c1.case.json",
+    "bench/geometries/corpus/primitives/plate_notch_s1_c0.case.json",
+    "bench/geometries/corpus/primitives/plate_notch_s1_c1.case.json",
+    "bench/geometries/corpus/primitives/plate_notch_s2_c0.case.json",
+    "bench/geometries/corpus/primitives/plate_notch_s2_c1.case.json",
+    "bench/geometries/corpus/primitives/plate_notch_s3_c0.case.json",
+    "bench/geometries/corpus/primitives/plate_notch_s3_c1.case.json",
+    "bench/geometries/corpus/primitives/sphere_box_s0_c0.case.json",
+    "bench/geometries/corpus/primitives/sphere_box_s0_c1.case.json",
+    "bench/geometries/corpus/primitives/sphere_box_s1_c0.case.json",
+    "bench/geometries/corpus/primitives/sphere_box_s1_c1.case.json",
+    "bench/geometries/corpus/primitives/sphere_box_s2_c0.case.json",
+    "bench/geometries/corpus/primitives/sphere_box_s2_c1.case.json",
+    "bench/geometries/corpus/primitives/sphere_box_s3_c0.case.json",
+    "bench/geometries/corpus/primitives/sphere_box_s3_c1.case.json",
+    "bench/geometries/corpus/primitives/stepped_shaft_s0_c0.case.json",
+    "bench/geometries/corpus/primitives/stepped_shaft_s0_c1.case.json",
+    "bench/geometries/corpus/primitives/stepped_shaft_s1_c0.case.json",
+    "bench/geometries/corpus/primitives/stepped_shaft_s1_c1.case.json",
+    "bench/geometries/corpus/primitives/stepped_shaft_s2_c0.case.json",
+    "bench/geometries/corpus/primitives/stepped_shaft_s2_c1.case.json",
+    "bench/geometries/corpus/primitives/stepped_shaft_s3_c0.case.json",
+    "bench/geometries/corpus/primitives/stepped_shaft_s3_c1.case.json"
+  ],
+  "tiers": [
+    {
+      "h_scale": 1.0,
+      "keep_frac": 1.0
+    }
+  ],
+  "grid": {
+    "mesher": [
+      "hybrid_zoo",
+      "graded_tet"
+    ],
+    "h_rel": [
+      0.2,
+      0.12
+    ],
+    "element_tendency": [
+      0.0
+    ],
+    "feature_refine": [
+      true
+    ],
+    "bc_grading": [
+      true,
+      false
+    ],
+    "order": [
+      1,
+      2
+    ],
+    "skin_layers": [
+      2
+    ],
+    "adapt_passes": [
+      0,
+      1
+    ],
+    "eta_target": [
+      0.02
+    ],
+    "p_elevate": [
+      false
+    ],
+    "adapt_leb_waves": [
+      2
+    ]
+  },
+  "score": {
+    "weights": {
+      "accuracy": 0.5,
+      "solve_ms": 0.25,
+      "mesh_ms": 0.25
+    }
+  },
+  "resources": {
+    "max_run_wall_s": 45,
+    "max_pack_wall_s": 86400,
+    "max_threads": 0,
+    "max_mem_gb": 0
+  }
+}

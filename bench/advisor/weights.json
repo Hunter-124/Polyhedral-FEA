@@ -1,0 +1,21 @@
+{
+  "stage_a": {
+    "rel_err": 1.0,
+    "geo_chamfer": 0.5,
+    "geo_p99": 0.5,
+    "dof": 0.0,
+    "mesh_ms": 0.0,
+    "solve_ms": 0.0,
+    "failure": 1.0,
+    "policy": 0.3
+  },
+  "stage_b_targets": {
+    "dof": 0.25,
+    "mesh_ms": 0.25,
+    "solve_ms": 0.5
+  },
+  "beta": 1.0,
+  "ramp_runs": 5,
+  "plateau_window": 10,
+  "plateau_rel_improvement": 0.02
+}

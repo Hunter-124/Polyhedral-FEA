@@ -1,0 +1,14 @@
+{
+  "cg_iter": 1240,
+  "cg_resid": 1.3556091252829024e-06,
+  "elapsed_ms": 219735.8916,
+  "n_elems": 32937,
+  "n_nodes": 40328,
+  "phase": "solve",
+  "phase_frac": 0.062,
+  "run": {
+    "cfg_id": "cfg-d99fcd7c",
+    "part": "l_bracket_s1_c0",
+    "tier": 0
+  }
+}

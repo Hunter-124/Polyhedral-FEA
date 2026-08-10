@@ -10,6 +10,8 @@
 
 #if defined(__linux__)
 #include <sys/sysinfo.h>
+#elif defined(_WIN32)
+#include <windows.h>
 #endif
 
 namespace polymesh::fea {
@@ -99,6 +101,17 @@ MemoryAvailability system_memory_available() {
         if (bytes > 0) {
             return {.bytes = bytes, .source = MemoryAvailabilitySource::kSysinfo};
         }
+    }
+#elif defined(_WIN32)
+    // ullAvailPhys is the Windows analogue of MemAvailable: physical memory
+    // that can be allocated without paging. Without this branch every Windows
+    // solve fell back to the 1 GiB unknown-machine default, so its 70% cap
+    // refused any factorization above ~0.7 GiB on a 32 GiB workstation.
+    MEMORYSTATUSEX status{};
+    status.dwLength = sizeof(status);
+    if (::GlobalMemoryStatusEx(&status) != 0 && status.ullAvailPhys > 0) {
+        return {.bytes = static_cast<std::uint64_t>(status.ullAvailPhys),
+                .source = MemoryAvailabilitySource::kGlobalMemoryStatus};
     }
 #endif
     return {.bytes = kUnknownMemoryFallbackBytes,

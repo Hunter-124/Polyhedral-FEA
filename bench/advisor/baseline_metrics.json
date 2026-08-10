@@ -1,0 +1,99 @@
+{
+  "model": "lightgbm.LGBMRegressor",
+  "targets": {
+    "rel_err": {
+      "val_mae": 0.9695712857349321,
+      "val_rmse": 1.4763395954056404,
+      "n_train": 959,
+      "n_val": 116
+    },
+    "geo_chamfer": {
+      "val_mae": 0.02468841441576718,
+      "val_rmse": 0.051665267754666226,
+      "n_train": 959,
+      "n_val": 116
+    },
+    "geo_p99": {
+      "val_mae": 0.06266662603848093,
+      "val_rmse": 0.16662630164842346,
+      "n_train": 959,
+      "n_val": 116
+    },
+    "dof": {
+      "val_mae": 0.018108350959189844,
+      "val_rmse": 0.036243423714867634,
+      "n_train": 959,
+      "n_val": 116
+    },
+    "mesh_ms": {
+      "val_mae": 0.09254773867410068,
+      "val_rmse": 0.16207592109200772,
+      "n_train": 959,
+      "n_val": 116
+    },
+    "solve_ms": {
+      "val_mae": 0.08541322618009271,
+      "val_rmse": 0.11621454489721234,
+      "n_train": 959,
+      "n_val": 116
+    }
+  },
+  "n_train": 1313,
+  "n_val": 224,
+  "params": {
+    "n_estimators": 300,
+    "learning_rate": 0.05,
+    "num_leaves": 31,
+    "min_child_samples": 5,
+    "n_jobs": 4,
+    "random_state": 1234,
+    "verbose": -1
+  },
+  "input_columns": [
+    "bbox_dx",
+    "bbox_dy",
+    "bbox_dz",
+    "diag",
+    "volume",
+    "surface_area",
+    "sa_over_v23",
+    "n_faces",
+    "n_sharp_edges",
+    "sharp_edge_len_total",
+    "curved_frac",
+    "kappa_max_h",
+    "kappa_mean_h",
+    "thin_min_over_diag",
+    "thin_p10_over_diag",
+    "min_feature_h",
+    "n_fix_faces",
+    "n_load_faces",
+    "fix_area_frac",
+    "load_area_frac",
+    "load_dir_x",
+    "load_dir_y",
+    "load_dir_z",
+    "fix_load_dist_over_diag",
+    "load_axis_alignment",
+    "poisson",
+    "case_poisson",
+    "case_n_fix_regions",
+    "case_n_load_regions",
+    "case_load_dir_x",
+    "case_load_dir_y",
+    "case_load_dir_z",
+    "case_traction_magnitude",
+    "h_rel",
+    "eta_target",
+    "adapt_passes",
+    "p_elevate",
+    "element_tendency",
+    "skin_layers",
+    "feature_refine",
+    "bc_grading",
+    "adapt_leb_waves",
+    "order_idx",
+    "mesher_idx"
+  ],
+  "timestamp": "2026-08-10T21:43:56Z"
+}

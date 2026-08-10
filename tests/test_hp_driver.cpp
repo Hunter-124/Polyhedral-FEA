@@ -33,7 +33,7 @@ adapt::ElementHpSignal base_signal() {
 
 } // namespace
 
-TEST_CASE("hp-driver: curved boundary (high h·κ) prefers h over p") {
+TEST_CASE("hp-driver: curved boundary (high h*kappa) prefers h over p") {
     adapt::HpDriverPolicy policy;
     policy.turn_angle_deg = 15.0;
     policy.seed = 1;

@@ -18,7 +18,7 @@
 using polymesh::pipeline::build_refinement_plan;
 using polymesh::pipeline::RefineRegion;
 
-TEST_CASE("refinement plan: no regions, no geometry → uniform (empty plan)") {
+TEST_CASE("refinement plan: no regions, no geometry -> uniform (empty plan)") {
     const auto m = polymesh::testsupport::box_model(1, 1, 1);
     const auto plan = build_refinement_plan(m, 0.25, {}, /*use_geometry=*/false);
     CHECK(plan.refine_seeds.empty());

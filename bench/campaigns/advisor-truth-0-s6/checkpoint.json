@@ -1,0 +1,12 @@
+{
+  "campaign": "advisor-truth-0-s6",
+  "completed_runs": 14,
+  "started_utc": "2026-08-10T19:11:54Z",
+  "state": "running",
+  "survivors": [
+    "cfg-1b21bb81",
+    "cfg-d99fcd7c"
+  ],
+  "tier": 0,
+  "updated_utc": "2026-08-10T20:06:21Z"
+}

@@ -24,6 +24,8 @@ option(POLYMESH_WITH_GUI "Build the desktop GUI (GLFW + Dear ImGui + OpenGL)" ON
 option(POLYMESH_WITH_GEOGRAM
     "Vendor Geogram PSM (ConvexCell + predicates) for restricted CVT (G1/ADR-0025)" ON)
 option(POLYMESH_BUILD_TESTS "Build the test suite" ON)
+option(POLYMESH_WITH_ADVISOR
+    "Build the learned mesh advisor inference module (ADR-0027; prebuilt ONNX Runtime)" ON)
 # Host CPU ISA tuning. Default OFF: on some GCC+Eigen combos, -march=x86-64-v3
 # or -march=native has corrupted heaps (double free) in patch/Tier-0 tests.
 # Safe speed comes from -O3 (Release) + OpenMP. Enable only after ctest is green.
@@ -134,6 +136,9 @@ add_subdirectory(src/adapt)
 add_subdirectory(src/fea)
 add_subdirectory(src/bench)
 add_subdirectory(src/pipeline)
+if(POLYMESH_WITH_ADVISOR)
+    add_subdirectory(src/advisor)
+endif()
 
 # --- applications (depend on libraries; no reverse deps) ---
 add_subdirectory(apps/cli)

@@ -204,7 +204,7 @@ TEST_CASE("chordal_edge_metrics near-zero on exact CAD samples") {
     CHECK(m_off.max_chordal > 0.04);
 }
 
-TEST_CASE("chordal_edge_metrics_segments e≈1 on synthetic circle chord") {
+TEST_CASE("chordal_edge_metrics_segments e~=1 on synthetic circle chord") {
     // Manual CadTopology (no OCC): unit circle in xy, R=1, κ=1.
     // A chord of length ℓ subtending angle θ has mid-chord sagitta
     //   d = R (1 − cos(θ/2)) ≈ ℓ²/(8R) for small θ,

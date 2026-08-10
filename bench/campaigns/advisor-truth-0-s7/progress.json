@@ -1,0 +1,12 @@
+{
+  "cg_iter": null,
+  "cg_resid": null,
+  "elapsed_ms": 67740.1093,
+  "phase": "mesh",
+  "phase_frac": 0.0,
+  "run": {
+    "cfg_id": "cfg-d99fcd7c",
+    "part": "plate_notch_s0_c1",
+    "tier": 0
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "part": "sphere_box_s1_c2",
+  "geometry": "bench/geometries/corpus/primitives/sphere_box_s1.step",
+  "family": "sphere_box",
+  "truth_source": "overkill-reference",
+  "metrics": [
+    {
+      "name": "strain_energy",
+      "value": 0.0008744015319368829,
+      "tol": 0.15,
+      "probe": {
+        "kind": "strain_energy"
+      },
+      "derivation": "bench/campaigns/advisor-truth-0-s5/results.jsonl (overkill reference solve at the finest h_rel this part could afford under the campaign element/DOF budget; NOT a converged limit -- see docs/validation/hand-calcs.md#corpus-primitives-provisional). tol=0.15 replaces the provisional seed's tol=1.0 and matches the analytic cantilever references; the reference is itself a discrete solve, so a tighter band would score its own discretization error. Promoted by scripts/advisor/promote_truth.py.",
+      "source": "overkill-reference",
+      "source_run": {
+        "campaign": "advisor-truth-0-s5",
+        "results": "bench/campaigns/advisor-truth-0-s5/results.jsonl",
+        "cfg_id": "cfg-1b21bb81",
+        "tier": 0,
+        "h_rel": 0.060000000000000005,
+        "order": 2,
+        "adapt_passes": 2,
+        "mesher": "graded_tet",
+        "n_dof": 92949,
+        "n_elems": 38776
+      }
+    },
+    {
+      "name": "tip_deflection",
+      "value": 1.879861717107112e-06,
+      "tol": 0.15,
+      "probe": {
+        "kind": "tip_deflection"
+      },
+      "derivation": "bench/campaigns/advisor-truth-0-s5/results.jsonl (overkill reference solve at the finest h_rel this part could afford under the campaign element/DOF budget; NOT a converged limit -- see docs/validation/hand-calcs.md#corpus-primitives-provisional). tol=0.15 replaces the provisional seed's tol=1.0 and matches the analytic cantilever references; the reference is itself a discrete solve, so a tighter band would score its own discretization error. Promoted by scripts/advisor/promote_truth.py.",
+      "source": "overkill-reference",
+      "source_run": {
+        "campaign": "advisor-truth-0-s5",
+        "results": "bench/campaigns/advisor-truth-0-s5/results.jsonl",
+        "cfg_id": "cfg-1b21bb81",
+        "tier": 0,
+        "h_rel": 0.060000000000000005,
+        "order": 2,
+        "adapt_passes": 2,
+        "mesher": "graded_tet",
+        "n_dof": 92949,
+        "n_elems": 38776
+      }
+    }
+  ]
+}

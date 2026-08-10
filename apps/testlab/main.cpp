@@ -6,6 +6,9 @@
 // Anti-cheat: reference truths are loaded only from paths declared in case
 // files (bench/reference/*). No numeric answers are embedded here.
 
+#ifdef POLYMESH_WITH_ADVISOR
+#include "advisor/advisor.hpp"
+#endif
 #include "fea/assembly.hpp"
 #include "fea/backend.hpp"
 #include "fea/boundary_faces.hpp"
@@ -18,6 +21,7 @@
 #include "fea/zz.hpp"
 #include "geom/cad_topology.hpp"
 #include "geom/step.hpp"
+#include "mesh/brep_fidelity.hpp"
 #include "mesh/surface_metrics.hpp"
 #include "pipeline/scene.hpp"
 #include "probe_util.hpp"
@@ -155,6 +159,12 @@ struct Campaign {
     double max_run_wall_s = 0.0;
     /// M14: pack-level ceiling (s). 0 = unlimited (do not start new runs past it).
     double max_pack_wall_s = 0.0;
+    /// Post-mesh DOF / element ceilings for a run. 0 → the throughput defaults
+    /// below. A reference campaign legitimately wants a bigger budget than a
+    /// throughput sweep: the whole point of an overkill solve is to be larger
+    /// than anything the training grid produces.
+    long long max_dof = 0;
+    long long max_elems = 0;
 };
 
 struct Box3 {
@@ -306,6 +316,8 @@ Campaign load_campaign(const fs::path& path) {
         const auto& r = j["resources"];
         c.max_run_wall_s = r.value("max_run_wall_s", 0.0);
         c.max_pack_wall_s = r.value("max_pack_wall_s", 0.0);
+        c.max_dof = r.value("max_dof", 0LL);
+        c.max_elems = r.value("max_elems", 0LL);
     }
     return c;
 }
@@ -1669,6 +1681,56 @@ json quality_of(const pipeline::Model& model, const fea::NodalMesh& mesh, double
             {"score", m.composite_score}};
 }
 
+/// Per-run mesh-vs-BRep fidelity row fields. The metric itself lives in
+/// mesh::brep_fidelity_summary; this only serializes it, so the campaign
+/// columns and the diagnostic sweep can never drift apart.
+json geo_fidelity_of(const pipeline::Model& model, const fea::NodalMesh& nodal, double h) {
+    mesh::BrepFidelitySummary summary;
+    if (geom::occ_enabled() && model.cad && !model.cad->empty()) {
+        const auto quads = fea::extract_boundary_faces(nodal);
+        const std::vector<mesh::FreeFace> faces(quads.begin(), quads.end());
+        summary = mesh::brep_fidelity_summary(*model.cad, nodal.nodes, faces, h);
+    }
+    return {{"available", summary.available},
+            {"chamfer_mean", summary.chamfer_mean},
+            {"dist_p95", summary.dist_p95},
+            {"dist_p99", summary.dist_p99},
+            {"dist_max", summary.dist_max},
+            {"normal_angle_p95_rad", summary.normal_angle_p95_rad},
+            {"rel_volume_err", summary.rel_volume_err},
+            {"n_samples", summary.n_samples}};
+}
+
+/// Records what the learned advisor would have chosen for a case, so a
+/// campaign can score the policy against the grid it actually ran (ADR-0027).
+///
+/// The advisor deliberately does NOT override the campaign action: the grid is
+/// the experiment. Letting the model pick the config would make every row
+/// self-confirming and destroy the comparison the campaign exists to produce.
+#ifdef POLYMESH_WITH_ADVISOR
+class AdvisorScorer {
+public:
+    explicit AdvisorScorer(const fs::path& model_dir) : advisor_(model_dir) {}
+
+    [[nodiscard]] json decision_json(const pipeline::CaseFeatures& features) const {
+        return json::parse(polymesh::advisor::to_json(advisor_.recommend(features)));
+    }
+
+private:
+    polymesh::advisor::Advisor advisor_;
+};
+#else
+class AdvisorScorer {
+public:
+    explicit AdvisorScorer(const fs::path&) {
+        throw std::runtime_error("--advisor needs a build with POLYMESH_WITH_ADVISOR=ON");
+    }
+    [[nodiscard]] json decision_json(const pipeline::CaseFeatures&) const {
+        return json::object();
+    }
+};
+#endif
+
 // ── single run ──────────────────────────────────────────────────────────────
 
 struct RunOutcome {
@@ -1727,7 +1789,9 @@ void write_adapt_trace(const fs::path& run_dir,
 
 RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_scale,
                    const fs::path& progress_path, const fs::path& mesh_preview_path,
-                   const fs::path& warehouse_run_dir = {}, double max_run_wall_s = 900.0) {
+                   const fs::path& warehouse_run_dir = {}, double max_run_wall_s = 900.0,
+                   const AdvisorScorer* advisor = nullptr, long long budget_dof = 0,
+                   long long budget_elems = 0) {
     using clock = std::chrono::steady_clock;
     const auto t_all0 = clock::now();
     const auto wall_elapsed_s = [&]() -> double {
@@ -1771,8 +1835,21 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
             load_regions.push_back({load.box.lo, load.box.hi, 0.25});
             load_dir += load.traction;
         }
-        out.line["features"] = case_features_json(pipeline::extract_case_features(
-            model, fix_regions, load_regions, load_dir, part.nu));
+        const pipeline::CaseFeatures features = pipeline::extract_case_features(
+            model, fix_regions, load_regions, load_dir, part.nu);
+        out.line["features"] = case_features_json(features);
+        if (advisor != nullptr) {
+            // The advisor is an observation, so its failure must not be
+            // reported as an FEA failure. Without this the outer handler would
+            // stamp status=solve_fail on a perfectly good run because an ORT
+            // session threw, and the training set would learn that fake
+            // solver failure.
+            try {
+                out.line["advisor_decision"] = advisor->decision_json(features);
+            } catch (const std::exception& e) {
+                out.line["advisor_error"] = e.what();
+            }
+        }
         const double actual_h_rel = bbox_diag > 0.0 ? h / bbox_diag : 0.0;
         out.line["action"] = action_json(cfg, h, actual_h_rel);
 
@@ -1787,8 +1864,13 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         }
 
         // M4: predicted element count from bbox volume / h³ before meshing.
-        constexpr long long kMaxCampaignDof = 80000;
-        constexpr long long kMaxCampaignElems = 60000;
+        // Defaults keep one pathological config from pinning an overnight
+        // throughput runner; a campaign may raise them (see Campaign::max_dof).
+        constexpr long long kDefaultMaxCampaignDof = 80000;
+        constexpr long long kDefaultMaxCampaignElems = 60000;
+        const long long kMaxCampaignDof = budget_dof > 0 ? budget_dof : kDefaultMaxCampaignDof;
+        const long long kMaxCampaignElems =
+            budget_elems > 0 ? budget_elems : kDefaultMaxCampaignElems;
         const double n_pred = predict_elem_count(model, h);
         out.line["n_pred_elems"] = n_pred;
         out.line["h"] = h;
@@ -1895,6 +1977,7 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         const long long n_dof = 3 * static_cast<long long>(vol.mesh.nodes.size());
         out.line["n_dof"] = n_dof;
         out.line["quality"] = quality_of(model, vol.mesh, h);
+        out.line["geo_fidelity"] = geo_fidelity_of(model, vol.mesh, h);
         if (n_pred > 0.0) {
             out.line["n_elems_over_pred"] =
                 static_cast<double>(vol.mesh.elements.size()) / n_pred;
@@ -2235,11 +2318,17 @@ std::vector<std::string> trim_survivors(std::vector<std::string> candidates,
 
 int usage() {
     std::fputs("usage: polymesh_testlab run|resume|validate|pause-status <campaign_dir>\n"
+               "                        [--advisor <model_dir>]\n"
                "\n"
                "  run           start (or restart) a campaign from campaign.json\n"
                "  resume        continue from checkpoint.json after pause / SIGINT\n"
                "  validate      parse campaign, grid, cases, and print maximum run count\n"
                "  pause-status  print checkpoint state (running|paused|finished)\n"
+               "\n"
+               "  --advisor DIR records what the learned advisor would have chosen for\n"
+               "                each case as the row's advisor_decision field. The grid\n"
+               "                still decides what actually runs — the decision is an\n"
+               "                extra observable, never an override.\n"
                "\n"
                "Schemas: docs/dag/interfaces.md. Run from the repo root so case and\n"
                "bench/reference paths resolve. SIGINT after a run finishes → paused.\n",
@@ -2278,7 +2367,7 @@ int cmd_validate(const fs::path& camp_dir) {
     return 0;
 }
 
-int run_campaign(const fs::path& camp_dir, bool resume) {
+int run_campaign(const fs::path& camp_dir, bool resume, const AdvisorScorer* advisor) {
     const fs::path camp_path = camp_dir / "campaign.json";
     if (!fs::exists(camp_path)) {
         std::fprintf(stderr, "missing %s\n", camp_path.string().c_str());
@@ -2420,8 +2509,9 @@ int run_campaign(const fs::path& camp_dir, bool resume) {
                     wh_dir =
                         camp_dir / "runs" / cfg_id / part.part / ("t" + std::to_string(tier));
                 }
-                const RunOutcome ro = run_one(cfg, part, tier, ts.h_scale, progress_path,
-                                              mesh_preview_path, wh_dir, run_limit);
+                const RunOutcome ro =
+                    run_one(cfg, part, tier, ts.h_scale, progress_path, mesh_preview_path,
+                            wh_dir, run_limit, advisor, camp.max_dof, camp.max_elems);
                 results_app << ro.line.dump() << '\n';
                 results_app.flush();
                 done.insert(key);
@@ -2490,12 +2580,24 @@ int main(int argc, char** argv) {
     }
     const std::string_view cmd = argv[1];
     const fs::path camp_dir = argv[2];
+    fs::path advisor_dir;
+    for (int i = 3; i < argc; ++i) {
+        if (std::string_view(argv[i]) == "--advisor" && i + 1 < argc) {
+            advisor_dir = argv[++i];
+        } else {
+            return usage();
+        }
+    }
     try {
+        std::unique_ptr<AdvisorScorer> advisor;
+        if (!advisor_dir.empty()) {
+            advisor = std::make_unique<AdvisorScorer>(advisor_dir);
+        }
         if (cmd == "run") {
-            return run_campaign(camp_dir, /*resume=*/false);
+            return run_campaign(camp_dir, /*resume=*/false, advisor.get());
         }
         if (cmd == "resume") {
-            return run_campaign(camp_dir, /*resume=*/true);
+            return run_campaign(camp_dir, /*resume=*/true, advisor.get());
         }
         if (cmd == "validate") {
             return cmd_validate(camp_dir);

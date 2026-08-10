@@ -43,6 +43,7 @@ add_executable(polymesh_tests
     test_element_tendency.cpp
     test_refinement_plan.cpp
     test_geometry_fidelity.cpp
+    test_brep_fidelity.cpp
     test_quality.cpp
     test_cell_quality.cpp
     test_hex_vem_pipeline.cpp
@@ -93,6 +94,19 @@ else()
     target_include_directories(polymesh_tests PRIVATE ${CMAKE_SOURCE_DIR}/apps/gui)
     target_link_libraries(polymesh_tests PRIVATE nlohmann_json::nlohmann_json)
 endif()
+
+# Advisor inference needs the ONNX Runtime module; the test is only meaningful
+# in a build that has it.
+if(TARGET advisor)
+    target_sources(polymesh_tests PRIVATE test_advisor_inference.cpp)
+    target_link_libraries(polymesh_tests PRIVATE advisor nlohmann_json::nlohmann_json)
+    polymesh_stage_onnxruntime(polymesh_tests)
+endif()
+
+# Catch2 test names must stay ASCII: ctest re-encodes the name from
+# CTestTestfile.cmake through the local ANSI code page before spawning the
+# binary, so a non-ASCII name never matches its own test and ctest reports a
+# failure for a test that never ran.
 
 include(Catch)
 # Working directory = repo root so the bench harness can load bench/reference/.

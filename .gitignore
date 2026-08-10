@@ -41,6 +41,18 @@ bench/self_improve/
 /bench/geometries/corpus/
 /bench/advisor/dataset.csv
 /bench/advisor/runs/
+/bench/advisor/model.onnx
+/bench/advisor/dashboard.html
+/bench/advisor/.cache/
 # Python bytecode from scripts/
 __pycache__/
 *.pyc
+
+# Advisor campaign warehouses. The rows (results.jsonl) and the provenance
+# (campaign.json, checkpoint.json) are tracked; the per-run mesh.vtu/wire.png
+# are not. Batch 1 alone is ~150 MB of them and every one is regenerable from
+# the committed campaign.json plus scripts/gen_primitive_corpus.py, which is
+# deterministic. Curated benchmark warehouses elsewhere stay tracked.
+/bench/campaigns/advisor-batch-*/runs/
+/bench/campaigns/advisor-truth-*/runs/
+/bench/campaigns/advisor-*/mesh_preview.pmp

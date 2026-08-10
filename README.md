@@ -138,6 +138,36 @@ flowchart TD
 Rendered diagram: [docs/assets/showcase/architecture.png](docs/assets/showcase/architecture.png).
 Design narrative: [docs/solver-core.md](docs/solver-core.md).
 
+## Learned mesh advisor
+
+A small multi-head MLP ([ADR-0027](docs/decisions/0027-learned-mesh-advisor.md),
+`scripts/advisor/`, ~10k parameters) maps (geometry + BC features, mesh action)
+to predicted solve accuracy, geometric fidelity vs the B-rep, solve cost, and
+failure risk. Its policy head recommends the mesh configuration — mesher,
+element size, order, adaptivity — which `polymesh solve --advisor bench/advisor`
+applies after hard clamps, vetoing back to defaults when predicted failure
+probability exceeds 0.5. Training is staged (accuracy heads first, cost heads
+blend in at the accuracy plateau) with worst-5% residual pruning, measured
+against a LightGBM baseline on a by-part validation split.
+
+| | |
+|---|---|
+| ![Advisor training curves](docs/advisor/figures/training_curves.png) <br> **training_curves** — per-epoch validation `rel_err` MAE, first vs latest training run. | ![Advisor activation map](docs/advisor/figures/activation_map.png) <br> **activation_map** — per-layer activations for a canonical corpus input, latest run. |
+
+The interactive dashboard (per-head validation metrics, Stage A→B marker,
+pruning log, campaign throughput, MLP vs LightGBM table, and a scrub-able
+network-activation view) is a single self-contained HTML file with plotly.js
+inlined — it regenerates offline once the bundle is cached.
+
+```sh
+python scripts/advisor/train.py --runs 30   # accumulate training runs
+python scripts/advisor/dashboard.py         # bench/advisor/dashboard.html
+python scripts/advisor/figures.py           # docs/advisor/figures/*.png
+```
+
+Details: [docs/advisor/](docs/advisor/) (architecture, objectives and
+guardrails, training log).
+
 ## Quickstart (Ubuntu)
 
 About ten minutes from clone to a VTU on the public unit box.

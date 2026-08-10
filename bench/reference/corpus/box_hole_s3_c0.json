@@ -1,0 +1,42 @@
+{
+  "part": "box_hole_s3_c0",
+  "geometry": "bench/geometries/corpus/primitives/box_hole_s3.step",
+  "family": "box_hole",
+  "truth_source": "analytic",
+  "metrics": [
+    {
+      "name": "scf",
+      "value": 3.0,
+      "tol": 0.1,
+      "probe": {
+        "kind": "mean_vm_over_nominal",
+        "nominal": 1000000.0,
+        "select": {
+          "box": [
+            [
+              -0.02579680011,
+              -0.02579680011,
+              -0.02153053475
+            ],
+            [
+              0.02579680011,
+              0.02579680011,
+              0.04220473757
+            ]
+          ]
+        }
+      },
+      "derivation": "docs/validation/hand-calcs.md#corpus-primitives-kirsch",
+      "source": "analytic",
+      "inputs": {
+        "sigma_inf": 1000000.0,
+        "hole_radius": 0.01719786674,
+        "half_width": 0.19,
+        "half_height": 0.1007449106,
+        "thickness": 0.02067420282,
+        "a_over_W": 0.09051508811,
+        "a_over_H": 0.1707070525
+      }
+    }
+  ]
+}

@@ -49,7 +49,7 @@ class AdvisorNet(nn.Module):
         self.output_names: list[str] = list(config.get("output_names", OUTPUT_NAMES))
         self.order_column = int(config["order_column"])
         self.mesher_column = int(config["mesher_column"])
-        self.hidden = int(config.get("hidden", 64))
+        self.hidden = int(config.get("hidden", 96))
         self.emb_dim = int(config.get("emb_dim", 4))
 
         n_inputs = len(self.input_columns)

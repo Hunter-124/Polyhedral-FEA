@@ -47,6 +47,18 @@ struct AdvisorDecision {
     double predicted_mesh_ms = 0.0;
     double predicted_solve_ms = 0.0;
 
+    /// Centred accuracy score at the recommended action: the `rel_err` head's
+    /// log10 prediction minus that case's median over the actions run, so it is
+    /// reported RAW (a log10 difference), not de-logged like the fields above.
+    ///
+    /// This is a PER-CASE-RELATIVE score. It is comparable BETWEEN actions on
+    /// the same case — lower is better, and it is the quantity that actually
+    /// discriminates a good mesh from a bad one — and it is meaningless as an
+    /// absolute number: the per-case reference-truth offset it subtracts out is
+    /// exactly the part `predicted_rel_err` cannot generalize. Never threshold
+    /// it, never compare it across cases.
+    double predicted_rel_err_rel = 0.0;
+
     /// Feasibility head output in [0, 1]. Above `clamps.json:veto_threshold`
     /// the recommendation is discarded and `defaults` are returned instead.
     double failure_prob = 0.0;
@@ -63,10 +75,15 @@ struct AdvisorDecision {
 [[nodiscard]] std::string to_json(const AdvisorDecision& decision);
 
 /// Raw head outputs for one (case, action) pair, exactly as the graph emits
-/// them: the six regressors are log10 of their target, `failure_logit` is a
+/// them: the seven regressors are log10 of their target, `failure_logit` is a
 /// pre-sigmoid logit, and `policy` is the un-clamped action proposal.
+///
+/// `rel_err_rel` is the one regressor that is not a log10 level but a log10
+/// DIFFERENCE — `rel_err` centred on its per-case median — so it is only
+/// meaningful when compared against other actions on the same case.
 struct AdvisorRawOutputs {
     double rel_err_log10 = 0.0;
+    double rel_err_rel = 0.0;
     double geo_chamfer_log10 = 0.0;
     double geo_p99_log10 = 0.0;
     double dof_log10 = 0.0;

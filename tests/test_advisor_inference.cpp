@@ -99,6 +99,10 @@ TEST_CASE("advisor head outputs match PyTorch within the exported tolerance", "[
         const json& expected = fixture_case.at("outputs");
 
         CHECK(within(raw.rel_err_log10, expected.at("rel_err").get<double>()));
+        // The centred accuracy head. It is a log10 difference rather than a
+        // level, so it is compared exactly as the exporter emitted it — no
+        // de-logging on either side.
+        CHECK(within(raw.rel_err_rel, expected.at("rel_err_rel").get<double>()));
         CHECK(within(raw.geo_chamfer_log10, expected.at("geo_chamfer").get<double>()));
         CHECK(within(raw.geo_p99_log10, expected.at("geo_p99").get<double>()));
         CHECK(within(raw.dof_log10, expected.at("dof").get<double>()));
@@ -209,9 +213,16 @@ TEST_CASE("advisor guardrails clamp the box and honour the veto", "[advisor]") {
 
         auto scored = query;
         advisor.apply_action(scored, proposed);
-        const double failure_prob = sigmoid(advisor.evaluate(scored).failure_logit);
+        const auto scored_raw = advisor.evaluate(scored);
+        const double failure_prob = sigmoid(scored_raw.failure_logit);
         CHECK(decision.failure_prob == Catch::Approx(failure_prob).margin(1e-9));
         CHECK(decision.vetoed == (failure_prob > veto_threshold));
+
+        // The reported score is the pass-2 head verbatim: not de-logged, and
+        // carried across the veto branch so a vetoed row still says what the
+        // discarded recommendation scored.
+        CHECK(decision.predicted_rel_err_rel ==
+              Catch::Approx(scored_raw.rel_err_rel).margin(1e-9));
 
         if (decision.vetoed) {
             // Guardrail 2 — the feasibility head vetoes: defaults, flagged.

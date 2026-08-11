@@ -859,6 +859,7 @@ bool quadratic_incident_valid(const fea::NodalMesh& nodal_mesh,
     return true;
 }
 
+
 } // namespace
 
 bool make_boundary_projection(const geom::CadModel& cad, double h,
@@ -3471,11 +3472,13 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 remove_slave_dirichlet();
                 const auto counts = fea::count_element_types(vol.mesh);
                 note_suffix = std::format(
-                    " p-elev={} n+{} constrained-mid={} (tet10={} hex20={})", linear.size(),
+                    " p-elev={} rejected={} n+{} constrained-mid={} (tet10={} hex20={})",
+                    elevated.n_promoted, elevated.n_rejected,
                     vol.mesh.nodes.size() - before, elevated.n_constrained_midside,
                     counts.tet10, counts.hex20);
                 report("recover", 0.5,
-                       std::format("p-elevate… ({} → quadratic via hp-driver)", linear.size()),
+                       std::format("p-elevate… ({} accepted, {} rejected)",
+                                   elevated.n_promoted, elevated.n_rejected),
                        /*pass=*/0, pass_count);
                 return true;
             };
@@ -3542,12 +3545,14 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 }
                 remove_slave_dirichlet();
                 const auto counts = fea::count_element_types(vol.mesh);
-                vol.mesher_note =
-                    std::format("{} | geo-hp: p-elev bulk {} (tet10={} n+{})", vol.mesher_note,
-                                bulk.size(), counts.tet10, vol.mesh.nodes.size() - before);
+                vol.mesher_note = std::format(
+                    "{} | geo-hp: p-elev bulk {} rejected={} (tet10={} n+{})",
+                    vol.mesher_note, elevated.n_promoted, elevated.n_rejected,
+                    counts.tet10, vol.mesh.nodes.size() - before);
                 report("recover", 0.3,
-                       std::format("geo hp-elevate… ({} bulk → quadratic)", bulk.size()), 0,
-                       pass_count);
+                       std::format("geo hp-elevate… ({} accepted, {} rejected)",
+                                   elevated.n_promoted, elevated.n_rejected),
+                       0, pass_count);
             };
             maybe_geo_p_elevate();
             checkpoint();

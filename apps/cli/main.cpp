@@ -914,6 +914,26 @@ int cmd_solve(std::span<char*> args) {
         vol = mesh_now(mesher);
     }
     vol.mesh.check_validity();
+    std::vector<polymesh::mesh::BoundarySupport> solve_boundary_provenance;
+    polymesh::mesh::BoundaryProjectionContext solve_projection_context;
+    polymesh::mesh::BoundaryProjectionContext* solve_projection = nullptr;
+    if (model && model->cad &&
+        polymesh::pipeline::make_boundary_projection(
+            *model->cad, h_use, &solve_projection_context, &solve_boundary_provenance)) {
+        solve_projection = &solve_projection_context;
+    }
+    const auto project_quadratic_mids = [&]() {
+        if (solve_projection == nullptr || !model || !model->cad) {
+            return;
+        }
+        std::vector<std::uint32_t> reverted;
+        std::vector<std::uint32_t> partial;
+        const std::size_t projected = polymesh::pipeline::project_quadratic_boundary_mids(
+            vol.mesh, *model->cad, solve_projection, h_use, &reverted, &partial);
+        vol.mesher_note +=
+            std::format(" | mids projected={} partial={} reverted={}", projected,
+                        partial.size(), reverted.size());
+    };
 
     const polymesh::fea::Material mat{.youngs_modulus = E, .poissons_ratio = nu};
     auto make_bc_loads = [&](const polymesh::pipeline::VolumeMeshOutput& v) {
@@ -986,6 +1006,7 @@ int cmd_solve(std::span<char*> args) {
                 if (!smooth.empty()) {
                     const auto n0 = vol.mesh.nodes.size();
                     vol.mesh = polymesh::fea::p_elevate(vol.mesh, smooth);
+                    project_quadratic_mids();
                     vol.mesh.check_validity();
                     auto [bc2, loads2] = make_bc_loads(vol);
                     if (bc2.dof_values.empty()) {
@@ -1020,6 +1041,7 @@ int cmd_solve(std::span<char*> args) {
                     const auto smooth = polymesh::adapt::mark_smooth(zz.element_eta, 0.3);
                     if (!smooth.empty()) {
                         vol.mesh = polymesh::fea::p_elevate(vol.mesh, smooth);
+                        project_quadratic_mids();
                         vol.mesh.check_validity();
                         auto [bc2, loads2] = make_bc_loads(vol);
                         u = polymesh::fea::solve_elastostatics(vol.mesh, mat, bc2, loads2,

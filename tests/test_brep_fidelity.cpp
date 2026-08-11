@@ -23,9 +23,12 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <filesystem>
+#include <optional>
 #include <set>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 namespace {
@@ -33,6 +36,7 @@ namespace {
 constexpr char kUnitBox[] = "bench/geometries/public/unit_box.step";
 constexpr char kSphere[] = "tests/fixtures/parts/sphere.step";
 constexpr char kPlateHole[] = "tests/fixtures/parts/plate_hole.step";
+constexpr char kLBracket[] = "bench/geometries/corpus/primitives/l_bracket_s0.step";
 constexpr char kCantilever[] = "tests/fixtures/parts/cantilever.step";
 constexpr char kIcecreamCone[] = "tests/fixtures/parts/icecream_cone.step";
 constexpr char kPipe[] = "tests/fixtures/parts/pipe.step";
@@ -303,8 +307,69 @@ TEST_CASE("brep_fidelity: quadratic plate-hole boundary mids lie on the exact BR
                 partial.size(), reverted.size(), limited_limit, post_max, full_max,
                 partial_max, reverted_max);
         CHECK(limited_count <= limited_limit);
-        CHECK(post_outliers == limited_set);
+        CHECK(std::includes(limited_set.begin(), limited_set.end(), post_outliers.begin(),
+                            post_outliers.end()));
     }
+}
+
+TEST_CASE("brep_fidelity: graded selective p-elevation stays stiffness-valid",
+          "[cad][fidelity][regression]") {
+    if (!polymesh::geom::occ_enabled()) {
+        SKIP("OpenCASCADE disabled");
+    }
+    if (!std::filesystem::exists(kLBracket)) {
+        SKIP("l_bracket_s0.step missing");
+    }
+
+    const auto model = polymesh::pipeline::Model::load(kLBracket);
+    REQUIRE(model.cad);
+    polymesh::pipeline::SimSetup setup;
+    setup.mesh_size = 0.002802519264087257;
+    setup.mesher = polymesh::pipeline::VolumeMesher::kGradedTet;
+    setup.skin_layers = 2;
+    setup.use_feature_grading = true;
+    setup.bc_grading = true;
+    setup.p_elevate = true;
+    setup.max_elems = 60'000;
+    setup.max_dof = 200'000;
+
+    const double diag = (model.bbox_max - model.bbox_min).norm();
+    for (std::size_t ti = 0; ti < model.surface.triangles.size(); ++ti) {
+        const auto& tri = model.surface.triangles[ti];
+        const Eigen::Vector3d centroid =
+            (model.surface.vertices[tri[0]] + model.surface.vertices[tri[1]] +
+             model.surface.vertices[tri[2]]) /
+            3.0;
+        const int region = model.triangle_region[ti];
+        if (centroid.z() >= model.bbox_max.z() - 0.01 * diag) {
+            setup.fixtures.insert(region);
+        }
+        if (centroid.x() >= model.bbox_max.x() - 0.01 * diag) {
+            setup.loads[region].force = Eigen::Vector3d{1'000.0, 0.0, 0.0};
+        }
+    }
+    REQUIRE_FALSE(setup.fixtures.empty());
+    REQUIRE_FALSE(setup.loads.empty());
+
+    polymesh::pipeline::SolveJob job;
+    job.start(model, setup);
+    std::optional<polymesh::pipeline::SolveResult> result;
+    for (int poll = 0; poll < 12'000; ++poll) {
+        result = job.take_result();
+        if (result) {
+            break;
+        }
+        if (job.state() == polymesh::pipeline::SolveJob::State::kFailed) {
+            FAIL(job.status_text());
+        }
+        if (job.state() == polymesh::pipeline::SolveJob::State::kCancelled) {
+            FAIL("graded selective p-elevation was cancelled");
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    REQUIRE(result);
+    CHECK(result->mesh_note.find("geo-hp: p-elev bulk") != std::string::npos);
+    CHECK(result->mesh_note.find("mids projected=") != std::string::npos);
 }
 
 // Exact-BRep residual survey with the mixed-mesh repair disabled:

@@ -7,6 +7,7 @@
 #include "adapt/loop.hpp"
 #include "fea/boundary_faces.hpp"
 #include "fea/p_elevate.hpp"
+#include "fea/quadrature.hpp"
 #include "fea/poly_to_vem.hpp"
 #include "fea/shape.hpp"
 #include "fea/solve.hpp"
@@ -792,16 +793,16 @@ quadratic_boundary_mids(const fea::NodalMesh& nodal_mesh) {
 }
 
 bool quadratic_incident_valid(const fea::NodalMesh& nodal_mesh,
-                               const fea::NodalElement& element,
-                               std::uint32_t moved_node,
-                               const Eigen::Vector3d& saved_position,
-                               double volume_epsilon) {
+                              const fea::NodalElement& element,
+                              std::uint32_t moved_node,
+                              const Eigen::Vector3d& saved_position,
+                              double volume_epsilon,
+                              double jacobian_epsilon) {
     const bool tet10 = element.type == fea::ElementType::kTet10;
     const bool hex20 = element.type == fea::ElementType::kHex20;
     if (!tet10 && !hex20) {
         return false;
     }
-    const std::size_t n_corner = tet10 ? 4 : 8;
     if (element.nodes.size() != (tet10 ? 10 : 20)) {
         return false;
     }
@@ -839,15 +840,19 @@ bool quadratic_incident_valid(const fea::NodalMesh& nodal_mesh,
         before.row(static_cast<Eigen::Index>(i)) =
             (node == moved_node ? saved_position : nodal_mesh.nodes[node]).transpose();
     }
-    const auto reference = fea::reference_nodes(element.type);
-    const double jacobian_epsilon = 6.0 * volume_epsilon;
-    for (std::size_t i = n_corner; i < reference.size(); ++i) {
-        const auto shape = fea::eval_shape(element.type, reference[i]);
+
+    // Use exactly the integration points consumed by element_stiffness. Keeping
+    // the rule selection in fea::default_rule makes a future quadrature change
+    // update both the acceptance gate and the solver together.
+    static const auto tet10_rule = fea::default_rule(fea::ElementType::kTet10);
+    static const auto hex20_rule = fea::default_rule(fea::ElementType::kHex20);
+    const auto& rule = tet10 ? tet10_rule : hex20_rule;
+    for (const auto& qp : rule) {
+        const auto shape = fea::eval_shape(element.type, qp.xi);
         const double det_before = (shape.dn.transpose() * before).determinant();
         const double det_after = (shape.dn.transpose() * after).determinant();
         if (!std::isfinite(det_before) || !std::isfinite(det_after) ||
-            !(det_before > jacobian_epsilon) || !(det_after > jacobian_epsilon) ||
-            det_before * det_after <= 0.0) {
+            !(det_before > 0.0) || !(det_after > jacobian_epsilon)) {
             return false;
         }
     }
@@ -996,6 +1001,7 @@ std::size_t project_quadratic_boundary_mids(
     };
 
     const double volume_epsilon = 1e-14 * h * h * h;
+    const double jacobian_epsilon = 1e-8 * h * h * h;
     std::size_t projected = 0;
     for (const auto& edge : boundary_mids) {
         if (edge.a >= nodal_mesh.nodes.size() || edge.b >= nodal_mesh.nodes.size() ||
@@ -1046,7 +1052,7 @@ std::size_t project_quadratic_boundary_mids(
                 for (const auto element_index : it->second) {
                     if (!quadratic_incident_valid(
                             nodal_mesh, nodal_mesh.elements[element_index], edge.mid, saved,
-                            volume_epsilon)) {
+                            volume_epsilon, jacobian_epsilon)) {
                         return false;
                     }
                 }
@@ -1074,7 +1080,9 @@ std::size_t project_quadratic_boundary_mids(
         }
         if (valid_fraction > 0.0) {
             nodal_mesh.nodes[edge.mid] = saved + valid_fraction * displacement;
-            if ((nodal_mesh.nodes[edge.mid] - target->point).norm() <= 0.02 * h) {
+            const auto surface_projection =
+                geom::project_point_on_surface(cad, nodal_mesh.nodes[edge.mid]);
+            if (surface_projection && surface_projection->distance <= 0.02 * h) {
                 ++projected;
             } else if (partial_nodes != nullptr) {
                 partial_nodes->push_back(edge.mid);

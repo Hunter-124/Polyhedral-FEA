@@ -9,8 +9,8 @@
 // group tags on surface elements are preserved so tests can select traction
 // and Dirichlet boundaries by group id.
 //
-// Node numbering in Gmsh v2.2 for these types matches the canonical order in
-// fea/nodal_mesh.hpp (verified against the Gmsh reference manual).
+// Gmsh v2.2 connectivity is converted to the canonical order in
+// fea/nodal_mesh.hpp (tet10's final two edge nodes differ).
 
 #include "fea/nodal_mesh.hpp"
 #include "fea/traction.hpp"

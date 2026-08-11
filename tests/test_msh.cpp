@@ -58,6 +58,30 @@ $Elements
 $EndElements
 )";
 
+// Gmsh's final two tet10 mid-edge nodes are (2,4), (1,4) in one-based
+// corner notation, the reverse of NodalMesh's canonical order.
+constexpr const char* kTinyTet10Msh = R"($MeshFormat
+2.2 0 8
+$EndMeshFormat
+$Nodes
+10
+1 0 0 0
+2 1 0 0
+3 0 1 0
+4 0 0 1
+5 0.5 0 0
+6 0.5 0.5 0
+7 0 0.5 0
+8 0 0 0.5
+9 0 0.5 0.5
+10 0.5 0 0.5
+$EndNodes
+$Elements
+1
+1 11 0 1 2 3 4 5 6 7 8 9 10
+$EndElements
+)";
+
 } // namespace
 
 TEST_CASE("msh v2.2 parses tet4 volume and tagged tri3 face") {
@@ -82,6 +106,14 @@ TEST_CASE("msh v2.2 parses hex8 volume and tagged quad4 face") {
     REQUIRE(model.physical_faces.at(3).size() == 1);
     CHECK(model.physical_faces.at(3)[0].type == FaceType::kQuad4);
     CHECK(model.physical_faces.at(3)[0].nodes.size() == 4);
+}
+
+TEST_CASE("msh v2.2 converts tet10 edge nodes to canonical order") {
+    const auto model = parse_msh(kTinyTet10Msh);
+    REQUIRE(model.mesh.elements.size() == 1);
+    CHECK(model.mesh.elements[0].type == ElementType::kTet10);
+    CHECK(model.mesh.elements[0].nodes ==
+          std::vector<std::uint32_t>({0, 1, 2, 3, 4, 5, 6, 7, 9, 8}));
 }
 
 TEST_CASE("msh rejects binary and v4 formats") {

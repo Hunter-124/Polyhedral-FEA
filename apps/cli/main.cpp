@@ -11,6 +11,7 @@
 #include "fea/backend.hpp"
 #include "fea/boundary_faces.hpp"
 #include "fea/cell_quality.hpp"
+#include "fea/msh.hpp"
 #include "fea/material.hpp"
 #include "fea/p_elevate.hpp"
 #include "fea/solve.hpp"
@@ -54,15 +55,16 @@ int usage() {
                "              [--max-elems N] [--max-dof N]\n"
                "              [--fix-box x0 y0 z0 x1 y1 z1] [--load-box x0 y0 z0 x1 y1 z1]\n"
                "                             geometry+BC-aware volume mesh; optional VTU\n"
-               "  solve <part> -o out.vtu [-h m] [-E Pa] [-nu r]\n"
+               "  solve <part.step|.brep|.msh> -o out.vtu [-h m] [-E Pa] [-nu r]\n"
                "              [--mesher name] [--skin n] [--no-feature] [--adapt n]\n"
                "              [--eta-target η] [--p-elevate] [--element-tendency t]\n"
                "              [--max-elems N] [--max-dof N] [--max-mem GB]\n"
                "              [--fix-box ...6] [--load-box ...6] [--bc-grade]\n"
                "              [--load-dir x y z] [--force N] [--traction Pa]\n"
-               "              [--advisor <model_dir>]\n"
-               "                             mesh + BCs + VTU. Default BCs: fix min-x,\n"
-               "                             load max-x. Boxes override selection.\n"
+               "              [--advisor <model_dir>] (CAD inputs only)\n"
+               "                             CAD: mesh + BCs + VTU; Gmsh: solve the imported\n"
+               "                             volume mesh directly. Default BCs fix min-x and\n"
+               "                             load max-x; boxes override selection.\n"
                "  diag  <part> [-h m] [--mesher name] [--json out.json] [--no-solve]\n"
                "              [--max-elems N] [--max-dof N] [--max-mem GB]\n"
                "              [--fix-box ...6] [--load-box ...6]\n"
@@ -70,7 +72,7 @@ int usage() {
                "                             JSON diagnostics: fidelity, quality, timings\n"
                "  backend                    print compute backend + OpenMP/opt summary\n"
                "\n"
-               "inputs: CAD only (.step .stp .brep .brp). STL is no longer supported.\n"
+               "inputs: CAD (.step .stp .brep .brp); solve also accepts Gmsh 2.x ASCII .msh.\n"
                "mesh size: omit -h (or -h 0) for auto h0 from bbox + feature density\n"
                "mesher names: hybrid|zoo (default), varyhedron|vary (CAD packing),\n"
                "              hybridvem, cvt_poly|cvt (experimental packed-poly VEM),\n"
@@ -106,6 +108,18 @@ int usage() {
                "              faces whose outward normal aligns with ∓x/±x.\n",
                stderr);
     return 2;
+}
+
+bool is_msh_path(std::string_view path) {
+    if (path.size() < 4 || path[path.size() - 4] != '.') {
+        return false;
+    }
+    const auto ascii_lower = [](char c) {
+        return c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c;
+    };
+    return ascii_lower(path[path.size() - 3]) == 'm' &&
+           ascii_lower(path[path.size() - 2]) == 's' &&
+           ascii_lower(path[path.size() - 1]) == 'h';
 }
 bool parse_ceiling(std::span<char*> args, std::size_t& i, std::size_t& value) {
     if (i + 1 >= args.size()) {
@@ -726,7 +740,29 @@ int cmd_solve(std::span<char*> args) {
         return 2;
     }
 
-    const auto model = polymesh::pipeline::Model::load(path);
+    const bool msh_input = is_msh_path(path);
+    if (msh_input && !advisor_dir.empty()) {
+        std::fputs("solve: --advisor requires CAD input and cannot be used with .msh\n", stderr);
+        return 2;
+    }
+
+    std::optional<polymesh::pipeline::Model> model;
+    std::optional<polymesh::fea::MshModel> msh_model;
+    Eigen::Vector3d bbox_min;
+    Eigen::Vector3d bbox_max;
+    if (msh_input) {
+        msh_model.emplace(polymesh::fea::load_msh(path));
+        bbox_min = msh_model->mesh.nodes.front();
+        bbox_max = bbox_min;
+        for (const auto& node : msh_model->mesh.nodes) {
+            bbox_min = bbox_min.cwiseMin(node);
+            bbox_max = bbox_max.cwiseMax(node);
+        }
+    } else {
+        model.emplace(polymesh::pipeline::Model::load(path));
+        bbox_min = model->bbox_min;
+        bbox_max = model->bbox_max;
+    }
 
     // Learned mesh advisor (ADR-0027). It runs before size resolution and
     // grading so its action is the one that actually meshes: h, mesher, adapt
@@ -744,10 +780,10 @@ int cmd_solve(std::span<char*> args) {
             advisor_load.push_back({load_box.lo, load_box.hi, 0.25});
         }
         const auto features = polymesh::pipeline::extract_case_features(
-            model, advisor_fix, advisor_load, load_spec.dir, nu);
+            *model, advisor_fix, advisor_load, load_spec.dir, nu);
         const auto decision = polymesh::advisor::advisor_recommend(advisor_dir, features);
         std::printf("advisor: %s\n", polymesh::advisor::to_json(decision).c_str());
-        const double diag = (model.bbox_max - model.bbox_min).norm();
+        const double diag = (model->bbox_max - model->bbox_min).norm();
         const auto resolved_mesher = try_parse_mesher(decision.mesher);
         if (!resolved_mesher) {
             std::fprintf(stderr,
@@ -786,12 +822,40 @@ int cmd_solve(std::span<char*> args) {
 #endif
     }
 
-    const auto exact_pressure_area = load_spec.traction_mode
-                                         ? cad_pressure_area(model, load_box, load_spec.dir)
-                                         : std::nullopt;
-    const auto resolved =
-        polymesh::pipeline::resolve_mesh_size(model, h, 30.0, max_elems, max_dof);
-    h = resolved.h;
+    const auto exact_pressure_area =
+        !msh_input && load_spec.traction_mode
+            ? cad_pressure_area(*model, load_box, load_spec.dir)
+            : std::nullopt;
+    polymesh::pipeline::ResolvedMeshSize resolved;
+    if (msh_input) {
+        const bool auto_h = !(h > 0.0);
+        if (auto_h) {
+            const Eigen::Vector3d extent = bbox_max - bbox_min;
+            const double n = static_cast<double>(msh_model->mesh.elements.size());
+            const double bbox_volume = extent.x() * extent.y() * extent.z();
+            h = bbox_volume > 0.0 ? std::cbrt(bbox_volume / n)
+                                  : extent.maxCoeff() / std::cbrt(n);
+        }
+        if (!(h > 0.0) || !std::isfinite(h)) {
+            throw std::runtime_error(
+                "solve: cannot infer a positive mesh scale from the imported .msh; pass -h");
+        }
+        resolved.h = h;
+        resolved.auto_chosen = auto_h;
+        if (max_elems > 0) {
+            resolved.element_ceiling = max_elems;
+        }
+        if (max_dof > 0) {
+            resolved.dof_ceiling = max_dof;
+        }
+        resolved.note =
+            std::format("imported .msh (CAD fidelity unavailable, h{}={:.6g} m)",
+                        auto_h ? "_estimate" : "", h);
+    } else {
+        resolved =
+            polymesh::pipeline::resolve_mesh_size(*model, h, 30.0, max_elems, max_dof);
+        h = resolved.h;
+    }
 
     double h_use = h;
     std::vector<Eigen::Vector3d> seeds;
@@ -802,28 +866,26 @@ int cmd_solve(std::span<char*> args) {
     // default cantilever slabs (fix min-x, load max-x). Geometry grading
     // (curvature / thin-wall) applies whenever --feature is on (default).
     std::vector<polymesh::pipeline::RefineRegion> regions;
-    {
-        const double xmin = model.bbox_min[0];
-        const double xmax = model.bbox_max[0];
+    if (!msh_input) {
+        const double xmin = bbox_min[0];
+        const double xmax = bbox_max[0];
         const double slab = 0.51 * h_use;
         if (load_box.set) {
             regions.push_back({load_box.lo, load_box.hi, 0.25});
         } else if (bc_grade) {
-            Eigen::Vector3d lo = model.bbox_min, hi = model.bbox_max;
+            Eigen::Vector3d lo = bbox_min, hi = bbox_max;
             lo[0] = xmax - slab;
             regions.push_back({lo, hi, 0.25});
         }
         if (fix_box.set) {
             regions.push_back({fix_box.lo, fix_box.hi, 0.5});
         } else if (bc_grade) {
-            Eigen::Vector3d lo = model.bbox_min, hi = model.bbox_max;
+            Eigen::Vector3d lo = bbox_min, hi = bbox_max;
             hi[0] = xmin + slab;
             regions.push_back({lo, hi, 0.5});
         }
-    }
-    {
         const auto plan =
-            polymesh::pipeline::build_refinement_plan(model, h_use, regions, feature);
+            polymesh::pipeline::build_refinement_plan(*model, h_use, regions, feature);
         seeds = plan.refine_seeds;
         seed_band = plan.seed_band;
         size_field = plan.size_field;
@@ -832,18 +894,31 @@ int cmd_solve(std::span<char*> args) {
             plan.n_geometry_seeds, plan.n_bc_seeds, seeds.size(), seed_band, plan.h_fine);
     }
     auto mesh_now = [&](polymesh::pipeline::VolumeMesher m) {
+        if (msh_input) {
+            throw std::runtime_error(
+                "solve: --adapt requires CAD geometry for remeshing and is unavailable for .msh");
+        }
         return polymesh::pipeline::volume_mesh(
-            model, h_use, m, skin, feature, seeds, seed_band, element_tendency,
+            *model, h_use, m, skin, feature, seeds, seed_band, element_tendency,
             resolved.element_ceiling, resolved.dof_ceiling, resolved.auto_chosen ? 3 : 0, {},
             size_field);
     };
-    auto vol = mesh_now(mesher);
+    polymesh::pipeline::VolumeMeshOutput vol;
+    if (msh_input) {
+        vol.mesh = std::move(msh_model->mesh);
+        vol.boundary_quads = polymesh::fea::extract_boundary_faces(vol.mesh);
+        vol.mesher_note =
+            std::format("Gmsh import: {} boundary faces, {} physical groups",
+                        vol.boundary_quads.size(), msh_model->physical_faces.size());
+    } else {
+        vol = mesh_now(mesher);
+    }
     vol.mesh.check_validity();
 
     const polymesh::fea::Material mat{.youngs_modulus = E, .poissons_ratio = nu};
     auto make_bc_loads = [&](const polymesh::pipeline::VolumeMeshOutput& v) {
-        const double xmin = model.bbox_min[0];
-        const double xmax = model.bbox_max[0];
+        const double xmin = bbox_min[0];
+        const double xmax = bbox_max[0];
         const double tol = 0.51 * h_use;
         const auto all_faces = polymesh::fea::boundary_surface_faces(v.mesh);
         const std::size_t n_bnd = count_boundary_nodes(all_faces);

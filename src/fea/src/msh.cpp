@@ -5,6 +5,7 @@
 #include <fstream>
 #include <sstream>
 #include <string_view>
+#include <utility>
 
 namespace polymesh::fea {
 namespace {
@@ -272,6 +273,11 @@ MshModel parse_msh(const std::string& text) {
                 throw FeaError(std::format("msh: element references unknown node {}", gid));
             }
             nodes.push_back(it->second);
+        }
+        // Gmsh numbers the last two tet10 edge nodes as (2,3), (1,3);
+        // NodalMesh's canonical order is (1,3), (2,3).
+        if (gtype == GmshType::kTet10) {
+            std::swap(nodes[8], nodes[9]);
         }
         if (is_volume(gtype)) {
             model.mesh.elements.push_back(

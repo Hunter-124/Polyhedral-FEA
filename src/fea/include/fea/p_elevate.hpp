@@ -18,12 +18,16 @@ struct PElevateResult {
     NodalMesh mesh;
     LinearConstraints constraints;
     std::size_t n_promoted = 0;
+    /// Requested promotions rejected because inherited curved edge nodes would
+    /// make the promoted element invalid at a stiffness quadrature point.
+    std::size_t n_rejected = 0;
     std::size_t n_constrained_midside = 0;
 };
 
-/// Promote every promotable linear element (tet4→tet10, hex8→hex20).
-/// Already-quadratic, prism, pyramid, and VEM elements are left unchanged.
-/// Mid-edge nodes sit at straight edge midpoints (isoparametric p=2).
+/// Promote every validity-safe promotable linear element (tet4→tet10,
+/// hex8→hex20). Already-quadratic, prism, pyramid, and VEM elements are left
+/// unchanged. New mid-edge nodes sit at straight edge midpoints; mids inherited
+/// from an existing quadratic neighbour retain their curved positions.
 NodalMesh promote_to_quadratic(const NodalMesh& mesh);
 
 /// Selective p-elevation: promote only the listed element indices.

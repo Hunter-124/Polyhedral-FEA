@@ -125,6 +125,36 @@ TEST_CASE("D3: selective p_elevate leaves unlisted tet4 linear") {
     REQUIRE(mesh.elements[3].type == fea::ElementType::kTet4);
 }
 
+TEST_CASE("D3: selective p_elevate rejects a tet invalidated by an inherited curved mid") {
+    fea::NodalMesh mesh;
+    mesh.nodes = {{0.0, 0.0, 0.0},
+                  {1.0, 0.0, 0.0},
+                  {0.0, 1.0, 0.0},
+                  {0.0, 0.0, 1.0}};
+    mesh.elements.emplace_back(fea::ElementType::kTet4,
+                               std::vector<std::uint32_t>{0, 1, 2, 3});
+    mesh = fea::promote_to_quadratic(mesh);
+
+    // Curve the shared (0,1) edge toward the existing Tet10. Its stiffness
+    // quadrature remains valid, but reusing this mid in the opposite Tet4
+    // would make the new Tet10's first quadrature Jacobian negative.
+    mesh.nodes[mesh.elements[0].nodes[4]] = {0.5, -0.25, -0.25};
+    mesh.nodes.push_back({0.0, -1.0, 0.0});
+    mesh.nodes.push_back({0.0, 0.0, -1.0});
+    mesh.elements.emplace_back(fea::ElementType::kTet4,
+                               std::vector<std::uint32_t>{0, 1, 10, 11});
+    REQUIRE_NOTHROW(fea::element_stiffness(mesh, mesh.elements[0], kSteel));
+    REQUIRE_NOTHROW(fea::element_stiffness(mesh, mesh.elements[1], kSteel));
+
+    const std::vector<std::size_t> elevate{1};
+    const auto result = fea::p_elevate_with_constraints(mesh, elevate);
+    CHECK(result.n_promoted == 0);
+    CHECK(result.n_rejected == 1);
+    REQUIRE(result.mesh.elements[1].type == fea::ElementType::kTet4);
+    CHECK_NOTHROW(fea::element_stiffness(result.mesh, result.mesh.elements[0], kSteel));
+    CHECK_NOTHROW(fea::element_stiffness(result.mesh, result.mesh.elements[1], kSteel));
+}
+
 TEST_CASE("D3: mark_smooth is complement of Doerfler") {
     // Synthetic η: a few large, many small.
     std::vector<double> eta{1.0, 0.9, 0.1, 0.05, 0.02, 0.01};

@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "fea/p_elevate.hpp"
+#include "fea/quadrature.hpp"
+#include "fea/shape.hpp"
 
 #include <array>
+#include <cmath>
 #include <format>
 #include <map>
 #include <utility>
@@ -117,26 +120,119 @@ void seed_existing_midpoints(const NodalElement& element, std::map<Edge, std::ui
     }
 }
 
+using ShapeDerivatives = Eigen::Matrix<double, Eigen::Dynamic, 3>;
+
+const std::vector<ShapeDerivatives>& stiffness_shape_derivatives(ElementType type) {
+    static const auto tet10 = [] {
+        std::vector<ShapeDerivatives> derivatives;
+        for (const auto& qp : default_rule(ElementType::kTet10)) {
+            derivatives.push_back(eval_shape(ElementType::kTet10, qp.xi).dn);
+        }
+        return derivatives;
+    }();
+    static const auto hex20 = [] {
+        std::vector<ShapeDerivatives> derivatives;
+        for (const auto& qp : default_rule(ElementType::kHex20)) {
+            derivatives.push_back(eval_shape(ElementType::kHex20, qp.xi).dn);
+        }
+        return derivatives;
+    }();
+    return type == ElementType::kTet10 ? tet10 : hex20;
+}
+
+template <std::size_t N>
+bool promotion_stays_valid(const NodalMesh& mesh, const NodalElement& element,
+                           const std::array<std::array<int, 2>, N>& edges,
+                           std::size_t n_corner, ElementType promoted_type,
+                           const std::map<Edge, std::uint32_t>& midpoints) {
+    if (element.nodes.size() != n_corner) {
+        throw FeaError("p_elevate: linear element node count invalid");
+    }
+
+    Eigen::Matrix<double, Eigen::Dynamic, 3> coordinates(
+        static_cast<Eigen::Index>(n_corner + N), 3);
+    for (std::size_t i = 0; i < n_corner; ++i) {
+        coordinates.row(static_cast<Eigen::Index>(i)) =
+            mesh.nodes[element.nodes[i]].transpose();
+    }
+    for (std::size_t edge_index = 0; edge_index < N; ++edge_index) {
+        const auto& edge = edges[edge_index];
+        const auto a = element.nodes[static_cast<std::size_t>(edge[0])];
+        const auto b = element.nodes[static_cast<std::size_t>(edge[1])];
+        const auto existing = midpoints.find(canonical_edge(a, b));
+        const Eigen::Vector3d position =
+            existing == midpoints.end()
+                ? 0.5 * (mesh.nodes[a] + mesh.nodes[b])
+                : mesh.nodes.at(existing->second);
+        coordinates.row(static_cast<Eigen::Index>(n_corner + edge_index)) =
+            position.transpose();
+    }
+
+    // Promotion can inherit already-curved mids from a quadratic neighbour.
+    // Admit it only if the exact Jacobians later consumed by element_stiffness
+    // are finite and positive; otherwise the element remains linear.
+    for (const auto& dn : stiffness_shape_derivatives(promoted_type)) {
+        const double det = (dn.transpose() * coordinates).determinant();
+        if (!std::isfinite(det) || !(det > 0.0)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool promotion_stays_valid(const NodalMesh& mesh, const NodalElement& element,
+                           const std::map<Edge, std::uint32_t>& midpoints) {
+    if (element.type == ElementType::kTet4) {
+        return promotion_stays_valid(mesh, element, kTetEdges, 4,
+                                     ElementType::kTet10, midpoints);
+    }
+    if (element.type == ElementType::kHex8) {
+        return promotion_stays_valid(mesh, element, kHexEdges, 8,
+                                     ElementType::kHex20, midpoints);
+    }
+    return false;
+}
+
 PElevateResult p_elevate_impl(const NodalMesh& mesh, const std::vector<bool>& elevate) {
     if (elevate.size() != mesh.elements.size()) {
         throw FeaError("p_elevate: elevate mask size mismatch");
+    }
+
+    std::map<Edge, std::uint32_t> midpoints;
+    for (const auto& element : mesh.elements) {
+        seed_existing_midpoints(element, midpoints);
+    }
+
+    // An existing quadratic neighbour may already have curved a shared edge.
+    // Reusing that node is required for conformity, but can invert a newly
+    // promoted element. Decide the actual promotion set before computing
+    // interface incidence so rejected elements correctly remain p=1.
+    std::vector<bool> accepted = elevate;
+    std::size_t n_rejected = 0;
+    for (std::size_t e = 0; e < mesh.elements.size(); ++e) {
+        if (accepted[e] && promotable(mesh.elements[e].type) &&
+            !promotion_stays_valid(mesh, mesh.elements[e], midpoints)) {
+            accepted[e] = false;
+            ++n_rejected;
+        }
     }
 
     struct EdgeIncidence {
         bool has_linear = false;
     };
     std::map<Edge, EdgeIncidence> incidence;
-    std::map<Edge, std::uint32_t> midpoints;
     for (std::size_t e = 0; e < mesh.elements.size(); ++e) {
         const auto& element = mesh.elements[e];
-        seed_existing_midpoints(element, midpoints);
-        const bool final_quadratic = quadratic(element.type) || (elevate[e] && promotable(element.type));
+        const bool final_quadratic =
+            quadratic(element.type) || (accepted[e] && promotable(element.type));
         visit_corner_edges(element, [&](const Edge& edge) {
-            incidence[edge].has_linear = incidence[edge].has_linear || !final_quadratic;
+            incidence[edge].has_linear =
+                incidence[edge].has_linear || !final_quadratic;
         });
     }
 
     PElevateResult result;
+    result.n_rejected = n_rejected;
     result.mesh.nodes = mesh.nodes;
     result.mesh.elements.reserve(mesh.elements.size());
     const auto midpoint = [&](std::uint32_t a, std::uint32_t b) {
@@ -151,7 +247,7 @@ PElevateResult p_elevate_impl(const NodalMesh& mesh, const std::vector<bool>& el
 
     for (std::size_t e = 0; e < mesh.elements.size(); ++e) {
         const auto& element = mesh.elements[e];
-        if (!elevate[e] || !promotable(element.type)) {
+        if (!accepted[e] || !promotable(element.type)) {
             result.mesh.elements.push_back(element);
             continue;
         }
@@ -159,9 +255,6 @@ PElevateResult p_elevate_impl(const NodalMesh& mesh, const std::vector<bool>& el
         promoted.nodes = element.nodes;
         promoted.faces = element.faces;
         if (element.type == ElementType::kTet4) {
-            if (element.nodes.size() != 4) {
-                throw FeaError("p_elevate: tet4 node count invalid");
-            }
             promoted.type = ElementType::kTet10;
             for (const auto& edge : kTetEdges) {
                 promoted.nodes.push_back(
@@ -169,9 +262,6 @@ PElevateResult p_elevate_impl(const NodalMesh& mesh, const std::vector<bool>& el
                              element.nodes[static_cast<std::size_t>(edge[1])]));
             }
         } else {
-            if (element.nodes.size() != 8) {
-                throw FeaError("p_elevate: hex8 node count invalid");
-            }
             promoted.type = ElementType::kHex20;
             for (const auto& edge : kHexEdges) {
                 promoted.nodes.push_back(

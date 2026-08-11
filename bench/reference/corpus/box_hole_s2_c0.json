@@ -9,7 +9,7 @@
       "value": 3.0,
       "tol": 0.1,
       "probe": {
-        "kind": "mean_vm_over_nominal",
+        "kind": "peak_vm_over_nominal",
         "nominal": 1000000.0,
         "select": {
           "box": [

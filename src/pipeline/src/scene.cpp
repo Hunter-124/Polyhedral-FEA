@@ -8,6 +8,7 @@
 #include "fea/boundary_faces.hpp"
 #include "fea/p_elevate.hpp"
 #include "fea/poly_to_vem.hpp"
+#include "fea/shape.hpp"
 #include "fea/solve.hpp"
 #include "fea/traction.hpp"
 #include "fea/vem.hpp"
@@ -721,6 +722,375 @@ ElementTendencyPlan resolve_element_tendency(VolumeMesher base, double tendency,
     return plan;
 }
 
+namespace {
+
+struct QuadraticBoundaryMid {
+    std::uint32_t a = 0;
+    std::uint32_t b = 0;
+    std::uint32_t mid = 0;
+};
+
+std::vector<QuadraticBoundaryMid>
+quadratic_boundary_mids(const fea::NodalMesh& nodal_mesh) {
+    static constexpr std::array<std::array<int, 2>, 6> kTetEdges{
+        {{0, 1}, {1, 2}, {0, 2}, {0, 3}, {1, 3}, {2, 3}}};
+    static constexpr std::array<std::array<int, 2>, 12> kHexEdges{
+        {{0, 1}, {1, 2}, {2, 3}, {3, 0}, {4, 5}, {5, 6}, {6, 7}, {7, 4}, {0, 4}, {1, 5},
+         {2, 6}, {3, 7}}};
+    std::map<std::pair<std::uint32_t, std::uint32_t>, std::uint32_t> edge_mids;
+    for (const auto& element : nodal_mesh.elements) {
+        const bool tet10 = element.type == fea::ElementType::kTet10;
+        const bool hex20 = element.type == fea::ElementType::kHex20;
+        if (!tet10 && !hex20) {
+            continue;
+        }
+        const std::size_t n_corner = tet10 ? 4 : 8;
+        const std::size_t n_mid = tet10 ? 6 : 12;
+        if (element.nodes.size() < n_corner + n_mid) {
+            continue;
+        }
+        for (std::size_t edge_index = 0; edge_index < n_mid; ++edge_index) {
+            const auto& edge =
+                tet10 ? kTetEdges[edge_index] : kHexEdges[edge_index];
+            const auto a = element.nodes[static_cast<std::size_t>(edge[0])];
+            const auto b = element.nodes[static_cast<std::size_t>(edge[1])];
+            edge_mids[std::minmax(a, b)] = element.nodes[n_corner + edge_index];
+        }
+    }
+
+    static constexpr std::array<std::array<int, 2>, 3> kTriEdges{
+        {{0, 1}, {1, 2}, {0, 2}}};
+    static constexpr std::array<std::array<int, 2>, 4> kQuadEdges{
+        {{0, 1}, {1, 2}, {2, 3}, {3, 0}}};
+    std::map<std::uint32_t, QuadraticBoundaryMid> by_mid;
+    for (const auto& face : fea::boundary_surface_faces(nodal_mesh)) {
+        const bool tri6 = face.type == fea::FaceType::kTri6;
+        const bool quad8 = face.type == fea::FaceType::kQuad8;
+        if (!tri6 && !quad8) {
+            continue;
+        }
+        const std::size_t n_edges = tri6 ? kTriEdges.size() : kQuadEdges.size();
+        for (std::size_t edge_index = 0; edge_index < n_edges; ++edge_index) {
+            const auto& edge =
+                tri6 ? kTriEdges[edge_index] : kQuadEdges[edge_index];
+            const auto a = face.nodes[static_cast<std::size_t>(edge[0])];
+            const auto b = face.nodes[static_cast<std::size_t>(edge[1])];
+            const auto it = edge_mids.find(std::minmax(a, b));
+            if (it != edge_mids.end()) {
+                by_mid.try_emplace(it->second, QuadraticBoundaryMid{a, b, it->second});
+            }
+        }
+    }
+
+    std::vector<QuadraticBoundaryMid> result;
+    result.reserve(by_mid.size());
+    for (const auto& [mid, edge] : by_mid) {
+        (void)mid;
+        result.push_back(edge);
+    }
+    return result;
+}
+
+bool quadratic_incident_valid(const fea::NodalMesh& nodal_mesh,
+                               const fea::NodalElement& element,
+                               std::uint32_t moved_node,
+                               const Eigen::Vector3d& saved_position,
+                               double volume_epsilon) {
+    const bool tet10 = element.type == fea::ElementType::kTet10;
+    const bool hex20 = element.type == fea::ElementType::kHex20;
+    if (!tet10 && !hex20) {
+        return false;
+    }
+    const std::size_t n_corner = tet10 ? 4 : 8;
+    if (element.nodes.size() != (tet10 ? 10 : 20)) {
+        return false;
+    }
+
+    if (tet10) {
+        const auto& a = nodal_mesh.nodes[element.nodes[0]];
+        const auto& b = nodal_mesh.nodes[element.nodes[1]];
+        const auto& c = nodal_mesh.nodes[element.nodes[2]];
+        const auto& d = nodal_mesh.nodes[element.nodes[3]];
+        if (!(mesh::validity::tet_signed_volume(a, b, c, d) > volume_epsilon)) {
+            return false;
+        }
+    } else {
+        std::array<Eigen::Vector3d, 8> corners{};
+        for (std::size_t i = 0; i < corners.size(); ++i) {
+            corners[i] = nodal_mesh.nodes[element.nodes[i]];
+        }
+        for (const auto& corner : mesh::validity::kHexCornerTriples) {
+            if (!(mesh::validity::tet_signed_volume(
+                      corners[static_cast<std::size_t>(corner[0])],
+                      corners[static_cast<std::size_t>(corner[1])],
+                      corners[static_cast<std::size_t>(corner[2])],
+                      corners[static_cast<std::size_t>(corner[3])]) >
+                  volume_epsilon)) {
+                return false;
+            }
+        }
+    }
+
+    Eigen::Matrix<double, Eigen::Dynamic, 3> after(element.nodes.size(), 3);
+    Eigen::Matrix<double, Eigen::Dynamic, 3> before(element.nodes.size(), 3);
+    for (std::size_t i = 0; i < element.nodes.size(); ++i) {
+        const auto node = element.nodes[i];
+        after.row(static_cast<Eigen::Index>(i)) = nodal_mesh.nodes[node].transpose();
+        before.row(static_cast<Eigen::Index>(i)) =
+            (node == moved_node ? saved_position : nodal_mesh.nodes[node]).transpose();
+    }
+    const auto reference = fea::reference_nodes(element.type);
+    const double jacobian_epsilon = 6.0 * volume_epsilon;
+    for (std::size_t i = n_corner; i < reference.size(); ++i) {
+        const auto shape = fea::eval_shape(element.type, reference[i]);
+        const double det_before = (shape.dn.transpose() * before).determinant();
+        const double det_after = (shape.dn.transpose() * after).determinant();
+        if (!std::isfinite(det_before) || !std::isfinite(det_after) ||
+            !(det_before > jacobian_epsilon) || !(det_after > jacobian_epsilon) ||
+            det_before * det_after <= 0.0) {
+            return false;
+        }
+    }
+    return true;
+}
+
+} // namespace
+
+bool make_boundary_projection(const geom::CadModel& cad, double h,
+                              mesh::BoundaryProjectionContext* ctx,
+                              std::vector<mesh::BoundarySupport>* provenance) {
+    if (ctx == nullptr || provenance == nullptr || cad.empty()) {
+        if (ctx != nullptr) {
+            *ctx = {};
+        }
+        return false;
+    }
+
+    auto topology = std::make_shared<geom::CadTopology>(geom::extract_topology(cad, 10));
+    const geom::CadModel* cad_ptr = &cad;
+    ctx->provenance = provenance;
+    ctx->target =
+        [cad_ptr, topology = std::move(topology),
+         h](const Eigen::Vector3d& p,
+            mesh::BoundarySupport& owner) -> std::optional<mesh::BoundaryTarget> {
+        std::optional<geom::ProjectResult> exact;
+        if (owner.kind == mesh::BoundarySupportKind::kCadVertex) {
+            exact = geom::project_point_on_vertex(*cad_ptr, owner.id, p);
+        } else if (owner.kind == mesh::BoundarySupportKind::kCadEdge) {
+            exact = geom::project_point_on_edge(*cad_ptr, owner.id, p);
+        } else if (owner.kind == mesh::BoundarySupportKind::kCadFace) {
+            exact = geom::project_point_on_face(*cad_ptr, owner.id, p);
+        } else {
+            exact = geom::project_point_on_surface(*cad_ptr, p);
+            if (!exact) {
+                return std::nullopt;
+            }
+
+            const double feature_slack = 0.08 * h;
+            bool chose_vertex = false;
+            const geom::CadVertex* nearest_vertex = nullptr;
+            double vertex_distance = std::numeric_limits<double>::infinity();
+            for (const auto& vertex : topology->vertices) {
+                const double distance = (p - vertex.position).norm();
+                if (distance < vertex_distance) {
+                    nearest_vertex = &vertex;
+                    vertex_distance = distance;
+                }
+            }
+            if (nearest_vertex != nullptr && vertex_distance <= 0.40 * h &&
+                vertex_distance <= exact->distance + feature_slack) {
+                auto vertex_exact =
+                    geom::project_point_on_vertex(*cad_ptr, nearest_vertex->id, p);
+                if (vertex_exact) {
+                    exact = std::move(vertex_exact);
+                    chose_vertex = true;
+                    owner = {mesh::BoundarySupportKind::kCadVertex, nearest_vertex->id};
+                }
+            }
+
+            if (!chose_vertex && owner.kind == mesh::BoundarySupportKind::kUnknown) {
+                const auto nearest_edge = geom::closest_edge(*topology, p, true);
+                if (nearest_edge && nearest_edge->distance <= 0.55 * h &&
+                    nearest_edge->distance <= exact->distance + feature_slack) {
+                    auto edge_exact =
+                        geom::project_point_on_edge(*cad_ptr, nearest_edge->edge_id, p);
+                    if (edge_exact) {
+                        exact = std::move(edge_exact);
+                        owner = {mesh::BoundarySupportKind::kCadEdge,
+                                 nearest_edge->edge_id};
+                    }
+                }
+            }
+
+            if (owner.kind == mesh::BoundarySupportKind::kUnknown &&
+                exact->support_kind == geom::CadSupportKind::kVertex) {
+                owner = {mesh::BoundarySupportKind::kCadVertex, exact->support_id};
+            } else if (owner.kind == mesh::BoundarySupportKind::kUnknown &&
+                       exact->support_kind == geom::CadSupportKind::kEdge &&
+                       exact->support_id < topology->edges.size() &&
+                       topology->edges[exact->support_id].feature ==
+                           geom::CadEdgeFeature::kSharp) {
+                owner = {mesh::BoundarySupportKind::kCadEdge, exact->support_id};
+            } else if (owner.kind == mesh::BoundarySupportKind::kUnknown &&
+                       exact->face_id != geom::kInvalidCadSupportId) {
+                owner = {mesh::BoundarySupportKind::kCadFace, exact->face_id};
+            } else if (owner.kind == mesh::BoundarySupportKind::kUnknown) {
+                return std::nullopt;
+            }
+        }
+        if (!exact) {
+            return std::nullopt;
+        }
+        return mesh::BoundaryTarget{exact->point, exact->distance};
+    };
+    return true;
+}
+
+std::size_t project_quadratic_boundary_mids(
+    fea::NodalMesh& nodal_mesh, const geom::CadModel& cad,
+    mesh::BoundaryProjectionContext* projection, double h,
+    std::vector<std::uint32_t>* reverted_nodes,
+    std::vector<std::uint32_t>* partial_nodes) {
+    if (reverted_nodes != nullptr) {
+        reverted_nodes->clear();
+    }
+    if (partial_nodes != nullptr) {
+        partial_nodes->clear();
+    }
+    if (projection == nullptr || !projection->target || cad.empty() || !(h > 0.0)) {
+        return 0;
+    }
+    const auto boundary_mids = quadratic_boundary_mids(nodal_mesh);
+    if (boundary_mids.empty()) {
+        return 0;
+    }
+
+    std::unordered_map<std::uint32_t, std::vector<std::size_t>> incident;
+    incident.reserve(boundary_mids.size());
+    for (const auto& edge : boundary_mids) {
+        incident.try_emplace(edge.mid);
+    }
+    for (std::size_t element_index = 0; element_index < nodal_mesh.elements.size();
+         ++element_index) {
+        for (const auto node : nodal_mesh.elements[element_index].nodes) {
+            if (auto it = incident.find(node); it != incident.end()) {
+                it->second.push_back(element_index);
+            }
+        }
+    }
+
+    const auto owner_of = [&](std::uint32_t node) {
+        if (projection->provenance != nullptr && node < projection->provenance->size()) {
+            return (*projection->provenance)[node];
+        }
+        return mesh::BoundarySupport{};
+    };
+    const auto commit_owner = [&](std::uint32_t node, mesh::BoundarySupport owner) {
+        if (projection->provenance == nullptr) {
+            return;
+        }
+        if (projection->provenance->size() <= node) {
+            projection->provenance->resize(static_cast<std::size_t>(node) + 1);
+        }
+        (*projection->provenance)[node] = owner;
+    };
+
+    const double volume_epsilon = 1e-14 * h * h * h;
+    std::size_t projected = 0;
+    for (const auto& edge : boundary_mids) {
+        if (edge.a >= nodal_mesh.nodes.size() || edge.b >= nodal_mesh.nodes.size() ||
+            edge.mid >= nodal_mesh.nodes.size()) {
+            if (reverted_nodes != nullptr) {
+                reverted_nodes->push_back(edge.mid);
+            }
+            continue;
+        }
+        const Eigen::Vector3d saved = nodal_mesh.nodes[edge.mid];
+        const auto owner_a = owner_of(edge.a);
+        const auto owner_b = owner_of(edge.b);
+        std::optional<geom::ProjectResult> exact;
+        mesh::BoundarySupport direct_owner;
+        bool direct = owner_a.kind != mesh::BoundarySupportKind::kUnknown &&
+                      owner_a.kind == owner_b.kind && owner_a.id == owner_b.id;
+        if (direct) {
+            direct_owner = owner_a;
+            if (owner_a.kind == mesh::BoundarySupportKind::kCadEdge) {
+                exact = geom::project_point_on_edge(cad, owner_a.id, saved);
+            } else if (owner_a.kind == mesh::BoundarySupportKind::kCadFace) {
+                exact = geom::project_point_on_face(cad, owner_a.id, saved);
+            } else if (owner_a.kind == mesh::BoundarySupportKind::kCadVertex) {
+                exact = geom::project_point_on_vertex(cad, owner_a.id, saved);
+            } else {
+                direct = false;
+            }
+        }
+
+        std::optional<mesh::BoundaryTarget> target;
+        if (direct) {
+            if (exact) {
+                commit_owner(edge.mid, direct_owner);
+                target = mesh::BoundaryTarget{exact->point, exact->distance};
+            }
+        } else {
+            target = mesh::owned_boundary_projection_target(saved, edge.mid, projection);
+        }
+        if (!target) {
+            if (reverted_nodes != nullptr) {
+                reverted_nodes->push_back(edge.mid);
+            }
+            continue;
+        }
+
+        const auto incident_valid = [&]() {
+            if (const auto it = incident.find(edge.mid); it != incident.end()) {
+                for (const auto element_index : it->second) {
+                    if (!quadratic_incident_valid(
+                            nodal_mesh, nodal_mesh.elements[element_index], edge.mid, saved,
+                            volume_epsilon)) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        };
+
+        nodal_mesh.nodes[edge.mid] = target->point;
+        if (incident_valid()) {
+            ++projected;
+            continue;
+        }
+
+        double valid_fraction = 0.0;
+        double invalid_fraction = 1.0;
+        const Eigen::Vector3d displacement = target->point - saved;
+        for (int step = 0; step < 6; ++step) {
+            const double fraction = 0.5 * (valid_fraction + invalid_fraction);
+            nodal_mesh.nodes[edge.mid] = saved + fraction * displacement;
+            if (incident_valid()) {
+                valid_fraction = fraction;
+            } else {
+                invalid_fraction = fraction;
+            }
+        }
+        if (valid_fraction > 0.0) {
+            nodal_mesh.nodes[edge.mid] = saved + valid_fraction * displacement;
+            if ((nodal_mesh.nodes[edge.mid] - target->point).norm() <= 0.02 * h) {
+                ++projected;
+            } else if (partial_nodes != nullptr) {
+                partial_nodes->push_back(edge.mid);
+            }
+            continue;
+        }
+
+        nodal_mesh.nodes[edge.mid] = saved;
+        if (reverted_nodes != nullptr) {
+            reverted_nodes->push_back(edge.mid);
+        }
+        continue;
+    }
+    return projected;
+}
+
 VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                              int skin_layers, bool feature_refine,
                              std::span<const Eigen::Vector3d> refine_seeds, double seed_band,
@@ -758,7 +1128,6 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
 
     // One exact BRep oracle and one compact owner slot per eventual mesh node.
     // Unknown nodes classify on their first snap; known owners remain immutable.
-    std::optional<geom::CadTopology> projection_topology;
     std::vector<mesh::BoundarySupport> boundary_provenance;
     mesh::BoundaryProjectionContext projection_context;
     mesh::BoundaryProjectionContext* projection = nullptr;
@@ -766,94 +1135,10 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         (mesher == VolumeMesher::kHybrid || mesher == VolumeMesher::kHybridVem ||
          mesher == VolumeMesher::kGradedTet || mesher == VolumeMesher::kVaryhedron)) {
         try {
-            projection_topology = geom::extract_topology(*model.cad, 10);
-            const geom::CadModel* cad = &(*model.cad);
-            const geom::CadTopology* topo = &(*projection_topology);
-            projection_context.provenance = &boundary_provenance;
-            projection_context.target =
-                [cad, topo,
-                 h](const Eigen::Vector3d& p,
-                    mesh::BoundarySupport& owner) -> std::optional<mesh::BoundaryTarget> {
-                std::optional<geom::ProjectResult> exact;
-                if (owner.kind == mesh::BoundarySupportKind::kCadVertex) {
-                    exact = geom::project_point_on_vertex(*cad, owner.id, p);
-                } else if (owner.kind == mesh::BoundarySupportKind::kCadEdge) {
-                    exact = geom::project_point_on_edge(*cad, owner.id, p);
-                } else if (owner.kind == mesh::BoundarySupportKind::kCadFace) {
-                    exact = geom::project_point_on_face(*cad, owner.id, p);
-                } else {
-                    exact = geom::project_point_on_surface(*cad, p);
-                    if (!exact) {
-                        return std::nullopt;
-                    }
-
-                    // Preserve true CAD corners before edge/face ownership.
-                    // The competitiveness term mirrors the legacy feature
-                    // classifier while the accepted target remains exact.
-                    const double feature_slack = 0.08 * h;
-                    // Ownership is committed before the first accepted move.
-                    // This prevents a node from changing trimmed faces or
-                    // crossing a protected sharp edge during incremental snap.
-                    bool chose_vertex = false;
-                    const geom::CadVertex* nearest_vertex = nullptr;
-                    double vertex_distance = std::numeric_limits<double>::infinity();
-                    for (const auto& vertex : topo->vertices) {
-                        const double d = (p - vertex.position).norm();
-                        if (d < vertex_distance) {
-                            nearest_vertex = &vertex;
-                            vertex_distance = d;
-                        }
-                    }
-                    if (nearest_vertex != nullptr && vertex_distance <= 0.40 * h &&
-                        vertex_distance <= exact->distance + feature_slack) {
-                        auto vertex_exact =
-                            geom::project_point_on_vertex(*cad, nearest_vertex->id, p);
-                        if (vertex_exact) {
-                            exact = std::move(vertex_exact);
-                            chose_vertex = true;
-                            owner = {mesh::BoundarySupportKind::kCadVertex,
-                                     nearest_vertex->id};
-                        }
-                    }
-
-                    if (!chose_vertex && owner.kind == mesh::BoundarySupportKind::kUnknown) {
-                        const auto nearest_edge = geom::closest_edge(*topo, p, true);
-                        if (nearest_edge && nearest_edge->distance <= 0.55 * h &&
-                            nearest_edge->distance <= exact->distance + feature_slack) {
-                            auto edge_exact =
-                                geom::project_point_on_edge(*cad, nearest_edge->edge_id, p);
-                            if (edge_exact) {
-                                exact = std::move(edge_exact);
-                                owner = {mesh::BoundarySupportKind::kCadEdge,
-                                         nearest_edge->edge_id};
-                            }
-                        }
-                    }
-
-                    if (owner.kind == mesh::BoundarySupportKind::kUnknown &&
-                        exact->support_kind == geom::CadSupportKind::kVertex) {
-                        owner = {mesh::BoundarySupportKind::kCadVertex, exact->support_id};
-                    } else if (owner.kind == mesh::BoundarySupportKind::kUnknown &&
-                               exact->support_kind == geom::CadSupportKind::kEdge &&
-                               exact->support_id < topo->edges.size() &&
-                               topo->edges[exact->support_id].feature ==
-                                   geom::CadEdgeFeature::kSharp) {
-                        owner = {mesh::BoundarySupportKind::kCadEdge, exact->support_id};
-                    } else if (owner.kind == mesh::BoundarySupportKind::kUnknown &&
-                               exact->face_id != geom::kInvalidCadSupportId) {
-                        // Smooth and seam edges deliberately free-slide on
-                        // their stable trimmed supporting face.
-                        owner = {mesh::BoundarySupportKind::kCadFace, exact->face_id};
-                    } else if (owner.kind == mesh::BoundarySupportKind::kUnknown) {
-                        return std::nullopt;
-                    }
-                }
-                if (!exact) {
-                    return std::nullopt;
-                }
-                return mesh::BoundaryTarget{exact->point, exact->distance};
-            };
-            projection = &projection_context;
+            if (make_boundary_projection(*model.cad, h, &projection_context,
+                                         &boundary_provenance)) {
+                projection = &projection_context;
+            }
         } catch (const std::exception& e) {
             throw std::runtime_error(
                 std::format("exact BRep projection setup failed: {}", e.what()));
@@ -1299,6 +1584,55 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             if (smooth_st.n_moved > 0) {
                 fill.boundary_max_distance = smooth_st.max_residual;
             }
+            // The mixed-cell merge survey never collapsed a node on any STEP
+            // fixture, so no topology-repair path remains. This post-smoothing
+            // projection round is active, however: without it icecream_cone at
+            // h_rel=.20 measured exact-BRep p99/h=.191; with it, .0594.
+            std::set<std::uint32_t> final_boundary_set;
+            for (const auto& face : fill.boundary_quads) {
+                final_boundary_set.insert(face.begin(), face.end());
+            }
+            const std::vector<std::uint32_t> final_boundary_nodes(
+                final_boundary_set.begin(), final_boundary_set.end());
+            const auto final_node_offends = [&](std::uint32_t node) {
+                const auto it = node_cells.find(node);
+                if (it == node_cells.end()) {
+                    return false;
+                }
+                for (const auto cell_index : it->second) {
+                    if (!cell_valid(fill.cells[cell_index])) {
+                        return true;
+                    }
+                }
+                return false;
+            };
+            validity_poll = 0;
+            const auto collect_final_offenders =
+                [&](std::set<std::uint32_t>& offenders) {
+                for (const auto& cell : fill.cells) {
+                    if ((validity_poll++ & 255U) == 0U) {
+                        poll_cancel();
+                    }
+                    if (cell_valid(cell)) {
+                        continue;
+                    }
+                    if (cell.kind == mesh::MixedCellKind::kPolyVem) {
+                        offenders.insert(cell.poly_nodes.begin(), cell.poly_nodes.end());
+                    } else {
+                        offenders.insert(cell.nodes.begin(),
+                                         cell.nodes.begin() + cell.n_nodes);
+                    }
+                }
+            };
+            fill.boundary_max_distance =
+                mesh::snap_boundary_nodes(
+                    model.surface, fill.nodes, final_boundary_nodes, h_snap,
+                    collect_final_offenders, /*max_move_frac=*/1.25, /*passes=*/4, edges,
+                    [&] { mesh::repair_mixed_fan_apices(fill, kMinShape); },
+                    final_node_offends, /*defer_coupled=*/true, projection)
+                    .max_residual;
+            poll_cancel();
+
         }
         out.mesh.nodes = std::move(fill.nodes);
         out.mesh.elements.reserve(fill.cells.size());
@@ -2827,6 +3161,15 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
             const fea::Material material{.youngs_modulus = setup.youngs_modulus,
                                          .poissons_ratio = setup.poissons_ratio};
 
+            std::vector<mesh::BoundarySupport> solve_boundary_provenance;
+            mesh::BoundaryProjectionContext solve_projection_context;
+            mesh::BoundaryProjectionContext* solve_projection = nullptr;
+            if (model.cad &&
+                make_boundary_projection(*model.cad, h, &solve_projection_context,
+                                         &solve_boundary_provenance)) {
+                solve_projection = &solve_projection_context;
+            }
+
             auto assign_boundary_regions = [&](double band) {
                 vol.boundary_node_region.clear();
                 const auto& surf = model.surface;
@@ -3108,6 +3451,15 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 p_constraints = std::move(elevated.constraints);
                 extend_boundary_regions();
                 apply_bcs();
+                if (solve_projection != nullptr && model.cad) {
+                    std::vector<std::uint32_t> reverted;
+                    std::vector<std::uint32_t> partial;
+                    const std::size_t projected = project_quadratic_boundary_mids(
+                        vol.mesh, *model.cad, solve_projection, h, &reverted, &partial);
+                    vol.mesher_note += std::format(
+                        " | mids projected={} partial={} reverted={}", projected,
+                        partial.size(), reverted.size());
+                }
                 remove_slave_dirichlet();
                 const auto counts = fea::count_element_types(vol.mesh);
                 note_suffix = std::format(
@@ -3171,6 +3523,15 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 p_constraints = std::move(elevated.constraints);
                 extend_boundary_regions();
                 apply_bcs();
+                if (solve_projection != nullptr && model.cad) {
+                    std::vector<std::uint32_t> reverted;
+                    std::vector<std::uint32_t> partial;
+                    const std::size_t projected = project_quadratic_boundary_mids(
+                        vol.mesh, *model.cad, solve_projection, h, &reverted, &partial);
+                    vol.mesher_note += std::format(
+                        " | mids projected={} partial={} reverted={}", projected,
+                        partial.size(), reverted.size());
+                }
                 remove_slave_dirichlet();
                 const auto counts = fea::count_element_types(vol.mesh);
                 vol.mesher_note =

@@ -56,3 +56,7 @@ __pycache__/
 /bench/campaigns/advisor-batch-*/runs/
 /bench/campaigns/advisor-truth-*/runs/
 /bench/campaigns/advisor-*/mesh_preview.pmp
+
+
+# Locally acquired external meshing and solver executables
+tools/

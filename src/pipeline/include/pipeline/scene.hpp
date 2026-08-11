@@ -11,6 +11,7 @@
 #include "geom/cad_model.hpp"
 #include "geom/tri_surface.hpp"
 #include "mesh/mixed_fill.hpp"
+#include "mesh/surface_project.hpp"
 
 #include <Eigen/Core>
 
@@ -265,6 +266,24 @@ struct SolveResult {
     std::vector<std::array<std::uint32_t, 4>> boundary_quads;
     std::string mesh_note; // e.g. element/node counts, mesher version
 };
+
+/// Build the exact, owner-stable BRep projection oracle used by volume meshing
+/// and later p-elevation. The CadModel must outlive `ctx`.
+/// Returns false for an empty CAD model or null output storage.
+bool make_boundary_projection(const geom::CadModel& cad, double h,
+                              mesh::BoundaryProjectionContext* ctx,
+                              std::vector<mesh::BoundarySupport>* provenance);
+
+/// Project quadratic free-surface mid-edge nodes onto their exact BRep support.
+/// A full move that would invalidate an incident tet10/hex20 is backed off by
+/// six bisection steps; only a move with no valid positive fraction is reverted.
+/// Returns the number projected to the 0.02h fidelity band. Optional outputs
+/// identify true reverts and backed-off nodes that remain outside that band.
+std::size_t project_quadratic_boundary_mids(
+    fea::NodalMesh& mesh, const geom::CadModel& cad,
+    mesh::BoundaryProjectionContext* projection, double h,
+    std::vector<std::uint32_t>* reverted_nodes = nullptr,
+    std::vector<std::uint32_t>* partial_nodes = nullptr);
 
 /// Volume mesh from closed surface: tet4 grid fill (P2 v1) with stair-cased
 /// boundary quads for region mapping / rendering.

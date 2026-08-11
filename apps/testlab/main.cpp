@@ -224,7 +224,7 @@ struct Config {
     std::string id;
     json values; // original grid values
     pipeline::VolumeMesher mesher = pipeline::VolumeMesher::kHybrid;
-    bool feature_refine = false;
+    bool feature_refine = true;
     double curvature_turn_deg = 15.0; // recorded; product path uses 15° today
     bool snap_boundary = true;
     int order = 1;
@@ -1034,6 +1034,7 @@ Eigen::VectorXd make_loads(const fea::NodalMesh& mesh, const std::vector<LoadSpe
 struct ProbeAnswers {
     double sigma_max = 0.0;          // DIAGNOSTIC only: global nodal max VM
     double sigma_face_mean = 0.0;    // PRIMARY stress: area-wtd face-region VM (centroid)
+    double sigma_box_max = 0.0;      // box-selected peak element-centroid VM
     double sigma_p99 = 0.0;          // DIAGNOSTIC: p99 element-centroid VM, quality-filtered
     double strain_energy = 0.0;      // 1/2 u^T K u (J)
     double tip_deflection = 0.0;     // face-mean |u| on tip/load faces
@@ -1172,25 +1173,6 @@ ProbeAnswers compute_probes(const fea::NodalMesh& mesh, const fea::Material& mat
         a.sigma_max = std::max(a.sigma_max, fea::von_mises(s));
     }
 
-    // Element-centroid (interior) stress samples — scoring path.
-    const auto elem_s = fea::recover_element_centroid_stress(mesh, mat, u);
-    std::vector<double> vm_quality;
-    vm_quality.reserve(elem_s.size());
-    for (const auto& es : elem_s) {
-        if (es.quality < kStressQualityFloor) {
-            ++a.n_quality_excluded;
-            continue;
-        }
-        vm_quality.push_back(fea::von_mises(es.stress));
-    }
-    if (!vm_quality.empty()) {
-        std::sort(vm_quality.begin(), vm_quality.end());
-        const std::size_t idx = std::min(
-            vm_quality.size() - 1,
-            static_cast<std::size_t>(0.99 * static_cast<double>(vm_quality.size() - 1)));
-        a.sigma_p99 = vm_quality[idx];
-    }
-
     // Stress select box: first metric probe.select, else first load box.
     Box3 stress_box;
     bool have_stress_box = false;
@@ -1204,6 +1186,29 @@ ProbeAnswers compute_probes(const fea::NodalMesh& mesh, const fea::Material& mat
     if (!have_stress_box && !loads.empty()) {
         stress_box = loads.front().box;
         have_stress_box = true;
+    }
+
+    // Element-centroid (interior) stress samples — scoring path.
+    const auto elem_s = fea::recover_element_centroid_stress(mesh, mat, u);
+    std::vector<double> vm_quality;
+    vm_quality.reserve(elem_s.size());
+    for (const auto& es : elem_s) {
+        if (es.quality < kStressQualityFloor) {
+            ++a.n_quality_excluded;
+            continue;
+        }
+        const double vm = fea::von_mises(es.stress);
+        vm_quality.push_back(vm);
+        if (have_stress_box && stress_box.contains(es.centroid)) {
+            a.sigma_box_max = std::max(a.sigma_box_max, vm);
+        }
+    }
+    if (!vm_quality.empty()) {
+        std::sort(vm_quality.begin(), vm_quality.end());
+        const std::size_t idx = std::min(
+            vm_quality.size() - 1,
+            static_cast<std::size_t>(0.99 * static_cast<double>(vm_quality.size() - 1)));
+        a.sigma_p99 = vm_quality[idx];
     }
 
     // Area-weighted mean VM: for each boundary face in stress box, use nearest
@@ -1293,6 +1298,15 @@ double evaluate_probe(const ProbeSpec& probe, const ProbeAnswers& a) {
     if (probe.kind == "mean_vm" || probe.kind == "mean_von_mises" ||
         probe.kind == "face_mean_vm") {
         return a.sigma_face_mean;
+    }
+    if (probe.kind == "peak_vm") {
+        return a.sigma_box_max;
+    }
+    if (probe.kind == "peak_vm_over_nominal") {
+        if (!(std::abs(probe.nominal) > 0.0)) {
+            throw std::runtime_error("peak_vm_over_nominal requires probe.nominal != 0");
+        }
+        return a.sigma_box_max / probe.nominal;
     }
     if (probe.kind == "mean_vm_over_nominal" || probe.kind == "scf_mean" ||
         probe.kind == "scf") {

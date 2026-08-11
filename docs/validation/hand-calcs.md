@@ -532,11 +532,10 @@ fixture's validated aspect band, \(a/W \in [0.088, 0.107]\) and
 \(t/H \in [0.16, 0.24]\), so plane stress applies.
 
 **Metric `scf`:** value \(3.0\), tolerance \(10\,\%\), probe
-`mean_vm_over_nominal` with `nominal` \(= \sigma_\infty = 10^{6}\,\mathrm{Pa}\) on the
-hole patch \(|x|, |y| \le 1.5a\) through the full thickness — element-centroid
-face-mean von Mises (ADR-0023), never nodal max. The \(10\,\%\) band covers the
-Howland finite-width correction plus the face-mean softening, exactly as for
-`plate_hole`.
+`peak_vm_over_nominal` with `nominal` \(= \sigma_\infty = 10^{6}\,\mathrm{Pa}\) on the
+hole patch \(|x|, |y| \le 1.5a\) through the full thickness — box-windowed peak
+element-centroid von Mises over nominal, never nodal max. The \(10\,\%\) band covers
+the Howland finite-width correction.
 
 ### corpus-primitives-cantilever
 

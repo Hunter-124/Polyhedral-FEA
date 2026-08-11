@@ -15,81 +15,257 @@ import re
 import struct
 import sys
 import zlib
-from collections import defaultdict
+from collections import Counter, defaultdict
+from itertools import combinations
 from pathlib import Path
+
+
+def _data_array(text, name):
+    pattern = (
+        r"<DataArray\b[^>]*\bName\s*=\s*[\"']"
+        + re.escape(name)
+        + r"[\"'][^>]*>(.*?)</DataArray>"
+    )
+    match = re.search(pattern, text, re.S | re.I)
+    return match.group(1) if match else None
 
 
 def parse_vtu_ascii(path: Path):
     text = path.read_text(encoding="utf-8", errors="ignore")
-    m = re.search(r"<Points>\s*<DataArray[^>]*>(.*?)</DataArray>", text, re.S | re.I)
-    if not m:
+    match = re.search(r"<Points>\s*<DataArray[^>]*>(.*?)</DataArray>", text, re.S | re.I)
+    if not match:
         raise RuntimeError("no Points array")
-    nums = [float(x) for x in m.group(1).split()]
+    nums = [float(x) for x in match.group(1).split()]
     pts = [(nums[i], nums[i + 1], nums[i + 2]) for i in range(0, len(nums) - 2, 3)]
-    m = re.search(r'Name="connectivity"[^>]*>(.*?)</DataArray>', text, re.S | re.I)
-    conn = [int(x) for x in m.group(1).split()] if m else []
-    m = re.search(r'Name="offsets"[^>]*>(.*?)</DataArray>', text, re.S | re.I)
-    offsets = [int(x) for x in m.group(1).split()] if m else []
+
+    def ints(name):
+        data = _data_array(text, name)
+        return [int(x) for x in data.split()] if data is not None else []
+
+    conn = ints("connectivity")
+    offsets = ints("offsets")
+    types = ints("types")
+    faces = ints("faces")
+    faceoffsets = ints("faceoffsets")
     cells = []
     prev = 0
     for off in offsets:
         cells.append(conn[prev:off])
         prev = off
-    return pts, cells
+    return pts, cells, types, faces, faceoffsets
 
 
-def cell_faces(ids):
-    n = len(ids)
-    if n == 4:  # tet
-        f = [(0, 1, 2), (0, 1, 3), (0, 2, 3), (1, 2, 3)]
-        return [[ids[i] for i in face] for face in f]
-    if n == 5:  # pyramid: quad base + 4 tris
-        base = [ids[0], ids[1], ids[2], ids[3]]
-        tris = [
-            [ids[0], ids[1], ids[4]],
-            [ids[1], ids[2], ids[4]],
-            [ids[2], ids[3], ids[4]],
-            [ids[3], ids[0], ids[4]],
+_TET_FACES = [(0, 1, 2), (0, 1, 3), (0, 2, 3), (1, 2, 3)]
+_PYRAMID_FACES = [
+    (0, 1, 2, 3),
+    (0, 1, 4),
+    (1, 2, 4),
+    (2, 3, 4),
+    (3, 0, 4),
+]
+_HEX_FACES = [
+    (0, 1, 2, 3),
+    (4, 5, 6, 7),
+    (0, 1, 5, 4),
+    (1, 2, 6, 5),
+    (2, 3, 7, 6),
+    (3, 0, 4, 7),
+]
+_WEDGE_FACES = [
+    (0, 1, 2),
+    (3, 4, 5),
+    (0, 1, 4, 3),
+    (1, 2, 5, 4),
+    (2, 0, 3, 5),
+]
+
+
+def _fixed_faces(ids, local_faces):
+    if not local_faces or len(ids) <= max(max(face) for face in local_faces):
+        return []
+    return [[ids[i] for i in face] for face in local_faces]
+
+
+def _ordered_planar_hull(point_ids, pts, normal):
+    """Order a planar facet's corner nodes, dropping collinear/interior nodes."""
+    nx, ny, nz = normal
+    nlen = math.sqrt(nx * nx + ny * ny + nz * nz)
+    if nlen == 0.0:
+        return []
+    nx, ny, nz = nx / nlen, ny / nlen, nz / nlen
+    axis = min(range(3), key=lambda i: abs((nx, ny, nz)[i]))
+    ax, ay, az = ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))[axis]
+    ux, uy, uz = ny * az - nz * ay, nz * ax - nx * az, nx * ay - ny * ax
+    ulen = math.sqrt(ux * ux + uy * uy + uz * uz)
+    ux, uy, uz = ux / ulen, uy / ulen, uz / ulen
+    vx, vy, vz = ny * uz - nz * uy, nz * ux - nx * uz, nx * uy - ny * ux
+
+    projected = []
+    seen_positions = set()
+    for point_id in point_ids:
+        x, y, z = pts[point_id]
+        xy = (x * ux + y * uy + z * uz, x * vx + y * vy + z * vz)
+        if xy not in seen_positions:
+            projected.append((xy[0], xy[1], point_id))
+            seen_positions.add(xy)
+    projected.sort()
+    if len(projected) < 3:
+        return []
+
+    def turn(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+    span = max(
+        projected[-1][0] - projected[0][0],
+        max(p[1] for p in projected) - min(p[1] for p in projected),
+        1.0,
+    )
+    tol = 1e-12 * span * span
+    lower = []
+    for point in projected:
+        while len(lower) >= 2 and turn(lower[-2], lower[-1], point) <= tol:
+            lower.pop()
+        lower.append(point)
+    upper = []
+    for point in reversed(projected):
+        while len(upper) >= 2 and turn(upper[-2], upper[-1], point) <= tol:
+            upper.pop()
+        upper.append(point)
+    return [point[2] for point in lower[:-1] + upper[:-1]]
+
+
+def convex_hull_faces(ids, pts):
+    """Return polygon facets of a small 3-D point set by supporting-plane tests."""
+    point_ids = list(dict.fromkeys(ids))
+    if len(point_ids) < 4 or any(i < 0 or i >= len(pts) for i in point_ids):
+        return []
+    coords = [pts[i] for i in point_ids]
+    extents = [max(p[d] for p in coords) - min(p[d] for p in coords) for d in range(3)]
+    scale = max(max(extents), 1.0)
+    planes = {}
+    for i, j, k in combinations(range(len(point_ids)), 3):
+        a, b, c = coords[i], coords[j], coords[k]
+        ab = (b[0] - a[0], b[1] - a[1], b[2] - a[2])
+        ac = (c[0] - a[0], c[1] - a[1], c[2] - a[2])
+        normal = (
+            ab[1] * ac[2] - ab[2] * ac[1],
+            ab[2] * ac[0] - ab[0] * ac[2],
+            ab[0] * ac[1] - ab[1] * ac[0],
+        )
+        nlen = math.sqrt(sum(v * v for v in normal))
+        if nlen <= 1e-12 * scale * scale:
+            continue
+        tol = 1e-9 * scale * nlen
+        distances = [
+            normal[0] * (p[0] - a[0])
+            + normal[1] * (p[1] - a[1])
+            + normal[2] * (p[2] - a[2])
+            for p in coords
         ]
-        return [base] + tris
-    if n == 8:  # hex
-        f = [
-            (0, 1, 2, 3),
-            (4, 5, 6, 7),
-            (0, 1, 5, 4),
-            (1, 2, 6, 5),
-            (2, 3, 7, 6),
-            (3, 0, 4, 7),
-        ]
-        return [[ids[i] for i in face] for face in f]
-    if n == 6:  # prism
-        f = [(0, 1, 2), (3, 4, 5), (0, 1, 4, 3), (1, 2, 5, 4), (2, 0, 3, 5)]
-        return [[ids[i] for i in face] for face in f]
-    return [list(ids)]
+        if any(d > tol for d in distances) and any(d < -tol for d in distances):
+            continue
+        coplanar = frozenset(point_ids[q] for q, d in enumerate(distances) if abs(d) <= tol)
+        if len(coplanar) >= 3:
+            planes.setdefault(coplanar, normal)
+
+    facets = []
+    seen = set()
+    for coplanar, normal in planes.items():
+        face = _ordered_planar_hull(coplanar, pts, normal)
+        key = frozenset(face)
+        if len(face) >= 3 and key not in seen:
+            facets.append(face)
+            seen.add(key)
+    return facets if len(facets) >= 4 else []
+
+
+def _polyhedron_face_blocks(face_stream, faceoffsets, cell_count):
+    blocks = [None] * cell_count
+    stream_start = 0
+    for cell_index in range(min(cell_count, len(faceoffsets))):
+        stream_end = faceoffsets[cell_index]
+        if stream_end < 0:
+            continue
+        if stream_end < stream_start or stream_end > len(face_stream):
+            continue
+        block = face_stream[stream_start:stream_end]
+        stream_start = stream_end
+        if not block:
+            continue
+        face_count = block[0]
+        cursor = 1
+        loops = []
+        for _ in range(face_count):
+            if cursor >= len(block):
+                loops = []
+                break
+            size = block[cursor]
+            cursor += 1
+            if size < 3 or cursor + size > len(block):
+                loops = []
+                break
+            loops.append(block[cursor : cursor + size])
+            cursor += size
+        if loops and cursor == len(block):
+            blocks[cell_index] = loops
+    return blocks
+
+
+def cell_faces(ids, vtk_type=None, poly_faces=None, pts=None):
+    if vtk_type == 10:
+        return _fixed_faces(ids, _TET_FACES)
+    if vtk_type == 12:
+        return _fixed_faces(ids, _HEX_FACES)
+    if vtk_type == 13:
+        return _fixed_faces(ids, _WEDGE_FACES)
+    if vtk_type == 14:
+        return _fixed_faces(ids, _PYRAMID_FACES)
+    if vtk_type == 24:
+        return _fixed_faces(ids, _TET_FACES)
+    if vtk_type == 25:
+        return _fixed_faces(ids, _HEX_FACES)
+    if vtk_type == 42:
+        return poly_faces or []
+    if vtk_type == 41:
+        return convex_hull_faces(ids, pts) if pts is not None else []
+    if vtk_type is not None:
+        return None
+    return {
+        4: _fixed_faces(ids, _TET_FACES),
+        5: _fixed_faces(ids, _PYRAMID_FACES),
+        6: _fixed_faces(ids, _WEDGE_FACES),
+        8: _fixed_faces(ids, _HEX_FACES),
+    }.get(len(ids))
 
 
 def face_key(face):
     return tuple(sorted(face))
 
 
-def boundary_edges(cells):
+def boundary_edges(pts, cells, types, face_stream, faceoffsets):
     counts = defaultdict(int)
     faces_by_key = {}
-    for cell in cells:
-        for face in cell_faces(cell):
+    skipped = 0
+    poly_blocks = _polyhedron_face_blocks(face_stream, faceoffsets, len(cells))
+    for cell_index, cell in enumerate(cells):
+        vtk_type = types[cell_index] if cell_index < len(types) else None
+        faces = cell_faces(cell, vtk_type, poly_blocks[cell_index], pts)
+        if not faces:
+            skipped += 1
+            continue
+        for face in faces:
             k = face_key(face)
             counts[k] += 1
             faces_by_key[k] = face
     edges = set()
-    for k, c in counts.items():
-        if c != 1:
+    for k, count in counts.items():
+        if count != 1:
             continue
         face = faces_by_key[k]
-        m = len(face)
-        for i in range(m):
-            a, b = face[i], face[(i + 1) % m]
+        for i in range(len(face)):
+            a, b = face[i], face[(i + 1) % len(face)]
             edges.add((min(a, b), max(a, b)))
-    return edges
+    return edges, skipped
 
 
 def bbox_of(pts):
@@ -250,11 +426,30 @@ def main():
 
     vtu = Path(args.vtu)
     out = Path(args.png)
-    pts, cells = parse_vtu_ascii(vtu)
+    pts, cells, types, face_stream, faceoffsets = parse_vtu_ascii(vtu)
     if not pts or not cells:
         print("empty mesh", file=sys.stderr)
         return 1
-    edges = boundary_edges(cells)
+    edges, skipped = boundary_edges(pts, cells, types, face_stream, faceoffsets)
+    type_names = {
+        10: "tet4",
+        12: "hex8",
+        13: "wedge6",
+        14: "pyramid5",
+        24: "tet10",
+        25: "hex20",
+        41: "convex-point-set",
+        42: "polyhedron",
+    }
+    census = Counter(types[: len(cells)])
+    census_parts = [
+        f"{vtk_type}({type_names.get(vtk_type, 'unsupported')})={count}"
+        for vtk_type, count in sorted(census.items())
+    ]
+    missing_types = len(cells) - min(len(types), len(cells))
+    if missing_types:
+        census_parts.append(f"missing(count-fallback)={missing_types}")
+    print(f"cell-type census {vtu}: {', '.join(census_parts)}; skipped={skipped}")
     mins, maxs = bbox_of(pts)
     roi_min, roi_max = mins, maxs
     hole_r = None

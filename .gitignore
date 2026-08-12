@@ -10,6 +10,8 @@ compile_commands.json
 !bench/campaigns/**/runs/**/mesh.vtu
 /polymesh-setup/
 
+/.omp/
+
 # machine-local graphify artifacts (committed: graph.json, GRAPH_REPORT.md,
 # .graphify_labels.json, manifest.json — see CONTRIBUTING.md §8)
 graphify-out/.graphify_python
@@ -49,13 +51,13 @@ __pycache__/
 *.pyc
 
 # Advisor campaign warehouses. The rows (results.jsonl) and the provenance
-# (campaign.json, checkpoint.json) are tracked; the per-run mesh.vtu/wire.png
-# are not. Batch 1 alone is ~150 MB of them and every one is regenerable from
-# the committed campaign.json plus scripts/gen_primitive_corpus.py, which is
-# deterministic. Curated benchmark warehouses elsewhere stay tracked.
-/bench/campaigns/advisor-batch-*/runs/
-/bench/campaigns/advisor-truth-*/runs/
-/bench/campaigns/advisor-*/mesh_preview.pmp
+# (campaign.json, checkpoint.json) are tracked; raw per-run meshes/renders and
+# previews are not, wherever a campaign is located (including archive-v2/).
+/bench/campaigns/**/runs/
+/bench/campaigns/**/mesh_preview.pmp
+
+# One-off renderer topology diagnostics are machine-local scratch.
+/bench/results/renderer-topology/
 
 
 # Locally acquired external meshing and solver executables

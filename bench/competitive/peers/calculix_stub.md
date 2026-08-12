@@ -1,9 +1,9 @@
-# CalculiX peer runner
+# CalculiX / PolyMesh cantilever cross-validation
 
-**Status:** cantilever smoke runner lives at
-[`run_calculix_cantilever.py`](run_calculix_cantilever.py). Full Lamé / Kirsch
-decks + accuracy parse land with the audit harness (ADR-0005). This tree does
-not install packages or require network.
+**Status:** [`run_calculix_cantilever.py`](run_calculix_cantilever.py) runs
+CalculiX 2.23 and PolyMesh on identical structured hex meshes through a
+4x1x1 → 32x8x8 refinement ladder. It uses the shared cantilever
+tip-deflection reference and does not install packages or require network.
 
 ## Run (CI-safe)
 
@@ -11,10 +11,10 @@ not install packages or require network.
 python3 bench/competitive/peers/run_calculix_cantilever.py
 ```
 
-| `ccx` on PATH? | Exit code | Effect |
+| Required executable(s) | Exit code | Effect |
 |---|---:|---|
-| Yes | 0 / 1 | Writes `bench/results/calculix-cantilever-smoke.json`; refreshes scoreboard on success |
-| No | **0** | Prints skip message — **CI must not fail** |
+| `ccx` and `polymesh` | 0 / 1 | Writes schema-validated `bench/results/calculix-cantilever.json` only after every rung succeeds |
+| Either missing | **1** | Prints the missing executable(s); writes no new rows |
 
 Check binary:
 
@@ -39,11 +39,13 @@ script `apt`/`dnf`/`brew` from CI without an explicit maintainer opt-in.
 
 The peer script:
 
-1. Emits a CalculiX `.inp` for a coarse C3D8 cantilever smoke case.
-2. Runs `ccx <jobname>` in a temp directory.
-3. Writes `bench/results/calculix-cantilever-smoke.json` per `../schema.json`
-   (`accuracy.name = smoke_ran`; not a calibrated tip-error peer yet).
-4. Best-effort refreshes `docs/bench/scoreboard.md`.
+1. Emits identical coordinates and hex8 connectivity to a CalculiX C3D8 deck
+   and Gmsh 2.2 `.msh` file for every refinement rung.
+2. Runs both solvers serially with `OMP_NUM_THREADS=1`.
+3. Applies the same \(-1000\,\mathrm{N}\) load-face resultant using equivalent
+   CLOAD weights in CalculiX and PolyMesh's consistent face-load assembly.
+4. Parses max \(|U_3|\), validates all rows against `../schema.json`, and writes
+   `bench/results/calculix-cantilever.json`.
 
 ## Cases to port next
 

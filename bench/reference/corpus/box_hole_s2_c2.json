@@ -6,7 +6,7 @@
   "metrics": [
     {
       "name": "strain_energy",
-      "value": 0.01736720095889114,
+      "value": 0.016611834734708557,
       "tol": 0.15,
       "probe": {
         "kind": "strain_energy"
@@ -16,19 +16,19 @@
       "source_run": {
         "campaign": "advisor-truth-0-s0",
         "results": "bench/campaigns/advisor-truth-0-s0/results.jsonl",
-        "cfg_id": "cfg-97015a68",
+        "cfg_id": "cfg-ca16e68c",
         "tier": 0,
-        "h_rel": 0.06,
+        "h_rel": 0.024,
         "order": 2,
         "adapt_passes": 3,
         "mesher": "graded_tet",
-        "n_dof": 61734,
-        "n_elems": 12736
+        "n_dof": 173322,
+        "n_elems": 47654
       }
     },
     {
       "name": "tip_deflection",
-      "value": 0.00021117800464715299,
+      "value": 0.00020188858224649082,
       "tol": 0.15,
       "probe": {
         "kind": "tip_deflection"
@@ -38,14 +38,14 @@
       "source_run": {
         "campaign": "advisor-truth-0-s0",
         "results": "bench/campaigns/advisor-truth-0-s0/results.jsonl",
-        "cfg_id": "cfg-97015a68",
+        "cfg_id": "cfg-ca16e68c",
         "tier": 0,
-        "h_rel": 0.06,
+        "h_rel": 0.024,
         "order": 2,
         "adapt_passes": 3,
         "mesher": "graded_tet",
-        "n_dof": 61734,
-        "n_elems": 12736
+        "n_dof": 173322,
+        "n_elems": 47654
       }
     }
   ]

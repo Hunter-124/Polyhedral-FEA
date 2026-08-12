@@ -144,7 +144,7 @@ def trusted(row: dict[str, Any]) -> bool | None:
 
 
 def flatten_row(campaign: str, row: dict[str, Any], case: dict[str, Any] | None) -> dict[str, Any]:
-    schema = row.get("schema") if row.get("schema") == "advisor-row-v2" else "legacy"
+    schema = row.get("schema") if row.get("schema") == "advisor-row-v3" else "legacy"
     flat: dict[str, Any] = {
         "schema": schema,
         "campaign": campaign,
@@ -152,10 +152,10 @@ def flatten_row(campaign: str, row: dict[str, Any], case: dict[str, Any] | None)
         "part": row.get("part", ""),
         "tier": row.get("tier", np.nan),
     }
-    features = row.get("features", {}) if schema == "advisor-row-v2" else {}
+    features = row.get("features", {}) if schema == "advisor-row-v3" else {}
     for name in FEATURE_COLUMNS:
         flat[name] = features.get(name, np.nan)
-    action = row.get("action", {}) if schema == "advisor-row-v2" else {}
+    action = row.get("action", {}) if schema == "advisor-row-v3" else {}
     legacy = row.get("config", {}) if schema == "legacy" else {}
     for name in ACTION_COLUMNS:
         if schema == "legacy" and name in {"mesher", "feature_refine", "order"}:
@@ -248,14 +248,22 @@ def main() -> int:
             records_scanned += 1
             unique[key] = row  # warehouse rows are visited last and win exact duplicates
 
+    source_schema_counts: Counter[str] = Counter()
+    excluded_legacy_sources: Counter[str] = Counter()
+    excluded_legacy_rows = 0
     schema_counts: Counter[str] = Counter()
     failure_signal: Counter[str] = Counter()
     kept: list[dict[str, Any]] = []
     for key in sorted(unique, key=lambda item: tuple("" if value is None else str(value) for value in item)):
         campaign, _, part, _ = key
         row = unique[key]
-        schema = row.get("schema") if row.get("schema") == "advisor-row-v2" else "legacy"
-        schema_counts[schema] += 1
+        source_schema = row.get("schema") if row.get("schema") == "advisor-row-v3" else "legacy"
+        source_schema_counts[source_schema] += 1
+        if source_schema != "advisor-row-v3":
+            excluded_legacy_rows += 1
+            excluded_legacy_sources[campaign] += 1
+            continue
+        schema_counts[source_schema] += 1
         # Unhealthy and untrusted rows are KEPT: they are the only supervision
         # the feasibility head has, and dataset.py masks them out of every
         # regression head via _failure_flag. Dropping them here made two of the
@@ -277,14 +285,23 @@ def main() -> int:
 
     print(f"Rows in: {len(unique)} unique ({records_scanned} records scanned, "
           f"{records_scanned - len(unique)} duplicates)")
-    print(f"Rows kept: {len(kept)}")
+    print(f"Rows emitted: {len(kept)}")
+    if excluded_legacy_rows:
+        excluded = ", ".join(
+            f"{CAMPAIGNS.relative_to(ROOT).as_posix()}/{campaign}/results.jsonl={count}"
+            for campaign, count in sorted(excluded_legacy_sources.items())
+        )
+        print(f"Legacy rows excluded from training dataset: {excluded_legacy_rows} ({excluded})")
     print(f"Truth campaigns skipped ({TRUTH_CAMPAIGN_GLOB}): "
           + (", ".join(skipped_truth) if skipped_truth else "none")
           + "  [their rel_err is ~0 by construction; promote_truth.py defines truth from them]")
     print(f"Rows retained for the failure head: {failure_signal['rows']} "
           f"(health_not_ok={failure_signal['health_not_ok']}, "
           f"accuracy_untrusted={failure_signal['accuracy_untrusted']})")
-    print("Schemas: " + ", ".join(f"{name}={schema_counts[name]}" for name in sorted(schema_counts)))
+    print("Source schemas: " + ", ".join(
+        f"{name}={source_schema_counts[name]}" for name in sorted(source_schema_counts)
+    ))
+    print("Schemas emitted: " + ", ".join(f"{name}={schema_counts[name]}" for name in sorted(schema_counts)))
 
     if args.dry_run:
         print("Dry run: no files written")

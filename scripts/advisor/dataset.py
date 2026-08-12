@@ -43,7 +43,7 @@ CLAMPS_JSON = ADVISOR_DIR / "clamps.json"
 #: feature/action vector. Legacy campaign rows leave all 26 features and most
 #: of the action columns empty, so training on them silently learns from
 #: imputed constants; ``load_dataset`` rejects them outright.
-ADVISOR_ROW_SCHEMA = "advisor-row-v2"
+ADVISOR_ROW_SCHEMA = "advisor-row-v3"
 
 # --- C2 input columns -------------------------------------------------------
 
@@ -505,7 +505,7 @@ def _best_actions(rows: list[dict[str, str]], failure: np.ndarray,
 
 
 def _reject_non_advisor_rows(rows: list[dict[str, str]], path: Path) -> list[dict[str, str]]:
-    """Keep only ``advisor-row-v2`` rows; abort with the counts we did find.
+    """Keep only ``advisor-row-v3`` rows; abort with the counts we did find.
 
     Legacy rows carry real outcome targets but no features, so they impute to
     the training median and become constant inputs. Training on them produces a

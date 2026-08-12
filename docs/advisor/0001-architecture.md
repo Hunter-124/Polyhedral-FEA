@@ -29,7 +29,7 @@ action it recommends.
 | Geometry corpus | `bench/geometries/corpus/primitives/*.step` (24 parts, 6 families x 4 size regimes) | `scripts/gen_primitive_corpus.py` |
 | Load cases | `bench/geometries/corpus/primitives/*.case.json` (72; 3 per part) | same |
 | Ground truth | `bench/reference/corpus/*.json` | analytic where it exists, else `bench/campaigns/advisor-truth-0` promoted by `scripts/advisor/promote_truth.py` |
-| Campaign rows | `bench/campaigns/advisor-batch-*/results.jsonl` (`advisor-row-v2`) | `apps/testlab` via `scripts/advisor/run_batch.py` |
+| Campaign rows | `bench/campaigns/advisor-batch-*/results.jsonl` (`advisor-row-v3`) | `apps/testlab` via `scripts/advisor/run_batch.py` |
 | Flat table | `bench/advisor/dataset.csv` | `scripts/build_advisor_dataset.py` |
 | Model | `bench/advisor/{model.onnx,normalization.json,clamps.json}` | `scripts/advisor/export_onnx.py` |
 | Inference | `src/advisor` + `--advisor` on `polymesh solve` / `polymesh_testlab` | this milestone |
@@ -43,7 +43,7 @@ Two admission rules apply between the campaign rows and the flat table:
 - **Unhealthy and untrusted rows are kept.** They are the feasibility head's
   only supervision, and `scripts/advisor/dataset.py` masks them out of every
   regression head. `dataset.py::load_dataset` then drops anything whose `schema`
-  is not `advisor-row-v2` and refuses to build a model at all if no advisor rows
+  is not `advisor-row-v3` and refuses to build a model at all if no advisor rows
   survive, or if a Stage-A head has no unmasked training row.
 
 `export_onnx.py` writes `normalization.json` / `clamps.json` **from the

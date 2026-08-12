@@ -3,222 +3,222 @@
     {
       "part": "box_hole_s0_c0",
       "n_actions": 32,
-      "spearman": 0.41385630498533726,
+      "spearman": 0.7096774193548387,
       "advisor_cfg": "cfg-e01963f2",
       "default_cfg": "cfg-6e294be8",
-      "oracle_cfg": "cfg-6e294be8",
-      "rel_err_regret_advisor": 0.00024014711380004883,
-      "rel_err_regret_default": 0.0,
+      "oracle_cfg": "cfg-10a5d6e1",
+      "rel_err_regret_advisor": 0.0001513063907623291,
+      "rel_err_regret_default": 0.0007520765066146851,
       "geo_p99_regret_advisor": 0.0,
       "geo_p99_regret_default": 0.0,
-      "solve_ms_regret_advisor": 2.1545931100845337,
-      "solve_ms_regret_default": 0.5499790906906128
+      "solve_ms_regret_advisor": 2.325891375541687,
+      "solve_ms_regret_default": 0.6291612386703491
     },
     {
       "part": "box_hole_s0_c2",
-      "n_actions": 32,
-      "spearman": 0.8812316715542522,
-      "advisor_cfg": "cfg-cecd5c28",
+      "n_actions": 28,
+      "spearman": 0.9118773946360154,
+      "advisor_cfg": "cfg-e01963f2",
       "default_cfg": "cfg-6e294be8",
       "oracle_cfg": "cfg-0250a6b5",
-      "rel_err_regret_advisor": 0.2528172731399536,
-      "rel_err_regret_default": 1.3841349184513092,
+      "rel_err_regret_advisor": 1.0582966804504395,
+      "rel_err_regret_default": 1.9788956940174103,
       "geo_p99_regret_advisor": 0.0,
       "geo_p99_regret_default": 0.0,
-      "solve_ms_regret_advisor": 1.5121279954910278,
-      "solve_ms_regret_default": 0.3083716630935669
+      "solve_ms_regret_advisor": 2.109094500541687,
+      "solve_ms_regret_default": 0.5166321992874146
     },
     {
       "part": "box_hole_s1_c1",
-      "n_actions": 48,
-      "spearman": 0.48751628310898826,
-      "advisor_cfg": "cfg-6bcf8463",
+      "n_actions": 44,
+      "spearman": 0.826215644820296,
+      "advisor_cfg": "cfg-eebb9de5",
       "default_cfg": "cfg-6e294be8",
-      "oracle_cfg": "cfg-ba90b861",
-      "rel_err_regret_advisor": 0.04839944839477539,
-      "rel_err_regret_default": 1.246136337518692,
-      "geo_p99_regret_advisor": 0.0,
-      "geo_p99_regret_default": 0.0,
-      "solve_ms_regret_advisor": 1.6144427061080933,
-      "solve_ms_regret_default": 0.4114649295806885
+      "oracle_cfg": "cfg-300fd306",
+      "rel_err_regret_advisor": 0.0,
+      "rel_err_regret_default": 1.1589903831481934,
+      "geo_p99_regret_advisor": 1.4288783073425293,
+      "geo_p99_regret_default": 0.09739947319030762,
+      "solve_ms_regret_advisor": 2.082534968852997,
+      "solve_ms_regret_default": 0.6350629925727844
     },
     {
       "part": "l_bracket_s1_c0",
       "n_actions": 32,
-      "spearman": -0.6495601173020528,
-      "advisor_cfg": "cfg-980f2497",
+      "spearman": 0.9215542521994134,
+      "advisor_cfg": "cfg-0250a6b5",
       "default_cfg": "cfg-6e294be8",
-      "oracle_cfg": "cfg-10a5d6e1",
-      "rel_err_regret_advisor": 0.1748899221420288,
-      "rel_err_regret_default": 0.05281639099121094,
+      "oracle_cfg": "cfg-ba90b861",
+      "rel_err_regret_advisor": 0.10461711883544922,
+      "rel_err_regret_default": 1.609799325466156,
       "geo_p99_regret_advisor": 0.2009512186050415,
       "geo_p99_regret_default": 0.2009512186050415,
-      "solve_ms_regret_advisor": 1.3687139749526978,
-      "solve_ms_regret_default": 0.0
+      "solve_ms_regret_advisor": 1.3172041177749634,
+      "solve_ms_regret_default": 0.07204663753509521
     },
     {
       "part": "l_bracket_s1_c2",
       "n_actions": 32,
-      "spearman": -0.9428152492668622,
+      "spearman": 0.9651759530791789,
       "advisor_cfg": "cfg-e01963f2",
       "default_cfg": "cfg-6e294be8",
-      "oracle_cfg": "cfg-10a5d6e1",
-      "rel_err_regret_advisor": 0.21444714069366455,
-      "rel_err_regret_default": 0.08119618892669678,
+      "oracle_cfg": "cfg-ba90b861",
+      "rel_err_regret_advisor": 0.0,
+      "rel_err_regret_default": 0.5517055094242096,
       "geo_p99_regret_advisor": 0.0,
       "geo_p99_regret_default": 0.2009512186050415,
-      "solve_ms_regret_advisor": 1.8385305404663086,
-      "solve_ms_regret_default": 0.109627366065979
+      "solve_ms_regret_advisor": 1.5526988506317139,
+      "solve_ms_regret_default": 0.0
     },
     {
       "part": "l_bracket_s3_c0",
       "n_actions": 16,
-      "spearman": -0.47058823529411764,
-      "advisor_cfg": "cfg-463ea325",
+      "spearman": 0.38823529411764707,
+      "advisor_cfg": "cfg-fdc26dd6",
       "default_cfg": "cfg-6e294be8",
-      "oracle_cfg": "cfg-10a5d6e1",
-      "rel_err_regret_advisor": 0.19601523876190186,
-      "rel_err_regret_default": 0.05225324630737305,
-      "geo_p99_regret_advisor": 0.0,
-      "geo_p99_regret_default": 0.2911570072174072,
-      "solve_ms_regret_advisor": 1.8420981168746948,
-      "solve_ms_regret_default": 0.09395730495452881
+      "oracle_cfg": "cfg-00713046",
+      "rel_err_regret_advisor": 1.08500075340271,
+      "rel_err_regret_default": 2.513457775115967,
+      "geo_p99_regret_advisor": 0.2903621196746826,
+      "geo_p99_regret_default": 0.2903621196746826,
+      "solve_ms_regret_advisor": 1.2994924783706665,
+      "solve_ms_regret_default": 0.0
     },
     {
       "part": "l_bracket_s3_c2",
       "n_actions": 16,
-      "spearman": -0.55,
-      "advisor_cfg": "cfg-463ea325",
+      "spearman": 0.39705882352941174,
+      "advisor_cfg": "cfg-6bcf8463",
       "default_cfg": "cfg-6e294be8",
-      "oracle_cfg": "cfg-10a5d6e1",
-      "rel_err_regret_advisor": 0.20804977416992188,
-      "rel_err_regret_default": 0.10122489929199219,
-      "geo_p99_regret_advisor": 0.0,
-      "geo_p99_regret_default": 0.2911570072174072,
-      "solve_ms_regret_advisor": 1.7159380912780762,
+      "oracle_cfg": "cfg-0250a6b5",
+      "rel_err_regret_advisor": 2.118087947368622,
+      "rel_err_regret_default": 2.4473727345466614,
+      "geo_p99_regret_advisor": 0.2903621196746826,
+      "geo_p99_regret_default": 0.2903621196746826,
+      "solve_ms_regret_advisor": 1.1752288341522217,
       "solve_ms_regret_default": 0.0
     },
     {
       "part": "plate_notch_s2_c2",
       "n_actions": 40,
-      "spearman": 0.7637898686679174,
-      "advisor_cfg": "cfg-3b741b47",
+      "spearman": 0.5866791744840525,
+      "advisor_cfg": "cfg-ba90b861",
       "default_cfg": "cfg-6e294be8",
       "oracle_cfg": "cfg-0250a6b5",
-      "rel_err_regret_advisor": 0.47396326065063477,
-      "rel_err_regret_default": 1.392282485961914,
-      "geo_p99_regret_advisor": 0.6850173473358154,
-      "geo_p99_regret_default": 0.6850173473358154,
-      "solve_ms_regret_advisor": 1.7283079624176025,
-      "solve_ms_regret_default": 0.40052151679992676
+      "rel_err_regret_advisor": 0.057654619216918945,
+      "rel_err_regret_default": 0.9765792489051819,
+      "geo_p99_regret_advisor": 0.0,
+      "geo_p99_regret_default": 0.6854802370071411,
+      "solve_ms_regret_advisor": 2.1792434453964233,
+      "solve_ms_regret_default": 0.3693106174468994
     },
     {
       "part": "plate_notch_s3_c2",
       "n_actions": 32,
-      "spearman": 0.8299120234604106,
-      "advisor_cfg": "cfg-3b741b47",
+      "spearman": 0.8790322580645161,
+      "advisor_cfg": "cfg-e01963f2",
       "default_cfg": "cfg-6e294be8",
-      "oracle_cfg": "cfg-ba90b861",
-      "rel_err_regret_advisor": 0.24436986446380615,
-      "rel_err_regret_default": 1.02921462059021,
-      "geo_p99_regret_advisor": 0.6809567213058472,
-      "geo_p99_regret_default": 0.6809567213058472,
-      "solve_ms_regret_advisor": 1.6704007387161255,
-      "solve_ms_regret_default": 0.44355547428131104
+      "oracle_cfg": "cfg-0250a6b5",
+      "rel_err_regret_advisor": 0.31346821784973145,
+      "rel_err_regret_default": 1.1488153338432312,
+      "geo_p99_regret_advisor": 0.0,
+      "geo_p99_regret_default": 0.6814380884170532,
+      "solve_ms_regret_advisor": 2.2672060132026672,
+      "solve_ms_regret_default": 0.5268715023994446
     },
     {
       "part": "sphere_box_s0_c2",
-      "n_actions": 45,
-      "spearman": -0.7092226613965744,
-      "advisor_cfg": "cfg-463ea325",
+      "n_actions": 44,
+      "spearman": -0.16208597603946442,
+      "advisor_cfg": "cfg-f16eae55",
       "default_cfg": "cfg-6e294be8",
-      "oracle_cfg": "cfg-0d85ac69",
-      "rel_err_regret_advisor": 1.1771458089351654,
-      "rel_err_regret_default": 0.8978063464164734,
-      "geo_p99_regret_advisor": 0.0,
-      "geo_p99_regret_default": 0.3423677682876587,
-      "solve_ms_regret_advisor": 3.1217328310012817,
-      "solve_ms_regret_default": 1.2443186044692993
+      "oracle_cfg": "cfg-300fd306",
+      "rel_err_regret_advisor": 0.5634863376617432,
+      "rel_err_regret_default": 1.0746355056762695,
+      "geo_p99_regret_advisor": 0.37295591831207275,
+      "geo_p99_regret_default": 0.3416311740875244,
+      "solve_ms_regret_advisor": 2.072299361228943,
+      "solve_ms_regret_default": 1.3328362703323364
     },
     {
       "part": "stepped_shaft_s0_c1",
-      "n_actions": 36,
-      "spearman": 0.27181467181467184,
-      "advisor_cfg": "cfg-3b741b47",
+      "n_actions": 40,
+      "spearman": 0.21200750469043153,
+      "advisor_cfg": "cfg-8b3f3cbd",
       "default_cfg": "cfg-6e294be8",
       "oracle_cfg": "cfg-6bcf8463",
-      "rel_err_regret_advisor": 0.6925567388534546,
-      "rel_err_regret_default": 1.9751489758491516,
-      "geo_p99_regret_advisor": 0.0,
+      "rel_err_regret_advisor": 1.8171402215957642,
+      "rel_err_regret_default": 1.9253644943237305,
+      "geo_p99_regret_advisor": 0.17251765727996826,
       "geo_p99_regret_default": 0.0,
-      "solve_ms_regret_advisor": 1.6447070240974426,
-      "solve_ms_regret_default": 0.42804545164108276
+      "solve_ms_regret_advisor": 1.0303078889846802,
+      "solve_ms_regret_default": 0.0
     },
     {
       "part": "stepped_shaft_s3_c2",
-      "n_actions": 36,
-      "spearman": 0.7974259974259974,
-      "advisor_cfg": "cfg-8c06ef12",
+      "n_actions": 40,
+      "spearman": 0.6851782363977486,
+      "advisor_cfg": "cfg-cecd5c28",
       "default_cfg": "cfg-6e294be8",
-      "oracle_cfg": "cfg-ba90b861",
-      "rel_err_regret_advisor": 0.2923278212547302,
-      "rel_err_regret_default": 0.9185561761260033,
-      "geo_p99_regret_advisor": 0.0,
+      "oracle_cfg": "cfg-6e294be8",
+      "rel_err_regret_advisor": 0.4681662917137146,
+      "rel_err_regret_default": 0.0,
+      "geo_p99_regret_advisor": 0.012242674827575684,
       "geo_p99_regret_default": 0.012242674827575684,
-      "solve_ms_regret_advisor": 2.2321656942367554,
-      "solve_ms_regret_default": 0.17957943677902222
+      "solve_ms_regret_advisor": 1.2259186506271362,
+      "solve_ms_regret_default": 0.2732125520706177
     }
   ],
   "heads": {
     "rel_err": {
       "advisor": {
-        "mean_regret": 0.3312685365478198,
-        "median_regret": 0.22940850257873535
+        "mean_regret": 0.6321724578738213,
+        "median_regret": 0.390817254781723
       },
       "default": {
-        "mean_regret": 0.7608975488692522,
-        "median_regret": 0.9081812612712383
+        "mean_regret": 1.2821973400811355,
+        "median_regret": 1.1539028584957123
       },
       "oracle": {
         "mean_regret": 0.0,
         "median_regret": 0.0
       },
-      "improvement_vs_default": 0.4296290123214324,
+      "improvement_vs_default": 0.6500248822073142,
       "beats_default": true
     },
     "geo_p99": {
       "advisor": {
-        "mean_regret": 0.13057710727055868,
-        "median_regret": 0.0
+        "mean_regret": 0.2306891679763794,
+        "median_regret": 0.09238016605377197
       },
       "default": {
-        "mean_regret": 0.22540008028348288,
+        "mean_regret": 0.23340152700742087,
         "median_regret": 0.2009512186050415
       },
       "oracle": {
-        "mean_regret": 0.06368408600489299,
-        "median_regret": 0.0
+        "mean_regret": 0.17575135827064514,
+        "median_regret": 0.0055637359619140625
       },
-      "improvement_vs_default": 0.0948229730129242,
+      "improvement_vs_default": 0.0027123590310414725,
       "beats_default": true
     },
     "solve_ms": {
       "advisor": {
-        "mean_regret": 1.87031323214372,
-        "median_regret": 1.7221230268478394
+        "mean_regret": 1.719760040442149,
+        "median_regret": 1.8124991059303284
       },
       "default": {
-        "mean_regret": 0.34745173652966815,
-        "median_regret": 0.3544465899467468
+        "mean_regret": 0.3629278341929118,
+        "median_regret": 0.32126158475875854
       },
       "oracle": {
-        "mean_regret": 1.259841874241829,
-        "median_regret": 1.3705444633960724
+        "mean_regret": 1.6251399318377178,
+        "median_regret": 1.7198606729507446
       },
-      "improvement_vs_default": -1.5228614956140518,
+      "improvement_vs_default": -1.356832206249237,
       "beats_default": false
     }
   },
-  "mean_spearman": 0.09361337981316398,
+  "mean_spearman": 0.6100504982778405,
   "n_cases": 12
 }

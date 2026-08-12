@@ -6,46 +6,46 @@
   "metrics": [
     {
       "name": "strain_energy",
-      "value": 0.0010428695142839267,
+      "value": 0.0006472047076488978,
       "tol": 0.15,
       "probe": {
         "kind": "strain_energy"
       },
-      "derivation": "bench/campaigns/advisor-truth-0-s7/results.jsonl (overkill reference solve at the finest h_rel this part could afford under the campaign element/DOF budget; NOT a converged limit -- see docs/validation/hand-calcs.md#corpus-primitives-provisional). tol=0.15 replaces the provisional seed's tol=1.0 and matches the analytic cantilever references; the reference is itself a discrete solve, so a tighter band would score its own discretization error. Promoted by scripts/advisor/promote_truth.py.",
+      "derivation": "bench/campaigns/advisor-truth-0-s3/results.jsonl (overkill reference solve at the finest h_rel this part could afford under the campaign element/DOF budget; NOT a converged limit -- see docs/validation/hand-calcs.md#corpus-primitives-provisional). tol=0.15 replaces the provisional seed's tol=1.0 and matches the analytic cantilever references; the reference is itself a discrete solve, so a tighter band would score its own discretization error. Promoted by scripts/advisor/promote_truth.py.",
       "source": "overkill-reference",
       "source_run": {
-        "campaign": "advisor-truth-0-s7",
-        "results": "bench/campaigns/advisor-truth-0-s7/results.jsonl",
-        "cfg_id": "cfg-1b21bb81",
+        "campaign": "advisor-truth-0-s3",
+        "results": "bench/campaigns/advisor-truth-0-s3/results.jsonl",
+        "cfg_id": "cfg-709703ab",
         "tier": 0,
-        "h_rel": 0.060000000000000005,
+        "h_rel": 0.038,
         "order": 2,
-        "adapt_passes": 2,
+        "adapt_passes": 3,
         "mesher": "graded_tet",
-        "n_dof": 92970,
-        "n_elems": 38796
+        "n_dof": 178116,
+        "n_elems": 75286
       }
     },
     {
       "name": "tip_deflection",
-      "value": 5.220727912256894e-07,
+      "value": 4.150176117194317e-07,
       "tol": 0.15,
       "probe": {
         "kind": "tip_deflection"
       },
-      "derivation": "bench/campaigns/advisor-truth-0-s7/results.jsonl (overkill reference solve at the finest h_rel this part could afford under the campaign element/DOF budget; NOT a converged limit -- see docs/validation/hand-calcs.md#corpus-primitives-provisional). tol=0.15 replaces the provisional seed's tol=1.0 and matches the analytic cantilever references; the reference is itself a discrete solve, so a tighter band would score its own discretization error. Promoted by scripts/advisor/promote_truth.py.",
+      "derivation": "bench/campaigns/advisor-truth-0-s3/results.jsonl (overkill reference solve at the finest h_rel this part could afford under the campaign element/DOF budget; NOT a converged limit -- see docs/validation/hand-calcs.md#corpus-primitives-provisional). tol=0.15 replaces the provisional seed's tol=1.0 and matches the analytic cantilever references; the reference is itself a discrete solve, so a tighter band would score its own discretization error. Promoted by scripts/advisor/promote_truth.py.",
       "source": "overkill-reference",
       "source_run": {
-        "campaign": "advisor-truth-0-s7",
-        "results": "bench/campaigns/advisor-truth-0-s7/results.jsonl",
-        "cfg_id": "cfg-1b21bb81",
+        "campaign": "advisor-truth-0-s3",
+        "results": "bench/campaigns/advisor-truth-0-s3/results.jsonl",
+        "cfg_id": "cfg-709703ab",
         "tier": 0,
-        "h_rel": 0.060000000000000005,
+        "h_rel": 0.038,
         "order": 2,
-        "adapt_passes": 2,
+        "adapt_passes": 3,
         "mesher": "graded_tet",
-        "n_dof": 92970,
-        "n_elems": 38796
+        "n_dof": 178116,
+        "n_elems": 75286
       }
     }
   ]

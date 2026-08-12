@@ -1,0 +1,81 @@
+{
+  "name": "advisor-truth-0-s1",
+  "comment": "Shard 1/4 of advisor-truth-0; rows are merged back into advisor-truth-0/results.jsonl.",
+  "warehouse": true,
+  "parts": [
+    "bench/geometries/corpus/primitives/box_hole_s0_c1.case.json",
+    "bench/geometries/corpus/primitives/box_hole_s1_c2.case.json",
+    "bench/geometries/corpus/primitives/box_hole_s3_c0.case.json",
+    "bench/geometries/corpus/primitives/l_bracket_s0_c1.case.json",
+    "bench/geometries/corpus/primitives/l_bracket_s1_c2.case.json",
+    "bench/geometries/corpus/primitives/l_bracket_s3_c0.case.json",
+    "bench/geometries/corpus/primitives/plate_notch_s0_c1.case.json",
+    "bench/geometries/corpus/primitives/plate_notch_s1_c2.case.json",
+    "bench/geometries/corpus/primitives/plate_notch_s3_c0.case.json",
+    "bench/geometries/corpus/primitives/stepped_shaft_s0_c1.case.json",
+    "bench/geometries/corpus/primitives/stepped_shaft_s1_c2.case.json",
+    "bench/geometries/corpus/primitives/stepped_shaft_s3_c0.case.json",
+    "bench/geometries/corpus/primitives/channel_s0_c1.case.json",
+    "bench/geometries/corpus/primitives/channel_s1_c2.case.json",
+    "bench/geometries/corpus/primitives/channel_s3_c0.case.json",
+    "bench/geometries/corpus/primitives/sphere_box_s0_c1.case.json",
+    "bench/geometries/corpus/primitives/sphere_box_s1_c2.case.json",
+    "bench/geometries/corpus/primitives/sphere_box_s3_c0.case.json"
+  ],
+  "tiers": [
+    {
+      "h_scale": 1.0,
+      "keep_frac": 1.0
+    }
+  ],
+  "grid": {
+    "mesher": [
+      "graded_tet"
+    ],
+    "h_rel": [
+      0.06,
+      0.038,
+      0.024
+    ],
+    "order": [
+      2
+    ],
+    "adapt_passes": [
+      3
+    ],
+    "eta_target": [
+      0.01
+    ],
+    "element_tendency": [
+      0.0
+    ],
+    "feature_refine": [
+      true
+    ],
+    "bc_grading": [
+      true
+    ],
+    "skin_layers": [
+      2
+    ],
+    "p_elevate": [
+      false
+    ],
+    "adapt_leb_waves": [
+      2
+    ]
+  },
+  "score": {
+    "weights": {
+      "accuracy": 1.0,
+      "solve_ms": 0.0,
+      "mesh_ms": 0.0
+    }
+  },
+  "resources": {
+    "max_run_wall_s": 400,
+    "max_pack_wall_s": 172800,
+    "max_threads": 0,
+    "max_mem_gb": 0
+  }
+}

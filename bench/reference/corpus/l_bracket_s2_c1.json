@@ -6,7 +6,7 @@
   "metrics": [
     {
       "name": "strain_energy",
-      "value": 0.004590807557393722,
+      "value": 0.004419564337018279,
       "tol": 0.15,
       "probe": {
         "kind": "strain_energy"
@@ -22,13 +22,13 @@
         "order": 2,
         "adapt_passes": 3,
         "mesher": "graded_tet",
-        "n_dof": 74091,
-        "n_elems": 16489
+        "n_dof": 73914,
+        "n_elems": 16458
       }
     },
     {
       "name": "tip_deflection",
-      "value": 0.00010513473263175141,
+      "value": 0.00010102871510683061,
       "tol": 0.15,
       "probe": {
         "kind": "tip_deflection"
@@ -44,8 +44,8 @@
         "order": 2,
         "adapt_passes": 3,
         "mesher": "graded_tet",
-        "n_dof": 74091,
-        "n_elems": 16489
+        "n_dof": 73914,
+        "n_elems": 16458
       }
     }
   ]

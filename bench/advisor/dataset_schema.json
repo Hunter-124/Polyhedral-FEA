@@ -1,8 +1,7 @@
 {
   "schema": "advisor-dataset-schema-v1",
   "source_row_schemas": [
-    "advisor-row-v2",
-    "legacy"
+    "advisor-row-v3"
   ],
   "columns": [
     {

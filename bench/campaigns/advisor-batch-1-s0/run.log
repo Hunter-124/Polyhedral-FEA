@@ -1,5 +1,5 @@
 
-=== 2026-08-10T20:56:10Z OMP_NUM_THREADS=2 :: C:\Users\Yakub\Desktop\Polyhedral-FEA\build\apps\testlab\polymesh_testlab.exe resume C:\Users\Yakub\Desktop\Polyhedral-FEA\bench\campaigns\advisor-batch-1-s0
+=== 2026-08-12T09:00:02Z OMP_NUM_THREADS=3 :: C:\Users\Yakub\Desktop\Polyhedral-FEA\build\apps\testlab\polymesh_testlab.exe resume C:\Users\Yakub\Desktop\Polyhedral-FEA\bench\campaigns\advisor-batch-1-s0
 campaign advisor-batch-1-s0: 32 configs, 48 parts, 1 tiers
   max_run_wall_s=45 (override all tiers)
   max_pack_wall_s=86400
@@ -423,9 +423,12 @@ wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-0250a6b5\sphere_box_s2_c0\t0\w
 wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-0250a6b5\sphere_box_s2_c1\t0\wire.png
 wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-0250a6b5\sphere_box_s3_c0\t0\wire.png
 wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-0250a6b5\sphere_box_s3_c1\t0\wire.png
+wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-0250a6b5\stepped_shaft_s0_c1\t0\wire.png
 wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-0250a6b5\stepped_shaft_s1_c0\t0\wire.png
 wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-0250a6b5\stepped_shaft_s1_c1\t0\wire.png
+wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-0250a6b5\stepped_shaft_s2_c0\t0\wire.png
 wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-0250a6b5\stepped_shaft_s2_c1\t0\wire.png
+wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-0250a6b5\stepped_shaft_s3_c1\t0\wire.png
 wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-03d7a4c3\box_hole_s0_c0\t0\wire.png
 wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-03d7a4c3\box_hole_s0_c1\t0\wire.png
 wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-03d7a4c3\box_hole_s1_c0\t0\wire.png
@@ -598,9 +601,12 @@ wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-79d3427c\sphere_box_s2_c0\t0\w
 wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-79d3427c\sphere_box_s2_c1\t0\wire.png
 wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-79d3427c\sphere_box_s3_c0\t0\wire.png
 wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-79d3427c\sphere_box_s3_c1\t0\wire.png
+wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-79d3427c\stepped_shaft_s0_c1\t0\wire.png
 wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-79d3427c\stepped_shaft_s1_c0\t0\wire.png
 wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-79d3427c\stepped_shaft_s1_c1\t0\wire.png
+wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-79d3427c\stepped_shaft_s2_c0\t0\wire.png
 wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-79d3427c\stepped_shaft_s2_c1\t0\wire.png
+wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-79d3427c\stepped_shaft_s3_c1\t0\wire.png
 wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-bc04b23c\box_hole_s0_c0\t0\wire.png
 wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-bc04b23c\box_hole_s0_c1\t0\wire.png
 wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-bc04b23c\box_hole_s1_c0\t0\wire.png
@@ -675,6 +681,6 @@ wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-f1ab37a3\stepped_shaft_s2_c0\t
 wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-f1ab37a3\stepped_shaft_s2_c1\t0\wire.png
 wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-f1ab37a3\stepped_shaft_s3_c0\t0\wire.png
 wrote bench\campaigns\advisor-batch-1-s0\runs\cfg-f1ab37a3\stepped_shaft_s3_c1\t0\wire.png
-warehouse_shots: 286 rendered, 0 skipped (exists), 0 failed (286 mesh.vtu total)
+warehouse_shots: 292 rendered, 0 skipped (exists), 0 failed (292 mesh.vtu total)
 finished: 384 runs → C:\Users\Yakub\Desktop\Polyhedral-FEA\bench\campaigns\advisor-batch-1-s0\results.jsonl
-=== exit 0 after 1377.8s
+=== exit 0 after 1180.8s

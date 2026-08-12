@@ -376,7 +376,7 @@ def synthetic_csv(path: Path, n_rows: int = 32) -> Path:
         scale = 0.05 + 0.02 * (index % len(TINY_PARTS))
         h_rel = float(np.round(0.01 + 0.03 * generator.random(), 5))
         row: dict[str, Any] = {
-            "schema": "advisor-row-v2",
+            "schema": "advisor-row-v3",
             "campaign": "advisor-tiny-fixture",
             "cfg_id": f"c{index:04d}",
             "part": part,

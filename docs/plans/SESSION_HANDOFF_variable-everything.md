@@ -50,7 +50,7 @@ whole tree.
 - Selective p-elevation is conforming. The headline number, printed by the suite:
   affine patch error **3.48e-19 constrained vs 3.74e-4 unconstrained**. That
   delta is the proof the old path was silently wrong.
-- Campaign rows carry `advisor-row-v2` context features + action objects and
+- Campaign rows carry `advisor-row-v3` context features + action objects and
   per-pass adapt traces. `bench/campaigns/advisor-pilot-1/` is loadable but
   **unrun** (needs OCC).
 

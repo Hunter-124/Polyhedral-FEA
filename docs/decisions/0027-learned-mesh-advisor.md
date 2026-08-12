@@ -117,7 +117,7 @@ defaults and says so in the mesh note.
 
 ## Consequences
 
-- The campaign harness must emit schema `advisor-row-v2` with explicit
+- The campaign harness must emit schema `advisor-row-v3` with explicit
   `features` and `action` objects, and persist per-pass adapt traces. Without
   that, only a case-level chooser is trainable — the current 40 warehouse runs,
   all at `order=1`, cannot train anything.

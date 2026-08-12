@@ -1820,7 +1820,7 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
     out.line["cfg_id"] = cfg.id;
     out.line["config"] = cfg.values;
     out.line["part"] = part.part;
-    out.line["schema"] = "advisor-row-v2";
+    out.line["schema"] = "advisor-row-v3";
     out.line["action"] = action_json(cfg, 0.0, cfg.h_rel.value_or(0.0));
     out.line["features"] = case_features_json(pipeline::CaseFeatures{});
     out.line["tier"] = tier;

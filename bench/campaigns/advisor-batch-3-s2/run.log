@@ -1,5 +1,5 @@
 
-=== 2026-08-10T23:05:11Z OMP_NUM_THREADS=2 :: C:\Users\Yakub\Desktop\Polyhedral-FEA\build\apps\testlab\polymesh_testlab.exe resume C:\Users\Yakub\Desktop\Polyhedral-FEA\bench\campaigns\advisor-batch-3-s2
+=== 2026-08-12T10:07:53Z OMP_NUM_THREADS=3 :: C:\Users\Yakub\Desktop\Polyhedral-FEA\build\apps\testlab\polymesh_testlab.exe resume C:\Users\Yakub\Desktop\Polyhedral-FEA\bench\campaigns\advisor-batch-3-s2
 campaign advisor-batch-3-s2: 16 configs, 72 parts, 1 tiers
   max_run_wall_s=45 (override all tiers)
   max_pack_wall_s=86400
@@ -435,4 +435,4 @@ wrote bench\campaigns\advisor-batch-3-s2\runs\cfg-d8c55ca3\sphere_box_s0_c2\t0\w
 wrote bench\campaigns\advisor-batch-3-s2\runs\cfg-d8c55ca3\sphere_box_s3_c0\t0\wire.png
 warehouse_shots: 140 rendered, 0 skipped (exists), 0 failed (140 mesh.vtu total)
 finished: 288 runs → C:\Users\Yakub\Desktop\Polyhedral-FEA\bench\campaigns\advisor-batch-3-s2\results.jsonl
-=== exit 0 after 711.6s
+=== exit 0 after 535.2s

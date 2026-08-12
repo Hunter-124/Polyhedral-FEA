@@ -54,7 +54,7 @@ DPI = 110  # committed PNGs stay small; every figure lands under 400 KB
 MAX_PNG_BYTES = 400 * 1024
 
 #: only these rows carry the full C2 feature/action vector (see dataset.py)
-CORPUS_SCHEMA = "advisor-row-v2"
+CORPUS_SCHEMA = "advisor-row-v3"
 #: statuses that produced a usable solve
 OK_STATUS = "ok"
 #: parts are named ``<family>_s<shape>_c<case>``; the family is the stem
@@ -509,7 +509,7 @@ def _step_sample(times: np.ndarray, values: np.ndarray,
 def mesh_progress(rows: list[dict[str, str]], out_dir: Path) -> bool:
     corpus = corpus_rows(rows)
     if not corpus:
-        print("no data yet — no advisor-row-v2 rows in dataset.csv; "
+        print("no data yet — no advisor-row-v3 rows in dataset.csv; "
               "skipping mesh_progress.png")
         return False
 
@@ -918,7 +918,7 @@ def main() -> int:
     rows = read_rows(dataset_csv)
     if rows:
         print(f"dataset: {len(rows)} rows "
-              f"({len(corpus_rows(rows))} advisor-row-v2) from {dataset_csv}")
+              f"({len(corpus_rows(rows))} advisor-row-v3) from {dataset_csv}")
     else:
         print(f"no data yet — {dataset_csv} is missing or empty")
 

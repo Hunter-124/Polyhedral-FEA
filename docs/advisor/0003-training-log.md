@@ -301,3 +301,115 @@ Measured mesh improvement, coarsest run -> best-accuracy run for the same part:
 
 Across the corpus the anytime curve improves median accuracy 1.50x and median
 geometric fidelity 2.02x as solver time is spent.
+
+## M-A3 — retrained on the corrected engine and re-derived truth (2026-08-12)
+
+M-A2's policy result could not survive changes to the engine and reference
+semantics as if nothing had happened. We bumped to `advisor-row-v3`, archived
+the old rows, reran truth, and retrained without increasing model capacity.
+
+### Engine changes that invalidated the old corpus
+
+- Order-2 boundary mid-nodes are owner-aware projected onto exact CAD; the
+  acceptance guard checks corner volumes and the stiffness quadrature rule,
+  with validity-preserving bisection backoff.
+- Selective p-elevation rejects candidates that the stiffness rule would make
+  invalid.
+- Longest-edge bisection rejects projected midpoints that destroy its progress
+  measure and diagnoses a repeated LEPP edge instead of spinning.
+- ZZ recovery bounds high-leverage, under-determined patch extrapolation with
+  an SVD basis, L2 gain guard, and patch-mean fallback.
+- Box-hole SCF labels now use the peak probe (`peak_vm_over_nominal`) that
+  matches the Kirsch peak truth, rather than an area mean that could not reach
+  3.0.
+- The VTU wire renderer dispatches on cell topology, including tet10, hex20,
+  polyhedron face streams, and convex point sets, instead of drawing raw
+  connectivity as a polygon.
+- Testlab's feature-refinement default now matches the CLI and GUI.
+
+These are label changes, not harmless implementation details: geometry,
+validity, recovered stress, adaptivity decisions, and the scored observable all
+moved.
+
+### Truth rerun and movement audit
+
+The rerun promoted **60 files / 120 metrics**, including **5 files / 10
+metrics** recovered for `l_bracket`. The final truth set is:
+
+| truth quality | references | provisional |
+| --- | ---: | ---: |
+| promoted overkill solve | 64 | 0 |
+| analytic | 8 | 0 |
+| **total** | **72** | **0** |
+
+Four channel parts could not be re-derived and retain their earlier references:
+`channel_s1_c1`, `channel_s1_c2`, `channel_s3_c1`, and `channel_s3_c2`.
+
+Most references moved **0.6–2.7 %**. Two large moves were real corrections:
+
+- `l_bracket_s1_c0` energy moved **+7,660 %** because a stated provisional beam
+  surrogate was replaced by an overkill solve.
+- `stepped_shaft_s0_c0` energy moved **+950 %**. The old label was internally
+  inconsistent: its coarse mesh resolved only 3.80e-6 m² of a 1.40e-5 m² load
+  face. The replacement satisfies Clapeyron,
+  \(U/(\tfrac12 F u)=0.99977\); the old value gave 0.628.
+
+The SCF label fix is similarly semantic rather than cosmetic. The old
+area-weighted mean over a rim box was graded against the Kirsch **peak** 3.0,
+creating an unreachable error floor. The four box-hole analytic references now
+score a box-windowed peak von Mises value over nominal stress.
+
+### Data and artifact
+
+- **3,456** `advisor-row-v3` rows.
+- **196** legacy blank-schema rows explicitly excluded from
+  `post-m10-smoke`, `settings-frontier-1`, `smoke`, `varyhedron-*`, and
+  `vem-gate-m5`.
+- **2,088 train / 672 validation**, with **696** rows pruned cumulatively.
+- Model: **15,986 parameters**, width 96 / depth 2; 44 inputs / 10 action
+  outputs; ONNX opset 17.
+- C++/ONNX parity: **2.483e-06 relative**. C++ advisor tests pass:
+  **168 assertions, 4 cases**.
+
+Capacity was deliberately unchanged. The question was whether corrected data
+and truth improved the decision, not whether a larger network could memorise
+them.
+
+### Validation MAE (log10): corrected model vs archived model
+
+| head | M-A3 | archived M-A2 | direction |
+| --- | ---: | ---: | --- |
+| `rel_err` | **0.4235** | 0.8086 | better |
+| `rel_err_rel` | **0.2837** | 0.3121 | better |
+| `geo_chamfer` | 0.1649 | **0.0989** | worse |
+| `geo_p99` | 0.1428 | **0.0970** | worse |
+| `dof` | 0.2025 | **0.1500** | worse |
+| `mesh_ms` | 0.1732 | **0.1324** | worse |
+| `solve_ms` | 0.1900 | **0.1708** | worse |
+
+Accuracy improved; every geometry/cost head regressed. The same corrected data
+also made LightGBM worse on `geo_chamfer` (0.0227 -> 0.0611), `geo_p99`
+(0.0327 -> 0.0733), and `dof` (0.0165 -> 0.0232). This is evidence that engine
+fixes and re-derived truths made those targets harder—a data-distribution
+shift—not evidence that the unchanged 96-wide MLP uniquely ran out of capacity.
+
+### Held-out decisions (`n=12`)
+
+Mean within-case Spearman correlation is **0.610**. Regret is log10 distance
+from the best available action for that outcome:
+
+| outcome | advisor | default | oracle |
+| --- | ---: | ---: | ---: |
+| `rel_err` | **0.6322** | 1.2822 | 0 |
+| `geo_p99` | **0.2307** | 0.2334 | 0.1758 |
+| `solve_ms` | 1.7198 | **0.3629** | 1.6251 |
+
+In linear terms the advisor's accuracy pick is approximately **4.3x** off the
+oracle versus the default's approximately **19x**: about **4.5x better than the
+default on accuracy regret**, replacing M-A2's stale approximately 6x claim.
+The geometry win is marginal.
+
+The time result is a trade, not a win. The accuracy-optimal oracle is itself
+slow at 1.6251 solve-time regret, and the advisor tracks it to within 0.095 at
+1.7198. It is buying accuracy with time rather than simply failing to predict
+cost, while the default remains much faster at 0.3629.

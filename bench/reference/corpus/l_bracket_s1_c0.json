@@ -2,51 +2,50 @@
   "part": "l_bracket_s1_c0",
   "geometry": "bench/geometries/corpus/primitives/l_bracket_s1.step",
   "family": "l_bracket",
-  "truth_source": "provisional",
-  "notes": "Provisional first-order beam surrogate; not a validated truth. Replaced by the advisor-truth-0 overkill reference solve via scripts/advisor/promote_truth.py.",
+  "truth_source": "overkill-reference",
   "metrics": [
     {
       "name": "strain_energy",
-      "value": 0.0001282044962,
-      "tol": 1.0,
+      "value": 0.009950499329090548,
+      "tol": 0.15,
       "probe": {
         "kind": "strain_energy"
       },
-      "derivation": "docs/validation/hand-calcs.md#corpus-primitives-provisional",
-      "source": "provisional",
-      "inputs": {
-        "E": 210000000000.0,
-        "span_m": 0.1978165879,
-        "section_area_m2": 0.0002722010776,
-        "transverse_extent_m": 0.07781658794,
-        "I_equivalent_m4": 1.373576849e-07,
-        "axial_traction_Pa": 1000000.0,
-        "transverse_traction_Pa": 0.0,
-        "delta_axial_m": 9.419837519e-07,
-        "delta_transverse_m": 0.0,
-        "model": "axial P*L/(E*A) + Euler-Bernoulli P*L^3/(3*E*I) on an equivalent rectangular section; U = 0.5 * sum(P_i * delta_i)"
+      "derivation": "bench/campaigns/advisor-truth-lb/results.jsonl (overkill reference solve at the finest h_rel this part could afford under the campaign element/DOF budget; NOT a converged limit -- see docs/validation/hand-calcs.md#corpus-primitives-provisional). tol=0.15 replaces the provisional seed's tol=1.0 and matches the analytic cantilever references; the reference is itself a discrete solve, so a tighter band would score its own discretization error. Promoted by scripts/advisor/promote_truth.py.",
+      "source": "overkill-reference",
+      "source_run": {
+        "campaign": "advisor-truth-lb",
+        "results": "bench/campaigns/advisor-truth-lb/results.jsonl",
+        "cfg_id": "cfg-b9d47e8b",
+        "tier": 0,
+        "h_rel": 0.08,
+        "order": 2,
+        "adapt_passes": 2,
+        "mesher": "graded_tet",
+        "n_dof": 24162,
+        "n_elems": 5088
       }
     },
     {
       "name": "tip_deflection",
-      "value": 9.419837519e-07,
-      "tol": 1.0,
+      "value": 0.0001863465956274914,
+      "tol": 0.15,
       "probe": {
         "kind": "tip_deflection"
       },
-      "derivation": "docs/validation/hand-calcs.md#corpus-primitives-provisional",
-      "source": "provisional",
-      "inputs": {
-        "E": 210000000000.0,
-        "span_m": 0.1978165879,
-        "section_area_m2": 0.0002722010776,
-        "transverse_extent_m": 0.07781658794,
-        "I_equivalent_m4": 1.373576849e-07,
-        "axial_traction_Pa": 1000000.0,
-        "transverse_traction_Pa": 0.0,
-        "delta_axial_m": 9.419837519e-07,
-        "delta_transverse_m": 0.0,
-        "model": "axial P*L/(E*A) + Euler-Bernoulli P*L^3/(3*E*I) on an equivalent rectangular section; U = 0.5 * sum(P_i * delta_i)"
+      "derivation": "bench/campaigns/advisor-truth-lb/results.jsonl (overkill reference solve at the finest h_rel this part could afford under the campaign element/DOF budget; NOT a converged limit -- see docs/validation/hand-calcs.md#corpus-primitives-provisional). tol=0.15 replaces the provisional seed's tol=1.0 and matches the analytic cantilever references; the reference is itself a discrete solve, so a tighter band would score its own discretization error. Promoted by scripts/advisor/promote_truth.py.",
+      "source": "overkill-reference",
+      "source_run": {
+        "campaign": "advisor-truth-lb",
+        "results": "bench/campaigns/advisor-truth-lb/results.jsonl",
+        "cfg_id": "cfg-b9d47e8b",
+        "tier": 0,
+        "h_rel": 0.08,
+        "order": 2,
+        "adapt_passes": 2,
+        "mesher": "graded_tet",
+        "n_dof": 24162,
+        "n_elems": 5088
       }
     }
   ]

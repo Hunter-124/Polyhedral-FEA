@@ -1,0 +1,23 @@
+Cases loaded: 78 (tests/fixtures/parts=6, bench/geometries/corpus/primitives=72)
+Rows in: 1732 unique (3308 records scanned, 1576 duplicates)
+Rows kept: 1732
+Truth campaigns skipped (advisor-truth-*): advisor-truth-0, advisor-truth-0-s0, advisor-truth-0-s1, advisor-truth-0-s2, advisor-truth-0-s3, advisor-truth-ch, advisor-truth-lb  [their rel_err is ~0 by construction; promote_truth.py defines truth from them]
+Rows retained for the failure head: 98 (health_not_ok=98, accuracy_untrusted=98)
+Schemas: advisor-row-v3=1536, legacy=196
+Wrote: bench\advisor\dataset.csv
+Wrote: bench\advisor\dataset_schema.json
+cfg_id mirror verified against 430 recorded row(s)
+truth gate: advisor-truth-0 has 216/216 pairs over 4 results.jsonl (advisor-truth-0-s0, advisor-truth-0-s1, advisor-truth-0-s2, advisor-truth-0-s3), 0 config(s) incomplete
+template:   bench/campaigns/advisor-batch-template/campaign.json
+parts:      48 from template parts
+configs:    32 (full-factorial grid expansion)
+pairs:      1536 total (part x cfg_id)
+dedup scan: 6 results.jsonl under bench/campaigns/advisor-*, 234 completed pairs on record
+dedup hits: 0
+to run:     1536 pairs across 4 campaign dir(s), 4 shard(s) x OMP_NUM_THREADS=3
+  shard 0: advisor-batch-1-s0/campaign.json (8 configs x 48 parts = 384 pairs)
+  shard 1: advisor-batch-1-s1/campaign.json (8 configs x 48 parts = 384 pairs)
+  shard 2: advisor-batch-1-s2/campaign.json (8 configs x 48 parts = 384 pairs)
+  shard 3: advisor-batch-1-s3/campaign.json (8 configs x 48 parts = 384 pairs)
+rebuilding bench/advisor/dataset.csv ...
+batch 1: 1536 new rows in 37.7 min (0.6791 rows/s), dedup_hits=0, mesh_ms_frac=0.5397 over 1536 row(s) -> mesh cache recommended

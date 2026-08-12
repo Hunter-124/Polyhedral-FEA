@@ -63,21 +63,18 @@ from a shell with a file-based deck.
 
 ## CalculiX peer (E1)
 
-Headless smoke runner (optional peer — not required for CI green):
+Structured-hex cross-validation runner (optional peer — not required for CI
+green):
 
 ```sh
-# when ccx is on PATH: writes bench/results/calculix-cantilever-smoke.json
-# and refreshes docs/bench/scoreboard.md
+# finds repository-local ccx before PATH, writes bench/results/calculix-cantilever.json
 python3 bench/competitive/peers/run_calculix_cantilever.py
-
-# when ccx is missing: prints a skip message and exits 0 (CI-safe)
 ```
 
-| Behavior | Exit | Output |
-|---|---:|---|
-| `ccx` present, deck OK | 0 | JSON row + scoreboard refresh |
-| `ccx` present, deck fails | 1 | stderr from ccx |
-| `ccx` absent | 0 | `ccx not found; skip …` |
+It runs CalculiX and PolyMesh serially with `OMP_NUM_THREADS=1` on identical
+4x1x1, 8x2x2, 16x4x4, and 32x8x8 C3D8/hex8 cantilevers, validates every row
+against the competitive schema, and records each solver's tip error against the
+shared beam-theory reference.
 
 Install notes and future Lamé/Kirsch deck plans:
 [`peers/calculix_stub.md`](peers/calculix_stub.md). No network package installs

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "fea/material.hpp"
+#include "fea/p_elevate.hpp"
 #include "fea/solve.hpp"
 #include "fea/stress.hpp"
 #include "fea/zz.hpp"
@@ -7,6 +8,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <array>
 #include <algorithm>
 #include <cmath>
 #include <vector>
@@ -74,6 +76,40 @@ double max_von_mises(const std::vector<polymesh::fea::Stress>& s) {
     return m;
 }
 
+struct SparseMidsidePatch {
+    polymesh::fea::NodalMesh mesh;
+    std::uint32_t midpoint = 0;
+};
+
+/// Four Tet10 elements around one edge. Their centroids form a barely
+/// well-conditioned tetrahedron near x=1 while the shared midside node is at
+/// the origin, reproducing the high-leverage extrapolation seen on graded
+/// box-hole meshes.
+SparseMidsidePatch sparse_midside_patch() {
+    constexpr double half_edge = 0.02;
+    const std::array<Eigen::Vector3d, 4> centroids{
+        Eigen::Vector3d{0.95620406, -0.02697512, -0.05756971},
+        Eigen::Vector3d{1.04332250, -0.21396582, 0.26428934},
+        Eigen::Vector3d{1.07359006, 0.12373944, 0.16931630},
+        Eigen::Vector3d{0.90601703, 0.00703957, -0.62175001}};
+
+    polymesh::fea::NodalMesh linear;
+    linear.nodes = {{-half_edge, 0.0, 0.0}, {half_edge, 0.0, 0.0}};
+    for (const auto& centroid : centroids) {
+        const Eigen::Vector3d transverse{0.0, centroid[2], -centroid[1]};
+        const auto c = static_cast<std::uint32_t>(linear.nodes.size());
+        linear.nodes.push_back(2.0 * centroid + transverse);
+        const auto d = static_cast<std::uint32_t>(linear.nodes.size());
+        linear.nodes.push_back(2.0 * centroid - transverse);
+        linear.elements.emplace_back(polymesh::fea::ElementType::kTet4,
+                                     std::vector<std::uint32_t>{0, 1, c, d});
+    }
+
+    auto quadratic = polymesh::fea::promote_to_quadratic(linear);
+    const auto midpoint = quadratic.elements.front().nodes[4];
+    return {std::move(quadratic), midpoint};
+}
+
 } // namespace
 
 // Regression: the per-node patch fit used to be posed in ABSOLUTE coordinates,
@@ -119,4 +155,31 @@ TEST_CASE("ZZ recovered nodal stress stays within the sampled element range") {
         REQUIRE(max_von_mises(zz.nodal_stress) <= 3.0 * raw_max);
         REQUIRE(zz.global_eta <= 1.0);
     }
+}
+
+TEST_CASE("ZZ sparse Tet10 midside patch does not extrapolate an unsmoothed fit") {
+    const polymesh::fea::Material mat{.youngs_modulus = 1e9, .poissons_ratio = 0.3};
+    auto patch = sparse_midside_patch();
+    REQUIRE(patch.mesh.elements.size() == 4);
+    REQUIRE(std::count_if(patch.mesh.elements.begin(), patch.mesh.elements.end(),
+                          [&](const auto& element) {
+                              return std::find(element.nodes.begin(), element.nodes.end(),
+                                               patch.midpoint) != element.nodes.end();
+                          }) == 4);
+
+    Eigen::VectorXd u =
+        Eigen::VectorXd::Zero(3 * static_cast<Eigen::Index>(patch.mesh.nodes.size()));
+    constexpr double strain_yy = 1e-3;
+    for (const auto node : patch.mesh.elements.front().nodes) {
+        u[3 * static_cast<Eigen::Index>(node) + 1] = strain_yy * patch.mesh.nodes[node][1];
+    }
+
+    polymesh::fea::Stress strain = polymesh::fea::Stress::Zero();
+    strain[1] = strain_yy;
+    const double sampled_max = polymesh::fea::von_mises(mat.d_matrix() * strain);
+    const auto zz = polymesh::fea::recover_zz(patch.mesh, mat, u);
+    const double recovered = polymesh::fea::von_mises(zz.nodal_stress[patch.midpoint]);
+
+    REQUIRE(sampled_max > 0.0);
+    REQUIRE(std::abs(recovered - 0.25 * sampled_max) <= 1e-12 * sampled_max);
 }

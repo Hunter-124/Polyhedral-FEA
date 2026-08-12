@@ -146,8 +146,8 @@ ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
     // Node → incident elements (serial — graph build).
     std::vector<std::vector<std::size_t>> incident(n_nodes);
     for (std::size_t e = 0; e < n_elem; ++e) {
-        for (auto n : mesh.elements[e].nodes) {
-            incident[n].push_back(e);
+        for (const auto node : mesh.elements[e].nodes) {
+            incident[node].push_back(e);
         }
     }
 
@@ -171,8 +171,13 @@ ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
     // In the patch frame the constant column is orthogonal to the three
     // coordinate columns, so a0 is the patch mean whatever the rank is, and the
     // SVD's minimum-norm solve zeroes the linear part along any direction the
-    // patch cannot resolve. A degenerate patch therefore degrades to the plain
-    // patch average — the honest answer — instead of diverging.
+    // patch cannot resolve. A second guard is still required for sparse edge
+    // patches: four or five samples can formally span the four-coefficient
+    // basis while leaving an extrapolation with enormous statistical leverage.
+    // Bound the L2 gain from sample noise to the recovered node; a fit that
+    // would amplify it by more than two falls back to the same honest patch
+    // average as the existing no-linear-part path.
+    constexpr double kMaxExtrapolationGain = 2.0;
     ZzRecovery out;
     out.nodal_stress.assign(n_nodes, Stress::Zero());
 #if defined(POLYMESH_WITH_OPENMP)
@@ -223,10 +228,24 @@ ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
         // (η 0.208, matching the h/2-refined answer), 5e-2 → starts discarding
         // real slopes. The 1e-3…1e-2 plateau is the safe operating point.
         svd.setThreshold(1e-2);
-        const Eigen::MatrixXd coeff = svd.solve(B);
-        // Extrapolate from the patch mean point back to the node itself.
+        // For A = UΣVᵀ, the node prediction's sample weights are
+        // row·VΣ⁻¹Uᵀ. U does not change their L2 norm, so evaluate the gain in
+        // the four-dimensional basis without allocating an m-entry weight row.
         Eigen::RowVector4d row;
         row << 1.0, -mean_off[0] / radius, -mean_off[1] / radius, -mean_off[2] / radius;
+        const Eigen::RowVector4d basis_weights = row * svd.matrixV();
+        double extrapolation_gain2 = 0.0;
+        for (Eigen::Index i = 0; i < svd.rank(); ++i) {
+            const double scaled = basis_weights[i] / svd.singularValues()[i];
+            extrapolation_gain2 += scaled * scaled;
+        }
+        if (!(extrapolation_gain2 <=
+              kMaxExtrapolationGain * kMaxExtrapolationGain)) {
+            out.nodal_stress[nu] = mean_stress;
+            continue;
+        }
+        const Eigen::MatrixXd coeff = svd.solve(B);
+        // Extrapolate from the patch mean point back to the node itself.
         const Stress fit = (row * coeff).transpose();
         out.nodal_stress[nu] = fit.allFinite() ? fit : mean_stress;
     }

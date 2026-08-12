@@ -1,0 +1,162 @@
+[
+  {
+    "schema_version": 1,
+    "solver": "calculix",
+    "version": "2.23",
+    "case_id": "cantilever",
+    "dofs": 48,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": 0.10843190000741743,
+      "total": 0.10843190000741743
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.7219377263930927,
+      "unit": "ratio"
+    },
+    "label": "calculix-cantilever-hex-4x1x1",
+    "timestamp": "2026-08-11T18:47:01.551398+00:00",
+    "notes": "structured hex8 4x1x1; max_abs_tip_u3=5.603789e-05; tip_deflection_reference=0.00020153; matched uniform load-face traction with resultant Fz=-1000 N; CalculiX uses equivalent CLOAD weights and PolyMesh uses its consistent face-load assembler (not asserted bitwise identical)"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "92455f9",
+    "case_id": "cantilever",
+    "dofs": 48,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": 0.05791999999200925,
+      "total": 0.05791999999200925
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.7219377215496642,
+      "unit": "ratio"
+    },
+    "label": "polymesh-native-cantilever-hex-4x1x1",
+    "timestamp": "2026-08-11T18:47:01.551398+00:00",
+    "notes": "structured hex8 4x1x1; max_abs_tip_u3=5.60378909761e-05; tip_deflection_reference=0.00020153; matched uniform load-face traction with resultant Fz=-1000 N; CalculiX uses equivalent CLOAD weights and PolyMesh uses its consistent face-load assembler (not asserted bitwise identical)"
+  },
+  {
+    "schema_version": 1,
+    "solver": "calculix",
+    "version": "2.23",
+    "case_id": "cantilever",
+    "dofs": 216,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": 0.14840919998823665,
+      "total": 0.14840919998823665
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.40195603632213567,
+      "unit": "ratio"
+    },
+    "label": "calculix-cantilever-hex-8x2x2",
+    "timestamp": "2026-08-11T18:47:01.783438+00:00",
+    "notes": "structured hex8 8x2x2; max_abs_tip_u3=0.0001205238; tip_deflection_reference=0.00020153; matched uniform load-face traction with resultant Fz=-1000 N; CalculiX uses equivalent CLOAD weights and PolyMesh uses its consistent face-load assembler (not asserted bitwise identical)"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "92455f9",
+    "case_id": "cantilever",
+    "dofs": 216,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": 0.060264900006586686,
+      "total": 0.060264900006586686
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.401955938032141,
+      "unit": "ratio"
+    },
+    "label": "polymesh-native-cantilever-hex-8x2x2",
+    "timestamp": "2026-08-11T18:47:01.783438+00:00",
+    "notes": "structured hex8 8x2x2; max_abs_tip_u3=0.000120523819808; tip_deflection_reference=0.00020153; matched uniform load-face traction with resultant Fz=-1000 N; CalculiX uses equivalent CLOAD weights and PolyMesh uses its consistent face-load assembler (not asserted bitwise identical)"
+  },
+  {
+    "schema_version": 1,
+    "solver": "calculix",
+    "version": "2.23",
+    "case_id": "cantilever",
+    "dofs": 1200,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": 0.31034289998933673,
+      "total": 0.31034289998933673
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.1513144444995782,
+      "unit": "ratio"
+    },
+    "label": "calculix-cantilever-hex-16x4x4",
+    "timestamp": "2026-08-11T18:47:02.304560+00:00",
+    "notes": "structured hex8 16x4x4; max_abs_tip_u3=0.0001710356; tip_deflection_reference=0.00020153; matched uniform load-face traction with resultant Fz=-1000 N; CalculiX uses equivalent CLOAD weights and PolyMesh uses its consistent face-load assembler (not asserted bitwise identical)"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "92455f9",
+    "case_id": "cantilever",
+    "dofs": 1200,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": 0.17316900001605973,
+      "total": 0.17316900001605973
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.1513144798074311,
+      "unit": "ratio"
+    },
+    "label": "polymesh-native-cantilever-hex-16x4x4",
+    "timestamp": "2026-08-11T18:47:02.304560+00:00",
+    "notes": "structured hex8 16x4x4; max_abs_tip_u3=0.000171035592884; tip_deflection_reference=0.00020153; matched uniform load-face traction with resultant Fz=-1000 N; CalculiX uses equivalent CLOAD weights and PolyMesh uses its consistent face-load assembler (not asserted bitwise identical)"
+  },
+  {
+    "schema_version": 1,
+    "solver": "calculix",
+    "version": "2.23",
+    "case_id": "cantilever",
+    "dofs": 7776,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": 1.2507949999999255,
+      "total": 1.2507949999999255
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.048804148265766935,
+      "unit": "ratio"
+    },
+    "label": "calculix-cantilever-hex-32x8x8",
+    "timestamp": "2026-08-11T18:47:05.851931+00:00",
+    "notes": "structured hex8 32x8x8; max_abs_tip_u3=0.0001916945; tip_deflection_reference=0.00020153; matched uniform load-face traction with resultant Fz=-1000 N; CalculiX uses equivalent CLOAD weights and PolyMesh uses its consistent face-load assembler (not asserted bitwise identical)"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "92455f9",
+    "case_id": "cantilever",
+    "dofs": 7776,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": 2.2123996000154875,
+      "total": 2.2123996000154875
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.04880412961230931,
+      "unit": "ratio"
+    },
+    "label": "polymesh-native-cantilever-hex-32x8x8",
+    "timestamp": "2026-08-11T18:47:05.851931+00:00",
+    "notes": "structured hex8 32x8x8; max_abs_tip_u3=0.000191694503759; tip_deflection_reference=0.00020153; matched uniform load-face traction with resultant Fz=-1000 N; CalculiX uses equivalent CLOAD weights and PolyMesh uses its consistent face-load assembler (not asserted bitwise identical)"
+  }
+]

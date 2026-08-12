@@ -16,9 +16,27 @@ RESULTS_DIR = ROOT / "bench" / "results"
 OUT_PATH = ROOT / "docs" / "bench" / "scoreboard.md"
 SCHEMA_HINT = "bench/competitive/schema.json"
 
+ROW_REQUIRED_FIELDS = (
+    "solver",
+    "version",
+    "case_id",
+    "dofs",
+    "wall_time_s",
+    "accuracy",
+    "label",
+    "timestamp",
+)
+
+
+def skip_non_row(path: Path, reason: str) -> list[dict[str, Any]]:
+    print(f"skip {path.relative_to(ROOT)}: {reason}")
+    return []
+
 
 def load_results(path: Path) -> list[dict[str, Any]]:
     raw = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(raw, dict) and "schema" in raw:
+        return skip_non_row(path, f"non-row document declares schema {raw['schema']!r}")
     if isinstance(raw, list):
         items = raw
     elif isinstance(raw, dict) and "results" in raw and isinstance(raw["results"], list):
@@ -26,25 +44,15 @@ def load_results(path: Path) -> list[dict[str, Any]]:
     elif isinstance(raw, dict):
         items = [raw]
     else:
-        raise ValueError(f"{path}: expected object, array, or {{results: [...]}}")
-    out: list[dict[str, Any]] = []
-    for i, item in enumerate(items):
+        return skip_non_row(path, "non-row document is not an object or array of rows")
+
+    for index, item in enumerate(items):
         if not isinstance(item, dict):
-            raise ValueError(f"{path}[{i}]: not an object")
-        for key in (
-            "solver",
-            "version",
-            "case_id",
-            "dofs",
-            "wall_time_s",
-            "accuracy",
-            "label",
-            "timestamp",
-        ):
-            if key not in item:
-                raise ValueError(f"{path}[{i}]: missing required field {key!r}")
-        out.append(item)
-    return out
+            return skip_non_row(path, f"non-row document has non-object entry {index}")
+        missing = [key for key in ROW_REQUIRED_FIELDS if key not in item]
+        if missing:
+            return skip_non_row(path, f"non-row document entry {index} lacks {', '.join(missing)}")
+    return items
 
 
 def fmt_num(v: Any, digits: int = 4) -> str:

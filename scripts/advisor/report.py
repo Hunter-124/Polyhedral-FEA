@@ -21,6 +21,9 @@ the meshes themselves:
   mesh_before_after.png real wireframe renders from the campaign warehouse:
                         the coarse baseline mesh beside the best-accuracy mesh
                         for three parts from three different families
+  external_comparison.png
+                        external mesh-source rel_err against active DOF,
+                        split by case family and element order
 
 Missing inputs skip the affected figure with a printed "no data yet" note --
 the script still exits 0 so it is safe to run mid-campaign. Every number that
@@ -49,6 +52,8 @@ ROOT = Path(__file__).resolve().parents[2]
 ADVISOR_DIR = ROOT / "bench" / "advisor"
 CAMPAIGNS_DIR = ROOT / "bench" / "campaigns"
 FIGURES_DIR = ROOT / "docs" / "advisor" / "figures"
+EXTERNAL_RESULTS = ROOT / "bench" / "results" / "gmsh-peer.json"
+CORPUS_REFERENCE_DIR = ROOT / "bench" / "reference" / "corpus"
 
 DPI = 110  # committed PNGs stay small; every figure lands under 400 KB
 MAX_PNG_BYTES = 400 * 1024
@@ -82,6 +87,17 @@ MESHER_COLORS = {
     "cvt_poly": GREY,
 }
 ORDER_COLORS = {1: BLUE, 2: ORANGE, 3: GREEN, 4: PURPLE}
+EXTERNAL_COLORS = {
+    "gmsh-mesh+polymesh-solver": BLUE,
+    "polymesh-native": GREY,
+    "polymesh-native-graded": ORANGE,
+}
+EXTERNAL_LABELS = {
+    "gmsh-mesh+polymesh-solver": "Gmsh mesh",
+    "polymesh-native": "native default",
+    "polymesh-native-graded": "native graded",
+}
+H_REL_MARKERS = {0.20: "o", 0.12: "s", 0.08: "^"}
 
 #: input-column groups drawn in network_layout.png, in trunk-input order
 GROUP_STYLE = [
@@ -97,6 +113,7 @@ try:
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
+    from matplotlib.lines import Line2D
 except ImportError:
     raise SystemExit(
         "matplotlib is required for report.py — install it with:\n"
@@ -121,6 +138,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--out-dir", type=Path, default=FIGURES_DIR,
                         help="figure output directory (default: "
                              "docs/advisor/figures)")
+    parser.add_argument("--external-results", type=Path, default=EXTERNAL_RESULTS,
+                        help="Gmsh peer rows (default: bench/results/gmsh-peer.json)")
+    parser.add_argument("--external-only", action="store_true",
+                        help="render only external_comparison.png")
     return parser.parse_args()
 
 
@@ -906,6 +927,181 @@ def mesh_before_after(rows: list[dict[str, str]], campaigns_dir: Path,
     return True
 
 
+# --- figure 6: external_comparison.png --------------------------------------
+
+
+def _external_tolerance(case_id: str, metric_name: str) -> float | None:
+    reference = load_json(CORPUS_REFERENCE_DIR / f"{case_id}.json")
+    if not isinstance(reference, dict):
+        return None
+    base_name = metric_name.removesuffix("_rel_err")
+    for metric in reference.get("metrics", []):
+        if metric.get("name") != base_name:
+            continue
+        tolerance = to_float(metric.get("tol"))
+        return tolerance if tolerance >= 0.0 else None
+    return None
+
+
+def external_comparison(result_path: Path, out_dir: Path) -> bool:
+    payload = load_json(result_path)
+    if not isinstance(payload, list):
+        print(f"no data yet — expected a JSON row array at {result_path}; "
+              "skipping external_comparison.png")
+        return False
+
+    usable = []
+    for row in payload:
+        if not isinstance(row, dict) or row.get("solver") not in EXTERNAL_COLORS:
+            continue
+        dofs = to_float(row.get("dofs"))
+        error = to_float((row.get("accuracy") or {}).get("value"))
+        h_rel = to_float(row.get("h_rel"))
+        order = row.get("order")
+        case_id = row.get("case_id")
+        if (not isinstance(case_id, str) or not isinstance(order, int)
+                or not math.isfinite(dofs) or dofs <= 0
+                or not math.isfinite(error) or error < 0
+                or not math.isfinite(h_rel) or h_rel <= 0):
+            continue
+        usable.append({
+            "solver": row["solver"],
+            "case_id": case_id,
+            "family": family_of(case_id),
+            "order": order,
+            "h_rel": h_rel,
+            "dofs": dofs,
+            "error": error,
+            "metric": str((row.get("accuracy") or {}).get("name", "")),
+        })
+    if not usable:
+        print(f"no data yet — no usable external-comparison rows in {result_path}; "
+              "skipping external_comparison.png")
+        return False
+
+    preferred = ("box_hole", "stepped_shaft")
+    present_families = {row["family"] for row in usable}
+    families = [family for family in preferred if family in present_families]
+    families.extend(sorted(present_families - set(families)))
+    orders = sorted({row["order"] for row in usable})
+    fig, axes = plt.subplots(
+        len(families), len(orders),
+        figsize=(6.2 * len(orders), 4.5 * len(families)),
+        squeeze=False,
+    )
+
+    print(f"\nexternal_comparison.png — {len(usable)} rows from {result_path}")
+    shown_solvers: set[str] = set()
+    shown_h: set[float] = set()
+    for family_index, family in enumerate(families):
+        for order_index, order in enumerate(orders):
+            ax = axes[family_index, order_index]
+            panel = [
+                row for row in usable
+                if row["family"] == family and row["order"] == order
+            ]
+            if not panel:
+                ax.set_visible(False)
+                continue
+
+            tolerances = {
+                tolerance
+                for row in panel
+                if (tolerance := _external_tolerance(
+                    row["case_id"], row["metric"]
+                )) is not None
+            }
+            if len(tolerances) == 1:
+                tolerance = next(iter(tolerances))
+                ax.axhspan(0.0, tolerance, color=LIGHT_BLUE, alpha=0.24, zorder=0)
+                ax.text(
+                    0.02, 0.02, f"truth tolerance ≤ {tolerance:g}",
+                    transform=ax.transAxes, fontsize=8, color=BLUE,
+                    ha="left", va="bottom",
+                )
+            elif tolerances:
+                lower, upper = min(tolerances), max(tolerances)
+                ax.axhspan(0.0, lower, color=LIGHT_BLUE, alpha=0.24, zorder=0)
+                ax.axhspan(lower, upper, color=LIGHT_BLUE, alpha=0.12, zorder=0)
+                ax.text(
+                    0.02, 0.02, f"truth tolerance {lower:g}–{upper:g}",
+                    transform=ax.transAxes, fontsize=8, color=BLUE,
+                    ha="left", va="bottom",
+                )
+
+            for solver in EXTERNAL_COLORS:
+                source_rows = [row for row in panel if row["solver"] == solver]
+                if not source_rows:
+                    continue
+                points = []
+                for h_rel in sorted({row["h_rel"] for row in source_rows}, reverse=True):
+                    rung = [row for row in source_rows if row["h_rel"] == h_rel]
+                    points.append((
+                        float(np.median([row["dofs"] for row in rung])),
+                        float(np.median([row["error"] for row in rung])),
+                        h_rel,
+                    ))
+                points.sort(key=lambda point: point[0])
+                xs = [point[0] for point in points]
+                ys = [point[1] for point in points]
+                color = EXTERNAL_COLORS[solver]
+                ax.plot(xs, ys, color=color, linewidth=2.0, zorder=2)
+                for x, y, h_rel in points:
+                    marker = H_REL_MARKERS.get(round(h_rel, 2), "D")
+                    ax.scatter(
+                        x, y, marker=marker, s=52, color=color,
+                        edgecolor="white", linewidth=0.7, zorder=3,
+                    )
+                    shown_h.add(h_rel)
+                    if len(panel) <= 9:
+                        ax.annotate(
+                            f"{y:.3f}", (x, y), xytext=(5, 5),
+                            textcoords="offset points", fontsize=7.5, color=color,
+                        )
+                shown_solvers.add(solver)
+                print(
+                    f"  {family} order {order} {EXTERNAL_LABELS[solver]}: "
+                    + ", ".join(
+                        f"h={h_rel:.2f} median(dof={dofs:.0f}, rel_err={error:.4g})"
+                        for dofs, error, h_rel in points
+                    )
+                )
+
+            family_label = {
+                "box_hole": "Box-hole SCF",
+                "stepped_shaft": "Stepped-shaft tip deflection",
+            }.get(family, family.replace("_", " ").title())
+            suffix = " (approx. native parity)" if order == 2 else ""
+            ax.set_title(f"{family_label} · order {order}{suffix}", fontsize=10.5)
+            ax.set_xscale("log")
+            ax.set_ylim(bottom=0.0)
+            ax.set_xlabel("active degrees of freedom  (log scale)")
+            ax.set_ylabel("relative error  (lower is better)")
+            style_axes(ax)
+
+    source_handles = [
+        Line2D([0], [0], color=EXTERNAL_COLORS[solver], linewidth=2.0,
+               label=EXTERNAL_LABELS[solver])
+        for solver in EXTERNAL_COLORS if solver in shown_solvers
+    ]
+    rung_handles = [
+        Line2D([0], [0], color=GREY, marker=H_REL_MARKERS.get(round(h_rel, 2), "D"),
+               linestyle="none", markersize=6, label=f"h_rel {h_rel:.2f}")
+        for h_rel in sorted(shown_h, reverse=True)
+    ]
+    fig.legend(
+        handles=source_handles + rung_handles, frameon=False, ncol=3,
+        loc="lower center", bbox_to_anchor=(0.5, 0.0), fontsize=8.5,
+    )
+    fig.suptitle(
+        "External mesh comparison — family medians by active DOF",
+        fontsize=12.5, weight="bold",
+    )
+    fig.tight_layout(rect=(0, 0.09, 1, 0.94))
+    save(fig, out_dir, "external_comparison.png")
+    return True
+
+
 # --- entry point ------------------------------------------------------------
 
 
@@ -913,6 +1109,10 @@ def main() -> int:
     args = parse_args()
     advisor_dir = args.advisor_dir
     out_dir = args.out_dir
+    if args.external_only:
+        written = int(external_comparison(args.external_results, out_dir))
+        print(f"\n{written}/1 figures written to {out_dir}")
+        return 0
     dataset_csv = advisor_dir / "dataset.csv"
 
     rows = read_rows(dataset_csv)
@@ -928,7 +1128,8 @@ def main() -> int:
     written += accuracy_vs_cost(rows, out_dir)
     written += fidelity_vs_h(rows, out_dir)
     written += mesh_before_after(rows, args.campaigns_dir, out_dir)
-    print(f"\n{written}/5 figures written to {out_dir}")
+    written += external_comparison(args.external_results, out_dir)
+    print(f"\n{written}/6 figures written to {out_dir}")
     return 0
 
 

@@ -105,9 +105,9 @@ Source: [bench/reports/p1-gate1-convergence.md](bench/reports/p1-gate1-convergen
 
 | | |
 |---|---|
-| ![Plate with hole](docs/assets/showcase/gallery_plate_hole.png) <br> **plate_hole** — von Mises around the stress riser; the mesh grades into the hole. | ![Cylinder](docs/assets/showcase/gallery_cylinder.png) <br> **cylinder** — curved-wall part solved from STEP with curvature-driven sizing. |
-| ![Sphere](docs/assets/showcase/gallery_sphere.png) <br> **sphere** — closed curved B-rep, stair-cased grid fill with feature-graded skin. | ![Ice-cream cone](docs/assets/showcase/gallery_icecream_cone.png) <br> **icecream_cone** — one watertight fused round cone and spherical scoop, solved from the committed STEP. |
-| ![Mesher comparison](docs/assets/showcase/compare_meshers.png) <br> **compare_meshers** — same part through `tet`, `graded`, and `hybrid`. | ![DOF/time benchmark](docs/assets/showcase/bench_dof_time.png) <br> **bench_dof_time** — the D6 L-domain result: 6384 → 1248 DOF, 2.762 s → 0.227 s. |
+| ![Plate with hole](docs/assets/showcase/gallery_plate_hole.png) <br> **plate_hole** — graded mesher at h = 3 mm; von Mises around the stress riser. | ![Cylinder](docs/assets/showcase/gallery_cylinder.png) <br> **cylinder** — graded mesher at h = 12 mm on the curved STEP wall. |
+| ![Sphere](docs/assets/showcase/gallery_sphere.png) <br> **sphere** — graded mesher at h = 8 mm on a closed curved B-rep. | ![Ice-cream cone](docs/assets/showcase/gallery_icecream_cone.png) <br> **icecream_cone** — graded mesher at h = 10 mm on the fused cone and spherical scoop. |
+| ![Mesher comparison](docs/assets/showcase/compare_meshers.png) <br> **compare_meshers** — h = 3 mm: `tet`, `graded`, and `hybrid` (hex bulk + transition cells). | ![DOF/time benchmark](docs/assets/showcase/bench_dof_time.png) <br> **bench_dof_time** — the D6 L-domain result: 6384 → 1248 DOF, 2.762 s → 0.227 s. |
 
 Stress renders come from real solver VTU output; displacement is warped for
 visibility and the colour range is clipped at a stated percentile, because a
@@ -140,33 +140,105 @@ Design narrative: [docs/solver-core.md](docs/solver-core.md).
 
 ## Learned mesh advisor
 
-A small multi-head MLP ([ADR-0027](docs/decisions/0027-learned-mesh-advisor.md),
-`scripts/advisor/`, ~10k parameters) maps (geometry + BC features, mesh action)
-to predicted solve accuracy, geometric fidelity vs the B-rep, solve cost, and
-failure risk. Its policy head recommends the mesh configuration — mesher,
-element size, order, adaptivity — which `polymesh solve --advisor bench/advisor`
-applies after hard clamps, vetoing back to defaults when predicted failure
-probability exceeds 0.5. Training is staged (accuracy heads first, cost heads
-blend in at the accuracy plateau) with worst-5% residual pruning, measured
-against a LightGBM baseline on a by-part validation split.
+A compact multi-head MLP maps geometry + BC features and a candidate mesh
+action to accuracy, B-rep fidelity, cost, and failure risk; its policy head
+chooses mesher, size, order, and adaptivity under hard runtime vetoes
+([ADR-0027](docs/decisions/0027-learned-mesh-advisor.md)).
 
-| | |
-|---|---|
-| ![Advisor training curves](docs/advisor/figures/training_curves.png) <br> **training_curves** — per-epoch validation `rel_err` MAE, first vs latest training run. | ![Advisor activation map](docs/advisor/figures/activation_map.png) <br> **activation_map** — per-layer activations for a canonical corpus input, latest run. |
+![Advisor mesh choices before and after](docs/advisor/figures/mesh_before_after.png)
 
-The interactive dashboard (per-head validation metrics, Stage A→B marker,
-pruning log, campaign throughput, MLP vs LightGBM table, and a scrub-able
-network-activation view) is a single self-contained HTML file with plotly.js
-inlined — it regenerates offline once the bundle is cached.
+Held-out decision regret is log10 distance from the best measured action
+(`n=12`, mean within-case Spearman 0.610). All 72 corpus references are
+non-provisional: 64 promoted overkill solves and 8 analytic truths.
 
-```sh
-python scripts/advisor/train.py --runs 30   # accumulate training runs
-python scripts/advisor/dashboard.py         # bench/advisor/dashboard.html
-python scripts/advisor/figures.py           # docs/advisor/figures/*.png
-```
+| Outcome regret | Advisor | Default | Oracle |
+|---|---:|---:|---:|
+| Accuracy (`rel_err`) | **0.6322** | 1.2822 | 0 |
+| B-rep fidelity (`geo_p99`) | **0.2307** | 0.2334 | 0.1758 |
+| Solve time (`solve_ms`) | 1.7198 | **0.3629** | 1.6251 |
 
-Details: [docs/advisor/](docs/advisor/) (architecture, objectives and
-guardrails, training log).
+The advisor is approximately **4.5x better than the default on accuracy
+regret**: its pick is approximately 4.3x off oracle accuracy versus the
+default's approximately 19x. Fidelity improves marginally. Time does not: the
+accuracy-optimal oracle is itself slow (1.6251), and the advisor tracks it
+within 0.095 at 1.7198, buying accuracy with solve time rather than beating the
+faster default.
+
+![Advisor accuracy versus cost](docs/advisor/figures/accuracy_vs_cost.png)
+
+![Advisor network layout](docs/advisor/figures/network_layout.png)
+
+The deployed width-96, depth-2 model has **15,986 parameters**, 44 inputs and 10
+action outputs. It exports at ONNX opset 17 with 2.483e-06 relative C++ parity.
+
+![Advisor training curves](docs/advisor/figures/training_curves.png)
+
+Accuracy-head validation improved after the engine/truth rebuild; geometry and
+cost heads regressed on the harder corrected distribution, as did LightGBM on
+the same geometry/DOF targets. Capacity was deliberately unchanged. Full
+metrics and provenance are in the
+[training log](docs/advisor/0003-training-log.md).
+
+**[Open the interactive advisor dashboard](bench/advisor/dashboard.html)** —
+per-head validation, pruning, throughput, baseline comparison, and network
+activations.
+
+### Vs established tools
+
+The Gmsh comparison swaps only the mesh source: PolyMesh's solver, probe, BCs,
+and truth stay fixed. Medians use the strict matched set, where a
+`(case, h_rel, order)` point counts only when all three mesh sources are
+measurable. Each result is `median relative error / median active DOF`;
+Accuracy/DOF is the median pointwise `relative error × DOF`.
+
+| Case family | Order | Gmsh | Native default | Native graded | Accuracy winner | Accuracy/DOF winner | n |
+|---|---:|---:|---:|---:|---|---|---:|
+| Box-hole SCF | 1 | 0.3577 / 822 | 0.6631 / 1,921.5 | 0.5110 / 4,314 | Gmsh | Gmsh (267.4 vs 1,359.3 vs 1,991.2) | 8 |
+| Box-hole SCF | 2 | 0.2671 / 4,809 | 0.6588 / 6,817.5 | 0.5110 / 27,555 | Gmsh | Gmsh (1,294.9 vs 4,218.3 vs 13,263.5) | 8 |
+| Stepped-shaft tip deflection | 1 | 0.2276 / 291 | 0.1486 / 486 | 0.1728 / 1,188 | Native default | Gmsh (66.24 vs 78.21 vs 233.10) | 9 |
+| Stepped-shaft tip deflection | 2 | 0.4410 / 1,482 | 0.06578 / 1,491 | 0.07704 / 7,491 | Native default | Native default (797.77 vs 91.61 vs 825.63) | 9 |
+
+Order-2 Gmsh meshes use high-order optimisation
+(`Mesh.HighOrderOptimize=2`; one row needed the mode-1 fallback). Without it,
+four meshes contained inverted tet10 elements that PolyMesh correctly rejects.
+
+The comparison exposed a real PolyMesh stress-recovery defect: ZZ patch fits
+were extrapolated at p-elevated mid-side nodes. Fixing it (`08f9f55`) moved
+`box_hole_s2_c0`, `h_rel=0.08`, order 2 from 2.595 relative error to **0.0072**
+(within 0.72 % of Kirsch 3.0), while the spurious node fell from 10.79 MPa to
+approximately 1.2 MPa.
+
+Gmsh optimisation also has run-to-run noise. Two serial, single-threaded Gmsh
+4.13.1 runs with identical order-2 / `HighOrderOptimize=2` inputs kept
+connectivity and node/DOF counts but moved coordinates by up to 1.59e-3 m;
+`stepped_shaft_s1_c1` at `h_rel=0.20` moved from 0.4103 to 0.4359 relative
+error (control: 0.7844 → 0.8067). Single rows therefore vary by a few points;
+the medians absorb part of that noise.
+
+![External mesh-source comparison](docs/advisor/figures/external_comparison.png)
+
+CalculiX 2.23 and PolyMesh agree in tip deflection to better than 2e-5 % at
+every rung on identical structured hex8 cantilever meshes
+(48 / 216 / 1,200 / 7,776 DOF). Both converge toward the shared reference:
+72.19 → 40.20 → 15.13 → 4.88 % error.
+
+**Scope and missing data:**
+
+- These comparisons isolate different components. Gmsh swaps the mesh source
+  while holding PolyMesh's solver and probe fixed; CalculiX swaps the solver
+  while holding the mesh fixed. Neither is an end-to-end matched-CAD comparison
+  of both mesher and solver.
+- Neither tool is uniformly better. Gmsh clearly wins box-hole SCF at both
+  orders; PolyMesh native default clearly wins stepped-shaft order 2.
+- Coverage is incomplete. Of 144 requested points, **116 measurable, 0 timed
+  out**; 12 failed before a result (stepped-shaft `h_rel=0.08` native rows,
+  empty load selection), and 16 solved but unmeasurable (box-hole `h_rel=0.20`
+  native rows whose frozen probe box contained no nodes). Unavailable points
+  carry explicit nulls; none were fabricated.
+
+Sources: [Gmsh mesh-source results](bench/results/gmsh-peer.json),
+[CalculiX solver-parity results](bench/results/calculix-cantilever.json), and
+the [benchmark scoreboard](docs/bench/scoreboard.md).
 
 ## Quickstart (Ubuntu)
 
@@ -227,8 +299,9 @@ corruption on this toolchain; leave them off unless you re-verify with `ctest`.
 
 ### CLI
 
-Inputs are **CAD only** (`.step .stp .brep .brp`). Fixture:
-[`bench/geometries/public/unit_box.step`](bench/geometries/public/unit_box.step)
+`check` and `mesh` take CAD (`.step .stp .brep .brp`); `solve` also accepts
+Gmsh `.msh`. Advisor features require CAD, so `--advisor` is rejected for
+`.msh`. Fixture: [`bench/geometries/public/unit_box.step`](bench/geometries/public/unit_box.step)
 (1 m axis-aligned box).
 
 ```sh
@@ -262,8 +335,8 @@ $CLI solve $BOX --mesher graded --adapt 3 --eta-target 0.05 -o /tmp/box_adapt.vt
 $CLI solve $BOX --load-box 0.99 -1 -1 2 2 2 --load-dir 0 -1 0 --traction 2e6 \
   -o /tmp/box_pressure.vtu
 
-# JSON diagnostics: exact live-BRep directional fidelity (hard-bounded reverse
-# sampling), mesh quality, per-phase timings, and η.
+# JSON diagnostics: directional fidelity measured against the exact live B-rep
+# (hard-bounded reverse sampling), mesh quality, per-phase timings, and η.
 $CLI diag tests/fixtures/parts/pipe.step --json /tmp/pipe.json
 
 # Runtime stack: e.g. "cpu | OpenMP 16 threads | Eigen serial (no nest)"
@@ -375,17 +448,35 @@ python3 scripts/render_showcase.py --all         # regenerate showcase assets
 
 Stated plainly, because the alternative is misleading:
 
-- **Speedups are self-relative.** "5.12× fewer DOFs, 12.2× lower wall time" is
-  measured against PolyMesh's *own* frozen uniform-tet10 baseline (ADR-0005) on
-  the same machine and code path. There is **no calibrated accuracy comparison
-  against CalculiX, Elmer, or Code_Aster yet** — the peer harness exists
-  ([bench/competitive/README.md](bench/competitive/README.md)) but no
-  head-to-head number is claimed.
-- **Product volume fills are Cartesian grid-fill, not constrained Delaunay.**
-  Tet/hex/graded/hex+pyramid fills run over the bounding box with a stair-cased
-  boundary and limited surface snap. Validity and determinism are guaranteed;
-  advancing-front and constrained-Delaunay conformity are not implemented
-  ([ADR-0015](docs/decisions/0015-grid-fill-limits.md)).
+- **Speedups are self-relative; external comparisons are scoped.** "5.12× fewer
+  DOFs, 12.2× lower wall time" is against PolyMesh's own frozen uniform-tet10
+  baseline (ADR-0005). On identical structured hex8 cantilever meshes,
+  CalculiX 2.23 and PolyMesh agree in tip deflection to better than 2e-5 % at
+  every rung (48 / 216 / 1,200 / 7,776 DOF), both converging monotonically
+  toward the shared reference (72.19 → 40.20 → 15.13 → 4.88 % error). This
+  validates solver formulation/assembly parity on identical meshes, **not** an
+  end-to-end mesher-plus-solver comparison. Elmer and Code_Aster remain
+  unmeasured ([results](bench/results/calculix-cantilever.json),
+  [scoreboard](docs/bench/scoreboard.md)).
+- **The default coarse product mesher can miss stress concentrations.** At
+  matched order 1 on `box_hole_s0_c0`, the default hybrid missed the hole
+  concentration (0.664 relative error), versus 0.364 for a Gmsh mesh consumed
+  by the same PolyMesh solver and probe, and 0.190 for PolyMesh graded tet.
+  This swaps the mesh source, not the solver
+  ([results](bench/results/gmsh-peer.json)).
+- **Product volume fills remain Cartesian grid-fill, not constrained Delaunay.**
+  Order-2 boundary mid-nodes are owner-aware projected onto exact CAD with
+  bisection backoff; validity checks cover corner volumes and stiffness
+  quadrature points. The committed hybrid boundary guard rail is
+  `dist_max <= 0.25 h` / `dist_p99 <= 0.10 h` (measured maximum 0.059 h) over
+  seven fixtures at `h_rel` 0.20/0.12, with 0.08 on two. This bounds known
+  behavior; it does not make grid-fill constrained Delaunay, which remains
+  unimplemented ([ADR-0015](docs/decisions/0015-grid-fill-limits.md),
+  [ADR-0028](docs/decisions/0028-boundary-conformance-hardening.md)).
+- **The iterative linear solver has a demonstrated order-2 scaling limit.** Two
+  approximately 200k-DOF truth runs reached CG's 20,000-iteration cap at
+  tolerance 1e-8 with relative residual approximately 5e-4. Six more finished
+  between 1e-6 and 2e-5 residual and were flagged rather than promoted.
 - **Tier-1 analytical accuracy was measured on structured parametric meshes**
   (hex20 sectors, annuli, shell octants built to
   [ADR-0009](docs/decisions/0009-tier1-verification-setups.md)) — not on the

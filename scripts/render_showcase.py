@@ -89,10 +89,10 @@ FONT_DIRS = (
     "/usr/share/fonts/liberation-sans-fonts",
     "/usr/share/fonts/truetype/liberation",
     "/usr/share/fonts/dejavu-sans-fonts",
-    "/usr/share/fonts/truetype/dejavu",
+    "C:/Windows/Fonts",
 )
-FONT_REGULAR = ("LiberationSans-Regular.ttf", "DejaVuSans.ttf")
-FONT_BOLD = ("LiberationSans-Bold.ttf", "DejaVuSans-Bold.ttf")
+FONT_REGULAR = ("LiberationSans-Regular.ttf", "DejaVuSans.ttf", "arial.ttf")
+FONT_BOLD = ("LiberationSans-Bold.ttf", "DejaVuSans-Bold.ttf", "arialbd.ttf")
 
 
 def rel(path: Path) -> str:
@@ -190,7 +190,7 @@ PARTS: list[Part] = [
         title="Plate with hole",
         step="plate_hole.step",
         mesher="graded",
-        h=0.006,
+        h=0.003,
         E=2.1e11,
         nu=0.3,
         view=(0.25, -0.60, 1.00),
@@ -277,10 +277,10 @@ FLAGSHIP = "plate_hole"
 # oblique angle (~34 deg above the plate vs ~57 deg) so the bending deflection
 # and the stress lobes around the hole read in 3D.
 #
-# Deliberately NOT a tight crop on the hole: at a reproducible h = 6 mm the
-# Cartesian grid-fill opening is a ~10-gon, so an extreme close-up shows off
-# mesh coarseness rather than the solve. Framing the whole plate also keeps the
-# model uncut. HERO_UP = (0, dz, -dy) keeps the plate's long axis horizontal.
+# Deliberately NOT a tight crop on the hole: at a reproducible h = 3 mm the
+# Cartesian grid-fill opening has enough perimeter segments to read as round,
+# framing the whole plate also keeps the model uncut. HERO_UP = (0, dz, -dy)
+# keeps the plate's long axis horizontal.
 HERO_FOCUS = None
 HERO_RADIUS = None
 HERO_VIEW = (0.35, -0.90, 0.65)
@@ -311,12 +311,11 @@ class MeshTile:
 
 # compare_meshers: one part, matched h, three topologies.
 MESHER_TILES = [
-    MeshTile("cmp_tet", "tet  \u00b7  Cartesian grid-fill tet4", "plate_hole", "tet", 0.006),
-    MeshTile("cmp_graded", "graded  \u00b7  feature-graded tet4", "plate_hole", "graded", 0.006),
-    # At this part and h the hybrid zoo emits an all-hex mesh with 2:1 fine
-    # cells and transition=0, so the label names that rather than the fan
-    # transition cells the mesher is also capable of but does not produce here.
-    MeshTile("cmp_hybrid", "hybrid  \u00b7  all-hex bulk + 2:1 fine cells", "plate_hole", "hybrid", 0.006),
+    MeshTile("cmp_tet", "tet  ·  Cartesian grid-fill tet4", "plate_hole", "tet", 0.003),
+    MeshTile("cmp_graded", "graded  ·  feature-graded tet4", "plate_hole", "graded", 0.003),
+    # At this part and h the hybrid path emits a mixed transition zoo, so the
+    # label names the conforming transition cells rather than claiming all-hex.
+    MeshTile("cmp_hybrid", "hybrid  ·  hex bulk + transition cells", "plate_hole", "hybrid", 0.003),
 ]
 
 # compare_grading: same mesher, only the sizing field differs. h values are
@@ -1318,7 +1317,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         foot = (
             f"plate_hole.step at h = {fmt_h(MESHER_TILES[0].h)} for all three "
-            f"\u2014 {counts}. All three are Cartesian grid-fill topologies "
+            f"· {counts}. All three are Cartesian grid-fill topologies "
             f"(not Delaunay); only the cell zoo and grading differ."
         )
         tile_grid(pngs, [t.label for t in MESHER_TILES],

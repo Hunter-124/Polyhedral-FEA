@@ -23,12 +23,10 @@ A one-line index of the same assets lives in
 ![Hero stress render](assets/showcase/hero.png)
 
 **`hero.png`** — `plate_hole` solved on the feature-graded mesher, shot from a
-low oblique angle across the whole plate (h = 6 mm, 9,568 nodes / 44,316
-elements, 28,704 DOF; min-x face fixed, conserved +x resultant on max-x).
+low oblique angle across the whole plate (h = 3 mm, 35,386 nodes / 174,234
+elements, 106,158 DOF; min-x face fixed, conserved +x resultant on max-x).
 von Mises is shown on the surface with displacement warped ×5000. The colour
-range is 0 – 3.08e6 Pa, clipped at the 99.9th percentile of the visible
-surface; the true peak nodal value is 5.16e6 Pa at the clamped-face stress
-singularity. Exact values per image live in
+range spans the full field, 0 – 3.84e6 Pa. Exact values per image live in
 [`manifest.json`](assets/showcase/manifest.json).
 
 ```sh
@@ -53,7 +51,7 @@ solve` invocation per part is in the manifest too.
 
 Flat plate with a central hole — the canonical stress-riser benchmark geometry.
 Feature-aware grading concentrates elements around the hole where the gradient
-lives. h = 6 mm, 9,568 nodes / 44,316 elements, 28,704 DOF.
+lives. h = 3 mm, 35,386 nodes / 174,234 elements, 106,158 DOF.
 
 ```sh
 python3 scripts/render_showcase.py --only plate_hole
@@ -64,7 +62,7 @@ python3 scripts/render_showcase.py --only plate_hole
 ![cantilever](assets/showcase/gallery_cantilever.png)
 
 End-loaded cantilever: linear bending stress distribution, maximum at the
-clamped root. h = 30 mm, 3,327 nodes / 13,008 elements, 9,981 DOF. This is the
+clamped root. h = 30 mm, 8,761 nodes / 44,832 elements, 26,283 DOF. This is the
 geometry behind the Timoshenko tip-deflection verification (1.50% error,
 [bench/reports/p1-gate1-convergence.md](../bench/reports/p1-gate1-convergence.md)).
 
@@ -77,8 +75,8 @@ python3 scripts/render_showcase.py --only cantilever
 ![cylinder](assets/showcase/gallery_cylinder.png)
 
 Curved-wall solid imported from STEP. Curvature-driven sizing refines the
-cylindrical face while the bulk stays coarse. h = 12 mm, 3,719 nodes / 17,186
-elements, 11,157 DOF.
+cylindrical face while the bulk stays coarse. h = 12 mm, 8,823 nodes / 42,443
+elements, 26,469 DOF.
 
 ```sh
 python3 scripts/render_showcase.py --only cylinder
@@ -90,8 +88,8 @@ python3 scripts/render_showcase.py --only cylinder
 
 Closed curved B-rep — the hardest case for a Cartesian grid fill. Shows the
 stair-cased boundary honestly, with the feature-graded skin layers absorbing the
-curvature ([ADR-0015](decisions/0015-grid-fill-limits.md)). h = 8 mm, 4,775
-nodes / 23,399 elements, 14,325 DOF.
+curvature ([ADR-0015](decisions/0015-grid-fill-limits.md)). h = 8 mm, 4,646
+nodes / 22,698 elements, 13,938 DOF.
 
 ```sh
 python3 scripts/render_showcase.py --only sphere
@@ -104,7 +102,7 @@ python3 scripts/render_showcase.py --only sphere
 One watertight 3D Boolean solid: a round truncated cone fused into an
 overlapping spherical scoop. The committed STEP is reloaded through
 OpenCASCADE, meshed at h = 10 mm, and solved with a conserved downward
-resultant on the scoop: 3,280 nodes / 15,411 elements, 9,840 DOF.
+resultant on the scoop: 3,250 nodes / 15,301 elements, 9,750 DOF.
 
 ```sh
 python3 scripts/render_showcase.py --only icecream_cone
@@ -114,10 +112,11 @@ python3 scripts/render_showcase.py --only icecream_cone
 
 ![Mesher comparison](assets/showcase/compare_meshers.png)
 
-**`compare_meshers.png`** — the same plate at h = 6 mm through three meshers:
-`tet` (1,884 nodes / 6,840 cells), `graded` (9,568 / 44,316) and `hybrid`
-(11,980 / 9,120), the default element zoo. Labels and counts are burned into
-the tiles. All three are Cartesian grid-fill topologies, not Delaunay
+**`compare_meshers.png`** — the same plate at h = 3 mm through three meshers:
+`tet` (11,770 nodes / 53,760 cells), `graded` (35,386 / 174,234) and `hybrid`
+(113,088 / 329,094), whose finer run includes conforming transition cells.
+Labels and counts are burned into the tiles. All three are Cartesian grid-fill
+topologies, not Delaunay
 ([ADR-0015](decisions/0015-grid-fill-limits.md)). This is the visual form of the
 `--mesher` dial documented in the [README CLI section](../README.md#cli); the
 element menu and transition strategy are described in

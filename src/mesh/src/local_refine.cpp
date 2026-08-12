@@ -347,7 +347,15 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
         // LEPP walk to a terminal edge (edge whose all live sharers have it as longest).
         std::size_t walk = seed;
         EdgeKey edge = longest_edge(tets[walk], nodes);
+        std::unordered_map<EdgeKey, int, EdgeHash> seen_edges;
+        seen_edges.reserve(64);
         for (int lepp = 0; lepp < 4096; ++lepp) {
+            const auto [seen_it, inserted] = seen_edges.emplace(edge, lepp);
+            if (!inserted) {
+                throw ValidityError(std::format(
+                    "local_refine_tets: LEPP cycle seed={} edge=({}, {}) first={} repeat={}",
+                    seed, edge.first, edge.second, seen_it->second, lepp));
+            }
             bool moved = false;
             const auto it = edge_tets.find(edge);
             if (it == edge_tets.end()) {
@@ -432,7 +440,20 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
         };
         const Eigen::Vector3d chord = 0.5 * (nodes[edge.first] + nodes[edge.second]);
         const Eigen::Vector3d projected = nodes[mid];
-        bool can_split = children_ok(projected);
+        const double parent_len2 = (nodes[edge.first] - nodes[edge.second]).squaredNorm();
+        constexpr double kMaxProjectedChildFraction = 0.75;
+        const double projected_child_limit2 =
+            kMaxProjectedChildFraction * kMaxProjectedChildFraction * parent_len2;
+        const bool projected_contracts =
+            (projected - nodes[edge.first]).squaredNorm() <= projected_child_limit2 &&
+            (projected - nodes[edge.second]).squaredNorm() <= projected_child_limit2;
+
+        // A global surface closest-point can land arbitrarily near one endpoint
+        // when the chord crosses a hole. Such a "midpoint" lets an LEPP keep
+        // splitting an unchanged longest edge forever. Keep surface projection
+        // only when both child edges contract; the Euclidean midpoint halves
+        // the parent and therefore restores the propagation progress invariant.
+        bool can_split = projected_contracts && children_ok(projected);
         if (!can_split && (projected - chord).squaredNorm() > 1e-30) {
             can_split = children_ok(chord); // leaves nodes[mid]=chord when true
         }

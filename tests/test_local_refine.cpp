@@ -4,6 +4,8 @@
 #include "fea/solve.hpp"
 #include "mesh/local_refine.hpp"
 #include "mesh/tet_fill.hpp"
+#include "geom/step.hpp"
+#include "pipeline/scene.hpp"
 #include "support/structured_mesh.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -11,6 +13,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <filesystem>
 #include <vector>
 
 using polymesh::fea::ElementType;
@@ -175,4 +178,24 @@ TEST_CASE("local_refine_tets: refined tet mesh still solves elastostatics") {
     REQUIRE(u.size() == 3 * static_cast<Eigen::Index>(refined.nodes.size()));
     REQUIRE(u.allFinite());
     REQUIRE(u.norm() > 0.0);
+}
+
+
+TEST_CASE("graded box-hole projected LEB terminates at h=0.019757645353151405",
+          "[mesh][refine][cad]") {
+    constexpr char kPart[] = "bench/geometries/corpus/primitives/box_hole_s2.step";
+    if (!polymesh::geom::occ_enabled() || !std::filesystem::exists(kPart)) {
+        SKIP("OpenCASCADE or box_hole_s2 STEP fixture unavailable");
+    }
+
+    const auto model = polymesh::pipeline::Model::load(kPart);
+    REQUIRE(model.cad);
+    constexpr double h = 0.019757645353151405;
+    const auto volume = polymesh::pipeline::volume_mesh(
+        model, h, polymesh::pipeline::VolumeMesher::kGradedTet,
+        /*skin_layers=*/2, /*feature_refine=*/true);
+
+    REQUIRE_FALSE(volume.mesh.elements.empty());
+    REQUIRE(volume.mesh.elements.size() < 200'000);
+    REQUIRE_NOTHROW(volume.mesh.check_validity());
 }

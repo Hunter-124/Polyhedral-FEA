@@ -276,26 +276,50 @@ void service_screenshot(App& app, GLFWwindow* window) {
 // ---- chrome bootstrap -----------------------------------------------------
 
 /// Loads a proportional UI face at 16 px: $POLYMESH_GUI_FONT first, then the
-/// usual distro locations. Returns false when none exist — ImGui's stock
+/// usual per-platform locations. Returns false when none exist — ImGui's stock
 /// bitmap font stays in place and everything still works. Existence is checked
 /// first because AddFontFromFileTTF asserts on a missing file in debug builds.
+///
+/// The glyph range is explicit. ImGui's default range is Latin only, so the
+/// labels that carry σ, ≥, ×, ⌀ or · rendered as "?" boxes — which then landed
+/// in committed screenshots. Anything drawn in the UI has to be in the atlas.
 bool load_ui_font() {
     ImGuiIO& io = ImGui::GetIO();
+    // Static: ImGui keeps the pointer until the atlas is built.
+    static const ImWchar kRanges[] = {
+        0x0020, 0x00FF,  // Latin + Latin-1 supplement (°, µ, ±)
+        0x0370, 0x03FF,  // Greek (σ, ν, Ω, θ)
+        0x2010, 0x203A,  // dashes, quotes, ·, —
+        0x2190, 0x21FF,  // arrows
+        0x2200, 0x22FF,  // maths operators (≈, ≤, ≥, ×, ∞)
+        0x2300, 0x2300,  // ⌀ diameter sign
+        0,
+    };
     auto try_load = [&io](const char* path) {
         std::error_code ec;
         if (path == nullptr || path[0] == '\0' ||
             !std::filesystem::is_regular_file(std::filesystem::path{path}, ec)) {
             return false;
         }
-        return io.Fonts->AddFontFromFileTTF(path, 16.0f) != nullptr;
+        return io.Fonts->AddFontFromFileTTF(path, 16.0f, nullptr, kRanges) !=
+               nullptr;
     };
     if (try_load(std::getenv("POLYMESH_GUI_FONT"))) {
         return true;
     }
     static constexpr const char* kFallbacks[] = {
+        // Linux
         "/usr/share/fonts/liberation-sans-fonts/LiberationSans-Regular.ttf",
         "/usr/share/fonts/google-noto/NotoSans-Regular.ttf",
         "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        // Windows — without these the stock ASCII bitmap font was used, which
+        // is what produced "?" for every symbol in the GUI screenshots.
+        "C:/Windows/Fonts/segoeui.ttf",
+        "C:/Windows/Fonts/arial.ttf",
+        // macOS
+        "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+        "/Library/Fonts/Arial Unicode.ttf",
     };
     for (const char* path : kFallbacks) {
         if (try_load(path)) {

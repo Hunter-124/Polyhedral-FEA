@@ -97,6 +97,14 @@ FAMILIES = (
     "stepped_shaft",
     "channel",
     "sphere_box",
+    # Added for the corpus-widening power test (+2 families, 8 total). Chosen
+    # for distance from the existing six in descriptor space, not for coverage:
+    # `tube` is curved AND thin-walled, `perforated_plate` carries many features
+    # far below its own thickness. See docs -- the question they exist to answer
+    # is whether held-out-family regret improves at all as families are added,
+    # which at six families is unmeasurable (slope CI [-0.051, +0.043]).
+    "tube",
+    "perforated_plate",
 )
 
 #: Nominal overall size (m) of each size regime. Same band as tests/fixtures/parts.
@@ -105,12 +113,14 @@ REGIME_SCALE = (0.06, 0.12, 0.22, 0.38)
 #: Committed seed table, family-major: SEEDS[family_index * 4 + regime_index].
 #: Literal values only -- never derived from the clock, the environment or hashing.
 SEEDS = (
-    100003, 100019, 100043, 100057,  # box_hole      s0..s3
-    200003, 200029, 200041, 200063,  # l_bracket     s0..s3
-    300007, 300017, 300031, 300049,  # plate_notch   s0..s3
-    400009, 400021, 400037, 400051,  # stepped_shaft s0..s3
-    500011, 500023, 500039, 500053,  # channel       s0..s3
-    600013, 600027, 600041, 600059,  # sphere_box    s0..s3
+    100003, 100019, 100043, 100057,  # box_hole         s0..s3
+    200003, 200029, 200041, 200063,  # l_bracket        s0..s3
+    300007, 300017, 300031, 300049,  # plate_notch      s0..s3
+    400009, 400021, 400037, 400051,  # stepped_shaft    s0..s3
+    500011, 500023, 500039, 500053,  # channel          s0..s3
+    600013, 600027, 600041, 600059,  # sphere_box       s0..s3
+    700001, 700019, 700033, 700061,  # tube             s0..s3
+    800011, 800029, 800047, 800063,  # perforated_plate s0..s3
 )
 
 MATERIAL = {"E": 2.1e11, "nu": 0.3, "rho": 7850}
@@ -234,6 +244,22 @@ class Geometry:
     """Effective cantilever span from the fixed face to the loaded face (m)."""
     params: dict[str, float] = field(default_factory=dict)
     analytic: str | None = None
+    load_face_boundary: str = "straight"
+    """``straight`` | ``curved`` | ``curved_surface``.
+
+    Declared by the builder rather than inferred, and emitted into the case, so
+    the load-area path a case will take is a stated property instead of one a
+    reader has to deduce from the geometry. Omitting that statement is how
+    ``sphere_box`` and ``stepped_shaft`` ended up as the two blind families.
+
+    ``straight``        planar loaded face, straight edges: the meshed area
+                        equals the exact area and no rescale is needed.
+    ``curved``          planar loaded face with a CURVED BOUNDARY (a disc or an
+                        annulus). The mesh under-resolves the area by a chordal
+                        deficit, so the traction is rescaled onto the CAD rule
+                        area (``apps/testlab/load_area.hpp:18-28``).
+    ``curved_surface``  the loaded face is itself curved (a spherical cap).
+    """
 
     @property
     def diag(self) -> float:
@@ -351,6 +377,7 @@ def build_stepped_shaft(name: str, scale: float, rng: random.Random) -> Geometry
         params={"length": length, "r_root": r_root, "r_tip": r_tip, "step_x": step_x,
                 "slenderness_L_over_D": r10(length / (2.0 * r_root))},
         analytic="stepped_cantilever",
+        load_face_boundary="curved",
     )
 
 
@@ -411,6 +438,130 @@ def build_sphere_box(name: str, scale: float, rng: random.Random) -> Geometry:
         params={"length": length, "half_w": half_w, "boss_radius": radius,
                 "box_section_area": r10(4.0 * half_w * half_w)},
         analytic=None,
+        load_face_boundary="curved_surface",
+    )
+
+
+def build_tube(name: str, scale: float, rng: random.Random) -> Geometry:
+    """Thin-walled hollow circular tube along +x; loaded on the annular end face.
+
+    Chosen for the corpus-widening test because it is the farthest point from the
+    existing six families in descriptor space: fully curved (no planar face
+    carries load), genuinely thin-walled, and hollow. ``channel`` is thin-walled
+    but prismatic; ``stepped_shaft`` is curved but solid. Nothing in the corpus is
+    both.
+
+    The loaded face is a planar annulus whose BOUNDARY is curved, so a mesh
+    under-resolves its area by the usual chordal deficit. That is exactly the
+    condition ``expected_area`` exists for: the authored value is the exact
+    analytic annulus area, and testlab cross-checks it against the CAD rule area
+    and rescales the traction onto the latter
+    (``apps/testlab/load_area.hpp:54-91``). This family therefore exercises the
+    rescaling path deliberately, unlike ``sphere_box`` and ``stepped_shaft``
+    which reached it by omitting the guard altogether.
+    """
+    length = r10(scale)
+    r_outer = r10(scale * jitter(rng, 0.070, 0.100))
+    wall = r10(r_outer * jitter(rng, 0.16, 0.30))
+    r_inner = r10(r_outer - wall)
+    if r_inner <= 0.0:
+        raise ValueError(f"{name}: degenerate tube wall")
+    # The bore is cut with a cylinder longer than the tube at both ends, so the
+    # cut produces a clean through-bore and never a coincident-face sliver.
+    margin = r10(max(wall * 0.5, 1e-4))
+    outer = _cyl((0.0, 0.0, 0.0), (1.0, 0.0, 0.0), r_outer, length)
+    bore = _cyl((r10(-margin), 0.0, 0.0), (1.0, 0.0, 0.0), r_inner,
+                r10(length + 2.0 * margin))
+    shape = _cut(outer, bore, name)
+    _require_solid(shape, name)
+    annulus = r10(math.pi * (r_outer * r_outer - r_inner * r_inner))
+    return Geometry(
+        name=name, family="tube", regime=-1, seed=-1, shape=shape,
+        lo=(0.0, -r_outer, -r_outer), hi=(length, r_outer, r_outer),
+        axis=0, transverse=2,
+        end_area=annulus, guard_end_area=True,
+        load_region="end_slab",
+        fix_axis=0, fix_side="lo", fix_char_len=r10(2.0 * r_outer),
+        # load_char_len sets the load slab depth as LOAD_SLAB_FRAC * it, and for a
+        # hollow section that choice is load-bearing rather than cosmetic. An end
+        # slab also encloses a RING of the inner and outer cylindrical walls, of
+        # area 2*pi*(r_o + r_i)*depth against an annulus of pi*wall*(r_o + r_i) --
+        # a ratio of exactly 2*depth/wall, independent of the geometry. Scaling
+        # the depth off the DIAMETER, as the solid shaft does, would make that
+        # ratio 2*LOAD_SLAB_FRAC*2*r_o/wall, i.e. about 25% on the thinnest wall.
+        #
+        # It matters asymmetrically. For c1/c2 the CAD-side rule substitutes the
+        # slab's thin axis at min_dot 0.7 and so drops the walls
+        # (apps/testlab/main.cpp:1865-1875), but the MESH-side selector honours
+        # normal_min_dot = -1 literally and keeps every face in the box
+        # (main.cpp:937-975). The traction is then rescaled onto the smaller CAD
+        # area, so the resultant stays right while the DISTRIBUTION smears onto
+        # the walls -- the same class of defect as the sphere_box under-loads,
+        # just silent because the rescale hides it in the resultant.
+        #
+        # Scaling off the wall instead pins the ratio at 2*LOAD_SLAB_FRAC*0.2 =
+        # 0.4%, comfortably inside kAuthoredAreaTol (1%), and in practice the
+        # wall triangles are excluded outright because the slab is far thinner
+        # than any element. The annulus faces are unaffected: their centroids sit
+        # exactly on the end plane, which the slab always contains.
+        load_char_len=r10(0.2 * wall),
+        span=length,
+        params={"length": length, "r_outer": r_outer, "r_inner": r_inner,
+                "wall": wall, "annulus_area": annulus,
+                "wall_over_r": r10(wall / r_outer),
+                "slenderness_L_over_D": r10(length / (2.0 * r_outer))},
+        analytic=None,
+        load_face_boundary="curved",
+    )
+
+
+def build_perforated_plate(name: str, scale: float, rng: random.Random) -> Geometry:
+    """Plate with a row of through-holes along its span; loaded on the +x end.
+
+    The second widening family, chosen for the opposite extreme: many small
+    features on an otherwise prismatic solid. It is the only corpus part whose
+    smallest feature is far below the plate thickness, which is precisely the
+    scale at which the corrected engine now refuses to alias a feature away
+    rather than silently meshing through it -- so it probes the new dominant
+    failure mode directly instead of by luck.
+
+    The loaded end face is a plain rectangle with straight edges: planar, exact
+    area, no chordal deficit. Paired with ``tube`` it separates "curved loaded
+    boundary" from "many small features" instead of confounding them.
+    """
+    half_w = r10(0.5 * scale)
+    half_h = r10(half_w * jitter(rng, 0.32, 0.42))
+    thickness = r10(half_h * jitter(rng, 0.18, 0.26))
+    n_holes = 3 + int(rng.random() * 2.0)  # 3 or 4, deterministic under the seed
+    hole_r = r10(half_h * jitter(rng, 0.14, 0.20))
+    # Holes evenly spaced across the span, leaving a full pitch of material at
+    # each end so neither the fixed nor the loaded face is perforated.
+    pitch = r10(2.0 * half_w / (n_holes + 1))
+    if pitch <= 2.2 * hole_r:
+        raise ValueError(f"{name}: perforation pitch too tight for the hole radius")
+    margin = r10(max(thickness * 0.5, 1e-4))
+    shape = _box((-half_w, -half_h, 0.0),
+                 (r10(2.0 * half_w), r10(2.0 * half_h), thickness))
+    for index in range(n_holes):
+        centre_x = r10(-half_w + pitch * (index + 1))
+        drill = _cyl((centre_x, 0.0, r10(-margin)), (0.0, 0.0, 1.0), hole_r,
+                     r10(thickness + 2.0 * margin))
+        shape = _cut(shape, drill, name)
+    _require_solid(shape, name)
+    return Geometry(
+        name=name, family="perforated_plate", regime=-1, seed=-1, shape=shape,
+        lo=(-half_w, -half_h, 0.0), hi=(half_w, half_h, thickness),
+        axis=0, transverse=2,
+        end_area=r10(2.0 * half_h * thickness), guard_end_area=True,
+        load_region="end_slab",
+        fix_axis=0, fix_side="lo",
+        fix_char_len=thickness, load_char_len=thickness,
+        span=r10(2.0 * half_w),
+        params={"half_w": half_w, "half_h": half_h, "thickness": thickness,
+                "hole_r": hole_r, "n_holes": float(n_holes), "pitch": pitch,
+                "ligament": r10(pitch - 2.0 * hole_r),
+                "hole_r_over_thickness": r10(hole_r / thickness)},
+        analytic=None,
     )
 
 
@@ -421,6 +572,8 @@ BUILDERS = {
     "stepped_shaft": build_stepped_shaft,
     "channel": build_channel,
     "sphere_box": build_sphere_box,
+    "tube": build_tube,
+    "perforated_plate": build_perforated_plate,
 }
 
 
@@ -540,6 +693,7 @@ def case_json(geom: Geometry, spec: dict[str, Any]) -> dict[str, Any]:
             "archetype": spec["archetype"],
             "fixed_face": f"{AXIS_NAMES[geom.fix_axis]}_{geom.fix_side}",
             "loaded_face": f"{AXIS_NAMES[geom.axis]}_hi",
+            "load_face_boundary": geom.load_face_boundary,
             "generator": "scripts/gen_primitive_corpus.py",
         },
     }

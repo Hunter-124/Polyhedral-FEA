@@ -10,7 +10,7 @@ is recorded in [`assets/showcase/manifest.json`](assets/showcase/manifest.json).
 Regenerate everything:
 
 ```sh
-python3 scripts/render_showcase.py --all
+python scripts/render_showcase.py --all
 ```
 
 A one-line index of the same assets lives in
@@ -30,7 +30,7 @@ range spans the full field, 0 – 3.84e6 Pa. Exact values per image live in
 [`manifest.json`](assets/showcase/manifest.json).
 
 ```sh
-python3 scripts/render_showcase.py --only hero
+python scripts/render_showcase.py --only hero
 ```
 
 ## Gallery — per-part stress renders
@@ -54,7 +54,7 @@ Feature-aware grading concentrates elements around the hole where the gradient
 lives. h = 3 mm, 35,386 nodes / 174,234 elements, 106,158 DOF.
 
 ```sh
-python3 scripts/render_showcase.py --only plate_hole
+python scripts/render_showcase.py --only plate_hole
 ```
 
 ### `gallery_cantilever.png`
@@ -67,7 +67,7 @@ geometry behind the Timoshenko tip-deflection verification (1.50% error,
 [bench/reports/p1-gate1-convergence.md](../bench/reports/p1-gate1-convergence.md)).
 
 ```sh
-python3 scripts/render_showcase.py --only cantilever
+python scripts/render_showcase.py --only cantilever
 ```
 
 ### `gallery_cylinder.png`
@@ -79,7 +79,7 @@ cylindrical face while the bulk stays coarse. h = 12 mm, 8,823 nodes / 42,443
 elements, 26,469 DOF.
 
 ```sh
-python3 scripts/render_showcase.py --only cylinder
+python scripts/render_showcase.py --only cylinder
 ```
 
 ### `gallery_sphere.png`
@@ -92,7 +92,7 @@ curvature ([ADR-0015](decisions/0015-grid-fill-limits.md)). h = 8 mm, 4,646
 nodes / 22,698 elements, 13,938 DOF.
 
 ```sh
-python3 scripts/render_showcase.py --only sphere
+python scripts/render_showcase.py --only sphere
 ```
 
 ### `gallery_icecream_cone.png`
@@ -105,7 +105,7 @@ OpenCASCADE, meshed at h = 10 mm, and solved with a conserved downward
 resultant on the scoop: 3,250 nodes / 15,301 elements, 9,750 DOF.
 
 ```sh
-python3 scripts/render_showcase.py --only icecream_cone
+python scripts/render_showcase.py --only icecream_cone
 ```
 
 ## Mesher comparison
@@ -175,7 +175,7 @@ sample has p99 = 0.118 h under a 500-point / 2,000-attempt ceiling:
 [`brep-roundtrip-plate-hole-current.json`](../bench/results/brep-roundtrip-plate-hole-current.json).
 
 ```sh
-python3 scripts/render_showcase.py --only compare_meshers
+python scripts/render_showcase.py --only compare_meshers
 ```
 
 ## Grading comparison
@@ -195,7 +195,7 @@ logarithmic radial grading cut SCF error from **3.06%** to **0.70%**
 ([docs/progress.md](progress.md)).
 
 ```sh
-python3 scripts/render_showcase.py --only compare_grading
+python scripts/render_showcase.py --only compare_grading
 ```
 
 ## Benchmark charts
@@ -204,7 +204,7 @@ All three charts are plotted directly from committed JSON/reports — the script
 reads the files, it does not carry the numbers.
 
 ```sh
-python3 scripts/plot_benchmarks.py
+python scripts/plot_benchmarks.py
 ```
 
 ### `bench_dof_time.png`
@@ -284,7 +284,7 @@ hp-adapt driver → back to the sizing field, or out to VTU. The same graph is
 kept as mermaid source in the [README](../README.md#architecture).
 
 ```sh
-python3 scripts/render_showcase.py --only architecture
+python scripts/render_showcase.py --only architecture
 ```
 
 ## GUI
@@ -364,13 +364,13 @@ Three entry points, all pure Python 3 on top of the built CLI:
 ```sh
 # 1. Everything: solves, renders, comparison grids, diagram, charts, manifest.
 #    Idempotent — skips solves whose VTU already exists unless --force.
-python3 scripts/render_showcase.py --all
+python scripts/render_showcase.py --all
 
 # 2. Benchmark charts only, straight from committed bench data.
-python3 scripts/plot_benchmarks.py
+python scripts/plot_benchmarks.py
 
 # 3. Generic labeled tiler, reusable for any set of PNGs.
-python3 scripts/make_compare_grid.py --out OUT.png --title "..." \
+python scripts/make_compare_grid.py --out OUT.png --title "..." \
   --labels tet,graded,hybrid img1.png img2.png img3.png
 ```
 

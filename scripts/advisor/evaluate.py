@@ -1,27 +1,32 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: BSD-3-Clause
-"""Does the advisor actually choose a better mesh than the default?
+"""Does the advisor actually choose a better mesh than the alternatives?
 
 Every other metric in this project scores a *prediction*. This one scores a
 *decision*, which is the only thing the advisor exists to make.
 
 For each held-out case the campaign ran a known set of actions, so the best
 achievable outcome for that case is known exactly. Regret is how much worse the
-chosen action is than that best:
+chosen action is than that best, in log10 units, so 0.30 of regret means
+"0.30 decades = 2x worse than the best mesh this case could have had".
 
-    regret(chooser) = value(chooser's action) - min over actions of value
+Two properties of this script matter more than the numbers it prints:
 
-measured in log10 units, so 0.30 of regret means "0.30 decades = 2x worse than
-the best mesh this case could have had". Three choosers are compared:
+* **It scores the shipped rule.** ``advisor_policy`` reproduces what
+  ``src/advisor/src/advisor.cpp`` does in production -- query the policy head
+  once at the clamp-box default action, decode, clamp, argmax -- next to
+  ``advisor_argmin``, which enumerates the candidates and takes the argmin of
+  the predicted ``rel_err_rel`` head. Those are different policies and only one
+  of them is deployed, so reporting only the second would describe software we
+  do not ship.
 
-* **advisor** -- the action minimizing the model's predicted `rel_err_rel`.
-* **default** -- the clamp-box default action, i.e. what shipping without an
-  advisor gets you. This is the bar to beat.
-* **oracle**  -- the true best action; regret 0 by definition, shown to make the
-  scale readable.
+* **The baselines include a zero-parameter one.** A learned policy that cannot
+  beat the single best constant configuration has not earned its weights.
 
-Ranking quality is reported alongside as Spearman rho between the predicted and
-actual ordering of a case's actions, averaged over cases.
+This is the one-checkpoint view. For the leakage-safe, multi-fold, multi-seed
+view with variance -- which is what any headline number should come from -- use
+``scripts/advisor/crossval.py``. Both share :mod:`advisor.regret`, so they
+cannot drift into reporting different things.
 
     python scripts/advisor/evaluate.py
 """
@@ -30,7 +35,6 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
@@ -41,70 +45,35 @@ if __package__ in (None, ""):  # direct `python scripts/advisor/evaluate.py`
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     __package__ = "advisor"
 
-from .dataset import ADVISOR_DIR, load_dataset  # noqa: E402
+from . import regret as R  # noqa: E402
+from .crossval import build_choosers  # noqa: E402
+from .dataset import ADVISOR_DIR, add_split_args, group_of, load_from_args  # noqa: E402
 from .model import AdvisorNet  # noqa: E402
 
 LATEST_CHECKPOINT = ADVISOR_DIR / "runs" / "latest.pt"
 REPORT_JSON = ADVISOR_DIR / "action_selection.json"
 
-#: Outcome columns a chooser can be scored on, and whether lower is better.
-SCORED_HEADS = ["rel_err", "geo_p99", "solve_ms"]
-
 
 def spearman(a: np.ndarray, b: np.ndarray) -> float:
     """Rank correlation without a scipy dependency."""
-    if a.size < 3:
+    if a.size < 2:
         return float("nan")
-
-    def ranks(v: np.ndarray) -> np.ndarray:
-        order = np.argsort(v, kind="stable")
-        out = np.empty_like(order, dtype=np.float64)
-        out[order] = np.arange(v.size, dtype=np.float64)
-        return out
-
-    ra, rb = ranks(a), ranks(b)
+    ra = np.argsort(np.argsort(a)).astype(np.float64)
+    rb = np.argsort(np.argsort(b)).astype(np.float64)
     ra -= ra.mean()
     rb -= rb.mean()
     denom = float(np.sqrt((ra * ra).sum() * (rb * rb).sum()))
     return float((ra * rb).sum() / denom) if denom > 0.0 else float("nan")
 
 
-def default_row(indices: list[int], x: np.ndarray, columns: list[str],
-                clamps: dict[str, Any], normalization: dict[str, Any]) -> int:
-    """The case's row closest to the clamp-box default action.
-
-    The default action is not guaranteed to be one of the grid points the
-    campaign ran, so the nearest one in standardized action space is used and
-    the distance is reported by the caller.
-    """
-    defaults = clamps["defaults"]
-    mean = np.asarray(normalization["mean"], dtype=np.float64)
-    std = np.asarray(normalization["std"], dtype=np.float64)
-    wanted = {
-        "h_rel": float(defaults["h_rel"]),
-        "eta_target": float(defaults["eta_target"]),
-        "adapt_passes": float(defaults["adapt_passes"]),
-        "p_elevate": 1.0 if defaults["p_elevate"] else 0.0,
-        "order_idx": float(normalization["order_choices"].index(defaults["order"])),
-        "mesher_idx": float(normalization["mesher_choices"].index(defaults["mesher"])),
-    }
-    cols = {name: i for i, name in enumerate(columns)}
-    best, best_d = indices[0], float("inf")
-    for i in indices:
-        d = 0.0
-        for name, target in wanted.items():
-            c = cols.get(name)
-            if c is None:
-                continue
-            d += (float(x[i, c]) - (target - mean[c]) / std[c]) ** 2
-        if d < best_d:
-            best, best_d = i, d
-    return best
-
-
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--checkpoint", default=None)
+    parser.add_argument("--csv", default=None)
+    add_split_args(parser)
+    parser.add_argument("--objective", default="rel_err")
+    parser.add_argument("--budget-head", default="dof", choices=R.BUDGET_HEADS)
     parser.add_argument("--out", default=None)
     parser.add_argument("--threads", type=int, default=4)
     args = parser.parse_args()
@@ -118,85 +87,95 @@ def main() -> int:
     net.load_state_dict(payload["model"])
     net.eval()
 
-    data = load_dataset()
-    split = data.val
-    with torch.no_grad():
-        predicted = net(torch.from_numpy(split.x))
-    score = predicted["rel_err_rel"].numpy().reshape(-1)
+    data = load_from_args(args)
+    choosers, cases, meta = build_choosers(net, data, seed=0, objective=args.objective,
+                                           budget_head=args.budget_head)
+    if not cases:
+        raise SystemExit(
+            f"no held-out case in split {data.split_mode} fold {data.fold} has "
+            f"{R.MIN_ACTIONS}+ measured actions; nothing to score"
+        )
 
-    by_case: dict[str, list[int]] = defaultdict(list)
-    for i, part in enumerate(split.parts):
-        by_case[part].append(i)
+    results: dict[str, Any] = R.score(cases, choosers, budget_head=args.budget_head)
+    results["dof_to_target"] = R.dof_to_target(cases, choosers)
+    results["split_mode"] = data.split_mode
+    results["fold"] = data.fold
+    results["n_folds"] = data.n_folds
+    results["held_out_groups"] = list(data.val_groups)
+    results["family_lookup_hit_rate"] = meta["family_lookup_hit_rate"]()
 
-    results: dict[str, Any] = {"cases": [], "heads": {}}
-    per_head: dict[str, dict[str, list[float]]] = {
-        h: {"advisor": [], "default": [], "oracle": []} for h in SCORED_HEADS
-    }
+    # Ranking quality of the enumerating chooser, kept because a model that
+    # ranks the whole action set is worth more than one that only finds a good
+    # top pick -- but regret, not rho, is what the product depends on.
     rhos: list[float] = []
-
-    for part, rows in sorted(by_case.items()):
-        usable = [i for i in rows if split.masks["rel_err"][i]]
-        if len(usable) < 3:
-            continue
-        truth = split.targets["rel_err"][usable].astype(np.float64)
-        pred = score[usable].astype(np.float64)
-        rho = spearman(pred, truth)
+    scores = {case.part: None for case in cases}
+    with torch.no_grad():
+        predicted = net(torch.from_numpy(data.val.x))["rel_err_rel"].numpy().reshape(-1)
+    for case in cases:
+        rows = np.asarray(case.rows, dtype=int)
+        rho = spearman(predicted[rows].astype(np.float64), case.outcomes["rel_err"])
         if np.isfinite(rho):
             rhos.append(rho)
-
-        chosen = usable[int(np.argmin(pred))]
-        oracle = usable[int(np.argmin(truth))]
-        fallback = default_row(usable, split.x, data.input_columns, data.clamps,
-                               data.normalization)
-
-        entry: dict[str, Any] = {
-            "part": part, "n_actions": len(usable), "spearman": rho,
-            "advisor_cfg": split.cfg_ids[chosen], "default_cfg": split.cfg_ids[fallback],
-            "oracle_cfg": split.cfg_ids[oracle],
-        }
-        for head in SCORED_HEADS:
-            mask = split.masks[head]
-            if not (mask[chosen] and mask[fallback] and mask[oracle]):
-                continue
-            values = split.targets[head]
-            best = float(min(values[i] for i in usable if mask[i]))
-            for name, index in (("advisor", chosen), ("default", fallback), ("oracle", oracle)):
-                per_head[head][name].append(float(values[index]) - best)
-            entry[f"{head}_regret_advisor"] = float(values[chosen]) - best
-            entry[f"{head}_regret_default"] = float(values[fallback]) - best
-        results["cases"].append(entry)
-
     results["mean_spearman"] = float(np.mean(rhos)) if rhos else float("nan")
-    results["n_cases"] = len(results["cases"])
-    for head, choosers in per_head.items():
-        if not choosers["advisor"]:
-            continue
-        results["heads"][head] = {
-            name: {"mean_regret": float(np.mean(v)), "median_regret": float(np.median(v))}
-            for name, v in choosers.items()
-        }
-        adv = float(np.mean(choosers["advisor"]))
-        dfl = float(np.mean(choosers["default"]))
-        results["heads"][head]["improvement_vs_default"] = dfl - adv
-        results["heads"][head]["beats_default"] = bool(adv < dfl)
+
+    results["paired"] = {}
+    for challenger in ("advisor_argmin", "advisor_policy"):
+        for reference in ("default", "constant_config"):
+            if reference not in choosers:
+                continue
+            left, right = R.paired_regrets(cases, choosers[challenger], choosers[reference],
+                                           args.objective, budget_head=args.budget_head,
+                                           quantile=0.5)
+            results["paired"][f"{challenger}_vs_{reference}"] = R.sign_test(left, right)
 
     out = Path(args.out) if args.out else REPORT_JSON
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(results, indent=2) + "\n", encoding="utf-8")
 
+    print(f"split                 : {data.split_mode} fold {data.fold}/{data.n_folds}, "
+          f"holding out {', '.join(data.val_groups)}")
     print(f"held-out cases scored : {results['n_cases']}")
     print(f"mean Spearman rho     : {results['mean_spearman']:.3f}"
-          "   (predicted vs actual action ordering, within case)")
-    print()
-    print(f"{'outcome':>10} | {'advisor':>9} {'default':>9} {'oracle':>7} | {'gain':>8}")
-    print("-" * 54)
-    for head, block in results["heads"].items():
-        print(f"{head:>10} | {block['advisor']['mean_regret']:>9.4f} "
-              f"{block['default']['mean_regret']:>9.4f} "
-              f"{block['oracle']['mean_regret']:>7.4f} | "
-              f"{block['improvement_vs_default']:>+8.4f}")
-    print()
-    print("Mean regret in log10 units; 0 = chose the best action the campaign ran.")
+          "   (advisor_argmin ordering vs actual, within case)")
+    print(f"family_lookup coverage: {results['family_lookup_hit_rate']:.0%} of cases had their "
+          "family in train")
+
+    for label in ("unconstrained", "q0.5", "q0.25"):
+        block = results["levels"].get(label, {})
+        head_block = block.get("heads", {}).get(args.objective)
+        if not head_block:
+            continue
+        print(f"\n{args.objective} regret at budget {label} "
+              f"({args.budget_head} axis, n={block['n_cases']} cases)")
+        print(f"{'chooser':>16} | {'mean':>8} {'median':>8} | {'x worse':>8}")
+        print("-" * 50)
+        for name, stats in sorted(head_block.items(), key=lambda kv: kv[1]["mean_regret"]):
+            print(f"{name:>16} | {stats['mean_regret']:>8.4f} "
+                  f"{stats['median_regret']:>8.4f} | "
+                  f"{R.decades_to_factor(stats['mean_regret']):>8.2f}")
+
+    print("\npaired sign tests (budget q0.5)")
+    for key, test in sorted(results["paired"].items()):
+        print(f"  {key:>38}: {test['wins']}W-{test['losses']}L-{test['ties']}T "
+              f"p={test['p_value']:.4f}")
+
+    print("\nactive DOF to reach a relative-error target "
+          "(reach rate first: spending less while reaching the target less often is not a win)")
+    for target, rows in results["dof_to_target"].items():
+        usable = {k: v for k, v in rows.items() if v["attempted"]}
+        if not usable:
+            continue
+        print(f"  {target}:")
+        ranked = sorted(usable.items(),
+                        key=lambda kv: (-kv[1]["reach_rate"], kv[1]["median_log10_dof"]))
+        for name, stats in ranked:
+            median = stats["median_log10_dof"]
+            spend = f"{10 ** median:>9.0f} DOF" if median == median else "  censored"
+            print(f"    {name:>16}: reached {stats['reached']}/{stats['attempted']} "
+                  f"({stats['reach_rate']:>4.0%})  median {spend}")
+
+    print("\nRegret in log10 units; 0 = chose the best feasible action the campaign ran.")
+    print("Budget levels are quantiles of each case's own candidate cost distribution.")
     print(f"wrote {out}")
     return 0
 

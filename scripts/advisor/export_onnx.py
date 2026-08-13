@@ -52,8 +52,9 @@ from .dataset import (
     ROOT,
     AdvisorData,
     action_group_slices,
+    add_split_args,
     clamp_table,
-    load_dataset,
+    load_from_args,
     standardize_matrix,
     standardize_row,
     write_json,
@@ -275,7 +276,7 @@ def normalization_drift(saved: dict[str, Any], fresh: dict[str, Any]) -> list[st
 
 def run_export(args: argparse.Namespace) -> int:
     checkpoint = Path(args.checkpoint) if args.checkpoint else LATEST_CHECKPOINT
-    data = load_dataset(args.csv, args.val_fraction)
+    data = load_from_args(args)
     net, payload = load_trained(checkpoint, data)
 
     # The graph was trained under the checkpoint's statistics, so those are the
@@ -456,7 +457,8 @@ def tiny_raw_cases(normalization: dict[str, Any]) -> list[dict[str, Any]]:
         raw["h_rel"] = float(defaults["h_rel"])
         raw["eta_target"] = float(defaults["eta_target"])
         raw["adapt_passes"] = float(defaults["adapt_passes"])
-        raw["p_elevate"] = 1.0 if defaults["p_elevate"] else 0.0
+        # No p_elevate: `order >= 2` is the p-elevation actuator, so the column
+        # no longer exists in the input vector.
         raw["order_idx"] = float(normalization["order_choices"].index(defaults["order"]))
         raw["mesher_idx"] = float(normalization["mesher_choices"].index(defaults["mesher"]))
         if name == "imputed_defaults":
@@ -541,7 +543,7 @@ def run_tiny_fixture(args: argparse.Namespace) -> int:
 
     with tempfile.TemporaryDirectory(prefix="advisor-tiny-") as tmp:
         csv_path = synthetic_csv(Path(tmp) / "tiny_dataset.csv")
-        data = load_dataset(csv_path, args.val_fraction)
+        data = load_from_args(args, csv_path)
 
     config = data.model_config()
     config["hidden"] = 16
@@ -631,7 +633,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--checkpoint", default=None, help="checkpoint to export (default runs/latest.pt)")
     parser.add_argument("--output", default=None, help="output .onnx path (default bench/advisor/model.onnx)")
     parser.add_argument("--csv", default=None, help="dataset CSV override")
-    parser.add_argument("--val-fraction", type=float, default=0.2)
+    add_split_args(parser)
     parser.add_argument("--tiny-fixture", action="store_true",
                         help="build the deterministic tests/fixtures/advisor_tiny/ directory")
     parser.add_argument("--fixture-dir", default=None, help="fixture output directory override")

@@ -17,6 +17,8 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <chrono>
+#include <limits>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -122,7 +124,8 @@ TEST_CASE("advisor head outputs match PyTorch within the exported tolerance", "[
     CHECK(checked == 4);
 }
 
-TEST_CASE("advisor guardrails clamp the box and honour the veto", "[advisor]") {
+TEST_CASE("advisor guardrails: gated enumeration stays in the box and honours the veto",
+          "[advisor]") {
     if (!fixture_present()) {
         SKIP("advisor_tiny fixture missing (python scripts/advisor/export_onnx.py "
              "--tiny-fixture)");
@@ -137,8 +140,8 @@ TEST_CASE("advisor guardrails clamp the box and honour the veto", "[advisor]") {
     const double eta_floor = clamps.at("eta_target")[0].get<double>();
     const double eta_ceil = clamps.at("eta_target")[1].get<double>();
     const int passes_ceil = clamps.at("adapt_passes")[1].get<int>();
-    const double passes_ceil_f = static_cast<double>(passes_ceil);
     const double veto_threshold = clamps.value("veto_threshold", 0.5);
+    const double gate_threshold = clamps.value("gate_threshold", veto_threshold);
     const auto order_choices = clamps.at("order_choices").get<std::vector<int>>();
     const auto mesher_choices = clamps.at("mesher_choices").get<std::vector<std::string>>();
 
@@ -149,9 +152,19 @@ TEST_CASE("advisor guardrails clamp the box and honour the veto", "[advisor]") {
     CHECK(defaults.eta_target >= eta_floor);
     CHECK(defaults.eta_target <= eta_ceil);
 
-    bool saw_clamped_floor = false;
+    // The candidate list is what the shipped rule enumerates. Read it here and
+    // re-derive the decision from it independently, rather than trusting the
+    // same code path the test is meant to check.
+    REQUIRE(clamps.contains("candidate_grid"));
+    const json& grid = clamps.at("candidate_grid");
+    REQUIRE(grid.contains("actions"));
+    const json& actions = grid.at("actions");
+    REQUIRE(actions.is_array());
+    REQUIRE(!actions.empty());
+
     bool saw_veto = false;
     bool saw_nominal = false;
+    bool saw_gate_bind = false;
 
     for (const auto& fixture_case : parity.at("cases")) {
         const std::string name = fixture_case.at("name").get<std::string>();
@@ -159,7 +172,8 @@ TEST_CASE("advisor guardrails clamp the box and honour the veto", "[advisor]") {
         const auto columns = columns_of(fixture_case.at("features"));
         const auto decision = advisor.recommend(columns);
 
-        // Guardrail 1 — whatever the heads said, the decision is in the box.
+        // Guardrail 1 — whatever the heads said, the decision is in the box and
+        // in the declared vocabularies.
         CHECK(decision.h_rel >= h_floor);
         CHECK(decision.h_rel <= h_ceil);
         CHECK(decision.eta_target >= eta_floor);
@@ -171,54 +185,62 @@ TEST_CASE("advisor guardrails clamp the box and honour the veto", "[advisor]") {
         CHECK(std::find(mesher_choices.begin(), mesher_choices.end(), decision.mesher) !=
               mesher_choices.end());
 
-        // `recommend` queries the policy at the default action, so that is the
-        // row whose policy output drives the decision. The fixture rows already
-        // carry the default action, so this is the fixture row itself and the
-        // forced policy values are exactly what the C++ sees.
-        auto query = columns;
-        advisor.apply_action(query, defaults);
-        const auto policy = advisor.evaluate(query).policy;
+        // Independently re-derive the gated argmin: score every candidate, drop
+        // those the feasibility head expects to fail, and take the lowest
+        // predicted rel_err_rel among the survivors. If the gate rejects every
+        // candidate the rule falls back to the best-ranked one and leaves the
+        // refusal to the veto, so both arms are reproduced here.
+        double best_survivor_score = std::numeric_limits<double>::infinity();
+        double best_any_score = std::numeric_limits<double>::infinity();
+        json best_survivor;
+        json best_any;
+        for (const auto& action : actions) {
+            auto candidate = defaults;
+            candidate.mesher = action.value("mesher", defaults.mesher);
+            candidate.order = action.value("order", defaults.order);
+            candidate.h_rel = action.value("h_rel", defaults.h_rel);
+            candidate.eta_target = action.value("eta_target", defaults.eta_target);
+            candidate.adapt_passes = action.value("adapt_passes", defaults.adapt_passes);
 
-        // The clamp is applied to the raw policy before anything else, and the
-        // flag survives a veto, so it can be checked on every case.
-        const double clamped_h = std::clamp(policy[0], h_floor, h_ceil);
-        const bool expect_clamped = policy[0] != clamped_h ||
-                                    policy[1] != std::clamp(policy[1], 0.0, passes_ceil_f) ||
-                                    policy[2] != std::clamp(policy[2], eta_floor, eta_ceil);
-        CHECK(decision.clamped == expect_clamped);
-        if (policy[0] < h_floor) {
-            saw_clamped_floor = true;
+            auto query = columns;
+            advisor.apply_action(query, candidate);
+            const auto raw = advisor.evaluate(query);
+            const double score = raw.rel_err_rel;
+            if (!std::isfinite(score)) {
+                continue;
+            }
+            if (score < best_any_score) {
+                best_any_score = score;
+                best_any = action;
+            }
+            if (sigmoid(raw.failure_logit) <= gate_threshold && score < best_survivor_score) {
+                best_survivor_score = score;
+                best_survivor = action;
+            }
         }
+        const bool gate_kept_nothing = best_survivor.is_null();
+        if (gate_kept_nothing && !best_any.is_null()) {
+            saw_gate_bind = true;
+        }
+        const json& expected = gate_kept_nothing ? best_any : best_survivor;
+        REQUIRE(!expected.is_null());
 
-        // Reconstruct the pre-veto recommendation: it is what pass 2 scores,
-        // whether or not the veto then discards it.
-        auto proposed = decision;
-        proposed.h_rel = clamped_h;
-        proposed.adapt_passes =
-            static_cast<int>(std::lround(std::clamp(policy[1], 0.0, passes_ceil_f)));
-        proposed.eta_target = std::clamp(policy[2], eta_floor, eta_ceil);
-        proposed.p_elevate = policy[3] > 0.0;
-        proposed.order = order_choices[static_cast<std::size_t>(std::distance(
-            policy.begin() + 4,
-            std::max_element(policy.begin() + 4,
-                             policy.begin() + 4 +
-                                 static_cast<std::ptrdiff_t>(order_choices.size()))))];
-        const auto mesher_begin =
-            policy.begin() + 4 + static_cast<std::ptrdiff_t>(order_choices.size());
-        proposed.mesher = mesher_choices[static_cast<std::size_t>(std::distance(
-            mesher_begin,
-            std::max_element(mesher_begin,
-                             mesher_begin +
-                                 static_cast<std::ptrdiff_t>(mesher_choices.size()))))];
-
-        auto scored = query;
-        advisor.apply_action(scored, proposed);
-        const auto scored_raw = advisor.evaluate(scored);
+        // The final pass re-scores the chosen action, so the reported prediction
+        // and the veto must both describe THAT action and no other.
+        auto chosen = defaults;
+        chosen.mesher = expected.value("mesher", defaults.mesher);
+        chosen.order = expected.value("order", defaults.order);
+        chosen.h_rel = expected.value("h_rel", defaults.h_rel);
+        chosen.eta_target = expected.value("eta_target", defaults.eta_target);
+        chosen.adapt_passes = expected.value("adapt_passes", defaults.adapt_passes);
+        auto scored_query = columns;
+        advisor.apply_action(scored_query, chosen);
+        const auto scored_raw = advisor.evaluate(scored_query);
         const double failure_prob = sigmoid(scored_raw.failure_logit);
+
         CHECK(decision.failure_prob == Catch::Approx(failure_prob).margin(1e-9));
         CHECK(decision.vetoed == (failure_prob > veto_threshold));
-
-        // The reported score is the pass-2 head verbatim: not de-logged, and
+        // Reported RAW: this head is a log10 difference, not a level, and it is
         // carried across the veto branch so a vetoed row still says what the
         // discarded recommendation scored.
         CHECK(decision.predicted_rel_err_rel ==
@@ -235,21 +257,93 @@ TEST_CASE("advisor guardrails clamp the box and honour the veto", "[advisor]") {
             continue;
         }
 
-        // Not vetoed: the decision IS the clamped policy, exactly.
+        // Not vetoed: the decision IS the independently re-derived gated argmin.
         saw_nominal = true;
-        CHECK(decision.h_rel == Catch::Approx(clamped_h).margin(1e-12));
-        CHECK(decision.eta_target == Catch::Approx(proposed.eta_target).margin(1e-12));
-        CHECK(decision.adapt_passes == proposed.adapt_passes);
-        CHECK(decision.order == proposed.order);
-        CHECK(decision.mesher == proposed.mesher);
-        CHECK(decision.p_elevate == proposed.p_elevate);
-        if (policy[0] < h_floor) {
-            CHECK(decision.h_rel == Catch::Approx(h_floor).margin(1e-12));
+        CHECK(decision.mesher == chosen.mesher);
+        CHECK(decision.order == chosen.order);
+        CHECK(decision.h_rel == Catch::Approx(chosen.h_rel).margin(1e-12));
+        CHECK(decision.eta_target == Catch::Approx(chosen.eta_target).margin(1e-12));
+        CHECK(decision.adapt_passes == chosen.adapt_passes);
+
+        // Every candidate came from the measured list, so the chosen action must
+        // be one of them -- the chooser must never synthesise an action.
+        bool found = false;
+        for (const auto& action : actions) {
+            if (action.value("mesher", std::string{}) == decision.mesher &&
+                action.value("order", 0) == decision.order &&
+                std::abs(action.value("h_rel", 0.0) - decision.h_rel) <= 1e-12) {
+                found = true;
+                break;
+            }
         }
+        CHECK(found);
     }
 
     // The fixture is only proof if it actually reaches both guardrails.
-    CHECK(saw_clamped_floor);
     CHECK(saw_veto);
     CHECK(saw_nominal);
+    // Not required: whether the gate binds depends on the forced head values.
+    // Recorded so a fixture that stops exercising it is visible rather than
+    // silently reducing what this test covers.
+    INFO("gate rejected every candidate on at least one case: " << saw_gate_bind);
+}
+
+// Not run by default: it is a measurement, not a pass/fail assertion, and the
+// number is machine-dependent. Run with
+//   build/tests/polymesh_tests.exe "[advisor][!benchmark]"
+// The cost matters because the shipped rule went from roughly two forward passes
+// to one per candidate action, and that trade needed quantifying before we
+// called it shippable rather than after.
+TEST_CASE("advisor recommend() latency", "[advisor][!benchmark]") {
+    if (!fixture_present()) {
+        SKIP("advisor_tiny fixture missing");
+    }
+    const json clamps = load(kFixtureDir / "clamps.json");
+    const json parity = load(kFixtureDir / "parity.json");
+    const std::size_t candidates =
+        clamps.contains("candidate_grid")
+            ? clamps.at("candidate_grid").value("n_candidates", std::size_t{0})
+            : std::size_t{0};
+
+    const polymesh::advisor::Advisor advisor(kFixtureDir);
+    const auto columns = columns_of(parity.at("cases")[0].at("features"));
+
+    // Warm the session and the allocator so the first call's one-off costs do
+    // not land in the distribution.
+    for (int i = 0; i < 5; ++i) {
+        (void)advisor.recommend(columns);
+    }
+
+    constexpr int kRuns = 200;
+    std::vector<double> micros;
+    micros.reserve(kRuns);
+    for (int i = 0; i < kRuns; ++i) {
+        const auto start = std::chrono::steady_clock::now();
+        const auto decision = advisor.recommend(columns);
+        const auto end = std::chrono::steady_clock::now();
+        (void)decision;
+        micros.push_back(
+            std::chrono::duration<double, std::micro>(end - start).count());
+    }
+    std::sort(micros.begin(), micros.end());
+    const auto pct = [&](double q) {
+        const auto index = static_cast<std::size_t>(q * (micros.size() - 1));
+        return micros[index];
+    };
+
+    const auto model_bytes = std::filesystem::file_size(kFixtureDir / "model.onnx");
+    WARN("advisor recommend() over " << kRuns << " calls, " << candidates
+         << " candidate actions, single-threaded:"
+         << "\n  p50 " << pct(0.50) << " us"
+         << "\n  p90 " << pct(0.90) << " us"
+         << "\n  p99 " << pct(0.99) << " us"
+         << "\n  max " << micros.back() << " us"
+         << "\n  per candidate (p50) " << (candidates ? pct(0.50) / static_cast<double>(candidates) : 0.0)
+         << " us"
+         << "\n  fixture model.onnx " << model_bytes << " bytes");
+
+    // A guard, not a benchmark target: if a recommendation ever costs more than
+    // a tenth of a second it is no longer negligible against a solve and the
+    // candidate list should be pruned via max_candidates.
+    CHECK(pct(0.99) < 100000.0);
 }

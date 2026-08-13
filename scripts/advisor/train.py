@@ -55,8 +55,10 @@ from .dataset import (
     AdvisorData,
     Split,
     action_group_slices,
+    add_split_args,
     continuous_box_halfwidths,
-    load_dataset,
+    load_from_args,
+    provenance,
     write_json,
 )
 from .model import AdvisorNet
@@ -331,11 +333,8 @@ class PolicyObjective:
         total = total + masked_huber(policy[:, continuous].reshape(-1),
                                      target[:, continuous].reshape(-1),
                                      mask[:, continuous].reshape(-1))
-        p_slice = self.groups["p_elevate"]
-        p_mask = mask[:, p_slice].reshape(-1)
-        if bool(p_mask.any()):
-            total = total + masked_bce(policy[:, p_slice].reshape(-1)[p_mask],
-                                       target[:, p_slice].reshape(-1)[p_mask])
+        # No p_elevate branch: it was removed from the action vector because
+        # `order >= 2` is the same actuator (apps/cli/main.cpp:805).
         for name in ("order", "mesher"):
             group = self.groups[name]
             rows = mask[:, group].all(dim=1)
@@ -360,8 +359,6 @@ class PolicyObjective:
         if policy.numel() == 0 or not bool(mask.any()):
             return math.nan
         predicted = policy.clone()
-        p_slice = self.groups["p_elevate"]
-        predicted[:, p_slice] = torch.sigmoid(policy[:, p_slice])
         for name in ("order", "mesher"):
             group = self.groups[name]
             predicted[:, group] = torch.softmax(policy[:, group], dim=1)
@@ -461,6 +458,11 @@ def save_checkpoint(path: Path, model: AdvisorNet, optimizer: torch.optim.Optimi
         "run": run,
         "normalization": data.normalization,
         "clamps": data.clamps,
+        # Which dataset, which split, which commit, which seed. Without this a
+        # checkpoint cannot be tied to the CSV that produced it, which stopped
+        # being answerable from the filename the moment the reference truths were
+        # replaced under a running analysis.
+        "provenance": provenance(data, seed=SEED, run=run),
     }, path)
 
 
@@ -552,7 +554,7 @@ def run_training(args: argparse.Namespace) -> int:
     torch.set_num_threads(max(1, int(args.threads)))
     torch.manual_seed(SEED)
 
-    data = load_dataset(args.csv, args.val_fraction)
+    data = load_from_args(args)
     config = load_weights_config(args.weights)
     policy_objective = PolicyObjective(data.mesher_choices)
 
@@ -664,7 +666,7 @@ def run_baseline(args: argparse.Namespace) -> int:
             f"install it with: python -m pip install lightgbm"
         ) from error
 
-    data = load_dataset(args.csv, args.val_fraction)
+    data = load_from_args(args)
     params = {"n_estimators": 300, "learning_rate": 0.05, "num_leaves": 31,
               "min_child_samples": 5, "n_jobs": 4, "random_state": SEED, "verbose": -1}
 
@@ -840,7 +842,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                         help="Adam L2 regularisation; the net overfits small corpora without it")
     parser.add_argument("--threads", type=int, default=4, help="torch CPU threads")
     parser.add_argument("--csv", default=None, help="dataset CSV override")
-    parser.add_argument("--val-fraction", type=float, default=0.2)
+    add_split_args(parser)
     parser.add_argument("--weights", type=Path, default=None, help="weights.json override")
     parser.add_argument("--prune-fraction", type=float, default=0.05)
     parser.add_argument("--activation-row", type=int, default=0,

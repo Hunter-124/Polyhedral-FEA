@@ -13,13 +13,7 @@
   ],
   "order_choices": [
     1,
-    2,
-    3,
-    4
-  ],
-  "p_elevate_choices": [
-    0,
-    1
+    2
   ],
   "mesher_choices": [
     "graded_tet",
@@ -29,21 +23,211 @@
     "h_rel",
     "adapt_passes",
     "eta_target",
-    "p_elevate_logit",
     "order_logit_1",
     "order_logit_2",
-    "order_logit_3",
-    "order_logit_4",
     "mesher_logit_graded_tet",
     "mesher_logit_hybrid_zoo"
   ],
   "veto_threshold": 0.5,
+  "candidate_grid": {
+    "actions": [
+      {
+        "mesher": "graded_tet",
+        "order": 1,
+        "h_rel": 0.08,
+        "adapt_passes": 1,
+        "eta_target": 0.02,
+        "measured_rows": 36
+      },
+      {
+        "mesher": "graded_tet",
+        "order": 1,
+        "h_rel": 0.09,
+        "adapt_passes": 1,
+        "eta_target": 0.02,
+        "measured_rows": 168
+      },
+      {
+        "mesher": "graded_tet",
+        "order": 1,
+        "h_rel": 0.12,
+        "adapt_passes": 0,
+        "eta_target": 0.0,
+        "measured_rows": 168
+      },
+      {
+        "mesher": "graded_tet",
+        "order": 1,
+        "h_rel": 0.12,
+        "adapt_passes": 1,
+        "eta_target": 0.005,
+        "measured_rows": 72
+      },
+      {
+        "mesher": "graded_tet",
+        "order": 1,
+        "h_rel": 0.12,
+        "adapt_passes": 1,
+        "eta_target": 0.02,
+        "measured_rows": 240
+      },
+      {
+        "mesher": "graded_tet",
+        "order": 1,
+        "h_rel": 0.12,
+        "adapt_passes": 1,
+        "eta_target": 0.05,
+        "measured_rows": 72
+      },
+      {
+        "mesher": "graded_tet",
+        "order": 1,
+        "h_rel": 0.12,
+        "adapt_passes": 2,
+        "eta_target": 0.005,
+        "measured_rows": 72
+      },
+      {
+        "mesher": "graded_tet",
+        "order": 1,
+        "h_rel": 0.12,
+        "adapt_passes": 2,
+        "eta_target": 0.05,
+        "measured_rows": 72
+      },
+      {
+        "mesher": "graded_tet",
+        "order": 1,
+        "h_rel": 0.16,
+        "adapt_passes": 1,
+        "eta_target": 0.02,
+        "measured_rows": 168
+      },
+      {
+        "mesher": "graded_tet",
+        "order": 2,
+        "h_rel": 0.12,
+        "adapt_passes": 0,
+        "eta_target": 0.0,
+        "measured_rows": 168
+      },
+      {
+        "mesher": "hybrid_zoo",
+        "order": 1,
+        "h_rel": 0.08,
+        "adapt_passes": 1,
+        "eta_target": 0.02,
+        "measured_rows": 36
+      },
+      {
+        "mesher": "hybrid_zoo",
+        "order": 1,
+        "h_rel": 0.09,
+        "adapt_passes": 1,
+        "eta_target": 0.02,
+        "measured_rows": 168
+      },
+      {
+        "mesher": "hybrid_zoo",
+        "order": 1,
+        "h_rel": 0.12,
+        "adapt_passes": 0,
+        "eta_target": 0.0,
+        "measured_rows": 138
+      },
+      {
+        "mesher": "hybrid_zoo",
+        "order": 1,
+        "h_rel": 0.12,
+        "adapt_passes": 1,
+        "eta_target": 0.005,
+        "measured_rows": 72
+      },
+      {
+        "mesher": "hybrid_zoo",
+        "order": 1,
+        "h_rel": 0.12,
+        "adapt_passes": 1,
+        "eta_target": 0.02,
+        "measured_rows": 240
+      },
+      {
+        "mesher": "hybrid_zoo",
+        "order": 1,
+        "h_rel": 0.12,
+        "adapt_passes": 1,
+        "eta_target": 0.05,
+        "measured_rows": 72
+      },
+      {
+        "mesher": "hybrid_zoo",
+        "order": 1,
+        "h_rel": 0.12,
+        "adapt_passes": 2,
+        "eta_target": 0.005,
+        "measured_rows": 72
+      },
+      {
+        "mesher": "hybrid_zoo",
+        "order": 1,
+        "h_rel": 0.12,
+        "adapt_passes": 2,
+        "eta_target": 0.05,
+        "measured_rows": 72
+      },
+      {
+        "mesher": "hybrid_zoo",
+        "order": 1,
+        "h_rel": 0.16,
+        "adapt_passes": 1,
+        "eta_target": 0.02,
+        "measured_rows": 168
+      },
+      {
+        "mesher": "hybrid_zoo",
+        "order": 2,
+        "h_rel": 0.12,
+        "adapt_passes": 0,
+        "eta_target": 0.0,
+        "measured_rows": 138
+      }
+    ],
+    "n_candidates": 20,
+    "order_collapsed_when_adapt_passes_positive": true,
+    "collapse_evidence": "264 of 264 matched pairs differing only in order at adapt_passes > 0 are bit-identical in n_dof, n_nodes and rel_err",
+    "observed_levels": {
+      "h_rel": [
+        0.08,
+        0.09,
+        0.12,
+        0.16
+      ],
+      "adapt_passes": [
+        0,
+        1,
+        2
+      ],
+      "eta_target": [
+        0.0,
+        0.005,
+        0.02,
+        0.05
+      ],
+      "order": [
+        1,
+        2
+      ],
+      "mesher": [
+        "graded_tet",
+        "hybrid_zoo"
+      ]
+    }
+  },
   "defaults": {
     "mesher": "hybrid_zoo",
     "h_rel": 0.1,
     "order": 1,
     "adapt_passes": 0,
-    "eta_target": 0.0,
-    "p_elevate": false
+    "eta_target": 0.0
   }
 }

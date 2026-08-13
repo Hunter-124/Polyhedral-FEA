@@ -12,9 +12,10 @@ Design notes
 * Every regression head carries its own validity mask. A row contributes to a
   head only when that head's *raw* target is present and finite, and only when
   the row is not a failure. Failure rows are always kept for the failure head.
-* The train/validation split is by a stable ``blake2b`` hash of the ``part``
-  string, so no part straddles the split and the assignment is identical on
-  every machine and every run.
+* The train/validation split is by geometry GROUP, never by row and never by
+  the full ``part`` string. The corpus is parametric -- ``box_hole_s0_c0`` and
+  ``box_hole_s0_c1`` are the same CAD solid under a different load case -- so a
+  per-part split puts an identical geometry on both sides. See :func:`group_of`.
 * ``order_idx`` / ``mesher_idx`` are *passthrough* columns (mean 0, std 1) so
   the plain ``(x - mean) / std`` loop in the C++ inference module stays valid
   for all D columns; the embedding lookup happens inside the graph.
@@ -26,8 +27,13 @@ import csv
 import hashlib
 import json
 import math
+import os
+import re
+import subprocess
+import sys
 from collections import Counter
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -59,14 +65,70 @@ CASE_COLUMNS: list[str] = [
     "case_poisson", "case_n_fix_regions", "case_n_load_regions", "case_load_dir_x",
     "case_load_dir_y", "case_load_dir_z", "case_traction_magnitude",
 ]
+
+#: Real per-part geometric descriptors, computed offline from the STEP files by
+#: ``scripts/advisor/geometry_features.py`` and joined by geometry name. They
+#: exist because the campaign's own geometry columns are largely dead: ten of
+#: the original 44 inputs are constant across all 3,456 rows, and ``curved_frac``
+#: is 1.0 in every single one because its formula saturates
+#: (``apps/testlab/main.cpp:1709``). A model cannot prefer ``graded_tet`` on a
+#: curved part when every part reports identical curvature, which is the most
+#: likely reason matched-cost judgement measured worse than random.
+#:
+#: Empty when ``bench/advisor/geometry_features.csv`` is absent, so the loader
+#: still works without the OCP binding.
+GEOMETRY_FEATURES_CSV = ADVISOR_DIR / "geometry_features.csv"
+
+
+def _load_geometry_features() -> tuple[list[str], dict[str, dict[str, float]]]:
+    """Read the offline descriptor table, keyed by geometry name.
+
+    Joined on ``<family>_s<n>`` rather than the full part id, because these are
+    properties of the CAD solid and every load case of one solid shares them.
+
+    Set ``ADVISOR_NO_GEOMETRY_FEATURES=1`` to ablate them. The with/without
+    comparison is the experiment that says whether they help, so it has to be
+    runnable from a flag rather than by moving the file out of the way.
+    """
+    if os.environ.get("ADVISOR_NO_GEOMETRY_FEATURES"):
+        return [], {}
+    if not GEOMETRY_FEATURES_CSV.is_file():
+        return [], {}
+    with GEOMETRY_FEATURES_CSV.open("r", newline="", encoding="utf-8") as stream:
+        rows = list(csv.DictReader(stream))
+    if not rows:
+        return [], {}
+    names = [name for name in rows[0] if name != "part"]
+
+    def cell(value: Any) -> float:
+        try:
+            number = float(str(value).strip())
+        except (TypeError, ValueError):
+            return math.nan
+        return number if math.isfinite(number) else math.nan
+
+    table = {
+        str(row["part"]): {name: cell(row.get(name)) for name in names}
+        for row in rows
+    }
+    return names, table
+
+
+GEOMETRY_FEATURE_COLUMNS, GEOMETRY_FEATURE_TABLE = _load_geometry_features()
 CONTINUOUS_ACTION_COLUMNS: list[str] = [
-    "h_rel", "eta_target", "adapt_passes", "p_elevate", "element_tendency",
+    # ``p_elevate`` is deliberately absent. It is not merely unvaried in the
+    # corpus, it is redundant: ``apps/cli/main.cpp:805`` computes
+    # ``p_elevate = decision.p_elevate || decision.order >= 2``, so it actuates
+    # exactly what ``order >= 2`` already actuates. Advertising it as a separate
+    # policy dimension claimed a control the engine does not have.
+    "h_rel", "eta_target", "adapt_passes", "element_tendency",
     "skin_layers", "feature_refine", "bc_grading", "adapt_leb_waves",
 ]
 CATEGORICAL_INDEX_COLUMNS: list[str] = ["order_idx", "mesher_idx"]
 
 INPUT_COLUMNS: list[str] = (
-    FEATURE_COLUMNS + CASE_COLUMNS + CONTINUOUS_ACTION_COLUMNS + CATEGORICAL_INDEX_COLUMNS
+    FEATURE_COLUMNS + GEOMETRY_FEATURE_COLUMNS + CASE_COLUMNS
+    + CONTINUOUS_ACTION_COLUMNS + CATEGORICAL_INDEX_COLUMNS
 )
 PASSTHROUGH_COLUMNS: list[str] = list(CATEGORICAL_INDEX_COLUMNS)
 
@@ -106,8 +168,12 @@ OK_STATUSES: frozenset[str] = frozenset({"ok", "solve_suspect"})
 
 # --- C4 clamp box -----------------------------------------------------------
 
-ORDER_CHOICES: list[int] = [1, 2, 3, 4]
-P_ELEVATE_CHOICES: list[int] = [0, 1]
+#: Only orders 1 and 2 exist. ``fea::promote_to_quadratic``
+#: (``src/fea/include/fea/p_elevate.hpp:33-38``) is a single linear->quadratic
+#: step, and ``apps/cli/main.cpp:814-818`` warns and downgrades anything higher.
+#: The vocabulary previously advertised 3 and 4, so the policy head spent two of
+#: its ten outputs on actions that could never be performed.
+ORDER_CHOICES: list[int] = [1, 2]
 CONTINUOUS_ACTION_DIMS: list[str] = ["h_rel", "adapt_passes", "eta_target"]
 CLAMP_BOX: dict[str, tuple[float, float]] = {
     "h_rel": (0.005, 0.2),
@@ -125,7 +191,6 @@ ACTION_DEFAULTS: dict[str, Any] = {
     "order": 1,
     "adapt_passes": 0,
     "eta_target": 0.0,
-    "p_elevate": False,
 }
 
 STD_FLOOR = 1e-9
@@ -183,10 +248,52 @@ def row_key(row: dict[str, str]) -> str:
     )
 
 
-def part_bucket(part: str) -> float:
-    """Deterministic value in ``[0, 1)`` derived from the part name."""
-    digest = hashlib.blake2b(part.encode("utf-8")).digest()
-    return (int.from_bytes(digest, "big") % 1_000_000_007) / 1_000_000_007
+#: parts are named ``<family>_s<shape>_c<case>``; ``_s\d+_c\d+`` is the suffix
+#: that distinguishes a shape variant and a load case of one family.
+PART_SUFFIX_RE = re.compile(r"_s\d+_c\d+$")
+CASE_SUFFIX_RE = re.compile(r"_c\d+$")
+
+#: How :func:`load_dataset` groups parts before holding a fold out.
+#:
+#: ``family``   all shape variants and load cases of one base geometry, e.g.
+#:              every ``box_hole_*``. Six groups today. This is the only split
+#:              that measures generalization to an unseen geometry family, and
+#:              it is the default because it is the only defensible one.
+#: ``geometry`` one CAD solid, its load cases held together, e.g. every
+#:              ``box_hole_s0_*``. Twenty-four groups today. Weaker: a held-out
+#:              geometry still has three siblings from its family in train.
+#: ``part``     one (geometry, load case) pair. Measured on the v3 corpus,
+#:              *every* held-out row then has a row in train with an identical
+#:              geometry-feature and action vector, so this mode exists only to
+#:              reproduce the leakage it causes and must never ship a number.
+SPLIT_MODES: tuple[str, ...] = ("family", "geometry", "part")
+DEFAULT_SPLIT_MODE = "family"
+
+
+def family_of(part: str) -> str:
+    """``box_hole_s0_c1`` -> ``box_hole``."""
+    return PART_SUFFIX_RE.sub("", part)
+
+
+def geometry_of(part: str) -> str:
+    """``box_hole_s0_c1`` -> ``box_hole_s0`` (one CAD solid, any load case)."""
+    return CASE_SUFFIX_RE.sub("", part)
+
+
+def group_of(part: str, mode: str = DEFAULT_SPLIT_MODE) -> str:
+    """The hold-out group a part belongs to under ``mode``."""
+    if mode == "family":
+        return family_of(part)
+    if mode == "geometry":
+        return geometry_of(part)
+    if mode == "part":
+        return part
+    raise ValueError(f"unknown split mode {mode!r}; expected one of {SPLIT_MODES}")
+
+
+def split_groups(parts: list[str], mode: str = DEFAULT_SPLIT_MODE) -> list[str]:
+    """Sorted unique hold-out groups present in ``parts``."""
+    return sorted({group_of(part, mode) for part in parts})
 
 
 # --------------------------------------------------------------------------- #
@@ -244,6 +351,13 @@ class AdvisorData:
     mesher_choices: list[str]
     n_rows: int
     csv_path: Path
+    #: Which hold-out grouping produced ``train``/``val``, and which fold of it.
+    #: Persisted into every checkpoint and report so a number can never be read
+    #: without knowing how hard the split that produced it was.
+    split_mode: str = DEFAULT_SPLIT_MODE
+    fold: int = 0
+    n_folds: int = 1
+    val_groups: list[str] = field(default_factory=list)
 
     @property
     def n_inputs(self) -> int:
@@ -289,8 +403,12 @@ def model_config(input_columns: list[str], action_dims: list[str],
 # --------------------------------------------------------------------------- #
 
 def build_action_dims(mesher_choices: list[str]) -> list[str]:
-    """``action_dims`` exactly as specified by C4."""
-    dims = ["h_rel", "adapt_passes", "eta_target", "p_elevate_logit"]
+    """The policy head's output layout: 3 continuous dims then two argmax blocks.
+
+    Width is ``3 + len(ORDER_CHOICES) + len(mesher_choices)`` = 7 today. It was
+    10 while a ``p_elevate_logit`` and two unreachable order logits were carried.
+    """
+    dims = ["h_rel", "adapt_passes", "eta_target"]
     dims += [f"order_logit_{value}" for value in ORDER_CHOICES]
     dims += [f"mesher_logit_{name}" for name in mesher_choices]
     return dims
@@ -298,17 +416,97 @@ def build_action_dims(mesher_choices: list[str]) -> list[str]:
 
 def action_group_slices(mesher_choices: list[str]) -> dict[str, slice]:
     """Index ranges of each logical group inside the action vector."""
+    n_continuous = len(CONTINUOUS_ACTION_DIMS)
     n_order = len(ORDER_CHOICES)
     n_mesher = len(mesher_choices)
     return {
-        "continuous": slice(0, 3),
-        "p_elevate": slice(3, 4),
-        "order": slice(4, 4 + n_order),
-        "mesher": slice(4 + n_order, 4 + n_order + n_mesher),
+        "continuous": slice(0, n_continuous),
+        "order": slice(n_continuous, n_continuous + n_order),
+        "mesher": slice(n_continuous + n_order, n_continuous + n_order + n_mesher),
     }
 
 
-def clamp_table(mesher_choices: list[str]) -> dict[str, Any]:
+def candidate_grid(rows: list[dict[str, str]], mesher_choices: list[str],
+                   max_candidates: int = 128) -> dict[str, Any]:
+    """The explicit list of actions a deployed chooser enumerates and scores.
+
+    A LIST of measured actions, not a cross product of per-dial levels. The
+    difference matters twice over.
+
+    First, a cross product invents combinations. The corpus runs
+    ``adapt_passes = 0`` only at ``h_rel = 0.12``, so crossing the dials would
+    manufacture "no adaptivity at h_rel = 0.08" and ask the regression heads to
+    extrapolate to it. That is the failure mode that produced
+    ``predicted_dof = 1.5e15`` on an unseen part. Every action here was actually
+    run, so no query leaves the training support.
+
+    Second, it lets provably inert dials be collapsed. Measured on this corpus,
+    ``order`` has NO effect when ``adapt_passes > 0``: of 264 matched pairs
+    differing only in ``order``, 264 are bit-identical in ``n_dof``, ``n_nodes``
+    and ``rel_err``, because that path takes the adaptive driver's marked p-set
+    and never consults ``cfg.order`` (``src/pipeline/src/scene.cpp:4408``). Those
+    candidates are duplicates and are dropped -- 26 distinct measured tuples
+    collapse to 20. ``eta_target`` is NOT collapsed: at 193 of 237 matched pairs
+    it is inert too, but not always, so dropping it would discard real actions.
+
+    ``max_candidates`` is a latency budget: each action costs one forward pass in
+    the C++ chooser, against roughly 2 for the retired single-shot rule.
+    """
+    seen: dict[tuple[Any, ...], int] = {}
+    for row in rows:
+        mesher = str(row.get("mesher", "") or "").strip()
+        if mesher not in mesher_choices:
+            continue
+        order = to_float(row.get("order"))
+        h_rel = to_float(row.get("h_rel"))
+        passes = to_float(row.get("adapt_passes"))
+        eta = to_float(row.get("eta_target"))
+        if not all(math.isfinite(v) for v in (order, h_rel, passes, eta)):
+            continue
+        order_int = int(round(order))
+        passes_int = int(round(passes))
+        if order_int not in ORDER_CHOICES:
+            continue
+        # Collapse the inert order dial rather than scoring duplicate actions.
+        if passes_int > 0:
+            order_int = ORDER_CHOICES[0]
+        key = (mesher, order_int, round(h_rel, 6), passes_int, round(eta, 6))
+        seen[key] = seen.get(key, 0) + 1
+
+    actions = [
+        {"mesher": m, "order": o, "h_rel": h, "adapt_passes": p, "eta_target": e,
+         "measured_rows": n}
+        for (m, o, h, p, e), n in sorted(seen.items(), key=lambda kv: kv[0])
+    ]
+    grid: dict[str, Any] = {
+        "actions": actions,
+        "n_candidates": len(actions),
+        "order_collapsed_when_adapt_passes_positive": True,
+        "collapse_evidence": ("264 of 264 matched pairs differing only in order at "
+                              "adapt_passes > 0 are bit-identical in n_dof, n_nodes "
+                              "and rel_err"),
+        # Kept for readability and for the figures generator; the C++ side reads
+        # `actions`, never these.
+        "observed_levels": {
+            "h_rel": sorted({a["h_rel"] for a in actions}),
+            "adapt_passes": sorted({a["adapt_passes"] for a in actions}),
+            "eta_target": sorted({a["eta_target"] for a in actions}),
+            "order": sorted({a["order"] for a in actions}),
+            "mesher": sorted({a["mesher"] for a in actions}),
+        },
+    }
+    if not actions:
+        raise SystemExit("candidate grid is empty; the dataset has no usable actions")
+    if len(actions) > max_candidates:
+        raise SystemExit(
+            f"candidate grid has {len(actions)} actions, over the {max_candidates} "
+            "ceiling; each one costs a forward pass in the C++ chooser"
+        )
+    return grid
+
+
+def clamp_table(mesher_choices: list[str],
+                rows: list[dict[str, str]] | None = None) -> dict[str, Any]:
     """The C4 ``clamps.json`` payload."""
     # The default action is what a feasibility veto falls back to, so it has to
     # be a legal action for THIS model: a default mesher absent from the trained
@@ -327,10 +525,10 @@ def clamp_table(mesher_choices: list[str]) -> dict[str, Any]:
         "eta_target": list(CLAMP_BOX["eta_target"]),
         "adapt_passes": [int(CLAMP_BOX["adapt_passes"][0]), int(CLAMP_BOX["adapt_passes"][1])],
         "order_choices": list(ORDER_CHOICES),
-        "p_elevate_choices": list(P_ELEVATE_CHOICES),
         "mesher_choices": list(mesher_choices),
         "action_dims": build_action_dims(mesher_choices),
         "veto_threshold": VETO_THRESHOLD,
+        "candidate_grid": candidate_grid(rows, mesher_choices) if rows else None,
         "defaults": defaults,
     }
 
@@ -363,15 +561,47 @@ def read_rows(csv_path: Path) -> list[dict[str, str]]:
 
 
 def _failure_flag(row: dict[str, str]) -> float:
+    """Did the engine fail to deliver a usable solve?
+
+    Deliberately NOT a function of ``accuracy_trusted``. That column is the
+    solve HEALTH gate -- ``apps/testlab/main.cpp:2525`` sets it to ``health_ok``,
+    and ``main.cpp:2562`` sets ``status = health_ok ? "ok" : "solve_suspect"``
+    from the same flag, so ``accuracy_trusted == false`` is exactly
+    ``status == "solve_suspect"`` (verified: 144 of 144 rows on the v3 corpus).
+
+    The old definition was therefore self-contradictory: ``OK_STATUSES``
+    explicitly whitelists ``solve_suspect`` as not-a-failure, and then the
+    ``accuracy_trusted`` clause re-flagged every one of those rows as a failure.
+    The cost of that was real. A residual- or reaction-gate wobble made the row
+    a "failure" for the feasibility head, which is meant to predict "will this
+    mesh and solve at all", and simultaneously discarded its ``n_dof``,
+    ``mesh_ms``, ``solve_ms`` and B-rep distances -- none of which depend on the
+    health gate or on the accuracy reference at all.
+
+    Health failures are still worth excluding from the ACCURACY heads, because a
+    solve that failed its residual check has an untrustworthy answer. That is
+    what :func:`_trust_flag` does, and it stops there.
+    """
     status = str(row.get("status", "") or "").strip()
     error = str(row.get("error", "") or "").strip()
     if error and error.lower() not in OK_STATUSES:
         return 1.0
     if status and status.lower() not in OK_STATUSES:
         return 1.0
-    if to_bool(row.get("accuracy_trusted")) is False:
-        return 1.0
     return 0.0
+
+
+def _trust_flag(row: dict[str, str]) -> bool:
+    """Did this row's solve pass its health gate, so its answer can be believed?
+
+    Masks the accuracy heads only. Note this is a statement about the SOLVE, not
+    about how close the answer landed to the reference: a coarse mesh that is
+    50 % off is a perfectly trustworthy measurement of a bad action, and it is
+    exactly the signal the advisor has to learn from. Masking on closeness would
+    be selecting on the outcome. A blank column is treated as trusted; only an
+    explicit ``false`` is not.
+    """
+    return to_bool(row.get("accuracy_trusted")) is not False
 
 
 def _raw_matrix(rows: list[dict[str, str]], mesher_choices: list[str]) -> np.ndarray:
@@ -379,6 +609,12 @@ def _raw_matrix(rows: list[dict[str, str]], mesher_choices: list[str]) -> np.nda
     n = len(rows)
     x = np.full((n, len(INPUT_COLUMNS)), np.nan, dtype=np.float64)
     plain = FEATURE_COLUMNS + CASE_COLUMNS + CONTINUOUS_ACTION_COLUMNS
+    # Column positions are looked up by NAME, never by enumeration order: the
+    # geometry descriptors sit between FEATURE_COLUMNS and CASE_COLUMNS in
+    # INPUT_COLUMNS, so a positional loop over `plain` would silently write every
+    # case and action value into the wrong column.
+    plain_cols = [INPUT_COLUMNS.index(name) for name in plain]
+    geo_cols = [INPUT_COLUMNS.index(name) for name in GEOMETRY_FEATURE_COLUMNS]
     order_lookup = {value: index for index, value in enumerate(ORDER_CHOICES)}
     mesher_lookup = {name: index for index, name in enumerate(mesher_choices)}
     order_unknown = float(len(ORDER_CHOICES))
@@ -386,8 +622,17 @@ def _raw_matrix(rows: list[dict[str, str]], mesher_choices: list[str]) -> np.nda
     order_col = INPUT_COLUMNS.index("order_idx")
     mesher_col = INPUT_COLUMNS.index("mesher_idx")
     for r, row in enumerate(rows):
-        for c, name in enumerate(plain):
+        for name, c in zip(plain, plain_cols):
             x[r, c] = to_float(row.get(name))
+        if geo_cols:
+            # Joined on the CAD solid, so all three load cases of a geometry
+            # share it. A missing geometry leaves NaN and is imputed like any
+            # other absent column rather than silently becoming zero.
+            descriptors = GEOMETRY_FEATURE_TABLE.get(
+                geometry_of(str(row.get("part", "") or "")))
+            if descriptors:
+                for name, c in zip(GEOMETRY_FEATURE_COLUMNS, geo_cols):
+                    x[r, c] = descriptors.get(name, math.nan)
         order_value = to_float(row.get("order"))
         if math.isfinite(order_value) and int(round(order_value)) in order_lookup:
             x[r, order_col] = float(order_lookup[int(round(order_value))])
@@ -482,13 +727,8 @@ def _best_actions(rows: list[dict[str, str]], failure: np.ndarray,
                 lo, hi = CLAMP_BOX[name]
                 vector[groups["continuous"].start + offset] = float(min(max(value, lo), hi))
                 valid[groups["continuous"].start + offset] = True
-        p_elevate = to_bool(row.get("p_elevate"))
-        if p_elevate is None:
-            numeric = to_float(row.get("p_elevate"))
-            p_elevate = bool(round(numeric)) if math.isfinite(numeric) else None
-        if p_elevate is not None:
-            vector[groups["p_elevate"]] = 1.0 if p_elevate else 0.0
-            valid[groups["p_elevate"]] = True
+        # `order >= 2` is the p-elevation actuator; there is no separate
+        # p_elevate dimension to clone into.
         order_value = to_float(row.get("order"))
         if math.isfinite(order_value) and int(round(order_value)) in order_lookup:
             vector[groups["order"].start + order_lookup[int(round(order_value))]] = 1.0
@@ -551,8 +791,19 @@ def _require_stage_a_supervision(masks: dict[str, np.ndarray], is_train: np.ndar
     )
 
 
-def load_dataset(csv_path: Path | str | None = None, val_fraction: float = 0.2) -> AdvisorData:
-    """Read the advisor CSV and produce standardized train/val splits."""
+def load_dataset(csv_path: Path | str | None = None,
+                 split: str = DEFAULT_SPLIT_MODE,
+                 fold: int = 0,
+                 n_folds: int | None = None,
+                 max_train_groups: int | None = None,
+                 group_seed: int = 0) -> AdvisorData:
+    """Read the advisor CSV and produce standardized train/val splits.
+
+    ``split`` names the hold-out grouping (see :data:`SPLIT_MODES`) and ``fold``
+    selects which group block is held out. ``n_folds`` defaults to the number
+    of groups, i.e. true leave-one-group-out: with today's six families that is
+    six folds of exactly one family each.
+    """
     path = Path(csv_path) if csv_path is not None else DATASET_CSV
     rows = read_rows(path)
     if not rows:
@@ -574,13 +825,36 @@ def load_dataset(csv_path: Path | str | None = None, val_fraction: float = 0.2) 
     targets, presence = _raw_targets(rows)
     failure = np.asarray([_failure_flag(row) for row in rows], dtype=np.float32)
     ok = failure == 0.0
-    masks = {head: (present & ok) for head, present in presence.items()}
+    trusted = np.asarray([_trust_flag(row) for row in rows], dtype=bool)
+    # Accuracy heads additionally require a trusted label; geometry and cost
+    # heads do not, because they are measured off the mesh and the clock rather
+    # than against the reference.
+    accuracy_masked = {"rel_err", "rel_err_rel"}
+    masks = {
+        head: (present & ok & trusted) if head in accuracy_masked else (present & ok)
+        for head, present in presence.items()
+    }
     policy_target, policy_mask = _best_actions(
-        rows, failure, targets["rel_err"], presence["rel_err"], mesher_choices
+        rows, failure, targets["rel_err"], masks["rel_err"], mesher_choices
     )
 
-    is_val = _split_mask(parts, val_fraction)
+    is_val = split_mask(parts, split, fold, n_folds)
     is_train = ~is_val
+    if max_train_groups is not None:
+        # Learning-curve support: keep only ``max_train_groups`` of the training
+        # groups, chosen by a seeded shuffle so the subset is reproducible and
+        # so averaging over seeds averages over which families were kept. Rows
+        # of dropped groups leave the training set entirely -- they must not
+        # reach the imputer or the standardiser either, or the curve would be
+        # measuring a model that had partial sight of data it was denied.
+        train_groups = sorted({group_of(part, split) for i, part in enumerate(parts)
+                               if is_train[i]})
+        rng = np.random.default_rng(group_seed)
+        keep = set(rng.permutation(np.asarray(train_groups, dtype=object))
+                   [:max(1, int(max_train_groups))].tolist())
+        is_train = np.asarray(
+            [is_train[i] and group_of(part, split) in keep for i, part in enumerate(parts)],
+            dtype=bool)
     _require_stage_a_supervision(masks, is_train, failure, path)
 
     impute = _column_medians(x_raw[is_train], mesher_choices)
@@ -617,34 +891,57 @@ def load_dataset(csv_path: Path | str | None = None, val_fraction: float = 0.2) 
             policy_mask=policy_mask[selector],
         )
 
+    groups = split_groups(parts, split)
+    n_folds_effective = len(groups) if n_folds is None else int(n_folds)
     return AdvisorData(
         train=build("train", is_train),
         val=build("val", is_val),
         normalization=normalization,
-        clamps=clamp_table(mesher_choices),
+        clamps=clamp_table(mesher_choices, rows),
         input_columns=list(INPUT_COLUMNS),
         action_dims=action_dims,
         order_choices=list(ORDER_CHOICES),
         mesher_choices=mesher_choices,
         n_rows=len(rows),
         csv_path=path,
+        split_mode=split,
+        fold=int(fold),
+        n_folds=n_folds_effective,
+        val_groups=fold_groups(groups, fold, n_folds_effective),
     )
 
 
-def _split_mask(parts: list[str], val_fraction: float) -> np.ndarray:
-    """80/20 part-hash split, guaranteed to leave both sides non-empty."""
-    unique = sorted(set(parts))
-    buckets = {part: part_bucket(part) for part in unique}
-    threshold = 1.0 - float(val_fraction)
-    val_parts = {part for part in unique if buckets[part] >= threshold}
-    if unique:
-        # With very few parts the hash can land entirely on one side; move the
-        # single most/least extreme part across so both splits stay usable.
-        if not val_parts:
-            val_parts = {max(unique, key=lambda part: buckets[part])}
-        elif len(val_parts) == len(unique):
-            val_parts = set(unique) - {min(unique, key=lambda part: buckets[part])}
-    return np.asarray([part in val_parts for part in parts], dtype=bool)
+def fold_groups(groups: list[str], fold: int, n_folds: int) -> list[str]:
+    """The groups held out by ``fold``, dealt round-robin over sorted groups.
+
+    Round-robin rather than contiguous blocks: contiguous blocks over an
+    alphabetically sorted list would put related families in one fold the
+    moment the corpus grows names like ``box_hole`` / ``box_slot``.
+    """
+    if not groups:
+        return []
+    n_folds = max(1, min(int(n_folds), len(groups)))
+    fold = int(fold) % n_folds
+    return [group for i, group in enumerate(groups) if i % n_folds == fold]
+
+
+def split_mask(parts: list[str], split: str = DEFAULT_SPLIT_MODE,
+               fold: int = 0, n_folds: int | None = None) -> np.ndarray:
+    """Boolean mask selecting the validation rows of ``fold``.
+
+    Every row of a held-out group goes to validation, so no geometry -- and
+    under the default ``family`` mode no *relative* of a geometry -- straddles
+    the split.
+    """
+    groups = split_groups(parts, split)
+    if len(groups) < 2:
+        raise SystemExit(
+            f"split mode {split!r} yields {len(groups)} group(s); at least 2 are "
+            "needed to hold one out"
+        )
+    total = len(groups) if n_folds is None else int(n_folds)
+    held = set(fold_groups(groups, fold, total))
+    return np.asarray([group_of(part, split) in held for part in parts], dtype=bool)
 
 
 def _column_medians(x_train: np.ndarray, mesher_choices: list[str]) -> np.ndarray:
@@ -658,6 +955,80 @@ def _column_medians(x_train: np.ndarray, mesher_choices: list[str]) -> np.ndarra
     impute[INPUT_COLUMNS.index("order_idx")] = float(len(ORDER_CHOICES))
     impute[INPUT_COLUMNS.index("mesher_idx")] = float(len(mesher_choices))
     return impute
+
+
+def file_digest(path: Path) -> str:
+    """SHA-256 of a file, streamed. Empty string when it is absent."""
+    if not path.is_file():
+        return ""
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def git_revision() -> str:
+    """Current commit, with ``-dirty`` when the tree has uncommitted changes.
+
+    Empty when git is unavailable, so provenance degrades to "unknown" rather
+    than to a wrong answer.
+    """
+    try:
+        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True,
+                              text=True, timeout=10, check=False)
+        if head.returncode != 0:
+            return ""
+        revision = head.stdout.strip()
+        status = subprocess.run(["git", "status", "--porcelain"], cwd=ROOT,
+                                capture_output=True, text=True, timeout=20, check=False)
+        if status.returncode == 0 and status.stdout.strip():
+            revision += "-dirty"
+        return revision
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def provenance(data: "AdvisorData | None" = None, seed: int | None = None,
+               **extra: Any) -> dict[str, Any]:
+    """What produced an artifact, recorded inside the artifact.
+
+    A checkpoint that cannot be tied to the CSV that trained it is not
+    reproducible evidence, and this matters acutely mid-rebuild: the reference
+    truths were replaced under a running analysis, so "which dataset was this?"
+    stopped being answerable from the filename. The content hash answers it.
+
+    ``-dirty`` on the revision is deliberate and not a warning to be silenced:
+    an artifact produced from an uncommitted tree cannot be regenerated by
+    anyone else, and that fact belongs in the artifact.
+    """
+    record: dict[str, Any] = {
+        "git_revision": git_revision(),
+        "created_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "python": sys.version.split()[0],
+        "numpy": np.__version__,
+    }
+    try:
+        import torch  # noqa: PLC0415 - optional at dataset-import time
+        record["torch"] = torch.__version__
+    except ImportError:
+        pass
+    if seed is not None:
+        record["seed"] = int(seed)
+    if data is not None:
+        record["dataset_csv"] = str(data.csv_path)
+        record["dataset_sha256"] = file_digest(Path(data.csv_path))
+        record["dataset_rows"] = data.n_rows
+        record["split_mode"] = data.split_mode
+        record["fold"] = data.fold
+        record["n_folds"] = data.n_folds
+        record["held_out_groups"] = list(data.val_groups)
+        record["n_inputs"] = data.n_inputs
+        record["n_actions"] = data.n_actions
+        record["geometry_features"] = list(GEOMETRY_FEATURE_COLUMNS)
+        record["geometry_features_sha256"] = file_digest(GEOMETRY_FEATURES_CSV)
+    record.update(extra)
+    return record
 
 
 def _standardizer(x_train: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -734,24 +1105,57 @@ def load_json(path: Path) -> dict[str, Any]:
         return json.load(stream)
 
 
+def add_split_args(parser: Any) -> None:
+    """Attach the ``--split`` / ``--fold`` / ``--n-folds`` trio to a parser.
+
+    Shared so every entry point that reads the dataset describes the hold-out
+    the same way and cannot quietly disagree with the others.
+    """
+    parser.add_argument("--split", choices=list(SPLIT_MODES), default=DEFAULT_SPLIT_MODE,
+                        help="hold-out grouping (default: family, the only leakage-safe one)")
+    parser.add_argument("--fold", type=int, default=0,
+                        help="which group block to hold out (default: 0)")
+    parser.add_argument("--n-folds", type=int, default=None,
+                        help="fold count (default: one fold per group, i.e. leave-one-out)")
+
+
+def load_from_args(args: Any, csv_path: Path | str | None = None) -> AdvisorData:
+    """``load_dataset`` driven by a parser built with :func:`add_split_args`."""
+    return load_dataset(
+        csv_path if csv_path is not None else getattr(args, "csv", None),
+        split=args.split, fold=args.fold, n_folds=args.n_folds,
+    )
+
+
 def main() -> int:
     import argparse
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--csv", type=Path, default=None, help="dataset CSV (default bench/advisor/dataset.csv)")
-    parser.add_argument("--val-fraction", type=float, default=0.2)
+    add_split_args(parser)
     args = parser.parse_args()
 
-    data = load_dataset(args.csv, args.val_fraction)
+    data = load_from_args(args)
     print(f"rows            : {data.n_rows}")
     print(f"input_columns D : {data.n_inputs}")
     print(f"action_dims   A : {data.n_actions}")
     print(f"mesher_choices  : {data.mesher_choices}")
+    print(f"split           : {data.split_mode} fold {data.fold}/{data.n_folds} "
+          f"holding out {data.val_groups}")
     print(f"train rows      : {data.train.n_rows} parts={sorted(set(data.train.parts))}")
     print(f"val rows        : {data.val.n_rows} parts={sorted(set(data.val.parts))}")
     for head in REGRESSION_HEADS:
         print(f"  mask {head:<12}: train={int(data.train.masks[head].sum())} val={int(data.val.masks[head].sum())}")
     print(f"  failure rows  : train={int(data.train.failure.sum())} val={int(data.val.failure.sum())}")
+    # Surfaced because nothing else in the pipeline prints it: these are solves
+    # that ran but failed their health gate, so they count for the cost and
+    # geometry heads and not for the accuracy heads.
+    for split_name, split in (("train", data.train), ("val", data.val)):
+        solved = int((split.failure == 0.0).sum())
+        trusted = int(split.masks["rel_err"].sum())
+        share = (1.0 - trusted / solved) if solved else float("nan")
+        print(f"  {split_name} accuracy : {trusted}/{solved} solved rows carry a trusted "
+              f"label ({share:.1%} untrusted, excluded from the accuracy heads only)")
     print(f"  policy dims ok: train={int(data.train.policy_mask.any(axis=0).sum())}/{data.n_actions}")
     return 0
 

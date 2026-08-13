@@ -176,3 +176,44 @@ TEST_CASE("load area: authored expected_area drift from the CAD cannot pass sile
         CHECK_FALSE(out.rel_diff.has_value());
     }
 }
+
+TEST_CASE("load area: both sides agree on the region for a normal_min_dot = -1 case") {
+    using polymesh::testlab::load_rule_filters;
+    using polymesh::testlab::load_rule_keeps_normal;
+
+    // THE REGRESSION. `normal_min_dot = -1` means "load every in-box face". The CAD
+    // side used to substitute the selector slab's thin axis at min_dot 0.7 instead,
+    // so it measured a 0.7-filtered cap while the mesh loaded everything: on
+    // sphere_box_s2_c1 the two disagreed by 130.7% and cad_rule_area rescaled the
+    // traction 2.3x onto a region the case never asked for. One predicate now
+    // serves both sides, so a wall-like normal MUST be kept for a -1 case.
+    const Eigen::Vector3d traction(1.0e6, 0.0, 0.0);
+    const Eigen::Vector3d cap_normal(1.0, 0.0, 0.0);       // end cap, aligned
+    const Eigen::Vector3d wall_normal(0.0, 1.0, 0.0);      // lateral wall, perpendicular
+    const Eigen::Vector3d oblique = Eigen::Vector3d(1.0, 1.0, 0.0).normalized();
+
+    CHECK_FALSE(load_rule_filters(-1.0, traction));
+    for (const auto& n : {cap_normal, wall_normal, oblique}) {
+        CHECK(load_rule_keeps_normal(-1.0, traction, n));
+    }
+
+    // A null traction has no direction to filter on: keep everything.
+    CHECK_FALSE(load_rule_filters(0.7, Eigen::Vector3d::Zero()));
+    CHECK(load_rule_keeps_normal(0.7, Eigen::Vector3d::Zero(), wall_normal));
+
+    // With the filter enabled the wall is dropped and the cap kept -- this is the
+    // behaviour the -1 cases must NOT silently receive.
+    CHECK(load_rule_filters(0.7, traction));
+    CHECK(load_rule_keeps_normal(0.7, traction, cap_normal));
+    CHECK_FALSE(load_rule_keeps_normal(0.7, traction, wall_normal));
+    CHECK(load_rule_keeps_normal(0.7, traction, oblique) == (std::abs(oblique.x()) > 0.7));
+
+    // Inverted winding must not change the answer (mixed/hex skins).
+    CHECK(load_rule_keeps_normal(0.7, traction, -cap_normal));
+    // Unnormalised normals are handled: the predicate normalises internally.
+    CHECK(load_rule_keeps_normal(0.7, traction, 1234.0 * cap_normal));
+    // A degenerate normal cannot satisfy a filter.
+    CHECK_FALSE(load_rule_keeps_normal(0.7, traction, Eigen::Vector3d::Zero()));
+    // ...but is kept when there is no filter, matching the mesh side's box-only path.
+    CHECK(load_rule_keeps_normal(-1.0, traction, Eigen::Vector3d::Zero()));
+}

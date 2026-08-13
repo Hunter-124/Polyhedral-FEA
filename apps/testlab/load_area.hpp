@@ -41,6 +41,8 @@
 // An area that cannot be established at all is reported as `unverified` with an
 // EMPTY rel_err. Never 0.0, which reads as a pass; never treated as verified.
 
+#include <Eigen/Core>
+
 #include <cmath>
 #include <optional>
 #include <string_view>
@@ -50,6 +52,47 @@ namespace polymesh::testlab {
 /// Relative area tolerance, applied only where a deviation means the applied
 /// resultant is genuinely wrong (i.e. nothing could be rescaled onto).
 inline constexpr double kLoadAreaTol = 0.05;
+
+/// Does the case's own load rule keep a face with this outward normal?
+///
+/// THE ONE definition of the normal test, called by both sides that need it: the
+/// mesh selector in select_load_faces and the CAD-tessellation rule area in
+/// with_exact_cad_selections. They used to implement it separately and drifted --
+/// the CAD side silently substituted the selector slab's thin axis at min_dot 0.7
+/// whenever a case asked for `normal_min_dot = -1`, so it measured a 0.7-filtered
+/// cap while the mesh loaded every in-box face. cad_rule_area then rescaled the
+/// traction onto a region the case never asked for: on sphere_box_s2_c1 the two
+/// sides disagreed by 130.7% and the resultant was scaled down 2.3x. One function
+/// makes that class of divergence structurally impossible.
+///
+/// `normal_min_dot <= -1` means "no normal filter, load every in-box face", and a
+/// null traction has no direction to filter on, so both keep everything. Otherwise
+/// keep faces whose unit normal satisfies |n.t_hat| > normal_min_dot; the absolute
+/// value tolerates inverted winding on mixed/hex skins.
+///
+/// Set-level behaviour is NOT part of this predicate: a filter that selects nothing
+/// falls back to the whole in-box set, which each caller applies to its own
+/// collection.
+inline bool load_rule_keeps_normal(double normal_min_dot,
+                                   const Eigen::Vector3d& traction,
+                                   const Eigen::Vector3d& normal) {
+    const double traction_norm = traction.norm();
+    if (!(normal_min_dot > -1.0) || !(traction_norm > 1e-30)) {
+        return true;
+    }
+    const double normal_norm = normal.norm();
+    if (!(normal_norm > 0.0)) {
+        return false; // degenerate face: no usable normal
+    }
+    return std::abs((normal / normal_norm).dot(traction / traction_norm)) > normal_min_dot;
+}
+
+/// True when the case's rule actually filters, i.e. when the fallback-to-box-only
+/// branch is reachable for it. Kept beside the predicate so callers agree on this
+/// too rather than each re-deriving `normal_min_dot > -1.0 && |t| > 0`.
+inline bool load_rule_filters(double normal_min_dot, const Eigen::Vector3d& traction) {
+    return normal_min_dot > -1.0 && traction.norm() > 1e-30;
+}
 
 /// Drift tolerance between an authored `expected_area` and `cad_rule_area`. Both
 /// describe the SAME loaded region by construction -- one hand-authored from the

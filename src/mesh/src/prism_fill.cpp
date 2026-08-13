@@ -225,6 +225,24 @@ PrismFillOutput prism_fill_surface(const geom::TriSurface& surface,
                    prism_signed_volume_impl(p[0], p[1], p[2], p[3], p[4], p[5]) > vol_eps;
         };
 
+        // Node -> incident prisms, so the snap line-searches ONE node against
+        // its own star. Without it `snap_boundary_nodes` falls back to a
+        // 0.75/0.5/0.25 ladder and, when none of the three is valid, retreats
+        // the node all the way to its raw lattice site — a spike on any curved
+        // wall. Measured on plate_hole at h=3 mm before this: 33 near-bore
+        // boundary nodes off the exact CAD by up to 1.99 mm (0.67 h).
+        std::unordered_map<std::uint32_t, std::vector<std::size_t>> incident;
+        incident.reserve(out.nodes.size());
+        for (std::size_t pi = 0; pi < out.prisms.size(); ++pi) {
+            for (const auto ni : out.prisms[pi]) {
+                incident[ni].push_back(pi);
+            }
+        }
+        const auto prism_is_bad = [&](const std::array<std::uint32_t, 6>& n) {
+            const auto p = corners(n);
+            return !(prism_sound(p) &&
+                     validity::prism_shape_quality(p) >= validity::kCellShapeFloor);
+        };
         out.boundary_max_distance =
             snap_boundary_nodes(
                 surface, out.nodes, bnodes, out.h,
@@ -234,17 +252,26 @@ PrismFillOutput prism_fill_surface(const geom::TriSurface& surface,
                         // keeps a comfortably positive total while one corner
                         // has already folded, which is exactly the Gauss point
                         // the assembly then reports as a non-positive Jacobian.
-                        // The signed volume is checked too (see `prism_sound`),
-                        // plus a shape floor so slivers get pulled back as well.
-                        const auto p = corners(n);
-                        if (prism_sound(p) &&
-                            validity::prism_shape_quality(p) >= validity::kCellShapeFloor) {
-                            continue;
+                        if (prism_is_bad(n)) {
+                            offenders.insert(n.begin(), n.end());
                         }
-                        offenders.insert(n.begin(), n.end());
                     }
                 },
-                /*max_move_frac=*/0.75, /*passes=*/4)
+                /*max_move_frac=*/0.75, /*passes=*/4, /*feature_edges=*/{},
+                /*repair_interior=*/{},
+                /*node_offends=*/
+                [&](std::uint32_t ni) {
+                    const auto it = incident.find(ni);
+                    if (it == incident.end()) {
+                        return false;
+                    }
+                    for (const auto pi : it->second) {
+                        if (prism_is_bad(out.prisms[pi])) {
+                            return true;
+                        }
+                    }
+                    return false;
+                })
                 .max_residual;
 
         // Fallback for cells the line-search left folded (it gives up once no

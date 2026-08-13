@@ -315,3 +315,53 @@ TEST_CASE("box-hole bore survives the coarse-grid parity ladder",
         }
     }
 }
+
+// The fill-stage guard is the third of three refusals, and it was the only one
+// that reported a ratio without naming a way out. Worse, on a mixed-level fill
+// the ratio barely moves as h shrinks (measured on this exact part: 0.3926 at
+// h=0.1732 m, 0.3600 at h=0.105 m), so a bare number argues for the one move
+// that does not work. This pins the remedy TEXT and then RUNS it: a message
+// that recommends something untested is the defect it replaced.
+TEST_CASE("fill-stage guard names a remedy that works",
+          "[cad][hybrid][geometry-completeness]") {
+    constexpr char kUnitBox[] = "bench/geometries/public/unit_box.step";
+    if (!polymesh::geom::occ_enabled()) {
+        SKIP("OpenCASCADE disabled");
+    }
+    if (!std::filesystem::exists(kUnitBox)) {
+        SKIP("unit_box.step missing");
+    }
+
+    const auto model = pipeline::Model::load(kUnitBox);
+    const double diagonal = (model.bbox_max - model.bbox_min).norm();
+    const double h = 0.1 * diagonal; // the advisor's clamp-box default action
+
+    bool refused = false;
+    try {
+        (void)pipeline::volume_mesh(model, h, pipeline::VolumeMesher::kHybrid,
+                                    /*skin_layers=*/2, /*feature_refine=*/true);
+    } catch (const pipeline::GeometryVolumeLimitError& error) {
+        refused = true;
+        const std::string what = error.what();
+        INFO(what);
+        CHECK_FALSE(error.solved_stage);
+        // The failing h is named, not just the error ratio.
+        CHECK(what.find("fill-stage guard failed at h=") != std::string::npos);
+        // The cause is identified as the transition, not as resolution...
+        CHECK(what.find("MIXED-LEVEL") != std::string::npos);
+        CHECK(what.find("pyramid cells") != std::string::npos);
+        // ...the asymptote is called out explicitly, so nobody follows it...
+        CHECK(what.find("Reducing -h a little does NOT fix this") != std::string::npos);
+        // ...and a concrete alternative is named.
+        CHECK(what.find("--mesher graded_tet") != std::string::npos);
+    }
+    REQUIRE(refused);
+
+    // The recommendation is executed, at the SAME h the guard refused. If this
+    // ever stops clearing the guard, the message is lying and this test says so.
+    const auto remedy = pipeline::volume_mesh(model, h, pipeline::VolumeMesher::kGradedTet,
+                                              /*skin_layers=*/2, /*feature_refine=*/true);
+    INFO(remedy.mesher_note);
+    REQUIRE(remedy.fill_geometry_volume.available);
+    CHECK(remedy.fill_geometry_volume.relative_error < 0.1);
+}

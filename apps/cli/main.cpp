@@ -816,12 +816,25 @@ int cmd_solve(std::span<char*> args) {
         // absolute `rel_err` level does not generalize across parts, so the
         // ranking the policy learned is the centred one. Printing it lets the
         // operator see what the model was optimizing, not just its output.
-        std::printf("advisor: applied mesher=%s h=%.6g m (h_rel=%.4g) adapt=%d eta=%.4g "
-                    "order=%d p_elevate=%d rel_err_rel=%+.4g (per-case score, lower is "
-                    "better)%s\n",
-                    decision.mesher.c_str(), h, decision.h_rel, adapt_passes, eta_target,
-                    decision.order, p_elevate ? 1 : 0, decision.predicted_rel_err_rel,
-                    decision.vetoed ? " [VETOED -> defaults]" : "");
+        //
+        // On a refusal it is NOT printed. The decision JSON nulls every
+        // prediction when the advisor vetoes, and printing "+nan" in the prose
+        // line would reintroduce the same defect one layer down: suppression that
+        // covers the machine-readable path but not the line a human actually
+        // reads. A refused row states the reason instead.
+        if (decision.vetoed) {
+            std::printf("advisor: applied mesher=%s h=%.6g m (h_rel=%.4g) adapt=%d eta=%.4g "
+                        "order=%d p_elevate=%d [VETOED -> defaults: %s]\n",
+                        decision.mesher.c_str(), h, decision.h_rel, adapt_passes, eta_target,
+                        decision.order, p_elevate ? 1 : 0,
+                        decision.note.empty() ? "no reason recorded" : decision.note.c_str());
+        } else {
+            std::printf("advisor: applied mesher=%s h=%.6g m (h_rel=%.4g) adapt=%d eta=%.4g "
+                        "order=%d p_elevate=%d rel_err_rel=%+.4g (per-case score, lower is "
+                        "better)\n",
+                        decision.mesher.c_str(), h, decision.h_rel, adapt_passes, eta_target,
+                        decision.order, p_elevate ? 1 : 0, decision.predicted_rel_err_rel);
+        }
         if (decision.order > 2) {
             std::printf("advisor: order %d executed as quadratic — this solve path has a "
                         "single p-elevation step\n",

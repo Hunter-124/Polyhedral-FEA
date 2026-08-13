@@ -6,8 +6,8 @@
   "metrics": [
     {
       "name": "scf",
-      "value": 3.0,
-      "tol": 0.1,
+      "value": 3.0934870351030597,
+      "tol": 0.087,
       "probe": {
         "kind": "peak_vm_over_nominal",
         "nominal": 1000000.0,
@@ -26,7 +26,7 @@
           ]
         }
       },
-      "derivation": "docs/validation/hand-calcs.md#corpus-primitives-kirsch",
+      "derivation": "Howland (1930), 'On the stresses in the neighbourhood of a circular hole in a strip under tension', Phil. Trans. R. Soc. London A 229:49-86; tabulated as Roark's Formulas for Stress and Strain ch.6 (central single circular hole in a finite-width plate, axial tension) and Peterson's Stress Concentration Factors chart 4.1. Ktn = 3.000 - 3.140(d/W) + 3.667(d/W)^2 - 1.527(d/W)^3 with sigma_nom = P/[t(W-d)], so on the gross-section stress the corpus probe uses, Ktg = sigma_max/sigma_gross = Ktn/(1 - d/W). Kirsch's 3.0 is the d/W -> 0 limit. Here d/W = 0.172715, so Ktn = 2.5592 and Ktg = 3.09349, replacing the previous infinite-plate value 3, which is +3.12% away and was passing its own tolerance by luck. Independently confirmed by Gmsh 4.13.1 + CalculiX 2.23 (C3D10): converged peak/nominal = 3.15829, i.e. +2.09% above the 2D handbook value, which is the expected 3D thickness effect for this plate (t/a of order 1). See provenance.",
       "source": "analytic",
       "inputs": {
         "sigma_inf": 1000000.0,
@@ -36,7 +36,127 @@
         "thickness": 0.01117676795,
         "a_over_W": 0.08766607349,
         "a_over_H": 0.1727145821
-      }
+      },
+      "provenance": {
+        "pipeline": "gmsh-mesh -> calculix-solve -> probe",
+        "independence": "neither the PolyMesh mesher nor the PolyMesh solver takes part in this value; the geometry is read straight from the case's STEP file by Gmsh",
+        "geometry_source": "case STEP file (CAD), meshed by Gmsh",
+        "gmsh_version": "4.13.1",
+        "calculix_version": "2.23",
+        "calculix_solver": "PaStiX direct sparse (Intel MKL BLAS), OMP_NUM_THREADS=1",
+        "element": "C3D10 (quadratic tetrahedron)",
+        "element_order": 2,
+        "gmsh_high_order_optimize": 2,
+        "rungs": [
+          {
+            "h_rel": 0.045,
+            "mesh_size_m": 0.011113675511147664,
+            "curvature_points_per_2pi": 24,
+            "n_nodes": 9199,
+            "n_elems": 4900,
+            "n_dof": 27258,
+            "wall_mesh_s": 1.46,
+            "wall_solve_s": 3.41,
+            "values": {
+              "scf": 3.1160356385163217
+            }
+          },
+          {
+            "h_rel": 0.03103448275862069,
+            "mesh_size_m": 0.007664603800791493,
+            "curvature_points_per_2pi": 34,
+            "n_nodes": 22516,
+            "n_elems": 12947,
+            "n_dof": 67071,
+            "wall_mesh_s": 4.35,
+            "wall_solve_s": 9.17,
+            "values": {
+              "scf": 3.124650837936978
+            }
+          },
+          {
+            "h_rel": 0.02140309155766944,
+            "mesh_size_m": 0.005285933655718271,
+            "curvature_points_per_2pi": 49,
+            "n_nodes": 56490,
+            "n_elems": 34641,
+            "n_dof": 168465,
+            "wall_mesh_s": 12.33,
+            "wall_solve_s": 32.08,
+            "values": {
+              "scf": 3.1582874381396575
+            }
+          }
+        ],
+        "refinement_ratio": 1.45,
+        "convergence_delta_between_h_rel": [
+          0.03103448275862069,
+          0.02140309155766944
+        ],
+        "converged_at": 0.03,
+        "load": {
+          "definition": "case traction (Pa) applied as energy-conjugate tri6 nodal loads over the free faces whose centroid lies in the case load box, kept when |n.t_hat| > select.normal_min_dot (the rule apps/testlab applies)",
+          "normal_min_dot": 0.7,
+          "n_load_faces": 142,
+          "load_area_m2": 0.0012480772422194442,
+          "loaded_cad_end_face_area_m2": 0.0012480772422194442,
+          "box_only_area_m2": 0.0012480772422194442,
+          "end_face_vs_selected_rel_diff": 0.0,
+          "resultant_N": [
+            1248.0772422194445,
+            0.0,
+            0.0
+          ]
+        },
+        "checks": {
+          "calculix_internal_energy_vs_half_f_dot_u_rel_gap": 1.9622762799759443e-08,
+          "reaction_vs_applied_resultant_rel_err": 1.9407408159584286e-07,
+          "frd_vs_dat_displacement_rel_err": 4.623990929707032e-06
+        },
+        "wall_time_s": 67.3,
+        "closed_form": {
+          "citation": "Howland (1930), 'On the stresses in the neighbourhood of a circular hole in a strip under tension', Phil. Trans. R. Soc. London A 229:49-86; tabulated as Roark's Formulas for Stress and Strain ch.6 (central single circular hole in a finite-width plate, axial tension) and Peterson's Stress Concentration Factors chart 4.1. Ktn = 3.000 - 3.140(d/W) + 3.667(d/W)^2 - 1.527(d/W)^3 with sigma_nom = P/[t(W-d)], so on the gross-section stress the corpus probe uses, Ktg = sigma_max/sigma_gross = Ktn/(1 - d/W). Kirsch's 3.0 is the d/W -> 0 limit.",
+          "d_over_W": 0.1727145821,
+          "Ktn_net_section": 2.5591967146034666,
+          "Ktg_gross_section": 3.0934870351030597,
+          "previous_value": 3.0,
+          "previous_basis": "Kirsch infinite plate (d/W -> 0)"
+        },
+        "external_confirmation": {
+          "converged_3d_value": 3.1582874381396575,
+          "gap_vs_closed_form_rel": 0.020947365319874053,
+          "gap_explanation": "3D finite-thickness effect: the peak surface stress at mid-thickness exceeds the 2D plane-stress solution",
+          "richardson": {
+            "values": [
+              3.1160356385163217,
+              3.124650837936978,
+              3.1582874381396575
+            ],
+            "order": -3.665824391282772,
+            "extrapolated": 3.1130693113428647,
+            "error_rel": 0.014525255390888605
+          }
+        },
+        "uncertainty": {
+          "rung_to_rung_delta": 0.010764914848818056,
+          "richardson_error_rel": 0.014525255390888605,
+          "richardson_order": -3.665824391282772,
+          "discretisation_rel": 0.014525255390888605,
+          "mesh_policy_rel": 0.00744,
+          "numerical_rel": 0.021965255390888606,
+          "idealisation_bias_rel": 0.020947365319874053,
+          "reference_uncertainty_rel": 0.042912620710762656,
+          "tol_basis": "tol = max(idealisation_bias 0.02095 + 3 x numerical_uncertainty 0.02197, floor 0.02) = 0.08684 -> 0.087 (rounded up, 2 s.f.). Numerical uncertainty is the measured rung-to-rung change (or the Richardson error estimate, whichever is larger) plus the measured sensitivity to the mesh sizing policy. The idealisation bias is the measured gap between the closed form and the converged 3D external solve, and is added at full size because it is a bias, not scatter."
+        }
+      },
+      "source_detail": "analytic-finite-width-howland"
     }
-  ]
+  ],
+  "external_validation": {
+    "status": "ok",
+    "pipeline": "gmsh-mesh -> calculix-solve -> probe",
+    "gmsh_version": "4.13.1",
+    "calculix_version": "2.23",
+    "generated": "2026-08-13T04:05:01.517313+00:00"
+  }
 }

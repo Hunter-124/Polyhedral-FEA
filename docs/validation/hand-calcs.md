@@ -578,11 +578,46 @@ the effective span, and discretization error. The generator holds
 \(L/2R_1 \in [8.5, 9.2]\) so the shear term stays a small correction
 (\(\lesssim 3\,\%\)) rather than a competing effect.
 
-### corpus-primitives-provisional
+### corpus-primitives-external (supersedes corpus-primitives-provisional)
+
+> **Superseded 2026-08-13 (ADR-0029).** Everything below described truth promoted
+> from our own overkill solves. That was circular — the references were produced by
+> the engine under test, on meshes ADR-0028 proved lose geometry — and all 88
+> non-closed-form references have been replaced by an independent chain. The
+> historical description is kept because archived campaigns and `archive-v2` rows
+> were scored against it.
+
+`l_bracket`, `plate_notch`, `channel`, `sphere_box`, `tube`, `perforated_plate`, and
+the non-analytic cases of the two analytic families have no closed form worth
+trusting (re-entrant corner, notch root, open thin-walled section with warping,
+fused spherical boss, thin curved wall, many small features). Their truth now comes
+from **Gmsh 4.13.1 meshing the case STEP** (CAD-conforming C3D10, order 2,
+`HighOrderOptimize=2`) and **CalculiX 2.23 solving it** (PaStiX direct), a chain
+that touches neither our mesher nor our solver. `bench/reference/external_truth.py`
+is the generator; it refuses to write references without `--approved`, and
+`scripts/truth_guard.py` prevents promotion from ever overwriting one.
+
+Read the tolerance as derived rather than chosen: each is built from measured
+reference uncertainty, rung-to-rung delta, Richardson error where available, and
+idealisation bias, and is mostly 0.02. Per-rung loaded areas, wall-ring exposure,
+CAD feature sizes and the annulus verification live in
+`bench/reference/external/external-truth-load-evidence.json`; per-metric before and
+after values for all 96 references live in
+`bench/reference/external/external-truth-audit.json`; the closed-form validation
+gate and the CalculiX-versus-PolyMesh cross-check live in
+`bench/reference/external/external-truth-validate.json`.
+
+**The corpus's own analytic value was corrected too.** The four `box_hole_*_c0`
+references carried 3.0, the infinite-plate Kirsch idealisation, for parts at
+\(d/W = 0.171\text{–}0.196\). The citable value is Howland (1930) via Roark ch. 6 /
+Peterson chart 4.1, \(K_{tg} = 3.091\text{–}3.127\); see
+`external-truth-findings.json` finding (a) for the per-case derivation.
+
+### corpus-primitives-provisional (historical)
 
 `l_bracket`, `plate_notch`, `channel`, `sphere_box`, and the non-analytic cases of the
 two families above have no closed form worth trusting (re-entrant corner, notch root,
-open thin-walled section with warping, fused spherical boss). Their truth comes from an
+open thin-walled section with warping, fused spherical boss). Their truth came from an
 **overkill reference solve**, not a hand calc: `bench/campaigns/advisor-truth-0`
 (`order = 2`, `adapt_passes = 3`, `graded_tet`, warehoused, over an
 `h_rel` ladder of \(0.060 / 0.038 / 0.024\) — a single very fine run is impossible

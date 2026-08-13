@@ -2462,13 +2462,25 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         const ProbeAnswers ans =
             compute_probes(vol.mesh, mat, u, selection_part.loads, resolved_loads,
                            part.metrics, bc, loads);
+        // INVARIANT: this block must carry every ProbeAnswers field that
+        // evaluate_probe() can read. scripts/build_advisor_dataset.py re-derives
+        // each row's accuracy from `answers` against the CURRENT references, so a
+        // probe input that is not recorded here makes that row permanently
+        // unscoreable — changing truth would need a campaign re-run instead of a
+        // dataset rebuild. sigma_box_max (the box-windowed peak VM behind the SCF
+        // probe) was missing for exactly that reason; mean_ux/mean_uz and
+        // dominant_load_axis back the axis-conditional displacement probes.
         out.line["answers"] = {{"sigma_max", ans.sigma_max},
                                {"sigma_face_mean", ans.sigma_face_mean},
+                               {"sigma_box_max", ans.sigma_box_max},
                                {"sigma_p99", ans.sigma_p99},
                                {"strain_energy", ans.strain_energy},
                                {"tip_deflection", ans.tip_deflection},
                                {"tip_deflection_max", ans.tip_deflection_max},
                                {"mean_u_component", ans.mean_u_component},
+                               {"mean_ux", ans.mean_ux},
+                               {"mean_uz", ans.mean_uz},
+                               {"dominant_load_axis", ans.dominant_load_axis},
                                {"n_probe_nodes", ans.n_probe_nodes},
                                {"n_load_faces", ans.n_load_faces},
                                {"n_quality_excluded", ans.n_quality_excluded},

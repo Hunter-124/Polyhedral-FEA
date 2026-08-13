@@ -734,6 +734,23 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             run_leb_for_min_level(3);
         }
     }
+    // Is `p` on the void side of the surface? Answered by the outward normal of
+    // the nearest triangle, which is the only inside/outside oracle available
+    // at a scale finer than the classifier's lattice samples. A point exactly
+    // on the surface, and a point whose nearest triangle is missing, both count
+    // as inside: every caller here uses this to authorise DELETING material, so
+    // the ambiguous answer has to be the one that keeps it.
+    const auto outside_solid = [&surface](const Eigen::Vector3d& p) {
+        const auto cp = closest_on_surface(surface, p);
+        if (cp.triangle >= surface.triangles.size()) {
+            return false;
+        }
+        const auto& tri = surface.triangles[cp.triangle];
+        const Eigen::Vector3d n = (surface.vertices[tri[1]] - surface.vertices[tri[0]])
+                                      .cross(surface.vertices[tri[2]] - surface.vertices[tri[0]]);
+        return (p - cp.point).dot(n) > 0.0;
+    };
+
 
     // The feature-aware classifier's h/2 samples are authoritative inside a
     // mixed coarse parent. LEB has already made those parents conforming; now
@@ -783,15 +800,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             if ((mask & static_cast<std::uint8_t>(1U << (a + 2 * b + 4 * c))) != 0) {
                 continue;
             }
-            const auto cp = closest_on_surface(surface, centroid);
-            if (cp.triangle < surface.triangles.size()) {
-                const auto& tri = surface.triangles[cp.triangle];
-                const Eigen::Vector3d n =
-                    (surface.vertices[tri[1]] - surface.vertices[tri[0]])
-                        .cross(surface.vertices[tri[2]] - surface.vertices[tri[0]]);
-                if ((centroid - cp.point).dot(n) <= 0.0) {
-                    continue; // centroid is inside the solid: keep the tet
-                }
+            if (!outside_solid(centroid)) {
+                continue; // centroid is inside the solid: keep the tet
             }
             kill[ti] = 1;
         }
@@ -908,11 +918,31 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     // expose interior lattice nodes; treating those newly exposed nodes as
     // fresh juts on every round peels successive healthy layers from the
     // solid. The carve contract is deliberately limited to this initial set.
+    //
+    // Distance alone is the WRONG test, and it is the sphere crater. A jut is
+    // meant to be a stair chord left hanging in a CAD void: the snap could not
+    // pull it onto the wall, so it pokes into a hole and its tets must go. But
+    // a boundary node that stayed put because projecting it OUTWARD would
+    // invert a skin tet is the exact mirror image — it sits inside the solid,
+    // short of the surface, and peeling its tets does not remove a spike, it
+    // digs a pit one element deep and calls the pit floor the boundary.
+    //
+    // A sphere has no holes, so every one of its juts is that mirror case, and
+    // the carve gouged it: measured on sphere.step at h = 8 mm feature-graded,
+    // 12 boundary nodes ended up as far as 9.46 mm inside the fitted 49.90 mm
+    // sphere (1.2 h, one carved layer), and the showcase solve of the same part
+    // had one 12.18 mm deep. Every crater passed the shell census -- open=0,
+    // nonmanifold=0 -- because a pit is watertight. `hybrid` on the same part
+    // and the same h keeps its worst boundary node 0.65 mm off the sphere.
+    //
+    // So the distance proposes and the surface confirms, exactly as the child
+    // carve above: a jut is a node that is far from the surface AND outside it.
     const double initial_jut_threshold = 0.15 * hc;
     std::unordered_set<std::uint32_t> initial_juts;
     for (const auto ni : tet_boundary_nodes(out.mesh.tets)) {
-        if (closest_on_surface(surface, out.mesh.nodes[ni]).distance >
-            initial_jut_threshold) {
+        const Eigen::Vector3d& p = out.mesh.nodes[ni];
+        if (closest_on_surface(surface, p).distance > initial_jut_threshold &&
+            outside_solid(p)) {
             initial_juts.insert(ni);
         }
     }

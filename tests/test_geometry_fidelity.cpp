@@ -40,6 +40,7 @@ namespace {
 constexpr double kPipeR = 30.0; // matches tests/fixtures/parts/pipe.step
 constexpr double kPipeH = 400.0;
 constexpr char kPipe[] = "tests/fixtures/parts/pipe.step";
+constexpr char kSphere[] = "tests/fixtures/parts/sphere.step";
 constexpr char kIcecreamCone[] = "tests/fixtures/parts/icecream_cone.step";
 constexpr char kPlateHole[] = "tests/fixtures/parts/plate_hole.step";
 } // namespace
@@ -263,6 +264,75 @@ TEST_CASE("graded plate-hole mesh resolves exact BRep surfaces and protected rim
           25.0);
     REQUIRE(fidelity.has_relative_volume_error);
     CHECK(fidelity.mesh_vs_brep_relative_volume_error < 0.002);
+}
+
+// The S5 void carve peels the tets of "juts" -- boundary nodes the snap could
+// not place on the surface. Those are meant to be stair chords hanging inside a
+// CAD hole, and peeling them opens the hole. The test used to be distance
+// alone, which also condemned the mirror case: a node that stayed put because
+// projecting it OUTWARD would invert a skin tet, i.e. a node sitting inside the
+// solid. Peeling that one digs a pit and calls the pit floor the boundary.
+//
+// A sphere has no holes, so every jut on it is the mirror case, and this is the
+// cheapest geometry that isolates the bug. Measured before the fix at h = 8 mm:
+// 12 boundary nodes as deep as 9.46 mm (1.16 h) inside the sphere. Every crater
+// was watertight, so no shell census could see it -- only radius can.
+TEST_CASE("a graded sphere has no boundary node carved into its interior") {
+    if (!polymesh::geom::occ_enabled()) {
+        SKIP("OpenCASCADE disabled");
+    }
+    if (!std::filesystem::exists(kSphere)) {
+        SKIP("sphere.step missing");
+    }
+
+    constexpr double kH = 0.008;
+    const auto model = polymesh::pipeline::Model::load(kSphere);
+    const auto graded = polymesh::pipeline::volume_mesh(
+        model, kH, polymesh::pipeline::VolumeMesher::kGradedTet,
+        /*skin_layers=*/2, /*feature_refine=*/true);
+    REQUIRE_NOTHROW(graded.mesh.check_validity());
+
+    const auto free_faces = polymesh::fea::extract_boundary_faces(graded.mesh);
+    REQUIRE_FALSE(free_faces.empty());
+
+    std::set<std::uint32_t> boundary_nodes;
+    for (const auto& face : free_faces) {
+        const std::size_t count = face[3] == face[2] ? 3 : 4;
+        for (std::size_t i = 0; i < count; ++i) {
+            boundary_nodes.insert(face[i]);
+        }
+    }
+    REQUIRE(boundary_nodes.size() > 500);
+
+    // Centre and radius from the boundary bounding box. A crater is an INWARD
+    // defect and cannot move the box, so the reference stays honest even on the
+    // mesh being accused -- which a least-squares radius fit would not.
+    Eigen::Vector3d lo = Eigen::Vector3d::Constant(std::numeric_limits<double>::max());
+    Eigen::Vector3d hi = Eigen::Vector3d::Constant(std::numeric_limits<double>::lowest());
+    for (const auto ni : boundary_nodes) {
+        lo = lo.cwiseMin(graded.mesh.nodes[ni]);
+        hi = hi.cwiseMax(graded.mesh.nodes[ni]);
+    }
+    const Eigen::Vector3d centre = 0.5 * (lo + hi);
+    const double radius = (hi - lo).sum() / 6.0;
+    REQUIRE(radius > 0.04);
+    REQUIRE(radius < 0.06);
+
+    double deepest = 0.0;
+    double highest = 0.0;
+    std::size_t carved = 0;
+    for (const auto ni : boundary_nodes) {
+        const double dr = (graded.mesh.nodes[ni] - centre).norm() - radius;
+        deepest = std::min(deepest, dr);
+        highest = std::max(highest, dr);
+        if (dr < -0.25 * kH) {
+            ++carved;
+        }
+    }
+    INFO("deepest " << deepest << " m, highest " << highest << " m, carved " << carved);
+    CHECK(carved == 0);
+    CHECK(deepest > -0.25 * kH);
+    CHECK(highest < 0.10 * kH);
 }
 
 TEST_CASE("ice-cream cone STEP is one closed fused solid with stable coarse selections") {

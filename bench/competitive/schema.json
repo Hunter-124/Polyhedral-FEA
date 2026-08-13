@@ -33,26 +33,42 @@
       "description": "Stable case id matching bench/reference or competitive case catalog (e.g. lame-cylinder, kirsch-plate, timoshenko-cantilever)."
     },
     "dofs": {
-      "type": ["integer", "null"],
+      "type": [
+        "integer",
+        "null"
+      ],
       "minimum": 0,
       "description": "Active degrees of freedom after BC elimination, or null if not recorded."
     },
     "wall_time_s": {
       "type": "object",
-      "required": ["mesh", "solve", "total"],
+      "required": [
+        "mesh",
+        "solve",
+        "total"
+      ],
       "properties": {
         "mesh": {
-          "type": ["number", "null"],
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0,
           "description": "Wall seconds for meshing only; null if unknown or external mesh."
         },
         "solve": {
-          "type": ["number", "null"],
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0,
           "description": "Wall seconds for assembly + linear solve (+ recovery if included)."
         },
         "total": {
-          "type": ["number", "null"],
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0,
           "description": "End-to-end wall seconds for the timed harness step."
         }
@@ -61,14 +77,20 @@
     },
     "accuracy": {
       "type": "object",
-      "required": ["name", "value"],
+      "required": [
+        "name",
+        "value"
+      ],
       "properties": {
         "name": {
           "type": "string",
           "description": "Metric id, e.g. tip_rel_err_pct, u_r_rel_err_pct, scf_rel_err_pct."
         },
         "value": {
-          "type": ["number", "null"],
+          "type": [
+            "number",
+            "null"
+          ],
           "description": "Metric value (lower is better for *err* metrics unless noted)."
         },
         "unit": {
@@ -94,6 +116,83 @@
     "host": {
       "type": "string",
       "description": "Optional machine/CPU label for fair-time comparisons."
+    },
+    "status": {
+      "description": "Outcome of the run. 'refused' is a first-class, informative result: the engine declined a size it cannot represent (feature-unresolved or volume-completeness guard), which is NOT an error and NOT a missing measurement. Absent means 'ok'.",
+      "enum": [
+        "ok",
+        "failed",
+        "timeout",
+        "refused"
+      ]
+    },
+    "refusal": {
+      "description": "Present only when status == 'refused': what the engine refused and why.",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "feature-unresolved",
+            "resolution-refused",
+            "geometry-fill-stage-guard"
+          ]
+        },
+        "refused_at_h_m": {
+          "type": "number"
+        },
+        "recommended_h_m": {
+          "type": "number"
+        },
+        "cad_face": {
+          "type": "integer"
+        },
+        "mesh_vs_brep_volume_rel_err": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "null when no mesh existed at the point of refusal. A 0.0 reported by the engine alongside an unavailable assessment means NOT MEASURED and must never be recorded as a perfect volume match."
+        },
+        "message": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "detected_from": {
+          "type": "string"
+        },
+        "thinnest_wall_m": {
+          "type": "number"
+        },
+        "volume_measured": {
+          "type": "boolean"
+        },
+        "volume_note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "promotion": {
+      "description": "Order-2 promotion counts for a native variant, so the order pairing against a uniformly quadratic Gmsh mesh is quantified per row rather than asserted to be matched.",
+      "type": "object"
+    },
+    "probe_definition": {
+      "type": "string"
+    },
+    "metric_caveat": {
+      "type": "string"
+    },
+    "truth": {
+      "description": "The reference value this row was scored against, recorded so a later truth replacement is detectable in the file instead of silently invalidating every rel_err.",
+      "type": "object"
+    },
+    "diagnosis": {
+      "description": "Present on a status='failed' row whose message indicates a resolution limit that did NOT arrive through a refusal guard. Kept as failed on purpose so a real error is never relabelled as a benign refusal.",
+      "type": "object"
     }
   },
   "additionalProperties": true

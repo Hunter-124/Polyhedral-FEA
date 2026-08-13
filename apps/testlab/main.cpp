@@ -26,6 +26,7 @@
 #include "pipeline/scene.hpp"
 #include "load_area.hpp"
 #include "probe_util.hpp"
+#include "run_artifacts.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -96,21 +97,7 @@ std::string utc_now() {
     return buf;
 }
 
-void atomic_write(const fs::path& path, const std::string& text) {
-    const fs::path tmp = path.string() + ".tmp";
-    {
-        std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
-        if (!out) {
-            throw std::runtime_error("cannot write " + tmp.string());
-        }
-        out << text;
-        out.flush();
-        if (!out) {
-            throw std::runtime_error("failed writing " + tmp.string());
-        }
-    }
-    fs::rename(tmp, path);
-}
+using polymesh::testlab::atomic_write;
 
 std::string read_file(const fs::path& path) {
     std::ifstream in(path);
@@ -945,22 +932,22 @@ select_load_faces(const fea::NodalMesh& mesh, const Box3& box, const Eigen::Vect
         }
     }
     const double tnorm = traction.norm();
-    if (in_box.empty() || !(tnorm > 1e-30) || !(normal_min_dot > -1.0)) {
+    const Eigen::Vector3d t_hat =
+        tnorm > 1e-30 ? Eigen::Vector3d(traction / tnorm) : Eigen::Vector3d::Zero();
+    if (in_box.empty() || !tlab::load_rule_filters(normal_min_dot, traction)) {
         return in_box;
     }
-    const Eigen::Vector3d t_hat = traction / tnorm;
     std::vector<fea::SurfaceFace> filtered;
     filtered.reserve(in_box.size());
-    // |n·t̂| so inverted face winding (common on mixed/hex skins) still keeps
-    // the traction-aligned CAD face. Same-hemisphere-only misses those skins
-    // when a few near-orthogonal slivers still pass n·t̂ > min_dot. Box-only
-    // fallback if nothing survives the filter.
+    // The normal test itself lives in tlab::load_rule_keeps_normal so the CAD-side
+    // rule area cannot drift from it. |n·t̂| there tolerates inverted winding on
+    // mixed/hex skins; box-only fallback below if nothing survives.
     for (const auto& face : in_box) {
         const Eigen::Vector3d n = face_unit_normal(mesh, face);
         if (n.norm() < 0.5) {
             continue; // degenerate
         }
-        if (std::abs(n.dot(t_hat)) > normal_min_dot) {
+        if (tlab::load_rule_keeps_normal(normal_min_dot, traction, n)) {
             filtered.push_back(face);
         }
     }
@@ -1858,25 +1845,41 @@ PartCase with_exact_cad_selections(const pipeline::Model& model, const PartCase&
         std::set<std::uint32_t> box_faces;
         std::set<std::uint32_t> aligned_faces;
         const double traction_norm = load.traction.norm();
-        Eigen::Vector3d direction = Eigen::Vector3d::Zero();
+        Eigen::Vector3d cap_direction = Eigen::Vector3d::Zero();
         if (traction_norm > 0.0) {
-            direction = load.traction / traction_norm;
+            cap_direction = load.traction / traction_norm;
         }
-        double exact_min_dot = load.normal_min_dot;
-        if (!(exact_min_dot > -1.0)) {
-            // A transverse end load has no reason to align with the end-face
-            // normal. The selector box is nevertheless a thin end slab; use
-            // its thin axis to distinguish the exact cap from lateral walls.
+        double cap_min_dot = load.normal_min_dot;
+        if (!(cap_min_dot > -1.0)) {
+            // WHY this substitution exists, and why it is now scoped: a transverse
+            // end load has no reason to align with the end-face normal, so with the
+            // normal filter disabled the traction direction cannot tell an end cap
+            // from the lateral walls that share the slab. The slab's thin axis can,
+            // so it is used to pick WHICH CAD faces the face-replacement fallback
+            // may substitute.
+            //
+            // It must NOT reach cad_rule_area. That is the rescale target, and the
+            // case asked for every in-box face; silently measuring a 0.7-filtered
+            // cap instead made the two sides disagree by 130.7% on sphere_box_s2_c1
+            // and rescaled the traction 2.3x onto a region nobody requested. The
+            // rule area below therefore uses the case's own normal_min_dot.
             Eigen::Index slab_axis = 0;
             (load.box.hi - load.box.lo).cwiseAbs().minCoeff(&slab_axis);
-            direction = Eigen::Vector3d::Zero();
-            direction[slab_axis] = 1.0;
-            exact_min_dot = 0.7;
+            cap_direction = Eigen::Vector3d::Zero();
+            cap_direction[slab_axis] = 1.0;
+            cap_min_dot = 0.7;
         }
-        // Tessellated area per candidate CAD face, split the same way the face
-        // sets are, so we can tell "took these faces whole" from "clipped them".
-        std::map<std::uint32_t, double> box_tess_area;
-        std::map<std::uint32_t, double> aligned_tess_area;
+        // CAD face ids that resolve, so the rule area counts the same tessellation
+        // the cap sets are built from and stays comparable with earlier runs.
+        std::set<std::uint32_t> topology_ids;
+        for (const auto& face : topology.faces) {
+            topology_ids.insert(face.id);
+        }
+        // The case's rule as written, mirroring select_load_faces through the
+        // shared predicate: box-only when normal_min_dot <= -1, else the filter,
+        // with a fallback to box-only if the filter selects nothing.
+        double box_rule_area = 0.0;
+        double filtered_rule_area = 0.0;
         for (const auto& tri : surface.triangles) {
             const Eigen::Vector3d& a = surface.vertices[tri[0]];
             const Eigen::Vector3d& b = surface.vertices[tri[1]];
@@ -1892,19 +1895,26 @@ PartCase with_exact_cad_selections(const pipeline::Model& model, const PartCase&
             box_faces.insert(exact->face_id);
             const Eigen::Vector3d cross = (b - a).cross(c - a);
             const double twice_area = cross.norm();
-            box_tess_area[exact->face_id] += 0.5 * twice_area;
-            if (direction.norm() <= 0.0 ||
+            const double tri_area = 0.5 * twice_area;
+            // Cap set: heuristic direction, used ONLY to pick face ids for the
+            // face-replacement fallback.
+            if (cap_direction.norm() <= 0.0 ||
                 (twice_area > 0.0 &&
-                 std::abs((cross / twice_area).dot(direction)) > exact_min_dot)) {
+                 std::abs((cross / twice_area).dot(cap_direction)) > cap_min_dot)) {
                 aligned_faces.insert(exact->face_id);
-                aligned_tess_area[exact->face_id] += 0.5 * twice_area;
+            }
+            // Rule area: the case's OWN normal_min_dot and traction, through the
+            // same predicate the mesh selector uses.
+            if (topology_ids.contains(exact->face_id)) {
+                box_rule_area += tri_area;
+                if (tlab::load_rule_keeps_normal(load.normal_min_dot, load.traction, cross)) {
+                    filtered_rule_area += tri_area;
+                }
             }
         }
         const bool use_aligned = !aligned_faces.empty();
         const auto& selected = use_aligned ? aligned_faces : box_faces;
-        const auto& selected_tess = use_aligned ? aligned_tess_area : box_tess_area;
         double exact_area = 0.0;
-        double selected_tess_area = 0.0;
         for (const auto face_id : selected) {
             const auto it = std::find_if(topology.faces.begin(), topology.faces.end(),
                                          [&](const geom::CadFace& face) {
@@ -1913,22 +1923,25 @@ PartCase with_exact_cad_selections(const pipeline::Model& model, const PartCase&
             if (it != topology.faces.end()) {
                 load.cad_face_ids.push_back(face_id);
                 exact_area += it->area;
-                if (const auto tess = selected_tess.find(face_id); tess != selected_tess.end()) {
-                    selected_tess_area += tess->second;
-                }
             }
         }
         if (exact_area > 0.0) {
             load.cad_face_area = exact_area;
         }
-        if (selected_tess_area > 0.0) {
-            // The SAME rule the mesh selection applies (box + normal alignment),
-            // evaluated on the exact CAD tessellation instead of the candidate
-            // mesh. On a curved loaded surface the mesh's answer is quantised to
-            // facet size -- 15 facets on a spherical boss put the 45-degree
-            // latitude cut-off anywhere -- while this is the rule's continuum
-            // limit, so it is what the traction must be rescaled onto.
-            load.cad_rule_area = selected_tess_area;
+        // Mirror select_load_faces at the set level too: a filter that selects
+        // nothing falls back to the whole in-box set.
+        const double rule_area =
+            (tlab::load_rule_filters(load.normal_min_dot, load.traction) &&
+             filtered_rule_area > 0.0)
+                ? filtered_rule_area
+                : box_rule_area;
+        if (rule_area > 0.0) {
+            // The case's rule evaluated on the exact CAD tessellation rather than on
+            // the candidate mesh. On a curved loaded surface the mesh's answer is
+            // quantised to facet size -- 15 facets on a spherical boss put the
+            // 45-degree latitude cut-off anywhere -- while this is the rule's
+            // continuum limit, so it is what the traction is rescaled onto.
+            load.cad_rule_area = rule_area;
         }
         // Loud once per part: an authored expected_area that no longer matches the
         // CAD is a case-definition or geometry bug, and every row it produces is
@@ -2140,13 +2153,13 @@ struct RunOutcome {
     double solve_ms = 0.0;
 };
 
+// Never throws: every caller is either run_one's success path or one of its
+// exception handlers, and a throw from inside a handler escapes run_one past
+// its own catch-all and aborts the campaign, losing the status row.
 void write_warehouse_run(const fs::path& run_dir, const json& line,
-                         const pipeline::VolumeMeshOutput* vol) {
-    std::error_code ec;
-    fs::create_directories(run_dir, ec);
-    atomic_write(run_dir / "result.json", line.dump(2) + "\n");
-    if (line.contains("quality")) {
-        atomic_write(run_dir / "quality.json", line["quality"].dump(2) + "\n");
+                         const pipeline::VolumeMeshOutput* vol) noexcept {
+    if (!polymesh::testlab::write_run_json(run_dir, line)) {
+        return;
     }
     if (vol != nullptr) {
         try {
@@ -2157,8 +2170,11 @@ void write_warehouse_run(const fs::path& run_dir, const json& line,
     }
 }
 
+// Never throws: this runs on the SolveJob worker thread via job.on_pass, where
+// a throw is caught as a solve failure and would silently downgrade a healthy
+// run to a mesh_fail row -- corrupting the training set rather than crashing.
 void write_adapt_trace(const fs::path& run_dir,
-                       const std::vector<pipeline::PassTrace>& traces) {
+                       const std::vector<pipeline::PassTrace>& traces) noexcept {
     if (run_dir.empty() || traces.empty()) {
         return;
     }
@@ -2183,8 +2199,18 @@ void write_adapt_trace(const fs::path& run_dir,
                        {"solve_ms", trace.solve_ms}};
         text << row.dump() << '\n';
     }
-    fs::create_directories(run_dir);
-    atomic_write(run_dir / "adapt_trace.jsonl", text.str());
+    std::error_code ec;
+    fs::create_directories(run_dir, ec);
+    if (ec && !fs::is_directory(run_dir)) {
+        std::fprintf(stderr, "warehouse: cannot create %s: %s\n", run_dir.string().c_str(),
+                     ec.message().c_str());
+        return;
+    }
+    try {
+        atomic_write(run_dir / "adapt_trace.jsonl", text.str());
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "warehouse: adapt_trace write failed: %s\n", e.what());
+    }
 }
 
 RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_scale,
@@ -3054,6 +3080,16 @@ int run_campaign(const fs::path& camp_dir, bool resume, const AdvisorScorer* adv
                             wh_dir, run_limit, advisor, camp.max_dof, camp.max_elems);
                 results_app << ro.line.dump() << '\n';
                 results_app.flush();
+                // A silently dropped row is worse than a stopped campaign: the
+                // run is finished and its per-run result.json is already on
+                // disk, so failing here loses nothing recoverable (see
+                // scripts/advisor/rebuild_results.py) whereas continuing would
+                // report success while the summary quietly lost work. Same
+                // check-after-flush idiom as atomic_write() above.
+                if (!results_app) {
+                    throw std::runtime_error("failed appending row to " +
+                                             results_path.string());
+                }
                 done.insert(key);
                 ++cp.completed_runs;
                 cp.updated_utc = utc_now();

@@ -441,7 +441,7 @@ the generated table lives in
 python3 bench/competitive/render_scoreboard.py   # refresh scoreboard
 ./bench/competitive/run_polymesh_smoke.sh        # Tier-0/1 ctest smoke
 python3 bench/d6/run_tier3.py --full --render    # D6 uniform tet10 vs graded
-python3 scripts/render_showcase.py --all         # regenerate showcase assets
+python scripts/render_showcase.py --all         # regenerate showcase assets
 ```
 
 ## Limitations

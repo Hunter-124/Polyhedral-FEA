@@ -107,12 +107,37 @@ def rel(path: Path) -> str:
 
 
 def cli_path() -> Path:
-    for cand in (CLI, REPO / "polymesh"):
-        if cand.is_file() and os.access(cand, os.X_OK):
-            return cand
-    raise SystemExit(
-        "polymesh CLI not found; build it first (expected build/apps/cli/polymesh)"
-    )
+    """The CLI to render with, chosen by MTIME and announced.
+
+    This used to take the first name that existed, preferring the extensionless
+    `build/apps/cli/polymesh`. On Windows the build target is `polymesh.exe`,
+    so an extensionless leftover from an earlier configuration sat there
+    unchanged and won every time: the showcase was regenerated for hours
+    against a 15-hour-old engine and came back "bit-identical", which read as
+    evidence that a mesher fix had changed nothing. It was evidence that the
+    fix had never been run. Pick the newest candidate and print it, so a stale
+    binary announces itself instead of quietly producing the old answer.
+    """
+    candidates = [
+        cand
+        for cand in (CLI.with_suffix(".exe"), CLI, REPO / "polymesh.exe", REPO / "polymesh")
+        if cand.is_file() and os.access(cand, os.X_OK)
+    ]
+    if not candidates:
+        raise SystemExit(
+            "polymesh CLI not found; build it first (expected build/apps/cli/polymesh)"
+        )
+    newest = max(candidates, key=lambda c: c.stat().st_mtime)
+    stamp = _dt.datetime.fromtimestamp(
+        newest.stat().st_mtime, _dt.timezone.utc
+    ).strftime("%Y-%m-%d %H:%M:%SZ")
+    if not getattr(cli_path, "_announced", False):
+        print(f"  cli: {rel(newest)} (built {stamp})")
+        for other in candidates:
+            if other != newest:
+                print(f"       ignoring older {rel(other)}")
+        cli_path._announced = True  # type: ignore[attr-defined]
+    return newest
 
 
 def hex_to_rgb(h: str) -> tuple[int, int, int]:

@@ -179,3 +179,83 @@ except ValueError as exc:
 print("ok")
 )PY");
 }
+
+TEST_CASE("dataset build: a re-run on the corrected engine supersedes the stale row") {
+    // THE REGRESSION. The dedup key used to include the campaign directory name,
+    // so the same (cfg_id, part, tier) re-run on a fixed engine did not collide
+    // with its predecessor and BOTH rows reached the dataset with contradictory
+    // labels. The stale row often scored better -- it was solved under a wrong
+    // load and graded against retired truth -- and a family-grouped split keeps
+    // both copies on the same side, so nothing downstream could reveal it.
+    run_python("advisor_precedence", R"PY(
+import json, sys, tempfile, io, contextlib, csv
+from pathlib import Path
+
+root = Path(tempfile.mkdtemp())
+campaigns = root / "campaigns"
+
+# One (cfg_id, part, tier), solved three times on three engine generations. The
+# STALE row carries the best rel_err on purpose: that is what makes a silent
+# tie-break dangerous rather than merely untidy.
+generations = [
+    ("advisor-batch-1-s0", 0.014026, False),
+    ("advisor-batch-1-affected-s0", 0.707560, True),
+    ("advisor-batch-1-affected2-s0", 0.025881, True),
+]
+for name, rel_err, marker in generations:
+    directory = campaigns / name
+    directory.mkdir(parents=True)
+    answers = {"sigma_max": 1.0}
+    if marker:
+        answers["load_area_status"] = "rescaled_to_exact_cad"
+    row = {
+        "schema": "advisor-row-v3", "cfg_id": "cfg-dup", "part": "sphere_box_s0_c1",
+        "tier": 0, "status": "ok", "answers": answers,
+        "accuracy": {"all": [{"metric": "strain_energy", "rel_err": rel_err}]},
+        "health": {"ok": True}, "config": {"h_rel": 0.1},
+    }
+    (directory / "results.jsonl").write_text(json.dumps(row) + "\n", encoding="utf-8")
+
+# Inside the repo (build/ is gitignored) because the builder reports the dataset
+# path relative to ROOT, which an out-of-tree directory cannot satisfy.
+out_dir = Path("build/test-advisor-dedup").resolve()
+out_dir.mkdir(parents=True, exist_ok=True)
+bad.CAMPAIGNS = campaigns
+bad.OUTPUT_DIR = out_dir
+sys.argv = ["build_advisor_dataset.py"]
+
+captured = io.StringIO()
+with contextlib.redirect_stdout(captured):
+    rc = bad.main()
+report = captured.getvalue()
+assert rc == 0, report
+
+# 1. The corrected row wins, not the best-scoring one and not sort order.
+rows = list(csv.DictReader((out_dir / "dataset.csv").open(encoding="utf-8")))
+rows = [r for r in rows if r["cfg_id"] == "cfg-dup"]
+assert len(rows) == 1, f"expected one row after dedup, got {len(rows)}: {rows}"
+assert rows[0]["campaign"] == "advisor-batch-1-affected2-s0", rows[0]["campaign"]
+
+# 2. Both supersedes are REPORTED, with the direction named. A silent supersede
+#    is how the stale rows nearly reached a retrain.
+assert "Superseded by CAMPAIGN_PRIORITY: 2 row(s)" in report, report
+assert "advisor-batch-1-s0  ->  advisor-batch-1-affected" in report, report
+assert "advisor-batch-1-affected-s0  ->  advisor-batch-1-affected2-s0" in report, report
+
+# 3. Priority is explicit, so the ranking holds whatever order the directories
+#    are scanned in; sort order alone would pick `affected` over `affected2`.
+assert bad.campaign_rank("advisor-batch-1-affected2-s0") < bad.campaign_rank(
+    "advisor-batch-1-affected-s0") < bad.campaign_rank("advisor-batch-1-s0")
+assert bad.campaign_rank("some-other-campaign") is None
+
+# 4. The cross-check fails a misconfigured list rather than trusting it: invert
+#    the priority so a row WITHOUT the engine marker beats one that has it.
+bad.CAMPAIGN_PRIORITY = ("advisor-batch-1-s*", "advisor-batch-1-affected2-*",
+                         "advisor-batch-1-affected-*")
+captured = io.StringIO()
+with contextlib.redirect_stdout(captured):
+    rc = bad.main()
+assert rc == 1, f"inverted priority must fail loudly, got rc={rc}"
+print("ok")
+)PY");
+}

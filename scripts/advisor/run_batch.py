@@ -200,7 +200,28 @@ def verify_cfg_id_mirror() -> int:
 
 
 def completed_pairs() -> tuple[set[tuple[str, str]], list[Path]]:
-    """(part, cfg_id) pairs already recorded under bench/campaigns/advisor-*."""
+    """(part, cfg_id) pairs already recorded under bench/campaigns/advisor-*.
+
+    The suppression this drives is GENERATION-BLIND and PERMANENT. The key holds
+    no tier, no campaign and no engine identity, so a pair recorded by ANY binary
+    -- including one whose loads were later proven wrong -- counts as done for
+    ever. That is deliberate for the current use (spreading unfinished work over
+    shards), but it means a fix requiring the same pairs to be re-solved cannot be
+    scheduled through this function at all: it reports those pairs complete and
+    plans nothing.
+
+    The two escape routes, for whoever needs them next:
+
+    * write the re-run into a campaign directory OUTSIDE the ``advisor-*`` glob, or
+    * delete the superseded rows from the recorded ``results.jsonl``.
+
+    ``advisor-batch-1-affected*`` took neither: those names DO match ``advisor-*``,
+    so their pairs are now permanently suppressed here. It did not bite because
+    testlab was driven directly for those re-runs. The duplicate rows that produced
+    are resolved explicitly by ``CAMPAIGN_PRIORITY`` in
+    scripts/build_advisor_dataset.py; this function does not rank generations, and
+    does not need to, because it only ever asks "has this been solved at all".
+    """
     done: set[tuple[str, str]] = set()
     scanned: list[Path] = []
     if not CAMPAIGNS.is_dir():

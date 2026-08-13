@@ -8,6 +8,7 @@ import argparse
 import csv
 import hashlib
 import json
+import sys
 from collections import Counter
 from datetime import datetime, timezone
 from fnmatch import fnmatch
@@ -30,6 +31,55 @@ OUTPUT_DIR = ROOT / "bench" / "advisor"
 # construction. Training on them would teach the model that the overkill config
 # has zero error -- definitionally true and completely non-generalizable.
 TRUTH_CAMPAIGN_GLOB = "advisor-truth-*"
+
+#: Explicit precedence when the SAME (cfg_id, part, tier) was solved more than
+#: once, newest engine first. The rank is stated here rather than inferred,
+#: because every implicit rule available is wrong in some case: directory sort
+#: order picks `affected` over `affected2` (wrong) while picking `affected2` over
+#: plain `batch-1` (right), and mtime silently depends on file copies.
+#:
+#: WHY each rank:
+#:   1. `advisor-batch-1-affected2-*` -- re-run AFTER the load-rule fix, so both
+#:      the CAD and mesh sides select the region the case actually specifies.
+#:   2. `advisor-batch-1-affected-*`  -- re-run AFTER traction rescaling but
+#:      BEFORE the load-rule fix, so the resultant is mesh-independent yet still
+#:      rescaled onto a 0.7-filtered region for `normal_min_dot = -1` cases.
+#:   3. `advisor-batch-1-*`           -- PRE-both. Solved under a load that was
+#:      scaled by whatever area the candidate mesh happened to select.
+#:
+#: A stale row frequently SCORES BETTER than its replacement, because it was
+#: solved under a wrong load and graded against retired truth: sphere_box_s0_c1
+#: cfg-d34d960b reports rel_err 0.7076 (affected), 0.0259 (affected2) and 0.0140
+#: (stale batch-1). Training on the stale row teaches that the wrong-load
+#: configuration is the most accurate one, and a family-grouped split cannot
+#: expose it because both copies land on the same side.
+CAMPAIGN_PRIORITY: tuple[str, ...] = (
+    "advisor-batch-1-affected2-*",
+    "advisor-batch-1-affected-*",
+    "advisor-batch-1-*",
+)
+
+
+def campaign_rank(campaign: str) -> int | None:
+    """Index in CAMPAIGN_PRIORITY (lower wins), or None when unranked."""
+    for rank, pattern in enumerate(CAMPAIGN_PRIORITY):
+        if fnmatch(campaign, pattern):
+            return rank
+    return None
+
+
+def has_engine_marker(row: dict[str, Any]) -> bool:
+    """True when the row was written by a post-traction-rescale testlab.
+
+    `answers.load_area_status` only exists once the load-area gate became
+    three-valued, so its presence is a per-row engine-generation marker. It is a
+    CROSS-CHECK on CAMPAIGN_PRIORITY, never a second precedence rule: if the list
+    ever prefers a row without it over one with it, the list is misconfigured and
+    the build fails rather than quietly training on the older row.
+    """
+    answers = row.get("answers")
+    return isinstance(answers, dict) and "load_area_status" in answers
+
 
 FEATURE_COLUMNS = [
     "bbox_dx", "bbox_dy", "bbox_dz", "diag", "volume", "surface_area",
@@ -72,6 +122,17 @@ def read_json(path: Path) -> dict[str, Any]:
 
 
 def campaign_records(campaign_dir: Path) -> Iterable[tuple[tuple[Any, ...], dict[str, Any]]]:
+    """Yield ((cfg_id, part, tier), row) for one campaign directory.
+
+    The key deliberately EXCLUDES the campaign name. It used to include it, which
+    meant the same (cfg_id, part, tier) solved in two directories never collided
+    and both rows reached the dataset -- so re-running a pair on a fixed engine
+    added a second, contradictory label instead of replacing the first. Collisions
+    are now resolved explicitly by CAMPAIGN_PRIORITY in main().
+
+    Within one directory the warehouse rows are yielded last and still win, which
+    is the intended last-seen behaviour for an exact duplicate of the same run.
+    """
     results = campaign_dir / "results.jsonl"
     if results.exists():
         with results.open("r", encoding="utf-8") as stream:
@@ -82,12 +143,10 @@ def campaign_records(campaign_dir: Path) -> Iterable[tuple[tuple[Any, ...], dict
                     row = json.loads(text)
                 except json.JSONDecodeError as exc:
                     raise ValueError(f"{results}:{line_number}: {exc}") from exc
-                key = (campaign_dir.name, row.get("cfg_id"), row.get("part"), row.get("tier"))
-                yield key, row
+                yield (row.get("cfg_id"), row.get("part"), row.get("tier")), row
     for path in sorted((campaign_dir / "runs").glob("*/*/t*/result.json")):
         row = read_json(path)
-        key = (campaign_dir.name, row.get("cfg_id"), row.get("part"), row.get("tier"))
-        yield key, row
+        yield (row.get("cfg_id"), row.get("part"), row.get("tier")), row
 
 
 def load_cases() -> dict[str, dict[str, Any]]:
@@ -453,7 +512,15 @@ def main() -> int:
     print(f"Cases loaded: {len(cases)} ({case_counts()})")
     records_scanned = 0
     skipped_truth: list[str] = []
-    unique: dict[tuple[Any, ...], dict[str, Any]] = {}
+    #: (cfg_id, part, tier) -> (campaign, row) for the winning row.
+    unique: dict[tuple[Any, ...], tuple[str, dict[str, Any]]] = {}
+    #: (loser_campaign, winner_campaign) -> rows superseded. A silent supersede is
+    #: how a wrong-load row nearly reached a retrain, so the count is reported.
+    superseded: Counter[tuple[str, str]] = Counter()
+    #: Collisions CAMPAIGN_PRIORITY cannot order. Never silent.
+    unordered: list[tuple[tuple[Any, ...], str, str]] = []
+    #: Cross-check violations: the list preferred an older-engine row.
+    marker_violations: list[str] = []
     for campaign_dir in sorted(path for path in CAMPAIGNS.iterdir() if path.is_dir()):
         if fnmatch(campaign_dir.name, TRUTH_CAMPAIGN_GLOB):
             # promote_truth.py DEFINES each case's reference truth from these
@@ -462,9 +529,51 @@ def main() -> int:
             # error: definitionally true, completely non-generalizable.
             skipped_truth.append(campaign_dir.name)
             continue
+        campaign = campaign_dir.name
         for key, row in campaign_records(campaign_dir):
             records_scanned += 1
-            unique[key] = row  # warehouse rows are visited last and win exact duplicates
+            previous = unique.get(key)
+            if previous is None:
+                unique[key] = (campaign, row)
+                continue
+            held_campaign, held_row = previous
+            if held_campaign == campaign:
+                # Same directory: warehouse rows are visited last and win an exact
+                # duplicate of the same run, which is the original behaviour.
+                unique[key] = (campaign, row)
+                continue
+            held_rank = campaign_rank(held_campaign)
+            new_rank = campaign_rank(campaign)
+            if held_rank is None or new_rank is None:
+                # Cannot order these two. Keep the incumbent deterministically and
+                # report it, so a future re-run directory cannot inherit a tie-break
+                # by being sorted luckily.
+                unordered.append((key, held_campaign, campaign))
+                continue
+            winner_campaign, winner_row, loser_campaign, loser_row = (
+                (campaign, row, held_campaign, held_row)
+                if new_rank < held_rank
+                else (held_campaign, held_row, campaign, row)
+            )
+            unique[key] = (winner_campaign, winner_row)
+            superseded[(loser_campaign, winner_campaign)] += 1
+            if has_engine_marker(loser_row) and not has_engine_marker(winner_row):
+                marker_violations.append(
+                    f"{key}: CAMPAIGN_PRIORITY chose {winner_campaign} (no "
+                    f"answers.load_area_status) over {loser_campaign} (has it)"
+                )
+
+    if marker_violations:
+        print("error: CAMPAIGN_PRIORITY preferred an older-engine row over a newer one.",
+              file=sys.stderr)
+        print("       answers.load_area_status exists only in post-rescale rows, so the",
+              file=sys.stderr)
+        print("       priority list is misconfigured. Refusing to build.", file=sys.stderr)
+        for line in marker_violations[:10]:
+            print(f"  {line}", file=sys.stderr)
+        if len(marker_violations) > 10:
+            print(f"  ... and {len(marker_violations) - 10} more", file=sys.stderr)
+        return 1
 
     source_schema_counts: Counter[str] = Counter()
     excluded_legacy_sources: Counter[str] = Counter()
@@ -478,8 +587,8 @@ def main() -> int:
     unscoreable: Counter[str] = Counter()
     kept: list[dict[str, Any]] = []
     for key in sorted(unique, key=lambda item: tuple("" if value is None else str(value) for value in item)):
-        campaign, _, part, _ = key
-        row = unique[key]
+        _, part, _ = key
+        campaign, row = unique[key]
         source_schema = row.get("schema") if row.get("schema") == "advisor-row-v3" else "legacy"
         source_schema_counts[source_schema] += 1
         if source_schema != "advisor-row-v3":
@@ -534,6 +643,22 @@ def main() -> int:
     print(f"Rows in: {len(unique)} unique ({records_scanned} records scanned, "
           f"{records_scanned - len(unique)} duplicates)")
     print(f"Rows emitted: {len(kept)}")
+    if superseded:
+        total = sum(superseded.values())
+        print(f"Superseded by CAMPAIGN_PRIORITY: {total} row(s) replaced by a "
+              "newer-engine re-run of the same (cfg_id, part, tier)")
+        for (loser, winner), count in sorted(superseded.items()):
+            print(f"  {count:5d}  {loser}  ->  {winner}")
+    if unordered:
+        parts = sorted({f"{a} vs {b}" for _, a, b in unordered})
+        print(f"WARNING: {len(unordered)} collision(s) CAMPAIGN_PRIORITY cannot order; "
+              "kept the first directory scanned:")
+        for pair in parts[:8]:
+            print(f"  {pair}")
+        if len(parts) > 8:
+            print(f"  ... and {len(parts) - 8} more directory pairs")
+        print("  Add the directory to CAMPAIGN_PRIORITY so the winner is chosen, "
+              "not inherited from sort order.")
     if excluded_legacy_rows:
         excluded = ", ".join(
             f"{CAMPAIGNS.relative_to(ROOT).as_posix()}/{campaign}/results.jsonl={count}"

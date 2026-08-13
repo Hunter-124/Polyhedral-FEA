@@ -241,10 +241,23 @@ guarantees is that the contamination is enumerable rather than vague: rows whose
 or stepped features.
 
 The peer matrix is **not** affected — `bench/results/gmsh-peer.json` is
-Gmsh-meshed and solved by our solver, so our mesher never touched it. The
-showcase was regenerated and came back **bit-identical** (node counts, element
-counts, DOF and peak von Mises match to the digit; `plate_hole.vtu` hashes the
-same): those fixtures run at fine `h` on parts whose shells were already sound.
+Gmsh-meshed and solved by our solver, so our mesher never touched it.
+
+**RETRACTED:** this ADR previously reported that the showcase "came back
+bit-identical", and offered that as evidence the fixtures ran at fine `h` on
+parts whose shells were already sound. That was wrong, and it was wrong in the
+way this whole document is about. `scripts/render_showcase.py::cli_path` took
+the first CLI name that existed, preferring the extensionless
+`build/apps/cli/polymesh`; on Windows the build target is `polymesh.exe`, so a
+leftover from an earlier configuration — dated 15 hours before any of this
+work — won every lookup. Every showcase regeneration ran the OLD engine, and
+"identical output" was read as "the fix changes nothing here" when it meant
+"the fix was never executed here". Run against the actual binary, the showcase
+does change: `plate_hole` 173,990 → 177,555 elements, `cylinder` 36,058 →
+42,524, `sphere` 17,928 → 23,346, and the feature-graded hole close-up loses
+the ragged crown entirely (near-bore boundary nodes off the exact CAD surface:
+84 → 0). `cli_path` now picks the newest candidate and prints which one it
+chose, so a stale binary has to announce itself.
 
 ## What this says about the method
 

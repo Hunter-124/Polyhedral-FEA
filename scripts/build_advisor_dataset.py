@@ -48,7 +48,10 @@ CASE_COLUMNS = [
 ]
 # ``error`` is the row's top-level failure string; it is the first signal
 # dataset.py::_failure_flag looks at, so it has to reach the CSV.
-TOP_OUTCOMES = ["status", "error", "mesh_ms", "solve_ms", "n_dof", "n_elems", "n_nodes"]
+TOP_OUTCOMES = [
+    "status", "error", "mesh_ms", "solve_ms", "n_dof", "n_elems", "n_nodes",
+    "geometry_fill_volume_err", "geometry_volume_err",
+]
 STRING_OUTCOMES = frozenset({"status", "error"})
 
 
@@ -251,6 +254,8 @@ def main() -> int:
     source_schema_counts: Counter[str] = Counter()
     excluded_legacy_sources: Counter[str] = Counter()
     excluded_legacy_rows = 0
+    excluded_geometry_rows = 0
+
     schema_counts: Counter[str] = Counter()
     failure_signal: Counter[str] = Counter()
     kept: list[dict[str, Any]] = []
@@ -263,6 +268,10 @@ def main() -> int:
             excluded_legacy_rows += 1
             excluded_legacy_sources[campaign] += 1
             continue
+        if row.get("advisor_training_eligible") is False:
+            excluded_geometry_rows += 1
+            continue
+
         schema_counts[source_schema] += 1
         # Unhealthy and untrusted rows are KEPT: they are the only supervision
         # the feasibility head has, and dataset.py masks them out of every
@@ -292,6 +301,8 @@ def main() -> int:
             for campaign, count in sorted(excluded_legacy_sources.items())
         )
         print(f"Legacy rows excluded from training dataset: {excluded_legacy_rows} ({excluded})")
+    if excluded_geometry_rows:
+        print(f"Egregious geometry rows excluded from training: {excluded_geometry_rows}")
     print(f"Truth campaigns skipped ({TRUTH_CAMPAIGN_GLOB}): "
           + (", ".join(skipped_truth) if skipped_truth else "none")
           + "  [their rel_err is ~0 by construction; promote_truth.py defines truth from them]")

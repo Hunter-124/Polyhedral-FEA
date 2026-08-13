@@ -227,6 +227,8 @@ NodalMesh make_l_graded(double h0, double rho, int max_layers, int n_coarse_bg, 
     return mesh;
 }
 
+/// This benchmark has no CAD/BRep: its synthetic L-domain boundary is planar,
+/// so straight edge mids already lie on the exact geometry (ADR-0028).
 NodalMesh promote_tet4_to_tet10(const NodalMesh& mesh) {
     constexpr std::array<std::array<int, 2>, 6> kTetEdges{
         {{0, 1}, {1, 2}, {0, 2}, {0, 3}, {1, 3}, {2, 3}}};

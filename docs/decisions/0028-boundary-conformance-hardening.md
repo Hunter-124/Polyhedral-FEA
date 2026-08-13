@@ -109,8 +109,19 @@ and skip count instead of drawing fictitious zig-zag cells.
 
 Every `fea::p_elevate` or other order-2 producer must use the shared helper, or
 document why CAD projection is unavailable or inappropriate.
-`apps/cli/main.cpp` had two private p-elevation sites; both now construct the
-shared context and call `project_quadratic_boundary_mids`.
+The exhaustive production inventory is:
+
+- the two adaptive `SolveJob` selective-elevation sites in
+  `src/pipeline/src/scene.cpp` project through the shared helper immediately
+  after promotion;
+- both private CLI selective-elevation sites in `apps/cli/main.cpp` do the
+  same;
+- synchronous order-2 campaign promotion in `apps/testlab/main.cpp` also
+  projects before the solved-stage geometry-volume measurement and solve;
+- the Gmsh reader preserves source-authored Tet10/Hex20 coordinates because
+  an imported `.msh` has no associated `CadModel` at that layer; and
+- the D6 synthetic L-domain benchmark has planar boundaries and no BRep, so
+  its straight mids already lie on the exact geometry.
 
 ### 7. Engine changes require a row-schema bump and retraining
 

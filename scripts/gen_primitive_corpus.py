@@ -84,6 +84,12 @@ CASE_DIR = STEP_DIR  # cases live next to their STEP; see build_advisor_dataset.
 REFERENCE_DIR = ROOT / "bench" / "reference" / "corpus"
 TRUTH_CAMPAIGN_DIR = ROOT / "bench" / "campaigns" / "advisor-truth-0"
 
+# Same allowlist promote_truth.py uses: only truth this repo generated itself may
+# be overwritten. Defined once in scripts/truth_guard.py so a newly added
+# external source is protected in both writers without editing either.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from truth_guard import SELF_GENERATED_SOURCES, protected_metrics  # noqa: E402
+
 FAMILIES = (
     "box_hole",
     "l_bracket",
@@ -804,12 +810,14 @@ def truth_campaign(case_paths: list[str]) -> dict[str, Any]:
     }
 
 
-def generate(families: list[str], regimes: list[int]) -> tuple[int, int]:
+def generate(families: list[str], regimes: list[int],
+             *, force_overwrite_external: bool = False) -> tuple[int, int, list[str]]:
     STEP_DIR.mkdir(parents=True, exist_ok=True)
     REFERENCE_DIR.mkdir(parents=True, exist_ok=True)
     case_paths: list[str] = []
     n_parts = 0
     n_cases = 0
+    protected_skipped: list[str] = []
     for family in FAMILIES:
         if family not in families:
             continue
@@ -821,7 +829,25 @@ def generate(families: list[str], regimes: list[int]) -> tuple[int, int]:
                 case = case_json(geom, spec)
                 name = case["part"]
                 write_json(CASE_DIR / f"{name}.case.json", case)
-                write_json(REFERENCE_DIR / f"{name}.json", reference_json(geom, spec))
+                # Geometry and cases are always regenerated (they are derived from
+                # the committed seed table), but a reference truth may have been
+                # replaced by an INDEPENDENT source since this corpus was seeded.
+                # Re-seeding it would silently discard a Gmsh+CalculiX or
+                # closed-form answer and restore a first-order surrogate, so the
+                # same allowlist that guards promote_truth.py applies here.
+                reference_path = REFERENCE_DIR / f"{name}.json"
+                blocked: list[tuple[str, str]] = []
+                if reference_path.is_file():
+                    try:
+                        existing = json.loads(reference_path.read_text(encoding="utf-8"))
+                    except (OSError, json.JSONDecodeError):
+                        existing = {}
+                    blocked = protected_metrics(existing)
+                if blocked and not force_overwrite_external:
+                    detail = ", ".join(f"{m} [{s}]" for m, s in blocked)
+                    protected_skipped.append(f"{name}: {detail}")
+                else:
+                    write_json(reference_path, reference_json(geom, spec))
                 case_paths.append(
                     f"bench/geometries/corpus/primitives/{name}.case.json"
                 )
@@ -833,7 +859,7 @@ def generate(families: list[str], regimes: list[int]) -> tuple[int, int]:
     else:
         print("partial selection: bench/campaigns/advisor-truth-0/campaign.json "
               "left untouched (regenerate with the full corpus)")
-    return n_parts, n_cases
+    return n_parts, n_cases, protected_skipped
 
 
 # ── --check ─────────────────────────────────────────────────────────────────
@@ -968,6 +994,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--regime", action="append", type=int,
                         choices=list(range(len(REGIME_SCALE))),
                         help="generate only this size regime (repeatable)")
+    parser.add_argument("--force-overwrite-external", action="store_true",
+                        help="DESTRUCTIVE: also re-seed reference truths whose source "
+                             "is protected (analytic / external-*), discarding an "
+                             "independent answer for a first-order surrogate")
     args = parser.parse_args(argv)
 
     if args.check:
@@ -975,11 +1005,25 @@ def main(argv: list[str] | None = None) -> int:
 
     families = args.family or list(FAMILIES)
     regimes = sorted(set(args.regime or range(len(REGIME_SCALE))))
-    n_parts, n_cases = generate(families, regimes)
+    if args.force_overwrite_external:
+        print("WARNING: --force-overwrite-external will re-seed protected reference "
+              "truths, replacing independently sourced answers with first-order "
+              "surrogates", file=sys.stderr)
+    n_parts, n_cases, protected_skipped = generate(
+        families, regimes, force_overwrite_external=args.force_overwrite_external)
+    n_written = n_cases - len(protected_skipped)
     print(f"corpus: {n_parts} STEP parts, {n_cases} case JSONs, "
-          f"{n_cases} reference truths")
+          f"{n_written} reference truths written")
     print(f"  geometry + cases: {STEP_DIR.relative_to(ROOT)}")
     print(f"  truths:           {REFERENCE_DIR.relative_to(ROOT)}")
+    if protected_skipped:
+        print(f"  REFUSED to re-seed {len(protected_skipped)} protected reference "
+              "truth(s) -- not this repo's truth to rewrite:")
+        for entry in protected_skipped:
+            print(f"    {entry}")
+        print("  (may only re-seed "
+              + "/".join(sorted(SELF_GENERATED_SOURCES))
+              + "; pass --force-overwrite-external to override)")
     return 0
 
 

@@ -13,8 +13,12 @@ the first-order surrogate that ``scripts/gen_primitive_corpus.py`` seeds.
 
 Rules:
 
-* Metrics whose ``source`` is ``"analytic"`` are never touched. A closed form outranks
-  any solve.
+* Promotion may only overwrite truth that THIS repo generated (``provisional`` seeds
+  and earlier ``overkill-reference`` promotions). Every other source is protected: a
+  closed-form ``analytic`` value, any ``external-*`` chain (Gmsh mesh + CalculiX
+  solve), and any third-party source added later. The rule is an ALLOWLIST, so a new
+  externally sourced truth is protected the moment it lands, without editing this
+  script. Overwriting a protected metric requires ``--force-overwrite-external``.
 * The promoted row is the health-ok row with the largest ``n_dof`` for that part whose
   solved-stage ``geometry_volume_err`` is below 1%. Fill-stage geometry may be degraded
   before quadratic mid-node projection; only the geometry actually solved determines
@@ -58,7 +62,14 @@ PROMOTED_TOL = 0.15
 #: A solved geometry at or above 1% relative CAD-volume error remains useful
 #: advisor training data, but may not define reference truth.
 GEOMETRY_VOLUME_TRUTH_LIMIT = 0.01
-
+#: Promotion may only overwrite truth this repo generated itself. The ALLOWLIST
+#: (and the reason it is not a denylist) lives in scripts/truth_guard.py so that
+#: scripts/gen_primitive_corpus.py enforces exactly the same rule and a newly
+#: added external source is protected in both places without editing either.
+_SCRIPTS_DIR = Path(__file__).resolve().parents[1]
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+from truth_guard import SELF_GENERATED_SOURCES, protected_source  # noqa: E402
 
 
 def rel(path: Path) -> str:
@@ -96,6 +107,13 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--require-all", action="store_true",
                         help="exit non-zero if any non-analytic corpus truth is still "
                              "provisional after promotion")
+    parser.add_argument("--part", action="append", default=None, metavar="PART",
+                        help="only promote these parts (repeatable). Naming a part "
+                             "whose truth is protected is an error, not a silent skip")
+    parser.add_argument("--force-overwrite-external", action="store_true",
+                        help="DESTRUCTIVE: also overwrite protected truth (analytic / "
+                             "external-*). Off by default; names every reference it "
+                             "would clobber before writing")
     return parser.parse_args(argv)
 
 
@@ -186,18 +204,27 @@ def provenance(row: dict[str, Any], results: Path) -> dict[str, Any]:
     }
 
 
-def promote(reference: dict[str, Any], row: dict[str, Any], results: Path
-            ) -> tuple[dict[str, Any], int, int]:
-    """Return (updated reference, promoted metric count, analytic metrics skipped)."""
+def promote(reference: dict[str, Any], row: dict[str, Any], results: Path,
+            *, force_external: bool = False
+            ) -> tuple[dict[str, Any], int, list[tuple[str, str]]]:
+    """Return (updated reference, promoted count, protected metrics refused).
+
+    ``protected`` lists ``(metric_name, source)`` for every metric promotion was
+    NOT allowed to touch, so the caller can name them instead of counting them.
+    """
     measured = measured_by_metric(row)
     updated = json.loads(json.dumps(reference))  # deep copy, no shared substructure
     promoted = 0
-    skipped = 0
+    protected: list[tuple[str, str]] = []
     source_run = provenance(row, results)
     for metric in updated.get("metrics", []):
-        if metric.get("source") == "analytic":
-            skipped += 1
-            continue
+        blocked = protected_source(metric)
+        if blocked is not None:
+            # Allowlist: only our own provisional/overkill truth is overwritable.
+            if not force_external:
+                protected.append((str(metric.get("name", "<unnamed>")), blocked))
+                continue
+            protected.append((str(metric.get("name", "<unnamed>")), blocked))
         name = metric.get("name")
         if name not in measured:
             continue
@@ -223,7 +250,7 @@ def promote(reference: dict[str, Any], row: dict[str, Any], results: Path
         else:
             updated["truth_source"] = "mixed"
         updated.pop("notes", None)
-    return updated, promoted, skipped
+    return updated, promoted, protected
 
 
 def write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -250,16 +277,48 @@ def main(argv: list[str] | None = None) -> int:
     print(f"truth rows: {len(scanned)} row(s) from {len(results_paths)} results.jsonl "
           f"({', '.join(p.parent.name for p in results_paths)}); "
           f"{len(rows)} part(s) have a usable overkill row")
+    requested: set[str] | None = set(args.part) if args.part else None
     promoted_files = 0
     promoted_metrics = 0
-    analytic_skipped = 0
     unchanged = 0
     missing: list[str] = []
     still_provisional: list[str] = []
+    #: part -> [(metric, source)] refused because the truth is not ours to rewrite.
+    refused: dict[str, list[tuple[str, str]]] = {}
 
-    for path in sorted(REFERENCE_DIR.glob("*.json")):
-        reference = json.loads(path.read_text(encoding="utf-8"))
+    references = [(path, json.loads(path.read_text(encoding="utf-8")))
+                  for path in sorted(REFERENCE_DIR.glob("*.json"))]
+
+    # Pre-pass: with --force-overwrite-external the user is about to destroy
+    # independent truth, so name every reference BEFORE writing anything.
+    if args.force_overwrite_external:
+        doomed: list[tuple[str, str, str]] = []
+        for path, reference in references:
+            part = reference.get("part", path.stem)
+            if (requested is not None and part not in requested) or part not in rows:
+                continue
+            for metric in reference.get("metrics", []):
+                blocked = protected_source(metric)
+                if blocked is not None:
+                    doomed.append((rel(path), str(metric.get("name", "<unnamed>")),
+                                   blocked))
+        if doomed:
+            print("=" * 72, file=sys.stderr)
+            print("WARNING: --force-overwrite-external will REPLACE independently "
+                  "sourced truth", file=sys.stderr)
+            print("with this repo's own overkill-mesher values and reset tol to "
+                  f"{PROMOTED_TOL:g}.", file=sys.stderr)
+            print(f"{len(doomed)} protected metric(s) in "
+                  f"{len({d[0] for d in doomed})} reference file(s):", file=sys.stderr)
+            for ref_path, metric_name, source in doomed:
+                print(f"  {ref_path}  metric={metric_name}  source={source}",
+                      file=sys.stderr)
+            print("=" * 72, file=sys.stderr)
+
+    for path, reference in references:
         part = reference.get("part", path.stem)
+        if requested is not None and part not in requested:
+            continue
         entry = rows.get(part)
         if entry is None:
             if any(m.get("source") == "provisional"
@@ -267,13 +326,18 @@ def main(argv: list[str] | None = None) -> int:
                 missing.append(part)
                 still_provisional.append(part)
             else:
-                analytic_skipped += sum(
-                    1 for m in reference.get("metrics", [])
-                    if m.get("source") == "analytic")
+                blocked = [(str(m.get("name", "<unnamed>")), src)
+                           for m in reference.get("metrics", [])
+                           if (src := protected_source(m)) is not None]
+                if blocked:
+                    refused[part] = blocked
             continue
         source_results, row = entry
-        updated, n_promoted, n_analytic = promote(reference, row, source_results)
-        analytic_skipped += n_analytic
+        updated, n_promoted, n_protected = promote(
+            reference, row, source_results,
+            force_external=args.force_overwrite_external)
+        if n_protected:
+            refused[part] = n_protected
         if updated == reference:
             unchanged += 1
         else:
@@ -284,13 +348,43 @@ def main(argv: list[str] | None = None) -> int:
         if any(m.get("source") == "provisional" for m in updated.get("metrics", [])):
             still_provisional.append(part)
 
+    n_refused = sum(len(items) for items in refused.values())
     verb = "would promote" if args.dry_run else "promoted"
+    # Under --force the protected metrics were overwritten, not refused; say so.
+    protected_label = ("protected_OVERWRITTEN" if args.force_overwrite_external
+                       else "protected_refused")
     print(f"{verb}={promoted_files} files / {promoted_metrics} metrics  "
-          f"analytic_skipped={analytic_skipped}  unchanged={unchanged}  "
+          f"{protected_label}={n_refused}  unchanged={unchanged}  "
           f"missing={len(missing)}")
     if missing:
         print("  no usable overkill row for: " + ", ".join(missing[:8])
               + (" ..." if len(missing) > 8 else ""))
+
+    # Loud, itemised refusal: never let a protected metric be skipped silently.
+    if refused and not args.force_overwrite_external:
+        by_source: dict[str, int] = {}
+        for items in refused.values():
+            for _, source in items:
+                by_source[source] = by_source.get(source, 0) + 1
+        print(f"  REFUSED to overwrite {n_refused} protected metric(s) in "
+              f"{len(refused)} reference file(s) -- not this repo's truth to rewrite:")
+        for part in sorted(refused):
+            detail = ", ".join(f"{name} [{source}]" for name, source in refused[part])
+            print(f"    {part}: {detail}")
+        print("  by source: "
+              + ", ".join(f"{source}={count}" for source, count in sorted(by_source.items())))
+        print("  (promotion may only overwrite "
+              + "/".join(sorted(SELF_GENERATED_SOURCES))
+              + "; pass --force-overwrite-external to override)")
+
+    # An explicit --part naming protected truth is an error, not a silent skip.
+    if requested is not None and not args.force_overwrite_external:
+        explicit = sorted(requested & refused.keys())
+        if explicit:
+            print(f"error: --part explicitly named {len(explicit)} part(s) whose truth "
+                  f"is protected: {', '.join(explicit)}", file=sys.stderr)
+            return 1
+
     if args.require_all and still_provisional:
         print(f"error: {len(still_provisional)} corpus truths are still provisional",
               file=sys.stderr)

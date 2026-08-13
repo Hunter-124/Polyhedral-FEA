@@ -73,6 +73,7 @@ add_executable(polymesh_tests
     testlab_selfcheck.cpp
     test_probe_util.cpp
     test_advisor_dataset_rederive.cpp
+    test_truth_guard.cpp
 
     support/structured_mesh.cpp
     support/mms.cpp

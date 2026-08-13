@@ -38,6 +38,8 @@ struct GradedTetFillOutput {
     std::size_t n_level0_cells = 0;
     std::size_t n_level1_cells = 0;
     std::size_t n_level2_cells = 0; // level 2 or deeper protected feature core
+    int classification_refinement_levels = 0;
+    double classification_volume_error = 0.0;
     /// Observed requested field range at interior cell centroids (metres).
     double field_h_min = 0.0;
     double field_h_max = 0.0;

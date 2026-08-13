@@ -129,6 +129,8 @@ struct BRepInspection {
 struct BRepSurfaceSamples {
     std::vector<Eigen::Vector3d> points;
     std::size_t face_count = 0;
+    /// Stable zero-based CAD face id for each point.
+    std::vector<std::uint32_t> face_ids;
     std::size_t uv_attempt_count = 0;
     std::size_t fallback_vertex_count = 0;
 };

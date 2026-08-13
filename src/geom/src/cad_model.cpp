@@ -767,6 +767,7 @@ BRepSurfaceSamples sample_brep_surface(const CadModel& model, std::size_t max_sa
     }
 
     std::vector<Eigen::Vector3d>& samples = result.points;
+    result.face_ids.reserve(max_samples);
     samples.reserve(max_samples);
     for (std::size_t i = 0; i < face_count; ++i) {
         const TopoDS_Face face =
@@ -813,6 +814,7 @@ BRepSurfaceSamples sample_brep_surface(const CadModel& model, std::size_t max_sa
                         std::isfinite(static_cast<double>(point.Y())) &&
                         std::isfinite(static_cast<double>(point.Z()))) {
                         samples.emplace_back(point.X(), point.Y(), point.Z());
+                        result.face_ids.push_back(static_cast<std::uint32_t>(i));
                     }
                 }
             }
@@ -829,6 +831,7 @@ BRepSurfaceSamples sample_brep_surface(const CadModel& model, std::size_t max_sa
                     std::isfinite(static_cast<double>(point.Y())) &&
                     std::isfinite(static_cast<double>(point.Z()))) {
                     samples.emplace_back(point.X(), point.Y(), point.Z());
+                    result.face_ids.push_back(static_cast<std::uint32_t>(i));
                     found_finite_vertex = true;
                     ++result.fallback_vertex_count;
                     break;

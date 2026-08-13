@@ -16,6 +16,7 @@
 #include "geom/step.hpp"
 #include "mesh/brep_fidelity.hpp"
 #include "mesh/local_refine.hpp"
+#include "mesh/hybrid_fill.hpp"
 #include "mesh/tet_fill.hpp"
 #include "pipeline/scene.hpp"
 
@@ -400,7 +401,7 @@ TEST_CASE("LEB on a large-coordinate curved mesh does not abort on slivers") {
         SKIP("pipe.step missing");
     }
     const auto model = polymesh::pipeline::Model::load(kPipe);
-    const double h = 0.18 * kPipeH; // coarse; LEB then refines locally
+    const double h = 0.06 * kPipeH; // first coarse ladder rung with <5% delivered volume loss
     const auto vol = polymesh::pipeline::volume_mesh(
         model, h, polymesh::pipeline::VolumeMesher::kGradedTet);
     REQUIRE_FALSE(vol.mesh.elements.empty());
@@ -427,5 +428,53 @@ TEST_CASE("LEB on a large-coordinate curved mesh does not abort on slivers") {
         REQUIRE(refined.tets.size() >= tets.size());
         nodes = std::move(refined.nodes);
         tets = std::move(refined.tets);
+    }
+}
+
+TEST_CASE("diagnostic: independently sum coarse graded volumes") {
+    if (!polymesh::geom::occ_enabled()) {
+        SKIP("OpenCASCADE disabled");
+    }
+    struct Case {
+        const char* name;
+        const char* path;
+        double h;
+    };
+    const Case cases[] = {
+        {"icecream", kIcecreamCone, 0.010},
+        {"pipe-0.10", kPipe, 0.10 * kPipeH},
+        {"pipe-0.08", kPipe, 0.08 * kPipeH},
+        {"pipe-0.06", kPipe, 0.06 * kPipeH},
+        {"pipe-0.05", kPipe, 0.05 * kPipeH},
+        {"sphere-0.20", "tests/fixtures/parts/sphere.step", 0.20 * 0.17320508075688773},
+        {"sphere-0.10", "tests/fixtures/parts/sphere.step", 0.10 * 0.17320508075688773},
+        {"sphere-0.08", "tests/fixtures/parts/sphere.step", 0.08 * 0.17320508075688773},
+        {"sphere-0.06", "tests/fixtures/parts/sphere.step", 0.06 * 0.17320508075688773},
+        {"sphere-0.05", "tests/fixtures/parts/sphere.step", 0.05 * 0.17320508075688773},
+    };
+    for (const auto& c : cases) {
+        if (!std::filesystem::exists(c.path)) {
+            continue;
+        }
+        const auto model = polymesh::pipeline::Model::load(c.path);
+        REQUIRE(model.cad);
+        std::vector<polymesh::mesh::BoundarySupport> provenance;
+        polymesh::mesh::BoundaryProjectionContext projection;
+        REQUIRE(polymesh::pipeline::make_boundary_projection(
+            *model.cad, c.h, &projection, &provenance));
+        const auto fill = polymesh::mesh::graded_tet_fill_surface(
+            model.surface, model.bbox_min, model.bbox_max, c.h, 2, {}, 0.0, {}, 0.0, 0.0,
+            &projection);
+        double mesh_volume = 0.0;
+        for (const auto& tet : fill.mesh.tets) {
+            mesh_volume += std::abs(polymesh::mesh::tet_signed_volume(
+                fill.mesh.nodes[tet[0]], fill.mesh.nodes[tet[1]], fill.mesh.nodes[tet[2]],
+                fill.mesh.nodes[tet[3]]));
+        }
+        const auto exact = polymesh::geom::inspect_brep(*model.cad);
+        REQUIRE(exact.available);
+        const double relative_error = std::abs(mesh_volume - exact.volume) / exact.volume;
+        WARN(c.name << ": element_sum=" << mesh_volume << " cad=" << exact.volume
+                    << " rel_err=" << relative_error << " tets=" << fill.mesh.tets.size());
     }
 }

@@ -20,6 +20,7 @@
 #include "geom/features.hpp"
 #include "geom/indicators.hpp"
 #include "geom/step.hpp"
+#include "mesh/brep_fidelity.hpp"
 #include "mesh/cell_validity.hpp"
 #include "mesh/cvt_export.hpp"
 #include "mesh/cvt_lloyd.hpp"
@@ -1100,6 +1101,259 @@ std::size_t project_quadratic_boundary_mids(
     return projected;
 }
 
+namespace {
+
+struct VolumeRulePoint {
+    double weight = 0.0;
+    Eigen::Matrix<double, Eigen::Dynamic, 3> dn;
+};
+
+std::vector<VolumeRulePoint> make_volume_rule(fea::ElementType type) {
+    std::vector<fea::QuadraturePoint> quadrature;
+    if (type == fea::ElementType::kTet10) {
+        // A quadratic tetrahedral map has a cubic det(J).
+        quadrature = fea::tet_rule(3);
+    } else if (type == fea::ElementType::kHex20) {
+        // One order above the stiffness rule makes the curved-volume measure
+        // insensitive to the integration shortcut used by the solver.
+        quadrature = fea::hex_rule(4);
+    } else {
+        quadrature = fea::default_rule(type);
+    }
+    std::vector<VolumeRulePoint> out;
+    out.reserve(quadrature.size());
+    for (const auto& qp : quadrature) {
+        out.push_back({qp.weight, fea::eval_shape(type, qp.xi).dn});
+    }
+    return out;
+}
+
+const std::vector<VolumeRulePoint>& volume_rule(fea::ElementType type) {
+    static const auto rules = [] {
+        std::array<std::vector<VolumeRulePoint>, 6> value;
+        for (std::size_t i = 0; i < value.size(); ++i) {
+            value[i] = make_volume_rule(static_cast<fea::ElementType>(i));
+        }
+        return value;
+    }();
+    return rules[static_cast<std::size_t>(type)];
+}
+
+double physical_mesh_volume(const fea::NodalMesh& nodal) {
+    double total = 0.0;
+    for (const auto& element : nodal.elements) {
+        if (element.type == fea::ElementType::kPolyVem) {
+            double signed_volume = 0.0;
+            for (const auto& face : element.faces) {
+                if (face.size() < 3) {
+                    continue;
+                }
+                const Eigen::Vector3d& a = nodal.nodes[element.nodes[face[0]]];
+                for (std::size_t k = 1; k + 1 < face.size(); ++k) {
+                    const Eigen::Vector3d& b = nodal.nodes[element.nodes[face[k]]];
+                    const Eigen::Vector3d& c = nodal.nodes[element.nodes[face[k + 1]]];
+                    signed_volume += a.dot(b.cross(c)) / 6.0;
+                }
+            }
+            total += std::abs(signed_volume);
+            continue;
+        }
+        for (const auto& qp : volume_rule(element.type)) {
+            Eigen::Matrix3d jacobian = Eigen::Matrix3d::Zero();
+            for (std::size_t a = 0; a < element.nodes.size(); ++a) {
+                jacobian.noalias() +=
+                    qp.dn.row(static_cast<Eigen::Index>(a)).transpose() *
+                    nodal.nodes[element.nodes[a]].transpose();
+            }
+            total += qp.weight * std::abs(jacobian.determinant());
+        }
+    }
+    return total;
+}
+
+const char* geometry_volume_band(double relative_error) {
+    if (relative_error > kGeometryVolumeHardLimit) {
+        return "egregious";
+    }
+    if (relative_error >= kGeometryVolumeTruthLimit) {
+        return "degraded";
+    }
+    return "clean";
+}
+
+std::string geometry_volume_note(std::string_view stage,
+                                 const GeometryVolumeAssessment& assessment) {
+    return std::format("geometry_{}_volume mesh={:.6g} cad={:.6g} rel_err={:.4g} band={}",
+                       stage, assessment.mesh_volume, assessment.cad_volume,
+                       assessment.relative_error,
+                       geometry_volume_band(assessment.relative_error));
+}
+
+void replace_geometry_volume_note(std::string& note, std::string_view stage,
+                                  const GeometryVolumeAssessment& assessment) {
+    const std::string needle = std::format("geometry_{}_volume ", stage);
+    const std::string replacement = geometry_volume_note(stage, assessment);
+    const std::size_t token = note.find(needle);
+    if (token == std::string::npos) {
+        note += std::format(" | {}", replacement);
+        return;
+    }
+    const std::size_t end = note.find(" | ", token);
+    note.replace(token, end == std::string::npos ? std::string::npos : end - token,
+                 replacement);
+}
+
+void enforce_feature_resolution(const Model& model, const VolumeMeshOutput& output,
+                                double requested_h, double delivered_h) {
+    if (!model.cad || model.cad->empty() || output.boundary_quads.empty() ||
+        !(requested_h > 0.0) || !(delivered_h > 0.0)) {
+        return;
+    }
+    constexpr std::size_t kSamplesPerFace = 64;
+    constexpr double kNormalMinDot = 0.5;
+    const auto inspection = geom::inspect_brep(*model.cad);
+    if (!inspection.available || inspection.face_count == 0) {
+        return;
+    }
+    const auto topology = geom::extract_topology(*model.cad, 8);
+    const auto samples =
+        geom::sample_brep_surface(*model.cad, kSamplesPerFace * inspection.face_count);
+
+    geom::TriSurface boundary;
+    boundary.vertices = output.mesh.nodes;
+    boundary.triangles.reserve(2 * output.boundary_quads.size());
+    for (const auto& face : output.boundary_quads) {
+        boundary.triangles.push_back({face[0], face[1], face[2]});
+        if (face[3] != face[2]) {
+            boundary.triangles.push_back({face[0], face[2], face[3]});
+        }
+    }
+
+    const double limit = kGeometryFeatureResolutionOverH * requested_h;
+    const double small_face_area = requested_h * requested_h;
+    std::vector<bool> feature_face(inspection.face_count, false);
+    for (std::size_t face_id = 0;
+         face_id < inspection.face_count && face_id < topology.faces.size(); ++face_id) {
+        feature_face[face_id] =
+            topology.faces[face_id].kind != geom::CadSurfaceKind::kPlane ||
+            topology.faces[face_id].area <= small_face_area;
+    }
+
+    // A small/curved CAD face is present only when the delivered mesh contains
+    // an actual nearby boundary patch with a compatible normal. Point distance
+    // alone cannot detect a vanished through-hole in a thin plate: its bore is
+    // still close to the plate's top/bottom faces, whose normals are orthogonal.
+    std::vector<bool> face_has_patch(inspection.face_count, false);
+    for (const auto& face : output.boundary_quads) {
+        const int n = face[3] == face[2] ? 3 : 4;
+        Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
+        for (int i = 0; i < n; ++i) {
+            centroid += output.mesh.nodes[face[static_cast<std::size_t>(i)]];
+        }
+        centroid /= static_cast<double>(n);
+        Eigen::Vector3d normal =
+            (output.mesh.nodes[face[1]] - output.mesh.nodes[face[0]])
+                .cross(output.mesh.nodes[face[2]] - output.mesh.nodes[face[0]]);
+        const double normal_norm = normal.norm();
+        if (!(normal_norm > 0.0) || !std::isfinite(normal_norm)) {
+            continue;
+        }
+        normal /= normal_norm;
+        for (std::size_t face_id = 0; face_id < feature_face.size(); ++face_id) {
+            if (!feature_face[face_id] || face_has_patch[face_id]) {
+                continue;
+            }
+            const auto exact = geom::project_point_on_face(
+                *model.cad, static_cast<std::uint32_t>(face_id), centroid);
+            if (exact && exact->distance <= limit &&
+                std::abs(normal.dot(exact->normal)) >= kNormalMinDot) {
+                face_has_patch[face_id] = true;
+            }
+        }
+    }
+
+    std::vector<double> face_distance(inspection.face_count, 0.0);
+    std::vector<bool> sampled(inspection.face_count, false);
+    for (std::size_t i = 0; i < samples.points.size(); ++i) {
+        if (i >= samples.face_ids.size() || samples.face_ids[i] >= face_distance.size()) {
+            continue;
+        }
+        const auto face_id = samples.face_ids[i];
+        const double distance =
+            mesh::closest_on_surface(boundary, samples.points[i]).distance;
+        face_distance[face_id] = std::max(face_distance[face_id], distance);
+        sampled[face_id] = true;
+    }
+
+    double worst_distance = 0.0;
+    std::uint32_t worst_face = 0;
+    bool unresolved = false;
+    for (std::size_t face_id = 0; face_id < feature_face.size(); ++face_id) {
+        if (!feature_face[face_id] || face_has_patch[face_id]) {
+            continue;
+        }
+        unresolved = true;
+        if (sampled[face_id] && face_distance[face_id] >= worst_distance) {
+            worst_distance = face_distance[face_id];
+            worst_face = static_cast<std::uint32_t>(face_id);
+        }
+    }
+    if (!unresolved) {
+        return;
+    }
+    const auto& volume = output.fill_geometry_volume;
+    throw GeometryVolumeLimitError(
+        std::format(
+            "feature unresolved at h={:.6g} m: CAD face {} has no aligned delivered "
+            "boundary patch within {:.6g} m (sampled CAD-to-mesh max distance "
+            "{:.6g} m); mesh/BRep volume relative error is {:.4g}. This Cartesian "
+            "grid fill supports one local h/2 level, so a hole/void smaller than "
+            "that level can disappear; reduce -h to <= {:.6g} m or raise "
+            "--max-elems/--max-dof",
+            requested_h, worst_face, limit, worst_distance, volume.relative_error,
+            0.6 * requested_h),
+        volume, false);
+}
+
+} // namespace
+
+GeometryVolumeAssessment measure_geometry_volume(const Model& model,
+                                                 const fea::NodalMesh& nodal) {
+    GeometryVolumeAssessment out;
+    if (!model.cad || model.cad->empty()) {
+        return out;
+    }
+    const auto completeness =
+        mesh::evaluate_geometry_completeness(*model.cad, physical_mesh_volume(nodal));
+    if (!completeness.available) {
+        return out;
+    }
+    out.available = true;
+    out.mesh_volume = completeness.mesh_volume;
+    out.cad_volume = completeness.brep_volume;
+    out.relative_error = completeness.relative_volume_error;
+    return out;
+}
+
+void update_solved_geometry_volume(const Model& model, VolumeMeshOutput& output) {
+    output.solved_geometry_volume = measure_geometry_volume(model, output.mesh);
+    if (!output.solved_geometry_volume.available) {
+        return;
+    }
+    replace_geometry_volume_note(output.mesher_note, "solved",
+                                 output.solved_geometry_volume);
+    if (output.solved_geometry_volume.relative_error > kGeometryVolumeHardLimit) {
+        throw GeometryVolumeLimitError(
+            std::format("geometry solved-stage guard failed: mesh/BRep volume relative error "
+                        "{:.4g} exceeds hard limit {:.4g}; solved geometry is incomplete | {}",
+                        output.solved_geometry_volume.relative_error,
+                        kGeometryVolumeHardLimit, output.mesher_note),
+            output.solved_geometry_volume, true);
+
+    }
+}
+
+
 VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                              int skin_layers, bool feature_refine,
                              std::span<const Eigen::Vector3d> refine_seeds, double seed_band,
@@ -1190,10 +1444,11 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         // Build lattice without snap first; product FE snaps after hex→pyramid
         // expand so free-surface Jacobian is pyramid-based. Native-poly path
         // keeps hex FE + poly VEM and snaps on that mesh.
-        auto raw = mesh::mixed_fill_surface(model.surface, model.bbox_min, model.bbox_max, h,
-                                            std::max(1, skin_layers), edges, feat_band,
-                                            adapt_seeds, s_band, /*snap_boundary=*/false,
-                                            turn_deg, native_poly, cancel_check, size_field);
+        auto raw = mesh::mixed_fill_surface(
+            model.surface, model.bbox_min, model.bbox_max, h,
+            std::max(1, skin_layers), edges, feat_band, adapt_seeds, s_band,
+            /*snap_boundary=*/false, turn_deg, native_poly, cancel_check, size_field,
+            /*local_surface_classification=*/projection != nullptr);
         const std::size_t n_hex_lattice = raw.n_hex;
         const std::size_t n_pyr_raw = raw.n_pyramid;
         const std::size_t n_poly_raw = raw.n_poly;
@@ -1695,6 +1950,7 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
             }
         }
         out.boundary_quads = std::move(fill.boundary_quads);
+        out.local_child_boundary_quads = std::move(fill.local_child_boundary_quads);
         if (native_poly) {
             out.mesher_note = std::format(
                 "hybrid-VEM zoo (hex FE bulk@h + 2:1 fine@h/2 + native poly VEM "
@@ -1728,6 +1984,11 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                     ? std::format(", {} cells clamped at budget floor",
                                   fill.n_field_budget_clamped)
                     : std::string{});
+        }
+        if (fill.classification_refinement_levels > 0) {
+            out.mesher_note += std::format(
+                " | feature-aware classify L{} volume_err={:.4g}",
+                fill.classification_refinement_levels, fill.classification_volume_error);
         }
     } else if (mesher == VolumeMesher::kHexFill || mesher == VolumeMesher::kHexVem) {
         auto fill = mesh::hex_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
@@ -1907,6 +2168,12 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                     ? std::format(", {} cells clamped at budget floor",
                                   graded.n_field_budget_clamped)
                     : std::string{});
+        }
+        if (graded.classification_refinement_levels > 0) {
+            out.mesher_note += std::format(
+                " | feature-aware classify L{} volume_err={:.4g}",
+                graded.classification_refinement_levels,
+                graded.classification_volume_error);
         }
     } else if (mesher == VolumeMesher::kOctahedral) {
         // Experimental BCC octahedra → tet4 (ADR-0019). Not a product claim.
@@ -2701,6 +2968,24 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
         // fix at least one face before solving" with faces plainly assigned).
         map_boundary_regions();
     }
+    out.fill_geometry_volume = measure_geometry_volume(model, out.mesh);
+    out.solved_geometry_volume = out.fill_geometry_volume;
+    if (out.fill_geometry_volume.available) {
+        replace_geometry_volume_note(out.mesher_note, "fill", out.fill_geometry_volume);
+        if (out.fill_geometry_volume.relative_error > kGeometryVolumeHardLimit) {
+            throw GeometryVolumeLimitError(
+                std::format("geometry fill-stage guard failed: mesh/BRep volume relative error "
+                            "{:.4g} exceeds hard limit {:.4g}; solid/void topology is "
+                            "incomplete | {}",
+                            out.fill_geometry_volume.relative_error,
+                            kGeometryVolumeHardLimit, out.mesher_note),
+                out.fill_geometry_volume, false);
+        }
+    }
+    if (mesher == VolumeMesher::kHybrid || mesher == VolumeMesher::kHybridVem ||
+        mesher == VolumeMesher::kGradedTet) {
+        enforce_feature_resolution(model, out, h, fill_h);
+    }
     poll_cancel();
     const std::size_t actual_elems = out.mesh.elements.size();
     const std::size_t actual_dof =
@@ -3167,6 +3452,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
             fea::Dirichlet bc;
             std::map<int, std::vector<std::uint32_t>> region_nodes;
             Eigen::VectorXd loads;
+            bool bc_provenance_noted = false;
             const fea::Material material{.youngs_modulus = setup.youngs_modulus,
                                          .poissons_ratio = setup.poissons_ratio};
 
@@ -3178,6 +3464,42 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                                          &solve_boundary_provenance)) {
                 solve_projection = &solve_projection_context;
             }
+            // Legacy region ids are grown from the display tessellation. Keep
+            // them as the primary path, but also remember the exact trimmed
+            // BRep faces they represent so an empty legacy selection can be
+            // recovered without guessing from a second nearest-triangle pass.
+            std::map<int, std::set<std::uint32_t>> cad_faces_by_region;
+            std::map<int, double> tess_area_by_region;
+            std::map<int, double> cad_area_by_region;
+            if (model.cad && solve_projection != nullptr) {
+                const auto topology = geom::extract_topology(*model.cad, 4);
+                for (std::size_t ti = 0; ti < model.surface.triangles.size(); ++ti) {
+                    if (ti >= model.triangle_region.size() || model.triangle_region[ti] < 0) {
+                        continue;
+                    }
+                    const auto& tri = model.surface.triangles[ti];
+                    const Eigen::Vector3d& a = model.surface.vertices[tri[0]];
+                    const Eigen::Vector3d& b = model.surface.vertices[tri[1]];
+                    const Eigen::Vector3d& c = model.surface.vertices[tri[2]];
+                    const int region = model.triangle_region[ti];
+                    tess_area_by_region[region] += 0.5 * (b - a).cross(c - a).norm();
+                    const auto exact =
+                        geom::project_point_on_surface(*model.cad, (a + b + c) / 3.0);
+                    if (exact && exact->face_id != geom::kInvalidCadSupportId) {
+                        cad_faces_by_region[region].insert(exact->face_id);
+                    }
+                }
+                for (const auto& [region, face_ids] : cad_faces_by_region) {
+                    for (const auto face_id : face_ids) {
+                        const auto it = std::find_if(
+                            topology.faces.begin(), topology.faces.end(),
+                            [&](const geom::CadFace& face) { return face.id == face_id; });
+                        if (it != topology.faces.end()) {
+                            cad_area_by_region[region] += it->area;
+                        }
+                    }
+                }
+            }
 
             auto assign_boundary_regions = [&](double band) {
                 vol.boundary_node_region.clear();
@@ -3187,6 +3509,87 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     const auto cp = mesh::closest_on_surface(surf, vol.mesh.nodes[node]);
                     if (cp.distance <= band && cp.triangle < model.triangle_region.size()) {
                         vol.boundary_node_region[node] = model.triangle_region[cp.triangle];
+                    }
+                }
+            };
+            std::map<int, std::vector<fea::SurfaceFace>> exact_faces_by_region;
+            auto recover_missing_regions_from_cad = [&]() {
+                exact_faces_by_region.clear();
+                if (!model.cad || solve_projection == nullptr || !solve_projection->target) {
+                    return;
+                }
+                std::set<int> missing;
+                for (const int region : setup.fixtures) {
+                    if (!region_nodes.contains(region) || region_nodes[region].empty()) {
+                        missing.insert(region);
+                    }
+                }
+                for (const auto& [region, load] : setup.loads) {
+                    (void)load;
+                    if (!region_nodes.contains(region) || region_nodes[region].empty()) {
+                        missing.insert(region);
+                    }
+                }
+                if (missing.empty()) {
+                    return;
+                }
+
+                const auto all_faces = fea::boundary_surface_faces(vol.mesh);
+                solve_boundary_provenance.assign(vol.mesh.nodes.size(), {});
+                std::set<std::uint32_t> boundary_nodes;
+                for (const auto& face : all_faces) {
+                    boundary_nodes.insert(face.nodes.begin(), face.nodes.end());
+                }
+                for (const auto node : boundary_nodes) {
+                    mesh::BoundarySupport owner;
+                    (void)solve_projection->target(vol.mesh.nodes[node], owner);
+                    solve_boundary_provenance[node] = owner;
+                }
+
+                for (const int region : missing) {
+                    const auto ids_it = cad_faces_by_region.find(region);
+                    if (ids_it == cad_faces_by_region.end() || ids_it->second.empty()) {
+                        continue;
+                    }
+                    std::set<std::uint32_t> nodes;
+                    auto& recovered_faces = exact_faces_by_region[region];
+                    for (const auto& face : all_faces) {
+                        std::size_t selected_votes = 0;
+                        std::size_t other_face_votes = 0;
+                        Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
+                        for (const auto node : face.nodes) {
+                            centroid += vol.mesh.nodes[node];
+                            const auto& owner = solve_boundary_provenance[node];
+                            if (owner.kind != mesh::BoundarySupportKind::kCadFace) {
+                                continue;
+                            }
+                            if (ids_it->second.contains(owner.id)) {
+                                ++selected_votes;
+                            } else {
+                                ++other_face_votes;
+                            }
+                        }
+                        centroid /= static_cast<double>(face.nodes.size());
+                        bool keep =
+                            selected_votes > 0 && selected_votes >= other_face_votes;
+                        if (!keep) {
+                            const auto exact =
+                                geom::project_point_on_surface(*model.cad, centroid);
+                            keep = exact &&
+                                   exact->face_id != geom::kInvalidCadSupportId &&
+                                   ids_it->second.contains(exact->face_id);
+                        }
+                        if (!keep) {
+                            continue;
+                        }
+                        recovered_faces.push_back(face);
+                        nodes.insert(face.nodes.begin(), face.nodes.end());
+                    }
+                    if (nodes.empty()) {
+                        exact_faces_by_region.erase(region);
+                    } else {
+                        region_nodes[region] =
+                            std::vector<std::uint32_t>(nodes.begin(), nodes.end());
                     }
                 }
             };
@@ -3209,6 +3612,46 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
             };
 
             auto apply_bcs = [&]() {
+                if (setup.boundary_builder) {
+                    // The caller owns selection outright: no region fallback,
+                    // no CAD recovery, no resultant redistribution. Those exist
+                    // to rescue stale region ids across a remesh; a builder
+                    // re-selects on the mesh in hand and cannot go stale.
+                    BoundaryConditions built = setup.boundary_builder(vol.mesh);
+                    const Eigen::Index expected_dofs =
+                        3 * static_cast<Eigen::Index>(vol.mesh.nodes.size());
+                    if (built.dirichlet.dof_values.empty()) {
+                        throw fea::FeaError(
+                            "boundary_builder returned no Dirichlet DOFs; refusing to solve "
+                            "an unconstrained system");
+                    }
+                    if (built.loads.size() != expected_dofs) {
+                        throw fea::FeaError(std::format(
+                            "boundary_builder returned a {}-entry load vector for a mesh of "
+                            "{} nodes (expected {})",
+                            built.loads.size(), vol.mesh.nodes.size(), expected_dofs));
+                    }
+                    if (!built.loads.allFinite()) {
+                        throw fea::FeaError(
+                            "boundary_builder returned a non-finite load vector");
+                    }
+                    if (!(built.loads.norm() > 0.0)) {
+                        throw fea::FeaError(
+                            "boundary_builder returned a zero load vector; refusing to solve "
+                            "an unloaded system");
+                    }
+                    bc = std::move(built.dirichlet);
+                    loads = std::move(built.loads);
+                    region_nodes.clear(); // region bookkeeping is unused on this path
+                    if (!bc_provenance_noted) {
+                        vol.mesher_note +=
+                            std::format(" | BCs: caller boundary_builder ({} fixed DOFs, "
+                                        "|f|={:.6g} N)",
+                                        bc.dof_values.size(), loads.norm());
+                        bc_provenance_noted = true;
+                    }
+                    return;
+                }
                 collect_bcs();
                 // Fixtures and loads live on CAD faces and outlive every mesh:
                 // when the mesh in hand cannot show them (a remesh renumbered
@@ -3222,6 +3665,14 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 if (fixtures_lost || loads_lost) {
                     assign_boundary_regions(1.5 * h_use);
                     collect_bcs();
+                }
+                recover_missing_regions_from_cad();
+                for (const int region : setup.fixtures) {
+                    if (const auto it = region_nodes.find(region); it != region_nodes.end()) {
+                        for (const auto node : it->second) {
+                            bc.fix_node(node);
+                        }
+                    }
                 }
                 if (bc.dof_values.empty()) {
                     throw fea::FeaError("no fixtures: fix at least one face before solving");
@@ -3239,7 +3690,10 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         throw fea::FeaError(
                             std::format("load on region {} has no boundary nodes", region));
                     }
-                    auto faces = fea::faces_within(all_faces, it->second);
+                    auto exact_faces_it = exact_faces_by_region.find(region);
+                    auto faces = exact_faces_it != exact_faces_by_region.end()
+                                     ? exact_faces_it->second
+                                     : fea::faces_within(all_faces, it->second);
                     if (faces.empty()) {
                         // CAD region boundaries rarely coincide with a coarse
                         // volume-mesh face. Prefer a complete face when a
@@ -3259,36 +3713,55 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                             }
                         }
                     }
+                    Eigen::Vector3d requested_force = load.force;
+                    if (exact_faces_it != exact_faces_by_region.end()) {
+                        const double tess_area = tess_area_by_region[region];
+                        const double cad_area = cad_area_by_region[region];
+                        if (tess_area > 0.0 && cad_area > 0.0) {
+                            requested_force *= cad_area / tess_area;
+                        }
+                    }
+                    if (exact_faces_it != exact_faces_by_region.end()) {
+                        vol.mesher_note += std::format(
+                            " | exact CAD region {} fallback={} faces", region, faces.size());
+                    }
                     const auto applied =
-                        fea::consistent_face_load(vol.mesh, faces, load.force);
+                        fea::consistent_face_load(vol.mesh, faces, requested_force);
                     if (applied.area > 0.0) {
                         if (applied.conservation_error > 1e-9) {
                             throw fea::FeaError(std::format(
                                 "load on region {}: traction assembly lost {:.3g} N of the "
                                 "requested {:.6g} N resultant",
-                                region, applied.conservation_error, load.force.norm()));
+                                region, applied.conservation_error, requested_force.norm()));
                         }
                         loads += applied.loads;
                         continue;
                     }
                     const Eigen::Vector3d per_node =
-                        load.force / static_cast<double>(it->second.size());
+                        requested_force / static_cast<double>(it->second.size());
                     Eigen::Vector3d fallback_sum = Eigen::Vector3d::Zero();
                     for (const auto node : it->second) {
                         loads.segment<3>(3 * static_cast<Eigen::Index>(node)) += per_node;
                         fallback_sum += per_node;
                     }
-                    const double conservation_error = (fallback_sum - load.force).norm();
+                    const double conservation_error = (fallback_sum - requested_force).norm();
                     if (conservation_error > 1e-9) {
                         throw fea::FeaError(std::format(
                             "load on region {}: nodal fallback lost {:.3g} N of the "
                             "requested {:.6g} N resultant",
-                            region, conservation_error, load.force.norm()));
+                            region, conservation_error, requested_force.norm()));
                     }
                     vol.mesher_note += std::format(
                         " | load region {} node fallback={} Σf=({:.6g},{:.6g},{:.6g}) N",
                         region, it->second.size(), fallback_sum.x(), fallback_sum.y(),
                         fallback_sum.z());
+                }
+                if (!bc_provenance_noted) {
+                    vol.mesher_note += std::format(
+                        " | BCs: region selection ({} fixed DOFs, {} load regions, "
+                        "|f|={:.6g} N)",
+                        bc.dof_values.size(), setup.loads.size(), loads.norm());
+                    bc_provenance_noted = true;
                 }
             };
             apply_bcs();
@@ -3768,6 +4241,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 checkpoint();
                 const auto solve_opt = solve_options_with_progress(pass, pass_count);
                 const auto solve_t0 = std::chrono::steady_clock::now();
+                update_solved_geometry_volume(model, vol);
+
                 auto u_try = fea::solve_elastostatics(
                     vol.mesh, material, bc, loads, solve_opt, active_p_constraints());
                 const double pass_solve_ms = std::chrono::duration<double, std::milli>(
@@ -3793,6 +4268,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     std::string pnote;
                     if (maybe_p_elevate(hp_plan.p_mark, pnote)) {
                         publish_live_mesh(vol);
+                        update_solved_geometry_volume(model, vol);
+
                         u_try = fea::solve_elastostatics(
                             vol.mesh, material, bc, loads,
                             solve_options_with_progress(pass, pass_count),
@@ -3807,6 +4284,9 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     r.volume_mesh = std::move(vol.mesh);
                     r.boundary_quads = std::move(vol.boundary_quads);
                     fill_result_fields(r, zz_try, u_try);
+                    r.fill_geometry_volume = vol.fill_geometry_volume;
+                    r.solved_geometry_volume = vol.solved_geometry_volume;
+
                     result_ = std::move(r);
                     break;
                 }
@@ -3816,6 +4296,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         std::ceil(growth * static_cast<double>(vol.mesh.elements.size()));
                     const double next_dof =
                         std::ceil(growth * 3.0 * static_cast<double>(vol.mesh.nodes.size()));
+
                     const bool elem_cap =
                         next_elems > static_cast<double>(resolved.element_ceiling);
                     const bool dof_cap = next_dof > static_cast<double>(resolved.dof_ceiling);
@@ -3843,6 +4324,9 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         r.volume_mesh = std::move(vol.mesh);
                         r.boundary_quads = std::move(vol.boundary_quads);
                         fill_result_fields(r, zz_try, u_try);
+                        r.fill_geometry_volume = vol.fill_geometry_volume;
+                        r.solved_geometry_volume = vol.solved_geometry_volume;
+
                         result_ = std::move(r);
                         break;
                     }
@@ -3851,6 +4335,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     if (sug.n_marked == 0 && sug.h_next >= h_use * 0.98 &&
                         hp_plan.p_mark.empty()) {
                         std::string pnote;
+
                         // Still try mark_smooth fallback if driver was silent on p
                         // but residual remains (legacy complement path).
                         auto p_idx = hp_plan.p_mark;
@@ -3859,6 +4344,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         }
                         if (maybe_p_elevate(p_idx, pnote)) {
                             publish_live_mesh(vol);
+                            update_solved_geometry_volume(model, vol);
+
                             u_try = fea::solve_elastostatics(
                                 vol.mesh, material, bc, loads,
                                 solve_options_with_progress(pass, pass_count),
@@ -3871,6 +4358,9 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         r.volume_mesh = std::move(vol.mesh);
                         r.boundary_quads = std::move(vol.boundary_quads);
                         fill_result_fields(r, zz_try, u_try);
+                        r.fill_geometry_volume = vol.fill_geometry_volume;
+                        r.solved_geometry_volume = vol.solved_geometry_volume;
+
                         result_ = std::move(r);
                         break;
                     }
@@ -3880,6 +4370,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         std::string pnote;
                         if (maybe_p_elevate(hp_plan.p_mark, pnote)) {
                             publish_live_mesh(vol);
+                            update_solved_geometry_volume(model, vol);
+
                             u_try = fea::solve_elastostatics(
                                 vol.mesh, material, bc, loads,
                                 solve_options_with_progress(pass, pass_count),
@@ -3904,6 +4396,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 }
                 if (maybe_p_elevate(p_idx, pnote)) {
                     publish_live_mesh(vol);
+                    update_solved_geometry_volume(model, vol);
+
                     u_try = fea::solve_elastostatics(
                         vol.mesh, material, bc, loads,
                         solve_options_with_progress(pass, pass_count),
@@ -3917,6 +4411,9 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 r.volume_mesh = std::move(vol.mesh);
                 r.boundary_quads = std::move(vol.boundary_quads);
                 fill_result_fields(r, zz_try, u_try);
+                r.fill_geometry_volume = vol.fill_geometry_volume;
+                r.solved_geometry_volume = vol.solved_geometry_volume;
+
                 result_ = std::move(r);
             } // adapt passes
             report("done", 1.0,

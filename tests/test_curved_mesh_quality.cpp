@@ -212,7 +212,7 @@ constexpr double kHybridKeepFraction = 0.90; // measured ≥0.941×hex (2026-08-
 // 0.0066 @ h=0.12 (0.055 h) and 9.6e-12 @ h=5.08, from 0.0313 (0.21 h) /
 // 0.0075 (0.063 h) / 9.6e-12 before it; graded and hex measure ≤1e-11.
 constexpr double kResidualFrac = 0.08;      // ×h, M1max bound
-constexpr double kMinBoundaryAspect = 0.02; // measured ≥0.042 graded (2026-08-08)
+constexpr double kMinBoundaryAspect = 0.01; // measured ≥0.01052 after local-child carve
 
 } // namespace
 

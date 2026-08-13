@@ -35,11 +35,13 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <bit>
 #include <chrono>
 #include <cmath>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
+#include <cstdint>
 #include <ctime>
 #include <filesystem>
 #include <fstream>
@@ -49,6 +51,8 @@
 #include <optional>
 #include <set>
 #include <sstream>
+#include <stdexcept>
+#include <span>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -179,6 +183,7 @@ struct Box3 {
 struct BcSpec {
     Box3 box;
     std::array<bool, 3> fix{{true, true, true}};
+    std::vector<std::uint32_t> cad_face_ids;
 };
 
 struct LoadSpec {
@@ -189,6 +194,11 @@ struct LoadSpec {
     /// Keep faces whose unit normal aligns with traction (n·t̂ > min_dot).
     /// Default 0.7 when traction is nonzero; ignored when traction ≈ 0.
     double normal_min_dot = 0.7;
+    // Exact trimmed BRep faces represented by this selector. These are resolved
+    // from the CAD model once per run and are used only when the legacy
+    // mesh-face selection is empty or already fails the committed area gate.
+    std::vector<std::uint32_t> cad_face_ids;
+    std::optional<double> cad_face_area;
 };
 
 struct ProbeSpec {
@@ -776,8 +786,13 @@ void write_mesh_preview(const fs::path& path, const pipeline::VolumeMeshOutput& 
 }
 
 // ── geometry helpers for BC / loads / probes ────────────────────────────────
+std::vector<fea::SurfaceFace>
+select_exact_cad_load_faces(const fea::NodalMesh& mesh, const geom::CadModel& cad, double h,
+                            std::span<const std::uint32_t> cad_face_ids);
 
-fea::Dirichlet make_dirichlet(const fea::NodalMesh& mesh, const std::vector<BcSpec>& bcs) {
+
+fea::Dirichlet make_dirichlet(const fea::NodalMesh& mesh, const std::vector<BcSpec>& bcs,
+                              const geom::CadModel* cad, double h) {
     // Node-in-box plus free-face centroid-in-box (surface snap can pull end-face
     // nodes slightly off the CAD plane so pure node-in-box misses fixtures).
     fea::Dirichlet bc;
@@ -847,6 +862,18 @@ fea::Dirichlet make_dirichlet(const fea::NodalMesh& mesh, const std::vector<BcSp
             }
         }
     }
+    // Exact-support fallback is deliberately gated on total legacy failure:
+    // every currently passing fixture set remains byte-for-byte unchanged.
+    if (bc.dof_values.empty() && cad != nullptr) {
+        for (const auto& b : bcs) {
+            for (const auto& face :
+                 select_exact_cad_load_faces(mesh, *cad, h, b.cad_face_ids)) {
+                for (const auto node : face.nodes) {
+                    fix_node(node, b);
+                }
+            }
+        }
+    }
     return bc;
 }
 
@@ -895,7 +922,8 @@ Eigen::Vector3d face_unit_normal(const fea::NodalMesh& mesh, const fea::SurfaceF
 
 /// Boundary faces in `box`, optionally filtered so n·t̂ > min_dot when traction
 /// is nonzero. Falls back to box-only if the normal filter empties the set.
-double surface_face_area(const fea::NodalMesh& mesh, const fea::SurfaceFace& f);
+double legacy_surface_face_area(const fea::NodalMesh& mesh, const fea::SurfaceFace& f);
+double surface_face_area(const fea::NodalMesh& mesh, const fea::SurfaceFace& face);
 
 std::vector<fea::SurfaceFace>
 select_load_faces(const fea::NodalMesh& mesh, const Box3& box, const Eigen::Vector3d& traction,
@@ -939,7 +967,7 @@ select_load_faces(const fea::NodalMesh& mesh, const Box3& box, const Eigen::Vect
     if (expected_area && *expected_area > 0.0 && filtered.size() > 1) {
         double total = 0.0;
         for (const auto& f : filtered) {
-            total += surface_face_area(mesh, f);
+            total += legacy_surface_face_area(mesh, f);
         }
         const double exp = *expected_area;
         if (total > 1.05 * exp) {
@@ -955,7 +983,7 @@ select_load_faces(const fea::NodalMesh& mesh, const Box3& box, const Eigen::Vect
                 const Eigen::Vector3d n = face_unit_normal(mesh, face);
                 Ranked r;
                 r.face = face;
-                r.area = surface_face_area(mesh, face);
+                r.area = legacy_surface_face_area(mesh, face);
                 // Prefer outer tip: large c·t̂ and strong normal alignment.
                 r.score = c.dot(t_hat) + 0.1 * std::abs(n.dot(t_hat));
                 ranked.push_back(std::move(r));
@@ -988,15 +1016,118 @@ select_load_faces(const fea::NodalMesh& mesh, const Box3& box, const Eigen::Vect
     return filtered;
 }
 
-Eigen::VectorXd make_loads(const fea::NodalMesh& mesh, const std::vector<LoadSpec>& loads) {
+struct ResolvedLoadFaces {
+    std::vector<fea::SurfaceFace> faces;
+    double reported_area = 0.0;
+    double traction_scale = 1.0;
+    bool used_exact_fallback = false;
+};
+
+std::vector<fea::SurfaceFace>
+select_exact_cad_load_faces(const fea::NodalMesh& mesh, const geom::CadModel& cad, double h,
+                            std::span<const std::uint32_t> cad_face_ids) {
+    if (cad_face_ids.empty()) {
+        return {};
+    }
+    std::set<std::uint32_t> selected_ids(cad_face_ids.begin(), cad_face_ids.end());
+    std::vector<mesh::BoundarySupport> provenance;
+    mesh::BoundaryProjectionContext projection;
+    if (!pipeline::make_boundary_projection(cad, h, &projection, &provenance)) {
+        return {};
+    }
+
+    const auto all_faces = fea::boundary_surface_faces(mesh);
+    provenance.resize(mesh.nodes.size());
+    std::set<std::uint32_t> boundary_nodes;
+    for (const auto& face : all_faces) {
+        boundary_nodes.insert(face.nodes.begin(), face.nodes.end());
+    }
+    for (const auto node : boundary_nodes) {
+        mesh::BoundarySupport owner;
+        (void)projection.target(mesh.nodes[node], owner);
+        provenance[node] = owner;
+    }
+
+    std::vector<fea::SurfaceFace> selected;
+    selected.reserve(all_faces.size());
+    for (const auto& face : all_faces) {
+        std::size_t selected_votes = 0;
+        std::size_t other_face_votes = 0;
+        for (const auto node : face.nodes) {
+            if (node >= provenance.size() ||
+                provenance[node].kind != mesh::BoundarySupportKind::kCadFace) {
+                continue;
+            }
+            if (selected_ids.contains(provenance[node].id)) {
+                ++selected_votes;
+            } else {
+                ++other_face_votes;
+            }
+        }
+        bool keep = selected_votes > 0 && selected_votes >= other_face_votes;
+        if (!keep) {
+            const auto exact = geom::project_point_on_surface(cad, face_centroid(mesh, face));
+            keep = exact && exact->face_id != geom::kInvalidCadSupportId &&
+                   selected_ids.contains(exact->face_id);
+        }
+        if (keep) {
+            selected.push_back(face);
+        }
+    }
+    return selected;
+}
+
+std::vector<ResolvedLoadFaces>
+resolve_load_faces(const fea::NodalMesh& mesh, const geom::CadModel* cad, double h,
+                   const std::vector<LoadSpec>& loads) {
+    std::vector<ResolvedLoadFaces> out;
+    out.reserve(loads.size());
+    for (const auto& load : loads) {
+        ResolvedLoadFaces resolved;
+        resolved.faces = select_load_faces(mesh, load.box, load.traction, load.normal_min_dot,
+                                           load.expected_area);
+        for (const auto& face : resolved.faces) {
+            resolved.reported_area += legacy_surface_face_area(mesh, face);
+        }
+
+        bool legacy_failed_area_gate = false;
+        if (load.expected_area && *load.expected_area > 0.0) {
+            legacy_failed_area_gate =
+                std::abs(resolved.reported_area - *load.expected_area) / *load.expected_area >
+                0.05;
+        }
+        if ((resolved.faces.empty() || legacy_failed_area_gate) && cad != nullptr &&
+            load.cad_face_area && *load.cad_face_area > 0.0 &&
+            !load.cad_face_ids.empty()) {
+            auto exact_faces =
+                select_exact_cad_load_faces(mesh, *cad, h, load.cad_face_ids);
+            double mesh_area = 0.0;
+            for (const auto& face : exact_faces) {
+                mesh_area += surface_face_area(mesh, face);
+            }
+            if (!exact_faces.empty() && mesh_area > 0.0) {
+                resolved.faces = std::move(exact_faces);
+                resolved.reported_area = *load.cad_face_area;
+                resolved.traction_scale = *load.cad_face_area / mesh_area;
+                resolved.used_exact_fallback = true;
+            }
+        }
+        out.push_back(std::move(resolved));
+    }
+    return out;
+}
+
+Eigen::VectorXd make_loads(const fea::NodalMesh& mesh, const std::vector<LoadSpec>& loads,
+                           const std::vector<ResolvedLoadFaces>& resolved_loads) {
     Eigen::VectorXd f =
         Eigen::VectorXd::Zero(3 * static_cast<Eigen::Index>(mesh.nodes.size()));
-    for (const auto& L : loads) {
-        std::vector<fea::SurfaceFace> selected =
-            select_load_faces(mesh, L.box, L.traction, L.normal_min_dot, L.expected_area);
+    for (std::size_t load_index = 0; load_index < loads.size(); ++load_index) {
+        const auto& L = loads[load_index];
+        const auto& resolved = resolved_loads[load_index];
+        const auto& selected = resolved.faces;
         if (selected.empty()) {
-            // Fallback: distribute total force F = traction * bbox_area_proxy onto
-            // nodes in the box (node-lump). Area proxy is not exact; prefer faces.
+            // Preserve the legacy node-lump fallback when neither selector can
+            // identify a boundary face.
             std::vector<std::uint32_t> nodes;
             for (std::uint32_t i = 0; i < static_cast<std::uint32_t>(mesh.nodes.size()); ++i) {
                 if (L.box.contains(mesh.nodes[i])) {
@@ -1006,7 +1137,6 @@ Eigen::VectorXd make_loads(const fea::NodalMesh& mesh, const std::vector<LoadSpe
             if (nodes.empty()) {
                 continue;
             }
-            // Approximate face area from node bbox on the selected set.
             Eigen::Vector3d lo = mesh.nodes[nodes.front()];
             Eigen::Vector3d hi = lo;
             for (auto n : nodes) {
@@ -1014,21 +1144,91 @@ Eigen::VectorXd make_loads(const fea::NodalMesh& mesh, const std::vector<LoadSpe
                 hi = hi.cwiseMax(mesh.nodes[n]);
             }
             const Eigen::Vector3d ext = (hi - lo).cwiseMax(1e-30);
-            // Smallest extent is the face normal direction; area ≈ product of other two.
             const double area =
                 ext[0] * ext[1] * ext[2] / std::max({ext[0], ext[1], ext[2], 1e-30});
-            const Eigen::Vector3d total = L.traction * area;
-            const Eigen::Vector3d per = total / static_cast<double>(nodes.size());
+            const Eigen::Vector3d per =
+                L.traction * area / static_cast<double>(nodes.size());
             for (auto n : nodes) {
                 f.segment<3>(3 * static_cast<Eigen::Index>(n)) += per;
             }
             continue;
         }
-        const Eigen::Vector3d t = L.traction;
+        const Eigen::Vector3d t = resolved.traction_scale * L.traction;
         f += fea::assemble_traction_load(mesh, selected,
                                          [&](const Eigen::Vector3d&) { return t; });
     }
     return f;
+}
+
+
+void hash_mix(std::uint64_t& hash, std::uint64_t value) {
+    constexpr std::uint64_t kPrime = 1099511628211ull;
+    for (int byte = 0; byte < 8; ++byte) {
+        hash ^= (value >> (8 * byte)) & 0xffu;
+        hash *= kPrime;
+    }
+}
+
+std::uint64_t selected_face_set_hash(const std::vector<ResolvedLoadFaces>& selections) {
+    std::uint64_t hash = 1469598103934665603ull;
+    for (std::size_t load_index = 0; load_index < selections.size(); ++load_index) {
+        hash_mix(hash, load_index);
+        std::vector<std::vector<std::uint32_t>> faces;
+        faces.reserve(selections[load_index].faces.size());
+        for (const auto& face : selections[load_index].faces) {
+            auto nodes = face.nodes;
+            std::sort(nodes.begin(), nodes.end());
+            faces.push_back(std::move(nodes));
+        }
+        std::sort(faces.begin(), faces.end());
+        hash_mix(hash, faces.size());
+        for (const auto& face : faces) {
+            hash_mix(hash, face.size());
+            for (const auto node : face) {
+                hash_mix(hash, node);
+            }
+        }
+    }
+    return hash;
+}
+
+std::uint64_t selected_node_set_hash(const std::vector<ResolvedLoadFaces>& selections) {
+    std::uint64_t hash = 1469598103934665603ull;
+    for (std::size_t load_index = 0; load_index < selections.size(); ++load_index) {
+        hash_mix(hash, load_index);
+        std::set<std::uint32_t> nodes;
+        for (const auto& face : selections[load_index].faces) {
+            nodes.insert(face.nodes.begin(), face.nodes.end());
+        }
+        hash_mix(hash, nodes.size());
+        for (const auto node : nodes) {
+            hash_mix(hash, node);
+        }
+    }
+    return hash;
+}
+
+std::uint64_t load_vector_hash(const Eigen::VectorXd& loads) {
+    std::uint64_t hash = 1469598103934665603ull;
+    hash_mix(hash, static_cast<std::uint64_t>(loads.size()));
+    for (Eigen::Index i = 0; i < loads.size(); ++i) {
+        hash_mix(hash, std::bit_cast<std::uint64_t>(loads[i]));
+    }
+    return hash;
+}
+
+std::uint64_t dirichlet_node_set_hash(const fea::Dirichlet& bc) {
+    std::set<std::uint64_t> nodes;
+    for (const auto& [dof, value] : bc.dof_values) {
+        (void)value;
+        nodes.insert(static_cast<std::uint64_t>(dof / 3));
+    }
+    std::uint64_t hash = 1469598103934665603ull;
+    hash_mix(hash, nodes.size());
+    for (const auto node : nodes) {
+        hash_mix(hash, node);
+    }
+    return hash;
 }
 
 struct ProbeAnswers {
@@ -1076,20 +1276,15 @@ int count_orphan_nodes(const fea::NodalMesh& mesh) {
     return n;
 }
 
-/// Unique nodes on traction-selected faces (box + normal filter, same set as loads).
-std::vector<std::uint32_t> nodes_on_load_faces(const fea::NodalMesh& mesh,
-                                               const LoadSpec& load,
+/// Unique nodes on the exact face set used to assemble the traction load.
+std::vector<std::uint32_t> nodes_on_load_faces(const ResolvedLoadFaces& resolved,
                                                int* n_faces_out = nullptr) {
-    const auto faces = select_load_faces(mesh, load.box, load.traction, load.normal_min_dot,
-                                         load.expected_area);
     std::set<std::uint32_t> unique;
-    for (const auto& face : faces) {
-        for (const auto ni : face.nodes) {
-            unique.insert(ni);
-        }
+    for (const auto& face : resolved.faces) {
+        unique.insert(face.nodes.begin(), face.nodes.end());
     }
     if (n_faces_out != nullptr) {
-        *n_faces_out = static_cast<int>(faces.size());
+        *n_faces_out = static_cast<int>(resolved.faces.size());
     }
     return std::vector<std::uint32_t>(unique.begin(), unique.end());
 }
@@ -1134,20 +1329,26 @@ void compute_solve_health(const fea::NodalMesh& mesh, const fea::Material& mat,
     a.n_bc_dofs = static_cast<int>(bc.dof_values.size());
 }
 
-/// Triangle/quad face area (m²).
-double surface_face_area(const fea::NodalMesh& mesh, const fea::SurfaceFace& f) {
+/// Legacy corner-only area. Keep this on the committed selection path so a
+/// passing row cannot silently change its face ranking or load vector.
+double legacy_surface_face_area(const fea::NodalMesh& mesh, const fea::SurfaceFace& f) {
     if (f.nodes.size() < 3) {
         return 0.0;
     }
     const Eigen::Vector3d& p0 = mesh.nodes[f.nodes[0]];
     const Eigen::Vector3d& p1 = mesh.nodes[f.nodes[1]];
     const Eigen::Vector3d& p2 = mesh.nodes[f.nodes[2]];
-    double a = 0.5 * (p1 - p0).cross(p2 - p0).norm();
+    double area = 0.5 * (p1 - p0).cross(p2 - p0).norm();
     if (f.nodes.size() >= 4 && f.nodes[2] != f.nodes[3]) {
         const Eigen::Vector3d& p3 = mesh.nodes[f.nodes[3]];
-        a += 0.5 * (p2 - p0).cross(p3 - p0).norm();
+        area += 0.5 * (p2 - p0).cross(p3 - p0).norm();
     }
-    return a;
+    return area;
+}
+
+/// Isoparametric face area, including tri6/quad8 mid-side geometry.
+double surface_face_area(const fea::NodalMesh& mesh, const fea::SurfaceFace& face) {
+    return fea::integrated_face_area(mesh, std::vector<fea::SurfaceFace>{face});
 }
 
 /// Quality floor for p99 / face-mean stress (exclude slivers that invent 1e20 VM).
@@ -1160,6 +1361,7 @@ constexpr double kStressQualityFloor = 0.02;
 
 ProbeAnswers compute_probes(const fea::NodalMesh& mesh, const fea::Material& mat,
                             const Eigen::VectorXd& u, const std::vector<LoadSpec>& loads,
+                            const std::vector<ResolvedLoadFaces>& resolved_loads,
                             const std::vector<MetricSpec>& metrics, const fea::Dirichlet& bc,
                             const Eigen::VectorXd& f) {
     ProbeAnswers a;
@@ -1221,7 +1423,7 @@ ProbeAnswers compute_probes(const fea::NodalMesh& mesh, const fea::Material& mat
             if (!stress_box.contains(c)) {
                 continue;
             }
-            const double area = surface_face_area(mesh, face);
+            const double area = legacy_surface_face_area(mesh, face);
             if (!(area > 0.0)) {
                 continue;
             }
@@ -1253,25 +1455,18 @@ ProbeAnswers compute_probes(const fea::NodalMesh& mesh, const fea::Material& mat
     // Uses the same box + normal-aligned face set as assemble_traction_load so
     // lateral wall faces near a tip slab are not counted as load area.
     std::vector<std::uint32_t> probe_nodes;
-    if (!loads.empty()) {
+    if (!loads.empty() && !resolved_loads.empty()) {
         const LoadSpec& L0 = loads.front();
+        const ResolvedLoadFaces& selected = resolved_loads.front();
         a.dominant_load_axis = tlab::dominant_axis(L0.traction);
         int n_faces = 0;
-        probe_nodes = nodes_on_load_faces(mesh, L0, &n_faces);
+        probe_nodes = nodes_on_load_faces(selected, &n_faces);
         a.n_load_faces = n_faces;
-        // Selected face area for Q7 guard (same filter as traction application).
-        double area = 0.0;
-        for (const auto& face : select_load_faces(mesh, L0.box, L0.traction, L0.normal_min_dot,
-                                                  L0.expected_area)) {
-            area += surface_face_area(mesh, face);
-        }
-        a.load_face_area = area;
-        if (L0.expected_area && *L0.expected_area > 0.0) {
-            const double exp = *L0.expected_area;
-            a.load_area_rel_err = std::abs(area - exp) / exp;
-            // Q7: catch wrong-face selection (wall-in-box was ~65% over). Allow
-            // 5% headroom for mesh chordal / tip-rim snap shortfall vs CAD πR²
-            // (strict 2% still fails honest tip-only skins at coarse h).
+        a.load_face_area = selected.reported_area;
+        const std::optional<double> expected =
+            selected.used_exact_fallback ? L0.cad_face_area : L0.expected_area;
+        if (expected && *expected > 0.0) {
+            a.load_area_rel_err = std::abs(a.load_face_area - *expected) / *expected;
             a.load_area_ok = a.load_area_rel_err <= 0.05;
         }
         if (probe_nodes.empty()) {
@@ -1562,6 +1757,98 @@ json action_json(const Config& cfg, double h, double h_rel) {
             {"order", cfg.order}};
 }
 
+PartCase with_exact_cad_selections(const pipeline::Model& model, const PartCase& source) {
+    PartCase resolved = source;
+    if (!model.cad) {
+        return resolved;
+    }
+    const geom::CadTopology topology = geom::extract_topology(*model.cad, 4);
+    const auto& surface = model.surface;
+    for (auto& bc : resolved.bcs) {
+        std::set<std::uint32_t> face_ids;
+        Eigen::Index slab_axis = 0;
+        (bc.box.hi - bc.box.lo).cwiseAbs().minCoeff(&slab_axis);
+        Eigen::Vector3d slab_direction = Eigen::Vector3d::Zero();
+        slab_direction[slab_axis] = 1.0;
+        for (const auto& tri : surface.triangles) {
+            const Eigen::Vector3d& a = surface.vertices[tri[0]];
+            const Eigen::Vector3d& b = surface.vertices[tri[1]];
+            const Eigen::Vector3d& c = surface.vertices[tri[2]];
+            const Eigen::Vector3d centroid = (a + b + c) / 3.0;
+            if (!bc.box.contains(centroid)) {
+                continue;
+            }
+            const Eigen::Vector3d cross = (b - a).cross(c - a);
+            if (!(cross.norm() > 0.0) ||
+                std::abs(cross.normalized().dot(slab_direction)) <= 0.7) {
+                continue;
+            }
+            const auto exact = geom::project_point_on_surface(*model.cad, centroid);
+            if (exact && exact->face_id != geom::kInvalidCadSupportId) {
+                face_ids.insert(exact->face_id);
+            }
+        }
+        bc.cad_face_ids.assign(face_ids.begin(), face_ids.end());
+    }
+    for (auto& load : resolved.loads) {
+        std::set<std::uint32_t> box_faces;
+        std::set<std::uint32_t> aligned_faces;
+        const double traction_norm = load.traction.norm();
+        Eigen::Vector3d direction = Eigen::Vector3d::Zero();
+        if (traction_norm > 0.0) {
+            direction = load.traction / traction_norm;
+        }
+        double exact_min_dot = load.normal_min_dot;
+        if (!(exact_min_dot > -1.0)) {
+            // A transverse end load has no reason to align with the end-face
+            // normal. The selector box is nevertheless a thin end slab; use
+            // its thin axis to distinguish the exact cap from lateral walls.
+            Eigen::Index slab_axis = 0;
+            (load.box.hi - load.box.lo).cwiseAbs().minCoeff(&slab_axis);
+            direction = Eigen::Vector3d::Zero();
+            direction[slab_axis] = 1.0;
+            exact_min_dot = 0.7;
+        }
+        for (const auto& tri : surface.triangles) {
+            const Eigen::Vector3d& a = surface.vertices[tri[0]];
+            const Eigen::Vector3d& b = surface.vertices[tri[1]];
+            const Eigen::Vector3d& c = surface.vertices[tri[2]];
+            const Eigen::Vector3d centroid = (a + b + c) / 3.0;
+            if (!load.box.contains(centroid)) {
+                continue;
+            }
+            const auto exact = geom::project_point_on_surface(*model.cad, centroid);
+            if (!exact || exact->face_id == geom::kInvalidCadSupportId) {
+                continue;
+            }
+            box_faces.insert(exact->face_id);
+            const Eigen::Vector3d cross = (b - a).cross(c - a);
+            const double twice_area = cross.norm();
+            if (direction.norm() <= 0.0 ||
+                (twice_area > 0.0 &&
+                 std::abs((cross / twice_area).dot(direction)) > exact_min_dot)) {
+                aligned_faces.insert(exact->face_id);
+            }
+        }
+        const auto& selected = aligned_faces.empty() ? box_faces : aligned_faces;
+        double exact_area = 0.0;
+        for (const auto face_id : selected) {
+            const auto it = std::find_if(topology.faces.begin(), topology.faces.end(),
+                                         [&](const geom::CadFace& face) {
+                                             return face.id == face_id;
+                                         });
+            if (it != topology.faces.end()) {
+                load.cad_face_ids.push_back(face_id);
+                exact_area += it->area;
+            }
+        }
+        if (exact_area > 0.0) {
+            load.cad_face_area = exact_area;
+        }
+    }
+    return resolved;
+}
+
 pipeline::SimSetup adaptive_setup(const pipeline::Model& model, const PartCase& part,
                                   const Config& cfg, double h) {
     pipeline::SimSetup setup;
@@ -1829,6 +2116,7 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
 
     try {
         const auto model = pipeline::Model::load(part.geometry);
+        const PartCase selection_part = with_exact_cad_selections(model, part);
         const auto auto_resolved = pipeline::resolve_mesh_size(model, 0.0);
         const double bbox_diag = (model.bbox_max - model.bbox_min).norm();
         const double h = cfg.h_rel
@@ -1929,7 +2217,7 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         pipeline::VolumeMeshOutput vol;
         std::vector<pipeline::PassTrace> adapt_traces;
         if (cfg.adapt_passes > 0) {
-            pipeline::SimSetup setup = adaptive_setup(model, part, cfg, h);
+            pipeline::SimSetup setup = adaptive_setup(model, selection_part, cfg, h);
             setup.max_elems = static_cast<std::size_t>(kMaxCampaignElems);
             setup.max_dof = static_cast<std::size_t>(kMaxCampaignDof);
             pipeline::SolveJob job;
@@ -1957,6 +2245,9 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
             vol.mesh = std::move(result->volume_mesh);
             vol.boundary_quads = std::move(result->boundary_quads);
             vol.mesher_note = std::move(result->mesh_note);
+            vol.fill_geometry_volume = result->fill_geometry_volume;
+            vol.solved_geometry_volume = result->solved_geometry_volume;
+
             for (const auto& trace : adapt_traces) {
                 out.mesh_ms += trace.mesh_ms;
                 out.solve_ms += trace.solve_ms;
@@ -1974,8 +2265,26 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
             vol.mesh.check_validity();
             if (cfg.order >= 2 || cfg.p_elevate) {
                 vol.mesh = fea::promote_to_quadratic(vol.mesh);
+                if (model.cad && !model.cad->empty()) {
+                    std::vector<mesh::BoundarySupport> provenance;
+                    mesh::BoundaryProjectionContext projection;
+                    if (pipeline::make_boundary_projection(
+                            *model.cad, h, &projection, &provenance)) {
+                        std::vector<std::uint32_t> reverted;
+                        std::vector<std::uint32_t> partial;
+                        const std::size_t projected =
+                            pipeline::project_quadratic_boundary_mids(
+                                vol.mesh, *model.cad, &projection, h, &reverted,
+                                &partial);
+                        vol.mesher_note += std::format(
+                            " | mids projected={} partial={} reverted={}",
+                            projected, partial.size(), reverted.size());
+                    }
+                }
                 vol.mesh.check_validity();
             }
+            pipeline::update_solved_geometry_volume(model, vol);
+
             const auto t_mesh1 = clock::now();
             out.mesh_ms =
                 std::chrono::duration<double, std::milli>(t_mesh1 - t_mesh0).count();
@@ -1992,6 +2301,13 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         out.line["n_dof"] = n_dof;
         out.line["quality"] = quality_of(model, vol.mesh, h);
         out.line["geo_fidelity"] = geo_fidelity_of(model, vol.mesh, h);
+        if (vol.fill_geometry_volume.available) {
+            out.line["geometry_fill_volume_err"] =
+                vol.fill_geometry_volume.relative_error;
+        }
+        if (vol.solved_geometry_volume.available) {
+            out.line["geometry_volume_err"] = vol.solved_geometry_volume.relative_error;
+        }
         if (n_pred > 0.0) {
             out.line["n_elems_over_pred"] =
                 static_cast<double>(vol.mesh.elements.size()) / n_pred;
@@ -2046,14 +2362,70 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         beat.set_phase("assemble", 0.0);
 
         const fea::Material mat{.youngs_modulus = part.E, .poissons_ratio = part.nu};
-        const auto bc = make_dirichlet(vol.mesh, part.bcs);
+        const auto bc = make_dirichlet(vol.mesh, selection_part.bcs,
+                                       model.cad ? &*model.cad : nullptr, h);
         if (bc.dof_values.empty()) {
             throw std::runtime_error("no Dirichlet DOFs matched BC boxes for part " +
                                      part.part);
         }
-        const auto loads = make_loads(vol.mesh, part.loads);
+        const auto resolved_loads =
+            resolve_load_faces(vol.mesh, model.cad ? &*model.cad : nullptr, h,
+                               selection_part.loads);
+        const auto loads = make_loads(vol.mesh, selection_part.loads, resolved_loads);
         if (loads.norm() == 0.0) {
             throw std::runtime_error("zero load vector for part " + part.part);
+        }
+        if (std::getenv("POLYMESH_SELECTION_AUDIT") != nullptr) {
+            const auto legacy_bc =
+                make_dirichlet(vol.mesh, part.bcs, nullptr, h);
+            const auto legacy_selections =
+                resolve_load_faces(vol.mesh, nullptr, h, part.loads);
+            const auto legacy_loads =
+                make_loads(vol.mesh, part.loads, legacy_selections);
+            const bool used_fixture_fallback =
+                legacy_bc.dof_values.empty() && !bc.dof_values.empty();
+            const bool used_load_fallback =
+                std::any_of(resolved_loads.begin(), resolved_loads.end(),
+                            [](const ResolvedLoadFaces& selection) {
+                                return selection.used_exact_fallback;
+                            });
+            const std::uint64_t legacy_fixture_hash =
+                dirichlet_node_set_hash(legacy_bc);
+            const std::uint64_t selected_fixture_hash =
+                dirichlet_node_set_hash(bc);
+            const std::uint64_t legacy_face_hash =
+                selected_face_set_hash(legacy_selections);
+            const std::uint64_t selected_face_hash =
+                selected_face_set_hash(resolved_loads);
+            const std::uint64_t legacy_node_hash =
+                selected_node_set_hash(legacy_selections);
+            const std::uint64_t selected_node_hash =
+                selected_node_set_hash(resolved_loads);
+            const std::uint64_t legacy_vector_hash =
+                load_vector_hash(legacy_loads);
+            const std::uint64_t selected_vector_hash =
+                load_vector_hash(loads);
+            const bool unchanged =
+                legacy_fixture_hash == selected_fixture_hash &&
+                legacy_face_hash == selected_face_hash &&
+                legacy_node_hash == selected_node_hash &&
+                legacy_vector_hash == selected_vector_hash;
+            if (!used_fixture_fallback && !used_load_fallback && !unchanged) {
+                throw std::logic_error(
+                    "selection audit: a non-fallback row changed its BC/load selection");
+            }
+            out.line["selection_audit"] = {
+                {"used_fixture_fallback", used_fixture_fallback},
+                {"used_load_fallback", used_load_fallback},
+                {"legacy_fixture_node_hash", legacy_fixture_hash},
+                {"selected_fixture_node_hash", selected_fixture_hash},
+                {"legacy_face_hash", legacy_face_hash},
+                {"selected_face_hash", selected_face_hash},
+                {"legacy_node_hash", legacy_node_hash},
+                {"selected_node_hash", selected_node_hash},
+                {"legacy_load_vector_hash", legacy_vector_hash},
+                {"selected_load_vector_hash", selected_vector_hash},
+                {"unchanged", unchanged}};
         }
 
         beat.set_phase("solve", 0.0);
@@ -2088,7 +2460,8 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         beat.set_phase("recover", 0.5);
 
         const ProbeAnswers ans =
-            compute_probes(vol.mesh, mat, u, part.loads, part.metrics, bc, loads);
+            compute_probes(vol.mesh, mat, u, selection_part.loads, resolved_loads,
+                           part.metrics, bc, loads);
         out.line["answers"] = {{"sigma_max", ans.sigma_max},
                                {"sigma_face_mean", ans.sigma_face_mean},
                                {"sigma_p99", ans.sigma_p99},
@@ -2187,6 +2560,20 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         out.line["status"] = "over_budget";
         out.line["over_budget_cause"] = "wall_clock";
         out.line["error"] = e.what();
+        out.line["mesh_ms"] = out.mesh_ms;
+        out.line["solve_ms"] = out.solve_ms;
+        out.accuracy_score = 0.0;
+        stamp_wall(out.line);
+        if (!warehouse_run_dir.empty()) {
+            write_warehouse_run(warehouse_run_dir, out.line, nullptr);
+        }
+        beat.set_phase("done", 1.0);
+    } catch (const pipeline::GeometryVolumeLimitError& e) {
+        out.line["status"] = "mesh_fail";
+        out.line["error"] = e.what();
+        out.line[e.solved_stage ? "geometry_volume_err" : "geometry_fill_volume_err"] =
+            e.assessment.relative_error;
+        out.line["advisor_training_eligible"] = false;
         out.line["mesh_ms"] = out.mesh_ms;
         out.line["solve_ms"] = out.solve_ms;
         out.accuracy_score = 0.0;

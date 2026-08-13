@@ -76,6 +76,10 @@ ElementType to_element_type(GmshType t) {
     switch (t) {
     case GmshType::kTet4:
         return ElementType::kTet4;
+    // Quadratic MSH nodes are source-authored import geometry, not locally
+    // elevated CAD. Preserve their coordinates: this layer has no CadModel,
+    // and reprojecting them would discard the external mesher's exact mids
+    // (ADR-0028).
     case GmshType::kTet10:
         return ElementType::kTet10;
     case GmshType::kHex8:

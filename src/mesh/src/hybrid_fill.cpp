@@ -115,11 +115,17 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     const double h_budget =
         min_h_for_cell_budget(bbox_min, bbox_max, kGradedMaxCells, /*subdivision=*/1);
     const double h_use = (h_budget > 0.0) ? std::max(h, h_budget) : h;
-    const CartesianGrid grid = make_bbox_grid(bbox_min, bbox_max, h_use);
+    // The h/2 classifier is sampling-only. The coarse Kuhn lattice remains at
+    // the requested h; mixed parents are marked for local LEB below.
+    const int classification_levels = projection != nullptr ? 1 : 0;
+    auto classification = classify_cells_feature_aware(
+        surface, bbox_min, bbox_max, h_use, static_cast<long>(kGradedMaxCells),
+        /*relative_volume_tolerance=*/0.01, classification_levels, size_field);
+    const CartesianGrid& grid = classification.grid;
+    const auto& inside = classification.inside;
     const int nx = grid.nx, ny = grid.ny, nz = grid.nz;
     const double hc = grid.max_edge();
     [[maybe_unused]] const double hf = 0.5 * hc;
-    const auto inside = classify_cells_inside(surface, grid);
     const auto idx = [&](int i, int j, int k) { return grid.index(i, j, k); };
     const auto inb = [&](int i, int j, int k) {
         return i >= 0 && i < nx && j >= 0 && j < ny && k >= 0 && k < nz &&
@@ -274,6 +280,13 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         if (is_deep_feature[c]) {
             refine_level[c] = 3;
         }
+        if (!classification.child_inside_mask.empty()) {
+            const auto mask = classification.child_inside_mask[c];
+            if (mask != 0 && mask != std::uint8_t{0xff}) {
+                refine_level[c] = std::max<std::uint8_t>(refine_level[c], 1);
+                is_feature[c] = 1;
+            }
+        }
     }
 
     bool any_l1 = false;
@@ -292,6 +305,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     out.skin_layers = skin_layers;
     out.subdivision = subdiv;
     out.mesh.h = out.h_fine;
+    out.classification_refinement_levels = classification.refinement_levels;
+    out.classification_volume_error = classification.relative_volume_error;
     out.field_h_min = std::isfinite(field_h_min) ? field_h_min : 0.0;
     out.field_h_max = field_h_max;
     out.n_field_budget_clamped = n_field_budget_clamped;
@@ -503,6 +518,42 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         }
     }
 
+    // The feature-aware classifier's h/2 samples are authoritative inside a
+    // mixed coarse parent. LEB has already made those parents conforming; now
+    // remove refined tets whose centroids fall in a void child. Without this
+    // local carve the classifier can see a bore while the emitted tet mesh
+    // remains the original solid coarse cube.
+    if (!classification.child_inside_mask.empty()) {
+        std::size_t write = 0;
+        for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+            const auto& tet = out.mesh.tets[ti];
+            const Eigen::Vector3d centroid =
+                0.25 * (out.mesh.nodes[tet[0]] + out.mesh.nodes[tet[1]] +
+                        out.mesh.nodes[tet[2]] + out.mesh.nodes[tet[3]]);
+            const Eigen::Vector3d lattice = (centroid - grid.origin).cwiseQuotient(grid.cell);
+            const int i = std::clamp(static_cast<int>(std::floor(lattice.x())), 0, nx - 1);
+            const int j = std::clamp(static_cast<int>(std::floor(lattice.y())), 0, ny - 1);
+            const int k = std::clamp(static_cast<int>(std::floor(lattice.z())), 0, nz - 1);
+            const auto parent = idx(i, j, k);
+            const std::uint8_t mask = classification.child_inside_mask[parent];
+            bool keep = true;
+            if (mask != 0 && mask != std::uint8_t{0xff}) {
+                const int a = lattice.x() - static_cast<double>(i) >= 0.5 ? 1 : 0;
+                const int b = lattice.y() - static_cast<double>(j) >= 0.5 ? 1 : 0;
+                const int c = lattice.z() - static_cast<double>(k) >= 0.5 ? 1 : 0;
+                const int child = a + 2 * b + 4 * c;
+                keep = (mask & static_cast<std::uint8_t>(1U << child)) != 0;
+            }
+            if (keep) {
+                out.mesh.tets[write++] = tet;
+            }
+        }
+        out.mesh.tets.resize(write);
+        if (out.mesh.tets.empty()) {
+            throw ValidityError("graded_tet_fill_surface: local child carve removed all tets");
+        }
+    }
+
     // CRITICAL: recollect free-surface nodes *after* LEB so mid-edge nodes on
     // the hole rim actually get snapped. Only unpaired-face nodes (S3) — do not
     // merge stale pre-LEB lattice quads (those can include interior/non-skin
@@ -591,6 +642,19 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         }
     };
     snap_round();
+
+    // Capture projection-resistant boundary nodes exactly once. Repair may
+    // expose interior lattice nodes; treating those newly exposed nodes as
+    // fresh juts on every round peels successive healthy layers from the
+    // solid. The carve contract is deliberately limited to this initial set.
+    const double initial_jut_threshold = 0.15 * hc;
+    std::unordered_set<std::uint32_t> initial_juts;
+    for (const auto ni : tet_boundary_nodes(out.mesh.tets)) {
+        if (closest_on_surface(surface, out.mesh.nodes[ni]).distance >
+            initial_jut_threshold) {
+            initial_juts.insert(ni);
+        }
+    }
 
     // S4 sliver-cap collapse: snapping all four corners of a skin tet onto a
     // curved surface leaves a near-flat cap that unsnap cannot cure without
@@ -706,7 +770,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             // to reject (hole-rim stair chords poking into the void) merge into
             // an adjacent on-surface boundary node instead of leaving a spike.
             for (const auto ni : bvec) {
-                if (node_remap[ni] != ni) {
+                if (node_remap[ni] != ni || !initial_juts.contains(ni)) {
                     continue;
                 }
                 const double resid = closest_on_surface(surface, out.mesh.nodes[ni]).distance;
@@ -818,7 +882,6 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         {
             constexpr int kCarvePasses = 4;
             constexpr double kPeelAspect = 0.03; // < kKeepAspect: only true flakes
-            const double node_thr = 0.15 * hc;
             const auto aspect_peel = [&](const std::array<std::uint32_t, 4>& n) {
                 const Eigen::Vector3d& a = out.mesh.nodes[n[0]];
                 const Eigen::Vector3d& b = out.mesh.nodes[n[1]];
@@ -832,12 +895,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 }
                 return 6.0 * 1.4142135623730951 * v / (emax * emax * emax) < kPeelAspect;
             };
-            std::unordered_set<std::uint32_t> jut;
-            for (const auto ni : tet_boundary_nodes(out.mesh.tets)) {
-                if (closest_on_surface(surface, out.mesh.nodes[ni]).distance > node_thr) {
-                    jut.insert(ni);
-                }
-            }
+            const auto& jut = initial_juts;
             for (int pass = 0; pass < kCarvePasses; ++pass) {
                 // Free faces per tet (faces appearing once across the mesh).
                 struct FKey {
@@ -992,6 +1050,10 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     }
     // Smoothing can thin an already-marginal cap — one more collapse round.
     repair_round();
+    // The final repair can expose lattice nodes after smoothing. Projection is
+    // inversion-safe and does not remove cells, so finish on a snapped boundary
+    // rather than leaving those new faces at raw lattice coordinates.
+    snap_round();
 
     // Rebuild boundary quads as exterior tris padded for pipeline display
     // (quad[3]=quad[2] for pure tris is OK — pipeline may re-extract).

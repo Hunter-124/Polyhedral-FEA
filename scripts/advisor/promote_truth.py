@@ -15,8 +15,11 @@ Rules:
 
 * Metrics whose ``source`` is ``"analytic"`` are never touched. A closed form outranks
   any solve.
-* The promoted row is the health-ok row with the largest ``n_dof`` for that part, so the
-  result depends only on the campaign contents -- re-running is a byte-identical no-op.
+* The promoted row is the health-ok row with the largest ``n_dof`` for that part whose
+  solved-stage ``geometry_volume_err`` is below 1%. Fill-stage geometry may be degraded
+  before quadratic mid-node projection; only the geometry actually solved determines
+  truth eligibility. The result depends only on the campaign contents -- re-running is
+  a byte-identical no-op.
 * The truth run is executed as shards (``<campaign>-s0..-sN``, same grid, disjoint part
   lists) that are never merged back, so all of their ``results.jsonl`` files are read as
   one pool; a part solved in a shard is not reported as provisional.
@@ -36,6 +39,8 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import math
+
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -50,6 +55,10 @@ REFERENCE_DIR = ROOT / "bench" / "reference" / "corpus"
 #: itself a discrete solve rather than a converged limit, so nothing tighter than the
 #: hand-calc band is defensible here.
 PROMOTED_TOL = 0.15
+#: A solved geometry at or above 1% relative CAD-volume error remains useful
+#: advisor training data, but may not define reference truth.
+GEOMETRY_VOLUME_TRUTH_LIMIT = 0.01
+
 
 
 def rel(path: Path) -> str:
@@ -116,6 +125,15 @@ def usable(row: dict[str, Any]) -> bool:
     health = row.get("health")
     if not isinstance(health, dict) or health.get("ok") is not True:
         return False
+    geometry_volume_error = row.get("geometry_volume_err")
+    if geometry_volume_error is not None:
+        if isinstance(geometry_volume_error, bool) or not isinstance(
+                geometry_volume_error, (int, float)):
+            return False
+        if not math.isfinite(float(geometry_volume_error)) or \
+                float(geometry_volume_error) >= GEOMETRY_VOLUME_TRUTH_LIMIT:
+            return False
+
     measured = row.get("accuracy", {}).get("all")
     return isinstance(measured, list) and bool(measured)
 

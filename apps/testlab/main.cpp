@@ -58,6 +58,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -254,6 +255,11 @@ struct Checkpoint {
     std::vector<std::string> survivors;
     std::string started_utc;
     std::string updated_utc;
+    /// Post-campaign hooks that failed, empty when all ran (or none were asked
+    /// for). Recorded beside `state` because `state == "finished"` is what a
+    /// consumer polls to conclude success, and three post-processing steps failed
+    /// silently behind exactly that marker for an entire regeneration.
+    std::vector<std::string> hooks_failed;
 };
 
 // ── parsers ─────────────────────────────────────────────────────────────────
@@ -625,6 +631,11 @@ Checkpoint load_checkpoint(const fs::path& path) {
     }
     cp.started_utc = j.value("started_utc", utc_now());
     cp.updated_utc = j.value("updated_utc", utc_now());
+    if (j.contains("hooks_failed")) {
+        for (const auto& h : j["hooks_failed"]) {
+            cp.hooks_failed.push_back(h.get<std::string>());
+        }
+    }
     return cp;
 }
 
@@ -637,13 +648,17 @@ void write_checkpoint(const fs::path& path, const Checkpoint& cp) {
     j["survivors"] = cp.survivors;
     j["started_utc"] = cp.started_utc;
     j["updated_utc"] = utc_now();
+    if (!cp.hooks_failed.empty()) {
+        j["hooks_failed"] = cp.hooks_failed;
+    }
     atomic_write(path, j.dump(2) + "\n");
 }
 
 void write_progress(const fs::path& path, const std::string& phase, double phase_frac,
                     double elapsed_ms, const std::string& cfg_id, const std::string& part,
                     int tier, int cg_iter = -1, double cg_resid = -1.0,
-                    std::size_t n_elems = 0, std::size_t n_nodes = 0) {
+                    std::size_t n_elems = 0, std::size_t n_nodes = 0,
+                    const std::vector<std::string>& hooks_failed = {}) {
     json j;
     j["phase"] = phase;
     j["phase_frac"] = phase_frac;
@@ -660,6 +675,11 @@ void write_progress(const fs::path& path, const std::string& phase, double phase
         j["n_nodes"] = n_nodes;
     }
     j["run"] = {{"cfg_id", cfg_id}, {"part", part}, {"tier", tier}};
+    if (!hooks_failed.empty()) {
+        // Only present when a post-campaign hook failed, so a reader that polls
+        // this file sees the failure rather than having to read run.log.
+        j["hooks_failed"] = hooks_failed;
+    }
     atomic_write(path, j.dump(2) + "\n");
 }
 
@@ -2148,10 +2168,22 @@ public:
 
 struct RunOutcome {
     json line;                   // results.jsonl object
+    // The mesh travels out so the CALLER can write artifacts AFTER the summary
+    // row is appended. Present only when a mesh was actually built: five of the
+    // eight former write sites had none, and std::optional makes handing over a
+    // default-constructed mesh as if it were real unrepresentable.
+    std::optional<pipeline::VolumeMeshOutput> mesh;
     double accuracy_score = 0.0; // 0..1 mean over metrics
     double mesh_ms = 0.0;
     double solve_ms = 0.0;
 };
+// The row-first ordering depends on moving the mesh out of run_one, never copying
+// it. Enforce the precondition in the compiler rather than in a review comment.
+static_assert(std::is_move_constructible_v<pipeline::VolumeMeshOutput>,
+              "RunOutcome moves the mesh out of run_one; a non-movable "
+              "VolumeMeshOutput would silently copy a whole mesh per run");
+static_assert(std::is_move_assignable_v<pipeline::VolumeMeshOutput>,
+              "out.mesh = std::move(vol) must move, not copy");
 
 // Never throws: every caller is either run_one's success path or one of its
 // exception handlers, and a throw from inside a handler escapes run_one past
@@ -2311,9 +2343,6 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
             out.line["solve_ms"] = 0.0;
             out.accuracy_score = 0.0;
             stamp_wall(out.line);
-            if (!warehouse_run_dir.empty()) {
-                write_warehouse_run(warehouse_run_dir, out.line, nullptr);
-            }
             beat.set_phase("done", 1.0);
             return out;
         }
@@ -2452,9 +2481,7 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
             out.line["solve_ms"] = 0.0;
             out.accuracy_score = 0.0;
             stamp_wall(out.line);
-            if (!warehouse_run_dir.empty()) {
-                write_warehouse_run(warehouse_run_dir, out.line, &vol);
-            }
+            out.mesh = std::move(vol);
             beat.set_phase("done", 1.0);
             return out;
         }
@@ -2477,9 +2504,7 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
             out.line["solve_ms"] = 0.0;
             out.accuracy_score = 0.0;
             stamp_wall(out.line);
-            if (!warehouse_run_dir.empty()) {
-                write_warehouse_run(warehouse_run_dir, out.line, &vol);
-            }
+            out.mesh = std::move(vol);
             beat.set_phase("done", 1.0);
             return out;
         }
@@ -2715,9 +2740,7 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         out.line["status"] = health_ok ? "ok" : "solve_suspect";
         stamp_wall(out.line);
 
-        if (!warehouse_run_dir.empty()) {
-            write_warehouse_run(warehouse_run_dir, out.line, &vol);
-        }
+        out.mesh = std::move(vol);
 
         beat.set_phase("done", 1.0);
     } catch (const WallClockBudgetExceeded& e) {
@@ -2729,23 +2752,28 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         out.line["solve_ms"] = out.solve_ms;
         out.accuracy_score = 0.0;
         stamp_wall(out.line);
-        if (!warehouse_run_dir.empty()) {
-            write_warehouse_run(warehouse_run_dir, out.line, nullptr);
-        }
         beat.set_phase("done", 1.0);
     } catch (const pipeline::GeometryVolumeLimitError& e) {
         out.line["status"] = "mesh_fail";
         out.line["error"] = e.what();
-        out.line[e.solved_stage ? "geometry_volume_err" : "geometry_fill_volume_err"] =
-            e.assessment.relative_error;
+        // A resolution refusal fires before any mesh exists, so there is nothing
+        // to measure and `available` is false. Emitting relative_error's 0.0 there
+        // would state a value this guard never computed, and 0.0 reads as a
+        // PERFECT volume match to anyone who does not also check a sibling flag.
+        // Say "not measured" explicitly instead; null is the honest answer.
+        const char* const volume_field =
+            e.solved_stage ? "geometry_volume_err" : "geometry_fill_volume_err";
+        if (e.assessment.available) {
+            out.line[volume_field] = e.assessment.relative_error;
+        } else {
+            out.line[volume_field] = nullptr;
+        }
+        out.line["geometry_volume_measured"] = e.assessment.available;
         out.line["advisor_training_eligible"] = false;
         out.line["mesh_ms"] = out.mesh_ms;
         out.line["solve_ms"] = out.solve_ms;
         out.accuracy_score = 0.0;
         stamp_wall(out.line);
-        if (!warehouse_run_dir.empty()) {
-            write_warehouse_run(warehouse_run_dir, out.line, nullptr);
-        }
         beat.set_phase("done", 1.0);
     } catch (const fea::FeaError& e) {
         out.line["status"] = "solve_fail";
@@ -2754,9 +2782,6 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         out.line["solve_ms"] = out.solve_ms;
         out.accuracy_score = 0.0;
         stamp_wall(out.line);
-        if (!warehouse_run_dir.empty()) {
-            write_warehouse_run(warehouse_run_dir, out.line, nullptr);
-        }
     } catch (const std::exception& e) {
         // Mesh / I/O / validity failures.
         const std::string msg = e.what();
@@ -2769,9 +2794,6 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         out.line["solve_ms"] = out.solve_ms;
         out.accuracy_score = 0.0;
         stamp_wall(out.line);
-        if (!warehouse_run_dir.empty()) {
-            write_warehouse_run(warehouse_run_dir, out.line, nullptr);
-        }
     }
     return out;
 }
@@ -2933,6 +2955,34 @@ int cmd_validate(const fs::path& camp_dir) {
     return 0;
 }
 
+/// Interpreter for the post-campaign hooks (ADR-0022).
+///
+/// `python3` is NOT a safe default. On this workstation it resolves to a bare
+/// C:\Python314 that has no numpy, while every other tool in the repo runs under
+/// the Python311 that does -- so `warehouse_shots.py` raised ModuleNotFoundError
+/// and rendered nothing for an entire campaign regeneration, reporting it only as
+/// an exit code in a log. Resolution order:
+///   1. $POLYMESH_PYTHON -- scripts/advisor/run_batch.py sets this to its own
+///      sys.executable, so a campaign driven by the runner uses EXACTLY the
+///      interpreter the runner itself is running under.
+///   2. `python`, when it runs at all. Mirrors python_exe() in the Catch2 tests,
+///      which has picked the working interpreter on Windows all along.
+///   3. `python3`, the POSIX fallback.
+const std::string& hook_python() {
+    static const std::string exe = []() -> std::string {
+        if (const char* env = std::getenv("POLYMESH_PYTHON"); env != nullptr && *env != '\0') {
+            return std::string("\"") + env + "\"";
+        }
+#if defined(_WIN32)
+        if (std::system("python -c \"import sys\" >nul 2>&1") == 0) {
+            return "python";
+        }
+#endif
+        return "python3";
+    }();
+    return exe;
+}
+
 int run_campaign(const fs::path& camp_dir, bool resume, const AdvisorScorer* advisor) {
     const fs::path camp_path = camp_dir / "campaign.json";
     if (!fs::exists(camp_path)) {
@@ -3090,6 +3140,15 @@ int run_campaign(const fs::path& camp_dir, bool resume, const AdvisorScorer* adv
                     throw std::runtime_error("failed appending row to " +
                                              results_path.string());
                 }
+                // Artifacts AFTER the row: the row is the record we cannot
+                // regenerate, the artifacts are rebuildable from it (and by
+                // scripts/advisor/rebuild_results.py in reverse). Writing them
+                // second makes an artifact failure unable to cost a row by
+                // construction, not merely by the guard inside the writer.
+                if (!wh_dir.empty()) {
+                    write_warehouse_run(wh_dir, ro.line,
+                                        ro.mesh ? &*ro.mesh : nullptr);
+                }
                 done.insert(key);
                 ++cp.completed_runs;
                 cp.updated_utc = utc_now();
@@ -3121,28 +3180,50 @@ int run_campaign(const fs::path& camp_dir, bool resume, const AdvisorScorer* adv
     write_progress(progress_path, "done", 1.0, 0.0, "", "", cp.tier);
     std::printf("finished: %d runs → %s\n", cp.completed_runs, results_path.string().c_str());
 
-    // Optional post-campaign hooks (ADR-0022). Failures here do not fail the campaign.
-    if (camp.warehouse) {
-        // V9b: mesh.vtu → wire.png for HANDOFF / review (best-effort).
-        const int rc =
-            std::system(("python3 scripts/warehouse_shots.py " + camp.name).c_str());
+    // Optional post-campaign hooks (ADR-0022). A hook failure does not fail the
+    // campaign -- no hook touches results.jsonl -- but it IS reported in the
+    // summary below, because an exit code alone went unnoticed for thousands of
+    // runs while warehouse_shots rendered nothing.
+    std::vector<std::string> hook_failures;
+    const auto run_hook = [&](const char* name, const char* script) {
+        const std::string cmd = hook_python() + " " + script + " " + camp.name;
+        const int rc = std::system(cmd.c_str());
         if (rc != 0) {
-            std::fprintf(stderr, "on_finish warehouse_shots exited %d\n", rc);
+            std::fprintf(stderr, "on_finish %s exited %d\n", name, rc);
+            hook_failures.push_back(std::string(name) + " (exit " + std::to_string(rc) + ")");
         }
+    };
+    if (camp.warehouse) {
+        // V9b: mesh.vtu → wire.png for HANDOFF / review, consumed by
+        // write_grok_handoff.py (shots) and scripts/advisor/report.py (WIRE_NAMES).
+        run_hook("warehouse_shots", "scripts/warehouse_shots.py");
     }
     if (camp.on_finish_analyze) {
-        const int rc =
-            std::system(("python3 scripts/analyze_campaign.py " + camp.name).c_str());
-        if (rc != 0) {
-            std::fprintf(stderr, "on_finish analyze exited %d\n", rc);
-        }
+        run_hook("analyze", "scripts/analyze_campaign.py");
     }
     if (camp.on_finish_grok) {
-        const int rc =
-            std::system(("python3 scripts/write_grok_handoff.py " + camp.name).c_str());
-        if (rc != 0) {
-            std::fprintf(stderr, "on_finish grok handoff exited %d\n", rc);
+        run_hook("grok handoff", "scripts/write_grok_handoff.py");
+    }
+    if (!hook_failures.empty()) {
+        std::string joined;
+        for (const auto& failure : hook_failures) {
+            if (!joined.empty()) {
+                joined += ", ";
+            }
+            joined += failure;
         }
+        // Three surfaces, because an exit code and 153 stack traces in run.log were
+        // already there and still went unread for a whole regeneration: the terminal
+        // summary, progress.json, and the checkpoint beside `state: finished` --
+        // which is the marker a downstream consumer polls to conclude success.
+        std::printf("campaign summary: %d runs, POST-CAMPAIGN HOOKS FAILED: %s\n",
+                    cp.completed_runs, joined.c_str());
+        std::fprintf(stderr, "campaign summary: POST-CAMPAIGN HOOKS FAILED: %s\n",
+                     joined.c_str());
+        write_progress(progress_path, "done", 1.0, 0.0, "", "", cp.tier, -1, -1.0, 0, 0,
+                       hook_failures);
+        cp.hooks_failed = hook_failures;
+        write_checkpoint(cp_path, cp);
     }
     return 0;
 }

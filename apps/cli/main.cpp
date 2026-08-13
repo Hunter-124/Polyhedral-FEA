@@ -57,7 +57,8 @@ int usage() {
                "                             geometry+BC-aware volume mesh; optional VTU\n"
                "  solve <part.step|.brep|.msh> -o out.vtu [-h m] [-E Pa] [-nu r]\n"
                "              [--mesher name] [--skin n] [--no-feature] [--adapt n]\n"
-               "              [--eta-target η] [--p-elevate] [--element-tendency t]\n"
+               "              [--eta-target η] [--p-elevate] [--p-elevate-uniform]\n"
+               "              [--element-tendency t]\n"
                "              [--max-elems N] [--max-dof N] [--max-mem GB]\n"
                "              [--fix-box ...6] [--load-box ...6] [--bc-grade]\n"
                "              [--load-dir x y z] [--force N] [--traction Pa]\n"
@@ -94,7 +95,11 @@ int usage() {
                "              available system memory)\n"
                "--adapt n: ZZ→Dörfler remesh passes (local seeds on graded path)\n"
                "--eta-target η: stop adapt when global ZZ η ≤ η (0=off; needs --adapt)\n"
-               "--p-elevate: promote smooth tet4/hex8 → tet10/hex20 (auto-on --adapt>0)\n"
+               "--p-elevate: promote ZZ-smooth tet4/hex8 → tet10/hex20 (auto-on --adapt>0);\n"
+               "             the unmarked remainder stays linear, so the mesh is mixed p\n"
+               "--p-elevate-uniform: promote EVERY tet4/hex8 instead of the smooth-marked\n"
+               "             subset → uniformly quadratic, for true order-2 parity with\n"
+               "             Gmsh peers; implies --p-elevate\n"
                "--bc-grade: force a-priori BC grading from the default cantilever faces\n"
                "--advisor DIR: pick mesher/h/adapt/p-order with the learned mesh advisor\n"
                "               (DIR holds model.onnx, normalization.json, clamps.json);\n"
@@ -657,6 +662,7 @@ int cmd_solve(std::span<char*> args) {
     int adapt_passes = 0;
     double eta_target = 0.0;
     bool p_elevate = false;
+    bool p_elevate_uniform = false;
     double element_tendency = 0.0;
     bool bc_grade = false;
     std::size_t max_elems = 0;
@@ -716,6 +722,11 @@ int cmd_solve(std::span<char*> args) {
                 eta_target = 0.0;
             }
         } else if (std::strcmp(args[i], "--p-elevate") == 0) {
+            p_elevate = true;
+        } else if (std::strcmp(args[i], "--p-elevate-uniform") == 0) {
+            // Implies --p-elevate: a flag that silently does nothing unless a
+            // second flag is also present is the failure mode we keep fixing.
+            p_elevate_uniform = true;
             p_elevate = true;
         } else if (std::strcmp(args[i], "--bc-grade") == 0) {
             bc_grade = true;
@@ -978,6 +989,40 @@ int cmd_solve(std::span<char*> args) {
 
     Eigen::VectorXd u;
     polymesh::fea::ZzRecovery zz;
+
+    // Which elements get promoted. Default (selective) promotes only the
+    // ZZ-smooth-marked subset, so an "order 2" run is really mixed p=1/p=2 with
+    // a quadratic fraction that varies per case and per h. Gmsh delivers a
+    // uniformly quadratic mesh, so --p-elevate-uniform promotes every promotable
+    // linear element and makes an order-2 peer comparison a true parity run.
+    const auto elevate_targets = [&]() {
+        if (!p_elevate_uniform) {
+            return polymesh::adapt::mark_smooth(zz.element_eta, 0.3);
+        }
+        std::vector<std::size_t> eligible;
+        eligible.reserve(vol.mesh.elements.size());
+        for (std::size_t e = 0; e < vol.mesh.elements.size(); ++e) {
+            const auto type = vol.mesh.elements[e].type;
+            if (type == polymesh::fea::ElementType::kTet4 ||
+                type == polymesh::fea::ElementType::kHex8) {
+                eligible.push_back(e);
+            }
+        }
+        return eligible;
+    };
+    // The discretisation that produced a row must be readable off the output and
+    // off the row's note, never inferred from element counts.
+    const char* const p_elevate_mode = p_elevate_uniform ? "uniform" : "selective";
+    const auto report_p_elevate = [&](std::size_t n_promoted, std::size_t n0) {
+        const auto counts = polymesh::fea::count_element_types(vol.mesh);
+        // Wording pinned: the peer matrix parses this line for per-row counts.
+        std::printf("p-elevate: %zu smooth, nodes %zu→%zu (tet10=%zu hex20=%zu)\n",
+                    n_promoted, n0, vol.mesh.nodes.size(), counts.tet10, counts.hex20);
+        std::printf("p-elevate-mode: %s\n", p_elevate_mode);
+        vol.mesher_note += std::format(" | p-elevate={} promoted={} tet10={} hex20={}",
+                                       p_elevate_mode, n_promoted, counts.tet10,
+                                       counts.hex20);
+    };
     for (int pass = 0; pass <= adapt_passes; ++pass) {
         if (pass > 0) {
             auto m = mesher;
@@ -1006,10 +1051,10 @@ int cmd_solve(std::span<char*> args) {
                             eta_target, pass, adapt_passes);
             }
             if (p_elevate) {
-                const auto smooth = polymesh::adapt::mark_smooth(zz.element_eta, 0.3);
-                if (!smooth.empty()) {
+                const auto promote = elevate_targets();
+                if (!promote.empty()) {
                     const auto n0 = vol.mesh.nodes.size();
-                    vol.mesh = polymesh::fea::p_elevate(vol.mesh, smooth);
+                    vol.mesh = polymesh::fea::p_elevate(vol.mesh, promote);
                     project_quadratic_mids();
                     vol.mesh.check_validity();
                     auto [bc2, loads2] = make_bc_loads(vol);
@@ -1024,10 +1069,7 @@ int cmd_solve(std::span<char*> args) {
                     u = polymesh::fea::solve_elastostatics(vol.mesh, mat, bc2, loads2,
                                                            solve_options);
                     zz = polymesh::fea::recover_zz(vol.mesh, mat, u);
-                    const auto counts = polymesh::fea::count_element_types(vol.mesh);
-                    std::printf("p-elevate: %zu smooth, nodes %zu→%zu (tet10=%zu hex20=%zu)\n",
-                                smooth.size(), n0, vol.mesh.nodes.size(), counts.tet10,
-                                counts.hex20);
+                    report_p_elevate(promote.size(), n0);
                 }
             }
             break;
@@ -1046,9 +1088,10 @@ int cmd_solve(std::span<char*> args) {
                                                              0.75, h * 0.35);
             if (sug.n_marked == 0 && sug.h_next >= h_use * 0.98) {
                 if (p_elevate) {
-                    const auto smooth = polymesh::adapt::mark_smooth(zz.element_eta, 0.3);
-                    if (!smooth.empty()) {
-                        vol.mesh = polymesh::fea::p_elevate(vol.mesh, smooth);
+                    const auto promote = elevate_targets();
+                    if (!promote.empty()) {
+                        const auto n0 = vol.mesh.nodes.size();
+                        vol.mesh = polymesh::fea::p_elevate(vol.mesh, promote);
                         project_quadratic_mids();
                         vol.mesh.check_validity();
                         auto [bc2, loads2] = make_bc_loads(vol);
@@ -1059,6 +1102,10 @@ int cmd_solve(std::span<char*> args) {
                         u = polymesh::fea::solve_elastostatics(vol.mesh, mat, bc2, loads2,
                                                                solve_options);
                         zz = polymesh::fea::recover_zz(vol.mesh, mat, u);
+                        // Previously silent: a converged-early run promoted with
+                        // no promotion line at all, so neither a reader nor the
+                        // peer parser could tell what was actually solved.
+                        report_p_elevate(promote.size(), n0);
                     }
                 }
                 break;

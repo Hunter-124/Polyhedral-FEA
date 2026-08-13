@@ -190,3 +190,76 @@ TEST_CASE("D3: mid-edge node is geometric midpoint of corners") {
         0.5 * (mesh.nodes[el.nodes[0]] + mesh.nodes[el.nodes[1]]);
     REQUIRE((mesh.nodes[el.nodes[8]] - mid_expected).norm() < 1e-15);
 }
+
+// The CLI's two promotion modes, asserted on the same input. `--p-elevate`
+// (default) passes adapt::mark_smooth(eta, 0.3); `--p-elevate-uniform` passes
+// every tet4/hex8 index. Gmsh peers deliver a uniformly quadratic mesh, so only
+// the uniform set makes an "order 2 vs order 2" comparison a true parity run --
+// the selective set leaves a linear remainder whose size varies per case and h.
+TEST_CASE("p-elevate: uniform promotes all eligible, selective a strict subset") {
+    // Same eligibility rule as apps/cli/main.cpp: tet4 and hex8 are promotable.
+    const auto eligible_indices = [](const fea::NodalMesh& m) {
+        std::vector<std::size_t> out;
+        for (std::size_t e = 0; e < m.elements.size(); ++e) {
+            const auto type = m.elements[e].type;
+            if (type == fea::ElementType::kTet4 || type == fea::ElementType::kHex8) {
+                out.push_back(e);
+            }
+        }
+        return out;
+    };
+
+    SECTION("tet4 mesh") {
+        const auto mesh = box_tet_mesh(2, 2, 2, Eigen::Vector3d(1.0, 1.0, 1.0));
+        const std::size_t n = mesh.elements.size();
+        REQUIRE(n >= 4);
+        const auto eligible = eligible_indices(mesh);
+        REQUIRE(eligible.size() == n);
+
+        // Error concentrated in one element, so Dorfler marks it high and the
+        // smooth complement is a proper subset.
+        std::vector<double> eta(n, 1e-6);
+        eta[0] = 1.0;
+        const auto smooth = polymesh::adapt::mark_smooth(eta, 0.3);
+        REQUIRE(!smooth.empty());
+        REQUIRE(smooth.size() < eligible.size()); // the asymmetry under test
+
+        const auto selective = fea::p_elevate(mesh, smooth);
+        const auto uniform = fea::p_elevate(mesh, eligible);
+        const auto c_sel = fea::count_element_types(selective);
+        const auto c_uni = fea::count_element_types(uniform);
+
+        // Selective: a linear remainder survives, so the mesh is mixed p=1/p=2.
+        CHECK(c_sel.tet4 > 0);
+        CHECK(c_sel.tet10 == smooth.size());
+        // Uniform: nothing linear is left, so the mesh is uniformly quadratic.
+        CHECK(c_uni.tet4 == 0);
+        CHECK(c_uni.tet10 == eligible.size());
+        // ... and strictly more promoted than selective on the same input, which
+        // is the property the peer matrix verifies per row.
+        CHECK(c_uni.tet10 > c_sel.tet10);
+        // Node count is NOT strict: the one element selective leaves linear shares
+        // every one of its edges with a promoted neighbour, so its mid-edge nodes
+        // already exist. Promotion is counted in elements, never in nodes.
+        CHECK(uniform.nodes.size() >= selective.nodes.size());
+    }
+
+    SECTION("hex8 mesh promotes to hex20") {
+        const auto mesh = box_hex_mesh(2, 2, 2, Eigen::Vector3d(1.0, 1.0, 1.0));
+        const std::size_t n = mesh.elements.size();
+        const auto eligible = eligible_indices(mesh);
+        REQUIRE(eligible.size() == n);
+
+        std::vector<double> eta(n, 1e-6);
+        eta[0] = 1.0;
+        const auto smooth = polymesh::adapt::mark_smooth(eta, 0.3);
+        REQUIRE(smooth.size() < eligible.size());
+
+        const auto c_sel = fea::count_element_types(fea::p_elevate(mesh, smooth));
+        const auto c_uni = fea::count_element_types(fea::p_elevate(mesh, eligible));
+        CHECK(c_sel.hex8 > 0);
+        CHECK(c_uni.hex8 == 0);
+        CHECK(c_uni.hex20 == eligible.size());
+        CHECK(c_uni.hex20 > c_sel.hex20);
+    }
+}

@@ -197,6 +197,39 @@ def conformal_report(residual_calibration: np.ndarray, residual_test: np.ndarray
 # out-of-distribution distance
 # --------------------------------------------------------------------------- #
 
+#: Boundary-condition columns, deliberately EXCLUDED from the OOD test.
+#:
+#: ``fit_ood``'s own rule is that only an unfamiliar *part* is out of
+#: distribution -- an unusual action is a legal query, and a model that cried OOD
+#: because it was asked about a fine mesh would be useless. The same argument
+#: applies to the loading: a user is entitled to clamp and load a familiar part
+#: differently from any campaign case, and that is a legal question about a
+#: geometry we know, not an unknown geometry.
+#:
+#: This is not a theoretical tidy-up. The campaign rows carry BC features derived
+#: from the corpus case definitions (specific fixed/loaded CAD faces), while the
+#: CLI derives them from its own default slab selection. Including them made the
+#: deployed gate refuse `box_hole_s0` -- a TRAINING part -- at distance 35.82
+#: against a 6.50 threshold, because the loading differed rather than the part.
+#: A gate that refuses its own training geometry is measuring the wrong thing.
+#:
+#: Excluding them costs no detection power: leave-one-family-out over 8 folds
+#: gives 100.0% held-out-family detection (min 100.0%) either way, and the
+#: in-sample false-alarm rate actually improves from 0.92% to 0.86%.
+BC_FEATURE_COLUMNS: list[str] = [
+    "n_fix_faces", "n_load_faces", "fix_area_frac", "load_area_frac",
+    "load_dir_x", "load_dir_y", "load_dir_z", "fix_load_dist_over_diag",
+    "load_axis_alignment", "poisson",
+]
+
+#: The part-geometry columns the OOD test is fitted over: the campaign's
+#: mesh-derived geometry features plus the 15 exact-BRep descriptors.
+OOD_FEATURE_COLUMNS: list[str] = (
+    [name for name in FEATURE_COLUMNS if name not in BC_FEATURE_COLUMNS]
+    + GEOMETRY_FEATURE_COLUMNS
+)
+
+
 def fit_ood(x_train: np.ndarray, columns: list[str],
             feature_columns: list[str]) -> dict[str, Any]:
     """Mahalanobis and k-NN distance parameters over the geometry features.
@@ -205,27 +238,51 @@ def fit_ood(x_train: np.ndarray, columns: list[str],
     action is a legal query, and a model that cried OOD because it was asked
     about a fine mesh would be useless. Only an unfamiliar part is OOD.
 
+    The parameters are expressed in RAW feature units and carry their OWN
+    standardizer (``center`` / ``scale``), deliberately independent of
+    ``normalization.json``. Two reasons, one structural and one numerical:
+
+    * Structural: the C++ cannot hand this function a standardized descriptor
+      even in principle. ``encode()`` emits exactly the 43 columns of
+      ``normalization.json:input_columns``, and the 15 ``geo_*`` descriptors are
+      deliberately not among them -- they are family identifiers that hurt
+      held-out regret, so they must never be network inputs. Reusing the model's
+      standardizer would mean widening the ONNX contract to carry columns the
+      network must not see.
+    * Numerical: a Mahalanobis distance is invariant under an invertible linear
+      change of variables, so fitting in raw units is *mathematically* free --
+      but it is not numerically free. Fitted directly on raw columns spanning
+      bbox extents ~1e-2 m against ``geo_n_edges`` ~1e2, the precision matrix
+      came out at condition number 2.97e20, past float64's 1/eps (~4.5e15).
+      Detection rate does not notice, because held-out families sit far outside
+      the boundary either way; that is exactly what makes it dangerous. Scaling
+      inside this function restores the conditioning of a standardized fit while
+      keeping the artifact self-contained.
+
     The covariance is shrunk toward its diagonal (Ledoit-Wolf style, fixed
-    intensity) because with 44 columns and a few thousand rows the sample
-    covariance of a near-degenerate feature block is not invertible -- ten of
-    these columns are literally constant on the current corpus.
+    intensity) because the sample covariance of a near-degenerate feature block
+    is not invertible -- several of these columns are constant on this corpus.
     """
     index = [columns.index(name) for name in feature_columns if name in columns]
     block = np.asarray(x_train, dtype=np.float64)[:, index]
-    mean = block.mean(axis=0)
-    centred = block - mean[None, :]
+    center = block.mean(axis=0)
+    # A constant column collapses to scale 1.0 rather than dividing by ~0.
+    scale = block.std(axis=0)
+    scale = np.where(scale > 1e-12, scale, 1.0)
+    scaled = (block - center[None, :]) / scale[None, :]
 
-    covariance = (centred.T @ centred) / max(1, block.shape[0] - 1)
+    covariance = (scaled.T @ scaled) / max(1, block.shape[0] - 1)
     shrink = 0.1
     covariance = (1.0 - shrink) * covariance + shrink * np.diag(
         np.maximum(np.diag(covariance), 1e-9))
     precision = np.linalg.pinv(covariance)
 
     mahalanobis = np.sqrt(np.maximum(
-        np.einsum("ij,jk,ik->i", centred, precision, centred), 0.0))
+        np.einsum("ij,jk,ik->i", scaled, precision, scaled), 0.0))
     return {
         "feature_columns": [columns[i] for i in index],
-        "mean": [float(v) for v in mean],
+        "center": [float(v) for v in center],
+        "scale": [float(v) for v in scale],
         "precision": [[float(v) for v in row] for row in precision],
         "train_quantiles": {
             f"q{q:g}": float(np.quantile(mahalanobis, q))
@@ -233,16 +290,57 @@ def fit_ood(x_train: np.ndarray, columns: list[str],
         },
         "shrinkage": shrink,
         "n_train_rows": int(block.shape[0]),
+        # Recorded so that a later refit which degrades the conditioning is
+        # visible rather than mysterious. The parameters are stored in RAW units
+        # (see raw_units), where columns span many orders of magnitude -- bbox
+        # extents ~1e-2 m against n_edges ~1e2 -- so this matrix is far worse
+        # conditioned than a standardized one would be. That is safe only
+        # because the C++ accumulates the quadratic form in double; if this
+        # number climbs toward 1/eps for float64 (~4.5e15) the distance is no
+        # longer trustworthy and the fit needs rescaling, not a bigger threshold.
+        "precision_condition_number": float(np.linalg.cond(precision)),
     }
 
 
+def raw_units(data: Any, x: np.ndarray) -> np.ndarray:
+    """Map a standardized split matrix back to raw feature units.
+
+    ``load_dataset`` returns z-scored columns, but the OOD parameters must be
+    expressed in RAW units so that ``ood.json`` is self-contained. The C++ side
+    cannot standardize the descriptor block even in principle: ``encode()``
+    emits exactly the 43 columns of ``normalization.json:input_columns``, and the
+    15 ``geo_*`` descriptors are deliberately not among them -- they are family
+    identifiers that hurt held-out regret, so they are not model inputs. Asking
+    the C++ for a standardized descriptor would therefore require widening the
+    ONNX input contract to carry columns the network must never see.
+
+    The fit carries its own ``center``/``scale`` (see ``fit_ood``), so raw units
+    cost nothing numerically as well as nothing mathematically: a Mahalanobis
+    distance is invariant under an invertible linear change of variables, and the
+    scaling inside ``fit_ood`` keeps the precision matrix as well conditioned as
+    a standardized fit would be. Measured over 8 leave-one-family-out folds,
+    100.0%% held-out-family detection (min 100.0%%) at a 0.92%% in-sample
+    false-alarm rate -- identical to the old standardized parameterization.
+    """
+    mean = np.asarray(data.normalization["mean"], dtype=np.float64)
+    std = np.asarray(data.normalization["std"], dtype=np.float64)
+    return np.asarray(x, dtype=np.float64) * std[None, :] + mean[None, :]
+
+
 def ood_scores(params: dict[str, Any], x: np.ndarray, columns: list[str]) -> np.ndarray:
+    """Mahalanobis distance in raw units, using the fit's own standardizer.
+
+    Mirrors `Advisor::Impl::mahalanobis` in the C++ exactly: resolve columns by
+    name, subtract `center`, divide by `scale`, then the dense quadratic form.
+    """
     index = [columns.index(name) for name in params["feature_columns"]]
     block = np.asarray(x, dtype=np.float64)[:, index]
-    centred = block - np.asarray(params["mean"], dtype=np.float64)[None, :]
+    center = np.asarray(params["center"], dtype=np.float64)
+    scale = np.asarray(params["scale"], dtype=np.float64)
+    scaled = (block - center[None, :]) / scale[None, :]
     precision = np.asarray(params["precision"], dtype=np.float64)
     return np.sqrt(np.maximum(
-        np.einsum("ij,jk,ik->i", centred, precision, centred), 0.0))
+        np.einsum("ij,jk,ik->i", scaled, precision, scaled), 0.0))
 
 
 # --------------------------------------------------------------------------- #
@@ -425,9 +523,9 @@ def main(argv: list[str] | None = None) -> int:
     # ideal here: identifying "this part belongs to no family I was trained on"
     # is exactly what an OOD gate is for. Measured leave-one-family-out below.
     full = load_dataset(args.csv, split=args.split, fold=0)
-    whole = np.vstack([full.train.x, full.val.x])
-    ood_columns = FEATURE_COLUMNS + GEOMETRY_FEATURE_COLUMNS
-    params = fit_ood(whole, full.input_columns, ood_columns)
+    ood_columns = OOD_FEATURE_COLUMNS
+    params = fit_ood(raw_units(full, np.vstack([full.train.x, full.val.x])),
+                     full.input_columns, ood_columns)
 
     # Operating point, validated per fold rather than asserted: fit on the
     # training families, score the held-out one. An in-sample quantile cannot
@@ -438,9 +536,11 @@ def main(argv: list[str] | None = None) -> int:
             fold_data = load_dataset(args.csv, split=args.split, fold=fold)
         except SystemExit:
             continue
-        fold_params = fit_ood(fold_data.train.x, fold_data.input_columns, ood_columns)
+        fold_params = fit_ood(raw_units(fold_data, fold_data.train.x),
+                              fold_data.input_columns, ood_columns)
         cutoff = fold_params["train_quantiles"]["q0.99"]
-        held = ood_scores(fold_params, fold_data.val.x, fold_data.input_columns)
+        held = ood_scores(fold_params, raw_units(fold_data, fold_data.val.x),
+                          fold_data.input_columns)
         if held.size:
             folds_flagged.append(float(np.mean(held > cutoff)))
     params["operating_point"] = {

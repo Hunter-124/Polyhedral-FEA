@@ -253,6 +253,35 @@ struct CaseFeatures {
     double fix_load_dist_over_diag = 0.0;
     double load_axis_alignment = 0.0;
     double poisson = 0.0;
+
+    // --- exact-BRep descriptors, for the advisor's OOD test only -------------
+    //
+    // Everything above is measured from the tessellation. These are read from
+    // the BRep, and they exist because the mesh proxies cannot answer "is this
+    // part unlike anything I was trained on": `curved_frac` above saturates to
+    // ~1.0 for any real triangulation.
+    //
+    // They are NOT network inputs. The shipped ONNX contract is 43 columns and
+    // these are not among them; they feed only the Mahalanobis distance in
+    // `bench/advisor/ood.json`. `geo_available` is false when the build has no
+    // OpenCASCADE or the model carries no BRep, and the advisor must then
+    // decline to run the OOD test rather than testing imputed values.
+    bool geo_available = false;
+    double geo_curved_area_frac = 0.0;
+    double geo_cyl_area_frac = 0.0;
+    double geo_plane_area_frac = 0.0;
+    double geo_other_area_frac = 0.0;
+    double geo_min_curv_radius_rel = 0.0;
+    double geo_log_curv_radius_mean = 0.0;
+    double geo_log_curv_radius_std = 0.0;
+    double geo_n_faces = 0.0;
+    double geo_n_edges = 0.0;
+    double geo_face_area_cv = 0.0;
+    double geo_aspect_max = 0.0;
+    double geo_aspect_mid = 0.0;
+    double geo_volume_frac = 0.0;
+    double geo_area_over_v23 = 0.0;
+    double geo_min_face_size_rel = 0.0;
 };
 
 /// Extract cheap, deterministic advisor context without meshing or solving.

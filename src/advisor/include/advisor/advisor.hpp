@@ -6,10 +6,11 @@
 // guardrailed mesh action.
 //
 // The model directory is the training package's output directory and must
-// contain `model.onnx`, `normalization.json`, and `clamps.json`. Those three
-// files are the single source of truth shared with scripts/advisor/ — nothing
-// about the feature order, the clamp box, or the mesher vocabulary is
-// duplicated as a C++ constant.
+// contain `model.onnx`, `normalization.json`, `clamps.json`, and `ood.json`.
+// Those four files are the single source of truth shared with
+// scripts/advisor/ — nothing about the feature order, the clamp box, the
+// mesher vocabulary, or the out-of-distribution operating point is duplicated
+// as a C++ constant.
 
 #include "pipeline/scene.hpp"
 
@@ -59,9 +60,19 @@ struct AdvisorDecision {
     /// it, never compare it across cases.
     double predicted_rel_err_rel = 0.0;
 
-    /// Feasibility head output in [0, 1]. Above `clamps.json:veto_threshold`
-    /// the recommendation is discarded and `defaults` are returned instead.
+    /// Feasibility head output in [0, 1]. Reported for audit; the candidate
+    /// GATE (`clamps.json:gate_threshold`) uses it to filter candidates before
+    /// ranking, and the residual `clamps.json:veto_threshold` refuses a
+    /// recommendation the model expects to fail outright.
     double failure_prob = 0.0;
+
+    /// Mahalanobis distance of this query's geometry features from the training
+    /// distribution, in standardized feature space, using the mean and
+    /// precision in `ood.json`. Above `ood.json:operating_point.threshold` the
+    /// recommendation is refused: the model is being asked about a part unlike
+    /// anything it was trained on, and its heads would be extrapolating.
+    double ood_distance = 0.0;
+
     bool vetoed = false;
 
     /// True when a raw policy output fell outside the clamp box and was

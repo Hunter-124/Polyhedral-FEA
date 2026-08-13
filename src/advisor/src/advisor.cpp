@@ -131,10 +131,12 @@ struct Advisor::Impl {
     /// Candidates whose predicted failure probability exceeds this are dropped
     /// before ranking. Distinct from `veto_threshold`, which refuses the whole
     /// recommendation after the fact: this one improves the choice, that one
-    /// abandons it. Measured, filtering first cuts held-out regret 0.4413 ->
-    /// 0.3468 and the rate of recommending an action that then fails outright
-    /// 22.7% -> 10.0%, and it is insensitive to the threshold over [0.05, 0.5].
-    double gate_threshold = 0.5;
+    /// abandons it. Required from clamps.json -- deliberately no default, see
+    /// load_clamps(). Measured on the rebuilt corpus (leave-one-family-out, 8
+    /// families, 5 seeds), the gated family spans only 0.3233-0.3350 of held-out
+    /// regret across thresholds 0.05-0.8, so the choice is made on pick-failure
+    /// rate instead: 27.5% at 0.05 against 31.2% at 0.5.
+    double gate_threshold = std::numeric_limits<double>::quiet_NaN();
 
     std::string input_name;
     std::vector<const char*> output_name_ptrs;
@@ -276,7 +278,25 @@ void Advisor::Impl::load_clamps(const std::filesystem::path& dir) {
             }
         }
     }
-    gate_threshold = clamps.value("gate_threshold", veto_threshold);
+    // Required, never defaulted. The gate and the veto are different decisions
+    // with different correct values -- the gate filters candidates before
+    // ranking, the veto abandons the whole recommendation afterwards -- so
+    // inheriting one from the other produced a threshold that looked deliberate
+    // and was not: the shipped rule silently ran at the veto's 0.5, the weakest
+    // member of its own sweep. An absent key is a misconfiguration, not a
+    // default, and it fails here rather than degrading a recommendation.
+    if (!clamps.contains("gate_threshold") || !clamps.at("gate_threshold").is_number()) {
+        throw AdvisorError("advisor: clamps.json is missing a numeric 'gate_threshold'. It is "
+                           "required and must not be inherited from 'veto_threshold': the gate "
+                           "filters candidates before ranking, the veto refuses the whole "
+                           "recommendation. Re-export with python scripts/advisor/export_onnx.py");
+    }
+    gate_threshold = clamps.at("gate_threshold").get<double>();
+    if (!(gate_threshold > 0.0) || !(gate_threshold < 1.0)) {
+        throw AdvisorError("advisor: clamps.json gate_threshold " +
+                           std::to_string(gate_threshold) +
+                           " is not a probability in (0, 1); it gates a sigmoid output");
+    }
 }
 
 std::vector<float> Advisor::Impl::encode(const FeatureColumns& columns) const {

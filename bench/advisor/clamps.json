@@ -28,7 +28,6 @@
     "mesher_logit_graded_tet",
     "mesher_logit_hybrid_zoo"
   ],
-  "veto_threshold": 0.5,
   "candidate_grid": {
     "actions": [
       {
@@ -229,5 +228,7 @@
     "order": 1,
     "adapt_passes": 0,
     "eta_target": 0.0
-  }
+  },
+  "veto_threshold": 0.5,
+  "gate_threshold": 0.05
 }

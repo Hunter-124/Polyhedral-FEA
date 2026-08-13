@@ -29,6 +29,7 @@
     "mesher_logit_hybrid_zoo"
   ],
   "veto_threshold": 0.5,
+  "gate_threshold": 0.05,
   "candidate_grid": {
     "actions": [
       {

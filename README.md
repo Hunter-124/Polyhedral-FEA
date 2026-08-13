@@ -159,8 +159,8 @@ with tolerances near 0.02.
 
 | Chooser | `rel_err` regret @ q0.5 | ±fold | ±seed | Picked an action that failed |
 |---|---:|---:|---:|---:|
-| `advisor_gated` — best threshold (0.2) | **0.3233** | 0.244 | 0.071 | 31.3 % |
-| **`advisor_gated` — as shipped (0.5)** | **0.3350** | 0.242 | 0.086 | 31.2 % |
+| **`advisor_gated` — as shipped (0.05)** | **0.3338** | 0.238 | 0.077 | **27.5 %** |
+| `advisor_gated` — best regret (0.2) | 0.3233 | 0.244 | 0.071 | 31.3 % |
 | `spend_budget` — *hindsight, not deployable* | 0.3358 | 0.190 | 0 | 0.0 % |
 | `advisor_argmin` (ranking only) | 0.3400 | 0.238 | 0.090 | 36.4 % |
 | Shipped default action | 0.3796 | 0.223 | 0 | 19.0 % |
@@ -169,12 +169,14 @@ with tolerances near 0.02.
 | "Just mesh finer" (`finest_action`) | 0.4409 | 0.294 | 0 | 23.8 % |
 
 **The advisor now beats `spend_budget`** — the baseline that previously beat
-everything — though as shipped it does so by 0.0008 decades, which is a tie in all
-but sign. The gate is threshold-insensitive: every variant from 0.05 to 0.8 lands
-in 0.3233–0.3350 and all of them beat `spend_budget` and the default. `clamps.json`
-currently sets no `gate_threshold`, so the C++ falls back to the veto's 0.5, which
-is the *weakest* member of that family; setting it explicitly to 0.2 buys 0.012
-decades for free and is a recorded action item.
+everything. The gate threshold is set explicitly to **0.05** in `clamps.json` and
+read strictly; the C++ **refuses to start** if the key is absent rather than
+inheriting the abstention veto's value, which is what it used to do. That fallback
+had been shipping the gate at 0.5, the weakest member of its own sweep, while
+looking deliberate. `0.2` is nominally the best on regret (0.3233) but the whole
+family spans only 0.3233–0.3350 — inside the ±0.24 fold spread — while
+pick-failure separates the thresholds by 3.8 points, so the operating point is
+chosen on avoiding doomed picks rather than on median accuracy inside the noise.
 
 `spend_budget` is **not a fair opponent** and is labelled as such: it ranks
 candidates by their *measured* DOF, so it can never select an action that turned
@@ -185,11 +187,10 @@ the constant config (p = 1.1e-03) and the default (p = 2.1e-03).
 
 Holding cost nearly constant, so only judgement separates the choosers, the
 advisor is **no longer the worst chooser**: in the 0.4–0.6 DOF band it scores
-0.2260 as shipped (0.2061 at the 0.05 threshold) against random 0.2576,
-constant-config 0.2637 and finest-action 0.2690 — though the shipped default at
-0.1724 still wins. So per-case judgement now *weakly* exists rather than not at
-all, and most of the advisor's value is spend allocation plus feasibility
-filtering.
+**0.2061** as shipped against random 0.2576, constant-config 0.2637 and
+finest-action 0.2690 — though the shipped default at 0.1724 still wins. So
+per-case judgement now *weakly* exists rather than not at all, and most of the
+advisor's value is spend allocation plus feasibility filtering.
 
 **An earlier claim is retired.** The feasibility gate was previously reported as
 strictly dominant over plain ranking (38W-0L, p = 7.3e-12). On the rebuilt corpus
@@ -200,8 +201,8 @@ the labels, not the model — independent references with roughly five times
 tighter tolerances made the ranking target learnable where it previously was not.
 **The model was never the bottleneck; the labels were.** The gate still ships, on
 its honest basis: best deployable chooser at q0.5, and it cuts the rate of
-recommending an action that then fails from 36.4 % to 27.5 % at its best threshold
-(31.2 % as shipped).
+recommending an action that then fails from 36.4 % to **27.5 %** at the shipped
+threshold.
 
 ![Advisor accuracy versus cost](docs/advisor/figures/accuracy_vs_cost.png)
 
@@ -210,7 +211,7 @@ recommending an action that then fails from 36.4 % to 27.5 % at its best thresho
 The deployed width-96, depth-2 model has **15,591 parameters**, **43 inputs and 7
 action outputs** — `p_elevate` was deleted as redundant (`order >= 2` is the same
 actuator) and the order vocabulary trimmed to the reachable `[1,2]`. It exports at
-ONNX opset 17 with **1.615e-06** relative C++ parity. A recommendation costs
+ONNX opset 17 with **2.158e-06** relative C++ parity. A recommendation costs
 **~1.0 ms** (p50, single-threaded, 20 candidates; p99 2.62 ms measured at 32),
 roughly **0.1 % of a solve**, and a test fails the build above 100 ms p99.
 

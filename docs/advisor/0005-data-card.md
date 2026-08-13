@@ -252,13 +252,39 @@ deployed chooser enumerates is one the model has actually seen.
 - Failure rate is **33.0 %** (621 `mesh_fail`, 102 `over_budget`, 72
   `solve_fail`, from 2,412 rows). A refusal to alias a feature away is the
   dominant mesh-failure cause and is concentrated at coarse rungs.
-- **Yield falls as `h_rel` coarsens**: 79 % usable at 0.08, 74 % at 0.09, 66 % at
-  0.12, **37 % at 0.16**. This *reverses* the sign of the trend reported on the
-  previous corpus, where yield appeared to improve toward coarser rungs. The
-  earlier reading was an artefact of the pre-fix engine, which accepted meshes
-  that had silently dropped small features instead of refusing them. The current
-  direction is the expected one: coarse meshes are cheaper per attempt but more
-  expensive per *usable* row.
+- Yield versus `h_rel` is covered in its own retraction below, because the
+  previously published direction was wrong.
+
+### Retracted: "yield improves as `h_rel` gets finer" — the sign was backwards
+
+An earlier version of this card reported, and highlighted as a **counterintuitive
+finding worth acting on**, that yield *improves* toward coarser meshes — quoted as
+52 % `mesh_fail` at `h_rel=0.20`, 33 % at 0.12 and 100 % ok at 0.09, with the
+conclusion that "fine rungs are cheaper per *usable* row than their per-row cost
+suggests". **That claim is withdrawn. The trend runs the other way.**
+
+Measured on the final corpus:
+
+| `h_rel` | rows | usable |
+|---|---:|---:|
+| 0.08 | 72 | 79 % |
+| 0.09 | 306 | 74 % |
+| 0.12 | 1,332 | 66 % |
+| 0.16 | 324 | **37 %** |
+
+**Why the old number was wrong, not merely stale.** The pre-fix engine *accepted*
+meshes that had silently dropped small features — the same defect class as the
+deleted bore in the peer comparison. A coarse mesh that should have failed instead
+returned a plausible-looking answer, so coarse rungs looked productive precisely
+*because* their failures were invisible. The corrected engine refuses to alias a
+feature away, those runs now surface as `mesh_fail`, and the coarsest rung drops to
+37 % usable.
+
+This matters beyond bookkeeping: the original reading would have argued for
+spending campaign budget on coarse rungs as "the cheap option". The corrected
+direction is the intuitive one — coarse meshes are cheaper per attempt and more
+expensive per usable row — and it is why the coarsest rung was dropped from the
+re-aimed grid rather than kept.
 
 ## Ethics and risk
 

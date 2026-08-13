@@ -65,6 +65,11 @@ MODEL_ONNX = ADVISOR_DIR / "model.onnx"
 LATEST_CHECKPOINT = ADVISOR_DIR / "runs" / "latest.pt"
 FIXTURE_DIR = ROOT / "tests" / "fixtures" / "advisor_tiny"
 
+#: Keys in ``clamps.json`` that the C++ reads *after* inference. They affect no
+#: tensor, so they may be retuned and re-exported without retraining; everything
+#: else in that file describes the graph contract and may not.
+DEPLOYMENT_CLAMP_KEYS = ("veto_threshold", "gate_threshold")
+
 OPSET = 17
 # Relative bound on |onnx_f32 - torch_f64| / max(1, |torch_f64|).
 #
@@ -292,8 +297,31 @@ def run_export(args: argparse.Namespace) -> int:
             f"python scripts/advisor/train.py --runs 1"
         )
     drift = normalization_drift(normalization, data.normalization)
-    if clamps != data.clamps:
-        drift.append("clamps.json payload differs from the checkpoint's")
+
+    # `clamps.json` mixes two kinds of key. Vocabularies, boxes, defaults and the
+    # candidate grid describe what the graph was trained to encode and decode, so
+    # a change there really does invalidate the checkpoint. The two thresholds do
+    # not: they are read by the C++ chooser *after* inference and touch neither
+    # the graph nor the encoding, so retuning them must not force a retrain.
+    # Conflating the two would mean a one-line operating-point change could only
+    # ship behind hours of training, which is how the gate ended up left at an
+    # unconsidered value in the first place.
+    graph_affecting = {k: v for k, v in clamps.items() if k not in DEPLOYMENT_CLAMP_KEYS}
+    current_graph_affecting = {
+        k: v for k, v in data.clamps.items() if k not in DEPLOYMENT_CLAMP_KEYS
+    }
+    if graph_affecting != current_graph_affecting:
+        drift.append("clamps.json graph-affecting payload differs from the checkpoint's")
+
+    # Ship the checkpoint's graph contract with the *current* operating point.
+    clamps = dict(graph_affecting)
+    for key in DEPLOYMENT_CLAMP_KEYS:
+        if key not in data.clamps:
+            raise SystemExit(
+                f"dataset.py did not emit '{key}'; the C++ requires it and refuses a "
+                f"clamps.json that omits it"
+            )
+        clamps[key] = data.clamps[key]
     if drift:
         detail = "\n".join(f"  {line}" for line in drift)
         raise SystemExit(

@@ -31,7 +31,7 @@ them is run.
 | Outputs | 7 regression heads, 1 feasibility logit, 1 policy vector of width **7** |
 | Trunk | `Linear → GELU → Linear → GELU`, width 96, 4-dim embeddings for `order_idx` and `mesher_idx` |
 | Parameters | **15,591** |
-| Export | ONNX opset 17, single-threaded CPU, deterministic; parity **1.615e-06** relative against a float64 PyTorch reference (tolerance 1e-05) |
+| Export | ONNX opset 17, single-threaded CPU, deterministic; parity **2.158e-06** relative against a float64 PyTorch reference (tolerance 1e-05) |
 | Runtime | ONNX Runtime via the C API, no Python at inference |
 
 `p_elevate` was **deleted** from the action space — it was redundant, not merely
@@ -93,8 +93,8 @@ lower is better.
 
 | chooser | q0.5 regret | ±fold | ±seed | pick-failure |
 |---|---:|---:|---:|---:|
-| `advisor_gated_0.2` | **0.3233** | 0.244 | 0.071 | 31.3 % |
-| `advisor_gated_0.05` | 0.3338 | 0.238 | 0.077 | **27.5 %** |
+| `advisor_gated_0.2` *(best regret)* | **0.3233** | 0.244 | 0.071 | 31.3 % |
+| `advisor_gated_0.05` **(shipped)** | 0.3338 | 0.238 | 0.077 | **27.5 %** |
 | `spend_budget` *(hindsight — not deployable)* | 0.3358 | 0.190 | 0 | 0.0 % |
 | `advisor_argmin` | 0.3400 | 0.238 | 0.090 | 36.4 % |
 | `default` | 0.3796 | 0.223 | 0 | 19.0 % |
@@ -110,24 +110,58 @@ hindsight-flavoured baseline that previously beat everything. `spend_budget` is
 action that failed, which shows up as an impossible 0.0 % pick-failure rate at
 every budget. `finest_action` is the honest form of the same idea.
 
-### Which threshold actually ships — and a discrepancy to fix
+### The gate threshold: chosen, not inherited
 
-`clamps.json` carries **no `gate_threshold` key**, so the C++ falls back to
-`veto_threshold = 0.5` (`src/advisor/src/advisor.cpp`). The shipped configuration
-is therefore **`advisor_gated_0.5`: q0.5 regret 0.3350, pick-failure 31.2 %** —
-not the 0.3233 of the best variant. It still beats `spend_budget` (0.3358), but by
-0.0008 decades, which is a tie in all but sign.
+**Shipped value: `gate_threshold = 0.05`**, set explicitly in `clamps.json` and
+read strictly by `Advisor::Impl::load_clamps`. The shipped chooser is therefore
+**`advisor_gated_0.05`: q0.5 regret 0.3338 (±0.238 fold, ±0.077 seed, 7 folds),
+pick-failure 27.5 %.**
 
-The gate is **threshold-insensitive**, which is why this is a small miss and not a
-broken claim: every variant from 0.05 to 0.8 lands inside 0.3233–0.3350 and all of
-them beat `spend_budget` and `default`. But the ordering is not flat either —
-`0.2` is the best on regret (0.3233) and `0.05` the best on pick-failure (27.5 %),
-while the un-set default is the *weakest* of the family on regret.
+**Why it needed choosing.** `clamps.json` previously carried no `gate_threshold`
+at all and the C++ fell back to `veto_threshold`, so the gate ran at 0.5 — the
+*weakest* member of its own measured sweep — while looking like a deliberate
+setting. The gate and the veto are different decisions: the gate filters
+candidates *before* ranking to improve a choice; the veto refuses the whole
+recommendation *after* the fact. Sharing one number was an accident, and a
+fallback that silently reuses one for the other is a value that looks considered
+and is not. **The C++ now rejects a `clamps.json` that omits the key** rather than
+defaulting, and a test asserts both the strict read and the rejection.
 
-**Action item:** set `gate_threshold` explicitly in `clamps.json`. Choosing `0.2`
-buys 0.012 decades and choosing `0.05` cuts pick-failure by 3.7 points, both for
-free, and neither requires retraining or an export. Until it is set, quote 0.3350
-as the shipped number.
+**Why 0.05 rather than 0.2.** Regret does not single out a threshold: across
+0.05–0.8 the whole gated family spans 0.3233–0.3350, so the *best* choice by
+regret (`0.2`, at 0.3233) is 0.012 decades ahead of the worst — inside the ±0.238
+fold spread, i.e. not a distinguishable difference. Pick-failure does separate
+them, and by more than the regret gap is worth:
+
+| threshold | q0.5 regret | pick-failure @ q0.5 | pick-failure, all levels |
+|---|---:|---:|---:|
+| **0.05 (shipped)** | 0.3338 | **27.5 %** | **30.6 %** |
+| 0.1 | 0.3249 | 29.0 % | 31.9 % |
+| 0.2 *(best regret)* | **0.3233** | 31.3 % | 33.3 % |
+| 0.5 *(the old accidental value)* | 0.3350 | 31.2 % | 33.3 % |
+| 0.8 | 0.3272 | 30.7 % | 33.1 % |
+| *ungated `advisor_argmin`* | 0.3400 | 36.4 % | 39.5 % |
+
+**Two different comparisons, both real, and they must not be confused.** Gating at
+all buys **8.9 points** of pick-failure against ungated ranking (36.4 % → 27.5 %),
+and that figure is basis-independent — it is 39.5 % → 30.6 %, the same 8.9 points,
+when averaged over all thirteen budget levels instead of q0.5 alone. Choosing
+*this* threshold rather than the regret-optimal one buys a further **3.8 points**
+(31.3 % → 27.5 %). Rates are quoted at the **q0.5 budget level** unless the column
+says otherwise; the all-levels mean is uniformly ~2–3 points higher for every
+chooser, because tight budgets leave fewer feasible actions to choose from.
+Trading 0.0105 decades of median regret for 3.8 points of pick-failure is the
+right direction for a user-facing default: **a rule that avoids doomed picks is
+worth more than a hair of median accuracy that sits inside the fold noise.** The
+failure head's calibration is mediocre (ECE 0.263), which argues the same way — if
+the probability is only roughly right, gate conservatively and let the ranking do
+the discriminating.
+
+Because the threshold is read after inference and touches no tensor, retuning it
+needs **no retrain**: `export_onnx.py` now separates the deployment keys
+(`veto_threshold`, `gate_threshold`) from the graph-affecting payload, so the
+operating point can move while the checkpoint's vocabularies, boxes, defaults and
+candidate grid stay pinned.
 
 Paired sign tests, pooled over folds and seeds, at q0.5:
 
@@ -158,7 +192,7 @@ The gate still ships, on its honest basis: the gated family occupies the whole t
 of the deployable ranking at q0.5 — every threshold from 0.05 to 0.8 beats
 `default`, `constant_config`, `finest_action` and `random` — and it cuts the rate
 of recommending an action that then fails from 36.4 % to 27.5 % at the best
-threshold, 31.2 % at the shipped one. It is no longer strictly dominant.
+threshold, which is now the shipped one. It is no longer strictly dominant.
 
 ## What the model has and has not learned
 
@@ -169,8 +203,8 @@ choosers). These bands are over **6 scorable folds**, one fewer than q0.5:
 |---|---:|---:|
 | `spend_budget` *(hindsight)* | 0.1673 | 0.1694 |
 | `default` | **0.1724** | **0.2098** |
-| `advisor_gated_0.05` | 0.2061 | 0.2714 |
-| `advisor_gated_0.5` *(shipped)* | 0.2260 | 0.2661 |
+| `advisor_gated_0.05` *(shipped)* | **0.2061** | 0.2714 |
+| `advisor_gated_0.5` *(the old accidental value)* | 0.2260 | 0.2661 |
 | `advisor_argmin` | 0.2425 | 0.3191 |
 | `random` | 0.2576 | 0.3531 |
 | `constant_config` | 0.2637 | 0.3706 |
@@ -178,9 +212,10 @@ choosers). These bands are over **6 scorable folds**, one fewer than q0.5:
 | `advisor_policy` | 0.2927 | 0.3095 |
 
 The advisor is **no longer the worst chooser at matched cost** — previously it
-ranked below random in both bands. In the 0.4–0.6 band the shipped gate at 0.2260
-beats `random` (0.2576), `constant_config` (0.2637) and `finest_action` (0.2690),
-and the 0.05 variant does better still at 0.2061. The shipped `default` at 0.1724
+ranked below random in both bands. In the 0.4–0.6 band the shipped gate at 0.2061
+beats `random` (0.2576), `constant_config` (0.2637) and `finest_action` (0.2690);
+the accidental 0.5 value managed only 0.2260, so setting the threshold explicitly
+improved this band too. The shipped `default` at 0.1724
 wins both bands. So **most of the advisor's value is spend allocation and
 feasibility filtering, and per-case judgement now weakly exists rather than being
 absent.**

@@ -74,6 +74,67 @@ TEST_CASE("advisor rejects an unusable model directory", "[advisor]") {
                     polymesh::advisor::AdvisorError);
 }
 
+TEST_CASE("advisor reads gate_threshold from clamps.json and rejects its absence",
+          "[advisor]") {
+    if (!fixture_present()) {
+        SKIP("advisor_tiny fixture missing (python scripts/advisor/export_onnx.py "
+             "--tiny-fixture)");
+    }
+
+    // The feasibility gate and the OOD/abstention veto are different decisions
+    // with different correct values. The gate used to inherit the veto's number
+    // whenever the key was absent, which shipped the gate at 0.5 -- the weakest
+    // member of its own measured sweep -- while looking like a deliberate
+    // choice. An absent key is a misconfiguration, so it must fail loudly.
+    const json clamps = load(kFixtureDir / "clamps.json");
+    REQUIRE(clamps.contains("gate_threshold"));
+    REQUIRE(clamps.contains("veto_threshold"));
+
+    // Distinct values, so a fallback cannot masquerade as a correct read: if the
+    // product ever silently reused the veto again, the value below would move.
+    const double gate = clamps.at("gate_threshold").get<double>();
+    const double veto = clamps.at("veto_threshold").get<double>();
+    CHECK(gate != veto);
+    CHECK(gate > 0.0);
+    CHECK(gate < 1.0);
+
+    // Loads with the key present.
+    CHECK_NOTHROW(polymesh::advisor::Advisor(kFixtureDir));
+
+    // Now stage a copy of the fixture with the key removed, and require that the
+    // constructor refuses it rather than defaulting.
+    const std::filesystem::path staged =
+        std::filesystem::temp_directory_path() / "polymesh_advisor_gate_missing";
+    std::filesystem::remove_all(staged);
+    std::filesystem::create_directories(staged);
+    for (const auto& entry : std::filesystem::directory_iterator(kFixtureDir)) {
+        std::filesystem::copy_file(entry.path(), staged / entry.path().filename(),
+                                   std::filesystem::copy_options::overwrite_existing);
+    }
+    json stripped = clamps;
+    stripped.erase("gate_threshold");
+    REQUIRE_FALSE(stripped.contains("gate_threshold"));
+    REQUIRE(stripped.contains("veto_threshold")); // the tempting fallback is still there
+    {
+        std::ofstream out(staged / "clamps.json");
+        REQUIRE(out.good());
+        out << stripped.dump(2) << "\n";
+    }
+    CHECK_THROWS_AS(polymesh::advisor::Advisor(staged), polymesh::advisor::AdvisorError);
+
+    // A non-probability is equally a misconfiguration.
+    json out_of_range = clamps;
+    out_of_range["gate_threshold"] = 1.5;
+    {
+        std::ofstream out(staged / "clamps.json");
+        REQUIRE(out.good());
+        out << out_of_range.dump(2) << "\n";
+    }
+    CHECK_THROWS_AS(polymesh::advisor::Advisor(staged), polymesh::advisor::AdvisorError);
+
+    std::filesystem::remove_all(staged);
+}
+
 TEST_CASE("advisor head outputs match PyTorch within the exported tolerance", "[advisor]") {
     if (!fixture_present()) {
         SKIP("advisor_tiny fixture missing (python scripts/advisor/export_onnx.py "
@@ -141,7 +202,11 @@ TEST_CASE("advisor guardrails: gated enumeration stays in the box and honours th
     const double eta_ceil = clamps.at("eta_target")[1].get<double>();
     const int passes_ceil = clamps.at("adapt_passes")[1].get<int>();
     const double veto_threshold = clamps.value("veto_threshold", 0.5);
-    const double gate_threshold = clamps.value("gate_threshold", veto_threshold);
+    // Read strictly, exactly as Advisor does. Mirroring the old
+    // `value("gate_threshold", veto_threshold)` fallback here would let the test
+    // keep passing against a clamps.json the product now rejects.
+    REQUIRE(clamps.contains("gate_threshold"));
+    const double gate_threshold = clamps.at("gate_threshold").get<double>();
     const auto order_choices = clamps.at("order_choices").get<std::vector<int>>();
     const auto mesher_choices = clamps.at("mesher_choices").get<std::vector<std::string>>();
 

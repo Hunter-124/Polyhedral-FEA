@@ -60,28 +60,46 @@ struct SolveOptions {
     /// switches to CG where the factor genuinely stops fitting.
     Eigen::Index cg_threshold = 50000;
 
-    /// CG relative residual tolerance: stop when ‖r‖ / ‖b‖ ≤ cg_tol.
+    /// CG true relative residual tolerance: return only when
+    /// ‖b-K*x‖ / ‖b‖ ≤ cg_tol. If the recursive residual has fallen 100× since
+    /// the last reliable measurement, a drifted recurrence restarts from
+    /// b-K*x. At most four reliable replacements are allowed per attempt; the
+    /// reduction and count bounds prevent futile restart cycles at an
+    /// unattainable-accuracy floor.
     /// 1e-8 is ~5 digits below any discretisation error these meshes carry;
     /// chasing 1e-10 only bought iterations.
     double cg_tol = 1e-8;
 
-    /// CG iteration cap. 0 means clamp(2 * nfree, 1000, 20000): always bounded,
-    /// so a pathological system fails in bounded time instead of grinding.
+    /// Maximum independently recomputed true relative residual that may be
+    /// returned when no preconditioner reaches `cg_tol`. This is an explicit
+    /// degraded-acceptance contract, not the iteration target: CG still pursues
+    /// `cg_tol` through every available preconditioner. The solver emits a loud
+    /// note with achieved residual and provenance when this threshold is used.
+    /// Callers may tighten it; Testlab independently remeasures its health gate.
+    double cg_accept_tol = 1e-6;
+
+    /// CG iteration cap per preconditioner attempt. 0 means
+    /// clamp(2 * nfree, 1000, 30000): always bounded, so a pathological system
+    /// fails in bounded time instead of grinding.
     int cg_max_iters = 0;
 
     /// When `on_progress` is set, CG invokes the callback every this many
-    /// iterations (and at completion). 0 = completion callback only. The
-    /// recurrence is never restarted, so this only affects reporting rate.
-    /// Four iterations keeps cooperative GUI cancellation comfortably below a
-    /// second even on large systems; keep the callback cheap.
+    /// iterations, at a reliable-residual restart, and at completion.
+    /// 0 = restart/completion callbacks only. Reporting never restarts the
+    /// recurrence; only detected recursive-residual drift does. Four iterations
+    /// keeps cooperative GUI cancellation comfortably below a second even on
+    /// large systems; keep the callback cheap.
     int cg_progress_chunk = 4;
 
     /// Optional progress callback (CG path only). Empty = no callbacks.
-    /// Args: (iter, max_iters, relative residual).
+    /// Args: (iteration within the current preconditioner attempt, per-attempt
+    /// max iterations, relative residual). The completion value is the
+    /// independently recomputed true residual.
     std::function<void(int, int, double)> on_progress;
 
-    /// Optional method-selection note (for example an LDLT→CG memory
-    /// downgrade). The callback runs during preflight, before assembly.
+    /// Optional solve note: method-selection decisions plus CG preconditioner
+    /// attempts, failures, and final true-residual provenance. Preflight notes
+    /// run before assembly; CG notes run during/after the iterative solve.
     std::function<void(std::string_view)> on_note;
 };
 

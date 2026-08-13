@@ -10,6 +10,8 @@
 #include <cmath>
 #include <format>
 #include <limits>
+#include <string>
+#include <utility>
 #include <vector>
 
 namespace polymesh::fea {
@@ -52,7 +54,7 @@ namespace {
 /// Iteration cap `kAuto` applies when the caller leaves `cg_max_iters` at 0.
 /// Even at ~10 ms per iteration this bounds a hopeless solve to minutes rather
 /// than letting `2 * nfree` grind for hours on a system that will not converge.
-constexpr int kCgAutoIterCap = 20000;
+constexpr int kCgAutoIterCap = 30000;
 
 int cg_iteration_budget(Eigen::Index nfree, const SolveOptions& options) {
     if (options.cg_max_iters > 0) {
@@ -62,64 +64,161 @@ int cg_iteration_budget(Eigen::Index nfree, const SolveOptions& options) {
         std::clamp<Eigen::Index>(2 * nfree, Eigen::Index{1000}, Eigen::Index{kCgAutoIterCap}));
 }
 
-/// Preconditioned conjugate gradient that reports progress from inside the
-/// recurrence.
-///
-/// Hand-rolled instead of `Eigen::ConjugateGradient` because progress used to
-/// be produced by restarting Eigen's solver every `cg_progress_chunk`
-/// iterations through `solveWithGuess`. A restart discards the Krylov space, so
-/// the callback-driven path converged far slower than the plain one — the GUI
-/// and the CLI were effectively running different solvers. Reporting from one
-/// uninterrupted recurrence removes that split. `iters` and `rel_error` report
-/// what actually happened; the caller decides whether that counts as success.
+/// Why a PCG attempt stopped.
+enum class CgStop {
+    kConverged,
+    kIterationLimit,
+    kAttainableAccuracy,
+    kBreakdown,
+};
+
+struct CgAttempt {
+    Eigen::VectorXd x;
+    int iterations = 0;
+    int reliable_restarts = 0;
+    double true_relative_residual = std::numeric_limits<double>::infinity();
+    CgStop stop = CgStop::kBreakdown;
+};
+
+std::string_view cg_stop_text(CgStop stop) {
+    switch (stop) {
+    case CgStop::kConverged:
+        return "converged";
+    case CgStop::kIterationLimit:
+        return "iteration limit";
+    case CgStop::kAttainableAccuracy:
+        return "attainable-accuracy limit";
+    case CgStop::kBreakdown:
+        return "breakdown";
+    }
+    return "unknown";
+}
+
+std::string join_attempts(const std::vector<std::string>& attempts) {
+    std::string joined;
+    for (const auto& attempt : attempts) {
+        if (!joined.empty()) {
+            joined += "; ";
+        }
+        joined += attempt;
+    }
+    return joined;
+}
+
+/// Preconditioned conjugate gradient that reports progress from inside one
+/// uninterrupted recurrence. Before accepting recursive convergence it
+/// recomputes b-A*x. If round-off has let the recurrence drift, that true
+/// residual restarts the recurrence instead of returning a false success.
 template <typename Precond>
-Eigen::VectorXd run_cg(const Eigen::SparseMatrix<double>& a, const Eigen::VectorXd& rhs,
-                       const Precond& precond, double tol, int max_iters, int report_every,
-                       const std::function<void(int, int, double)>& on_progress, int& iters,
-                       double& rel_error) {
-    Eigen::VectorXd x = Eigen::VectorXd::Zero(rhs.size());
-    iters = 0;
+CgAttempt run_cg(const Eigen::SparseMatrix<double>& a, const Eigen::VectorXd& rhs,
+                 const Precond& precond, double tol, int max_iters, int report_every,
+                 const std::function<void(int, int, double)>& on_progress) {
+    CgAttempt result;
+    result.x = Eigen::VectorXd::Zero(rhs.size());
     const double rhs_norm2 = rhs.squaredNorm();
     if (!(rhs_norm2 > 0.0)) {
-        rel_error = 0.0;
-        return x;
+        result.true_relative_residual = 0.0;
+        result.stop = CgStop::kConverged;
+        return result;
     }
     const double threshold = tol * tol * rhs_norm2;
+    // A reliable replacement is useful after the recursive residual has fallen
+    // substantially from the last independently measured residual. Limiting
+    // replacement frequency prevents a requested tolerance below attainable
+    // accuracy from repeatedly discarding the Krylov space, while allowing a
+    // long ill-conditioned solve several updates to repair accumulated drift.
+    constexpr double kReliableUpdateDelta = 1e-2;
+    constexpr int kMaxReliableRestarts = 4;
 
-    Eigen::VectorXd r = rhs; // b − A·x0 with x0 = 0
+    Eigen::VectorXd r = rhs; // b-A*x0 with x0=0
     Eigen::VectorXd z = precond.solve(r);
     Eigen::VectorXd p = z;
     Eigen::VectorXd ap(rhs.size());
     double r_norm2 = rhs_norm2;
+    double last_reliable_norm2 = rhs_norm2;
     double rz = r.dot(z);
+    bool breakdown = !(rz > 0.0);
+    bool attainable_accuracy = false;
 
-    while (iters < max_iters && r_norm2 > threshold) {
+    while (!breakdown && result.iterations < max_iters && r_norm2 > threshold) {
         ap.noalias() = a * p;
         const double pap = p.dot(ap);
         if (!(pap > 0.0)) {
-            break; // breakdown: K_ff is not positive definite along p
-        }
-        const double alpha = rz / pap;
-        x += alpha * p;
-        r -= alpha * ap;
-        r_norm2 = r.squaredNorm();
-        ++iters;
-        if (r_norm2 <= threshold) {
+            breakdown = true; // K_ff is not positive definite along p
             break;
         }
+        const double alpha = rz / pap;
+        result.x += alpha * p;
+        r -= alpha * ap;
+        r_norm2 = r.squaredNorm();
+        ++result.iterations;
+
+        if (r_norm2 <= threshold) {
+            // Recursive residuals lose their connection to b-A*x on long,
+            // ill-conditioned solves. Never report success without measuring
+            // the same residual that callers and campaign health gates see.
+            const double recursive_norm2 = r_norm2;
+            r = rhs;
+            r.noalias() -= a * result.x;
+            r_norm2 = r.squaredNorm();
+            if (r_norm2 <= threshold) {
+                break;
+            }
+
+            const double update_bound2 =
+                kReliableUpdateDelta * kReliableUpdateDelta * last_reliable_norm2;
+            if (recursive_norm2 > update_bound2 ||
+                result.reliable_restarts >= kMaxReliableRestarts) {
+                // The recurrence has not earned another replacement, or the
+                // bounded reliable-update allowance is exhausted. At this
+                // precision another restart would cycle at the same floor.
+                attainable_accuracy = true;
+                break;
+            }
+
+            last_reliable_norm2 = r_norm2;
+            ++result.reliable_restarts;
+            z = precond.solve(r);
+            rz = r.dot(z);
+            if (!(rz > 0.0)) {
+                breakdown = true;
+                break;
+            }
+            p = z;
+            if (on_progress) {
+                on_progress(result.iterations, max_iters, std::sqrt(r_norm2 / rhs_norm2));
+            }
+            continue;
+        }
+
         z = precond.solve(r);
         const double rz_next = r.dot(z);
         if (!(rz_next > 0.0)) {
-            break; // preconditioner lost positive definiteness
+            breakdown = true; // preconditioner lost positive definiteness
+            break;
         }
         p = (rz_next / rz) * p + z;
         rz = rz_next;
-        if (on_progress && report_every > 0 && iters % report_every == 0) {
-            on_progress(iters, max_iters, std::sqrt(r_norm2 / rhs_norm2));
+        if (on_progress && report_every > 0 && result.iterations % report_every == 0) {
+            on_progress(result.iterations, max_iters, std::sqrt(r_norm2 / rhs_norm2));
         }
     }
-    rel_error = std::sqrt(r_norm2 / rhs_norm2);
-    return x;
+
+    // The error/result contract is always based on the independently
+    // recomputed residual, including iteration-limit and breakdown exits.
+    r = rhs;
+    r.noalias() -= a * result.x;
+    result.true_relative_residual = std::sqrt(r.squaredNorm() / rhs_norm2);
+    if (result.true_relative_residual <= tol) {
+        result.stop = CgStop::kConverged;
+    } else if (attainable_accuracy) {
+        result.stop = CgStop::kAttainableAccuracy;
+    } else if (!breakdown && result.iterations >= max_iters) {
+        result.stop = CgStop::kIterationLimit;
+    } else {
+        result.stop = CgStop::kBreakdown;
+    }
+    return result;
 }
 
 Eigen::VectorXd solve_reduced(const Eigen::SparseMatrix<double>& kff,
@@ -130,37 +229,123 @@ Eigen::VectorXd solve_reduced(const Eigen::SparseMatrix<double>& kff,
     if (method == SolveMethod::kCG) {
         const int max_iters = cg_iteration_budget(nfree, options);
         const int report_every = std::max(options.cg_progress_chunk, 0);
-        int iters = 0;
-        double rel_error = std::numeric_limits<double>::infinity();
-        Eigen::VectorXd uf;
+        constexpr double kIcRetryInitialShift = 0.5;
 
-        // K_ff is SPD, so the preconditioner must be too: an incomplete
-        // *Cholesky* keeps the preconditioned operator symmetric, which is what
-        // CG's convergence argument rests on. The previous IncompleteLUT is not
-        // symmetric on a general SPD matrix, which is a large part of why CG
-        // used to crawl here. Eigen's IncompleteCholesky auto-shifts until the
-        // factorisation succeeds; fall back to Jacobi if even that fails.
+        auto emit_note = [&](std::string note) {
+            if (options.on_note) {
+                options.on_note(note);
+            }
+        };
+        auto attempt_summary = [](std::string_view preconditioner, const CgAttempt& attempt) {
+            return std::format("{}: {}, {} iterations, true relative residual={}, "
+                               "reliable restarts={}",
+                               preconditioner, cg_stop_text(attempt.stop), attempt.iterations,
+                               attempt.true_relative_residual, attempt.reliable_restarts);
+        };
+
+        std::vector<std::string> attempts;
+        attempts.reserve(3);
+        CgAttempt selected_attempt;
+        std::string selected_preconditioner;
+        int total_iterations = 0;
+        bool have_attempt = false;
+        bool target_met = false;
+
+        auto run_attempt = [&](std::string_view name, const auto& preconditioner) {
+            emit_note(std::format("CG using {} (target tol={}, acceptance tol={}, "
+                                  "max iterations={})",
+                                  name, options.cg_tol, options.cg_accept_tol, max_iters));
+            CgAttempt attempt =
+                run_cg(kff, rhs, preconditioner, options.cg_tol, max_iters, report_every,
+                       options.on_progress);
+            total_iterations += attempt.iterations;
+            attempts.push_back(attempt_summary(name, attempt));
+            const bool converged = attempt.stop == CgStop::kConverged;
+            if (!have_attempt || converged ||
+                attempt.true_relative_residual < selected_attempt.true_relative_residual) {
+                selected_attempt = std::move(attempt);
+                selected_preconditioner = name;
+                have_attempt = true;
+            }
+            target_met = converged;
+        };
+        // Eigen's modified incomplete Cholesky is the primary preconditioner.
+        // Its default initial shift (1e-3) makes ten attempts ending near
+        // 0.256 on the scaled matrix. Continue at the next shift scale before
+        // giving up on IC and falling back to Jacobi.
         Eigen::IncompleteCholesky<double> ichol;
         ichol.compute(kff);
         if (ichol.info() == Eigen::Success) {
-            uf = run_cg(kff, rhs, ichol, options.cg_tol, max_iters, report_every,
-                        options.on_progress, iters, rel_error);
+            const std::string name =
+                std::format("incomplete Cholesky (shift={})", ichol.shift());
+            run_attempt(name, ichol);
+        } else {
+            attempts.push_back(std::format(
+                "incomplete Cholesky: factorization failed after shift {}", ichol.shift()));
+            emit_note(std::format(
+                "CG incomplete Cholesky factorization failed after shift {}; "
+                "retrying with initial shift {}",
+                ichol.shift(), kIcRetryInitialShift));
+
+            ichol.setInitialShift(kIcRetryInitialShift);
+            ichol.factorize(kff); // reuse the already-computed AMD ordering
+            if (ichol.info() == Eigen::Success) {
+                const std::string name = std::format(
+                    "shifted incomplete Cholesky (initial shift={}, final shift={})",
+                    kIcRetryInitialShift, ichol.shift());
+                run_attempt(name, ichol);
+            } else {
+                attempts.push_back(std::format(
+                    "shifted incomplete Cholesky: factorization failed after shift {}",
+                    ichol.shift()));
+                emit_note(std::format(
+                    "CG shifted incomplete Cholesky factorization failed after shift {}; "
+                    "using Jacobi",
+                    ichol.shift()));
+            }
         }
-        if (rel_error > options.cg_tol) {
+
+        if (!target_met) {
+            if (!attempts.empty() && ichol.info() == Eigen::Success) {
+                emit_note("CG incomplete Cholesky target not met; using Jacobi");
+            }
             const Eigen::DiagonalPreconditioner<double> jacobi(kff);
-            uf = run_cg(kff, rhs, jacobi, options.cg_tol, max_iters, report_every,
-                        options.on_progress, iters, rel_error);
+            run_attempt("Jacobi", jacobi);
         }
-        if (rel_error > options.cg_tol) {
-            throw FeaError(
-                std::format("solve_elastostatics: CG failed to converge after {} iterations "
-                            "(tol={}, relative residual={})",
-                            iters, options.cg_tol, rel_error));
+
+        const std::string provenance = join_attempts(attempts);
+        if (!target_met &&
+            (!have_attempt ||
+             selected_attempt.true_relative_residual > options.cg_accept_tol)) {
+            throw FeaError(std::format(
+                "solve_elastostatics: CG failed (target tol={}, acceptance tol={}, "
+                "max iterations per attempt={}, total iterations={}, best preconditioner={}, "
+                "best true relative residual={}, preconditioner attempts=[{}])",
+                options.cg_tol, options.cg_accept_tol, max_iters, total_iterations,
+                selected_preconditioner, selected_attempt.true_relative_residual, provenance));
         }
         if (options.on_progress) {
-            options.on_progress(iters, max_iters, rel_error);
+            options.on_progress(selected_attempt.iterations, max_iters,
+                                selected_attempt.true_relative_residual);
         }
-        return uf;
+        if (target_met) {
+            emit_note(std::format(
+                "CG converged with {} after {} iterations ({} total; "
+                "true relative residual={}; reliable restarts={}); attempts=[{}]",
+                selected_preconditioner, selected_attempt.iterations, total_iterations,
+                selected_attempt.true_relative_residual,
+                selected_attempt.reliable_restarts, provenance));
+        } else {
+            emit_note(std::format(
+                "CG TARGET NOT MET: accepted {} after {} iterations ({} total; "
+                "target tol={}; acceptance tol={}; achieved true relative residual={}; "
+                "reliable restarts={}); attempts=[{}]",
+                selected_preconditioner, selected_attempt.iterations, total_iterations,
+                options.cg_tol, options.cg_accept_tol,
+                selected_attempt.true_relative_residual,
+                selected_attempt.reliable_restarts, provenance));
+        }
+        return std::move(selected_attempt.x);
     }
 
     Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> ldlt(kff);
@@ -188,6 +373,9 @@ Eigen::VectorXd solve_elastostatics(
     }
     if (!std::isfinite(options.cg_tol) || options.cg_tol <= 0.0) {
         throw FeaError("solve_elastostatics: cg_tol must be finite and positive");
+    }
+    if (!std::isfinite(options.cg_accept_tol) || options.cg_accept_tol <= 0.0) {
+        throw FeaError("solve_elastostatics: cg_accept_tol must be finite and positive");
     }
     if (!loads.allFinite()) {
         throw FeaError("solve_elastostatics: load vector contains a non-finite value");

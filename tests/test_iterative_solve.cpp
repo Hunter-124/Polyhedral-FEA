@@ -11,6 +11,7 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <string>
 
 using namespace polymesh::fea;
 using namespace polymesh::test_support;
@@ -95,9 +96,94 @@ TEST_CASE("CG honours its iteration cap instead of grinding") {
     SolveOptions opt;
     opt.method = SolveMethod::kCG;
     opt.cg_tol = 1e-14;
+    opt.cg_accept_tol = 1e-14;
     opt.cg_max_iters = 2;
-    CHECK_THROWS_AS(solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, opt),
-                    polymesh::fea::FeaError);
+    try {
+        static_cast<void>(
+            solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, opt));
+        FAIL("two CG iterations unexpectedly converged");
+    } catch (const polymesh::fea::FeaError& e) {
+        const std::string message = e.what();
+        CHECK(message.find("preconditioner attempts=[") != std::string::npos);
+        CHECK(message.find("incomplete Cholesky") != std::string::npos);
+        CHECK(message.find("Jacobi") != std::string::npos);
+    }
+}
+
+TEST_CASE("unattainable CG tolerance does not cycle reliable restarts") {
+    // This is the same case that exposed the old false success. With tol=1e-12,
+    // recursive residuals used to claim convergence while b-K*x remained
+    // 2e-11 to 6e-11. The first reliable-residual implementation corrected the
+    // result but restarted 29 times under IC and 8 under Jacobi. A reduction-
+    // bound policy must report the unattainable tolerance without that cycle.
+    auto setup = make_cantilever_hex(12, 2, 2);
+    SolveOptions options;
+    options.method = SolveMethod::kCG;
+    options.cg_tol = 1e-12;
+    options.cg_accept_tol = 1e-13;
+    options.cg_max_iters = 1000;
+
+    try {
+        static_cast<void>(
+            solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, options));
+        FAIL("an independently unattainable tolerance unexpectedly converged");
+    } catch (const polymesh::fea::FeaError& e) {
+        const std::string message = e.what();
+        const std::string marker = "reliable restarts=";
+        std::size_t cursor = 0;
+        int attempts = 0;
+        while ((cursor = message.find(marker, cursor)) != std::string::npos) {
+            cursor += marker.size();
+            const int count = std::stoi(message.substr(cursor));
+            CHECK(count >= 1);
+            CHECK(count <= 4);
+            ++attempts;
+        }
+        CHECK(attempts == 2);
+        CHECK(message.find("attainable-accuracy limit") != std::string::npos);
+    }
+}
+
+TEST_CASE("CG may accept a measured residual without claiming target convergence") {
+    // The target remains 1e-14, but this system's independently recomputed
+    // residual floors above it. A result below the explicit acceptance
+    // threshold is returned with loud provenance rather than being mislabeled
+    // as target convergence.
+    auto setup = make_cantilever_hex(12, 2, 2);
+    SolveOptions options;
+    options.method = SolveMethod::kCG;
+    options.cg_tol = 1e-14;
+    options.cg_accept_tol = 1e-8;
+    options.cg_max_iters = 1000;
+
+    std::string notes;
+    options.on_note = [&](std::string_view note) {
+        if (!notes.empty()) {
+            notes += '\n';
+        }
+        notes += note;
+    };
+    const Eigen::VectorXd u =
+        solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, options);
+    const Eigen::SparseMatrix<double> k = assemble_stiffness(setup.mesh, kSteel);
+    const Eigen::VectorXd full_residual = setup.loads - k * u;
+
+    double free_residual2 = 0.0;
+    double free_load2 = 0.0;
+    for (Eigen::Index dof = 0; dof < full_residual.size(); ++dof) {
+        if (!setup.bc.dof_values.contains(dof)) {
+            free_residual2 += full_residual[dof] * full_residual[dof];
+            free_load2 += setup.loads[dof] * setup.loads[dof];
+        }
+    }
+    const double independently_measured =
+        std::sqrt(free_residual2 / std::max(free_load2, 1e-30));
+
+    CHECK(independently_measured > options.cg_tol);
+    CHECK(independently_measured <= options.cg_accept_tol);
+    CHECK(notes.find("CG TARGET NOT MET: accepted ") != std::string::npos);
+    CHECK(notes.find("achieved true relative residual=") != std::string::npos);
+    CHECK(notes.find("attempts=[") != std::string::npos);
 }
 
 TEST_CASE("solve rejects invalid CG tolerances and non-finite inputs") {
@@ -114,6 +200,15 @@ TEST_CASE("solve rejects invalid CG tolerances and non-finite inputs") {
     }
 
     options.cg_tol = 1e-8;
+    for (const double invalid : {0.0, -1.0, std::numeric_limits<double>::infinity(),
+                                 std::numeric_limits<double>::quiet_NaN()}) {
+        options.cg_accept_tol = invalid;
+        CHECK_THROWS_AS(
+            solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, options),
+            polymesh::fea::FeaError);
+    }
+
+    options.cg_accept_tol = 1e-6;
     CHECK_NOTHROW(solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, options));
 
     Eigen::VectorXd invalid_loads = setup.loads;
@@ -136,7 +231,11 @@ TEST_CASE("forced CG matches direct LDLT on small cantilever") {
     opt_direct.method = SolveMethod::kDirect;
     SolveOptions opt_cg;
     opt_cg.method = SolveMethod::kCG;
-    opt_cg.cg_tol = 1e-12;
+    // 1e-12 was a false-success contract: the old recursive residual crossed it
+    // while independently measured b-K*x remained 2e-11 to 6e-11 at this
+    // 1000-iteration budget. 1e-10 is attainable and still two orders tighter
+    // than the displacement-agreement contract below.
+    opt_cg.cg_tol = 1e-10;
     const auto u_direct =
         solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, opt_direct);
     const auto u_cg = solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, opt_cg);
@@ -151,11 +250,11 @@ TEST_CASE("forced CG matches direct LDLT on small cantilever") {
     CHECK(rel_l2 < 1e-8);
 }
 
-TEST_CASE("CG progress reporting does not restart the recurrence") {
+TEST_CASE("CG progress reporting does not introduce recurrence restarts") {
     auto setup = make_cantilever_hex(12, 2, 2);
     SolveOptions plain;
     plain.method = SolveMethod::kCG;
-    plain.cg_tol = 1e-12;
+    plain.cg_tol = 1e-10;
     const auto u_plain = solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, plain);
 
     SolveOptions reported = plain;
@@ -174,9 +273,71 @@ TEST_CASE("CG progress reporting does not restart the recurrence") {
 
     CHECK(callback_count > 1);
     CHECK(last_iter > 0);
-    // Reporting is an observer of one uninterrupted recurrence. It must not
-    // alter arithmetic or discard the Krylov space as the old chunked path did.
+    // Reporting is only an observer. It must not alter arithmetic, reliable
+    // residual decisions, or the Krylov space as the old chunked path did.
     CHECK(u_reported == u_plain);
+}
+
+TEST_CASE("CG success uses a true residual and reports preconditioner provenance") {
+    auto setup = make_cantilever_hex(12, 2, 2);
+    SolveOptions options;
+    options.method = SolveMethod::kCG;
+    options.cg_tol = 1e-10;
+
+    double reported_final_residual = std::numeric_limits<double>::infinity();
+    std::string notes;
+    options.on_progress = [&](int, int, double residual) {
+        reported_final_residual = residual;
+    };
+    options.on_note = [&](std::string_view note) {
+        if (!notes.empty()) {
+            notes += '\n';
+        }
+        notes += note;
+    };
+
+    const Eigen::VectorXd u =
+        solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, options);
+    const Eigen::SparseMatrix<double> k = assemble_stiffness(setup.mesh, kSteel);
+    const Eigen::VectorXd full_residual = setup.loads - k * u;
+
+    double free_residual2 = 0.0;
+    double free_load2 = 0.0;
+    for (Eigen::Index dof = 0; dof < full_residual.size(); ++dof) {
+        if (!setup.bc.dof_values.contains(dof)) {
+            free_residual2 += full_residual[dof] * full_residual[dof];
+            free_load2 += setup.loads[dof] * setup.loads[dof];
+        }
+    }
+    const double independently_measured =
+        std::sqrt(free_residual2 / std::max(free_load2, 1e-30));
+
+    CHECK(reported_final_residual <= options.cg_tol);
+    CHECK(independently_measured <= options.cg_tol);
+    CHECK(notes.find("CG converged with ") != std::string::npos);
+    CHECK(notes.find("true relative residual=") != std::string::npos);
+    INFO(notes);
+    CHECK(notes.find("reliable restarts=0") != std::string::npos);
+    CHECK(notes.find("attempts=[") != std::string::npos);
+}
+
+TEST_CASE("CG acceptance threshold does not alter honest convergence") {
+    auto setup = make_cantilever_hex(12, 2, 2);
+    SolveOptions defaults;
+    defaults.method = SolveMethod::kCG;
+    defaults.cg_tol = 1e-10;
+
+    SolveOptions tightened = defaults;
+    tightened.cg_accept_tol = defaults.cg_tol;
+
+    const Eigen::VectorXd u_default =
+        solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, defaults);
+    const Eigen::VectorXd u_tightened =
+        solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, tightened);
+
+    // Both attempts meet the target. The fallback acceptance policy is
+    // unreachable and therefore cannot perturb the returned arithmetic.
+    CHECK(u_tightened == u_default);
 }
 
 TEST_CASE("forced CG reproduces constant-strain patch within solver tol") {

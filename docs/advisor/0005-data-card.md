@@ -4,11 +4,14 @@ Companions: [0004 — model card](0004-model-card.md),
 [0003 — training log](0003-training-log.md),
 [ADR-0027](../decisions/0027-learned-mesh-advisor.md).
 
-> **Status.** All 72 reference truths were replaced with an independent
-> Gmsh + CalculiX chain after the measurements below were taken, and the campaign
-> is being regenerated on a corrected engine with a re-aimed action grid. Row
-> counts and label distributions will change. What will not change is the
-> *structure* documented here, which is what the caveats are about.
+> **Status.** The regeneration has **landed**. The corpus is final for this cycle:
+> **2,412 rows, `dataset.csv` SHA-256 `3c0d6bd7a7d3…`**, generated on the
+> corrected engine with a re-aimed action grid. All reference truths were replaced
+> with an independent chain — **96 references: 88 external (Gmsh + CalculiX) and 8
+> closed-form** — with evidence-derived tolerances near 0.02, roughly five times
+> tighter than the promoted-overkill truths they replaced. Counts below are as of
+> that dataset hash; the *structural* caveats are hash-independent and are what
+> this card exists to record.
 
 ## Provenance
 
@@ -94,22 +97,119 @@ not about how close the answer landed: a coarse mesh that is 50 % off is a
 trustworthy measurement of a bad action, and it is exactly the signal the
 advisor must learn from. Masking on closeness would be selecting on the outcome.
 
+## `order` does not denote one discretisation — measured
+
+**`order` is not a clean knob, and it is not independent of `adapt_passes`.** The
+same nominal value denotes two different discretisations, selected by another
+input the model also sees, and nothing in the schema says so.
+
+Two code paths:
+
+- **`adapt_passes = 0`** — promotion is unconditional.
+  `apps/testlab/main.cpp:2391-2392` calls `fea::promote_to_quadratic` on the
+  whole mesh, so **every** promotable linear element becomes quadratic. The mesh
+  is uniformly quadratic.
+- **`adapt_passes > 0`** — promotion routes through `SolveJob`, where the p-set
+  comes from the adaptive driver and falls back to
+  `adapt::mark_smooth(zz.element_eta, 0.3)`
+  (`src/pipeline/src/scene.cpp:4408`). Only ZZ-smooth-marked elements are
+  promoted, so the mesh is **mixed-p** and the quadratic fraction varies per case
+  and per mesh because it depends on the error field. That path never consults
+  `cfg.order`.
+
+### How the corpus splits, and what it costs
+
+Measured on the final `bench/advisor/dataset.csv` — 2,412 rows, SHA-256
+`3c0d6bd7a7d3…`:
+
+| `order` | `adapt_passes` | rows | share |
+|---|---|---:|---:|
+| 1 | 0 | 306 | 12.7 % |
+| 1 | 1 | 1,080 | 44.8 % |
+| 1 | 2 | 288 | 11.9 % |
+| 2 | 0 | 306 | 12.7 % |
+| 2 | 1 | 432 | 17.9 % |
+
+Of the 738 `order = 2` rows, **306 (41.5 %) are uniformly quadratic** and
+**432 (58.5 %) are mixed-p**. The split is better balanced than on the previous
+corpus (where it was 9.1 % / 90.9 %), but the label still describes two different
+discretisations.
+
+Worse than ambiguity — matching `order = 1` against `order = 2` rows identical in
+every other column:
+
+| `adapt_passes` | matched pairs | identical `n_dof`, `n_nodes` **and** `rel_err` | median `n_dof` ratio (o2/o1) |
+|---|---:|---:|---:|
+| 0 | 290 | 6 / 290 | 5.52 |
+| 1 | 264 | **264 / 264** | 1.000 |
+
+**With `adapt_passes > 0`, `order` changes nothing measurable at all.** Those 264
+pairs have distinct `cfg_id`s and solve times differing by a median of 176 ms, so
+they are genuinely separate executions that produced bit-identical meshes and
+answers — not a deduplication artefact. The 5.52 ratio at `adapt_passes = 0` is
+the expected linear→quadratic growth, which is what the knob does when it is
+actually honoured.
+
+### Consequence for interpretation
+
+- **A coefficient, importance score or ablation delta attached to `order` is not
+  an estimate of element-order effect.** It is a weighted average over two
+  regimes: "no effect whatsoever" on the **74.6 %** of rows with
+  `adapt_passes > 0`, and a **5.5× DOF change** on the 25.4 % with
+  `adapt_passes = 0`. Any such number should be reported per `adapt_passes`
+  stratum or not at all.
+- The 432 `order = 2, adapt_passes = 1` rows — **17.9 % of the corpus** — actively
+  teach the model that order is inert, because for each there is an otherwise
+  identical `order = 1` row with the same outcome. This is not merely
+  uninformative; it dilutes the learned order effect toward zero.
+- It also costs compute: 2,520 s of mesh+solve went to the redundant half of
+  those pairs. Crossing `order` with `adapt_passes ≥ 1` in a campaign grid buys
+  duplicate rows, which is why the shipped `candidate_grid` collapses that dial
+  and enumerates 20 actions rather than 26.
+- The rows are still worth keeping. Same configuration, separate execution makes
+  them usable **measurement-noise replicates**, which the corpus otherwise has
+  none of — provided they are labelled honestly rather than read as an order
+  contrast.
+
+### Status: known, named, not silently tolerated
+
+The engine has deliberately **not** been changed to unify the two paths, because
+doing so now would invalidate the comparability of every row already generated.
+The CLI's `--p-elevate-uniform` covers the benchmark case that needed parity.
+Unifying them, or renaming the dial so the two regimes are distinguishable in the
+schema, is future work; see the model card's limitations.
+
 ## Known defects in the features
 
-Ten of the original 44 input columns are **constant** across all 3,456 rows and
+> Counts in this section are as of the final `dataset.csv` — **2,412 rows,
+> SHA-256 `3c0d6bd7a7d3…`**. Re-derive with
+> `python scripts/advisor/dataset.py`.
+
+**Six of the 58 candidate input columns are constant** on the final corpus and
 therefore carry no information:
 
 `diag` (1.0 by construction), **`curved_frac` (1.0 in every row — its formula
 `(ntri-12)/ntri` at `apps/testlab/main.cpp:1709` saturates for any real
 triangulation)**, `poisson`, `case_poisson`, `case_n_fix_regions`,
-`case_n_load_regions`, `p_elevate`, `skin_layers`, `feature_refine`,
-`adapt_leb_waves`.
+`case_n_load_regions`.
 
-`p_elevate` has since been deleted from the action space — it was redundant, not
-merely unvaried: `apps/cli/main.cpp:805` computes
-`p_elevate = decision.p_elevate || order >= 2`, the same actuator. The order
-vocabulary was trimmed from `[1,2,3,4]` to `[1,2]` for the same reason; orders 3
-and 4 were unreachable and the engine warned and downgraded.
+This is down from **ten of 44** on the pre-rebuild corpus, and the trajectory is
+instructive about which fixes worked:
+
+- `skin_layers` and `feature_refine` came alive when the re-aimed static-dial
+  block landed — that block exists precisely to vary them.
+- `element_tendency` and `adapt_leb_waves` were constant mid-regeneration and are
+  **now varying too**, once `advisor-batch-3` and `advisor-batch-5` landed. They
+  were flagged as "re-check when the pack completes" rather than recorded as dead
+  inputs, and that caution was justified.
+- `p_elevate` is gone from the schema entirely. It was redundant, not merely
+  unvaried: `apps/cli/main.cpp:805` computes
+  `p_elevate = decision.p_elevate || order >= 2`, the same actuator. The order
+  vocabulary was trimmed from `[1,2,3,4]` to `[1,2]` for the same reason; orders
+  3 and 4 were unreachable and the engine warned and downgraded.
+- `curved_frac` and `diag` remain broken and are the two worth fixing at source:
+  `diag` is 1.0 by normalisation and carries nothing, and `curved_frac`'s formula
+  saturates. Both are superseded in practice by the offline descriptors.
 
 The 15 offline descriptors in `geometry_features.csv` were built to replace the
 dead geometry signal. They do vary (`curved_area_frac` spans 0.000–0.986), but
@@ -119,32 +219,46 @@ detection instead.
 ## Action grid
 
 The grid the campaign sweeps is the support of every action column, and the model
-must never be asked to extrapolate beyond it. Historical v3 support:
-`h_rel {0.12, 0.16, 0.20}` × `order {1,2}` × `mesher {graded_tet, hybrid_zoo}` ×
-`adapt_passes {0,1}` × `eta_target {0.005, 0.02, 0.05}` — while the clamp box
-allowed `h_rel` down to 0.005, i.e. the policy could emit an action 24× finer
-than anything measured.
+must never be asked to extrapolate beyond it. **Final support:**
+`h_rel {0.08, 0.09, 0.12, 0.16}` × `order {1,2}` ×
+`mesher {graded_tet, hybrid_zoo}` × `adapt_passes {0,1,2}` ×
+`eta_target {0, 0.005, 0.02, 0.05}`.
 
-**81 % of cases (51/63) had the finest offered `h_rel` as their accuracy
-optimum** — the grid was saturated at its own edge, which is why a pure-accuracy
-objective is degenerate and why evaluation is now budget-constrained and
-efficiency-based.
+The previous grid was `h_rel {0.12, 0.16, 0.20}` while the clamp box allowed
+`h_rel` down to 0.005 — so the policy could legally emit an action **24× finer
+than anything ever measured**, and the M-A1 log records what that produced
+(`predicted_dof = 1.5e15`).
 
-`clamps.json` now carries an explicit `candidate_grid` of exactly the measured
-levels, so every action a deployed chooser enumerates is one the model has seen.
+**Grid saturation was the reason for re-aiming, and it is measurably fixed.** On
+the previous corpus the finest offered `h_rel` was the accuracy optimum for
+**81 % of cases (51/63)** — the grid was saturated at its own edge, so a
+pure-accuracy objective was degenerate and there was no headroom for any policy to
+find. After extending the grid downward the finest rung is optimal for only
+**49 % (35/72)**, so the interesting region is now inside the sampled range rather
+than beyond it. Evaluation remains budget-constrained and efficiency-based.
+
+`clamps.json` carries an explicit `candidate_grid` of **20 measured action
+tuples** — a list, not a cross product of per-dial levels — so every action a
+deployed chooser enumerates is one the model has actually seen.
 
 ## Coverage and gaps
 
-- 63 of 72 v3 cases had ≥3 measured actions; `channel` had 3 usable cases and
+- **72 of 96 cases had ≥3 measured actions.** `tube` is the family that
   contributes **zero** scorable cases under leave-one-family-out, so macro means
-  are over 5 families, not 6. The harness prints a warning saying so.
-- Failure rate is ~33 % on the v3 corpus and rises at coarse `h_rel`. On the
-  corrected engine the dominant cause changed: a new refusal to alias a feature
-  away accounts for 90 of 162 mesh failures, concentrated at coarse rungs.
-- Yield *improves* as `h_rel` gets finer — 52 % `mesh_fail` at 0.20, 33 % at
-  0.12, 100 % ok at 0.09 — so fine rungs are cheaper per *usable* row than their
-  per-row cost suggests. Counterintuitive, and it is why the coarsest rung was
-  dropped rather than kept as the cheap option.
+  are over **7 families, not 8**. The harness prints a warning saying so. Note
+  this is a different family from the previous corpus, where `channel` was the
+  empty one — `channel` now scores and `tube`, the thin-walled addition, does not.
+  That is consistent with `tube` being the geometry both meshers struggle on.
+- Failure rate is **33.0 %** (621 `mesh_fail`, 102 `over_budget`, 72
+  `solve_fail`, from 2,412 rows). A refusal to alias a feature away is the
+  dominant mesh-failure cause and is concentrated at coarse rungs.
+- **Yield falls as `h_rel` coarsens**: 79 % usable at 0.08, 74 % at 0.09, 66 % at
+  0.12, **37 % at 0.16**. This *reverses* the sign of the trend reported on the
+  previous corpus, where yield appeared to improve toward coarser rungs. The
+  earlier reading was an artefact of the pre-fix engine, which accepted meshes
+  that had silently dropped small features instead of refusing them. The current
+  direction is the expected one: coarse meshes are cheaper per attempt but more
+  expensive per *usable* row.
 
 ## Ethics and risk
 

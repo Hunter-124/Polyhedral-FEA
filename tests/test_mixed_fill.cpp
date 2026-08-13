@@ -278,13 +278,31 @@ TEST_CASE("box-hole bore survives the coarse-grid parity ladder",
     const auto model = pipeline::Model::load(kBoxHole);
     const double diagonal = (model.bbox_max - model.bbox_min).norm();
 
+    // The coarse rung used to be a refusal for both meshers: the bore vanished
+    // and `enforce_feature_resolution` said so. The graded mesher now resolves
+    // it there, because the local child carve confirms each deletion against
+    // the surface instead of trusting an h/2 centre sample, so the bore opens
+    // at a coarseness that previously produced no bore at all. Measured at
+    // h_rel=0.20: 6 wall faces, 0.59x the exact wall area, fill rel_err 0.0101,
+    // shell closed. Crude, and present -- which is the thing this case exists
+    // to defend. The hybrid mesher still refuses there.
+    //
+    // What must never come back is a SILENT solid: either the bore is in the
+    // mesh, or the engine says it could not put it there.
     for (const auto mesher :
          {pipeline::VolumeMesher::kHybrid, pipeline::VolumeMesher::kGradedTet}) {
         CAPTURE(mesher);
         try {
-            (void)pipeline::volume_mesh(model, 0.20 * diagonal, mesher,
-                                        /*skin_layers=*/2, /*feature_refine=*/true);
-            FAIL("coarse unresolved bore returned a silent solid mesh");
+            const auto coarse = pipeline::volume_mesh(model, 0.20 * diagonal, mesher,
+                                                      /*skin_layers=*/2,
+                                                      /*feature_refine=*/true);
+            const auto [n_wall_faces, wall_area] = bore_wall(coarse.mesh, radius, thickness);
+            INFO("coarse mesher=" << static_cast<int>(mesher) << " wall_faces=" << n_wall_faces
+                                  << " wall_area=" << wall_area
+                                  << " expected=" << expected_wall_area
+                                  << " note=" << coarse.mesher_note);
+            CHECK(n_wall_faces > 0);
+            CHECK(wall_area > 0.25 * expected_wall_area);
         } catch (const pipeline::GeometryVolumeLimitError& error) {
             CHECK_FALSE(error.solved_stage);
             CHECK(std::string(error.what()).find("feature unresolved") !=

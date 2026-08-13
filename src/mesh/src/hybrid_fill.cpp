@@ -8,6 +8,8 @@
 #include "mesh/quality.hpp"
 #include "mesh/surface_project.hpp"
 
+#include <Eigen/Geometry>
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -739,6 +741,28 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     // local carve the classifier can see a bore while the emitted tet mesh
     // remains the original solid coarse cube.
     if (!classification.child_inside_mask.empty()) {
+        // The child mask is a cell-CENTRE parity sample on the h/2 lattice, but
+        // LEB has already refined these tets to h/4 and finer. Condemning an
+        // h/4 tet because one h/2 sample point landed in void is the hole
+        // aliasing bug one level down: beside a curved wall the centre of a
+        // child can sit outside the solid while most of the child is inside it,
+        // and the carve then cuts a slot into the material. Measured on the
+        // showcase plate_hole at h=5.6 mm feature-graded: 84 of 672 near-bore
+        // boundary nodes ended up off every exact CAD surface, the worst 3.75 mm
+        // out — 37% of the bore radius — as fissures open to the top face,
+        // which is the ragged crown the hole close-up showed. The uniform mesh
+        // of the same part, which has no tets finer than the sample, had none.
+        //
+        // So the mask proposes and the surface confirms: a tet is carved only
+        // when its own centroid is outside the solid, judged against the
+        // surface at the tet's own scale rather than the sampler's.
+        //
+        // Requiring instead that the whole tet lie in void children was tried
+        // and is WRONG in the other direction — it under-carves, and voids stop
+        // opening: channel_s0 at h=0.0075 m went to mesh=4.990e-06 against
+        // cad=4.534e-06, rel_err 0.1006 with the material still filling the
+        // slot, which is the hole-disappearance failure this project already
+        // fixed once at the coarse level.
         std::vector<char> kill(out.mesh.tets.size(), 0);
         for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
             const auto& tet = out.mesh.tets[ti];
@@ -749,18 +773,27 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             const int i = std::clamp(static_cast<int>(std::floor(lattice.x())), 0, nx - 1);
             const int j = std::clamp(static_cast<int>(std::floor(lattice.y())), 0, ny - 1);
             const int k = std::clamp(static_cast<int>(std::floor(lattice.z())), 0, nz - 1);
-            const auto parent = idx(i, j, k);
-            const std::uint8_t mask = classification.child_inside_mask[parent];
+            const std::uint8_t mask = classification.child_inside_mask[idx(i, j, k)];
             if (mask == 0 || mask == std::uint8_t{0xff}) {
                 continue;
             }
             const int a = lattice.x() - static_cast<double>(i) >= 0.5 ? 1 : 0;
             const int b = lattice.y() - static_cast<double>(j) >= 0.5 ? 1 : 0;
             const int c = lattice.z() - static_cast<double>(k) >= 0.5 ? 1 : 0;
-            const int child = a + 2 * b + 4 * c;
-            if ((mask & static_cast<std::uint8_t>(1U << child)) == 0) {
-                kill[ti] = 1;
+            if ((mask & static_cast<std::uint8_t>(1U << (a + 2 * b + 4 * c))) != 0) {
+                continue;
             }
+            const auto cp = closest_on_surface(surface, centroid);
+            if (cp.triangle < surface.triangles.size()) {
+                const auto& tri = surface.triangles[cp.triangle];
+                const Eigen::Vector3d n =
+                    (surface.vertices[tri[1]] - surface.vertices[tri[0]])
+                        .cross(surface.vertices[tri[2]] - surface.vertices[tri[0]]);
+                if ((centroid - cp.point).dot(n) <= 0.0) {
+                    continue; // centroid is inside the solid: keep the tet
+                }
+            }
+            kill[ti] = 1;
         }
         // A centroid-in-void test decides one tet at a time and cannot see that
         // dropping this one strands its neighbour with two exposed faces. That
@@ -924,6 +957,22 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             const auto tets_before = out.mesh.tets;
             const auto remap_before = node_remap;
             const std::size_t torn_before = tet_shell_topology(out.mesh.tets).n_torn_edges;
+            // Slivers are, by definition, almost no material: a pass that
+            // cleans them up loses a rounding error of volume. A pass that
+            // loses real volume is not cleaning up, it is eating the part.
+            // Measured after the link condition let S4 collapse freely for the
+            // first time: channel_s0 at h=0.0075 m went from rel_err 0.0045 to
+            // 0.1006 and was refused outright, and sphere_box and
+            // perforated_plate lost an order of magnitude of accuracy each.
+            const auto total_volume = [&]() {
+                double v = 0.0;
+                for (const auto& t : out.mesh.tets) {
+                    v += std::abs(tet_signed_volume(out.mesh.nodes[t[0]], out.mesh.nodes[t[1]],
+                                                    out.mesh.nodes[t[2]], out.mesh.nodes[t[3]]));
+                }
+                return v;
+            };
+            const double volume_before = total_volume();
             const auto bvec = tet_boundary_nodes(out.mesh.tets);
             const std::unordered_set<std::uint32_t> bset(bvec.begin(), bvec.end());
             std::unordered_map<std::uint32_t, std::vector<std::size_t>> incident;
@@ -1092,7 +1141,13 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 }
             }
             out.mesh.tets.resize(w);
-            if (tet_shell_topology(out.mesh.tets).n_torn_edges > torn_before) {
+            // 0.5% of the part per pass: three orders of magnitude more than a
+            // sliver sweep needs, and far below the fill guard's 10% limit, so
+            // a pass has to be visibly destructive to trip it.
+            constexpr double kMaxPassVolumeLoss = 0.005;
+            const double volume_after = total_volume();
+            if (tet_shell_topology(out.mesh.tets).n_torn_edges > torn_before ||
+                volume_after < (1.0 - kMaxPassVolumeLoss) * volume_before) {
                 out.mesh.tets = tets_before;
                 node_remap = remap_before;
                 break;

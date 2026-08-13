@@ -288,10 +288,16 @@ Gmsh is more economical on the curved-hole families.
 **Coverage is thin and the reason matters.** Of 336 rows, only 159 are `ok`:
 **166 are refusals**, 9 are outright failures and 2 are honest timeouts.
 
-- The **9 failures are Gmsh's own**, all on thin-walled tubes at coarse `h`
-  (`h_rel` 0.08/0.12/0.20). That geometry is effectively unmeshable by either tool
-  at those sizes; the difference is that our refusals *name the size they would
-  need* rather than emitting a mesh that cannot be solved.
+- The **9 failures are Gmsh's own** — zero native failures — and all 9 are
+  thin-walled tubes, concentrated in two parts. They span all three rungs
+  (`h_rel` 0.20 ×4, 0.12 ×4, 0.08 ×1), so coarse sizes dominate but do not fully
+  explain them. That geometry is near-unmeshable by either tool; the difference is
+  that our refusals *name the size they would need* rather than emitting a mesh
+  that cannot be solved.
+- **Gmsh records 0 refusals** against 166 of ours, because it has no refusal path —
+  it either meshes or fails. That is why the same unmeshable tubes produce hard
+  failures from Gmsh and named size requirements from us, and it is the clearest
+  argument in the matrix for having a refusal path at all.
 - The 2 timeouts are `perforated_plate_s2_c1` graded at `h_rel=0.08`, recorded as
   timeouts rather than dropped.
 - Because refusal counts differ per source, the medians are over **each source's

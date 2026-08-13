@@ -488,6 +488,11 @@ def launch(directory: Path, omp_threads: int) -> tuple[int, float]:
     """Run `polymesh_testlab resume <dir>`, streaming output to run.log."""
     env = os.environ.copy()
     env["OMP_NUM_THREADS"] = str(omp_threads)
+    # testlab's on_finish hooks are Python. Hand them THIS interpreter rather than
+    # letting them resolve `python3` from PATH: on the workstation that resolves to
+    # a bare install with no numpy, which made warehouse_shots.py render nothing
+    # for a whole regeneration while reporting only an exit code.
+    env["POLYMESH_PYTHON"] = sys.executable
     command = [str(TESTLAB), "resume", str(directory)]
     started = time.monotonic()
     log_path = directory / "run.log"

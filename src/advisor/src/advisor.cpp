@@ -8,6 +8,7 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <cstdio>
 #include <fstream>
 #include <limits>
 #include <vector>
@@ -138,11 +139,40 @@ struct Advisor::Impl {
     /// rate instead: 27.5% at 0.05 against 31.2% at 0.5.
     double gate_threshold = std::numeric_limits<double>::quiet_NaN();
 
+    /// Out-of-distribution test, from ood.json.
+    ///
+    /// Deliberately independent of the network's input vector. The distance is
+    /// evaluated over `ood_columns` -- the FILE's column order, resolved by name
+    /// from the caller's FeatureColumns, never a map iteration order, because a
+    /// wrong-order Mahalanobis still yields plausible-looking distances. Fifteen
+    /// of these columns are exact-BRep descriptors that are NOT network inputs
+    /// (the ONNX contract is 43 columns and excludes them), so this cannot read
+    /// `encode()`'s output: the values it needs are not in it.
+    ///
+    /// Values arrive in raw units and are scaled by the file's own
+    /// `center`/`scale` before the quadratic form. `ood_precision` is the k*k
+    /// inverse of the shrunk training covariance in that scaled space,
+    /// row-major. Fitting directly on raw columns instead gave a precision
+    /// matrix at condition number 2.97e20, past float64's 1/eps; the file's own
+    /// standardizer brings it to 1.25e11. Required, never defaulted -- see
+    /// load_ood().
+    std::vector<std::string> ood_columns;
+    std::vector<double> ood_center;
+    std::vector<double> ood_scale;
+    std::vector<double> ood_precision;
+    double ood_threshold = std::numeric_limits<double>::quiet_NaN();
+
     std::string input_name;
     std::vector<const char*> output_name_ptrs;
 
     void load_normalization(const std::filesystem::path& dir);
     void load_clamps(const std::filesystem::path& dir);
+    void load_ood(const std::filesystem::path& dir);
+    /// Mahalanobis distance of one query, in raw feature units. Accumulates in
+    /// double regardless of storage width: the precision matrix is
+    /// ill-conditioned by construction and a float32 accumulation here would be
+    /// indistinguishable from a real disagreement with the Python reference.
+    [[nodiscard]] double mahalanobis(const FeatureColumns& columns) const;
     [[nodiscard]] std::vector<float> encode(const FeatureColumns& columns) const;
     void apply_action(FeatureColumns& columns, const AdvisorDecision& action) const;
     [[nodiscard]] std::vector<std::vector<float>> run(const std::vector<float>& row) const;
@@ -299,6 +329,163 @@ void Advisor::Impl::load_clamps(const std::filesystem::path& dir) {
     }
 }
 
+// Out-of-distribution test (ood.json), fitted by scripts/advisor/calibration.py
+// on the STANDARDIZED training matrix -- the same space `encode()` produces --
+// over the geometry/BC context columns only. An unusual ACTION is a legal
+// query; only an unfamiliar PART is out of distribution.
+//
+// Required, never defaulted, for the same reason `gate_threshold` is: the file
+// carries a measured operating point (training q0.99, in-sample false-alarm
+// rate 0.01, held-out-family detection 1.0 over 8 leave-one-family-out folds),
+// and an advisor that silently runs without it answers questions about parts
+// unlike anything it was trained on -- which is exactly what the abstention
+// exists to prevent. An absent or malformed block is a misconfiguration.
+void Advisor::Impl::load_ood(const std::filesystem::path& dir) {
+    const std::filesystem::path path = dir / "ood.json";
+    const char* remedy =
+        " The out-of-distribution veto is required and has no default: rebuild it with "
+        "python scripts/advisor/calibration.py.";
+    if (!std::filesystem::exists(path)) {
+        throw AdvisorError("advisor: no ood.json in " + dir.string() + "." + remedy);
+    }
+    const json ood = read_json(path);
+    if (!ood.contains("feature_columns") || !ood.at("feature_columns").is_array() ||
+        ood.at("feature_columns").empty()) {
+        throw AdvisorError("advisor: ood.json has no non-empty 'feature_columns' array." +
+                           std::string(remedy));
+    }
+    const auto names = ood.at("feature_columns").get<std::vector<std::string>>();
+    const std::size_t k = names.size();
+
+    // Column ORDER is the contract, and it is pinned here rather than assumed:
+    // the quadratic form is evaluated in the order ood.json lists, and every
+    // value is fetched from the caller's FeatureColumns BY NAME at query time.
+    // Two files iterating a map in incidentally-equal order is not a guarantee;
+    // a permutation would silently score a different distance.
+    //
+    // Note what is NOT checked here: whether these names appear in
+    // normalization.json:input_columns. They largely do not, and must not --
+    // fifteen of them are exact-BRep descriptors excluded from the 43-column
+    // ONNX contract precisely because they are family identifiers that hurt
+    // held-out regret. The OOD test and the network read overlapping but
+    // different feature sets, on purpose.
+    ood_columns = names;
+
+    const auto require_vector = [&](const char* key) {
+        if (!ood.contains(key) || !ood.at(key).is_array()) {
+            throw AdvisorError("advisor: ood.json has no '" + std::string(key) + "' array." +
+                               remedy);
+        }
+        auto values = ood.at(key).get<std::vector<double>>();
+        if (values.size() != k) {
+            throw AdvisorError("advisor: ood.json '" + std::string(key) + "' has " +
+                               std::to_string(values.size()) + " entries for " +
+                               std::to_string(k) + " feature_columns." + remedy);
+        }
+        return values;
+    };
+    ood_center = require_vector("center");
+    ood_scale = require_vector("scale");
+    for (const double value : ood_scale) {
+        // A zero or negative scale would divide the query into infinity. The
+        // fitter collapses a constant column to exactly 1.0, so this can only
+        // fire on a corrupt or hand-edited artifact.
+        if (!(value > 0.0) || !std::isfinite(value)) {
+            throw AdvisorError("advisor: ood.json 'scale' holds a non-positive entry; the "
+                               "distance would be infinite." + std::string(remedy));
+        }
+    }
+    if (!ood.contains("precision") || !ood.at("precision").is_array() ||
+        ood.at("precision").size() != k) {
+        throw AdvisorError("advisor: ood.json 'precision' is not a " + std::to_string(k) + "x" +
+                           std::to_string(k) + " matrix." + remedy);
+    }
+    ood_precision.assign(k * k, 0.0);
+    for (std::size_t i = 0; i < k; ++i) {
+        const json& row = ood.at("precision")[i];
+        if (!row.is_array() || row.size() != k) {
+            throw AdvisorError("advisor: ood.json 'precision' row " + std::to_string(i) +
+                               " is not " + std::to_string(k) + " wide." + remedy);
+        }
+        for (std::size_t j = 0; j < k; ++j) {
+            const double value = row[j].get<double>();
+            if (!std::isfinite(value)) {
+                throw AdvisorError("advisor: ood.json 'precision' holds a non-finite entry at (" +
+                                   std::to_string(i) + ", " + std::to_string(j) + ")." + remedy);
+            }
+            ood_precision[i * k + j] = value;
+        }
+    }
+    for (const double value : ood_center) {
+        if (!std::isfinite(value)) {
+            throw AdvisorError("advisor: ood.json 'center' holds a non-finite entry." +
+                               std::string(remedy));
+        }
+    }
+
+    // The threshold is the VALIDATED operating point, not a quantile the C++
+    // picks for itself. Reading it from `operating_point` keeps the shipped
+    // rule and the measured false-alarm/detection rates the same object.
+    if (!ood.contains("operating_point") || !ood.at("operating_point").is_object() ||
+        !ood.at("operating_point").contains("threshold") ||
+        !ood.at("operating_point").at("threshold").is_number()) {
+        throw AdvisorError("advisor: ood.json has no numeric 'operating_point.threshold'." +
+                           std::string(remedy));
+    }
+    ood_threshold = ood.at("operating_point").at("threshold").get<double>();
+    if (!(ood_threshold > 0.0) || !std::isfinite(ood_threshold)) {
+        throw AdvisorError("advisor: ood.json operating_point.threshold " +
+                           std::to_string(ood_threshold) +
+                           " is not a positive distance." + remedy);
+    }
+}
+
+/// Mahalanobis distance of one query from the training centre, over the ood.json
+/// columns in the ood.json order. Mirrors
+/// `scripts/advisor/calibration.py:ood_scores` exactly, including the clamp at
+/// zero that guards the square root against a tiny negative quadratic form
+/// produced by rounding in a near-degenerate direction.
+///
+/// Throws when the caller did not supply a column the file names. That is
+/// deliberate and it is the whole point: `encode()` silently imputes a missing
+/// column from the training median, which is right for a network input and fatal
+/// for a distribution test -- imputing the median places an unknown part exactly
+/// at the centre of the training distribution, i.e. it manufactures the answer
+/// "perfectly familiar" for a part we know nothing about. A missing descriptor
+/// must abort the test, never soften it.
+double Advisor::Impl::mahalanobis(const FeatureColumns& columns) const {
+    const std::size_t k = ood_columns.size();
+    std::vector<double> scaled(k);
+    for (std::size_t i = 0; i < k; ++i) {
+        const auto it = columns.find(ood_columns[i]);
+        if (it == columns.end()) {
+            throw AdvisorError("advisor: the out-of-distribution test needs feature column '" +
+                               ood_columns[i] + "', which the caller did not supply. Imputing it "
+                               "would place an unknown part at the centre of the training "
+                               "distribution and report it as familiar.");
+        }
+        if (!std::isfinite(it->second)) {
+            throw AdvisorError("advisor: feature column '" + ood_columns[i] +
+                               "' is not finite; the out-of-distribution distance would be "
+                               "meaningless.");
+        }
+        scaled[i] = (it->second - ood_center[i]) / ood_scale[i];
+    }
+    // Accumulated in double: the precision matrix is ill-conditioned by
+    // construction (cond ~1.25e11) and a narrower accumulation here would be
+    // indistinguishable from a real disagreement with the Python reference.
+    double quadratic = 0.0;
+    for (std::size_t i = 0; i < k; ++i) {
+        double partial = 0.0;
+        const double* row = ood_precision.data() + i * k;
+        for (std::size_t j = 0; j < k; ++j) {
+            partial += row[j] * scaled[j];
+        }
+        quadratic += scaled[i] * partial;
+    }
+    return std::sqrt(std::max(quadratic, 0.0));
+}
+
 std::vector<float> Advisor::Impl::encode(const FeatureColumns& columns) const {
     // Name-keyed so the exported column list, not a C++ ordering, decides the
     // layout. Any column the caller did not supply falls back to the training
@@ -338,7 +525,7 @@ void Advisor::Impl::apply_action(FeatureColumns& columns, const AdvisorDecision&
 }
 
 FeatureColumns to_columns(const pipeline::CaseFeatures& f) {
-    return {
+    FeatureColumns columns = {
         {"bbox_dx", f.bbox_dx},
         {"bbox_dy", f.bbox_dy},
         {"bbox_dz", f.bbox_dz},
@@ -373,6 +560,38 @@ FeatureColumns to_columns(const pipeline::CaseFeatures& f) {
         {"case_load_dir_y", f.load_dir_y},
         {"case_load_dir_z", f.load_dir_z},
     };
+
+    // Exact-BRep descriptors. These are NOT network inputs: the ONNX contract is
+    // the 43 columns of normalization.json:input_columns and none of these are
+    // among it, so encode() ignores them entirely. They exist for the
+    // out-of-distribution test in ood.json, which reads this map by name.
+    //
+    // Inserted only when the feature extractor actually measured them from a
+    // BRep. When it did not -- no OpenCASCADE, or a model carrying no CAD -- the
+    // keys stay ABSENT rather than zero, and mahalanobis() then refuses to score
+    // rather than testing fabricated values. Zero is a legal measured value for
+    // several of these descriptors (a fully planar part has
+    // geo_curved_area_frac == 0), so a zero-filled block would be
+    // indistinguishable from a real measurement of a simple part -- which is
+    // precisely the part most likely to be out of distribution.
+    if (f.geo_available) {
+        columns.emplace("geo_curved_area_frac", f.geo_curved_area_frac);
+        columns.emplace("geo_cyl_area_frac", f.geo_cyl_area_frac);
+        columns.emplace("geo_plane_area_frac", f.geo_plane_area_frac);
+        columns.emplace("geo_other_area_frac", f.geo_other_area_frac);
+        columns.emplace("geo_min_curv_radius_rel", f.geo_min_curv_radius_rel);
+        columns.emplace("geo_log_curv_radius_mean", f.geo_log_curv_radius_mean);
+        columns.emplace("geo_log_curv_radius_std", f.geo_log_curv_radius_std);
+        columns.emplace("geo_n_faces", f.geo_n_faces);
+        columns.emplace("geo_n_edges", f.geo_n_edges);
+        columns.emplace("geo_face_area_cv", f.geo_face_area_cv);
+        columns.emplace("geo_aspect_max", f.geo_aspect_max);
+        columns.emplace("geo_aspect_mid", f.geo_aspect_mid);
+        columns.emplace("geo_volume_frac", f.geo_volume_frac);
+        columns.emplace("geo_area_over_v23", f.geo_area_over_v23);
+        columns.emplace("geo_min_face_size_rel", f.geo_min_face_size_rel);
+    }
+    return columns;
 }
 
 std::vector<std::vector<float>> Advisor::Impl::run(const std::vector<float>& row) const {
@@ -401,6 +620,7 @@ Advisor::Advisor(const std::filesystem::path& model_dir) : impl_(std::make_uniqu
     }
     impl_->load_normalization(model_dir);
     impl_->load_clamps(model_dir);
+    impl_->load_ood(model_dir);
 
     // Determinism: one intra-op thread, sequential execution, CPU only. A
     // recommendation that changes with the thread pool is not reproducible
@@ -583,19 +803,88 @@ AdvisorDecision Advisor::recommend(const FeatureColumns& columns) const {
                                          : std::numeric_limits<double>::quiet_NaN();
     decision.failure_prob = sigmoid(scored.failure_logit);
 
-    if (decision.failure_prob > impl.veto_threshold) {
+    // The OOD test is evaluated over raw feature columns, NOT over encode()'s
+    // output: fifteen of the columns ood.json names are exact-BRep descriptors
+    // deliberately outside the 43-column ONNX contract, so they are not in the
+    // encoded row at all.
+    //
+    // mahalanobis() throws when a named column is missing or non-finite, because
+    // imputing it would place an unknown part at the centre of the training
+    // distribution and call it familiar. But advisor.hpp promises that inference
+    // on a loaded advisor never throws -- an unusable prediction becomes a veto --
+    // and apps/cli/main.cpp calls this without a try/catch. So the failure is
+    // converted here into the refusal it morally is. Declining to advise is the
+    // correct outcome for a part we cannot assess; terminating the process is
+    // strictly worse than declining.
+    bool ood_assessable = true;
+    std::string ood_failure;
+    try {
+        decision.ood_distance = impl.mahalanobis(columns);
+    } catch (const AdvisorError& error) {
+        ood_assessable = false;
+        ood_failure = error.what();
+        decision.ood_distance = std::numeric_limits<double>::quiet_NaN();
+    }
+
+    // Both refusals return the defaults, and both SUPPRESS the predictions.
+    //
+    // The predictions are exactly what must not survive a refusal. Beyond the
+    // training support the regression heads do not degrade gracefully, they
+    // diverge: the observed case that motivated this gate reported
+    // predicted_mesh_ms = 1.66e14 -- about 5,300 years -- for a unit box, next to
+    // a failure probability of 1e-65 claiming near-certain success. Printing a
+    // number like that to a user is its own defect, independent of the meshing
+    // decision, and NaN is the honest value: the model has no opinion here, and a
+    // reader can see that it has none.
+    //
+    // `failure_prob` goes too. It is the output of the same extrapolating trunk,
+    // and its confident 1e-65 on an out-of-distribution part is precisely the
+    // evidence that it cannot be trusted there.
+    //
+    // `ood_distance` is retained: it is the measurement that produced the
+    // refusal, it is meaningful by construction, and it is what a user or a
+    // figure needs in order to see how far outside the part fell.
+    const auto refuse = [&](const std::string& note) {
+        const double unknown = std::numeric_limits<double>::quiet_NaN();
         AdvisorDecision vetoed = impl.default_decision;
-        vetoed.predicted_rel_err = decision.predicted_rel_err;
-        vetoed.predicted_rel_err_rel = decision.predicted_rel_err_rel;
-        vetoed.predicted_chamfer_mean = decision.predicted_chamfer_mean;
-        vetoed.predicted_dof = decision.predicted_dof;
-        vetoed.predicted_mesh_ms = decision.predicted_mesh_ms;
-        vetoed.predicted_solve_ms = decision.predicted_solve_ms;
-        vetoed.failure_prob = decision.failure_prob;
+        vetoed.predicted_rel_err = unknown;
+        vetoed.predicted_rel_err_rel = unknown;
+        vetoed.predicted_chamfer_mean = unknown;
+        vetoed.predicted_dof = unknown;
+        vetoed.predicted_mesh_ms = unknown;
+        vetoed.predicted_solve_ms = unknown;
+        vetoed.failure_prob = unknown;
+        vetoed.ood_distance = decision.ood_distance;
         vetoed.clamped = decision.clamped;
         vetoed.vetoed = true;
-        vetoed.note = "feasibility head vetoed the recommendation; defaults used";
+        vetoed.note = note;
         return vetoed;
+    };
+
+    // Two distinct refusals, deliberately not collapsed into one note. A user
+    // must be able to tell "this part is unlike anything I was trained on" from
+    // "I could not measure this part at all": the first is a statement about the
+    // part, the second about our own instrumentation, and they call for different
+    // actions. Same discipline as keeping the feasibility gate separate from the
+    // OOD veto.
+    if (!ood_assessable) {
+        return refuse("out-of-distribution test unavailable, so no recommendation can be "
+                      "assessed; defaults used (" + ood_failure + ")");
+    }
+
+    // Out of distribution refuses the QUESTION, not the answer: beyond the
+    // training support every head is extrapolating, the feasibility probability
+    // included, so its opinion is no evidence that the action is safe.
+    if (!(decision.ood_distance <= impl.ood_threshold)) {
+        char detail[192];
+        std::snprintf(detail, sizeof(detail),
+                      "out of distribution: mahalanobis %.4g exceeds the validated "
+                      "operating point %.4g; defaults used",
+                      decision.ood_distance, impl.ood_threshold);
+        return refuse(detail);
+    }
+    if (decision.failure_prob > impl.veto_threshold) {
+        return refuse("feasibility head vetoed the recommendation; defaults used");
     }
     if (clamped) {
         decision.note = "raw policy output projected onto the clamp box";
@@ -622,6 +911,7 @@ std::string to_json(const AdvisorDecision& d) {
                    {"predicted_mesh_ms", d.predicted_mesh_ms},
                    {"predicted_solve_ms", d.predicted_solve_ms},
                    {"failure_prob", d.failure_prob},
+                   {"ood_distance", d.ood_distance},
                    {"vetoed", d.vetoed},
                    {"clamped", d.clamped},
                    {"note", d.note}};

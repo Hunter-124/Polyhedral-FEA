@@ -257,10 +257,39 @@ same cause.
   shift. Group-conformal restores it — 90.5 % at nominal 90 % — but only with a
   **±2.3 decade** band, so an honest interval on an unseen family still says
   little.
-- **The OOD gate is distance-based and validated.** Mahalanobis over the geometry
-  columns, shrunk covariance, threshold at the training 99th percentile:
-  **100 % of held-out-family rows flagged in all 8 folds** at a 1 % in-sample
-  false-alarm rate. Parameters in `bench/advisor/ood.json`.
+- **The OOD gate is distance-based, validated, and now actually wired.**
+  Mahalanobis over **31 part-geometry columns** — the 16 mesh-derived geometry
+  features plus the 15 exact-BRep descriptors — with shrunk covariance and the
+  threshold at the training 99th percentile (**6.3037**): **100 % of
+  held-out-family rows flagged in all 8 folds** at a **0.86 %** in-sample
+  false-alarm rate. Parameters in `bench/advisor/ood.json`, consumed by
+  `Advisor::Impl::load_ood`.
+
+  **It tests the part, not the load case.** Boundary-condition columns are
+  deliberately excluded. `fit_ood`'s rule is that only an unfamiliar *part* is out
+  of distribution — a user is entitled to clamp and load a familiar part
+  differently from any campaign case, and that is a legal question about a known
+  geometry. This is not a tidy-up: the campaign derives BC features from the
+  corpus case definitions while the CLI derives them from its own default slab
+  selection, and including them made the deployed gate refuse `box_hole_s0`, a
+  *training* part, at distance 35.82 against a 6.50 threshold. A gate that refuses
+  its own training geometry is measuring the wrong thing. Excluding them costs no
+  detection power — 100 % mean and 100 % min either way — and improves the
+  false-alarm rate from 0.92 % to 0.86 %.
+
+  The parameters are held in **raw feature units with their own `center`/`scale`**,
+  independent of `normalization.json`. Fifteen of the columns are outside the
+  43-column ONNX contract, so they never appear in `encode()`'s output and the
+  distance cannot be computed there. Fitting on raw columns directly gave a
+  precision matrix at condition number **2.97e20**, past float64's 1/eps; the
+  artifact's own standardizer brings it to **9.15e10**, which is recorded in the
+  file as `precision_condition_number` so a later refit that degrades it is
+  visible. The C++ accumulates the quadratic form in double.
+
+  **Verified against the Python reference**, descriptors *and* distances, over 32
+  corpus parts: worst relative deviation **2.94e-16** on any descriptor and
+  **4.35e-16** on any distance; no part moves across the threshold. Regenerate the
+  comparison with `polymesh_tests "advisor descriptor dump"`.
 
 The 15 offline CAD descriptors *hurt* held-out regret — a 1-NN classifier
 recovers the family from them alone at 32/32, so on a corpus this narrow they are
@@ -275,8 +304,22 @@ why they are **not** among the 43 shipped inputs.
   produces numerically meaningless geometry predictions. Regret survives it
   because regret depends only on the argmin, and a ranking tolerates a large
   constant offset.
-- Consequently `predicted_rel_err` / `predicted_dof` must be **suppressed, not
-  printed**, when the OOD gate fires. That wiring is not yet in the C++.
+- Consequently every `predicted_*` value **and** `failure_prob` are **suppressed
+  to NaN on a refusal** — implemented, not aspirational. The case that motivated
+  the gate reported `predicted_mesh_ms = 1.66e14` (about 5,300 years) for a unit
+  box beside a failure probability of 1e-65 claiming near-certain success.
+  Printing that to a user is a defect independent of the meshing decision. The
+  `ood_distance` is retained, because it is the measurement that caused the
+  refusal and it is meaningful by construction.
+- **Two refusal causes exist and are deliberately distinguishable.** "out of
+  distribution: mahalanobis X exceeds the validated operating point Y" means the
+  part was measured and is unlike the training corpus. "out-of-distribution test
+  unavailable ..." means the descriptors could not be measured at all — no
+  OpenCASCADE, or a model carrying no BRep. The first is a statement about the
+  part, the second about our own instrumentation, and they call for different
+  actions. A missing descriptor is never imputed: substituting the training median
+  would place an unknown part at the *centre* of the training distribution and
+  report it as maximally familiar.
 - **`failure_auc` on the shipped checkpoint's own fold is 0.5248 — near chance**,
   against a leave-one-family-out mean of 0.8062 (sd 0.216). The gate is built on
   this head, so this is the main open risk to the shipped rule and the fold

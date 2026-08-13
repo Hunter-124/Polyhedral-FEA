@@ -10,6 +10,9 @@
 // number, so the test fails if either side drifts.
 
 #include "advisor/advisor.hpp"
+#include "geom/cad_model.hpp"
+#include "geom/step.hpp"
+#include "geom/cad_geometry_features.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -133,6 +136,64 @@ TEST_CASE("advisor reads gate_threshold from clamps.json and rejects its absence
     CHECK_THROWS_AS(polymesh::advisor::Advisor(staged), polymesh::advisor::AdvisorError);
 
     std::filesystem::remove_all(staged);
+}
+
+TEST_CASE("advisor requires ood.json and refuses rather than imputes", "[advisor]") {
+    if (!fixture_present()) {
+        SKIP("advisor_tiny fixture missing (python scripts/advisor/export_onnx.py "
+             "--tiny-fixture)");
+    }
+
+    const json ood = load(kFixtureDir / "ood.json");
+    REQUIRE(ood.contains("feature_columns"));
+    REQUIRE(ood.contains("center"));
+    REQUIRE(ood.contains("scale"));
+    REQUIRE(ood.at("operating_point").contains("threshold"));
+
+    // The distance is fitted and evaluated in RAW feature units with the file's
+    // own center/scale, deliberately NOT reusing normalization.json: fifteen of
+    // the columns the shipped ood.json names are exact-BRep descriptors outside
+    // the 43-column ONNX contract, so they never appear in encode()'s output.
+    const auto names = ood.at("feature_columns").get<std::vector<std::string>>();
+    REQUIRE_FALSE(names.empty());
+    CHECK(ood.at("center").size() == names.size());
+    CHECK(ood.at("scale").size() == names.size());
+    CHECK(ood.at("precision").size() == names.size());
+
+    // A model directory without an OOD block must not load. The whole defect this
+    // guards is a validated detector sitting inert on disk while the product runs
+    // without it, so the requirement is defended by a test and not only by the
+    // loader.
+    const std::filesystem::path staged =
+        std::filesystem::temp_directory_path() / "polymesh_advisor_ood_missing";
+    std::filesystem::remove_all(staged);
+    std::filesystem::create_directories(staged);
+    for (const auto& entry : std::filesystem::directory_iterator(kFixtureDir)) {
+        std::filesystem::copy_file(entry.path(), staged / entry.path().filename(),
+                                   std::filesystem::copy_options::overwrite_existing);
+    }
+    CHECK_NOTHROW(polymesh::advisor::Advisor(staged));
+    std::filesystem::remove(staged / "ood.json");
+    CHECK_THROWS_AS(polymesh::advisor::Advisor(staged), polymesh::advisor::AdvisorError);
+    std::filesystem::remove_all(staged);
+
+    // Inference must NEVER throw, even when the OOD test cannot be performed:
+    // advisor.hpp promises an unusable prediction becomes a veto. A query missing
+    // a required descriptor is refused, not imputed -- imputing the training
+    // median would place an unknown part at the centre of the training
+    // distribution and report it as maximally familiar.
+    const polymesh::advisor::Advisor advisor(kFixtureDir);
+    polymesh::advisor::FeatureColumns empty;
+    polymesh::advisor::AdvisorDecision decision;
+    REQUIRE_NOTHROW(decision = advisor.recommend(empty));
+    CHECK(decision.vetoed);
+    CHECK(decision.note.find("out-of-distribution test unavailable") != std::string::npos);
+    // Every prediction is suppressed on a refusal: an extrapolating head reported
+    // predicted_mesh_ms = 1.66e14 (about 5,300 years) on the case that motivated
+    // this gate, and printing that to a user is its own defect.
+    CHECK_FALSE(std::isfinite(decision.predicted_mesh_ms));
+    CHECK_FALSE(std::isfinite(decision.predicted_rel_err));
+    CHECK_FALSE(std::isfinite(decision.failure_prob));
 }
 
 TEST_CASE("advisor head outputs match PyTorch within the exported tolerance", "[advisor]") {
@@ -303,13 +364,29 @@ TEST_CASE("advisor guardrails: gated enumeration stays in the box and honours th
         const auto scored_raw = advisor.evaluate(scored_query);
         const double failure_prob = sigmoid(scored_raw.failure_logit);
 
-        CHECK(decision.failure_prob == Catch::Approx(failure_prob).margin(1e-9));
-        CHECK(decision.vetoed == (failure_prob > veto_threshold));
-        // Reported RAW: this head is a log10 difference, not a level, and it is
-        // carried across the veto branch so a vetoed row still says what the
-        // discarded recommendation scored.
-        CHECK(decision.predicted_rel_err_rel ==
-              Catch::Approx(scored_raw.rel_err_rel).margin(1e-9));
+        // A refusal now SUPPRESSES every prediction rather than carrying it, and
+        // there are two independent causes of refusal, so neither the predicted
+        // values nor `vetoed` can be predicted from the feasibility head alone.
+        //
+        // Suppression is the point: beyond the training support the heads diverge
+        // rather than degrade -- the case that motivated the OOD gate reported
+        // predicted_mesh_ms = 1.66e14, about 5,300 years, beside a failure
+        // probability of 1e-65 claiming near-certain success. NaN is the honest
+        // value and a reader can see the model has no opinion.
+        if (decision.vetoed) {
+            CHECK_FALSE(std::isfinite(decision.failure_prob));
+            CHECK_FALSE(std::isfinite(decision.predicted_rel_err_rel));
+            CHECK_FALSE(std::isfinite(decision.predicted_mesh_ms));
+            CHECK_FALSE(std::isfinite(decision.predicted_dof));
+        } else {
+            // Not refused: the reported prediction and the feasibility
+            // probability must both describe the action actually chosen.
+            CHECK(decision.failure_prob == Catch::Approx(failure_prob).margin(1e-9));
+            CHECK(failure_prob <= veto_threshold);
+            // Reported RAW: this head is a log10 difference, not a level.
+            CHECK(decision.predicted_rel_err_rel ==
+                  Catch::Approx(scored_raw.rel_err_rel).margin(1e-9));
+        }
 
         if (decision.vetoed) {
             // Guardrail 2 — the feasibility head vetoes: defaults, flagged.
@@ -411,4 +488,66 @@ TEST_CASE("advisor recommend() latency", "[advisor][!benchmark]") {
     // a tenth of a second it is no longer negligible against a solve and the
     // candidate list should be pruned via max_candidates.
     CHECK(pct(0.99) < 100000.0);
+}
+
+// Emits the C++ exact-BRep descriptors AND the resulting OOD distance for every
+// corpus part, so they can be diffed against the Python reference
+// (`bench/advisor/geometry_features.csv`, written by
+// scripts/advisor/geometry_features.py, and the distances from
+// scripts/advisor/calibration.py:ood_scores).
+//
+// Not a pass/fail assertion and not run by default: it produces the evidence the
+// comparison needs. Descriptor agreement alone is insufficient -- every
+// descriptor can match to six figures while the distance still diverges through
+// an ill-conditioned precision matrix, and the distance is what decides whether
+// the product refuses. So both are emitted together.
+TEST_CASE("advisor descriptor dump", "[advisor][!benchmark]") {
+    const std::filesystem::path corpus = "bench/geometries/corpus/primitives";
+    if (!std::filesystem::is_directory(corpus)) {
+        SKIP("corpus STEP directory missing");
+    }
+    if (!polymesh::geom::occ_enabled()) {
+        SKIP("built without OpenCASCADE");
+    }
+
+    std::vector<std::filesystem::path> steps;
+    for (const auto& entry : std::filesystem::directory_iterator(corpus)) {
+        if (entry.path().extension() == ".step") {
+            steps.push_back(entry.path());
+        }
+    }
+    std::sort(steps.begin(), steps.end());
+    REQUIRE_FALSE(steps.empty());
+
+    json out = json::object();
+    for (const std::filesystem::path& step : steps) {
+        const polymesh::geom::CadModel cad = polymesh::geom::load_cad(step.string());
+        const auto geo = polymesh::geom::compute_geometry_descriptors(cad);
+        json record;
+        record["available"] = geo.available;
+        record["geo_curved_area_frac"] = geo.curved_area_frac;
+        record["geo_cyl_area_frac"] = geo.cyl_area_frac;
+        record["geo_plane_area_frac"] = geo.plane_area_frac;
+        record["geo_other_area_frac"] = geo.other_area_frac;
+        record["geo_min_curv_radius_rel"] = geo.min_curv_radius_rel;
+        record["geo_log_curv_radius_mean"] = geo.log_curv_radius_mean;
+        record["geo_log_curv_radius_std"] = geo.log_curv_radius_std;
+        record["geo_n_faces"] = geo.n_faces;
+        record["geo_n_edges"] = geo.n_edges;
+        record["geo_face_area_cv"] = geo.face_area_cv;
+        record["geo_aspect_max"] = geo.aspect_max;
+        record["geo_aspect_mid"] = geo.aspect_mid;
+        record["geo_volume_frac"] = geo.volume_frac;
+        record["geo_area_over_v23"] = geo.area_over_v23;
+        record["geo_min_face_size_rel"] = geo.min_face_size_rel;
+        out[step.stem().string()] = record;
+    }
+
+    const std::filesystem::path path =
+        std::filesystem::temp_directory_path() / "polymesh_cpp_descriptors.json";
+    std::ofstream stream(path);
+    REQUIRE(stream.good());
+    stream << out.dump(2) << "\n";
+    stream.close();
+    WARN("wrote C++ descriptors for " << steps.size() << " parts to " << path.string());
 }

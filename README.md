@@ -215,12 +215,27 @@ ONNX opset 17 with **2.158e-06** relative C++ parity. A recommendation costs
 **~1.0 ms** (p50, single-threaded, 20 candidates; p99 2.62 ms measured at 32),
 roughly **0.1 % of a solve**, and a test fails the build above 100 ms p99.
 
-The out-of-distribution gate is distance-based and validated: Mahalanobis over
-the geometry columns flags **100 % of held-out-family rows in all 8 folds** at a
-1 % in-sample false-alarm rate. The feasibility head's calibration improved
-(ECE 0.4795 → 0.263), but on the shipped checkpoint's own fold its AUC is 0.5248
-— near chance against a cross-fold mean of 0.806. Since the gate is built on that
-head, this is the main open risk and is recorded as such in the
+**The advisor refuses parts it does not recognise.** A Mahalanobis distance over
+31 part-geometry columns — 16 mesh-derived features plus 15 exact-BRep descriptors
+read from the CAD — flags **100 % of held-out-family rows in all 8 folds** at a
+0.86 % in-sample false-alarm rate, with the threshold at the training 99th
+percentile. It is enforced in C++, not just measured: on the public unit box the
+advisor reports distance 61.83 against the 6.30 operating point, refuses, and
+falls back to defaults, while an in-corpus part scores 2.29 and is advised
+normally.
+
+The gate tests the **part**, not the load case — a user may clamp and load a
+familiar geometry any way they like, and that is a legal question rather than an
+unknown part. On a refusal every `predicted_*` value is **suppressed to NaN**: the
+case that motivated the gate had been reporting a predicted mesh time of 1.66e14
+ms, about 5,300 years, beside a failure probability of 1e-65 claiming near-certain
+success. The descriptor port is verified against its Python reference to
+**4.35e-16** on the distance across 32 parts.
+
+The feasibility head's calibration improved (ECE 0.4795 → 0.263), but on the
+shipped checkpoint's own fold its AUC is 0.5248 — near chance against a cross-fold
+mean of 0.806. Since the feasibility *gate* is built on that head, this is the
+main open risk and is recorded as such in the
 [model card](docs/advisor/0004-model-card.md).
 
 ![Advisor training curves](docs/advisor/figures/training_curves.png)

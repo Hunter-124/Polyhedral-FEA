@@ -40,12 +40,14 @@ if __package__ in (None, ""):  # direct `python scripts/advisor/export_onnx.py`
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     __package__ = "advisor"
 
+from .calibration import OOD_FEATURE_COLUMNS, fit_ood, ood_scores
 from .dataset import (
     ADVISOR_DIR,
     CASE_COLUMNS,
     CLAMPS_JSON,
     CONTINUOUS_ACTION_DIMS,
     FEATURE_COLUMNS,
+    GEOMETRY_FEATURE_COLUMNS,
     NORMALIZATION_JSON,
     OUTPUT_NAMES,
     REGRESSION_HEADS,
@@ -565,6 +567,73 @@ def check_fixture_guarantees(cases: list[dict[str, Any]], clamps: dict[str, Any]
             f"fixture 'vetoed_failure' logit {vetoed['failure_logit']} must be >= 4.0")
 
 
+#: How far above the fixture's own worst in-distribution distance the fixture
+#: threshold sits. Every fixture case must stay INSIDE it, or the four parity
+#: cases would all be refused and the C++ test would only prove that a veto
+#: which fires on everything fires.
+TINY_OOD_MARGIN = 1.5
+
+
+def tiny_ood(raw_matrix: np.ndarray, normalization: dict[str, Any]) -> dict[str, Any]:
+    """OOD parameters for the tiny fixture, fitted exactly as the real ones are.
+
+    Same :func:`advisor.calibration.fit_ood` the shipped ``bench/advisor/ood.json``
+    comes from, on the fixture's own RAW rows, so the C++ loader is exercised
+    against a real dense precision matrix and a real ``center``/``scale`` pair
+    rather than an identity.
+
+    Fitted over the intersection of ``OOD_FEATURE_COLUMNS`` with the fixture's own
+    columns, deliberately and not by accident. The
+    synthetic fixture cases are keyed by ``normalization.json:input_columns`` and
+    carry no ``geo_*`` descriptors, so asking for them would make ``fit_ood``
+    silently drop them -- the same quiet-subset failure this fixture exists to
+    catch. The count is asserted below rather than trusted: a fixture that
+    silently fitted 11 columns instead of 26 would still produce a plausible
+    distance and would still pass every test.
+
+    The operating point cannot be a training quantile here -- four rows have no
+    99th percentile -- so it is placed above the worst fixture distance and
+    asserted, which is what the C++ test needs: the four parity cases are in
+    distribution, and a far row is not.
+    """
+    input_columns = list(normalization["input_columns"])
+    expected = [name for name in OOD_FEATURE_COLUMNS if name in input_columns]
+    # `raw_matrix` carries NaN wherever a synthetic case omits a column -- that is
+    # deliberate, it is what exercises the impute path -- but a NaN propagates
+    # through the covariance and makes the SVD diverge. Fill from the fixture's
+    # own recorded impute values, i.e. the same medians the C++ would substitute.
+    # This is sound HERE precisely because it is a synthetic fixture whose job is
+    # to exercise the loader and the quadratic form; production never imputes an
+    # OOD input, it refuses (see Advisor::Impl::mahalanobis).
+    impute = np.asarray(normalization["impute"], dtype=np.float64)
+    filled = np.asarray(raw_matrix, dtype=np.float64).copy()
+    for column in range(filled.shape[1]):
+        missing = ~np.isfinite(filled[:, column])
+        filled[missing, column] = impute[column]
+    params = fit_ood(filled, input_columns, expected)
+    if params["feature_columns"] != expected:
+        raise SystemExit(
+            f"tiny fixture OOD fit resolved {len(params['feature_columns'])} columns, "
+            f"expected {len(expected)}; a silently narrowed fit would still produce "
+            f"plausible distances"
+        )
+    scores = ood_scores(params, filled, input_columns)
+    threshold = float(scores.max()) * TINY_OOD_MARGIN
+    if not (scores.max() < threshold):
+        raise SystemExit("tiny fixture OOD threshold does not admit its own cases")
+    params["operating_point"] = {
+        "rule": "flag when mahalanobis distance exceeds the threshold",
+        "threshold": threshold,
+        "note": f"synthetic fixture operating point: {TINY_OOD_MARGIN}x the worst of the "
+                f"{len(scores)} fixture cases (max {float(scores.max()):.6f}), so every "
+                "parity case is in distribution and the C++ veto has a direction to be "
+                "wrong in. The shipped bench/advisor/ood.json uses the validated "
+                "training q0.99 instead.",
+        "fixture_case_distances": [float(value) for value in scores],
+    }
+    return params
+
+
 def run_tiny_fixture(args: argparse.Namespace) -> int:
     directory = Path(args.fixture_dir) if args.fixture_dir else FIXTURE_DIR
     directory.mkdir(parents=True, exist_ok=True)
@@ -607,6 +676,11 @@ def run_tiny_fixture(args: argparse.Namespace) -> int:
     export_graph(net, model_path)
     write_json(directory / "normalization.json", normalization)
     write_json(directory / "clamps.json", clamps)
+    # The OOD block is required by the C++ loader, so the fixture must carry one
+    # or every advisor test fails at construction. Fitted from the fixture's own
+    # raw rows rather than copied from bench/advisor: a fixture that shared the
+    # shipped parameters would stop being a self-contained unit.
+    write_json(directory / "ood.json", tiny_ood(raw_matrix, normalization))
     parity = {
         "generator": "scripts/advisor/export_onnx.py --tiny-fixture",
         "seed": TINY_SEED,

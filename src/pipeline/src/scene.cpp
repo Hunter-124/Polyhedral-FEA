@@ -16,6 +16,7 @@
 #include "fea/vtu.hpp"
 #include "fea/zz.hpp"
 #include "geom/cad_model.hpp"
+#include "geom/cad_geometry_features.hpp"
 #include "geom/cad_topology.hpp"
 #include "geom/features.hpp"
 #include "geom/indicators.hpp"
@@ -373,6 +374,49 @@ CaseFeatures extract_case_features(const Model& model,
     out.diag = inv_diag > 0.0 ? 1.0 : 0.0;
     out.n_faces = model.surface.triangles.size();
     out.poisson = std::isfinite(poisson) ? poisson : 0.0;
+
+    // Exact-BRep descriptors for the advisor's OOD test. Same
+    // retained-cad-then-reload-source_path pattern as resolve_mesh_size above,
+    // guarded so a surface-only or no-OCC build simply reports them unavailable
+    // instead of contributing zeros to a Mahalanobis distance.
+    if (geom::occ_enabled()) {
+        try {
+            std::optional<geom::CadModel> cad_owned;
+            const geom::CadModel* cad_ptr = nullptr;
+            if (model.cad && !model.cad->empty()) {
+                cad_ptr = &(*model.cad);
+            } else if (!model.source_path.empty()) {
+                cad_owned = geom::load_cad(model.source_path);
+                if (cad_owned && !cad_owned->empty()) {
+                    cad_ptr = &(*cad_owned);
+                }
+            }
+            if (cad_ptr != nullptr) {
+                const geom::GeometryDescriptors geo =
+                    geom::compute_geometry_descriptors(*cad_ptr);
+                if (geo.available) {
+                    out.geo_available = true;
+                    out.geo_curved_area_frac = geo.curved_area_frac;
+                    out.geo_cyl_area_frac = geo.cyl_area_frac;
+                    out.geo_plane_area_frac = geo.plane_area_frac;
+                    out.geo_other_area_frac = geo.other_area_frac;
+                    out.geo_min_curv_radius_rel = geo.min_curv_radius_rel;
+                    out.geo_log_curv_radius_mean = geo.log_curv_radius_mean;
+                    out.geo_log_curv_radius_std = geo.log_curv_radius_std;
+                    out.geo_n_faces = geo.n_faces;
+                    out.geo_n_edges = geo.n_edges;
+                    out.geo_face_area_cv = geo.face_area_cv;
+                    out.geo_aspect_max = geo.aspect_max;
+                    out.geo_aspect_mid = geo.aspect_mid;
+                    out.geo_volume_frac = geo.volume_frac;
+                    out.geo_area_over_v23 = geo.area_over_v23;
+                    out.geo_min_face_size_rel = geo.min_face_size_rel;
+                }
+            }
+        } catch (...) {
+            out.geo_available = false;
+        }
+    }
 
     double surface_area_m2 = 0.0;
     double signed_volume_m3 = 0.0;

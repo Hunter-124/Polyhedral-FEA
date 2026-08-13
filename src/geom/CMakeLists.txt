@@ -5,6 +5,7 @@ add_library(geom
     src/step.cpp
     src/cad_model.cpp
     src/cad_topology.cpp
+    src/cad_geometry_features.cpp
     src/features.cpp
     src/indicators.cpp
 )

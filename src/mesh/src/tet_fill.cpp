@@ -154,28 +154,61 @@ TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
         std::vector<std::uint32_t> bnodes(bnode_set.begin(), bnode_set.end());
         const double h_snap = out.h;
         const double vol_eps = 1e-14 * h_snap * h_snap * h_snap;
+        const auto tet_is_bad = [&](const std::array<std::uint32_t, 4>& n) {
+            const Eigen::Vector3d& a = out.nodes[n[0]];
+            const Eigen::Vector3d& b = out.nodes[n[1]];
+            const Eigen::Vector3d& c = out.nodes[n[2]];
+            const Eigen::Vector3d& d = out.nodes[n[3]];
+            // vol_eps alone is a machine-degeneracy test (~1e-14·h³, thirteen
+            // orders under a healthy tet), so the snap was free to flatten skin
+            // tets into slivers. Add the shape floor the unsnap line-search was
+            // supposed to defend.
+            return !(tet_signed_volume_impl(a, b, c, d) > vol_eps &&
+                     validity::tet_shape_quality(a, b, c, d) >= validity::kCellShapeFloor);
+        };
+        // Node -> incident tets, so the snap can line-search ONE node against
+        // its own star instead of rescanning the whole mesh.
+        //
+        // Without this callback `snap_boundary_nodes` takes its compatibility
+        // path: a 0.75/0.5/0.25 ladder, and if none of the three fractions is
+        // valid the node retreats ALL THE WAY to its raw Cartesian lattice
+        // site. On a bore that is a spike. Measured on plate_hole at h=3 mm:
+        // 30 near-bore boundary nodes off the exact CAD by up to 1.99 mm --
+        // 0.67 h, a fifth of the bore radius -- and the mesher printed
+        // `snap max|d|=0.002 m` while shipping it. With the callback the same
+        // node keeps the largest fraction of its projection that stays valid.
+        std::unordered_map<std::uint32_t, std::vector<std::size_t>> incident;
+        incident.reserve(out.nodes.size());
+        for (std::size_t ti = 0; ti < out.tets.size(); ++ti) {
+            for (const auto ni : out.tets[ti]) {
+                incident[ni].push_back(ti);
+            }
+        }
         // Multi-pass snap ≤0.75 h with Jacobian safety (shared helper; ADR-0015/B3).
         snap_boundary_nodes(
             surface, out.nodes, bnodes, h_snap,
             [&](std::set<std::uint32_t>& offenders) {
                 for (const auto& n : out.tets) {
-                    const Eigen::Vector3d& a = out.nodes[n[0]];
-                    const Eigen::Vector3d& b = out.nodes[n[1]];
-                    const Eigen::Vector3d& c = out.nodes[n[2]];
-                    const Eigen::Vector3d& d = out.nodes[n[3]];
-                    // vol_eps alone is a machine-degeneracy test (~1e-14·h³,
-                    // thirteen orders under a healthy tet), so the snap was
-                    // free to flatten skin tets into slivers. Add the shape
-                    // floor the unsnap line-search was supposed to defend.
-                    if (tet_signed_volume_impl(a, b, c, d) > vol_eps &&
-                        validity::tet_shape_quality(a, b, c, d) >=
-                            validity::kCellShapeFloor) {
-                        continue;
+                    if (tet_is_bad(n)) {
+                        offenders.insert(n.begin(), n.end());
                     }
-                    offenders.insert(n.begin(), n.end());
                 }
             },
-            /*max_move_frac=*/0.75, /*passes=*/4);
+            /*max_move_frac=*/0.75, /*passes=*/4, /*feature_edges=*/{},
+            /*repair_interior=*/{},
+            /*node_offends=*/
+            [&](std::uint32_t ni) {
+                const auto it = incident.find(ni);
+                if (it == incident.end()) {
+                    return false;
+                }
+                for (const auto ti : it->second) {
+                    if (tet_is_bad(out.tets[ti])) {
+                        return true;
+                    }
+                }
+                return false;
+            });
 
         for (auto& n : out.tets) {
             const double v = tet_signed_volume_impl(out.nodes[n[0]], out.nodes[n[1]],

@@ -1,0 +1,466 @@
+{
+  "schema_version": 1,
+  "pipeline": "gmsh-mesh -> calculix-solve -> probe",
+  "gmsh_version": "4.13.1",
+  "calculix_version": "2.23",
+  "truth_source": "external-gmsh-mesh+calculix-solver",
+  "rungs": [
+    {
+      "h_rel_factor": 1.0,
+      "curvature_points": 24
+    },
+    {
+      "h_rel_factor": 0.6896551724137931,
+      "curvature_points": 34
+    }
+  ],
+  "include_wall_strip": false,
+  "started": "2026-08-13T05:40:35.239130+00:00",
+  "wall_total_s": 197.8,
+  "cases": [
+    {
+      "case_id": "tube_s0_c1",
+      "family": "tube",
+      "truth_source_existing": "provisional",
+      "analytic": false,
+      "bbox_diagonal_m": 0.061454126289832815,
+      "rungs": [
+        {
+          "case_id": "tube_s0_c1",
+          "h": 0.0033799769459408047,
+          "curvature_points": 24,
+          "status": "ok",
+          "wall_mesh_s": 2.74,
+          "gmsh_high_order_optimize": 2,
+          "n_nodes": 19217,
+          "n_elems": 9554,
+          "n_dof": 56931,
+          "n_fixed_nodes": 240,
+          "n_load_faces": 96,
+          "load_rule": "box+normal_min_dot",
+          "normal_min_dot": -1.0,
+          "load_area_m2": 3.427503121702501e-05,
+          "end_face_area_m2": 3.427503121702501e-05,
+          "box_only_area_m2": 3.427503121702501e-05,
+          "end_face_vs_selected_rel_diff": 0.0,
+          "resultant_N": [
+            0.0,
+            0.0,
+            -3.427503121702502
+          ],
+          "resultant_mag_N": 3.427503121702502,
+          "load_area_rel_err_vs_cad": 9.766576242544024e-06,
+          "wall_solve_s": 9.04,
+          "strain_energy_work_J": 6.589184964208506e-06,
+          "strain_energy_ccx_J": 6.589184981088e-06,
+          "strain_energy_rel_gap": 2.5616967648318626e-09,
+          "reaction_N": [
+            3.494594e-12,
+            1.447197e-12,
+            3.427503
+          ],
+          "equilibrium_rel_err": 3.55076268617327e-08,
+          "n_probe_nodes": 72,
+          "tip_deflection_m": 3.855090814589465e-06,
+          "h_rel": 0.055,
+          "bbox_diagonal_m": 0.061454126289832815,
+          "values": {
+            "strain_energy": 6.589184981088e-06,
+            "tip_deflection": 3.855090814589465e-06
+          }
+        },
+        {
+          "case_id": "tube_s0_c1",
+          "h": 0.0023310185834074515,
+          "curvature_points": 34,
+          "status": "ok",
+          "wall_mesh_s": 9.48,
+          "gmsh_high_order_optimize": 2,
+          "n_nodes": 56311,
+          "n_elems": 32552,
+          "n_dof": 167913,
+          "n_fixed_nodes": 340,
+          "n_load_faces": 136,
+          "load_rule": "box+normal_min_dot",
+          "normal_min_dot": -1.0,
+          "load_area_m2": 3.4275282777708983e-05,
+          "end_face_area_m2": 3.4275282777708983e-05,
+          "box_only_area_m2": 3.4275282777708983e-05,
+          "end_face_vs_selected_rel_diff": 0.0,
+          "resultant_N": [
+            0.0,
+            0.0,
+            -3.4275282777708975
+          ],
+          "resultant_mag_N": 3.4275282777708975,
+          "load_area_rel_err_vs_cad": 2.4271744052948298e-06,
+          "wall_solve_s": 39.57,
+          "strain_energy_work_J": 6.591400245201048e-06,
+          "strain_energy_ccx_J": 6.591400240646e-06,
+          "strain_energy_rel_gap": 6.910592979590568e-10,
+          "reaction_N": [
+            1.240638e-11,
+            2.296426e-12,
+            3.427528
+          ],
+          "equilibrium_rel_err": 8.10411687869862e-08,
+          "n_probe_nodes": 102,
+          "tip_deflection_m": 3.8563058272945116e-06,
+          "h_rel": 0.03793103448275862,
+          "bbox_diagonal_m": 0.061454126289832815,
+          "values": {
+            "strain_energy": 6.591400240646e-06,
+            "tip_deflection": 3.8563058272945116e-06
+          }
+        }
+      ],
+      "wall_total_s": 62.8,
+      "values": {
+        "strain_energy": 6.591400240646e-06,
+        "tip_deflection": 3.8563058272945116e-06
+      },
+      "convergence_delta": {
+        "strain_energy": 0.00033619629200852324,
+        "tip_deflection": 0.000315170968333157
+      },
+      "convergence_delta_between": [
+        0.055,
+        0.03793103448275862
+      ],
+      "status": "ok"
+    },
+    {
+      "case_id": "tube_s1_c1",
+      "family": "tube",
+      "truth_source_existing": "provisional",
+      "analytic": false,
+      "bbox_diagonal_m": 0.12250291601643479,
+      "rungs": [
+        {
+          "case_id": "tube_s1_c1",
+          "h": 0.006737660380903913,
+          "curvature_points": 24,
+          "status": "ok",
+          "wall_mesh_s": 3.24,
+          "gmsh_high_order_optimize": 2,
+          "n_nodes": 19651,
+          "n_elems": 9760,
+          "n_dof": 58233,
+          "n_fixed_nodes": 240,
+          "n_load_faces": 96,
+          "load_rule": "box+normal_min_dot",
+          "normal_min_dot": -1.0,
+          "load_area_m2": 8.81541446250125e-05,
+          "end_face_area_m2": 8.81541446250125e-05,
+          "box_only_area_m2": 8.81541446250125e-05,
+          "end_face_vs_selected_rel_diff": 0.0,
+          "resultant_N": [
+            0.0,
+            0.0,
+            -8.815414462501241
+          ],
+          "resultant_mag_N": 8.815414462501241,
+          "load_area_rel_err_vs_cad": 9.766716949809138e-06,
+          "wall_solve_s": 11.02,
+          "strain_energy_work_J": 3.668969768691342e-05,
+          "strain_energy_ccx_J": 3.668969776894e-05,
+          "strain_energy_rel_gap": 2.235684333985446e-09,
+          "reaction_N": [
+            -1.409384e-11,
+            -4.320912e-12,
+            8.815414
+          ],
+          "equilibrium_rel_err": 5.24650591374123e-08,
+          "n_probe_nodes": 72,
+          "tip_deflection_m": 8.344505668005788e-06,
+          "h_rel": 0.055,
+          "bbox_diagonal_m": 0.12250291601643479,
+          "values": {
+            "strain_energy": 3.668969776894e-05,
+            "tip_deflection": 8.344505668005788e-06
+          }
+        },
+        {
+          "case_id": "tube_s1_c1",
+          "h": 0.0046466623316578715,
+          "curvature_points": 34,
+          "status": "ok",
+          "wall_mesh_s": 6.7,
+          "gmsh_high_order_optimize": 2,
+          "n_nodes": 39387,
+          "n_elems": 19620,
+          "n_dof": 117141,
+          "n_fixed_nodes": 340,
+          "n_load_faces": 136,
+          "load_rule": "box+normal_min_dot",
+          "normal_min_dot": -1.0,
+          "load_area_m2": 8.815479163002253e-05,
+          "end_face_area_m2": 8.815479163002253e-05,
+          "box_only_area_m2": 8.815479163002253e-05,
+          "end_face_vs_selected_rel_diff": 0.0,
+          "resultant_N": [
+            0.0,
+            0.0,
+            -8.815479163002255
+          ],
+          "resultant_mag_N": 8.815479163002255,
+          "load_area_rel_err_vs_cad": 2.4273151137285937e-06,
+          "wall_solve_s": 21.38,
+          "strain_energy_work_J": 3.670188494231873e-05,
+          "strain_energy_ccx_J": 3.6701884769166e-05,
+          "strain_energy_rel_gap": 4.7178157923640125e-09,
+          "reaction_N": [
+            1.747968e-11,
+            -2.807214e-11,
+            8.815479
+          ],
+          "equilibrium_rel_err": 1.8490459292062485e-08,
+          "n_probe_nodes": 102,
+          "tip_deflection_m": 8.347250499363064e-06,
+          "h_rel": 0.03793103448275862,
+          "bbox_diagonal_m": 0.12250291601643479,
+          "values": {
+            "strain_energy": 3.6701884769166e-05,
+            "tip_deflection": 8.347250499363064e-06
+          }
+        }
+      ],
+      "wall_total_s": 44.0,
+      "values": {
+        "strain_energy": 3.6701884769166e-05,
+        "tip_deflection": 8.347250499363064e-06
+      },
+      "convergence_delta": {
+        "strain_energy": 0.0003321640942029329,
+        "tip_deflection": 0.00032893876120184806
+      },
+      "convergence_delta_between": [
+        0.055,
+        0.03793103448275862
+      ],
+      "status": "ok"
+    },
+    {
+      "case_id": "tube_s2_c1",
+      "family": "tube",
+      "truth_source_existing": "provisional",
+      "analytic": false,
+      "bbox_diagonal_m": 0.22423591747484384,
+      "rungs": [
+        {
+          "case_id": "tube_s2_c1",
+          "h": 0.012332975461116412,
+          "curvature_points": 24,
+          "status": "ok",
+          "wall_mesh_s": 3.28,
+          "gmsh_high_order_optimize": 2,
+          "n_nodes": 20890,
+          "n_elems": 10393,
+          "n_dof": 61950,
+          "n_fixed_nodes": 240,
+          "n_load_faces": 96,
+          "load_rule": "box+normal_min_dot",
+          "normal_min_dot": -1.0,
+          "load_area_m2": 0.00031558988952345383,
+          "end_face_area_m2": 0.00031558988952345383,
+          "box_only_area_m2": 0.00031558988952345383,
+          "end_face_vs_selected_rel_diff": 0.0,
+          "resultant_N": [
+            0.0,
+            0.0,
+            -31.55898895234542
+          ],
+          "resultant_mag_N": 31.55898895234542,
+          "load_area_rel_err_vs_cad": 9.766619733677902e-06,
+          "wall_solve_s": 10.73,
+          "strain_energy_work_J": 0.0002685316962565879,
+          "strain_energy_ccx_J": 0.00026853169446204,
+          "strain_energy_rel_gap": 6.682816016582146e-09,
+          "reaction_N": [
+            1.049703e-10,
+            -1.784113e-10,
+            31.55899
+          ],
+          "equilibrium_rel_err": 3.319670993852313e-08,
+          "n_probe_nodes": 72,
+          "tip_deflection_m": 1.705548177304956e-05,
+          "h_rel": 0.055,
+          "bbox_diagonal_m": 0.22423591747484384,
+          "values": {
+            "strain_energy": 0.00026853169446204,
+            "tip_deflection": 1.705548177304956e-05
+          }
+        },
+        {
+          "case_id": "tube_s2_c1",
+          "h": 0.00850550031801132,
+          "curvature_points": 34,
+          "status": "ok",
+          "wall_mesh_s": 6.92,
+          "gmsh_high_order_optimize": 2,
+          "n_nodes": 41963,
+          "n_elems": 20888,
+          "n_dof": 124869,
+          "n_fixed_nodes": 340,
+          "n_load_faces": 136,
+          "load_rule": "box+normal_min_dot",
+          "normal_min_dot": -1.0,
+          "load_area_m2": 0.0003155922057870908,
+          "end_face_area_m2": 0.0003155922057870908,
+          "box_only_area_m2": 0.0003155922057870908,
+          "end_face_vs_selected_rel_diff": 0.0,
+          "resultant_N": [
+            0.0,
+            0.0,
+            -31.55922057870906
+          ],
+          "resultant_mag_N": 31.55922057870906,
+          "load_area_rel_err_vs_cad": 2.4272178967611226e-06,
+          "wall_solve_s": 23.52,
+          "strain_energy_work_J": 0.00026861232332097085,
+          "strain_energy_ccx_J": 0.00026861232420333003,
+          "strain_energy_rel_gap": 3.284879738845598e-09,
+          "reaction_N": [
+            9.692736e-11,
+            6.474407e-11,
+            31.55922
+          ],
+          "equilibrium_rel_err": 1.8337242189983705e-08,
+          "n_probe_nodes": 102,
+          "tip_deflection_m": 1.706055148444265e-05,
+          "h_rel": 0.03793103448275862,
+          "bbox_diagonal_m": 0.22423591747484384,
+          "values": {
+            "strain_energy": 0.00026861232420333003,
+            "tip_deflection": 1.706055148444265e-05
+          }
+        }
+      ],
+      "wall_total_s": 46.2,
+      "values": {
+        "strain_energy": 0.00026861232420333003,
+        "tip_deflection": 1.706055148444265e-05
+      },
+      "convergence_delta": {
+        "strain_energy": 0.00030026154436473744,
+        "tip_deflection": 0.00029724820796909844
+      },
+      "convergence_delta_between": [
+        0.055,
+        0.03793103448275862
+      ],
+      "status": "ok"
+    },
+    {
+      "case_id": "tube_s3_c1",
+      "family": "tube",
+      "truth_source_existing": "provisional",
+      "analytic": false,
+      "bbox_diagonal_m": 0.3929484502052447,
+      "rungs": [
+        {
+          "case_id": "tube_s3_c1",
+          "h": 0.02161216476128846,
+          "curvature_points": 24,
+          "status": "ok",
+          "wall_mesh_s": 2.68,
+          "gmsh_high_order_optimize": 2,
+          "n_nodes": 16317,
+          "n_elems": 8109,
+          "n_dof": 48231,
+          "n_fixed_nodes": 240,
+          "n_load_faces": 96,
+          "load_rule": "box+normal_min_dot",
+          "normal_min_dot": -1.0,
+          "load_area_m2": 0.0018928173113128346,
+          "end_face_area_m2": 0.0018928173113128346,
+          "box_only_area_m2": 0.0018928173113128346,
+          "end_face_vs_selected_rel_diff": 0.0,
+          "resultant_N": [
+            0.0,
+            0.0,
+            -189.28173113128327
+          ],
+          "resultant_mag_N": 189.28173113128327,
+          "load_area_rel_err_vs_cad": 9.766661843979293e-06,
+          "wall_solve_s": 8.13,
+          "strain_energy_work_J": 0.001642624230686571,
+          "strain_energy_ccx_J": 0.0016426242761226001,
+          "strain_energy_rel_gap": 2.7660634103338603e-08,
+          "reaction_N": [
+            -3.212559e-10,
+            -1.060212e-10,
+            189.2817
+          ],
+          "equilibrium_rel_err": 1.64470617849992e-07,
+          "n_probe_nodes": 72,
+          "tip_deflection_m": 1.74200409013669e-05,
+          "h_rel": 0.055,
+          "bbox_diagonal_m": 0.3929484502052447,
+          "values": {
+            "strain_energy": 0.0016426242761226001,
+            "tip_deflection": 1.74200409013669e-05
+          }
+        },
+        {
+          "case_id": "tube_s3_c1",
+          "h": 0.014904941214681697,
+          "curvature_points": 34,
+          "status": "ok",
+          "wall_mesh_s": 7.43,
+          "gmsh_high_order_optimize": 2,
+          "n_nodes": 43418,
+          "n_elems": 24610,
+          "n_dof": 129234,
+          "n_fixed_nodes": 340,
+          "n_load_faces": 136,
+          "load_rule": "box+normal_min_dot",
+          "normal_min_dot": -1.0,
+          "load_area_m2": 0.001892831203595367,
+          "end_face_area_m2": 0.001892831203595367,
+          "box_only_area_m2": 0.001892831203595367,
+          "end_face_vs_selected_rel_diff": 0.0,
+          "resultant_N": [
+            0.0,
+            0.0,
+            -189.28312035953715
+          ],
+          "resultant_mag_N": 189.28312035953715,
+          "load_area_rel_err_vs_cad": 2.4272600073675847e-06,
+          "wall_solve_s": 24.38,
+          "strain_energy_work_J": 0.0016432782690525634,
+          "strain_energy_ccx_J": 0.0016432782546136,
+          "strain_energy_rel_gap": 8.786682011509582e-09,
+          "reaction_N": [
+            -3.768719e-11,
+            -6.249422e-10,
+            189.2831
+          ],
+          "equilibrium_rel_err": 1.0756129300451628e-07,
+          "n_probe_nodes": 102,
+          "tip_deflection_m": 1.7426671499396878e-05,
+          "h_rel": 0.03793103448275862,
+          "bbox_diagonal_m": 0.3929484502052447,
+          "values": {
+            "strain_energy": 0.0016432782546136,
+            "tip_deflection": 1.7426671499396878e-05
+          }
+        }
+      ],
+      "wall_total_s": 44.2,
+      "values": {
+        "strain_energy": 0.0016432782546136,
+        "tip_deflection": 1.7426671499396878e-05
+      },
+      "convergence_delta": {
+        "strain_energy": 0.00039813029705338716,
+        "tip_deflection": 0.00038063045130143916
+      },
+      "convergence_delta_between": [
+        0.055,
+        0.03793103448275862
+      ],
+      "status": "ok"
+    }
+  ]
+}

@@ -1,0 +1,308 @@
+{
+  "purpose": "Raw per-rung solver output from the external truth pipeline, kept so every reference value and every trust claim can be recomputed from the source data rather than re-solved.",
+  "pipeline": "gmsh-mesh -> calculix-solve -> probe (bench/reference/external_truth.py)",
+  "chain": [
+    "raw-*.json  : per-case, per-rung Gmsh + CalculiX output and probe values (this directory)",
+    "../external-truth-load-evidence.json : per-rung loaded areas, wall-ring exposure, CAD feature sizes, annulus verification (--stage evidence)",
+    "../external-truth-audit*.json : before/after reference movement (--stage audit / --stage write)",
+    "../external-truth-validate.json : the closed-form gate and the CalculiX-vs-PolyMesh cross-check",
+    "../external-truth-findings.json : headline findings with their evidence",
+    "../../corpus/*.json : the references themselves, each carrying metric.provenance"
+  ],
+  "reproduce": [
+    "python bench/reference/external_truth.py --stage generate --family <family> --out <raw.json>",
+    "python bench/reference/external_truth.py --stage evidence --family tube --family perforated_plate --results <raw.json> ...",
+    "python bench/reference/external_truth.py --stage write --approved --results <raw.json> ... --audit <audit.json>",
+    "python bench/reference/external_truth.py --stage audit --baseline <git-rev>"
+  ],
+  "files": {
+    "raw-box_hole.json": {
+      "cases": [
+        "box_hole_s0_c1",
+        "box_hole_s0_c2",
+        "box_hole_s1_c1",
+        "box_hole_s1_c2",
+        "box_hole_s2_c1",
+        "box_hole_s2_c2",
+        "box_hole_s3_c1",
+        "box_hole_s3_c2"
+      ],
+      "rungs_per_case": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "gmsh_version": "4.13.1",
+      "calculix_version": "2.23"
+    },
+    "raw-box_hole_c0_3rung_a.json": {
+      "cases": [
+        "box_hole_s0_c0",
+        "box_hole_s1_c0"
+      ],
+      "rungs_per_case": [
+        3,
+        3
+      ],
+      "gmsh_version": "4.13.1",
+      "calculix_version": "2.23"
+    },
+    "raw-box_hole_c0_3rung_b.json": {
+      "cases": [
+        "box_hole_s2_c0",
+        "box_hole_s3_c0"
+      ],
+      "rungs_per_case": [
+        3,
+        3
+      ],
+      "gmsh_version": "4.13.1",
+      "calculix_version": "2.23"
+    },
+    "raw-channel_l_bracket.json": {
+      "cases": [
+        "channel_s0_c0",
+        "channel_s0_c1",
+        "channel_s0_c2",
+        "channel_s1_c0",
+        "channel_s1_c1",
+        "channel_s1_c2",
+        "channel_s2_c0",
+        "channel_s2_c1",
+        "channel_s2_c2",
+        "channel_s3_c0",
+        "channel_s3_c1",
+        "channel_s3_c2",
+        "l_bracket_s0_c0",
+        "l_bracket_s0_c1",
+        "l_bracket_s0_c2",
+        "l_bracket_s1_c0",
+        "l_bracket_s1_c1",
+        "l_bracket_s1_c2",
+        "l_bracket_s2_c0",
+        "l_bracket_s2_c1",
+        "l_bracket_s2_c2",
+        "l_bracket_s3_c0",
+        "l_bracket_s3_c1",
+        "l_bracket_s3_c2"
+      ],
+      "rungs_per_case": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "gmsh_version": "4.13.1",
+      "calculix_version": "2.23"
+    },
+    "raw-perforated_plate_a.json": {
+      "cases": [
+        "perforated_plate_s0_c0",
+        "perforated_plate_s0_c1",
+        "perforated_plate_s0_c2",
+        "perforated_plate_s1_c0",
+        "perforated_plate_s1_c1",
+        "perforated_plate_s1_c2"
+      ],
+      "rungs_per_case": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "gmsh_version": "4.13.1",
+      "calculix_version": "2.23"
+    },
+    "raw-perforated_plate_b.json": {
+      "cases": [
+        "perforated_plate_s2_c0",
+        "perforated_plate_s2_c1",
+        "perforated_plate_s2_c2",
+        "perforated_plate_s3_c0",
+        "perforated_plate_s3_c1",
+        "perforated_plate_s3_c2"
+      ],
+      "rungs_per_case": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "gmsh_version": "4.13.1",
+      "calculix_version": "2.23"
+    },
+    "raw-plate_notch.json": {
+      "cases": [
+        "plate_notch_s0_c0",
+        "plate_notch_s0_c1",
+        "plate_notch_s0_c2",
+        "plate_notch_s1_c0",
+        "plate_notch_s1_c1",
+        "plate_notch_s1_c2",
+        "plate_notch_s2_c0",
+        "plate_notch_s2_c1",
+        "plate_notch_s2_c2",
+        "plate_notch_s3_c0",
+        "plate_notch_s3_c1",
+        "plate_notch_s3_c2"
+      ],
+      "rungs_per_case": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "gmsh_version": "4.13.1",
+      "calculix_version": "2.23"
+    },
+    "raw-sphere_box.json": {
+      "cases": [
+        "sphere_box_s0_c0",
+        "sphere_box_s0_c1",
+        "sphere_box_s0_c2",
+        "sphere_box_s1_c0",
+        "sphere_box_s1_c1",
+        "sphere_box_s1_c2",
+        "sphere_box_s2_c0",
+        "sphere_box_s2_c1",
+        "sphere_box_s2_c2",
+        "sphere_box_s3_c0",
+        "sphere_box_s3_c1",
+        "sphere_box_s3_c2"
+      ],
+      "rungs_per_case": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "gmsh_version": "4.13.1",
+      "calculix_version": "2.23"
+    },
+    "raw-stepped_shaft_c0.json": {
+      "cases": [
+        "stepped_shaft_s0_c0",
+        "stepped_shaft_s1_c0",
+        "stepped_shaft_s2_c0",
+        "stepped_shaft_s3_c0"
+      ],
+      "rungs_per_case": [
+        2,
+        2,
+        2,
+        2
+      ],
+      "gmsh_version": "4.13.1",
+      "calculix_version": "2.23"
+    },
+    "raw-stepped_shaft_c2.json": {
+      "cases": [
+        "stepped_shaft_s0_c2",
+        "stepped_shaft_s1_c2",
+        "stepped_shaft_s2_c2",
+        "stepped_shaft_s3_c2"
+      ],
+      "rungs_per_case": [
+        2,
+        2,
+        2,
+        2
+      ],
+      "gmsh_version": "4.13.1",
+      "calculix_version": "2.23"
+    },
+    "raw-tube_c0.json": {
+      "cases": [
+        "tube_s0_c0",
+        "tube_s1_c0",
+        "tube_s2_c0",
+        "tube_s3_c0"
+      ],
+      "rungs_per_case": [
+        2,
+        2,
+        2,
+        2
+      ],
+      "gmsh_version": "4.13.1",
+      "calculix_version": "2.23"
+    },
+    "raw-tube_c1.json": {
+      "cases": [
+        "tube_s0_c1",
+        "tube_s1_c1",
+        "tube_s2_c1",
+        "tube_s3_c1"
+      ],
+      "rungs_per_case": [
+        2,
+        2,
+        2,
+        2
+      ],
+      "gmsh_version": "4.13.1",
+      "calculix_version": "2.23"
+    },
+    "raw-tube_c2.json": {
+      "cases": [
+        "tube_s0_c2",
+        "tube_s1_c2",
+        "tube_s2_c2",
+        "tube_s3_c2"
+      ],
+      "rungs_per_case": [
+        2,
+        2,
+        2,
+        2
+      ],
+      "gmsh_version": "4.13.1",
+      "calculix_version": "2.23"
+    }
+  }
+}

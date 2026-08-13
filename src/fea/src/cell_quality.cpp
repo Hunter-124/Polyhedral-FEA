@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "fea/cell_quality.hpp"
 
+#include "fea/quadrature.hpp"
+#include "fea/shape.hpp"
 #include "mesh/quality.hpp"
 
 #include <Eigen/Geometry>
@@ -8,6 +10,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <limits>
 #include <span>
 #include <vector>
@@ -311,6 +314,82 @@ CellQualityStats summarize_cell_quality(const NodalMesh& mesh) {
     s.min = min_q;
     s.mean = sum / static_cast<double>(s.n_measured);
     return s;
+}
+
+namespace {
+
+struct VolumeRulePoint {
+    double weight = 0.0;
+    Eigen::Matrix<double, Eigen::Dynamic, 3> dn;
+};
+
+std::vector<VolumeRulePoint> make_volume_rule(ElementType type) {
+    std::vector<QuadraturePoint> quadrature;
+    if (type == ElementType::kTet10) {
+        // A quadratic tetrahedral map has a cubic det(J).
+        quadrature = tet_rule(3);
+    } else if (type == ElementType::kHex20) {
+        // One order above the stiffness rule makes the curved-volume measure
+        // insensitive to the integration shortcut used by the solver.
+        quadrature = hex_rule(4);
+    } else {
+        quadrature = default_rule(type);
+    }
+    std::vector<VolumeRulePoint> out;
+    out.reserve(quadrature.size());
+    for (const auto& qp : quadrature) {
+        out.push_back({qp.weight, eval_shape(type, qp.xi).dn});
+    }
+    return out;
+}
+
+const std::vector<VolumeRulePoint>& volume_rule(ElementType type) {
+    static const auto rules = [] {
+        std::array<std::vector<VolumeRulePoint>, 6> value;
+        for (std::size_t i = 0; i < value.size(); ++i) {
+            value[i] = make_volume_rule(static_cast<ElementType>(i));
+        }
+        return value;
+    }();
+    return rules[static_cast<std::size_t>(type)];
+}
+
+} // namespace
+
+double element_volume(const NodalMesh& mesh, const NodalElement& element) {
+    if (element.type == ElementType::kPolyVem) {
+        double signed_volume = 0.0;
+        for (const auto& face : element.faces) {
+            if (face.size() < 3) {
+                continue;
+            }
+            const Eigen::Vector3d& a = mesh.nodes[element.nodes[face[0]]];
+            for (std::size_t k = 1; k + 1 < face.size(); ++k) {
+                const Eigen::Vector3d& b = mesh.nodes[element.nodes[face[k]]];
+                const Eigen::Vector3d& c = mesh.nodes[element.nodes[face[k + 1]]];
+                signed_volume += a.dot(b.cross(c)) / 6.0;
+            }
+        }
+        return std::abs(signed_volume);
+    }
+    double total = 0.0;
+    for (const auto& qp : volume_rule(element.type)) {
+        Eigen::Matrix3d jacobian = Eigen::Matrix3d::Zero();
+        for (std::size_t a = 0; a < element.nodes.size(); ++a) {
+            jacobian.noalias() += qp.dn.row(static_cast<Eigen::Index>(a)).transpose() *
+                                  mesh.nodes[element.nodes[a]].transpose();
+        }
+        total += qp.weight * std::abs(jacobian.determinant());
+    }
+    return total;
+}
+
+double mesh_volume(const NodalMesh& mesh) {
+    double total = 0.0;
+    for (const auto& element : mesh.elements) {
+        total += element_volume(mesh, element);
+    }
+    return total;
 }
 
 } // namespace polymesh::fea

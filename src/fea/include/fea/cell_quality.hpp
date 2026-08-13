@@ -77,4 +77,21 @@ struct CellQualityStats {
 /// Min/mean over measured cells only; unmeasured cells are counted, not faked.
 CellQualityStats summarize_cell_quality(const NodalMesh& mesh);
 
+/// Volume of one cell in m³, integrated with the element's OWN shape functions
+/// over their own parametric domain (`sum w·|det J|`); kPolyVem cells use the
+/// divergence theorem on their face loops instead, since they have no
+/// isoparametric map. Curved cells are measured with a rule one order above
+/// the stiffness rule, so the number is insensitive to the solver's
+/// integration shortcut.
+///
+/// This is the ONE definition of "how much solid is this cell". The fill-volume
+/// guard and the advisor's per-element samples both come through here. They did
+/// not, once: `stress.cpp` used a bare |det J| at a single reference point,
+/// which drops the reference-domain measure and reports 0.125x the true volume
+/// of a hex and ~0.09x that of a pyramid.
+double element_volume(const NodalMesh& mesh, const NodalElement& element);
+
+/// Sum of `element_volume` over every cell, in m³.
+double mesh_volume(const NodalMesh& mesh);
+
 } // namespace polymesh::fea

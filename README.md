@@ -140,44 +140,98 @@ Design narrative: [docs/solver-core.md](docs/solver-core.md).
 
 ## Learned mesh advisor
 
-A compact multi-head MLP maps geometry + BC features and a candidate mesh
-action to accuracy, B-rep fidelity, cost, and failure risk; its policy head
-chooses mesher, size, order, and adaptivity under hard runtime vetoes
-([ADR-0027](docs/decisions/0027-learned-mesh-advisor.md)).
+A compact multi-head MLP maps geometry + BC features and a candidate mesh action
+to accuracy, B-rep fidelity, cost, and failure risk
+([ADR-0027](docs/decisions/0027-learned-mesh-advisor.md)). The shipped decision
+rule is **gated enumeration**: score every action in an explicit list of 20
+*measured* candidates, drop those the feasibility head expects to fail, and take
+the argmin of predicted per-case accuracy over the survivors. Hard runtime vetoes
+still run afterwards — the gate improves a choice, the veto refuses one.
 
 ![Advisor mesh choices before and after](docs/advisor/figures/mesh_before_after.png)
 
-Held-out decision regret is log10 distance from the best measured action
-(`n=12`, mean within-case Spearman 0.610). All 72 corpus references are
-non-provisional: 64 promoted overkill solves and 8 analytic truths.
+Evaluation is **leave-one-family-out** over 8 geometry families (7 of 8 folds
+scorable) with 5 seeds, under a **DOF-primary budget**, with failing actions
+offered and charged. Regret is log10 distance from the best feasible measured
+action, so 0.30 means "2× worse than the best mesh this case could have had".
+References are an independent Gmsh + CalculiX chain (88 external, 8 closed-form)
+with tolerances near 0.02.
 
-| Outcome regret | Advisor | Default | Oracle |
-|---|---:|---:|---:|
-| Accuracy (`rel_err`) | **0.6322** | 1.2822 | 0 |
-| B-rep fidelity (`geo_p99`) | **0.2307** | 0.2334 | 0.1758 |
-| Solve time (`solve_ms`) | 1.7198 | **0.3629** | 1.6251 |
+| Chooser | `rel_err` regret @ q0.5 | ±fold | ±seed | Picked an action that failed |
+|---|---:|---:|---:|---:|
+| `advisor_gated` — best threshold (0.2) | **0.3233** | 0.244 | 0.071 | 31.3 % |
+| **`advisor_gated` — as shipped (0.5)** | **0.3350** | 0.242 | 0.086 | 31.2 % |
+| `spend_budget` — *hindsight, not deployable* | 0.3358 | 0.190 | 0 | 0.0 % |
+| `advisor_argmin` (ranking only) | 0.3400 | 0.238 | 0.090 | 36.4 % |
+| Shipped default action | 0.3796 | 0.223 | 0 | 19.0 % |
+| Random feasible action | 0.4076 | 0.238 | 0.098 | 41.7 % |
+| Best single constant config | 0.4379 | 0.321 | 0 | 27.4 % |
+| "Just mesh finer" (`finest_action`) | 0.4409 | 0.294 | 0 | 23.8 % |
 
-The advisor is approximately **4.5x better than the default on accuracy
-regret**: its pick is approximately 4.3x off oracle accuracy versus the
-default's approximately 19x. Fidelity improves marginally. Time does not: the
-accuracy-optimal oracle is itself slow (1.6251), and the advisor tracks it
-within 0.095 at 1.7198, buying accuracy with solve time rather than beating the
-faster default.
+**The advisor now beats `spend_budget`** — the baseline that previously beat
+everything — though as shipped it does so by 0.0008 decades, which is a tie in all
+but sign. The gate is threshold-insensitive: every variant from 0.05 to 0.8 lands
+in 0.3233–0.3350 and all of them beat `spend_budget` and the default. `clamps.json`
+currently sets no `gate_threshold`, so the C++ falls back to the veto's 0.5, which
+is the *weakest* member of that family; setting it explicitly to 0.2 buys 0.012
+decades for free and is a recorded action item.
+
+`spend_budget` is **not a fair opponent** and is labelled as such: it ranks
+candidates by their *measured* DOF, so it can never select an action that turned
+out to fail, which shows up as an impossible 0.0 % failure rate at every budget. It
+has hindsight no shipped rule can have. `finest_action` is the honest form of the
+same idea, and the advisor beats it 107W-55L-198T (**p = 5.4e-05**); it also beats
+the constant config (p = 1.1e-03) and the default (p = 2.1e-03).
+
+Holding cost nearly constant, so only judgement separates the choosers, the
+advisor is **no longer the worst chooser**: in the 0.4–0.6 DOF band it scores
+0.2260 as shipped (0.2061 at the 0.05 threshold) against random 0.2576,
+constant-config 0.2637 and finest-action 0.2690 — though the shipped default at
+0.1724 still wins. So per-case judgement now *weakly* exists rather than not at
+all, and most of the advisor's value is spend allocation plus feasibility
+filtering.
+
+**An earlier claim is retired.** The feasibility gate was previously reported as
+strictly dominant over plain ranking (38W-0L, p = 7.3e-12). On the rebuilt corpus
+that comparison is 21W-16L-323T, **p = 0.51 — not significant**. Ranking alone
+became significant instead: `advisor_argmin` versus `finest_action` moved from
+117W-136L (p = 0.258, losing) to 108W-64L (p = 9.9e-04, winning). The cause is
+the labels, not the model — independent references with roughly five times
+tighter tolerances made the ranking target learnable where it previously was not.
+**The model was never the bottleneck; the labels were.** The gate still ships, on
+its honest basis: best deployable chooser at q0.5, and it cuts the rate of
+recommending an action that then fails from 36.4 % to 27.5 % at its best threshold
+(31.2 % as shipped).
 
 ![Advisor accuracy versus cost](docs/advisor/figures/accuracy_vs_cost.png)
 
 ![Advisor network layout](docs/advisor/figures/network_layout.png)
 
-The deployed width-96, depth-2 model has **15,986 parameters**, 44 inputs and 10
-action outputs. It exports at ONNX opset 17 with 2.483e-06 relative C++ parity.
+The deployed width-96, depth-2 model has **15,591 parameters**, **43 inputs and 7
+action outputs** — `p_elevate` was deleted as redundant (`order >= 2` is the same
+actuator) and the order vocabulary trimmed to the reachable `[1,2]`. It exports at
+ONNX opset 17 with **1.615e-06** relative C++ parity. A recommendation costs
+**~1.0 ms** (p50, single-threaded, 20 candidates; p99 2.62 ms measured at 32),
+roughly **0.1 % of a solve**, and a test fails the build above 100 ms p99.
+
+The out-of-distribution gate is distance-based and validated: Mahalanobis over
+the geometry columns flags **100 % of held-out-family rows in all 8 folds** at a
+1 % in-sample false-alarm rate. The feasibility head's calibration improved
+(ECE 0.4795 → 0.263), but on the shipped checkpoint's own fold its AUC is 0.5248
+— near chance against a cross-fold mean of 0.806. Since the gate is built on that
+head, this is the main open risk and is recorded as such in the
+[model card](docs/advisor/0004-model-card.md).
 
 ![Advisor training curves](docs/advisor/figures/training_curves.png)
 
-Accuracy-head validation improved after the engine/truth rebuild; geometry and
-cost heads regressed on the harder corrected distribution, as did LightGBM on
-the same geometry/DOF targets. Capacity was deliberately unchanged. Full
-metrics and provenance are in the
-[training log](docs/advisor/0003-training-log.md).
+Per-head accuracy is **worse** than previously published (`rel_err` median 0.80
+versus 0.809; `dof` 0.52 versus 0.150) and that is correct rather than a
+regression: the old numbers came from a split that leaked — 672 of 672 validation
+rows had a training row with an identical geometry-feature and action vector.
+Prediction accuracy fell and decision quality rose at the same time, from the
+same cause. Full metrics, limitations and provenance are in the
+[model card](docs/advisor/0004-model-card.md) and
+[data card](docs/advisor/0005-data-card.md).
 
 **[Open the interactive advisor dashboard](bench/advisor/dashboard.html)** —
 per-head validation, pruning, throughput, baseline comparison, and network
@@ -186,23 +240,58 @@ activations.
 ### Vs established tools
 
 The Gmsh comparison swaps only the mesh source: PolyMesh's solver, probe, BCs,
-and truth stay fixed. Medians use the strict matched set, where a
-`(case, h_rel, order)` point counts only when all three mesh sources are
-measurable. Each result is `median relative error / median active DOF`;
-Accuracy/DOF is the median pointwise `relative error × DOF`.
+and truth stay fixed. The matrix below is the committed one
+([`a25b4ec`](bench/results/gmsh-peer.json), 336 rows, engine `f372e83`).
 
-| Case family | Order | Gmsh | Native default | Native graded | Accuracy winner | Accuracy/DOF winner | n |
-|---|---:|---:|---:|---:|---|---|---:|
-| Box-hole SCF | 1 | 0.3577 / 822 | 0.6631 / 1,921.5 | 0.5110 / 4,314 | Gmsh | Gmsh (267.4 vs 1,359.3 vs 1,991.2) | 8 |
-| Box-hole SCF | 2 | 0.2671 / 4,809 | 0.6588 / 6,817.5 | 0.5110 / 27,555 | Gmsh | Gmsh (1,294.9 vs 4,218.3 vs 13,263.5) | 8 |
-| Stepped-shaft tip deflection | 1 | 0.2276 / 291 | 0.1486 / 486 | 0.1728 / 1,188 | Native default | Gmsh (66.24 vs 78.21 vs 233.10) | 9 |
-| Stepped-shaft tip deflection | 2 | 0.4410 / 1,482 | 0.06578 / 1,491 | 0.07704 / 7,491 | Native default | Native default (797.77 vs 91.61 vs 825.63) | 9 |
+**Order-1 medians are the clean comparison**, and our meshers now win all four
+families on accuracy:
+
+| Case family | Gmsh mesh | Native default | Native graded | Accuracy winner |
+|---|---:|---:|---:|---|
+| Box-hole SCF | 0.3780 | 0.4831 | **0.1493** | native graded |
+| Stepped-shaft tip deflection | 0.2381 | **0.0148** | 0.1399 | native default |
+| Thin-walled tube | 0.1448 | — | **0.0802** | native graded |
+| Perforated plate | 0.7622 | **0.3318** | 0.4163 | native default |
+
+**This is a bug fix, not an improvement in meshing.** The earlier README reported
+that Gmsh dominates the hole family at both orders. That result was measured on an
+engine that was **silently deleting the bore** — the geometry being compared was
+not the geometry requested. The number moved because the engine was corrected;
+nothing about the mesher got better, and the previous figures should be read as
+having measured the wrong solid rather than as having been beaten.
+
+**The accuracy wins are bought with degrees of freedom, and the ranking flips
+when you charge for them.** Median DOF at the same rungs: box-hole 738 (Gmsh)
+versus 6,242 (graded); tube 540 versus 5,142. On median `relative error × DOF`,
+Gmsh still wins two of the four families — box-hole 278 versus 849 and tube 84
+versus 363 — while native wins stepped-shaft 17 versus 69 and perforated-plate 678
+versus 1,171. Neither tool is uniformly better; ours is more accurate per case and
+Gmsh is more economical on the curved-hole families.
+
+**Coverage is thin and the reason matters.** Of 336 rows, only 159 are `ok`:
+**166 are refusals**, 9 are outright failures and 2 are honest timeouts.
+
+- The **9 failures are Gmsh's own**, all on thin-walled tubes at coarse `h`
+  (`h_rel` 0.08/0.12/0.20). That geometry is effectively unmeshable by either tool
+  at those sizes; the difference is that our refusals *name the size they would
+  need* rather than emitting a mesh that cannot be solved.
+- The 2 timeouts are `perforated_plate_s2_c1` graded at `h_rel=0.08`, recorded as
+  timeouts rather than dropped.
+- Because refusal counts differ per source, the medians are over **each source's
+  own measurable rows and the `n` are unequal** (12 Gmsh versus 6 graded on
+  box-hole, for example). They are not a strict matched set.
+
+**Order 2 remains an approximate pairing** — the adaptive path produces a mixed-p
+mesh, so an `order=2` native row is not the uniformly quadratic mesh a Gmsh
+`order=2` row is. Where the uniform variant is used the pairing is exact, and
+**full parity was verified on 14 of 14** matched `polymesh-native-uniform-p2`
+rows.
 
 Order-2 Gmsh meshes use high-order optimisation
 (`Mesh.HighOrderOptimize=2`; one row needed the mode-1 fallback). Without it,
 four meshes contained inverted tet10 elements that PolyMesh correctly rejects.
 
-The comparison exposed a real PolyMesh stress-recovery defect: ZZ patch fits
+The comparison also exposed a real PolyMesh stress-recovery defect: ZZ patch fits
 were extrapolated at p-elevated mid-side nodes. Fixing it (`08f9f55`) moved
 `box_hole_s2_c0`, `h_rel=0.08`, order 2 from 2.595 relative error to **0.0072**
 (within 0.72 % of Kirsch 3.0), while the spurious node fell from 10.79 MPa to
@@ -222,19 +311,12 @@ every rung on identical structured hex8 cantilever meshes
 (48 / 216 / 1,200 / 7,776 DOF). Both converge toward the shared reference:
 72.19 → 40.20 → 15.13 → 4.88 % error.
 
-**Scope and missing data:**
-
-- These comparisons isolate different components. Gmsh swaps the mesh source
-  while holding PolyMesh's solver and probe fixed; CalculiX swaps the solver
-  while holding the mesh fixed. Neither is an end-to-end matched-CAD comparison
-  of both mesher and solver.
-- Neither tool is uniformly better. Gmsh clearly wins box-hole SCF at both
-  orders; PolyMesh native default clearly wins stepped-shaft order 2.
-- Coverage is incomplete. Of 144 requested points, **116 measurable, 0 timed
-  out**; 12 failed before a result (stepped-shaft `h_rel=0.08` native rows,
-  empty load selection), and 16 solved but unmeasurable (box-hole `h_rel=0.20`
-  native rows whose frozen probe box contained no nodes). Unavailable points
-  carry explicit nulls; none were fabricated.
+**Scope:** these comparisons isolate different components. Gmsh swaps the mesh
+source while holding PolyMesh's solver and probe fixed; CalculiX swaps the solver
+while holding the mesh fixed. Neither is an end-to-end matched-CAD comparison of
+both mesher and solver. Unavailable points carry explicit nulls; none were
+fabricated. A pre-fix snapshot and the per-row attribution of what moved and why
+are archived under [`bench/results/archive/`](bench/results/archive/).
 
 Sources: [Gmsh mesh-source results](bench/results/gmsh-peer.json),
 [CalculiX solver-parity results](bench/results/calculix-cantilever.json), and

@@ -1392,6 +1392,42 @@ def _order_tally(measured: list[dict[str, Any]], families: list[str],
     return out
 
 
+def _cost_tally(measured: list[dict[str, Any]], families: list[str],
+                order: int) -> list[tuple[str, float, float]]:
+    """(family, best native median rel_err x DOF, Gmsh median) per family.
+
+    The accuracy tally answers "whose mesh is more accurate". It does not
+    answer "at what cost", and on this matrix the two answers differ: the
+    native wins are bought with 4-10x the degrees of freedom. Charging for
+    them is one multiplication, so there is no excuse for showing only the
+    flattering basis.
+    """
+    out = []
+    for family in families:
+        panel = [row for row in measured
+                 if row["family"] == family and row["order"] == order
+                 and row.get("dofs")]
+        peer = [row["error"] * row["dofs"] for row in panel
+                if row["solver"] == "gmsh-mesh+polymesh-solver"]
+        native = [row["error"] * row["dofs"] for row in panel
+                  if row["solver"] != "gmsh-mesh+polymesh-solver"]
+        best: float | None = None
+        for solver in EXTERNAL_SOURCES:
+            if solver == "gmsh-mesh+polymesh-solver":
+                continue
+            costs = [row["error"] * row["dofs"] for row in panel
+                     if row["solver"] == solver]
+            if not costs:
+                continue
+            median = float(np.median(costs))
+            if best is None or median < best:
+                best = median
+        if not peer or best is None or not native:
+            continue
+        out.append((family, best, float(np.median(peer))))
+    return out
+
+
 def external_comparison(result_path: Path, out_dir: Path) -> bool:
     payload = load_json(result_path)
     if not isinstance(payload, list):
@@ -1442,6 +1478,25 @@ def external_comparison(result_path: Path, out_dir: Path) -> bool:
     order1 = orders[0]
     reversal = ("; ".join(f"{family} {native:.4f} vs {peer:.4f}"
                           for family, _, native, peer in tallies[order1]))
+
+    cost = _cost_tally(measured, families, order1)
+    cost_wins = sum(1 for _, native, peer in cost if native < peer)
+    for family, native, peer in cost:
+        print(f"  order {order1} {family} rel_err x DOF: ours "
+              f"{native:.0f} vs Gmsh {peer:.0f} — "
+              + ("ours lower" if native < peer else "Gmsh lower"))
+    print(f"  order {order1} cost tally: ours lower in {cost_wins}/"
+          f"{len(cost)} families on rel_err x DOF")
+    cost_sentence = ""
+    if cost:
+        losers = ", ".join(family for family, native, peer in cost
+                           if native >= peer)
+        cost_sentence = (
+            " \u00b7 those wins are bought with degrees of freedom: on median "
+            f"rel_err x DOF ours is lower in only {cost_wins}/{len(cost)} "
+            "families"
+            + (f", with Gmsh more economical on {losers}" if losers else "")
+            + " \u2014 more accurate per case is not the same as cheaper per case")
     findings = ROOT / "bench" / "reference" / "external" / \
         "external-truth-findings.json"
     # the parity vocabulary is read off promotion.order_pairing, so no caveat
@@ -1497,7 +1552,8 @@ def external_comparison(result_path: Path, out_dir: Path) -> bool:
         "measured on an engine that silently deleted the bore, so this is a "
         "corrected measurement and not a method improvement (see "
         "external-truth-findings.json and "
-        "docs/validation/figures/hole_aliasing.png)")
+        "docs/validation/figures/hole_aliasing.png)"
+        + cost_sentence)
 
     # two axes rows per element order: the convergence panel and its outcome
     # strip. Width grows with the family count; the height is generous because

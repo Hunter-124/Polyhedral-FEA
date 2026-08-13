@@ -6,8 +6,10 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 from collections import Counter
+from datetime import datetime, timezone
 from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any, Iterable
@@ -127,6 +129,219 @@ def case_context(case: dict[str, Any] | None) -> dict[str, Any]:
         "case_load_dir_z": float(direction[2]),
         "case_traction_magnitude": magnitude,
     }
+
+# --- Accuracy re-derivation ------------------------------------------------
+# Every campaign row carries a raw ``answers`` block AND an ``accuracy`` block
+# that testlab computed against whatever bench/reference/ held AT SOLVE TIME.
+# That freezes a truth snapshot into every row, so replacing truth (here:
+# self-generated overkill references -> closed-form + CalculiX-on-Gmsh) would
+# otherwise mean re-running hours of campaigns to re-score measurements the row
+# already contains. We therefore IGNORE the stored ``accuracy`` and re-derive it
+# from ``answers`` against the CURRENT references on every build.
+#
+# The re-derivation below mirrors apps/testlab/main.cpp exactly:
+#   load_metrics()   ~line 359  -> load_reference_metrics()
+#   evaluate_probe() ~line 1491 -> probe_measured()
+#   accuracy loop    ~line 2492 -> rederive_accuracy()
+# Any drift between them is a correctness bug, not a style difference.
+
+# probe.kind -> the ProbeAnswers field it scores, and whether evaluate_probe
+# divides that field by probe.nominal. Kinds reading a field testlab does not
+# write into ``answers`` are unscoreable from a stored row; they are counted and
+# reported, never approximated with a neighbouring field.
+_PROBE_FIELD: dict[str, str] = {
+    "mean_vm": "sigma_face_mean",
+    "mean_von_mises": "sigma_face_mean",
+    "face_mean_vm": "sigma_face_mean",
+    "peak_vm": "sigma_box_max",
+    "peak_vm_over_nominal": "sigma_box_max",
+    "mean_vm_over_nominal": "sigma_face_mean",
+    "scf_mean": "sigma_face_mean",
+    "scf": "sigma_face_mean",
+    "max_von_mises": "sigma_max",
+    "max_vm": "sigma_max",
+    "max_vm_over_nominal": "sigma_max",
+    "sigma_p99": "sigma_p99",
+    "p99_vm": "sigma_p99",
+    "strain_energy": "strain_energy",
+    "energy": "strain_energy",
+    "max_displacement": "tip_deflection",
+    "tip_deflection": "tip_deflection",
+}
+# Kinds normalised by probe.nominal. evaluate_probe throws when nominal == 0, so
+# a reference that omits it is malformed and must fail loudly here too.
+_PROBE_OVER_NOMINAL = frozenset({
+    "peak_vm_over_nominal", "mean_vm_over_nominal", "scf_mean", "scf",
+    "max_vm_over_nominal",
+})
+# Axis-conditional kinds: evaluate_probe picks mean_u_component when the probed
+# axis IS the dominant load axis, else the per-axis mean.
+_PROBE_AXIS = {"mean_ux_on_face": (0, "mean_ux"), "mean_uz_on_face": (2, "mean_uz")}
+
+
+def load_reference_metrics(path: Path) -> list[dict[str, Any]]:
+    """Mirror of ``load_metrics`` (apps/testlab/main.cpp:359).
+
+    Requires the interfaces.md ``metrics[]`` form; the legacy values-only format
+    is rejected there and here. ``tol`` defaults to 0.05, ``nominal`` to 0.0.
+    """
+    document = read_json(path)
+    metrics = document.get("metrics")
+    if not isinstance(metrics, list):
+        raise ValueError(
+            f"reference {path} must use interfaces.md metrics[] (name/value/tol/probe)"
+        )
+    out: list[dict[str, Any]] = []
+    for metric in metrics:
+        probe = metric.get("probe", {})
+        if not isinstance(probe, dict):
+            probe = {}
+        out.append({
+            "name": str(metric["name"]),
+            "value": float(metric["value"]),
+            "tol": float(metric.get("tol", 0.05)),
+            "probe": {
+                "kind": str(probe.get("kind", "")),
+                "nominal": float(probe.get("nominal", 0.0)),
+            },
+        })
+    return out
+
+
+def probe_measured(probe: dict[str, Any], answers: dict[str, Any]) -> tuple[float | None, str]:
+    """Mirror of ``evaluate_probe`` (apps/testlab/main.cpp:1491).
+
+    Returns ``(value, "")`` when the probe can be scored from the recorded
+    answers, or ``(None, reason)`` when the field it needs was never written to
+    the row. An unknown kind, or a zero ``nominal`` on a normalised kind, throws
+    exactly as the C++ does: those are malformed references, not missing data.
+    """
+    kind = probe.get("kind", "")
+
+    def recorded(field: str) -> tuple[float | None, str]:
+        value = answers.get(field)
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            return None, f"answers.{field}_absent"
+        return float(value), ""
+
+    if kind in _PROBE_AXIS:
+        axis, per_axis_field = _PROBE_AXIS[kind]
+        dominant = answers.get("dominant_load_axis")
+        if not isinstance(dominant, int) or isinstance(dominant, bool):
+            return None, "answers.dominant_load_axis_absent"
+        return recorded("mean_u_component" if dominant == axis else per_axis_field)
+
+    field = _PROBE_FIELD.get(kind)
+    if field is None:
+        raise ValueError(f"unknown probe kind '{kind}'")
+    value, reason = recorded(field)
+    if value is None:
+        return None, reason
+    if kind in _PROBE_OVER_NOMINAL:
+        nominal = probe.get("nominal", 0.0)
+        if not abs(nominal) > 0.0:
+            raise ValueError(f"{kind} requires probe.nominal != 0")
+        return value / nominal, ""
+    return value, ""
+
+
+def rederive_accuracy(
+    row: dict[str, Any], metrics: list[dict[str, Any]]
+) -> tuple[dict[str, Any] | None, str]:
+    """Recompute a row's ``accuracy`` block from raw ``answers`` + current truth.
+
+    Mirror of apps/testlab/main.cpp:2492-2525, including the health gate: when
+    the solve failed its residual/reaction/orphan gates, rel_err is still
+    recorded but every score is zeroed and ``trusted`` is false, so ranking never
+    trusts a singular solve. Returns ``(None, reason)`` when the row cannot be
+    re-scored honestly.
+    """
+    answers = row.get("answers")
+    if not isinstance(answers, dict):
+        return None, "no_answers"
+    health = row.get("health")
+    if not isinstance(health, dict) or not isinstance(health.get("ok"), bool):
+        # health_ok is what makes a score trusted; without it we cannot
+        # reproduce the C++ decision and must not invent one.
+        return None, "no_health_ok"
+    health_ok = bool(health["ok"])
+
+    detail: list[dict[str, Any]] = []
+    for metric in metrics:
+        measured, reason = probe_measured(metric["probe"], answers)
+        if measured is None:
+            return None, reason
+        truth = metric["value"]
+        rel = abs(measured - truth) / abs(truth) if abs(truth) > 0.0 else abs(measured)
+        tol = metric["tol"] if metric["tol"] > 0.0 else 1e-12
+        detail.append({
+            "metric": metric["name"],
+            "value": measured,
+            "truth": truth,
+            "rel_err": rel,
+            "score": (1.0 / (1.0 + rel / tol)) if health_ok else 0.0,
+            "trusted": health_ok,
+        })
+
+    if not detail:
+        # Same empty-metrics shape the C++ emits: no score/trusted/all keys.
+        return {"metric": "none", "value": None, "truth": None, "rel_err": None}, ""
+    accuracy = dict(detail[0])
+    accuracy["all"] = detail
+    return accuracy, ""
+
+
+class ReferenceSet:
+    """The CURRENT truth, resolved per part via the case's ``reference`` path.
+
+    Also records provenance (which files, content hash, newest mtime) so a built
+    dataset is self-describing about the truth that produced it.
+    """
+
+    def __init__(self) -> None:
+        self._metrics: dict[str, list[dict[str, Any]]] = {}
+        self._used: dict[Path, str] = {}
+        self._missing: Counter[str] = Counter()
+
+    def metrics_for(self, part: str, case: dict[str, Any] | None) -> list[dict[str, Any]] | None:
+        """Metrics for ``part``, or None when the reference is missing/unreadable."""
+        if part in self._metrics:
+            return self._metrics[part]
+        reference = case.get("reference") if isinstance(case, dict) else None
+        if not isinstance(reference, str) or not reference:
+            self._missing["no_case_reference"] += 1
+            return None
+        path = ROOT / reference
+        if not path.is_file():
+            self._missing["reference_file_missing"] += 1
+            return None
+        metrics = load_reference_metrics(path)
+        self._metrics[part] = metrics
+        payload = path.read_bytes()
+        self._used[path] = hashlib.sha256(payload).hexdigest()
+        return metrics
+
+    @property
+    def missing(self) -> Counter[str]:
+        return self._missing
+
+    def provenance(self) -> dict[str, Any]:
+        if not self._used:
+            return {"n_files": 0, "sha256": None, "newest_mtime": None, "roots": []}
+        combined = hashlib.sha256()
+        for path in sorted(self._used):
+            combined.update(path.relative_to(ROOT).as_posix().encode("utf-8"))
+            combined.update(self._used[path].encode("ascii"))
+        roots = sorted({path.parent.relative_to(ROOT).as_posix() for path in self._used})
+        newest = max(path.stat().st_mtime for path in self._used)
+        return {
+            "n_files": len(self._used),
+            "sha256": combined.hexdigest(),
+            "newest_mtime": datetime.fromtimestamp(newest, tz=timezone.utc)
+            .isoformat(timespec="seconds")
+            .replace("+00:00", "Z"),
+            "roots": roots,
+        }
 
 
 def flatten_scalars(prefix: str, value: Any, output: dict[str, Any]) -> None:
@@ -258,6 +473,9 @@ def main() -> int:
 
     schema_counts: Counter[str] = Counter()
     failure_signal: Counter[str] = Counter()
+    references = ReferenceSet()
+    rescored_rows = 0
+    unscoreable: Counter[str] = Counter()
     kept: list[dict[str, Any]] = []
     for key in sorted(unique, key=lambda item: tuple("" if value is None else str(value) for value in item)):
         campaign, _, part, _ = key
@@ -273,6 +491,27 @@ def main() -> int:
             continue
 
         schema_counts[source_schema] += 1
+
+        # Re-derive accuracy from this row's raw `answers` against the CURRENT
+        # reference set, discarding the truth snapshot testlab froze into the row
+        # at solve time. Substituting it here (rather than at each use) keeps
+        # `trusted()`, the failure signal and the flattened columns consistent by
+        # construction. A row we cannot re-score honestly loses its accuracy
+        # block entirely -- an empty column is recoverable, a stale one is not.
+        case = cases.get(str(part))
+        metrics = references.metrics_for(str(part), case)
+        if metrics is None:
+            accuracy, reason = None, "no_reference"
+        else:
+            accuracy, reason = rederive_accuracy(row, metrics)
+        row = dict(row)
+        if accuracy is None:
+            row.pop("accuracy", None)
+            unscoreable[reason] += 1
+        else:
+            row["accuracy"] = accuracy
+            rescored_rows += 1
+
         # Unhealthy and untrusted rows are KEPT: they are the only supervision
         # the feasibility head has, and dataset.py masks them out of every
         # regression head via _failure_flag. Dropping them here made two of the
@@ -286,7 +525,7 @@ def main() -> int:
             failure_signal["accuracy_untrusted"] += 1
         if unhealthy or untrusted:
             failure_signal["rows"] += 1
-        kept.append(flatten_row(campaign, row, cases.get(str(part))))
+        kept.append(flatten_row(campaign, row, case))
 
     fixed = IDENTITY_COLUMNS + FEATURE_COLUMNS + CASE_COLUMNS + ACTION_COLUMNS + TOP_OUTCOMES
     extra = sorted({column for row in kept for column in row if column not in fixed})
@@ -303,6 +542,24 @@ def main() -> int:
         print(f"Legacy rows excluded from training dataset: {excluded_legacy_rows} ({excluded})")
     if excluded_geometry_rows:
         print(f"Egregious geometry rows excluded from training: {excluded_geometry_rows}")
+
+    # Truth provenance: a dataset must be self-describing about the references
+    # that scored it, because accuracy is now re-derived at build time and the
+    # reference set is expected to change (self-generated -> third-party).
+    truth = references.provenance()
+    print(f"Accuracy re-derived from raw answers: {rescored_rows} rows "
+          f"(stored per-row accuracy snapshots ignored)")
+    if unscoreable:
+        detail = ", ".join(f"{reason}={count}" for reason, count in sorted(unscoreable.items()))
+        print(f"Rows left unscored (no accuracy columns emitted): {sum(unscoreable.values())} "
+              f"({detail})")
+    if references.missing:
+        detail = ", ".join(f"{reason}={count}" for reason, count in sorted(references.missing.items()))
+        print(f"Parts with no usable reference: {detail}")
+    print(f"Truth set: {truth['n_files']} reference files under "
+          + (", ".join(truth["roots"]) if truth["roots"] else "(none)")
+          + f" sha256={truth['sha256'][:16] if truth['sha256'] else 'none'} "
+          + f"newest={truth['newest_mtime'] or 'n/a'}")
     print(f"Truth campaigns skipped ({TRUTH_CAMPAIGN_GLOB}): "
           + (", ".join(skipped_truth) if skipped_truth else "none")
           + "  [their rel_err is ~0 by construction; promote_truth.py defines truth from them]")
@@ -328,6 +585,17 @@ def main() -> int:
     schema = {
         "schema": "advisor-dataset-schema-v1",
         "source_row_schemas": sorted(schema_counts),
+        # Accuracy columns are re-derived at build time, so the dataset records
+        # WHICH truth produced them. Re-running this build against a different
+        # reference set is the supported way to re-score, and this block is how a
+        # consumer tells two such datasets apart.
+        "truth": {
+            "rederived_from": "row answers[] via probe kinds mirrored from apps/testlab/main.cpp",
+            "rows_rescored": rescored_rows,
+            "rows_unscored": sum(unscoreable.values()),
+            "unscored_reasons": dict(sorted(unscoreable.items())),
+            **references.provenance(),
+        },
         "columns": [
             {
                 "name": column,

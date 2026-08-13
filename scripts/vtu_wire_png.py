@@ -88,6 +88,24 @@ _WEDGE_FACES = [
     (2, 0, 3, 5),
 ]
 
+#: Mid-edge node of each corner edge, as local indices, for the quadratic
+#: cells VTK writes as tet10 (24) and hex20 (25). Drawing a quadratic cell
+#: through its CORNERS ONLY throws the curvature away: the mid-edge nodes are
+#: projected onto the B-rep, so on a bore rim they sit off the corner-to-corner
+#: chord by up to 0.20 of the edge length (measured on a plate_hole hex20 mesh
+#: at h=0.02 m: max |mid - chord midpoint| = 1.12e-3 m). Rendered as chords,
+#: every curved surface reads as a coarse faceted polygon and the rim looks
+#: broken. These tables let the wireframe follow the element's own geometry.
+_TET10_EDGE_MIDS = {
+    (0, 1): 4, (1, 2): 5, (0, 2): 6, (0, 3): 7, (1, 3): 8, (2, 3): 9,
+}
+_HEX20_EDGE_MIDS = {
+    (0, 1): 8, (1, 2): 9, (2, 3): 10, (0, 3): 11,
+    (4, 5): 12, (5, 6): 13, (6, 7): 14, (4, 7): 15,
+    (0, 4): 16, (1, 5): 17, (2, 6): 18, (3, 7): 19,
+}
+_QUADRATIC_EDGE_MIDS = {24: _TET10_EDGE_MIDS, 25: _HEX20_EDGE_MIDS}
+
 
 def _fixed_faces(ids, local_faces):
     if not local_faces or len(ids) <= max(max(face) for face in local_faces):
@@ -249,6 +267,26 @@ def cell_faces(ids, vtk_type=None, poly_faces=None, pts=None):
 
 def face_key(face):
     return tuple(sorted(face))
+
+
+def quadratic_edge_mids(cells, types):
+    """``{(a, b): mid node}`` for every corner edge of a tet10/hex20 cell.
+
+    Kept apart from ``boundary_edges`` on purpose: face matching must stay on
+    corner nodes so a quadratic cell and a linear neighbour across one face
+    still cancel (in a mixed-p mesh they otherwise all read as exterior). The
+    curvature is a drawing concern only, so it travels in its own table.
+    """
+    edge_mids = {}
+    for cell_index, cell in enumerate(cells):
+        vtk_type = types[cell_index] if cell_index < len(types) else None
+        mids = _QUADRATIC_EDGE_MIDS.get(vtk_type)
+        if not mids or len(cell) <= max(mids.values()):
+            continue
+        for (i, j), m in mids.items():
+            a, b = cell[i], cell[j]
+            edge_mids[(min(a, b), max(a, b))] = cell[m]
+    return edge_mids
 
 
 def boundary_edges(pts, cells, types, face_stream, faceoffsets):
@@ -729,6 +767,24 @@ def draw_line(img, w, h, x0, y0, x1, y1, rgb):
             y0 += sy
 
 
+#: Segments per curved edge. The edge is a quadratic through three nodes, so
+#: its projection is a parabola; 8 chords keep the raster error under a pixel
+#: at the 1100 px default while costing nothing measurable.
+CURVE_SEGMENTS = 8
+
+
+def quadratic_edge_points(pa, pm, pb, segments=CURVE_SEGMENTS):
+    """Sample the quadratic through end/mid/end nodes at t = 0 .. 1."""
+    out = []
+    for step in range(segments + 1):
+        t = step / segments
+        n0 = 2.0 * (t - 0.5) * (t - 1.0)
+        nm = -4.0 * t * (t - 1.0)
+        n1 = 2.0 * t * (t - 0.5)
+        out.append(tuple(n0 * pa[i] + nm * pm[i] + n1 * pb[i] for i in range(3)))
+    return out
+
+
 def write_png(path: Path, w: int, h: int, rgb: bytearray):
     def chunk(tag, data):
         return (
@@ -773,6 +829,13 @@ def main():
     ap.add_argument("--size", type=int, default=1100)
     ap.add_argument("--elev", type=float, default=0.6)
     ap.add_argument("--azim", type=float, default=0.85)
+    ap.add_argument(
+        "--straight-edges", action="store_true",
+        help="draw quadratic (tet10/hex20) edges as corner-to-corner chords, "
+             "discarding the mid-edge nodes. This is what the renderer used to "
+             "do unconditionally; it is kept only so the faceting it causes can "
+             "be reproduced side by side with the curved default.",
+    )
     args = ap.parse_args()
     # A mesh wireframe is a render, so it stages dark like the rest of the
     # showcase; the colours come from figstyle, never from a literal here.
@@ -785,6 +848,7 @@ def main():
         print("empty mesh", file=sys.stderr)
         return 1
     edges, skipped = boundary_edges(pts, cells, types, face_stream, faceoffsets)
+    edge_mids = quadratic_edge_mids(cells, types)
     type_names = {
         10: "tet4",
         12: "hex8",
@@ -803,7 +867,10 @@ def main():
     missing_types = len(cells) - min(len(types), len(cells))
     if missing_types:
         census_parts.append(f"missing(count-fallback)={missing_types}")
-    print(f"cell-type census {vtu}: {', '.join(census_parts)}; skipped={skipped}")
+    curved = 0 if args.straight_edges else sum(1 for e in edges if e in edge_mids)
+    print(f"cell-type census {vtu}: {', '.join(census_parts)}; skipped={skipped}; "
+          f"curved edges {curved}/{len(edges)} exterior "
+          f"({len(edge_mids)} mid-edge nodes in mesh)")
     mins, maxs = bbox_of(pts)
     roi_min, roi_max = mins, maxs
     hole = None
@@ -849,9 +916,16 @@ def main():
                 or point_in_roi(mid, roi_min, roi_max)
             ):
                 continue
-        u0, v0 = project(pa, mins, scales, w, h, args.elev, args.azim, args.view)
-        u1, v1 = project(pb, mins, scales, w, h, args.elev, args.azim, args.view)
-        draw_line(img, w, h, u0, v0, u1, v1, ink)
+        mid_node = None if args.straight_edges else edge_mids.get((a, b))
+        chain = (
+            [pa, pb] if mid_node is None
+            else quadratic_edge_points(pa, pts[mid_node], pb)
+        )
+        prev = project(chain[0], mins, scales, w, h, args.elev, args.azim, args.view)
+        for point in chain[1:]:
+            nxt = project(point, mins, scales, w, h, args.elev, args.azim, args.view)
+            draw_line(img, w, h, prev[0], prev[1], nxt[0], nxt[1], ink)
+            prev = nxt
         n_drawn += 1
     write_png(out, w, h, img)
     if hole is None:

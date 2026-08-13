@@ -413,3 +413,79 @@ The time result is a trade, not a win. The accuracy-optimal oracle is itself
 slow at 1.6251 solve-time regret, and the advisor tracks it to within 0.095 at
 1.7198. It is buying accuracy with time rather than simply failing to predict
 cost, while the default remains much faster at 0.3629.
+
+## M-A4 — independent truth, honest gates, no model yet (2026-08-13)
+
+No model was trained in this entry. It records why every accuracy number above is
+now provisional, and what had to be fixed before a retrain could mean anything.
+Full reasoning: [ADR-0029](../decisions/0029-independent-truth-and-honest-gates.md).
+
+### The corpus was scoring itself
+
+M-A3 reran truth, but the truth it reran was still ours: 64 of 72 references
+carried `source = "overkill-reference"`, promoted from our own overkill solves, on
+meshes ADR-0028 had just proven lose geometry. A reference produced by the system
+under test cannot falsify that system.
+
+All 88 non-closed-form references now come from **Gmsh 4.13.1 -> CalculiX 2.23**,
+validated against closed form before adoption. Values moved a **median 3.79 %** and
+up to **+88.4 %** (`stepped_shaft_s1_c2` strain energy), so the advisor had been
+scored against values wrong by up to a factor of 1.9 on the families where geometry
+loss was demonstrated. Tolerances are now derived from measured convergence, mostly
+0.02 against the previous hand-picked 0.15.
+
+The corpus's own `analytic` 3.0 for the four `box_hole_*_c0` SCF references was the
+infinite-plate idealisation and was 2.9–4.1 % below the finite-width Howland value
+it should have carried.
+
+**Our solver was never the suspect.** On one identical Gmsh mesh CalculiX and our
+solver agree to 3.4e-09 in tip deflection and 6.7e-10 in strain energy.
+
+### Three engine defects the new truth exposed
+
+- **The applied load depended on mesh resolution.** Traction is a pressure, so the
+  resultant was scaled by whatever area the candidate mesh selected — up to 28.2 %
+  short of the CAD face. Energy scales as \(F^2\). The traction is now rescaled onto
+  the exact CAD rule area, which corrects the resultant but not its distribution.
+- **One rule had two implementations.** The CAD and mesh sides disagreed by a factor
+  of 2.3072 on `sphere_box_s2_c1` for `normal_min_dot = -1`. Now a single shared
+  predicate. The prediction that `tube` would be unaffected, because its load slab
+  was sized so the wall ring is empty, was made before the fix and held.
+- **The load-area gate reported `rel_err = 0.0` when it could not verify anything**,
+  including on a mesh missing 28 % of its loaded face. `unverified` is now a distinct
+  state that is never a pass.
+
+### Why no numbers are quoted here
+
+Two findings above the line are load-bearing for reading M-A1 to M-A3:
+
+- **The split leaked completely.** 672 of 672 validation rows had a training row
+  with an identical (geometry-feature, action) vector. Every validation MAE and
+  regret number published before that was found was measuring interpolation across
+  three BC variants of a memorised geometry. See the
+  [data card](0005-data-card.md) §"The split".
+- **The reported chooser was not the shipped chooser.** `advisor_policy` shipped
+  while every historical regret number came from `advisor_argmin`. The shipped rule
+  is now feasibility-gated enumeration: `advisor_gated_0.05` reaches 0.3468
+  `rel_err` regret at 10.0 % pick-failure against `advisor_argmin`'s 0.4413 at
+  22.7 %, paired 38W-0L-262T, p = 7.3e-12. `advisor_argmin` versus the trivial
+  `finest_action` is p = 0.258 — ranking alone does not beat the trivial rule; the
+  gate earns the win. See the [model card](0004-model-card.md).
+
+### Corpus widened for power, not coverage
+
+`tube` and `perforated_plate` take the corpus to 8 families and 96 references. The
+measured learning curve over 1–5 training families is flat, and eight families is
+the smallest corpus at which a per-family effect is resolvable: CI half-width
+0.0317 at six against 0.0164 at eight. `perforated_plate` sits at 1.70 descriptor
+distance from `plate_notch`, below the 2.22 corpus minimum, so it is a weaker
+transfer test than `tube` at 3.18 — a flat slope at eight families must be reported
+with that qualification. Machine-readable in
+[`bench/advisor/corpus_evidence.json`](../../bench/advisor/corpus_evidence.json).
+
+### What must happen before the next number
+
+Regenerate the corpus on the corrected engine, re-run the eight
+`sphere_box_*_c1`/`_c2` cases affected by the load-rule fix, rebuild the dataset
+(accuracy is re-derived from raw answers, so this no longer requires re-solving),
+then retrain under leave-one-family-out with deployable baselines only.

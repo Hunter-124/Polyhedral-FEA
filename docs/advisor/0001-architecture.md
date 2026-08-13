@@ -26,20 +26,24 @@ action it recommends.
 
 | Stage | Artifact | Producer |
 | --- | --- | --- |
-| Geometry corpus | `bench/geometries/corpus/primitives/*.step` (24 parts, 6 families x 4 size regimes) | `scripts/gen_primitive_corpus.py` |
-| Load cases | `bench/geometries/corpus/primitives/*.case.json` (72; 3 per part) | same |
-| Ground truth | `bench/reference/corpus/*.json` | analytic where it exists, else `bench/campaigns/advisor-truth-0` promoted by `scripts/advisor/promote_truth.py` |
+| Geometry corpus | `bench/geometries/corpus/primitives/*.step` (32 parts, 8 families x 4 size regimes) | `scripts/gen_primitive_corpus.py` |
+| Load cases | `bench/geometries/corpus/primitives/*.case.json` (96; 3 per part) | same |
+| Ground truth | `bench/reference/corpus/*.json` (96: 8 closed-form, 88 external) | closed form where it exists, else **Gmsh 4.13.1 -> CalculiX 2.23** via `bench/reference/external_truth.py` (ADR-0029 §1). Promotion from our own solves is retired; `scripts/truth_guard.py` refuses to overwrite either source |
 | Campaign rows | `bench/campaigns/advisor-batch-*/results.jsonl` (`advisor-row-v3`) | `apps/testlab` via `scripts/advisor/run_batch.py` |
 | Flat table | `bench/advisor/dataset.csv` | `scripts/build_advisor_dataset.py` |
 | Model | `bench/advisor/{model.onnx,normalization.json,clamps.json}` | `scripts/advisor/export_onnx.py` |
 | Inference | `src/advisor` + `--advisor` on `polymesh solve` / `polymesh_testlab` | this milestone |
 
-Two admission rules apply between the campaign rows and the flat table:
+Three admission rules apply between the campaign rows and the flat table:
 
-- **`advisor-truth-*` campaigns are excluded.** `promote_truth.py` *defines*
-  each case's reference truth from those rows, so their own `accuracy_rel_err`
-  is ~0 by construction; training on them teaches only that the overkill config
-  is exact.
+- **`advisor-truth-*` campaigns are excluded.** They were the source of the
+  retired self-generated truth, so their own `accuracy_rel_err` is ~0 by
+  construction and training on them teaches only that the overkill config is
+  exact. The exclusion stays for the archived rows.
+- **Accuracy is re-derived at build time.** `build_advisor_dataset.py` ignores the
+  `accuracy` block frozen into each row at solve time and recomputes it from the
+  raw `answers` against the *current* references (ADR-0029 §8), so replacing truth
+  is a dataset rebuild rather than a campaign re-run.
 - **Unhealthy and untrusted rows are kept.** They are the feasibility head's
   only supervision, and `scripts/advisor/dataset.py` masks them out of every
   regression head. `dataset.py::load_dataset` then drops anything whose `schema`
@@ -102,8 +106,8 @@ The absolute level of `rel_err` does not generalize across parts. Measured on a
 held-out part, val MAE is ~1.0 — a full decade — for **both** the MLP and a
 LightGBM baseline, at **every** capacity from 2.5k to 811k parameters. Capacity
 is therefore not the bottleneck: the target is dominated by a per-case
-reference-truth offset, set by how `promote_truth.py` defined that case's
-truth, and a held-out part never shows the model its own offset. No amount of
+reference-truth offset — set by that case's reference, whatever produced it — and
+a held-out part never shows the model its own offset. No amount of
 fitting recovers a constant the input does not contain.
 
 Centring removes exactly that constant. `rel_err_rel` is `log10(rel_err)` minus

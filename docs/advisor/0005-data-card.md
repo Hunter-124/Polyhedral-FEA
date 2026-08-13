@@ -52,6 +52,43 @@ corpus. `tube` is genuinely distinct (3.18 from `stepped_shaft`). So
 at eight families should be reported with that qualification rather than as a
 clean falsification. `t_junction` or `lug` is the obvious next test.
 
+### `tube` is the hardest family in the corpus, and four measurements say so
+
+Four independent findings land on the same family. They are collected here rather
+than left as one line in each of three documents, because they are not four
+coincidences — they are one thin-walled geometry sitting at the edge of
+everything, and a reader who meets them separately will read each as a footnote.
+
+1. **It contributes zero scorable cases** under leave-one-family-out, so every
+   macro mean in the model card is over 7 families and not 8. Too few of its cases
+   reach ≥3 measured actions to score a fold.
+2. **Gmsh fails outright on it.** All 9 hard failures in the 336-row peer matrix
+   are Gmsh's own, every one a thin-walled tube at coarse `h`
+   (`h_rel` 0.08/0.12/0.20). The geometry is effectively unmeshable by either tool
+   at those sizes; the difference is that our refusals name the size they would
+   need.
+3. **It is the single out-of-distribution false alarm.** Of 32 corpus parts,
+   `tube_s1` trips the OOD gate at 6.684 against the 6.304 operating point — 6.0 %
+   over, on *training* geometry. That is 1 of 32, consistent with a q0.99 fit
+   having a ~1 % in-sample alarm rate by construction, but it is a false alarm and
+   it is recorded as one.
+4. **It is nonetheless the corpus's strongest transfer test.** Its standardized
+   descriptor centroid sits 3.18 from `stepped_shaft`, above the corpus minimum
+   pairwise distance of 2.22 — genuinely distinct, unlike `perforated_plate` at
+   1.70 from `plate_notch`.
+
+The common cause is thin walls with curvature: a wall thin relative to the
+bounding-box diagonal forces a fine mesh to resolve it at all, which is what makes
+the family expensive to score, unmeshable at coarse sizes, and geometrically
+extreme enough to sit near the OOD boundary.
+
+**Do not "fix" this by widening the OOD threshold or dropping the family.** The
+correct reading is that the corpus is thin exactly where the engineering is
+hardest. `tube_s2`, at distance 5.704, is *inside* the OOD boundary and is refused
+by the feasibility head instead, with its own distinct note — the two mechanisms
+firing on adjacent parts for different stated reasons is the clearest evidence
+that they are genuinely separate gates rather than one wearing two labels.
+
 ## The split — read this before quoting any validation number
 
 **The corpus is parametric.** `box_hole_s0_c0` and `box_hole_s0_c1` are the
@@ -248,7 +285,8 @@ deployed chooser enumerates is one the model has actually seen.
   are over **7 families, not 8**. The harness prints a warning saying so. Note
   this is a different family from the previous corpus, where `channel` was the
   empty one — `channel` now scores and `tube`, the thin-walled addition, does not.
-  That is consistent with `tube` being the geometry both meshers struggle on.
+  This is one of four findings that land on `tube`; they share a cause and are
+  collected above rather than repeated here.
 - Failure rate is **33.0 %** (621 `mesh_fail`, 102 `over_budget`, 72
   `solve_fail`, from 2,412 rows). A refusal to alias a feature away is the
   dominant mesh-failure cause and is concentrated at coarse rungs.

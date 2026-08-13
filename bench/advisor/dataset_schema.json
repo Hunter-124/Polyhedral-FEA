@@ -3,6 +3,20 @@
   "source_row_schemas": [
     "advisor-row-v3"
   ],
+  "truth": {
+    "rederived_from": "row answers[] via probe kinds mirrored from apps/testlab/main.cpp",
+    "rows_rescored": 1617,
+    "rows_unscored": 795,
+    "unscored_reasons": {
+      "no_answers": 795
+    },
+    "n_files": 96,
+    "sha256": "2a7ee9265ddd6b8d4f794ae765d4008193e42129aa12c9a939e6d6ada5d983b8",
+    "newest_mtime": "2026-08-13T05:58:35Z",
+    "roots": [
+      "bench/reference/corpus"
+    ]
+  },
   "columns": [
     {
       "name": "schema",
@@ -347,6 +361,18 @@
       "description": "Campaign outcome 'n_nodes'."
     },
     {
+      "name": "geometry_fill_volume_err",
+      "role": "outcome",
+      "dtype": "number",
+      "description": "Campaign outcome 'geometry_fill_volume_err'."
+    },
+    {
+      "name": "geometry_volume_err",
+      "role": "outcome",
+      "dtype": "number",
+      "description": "Campaign outcome 'geometry_volume_err'."
+    },
+    {
       "name": "accuracy_metric",
       "role": "outcome",
       "dtype": "string",
@@ -383,10 +409,40 @@
       "description": "Flattened accuracy outcome field 'value'."
     },
     {
+      "name": "answers_authored_area_checked",
+      "role": "outcome",
+      "dtype": "boolean",
+      "description": "Flattened measured answer 'authored_area_checked'."
+    },
+    {
+      "name": "answers_authored_area_consistent",
+      "role": "outcome",
+      "dtype": "boolean",
+      "description": "Flattened measured answer 'authored_area_consistent'."
+    },
+    {
+      "name": "answers_authored_area_rel_diff",
+      "role": "outcome",
+      "dtype": "number",
+      "description": "Flattened measured answer 'authored_area_rel_diff'."
+    },
+    {
+      "name": "answers_dominant_load_axis",
+      "role": "outcome",
+      "dtype": "number",
+      "description": "Flattened measured answer 'dominant_load_axis'."
+    },
+    {
       "name": "answers_load_area_rel_err",
       "role": "outcome",
       "dtype": "number",
       "description": "Flattened measured answer 'load_area_rel_err'."
+    },
+    {
+      "name": "answers_load_area_status",
+      "role": "outcome",
+      "dtype": "string",
+      "description": "Flattened measured answer 'load_area_status'."
     },
     {
       "name": "answers_load_face_area",
@@ -399,6 +455,24 @@
       "role": "outcome",
       "dtype": "number",
       "description": "Flattened measured answer 'mean_u_component'."
+    },
+    {
+      "name": "answers_mean_ux",
+      "role": "outcome",
+      "dtype": "number",
+      "description": "Flattened measured answer 'mean_ux'."
+    },
+    {
+      "name": "answers_mean_uz",
+      "role": "outcome",
+      "dtype": "number",
+      "description": "Flattened measured answer 'mean_uz'."
+    },
+    {
+      "name": "answers_mesh_selected_area",
+      "role": "outcome",
+      "dtype": "number",
+      "description": "Flattened measured answer 'mesh_selected_area'."
     },
     {
       "name": "answers_n_load_faces",
@@ -417,6 +491,12 @@
       "role": "outcome",
       "dtype": "number",
       "description": "Flattened measured answer 'n_quality_excluded'."
+    },
+    {
+      "name": "answers_sigma_box_max",
+      "role": "outcome",
+      "dtype": "number",
+      "description": "Flattened measured answer 'sigma_box_max'."
     },
     {
       "name": "answers_sigma_face_mean",
@@ -503,6 +583,12 @@
       "description": "Campaign outcome 'geo_fidelity_rel_volume_err'."
     },
     {
+      "name": "health_authored_area_consistent",
+      "role": "outcome",
+      "dtype": "boolean",
+      "description": "Flattened solve-health outcome 'authored_area_consistent'."
+    },
+    {
       "name": "health_free_residual_rel",
       "role": "outcome",
       "dtype": "number",
@@ -519,6 +605,18 @@
       "role": "outcome",
       "dtype": "number",
       "description": "Flattened solve-health outcome 'load_area_rel_err'."
+    },
+    {
+      "name": "health_load_area_status",
+      "role": "outcome",
+      "dtype": "string",
+      "description": "Flattened solve-health outcome 'load_area_status'."
+    },
+    {
+      "name": "health_load_area_verified",
+      "role": "outcome",
+      "dtype": "boolean",
+      "description": "Flattened solve-health outcome 'load_area_verified'."
     },
     {
       "name": "health_n_bc_dofs",

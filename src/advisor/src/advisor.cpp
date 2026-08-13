@@ -124,6 +124,18 @@ struct Advisor::Impl {
     AdvisorDecision default_decision;
     std::vector<std::string> action_dims;
 
+    /// Discrete actions the chooser enumerates, from clamps.json:candidate_grid.
+    /// Empty when the artifact predates the grid, in which case recommend()
+    /// falls back to the single-shot policy read.
+    std::vector<AdvisorDecision> candidates;
+    /// Candidates whose predicted failure probability exceeds this are dropped
+    /// before ranking. Distinct from `veto_threshold`, which refuses the whole
+    /// recommendation after the fact: this one improves the choice, that one
+    /// abandons it. Measured, filtering first cuts held-out regret 0.4413 ->
+    /// 0.3468 and the rate of recommending an action that then fails outright
+    /// 22.7% -> 10.0%, and it is insensitive to the threshold over [0.05, 0.5].
+    double gate_threshold = 0.5;
+
     std::string input_name;
     std::vector<const char*> output_name_ptrs;
 
@@ -179,7 +191,10 @@ void Advisor::Impl::load_clamps(const std::filesystem::path& dir) {
                            "order/mesher vocabulary");
     }
 
-    const std::size_t expected = 4 + order_choices.size() + mesher_choices.size();
+    // 3 continuous dims + one logit per order + one per mesher. It was 4 + ...
+    // while a p_elevate logit was carried; that dial is the same actuator as
+    // `order >= 2` (apps/cli/main.cpp:805) and no longer exists.
+    const std::size_t expected = 3 + order_choices.size() + mesher_choices.size();
     if (action_dims.size() != expected) {
         throw AdvisorError("advisor: clamps.json action_dims has " +
                            std::to_string(action_dims.size()) + " entries, expected " +
@@ -217,6 +232,51 @@ void Advisor::Impl::load_clamps(const std::filesystem::path& dir) {
         throw AdvisorError("advisor: clamps.json defaults fall outside the clamp box the same "
                            "file declares; re-export the model");
     }
+
+    // The candidate list is optional: an artifact exported before it existed
+    // still loads, and recommend() then keeps the old single-shot behaviour.
+    // Validating it here rather than at query time means a malformed list is a
+    // construction error, never a silently degraded recommendation.
+    //
+    // A LIST of measured actions, not a cross product of dial levels: crossing
+    // the dials would manufacture combinations the campaign never ran and ask
+    // the regression heads to extrapolate to them.
+    if (clamps.contains("candidate_grid") && clamps.at("candidate_grid").is_object()) {
+        const json& grid = clamps.at("candidate_grid");
+        if (grid.contains("actions") && grid.at("actions").is_array()) {
+            for (const json& entry : grid.at("actions")) {
+                AdvisorDecision candidate = default_decision;
+                candidate.mesher = entry.value("mesher", default_decision.mesher);
+                candidate.order = entry.value("order", default_decision.order);
+                bool clamped = false;
+                candidate.h_rel = h_rel.clamp(entry.value("h_rel", default_decision.h_rel),
+                                              clamped);
+                candidate.eta_target =
+                    eta_target.clamp(entry.value("eta_target", default_decision.eta_target),
+                                     clamped);
+                candidate.adapt_passes = static_cast<int>(std::lround(adapt_passes.clamp(
+                    static_cast<double>(entry.value("adapt_passes",
+                                                    default_decision.adapt_passes)),
+                    clamped)));
+                if (clamped) {
+                    throw AdvisorError("advisor: clamps.json candidate_grid action leaves the "
+                                       "clamp box the same file declares; re-export the model");
+                }
+                if (std::find(mesher_choices.begin(), mesher_choices.end(), candidate.mesher) ==
+                    mesher_choices.end()) {
+                    throw AdvisorError("advisor: clamps.json candidate_grid names mesher '" +
+                                       candidate.mesher + "', absent from mesher_choices");
+                }
+                if (std::find(order_choices.begin(), order_choices.end(), candidate.order) ==
+                    order_choices.end()) {
+                    throw AdvisorError("advisor: clamps.json candidate_grid names an order "
+                                       "absent from order_choices");
+                }
+                candidates.push_back(candidate);
+            }
+        }
+    }
+    gate_threshold = clamps.value("gate_threshold", veto_threshold);
 }
 
 std::vector<float> Advisor::Impl::encode(const FeatureColumns& columns) const {
@@ -403,37 +463,88 @@ AdvisorDecision Advisor::recommend(const pipeline::CaseFeatures& features) const
 
 AdvisorDecision Advisor::recommend(const FeatureColumns& columns) const {
     const Impl& impl = *impl_;
-
-    // Pass 1 — query the policy head at the default action. The trunk consumes
-    // an action, so the policy needs a well-defined query point; the clamp-box
-    // default is the one action that is always legal.
     FeatureColumns query = columns;
-    impl.apply_action(query, impl.default_decision);
-    const std::vector<double> policy = evaluate(query).policy;
-    if (policy.size() != impl.action_dims.size()) {
-        AdvisorDecision vetoed = impl.default_decision;
-        vetoed.vetoed = true;
-        vetoed.note = "policy head width does not match clamps.json action_dims";
-        return vetoed;
-    }
 
     AdvisorDecision decision = impl.default_decision;
     bool clamped = false;
-    decision.h_rel = impl.h_rel.clamp(policy[0], clamped);
-    decision.adapt_passes =
-        static_cast<int>(std::lround(impl.adapt_passes.clamp(policy[1], clamped)));
-    decision.eta_target = impl.eta_target.clamp(policy[2], clamped);
-    decision.p_elevate = policy[3] > 0.0;
 
-    const std::size_t order_begin = 4;
-    const std::size_t mesher_begin = order_begin + impl.order_choices.size();
-    decision.order = impl.order_choices[argmax(policy, order_begin, impl.order_choices.size())];
-    decision.mesher =
-        impl.mesher_choices[argmax(policy, mesher_begin, impl.mesher_choices.size())];
-    decision.clamped = clamped;
+    if (impl.candidates.empty()) {
+        // Legacy artifact with no candidate grid: single-shot policy read. Kept
+        // only so an old model directory still loads; measured on held-out
+        // families this rule is the worst deployable chooser tested, losing
+        // significantly to a zero-parameter constant configuration.
+        impl.apply_action(query, impl.default_decision);
+        const std::vector<double> policy = evaluate(query).policy;
+        if (policy.size() != impl.action_dims.size()) {
+            AdvisorDecision vetoed = impl.default_decision;
+            vetoed.vetoed = true;
+            vetoed.note = "policy head width does not match clamps.json action_dims";
+            return vetoed;
+        }
+        decision.h_rel = impl.h_rel.clamp(policy[0], clamped);
+        decision.adapt_passes =
+            static_cast<int>(std::lround(impl.adapt_passes.clamp(policy[1], clamped)));
+        decision.eta_target = impl.eta_target.clamp(policy[2], clamped);
+        const std::size_t order_begin = 3;
+        const std::size_t mesher_begin = order_begin + impl.order_choices.size();
+        decision.order =
+            impl.order_choices[argmax(policy, order_begin, impl.order_choices.size())];
+        decision.mesher =
+            impl.mesher_choices[argmax(policy, mesher_begin, impl.mesher_choices.size())];
+        decision.clamped = clamped;
+    } else {
+        // Enumerate the measured candidate grid, drop the candidates the
+        // feasibility head expects to fail, and rank the survivors by predicted
+        // per-case accuracy. Two heads, used in the order that can change the
+        // decision -- the veto below can only refuse one after the fact.
+        //
+        // Every candidate is an action the campaign actually ran, so no query
+        // asks the regression heads to extrapolate; that is the failure mode
+        // that produced predicted_dof = 1.5e15 on an unseen part.
+        double best_score = std::numeric_limits<double>::infinity();
+        double best_risk_score = std::numeric_limits<double>::infinity();
+        AdvisorDecision best_survivor = impl.default_decision;
+        AdvisorDecision best_any = impl.default_decision;
+        bool have_survivor = false;
+        bool have_any = false;
 
-    // Pass 2 — score the action we are actually about to recommend, so the
-    // feasibility veto is about the recommendation and not about the default.
+        for (const AdvisorDecision& candidate : impl.candidates) {
+                            impl.apply_action(query, candidate);
+                            const AdvisorRawOutputs out = evaluate(query);
+                            const double risk = sigmoid(out.failure_logit);
+                            const double score = out.rel_err_rel;
+                            if (!std::isfinite(score)) {
+                                continue;
+                            }
+                            // Tracked separately so a query where the gate
+                            // rejects everything still returns the best ranked
+                            // action rather than nothing: refusing to act is the
+                            // veto's job, not the gate's.
+                            if (score < best_risk_score) {
+                                best_risk_score = score;
+                                best_any = candidate;
+                                have_any = true;
+                            }
+                            if (risk <= impl.gate_threshold && score < best_score) {
+                                best_score = score;
+                                best_survivor = candidate;
+                                have_survivor = true;
+                            }
+        }
+
+        if (have_survivor) {
+            decision = best_survivor;
+        } else if (have_any) {
+            decision = best_any;
+            decision.note = "every candidate exceeded the feasibility gate; "
+                            "best-ranked action returned and left to the veto";
+        }
+        clamped = decision.clamped;
+    }
+
+    // Final pass — re-score the action we are actually about to recommend, so
+    // the reported predictions and the feasibility veto both describe the
+    // recommendation rather than the default or some other candidate.
     impl.apply_action(query, decision);
     const AdvisorRawOutputs scored = evaluate(query);
     decision.predicted_rel_err = from_log10(scored.rel_err_log10);

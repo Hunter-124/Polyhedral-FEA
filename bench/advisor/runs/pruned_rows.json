@@ -1088,6 +1088,396 @@
       "fraction": 0.05,
       "ceiling": 696,
       "cap_reached": true
+    },
+    {
+      "run": 31,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
+    },
+    {
+      "run": 32,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
+    },
+    {
+      "run": 33,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
+    },
+    {
+      "run": 34,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
+    },
+    {
+      "run": 35,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
+    },
+    {
+      "run": 36,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
+    },
+    {
+      "run": 37,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
+    },
+    {
+      "run": 38,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
+    },
+    {
+      "run": 39,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
+    },
+    {
+      "run": 40,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
+    },
+    {
+      "run": 41,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
+    },
+    {
+      "run": 42,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
+    },
+    {
+      "run": 43,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
+    },
+    {
+      "run": 44,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
+    },
+    {
+      "run": 45,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
+    },
+    {
+      "run": 46,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
+    },
+    {
+      "run": 47,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
+    },
+    {
+      "run": 48,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
+    },
+    {
+      "run": 49,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
+    },
+    {
+      "run": 50,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
+    },
+    {
+      "run": 51,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
+    },
+    {
+      "run": 52,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
+    },
+    {
+      "run": 53,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
+    },
+    {
+      "run": 54,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
+    },
+    {
+      "run": 55,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
+    },
+    {
+      "run": 56,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
+    },
+    {
+      "run": 57,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
+    },
+    {
+      "run": 58,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
+    },
+    {
+      "run": 59,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
+    },
+    {
+      "run": 60,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 687,
+      "cap_reached": true
     }
   ]
 }

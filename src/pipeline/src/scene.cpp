@@ -1147,11 +1147,49 @@ std::size_t project_quadratic_boundary_mids(
 }
 
 namespace {
-
 // The mesh volume measure lives in `fea::element_volume` / `fea::mesh_volume`
 // (fea/cell_quality.hpp). It used to be duplicated here; the copy in
 // `fea::element_centroid_stresses` had drifted into a wrong one, so the rule is
 // now defined once and every caller shares it.
+
+struct BoundaryShellTopology {
+    std::size_t n_edges = 0;
+    /// Used by one face: a hole in the shell.
+    std::size_t n_open = 0;
+    /// Used by three or more: two boundary patches occupying the same place.
+    std::size_t n_nonmanifold = 0;
+};
+
+/// Edge-use census over the free-face set. A closed 2-manifold uses every edge
+/// exactly twice; anything else is a tear or a duplicated skin, and neither
+/// shows up in a volume comparison.
+BoundaryShellTopology boundary_shell_topology(
+    const std::vector<std::array<std::uint32_t, 4>>& faces) {
+    std::map<std::pair<std::uint32_t, std::uint32_t>, std::size_t> use;
+    for (const auto& face : faces) {
+        // Triangles arrive as the degenerate quad (a,b,c,c).
+        const std::size_t n = face[3] == face[2] ? 3 : 4;
+        for (std::size_t i = 0; i < n; ++i) {
+            const std::uint32_t a = face[i];
+            const std::uint32_t b = face[(i + 1) % n];
+            if (a == b) {
+                continue;
+            }
+            ++use[a < b ? std::pair{a, b} : std::pair{b, a}];
+        }
+    }
+    BoundaryShellTopology out;
+    out.n_edges = use.size();
+    for (const auto& [edge, count] : use) {
+        (void)edge;
+        if (count == 1) {
+            ++out.n_open;
+        } else if (count > 2) {
+            ++out.n_nonmanifold;
+        }
+    }
+    return out;
+}
 
 const char* geometry_volume_band(double relative_error) {
     if (relative_error > kGeometryVolumeHardLimit) {
@@ -3002,6 +3040,36 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
                             fill_h, h, out.fill_geometry_volume.relative_error,
                             kGeometryVolumeHardLimit, 0.5 * h, out.mesh.elements.size(),
                             n_pyramid, out.mesher_note),
+                out.fill_geometry_volume, false);
+        }
+    }
+    // A volume check cannot see a duplicated boundary skin: two coincident
+    // patches with opposite orientation cancel in the divergence sum, so the
+    // mesh measures right and is still torn. Measured on graded_tet, four of
+    // the seven meshes carrying real non-manifold edges reported a "clean"
+    // volume band -- box_hole at h=0.00278 sits at rel_err 2.4e-4 with three
+    // multiplicity-4 edges on the bore. The shell is the thing the solver's
+    // traction integral and the renderer both consume, so check the shell.
+    {
+        const auto shell = boundary_shell_topology(out.boundary_quads);
+        out.mesher_note +=
+            std::format(" | boundary_shell edges={} open={} nonmanifold={}",
+                        shell.n_edges, shell.n_open, shell.n_nonmanifold);
+        if (shell.n_open > 0 || shell.n_nonmanifold > 0) {
+            throw GeometryVolumeLimitError(
+                std::format(
+                    "geometry fill-stage guard failed at h={:.6g} m (requested -h {:.6g} m): "
+                    "the boundary is not a closed surface -- {} edge(s) are used by one face "
+                    "(a hole) and {} by three or more (two skins in the same place), out of "
+                    "{}. A volume check cannot catch this, because coincident skins cancel: "
+                    "this mesh's volume error is {:.4g}. This is a mesher defect, not a "
+                    "resolution one, and refining does not clear it. Retry with the default "
+                    "--mesher hybrid, which is watertight on every part measured | {}",
+                    fill_h, h, shell.n_open, shell.n_nonmanifold, shell.n_edges,
+                    out.fill_geometry_volume.available
+                        ? out.fill_geometry_volume.relative_error
+                        : std::numeric_limits<double>::quiet_NaN(),
+                    out.mesher_note),
                 out.fill_geometry_volume, false);
         }
     }

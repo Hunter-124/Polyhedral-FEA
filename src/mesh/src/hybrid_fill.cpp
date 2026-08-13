@@ -79,6 +79,221 @@ tet_boundary_nodes(const std::vector<std::array<std::uint32_t, 4>>& tets) {
     return {nodes.begin(), nodes.end()};
 }
 
+/// Edges of the free-face shell that are used a number of times other than two.
+///
+/// A conforming tet complex has none. Two later steps can create them without
+/// changing the mesh's volume or invalidating a single element, which is why
+/// nothing caught them for so long: an edge collapse that violates the link
+/// condition, and a carve that deletes a tet whose neighbour is then left with
+/// two exposed faces meeting at their shared edge. Either way the skin is slit
+/// along a line, the two torn patches coincide, and the divergence volume
+/// cancels out to the right answer.
+struct TetShellTopology {
+    std::size_t n_torn_edges = 0;
+    /// Packed (min << 32) | max, for the torn edges only.
+    std::unordered_set<std::uint64_t> torn;
+};
+
+TetShellTopology tet_shell_topology(const std::vector<std::array<std::uint32_t, 4>>& tets) {
+    struct FaceKey {
+        std::uint32_t a, b, c;
+        bool operator==(const FaceKey& o) const { return a == o.a && b == o.b && c == o.c; }
+    };
+    struct FaceHash {
+        std::size_t operator()(const FaceKey& f) const noexcept {
+            std::size_t h = f.a;
+            h ^= static_cast<std::size_t>(f.b) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+            h ^= static_cast<std::size_t>(f.c) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+            return h;
+        }
+    };
+    const auto make_key = [](std::uint32_t i, std::uint32_t j, std::uint32_t k) {
+        std::array<std::uint32_t, 3> v{{i, j, k}};
+        std::sort(v.begin(), v.end());
+        return FaceKey{v[0], v[1], v[2]};
+    };
+    static constexpr int kFaces[4][3] = {{0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}};
+    std::unordered_map<FaceKey, int, FaceHash> face_use;
+    face_use.reserve(tets.size() * 2);
+    for (const auto& t : tets) {
+        for (const auto& f : kFaces) {
+            ++face_use[make_key(t[static_cast<std::size_t>(f[0])],
+                                t[static_cast<std::size_t>(f[1])],
+                                t[static_cast<std::size_t>(f[2])])];
+        }
+    }
+    const auto pack = [](std::uint32_t x, std::uint32_t y) {
+        return x < y ? (static_cast<std::uint64_t>(x) << 32) | y
+                     : (static_cast<std::uint64_t>(y) << 32) | x;
+    };
+    std::unordered_map<std::uint64_t, int> edge_use;
+    edge_use.reserve(face_use.size());
+    for (const auto& [face, count] : face_use) {
+        if (count != 1) {
+            continue;
+        }
+        ++edge_use[pack(face.a, face.b)];
+        ++edge_use[pack(face.a, face.c)];
+        ++edge_use[pack(face.b, face.c)];
+    }
+    TetShellTopology out;
+    for (const auto& [edge, count] : edge_use) {
+        if (count != 2) {
+            out.torn.insert(edge);
+        }
+    }
+    out.n_torn_edges = out.torn.size();
+    return out;
+}
+
+/// Restrict a proposed set of tet deletions to those that keep the boundary as
+/// intact as it already is.
+///
+/// Every deletion site in this mesher decides tet-by-tet — centroid in a void
+/// child, node in the jut set, aspect below a flake threshold — and none of
+/// them could see that removing one tet may leave its neighbour with two
+/// exposed faces meeting at their shared edge. Two such neighbours slit the
+/// skin along that edge while the volume stays right, because the two torn
+/// patches coincide and cancel, so no volume or validity check can find it.
+///
+/// Each site proposes; this disposes. There are two ways to close a slit and
+/// they are not equally good:
+///
+///  - EXTEND: delete the stranded neighbour too. At a void carve that neighbour
+///    is a one-cell spike poking into the hole, so removing it moves the
+///    boundary toward the true surface.
+///  - REVIVE: put a deleted tet back. That reconnects the survivors through
+///    solid, but at a void carve it backfills material INTO the hole.
+///
+/// Extending is tried first and revival is the fallback, because backfilling
+/// measurably degrades the surface: reviving alone left the box_hole bore wall
+/// 12% larger and doubled cylinder_prism's graded surface residual (M1max
+/// 0.0080 -> 0.0194 h), while extending keeps both at their pre-fix values.
+/// Extension is capped so a runaway cannot eat the solid, and if neither
+/// converges the whole proposal is dropped — a surviving flake is a quality
+/// problem, a torn skin is a correctness one, and the two are not tradeable.
+bool restrict_kill_to_shell(const std::vector<std::array<std::uint32_t, 4>>& tets,
+                            std::vector<char>& kill, int max_rounds = 8) {
+    const auto pack = [](std::uint32_t x, std::uint32_t y) {
+        return x < y ? (static_cast<std::uint64_t>(x) << 32) | y
+                     : (static_cast<std::uint64_t>(y) << 32) | x;
+    };
+    static constexpr int kFaces[4][3] = {{0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}};
+    const auto entry = tet_shell_topology(tets);
+    const auto proposed = kill;
+    const std::size_t n_proposed =
+        static_cast<std::size_t>(std::count(kill.begin(), kill.end(), static_cast<char>(1)));
+    // A slit is local: the repair may not grow the deletion without bound.
+    const std::size_t kill_ceiling = 3 * n_proposed + 64;
+
+    std::vector<std::array<std::uint32_t, 4>> survivors;
+    std::vector<std::size_t> survivor_index;
+    survivors.reserve(tets.size());
+    survivor_index.reserve(tets.size());
+    const auto fresh_tears = [&]() {
+        survivors.clear();
+        survivor_index.clear();
+        for (std::size_t ti = 0; ti < tets.size(); ++ti) {
+            if (!kill[ti]) {
+                survivors.push_back(tets[ti]);
+                survivor_index.push_back(ti);
+            }
+        }
+        std::unordered_set<std::uint64_t> fresh;
+        for (const auto e : tet_shell_topology(survivors).torn) {
+            if (entry.torn.count(e) == 0) {
+                fresh.insert(e);
+            }
+        }
+        return fresh;
+    };
+    const auto touches_any = [&](const std::array<std::uint32_t, 4>& t,
+                                 const std::unordered_set<std::uint64_t>& edges) {
+        for (std::size_t i = 0; i < 4; ++i) {
+            for (std::size_t j = i + 1; j < 4; ++j) {
+                if (edges.count(pack(t[i], t[j])) != 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+
+    std::size_t killed = n_proposed;
+    for (int round = 0; round < max_rounds; ++round) {
+        const auto fresh = fresh_tears();
+        if (fresh.empty()) {
+            return true;
+        }
+        // Free-face count per survivor: a survivor at a fresh tear carrying two
+        // or more exposed faces is the stranded spike.
+        std::unordered_map<std::uint64_t, int> face_use;
+        face_use.reserve(survivors.size() * 2);
+        const auto face_hash = [](std::uint32_t a, std::uint32_t b, std::uint32_t c) {
+            std::array<std::uint32_t, 3> v{{a, b, c}};
+            std::sort(v.begin(), v.end());
+            std::uint64_t h = v[0];
+            h = h * 1000003U + v[1];
+            h = h * 1000003U + v[2];
+            return h;
+        };
+        for (const auto& t : survivors) {
+            for (const auto& f : kFaces) {
+                ++face_use[face_hash(t[static_cast<std::size_t>(f[0])],
+                                     t[static_cast<std::size_t>(f[1])],
+                                     t[static_cast<std::size_t>(f[2])])];
+            }
+        }
+        std::size_t extended = 0;
+        for (std::size_t si = 0; si < survivors.size(); ++si) {
+            const auto& t = survivors[si];
+            if (!touches_any(t, fresh)) {
+                continue;
+            }
+            int free_faces = 0;
+            for (const auto& f : kFaces) {
+                if (face_use[face_hash(t[static_cast<std::size_t>(f[0])],
+                                       t[static_cast<std::size_t>(f[1])],
+                                       t[static_cast<std::size_t>(f[2])])] == 1) {
+                    ++free_faces;
+                }
+            }
+            if (free_faces >= 2) {
+                kill[survivor_index[si]] = 1;
+                ++extended;
+            }
+        }
+        killed += extended;
+        if (extended == 0 || killed > kill_ceiling) {
+            break;
+        }
+    }
+
+    // Extension did not close it. Fall back to backfilling the minimum.
+    kill = proposed;
+    for (int round = 0; round < max_rounds; ++round) {
+        const auto fresh = fresh_tears();
+        if (fresh.empty()) {
+            return true;
+        }
+        std::size_t revived = 0;
+        for (std::size_t ti = 0; ti < tets.size(); ++ti) {
+            if (kill[ti] && touches_any(tets[ti], fresh)) {
+                kill[ti] = 0;
+                ++revived;
+            }
+        }
+        if (revived == 0) {
+            break;
+        }
+    }
+    if (fresh_tears().empty()) {
+        return true;
+    }
+    std::fill(kill.begin(), kill.end(), 0);
+    return false;
+}
+
 } // namespace
 
 GradedTetFillOutput
@@ -524,7 +739,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     // local carve the classifier can see a bore while the emitted tet mesh
     // remains the original solid coarse cube.
     if (!classification.child_inside_mask.empty()) {
-        std::size_t write = 0;
+        std::vector<char> kill(out.mesh.tets.size(), 0);
         for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
             const auto& tet = out.mesh.tets[ti];
             const Eigen::Vector3d centroid =
@@ -536,16 +751,29 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             const int k = std::clamp(static_cast<int>(std::floor(lattice.z())), 0, nz - 1);
             const auto parent = idx(i, j, k);
             const std::uint8_t mask = classification.child_inside_mask[parent];
-            bool keep = true;
-            if (mask != 0 && mask != std::uint8_t{0xff}) {
-                const int a = lattice.x() - static_cast<double>(i) >= 0.5 ? 1 : 0;
-                const int b = lattice.y() - static_cast<double>(j) >= 0.5 ? 1 : 0;
-                const int c = lattice.z() - static_cast<double>(k) >= 0.5 ? 1 : 0;
-                const int child = a + 2 * b + 4 * c;
-                keep = (mask & static_cast<std::uint8_t>(1U << child)) != 0;
+            if (mask == 0 || mask == std::uint8_t{0xff}) {
+                continue;
             }
-            if (keep) {
-                out.mesh.tets[write++] = tet;
+            const int a = lattice.x() - static_cast<double>(i) >= 0.5 ? 1 : 0;
+            const int b = lattice.y() - static_cast<double>(j) >= 0.5 ? 1 : 0;
+            const int c = lattice.z() - static_cast<double>(k) >= 0.5 ? 1 : 0;
+            const int child = a + 2 * b + 4 * c;
+            if ((mask & static_cast<std::uint8_t>(1U << child)) == 0) {
+                kill[ti] = 1;
+            }
+        }
+        // A centroid-in-void test decides one tet at a time and cannot see that
+        // dropping this one strands its neighbour with two exposed faces. That
+        // is where the graded mesher's torn skins came from: measured on
+        // sphere_box_s0 at h=0.0072 m, the LEB lattice reaching this point is
+        // perfectly conforming (0 torn edges over 26008 tets) and this carve
+        // alone introduced 30. The later repair rounds only ever whittled that
+        // down (30 -> 17 -> 6); they were never the source.
+        restrict_kill_to_shell(out.mesh.tets, kill);
+        std::size_t write = 0;
+        for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+            if (!kill[ti]) {
+                out.mesh.tets[write++] = out.mesh.tets[ti];
             }
         }
         out.mesh.tets.resize(write);
@@ -685,6 +913,17 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         }
         bool collapsed_any = false;
         for (int pass = 0; pass < kCollapsePasses; ++pass) {
+            // `try_collapse` checks that no incident tet inverts or degrades,
+            // which is necessary and not sufficient: an edge collapse also has
+            // to satisfy the link condition, or it welds the complex to itself
+            // and slits the skin. Rather than evaluate that condition -- which
+            // is subtle in 3D and easy to get subtly wrong -- the pass is run
+            // and then checked, and reverted whole if it tore anything. A
+            // sliver that survives is a quality problem; a torn skin is a
+            // correctness one, and the two are not tradeable.
+            const auto tets_before = out.mesh.tets;
+            const auto remap_before = node_remap;
+            const std::size_t torn_before = tet_shell_topology(out.mesh.tets).n_torn_edges;
             const auto bvec = tet_boundary_nodes(out.mesh.tets);
             const std::unordered_set<std::uint32_t> bset(bvec.begin(), bvec.end());
             std::unordered_map<std::uint32_t, std::vector<std::size_t>> incident;
@@ -762,7 +1001,6 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 }
                 node_remap[dead] = surv;
                 any = true;
-                collapsed_any = true;
                 return true;
             };
 
@@ -844,17 +1082,22 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                     }
                 }
             }
-            if (any) {
-                std::size_t w = 0;
-                for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
-                    if (!removed[ti]) {
-                        out.mesh.tets[w++] = out.mesh.tets[ti];
-                    }
-                }
-                out.mesh.tets.resize(w);
-            } else {
+            if (!any) {
                 break;
             }
+            std::size_t w = 0;
+            for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+                if (!removed[ti]) {
+                    out.mesh.tets[w++] = out.mesh.tets[ti];
+                }
+            }
+            out.mesh.tets.resize(w);
+            if (tet_shell_topology(out.mesh.tets).n_torn_edges > torn_before) {
+                out.mesh.tets = tets_before;
+                node_remap = remap_before;
+                break;
+            }
+            collapsed_any = true;
         }
         if (collapsed_any) {
             const auto resolve = [&](std::uint32_t ni) {
@@ -957,6 +1200,14 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                         kill[ti] = 1;
                         ++n_kill;
                     }
+                }
+                // Deleting a tet that has a free face exposes its other three,
+                // which can strand a neighbour with two exposed faces of its
+                // own. Same class as the child carve above, same remedy.
+                if (n_kill > 0 && n_kill < out.mesh.tets.size()) {
+                    restrict_kill_to_shell(out.mesh.tets, kill);
+                    n_kill = static_cast<std::size_t>(
+                        std::count(kill.begin(), kill.end(), static_cast<char>(1)));
                 }
                 if (n_kill == 0 || n_kill >= out.mesh.tets.size()) {
                     break;

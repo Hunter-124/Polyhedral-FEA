@@ -338,6 +338,83 @@ def bbox_diagonal(work: Path, step: Path) -> float:
 
 
 # --------------------------------------------------------------------------- #
+# CAD feature measurement
+# --------------------------------------------------------------------------- #
+
+def cad_feature_sizes(work: Path, step: Path) -> dict:
+    """Feature sizes of a STEP solid, measured from a curvature-refined 1D mesh.
+
+    Nothing is taken from the generator's intent. Every CAD vertex is a mesh node
+    and every CAD edge is meshed, so per-curve lengths come out of the mesh; a
+    closed curve whose nodes are equidistant from their own centroid is reported
+    as a circle of radius length/(2*pi), which is how hole radii, a tube's bore
+    and its outer wall are recovered.
+    """
+    stem = f"feat-{step.stem}"
+    geo = work / f"{stem}.geo"
+    msh = work / f"{stem}.msh"
+    geo.write_text(
+        f'Merge "{step.resolve().as_posix()}";\n'
+        "Mesh.MeshSizeFromCurvature = 64;\nMesh.MeshSizeMax = 1;\nMesh.MeshSizeMin = 1e-6;\n",
+        encoding="utf-8",
+    )
+    result = run(
+        [str(GMSH), "-nt", "1", "-1", "-format", "msh2", "-o", str(msh), str(geo)],
+        work, GMSH_TIMEOUT_S,
+    )
+    if not result.ok:
+        raise RuntimeError(f"gmsh 1D pass failed for {step.name}: {result.stderr[-400:]}")
+    text = msh.read_text(encoding="utf-8", errors="replace").splitlines()
+    i, j = text.index("$Nodes"), text.index("$Elements")
+    coords = {}
+    for k in range(int(text[i + 1])):
+        f = text[i + 2 + k].split()
+        coords[int(f[0])] = tuple(float(v) for v in f[1:4])
+    curves: dict[int, dict] = {}
+    for k in range(int(text[j + 1])):
+        f = text[j + 2 + k].split()
+        if int(f[1]) != 1:  # 2-node line
+            continue
+        ntags = int(f[2])
+        # msh2 tags are (physical, elementary); with no physical groups the first
+        # is 0 for every curve, so the elementary tag is what separates edges.
+        tag = int(f[4]) if ntags >= 2 else int(f[3])
+        a, b = int(f[3 + ntags]), int(f[4 + ntags])
+        entry = curves.setdefault(tag, {"length": 0.0, "nodes": set()})
+        entry["length"] += math.dist(coords[a], coords[b])
+        entry["nodes"].update((a, b))
+    points = np.asarray(list(coords.values()))
+    lo, hi = points.min(axis=0), points.max(axis=0)
+    diagonal = float(np.linalg.norm(hi - lo))
+    circles = []
+    for entry in curves.values():
+        nodes = np.asarray([coords[n] for n in entry["nodes"]])
+        centre = nodes.mean(axis=0)
+        radii = np.linalg.norm(nodes - centre, axis=1)
+        mean_r = float(radii.mean())
+        if mean_r <= 0.0:
+            continue
+        round_enough = (radii.max() - radii.min()) / mean_r < 0.02
+        closed_enough = abs(entry["length"] / (2.0 * math.pi * mean_r) - 1.0) < 0.02
+        if round_enough and closed_enough:
+            circles.append({"radius_m": mean_r, "centre_m": [float(v) for v in centre]})
+    circles.sort(key=lambda c: c["radius_m"])
+    lengths = sorted(v["length"] for v in curves.values())
+    return {
+        "step": step.name,
+        "bbox_lo_m": [float(v) for v in lo],
+        "bbox_hi_m": [float(v) for v in hi],
+        "extents_m": [float(v) for v in (hi - lo)],
+        "bbox_diagonal_m": diagonal,
+        "n_cad_curves": len(curves),
+        "shortest_cad_edge_m": lengths[0] if lengths else None,
+        "circular_edges": circles,
+        "method": "gmsh -1 with MeshSizeFromCurvature=64; per-curve length summed over "
+        "its 1D elements; circle = closed curve with equidistant nodes, radius = L/(2*pi)",
+    }
+
+
+# --------------------------------------------------------------------------- #
 # mesh parsing / derived topology
 # --------------------------------------------------------------------------- #
 def parse_msh2(path: Path, require_tets: bool = True) -> tuple[np.ndarray, np.ndarray]:
@@ -1454,6 +1531,213 @@ def audit_against_git(revision: str, audit_path: Path | None) -> int:
         print("\nwrote audit", audit_path)
     return 0
 
+# --------------------------------------------------------------------------- #
+# evidence artifact: the measurements behind the trust claims, per rung
+# --------------------------------------------------------------------------- #
+def load_area_evidence(entry: dict) -> dict:
+    """Per-rung loaded-area record so area stability is derivable, not asserted."""
+    case = load_json(CASE_DIR / f"{entry['case_id']}.case.json")
+    expected = case["loads"][0]["select"].get("expected_area")
+    rungs = []
+    for row in entry.get("rungs", []):
+        if row.get("status") not in ("ok", "mesh-only"):
+            rungs.append({"h_rel": row.get("h_rel"), "status": row.get("status")})
+            continue
+        selected = row["load_area_m2"]
+        end_face = row.get("end_face_area_m2")
+        box_only = row.get("box_only_area_m2")
+        rungs.append({
+            "h_rel": row["h_rel"],
+            "mesh_size_m": row["h"],
+            "curvature_points_per_2pi": row["curvature_points"],
+            "n_dof": row.get("n_dof"),
+            "n_load_faces": row["n_load_faces"],
+            "normal_min_dot": row.get("normal_min_dot"),
+            "selected_area_m2": selected,
+            "cad_end_face_area_m2": end_face,
+            "box_only_area_m2": box_only,
+            "wall_ring_area_m2": (
+                None if (box_only is None or end_face is None) else box_only - end_face
+            ),
+            "wall_ring_over_end_face": (
+                None if not end_face else (box_only - end_face) / end_face
+            ),
+            "selected_vs_cad_expected_rel_err": (
+                None if not expected else abs(selected - expected) / expected
+            ),
+            "resultant_mag_N": row.get("resultant_mag_N"),
+        })
+    areas = [r["selected_area_m2"] for r in rungs if r.get("selected_area_m2")]
+    drift = (
+        max(abs(areas[k] - areas[k - 1]) / areas[k - 1] for k in range(1, len(areas)))
+        if len(areas) > 1 else None
+    )
+    return {
+        "case_id": entry["case_id"],
+        "family": entry.get("family"),
+        "cad_expected_area_m2": expected,
+        "traction_Pa": [float(v) for v in case["loads"][0]["traction"]],
+        "rungs": rungs,
+        "max_between_rung_area_drift": drift,
+        "derivation": "drift = max over consecutive rungs of |A_k - A_(k-1)| / A_(k-1); "
+        "selected_vs_cad_expected_rel_err = |A_selected - expected_area| / expected_area; "
+        "wall_ring_over_end_face = (box_only_area - cad_end_face_area) / cad_end_face_area",
+    }
+
+
+def family_feature_report(work: Path, family: str) -> list[dict]:
+    """Feature sizes per part, absolute and relative to the diagonal and each rung's h."""
+    out = []
+    seen: set[str] = set()
+    for path in sorted(CASE_DIR.glob(f"{family}_s*_c*.case.json")):
+        case = load_json(path)
+        step = ROOT / case["geometry"]
+        if step.name in seen:
+            continue
+        seen.add(step.name)
+        features = cad_feature_sizes(work, step)
+        diagonal = features["bbox_diagonal_m"]
+        h_rel = H_REL_BY_FAMILY.get(family, DEFAULT_H_REL)
+        radii = [c["radius_m"] for c in features["circular_edges"]]
+        # distinct radii (a through hole contributes one circle per face)
+        distinct: dict[float, int] = {}
+        for r in radii:
+            key = round(r, 9)
+            distinct[key] = distinct.get(key, 0) + 1
+        # distinct axes: dedupe circles sharing an (x, y) centre
+        axes: list[dict] = []
+        for circle in features["circular_edges"]:
+            cx, cy, _ = circle["centre_m"]
+            if not any(abs(a["centre_m"][0] - cx) < 1e-9 and abs(a["centre_m"][1] - cy) < 1e-9
+                       for a in axes):
+                axes.append(circle)
+        derived: dict = {}
+        if family == "tube" and len(distinct) >= 2:
+            r_inner, r_outer = min(distinct), max(distinct)
+            annulus = math.pi * (r_outer**2 - r_inner**2)
+            expected = case["loads"][0]["select"].get("expected_area")
+            derived = {
+                "r_outer_m": r_outer,
+                "r_inner_m": r_inner,
+                "wall_thickness_m": r_outer - r_inner,
+                "wall_thickness_over_diagonal": (r_outer - r_inner) / diagonal,
+                "annulus_area_from_measured_radii_m2": annulus,
+                "case_expected_area_m2": expected,
+                "annulus_vs_expected_rel_err": (
+                    None if not expected else abs(annulus - expected) / expected
+                ),
+                "verification": "pi*(r_outer^2 - r_inner^2) from radii measured off the "
+                "meshed CAD edges, against the expected_area the case file declares",
+            }
+        elif family == "perforated_plate" and axes:
+            gaps = []
+            for a in range(len(axes)):
+                for b in range(a + 1, len(axes)):
+                    ca, cb = axes[a]["centre_m"], axes[b]["centre_m"]
+                    distance = math.dist((ca[0], ca[1]), (cb[0], cb[1]))
+                    gaps.append(distance - axes[a]["radius_m"] - axes[b]["radius_m"])
+            clearance = []
+            for circle in axes:
+                cx, cy, _ = circle["centre_m"]
+                r = circle["radius_m"]
+                clearance += [
+                    cx - features["bbox_lo_m"][0] - r, features["bbox_hi_m"][0] - cx - r,
+                    cy - features["bbox_lo_m"][1] - r, features["bbox_hi_m"][1] - cy - r,
+                ]
+            derived = {
+                "n_holes": len(axes),
+                "hole_radius_m": min(distinct) if distinct else None,
+                "min_ligament_between_holes_m": min(gaps) if gaps else None,
+                "min_hole_to_free_face_clearance_m": min(clearance) if clearance else None,
+                "plate_thickness_m": features["extents_m"][2],
+            }
+        # Ratios are only meaningful for LENGTHS, so they are built from the
+        # fields whose names end in _m; counts and areas are left alone.
+        ratios = {}
+        for name, value in list(derived.items()) + [
+            ("shortest_cad_edge_m", features["shortest_cad_edge_m"])
+        ]:
+            if not name.endswith("_m") or not isinstance(value, (int, float)) or not value:
+                continue
+            base = name[:-2]
+            ratios[f"{base}_over_diagonal"] = value / diagonal
+            for factor, curvature in RUNGS:
+                h = diagonal * h_rel * factor
+                ratios[f"{base}_over_h_rung_c{curvature}"] = value / h
+        out.append({
+            "part": step.stem,
+            "family": family,
+            "features": features,
+            "distinct_circle_radii_m": {str(r): n for r, n in sorted(distinct.items())},
+            "derived": derived,
+            "rungs": [
+                {
+                    "h_rel": h_rel * factor,
+                    "mesh_size_max_m": diagonal * h_rel * factor,
+                    "mesh_size_min_m": diagonal * h_rel * factor / MESH_SIZE_MIN_DIVISOR,
+                    "curvature_points_per_2pi": curvature,
+                    "curvature_size_on_smallest_circle_m": (
+                        2.0 * math.pi * min(radii) / curvature if radii else None
+                    ),
+                }
+                for factor, curvature in RUNGS
+            ],
+            "ratios": ratios,
+        })
+    return out
+
+
+def evidence_stage(result_paths: list[Path], families: list[str], work: Path,
+                   out_path: Path) -> int:
+    merged: dict[str, dict] = {}
+    for path in result_paths or []:
+        for entry in load_json(path)["cases"]:
+            previous = merged.get(entry["case_id"])
+            if previous is None or len(entry.get("rungs", [])) >= len(previous.get("rungs", [])):
+                merged[entry["case_id"]] = entry
+    areas = [load_area_evidence(entry) for entry in sorted(merged.values(),
+                                                           key=lambda e: e["case_id"])]
+    drifts = [a["max_between_rung_area_drift"] for a in areas
+              if a["max_between_rung_area_drift"] is not None]
+    errors = [r["selected_vs_cad_expected_rel_err"] for a in areas for r in a["rungs"]
+              if r.get("selected_vs_cad_expected_rel_err") is not None]
+    rings = {}
+    for a in areas:
+        values = [r["wall_ring_over_end_face"] for r in a["rungs"]
+                  if r.get("wall_ring_over_end_face") is not None]
+        if values:
+            rings.setdefault(a["family"], []).extend(values)
+    payload = {
+        "purpose": "The per-rung measurements behind the load-stability and feature-size "
+        "claims, so a reviewer can re-derive them instead of taking prose on trust.",
+        "pipeline": "gmsh-mesh -> calculix-solve -> probe",
+        "gmsh_version": GMSH_VERSION,
+        "calculix_version": CCX_VERSION,
+        "generated": datetime.now(timezone.utc).isoformat(),
+        "summary": {
+            "cases": len(areas),
+            "max_between_rung_area_drift": max(drifts) if drifts else None,
+            "max_selected_vs_cad_expected_rel_err": max(errors) if errors else None,
+            "wall_ring_over_end_face_by_family": {
+                family: {"min": min(values), "max": max(values), "n_rungs": len(values)}
+                for family, values in sorted(rings.items())
+            },
+        },
+        "per_case_loaded_areas": areas,
+        "feature_sizes": [row for family in families
+                          for row in family_feature_report(work, family)],
+    }
+    dump_json(out_path, payload)
+    print(f"cases recorded: {len(areas)}")
+    print(f"max between-rung loaded-area drift: {payload['summary']['max_between_rung_area_drift']:.3e}")
+    print(f"max selected-vs-CAD area error:     {payload['summary']['max_selected_vs_cad_expected_rel_err']:.3e}")
+    for family, stats in payload["summary"]["wall_ring_over_end_face_by_family"].items():
+        print(f"wall-ring/end-face {family:<18} min {stats['min']:.3e} max {stats['max']:.3e}"
+              f" over {stats['n_rungs']} rungs")
+    print("wrote", out_path)
+    return 0
+
+
 
 # --------------------------------------------------------------------------- #
 def analytic_case_ids() -> list[str]:
@@ -1470,7 +1754,8 @@ def all_case_ids() -> list[str]:
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--stage", choices=("validate", "generate", "crosscheck", "write", "audit"),
+    p.add_argument("--stage",
+                   choices=("validate", "generate", "crosscheck", "write", "audit", "evidence"),
                    default="validate")
     p.add_argument("--case", action="append", help="run only this case id (repeatable)")
     p.add_argument("--family", action="append", help="run only this family (repeatable)")
@@ -1501,6 +1786,14 @@ def main() -> int:
     if args.stage == "audit":
         return audit_against_git(
             args.baseline, args.audit or OUT_DIR / "external-truth-audit.json"
+        )
+    RUNGS = RUNGS_ALL[: args.rungs]
+    if args.stage == "evidence":
+        work = args.work or Path(os.environ.get("TEMP", "/tmp")) / "polymesh-truth"
+        work.mkdir(parents=True, exist_ok=True)
+        return evidence_stage(
+            args.results or [], args.family or [], work,
+            args.out or OUT_DIR / "external-truth-load-evidence.json",
         )
     RUNGS = RUNGS_ALL[: args.rungs]
     if args.stage == "write":

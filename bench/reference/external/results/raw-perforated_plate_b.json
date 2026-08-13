@@ -1,0 +1,688 @@
+{
+  "schema_version": 1,
+  "pipeline": "gmsh-mesh -> calculix-solve -> probe",
+  "gmsh_version": "4.13.1",
+  "calculix_version": "2.23",
+  "truth_source": "external-gmsh-mesh+calculix-solver",
+  "rungs": [
+    {
+      "h_rel_factor": 1.0,
+      "curvature_points": 24
+    },
+    {
+      "h_rel_factor": 0.6896551724137931,
+      "curvature_points": 34
+    }
+  ],
+  "include_wall_strip": false,
+  "started": "2026-08-13T05:40:35.328172+00:00",
+  "wall_total_s": 178.4,
+  "cases": [
+    {
+      "case_id": "perforated_plate_s2_c0",
+      "family": "perforated_plate",
+      "truth_source_existing": "provisional",
+      "analytic": false,
+      "bbox_diagonal_m": 0.23569677285326768,
+      "rungs": [
+        {
+          "case_id": "perforated_plate_s2_c0",
+          "h": 0.012963322506929722,
+          "curvature_points": 24,
+          "status": "ok",
+          "wall_mesh_s": 1.93,
+          "gmsh_high_order_optimize": 2,
+          "n_nodes": 12941,
+          "n_elems": 6912,
+          "n_dof": 38604,
+          "n_fixed_nodes": 73,
+          "n_load_faces": 28,
+          "load_rule": "box+normal_min_dot",
+          "normal_min_dot": 0.7,
+          "load_area_m2": 0.0006789457104979738,
+          "end_face_area_m2": 0.0006789457104979738,
+          "box_only_area_m2": 0.0006789457104979738,
+          "end_face_vs_selected_rel_diff": 0.0,
+          "resultant_N": [
+            678.9457104979738,
+            0.0,
+            0.0
+          ],
+          "resultant_mag_N": 678.9457104979738,
+          "load_area_rel_err_vs_cad": 2.9842695647178856e-12,
+          "wall_solve_s": 4.27,
+          "strain_energy_work_J": 0.0003892109550337161,
+          "strain_energy_ccx_J": 0.00038921094310690005,
+          "strain_energy_rel_gap": 3.064357836177605e-08,
+          "reaction_N": [
+            -678.9457,
+            4.569012e-12,
+            -1.328448e-11
+          ],
+          "equilibrium_rel_err": 1.546216969562176e-08,
+          "n_probe_nodes": 23,
+          "tip_deflection_m": 1.1450086560426675e-06,
+          "h_rel": 0.055,
+          "bbox_diagonal_m": 0.23569677285326768,
+          "values": {
+            "strain_energy": 0.00038921094310690005,
+            "tip_deflection": 1.1450086560426675e-06
+          }
+        },
+        {
+          "case_id": "perforated_plate_s2_c0",
+          "h": 0.008940222418572223,
+          "curvature_points": 34,
+          "status": "ok",
+          "wall_mesh_s": 4.5,
+          "gmsh_high_order_optimize": 2,
+          "n_nodes": 25574,
+          "n_elems": 14213,
+          "n_dof": 76413,
+          "n_fixed_nodes": 103,
+          "n_load_faces": 40,
+          "load_rule": "box+normal_min_dot",
+          "normal_min_dot": 0.7,
+          "load_area_m2": 0.0006789457104979738,
+          "end_face_area_m2": 0.0006789457104979738,
+          "box_only_area_m2": 0.0006789457104979738,
+          "end_face_vs_selected_rel_diff": 0.0,
+          "resultant_N": [
+            678.945710497974,
+            0.0,
+            0.0
+          ],
+          "resultant_mag_N": 678.945710497974,
+          "load_area_rel_err_vs_cad": 2.9842695647178856e-12,
+          "wall_solve_s": 8.78,
+          "strain_energy_work_J": 0.00038943367792029836,
+          "strain_energy_ccx_J": 0.00038943368715567,
+          "strain_energy_rel_gap": 2.3714876090278784e-08,
+          "reaction_N": [
+            -678.9457,
+            -1.317169e-11,
+            3.629874e-12
+          ],
+          "equilibrium_rel_err": 1.546217003051328e-08,
+          "n_probe_nodes": 32,
+          "tip_deflection_m": 1.146179919591706e-06,
+          "h_rel": 0.03793103448275862,
+          "bbox_diagonal_m": 0.23569677285326768,
+          "values": {
+            "strain_energy": 0.00038943368715567,
+            "tip_deflection": 1.146179919591706e-06
+          }
+        }
+      ],
+      "wall_total_s": 20.5,
+      "values": {
+        "strain_energy": 0.00038943368715567,
+        "tip_deflection": 1.146179919591706e-06
+      },
+      "convergence_delta": {
+        "strain_energy": 0.000572296469857384,
+        "tip_deflection": 0.0010229298642042562
+      },
+      "convergence_delta_between": [
+        0.055,
+        0.03793103448275862
+      ],
+      "status": "ok"
+    },
+    {
+      "case_id": "perforated_plate_s2_c1",
+      "family": "perforated_plate",
+      "truth_source_existing": "provisional",
+      "analytic": false,
+      "bbox_diagonal_m": 0.23569677285326768,
+      "rungs": [
+        {
+          "case_id": "perforated_plate_s2_c1",
+          "h": 0.012963322506929722,
+          "curvature_points": 24,
+          "status": "ok",
+          "wall_mesh_s": 2.08,
+          "gmsh_high_order_optimize": 2,
+          "n_nodes": 12941,
+          "n_elems": 6912,
+          "n_dof": 38604,
+          "n_fixed_nodes": 73,
+          "n_load_faces": 28,
+          "load_rule": "box+normal_min_dot",
+          "normal_min_dot": -1.0,
+          "load_area_m2": 0.0006789457104979738,
+          "end_face_area_m2": 0.0006789457104979738,
+          "box_only_area_m2": 0.0006789457104979738,
+          "end_face_vs_selected_rel_diff": 0.0,
+          "resultant_N": [
+            0.0,
+            0.0,
+            -67.89457104979736
+          ],
+          "resultant_mag_N": 67.89457104979736,
+          "load_area_rel_err_vs_cad": 2.9842695647178856e-12,
+          "wall_solve_s": 6.19,
+          "strain_energy_work_J": 0.010918166788087416,
+          "strain_energy_ccx_J": 0.0109181667703854,
+          "strain_energy_rel_gap": 1.6213360088658027e-09,
+          "reaction_N": [
+            3.96038e-09,
+            1.698899e-10,
+            67.89457
+          ],
+          "equilibrium_rel_err": 1.5462279674511777e-08,
+          "n_probe_nodes": 23,
+          "tip_deflection_m": 0.00032165988132006,
+          "h_rel": 0.055,
+          "bbox_diagonal_m": 0.23569677285326768,
+          "values": {
+            "strain_energy": 0.0109181667703854,
+            "tip_deflection": 0.00032165988132006
+          }
+        },
+        {
+          "case_id": "perforated_plate_s2_c1",
+          "h": 0.008940222418572223,
+          "curvature_points": 34,
+          "status": "ok",
+          "wall_mesh_s": 4.93,
+          "gmsh_high_order_optimize": 2,
+          "n_nodes": 25574,
+          "n_elems": 14213,
+          "n_dof": 76413,
+          "n_fixed_nodes": 103,
+          "n_load_faces": 40,
+          "load_rule": "box+normal_min_dot",
+          "normal_min_dot": -1.0,
+          "load_area_m2": 0.0006789457104979738,
+          "end_face_area_m2": 0.0006789457104979738,
+          "box_only_area_m2": 0.0006789457104979738,
+          "end_face_vs_selected_rel_diff": 0.0,
+          "resultant_N": [
+            0.0,
+            0.0,
+            -67.89457104979738
+          ],
+          "resultant_mag_N": 67.89457104979738,
+          "load_area_rel_err_vs_cad": 2.9842695647178856e-12,
+          "wall_solve_s": 15.39,
+          "strain_energy_work_J": 0.010940019253898634,
+          "strain_energy_ccx_J": 0.01094001932533601,
+          "strain_energy_rel_gap": 6.529913222538528e-09,
+          "reaction_N": [
+            -2.76313e-09,
+            -9.530271e-10,
+            67.89457
+          ],
+          "equilibrium_rel_err": 1.546222958406181e-08,
+          "n_probe_nodes": 32,
+          "tip_deflection_m": 0.00032231711020407386,
+          "h_rel": 0.03793103448275862,
+          "bbox_diagonal_m": 0.23569677285326768,
+          "values": {
+            "strain_energy": 0.01094001932533601,
+            "tip_deflection": 0.00032231711020407386
+          }
+        }
+      ],
+      "wall_total_s": 29.6,
+      "values": {
+        "strain_energy": 0.01094001932533601,
+        "tip_deflection": 0.00032231711020407386
+      },
+      "convergence_delta": {
+        "strain_energy": 0.0020014857265126225,
+        "tip_deflection": 0.0020432417039906742
+      },
+      "convergence_delta_between": [
+        0.055,
+        0.03793103448275862
+      ],
+      "status": "ok"
+    },
+    {
+      "case_id": "perforated_plate_s2_c2",
+      "family": "perforated_plate",
+      "truth_source_existing": "provisional",
+      "analytic": false,
+      "bbox_diagonal_m": 0.23569677285326768,
+      "rungs": [
+        {
+          "case_id": "perforated_plate_s2_c2",
+          "h": 0.012963322506929722,
+          "curvature_points": 24,
+          "status": "ok",
+          "wall_mesh_s": 2.43,
+          "gmsh_high_order_optimize": 2,
+          "n_nodes": 12941,
+          "n_elems": 6912,
+          "n_dof": 38604,
+          "n_fixed_nodes": 73,
+          "n_load_faces": 28,
+          "load_rule": "box+normal_min_dot",
+          "normal_min_dot": -1.0,
+          "load_area_m2": 0.0006789457104979738,
+          "end_face_area_m2": 0.0006789457104979738,
+          "box_only_area_m2": 0.0006789457104979738,
+          "end_face_vs_selected_rel_diff": 0.0,
+          "resultant_N": [
+            59.60576099399459,
+            -71.74689366698983,
+            -98.682458481235
+          ],
+          "resultant_mag_N": 135.78914207857792,
+          "load_area_rel_err_vs_cad": 2.9842695647178856e-12,
+          "wall_solve_s": 6.64,
+          "strain_energy_work_J": 0.023191011355217096,
+          "strain_energy_ccx_J": 0.023191011287063,
+          "strain_energy_rel_gap": 2.938815220507411e-09,
+          "reaction_N": [
+            -59.60576,
+            71.74689,
+            98.68246
+          ],
+          "equilibrium_rel_err": 3.013227824203605e-08,
+          "n_probe_nodes": 23,
+          "tip_deflection_m": 0.0004675355918511264,
+          "h_rel": 0.055,
+          "bbox_diagonal_m": 0.23569677285326768,
+          "values": {
+            "strain_energy": 0.023191011287063,
+            "tip_deflection": 0.0004675355918511264
+          }
+        },
+        {
+          "case_id": "perforated_plate_s2_c2",
+          "h": 0.008940222418572223,
+          "curvature_points": 34,
+          "status": "ok",
+          "wall_mesh_s": 4.89,
+          "gmsh_high_order_optimize": 2,
+          "n_nodes": 25574,
+          "n_elems": 14213,
+          "n_dof": 76413,
+          "n_fixed_nodes": 103,
+          "n_load_faces": 40,
+          "load_rule": "box+normal_min_dot",
+          "normal_min_dot": -1.0,
+          "load_area_m2": 0.0006789457104979738,
+          "end_face_area_m2": 0.0006789457104979738,
+          "box_only_area_m2": 0.0006789457104979738,
+          "end_face_vs_selected_rel_diff": 0.0,
+          "resultant_N": [
+            59.60576099399465,
+            -71.74689366698983,
+            -98.68245848123503
+          ],
+          "resultant_mag_N": 135.78914207857798,
+          "load_area_rel_err_vs_cad": 2.9842695647178856e-12,
+          "wall_solve_s": 15.51,
+          "strain_energy_work_J": 0.023237134472830854,
+          "strain_energy_ccx_J": 0.0232371346062727,
+          "strain_energy_rel_gap": 5.742611842679156e-09,
+          "reaction_N": [
+            -59.60576,
+            71.74689,
+            98.68246
+          ],
+          "equilibrium_rel_err": 3.01322782660392e-08,
+          "n_probe_nodes": 32,
+          "tip_deflection_m": 0.0004684891487271506,
+          "h_rel": 0.03793103448275862,
+          "bbox_diagonal_m": 0.23569677285326768,
+          "values": {
+            "strain_energy": 0.0232371346062727,
+            "tip_deflection": 0.0004684891487271506
+          }
+        }
+      ],
+      "wall_total_s": 30.6,
+      "values": {
+        "strain_energy": 0.0232371346062727,
+        "tip_deflection": 0.0004684891487271506
+      },
+      "convergence_delta": {
+        "strain_energy": 0.0019888446708414406,
+        "tip_deflection": 0.002039538577691453
+      },
+      "convergence_delta_between": [
+        0.055,
+        0.03793103448275862
+      ],
+      "status": "ok"
+    },
+    {
+      "case_id": "perforated_plate_s3_c0",
+      "family": "perforated_plate",
+      "truth_source_existing": "provisional",
+      "analytic": false,
+      "bbox_diagonal_m": 0.4080283472450004,
+      "rungs": [
+        {
+          "case_id": "perforated_plate_s3_c0",
+          "h": 0.022441559098475023,
+          "curvature_points": 24,
+          "status": "ok",
+          "wall_mesh_s": 2.7,
+          "gmsh_high_order_optimize": 2,
+          "n_nodes": 14150,
+          "n_elems": 7751,
+          "n_dof": 42231,
+          "n_fixed_nodes": 73,
+          "n_load_faces": 28,
+          "load_rule": "box+normal_min_dot",
+          "normal_min_dot": 0.7,
+          "load_area_m2": 0.0026027019531519265,
+          "end_face_area_m2": 0.0026027019531519265,
+          "box_only_area_m2": 0.0026027019531519265,
+          "end_face_vs_selected_rel_diff": 0.0,
+          "resultant_N": [
+            2602.7019531519254,
+            0.0,
+            0.0
+          ],
+          "resultant_mag_N": 2602.7019531519254,
+          "load_area_rel_err_vs_cad": 3.258434360321756e-10,
+          "wall_solve_s": 5.25,
+          "strain_energy_work_J": 0.0025719262729223336,
+          "strain_energy_ccx_J": 0.0025719261742240002,
+          "strain_energy_rel_gap": 3.837525911494201e-08,
+          "reaction_N": [
+            -2602.702,
+            2.669864e-11,
+            3.471934e-11
+          ],
+          "equilibrium_rel_err": 1.7999784708385118e-08,
+          "n_probe_nodes": 23,
+          "tip_deflection_m": 1.9737624506682146e-06,
+          "h_rel": 0.055,
+          "bbox_diagonal_m": 0.4080283472450004,
+          "values": {
+            "strain_energy": 0.0025719261742240002,
+            "tip_deflection": 1.9737624506682146e-06
+          }
+        },
+        {
+          "case_id": "perforated_plate_s3_c0",
+          "h": 0.01547693730929312,
+          "curvature_points": 34,
+          "status": "ok",
+          "wall_mesh_s": 5.63,
+          "gmsh_high_order_optimize": 2,
+          "n_nodes": 29631,
+          "n_elems": 17029,
+          "n_dof": 88566,
+          "n_fixed_nodes": 109,
+          "n_load_faces": 42,
+          "load_rule": "box+normal_min_dot",
+          "normal_min_dot": 0.7,
+          "load_area_m2": 0.0026027019531519257,
+          "end_face_area_m2": 0.0026027019531519257,
+          "box_only_area_m2": 0.0026027019531519257,
+          "end_face_vs_selected_rel_diff": 0.0,
+          "resultant_N": [
+            2602.7019531519277,
+            0.0,
+            0.0
+          ],
+          "resultant_mag_N": 2602.7019531519277,
+          "load_area_rel_err_vs_cad": 3.258437692865218e-10,
+          "wall_solve_s": 12.34,
+          "strain_energy_work_J": 0.002573436529890569,
+          "strain_energy_ccx_J": 0.0025734364933537,
+          "strain_energy_rel_gap": 1.4197696003282946e-08,
+          "reaction_N": [
+            -2602.702,
+            1.473932e-11,
+            9.356338e-11
+          ],
+          "equilibrium_rel_err": 1.7999783834807753e-08,
+          "n_probe_nodes": 34,
+          "tip_deflection_m": 1.974071314950974e-06,
+          "h_rel": 0.03793103448275862,
+          "bbox_diagonal_m": 0.4080283472450004,
+          "values": {
+            "strain_energy": 0.0025734364933537,
+            "tip_deflection": 1.974071314950974e-06
+          }
+        }
+      ],
+      "wall_total_s": 27.1,
+      "values": {
+        "strain_energy": 0.0025734364933537,
+        "tip_deflection": 1.974071314950974e-06
+      },
+      "convergence_delta": {
+        "strain_energy": 0.0005872326915275844,
+        "tip_deflection": 0.00015648503326969013
+      },
+      "convergence_delta_between": [
+        0.055,
+        0.03793103448275862
+      ],
+      "status": "ok"
+    },
+    {
+      "case_id": "perforated_plate_s3_c1",
+      "family": "perforated_plate",
+      "truth_source_existing": "provisional",
+      "analytic": false,
+      "bbox_diagonal_m": 0.4080283472450004,
+      "rungs": [
+        {
+          "case_id": "perforated_plate_s3_c1",
+          "h": 0.022441559098475023,
+          "curvature_points": 24,
+          "status": "ok",
+          "wall_mesh_s": 2.6,
+          "gmsh_high_order_optimize": 2,
+          "n_nodes": 14150,
+          "n_elems": 7751,
+          "n_dof": 42231,
+          "n_fixed_nodes": 73,
+          "n_load_faces": 28,
+          "load_rule": "box+normal_min_dot",
+          "normal_min_dot": -1.0,
+          "load_area_m2": 0.0026027019531519265,
+          "end_face_area_m2": 0.0026027019531519265,
+          "box_only_area_m2": 0.0026027019531519265,
+          "end_face_vs_selected_rel_diff": 0.0,
+          "resultant_N": [
+            0.0,
+            0.0,
+            -260.2701953151926
+          ],
+          "resultant_mag_N": 260.2701953151926,
+          "load_area_rel_err_vs_cad": 3.258434360321756e-10,
+          "wall_solve_s": 7.72,
+          "strain_energy_work_J": 0.04518601024848751,
+          "strain_energy_ccx_J": 0.045186010601655,
+          "strain_energy_rel_gap": 7.815859168488978e-09,
+          "reaction_N": [
+            -5.761081e-10,
+            -2.051627e-09,
+            260.2702
+          ],
+          "equilibrium_rel_err": 1.7999786177394617e-08,
+          "n_probe_nodes": 23,
+          "tip_deflection_m": 0.000347320295814244,
+          "h_rel": 0.055,
+          "bbox_diagonal_m": 0.4080283472450004,
+          "values": {
+            "strain_energy": 0.045186010601655,
+            "tip_deflection": 0.000347320295814244
+          }
+        },
+        {
+          "case_id": "perforated_plate_s3_c1",
+          "h": 0.01547693730929312,
+          "curvature_points": 34,
+          "status": "ok",
+          "wall_mesh_s": 5.87,
+          "gmsh_high_order_optimize": 2,
+          "n_nodes": 29631,
+          "n_elems": 17029,
+          "n_dof": 88566,
+          "n_fixed_nodes": 109,
+          "n_load_faces": 42,
+          "load_rule": "box+normal_min_dot",
+          "normal_min_dot": -1.0,
+          "load_area_m2": 0.0026027019531519257,
+          "end_face_area_m2": 0.0026027019531519257,
+          "box_only_area_m2": 0.0026027019531519257,
+          "end_face_vs_selected_rel_diff": 0.0,
+          "resultant_N": [
+            0.0,
+            0.0,
+            -260.27019531519267
+          ],
+          "resultant_mag_N": 260.27019531519267,
+          "load_area_rel_err_vs_cad": 3.258437692865218e-10,
+          "wall_solve_s": 18.67,
+          "strain_energy_work_J": 0.045285993569087676,
+          "strain_energy_ccx_J": 0.045285993287463404,
+          "strain_energy_rel_gap": 6.218794202564153e-09,
+          "reaction_N": [
+            -3.409298e-09,
+            5.756384e-09,
+            260.2702
+          ],
+          "equilibrium_rel_err": 1.799980245110113e-08,
+          "n_probe_nodes": 34,
+          "tip_deflection_m": 0.00034806506900516383,
+          "h_rel": 0.03793103448275862,
+          "bbox_diagonal_m": 0.4080283472450004,
+          "values": {
+            "strain_energy": 0.045285993287463404,
+            "tip_deflection": 0.00034806506900516383
+          }
+        }
+      ],
+      "wall_total_s": 36.1,
+      "values": {
+        "strain_energy": 0.045285993287463404,
+        "tip_deflection": 0.00034806506900516383
+      },
+      "convergence_delta": {
+        "strain_energy": 0.0022126911510249496,
+        "tip_deflection": 0.0021443411165299347
+      },
+      "convergence_delta_between": [
+        0.055,
+        0.03793103448275862
+      ],
+      "status": "ok"
+    },
+    {
+      "case_id": "perforated_plate_s3_c2",
+      "family": "perforated_plate",
+      "truth_source_existing": "provisional",
+      "analytic": false,
+      "bbox_diagonal_m": 0.4080283472450004,
+      "rungs": [
+        {
+          "case_id": "perforated_plate_s3_c2",
+          "h": 0.022441559098475023,
+          "curvature_points": 24,
+          "status": "ok",
+          "wall_mesh_s": 2.62,
+          "gmsh_high_order_optimize": 2,
+          "n_nodes": 14150,
+          "n_elems": 7751,
+          "n_dof": 42231,
+          "n_fixed_nodes": 73,
+          "n_load_faces": 28,
+          "load_rule": "box+normal_min_dot",
+          "normal_min_dot": -1.0,
+          "load_area_m2": 0.0026027019531519265,
+          "end_face_area_m2": 0.0026027019531519265,
+          "box_only_area_m2": 0.0026027019531519265,
+          "end_face_vs_selected_rel_diff": 0.0,
+          "resultant_N": [
+            321.9828912574503,
+            -310.847840243417,
+            265.8250106573562
+          ],
+          "resultant_mag_N": 520.5403906878769,
+          "load_area_rel_err_vs_cad": 3.258434360321756e-10,
+          "wall_solve_s": 7.68,
+          "strain_energy_work_J": 0.04818394481950285,
+          "strain_energy_ccx_J": 0.048183944913682,
+          "strain_energy_rel_gap": 1.9545753415999013e-09,
+          "reaction_N": [
+            -321.9829,
+            310.8478,
+            -265.825
+          ],
+          "equilibrium_rel_err": 8.172033597487636e-08,
+          "n_probe_nodes": 23,
+          "tip_deflection_m": 0.0003547936898779548,
+          "h_rel": 0.055,
+          "bbox_diagonal_m": 0.4080283472450004,
+          "values": {
+            "strain_energy": 0.048183944913682,
+            "tip_deflection": 0.0003547936898779548
+          }
+        },
+        {
+          "case_id": "perforated_plate_s3_c2",
+          "h": 0.01547693730929312,
+          "curvature_points": 34,
+          "status": "ok",
+          "wall_mesh_s": 6.04,
+          "gmsh_high_order_optimize": 2,
+          "n_nodes": 29631,
+          "n_elems": 17029,
+          "n_dof": 88566,
+          "n_fixed_nodes": 109,
+          "n_load_faces": 42,
+          "load_rule": "box+normal_min_dot",
+          "normal_min_dot": -1.0,
+          "load_area_m2": 0.0026027019531519257,
+          "end_face_area_m2": 0.0026027019531519257,
+          "box_only_area_m2": 0.0026027019531519257,
+          "end_face_vs_selected_rel_diff": 0.0,
+          "resultant_N": [
+            321.9828912574504,
+            -310.84784024341695,
+            265.82501065735624
+          ],
+          "resultant_mag_N": 520.540390687877,
+          "load_area_rel_err_vs_cad": 3.258437692865218e-10,
+          "wall_solve_s": 16.64,
+          "strain_energy_work_J": 0.048289500267220106,
+          "strain_energy_ccx_J": 0.048289500144001095,
+          "strain_energy_rel_gap": 2.5516729520015887e-09,
+          "reaction_N": [
+            -321.9829,
+            310.8478,
+            -265.825
+          ],
+          "equilibrium_rel_err": 8.172033587648332e-08,
+          "n_probe_nodes": 34,
+          "tip_deflection_m": 0.000355554799363876,
+          "h_rel": 0.03793103448275862,
+          "bbox_diagonal_m": 0.4080283472450004,
+          "values": {
+            "strain_energy": 0.048289500144001095,
+            "tip_deflection": 0.000355554799363876
+          }
+        }
+      ],
+      "wall_total_s": 34.2,
+      "values": {
+        "strain_energy": 0.048289500144001095,
+        "tip_deflection": 0.000355554799363876
+      },
+      "convergence_delta": {
+        "strain_energy": 0.0021906722354965292,
+        "tip_deflection": 0.002145217087099301
+      },
+      "convergence_delta_between": [
+        0.055,
+        0.03793103448275862
+      ],
+      "status": "ok"
+    }
+  ]
+}

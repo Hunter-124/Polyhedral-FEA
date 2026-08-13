@@ -992,6 +992,10 @@ int cmd_solve(std::span<char*> args) {
             std::fputs("solve: no fixture nodes found\n", stderr);
             return 1;
         }
+        if (model) {
+            polymesh::pipeline::update_solved_geometry_volume(*model, vol);
+        }
+
         u = polymesh::fea::solve_elastostatics(vol.mesh, mat, bc, loads, solve_options);
         zz = polymesh::fea::recover_zz(vol.mesh, mat, u);
         const bool last_pass =
@@ -1013,6 +1017,10 @@ int cmd_solve(std::span<char*> args) {
                         std::fputs("solve: no fixture nodes after p-elevate\n", stderr);
                         return 1;
                     }
+                    if (model) {
+                        polymesh::pipeline::update_solved_geometry_volume(*model, vol);
+                    }
+
                     u = polymesh::fea::solve_elastostatics(vol.mesh, mat, bc2, loads2,
                                                            solve_options);
                     zz = polymesh::fea::recover_zz(vol.mesh, mat, u);
@@ -1044,6 +1052,10 @@ int cmd_solve(std::span<char*> args) {
                         project_quadratic_mids();
                         vol.mesh.check_validity();
                         auto [bc2, loads2] = make_bc_loads(vol);
+                        if (model) {
+                            polymesh::pipeline::update_solved_geometry_volume(*model, vol);
+                        }
+
                         u = polymesh::fea::solve_elastostatics(vol.mesh, mat, bc2, loads2,
                                                                solve_options);
                         zz = polymesh::fea::recover_zz(vol.mesh, mat, u);

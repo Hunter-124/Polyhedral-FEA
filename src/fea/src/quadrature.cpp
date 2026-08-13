@@ -118,27 +118,31 @@ std::vector<QuadraturePoint> hex_rule(int points_per_axis) {
 }
 
 std::vector<QuadraturePoint> pyramid_rule() {
-    // Product Gauss via Duffy map on the reference pyramid used by eval_pyramid5:
-    //   zeta ∈ [-1,1], cross-section half-width a = (1-zeta)/2 so base zeta=-1 has
-    //   |xi|,|eta|≤1 and the apex is at zeta=+1.
-    // Map (s,t,z) ∈ [-1,1]^3 → (xi,eta,zeta) = (a s, a t, z) with a=(1-z)/2.
-    // dV_ref = a² · (1/2? no) |∂(xi,eta,zeta)/∂(s,t,z)| ds dt dz = a² ds dt dz
-    // since xi=a(s)s with a depending only on z: det = a * a * 1 = a².
-    // 3-point Gauss per axis is enough for constant-stress patch residuals on
-    // affine-ish physical pyramids (hex–pyramid hybrids).
+    // eval_pyramid5 is a COLLAPSED-BRICK map, not a rational pyramid element:
+    // N_{0..3} = ¼(1±xi)(1±eta)·t with t=(1-zeta)/2, N_4 = 1-t. Its parametric
+    // domain is therefore the full cube [-1,1]³ — at height zeta the image
+    // cross-section already shrinks like t because every base shape function
+    // carries the factor t, and xi,eta keep their full ±1 range. The collapse
+    // lives in det(J) (∝ t²), so the rule must NOT re-apply it.
+    //
+    // The previous rule placed points on the reference *pyramid* (xi = a·s with
+    // a=(1-zeta)/2) and weighted by the Duffy Jacobian a². Against a cube-domain
+    // map that double-counts the collapse: it integrates (1-zeta)⁴ where the map
+    // needs (1-zeta)², yielding exactly 0.6× the true volume of every pyramid
+    // (1/10 instead of 1/6 on the unit-hex fan). That fed the fill-volume guard,
+    // assemble_body_load and the ZZ recovery rule alike.
+    //
+    // 3-point Gauss per axis integrates det(J) (degree ≤ 2 in zeta, ≤ 1 in
+    // xi,eta for a straight-edged pyramid) exactly, and never samples the apex
+    // zeta=1 where J is singular.
     const auto g = gauss_1d(3);
     std::vector<QuadraturePoint> rule;
     rule.reserve(g.nodes.size() * g.nodes.size() * g.nodes.size());
     for (std::size_t iz = 0; iz < g.nodes.size(); ++iz) {
-        const double z = g.nodes[iz];
-        const double a = 0.5 * (1.0 - z);
-        const double a2 = a * a;
         for (std::size_t is = 0; is < g.nodes.size(); ++is) {
             for (std::size_t it = 0; it < g.nodes.size(); ++it) {
-                const double s = g.nodes[is];
-                const double t = g.nodes[it];
-                const double w = g.weights[iz] * g.weights[is] * g.weights[it] * a2;
-                rule.push_back({{a * s, a * t, z}, w});
+                rule.push_back({{g.nodes[is], g.nodes[it], g.nodes[iz]},
+                                g.weights[iz] * g.weights[is] * g.weights[it]});
             }
         }
     }

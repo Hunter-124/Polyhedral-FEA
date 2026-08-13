@@ -444,7 +444,14 @@ def flatten_row(campaign: str, row: dict[str, Any], case: dict[str, Any] | None)
         # `status`/`error` are strings: an absent one means "no error", not
         # "unknown". A NaN here would reach the CSV as the literal "nan" and
         # dataset.py::_failure_flag would score every row as a failure.
-        flat[name] = row.get(name, "" if name in STRING_OUTCOMES else np.nan)
+        value = row.get(name, "" if name in STRING_OUTCOMES else np.nan)
+        # An explicit null is the engine saying "not measured" (e.g. a resolution
+        # refusal fires before any mesh exists, so there is no volume to compare).
+        # Map it to NaN deliberately rather than relying on the CSV writer, so the
+        # distinction between "unknown" and a real 0.0 survives into the dataset.
+        if value is None and name not in STRING_OUTCOMES:
+            value = np.nan
+        flat[name] = value
     for group in ("accuracy", "answers", "health", "quality", "geo_fidelity", "scorecard"):
         value = row.get(group)
         if isinstance(value, dict):

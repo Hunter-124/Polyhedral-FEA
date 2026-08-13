@@ -1354,13 +1354,16 @@ void update_solved_geometry_volume(const Model& model, VolumeMeshOutput& output)
 }
 
 
-VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
-                             int skin_layers, bool feature_refine,
-                             std::span<const Eigen::Vector3d> refine_seeds, double seed_band,
-                             double element_tendency, std::size_t max_elems,
-                             std::size_t max_dof, int auto_retry_budget,
-                             const std::function<void()>& cancel_check,
-                             const mesh::SizeFieldFn& size_field) {
+// Internal: the public `volume_mesh` below wraps this to convert a zero-interior-cell
+// fill into a resolution refusal. Nothing else about its behaviour changes.
+static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMesher mesher,
+                                         int skin_layers, bool feature_refine,
+                                         std::span<const Eigen::Vector3d> refine_seeds,
+                                         double seed_band, double element_tendency,
+                                         std::size_t max_elems, std::size_t max_dof,
+                                         int auto_retry_budget,
+                                         const std::function<void()>& cancel_check,
+                                         const mesh::SizeFieldFn& size_field) {
     const auto poll_cancel = [&] {
         if (cancel_check) {
             cancel_check();
@@ -3036,6 +3039,68 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
     }
     out.mesh.check_validity();
     return out;
+}
+
+/// A fill that yields zero interior cells means h could not represent the part at
+/// all -- typically h exceeds a wall thickness -- which is a resolution refusal,
+/// not a generic validity failure. Report it in the same actionable shape as
+/// `enforce_feature_resolution`, and keep the three refusal causes textually
+/// distinct: "feature unresolved at h=", "geometry fill-stage guard failed:",
+/// and "resolution refused at h=".
+[[noreturn]] static void refuse_unresolvable_h(const Model& model, double h,
+                                               const mesh::ValidityError& cause) {
+    // Only reached on a failure path, so an otherwise-expensive measurement is
+    // free here -- and it is the one number that makes the refusal actionable.
+    double thinnest = 0.0;
+    try {
+        const auto thickness = geom::estimate_local_thickness(model.surface);
+        for (const double t : thickness.thickness) {
+            if (geom::has_finite_thickness(t) && t > 0.0 && (thinnest == 0.0 || t < thinnest)) {
+                thinnest = t;
+            }
+        }
+    } catch (...) {
+        thinnest = 0.0; // fall through to the honest "cannot derive" message
+    }
+    if (thinnest > 0.0) {
+        // Two cells across the thinnest wall is the minimum that can represent it.
+        throw GeometryVolumeLimitError(
+            std::format("resolution refused at h={:.6g} m: the fill produced no interior "
+                        "cells, so this h cannot represent the part at all; thinnest wall "
+                        "is {:.6g} m and needs at least two cells across, so reduce -h to "
+                        "<= {:.6g} m (or raise --max-elems/--max-dof to afford it) | {}",
+                        h, thinnest, 0.5 * thinnest, cause.what()),
+            GeometryVolumeAssessment{}, false);
+    }
+    throw GeometryVolumeLimitError(
+        std::format("resolution refused at h={:.6g} m: the fill produced no interior cells, "
+                    "so this h cannot represent the part at all. A recommended h could not "
+                    "be derived here (no finite local thickness sample on this surface), so "
+                    "reduce -h and retry rather than trusting a number this guard never "
+                    "measured | {}",
+                    h, cause.what()),
+        GeometryVolumeAssessment{}, false);
+}
+
+VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
+                             int skin_layers, bool feature_refine,
+                             std::span<const Eigen::Vector3d> refine_seeds, double seed_band,
+                             double element_tendency, std::size_t max_elems,
+                             std::size_t max_dof, int auto_retry_budget,
+                             const std::function<void()>& cancel_check,
+                             const mesh::SizeFieldFn& size_field) {
+    try {
+        return volume_mesh_impl(model, h, mesher, skin_layers, feature_refine, refine_seeds,
+                                seed_band, element_tendency, max_elems, max_dof,
+                                auto_retry_budget, cancel_check, size_field);
+    } catch (const mesh::ValidityError& e) {
+        // ONLY this cause is reclassified. Every other validity failure propagates
+        // unchanged, so no existing campaign row status shifts.
+        if (std::string(e.what()).find("no interior cells") == std::string::npos) {
+            throw;
+        }
+        refuse_unresolvable_h(model, h, e);
+    }
 }
 
 VolumeMeshOutput voxel_mesh(const Model& model, double h) {

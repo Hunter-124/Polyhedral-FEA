@@ -716,8 +716,14 @@ void draw_results_panel(TestLabState& tl) {
                                "area_fail %d/%d", n_area_bad, n_area_known);
             if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip(
-                    "load_area_ok gate (expected_area ±5%%). area_fail counts runs that\n"
-                    "selected the wrong load faces or under/over-resolved a cap/tip.");
+                    "load_area_ok gate (±5%%). area_fail counts only runs whose area was\n"
+                    "VERIFIED against an authored expected_area with no CAD area to\n"
+                    "rescale onto, so a deviation really is a wrong resultant.\n"
+                    "load_area_status=rescaled_to_exact_cad means the traction was\n"
+                    "rescaled onto the exact CAD rule area: the resultant is correct and\n"
+                    "load_area_rel_err is a mesh fidelity deficit, not a failure.\n"
+                    "unverified means nothing could be established: null rel_err, never\n"
+                    "a 0.0 that would read as a pass.");
             }
         }
         if (n_ok > 0 && best_err < 1e299) {

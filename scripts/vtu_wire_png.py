@@ -19,6 +19,15 @@ from collections import Counter, defaultdict
 from itertools import combinations
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[0]))
+import figstyle as fs  # noqa: E402
+
+
+def _rgb(hex_colour: str) -> tuple[int, int, int]:
+    """Parse a figstyle theme colour into the 8-bit channels the PNG writer uses."""
+    h = hex_colour.lstrip("#")
+    return tuple(int(h[i : i + 2], 16) for i in (0, 2, 4))  # type: ignore[return-value]
+
 
 def _data_array(text, name):
     pattern = (
@@ -274,72 +283,406 @@ def bbox_of(pts):
     return mins, maxs
 
 
-def detect_hole_roi(pts, edges, pad_frac=0.55):
-    """Estimate circular-hole ROI: densest radial ring of free-surface nodes."""
+#: A ring estimate is not a hole. The radial histogram below always yields a
+#: densest band -- a solid box has one too -- so the ring alone cannot answer
+#: "is there a hole here". A through-hole has one property a solid does not:
+#: there is NO MATERIAL inside the ring. That is what gets measured, as the
+#: area-normalised node density inside 0.6*r against the density of the
+#: annulus just outside it, and it is what ``detected`` reports.
+HOLE_VOID_RATIO = 0.15
+#: Below this many sampled nodes the density comparison is noise, not evidence.
+HOLE_MIN_SAMPLES = 40
+#: Exit code meaning "asked for a feature render, found no feature, wrote
+#: nothing". Distinct from 1 (real failure) so a caller can count it as a skip.
+NO_FEATURE_EXIT = 3
+
+
+class HoleROI:
+    """An ROI plus whether a hole was actually found inside it.
+
+    ``detected`` is the only field a caller may treat as a claim. ``roi_min``
+    and ``roi_max`` are always populated so a caller that wants a centre crop
+    regardless can still have one -- but it must then say "centre crop", not
+    "hole".
+    """
+
+    __slots__ = ("roi_min", "roi_max", "hole_r", "center", "detected",
+                 "void_ratio", "reason")
+
+    def __init__(self, roi_min, roi_max, hole_r, center, detected,
+                 void_ratio, reason):
+        self.roi_min = roi_min
+        self.roi_max = roi_max
+        self.hole_r = hole_r
+        self.center = center
+        self.detected = detected
+        self.void_ratio = void_ratio
+        self.reason = reason
+
+
+def _ring_radius(pts, used, axis, centre, span, bins=48):
+    """Densest in-plane radial band of free-surface nodes about ``axis``.
+
+    Returns (radius, n_samples) or (None, n) when no band clears the noise
+    floor. The radius is an ESTIMATE; whether it bounds a hole is a separate
+    question, answered by :func:`_void_ratio`.
+    """
+    u, v = [i for i in range(3) if i != axis]
+    rads = []
+    for i in used:
+        p = pts[i]
+        if abs(p[axis] - centre[axis]) > 0.45 * span:
+            continue
+        rads.append(math.hypot(p[u] - centre[u], p[v] - centre[v]))
+    if len(rads) < 16:
+        rads = [math.hypot(pts[i][u] - centre[u], pts[i][v] - centre[v])
+                for i in used]
+    if not rads:
+        return None, 0
+    rmax = max(rads)
+    hist = [0] * bins
+    for r in rads:
+        hist[min(bins - 1, int(r / (rmax + 1e-12) * bins))] += 1
+    radius = None
+    peak = 0
+    for i in range(1, bins - 1):
+        # Prefer bands closer to the centre than the outer boundary: the outer
+        # silhouette is always the densest band on any part.
+        if hist[i] >= peak and hist[i] >= 8 and i < int(0.65 * bins):
+            peak = hist[i]
+            radius = (i + 0.5) / bins * rmax
+    if radius is not None and radius < 1e-9:
+        radius = None
+    return radius, len(rads)
+
+
+#: A bore is empty AND enclosed. Emptiness alone called an L-bracket's open
+#: quadrant a hole; an angular-coverage test then called a deep narrow U
+#: channel a hole, because a U's opening angle is a continuous function of two
+#: jittered dimensions and crosses ANY fixed fraction you pick -- channel_s0
+#: passed a 75% sector floor while channel_s1 failed it, on the same family.
+#:
+#: So enclosure is no longer measured as a fraction of anything. It is decided
+#: topologically: in the plane normal to the candidate axis, a bore's void does
+#: not reach the outside world, and an open pocket does. Flood fill from the
+#: border of the slab decides it, and there is no threshold left to tune.
+#:
+#: The sector count survives only as the resolution of the occupancy raster.
+#: The raster must resolve the void it is asked about. Pixels sized off the
+#: ELEMENT length were too coarse: on a warehouse box_hole (392 cells, 2.4 mm
+#: elements, 5.7 mm bore) the bore spanned two pixels and a one-pixel dilation
+#: erased it, so a real bore read as solid. Pixels are therefore sized off the
+#: candidate radius, and material is stamped as a disc of half an element
+#: around each sample -- the same seam-closing intent as the dilation, but in
+#: physical units, so it thickens the material band without swallowing a void
+#: that is genuinely wider than the discretisation.
+RASTER_PIXELS_PER_RADIUS = 4.0
+RASTER_MAX_PIXELS = 300
+RASTER_MIN_PIXELS = 24
+
+
+def _occupancy(pts, cells, axis, centre, extents, radius):
+    """Rasterise the mid-slab normal to ``axis``, resolving ``radius``.
+
+    Returns (grid, nu, nv, origin_u, origin_v, (step_u, step_v)) with
+    ``grid[j * nu + i]`` True where material was sampled. Nodes and cell
+    centroids are both stamped, each as a disc of half an element, so a coarse
+    tet cannot leave a seam the flood fill would leak through.
+    """
+    u, v = [i for i in range(3) if i != axis]
+    span = extents[axis]
+    volume = extents[0] * extents[1] * extents[2]
+    element = (volume / max(1, len(cells) if cells else len(pts))) ** (1.0 / 3.0)
+    pixel = max(radius / RASTER_PIXELS_PER_RADIUS, element / 8.0, 1e-12)
+    nu = int(min(RASTER_MAX_PIXELS,
+                 max(RASTER_MIN_PIXELS, extents[u] / pixel + 2)))
+    nv = int(min(RASTER_MAX_PIXELS,
+                 max(RASTER_MIN_PIXELS, extents[v] / pixel + 2)))
+    origin_u = centre[u] - 0.5 * extents[u]
+    origin_v = centre[v] - 0.5 * extents[v]
+    step_u = extents[u] / (nu - 1)
+    step_v = extents[v] / (nv - 1)
+
+    grid = [False] * (nu * nv)
+    stamp_u = max(1, int(round(0.5 * element / step_u)))
+    stamp_v = max(1, int(round(0.5 * element / step_v)))
+
+    def mark(points):
+        for p in points:
+            if abs(p[axis] - centre[axis]) > 0.45 * span:
+                continue
+            ci = int((p[u] - origin_u) / step_u)
+            cj = int((p[v] - origin_v) / step_v)
+            for dj in range(-stamp_v, stamp_v + 1):
+                jj = cj + dj
+                if not 0 <= jj < nv:
+                    continue
+                for di in range(-stamp_u, stamp_u + 1):
+                    ii = ci + di
+                    if not 0 <= ii < nu:
+                        continue
+                    if (di / stamp_u) ** 2 + (dj / stamp_v) ** 2 <= 1.0:
+                        grid[jj * nu + ii] = True
+
+    mark(pts)
+    if cells:
+        mark(_cell_centroids(pts, cells))
+    return grid, nu, nv, origin_u, origin_v, (step_u, step_v)
+
+
+def _void_is_enclosed(pts, cells, axis, centre, extents, radius):
+    """Does the void at the candidate radius reach the outside of the part?
+
+    A bore says no, an open pocket -- an L's quadrant, a U channel's mouth --
+    says yes, and the answer is connectivity, not a tuned fraction. Returns
+    (enclosed, void_pixels); ``enclosed`` is None when the raster shows no
+    void at the candidate location at all.
+    """
+    grid, nu, nv, origin_u, origin_v, (step_u, step_v) = _occupancy(
+        pts, cells, axis, centre, extents, radius)
+    u, v = [i for i in range(3) if i != axis]
+    ci = int((centre[u] - origin_u) / step_u)
+    cj = int((centre[v] - origin_v) / step_v)
+    if not (0 <= ci < nu and 0 <= cj < nv) or grid[cj * nu + ci]:
+        return None, 0
+
+    # Flood the void containing the axis, and note whether it touches the
+    # border of the raster: touching means it is continuous with the outside.
+    seen = [False] * (nu * nv)
+    stack = [(ci, cj)]
+    seen[cj * nu + ci] = True
+    void = 0
+    touches_border = False
+    while stack:
+        i, j = stack.pop()
+        void += 1
+        if i == 0 or j == 0 or i == nu - 1 or j == nv - 1:
+            touches_border = True
+        for di, dj in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            ii, jj = i + di, j + dj
+            if not (0 <= ii < nu and 0 <= jj < nv):
+                continue
+            index = jj * nu + ii
+            if seen[index] or grid[index]:
+                continue
+            seen[index] = True
+            stack.append((ii, jj))
+    return (not touches_border), void
+
+
+def _void_ratio(pts, axis, centre, span, hole_r):
+    """Node density inside 0.6*hole_r over the density of the annulus outside.
+
+    Both counts are divided by their own area, so this is a density ratio and
+    not an artefact of the inner disc being smaller. Emptiness only: whether
+    the empty region is a bore or an open pocket is decided separately, by
+    :func:`_void_is_enclosed`. Returns (ratio, sampled); ratio is None when
+    there is too little to measure.
+    """
+    u, v = [i for i in range(3) if i != axis]
+    inner_r = 0.6 * hole_r
+    outer_r = 1.6 * hole_r
+    inner = outer = 0
+    for p in pts:
+        if abs(p[axis] - centre[axis]) > 0.45 * span:
+            continue
+        r = math.hypot(p[u] - centre[u], p[v] - centre[v])
+        if r <= inner_r:
+            inner += 1
+        elif r <= outer_r:
+            outer += 1
+    sampled = inner + outer
+    if sampled < HOLE_MIN_SAMPLES or outer == 0:
+        return None, sampled
+    inner_area = math.pi * inner_r * inner_r
+    outer_area = math.pi * (outer_r * outer_r - inner_r * inner_r)
+    return ((inner / max(inner_area, 1e-30))
+            / max(outer / max(outer_area, 1e-30), 1e-30)), sampled
+
+
+#: An empty core must be bigger than the discretisation to mean anything: at
+#: any resolution there is some radius around an axis with no cell centroid in
+#: it. This sizes the core; whether it is a bore or a pocket is connectivity's
+#: job, not this threshold's.
+CORE_ELEMENTS = 1.5
+
+
+def _cell_centroids(pts, cells):
+    out = []
+    for ids in cells:
+        if not ids:
+            continue
+        sx = sy = sz = 0.0
+        for i in ids:
+            p = pts[i]
+            sx += p[0]
+            sy += p[1]
+            sz += p[2]
+        n = float(len(ids))
+        out.append((sx / n, sy / n, sz / n))
+    return out
+
+
+def _empty_core(pts, cells, axis, centre, extents):
+    """Largest cell-free radius about ``axis``, in absolute units and elements.
+
+    The node-density test needs nodes near the bore wall to compare, and a
+    coarse mesh does not have them: at h_rel 0.20 a 3 mm bore has 14 nodes
+    around it, under any sane noise floor, so the test declines and the
+    caller cannot tell "no bore" from "not enough mesh to see one". Cells are
+    the robust signal at that resolution -- a bore is a region with no cells
+    in it, however few elements describe its wall.
+    """
+    span = extents[axis]
+    u, v = [i for i in range(3) if i != axis]
+    slab = [q for q in _cell_centroids(pts, cells)
+            if abs(q[axis] - centre[axis]) <= 0.45 * span]
+    if len(slab) < 12:
+        return None
+    core = min(math.hypot(q[u] - centre[u], q[v] - centre[v]) for q in slab)
+    volume = extents[0] * extents[1] * extents[2]
+    element = (volume / max(1, len(cells))) ** (1.0 / 3.0)
+    return core, core / max(element, 1e-30)
+
+
+def detect_hole_roi(pts, edges, pad_frac=0.55, cells=None):
+    """Find a circular bore and MEASURE whether it is really a bore.
+
+    Two things this deliberately does not assume:
+
+    * **The bore axis.** The previous version sampled radii in xy while taking
+      its slab from the LONGEST bbox axis -- two different axes, and neither
+      derived. On a plate the bore runs through the THINNEST axis, so the
+      radial histogram measured across the bore instead of around it. All
+      three axes are now tried and the one with the strongest void evidence
+      wins, so the answer does not depend on how the part was exported.
+    * **That a ring is a hole.** The densest inner radial band exists on a
+      solid box too. A bore has no material inside it, and that is measured.
+
+    Returns a :class:`HoleROI`; ``detected`` is True only when some axis shows
+    a ring whose interior is empty, or -- on a mesh too coarse to carry that
+    many nodes -- a cell-free core wider than ``CORE_ELEMENTS`` elements that
+    material encloses. Pass ``cells`` to enable the coarse path.
+    """
     mins, maxs = bbox_of(pts)
-    cx = 0.5 * (mins[0] + maxs[0])
-    cy = 0.5 * (mins[1] + maxs[1])
-    cz = 0.5 * (mins[2] + maxs[2])
-    # Free-surface node ids
+    centre = [0.5 * (mins[i] + maxs[i]) for i in range(3)]
+    extents = [max(1e-12, maxs[i] - mins[i]) for i in range(3)]
+
     used = set()
     for a, b in edges:
         used.add(a)
         used.add(b)
     if not used:
         used = set(range(len(pts)))
-    # Sample mid-depth free-surface nodes (hole wall + rims live near center)
-    rads = []
-    for i in used:
-        x, y, z = pts[i]
-        # Prefer nodes near mid-axis span so outer box corners do not dominate.
-        if abs(z - cz) > 0.45 * max(1e-12, maxs[2] - mins[2]):
+
+    best = None          # (void_ratio, axis, radius) for the emptiest ring
+    fallback = None      # (axis, radius) for the best ring with material in it
+    notes = []
+    for axis in range(3):
+        radius, n_rad = _ring_radius(pts, used, axis, centre, extents[axis])
+        name = "xyz"[axis]
+        if radius is None:
+            notes.append(f"{name}: no ring above the noise floor")
             continue
-        rads.append(math.hypot(x - cx, y - cy))
-    if len(rads) < 16:
-        rads = [math.hypot(pts[i][0] - cx, pts[i][1] - cy) for i in used]
-    rads.sort()
-    # Histogram: hole radius ≈ first strong peak above small r
-    rmax = max(rads) if rads else 1.0
-    bins = 48
-    hist = [0] * bins
-    for r in rads:
-        b = min(bins - 1, int(r / (rmax + 1e-12) * bins))
-        hist[b] += 1
-    hole_r = None
-    peak = 0
-    for i in range(1, bins - 1):
-        if hist[i] >= peak and hist[i] >= 8:
-            # prefer peaks closer to center than outer box
-            if i < int(0.65 * bins):
-                peak = hist[i]
-                hole_r = (i + 0.5) / bins * rmax
-    if hole_r is None or hole_r < 1e-9:
-        # fallback: 15th percentile radius of free-surface nodes near mid
-        hole_r = rads[max(0, len(rads) // 8)] if rads else 0.25 * rmax
+        ratio, sampled = _void_ratio(pts, axis, centre, extents[axis], radius)
+        if ratio is None:
+            notes.append(f"{name}: ring r={radius:.4g} but only {sampled} "
+                         f"nodes near it (floor {HOLE_MIN_SAMPLES})")
+            continue
+        if ratio >= HOLE_VOID_RATIO:
+            notes.append(f"{name}: ring r={radius:.4g}, interior density "
+                         f"{ratio:.2f}x the annulus — encloses material")
+            if fallback is None or ratio < fallback[0]:
+                fallback = (ratio, axis, radius)
+            continue
+        enclosed, void_px = _void_is_enclosed(pts, cells, axis, centre,
+                                              extents, radius)
+        if not enclosed:
+            notes.append(f"{name}: ring r={radius:.4g} is empty (density "
+                         f"{ratio:.2f}) but its void reaches the outside of "
+                         f"the part — an open pocket, not a bore")
+            if fallback is None or ratio < fallback[0]:
+                fallback = (ratio, axis, radius)
+            continue
+        notes.append(f"{name}: ring r={radius:.4g}, interior density "
+                     f"{ratio:.2f}x the annulus, void enclosed ({void_px} px)")
+        if best is None or ratio < best[0]:
+            best = (ratio, axis, radius)
+
+    if best is None and cells:
+        # The node-density test needs a populated bore wall. At h_rel 0.20 a
+        # box_hole bore has 14 nodes around it and the test correctly declines
+        # -- but "declined" then looks identical to "no bore" downstream, and
+        # the bore is right there in the CAD. Measure the cells instead.
+        for axis in range(3):
+            core = _empty_core(pts, cells, axis, centre, extents)
+            if core is None:
+                continue
+            radius, in_elements = core
+            if in_elements < CORE_ELEMENTS:
+                continue
+            enclosed, void_px = _void_is_enclosed(pts, cells, axis, centre,
+                                                  extents, radius)
+            if not enclosed:
+                notes.append(f"{'xyz'[axis]}: cell-free core r={radius:.4g} "
+                             f"({in_elements:.1f} elements) reaches the "
+                             f"outside — an open pocket, not a bore")
+                continue
+            if best is None or in_elements > best[0]:
+                best = (in_elements, axis, radius)
+                notes.append(f"{'xyz'[axis]}: cell-free core r={radius:.4g} "
+                             f"({in_elements:.1f} elements wide), void "
+                             f"enclosed ({void_px} px)")
+        if best is not None:
+            in_elements, axis, hole_r = best
+            return _roi_for(mins, maxs, centre, extents, axis, hole_r, pad_frac,
+                            True, None,
+                            f"bore on the {'xyz'[axis]} axis at r={hole_r:.4g}, "
+                            f"found by cell occupancy: the core is "
+                            f"{in_elements:.1f} elements wide and its void does "
+                            f"not reach the outside. Too coarse for the "
+                            f"node-density test, which needs "
+                            f"{HOLE_MIN_SAMPLES} nodes near the wall")
+
+    detected = best is not None
+    if detected:
+        void_ratio, axis, hole_r = best
+        reason = (f"bore on the {'xyz'[axis]} axis at r={hole_r:.4g}: "
+                  f"interior node density is {void_ratio:.2f} of the "
+                  f"surrounding annulus (a bore is < {HOLE_VOID_RATIO:g})")
+    elif fallback is not None:
+        void_ratio, axis, hole_r = fallback
+        reason = ("every axis encloses material — " + "; ".join(notes))
+    else:
+        void_ratio = None
+        # Nothing measurable on any axis: fall back to a centre crop, and say
+        # plainly that the radius is invented rather than measured.
+        axis = max(range(3), key=lambda i: extents[i])
+        u, v = [i for i in range(3) if i != axis]
+        hole_r = 0.25 * max(extents[u], extents[v])
+        reason = ("no measurable ring on any axis — " + "; ".join(notes))
+
+    return _roi_for(mins, maxs, centre, extents, axis, hole_r, pad_frac,
+                    detected, void_ratio, reason)
+
+
+def _roi_for(mins, maxs, centre, extents, axis, hole_r, pad_frac,
+             detected, void_ratio, reason):
+    """Build the ROI box about ``axis`` and package the verdict with it."""
     half = hole_r * (1.0 + pad_frac)
-    # Axis of hole: longest bbox direction among remaining (z for test.stl)
-    extents = [maxs[i] - mins[i] for i in range(3)]
-    axis = max(range(3), key=lambda i: extents[i])
-    # ROI box around hole in the two in-plane axes
-    roi_min = [mins[0], mins[1], mins[2]]
-    roi_max = [maxs[0], maxs[1], maxs[2]]
+    roi_min = list(mins)
+    roi_max = list(maxs)
     for i in range(3):
         if i == axis:
-            # keep a mid-slice band so we see the wall transition
-            mid = 0.5 * (mins[i] + maxs[i])
+            # Keep a slab about the bore axis so the wall transition is visible.
             band = 0.22 * extents[i]
-            roi_min[i] = mid - band
-            roi_max[i] = mid + band
+            roi_min[i] = centre[i] - band
+            roi_max[i] = centre[i] + band
         else:
-            c = 0.5 * (mins[i] + maxs[i])
-            # for xy: use hole center; for non-z axes use geometric center
-            if i == 0:
-                c = cx
-            elif i == 1:
-                c = cy
-            roi_min[i] = c - half
-            roi_max[i] = c + half
-    return roi_min, roi_max, hole_r, (cx, cy, cz)
+            roi_min[i] = centre[i] - half
+            roi_max[i] = centre[i] + half
+    return HoleROI(roi_min, roi_max, hole_r, tuple(centre), detected,
+                   void_ratio, reason)
 
 
 def project(p, mins, scales, w, h, elev=0.6, azim=0.85, view="iso"):
@@ -418,11 +761,22 @@ def main():
     ap.add_argument("vtu")
     ap.add_argument("png")
     ap.add_argument("--hole-zoom", action="store_true", help="auto ROI around circular hole")
+    ap.add_argument(
+        "--require-hole", action="store_true",
+        help="with --hole-zoom, write nothing and exit 3 when no hole is "
+             "actually detected. Use this whenever the output filename "
+             "promises a feature (wire_feature.png): a file that exists only "
+             "when the feature exists is self-describing, one that always "
+             "exists and is sometimes a plain centre crop is a false promise.",
+    )
     ap.add_argument("--view", default="iso", choices=["iso", "top", "front", "side"])
     ap.add_argument("--size", type=int, default=1100)
     ap.add_argument("--elev", type=float, default=0.6)
     ap.add_argument("--azim", type=float, default=0.85)
     args = ap.parse_args()
+    # A mesh wireframe is a render, so it stages dark like the rest of the
+    # showcase; the colours come from figstyle, never from a literal here.
+    t = fs.use("dark")
 
     vtu = Path(args.vtu)
     out = Path(args.png)
@@ -452,9 +806,19 @@ def main():
     print(f"cell-type census {vtu}: {', '.join(census_parts)}; skipped={skipped}")
     mins, maxs = bbox_of(pts)
     roi_min, roi_max = mins, maxs
-    hole_r = None
+    hole = None
     if args.hole_zoom:
-        roi_min, roi_max, hole_r, _ = detect_hole_roi(pts, edges)
+        hole = detect_hole_roi(pts, edges, cells=cells)
+        roi_min, roi_max = hole.roi_min, hole.roi_max
+        verdict = "hole detected" if hole.detected else "NO hole detected"
+        print(f"hole check {vtu}: {verdict} — {hole.reason}")
+        if args.require_hole and not hole.detected:
+            # Write NOTHING. The caller asked for a feature-framed render and there
+            # is no feature to frame, so producing a file whose name claims one
+            # would be the same false promise the flag exists to prevent.
+            print(f"no circular hole detected in {vtu}: refusing to write "
+                  f"{out} (--require-hole)", file=sys.stderr)
+            return 3
         # slightly expand for context
         for i in range(3):
             pad = 0.05 * max(1e-12, roi_max[i] - roi_min[i])
@@ -470,7 +834,8 @@ def main():
     # (project normalizes via mins/scales)
 
     w = h = max(400, args.size)
-    bg = (42, 58, 106)
+    bg = _rgb(t.panel)
+    ink = _rgb(t.ink)
     img = bytearray([bg[0], bg[1], bg[2]] * w * h)
     n_drawn = 0
     for a, b in edges:
@@ -486,10 +851,17 @@ def main():
                 continue
         u0, v0 = project(pa, mins, scales, w, h, args.elev, args.azim, args.view)
         u1, v1 = project(pb, mins, scales, w, h, args.elev, args.azim, args.view)
-        draw_line(img, w, h, u0, v0, u1, v1, (15, 15, 18))
+        draw_line(img, w, h, u0, v0, u1, v1, ink)
         n_drawn += 1
     write_png(out, w, h, img)
-    extra = f", hole_r≈{hole_r:.4g}" if hole_r is not None else ""
+    if hole is None:
+        extra = ""
+    elif hole.detected and hole.void_ratio is not None:
+        extra = f", bore r≈{hole.hole_r:.4g} (void ratio {hole.void_ratio:.2f})"
+    elif hole.detected:
+        extra = f", bore r≈{hole.hole_r:.4g} (found by cell occupancy)"
+    else:
+        extra = f", centre crop r≈{hole.hole_r:.4g} — NOT a detected bore"
     print(
         f"wrote {out} ({n_drawn} edges drawn / {len(edges)} exterior, "
         f"{len(cells)} cells, view={args.view}{extra})"

@@ -4,9 +4,10 @@
 
 Committed README assets, regenerated from the real training artifacts:
 
-  training_curves.png  per-epoch validation rel_err MAE, first vs latest
-                       training run overlaid (runs/<NNN>/metrics.json)
-  activation_map.png   per-layer activation profile of the latest run for
+  training_curves.png  per-epoch train and validation MAE of log10(rel_err),
+                       first vs latest training run overlaid
+                       (runs/<NNN>/metrics.json)
+  activation_map.png   per-layer activation heatmap of the latest run for
                        its canonical input case (runs/<NNN>/activations.json)
 
 Missing inputs skip the affected figure with a printed "no data yet" note —
@@ -26,29 +27,15 @@ import sys
 from pathlib import Path
 from typing import Any
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import figstyle as fs  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
 ADVISOR_DIR = ROOT / "bench" / "advisor"
 FIGURES_DIR = ROOT / "docs" / "advisor" / "figures"
 
-DPI = 110  # committed PNGs stay small; both figures land well under 300 KB
-MAX_INPUT_BARS = 32
-
-BLUE = "#2166ac"
-ORANGE = "#b35806"
-GREY = "#4d4d4d"
-LIGHT_BLUE = "#92c5de"
-LIGHT_ORANGE = "#f4a582"
-
-try:
-    import matplotlib
-
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-except ImportError:
-    raise SystemExit(
-        "matplotlib is required for figures.py — install it with:\n"
-        "  pip install matplotlib"
-    )
+import numpy as np  # noqa: E402
+from matplotlib.colors import TwoSlopeNorm  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -77,22 +64,104 @@ def run_dirs(runs_dir: Path) -> list[Path]:
     return sorted(child for child in runs_dir.iterdir() if child.is_dir())
 
 
-def style_axes(ax: Any) -> None:
-    for side in ("top", "right"):
-        ax.spines[side].set_visible(False)
-    ax.grid(axis="y", color="#e4e1da", linewidth=0.8)
-    ax.set_axisbelow(True)
+def regime_start(dirs: list[Path]) -> tuple[int, str]:
+    """Index of the first run of the CURRENT training campaign, and why.
+
+    Overlaying run 1 on run 60 is only a comparison if both were trained on
+    the same labels. They were not: runs 1-30 here were fitted against the
+    retired self-generated truth on a 3,456-row corpus, runs 31-60 against
+    the independent Gmsh -> CalculiX references on the rebuilt 2,412-row one.
+    Reporting "the latest run REGRESSED by 55%" across that boundary compares
+    two different questions and calls the difference a result.
+
+    A campaign begins where training restarted from scratch (``warm_start``
+    is not "warm") or where the split size changed, so the boundary is read
+    from the records instead of being pinned to a run number.
+    """
+    sizes = []
+    for index, directory in enumerate(dirs):
+        metrics = load_json(directory / "metrics.json") or {}
+        sizes.append((index, metrics.get("warm_start"),
+                      metrics.get("train_rows"), metrics.get("val_rows")))
+    start, reason = 0, "single training campaign"
+    for index, warm, train_rows, val_rows in sizes:
+        if index == 0:
+            continue
+        previous = sizes[index - 1]
+        if warm is not None and warm != "warm":
+            start = index
+            reason = (f"training restarted from scratch at run "
+                      f"{index + 1} (warm_start={warm!r})")
+        elif (train_rows, val_rows) != (previous[2], previous[3]):
+            start = index
+            reason = (f"the corpus changed at run {index + 1}: "
+                      f"{previous[2]}/{previous[3]} -> {train_rows}/{val_rows} "
+                      f"train/val rows")
+    return start, reason
 
 
-def epoch_series(metrics: dict[str, Any], key: str) -> tuple[list[int], list[float]]:
+def epoch_series(metrics: dict[str, Any], split: str,
+                 key: str = "rel_err_mae") -> tuple[list[int], list[float]]:
     xs: list[int] = []
     ys: list[float] = []
-    for entry in metrics.get("epochs", []):
-        value = (entry.get("val") or {}).get(key)
+    for i, entry in enumerate(metrics.get("epochs", [])):
+        value = (entry.get(split) or {}).get(key)
         if isinstance(value, (int, float)):
-            xs.append(int(entry.get("epoch", len(xs) + 1)))
+            xs.append(int(entry.get("epoch", i + 1)))
             ys.append(float(value))
     return xs, ys
+
+
+def _pct(new: float, old: float) -> str:
+    if old == 0.0:
+        return "n/a"
+    return f"{abs(new - old) / old * 100.0:.0f}%"
+
+
+def _finding(first: dict[str, Any], latest: dict[str, Any]) -> str:
+    """One honest line about the latest run, computed from the metrics.
+
+    Never hardcoded: a rerun on corrected data flips the wording with the
+    numbers.
+    """
+    _, first_val = epoch_series(first, "val")
+    _, latest_val = epoch_series(latest, "val")
+    _, latest_train = epoch_series(latest, "train")
+    if not first_val or not latest_val:
+        return "not enough validation epochs to compare the two runs"
+
+    best_first = min(first_val)
+    best_latest = min(latest_val)
+    # Epoch-to-epoch swing on the same run is the scale below which a
+    # difference between two runs says nothing. Without it a 1% move reads as
+    # a regression in the same voice as a 55% one.
+    swings = [abs(b - a) for a, b in zip(latest_val, latest_val[1:])]
+    noise = (sum(swings) / len(swings)) if swings else 0.0
+    delta = best_latest - best_first
+    if abs(delta) <= noise:
+        verdict = (f"latest run is level with the first on val: best MAE of "
+                   f"log10(rel_err) {best_latest:.3f} vs {best_first:.3f}, a "
+                   f"{abs(delta):.3f} difference inside the {noise:.3f} "
+                   f"epoch-to-epoch swing of the run itself")
+    elif delta < 0:
+        verdict = (f"latest run improved on val: best MAE of log10(rel_err) "
+                   f"{best_latest:.3f} vs {best_first:.3f} "
+                   f"(−{_pct(best_latest, best_first)})")
+    else:
+        verdict = (f"latest run REGRESSED on val: best MAE of log10(rel_err) "
+                   f"{best_latest:.3f} vs {best_first:.3f} "
+                   f"(+{_pct(best_latest, best_first)})")
+
+    if latest_train:
+        gap = latest_val[-1] - latest_train[-1]
+        share = (gap / latest_val[-1] * 100.0) if latest_val[-1] else 0.0
+        if gap > 0:
+            verdict += (f"; final train/val {latest_train[-1]:.3f}/"
+                        f"{latest_val[-1]:.3f} — {share:.0f}% gap, overfits")
+        else:
+            verdict += (f"; final train/val {latest_train[-1]:.3f}/"
+                        f"{latest_val[-1]:.3f} — no train/val gap")
+    return verdict
 
 
 def training_curves(runs_dir: Path, out_dir: Path) -> bool:
@@ -101,45 +170,80 @@ def training_curves(runs_dir: Path, out_dir: Path) -> bool:
         print(f"no data yet — expected {runs_dir}/<NNN>/metrics.json; "
               "skipping training_curves.png")
         return False
-    first = load_json(dirs[0] / "metrics.json")
-    latest = load_json(dirs[-1] / "metrics.json")
+    start, reason = regime_start(dirs)
+    campaign = dirs[start:]
+    first = load_json(campaign[0] / "metrics.json")
+    latest = load_json(campaign[-1] / "metrics.json")
     assert first is not None and latest is not None  # is_file checked above
 
-    fig, ax = plt.subplots(figsize=(8.4, 4.6))
-    for metrics, color, light in ((first, LIGHT_BLUE, BLUE),
-                                  (latest, ORANGE, LIGHT_ORANGE)):
-        run = metrics.get("run")
-        xs, ys = epoch_series(metrics, "rel_err_mae")
-        if not xs:
-            continue
-        ax.plot(xs, ys, color=color, linewidth=2.2,
-                label=f"run {run} (val)")
-        ax.annotate(f"{ys[-1]:.3f}", (xs[-1], ys[-1]),
-                    textcoords="offset points", xytext=(8, -2),
-                    fontsize=9, color=color)
-        xs_t = [int(e.get("epoch", i + 1)) for i, e in
-                enumerate(metrics.get("epochs", []))
-                if isinstance((e.get("train") or {}).get("rel_err_mae"),
-                              (int, float))]
-        ys_t = [float((e.get("train") or {})["rel_err_mae"]) for e in
-                metrics.get("epochs", [])
-                if isinstance((e.get("train") or {}).get("rel_err_mae"),
-                              (int, float))]
+    first_id = str(first.get("run"))
+    latest_id = str(latest.get("run"))
+    subtitle = _finding(first, latest)
+    if start:
+        subtitle += (f"\nRuns before {first_id} are excluded: {reason}. They "
+                     f"were fitted against different labels, so overlaying "
+                     f"them would compare two questions, not two runs.")
+    title = (f"Advisor training curves — first run ({first_id}) vs latest "
+             f"run ({latest_id}) of the current campaign")
+    footer = fs.footer_source(campaign[0] / "metrics.json",
+                              campaign[-1] / "metrics.json",
+                              n=len(campaign),
+                              note=f"runs in this campaign, of {len(dirs)} on disk")
+    fs.assert_glyphs(title, subtitle, footer, first_id, latest_id)
+    print(f"training_curves campaign: runs {first_id}-{latest_id} "
+          f"({len(campaign)} of {len(dirs)}) — {reason}")
+    print(f"training_curves finding: {subtitle}")
+
+    fig, axes = fs.figure(title, subtitle=subtitle, footer=footer, size="full")
+    ax = axes[0][0]
+    n_series = 0
+    # End-of-run value labels collide when two runs finish at nearly the same
+    # MAE, which is exactly what happens when a campaign converges. Collect
+    # them and offset the second one instead of overprinting.
+    end_labels: list[tuple[float, float, str, str]] = []
+    for metrics, name in ((first, "before"), (latest, "after")):
+        run = str(metrics.get("run"))
+        st = fs.series(name, label=f"run {run}")
+        xs, ys = epoch_series(metrics, "val")
+        if xs:
+            n_series += 1
+            ax.plot(xs, ys, **st.line(linestyle="-", linewidth=2.0,
+                                      markersize=4, markevery=max(1, len(xs) // 12),
+                                      label=f"run {run} (val)"))
+            end_labels.append((float(xs[-1]), float(ys[-1]),
+                               f"{ys[-1]:.3f}", st.color))
+        xs_t, ys_t = epoch_series(metrics, "train")
         if xs_t:
-            ax.plot(xs_t, ys_t, color=light, linewidth=1.2, linestyle="--",
-                    alpha=0.75, label=f"run {run} (train)")
+            ax.plot(xs_t, ys_t, **st.line(linestyle="--", linewidth=1.4,
+                                          markersize=4, alpha=0.85,
+                                          markerfacecolor="none",
+                                          markevery=max(1, len(xs_t) // 12),
+                                          label=f"run {run} (train)"))
+        print(f"  run {run}: {len(xs)} val epochs, {len(xs_t)} train epochs, "
+              f"final val {ys[-1]:.4f}" if xs else f"  run {run}: no val epochs")
+
+    spread = max((y for _, y, _, _ in end_labels), default=0.0) - \
+        min((y for _, y, _, _ in end_labels), default=0.0)
+    for index, (x, y, text, colour) in enumerate(sorted(end_labels,
+                                                        key=lambda item: -item[1])):
+        crowded = len(end_labels) > 1 and spread < 0.06
+        dy = (10 if index == 0 else -12) if crowded else -2
+        ax.annotate(text, (x, y), textcoords="offset points",
+                    xytext=(8, dy), fontsize=fs.FONT_PT["annot"], color=colour)
     ax.set_xlabel("epoch")
-    ax.set_ylabel("rel_err MAE (log10 space)")
-    ax.set_title(f"Training curves — first run ({first.get('run')}) vs latest "
-                 f"run ({latest.get('run')}) overlaid")
-    ax.legend(frameon=False, fontsize=9)
-    style_axes(ax)
-    fig.tight_layout()
+    ax.set_ylabel("MAE of log10(rel_err)  (unitless)")
+    ax.legend(frameon=False, fontsize=fs.FONT_PT["legend"], ncol=2)
+    fs.annotate_n(ax, n_series, what="runs (solid = val, dashed = train)")
     path = out_dir / "training_curves.png"
-    fig.savefig(path, dpi=DPI)
-    plt.close(fig)
-    print(f"wrote {path} ({path.stat().st_size / 1024:.0f} KB)")
+    fs.finish(fig, path)
     return True
+
+
+def _tick_step(n: int) -> int:
+    for step in (1, 2, 5, 10, 20, 25, 50, 100):
+        if n / step <= 14:
+            return step
+    return max(1, n // 14)
 
 
 def activation_map(runs_dir: Path, out_dir: Path) -> bool:
@@ -157,51 +261,104 @@ def activation_map(runs_dir: Path, out_dir: Path) -> bool:
         return False
 
     case = act.get("input_case") or {}
-    fig, axes = plt.subplots(len(layers), 1, figsize=(8.4, 2.1 * len(layers)),
-                             sharey=False)
-    if len(layers) == 1:
-        axes = [axes]
+    run_id = str(act.get("run"))
+    part = str(case.get("part", "?"))
+    cfg_id = str(case.get("cfg_id", "?"))
     amax = max((abs(float(v)) for layer in layers
                 for v in layer.get("values", [])), default=0.0)
-    for ax, layer in zip(axes, layers):
-        values = [float(v) for v in layer.get("values", [])]
-        labels = layer.get("labels") or []
-        indices = list(range(len(values)))
-        note = ""
-        if layer.get("name") == "input" and len(values) > MAX_INPUT_BARS:
-            step = len(values) / MAX_INPUT_BARS
-            indices = sorted({int(i * step) for i in range(MAX_INPUT_BARS)})
-            note = f" (showing {len(indices)} of {len(values)}, evenly spaced)"
-        shown = [values[i] for i in indices]
-        colors = [BLUE if v >= 0 else ORANGE for v in shown]
-        ax.bar(range(len(shown)), shown, color=colors, width=0.82)
-        ax.axhline(0, color="#9a9ea6", linewidth=0.8)
-        name = layer.get("name")
-        ax.set_ylabel(str(name), fontsize=9)
-        if note:
-            ax.set_title(note, fontsize=8, color=GREY, loc="left")
-        if layer is layers[-1] and labels:
-            ax.set_xticks(range(len(indices)))
-            ax.set_xticklabels([str(labels[i]) for i in indices],
-                               rotation=65, ha="right", fontsize=7)
-        else:
-            ax.set_xticks([])
-        style_axes(ax)
-    title = f"Activations — run {act.get('run')}"
+    if amax <= 0.0:
+        amax = 1.0
+
+    title = f"Advisor activations — run {run_id}"
     if case:
-        title += (f" on {case.get('part', '?')} · {case.get('cfg_id', '?')}")
-    title += f"  (max |a| = {amax:.2f})"
-    fig.suptitle(title, fontsize=11)
-    fig.tight_layout(rect=(0, 0, 1, 0.97))
+        title += f" on {part} · {cfg_id}"
+    subtitle = ("all units, no subsampling; each row scaled to its own "
+                "max |a|, given in the row label")
+    # The input row is WIDER than the documented input contract and saying
+    # "unit index (0-48)" beside a 43-column contract invites the reader to
+    # think one of the two is wrong. Name the composition from the data:
+    # the two categorical columns are replaced by their embeddings.
+    encoder = next((l for l in layers if str(l.get("name")) == "input"), None)
+    if encoder:
+        labels = [str(x) for x in (encoder.get("labels") or [])]
+        embedded = [x for x in labels if "_emb_" in x]
+        if embedded:
+            groups = sorted({x.split("_emb_")[0] for x in embedded})
+            subtitle += (f"\nthe encoder row is {len(labels)} units, not the "
+                         f"{len(labels) - len(embedded) + len(groups)}-column "
+                         f"input contract: {', '.join(groups)} enter as "
+                         f"{len(embedded)} embedding units rather than as "
+                         f"{len(groups)} index columns")
+    footer = fs.footer_source(
+        dirs[-1] / "activations.json",
+        n=sum(len(l.get("values", [])) for l in layers),
+        note="per-row scaling: trunk and head magnitudes differ ~10×")
+    fs.assert_glyphs(title, subtitle, footer, run_id, part, cfg_id)
+
+    n_layers = len(layers)
+    # The bottom row draws its unit names rotated, and those names are long
+    # (`policy_mesher_logit_graded_tet`). A fixed spacer let them run into the
+    # colourbar, so the gutter is sized from the longest label actually drawn.
+    longest = max((len(str(x)) for layer in layers
+                   for x in (layer.get("labels") or [])
+                   if len(layer.get("labels") or []) <= 24), default=0)
+    spacer_ratio = max(0.6, 0.075 * longest)
+    fig, axes = fs.figure(title, subtitle=subtitle, footer=footer,
+                          size="tall", nrows=n_layers + 2, ncols=1,
+                          gridspec_kw={"height_ratios":
+                                       [1.0] * n_layers + [spacer_ratio, 0.16],
+                                       "hspace": 1.0})
+    spacer = axes[-2][0]   # keeps the long head labels clear of the colourbar
+    spacer.set_axis_off()
+    cax = axes[-1][0]
+    norm = TwoSlopeNorm(vmin=-1.0, vcenter=0.0, vmax=1.0)
+    cmap = fs.field_cmap("signed")
+    im = None
+    for ax, layer in zip([a[0] for a in axes[:-2]], layers):
+        values = [float(v) for v in layer.get("values", [])]
+        labels = [str(x) for x in (layer.get("labels") or [])]
+        name = str(layer.get("name"))
+        fs.assert_glyphs(name, *labels)
+        row_max = max((abs(v) for v in values), default=0.0) or 1.0
+        row = np.asarray(values, dtype=float).reshape(1, -1) / row_max
+        im = ax.imshow(row, cmap=cmap, norm=norm, aspect="auto",
+                       interpolation="nearest",
+                       extent=(-0.5, len(values) - 0.5, -0.5, 0.5))
+        ax.set_yticks([])
+        ax.set_ylabel(f"{name}\n±{row_max:.2f}", fontsize=fs.FONT_PT["label"],
+                      rotation=0, ha="right", va="center", labelpad=8)
+        for side in ax.spines.values():
+            side.set_visible(False)
+        if labels and len(labels) == len(values) and len(values) <= 24:
+            ax.set_xticks(range(len(values)))
+            ax.set_xticklabels(labels, rotation=90, ha="center",
+                               va="top",
+                               fontsize=fs.FONT_PT["tick"] - 1.5)
+        else:
+            step = _tick_step(len(values))
+            ticks = list(range(0, len(values), step))
+            ax.set_xticks(ticks)
+            ax.set_xticklabels([str(t) for t in ticks],
+                               fontsize=fs.FONT_PT["tick"] - 1)
+            ax.set_xlabel(f"unit index (0–{len(values) - 1})",
+                          fontsize=fs.FONT_PT["tick"])
+        print(f"  layer {name}: {len(values)} units, "
+              f"row scale ±{row_max:.3f}")
+
+    print(f"  max |a| over all layers = {amax:.2f}")
+    if im is not None:
+        fs.colorbar(fig, im, label="activation, normalised", unit="row max",
+                    cax=cax, orientation="horizontal")
+    else:
+        cax.set_visible(False)
     path = out_dir / "activation_map.png"
-    fig.savefig(path, dpi=DPI)
-    plt.close(fig)
-    print(f"wrote {path} ({path.stat().st_size / 1024:.0f} KB)")
+    fs.finish(fig, path)
     return True
 
 
 def main() -> int:
     args = parse_args()
+    fs.use("light")
     runs_dir = args.runs_dir or args.advisor_dir / "runs"
     args.out_dir.mkdir(parents=True, exist_ok=True)
     wrote = [training_curves(runs_dir, args.out_dir),

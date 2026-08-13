@@ -34,9 +34,12 @@ series by colour alone.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import math
+import os
 import re
+import subprocess
 import textwrap
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -60,6 +63,7 @@ __all__ = [
     "field_cmap", "field_lut", "colorbar",
     "loglim", "share_y", "annotate_n", "ratio_bars", "tolerance_band",
     "convergence", "si", "unit_formatter", "footer_source",
+    "provenance", "git_revision", "digest",
     "font_path", "assert_glyphs", "GLYPHS_REQUIRED",
 ]
 
@@ -522,8 +526,240 @@ def unit_formatter(unit: str, reference: float | None = None) -> FuncFormatter:
     return FuncFormatter(lambda v, _: f"{v / scale:g}")
 
 
-def footer_source(*paths: Path | str, note: str = "", n: int | None = None) -> str:
-    """Provenance line: POSIX slashes, repo-relative, record count."""
+# ---------------------------------------------------------------------------
+# Provenance
+# ---------------------------------------------------------------------------
+#: This repository now holds figures produced under three different reference
+#: truth regimes (self-generated truth, the corrected engine, and the
+#: independent Gmsh -> CalculiX chain). A reader cannot tell them apart from
+#: the pixels, and a wrong-regime figure is indistinguishable from a wrong
+#: result. So every figure that carries a number states, on its face, the
+#: revision of the code and the digest of the data it was drawn from.
+#:
+#: This is deliberately not opt-in: ``footer_source`` already receives the
+#: exact inputs each figure reads, so the stamp is derived there and no
+#: generator can forget it.
+
+#: Short digests keep the footer legible. Twelve hex characters is 48 bits --
+#: far past any accidental collision among a few hundred artefacts, and it is
+#: a prefix of the full sha256 the provenance JSON records elsewhere, so it
+#: can be checked with a plain ``sha256sum``.
+DIGEST_CHARS = 12
+#: Hash by content, but do not re-read a 4 MB CSV once per panel: the same
+#: file is stamped on six advisor figures in one process. Keyed by resolved
+#: path plus (size, mtime_ns), so an edit mid-run is still picked up.
+_DIGEST_CACHE: dict[tuple[str, int, int], str] = {}
+#: Directory digests fold in this many members at most, newest-name-first by
+#: sorted order, so a warehouse holding thousands of PNGs cannot stall a
+#: figure. The count is always reported alongside, so a truncated fold is
+#: visible rather than silent.
+DIGEST_DIR_LIMIT = 512
+
+
+def _digest_file(path: Path) -> str:
+    stat = path.stat()
+    key = (str(path), stat.st_size, stat.st_mtime_ns)
+    cached = _DIGEST_CACHE.get(key)
+    if cached is not None:
+        return cached
+    hasher = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            hasher.update(block)
+    value = hasher.hexdigest()
+    _DIGEST_CACHE[key] = value
+    return value
+
+
+def digest(path: Path | str) -> tuple[str, int]:
+    """(sha256 hex, member count) for a file or a directory of inputs.
+
+    A directory digest is the hash of its members' digests in sorted-name
+    order, so it changes if any member changes, is added or is removed --
+    which is what "the data this figure read" means when the input is a
+    results directory or a campaign warehouse.
+    """
+    p = Path(path)
+    try:
+        if p.is_file():
+            return _digest_file(p), 1
+        if p.is_dir():
+            members = sorted(q for q in p.rglob("*") if q.is_file())
+            folded = members[:DIGEST_DIR_LIMIT]
+            hasher = hashlib.sha256()
+            for member in folded:
+                hasher.update(member.relative_to(p).as_posix().encode("utf-8"))
+                hasher.update(_digest_file(member).encode("ascii"))
+            return hasher.hexdigest(), len(members)
+    except OSError:
+        pass
+    return "", 0
+
+
+_GIT_REVISION: str | None = None
+
+
+def git_revision() -> str:
+    """``129de02`` or ``129de02+dirty``; ``unknown`` if this is not a checkout.
+
+    ``+dirty`` is not decoration. Most figures in this repository are
+    regenerated from a working tree mid-sweep, and a stamp that silently
+    reports the last commit for a tree that no longer matches it is worse
+    than no stamp at all.
+    """
+    global _GIT_REVISION
+    if _GIT_REVISION is not None:
+        return _GIT_REVISION
+    override = os.environ.get("POLYMESH_GIT_REVISION")
+    if override:
+        _GIT_REVISION = override.strip()
+        return _GIT_REVISION
+
+    def run(*args: str) -> str | None:
+        try:
+            done = subprocess.run(("git", "-C", str(ROOT)) + args,
+                                  capture_output=True, text=True, timeout=15)
+        except (OSError, subprocess.SubprocessError):
+            return None
+        return done.stdout if done.returncode == 0 else None
+
+    head = run("rev-parse", "--short", "HEAD")
+    if head is None:
+        _GIT_REVISION = "unknown"
+        return _GIT_REVISION
+    revision = head.strip()
+    status = run("status", "--porcelain", "--untracked-files=no")
+    if status is None:
+        revision += "+unknown-tree"
+    elif status.strip():
+        revision += "+dirty"
+    _GIT_REVISION = revision
+    return revision
+
+
+def _stamp_names(paths: Sequence[Path]) -> list[str]:
+    """Shortest trailing path fragments that stay distinct within one stamp.
+
+    Bare basenames collide constantly here -- two ``metrics.json`` from
+    different run directories, six ``wire_feature.png`` from six warehouse
+    ``t0`` directories -- and a stamp that prints the same label twice has
+    lost the distinction it exists to make. So each label grows one parent at
+    a time until every label in the stamp is unique.
+    """
+    parts = [tuple(p.parts) or (p.as_posix(),) for p in paths]
+    # Grow only the labels that actually collide, and grow every member of a
+    # colliding group together: bumping just one of them yields "t0/wire.png"
+    # beside a bare "wire.png", which reads as two different KINDS of input
+    # rather than two siblings. A single global depth is the other failure --
+    # it drags an unrelated input up to "Polyhedral-FEA/bench/advisor/
+    # dataset.csv" because two warehouse renders share a basename.
+    depths = [1] * len(parts)
+    names = [part[-1] for part in parts]
+    for _ in range(max((len(part) for part in parts), default=1)):
+        groups: dict[str, list[int]] = {}
+        for index, name in enumerate(names):
+            groups.setdefault(name, []).append(index)
+        clashing = [index for members in groups.values() if len(members) > 1
+                    for index in members
+                    if depths[index] < len(parts[index])]
+        if not clashing:
+            break
+        for index in clashing:
+            depths[index] += 1
+            names[index] = "/".join(parts[index][-depths[index]:])
+    return names
+
+
+#: More than this many inputs sharing a basename are folded into one combined
+#: digest. Six ``wire_feature.png`` paths spelled out in full would be a
+#: footer nobody reads, and the question the stamp answers -- "are these the
+#: renders I think they are" -- is answered just as well by one digest over
+#: the set.
+FOLD_REPEATS_ABOVE = 2
+
+
+def provenance(*paths: Path | str) -> str:
+    """``regime: git <rev> · <name> sha256 <12 hex>`` for the given inputs.
+
+    Missing inputs are stamped ``absent`` rather than omitted: a figure drawn
+    without one of its stated sources is a fact about the figure.
+    """
+    resolved = [Path(path) for path in paths]
+    repeats: dict[str, list[Path]] = {}
+    for p in resolved:
+        repeats.setdefault(p.name, []).append(p)
+
+    folded_names = {name for name, group in repeats.items()
+                    if len(group) > FOLD_REPEATS_ABOVE}
+    singles = [p for p in resolved if p.name not in folded_names]
+    labels = dict(zip((str(p) for p in singles), _stamp_names(singles)))
+
+    parts = [f"git {git_revision()}"]
+    seen: set[str] = set()
+    for p in resolved:
+        if p.name in folded_names:
+            if p.name in seen:
+                continue
+            seen.add(p.name)
+            group = repeats[p.name]
+            hasher = hashlib.sha256()
+            missing = 0
+            for member in group:
+                value, _ = digest(member)
+                if not value:
+                    missing += 1
+                hasher.update((value or "absent").encode("ascii"))
+            note = f" ({missing} absent)" if missing else ""
+            parts.append(f"{p.name} x{len(group)} sha256 "
+                         f"{hasher.hexdigest()[:DIGEST_CHARS]}{note}")
+            continue
+        name = labels[str(p)]
+        value, count = digest(p)
+        if not value:
+            parts.append(f"{name} absent")
+        elif p.is_dir():
+            shown = min(count, DIGEST_DIR_LIMIT)
+            folded = f"{shown} of {count}" if count > shown else f"{count}"
+            parts.append(f"{name}/ sha256 {value[:DIGEST_CHARS]} ({folded} files)")
+        else:
+            parts.append(f"{name} sha256 {value[:DIGEST_CHARS]}")
+    return "regime: " + " · ".join(parts)
+
+
+def stale_against(recorded_sha: str, path: Path | str) -> str:
+    """Say so when a record was computed on a different file than exists now.
+
+    Artefacts like ``crossval_*.json`` record the sha256 of the dataset they
+    were computed from. That is a fact about the record; whether it still
+    matches the dataset on disk is a fact about the FIGURE, and it is the one
+    a reader needs, because a chart drawn from a record computed on retired
+    truth looks exactly like a current one.
+
+    Returns "" when they agree or when there is nothing to compare.
+    """
+    recorded = (recorded_sha or "").strip().lower()
+    if not recorded:
+        return ""
+    current, _ = digest(path)
+    if not current:
+        return f"STALE? {Path(path).name} is absent, so the record cannot be checked"
+    if current.startswith(recorded) or recorded.startswith(current):
+        return ""
+    return (f"STALE: computed on {Path(path).name} sha256 "
+            f"{recorded[:DIGEST_CHARS]}, but the file on disk is now "
+            f"{current[:DIGEST_CHARS]}")
+
+
+def footer_source(*paths: Path | str, note: str = "", n: int | None = None,
+                  stamp: bool = True) -> str:
+    """Provenance line: POSIX slashes, repo-relative, record count.
+
+    A second line stamps the code revision and a content digest per input,
+    because figures from three different truth regimes now coexist in this
+    repository and only the stamp tells them apart. ``stamp=False`` exists for
+    figures with no data inputs at all (a drawn diagram); it is never the
+    right choice for a figure carrying a number.
+    """
     parts = []
     for path in paths:
         p = Path(path)
@@ -536,6 +772,9 @@ def footer_source(*paths: Path | str, note: str = "", n: int | None = None) -> s
         text += f"  ({n} record{'' if n == 1 else 's'})"
     if note:
         text = f"{text} · {note}" if text else note
+    if stamp:
+        line = provenance(*paths)
+        text = f"{text}\n{line}" if text else line
     return text
 
 

@@ -7,18 +7,29 @@ recording the exact command that made each one.
 
 Design notes
 ------------
+* Every colour, font and type size comes from ``scripts/figstyle.py``. This
+  module defines no palette and names no font file; ``fs.use("dark")`` selects
+  the stage and ``fs.font_path`` resolves a face with verified glyph coverage,
+  so a caption character a font cannot draw fails the build instead of shipping
+  as a box.
 * VTK/pyvista renders **geometry only**, on a transparent background. The
   background gradient, title block, colour bar and captions are drawn with PIL
-  afterwards. That keeps full typographic control (real Liberation Sans, real
-  superscripts), gives an exact 3-stop Studio gradient, and avoids VTK's
-  cramped default scalar bar entirely.
+  afterwards. That keeps full typographic control, gives an exact theme
+  gradient, and avoids VTK's cramped default scalar bar entirely.
 * Everything is supersampled by ``SUPERSAMPLE`` and Lanczos-downsampled to the
-  final 1920x1440, which anti-aliases geometry and text together.
-* The von Mises colour range is clipped robustly. A perfectly clamped face is a
-  stress singularity: the peak nodal value can be millions of times the bulk
-  field, which would render the whole part flat blue. Captions and the manifest
-  always report BOTH the clipped range and the true peak, and the colour bar's
-  top tick is prefixed with an explicit "≥" when clipping is active.
+  final 1920x1440, which anti-aliases geometry and text together. PIL type is
+  sized by ``fs.font_px`` against the final canvas width, so the smallest
+  caption still clears 11 px once a README scales the image down.
+* Fields are coloured with ``fs.field_cmap("magnitude")`` (viridis). The GUI's
+  own blue-cyan-green-yellow-red ramp is neither perceptually uniform nor
+  colour-blind safe; it survives in figstyle for ``gui_studio.png``, which
+  documents the GUI, and nowhere else.
+* One colour-range rule, ``CLIP_PERCENTILE``, applies to every stress render and
+  is stated verbatim in every footer. A perfectly clamped face is a stress
+  singularity whose peak nodal value can be orders of magnitude above the bulk
+  field, so captions and the manifest always report BOTH the clipped range and
+  the true peak, and the colour bar's top tick is prefixed "≥" exactly when
+  clipping is active.
 
 Usage
 -----
@@ -46,22 +57,19 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
-# ---------------------------------------------------------------------------
-# Studio palette (shared contract with the GUI, plot_benchmarks, tiler)
-# ---------------------------------------------------------------------------
-CHROME_BG = "#0E1116"
-PANEL_BG = "#161B22"
-HEADER_BG = "#1C2330"
-BORDER = "#2A3240"
-TEXT = "#E6EAF0"
-TEXT_DIM = "#8A93A3"
-ACCENT = "#4CC2FF"
-ACCENT_DIM = "#2A6E96"
+sys.path.insert(0, str(Path(__file__).resolve().parents[0]))
+import figstyle as fs  # noqa: E402
+from make_compare_grid import PanelSpec, matched_panels  # noqa: E402
 
-VIEWPORT_TOP = "#1B2028"
-VIEWPORT_MID = "#141922"
-VIEWPORT_BOTTOM = "#0F131A"
-PART_DEFAULT = "#8B95A5"
+
+# ---------------------------------------------------------------------------
+# Theme -- every colour in this file comes from figstyle. 3D renders and the
+# composites around them keep the dark stage.
+# ---------------------------------------------------------------------------
+def theme() -> fs.Theme:
+    t = fs.theme()
+    return t if t.name == "dark" else fs.use("dark")
+
 
 # ---------------------------------------------------------------------------
 # Output geometry
@@ -85,15 +93,6 @@ CACHE = REPO / "build/showcase"        # gitignored VTU cache
 CLI = REPO / "build/apps/cli/polymesh"
 SOLVE_TIMEOUT = 300
 
-FONT_DIRS = (
-    "/usr/share/fonts/liberation-sans-fonts",
-    "/usr/share/fonts/truetype/liberation",
-    "/usr/share/fonts/dejavu-sans-fonts",
-    "C:/Windows/Fonts",
-)
-FONT_REGULAR = ("LiberationSans-Regular.ttf", "DejaVuSans.ttf", "arial.ttf")
-FONT_BOLD = ("LiberationSans-Bold.ttf", "DejaVuSans-Bold.ttf", "arialbd.ttf")
-
 
 def rel(path: Path) -> str:
     """Repo-relative string when possible, absolute otherwise.
@@ -116,41 +115,16 @@ def cli_path() -> Path:
     )
 
 
-def load_font(names: tuple[str, ...], size: int) -> ImageFont.FreeTypeFont:
-    for directory in FONT_DIRS:
-        for name in names:
-            path = Path(directory) / name
-            if path.is_file():
-                return ImageFont.truetype(str(path), size)
-    return ImageFont.load_default(size)
-
-
-# ---------------------------------------------------------------------------
-# fea_colormap -- verbatim port of apps/gui/viewport.cpp:127-133
-# ---------------------------------------------------------------------------
-def fea_colormap(t: float) -> tuple[float, float, float]:
-    """blue -> cyan -> green -> yellow -> red, exactly as the GUI computes it."""
-    t = min(max(t, 0.0), 1.0)
-    r = min(max(min(4.0 * t - 2.0, 4.0 - 4.0 * t) + 1.0, 0.0), 1.0)
-    g = min(max(min(4.0 * t, 3.4 - 3.0 * t), 0.0), 1.0)
-    b = min(max(2.0 - 4.0 * t, 0.0), 1.0)
-    return (1.0 if t > 0.75 else r * 0.9, g * 0.85, b)
-
-
-def fea_lut(n: int = 256) -> np.ndarray:
-    """(n, 3) float LUT in [0,1]."""
-    return np.array([fea_colormap(i / (n - 1)) for i in range(n)], dtype=float)
-
-
-def fea_cmap():
-    from matplotlib.colors import ListedColormap
-
-    return ListedColormap(fea_lut(256), name="fea_colormap")
-
-
 def hex_to_rgb(h: str) -> tuple[int, int, int]:
+    """Parse a figstyle theme colour into 8-bit channels for PIL/PyVista."""
     h = h.lstrip("#")
     return tuple(int(h[i : i + 2], 16) for i in (0, 2, 4))  # type: ignore[return-value]
+
+
+def mix(a: str, b: str, t: float) -> tuple[int, int, int]:
+    """Blend two theme colours; used for the viewport's vertical gradient."""
+    ca, cb = hex_to_rgb(a), hex_to_rgb(b)
+    return tuple(int(round(ca[i] + (cb[i] - ca[i]) * t)) for i in range(3))  # type: ignore[return-value]
 
 
 # ---------------------------------------------------------------------------
@@ -177,8 +151,9 @@ class Part:
     # warping a 10 mm-thick plate by 18 mm to "show" bending shears the hole
     # rim into something the solve never predicted.
     warp_frac: float = 0.02
-    # None = let color_range pick the least-clipping readable range.
-    clip_pct: float | None = None
+    # There is no per-part colour-range override: CLIP_PERCENTILE is the one
+    # rule, applied identically to every stress render (and stated in every
+    # footer), so no figure gets a range that happens to flatter it.
 
 
 # Selection boxes and load directions follow the *.case.json contracts. The
@@ -344,7 +319,32 @@ GRADING_TILES = [
 # ---------------------------------------------------------------------------
 # CLI driving
 # ---------------------------------------------------------------------------
-def run_cli(argv: list[str], timeout: int = SOLVE_TIMEOUT) -> tuple[str, float]:
+class MeshRefused(RuntimeError):
+    """The engine declined to produce this mesh, and said why.
+
+    A refusal is a legitimate, informative outcome of the current engine (the
+    volume-completeness guard rejecting a mesh whose solid/void topology is
+    incomplete), not a crash. A figure that asks for such a mesh must be able
+    to report the refusal instead of aborting the whole sweep.
+    """
+
+    def __init__(self, message: str, argv: list[str]):
+        super().__init__(message)
+        self.message = message
+        self.argv = argv
+
+
+#: Engine messages that mean "declined", as opposed to "crashed". Kept
+#: textually distinct engine-side on purpose; matched on the opening phrase.
+REFUSAL_MARKERS = (
+    "geometry fill-stage guard failed:",
+    "feature unresolved at h=",
+    "resolution refused at h=",
+)
+
+
+def run_cli(argv: list[str], timeout: int = SOLVE_TIMEOUT,
+            allow_refusal: bool = False) -> tuple[str, float]:
     """Run the polymesh CLI, streaming output. Returns (stdout, wall seconds)."""
     print("    $ " + " ".join(argv), flush=True)
     start = time.perf_counter()
@@ -362,9 +362,15 @@ def run_cli(argv: list[str], timeout: int = SOLVE_TIMEOUT) -> tuple[str, float]:
         proc.kill()
         raise SystemExit(f"polymesh timed out after {timeout}s: {' '.join(argv)}")
     wall = time.perf_counter() - start
+    output = "".join(lines)
     if proc.returncode != 0:
+        marker = next((m for m in REFUSAL_MARKERS if m in output), None)
+        if allow_refusal and marker:
+            detail = next((line.strip() for line in output.splitlines()
+                           if marker in line), marker)
+            raise MeshRefused(detail, argv)
         raise SystemExit(f"polymesh failed (rc={proc.returncode}): {' '.join(argv)}")
-    return "".join(lines), wall
+    return output, wall
 
 
 def solve_argv(part: Part, out: Path) -> list[str]:
@@ -487,10 +493,11 @@ def fit_camera(
 # PIL compositing
 # ---------------------------------------------------------------------------
 def gradient_canvas(w: int, h: int) -> Image.Image:
-    """Exact 3-stop vertical viewport gradient (top / mid / bottom)."""
-    top = np.array(hex_to_rgb(VIEWPORT_TOP), dtype=float)
-    mid = np.array(hex_to_rgb(VIEWPORT_MID), dtype=float)
-    bot = np.array(hex_to_rgb(VIEWPORT_BOTTOM), dtype=float)
+    """Vertical viewport gradient, panel at the top easing to page at the foot."""
+    t = theme()
+    top = np.array(mix(t.panel, t.grid, 0.25), dtype=float)
+    mid = np.array(mix(t.panel, t.bg, 0.5), dtype=float)
+    bot = np.array(hex_to_rgb(t.bg), dtype=float)
     ys = np.linspace(0.0, 1.0, h)[:, None]
     upper = top + (mid - top) * (ys / 0.5)
     lower = mid + (bot - mid) * ((ys - 0.5) / 0.5)
@@ -500,50 +507,14 @@ def gradient_canvas(w: int, h: int) -> Image.Image:
     )
 
 
-def sci_parts(v: float) -> tuple[str, str | None]:
-    """Split a value into (mantissa string, exponent string) for typeset labels."""
-    if v == 0 or not math.isfinite(v):
-        return ("0", None)
-    exp = int(math.floor(math.log10(abs(v))))
-    mant = round(v / (10.0**exp), 2)
-    if abs(mant) >= 10.0:
-        mant /= 10.0
-        exp += 1
-    return (f"{mant:.2f}", str(exp))
+def _font(role: str, out_w: int, s: int, *, bold: bool = False):
+    """A glyph-verified font at figstyle's point size for this canvas width.
 
-
-def draw_sci(
-    draw: ImageDraw.ImageDraw, xy, value: float, font, font_sup, fill, prefix: str = ""
-) -> int:
-    """Draw `prefix` + mantissa + x10^exp with a real raised exponent."""
-    x, y = xy
-    mant, exp = sci_parts(value)
-    text = prefix + mant
-    draw.text((x, y), text, font=font, fill=fill)
-    x += draw.textlength(text, font=font)
-    if exp is None:
-        return int(x - xy[0])
-    body = "\u00d710"
-    draw.text((x, y), body, font=font, fill=fill)
-    x += draw.textlength(body, font=font)
-    asc = font.getbbox("8")[3] - font.getbbox("8")[1]
-    draw.text((x, y - asc * 0.42), exp, font=font_sup, fill=fill)
-    x += draw.textlength(exp, font=font_sup)
-    return int(x - xy[0])
-
-
-def wrap(draw, text: str, font, max_w: int) -> list[str]:
-    words, lines, cur = text.split(), [], ""
-    for word in words:
-        trial = f"{cur} {word}".strip()
-        if draw.textlength(trial, font=font) <= max_w or not cur:
-            cur = trial
-        else:
-            lines.append(cur)
-            cur = word
-    if cur:
-        lines.append(cur)
-    return lines
+    ``out_w`` is the *final* width, so type keeps its apparent size after the
+    supersampled canvas is downscaled.
+    """
+    return ImageFont.truetype(str(fs.font_path("regular", bold=bold)),
+                              fs.font_px(role, out_w) * s)
 
 
 def draw_colorbar(
@@ -555,42 +526,72 @@ def draw_colorbar(
     hi: float,
     clipped: bool,
     s: int,
+    out_w: int,
 ) -> None:
-    """Vertical colour bar on the fea_colormap, with typeset scientific ticks."""
+    """Vertical viridis colour bar with SI-prefixed ticks (``0`` .. ``3.84 MPa``).
+
+    Exponent soup (``3.84x10^6`` under a separate ``(Pa)`` heading) made the
+    reader do the arithmetic; ``fs.si`` puts the unit on the number. The top
+    tick carries a ``>=`` marker exactly when the range is clipped.
+    """
     bar_w = 54 * s
-    f_title = load_font(FONT_BOLD, 25 * s)
-    f_tick = load_font(FONT_REGULAR, 24 * s)
-    f_sup = load_font(FONT_REGULAR, 16 * s)
+    f_title = _font("panel", out_w, s, bold=True)
+    f_tick = _font("label", out_w, s)
+    t = theme()
 
-    # heading, above the bar
-    draw.text((x, y0 - 74 * s), "von Mises", font=f_title, fill=TEXT)
-    draw.text((x, y0 - 44 * s), "stress (Pa)", font=f_title, fill=TEXT)
+    # Two lines: one line of "von Mises stress" would run past the right edge
+    # of the bar zone at this type size. The unit lives on the ticks now.
+    head_px = fs.font_px("panel", out_w)
+    for i, line in enumerate(("von Mises", "stress")):
+        fs.assert_glyphs(line)
+        draw.text((x, y0 - int((3.5 - 1.25 * i) * head_px) * s), line,
+                  font=f_title, fill=t.ink)
 
-    lut = fea_lut(512)
+    lut = fs.field_lut("magnitude", 512)
     height = y1 - y0
     for i in range(height):
-        t = 1.0 - i / max(1, height - 1)
-        rgb = lut[min(len(lut) - 1, int(t * (len(lut) - 1)))]
+        frac = 1.0 - i / max(1, height - 1)
+        rgb = lut[min(len(lut) - 1, int(frac * (len(lut) - 1)))]
         col = tuple(int(round(c * 255)) for c in rgb)
         draw.rectangle([x, y0 + i, x + bar_w, y0 + i], fill=col)
-    draw.rectangle([x, y0, x + bar_w, y1], outline=BORDER, width=max(1, s))
+    draw.rectangle([x, y0, x + bar_w, y1], outline=t.grid, width=max(1, s))
 
     n_ticks = 6
     for k in range(n_ticks):
-        t = k / (n_ticks - 1)
-        val = lo + t * (hi - lo)
-        ty = int(y1 - t * height)
-        draw.line([x + bar_w, ty, x + bar_w + 9 * s, ty], fill=BORDER, width=max(1, s))
-        prefix = "\u2265" if (clipped and k == n_ticks - 1) else ""
-        draw_sci(
-            draw,
-            (x + bar_w + 15 * s, ty - 14 * s),
-            val,
-            f_tick,
-            f_sup,
-            TEXT,
-            prefix=prefix,
-        )
+        frac = k / (n_ticks - 1)
+        val = lo + frac * (hi - lo)
+        ty = int(y1 - frac * height)
+        draw.line([x + bar_w, ty, x + bar_w + 9 * s, ty], fill=t.grid,
+                  width=max(1, s))
+        label = fs.si(val, "Pa")
+        if clipped and k == n_ticks - 1:
+            label = "\u2265" + label
+        fs.assert_glyphs(label)
+        draw.text((x + bar_w + 15 * s, ty - 0.6 * fs.font_px("label", out_w) * s),
+                  label, font=f_tick, fill=t.ink)
+
+
+def wrap(draw, text: str, font, max_w: int) -> list[str]:
+    """Greedy word wrap that honours explicit newlines as hard breaks.
+
+    A caption that ends in a provenance stamp needs that stamp on its own
+    line; flowing it into the prose above hides it in exactly the place a
+    reader scans past.
+    """
+    lines: list[str] = []
+    for paragraph in text.split("\n"):
+        cur = ""
+        for word in paragraph.split():
+            trial = f"{cur} {word}".strip()
+            if draw.textlength(trial, font=font) <= max_w or not cur:
+                cur = trial
+            else:
+                lines.append(cur)
+                cur = word
+        if cur:
+            lines.append(cur)
+    return lines
+
 
 
 def compose(
@@ -615,13 +616,15 @@ def compose(
     canvas.paste(layer, (inset[0] * s, inset[1] * s), layer)
     draw = ImageDraw.Draw(canvas)
 
-    # Readability scrims: a soft vignette toward the chrome colour behind each
+    t = theme()
+    out_w = out_size[0]
+    # Readability scrims: a soft vignette toward the page colour behind each
     # text band, so a bright stress lobe reaching the band edge can never sit
     # under the title or the caption.
     if title or footer_text:
         scrim = Image.new("RGBA", (w, h), (0, 0, 0, 0))
         sd = ImageDraw.Draw(scrim)
-        base = hex_to_rgb(CHROME_BG)
+        base = hex_to_rgb(t.bg)
         if title:
             band = int(0.150 * h)
             for i in range(band):
@@ -635,13 +638,14 @@ def compose(
         draw = ImageDraw.Draw(canvas)
 
     if title:
-        f_title = load_font(FONT_BOLD, 40 * s)
-        draw.text((56 * s, 44 * s), title, font=f_title, fill=TEXT)
+        fs.assert_glyphs(title, meta or "")
+        f_title = _font("title", out_w, s, bold=True)
+        draw.text((56 * s, 44 * s), title, font=f_title, fill=t.ink)
         ty = 44 * s + (f_title.getbbox(title)[3] - f_title.getbbox(title)[1]) + 18 * s
-        draw.rectangle([56 * s, ty, 56 * s + 96 * s, ty + 3 * s], fill=ACCENT)
+        draw.rectangle([56 * s, ty, 56 * s + 96 * s, ty + 3 * s], fill=t.accent)
         if meta:
-            f_meta = load_font(FONT_REGULAR, 25 * s)
-            draw.text((56 * s, ty + 16 * s), meta, font=f_meta, fill=TEXT_DIM)
+            f_meta = _font("label", out_w, s)
+            draw.text((56 * s, ty + 16 * s), meta, font=f_meta, fill=t.muted)
 
     if bar:
         draw_colorbar(
@@ -653,25 +657,26 @@ def compose(
             hi=bar["hi"],
             clipped=bar["clipped"],
             s=s,
+            out_w=out_w,
         )
 
     if footer_text:
-        f_foot = load_font(FONT_REGULAR, 22 * s)
+        fs.assert_glyphs(footer_text)
+        f_foot = _font("footer", out_w, s)
         lines = wrap(draw, footer_text, f_foot, w - 112 * s)
-        line_h = 30 * s
+        line_h = int(round(fs.font_px("footer", out_w) * 1.45)) * s
         y = h - 42 * s - line_h * len(lines)
         for line in lines:
-            draw.text((56 * s, y), line, font=f_foot, fill=TEXT_DIM)
+            draw.text((56 * s, y), line, font=f_foot, fill=t.muted)
             y += line_h
-        f_mark = load_font(FONT_BOLD, 23 * s)
+        f_mark = _font("footer", out_w, s, bold=True)
         mark = "PolyMesh"
         draw.text(
             (w - 56 * s - draw.textlength(mark, font=f_mark), h - 66 * s),
             mark,
             font=f_mark,
-            fill=ACCENT_DIM,
+            fill=t.muted,
         )
-
     return canvas.resize(out_size, Image.LANCZOS)
 
 
@@ -690,44 +695,36 @@ def _shot(p) -> np.ndarray:
     return np.asarray(p.screenshot(transparent_background=True, return_img=True))
 
 
-# Candidate upper bounds, most inclusive first. "None" means the true maximum.
-CLIP_CANDIDATES = (None, 99.9, 99.5, 99.0, 98.0, 97.0, 95.0, 92.0, 90.0)
-# Reject a range if more than this fraction of the visible surface falls into
-# the bottom quarter of it -- that is the "everything is flat blue" failure.
-CLIP_CROWD_LIMIT = 0.60
+# ---------------------------------------------------------------------------
+# The one colour-range rule
+# ---------------------------------------------------------------------------
+# Every stress render clips its colour range at this percentile of the *visible
+# surface* field -- one rule, one number, stated verbatim in every footer. The
+# old per-figure choices (95th here, 90th there, full range elsewhere) let each
+# image pick the range that flattered it.
+#
+# Why the surface and not the volume: interior nodes never reach a pixel. Why
+# clip at all: a clamped face is a stress singularity whose nodal peak can be
+# orders of magnitude above the bulk field, and mapping to it turns the whole
+# part one flat colour. The true unclipped peak is always reported alongside.
+CLIP_PERCENTILE = 99.0
 
 
-def color_range(
-    vm_surface: np.ndarray, clip_pct: float | None = None
-) -> tuple[float, float, bool, float | None]:
-    """Pick the least-clipping colour range that still shows structure.
+def clip_rule_text() -> str:
+    """The rule sentence. Identical in every stress footer and caption."""
+    return (f"clipped at the {ordinal(CLIP_PERCENTILE)} percentile of the "
+            f"visible surface field")
 
-    Percentiles are taken over the *surface* field, because that is what the
-    render actually shows; interior nodes never reach a pixel. A clamped face is
-    a stress singularity, so the true peak can be millions of times the bulk
-    field and using it would map the whole part to flat blue.
 
-    Returns (lo, hi, clipped, chosen_percentile).
-    """
+def color_range(vm_surface: np.ndarray) -> tuple[float, float, bool]:
+    """(lo, hi, clipped) for a surface von Mises field under the one rule."""
     true_max = float(vm_surface.max())
     if not math.isfinite(true_max) or true_max <= 0.0:
-        return 0.0, 1.0, False, None
-
-    def crowding(hi: float) -> float:
-        return float((vm_surface < 0.25 * hi).mean()) if hi > 0 else 1.0
-
-    if clip_pct is not None:                       # explicit per-part override
-        hi = float(np.percentile(vm_surface, clip_pct))
-        return 0.0, hi, hi < true_max, clip_pct
-
-    for pct in CLIP_CANDIDATES:
-        hi = true_max if pct is None else float(np.percentile(vm_surface, pct))
-        if hi <= 0.0:
-            continue
-        if crowding(hi) <= CLIP_CROWD_LIMIT:
-            return 0.0, hi, hi < true_max, pct
-    hi = float(np.percentile(vm_surface, CLIP_CANDIDATES[-1]))
-    return 0.0, hi, hi < true_max, CLIP_CANDIDATES[-1]
+        return 0.0, 1.0, False
+    hi = float(np.percentile(vm_surface, CLIP_PERCENTILE))
+    if hi <= 0.0:
+        return 0.0, true_max, False
+    return 0.0, hi, hi < true_max
 
 
 def nice_factor(x: float) -> float:
@@ -763,7 +760,6 @@ def render_stress(
     up=(0.0, 1.0, 0.0),
     margin: float = 1.12,
     warp_frac: float = 0.02,
-    clip_pct: float | None = None,
     focus: tuple[float, float, float] | None = None,
     focus_radius: float | None = None,
 ) -> dict:
@@ -786,8 +782,8 @@ def render_stress(
     surf = warped.extract_surface(algorithm="dataset_surface")
 
     # Range comes from the surface field: that is what the render shows.
-    lo, hi, clipped, chosen_pct = color_range(
-        np.asarray(surf.point_data["von_Mises"], dtype=float), clip_pct
+    lo, hi, clipped = color_range(
+        np.asarray(surf.point_data["von_Mises"], dtype=float)
     )
 
     s = SUPERSAMPLE
@@ -797,10 +793,13 @@ def render_stress(
     p.add_mesh(
         surf,
         scalars="von_Mises",
-        cmap=fea_cmap(),
+        # von Mises is a magnitude anchored at zero: viridis. The GUI's own
+        # blue-cyan-green-yellow-red ramp is not perceptually uniform and not
+        # colour-blind safe, and now lives in figstyle for gui_studio.png only.
+        cmap=fs.field_cmap("magnitude"),
         clim=(lo, hi),
         show_edges=True,
-        edge_color="#101418",
+        edge_color=theme().bg,
         line_width=0.9 * s,
         show_scalar_bar=False,
         ambient=0.34,
@@ -826,20 +825,25 @@ def render_stress(
     p.close()
 
     if clipped:
-        where = (
-            f"clipped at the {ordinal(chosen_pct)} percentile of the visible surface"
-            if chosen_pct is not None
-            else "clipped"
-        )
         clip_note = (
-            f"colour range 0 \u2013 {hi:.3g} Pa ({where}); peak nodal value "
-            f"{true_max:.3g} Pa at the clamped-face stress singularity"
+            f"colour range 0 \u2013 {fs.si(hi, 'Pa')} ({clip_rule_text()}); "
+            f"peak nodal value {fs.si(true_max, 'Pa')} at the clamped-face "
+            f"stress singularity"
         )
     else:
-        clip_note = f"colour range 0 \u2013 {hi:.3g} Pa (full field range)"
+        clip_note = (
+            f"colour range 0 \u2013 {fs.si(hi, 'Pa')} (full field range; "
+            f"the {ordinal(CLIP_PERCENTILE)} percentile of the visible surface "
+            f"field equals the peak)"
+        )
     footer = f"Deformation warped \u00d7{factor:g} for visibility \u00b7 {clip_note}"
     if footer_extra:
         footer += f" \u00b7 {footer_extra}"
+    # Same stamp the matplotlib figures carry, for the same reason: these
+    # renders show numbers (peak stress, DOF, warp factor) and the mesh they
+    # were solved on changes with every engine fix. The VTU digest says which
+    # mesh this is; the revision says which engine produced it.
+    footer += "\n" + fs.provenance(vtu)
 
     canvas = compose(
         img,
@@ -862,7 +866,7 @@ def render_stress(
         "clipped": clipped,
         "warp_factor": factor,
         "max_disp_m": umax,
-        "clip_pct": chosen_pct,
+        "clip_pct": CLIP_PERCENTILE,
         "caption_clip": clip_note,
     }
 
@@ -893,11 +897,12 @@ def render_mesh(
     s = SUPERSAMPLE
     w, h = size
     p = _plotter(w * s, h * s, "none")
+    t = theme()
     p.add_mesh(
         surf,
-        color=PART_DEFAULT,
+        color=t.muted,
         show_edges=True,
-        edge_color="#141A22",
+        edge_color=t.bg,
         # These tiles get downscaled again by the grid tiler, so the lines are
         # drawn heavier than the stress renders' to survive it.
         line_width=1.7 * s,
@@ -912,7 +917,7 @@ def render_mesh(
 
     # Key / fill / rim: fill and rim carry the accent so the grey part reads as
     # lit metal against the dark viewport rather than flat clay. Intensities are
-    # kept well under 1.0 in total so PART_DEFAULT stays a mid grey instead of
+    # kept well under 1.0 in total so the part stays a mid grey instead of
     # blowing out to white.
     d = np.asarray(view, dtype=float)
     d /= np.linalg.norm(d)
@@ -921,10 +926,10 @@ def render_mesh(
     key.diffuse_color = (1.0, 1.0, 1.0)
     fill = pv.Light(position=tuple(d * 4 + np.array([-2.2, -1.4, 0.4])), light_type="scene light")
     fill.intensity = 0.26
-    fill.diffuse_color = hex_to_rgb(ACCENT)
+    fill.diffuse_color = t.accent
     rim = pv.Light(position=tuple(-d * 4 + np.array([0.0, 0.0, 1.6])), light_type="scene light")
     rim.intensity = 0.20
-    rim.diffuse_color = hex_to_rgb(ACCENT_DIM)
+    rim.diffuse_color = t.band
     for light in (key, fill, rim):
         light.positional = False
         p.add_light(light)
@@ -954,96 +959,145 @@ def render_mesh(
 
 
 # ---------------------------------------------------------------------------
-# architecture.png -- graphviz, generated inline (no .dot file on disk)
+# architecture.png -- drawn with matplotlib through figstyle
 # ---------------------------------------------------------------------------
-def architecture_dot() -> str:
-    n = f'fillcolor="{PANEL_BG}", color="{BORDER}", fontcolor="{TEXT}"'
-    acc = f'fillcolor="{HEADER_BG}", color="{ACCENT}", fontcolor="{TEXT}"'
-    # Side outputs stay subordinate but must remain legible: filling them with
-    # the page colour made them near-invisible against the background.
-    side = f'fillcolor="{PANEL_BG}", color="{ACCENT_DIM}", fontcolor="{TEXT_DIM}"'
-    return f"""
-digraph polymesh {{
-  rankdir=LR;
-  bgcolor="{CHROME_BG}";
-  splines=spline;
-  nodesep=0.34;
-  ranksep=0.72;
-  fontname="Liberation Sans";
-  node [shape=box, style="rounded,filled", fontname="Liberation Sans",
-        fontsize=15, penwidth=1.6, margin="0.26,0.17", height=0.62];
-  edge [color="{ACCENT}", penwidth=1.7, arrowsize=0.85,
-        fontname="Liberation Sans", fontsize=12, fontcolor="{TEXT_DIM}"];
+# Two rows of four stages, serpentine, so the diagram is ~2:1 instead of the
+# 4:1 letterbox graphviz produced at rankdir=LR (its panels and 15 pt labels
+# were sub-pixel once a README scaled it to 900 px). Positions are axes
+# fractions; the row gap is left empty on purpose because the feedback edge
+# runs through it.
+ARCH_ROW_Y = (0.80, 0.335)
+ARCH_COL_X = (0.13, 0.375, 0.62, 0.865)
+ARCH_BOX = (0.215, 0.175)      # (width, height) of a stage box
+ARCH_FEEDBACK_Y = 0.575        # mid-gap lane for the return path
 
-  cad      [label="STEP / B-rep CAD", {acc}];
-  feat     [label="feature analysis\\ncurvature \u00b7 thin-wall", {n}];
-  sizing   [label="gradient-limited\\nsizing field", {acc}];
-  meshers  [label="hybrid meshers\\ntet \u00b7 hex \u00b7 prism \u00b7 pyramid \u00b7 poly-VEM", {n}];
-  assembly [label="unified FE + VEM\\nassembly", {n}];
-  solve    [label="solve\\nLDLT / CG", {acc}];
-  zz       [label="ZZ error\\nestimate", {n}];
-  hp       [label="hp-adapt\\ndecision", {acc}];
+#: (column, row, label, detail, accent) -- rows are laid out serpentine, so row
+#: 1 reads right-to-left and the row-to-row hop is a short vertical.
+ARCH_STAGES = [
+    (0, 0, "STEP / B-rep CAD", "", True),
+    (1, 0, "feature analysis", "curvature \u00b7 thin-wall", False),
+    (2, 0, "gradient-limited\nsizing field", "", True),
+    (3, 0, "hybrid meshers", "tet \u00b7 hex \u00b7 prism \u00b7 pyramid \u00b7 poly-VEM", False),
+    (3, 1, "unified FE + VEM\nassembly", "", False),
+    (2, 1, "solve", "LDLT / CG", True),
+    (1, 1, "ZZ error\nestimate", "", False),
+    (0, 1, "hp-adapt\ndecision", "", True),
+]
 
-  vtu      [label="VTU export", {side}];
-  gui      [label="GUI viewport", {side}];
-  bench    [label="bench harness", {side}];
-
-  cad -> feat -> sizing -> meshers -> assembly -> solve -> zz -> hp;
-  hp -> sizing [label="  refine / p-elevate", constraint=false,
-                style=dashed, color="{ACCENT_DIM}", fontcolor="{ACCENT}"];
-
-  solve -> vtu  [color="{ACCENT_DIM}", arrowsize=0.7];
-  solve -> gui  [color="{ACCENT_DIM}", arrowsize=0.7];
-  zz    -> bench [color="{ACCENT_DIM}", arrowsize=0.7];
-
-  {{ rank=same; vtu; gui; }}
-}}
-"""
+#: side outputs: (x, y, label, source stage index)
+ARCH_SIDES = [
+    (0.19, 0.085, "bench harness", 6),
+    (0.505, 0.085, "GUI viewport", 5),
+    (0.735, 0.085, "VTU export", 5),
+]
 
 
-def render_architecture(out: Path, width: int = 2400) -> None:
-    if not shutil.which("dot"):
-        raise SystemExit("graphviz 'dot' not found; cannot render architecture.png")
-    out.parent.mkdir(parents=True, exist_ok=True)
-    proc = subprocess.run(
-        ["dot", "-Tpng", f"-Gsize={width / 96:.3f},99", "-Gdpi=96"],
-        input=architecture_dot().encode("utf-8"),
-        capture_output=True,
-        text=False,
-        cwd=REPO,
+def _arch_center(col: int, row: int) -> tuple[float, float]:
+    return ARCH_COL_X[col], ARCH_ROW_Y[row]
+
+
+def render_architecture(out: Path) -> None:
+    """Pipeline diagram: two rows, tight feedback lane, theme contrast."""
+    from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
+
+    t = theme()
+    bw, bh = ARCH_BOX
+    fig, axes = fs.figure(
+        "PolyMesh pipeline",
+        subtitle="STEP CAD to solved fields; the hp-adapt decision feeds back "
+                 "into the sizing field rather than into a remesh from scratch",
+        footer=fs.footer_source(Path(__file__),
+                               note="drawn programmatically, no external "
+                                    "diagram tool"),
+        size=(11.0, 5.5),
     )
-    if proc.returncode != 0:
-        raise SystemExit(f"dot failed: {proc.stderr.decode(errors='replace')[:800]}")
-    tmp = out.with_suffix(".raw.png")
-    tmp.write_bytes(proc.stdout)
-    img = Image.open(tmp).convert("RGB")
-    tmp.unlink(missing_ok=True)
+    ax = axes[0, 0]
+    fs.axes_off(ax)
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.set_facecolor(t.bg)
+    ax.grid(False)
 
-    # Crop to the ink bounding box first. Graphviz pads asymmetrically around a
-    # long dashed feedback spline, which otherwise leaves the diagram sitting
-    # off-centre inside a band of dead background.
-    arr = np.asarray(img).astype(int)
-    ink = np.abs(arr - np.array(hex_to_rgb(CHROME_BG))).sum(axis=2) > 12
-    rows, cols = np.any(ink, axis=1), np.any(ink, axis=0)
-    if rows.any() and cols.any():
-        y0, y1 = np.nonzero(rows)[0][[0, -1]]
-        x0, x1 = np.nonzero(cols)[0][[0, -1]]
-        img = img.crop((int(x0), int(y0), int(x1) + 1, int(y1) + 1))
+    def box(cx: float, cy: float, w: float, h: float, label: str, detail: str,
+            *, edge: str, ink: str) -> None:
+        fs.assert_glyphs(label, detail)
+        ax.add_patch(FancyBboxPatch(
+            (cx - w / 2, cy - h / 2), w, h,
+            boxstyle="round,pad=0.004,rounding_size=0.02",
+            linewidth=1.4, edgecolor=edge, facecolor=t.panel, zorder=3,
+        ))
+        dy = 0.022 if detail else 0.0
+        ax.text(cx, cy + dy, label, ha="center", va="center", zorder=4,
+                fontsize=fs.FONT_PT["label"], color=ink,
+                linespacing=1.35)
+        if detail:
+            ax.text(cx, cy - h / 2 + 0.032, detail, ha="center", va="center",
+                    zorder=4, fontsize=fs.FONT_PT["annot"] - 0.5, color=t.muted)
 
-    if img.width != width:
-        img = img.resize((width, round(img.height * width / img.width)), Image.LANCZOS)
-    pad = 56
-    canvas = Image.new("RGB", (img.width + 2 * pad, img.height + 2 * pad), CHROME_BG)
-    canvas.paste(img, (pad, pad))
-    canvas.save(out)
-    print(f"    wrote {rel(out)}  ({canvas.width}x{canvas.height})")
+    def arrow(p0, p1, *, color: str, dashed: bool = False,
+              connect: str = "arc3,rad=0.0") -> None:
+        ax.add_patch(FancyArrowPatch(
+            p0, p1, arrowstyle="-|>", mutation_scale=13,
+            linewidth=1.6, color=color, zorder=2,
+            linestyle=(0, (5, 3)) if dashed else "solid",
+            connectionstyle=connect, shrinkA=0, shrinkB=0,
+        ))
+
+    for col, row, label, detail, accent in ARCH_STAGES:
+        cx, cy = _arch_center(col, row)
+        box(cx, cy, bw, bh, label, detail,
+            edge=t.accent if accent else t.grid, ink=t.ink)
+
+    # in-row flow: row 0 left-to-right, row 1 right-to-left (serpentine)
+    for row, cols in ((0, (0, 1, 2)), (1, (3, 2, 1))):
+        step = 1 if row == 0 else -1
+        for col in cols:
+            x0, y0 = _arch_center(col, row)
+            x1, _ = _arch_center(col + step, row)
+            arrow((x0 + step * bw / 2, y0), (x1 - step * bw / 2, y0),
+                  color=t.accent)
+
+    # row hop: meshers -> assembly, a short vertical at the right edge
+    hx, hy0 = _arch_center(3, 0)
+    _, hy1 = _arch_center(3, 1)
+    arrow((hx, hy0 - bh / 2), (hx, hy1 + bh / 2), color=t.accent)
+
+    # feedback: hp-adapt -> sizing field, routed through the empty row gap
+    # instead of the ~350 px swoop graphviz drew through open background.
+    fx, fy = _arch_center(0, 1)
+    sx, sy = _arch_center(2, 0)
+    lane = ARCH_FEEDBACK_Y
+    ax.plot([fx, fx], [fy + bh / 2, lane], color=t.accent, linewidth=1.6,
+            linestyle=(0, (5, 3)), zorder=2)
+    ax.plot([fx, sx], [lane, lane], color=t.accent, linewidth=1.6,
+            linestyle=(0, (5, 3)), zorder=2)
+    arrow((sx, lane), (sx, sy - bh / 2), color=t.accent, dashed=True)
+    feedback = "refine / p-elevate"
+    fs.assert_glyphs(feedback)
+    # Accent ink on a page-coloured plate: the old dark blue on near-black was
+    # invisible at any size.
+    ax.text((fx + sx) / 2, lane, feedback, ha="center", va="center", zorder=5,
+            fontsize=fs.FONT_PT["annot"], color=t.accent,
+            bbox=dict(facecolor=t.bg, edgecolor=t.accent, linewidth=0.8,
+                      boxstyle="round,pad=0.32"))
+
+    # side outputs: subordinate but legible
+    for sxc, syc, label, src in ARCH_SIDES:
+        box(sxc, syc, 0.19, 0.085, label, "", edge=t.muted, ink=t.muted)
+        col, row = ARCH_STAGES[src][0], ARCH_STAGES[src][1]
+        px, py = _arch_center(col, row)
+        arrow((px, py - bh / 2), (sxc, syc + 0.085 / 2), color=t.muted,
+              connect="arc3,rad=0.08")
+
+    fs.finish(fig, out)
 
 
 # ---------------------------------------------------------------------------
 # Grids
 # ---------------------------------------------------------------------------
 def tile_grid(images: list[Path], labels: list[str], out: Path, title: str,
-              footer: str, tile_width: int) -> None:
+              footer: str, tile_width: int, cols: int = 0) -> None:
+    fs.assert_glyphs(title, footer, *labels)
     argv = [
         sys.executable,
         rel(REPO / "scripts/make_compare_grid.py"),
@@ -1052,6 +1106,7 @@ def tile_grid(images: list[Path], labels: list[str], out: Path, title: str,
         "--labels", ",".join(labels),
         "--footer", footer,
         "--tile-width", str(tile_width),
+        "--cols", str(cols),
         *[rel(p) for p in images],
     ]
     print("    $ " + " ".join(argv))
@@ -1061,21 +1116,58 @@ def tile_grid(images: list[Path], labels: list[str], out: Path, title: str,
     print("      " + proc.stdout.strip())
 
 
+
+
+#: Tiles the engine declined during this run, as (tile, reason). Collected so
+#: the comparison grid can state the refusal on its face instead of silently
+#: showing one fewer panel.
+REFUSED_TILES: list[tuple["MeshTile", str]] = []
+
+
 def build_mesh_tiles(tiles: list[MeshTile], force: bool) -> list[Path]:
-    """Mesh every tile, then render them all through one shared camera fit."""
+    """Mesh every tile, then render them all through one shared camera fit.
+
+    The matched-panel invariant is asserted before anything is meshed, so a tile
+    table that diverges in camera, zoom window or tile size fails immediately
+    rather than producing a comparison the reader cannot trust.
+    """
     import pyvista as pv
+
+    matched_panels([
+        PanelSpec(label=t.label, size=t.size, view=t.view, up=t.up,
+                  focus=t.focus, window=t.window)
+        for t in tiles
+    ])
 
     CACHE.mkdir(parents=True, exist_ok=True)
     vtus: list[Path] = []
+    refused: list[tuple[MeshTile, str]] = []
+    kept: list[MeshTile] = []
     for tile in tiles:
         vtu = CACHE / f"{tile.tag}.vtu"
         argv = mesh_argv(tile, vtu)
         if force or not vtu.is_file():
-            run_cli(argv)
+            try:
+                run_cli(argv, allow_refusal=True)
+            except MeshRefused as declined:
+                # The engine declining a mesh is a result, not a crash: the
+                # volume-completeness guard rejects a mesh whose solid/void
+                # topology is incomplete. Drop the tile, keep the reason, and
+                # let the caller state it on the figure.
+                print(f"    REFUSED {tile.label}: {declined.message}")
+                vtu.unlink(missing_ok=True)
+                refused.append((tile, declined.message))
+                continue
         else:
             print(f"    reusing {rel(vtu)} (use --force to remesh)")
         tile.stats = {"cmd": " ".join(argv)}
+        kept.append(tile)
         vtus.append(vtu)
+
+    tiles[:] = kept
+    REFUSED_TILES.extend(refused)
+    if not tiles:
+        return []
 
     # Shared framing: the 8 corners of one box used by every tile, so the reader
     # compares topology and not zoom level.
@@ -1173,6 +1265,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--mesh", type=Path, help="single-image mode: mesh VTU in")
     ap.add_argument("--out", type=Path, help="single-image mode: PNG out")
     args = ap.parse_args(argv)
+    fs.use("dark")          # 3D renders and their composites keep the dark stage
 
     if args.list:
         print("parts (gallery_<name>.png):")
@@ -1183,12 +1276,28 @@ def main(argv: list[str] | None = None) -> int:
         print("                   bench_dof_time, bench_tier1, bench_mms")
         return 0
 
-    raw_argv = argv if argv is not None else sys.argv[1:]
-    maybe_reexec_under_xvfb([str(Path(__file__).resolve()), *raw_argv])
+    wanted = set(args.only)
+    if not wanted and not args.all and not (args.stress or args.mesh):
+        ap.error("pass --all, --only NAME, or --list")
 
-    import pyvista as pv
+    def want(name: str) -> bool:
+        return args.all or name in wanted
 
-    pv.OFF_SCREEN = True
+    # architecture.png and the benchmark charts need no GL at all, so a
+    # `--only architecture` run must not demand pyvista or an X server.
+    three_d = {p.name for p in PARTS} | {
+        "hero", "compare_meshers", "compare_grading",
+    }
+    needs_gl = bool(args.stress or args.mesh or args.all
+                    or (wanted & three_d))
+
+    if needs_gl:
+        raw_argv = argv if argv is not None else sys.argv[1:]
+        maybe_reexec_under_xvfb([str(Path(__file__).resolve()), *raw_argv])
+
+        import pyvista as pv
+
+        pv.OFF_SCREEN = True
 
     outdir: Path = args.outdir
     outdir.mkdir(parents=True, exist_ok=True)
@@ -1205,13 +1314,6 @@ def main(argv: list[str] | None = None) -> int:
                         view=(0.3, -0.52, 1.0), up=(0.0, 1.0, 0.0),
                         title=args.mesh.stem, meta_extra="single-image mode")
         return 0
-
-    wanted = set(args.only)
-    if not wanted and not args.all:
-        ap.error("pass --all, --only NAME, or --list")
-
-    def want(name: str) -> bool:
-        return args.all or name in wanted
 
     CACHE.mkdir(parents=True, exist_ok=True)
     images: list[dict] = []
@@ -1249,7 +1351,7 @@ def main(argv: list[str] | None = None) -> int:
                 meta_extra=base_meta,
                 footer_extra=part.bc_note,
                 view=part.view, up=part.up, margin=part.margin,
-                warp_frac=part.warp_frac, clip_pct=part.clip_pct,
+                warp_frac=part.warp_frac,
             )
             images.append({
                 "file": f"gallery_{part.name}.png",
@@ -1270,6 +1372,7 @@ def main(argv: list[str] | None = None) -> int:
                     f"{info['caption_clip']}."
                 ),
             })
+            fs.assert_glyphs(images[-1]["caption"])
             timings.append(
                 f"{part.name}: h={fmt_h(part.h)} mesher={part.mesher} "
                 f"nodes={info['nodes']} elems={info['elems']} "
@@ -1283,7 +1386,7 @@ def main(argv: list[str] | None = None) -> int:
                 meta_extra=base_meta,
                 footer_extra=f"{part.bc_note} \u00b7 low-oblique view",
                 view=HERO_VIEW, up=HERO_UP, margin=1.02,
-                warp_frac=part.warp_frac, clip_pct=part.clip_pct,
+                warp_frac=part.warp_frac,
                 focus=HERO_FOCUS, focus_radius=HERO_RADIUS,
             )
             images.append({
@@ -1306,40 +1409,70 @@ def main(argv: list[str] | None = None) -> int:
                     f"warped \u00d7{info['warp_factor']:g}; {info['caption_clip']}."
                 ),
             })
+            fs.assert_glyphs(images[-1]["caption"])
 
     # ---- compare_meshers ---------------------------------------------------
     if want("compare_meshers"):
         print("[compare_meshers]")
+        wanted = list(MESHER_TILES)
         pngs = build_mesh_tiles(MESHER_TILES, args.force)
-        counts = " \u00b7 ".join(
-            f"{t.mesher}: {t.stats['nodes']:,} nodes / {t.stats['elems']:,} cells"
-            for t in MESHER_TILES
-        )
-        foot = (
-            f"plate_hole.step at h = {fmt_h(MESHER_TILES[0].h)} for all three "
-            f"· {counts}. All three are Cartesian grid-fill topologies "
-            f"(not Delaunay); only the cell zoo and grading differ."
-        )
-        tile_grid(pngs, [t.label for t in MESHER_TILES],
-                  outdir / "compare_meshers.png",
-                  "One part, three mesh topologies", foot, tile_width=1000)
-        images.append({
-            "file": "compare_meshers.png",
-            "kind": "grid",
-            "part": "plate_hole",
-            "mesher": "tet | graded | hybrid",
-            "h": MESHER_TILES[0].h,
-            "solve_command": None,
-            "render_command": "python3 scripts/render_showcase.py --only compare_meshers",
-            "dofs": None,
-            "wall_time_s": None,
-            "max_von_mises_pa": None,
-            "caption": (
-                "Mesh-only renders of the same plate at h = "
-                f"{fmt_h(MESHER_TILES[0].h)} under three meshers \u2014 " + counts
-                + ". All are Cartesian grid-fill topologies, not Delaunay."
-            ),
-        })
+        if not MESHER_TILES:
+            print("  every mesher variant was declined; no grid to draw")
+        else:
+            counts = " \u00b7 ".join(
+                f"{t.mesher}: {t.stats['nodes']:,} nodes / {t.stats['elems']:,} cells"
+                for t in MESHER_TILES
+            )
+            declined = [(t, why) for t, why in REFUSED_TILES if t in wanted]
+            title = (f"One part, {len(MESHER_TILES)} mesh "
+                     f"topolog{'y' if len(MESHER_TILES) == 1 else 'ies'}")
+            foot = (
+                f"plate_hole.step at h = {fmt_h(wanted[0].h)} for all "
+                f"{len(wanted)} variants \u00b7 {counts}. All are Cartesian "
+                f"grid-fill topologies (not Delaunay); only the cell zoo and "
+                f"grading differ. Identical camera, zoom and tile size in "
+                f"every panel (asserted, not assumed)."
+            )
+            for tile, why in declined:
+                # The engine refusing a variant at this h is the finding, not a
+                # missing panel: name the variant and quote the guard's
+                # verdict. The engine appends its whole mesh report after the
+                # first "|"; that belongs in the manifest, not in six lines of
+                # figure caption.
+                verdict = why.split(" | ", 1)[0].removeprefix("error: ").strip()
+                foot += (f"\nDECLINED by the engine, so it has no panel: "
+                         f"{tile.mesher} at this h \u2014 {verdict}")
+            foot += "\n" + fs.provenance(
+                *(CACHE / f"{t.tag}.vtu" for t in MESHER_TILES))
+            # 2x2 rather than one row: three 1500x820 tiles side by side made a
+            # 4.1:1 letterbox whose labels were unreadable at README width. The
+            # remaining cell carries the caption.
+            tile_grid(pngs, [t.label for t in MESHER_TILES],
+                      outdir / "compare_meshers.png",
+                      title, foot, tile_width=1000, cols=2)
+            images.append({
+                "file": "compare_meshers.png",
+                "kind": "grid",
+                "part": "plate_hole",
+                "mesher": " | ".join(t.mesher for t in MESHER_TILES),
+                "h": MESHER_TILES[0].h,
+                "solve_command": None,
+                "render_command":
+                    "python3 scripts/render_showcase.py --only compare_meshers",
+                "dofs": None,
+                "wall_time_s": None,
+                "max_von_mises_pa": None,
+                "caption": (
+                    "Mesh-only renders of the same plate at h = "
+                    f"{fmt_h(wanted[0].h)} under "
+                    f"{len(MESHER_TILES)} of {len(wanted)} meshers \u2014 "
+                    + counts
+                    + ". All are Cartesian grid-fill topologies, not Delaunay."
+                    + "".join(f" {t.mesher} was declined by the engine at this "
+                              f"h: {why}" for t, why in declined)
+                ),
+            })
+            fs.assert_glyphs(images[-1]["caption"])
         for tile in MESHER_TILES:
             images.append({
                 "file": f"compare_meshers.png#{tile.mesher}",
@@ -1373,12 +1506,15 @@ def main(argv: list[str] | None = None) -> int:
             f"h tuned to match the element budget: {uni['elems']:,} vs "
             f"{gra['elems']:,} cells ({cell_gap:.1f}% apart). Node counts "
             f"{uni['nodes']:,} vs {gra['nodes']:,} "
-            f"({3 * uni['nodes']:,} vs {3 * gra['nodes']:,} DOF)."
+            f"({3 * uni['nodes']:,} vs {3 * gra['nodes']:,} DOF).\n"
+            + fs.provenance(*(CACHE / f"{t.tag}.vtu" for t in GRADING_TILES))
         )
+        # Two panels stay side by side -- the whole point is a paired read --
+        # and 2 x 1300 px keeps the composite near 1.6:1.
         tile_grid(pngs, [t.label for t in GRADING_TILES],
                   outdir / "compare_grading.png",
                   "Uniform vs feature-graded sizing at a matched element budget",
-                  foot, tile_width=1300)
+                  foot, tile_width=1300, cols=2)
         images.append({
             "file": "compare_grading.png",
             "kind": "grid",
@@ -1400,6 +1536,7 @@ def main(argv: list[str] | None = None) -> int:
                 f"{3 * uni['nodes']:,} vs {3 * gra['nodes']:,} DOF."
             ),
         })
+        fs.assert_glyphs(images[-1]["caption"])
         for tile in GRADING_TILES:
             images.append({
                 "file": f"compare_grading.png#{tile.tag}",

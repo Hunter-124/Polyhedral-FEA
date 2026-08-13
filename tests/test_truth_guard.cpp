@@ -198,28 +198,39 @@ print("ok")
 )PY");
 }
 
-TEST_CASE("truth guard: the committed corpus is fully protected today") {
-    // Guards the live artefact, not just the logic: every reference currently in
-    // bench/reference/corpus must be unpromotable. A future commit that seeds a
-    // corpus truth from our own solve without marking it provisional will trip here.
+TEST_CASE("truth guard: no externally sourced corpus truth is promotable") {
+    // Guards the live artefact, not just the logic. The invariant is NOT "nothing
+    // in the corpus is promotable" -- newly seeded families legitimately carry
+    // `provisional` metrics, and promoting those is precisely what promote_truth.py
+    // exists to do. The invariant that matters is that nothing INDEPENDENTLY
+    // sourced is promotable: a commit that lets an analytic or external-* truth be
+    // overwritten by our own solve trips here, while corpus growth does not.
     run_python("polymesh_guard_corpus", R"PY(
 import json
 from pathlib import Path
 
 corpus = sorted(Path("bench/reference/corpus").glob("*.json"))
 assert len(corpus) >= 72, len(corpus)
-unprotected = []
+promotable_external = []
 sources = {}
 for path in corpus:
     reference = json.loads(path.read_text(encoding="utf-8"))
     metrics = reference.get("metrics", [])
     assert metrics, path
     for metric in metrics:
-        source = guard.protected_source(metric)
-        sources[metric.get("source")] = sources.get(metric.get("source"), 0) + 1
-        if source is None:
-            unprotected.append((path.name, metric.get("name"), metric.get("source")))
-assert not unprotected, f"promotable corpus truth: {unprotected}"
+        source = metric.get("source")
+        sources[source] = sources.get(source, 0) + 1
+        independent = source == "analytic" or (
+            isinstance(source, str) and source.startswith("external-"))
+        if independent and guard.protected_source(metric) is None:
+            promotable_external.append((path.name, metric.get("name"), source))
+assert not promotable_external, f"independent truth is promotable: {promotable_external}"
+
+# And every source present is either ours to overwrite or protected -- no third
+# category can appear unnoticed.
+for source in sources:
+    assert source in guard.SELF_GENERATED_SOURCES or guard.protected_source(
+        {"source": source}) is not None, source
 print("corpus metric sources:", sources)
 print("ok")
 )PY");

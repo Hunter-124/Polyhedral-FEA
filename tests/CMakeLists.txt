@@ -74,6 +74,7 @@ add_executable(polymesh_tests
     test_probe_util.cpp
     test_advisor_dataset_rederive.cpp
     test_truth_guard.cpp
+    test_load_area_gate.cpp
 
     support/structured_mesh.cpp
     support/mms.cpp

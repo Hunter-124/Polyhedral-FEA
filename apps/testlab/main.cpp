@@ -24,6 +24,7 @@
 #include "mesh/brep_fidelity.hpp"
 #include "mesh/surface_metrics.hpp"
 #include "pipeline/scene.hpp"
+#include "load_area.hpp"
 #include "probe_util.hpp"
 
 #include <nlohmann/json.hpp>
@@ -194,11 +195,18 @@ struct LoadSpec {
     /// Keep faces whose unit normal aligns with traction (n·t̂ > min_dot).
     /// Default 0.7 when traction is nonzero; ignored when traction ≈ 0.
     double normal_min_dot = 0.7;
-    // Exact trimmed BRep faces represented by this selector. These are resolved
-    // from the CAD model once per run and are used only when the legacy
-    // mesh-face selection is empty or already fails the committed area gate.
+    // Exact trimmed BRep faces represented by this selector, resolved from the
+    // CAD model once per run. cad_face_area is the sum of the WHOLE trimmed areas
+    // of those faces; it drives the face-replacement fallback, but it is NOT a
+    // verification target because the selector box may cover only part of a face.
     std::vector<std::uint32_t> cad_face_ids;
     std::optional<double> cad_face_area;
+    /// Area of the loaded region obtained by applying THIS case's own selection
+    /// rule (load box + |n·t̂| > normal_min_dot) to the exact CAD tessellation.
+    /// Being the continuum limit of the same rule, it is mesh-independent and is
+    /// both the rescale target for the traction and the basis for the reported
+    /// fidelity deficit. Empty when there is no CAD to measure against.
+    std::optional<double> cad_rule_area;
 };
 
 struct ProbeSpec {
@@ -1018,7 +1026,14 @@ select_load_faces(const fea::NodalMesh& mesh, const Box3& box, const Eigen::Vect
 
 struct ResolvedLoadFaces {
     std::vector<fea::SurfaceFace> faces;
+    /// Area the traction is applied over. In the exact-CAD fallback this is
+    /// REPLACED by the exact CAD area, because the traction is rescaled so the
+    /// resultant matches the true face; it is then a statement of intent, not a
+    /// measurement, and comparing it against the CAD area is vacuous.
     double reported_area = 0.0;
+    /// Area the MESH actually selected, always measured, never substituted. This
+    /// is the only value that can verify mesh fidelity against the CAD.
+    double mesh_selected_area = 0.0;
     double traction_scale = 1.0;
     bool used_exact_fallback = false;
 };
@@ -1087,18 +1102,21 @@ resolve_load_faces(const fea::NodalMesh& mesh, const geom::CadModel* cad, double
         resolved.faces = select_load_faces(mesh, load.box, load.traction, load.normal_min_dot,
                                            load.expected_area);
         for (const auto& face : resolved.faces) {
-            resolved.reported_area += legacy_surface_face_area(mesh, face);
+            resolved.mesh_selected_area += legacy_surface_face_area(mesh, face);
         }
 
         bool legacy_failed_area_gate = false;
         if (load.expected_area && *load.expected_area > 0.0) {
             legacy_failed_area_gate =
-                std::abs(resolved.reported_area - *load.expected_area) / *load.expected_area >
+                std::abs(resolved.mesh_selected_area - *load.expected_area) /
+                    *load.expected_area >
                 0.05;
         }
         if ((resolved.faces.empty() || legacy_failed_area_gate) && cad != nullptr &&
             load.cad_face_area && *load.cad_face_area > 0.0 &&
             !load.cad_face_ids.empty()) {
+            // Face REPLACEMENT: the box selection found nothing usable, so take the
+            // faces the exact CAD ids resolve to instead.
             auto exact_faces =
                 select_exact_cad_load_faces(mesh, *cad, h, load.cad_face_ids);
             double mesh_area = 0.0;
@@ -1107,10 +1125,23 @@ resolve_load_faces(const fea::NodalMesh& mesh, const geom::CadModel* cad, double
             }
             if (!exact_faces.empty() && mesh_area > 0.0) {
                 resolved.faces = std::move(exact_faces);
-                resolved.reported_area = *load.cad_face_area;
-                resolved.traction_scale = *load.cad_face_area / mesh_area;
+                resolved.mesh_selected_area = mesh_area;
                 resolved.used_exact_fallback = true;
             }
+        }
+
+        // Resultant-preserving rescale. Whichever face set we ended up with, the
+        // applied resultant is made equal to traction x cad_rule_area, so it no
+        // longer depends on how well this mesh happened to resolve a curved loaded
+        // surface. A coarse mesh then solves the RIGHT problem badly instead of the
+        // WRONG problem, and mesh_selected_area keeps the measured deficit so the
+        // remaining distribution error stays visible in the row.
+        if (load.cad_rule_area && *load.cad_rule_area > 0.0 &&
+            resolved.mesh_selected_area > 0.0) {
+            resolved.reported_area = *load.cad_rule_area;
+            resolved.traction_scale = *load.cad_rule_area / resolved.mesh_selected_area;
+        } else {
+            resolved.reported_area = resolved.mesh_selected_area;
         }
         out.push_back(std::move(resolved));
     }
@@ -1251,7 +1282,25 @@ struct ProbeAnswers {
     int n_probe_nodes = 0;
     int n_quality_excluded = 0; // elements below quality floor for p99
     double load_face_area = 0.0;
-    double load_area_rel_err = 0.0; // |A_sel - A_expected|/A_expected if set
+    /// Area the mesh actually selected, never substituted (see ResolvedLoadFaces).
+    double mesh_selected_area = 0.0;
+    /// |A_mesh - A_expected|/A_expected. EMPTY when no expected area could be
+    /// established: a gate that cannot verify anything must not report 0.0, which
+    /// reads as a perfect match and manufactured false confidence in exactly the
+    /// runs that were most wrong (a mesh missing 28% of its loaded face recorded
+    /// load_area_rel_err = 0.0 and passed).
+    std::optional<double> load_area_rel_err;
+    tlab::LoadAreaStatus load_area_status = tlab::LoadAreaStatus::kUnverified;
+    /// Mesh-INDEPENDENT case-definition cross-check: authored expected_area vs the
+    /// CAD-rule area. Kept separate from load_area_rel_err because a disagreement
+    /// here is a case or geometry bug, not a mesh-quality one.
+    std::optional<double> authored_area_rel_diff;
+    bool authored_area_consistent = true;
+    bool authored_area_checked = false;
+    /// Health contribution. FALSE only when the area was actually verified and is
+    /// out of tolerance. Unverified and partial-selection are not passes -- they
+    /// are reported as their own status -- but they are not solve failures either,
+    /// so they must not silently sink a row that is otherwise healthy.
     bool load_area_ok = true;
 };
 
@@ -1463,12 +1512,27 @@ ProbeAnswers compute_probes(const fea::NodalMesh& mesh, const fea::Material& mat
         probe_nodes = nodes_on_load_faces(selected, &n_faces);
         a.n_load_faces = n_faces;
         a.load_face_area = selected.reported_area;
-        const std::optional<double> expected =
-            selected.used_exact_fallback ? L0.cad_face_area : L0.expected_area;
-        if (expected && *expected > 0.0) {
-            a.load_area_rel_err = std::abs(a.load_face_area - *expected) / *expected;
-            a.load_area_ok = a.load_area_rel_err <= 0.05;
-        }
+        a.mesh_selected_area = selected.mesh_selected_area;
+
+        // Expected area comes from the case's own selection rule applied to the
+        // exact CAD (cad_rule_area) when available -- that is what the traction was
+        // rescaled onto -- else from an authored expected_area. The old rule
+        // consulted neither on a CAD-backed run whose case omitted expected_area,
+        // and left rel_err at its 0.0 default, which reads as a perfect match.
+        // Policy and reasoning live in load_area.hpp so they can be unit-tested.
+        const tlab::LoadAreaAssessment area = tlab::assess_load_area(
+            L0.expected_area, L0.cad_rule_area, a.mesh_selected_area);
+        a.load_area_status = area.status;
+        a.load_area_rel_err = area.rel_err;
+        a.load_area_ok = area.ok;
+
+        // Mesh-independent: does the authored case definition still agree with the
+        // CAD? Reported separately from the deficit above, never folded into it.
+        const tlab::AuthoredAreaCheck authored =
+            tlab::check_authored_area(L0.expected_area, L0.cad_rule_area);
+        a.authored_area_checked = authored.checked;
+        a.authored_area_rel_diff = authored.rel_diff;
+        a.authored_area_consistent = authored.consistent;
         if (probe_nodes.empty()) {
             probe_nodes = nodes_in_box(mesh, L0.box);
         }
@@ -1809,6 +1873,10 @@ PartCase with_exact_cad_selections(const pipeline::Model& model, const PartCase&
             direction[slab_axis] = 1.0;
             exact_min_dot = 0.7;
         }
+        // Tessellated area per candidate CAD face, split the same way the face
+        // sets are, so we can tell "took these faces whole" from "clipped them".
+        std::map<std::uint32_t, double> box_tess_area;
+        std::map<std::uint32_t, double> aligned_tess_area;
         for (const auto& tri : surface.triangles) {
             const Eigen::Vector3d& a = surface.vertices[tri[0]];
             const Eigen::Vector3d& b = surface.vertices[tri[1]];
@@ -1824,14 +1892,19 @@ PartCase with_exact_cad_selections(const pipeline::Model& model, const PartCase&
             box_faces.insert(exact->face_id);
             const Eigen::Vector3d cross = (b - a).cross(c - a);
             const double twice_area = cross.norm();
+            box_tess_area[exact->face_id] += 0.5 * twice_area;
             if (direction.norm() <= 0.0 ||
                 (twice_area > 0.0 &&
                  std::abs((cross / twice_area).dot(direction)) > exact_min_dot)) {
                 aligned_faces.insert(exact->face_id);
+                aligned_tess_area[exact->face_id] += 0.5 * twice_area;
             }
         }
-        const auto& selected = aligned_faces.empty() ? box_faces : aligned_faces;
+        const bool use_aligned = !aligned_faces.empty();
+        const auto& selected = use_aligned ? aligned_faces : box_faces;
+        const auto& selected_tess = use_aligned ? aligned_tess_area : box_tess_area;
         double exact_area = 0.0;
+        double selected_tess_area = 0.0;
         for (const auto face_id : selected) {
             const auto it = std::find_if(topology.faces.begin(), topology.faces.end(),
                                          [&](const geom::CadFace& face) {
@@ -1840,10 +1913,36 @@ PartCase with_exact_cad_selections(const pipeline::Model& model, const PartCase&
             if (it != topology.faces.end()) {
                 load.cad_face_ids.push_back(face_id);
                 exact_area += it->area;
+                if (const auto tess = selected_tess.find(face_id); tess != selected_tess.end()) {
+                    selected_tess_area += tess->second;
+                }
             }
         }
         if (exact_area > 0.0) {
             load.cad_face_area = exact_area;
+        }
+        if (selected_tess_area > 0.0) {
+            // The SAME rule the mesh selection applies (box + normal alignment),
+            // evaluated on the exact CAD tessellation instead of the candidate
+            // mesh. On a curved loaded surface the mesh's answer is quantised to
+            // facet size -- 15 facets on a spherical boss put the 45-degree
+            // latitude cut-off anywhere -- while this is the rule's continuum
+            // limit, so it is what the traction must be rescaled onto.
+            load.cad_rule_area = selected_tess_area;
+        }
+        // Loud once per part: an authored expected_area that no longer matches the
+        // CAD is a case-definition or geometry bug, and every row it produces is
+        // scored against a load the reference did not assume.
+        const auto authored = tlab::check_authored_area(load.expected_area,
+                                                       load.cad_rule_area);
+        if (authored.checked && !authored.consistent) {
+            std::fprintf(stderr,
+                         "WARNING %s: authored select.expected_area %.9g disagrees with the "
+                         "exact CAD rule area %.9g by %.3g%% (tol %.3g%%). This is a case "
+                         "definition or geometry drift, not mesh quality: the reference "
+                         "truth assumes a different loaded region than the run applies.\n",
+                         resolved.part.c_str(), *load.expected_area, *load.cad_rule_area,
+                         100.0 * *authored.rel_diff, 100.0 * tlab::kAuthoredAreaTol);
         }
     }
     return resolved;
@@ -2485,9 +2584,29 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
                                {"n_load_faces", ans.n_load_faces},
                                {"n_quality_excluded", ans.n_quality_excluded},
                                {"load_face_area", ans.load_face_area},
-                               {"load_area_rel_err", ans.load_area_rel_err}};
+                               {"mesh_selected_area", ans.mesh_selected_area},
+                               {"load_area_status",
+                                std::string(tlab::load_area_status_name(
+                                    ans.load_area_status))},
+                               // Explicit null, never 0.0, when nothing could be
+                               // verified. A number here reads as a pass.
+                               {"load_area_rel_err",
+                                ans.load_area_rel_err ? json(*ans.load_area_rel_err)
+                                                      : json(nullptr)},
+                               // Case-definition cross-check, deliberately a
+                               // separate field from the mesh deficit above.
+                               {"authored_area_checked", ans.authored_area_checked},
+                               {"authored_area_consistent", ans.authored_area_consistent},
+                               {"authored_area_rel_diff",
+                                ans.authored_area_rel_diff
+                                    ? json(*ans.authored_area_rel_diff)
+                                    : json(nullptr)}};
 
-        // Health gates: residual / reaction / orphans / optional load-area guard.
+        // Health gates: residual / reaction / orphans / load-area guard.
+        // load_area_ok is false only when the area was genuinely verified and is
+        // out of tolerance, so an UNVERIFIABLE area no longer silently satisfies
+        // the gate and no longer sinks a healthy row either -- it is visible as
+        // load_area_status instead.
         constexpr double kFreeResidTolDirect = 1e-6;
         constexpr double kReactionSumTol = 0.05;
         const bool health_ok = (ans.n_orphan_nodes == 0) &&
@@ -2498,7 +2617,15 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
                               {"n_orphans", ans.n_orphan_nodes},
                               {"n_bc_dofs", ans.n_bc_dofs},
                               {"load_area_ok", ans.load_area_ok},
-                              {"load_area_rel_err", ans.load_area_rel_err},
+                              {"load_area_status",
+                               std::string(tlab::load_area_status_name(
+                                   ans.load_area_status))},
+                              {"load_area_verified",
+                               ans.load_area_status == tlab::LoadAreaStatus::kVerified},
+                              {"authored_area_consistent", ans.authored_area_consistent},
+                              {"load_area_rel_err",
+                               ans.load_area_rel_err ? json(*ans.load_area_rel_err)
+                                                     : json(nullptr)},
                               {"ok", health_ok}};
 
         // Accuracy vs hand-calc truths (loaded from bench/reference via the case).

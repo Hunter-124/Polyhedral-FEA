@@ -1,17 +1,25 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: BSD-3-Clause
-"""Render warehouse mesh.vtu → wire.png for a campaign (Lane V / V9b).
+"""Render warehouse mesh.vtu → wire PNGs for a campaign (Lane V / V9b).
 
-Walks ``bench/campaigns/<name>/runs/**/mesh.vtu`` and writes sibling
-``wire.png`` via ``scripts/vtu_wire_png.py`` (pure-Python exterior edges).
+Walks ``bench/campaigns/<name>/runs/**/mesh.vtu`` and writes a sibling PNG
+(``--out-name``, default ``wire.png``) via ``scripts/vtu_wire_png.py``.
 
-Usage (repo root):
-  python3 scripts/warehouse_shots.py varyhedron-short-1
-  python3 scripts/warehouse_shots.py bench/campaigns/varyhedron-short-1
-  python3 scripts/warehouse_shots.py varyhedron-short-1 --force
-  python3 scripts/warehouse_shots.py varyhedron-short-1 --hole-zoom
+Usage (repo root) -- ``python``, NOT ``python3``: on Windows ``python3`` can
+resolve to a different install than the one carrying this repo's dependencies,
+and the renderer then fails on a missing numpy.
+  python scripts/warehouse_shots.py varyhedron-short-1
+  python scripts/warehouse_shots.py bench/campaigns/varyhedron-short-1
+  python scripts/warehouse_shots.py varyhedron-short-1 --force
+  python scripts/warehouse_shots.py varyhedron-short-1 --hole-zoom
 
-Skips runs that already have wire.png unless ``--force``. Failures are
+The figures sweep runs TWO passes per campaign, because
+``scripts/advisor/report.py`` prefers a feature-framed render and falls back to
+the whole-part camera when it is missing:
+  python scripts/warehouse_shots.py <name>
+  python scripts/warehouse_shots.py <name> --out-name wire_feature.png --hole-zoom
+
+Skips runs that already have the target PNG unless ``--force``. Failures are
 reported; exit code is non-zero only if every conversion failed when work
 was expected.
 """
@@ -63,6 +71,17 @@ def main() -> int:
         default=1100,
         help="PNG edge size in pixels (default 1100)",
     )
+    ap.add_argument(
+        "--out-name",
+        default="wire.png",
+        help="sibling PNG filename to write (default wire.png). The figures sweep "
+             "makes a second pass with --out-name wire_feature.png --hole-zoom, "
+             "because scripts/advisor/report.py PREFERS a feature-framed "
+             "wire_feature.png and falls back to the whole-part camera when it is "
+             "absent -- which, until this option existed, was always: no code path "
+             "could name the output anything but wire.png, so mesh_before_after.png "
+             "has only ever shown the whole-part camera with the hole rim edge-on.",
+    )
     args = ap.parse_args()
 
     if not WIRE.is_file():
@@ -84,7 +103,7 @@ def main() -> int:
     skip = 0
     fail = 0
     for vtu in vtus:
-        png = vtu.with_name("wire.png")
+        png = vtu.with_name(args.out_name)
         if png.is_file() and not args.force:
             skip += 1
             continue

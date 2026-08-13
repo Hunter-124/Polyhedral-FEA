@@ -35,15 +35,29 @@ After mesh VTUs exist, render exterior wireframes with:
 
 ```sh
 # Campaign name or path under bench/campaigns/
-python3 scripts/warehouse_shots.py varyhedron-short-1
-python3 scripts/warehouse_shots.py bench/campaigns/varyhedron-smoke --force
-python3 scripts/warehouse_shots.py varyhedron-short-1 --hole-zoom   # plate_hole ROI
+python scripts/warehouse_shots.py varyhedron-short-1
+python scripts/warehouse_shots.py bench/campaigns/varyhedron-smoke --force
+python scripts/warehouse_shots.py varyhedron-short-1 --hole-zoom   # plate_hole ROI
 ```
 
 `warehouse_shots.py` walks `runs/**/mesh.vtu` → sibling `wire.png` via
 [`scripts/vtu_wire_png.py`](../../scripts/vtu_wire_png.py) (pure Python, no
 meshio). Skips existing PNGs unless `--force`. Testlab also runs this
 post-hook when `"warehouse": true` so HANDOFF packs can list shots (V9b).
+
+Two passes are needed per campaign. `scripts/advisor/report.py` PREFERS a
+feature-framed `wire_feature.png` and falls back to the whole-part camera when it
+is absent, so the sweep runs:
+
+```sh
+python scripts/warehouse_shots.py <name>
+python scripts/warehouse_shots.py <name> --out-name wire_feature.png --hole-zoom
+```
+
+Until `--out-name` existed no code path could name the output anything but
+`wire.png`, so `docs/advisor/figures/mesh_before_after.png` had only ever used the
+whole-part camera -- which puts a plate's hole rim edge-on, the exact defect the
+feature camera was added to fix.
 
 ## Short-campaign defaults (Lane V)
 

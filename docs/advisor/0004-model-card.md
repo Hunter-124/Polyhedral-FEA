@@ -286,10 +286,27 @@ same cause.
   file as `precision_condition_number` so a later refit that degrades it is
   visible. The C++ accumulates the quadratic form in double.
 
-  **Verified against the Python reference**, descriptors *and* distances, over 32
-  corpus parts: worst relative deviation **2.94e-16** on any descriptor and
-  **4.35e-16** on any distance; no part moves across the threshold. Regenerate the
-  comparison with `polymesh_tests "advisor descriptor dump"`.
+  **Verified against the Python reference over 32 corpus parts**, at both levels
+  that matter. Descriptors: worst relative deviation **2.94e-16**. Distance, on
+  the *assembled 31-column vector the C++ actually used*, against
+  `calibration.py:ood_scores`: worst **2.00e-15**, no part differing by more than
+  1e-12 and none moving across the threshold.
+
+  The distance check is the load-bearing one and it initially was not done
+  properly: an earlier version computed both sides in Python from the C++
+  descriptors, which tests descriptor agreement propagated through the matrix but
+  never exercises the C++ quadratic form at all. `polymesh_tests "advisor
+  descriptor dump"` now emits the assembled vector, the resolved column order and
+  the C++-computed `ood_distance` for every part, so the comparison is one command
+  rather than an argument.
+
+  **In-sample false alarms are real and visible.** Of the 32 corpus parts,
+  `tube_s1` trips the gate at 6.68 against the 6.30 operating point — 6 % over.
+  `tube` is also the family that contributes no scorable cases and the one Gmsh
+  fails outright on, so the geometry sitting at the boundary is consistent rather
+  than surprising. Separately `tube_s2` is refused by the *feasibility* gate at a
+  distance of 5.70, which is a useful demonstration that the two mechanisms stay
+  distinct in practice and not only in the code.
 
 The 15 offline CAD descriptors *hurt* held-out regret — a 1-NN classifier
 recovers the family from them alone at 32/32, so on a corpus this narrow they are

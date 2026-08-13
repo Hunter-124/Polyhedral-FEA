@@ -229,8 +229,9 @@ familiar geometry any way they like, and that is a legal question rather than an
 unknown part. On a refusal every `predicted_*` value is **suppressed to NaN**: the
 case that motivated the gate had been reporting a predicted mesh time of 1.66e14
 ms, about 5,300 years, beside a failure probability of 1e-65 claiming near-certain
-success. The descriptor port is verified against its Python reference to
-**4.35e-16** on the distance across 32 parts.
+success. The descriptor port is verified against its Python reference over 32
+parts: **2.94e-16** on any descriptor and **2.00e-15** on the distance the C++
+actually computed.
 
 The feasibility head's calibration improved (ECE 0.4795 → 0.263), but on the
 shipped checkpoint's own fold its AUC is 0.5248 — near chance against a cross-fold

@@ -10,6 +10,7 @@
 // number, so the test fails if either side drifts.
 
 #include "advisor/advisor.hpp"
+#include "pipeline/scene.hpp"
 #include "geom/cad_model.hpp"
 #include "geom/step.hpp"
 #include "geom/cad_geometry_features.hpp"
@@ -490,21 +491,31 @@ TEST_CASE("advisor recommend() latency", "[advisor][!benchmark]") {
     CHECK(pct(0.99) < 100000.0);
 }
 
-// Emits the C++ exact-BRep descriptors AND the resulting OOD distance for every
-// corpus part, so they can be diffed against the Python reference
-// (`bench/advisor/geometry_features.csv`, written by
-// scripts/advisor/geometry_features.py, and the distances from
-// scripts/advisor/calibration.py:ood_scores).
+// Emits, for every corpus part: the 15 exact-BRep descriptors, the ASSEMBLED
+// out-of-distribution vector in ood.json's own column order, and the
+// ood_distance the C++ actually computed. Diffed against the Python reference
+// (`bench/advisor/geometry_features.csv` from geometry_features.py, and
+// `calibration.py:ood_scores`).
 //
-// Not a pass/fail assertion and not run by default: it produces the evidence the
-// comparison needs. Descriptor agreement alone is insufficient -- every
-// descriptor can match to six figures while the distance still diverges through
-// an ill-conditioned precision matrix, and the distance is what decides whether
-// the product refuses. So both are emitted together.
+// Not a pass/fail assertion and not run by default: it produces evidence.
+//
+// The distance and the vector are emitted because descriptor agreement alone
+// proves nothing about the decision. Every descriptor can match to six figures
+// while the distance diverges through a precision matrix whose condition number
+// is 9.15e10, and the distance is what decides whether the product refuses.
+// Emitting only descriptors and then asserting distance agreement -- computing
+// both sides in Python from those descriptors -- would not exercise the C++
+// quadratic form at all. It has to be the number the C++ produced.
+//
+// The full production path is used: CAD -> extract_case_features -> to_columns ->
+// Advisor::recommend, so feature assembly and name resolution are covered too,
+// not just the descriptor extractor.
 TEST_CASE("advisor descriptor dump", "[advisor][!benchmark]") {
     const std::filesystem::path corpus = "bench/geometries/corpus/primitives";
-    if (!std::filesystem::is_directory(corpus)) {
-        SKIP("corpus STEP directory missing");
+    const std::filesystem::path model_dir = "bench/advisor";
+    if (!std::filesystem::is_directory(corpus) ||
+        !std::filesystem::exists(model_dir / "ood.json")) {
+        SKIP("corpus STEP directory or bench/advisor/ood.json missing");
     }
     if (!polymesh::geom::occ_enabled()) {
         SKIP("built without OpenCASCADE");
@@ -519,29 +530,41 @@ TEST_CASE("advisor descriptor dump", "[advisor][!benchmark]") {
     std::sort(steps.begin(), steps.end());
     REQUIRE_FALSE(steps.empty());
 
+    // The column ORDER is read from the artifact, not hardcoded, so the emitted
+    // vector is directly comparable to what mahalanobis() indexes.
+    const json ood = load(model_dir / "ood.json");
+    const auto ood_names = ood.at("feature_columns").get<std::vector<std::string>>();
+    const polymesh::advisor::Advisor advisor(model_dir);
+
     json out = json::object();
+    out["ood_column_order"] = ood_names;
+    out["ood_threshold"] = ood.at("operating_point").at("threshold").get<double>();
+    json parts = json::object();
     for (const std::filesystem::path& step : steps) {
-        const polymesh::geom::CadModel cad = polymesh::geom::load_cad(step.string());
-        const auto geo = polymesh::geom::compute_geometry_descriptors(cad);
+        auto model = polymesh::pipeline::Model::load(step.string());
+        // No BC regions and a nominal load direction: the OOD fit deliberately
+        // excludes boundary-condition columns, so the distance must not depend on
+        // them. Emitting it this way makes that property checkable rather than
+        // asserted.
+        const auto features = polymesh::pipeline::extract_case_features(
+            model, {}, {}, Eigen::Vector3d(1.0, 0.0, 0.0), 0.3);
+        const auto columns = polymesh::advisor::to_columns(features);
+        const auto decision = advisor.recommend(columns);
+
         json record;
-        record["available"] = geo.available;
-        record["geo_curved_area_frac"] = geo.curved_area_frac;
-        record["geo_cyl_area_frac"] = geo.cyl_area_frac;
-        record["geo_plane_area_frac"] = geo.plane_area_frac;
-        record["geo_other_area_frac"] = geo.other_area_frac;
-        record["geo_min_curv_radius_rel"] = geo.min_curv_radius_rel;
-        record["geo_log_curv_radius_mean"] = geo.log_curv_radius_mean;
-        record["geo_log_curv_radius_std"] = geo.log_curv_radius_std;
-        record["geo_n_faces"] = geo.n_faces;
-        record["geo_n_edges"] = geo.n_edges;
-        record["geo_face_area_cv"] = geo.face_area_cv;
-        record["geo_aspect_max"] = geo.aspect_max;
-        record["geo_aspect_mid"] = geo.aspect_mid;
-        record["geo_volume_frac"] = geo.volume_frac;
-        record["geo_area_over_v23"] = geo.area_over_v23;
-        record["geo_min_face_size_rel"] = geo.min_face_size_rel;
-        out[step.stem().string()] = record;
+        record["geo_available"] = features.geo_available;
+        record["ood_distance"] = decision.ood_distance;
+        record["vetoed"] = decision.vetoed;
+        record["note"] = decision.note;
+        json vector = json::object();
+        for (const std::string& name : ood_names) {
+            const auto it = columns.find(name);
+            vector[name] = it == columns.end() ? json() : json(it->second);
+        }
+        record["ood_vector"] = vector;
+        parts[step.stem().string()] = record;
     }
+    out["parts"] = parts;
 
     const std::filesystem::path path =
         std::filesystem::temp_directory_path() / "polymesh_cpp_descriptors.json";
@@ -549,5 +572,6 @@ TEST_CASE("advisor descriptor dump", "[advisor][!benchmark]") {
     REQUIRE(stream.good());
     stream << out.dump(2) << "\n";
     stream.close();
-    WARN("wrote C++ descriptors for " << steps.size() << " parts to " << path.string());
+    WARN("wrote C++ OOD vectors and distances for " << steps.size() << " parts to "
+         << path.string());
 }

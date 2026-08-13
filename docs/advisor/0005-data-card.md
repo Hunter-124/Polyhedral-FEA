@@ -63,10 +63,23 @@ everything, and a reader who meets them separately will read each as a footnote.
    macro mean in the model card is over 7 families and not 8. Too few of its cases
    reach ≥3 measured actions to score a fold.
 2. **Gmsh fails outright on it.** All 9 hard failures in the 336-row peer matrix
-   are Gmsh's own, every one a thin-walled tube at coarse `h`
-   (`h_rel` 0.08/0.12/0.20). The geometry is effectively unmeshable by either tool
-   at those sizes; the difference is that our refusals name the size they would
-   need.
+   are Gmsh's own — zero native failures — and all 9 are `tube`, concentrated in
+   just two parts (`tube_s1_c1` ×5, `tube_s2_c1` ×4). They span **all three
+   rungs**: `h_rel` 0.20 ×4, 0.12 ×4, and **one at the finest rung**, 0.08
+   (`tube_s1_c1`, order 2). Coarse sizes dominate 8 of 9, but the failure is not
+   purely a coarseness artefact and should not be described as one.
+
+   **It is the most-refused family on our own side too**, so this is not simply
+   Gmsh struggling. Refusals by family: `tube` 56, `perforated_plate` 40,
+   `stepped_shaft` 40, `box_hole` 30.
+
+   The revealing contrast is refusals by mesh source: `polymesh-native` 68,
+   `polymesh-native-graded` 64, `polymesh-native-uniform-p2` 34, **Gmsh 0**. Gmsh
+   never refuses because it has no refusal path — it either meshes or fails. That
+   is exactly why those 9 rows land as *failures* rather than declines, and it is
+   the single cleanest argument in the whole matrix for why a refusal path is worth
+   having: the same unmeshable geometry produces a hard failure from one tool and a
+   named size requirement from the other.
 3. **It is the single out-of-distribution false alarm.** Of 32 corpus parts,
    `tube_s1` trips the OOD gate at 6.684 against the 6.304 operating point — 6.0 %
    over, on *training* geometry. That is 1 of 32, consistent with a q0.99 fit
@@ -79,7 +92,7 @@ everything, and a reader who meets them separately will read each as a footnote.
 
 The common cause is thin walls with curvature: a wall thin relative to the
 bounding-box diagonal forces a fine mesh to resolve it at all, which is what makes
-the family expensive to score, unmeshable at coarse sizes, and geometrically
+the family expensive to score, near-unmeshable across the sampled sizes, and
 extreme enough to sit near the OOD boundary.
 
 **Do not "fix" this by widening the OOD threshold or dropping the family.** The

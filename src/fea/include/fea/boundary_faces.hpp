@@ -22,6 +22,13 @@ std::vector<std::array<std::uint32_t, 4>> extract_boundary_faces(const NodalMesh
 /// For preview rendering of poly meshes: draw each polygon as one facet so the
 /// wireframe shows real cell faces (not fan-triangulation diagonals). FEM
 /// element faces come back as their 3- or 4-node loops. Empty if no solids.
+///
+/// Quadratic faces (tet10, hex20) are split through their mid-edge nodes into
+/// four/five sub-facets, so a curved boundary draws curved rather than as the
+/// straight chord between corners. Only existing nodes are emitted — no vertex
+/// is interpolated — so nodal result scalars still colour every sub-facet.
+/// This is the DISPLAY contract; `extract_boundary_faces` above is the physics
+/// one (BC/load selection, traction area) and stays on the corner topology.
 std::vector<std::vector<std::uint32_t>> extract_boundary_polys(const NodalMesh& mesh);
 
 } // namespace polymesh::fea

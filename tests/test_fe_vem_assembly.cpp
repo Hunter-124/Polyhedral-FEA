@@ -334,6 +334,7 @@ TEST_CASE("hybrid native-poly fill emits unsplit VEM transitions (no fan apex)")
                                          /*snap=*/false, /*turn=*/0.0,
                                          /*native_poly=*/true);
     REQUIRE(fill.native_poly_transitions);
+    REQUIRE(fill.classification_refinement_levels == 0);
     REQUIRE(fill.n_fine_cells > 0);
     REQUIRE(fill.n_transition_cells > 0);
     REQUIRE(fill.n_poly == fill.n_transition_cells);

@@ -10,7 +10,9 @@
 
 #include <Eigen/Core>
 
+#include <cstdint>
 #include <cstddef>
+#include <functional>
 #include <vector>
 
 namespace polymesh::mesh {
@@ -47,6 +49,26 @@ struct CartesianGrid {
     [[nodiscard]] double max_edge() const { return cell.maxCoeff(); }
 };
 
+/// A coarse Cartesian solid/void classification with one optional local
+/// child level. `child_inside_mask[c]` stores the eight h/2 child samples for
+/// coarse cell `c` (bit = a + 2*b + 4*d). A zero or 0xff mask is uniform;
+/// every other mask is a surface-straddling cell that the caller must emit at
+/// h/2. The fine lattice is sampling-only: `grid` always remains the requested
+/// coarse lattice.
+struct FeatureAwareClassification {
+    CartesianGrid grid;
+    std::vector<bool> inside;
+    /// Requested-grid centre classification before child samples broaden mixed
+    /// parents to `inside = any child`. Populated only when child sampling runs.
+    std::vector<bool> coarse_inside;
+    std::vector<std::uint8_t> child_inside_mask;
+    std::size_t n_mixed_cells = 0;
+    int refinement_levels = 0;
+    double surface_volume = 0.0;
+    double classified_volume = 0.0;
+    double relative_volume_error = 0.0;
+};
+
 /// Default product-mesh cell budget (fine lattice for graded is ~8× denser).
 inline constexpr long kDefaultMaxGridCells = 512 * 1024;
 
@@ -75,6 +97,17 @@ CartesianGrid make_bbox_grid_even(const Eigen::Vector3d& bbox_min,
 /// eps) count once so coplanar face diagonals do not flip parity.
 std::vector<bool> classify_cells_inside(const geom::TriSurface& surface,
                                         const CartesianGrid& grid);
+
+/// Sample one h/2 child level, but retain the requested coarse lattice.
+/// Only parents whose eight child samples mix solid and void are locally
+/// refined by callers; uniform interior and exterior parents remain coarse.
+/// `max_refinement_levels == 0` returns the original centre classification.
+FeatureAwareClassification classify_cells_feature_aware(
+    const geom::TriSurface& surface, const Eigen::Vector3d& bbox_min,
+    const Eigen::Vector3d& bbox_max, double h,
+    long max_cells = kDefaultMaxGridCells, double relative_volume_tolerance = 0.01,
+    int max_refinement_levels = 4,
+    const std::function<double(const Eigen::Vector3d&)>& size_field = {});
 
 /// Even-odd with rays along axis 0/1/2 (prism sweep uses longest axis).
 std::vector<bool> classify_cells_inside_axis(const geom::TriSurface& surface,

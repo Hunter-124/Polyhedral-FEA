@@ -23,9 +23,12 @@
 #include <optional>
 #include <set>
 #include <span>
+#include <stdexcept>
+
 #include <string>
 #include <thread>
 #include <vector>
+#include <utility>
 
 namespace polymesh::pipeline {
 /// Product defaults derive from the hybrid fill's established 48k work budget.
@@ -102,6 +105,13 @@ struct RegionLoad {
     Eigen::Vector3d force = Eigen::Vector3d::Zero();
 };
 
+/// A fully resolved boundary-condition set for one concrete mesh.
+/// `loads` is the assembled 3N nodal load vector, not a per-region resultant.
+struct BoundaryConditions {
+    fea::Dirichlet dirichlet;
+    Eigen::VectorXd loads;
+};
+
 /// Material, mesh, adapt, and BC settings for a study solve.
 /// SI throughout: length m, stress/modulus Pa, force N (via RegionLoad).
 struct SimSetup {
@@ -147,6 +157,32 @@ struct SimSetup {
     double element_tendency = 0.0;
     std::set<int> fixtures; // region ids with all DOFs fixed
     std::map<int, RegionLoad> loads;
+
+    /// Optional caller-supplied boundary conditions, evaluated per mesh.
+    ///
+    /// Empty (the default) keeps the region-based `fixtures`/`loads` selection
+    /// above, so the GUI and every existing caller are byte-identical.
+    ///
+    /// When set, the callback fully replaces that selection and is the sole
+    /// source of the Dirichlet set and the load vector. It is re-invoked after
+    /// every remesh, LEB pass, and p-elevation, because the mesh it must
+    /// select on changes each adapt pass — which is exactly why this is a
+    /// callback rather than a precomputed pair.
+    ///
+    /// Rationale: region selection fixes a whole tessellation region when any
+    /// of its triangle centroids falls in a BC box, and spreads a region
+    /// resultant over that whole region. A campaign that scores CAD-aware,
+    /// mesh-resolved BCs was therefore adapting against a different problem
+    /// than it reported. This hook lets such a caller adapt and score the
+    /// same system, and reuse `SolveResult::displacement` instead of solving
+    /// twice.
+    ///
+    /// The callback must return a non-empty Dirichlet set, a non-zero load
+    /// vector, and `loads.size() == 3 * mesh.nodes.size()`; otherwise the
+    /// solve fails with `fea::FeaError`. It must never silently hand back an
+    /// unconstrained or unloaded system. Throwing from the callback is
+    /// allowed and propagates as a solve failure.
+    std::function<BoundaryConditions(const fea::NodalMesh&)> boundary_builder;
 };
 
 /// Same pre-flight estimator used by mesh, solve, and diagnostics:
@@ -248,6 +284,41 @@ struct RefinementPlan {
 RefinementPlan build_refinement_plan(const Model& model, double h_coarse,
                                      std::span<const RefineRegion> regions,
                                      bool use_geometry = true);
+/// Geometry-volume policy bands. Fill-stage errors above the hard limit never
+/// reach a solver; solved-stage errors at or above the truth limit remain
+/// useful advisor outcomes but may not define corpus truth.
+inline constexpr double kGeometryVolumeTruthLimit = 0.01;
+inline constexpr double kGeometryVolumeHardLimit = 0.10;
+/// Exact CAD faces farther than this requested-edge fraction from the delivered
+/// boundary are unresolved. This is below the measured missing-bore distance;
+/// present one-level holes are accepted by the topology test below.
+inline constexpr double kGeometryFeatureResolutionOverH = 0.30;
+
+struct GeometryVolumeAssessment {
+    bool available = false;
+    double mesh_volume = 0.0;
+    double cad_volume = 0.0;
+    double relative_error = 0.0;
+};
+
+class GeometryVolumeLimitError : public std::runtime_error {
+  public:
+    GeometryVolumeLimitError(std::string message, GeometryVolumeAssessment assessment,
+                             bool solved_stage)
+        : std::runtime_error(std::move(message)), assessment(assessment),
+          solved_stage(solved_stage) {}
+
+    GeometryVolumeAssessment assessment;
+    bool solved_stage = false;
+};
+
+/// Integrate the physical volume of the actual isoparametric FE/VEM mesh and
+/// compare it with the exact CAD solid volume. Quadratic boundary mids therefore
+/// contribute to the measured geometry rather than being reduced to corner-only
+/// planar faces.
+GeometryVolumeAssessment measure_geometry_volume(const Model& model,
+                                                 const fea::NodalMesh& mesh);
+
 
 /// Solve products, ready for rendering / VTU.
 struct SolveResult {
@@ -265,6 +336,9 @@ struct SolveResult {
     // Boundary quads of the voxel mesh (node indices), for rendering.
     std::vector<std::array<std::uint32_t, 4>> boundary_quads;
     std::string mesh_note; // e.g. element/node counts, mesher version
+    GeometryVolumeAssessment fill_geometry_volume;
+    GeometryVolumeAssessment solved_geometry_volume;
+
 };
 
 /// Build the exact, owner-stable BRep projection oracle used by volume meshing
@@ -290,10 +364,15 @@ std::size_t project_quadratic_boundary_mids(
 struct VolumeMeshOutput {
     fea::NodalMesh mesh;
     std::vector<std::array<std::uint32_t, 4>> boundary_quads;
+    /// Boundary subset introduced only by local h/2 solid/void classification.
+    std::vector<std::array<std::uint32_t, 4>> local_child_boundary_quads;
     // For every mesh node on the boundary: the region of the nearest STL
     // triangle (used to map picked regions to constraint/load node sets).
     std::map<std::uint32_t, int> boundary_node_region;
     std::string mesher_note;
+    GeometryVolumeAssessment fill_geometry_volume;
+    GeometryVolumeAssessment solved_geometry_volume;
+
 };
 /// Volume fill of a closed model surface.
 /// @param h Coarse target edge length, metres (must be > 0; call resolve_mesh_size first).
@@ -314,6 +393,11 @@ VolumeMeshOutput volume_mesh(
     double element_tendency = 0.0, std::size_t max_elems = 0, std::size_t max_dof = 0,
     int auto_retry_budget = 0, const std::function<void()>& cancel_check = {},
     const mesh::SizeFieldFn& size_field = {});
+
+/// Refresh the solved-stage assessment after the final order elevation and CAD
+/// mid-node projection. Replaces its prior mesher-note token and enforces the
+/// same egregious-error hard limit used at fill time.
+void update_solved_geometry_volume(const Model& model, VolumeMeshOutput& output);
 
 /// @deprecated name kept as alias during transition; calls volume_mesh.
 /// @param h Target edge length, metres.

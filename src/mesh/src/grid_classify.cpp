@@ -2,11 +2,13 @@
 #include "mesh/grid_classify.hpp"
 
 #include "mesh/poly_mesh.hpp"
+#include <Eigen/Geometry>
 
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <format>
+#include <limits>
 #include <vector>
 
 #if defined(POLYMESH_WITH_OPENMP)
@@ -271,6 +273,100 @@ CartesianGrid make_bbox_grid_even(const Eigen::Vector3d& bbox_min,
 std::vector<bool> classify_cells_inside(const geom::TriSurface& surface,
                                         const CartesianGrid& grid) {
     return classify_impl(surface, grid, /*ray_axis=*/2);
+}
+
+FeatureAwareClassification classify_cells_feature_aware(
+    const geom::TriSurface& surface, const Eigen::Vector3d& bbox_min,
+    const Eigen::Vector3d& bbox_max, double h, long max_cells,
+    double relative_volume_tolerance, int max_refinement_levels,
+    const std::function<double(const Eigen::Vector3d&)>& size_field) {
+    validate_h_bbox(bbox_min, bbox_max, h, "classify_cells_feature_aware");
+    if (max_cells < 1) {
+        throw ValidityError("classify_cells_feature_aware: max_cells must be positive");
+    }
+    if (!(relative_volume_tolerance > 0.0) ||
+        !std::isfinite(relative_volume_tolerance)) {
+        throw ValidityError(
+            "classify_cells_feature_aware: relative volume tolerance must be positive");
+    }
+    (void)size_field;
+
+    // Closed-surface volume in divergence form about bbox_min. Translating the
+    // origin keeps the triple products small for parts far from world zero.
+    double signed_surface_volume = 0.0;
+    for (const auto& tri : surface.triangles) {
+        if (tri[0] >= surface.vertices.size() || tri[1] >= surface.vertices.size() ||
+            tri[2] >= surface.vertices.size()) {
+            continue;
+        }
+        const Eigen::Vector3d a = surface.vertices[tri[0]] - bbox_min;
+        const Eigen::Vector3d b = surface.vertices[tri[1]] - bbox_min;
+        const Eigen::Vector3d c = surface.vertices[tri[2]] - bbox_min;
+        signed_surface_volume += a.dot(b.cross(c)) / 6.0;
+    }
+    const double surface_volume = std::abs(signed_surface_volume);
+    const auto relative_error = [&](double classified_volume) {
+        return surface_volume > 0.0 && std::isfinite(surface_volume)
+                   ? std::abs(classified_volume - surface_volume) / surface_volume
+                   : 0.0;
+    };
+
+    FeatureAwareClassification out;
+    out.grid = make_bbox_grid(bbox_min, bbox_max, h, max_cells);
+    out.inside = classify_cells_inside(surface, out.grid);
+    out.surface_volume = surface_volume;
+    out.classified_volume =
+        static_cast<double>(std::count(out.inside.begin(), out.inside.end(), true)) *
+        out.grid.cell.prod();
+    out.relative_volume_error = relative_error(out.classified_volume);
+    if (max_refinement_levels <= 0) {
+        return out;
+    }
+    out.coarse_inside = out.inside;
+
+    // The h/2 lattice is a sampler, not the delivered lattice. Its exact 2×
+    // indexing lets callers subdivide only parents whose children mix solid
+    // and void, without making every bulk cell pay the global 8× cost.
+    CartesianGrid fine;
+    fine.origin = out.grid.origin;
+    fine.cell = 0.5 * out.grid.cell;
+    fine.nx = 2 * out.grid.nx;
+    fine.ny = 2 * out.grid.ny;
+    fine.nz = 2 * out.grid.nz;
+    const auto fine_inside = classify_cells_inside(surface, fine);
+
+    out.child_inside_mask.assign(out.inside.size(), std::uint8_t{0});
+    std::size_t n_inside_children = 0;
+    for (int k = 0; k < out.grid.nz; ++k) {
+        for (int j = 0; j < out.grid.ny; ++j) {
+            for (int i = 0; i < out.grid.nx; ++i) {
+                std::uint8_t mask = 0;
+                for (int d = 0; d < 2; ++d) {
+                    for (int b = 0; b < 2; ++b) {
+                        for (int a = 0; a < 2; ++a) {
+                            if (!fine_inside[fine.index(2 * i + a, 2 * j + b,
+                                                       2 * k + d)]) {
+                                continue;
+                            }
+                            const int bit = a + 2 * b + 4 * d;
+                            mask |= static_cast<std::uint8_t>(1U << bit);
+                            ++n_inside_children;
+                        }
+                    }
+                }
+                const auto id = out.grid.index(i, j, k);
+                out.child_inside_mask[id] = mask;
+                out.inside[id] = mask != 0;
+                if (mask != 0 && mask != std::uint8_t{0xff}) {
+                    ++out.n_mixed_cells;
+                }
+            }
+        }
+    }
+    out.refinement_levels = out.n_mixed_cells > 0 ? 1 : 0;
+    out.classified_volume = static_cast<double>(n_inside_children) * fine.cell.prod();
+    out.relative_volume_error = relative_error(out.classified_volume);
+    return out;
 }
 
 std::vector<bool> classify_cells_inside_axis(const geom::TriSurface& surface,

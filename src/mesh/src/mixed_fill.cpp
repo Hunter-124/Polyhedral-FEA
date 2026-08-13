@@ -455,7 +455,8 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                                    double seed_band, bool snap_boundary,
                                    double curvature_turn_deg, bool native_poly_transitions,
                                    const std::function<void()>& cancel_check,
-                                   const SizeFieldFn& size_field) {
+                                   const SizeFieldFn& size_field,
+                                   bool local_surface_classification) {
     if (!(h > 0.0) || !std::isfinite(h)) {
         throw ValidityError("mixed_fill_surface: h must be positive");
     }
@@ -483,8 +484,15 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
     const double h_budget =
         min_h_for_cell_budget(bbox_min, bbox_max, kHybridMaxCoarse, /*subdivision=*/1);
     const double h_use = (h_budget > 0.0) ? std::max(h, h_budget) : h;
-    const CartesianGrid grid = make_bbox_grid(bbox_min, bbox_max, h_use);
-    const auto inside = classify_cells_inside(surface, grid);
+    // The optional h/2 classifier is sampling-only. Mixed parents are folded
+    // into the existing one-level local refinement below; the coarse lattice
+    // itself never advances globally.
+    auto classification = classify_cells_feature_aware(
+        surface, bbox_min, bbox_max, h_use, kHybridMaxCoarse,
+        /*relative_volume_tolerance=*/0.01,
+        local_surface_classification ? 1 : 0, size_field);
+    const CartesianGrid& grid = classification.grid;
+    const auto& inside = classification.inside;
     poll_cancel();
     const int nx = grid.nx, ny = grid.ny, nz = grid.nz;
     const double h_cell = grid.max_edge();
@@ -544,6 +552,8 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
     out.h_fine = h_cell;
     out.skin_layers = skin_layers;
     out.native_poly_transitions = native_poly_transitions;
+    out.classification_refinement_levels = classification.refinement_levels;
+    out.classification_volume_error = classification.relative_volume_error;
 
     // Free-surface hop skin only when no geo drivers (unit boxes). With
     // feature/seed/curvature, refine those bands to h/2 instead of flooding
@@ -622,6 +632,36 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                               curvature_turn_deg * 3.14159265358979323846 / 180.0);
     }
 
+    // Fine child sampling detects sub-cell topology without a global lattice
+    // advance. Mixed parents are already surface cells; one face-neighbour
+    // solid shell is promoted so the 2:1 interface closes in the interior.
+    if (!classification.child_inside_mask.empty()) {
+        std::vector<char> promote(inside.size(), 0);
+        for (int k = 0; k < nz; ++k) {
+            for (int j = 0; j < ny; ++j) {
+                for (int i = 0; i < nx; ++i) {
+                    const auto id = idx(i, j, k);
+                    const auto mask = classification.child_inside_mask[id];
+                    if (!inside[id] || mask == 0 || mask == std::uint8_t{0xff}) {
+                        continue;
+                    }
+                    is_fine[id] = 1;
+                    is_feature_skin[id] = 1;
+                    for (const auto& o : kFaceNbr) {
+                        const int ni = i + o[0], nj = j + o[1], nk = k + o[2];
+                        if (inb(ni, nj, nk)) {
+                            promote[idx(ni, nj, nk)] = 1;
+                        }
+                    }
+                }
+            }
+        }
+        for (std::size_t c = 0; c < promote.size(); ++c) {
+            if (promote[c]) {
+                is_fine[c] = 1;
+            }
+        }
+    }
     // Outside → not fine.
     for (std::size_t c = 0; c < inside.size(); ++c) {
         if (!inside[c]) {
@@ -886,10 +926,24 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
         }};
     };
 
-    auto emit_boundary_quad_fine = [&](int I0, int J0, int K0, int I1, int J1, int K1, int I2,
-                                       int J2, int K2, int I3, int J3, int K3) {
-        out.boundary_quads.push_back({{node_fine(I0, J0, K0), node_fine(I1, J1, K1),
-                                       node_fine(I2, J2, K2), node_fine(I3, J3, K3)}});
+    const auto& coarse_inside = classification.coarse_inside.empty()
+                                    ? classification.inside
+                                    : classification.coarse_inside;
+    const auto coarse_was_inside = [&](int i, int j, int k) {
+        return i >= 0 && i < nx && j >= 0 && j < ny && k >= 0 && k < nz &&
+               coarse_inside[idx(i, j, k)];
+    };
+    const auto fine_child_inside = [&](int I, int J, int K) {
+        if (I < 0 || I >= 2 * nx || J < 0 || J >= 2 * ny || K < 0 || K >= 2 * nz) {
+            return false;
+        }
+        const int i = I / 2, j = J / 2, k = K / 2;
+        if (classification.child_inside_mask.empty()) {
+            return inside[idx(i, j, k)];
+        }
+        const int bit = (I % 2) + 2 * (J % 2) + 4 * (K % 2);
+        return (classification.child_inside_mask[idx(i, j, k)] &
+                static_cast<std::uint8_t>(1U << bit)) != 0;
     };
 
     // Every apex-fan cell group emitted below (2:1 closure fan, plain-mode skin
@@ -914,55 +968,67 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                 }
 
                 if (size_adaptive && is_fine[id]) {
-                    // 2×2×2 fine hexes at h/2 (all hex; product expand → pyramids).
-                    // Free-surface pyramids here would break face match with interior
-                    // fine hexes and show as jagged exterior patches in the wireframe.
+                    // Emit every live h/2 child and derive its free faces from the
+                    // same child mask. The former parent-face-only pass omitted
+                    // live/void interfaces inside a mixed parent; those nodes
+                    // never entered boundary snapping and caused the apparent
+                    // curved-fidelity regression on spheres and cones.
                     ++out.n_fine_cells;
+                    const auto child_mask =
+                        classification.child_inside_mask.empty()
+                            ? std::uint8_t{0xff}
+                            : classification.child_inside_mask[id];
                     for (int c = 0; c < 2; ++c) {
                         for (int b = 0; b < 2; ++b) {
                             for (int a = 0; a < 2; ++a) {
-                                emit_hex(out, fine_sub_corners(i, j, k, a, b, c));
+                                const int child_bit = a + 2 * b + 4 * c;
+                                if ((child_mask &
+                                     static_cast<std::uint8_t>(1U << child_bit)) == 0) {
+                                    continue;
+                                }
+                                const auto child = fine_sub_corners(i, j, k, a, b, c);
+                                emit_hex(out, child);
+                                const int I = 2 * i + a;
+                                const int J = 2 * j + b;
+                                const int K = 2 * k + c;
+                                for (std::size_t f = 0; f < kFaceNbr.size(); ++f) {
+                                    const auto& o = kFaceNbr[f];
+                                    if (fine_child_inside(I + o[0], J + o[1], K + o[2])) {
+                                        continue;
+                                    }
+                                    const auto& face = kHexFaces[f];
+                                    const std::array<std::uint32_t, 4> quad{{
+                                        child[static_cast<std::size_t>(face[0])],
+                                        child[static_cast<std::size_t>(face[1])],
+                                        child[static_cast<std::size_t>(face[2])],
+                                        child[static_cast<std::size_t>(face[3])],
+                                    }};
+
+                                    int pi = i, pj = j, pk = k;
+                                    if (I + o[0] < 2 * i) {
+                                        --pi;
+                                    } else if (I + o[0] >= 2 * i + 2) {
+                                        ++pi;
+                                    }
+                                    if (J + o[1] < 2 * j) {
+                                        --pj;
+                                    } else if (J + o[1] >= 2 * j + 2) {
+                                        ++pj;
+                                    }
+                                    if (K + o[2] < 2 * k) {
+                                        --pk;
+                                    } else if (K + o[2] >= 2 * k + 2) {
+                                        ++pk;
+                                    }
+                                    const bool existed_on_coarse_grid =
+                                        coarse_was_inside(i, j, k) !=
+                                        coarse_was_inside(pi, pj, pk);
+                                    out.boundary_quads.push_back(quad);
+                                    if (!existed_on_coarse_grid) {
+                                        out.local_child_boundary_quads.push_back(quad);
+                                    }
+                                }
                             }
-                        }
-                    }
-                    // Boundary quads at h/2 on free faces.
-                    for (std::size_t f = 0; f < 6; ++f) {
-                        const auto& o = kFaceNbr[f];
-                        if (inb(i + o[0], j + o[1], k + o[2])) {
-                            continue;
-                        }
-                        // 4 child quads on this coarse face.
-                        const auto& fl = kHexFaces[f];
-                        std::array<std::array<int, 3>, 4> lc{};
-                        for (int qn = 0; qn < 4; ++qn) {
-                            const auto& corner = kHexCornerLocal[static_cast<std::size_t>(
-                                fl[static_cast<std::size_t>(qn)])];
-                            lc[static_cast<std::size_t>(qn)] = {
-                                {2 * corner[0], 2 * corner[1], 2 * corner[2]}};
-                        }
-                        const int fcx =
-                            (lc[0][0] + lc[1][0] + lc[2][0] + lc[3][0]) / 4;
-                        const int fcy =
-                            (lc[0][1] + lc[1][1] + lc[2][1] + lc[3][1]) / 4;
-                        const int fcz =
-                            (lc[0][2] + lc[1][2] + lc[2][2] + lc[3][2]) / 4;
-                        for (int q = 0; q < 4; ++q) {
-                            const int qn = (q + 1) % 4;
-                            const int qp = (q + 3) % 4;
-                            const auto& A = lc[static_cast<std::size_t>(q)];
-                            const auto& B = lc[static_cast<std::size_t>(qn)];
-                            const auto& P = lc[static_cast<std::size_t>(qp)];
-                            const int mx = (A[0] + B[0]) / 2;
-                            const int my = (A[1] + B[1]) / 2;
-                            const int mz = (A[2] + B[2]) / 2;
-                            const int pmx = (A[0] + P[0]) / 2;
-                            const int pmy = (A[1] + P[1]) / 2;
-                            const int pmz = (A[2] + P[2]) / 2;
-                            emit_boundary_quad_fine(
-                                2 * i + A[0], 2 * j + A[1], 2 * k + A[2],
-                                2 * i + mx, 2 * j + my, 2 * k + mz,
-                                2 * i + fcx, 2 * j + fcy, 2 * k + fcz,
-                                2 * i + pmx, 2 * j + pmy, 2 * k + pmz);
                         }
                     }
                     continue;
@@ -1544,12 +1610,20 @@ MixedFillOutput expand_mixed_hex_to_pyramids(const MixedFillOutput& fill) {
     out.h = fill.h;
     out.h_fine = fill.h_fine;
     out.boundary_quads = fill.boundary_quads;
+    out.local_child_boundary_quads = fill.local_child_boundary_quads;
     out.movable_fans = fill.movable_fans;
     out.boundary_max_distance = fill.boundary_max_distance;
     out.skin_layers = fill.skin_layers;
     out.n_feature_skin_cells = fill.n_feature_skin_cells;
     out.n_fine_cells = fill.n_fine_cells;
     out.n_transition_cells = fill.n_transition_cells;
+    out.n_level0_cells = fill.n_level0_cells;
+    out.n_level1_cells = fill.n_level1_cells;
+    out.classification_refinement_levels = fill.classification_refinement_levels;
+    out.classification_volume_error = fill.classification_volume_error;
+    out.field_h_min = fill.field_h_min;
+    out.field_h_max = fill.field_h_max;
+    out.n_field_budget_clamped = fill.n_field_budget_clamped;
     out.native_poly_transitions = fill.native_poly_transitions;
     out.nodes = fill.nodes;
     out.n_hex = 0;

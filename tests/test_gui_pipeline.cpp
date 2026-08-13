@@ -4,6 +4,7 @@
 // regions -> draft voxel mesh -> fixture/load mapping -> solve. Keeps the
 // interactive path covered by CI without a display.
 
+#include "fea/assembly.hpp"
 #include "fea/solve.hpp"
 #include "pipeline/scene.hpp"
 #include "support/box_model.hpp"
@@ -15,6 +16,10 @@
 #include <format>
 #include <fstream>
 #include <thread>
+#include <algorithm>
+#include <cstdint>
+#include <string>
+#include <vector>
 
 using namespace polymesh::pipeline;
 namespace fea = polymesh::fea;
@@ -500,4 +505,196 @@ TEST_CASE("SolveJob pause holds then resume completes") {
     }
     REQUIRE(result.has_value());
     REQUIRE(result->volume_mesh.elements.size() > 0);
+}
+
+namespace {
+
+/// Nodes whose x lies within `tol` of `x_target`, on the mesh in hand.
+std::vector<std::uint32_t> nodes_near_x(const fea::NodalMesh& mesh, double x_target,
+                                        double tol) {
+    std::vector<std::uint32_t> out;
+    for (std::uint32_t i = 0; i < static_cast<std::uint32_t>(mesh.nodes.size()); ++i) {
+        if (std::abs(mesh.nodes[i][0] - x_target) < tol) {
+            out.push_back(i);
+        }
+    }
+    return out;
+}
+
+/// A mesh-resolved builder: clamp every node on the x=0 plane, spread `total`
+/// over the nodes on the x=lx plane. Deliberately node-resolved rather than
+/// region-resolved so it exercises the non-region path.
+BoundaryConditions clamp_and_pull(const fea::NodalMesh& mesh, double lx,
+                                  const Eigen::Vector3d& total, double tol) {
+    BoundaryConditions out;
+    for (const auto node : nodes_near_x(mesh, 0.0, tol)) {
+        out.dirichlet.fix_node(node);
+    }
+    out.loads = Eigen::VectorXd::Zero(3 * static_cast<Eigen::Index>(mesh.nodes.size()));
+    const auto loaded = nodes_near_x(mesh, lx, tol);
+    if (!loaded.empty()) {
+        const Eigen::Vector3d per = total / static_cast<double>(loaded.size());
+        for (const auto node : loaded) {
+            out.loads.segment<3>(3 * static_cast<Eigen::Index>(node)) += per;
+        }
+    }
+    return out;
+}
+
+/// Runs a job that is expected to fail and returns its status text.
+std::string failure_text(const Model& model, const SimSetup& setup) {
+    SolveJob job;
+    job.start(model, setup);
+    for (int i = 0; i < 800; ++i) {
+        if (job.state() == SolveJob::State::kFailed) {
+            return job.status_text();
+        }
+        if (job.take_result()) {
+            FAIL("solve unexpectedly succeeded");
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    FAIL("timed out waiting for the expected failure");
+    return {};
+}
+
+} // namespace
+
+TEST_CASE("boundary_builder replaces region selection and is self-describing") {
+    const double lx = 0.1;
+    const auto model = polymesh::testsupport::box_model(lx, 0.02, 0.02);
+    auto setup = cantilever_setup(model, 0.012);
+    // Strip the region selection outright: if the builder were ignored, the
+    // region path would throw "no fixtures" instead of solving.
+    setup.fixtures.clear();
+    setup.loads.clear();
+    setup.boundary_builder = [lx](const fea::NodalMesh& mesh) {
+        return clamp_and_pull(mesh, lx, {0.0, 0.0, -100.0}, 1e-9);
+    };
+
+    const auto result = run_solve_job(model, setup);
+    REQUIRE(result.has_value());
+    CHECK(result->displacement.size() ==
+          3 * static_cast<Eigen::Index>(result->volume_mesh.nodes.size()));
+    CHECK(result->displacement.allFinite());
+    CHECK(result->max_displacement > 0.0);
+    // Provenance: a row must say which path produced its BCs.
+    CHECK(result->mesh_note.find("BCs: caller boundary_builder") != std::string::npos);
+    CHECK(result->mesh_note.find("BCs: region selection") == std::string::npos);
+}
+
+TEST_CASE("an unset boundary_builder leaves the region path in charge") {
+    const auto model = polymesh::testsupport::box_model(0.1, 0.02, 0.02);
+    const auto setup = cantilever_setup(model, 0.012);
+    REQUIRE_FALSE(static_cast<bool>(setup.boundary_builder)); // empty by default
+
+    const auto result = run_solve_job(model, setup);
+    REQUIRE(result.has_value());
+    CHECK(result->mesh_note.find("BCs: region selection") != std::string::npos);
+    CHECK(result->mesh_note.find("BCs: caller boundary_builder") == std::string::npos);
+}
+
+TEST_CASE("boundary_builder cannot silently hand back a degenerate system") {
+    const double lx = 0.1;
+    const auto model = polymesh::testsupport::box_model(lx, 0.02, 0.02);
+    auto base = cantilever_setup(model, 0.012);
+    base.fixtures.clear();
+    base.loads.clear();
+
+    SECTION("no Dirichlet DOFs") {
+        auto setup = base;
+        setup.boundary_builder = [lx](const fea::NodalMesh& mesh) {
+            auto out = clamp_and_pull(mesh, lx, {0.0, 0.0, -100.0}, 1e-9);
+            out.dirichlet = fea::Dirichlet{};
+            return out;
+        };
+        CHECK(failure_text(model, setup).find("no Dirichlet DOFs") != std::string::npos);
+    }
+    SECTION("load vector sized for the wrong mesh") {
+        auto setup = base;
+        setup.boundary_builder = [lx](const fea::NodalMesh& mesh) {
+            auto out = clamp_and_pull(mesh, lx, {0.0, 0.0, -100.0}, 1e-9);
+            out.loads = Eigen::VectorXd::Ones(out.loads.size() + 3);
+            return out;
+        };
+        CHECK(failure_text(model, setup).find("expected") != std::string::npos);
+    }
+    SECTION("zero load vector") {
+        auto setup = base;
+        setup.boundary_builder = [lx](const fea::NodalMesh& mesh) {
+            auto out = clamp_and_pull(mesh, lx, {0.0, 0.0, -100.0}, 1e-9);
+            out.loads.setZero();
+            return out;
+        };
+        CHECK(failure_text(model, setup).find("zero load vector") != std::string::npos);
+    }
+}
+
+TEST_CASE("a solution from a different discretization fails an independent residual check") {
+    // This is the guard for reusing SolveResult::displacement. Reuse is only
+    // sound while the adaptive solve and the scoring solve are the SAME system.
+    // An independent residual check (the shape of testlab's health gate) must
+    // still catch a solution imported from a different BC discretization, so
+    // that a future "optimisation" which reintroduces a mismatched reuse is
+    // caught here rather than by silently wrong campaign numbers.
+    const double lx = 0.1;
+    const auto model = polymesh::testsupport::box_model(lx, 0.02, 0.02);
+    const Eigen::Vector3d total{0.0, 0.0, -100.0};
+
+    auto base = cantilever_setup(model, 0.012);
+    base.fixtures.clear();
+    base.loads.clear();
+
+    // Two genuinely different discretizations of "clamp one end, pull the
+    // other": a fully clamped end face versus a narrow clamped strip.
+    auto broad = base;
+    broad.boundary_builder = [lx, total](const fea::NodalMesh& mesh) {
+        return clamp_and_pull(mesh, lx, total, 1e-9);
+    };
+    auto narrow = base;
+    narrow.boundary_builder = [lx, total](const fea::NodalMesh& mesh) {
+        BoundaryConditions out = clamp_and_pull(mesh, lx, total, 1e-9);
+        out.dirichlet = fea::Dirichlet{};
+        for (const auto node : nodes_near_x(mesh, 0.0, 1e-9)) {
+            if (mesh.nodes[node][2] < 1e-9) { // only the bottom edge of that face
+                out.dirichlet.fix_node(node);
+            }
+        }
+        return out;
+    };
+
+    const auto broad_result = run_solve_job(model, broad);
+    const auto narrow_result = run_solve_job(model, narrow);
+    REQUIRE(broad_result.has_value());
+    REQUIRE(narrow_result.has_value());
+    // Same mesher, same h, no adaptation: both solves share one mesh.
+    REQUIRE(broad_result->volume_mesh.nodes.size() ==
+            narrow_result->volume_mesh.nodes.size());
+
+    const fea::Material mat{.youngs_modulus = base.youngs_modulus,
+                            .poissons_ratio = base.poissons_ratio};
+    const auto& mesh = broad_result->volume_mesh;
+    const auto k = fea::assemble_stiffness(mesh, mat);
+    const auto broad_bc = clamp_and_pull(mesh, lx, total, 1e-9);
+    REQUIRE_FALSE(broad_bc.dirichlet.dof_values.empty());
+
+    // Free-DOF relative residual, exactly the health gate's arithmetic.
+    const auto free_residual_rel = [&](const Eigen::VectorXd& u) {
+        const Eigen::VectorXd r = k * u - broad_bc.loads;
+        double free_r2 = 0.0;
+        double f2 = 0.0;
+        for (Eigen::Index dof = 0; dof < r.size(); ++dof) {
+            f2 += broad_bc.loads[dof] * broad_bc.loads[dof];
+            if (!broad_bc.dirichlet.dof_values.contains(dof)) {
+                free_r2 += r[dof] * r[dof];
+            }
+        }
+        return std::sqrt(free_r2) / std::max(std::sqrt(f2), 1e-30);
+    };
+
+    // The matching solution satisfies its own system.
+    CHECK(free_residual_rel(broad_result->displacement) < 1e-6);
+    // The mismatched one does not, and by a wide margin - so a gate that
+    // independently recomputes the residual cannot be fooled by a swap.
+    CHECK(free_residual_rel(narrow_result->displacement) > 1e-3);
 }

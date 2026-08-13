@@ -67,6 +67,9 @@ struct MixedFillOutput {
     std::vector<Eigen::Vector3d> nodes; // metres
     std::vector<MixedCell> cells;
     std::vector<std::array<std::uint32_t, 4>> boundary_quads;
+    /// Subset of `boundary_quads` created by live/void child interfaces that
+    /// were not boundary faces in the original coarse-centre classification.
+    std::vector<std::array<std::uint32_t, 4>> local_child_boundary_quads;
     std::vector<MixedMovableFan> movable_fans;
     double h = 0.0;      // bulk cell edge (metres)
     double h_fine = 0.0; // fine cell edge when 2:1 active (≈ h/2), else = h
@@ -81,6 +84,8 @@ struct MixedFillOutput {
     std::size_t n_transition_cells = 0; // 2:1 interface cells (fan or poly)
     std::size_t n_level0_cells = 0;
     std::size_t n_level1_cells = 0;
+    int classification_refinement_levels = 0;
+    double classification_volume_error = 0.0;
     /// Observed requested field range at interior cell centroids (metres).
     double field_h_min = 0.0;
     double field_h_max = 0.0;
@@ -100,6 +105,8 @@ struct MixedFillOutput {
 /// plain free-surface skin stays hex (no pyramid expand required).
 /// `cancel_check`, when supplied, is polled inside lattice classification,
 /// transition closure, and emission loops and may throw to cancel the fill.
+/// `local_surface_classification` enables one h/2 sampling level whose mixed
+/// parents alone are subdivided; it is intended for authoritative CAD topology.
 MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                                    const Eigen::Vector3d& bbox_min,
                                    const Eigen::Vector3d& bbox_max, double h,
@@ -111,7 +118,8 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                                    double curvature_turn_deg = 0.0,
                                    bool native_poly_transitions = false,
                                    const std::function<void()>& cancel_check = {},
-                                   const SizeFieldFn& size_field = {});
+                                   const SizeFieldFn& size_field = {},
+                                   bool local_surface_classification = false);
 
 /// Expand every hex8 → 6 pyramid5 (centroid apex). Pyramids/tets/polys pass
 /// through. Product FE path for hybrid / hexpyr (constant-strain exact).

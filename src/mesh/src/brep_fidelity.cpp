@@ -346,6 +346,29 @@ BRepGeometryFidelity evaluate_brep_geometry_fidelity(
     return out;
 }
 
+GeometryCompleteness evaluate_geometry_completeness(
+    const geom::CadModel& model, double mesh_volume, double relative_volume_tolerance) {
+    GeometryCompleteness out;
+    out.mesh_volume = mesh_volume;
+    out.relative_volume_tolerance = relative_volume_tolerance;
+    const auto brep = geom::inspect_brep(model);
+    if (!brep.available || !brep.valid || !brep.closed || brep.solid_count == 0 ||
+        !(brep.volume > 0.0) || !std::isfinite(brep.volume) ||
+        !(relative_volume_tolerance > 0.0) ||
+        !std::isfinite(relative_volume_tolerance)) {
+        return out;
+    }
+    out.available = true;
+    out.brep_volume = brep.volume;
+    if (!(mesh_volume >= 0.0) || !std::isfinite(mesh_volume)) {
+        out.relative_volume_error = std::numeric_limits<double>::infinity();
+        return out;
+    }
+    out.relative_volume_error = std::abs(mesh_volume - brep.volume) / brep.volume;
+    out.complete = out.relative_volume_error <= relative_volume_tolerance;
+    return out;
+}
+
 double boundary_surface_volume(const std::vector<Eigen::Vector3d>& nodes,
                                const std::vector<FreeFace>& free_faces) {
     if (nodes.empty()) {

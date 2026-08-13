@@ -9,6 +9,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 using namespace polymesh::fea;
 using polymesh::test_support::box_hex_mesh;
@@ -96,11 +97,13 @@ TEST_CASE("auto solve records LDLT to CG downgrade when only CG fits") {
     CHECK(decision.note.find("LDLT estimate") != std::string::npos);
     CHECK(decision.note.find("using CG estimate") != std::string::npos);
 
-    std::string recorded_note;
+    std::vector<std::string> recorded_notes;
     options.max_mem_gb = static_cast<double>(cap) / 1'000'000'000.0;
-    options.on_note = [&](std::string_view note) { recorded_note = note; };
+    options.on_note = [&](std::string_view note) { recorded_notes.emplace_back(note); };
     const auto loads = Eigen::VectorXd::Zero(ndof);
     const auto u = solve_elastostatics(mesh, kSteel, bc, loads, options);
     CHECK(u.isZero());
-    CHECK(recorded_note == decision.note);
+    REQUIRE(recorded_notes.size() >= 2);
+    CHECK(recorded_notes.front() == decision.note);
+    CHECK(recorded_notes.back().find("CG converged with ") != std::string::npos);
 }

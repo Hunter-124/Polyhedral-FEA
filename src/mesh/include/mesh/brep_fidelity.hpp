@@ -70,6 +70,24 @@ struct BRepGeometryFidelity {
     double mesh_vs_brep_relative_volume_error = 0.0;
 };
 
+inline constexpr double kGeometryCompletenessRelVolumeTolerance = 0.01;
+
+/// Exact-CAD volume guard.  Unlike boundary residuals, this detects a missing
+/// or over-cut void even when every boundary face that does exist projects
+/// perfectly onto the BRep.
+struct GeometryCompleteness {
+    bool available = false;
+    bool complete = false;
+    double brep_volume = 0.0;
+    double mesh_volume = 0.0;
+    double relative_volume_error = 0.0;
+    double relative_volume_tolerance = kGeometryCompletenessRelVolumeTolerance;
+};
+
+[[nodiscard]] GeometryCompleteness evaluate_geometry_completeness(
+    const geom::CadModel& model, double mesh_volume,
+    double relative_volume_tolerance = kGeometryCompletenessRelVolumeTolerance);
+
 /// Evaluate sampled mesh/BRep fidelity using the live BRep projection oracle.
 ///
 /// `free_faces` are exterior triangles/quads (triangle iff f[3] == f[2]).

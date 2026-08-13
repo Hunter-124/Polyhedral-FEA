@@ -184,7 +184,22 @@ CLAMP_BOX: dict[str, tuple[float, float]] = {
     "eta_target": (0.0, 0.3),
     "adapt_passes": (0.0, 6.0),
 }
+#: Refuses the whole recommendation after the fact — an abstention.
 VETO_THRESHOLD = 0.5
+#: Drops individual candidates before ranking. A DIFFERENT decision from the
+#: veto, and deliberately a different number: the C++ used to inherit this from
+#: `veto_threshold` when the key was absent, which shipped the gate at 0.5 —
+#: the weakest member of its own sweep — while looking deliberate. The C++ now
+#: rejects a clamps.json that omits it.
+#:
+#: 0.05 is chosen on pick-failure rate, not regret. Across thresholds 0.05–0.8
+#: held-out regret spans only 0.3233–0.3350 (leave-one-family-out, 8 families,
+#: 5 seeds), so regret does not single out any threshold — 0.2 is nominally best
+#: by 0.012 decades. Pick-failure does separate them: 27.5 % at 0.05 against
+#: 31.3 % at 0.2 and 31.2 % at 0.5. Given the failure head's calibration is
+#: mediocre (ECE 0.263), a rule that avoids doomed picks is worth more to a user
+#: than a hair of median accuracy inside the noise band.
+GATE_THRESHOLD = 0.05
 ACTION_DEFAULTS: dict[str, Any] = {
     "mesher": "hybrid_zoo",
     "h_rel": 0.1,
@@ -528,6 +543,7 @@ def clamp_table(mesher_choices: list[str],
         "mesher_choices": list(mesher_choices),
         "action_dims": build_action_dims(mesher_choices),
         "veto_threshold": VETO_THRESHOLD,
+        "gate_threshold": GATE_THRESHOLD,
         "candidate_grid": candidate_grid(rows, mesher_choices) if rows else None,
         "defaults": defaults,
     }

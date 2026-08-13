@@ -208,18 +208,43 @@ dropping the facets it would have been judged on.
 
 ## Consequences
 
-- **Every mixed-level hybrid mesh that the engine refused was correct.** The
-  advisor was trained on campaigns in which those configurations appear as
-  hard failures. That label is wrong for every affected row. Retraining is not
-  scheduled by this ADR, but the data is now known-contaminated in a specific,
-  enumerable way: rows whose `error` contains `fill-stage guard` and whose fill
-  carried pyramid cells.
-- **Body forces and ZZ recovery on pyramid cells were under-weighted by 0.6×**
-  wherever they were used. Cantilever campaigns are traction-loaded, so body
-  force is largely unexercised; ZZ on hybrid meshes was affected and fed the
-  adaptivity indicator.
-- The peer matrix and showcase imagery were generated on the old engine and old
-  renderer, and are regenerated on this one.
+**The advisor's training data is contaminated, and the amount is measured, not
+estimated.** Every one of the 141 distinct configurations that the fill-stage
+guard refused across the checked-in campaigns was re-run on the fixed engine
+(47 distinct `part × mesher × h`, the rest duplicates):
+
+| channel | measurement |
+|---|---|
+| campaign rows total | 3,548 |
+| rows carrying a `fill-stage guard` refusal | 948 (26.7 %) |
+| refused configurations that now succeed | 16 of 47 (34 %) |
+| **rows whose refusal label is now definitively wrong** | **76 (2.1 % of all rows, 8.0 % of refusals)** |
+| still genuinely refused | 30 — `channel`, `tube`, `stepped_shaft`, `l_bracket`, all thin-walled under-resolution |
+
+The second channel is larger. The shell fix changes graded-tet **geometry**, so
+its accuracy labels move even where the row succeeded. Sampling 24 distinct
+`part × h` graded configurations from the campaigns and re-meshing each:
+**17 of 24 changed**, most by under 1 % but several by a great deal —
+`stepped_shaft_s0` 8,225 → 10,336 tets (+26 %), `tube_s3` 7,959 → 11,883
+(+49 %), `sphere_box_s2` 2,536 → 19,093 (+653 %). The large jumps are where the
+carve had been tearing out the most material. `graded_tet` is 1,684 of the
+3,548 rows.
+
+Third, **body forces and ZZ recovery on pyramid cells were under-weighted by
+0.6×**. Cantilever campaigns are traction-loaded so body force is largely
+unexercised, but ZZ fed the adaptivity indicator on every hybrid mesh.
+
+Regenerating the campaigns is hours of compute and is **not** done by this ADR;
+it is a decision for whoever owns the next advisor revision. What this ADR
+guarantees is that the contamination is enumerable rather than vague: rows whose
+`error` contains `fill-stage guard`, and `graded_tet` rows on parts with curved
+or stepped features.
+
+The peer matrix is **not** affected — `bench/results/gmsh-peer.json` is
+Gmsh-meshed and solved by our solver, so our mesher never touched it. The
+showcase was regenerated and came back **bit-identical** (node counts, element
+counts, DOF and peak von Mises match to the digit; `plate_hole.vtu` hashes the
+same): those fixtures run at fine `h` on parts whose shells were already sound.
 
 ## What this says about the method
 

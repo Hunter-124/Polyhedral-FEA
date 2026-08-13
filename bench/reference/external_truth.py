@@ -104,6 +104,28 @@ MESH_POLICY_SENSITIVITY = {
     "tip_deflection": 2.0e-5,
     "peak_vm_over_nominal": 7.44e-3,
 }
+# Measured family-specific sensitivity that the two-rung delta does NOT see.
+# On a thin wall the element size ACROSS the wall is set by the curvature count
+# (the bore asks for 2*pi*r_i/N, comfortably above MeshSizeMin, so tightening
+# MeshSizeMin changes nothing), and both shipped rungs sit at a similar
+# through-wall element count. Measured on the two worst-resolved regimes by
+# re-solving at the shipped MeshSizeMax with the curvature count raised 34 -> 60,
+# which is the knob that actually adds elements across the wall:
+#   tube_s0_c1 (through-wall ~1.9 -> ~3.4 elements, DOF 167,913 -> 435,039):
+#       strain_energy moved 0.141%, tip_deflection 0.134%
+#   tube_s1_c1 (through-wall ~1.3 -> ~2.2 elements, DOF 117,141 -> 427,392):
+#       strain_energy moved 0.143%, tip_deflection 0.141%
+# The two-rung global-size delta had claimed 0.03%, so it understated the error by
+# about 4x. The worst measured value, rounded up, is carried for this family.
+FAMILY_EXTRA_SENSITIVITY = {
+    "tube": {
+        "value": 1.5e-3,
+        "why": "through-wall resolution: raising the curvature count 34 -> 60 at fixed "
+        "MeshSizeMax moved the answer 0.141% on tube_s0_c1 and 0.143% on tube_s1_c1 "
+        "(the two worst-resolved regimes, ~1.3-1.9 elements through the wall at the "
+        "shipped rung), which the two-rung global-size delta of 0.03% did not capture",
+    },
+}
 # Coverage factor applied to the numerical (random-like) uncertainty terms. A
 # known idealisation bias is added at full size instead, because it is a bias.
 UNCERTAINTY_COVERAGE = 3.0
@@ -1063,14 +1085,22 @@ def uncertainty_terms(entry: dict, name: str, kind: str) -> dict:
     candidates = [v for v in (delta, rich_error) if v is not None]
     discretisation = max(candidates) if candidates else None
     policy = MESH_POLICY_SENSITIVITY.get(kind, 0.0)
-    return {
+    extra = FAMILY_EXTRA_SENSITIVITY.get(entry.get("family"), {})
+    extra_value = float(extra.get("value", 0.0))
+    terms = {
         "rung_to_rung_delta": delta,
         "richardson_error_rel": rich_error,
         "richardson_order": rich.get("order") if isinstance(rich, dict) else None,
         "discretisation_rel": discretisation,
         "mesh_policy_rel": policy,
-        "numerical_rel": (discretisation + policy) if discretisation is not None else None,
+        "numerical_rel": (
+            discretisation + policy + extra_value if discretisation is not None else None
+        ),
     }
+    if extra_value:
+        terms["family_extra_rel"] = extra_value
+        terms["family_extra_why"] = extra.get("why")
+    return terms
 
 
 def derive_tol(numerical: float | None, idealisation: float) -> tuple[float, str]:

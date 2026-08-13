@@ -1,0 +1,3368 @@
+[
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "box_hole_s0_c0",
+    "order": 1,
+    "h_rel": 0.08,
+    "probe_nodes": 31,
+    "dofs": 978,
+    "wall_time_s": {
+      "mesh": 0.23320059999241494,
+      "solve": 0.1028816000034567,
+      "total": 0.33608219999587163
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.36402425445483483,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p1",
+    "timestamp": "2026-08-12T02:55:11.901362+00:00",
+    "notes": "h_rel=0.08; order=1; load=fixed resultant; probe=1.90792723664; raw_peak_von_mises_pa=1907927.23664; nominal_pa=1000000; truth=3; probe_nodes=31; nodes=346; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "box_hole_s0_c0",
+    "order": 1,
+    "h_rel": 0.08,
+    "probe_nodes": 27,
+    "dofs": 2808,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 3.052978499996243
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.663546124728184,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p1",
+    "timestamp": "2026-08-12T02:55:11.901362+00:00",
+    "notes": "h_rel=0.08; order=1; load=fixed resultant; probe=1.00936162582; raw_peak_von_mises_pa=1009361.62582; nominal_pa=1000000; truth=3; probe_nodes=27; nodes=975; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "box_hole_s0_c0",
+    "order": 1,
+    "h_rel": 0.08,
+    "probe_nodes": 246,
+    "dofs": 7581,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 5.62540610000724
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.09069036937038562,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p1",
+    "timestamp": "2026-08-12T02:55:11.901362+00:00",
+    "notes": "h_rel=0.08; order=1; load=fixed resultant; probe=2.72792889189; raw_peak_von_mises_pa=2727928.89189; nominal_pa=1000000; truth=3; probe_nodes=246; nodes=2578; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "box_hole_s0_c0",
+    "order": 2,
+    "h_rel": 0.08,
+    "probe_nodes": 188,
+    "dofs": 5715,
+    "wall_time_s": {
+      "mesh": 0.38311119997524656,
+      "solve": 0.3412595000118017,
+      "total": 0.7243706999870483
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.2737083359788208,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p2",
+    "timestamp": "2026-08-12T02:55:20.999263+00:00",
+    "notes": "h_rel=0.08; order=2; load=fixed resultant; probe=2.17887499206; raw_peak_von_mises_pa=2178874.99206; nominal_pa=1000000; truth=3; probe_nodes=188; nodes=1968; identical VTU nodal probe for every mesh variant; gmsh_high_order_optimize=2; gmsh_high_order_optimize_attempts=2"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "box_hole_s0_c0",
+    "order": 2,
+    "h_rel": 0.08,
+    "probe_nodes": 117,
+    "dofs": 10014,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 5.022835599986138
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.6618356638170485,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p2",
+    "timestamp": "2026-08-12T02:55:20.999263+00:00",
+    "notes": "h_rel=0.08; order=2; load=fixed resultant; probe=1.01449300855; raw_peak_von_mises_pa=1014493.00855; nominal_pa=1000000; truth=3; probe_nodes=117; nodes=3429; identical VTU nodal probe for every mesh variant; hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 576 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 975 nodes, h_bulk=0.005/h_fine=0.0025 m, fine_cells=72 transition=0 feature=72, snap max|d|=4.32e-08 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.002951 h_max=0.005345 m, levels L0=0 L1=72 | budget predicted=210 elems/631 DOF ceilings=589824/1769472 | mids projected=1408 partial=2 reverted=0",
+    "projection": "hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 576 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 975 nodes, h_bulk=0.005/h_fine=0.0025 m, fine_cells=72 transition=0 feature=72, snap max|d|=4.32e-08 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.002951 h_max=0.005345 m, levels L0=0 L1=72 | budget predicted=210 elems/631 DOF ceilings=589824/1769472 | mids projected=1408 partial=2 reverted=0"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "box_hole_s0_c0",
+    "order": 2,
+    "h_rel": 0.08,
+    "probe_nodes": 1573,
+    "dofs": 49482,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 16.64725219999673
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.11569143864968041,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p2",
+    "timestamp": "2026-08-12T02:55:20.999263+00:00",
+    "notes": "h_rel=0.08; order=2; load=fixed resultant; probe=3.34707431595; raw_peak_von_mises_pa=3347074.31595; nominal_pa=1000000; truth=3; probe_nodes=1573; nodes=16667; identical VTU nodal probe for every mesh variant; graded tet v6 (multi-level LEB geo + cap collapse/void carve): 10405 tets (0 bulk, 72 refined L1/L2, 68 feature, 72 seed), h_bulk=0.005/h_L2~0.00125 m (L0/L1/L2), snap max|d|=0.001 m mean|d|=1.31e-05 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.002951 h_max=0.005345 m, levels L0=0 L1=0 L2=72 | compact_orphans=116 | budget predicted=210 elems/631 DOF ceilings=589824/1769472 | mids projected=3333 partial=47 reverted=11",
+    "projection": "graded tet v6 (multi-level LEB geo + cap collapse/void carve): 10405 tets (0 bulk, 72 refined L1/L2, 68 feature, 72 seed), h_bulk=0.005/h_L2~0.00125 m (L0/L1/L2), snap max|d|=0.001 m mean|d|=1.31e-05 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.002951 h_max=0.005345 m, levels L0=0 L1=0 L2=72 | compact_orphans=116 | budget predicted=210 elems/631 DOF ceilings=589824/1769472 | mids projected=3333 partial=47 reverted=11"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "box_hole_s0_c0",
+    "order": 1,
+    "h_rel": 0.12,
+    "probe_nodes": 31,
+    "dofs": 720,
+    "wall_time_s": {
+      "mesh": 0.20126120001077652,
+      "solve": 0.09743360002175905,
+      "total": 0.29869480003253557
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.35778818732108286,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p1",
+    "timestamp": "2026-08-12T02:55:01.204724+00:00",
+    "notes": "h_rel=0.12; order=1; load=fixed resultant; probe=1.92663543804; raw_peak_von_mises_pa=1926635.43804; nominal_pa=1000000; truth=3; probe_nodes=31; nodes=257; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "box_hole_s0_c0",
+    "order": 1,
+    "h_rel": 0.12,
+    "probe_nodes": 25,
+    "dofs": 1296,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 1.3612158999894746
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.663233403381185,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p1",
+    "timestamp": "2026-08-12T02:55:01.204724+00:00",
+    "notes": "h_rel=0.12; order=1; load=fixed resultant; probe=1.01029978986; raw_peak_von_mises_pa=1010299.78986; nominal_pa=1000000; truth=3; probe_nodes=25; nodes=459; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "box_hole_s0_c0",
+    "order": 1,
+    "h_rel": 0.12,
+    "probe_nodes": 56,
+    "dofs": 3294,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 2.1485168999934103
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.6634193727854297,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p1",
+    "timestamp": "2026-08-12T02:55:01.204724+00:00",
+    "notes": "h_rel=0.12; order=1; load=fixed resultant; probe=1.00974188164; raw_peak_von_mises_pa=1009741.88164; nominal_pa=1000000; truth=3; probe_nodes=56; nodes=1132; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "box_hole_s0_c0",
+    "order": 2,
+    "h_rel": 0.12,
+    "probe_nodes": 173,
+    "dofs": 4206,
+    "wall_time_s": {
+      "mesh": 0.3353587999881711,
+      "solve": 0.2622094000107609,
+      "total": 0.597568199998932
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.25001193911106734,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p2",
+    "timestamp": "2026-08-12T02:55:05.069182+00:00",
+    "notes": "h_rel=0.12; order=2; load=fixed resultant; probe=2.24996418267; raw_peak_von_mises_pa=2249964.18267; nominal_pa=1000000; truth=3; probe_nodes=173; nodes=1455; identical VTU nodal probe for every mesh variant; gmsh_high_order_optimize=2; gmsh_high_order_optimize_attempts=2"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "box_hole_s0_c0",
+    "order": 2,
+    "h_rel": 0.12,
+    "probe_nodes": 79,
+    "dofs": 4557,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 1.6579658999980893
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.6592311315777942,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p2",
+    "timestamp": "2026-08-12T02:55:05.069182+00:00",
+    "notes": "h_rel=0.12; order=2; load=fixed resultant; probe=1.02230660527; raw_peak_von_mises_pa=1022306.60527; nominal_pa=1000000; truth=3; probe_nodes=79; nodes=1581; identical VTU nodal probe for every mesh variant; hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 256 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 459 nodes, h_bulk=0.0075/h_fine=0.00375 m, fine_cells=32 transition=0 feature=32, snap max|d|=4.68e-15 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.004063 h_max=0.008017 m, levels L0=0 L1=32 | budget predicted=62 elems/187 DOF ceilings=589824/1769472 | mids projected=679 partial=2 reverted=0",
+    "projection": "hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 256 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 459 nodes, h_bulk=0.0075/h_fine=0.00375 m, fine_cells=32 transition=0 feature=32, snap max|d|=4.68e-15 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.004063 h_max=0.008017 m, levels L0=0 L1=32 | budget predicted=62 elems/187 DOF ceilings=589824/1769472 | mids projected=679 partial=2 reverted=0"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "box_hole_s0_c0",
+    "order": 2,
+    "h_rel": 0.12,
+    "probe_nodes": 344,
+    "dofs": 21003,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 4.4355163000000175
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.6494256130267576,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p2",
+    "timestamp": "2026-08-12T02:55:05.069182+00:00",
+    "notes": "h_rel=0.12; order=2; load=fixed resultant; probe=1.05172316092; raw_peak_von_mises_pa=1051723.16092; nominal_pa=1000000; truth=3; probe_nodes=344; nodes=7114; identical VTU nodal probe for every mesh variant; graded tet v6 (multi-level LEB geo + cap collapse/void carve): 4332 tets (0 bulk, 32 refined L1/L2, 32 feature, 32 seed), h_bulk=0.0075/h_L2~0.001875 m (L0/L1/L2), snap max|d|=7.07e-05 m mean|d|=1.32e-07 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.004063 h_max=0.008017 m, levels L0=0 L1=0 L2=32 | compact_orphans=6 | budget predicted=62 elems/187 DOF ceilings=589824/1769472 | mids projected=1585 partial=2 reverted=0",
+    "projection": "graded tet v6 (multi-level LEB geo + cap collapse/void carve): 4332 tets (0 bulk, 32 refined L1/L2, 32 feature, 32 seed), h_bulk=0.0075/h_L2~0.001875 m (L0/L1/L2), snap max|d|=7.07e-05 m mean|d|=1.32e-07 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.004063 h_max=0.008017 m, levels L0=0 L1=0 L2=32 | compact_orphans=6 | budget predicted=62 elems/187 DOF ceilings=589824/1769472 | mids projected=1585 partial=2 reverted=0"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "box_hole_s0_c0",
+    "order": 1,
+    "h_rel": 0.2,
+    "probe_nodes": 31,
+    "dofs": 720,
+    "wall_time_s": {
+      "mesh": 0.21438019999186508,
+      "solve": 0.14172030001645908,
+      "total": 0.35610050000832416
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.35778818732108286,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p1",
+    "timestamp": "2026-08-12T02:54:55.117224+00:00",
+    "notes": "h_rel=0.20; order=1; load=fixed resultant; probe=1.92663543804; raw_peak_von_mises_pa=1926635.43804; nominal_pa=1000000; truth=3; probe_nodes=31; nodes=257; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "box_hole_s0_c0",
+    "order": 1,
+    "h_rel": 0.2,
+    "probe_nodes": 0,
+    "dofs": 621,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.6149874000111595
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": null,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p1",
+    "timestamp": "2026-08-12T02:54:55.117224+00:00",
+    "notes": "h_rel=0.20; order=1; load=fixed resultant; probe=null; truth=3; probe_nodes=0; nodes=228; identical VTU nodal probe for every mesh variant; probe selection contained no nodes"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "box_hole_s0_c0",
+    "order": 1,
+    "h_rel": 0.2,
+    "probe_nodes": 0,
+    "dofs": 1161,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 1.0828052000142634
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": null,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p1",
+    "timestamp": "2026-08-12T02:54:55.117224+00:00",
+    "notes": "h_rel=0.20; order=1; load=fixed resultant; probe=null; truth=3; probe_nodes=0; nodes=402; identical VTU nodal probe for every mesh variant; probe selection contained no nodes"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "box_hole_s0_c0",
+    "order": 2,
+    "h_rel": 0.2,
+    "probe_nodes": 173,
+    "dofs": 4206,
+    "wall_time_s": {
+      "mesh": 0.26886320000630803,
+      "solve": 0.3212190000049304,
+      "total": 0.5900822000112385
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.25001193911106734,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p2",
+    "timestamp": "2026-08-12T02:54:57.199418+00:00",
+    "notes": "h_rel=0.20; order=2; load=fixed resultant; probe=2.24996418267; raw_peak_von_mises_pa=2249964.18267; nominal_pa=1000000; truth=3; probe_nodes=173; nodes=1455; identical VTU nodal probe for every mesh variant; gmsh_high_order_optimize=2; gmsh_high_order_optimize_attempts=2"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "box_hole_s0_c0",
+    "order": 2,
+    "h_rel": 0.2,
+    "probe_nodes": 0,
+    "dofs": 2145,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 1.0484802999999374
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": null,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p2",
+    "timestamp": "2026-08-12T02:54:57.199418+00:00",
+    "notes": "h_rel=0.20; order=2; load=fixed resultant; probe=null; truth=3; probe_nodes=0; nodes=768; identical VTU nodal probe for every mesh variant; probe selection contained no nodes; hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 112 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 228 nodes, h_bulk=0.012/h_fine=0.006 m, fine_cells=14 transition=0 feature=14, snap max|d|=2.33e-08 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.009089 h_max=0.01336 m, levels L0=0 L1=14 | budget predicted=13 elems/40 DOF ceilings=589824/1769472 | mids projected=366 partial=6 reverted=4",
+    "projection": "hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 112 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 228 nodes, h_bulk=0.012/h_fine=0.006 m, fine_cells=14 transition=0 feature=14, snap max|d|=2.33e-08 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.009089 h_max=0.01336 m, levels L0=0 L1=14 | budget predicted=13 elems/40 DOF ceilings=589824/1769472 | mids projected=366 partial=6 reverted=4"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "box_hole_s0_c0",
+    "order": 2,
+    "h_rel": 0.2,
+    "probe_nodes": 0,
+    "dofs": 7272,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 2.2896619000239298
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": null,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p2",
+    "timestamp": "2026-08-12T02:54:57.199418+00:00",
+    "notes": "h_rel=0.20; order=2; load=fixed resultant; probe=null; truth=3; probe_nodes=0; nodes=2469; identical VTU nodal probe for every mesh variant; probe selection contained no nodes; graded tet v6 (multi-level LEB geo + cap collapse/void carve): 1460 tets (0 bulk, 14 refined L1/L2, 14 feature, 14 seed), h_bulk=0.012/h_L2~0.003 m (L0/L1/L2), snap max|d|=3.33e-14 m mean|d|=4.94e-16 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.009089 h_max=0.01336 m, levels L0=0 L1=0 L2=14 | compact_orphans=60 | budget predicted=13 elems/40 DOF ceilings=589824/1769472 | mids projected=613 partial=1 reverted=7",
+    "projection": "graded tet v6 (multi-level LEB geo + cap collapse/void carve): 1460 tets (0 bulk, 14 refined L1/L2, 14 feature, 14 seed), h_bulk=0.012/h_L2~0.003 m (L0/L1/L2), snap max|d|=3.33e-14 m mean|d|=4.94e-16 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.009089 h_max=0.01336 m, levels L0=0 L1=0 L2=14 | compact_orphans=60 | budget predicted=13 elems/40 DOF ceilings=589824/1769472 | mids projected=613 partial=1 reverted=7"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "box_hole_s1_c0",
+    "order": 1,
+    "h_rel": 0.08,
+    "probe_nodes": 31,
+    "dofs": 906,
+    "wall_time_s": {
+      "mesh": 0.19509829999879003,
+      "solve": 0.10670989999198355,
+      "total": 0.3018081999907736
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.29716747542379124,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p1",
+    "timestamp": "2026-08-12T02:55:59.817269+00:00",
+    "notes": "h_rel=0.08; order=1; load=fixed resultant; probe=2.10849757373; raw_peak_von_mises_pa=2108497.57373; nominal_pa=1000000; truth=3; probe_nodes=31; nodes=322; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "box_hole_s1_c0",
+    "order": 1,
+    "h_rel": 0.08,
+    "probe_nodes": 18,
+    "dofs": 2547,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 2.074503099982394
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.7299072946715256,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p1",
+    "timestamp": "2026-08-12T02:55:59.817269+00:00",
+    "notes": "h_rel=0.08; order=1; load=fixed resultant; probe=0.810278115985; raw_peak_von_mises_pa=810278.115985; nominal_pa=1000000; truth=3; probe_nodes=18; nodes=888; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "box_hole_s1_c0",
+    "order": 1,
+    "h_rel": 0.08,
+    "probe_nodes": 60,
+    "dofs": 5232,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 3.602989399980288
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.484486118449656,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p1",
+    "timestamp": "2026-08-12T02:55:59.817269+00:00",
+    "notes": "h_rel=0.08; order=1; load=fixed resultant; probe=1.54654164465; raw_peak_von_mises_pa=1546541.64465; nominal_pa=1000000; truth=3; probe_nodes=60; nodes=1794; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "box_hole_s1_c0",
+    "order": 2,
+    "h_rel": 0.08,
+    "probe_nodes": 193,
+    "dofs": 5304,
+    "wall_time_s": {
+      "mesh": 0.3072067000030074,
+      "solve": 0.2694463000225369,
+      "total": 0.5766530000255443
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.24633186808287708,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p2",
+    "timestamp": "2026-08-12T02:56:05.868364+00:00",
+    "notes": "h_rel=0.08; order=2; load=fixed resultant; probe=2.26100439575; raw_peak_von_mises_pa=2261004.39575; nominal_pa=1000000; truth=3; probe_nodes=193; nodes=1831; identical VTU nodal probe for every mesh variant; gmsh_high_order_optimize=2; gmsh_high_order_optimize_attempts=2"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "box_hole_s1_c0",
+    "order": 2,
+    "h_rel": 0.08,
+    "probe_nodes": 71,
+    "dofs": 9078,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 4.266835999995237
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.5984243958088163,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p2",
+    "timestamp": "2026-08-12T02:56:05.868364+00:00",
+    "notes": "h_rel=0.08; order=2; load=fixed resultant; probe=1.20472681257; raw_peak_von_mises_pa=1204726.81257; nominal_pa=1000000; truth=3; probe_nodes=71; nodes=3127; identical VTU nodal probe for every mesh variant; hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 512 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 888 nodes, h_bulk=0.01091/h_fine=0.005455 m, fine_cells=64 transition=0 feature=64, snap max|d|=7.91e-06 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.008257 h_max=0.01092 m, levels L0=0 L1=64 | budget predicted=190 elems/570 DOF ceilings=589824/1769472 | mids projected=1329 partial=5 reverted=0",
+    "projection": "hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 512 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 888 nodes, h_bulk=0.01091/h_fine=0.005455 m, fine_cells=64 transition=0 feature=64, snap max|d|=7.91e-06 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.008257 h_max=0.01092 m, levels L0=0 L1=64 | budget predicted=190 elems/570 DOF ceilings=589824/1769472 | mids projected=1329 partial=5 reverted=0"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "box_hole_s1_c0",
+    "order": 2,
+    "h_rel": 0.08,
+    "probe_nodes": 318,
+    "dofs": 33282,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 7.862711099995067
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.5185614972619098,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p2",
+    "timestamp": "2026-08-12T02:56:05.868364+00:00",
+    "notes": "h_rel=0.08; order=2; load=fixed resultant; probe=1.44431550821; raw_peak_von_mises_pa=1444315.50821; nominal_pa=1000000; truth=3; probe_nodes=318; nodes=11265; identical VTU nodal probe for every mesh variant; graded tet v6 (multi-level LEB geo + cap collapse/void carve): 6832 tets (0 bulk, 64 refined L1/L2, 60 feature, 64 seed), h_bulk=0.01091/h_L2~0.002727 m (L0/L1/L2), snap max|d|=7.61e-06 m mean|d|=3.23e-08 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.008257 h_max=0.01092 m, levels L0=0 L1=0 L2=64 | compact_orphans=11 | budget predicted=190 elems/570 DOF ceilings=589824/1769472 | mids projected=2566 partial=0 reverted=0",
+    "projection": "graded tet v6 (multi-level LEB geo + cap collapse/void carve): 6832 tets (0 bulk, 64 refined L1/L2, 60 feature, 64 seed), h_bulk=0.01091/h_L2~0.002727 m (L0/L1/L2), snap max|d|=7.61e-06 m mean|d|=3.23e-08 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.008257 h_max=0.01092 m, levels L0=0 L1=0 L2=64 | compact_orphans=11 | budget predicted=190 elems/570 DOF ceilings=589824/1769472 | mids projected=2566 partial=0 reverted=0"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "box_hole_s1_c0",
+    "order": 1,
+    "h_rel": 0.12,
+    "probe_nodes": 31,
+    "dofs": 657,
+    "wall_time_s": {
+      "mesh": 0.19722900001215748,
+      "solve": 0.06731670000590384,
+      "total": 0.2645457000180613
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.28180922308120265,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p1",
+    "timestamp": "2026-08-12T02:55:48.815956+00:00",
+    "notes": "h_rel=0.12; order=1; load=fixed resultant; probe=2.15457233076; raw_peak_von_mises_pa=2154572.33076; nominal_pa=1000000; truth=3; probe_nodes=31; nodes=236; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "box_hole_s1_c0",
+    "order": 1,
+    "h_rel": 0.12,
+    "probe_nodes": 27,
+    "dofs": 1296,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 1.0108211999759078
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.662393544756347,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p1",
+    "timestamp": "2026-08-12T02:55:48.815956+00:00",
+    "notes": "h_rel=0.12; order=1; load=fixed resultant; probe=1.01281936573; raw_peak_von_mises_pa=1012819.36573; nominal_pa=1000000; truth=3; probe_nodes=27; nodes=459; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "box_hole_s1_c0",
+    "order": 1,
+    "h_rel": 0.12,
+    "probe_nodes": 72,
+    "dofs": 3396,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 2.352174899977399
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.5375691572160658,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p1",
+    "timestamp": "2026-08-12T02:55:48.815956+00:00",
+    "notes": "h_rel=0.12; order=1; load=fixed resultant; probe=1.38729252835; raw_peak_von_mises_pa=1387292.52835; nominal_pa=1000000; truth=3; probe_nodes=72; nodes=1164; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "box_hole_s1_c0",
+    "order": 2,
+    "h_rel": 0.12,
+    "probe_nodes": 180,
+    "dofs": 3828,
+    "wall_time_s": {
+      "mesh": 0.27931000001262873,
+      "solve": 0.1921808999904897,
+      "total": 0.47149090000311844
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.24029441345015665,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p2",
+    "timestamp": "2026-08-12T02:55:52.485521+00:00",
+    "notes": "h_rel=0.12; order=2; load=fixed resultant; probe=2.27911675965; raw_peak_von_mises_pa=2279116.75965; nominal_pa=1000000; truth=3; probe_nodes=180; nodes=1329; identical VTU nodal probe for every mesh variant; gmsh_high_order_optimize=2; gmsh_high_order_optimize_attempts=2"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "box_hole_s1_c0",
+    "order": 2,
+    "h_rel": 0.12,
+    "probe_nodes": 81,
+    "dofs": 4557,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 1.892010500014294
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.657089498783615,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p2",
+    "timestamp": "2026-08-12T02:55:52.485521+00:00",
+    "notes": "h_rel=0.12; order=2; load=fixed resultant; probe=1.02873150365; raw_peak_von_mises_pa=1028731.50365; nominal_pa=1000000; truth=3; probe_nodes=81; nodes=1581; identical VTU nodal probe for every mesh variant; hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 256 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 459 nodes, h_bulk=0.01621/h_fine=0.008106 m, fine_cells=32 transition=0 feature=32, snap max|d|=9.7e-08 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.007838 h_max=0.01638 m, levels L0=0 L1=32 | budget predicted=56 elems/169 DOF ceilings=589824/1769472 | mids projected=679 partial=2 reverted=0",
+    "projection": "hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 256 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 459 nodes, h_bulk=0.01621/h_fine=0.008106 m, fine_cells=32 transition=0 feature=32, snap max|d|=9.7e-08 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.007838 h_max=0.01638 m, levels L0=0 L1=32 | budget predicted=56 elems/169 DOF ceilings=589824/1769472 | mids projected=679 partial=2 reverted=0"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "box_hole_s1_c0",
+    "order": 2,
+    "h_rel": 0.12,
+    "probe_nodes": 497,
+    "dofs": 21828,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 4.8323324999946635
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.5033968038518332,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p2",
+    "timestamp": "2026-08-12T02:55:52.485521+00:00",
+    "notes": "h_rel=0.12; order=2; load=fixed resultant; probe=1.48980958844; raw_peak_von_mises_pa=1489809.58844; nominal_pa=1000000; truth=3; probe_nodes=497; nodes=7381; identical VTU nodal probe for every mesh variant; graded tet v6 (multi-level LEB geo + cap collapse/void carve): 4531 tets (0 bulk, 32 refined L1/L2, 32 feature, 32 seed), h_bulk=0.01621/h_L2~0.004053 m (L0/L1/L2), snap max|d|=0.00054 m mean|d|=2.98e-06 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.007838 h_max=0.01638 m, levels L0=0 L1=0 L2=32 | compact_orphans=45 | budget predicted=56 elems/169 DOF ceilings=589824/1769472 | mids projected=1576 partial=5 reverted=1",
+    "projection": "graded tet v6 (multi-level LEB geo + cap collapse/void carve): 4531 tets (0 bulk, 32 refined L1/L2, 32 feature, 32 seed), h_bulk=0.01621/h_L2~0.004053 m (L0/L1/L2), snap max|d|=0.00054 m mean|d|=2.98e-06 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.007838 h_max=0.01638 m, levels L0=0 L1=0 L2=32 | compact_orphans=45 | budget predicted=56 elems/169 DOF ceilings=589824/1769472 | mids projected=1576 partial=5 reverted=1"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "box_hole_s1_c0",
+    "order": 1,
+    "h_rel": 0.2,
+    "probe_nodes": 31,
+    "dofs": 657,
+    "wall_time_s": {
+      "mesh": 0.212078400014434,
+      "solve": 0.06742850001319312,
+      "total": 0.2795069000276271
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.28180922308120265,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p1",
+    "timestamp": "2026-08-12T02:55:43.639729+00:00",
+    "notes": "h_rel=0.20; order=1; load=fixed resultant; probe=2.15457233076; raw_peak_von_mises_pa=2154572.33076; nominal_pa=1000000; truth=3; probe_nodes=31; nodes=236; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "box_hole_s1_c0",
+    "order": 1,
+    "h_rel": 0.2,
+    "probe_nodes": 0,
+    "dofs": 621,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.4926813000056427
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": null,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p1",
+    "timestamp": "2026-08-12T02:55:43.639729+00:00",
+    "notes": "h_rel=0.20; order=1; load=fixed resultant; probe=null; truth=3; probe_nodes=0; nodes=228; identical VTU nodal probe for every mesh variant; probe selection contained no nodes"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "box_hole_s1_c0",
+    "order": 1,
+    "h_rel": 0.2,
+    "probe_nodes": 0,
+    "dofs": 1272,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 1.0434446000144817
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": null,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p1",
+    "timestamp": "2026-08-12T02:55:43.639729+00:00",
+    "notes": "h_rel=0.20; order=1; load=fixed resultant; probe=null; truth=3; probe_nodes=0; nodes=441; identical VTU nodal probe for every mesh variant; probe selection contained no nodes"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "box_hole_s1_c0",
+    "order": 2,
+    "h_rel": 0.2,
+    "probe_nodes": 180,
+    "dofs": 3828,
+    "wall_time_s": {
+      "mesh": 0.285764600004768,
+      "solve": 0.21978600000147708,
+      "total": 0.5055506000062451
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.24029441345015665,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p2",
+    "timestamp": "2026-08-12T02:55:45.481791+00:00",
+    "notes": "h_rel=0.20; order=2; load=fixed resultant; probe=2.27911675965; raw_peak_von_mises_pa=2279116.75965; nominal_pa=1000000; truth=3; probe_nodes=180; nodes=1329; identical VTU nodal probe for every mesh variant; gmsh_high_order_optimize=2; gmsh_high_order_optimize_attempts=2"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "box_hole_s1_c0",
+    "order": 2,
+    "h_rel": 0.2,
+    "probe_nodes": 0,
+    "dofs": 2145,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.9616378000064287
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": null,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p2",
+    "timestamp": "2026-08-12T02:55:45.481791+00:00",
+    "notes": "h_rel=0.20; order=2; load=fixed resultant; probe=null; truth=3; probe_nodes=0; nodes=768; identical VTU nodal probe for every mesh variant; probe selection contained no nodes; hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 112 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 228 nodes, h_bulk=0.024/h_fine=0.012 m, fine_cells=14 transition=0 feature=14, snap max|d|=4.04e-08 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.0196 h_max=0.0273 m, levels L0=0 L1=14 | budget predicted=12 elems/36 DOF ceilings=589824/1769472 | mids projected=366 partial=6 reverted=4",
+    "projection": "hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 112 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 228 nodes, h_bulk=0.024/h_fine=0.012 m, fine_cells=14 transition=0 feature=14, snap max|d|=4.04e-08 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.0196 h_max=0.0273 m, levels L0=0 L1=14 | budget predicted=12 elems/36 DOF ceilings=589824/1769472 | mids projected=366 partial=6 reverted=4"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "box_hole_s1_c0",
+    "order": 2,
+    "h_rel": 0.2,
+    "probe_nodes": 0,
+    "dofs": 7992,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 1.777928299998166
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": null,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p2",
+    "timestamp": "2026-08-12T02:55:45.481791+00:00",
+    "notes": "h_rel=0.20; order=2; load=fixed resultant; probe=null; truth=3; probe_nodes=0; nodes=2715; identical VTU nodal probe for every mesh variant; probe selection contained no nodes; graded tet v6 (multi-level LEB geo + cap collapse/void carve): 1616 tets (0 bulk, 14 refined L1/L2, 14 feature, 14 seed), h_bulk=0.024/h_L2~0.006 m (L0/L1/L2), snap max|d|=3.35e-14 m mean|d|=6.62e-16 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.0196 h_max=0.0273 m, levels L0=0 L1=0 L2=14 | compact_orphans=57 | budget predicted=12 elems/36 DOF ceilings=589824/1769472 | mids projected=648 partial=4 reverted=6",
+    "projection": "graded tet v6 (multi-level LEB geo + cap collapse/void carve): 1616 tets (0 bulk, 14 refined L1/L2, 14 feature, 14 seed), h_bulk=0.024/h_L2~0.006 m (L0/L1/L2), snap max|d|=3.35e-14 m mean|d|=6.62e-16 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.0196 h_max=0.0273 m, levels L0=0 L1=0 L2=14 | compact_orphans=57 | budget predicted=12 elems/36 DOF ceilings=589824/1769472 | mids projected=648 partial=4 reverted=6"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "box_hole_s2_c0",
+    "order": 1,
+    "h_rel": 0.08,
+    "probe_nodes": 29,
+    "dofs": 1026,
+    "wall_time_s": {
+      "mesh": 0.19710019999183714,
+      "solve": 0.09933370002545416,
+      "total": 0.2964339000172913
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.35754598131546494,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p1",
+    "timestamp": "2026-08-12T02:56:34.255022+00:00",
+    "notes": "h_rel=0.08; order=1; load=fixed resultant; probe=1.92736205605; raw_peak_von_mises_pa=1927362.05605; nominal_pa=1000000; truth=3; probe_nodes=29; nodes=362; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "box_hole_s2_c0",
+    "order": 1,
+    "h_rel": 0.08,
+    "probe_nodes": 27,
+    "dofs": 2808,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 3.1681137999985367
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.6632306101542894,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p1",
+    "timestamp": "2026-08-12T02:56:34.255022+00:00",
+    "notes": "h_rel=0.08; order=1; load=fixed resultant; probe=1.01030816954; raw_peak_von_mises_pa=1010308.16954; nominal_pa=1000000; truth=3; probe_nodes=27; nodes=975; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "box_hole_s2_c0",
+    "order": 1,
+    "h_rel": 0.08,
+    "probe_nodes": 263,
+    "dofs": 7725,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 5.280674400011776
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.08303413386731891,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p1",
+    "timestamp": "2026-08-12T02:56:34.255022+00:00",
+    "notes": "h_rel=0.08; order=1; load=fixed resultant; probe=2.7508975984; raw_peak_von_mises_pa=2750897.5984; nominal_pa=1000000; truth=3; probe_nodes=263; nodes=2626; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "box_hole_s2_c0",
+    "order": 2,
+    "h_rel": 0.08,
+    "probe_nodes": 180,
+    "dofs": 6000,
+    "wall_time_s": {
+      "mesh": 0.33618129999376833,
+      "solve": 0.34945609999704175,
+      "total": 0.6856373999908101
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.27838769618234593,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p2",
+    "timestamp": "2026-08-12T02:56:43.069269+00:00",
+    "notes": "h_rel=0.08; order=2; load=fixed resultant; probe=2.16483691145; raw_peak_von_mises_pa=2164836.91145; nominal_pa=1000000; truth=3; probe_nodes=180; nodes=2063; identical VTU nodal probe for every mesh variant; gmsh_high_order_optimize=2; gmsh_high_order_optimize_attempts=2"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "box_hole_s2_c0",
+    "order": 2,
+    "h_rel": 0.08,
+    "probe_nodes": 117,
+    "dofs": 10014,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 4.830623999994714
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.6612254255087743,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p2",
+    "timestamp": "2026-08-12T02:56:43.069269+00:00",
+    "notes": "h_rel=0.08; order=2; load=fixed resultant; probe=1.01632372347; raw_peak_von_mises_pa=1016323.72347; nominal_pa=1000000; truth=3; probe_nodes=117; nodes=3429; identical VTU nodal probe for every mesh variant; hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 576 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 975 nodes, h_bulk=0.01861/h_fine=0.009306 m, fine_cells=72 transition=0 feature=72, snap max|d|=1.47e-07 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.01129 h_max=0.01976 m, levels L0=0 L1=72 | budget predicted=214 elems/641 DOF ceilings=589824/1769472 | mids projected=1408 partial=2 reverted=0",
+    "projection": "hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 576 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 975 nodes, h_bulk=0.01861/h_fine=0.009306 m, fine_cells=72 transition=0 feature=72, snap max|d|=1.47e-07 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.01129 h_max=0.01976 m, levels L0=0 L1=72 | budget predicted=214 elems/641 DOF ceilings=589824/1769472 | mids projected=1408 partial=2 reverted=0"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "box_hole_s2_c0",
+    "order": 2,
+    "h_rel": 0.08,
+    "probe_nodes": 1631,
+    "dofs": 50538,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 92.00382460001856
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.007156090971624322,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p2",
+    "timestamp": "2026-08-12T02:56:43.069269+00:00",
+    "notes": "h_rel=0.08; order=2; load=fixed resultant; probe=2.97853172709; raw_peak_von_mises_pa=2978531.72709; nominal_pa=1000000; truth=3; probe_nodes=1631; nodes=17017; identical VTU nodal probe for every mesh variant; graded tet v6 (multi-level LEB geo + cap collapse/void carve): 10651 tets (0 bulk, 72 refined L1/L2, 68 feature, 72 seed), h_bulk=0.01861/h_L2~0.004653 m (L0/L1/L2), snap max|d|=0.00284 m mean|d|=4.89e-05 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.01129 h_max=0.01976 m, levels L0=0 L1=0 L2=72 | compact_orphans=126 | budget predicted=214 elems/641 DOF ceilings=589824/1769472 | mids projected=3373 partial=39 reverted=12",
+    "projection": "graded tet v6 (multi-level LEB geo + cap collapse/void carve): 10651 tets (0 bulk, 72 refined L1/L2, 68 feature, 72 seed), h_bulk=0.01861/h_L2~0.004653 m (L0/L1/L2), snap max|d|=0.00284 m mean|d|=4.89e-05 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.01129 h_max=0.01976 m, levels L0=0 L1=0 L2=72 | compact_orphans=126 | budget predicted=214 elems/641 DOF ceilings=589824/1769472 | mids projected=3373 partial=39 reverted=12"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "box_hole_s2_c0",
+    "order": 1,
+    "h_rel": 0.12,
+    "probe_nodes": 29,
+    "dofs": 738,
+    "wall_time_s": {
+      "mesh": 0.19625089998589829,
+      "solve": 0.08389660000102594,
+      "total": 0.28014749998692423
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.35975357772606337,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p1",
+    "timestamp": "2026-08-12T02:56:23.919374+00:00",
+    "notes": "h_rel=0.12; order=1; load=fixed resultant; probe=1.92073926682; raw_peak_von_mises_pa=1920739.26682; nominal_pa=1000000; truth=3; probe_nodes=29; nodes=263; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "box_hole_s2_c0",
+    "order": 1,
+    "h_rel": 0.12,
+    "probe_nodes": 25,
+    "dofs": 1296,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 1.2879096000106074
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.6628814914284568,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p1",
+    "timestamp": "2026-08-12T02:56:23.919374+00:00",
+    "notes": "h_rel=0.12; order=1; load=fixed resultant; probe=1.01135552571; raw_peak_von_mises_pa=1011355.52571; nominal_pa=1000000; truth=3; probe_nodes=25; nodes=459; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "box_hole_s2_c0",
+    "order": 1,
+    "h_rel": 0.12,
+    "probe_nodes": 50,
+    "dofs": 3291,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 2.1670523999782745
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.6629683274114352,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p1",
+    "timestamp": "2026-08-12T02:56:23.919374+00:00",
+    "notes": "h_rel=0.12; order=1; load=fixed resultant; probe=1.01109501777; raw_peak_von_mises_pa=1011095.01777; nominal_pa=1000000; truth=3; probe_nodes=50; nodes=1127; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "box_hole_s2_c0",
+    "order": 2,
+    "h_rel": 0.12,
+    "probe_nodes": 155,
+    "dofs": 4314,
+    "wall_time_s": {
+      "mesh": 0.3018701999972109,
+      "solve": 0.3351822000113316,
+      "total": 0.6370524000085425
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.2604411918042319,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p2",
+    "timestamp": "2026-08-12T02:56:27.700700+00:00",
+    "notes": "h_rel=0.12; order=2; load=fixed resultant; probe=2.21867642459; raw_peak_von_mises_pa=2218676.42459; nominal_pa=1000000; truth=3; probe_nodes=155; nodes=1491; identical VTU nodal probe for every mesh variant; gmsh_high_order_optimize=2; gmsh_high_order_optimize_attempts=2"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "box_hole_s2_c0",
+    "order": 2,
+    "h_rel": 0.12,
+    "probe_nodes": 73,
+    "dofs": 4557,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 1.6794880999950692
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.6583241648535182,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p2",
+    "timestamp": "2026-08-12T02:56:27.700700+00:00",
+    "notes": "h_rel=0.12; order=2; load=fixed resultant; probe=1.02502750544; raw_peak_von_mises_pa=1025027.50544; nominal_pa=1000000; truth=3; probe_nodes=73; nodes=1581; identical VTU nodal probe for every mesh variant; hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 256 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 459 nodes, h_bulk=0.02792/h_fine=0.01396 m, fine_cells=32 transition=0 feature=32, snap max|d|=3.82e-14 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.01588 h_max=0.02964 m, levels L0=0 L1=32 | budget predicted=63 elems/190 DOF ceilings=589824/1769472 | mids projected=679 partial=2 reverted=0",
+    "projection": "hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 256 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 459 nodes, h_bulk=0.02792/h_fine=0.01396 m, fine_cells=32 transition=0 feature=32, snap max|d|=3.82e-14 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.01588 h_max=0.02964 m, levels L0=0 L1=32 | budget predicted=63 elems/190 DOF ceilings=589824/1769472 | mids projected=679 partial=2 reverted=0"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "box_hole_s2_c0",
+    "order": 2,
+    "h_rel": 0.12,
+    "probe_nodes": 319,
+    "dofs": 21000,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 4.119836700003361
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.6267802910710685,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p2",
+    "timestamp": "2026-08-12T02:56:27.700700+00:00",
+    "notes": "h_rel=0.12; order=2; load=fixed resultant; probe=1.11965912679; raw_peak_von_mises_pa=1119659.12679; nominal_pa=1000000; truth=3; probe_nodes=319; nodes=7095; identical VTU nodal probe for every mesh variant; graded tet v6 (multi-level LEB geo + cap collapse/void carve): 4322 tets (0 bulk, 32 refined L1/L2, 32 feature, 32 seed), h_bulk=0.02792/h_L2~0.006979 m (L0/L1/L2), snap max|d|=9.16e-14 m mean|d|=5.9e-16 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.01588 h_max=0.02964 m, levels L0=0 L1=0 L2=32 | budget predicted=63 elems/190 DOF ceilings=589824/1769472 | mids projected=1573 partial=1 reverted=0",
+    "projection": "graded tet v6 (multi-level LEB geo + cap collapse/void carve): 4322 tets (0 bulk, 32 refined L1/L2, 32 feature, 32 seed), h_bulk=0.02792/h_L2~0.006979 m (L0/L1/L2), snap max|d|=9.16e-14 m mean|d|=5.9e-16 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.01588 h_max=0.02964 m, levels L0=0 L1=0 L2=32 | budget predicted=63 elems/190 DOF ceilings=589824/1769472 | mids projected=1573 partial=1 reverted=0"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "box_hole_s2_c0",
+    "order": 1,
+    "h_rel": 0.2,
+    "probe_nodes": 29,
+    "dofs": 738,
+    "wall_time_s": {
+      "mesh": 0.20062930000131018,
+      "solve": 0.08974229998420924,
+      "total": 0.2903715999855194
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.35975357772606337,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p1",
+    "timestamp": "2026-08-12T02:56:18.828120+00:00",
+    "notes": "h_rel=0.20; order=1; load=fixed resultant; probe=1.92073926682; raw_peak_von_mises_pa=1920739.26682; nominal_pa=1000000; truth=3; probe_nodes=29; nodes=263; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "box_hole_s2_c0",
+    "order": 1,
+    "h_rel": 0.2,
+    "probe_nodes": 0,
+    "dofs": 621,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.5613816000113729
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": null,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p1",
+    "timestamp": "2026-08-12T02:56:18.828120+00:00",
+    "notes": "h_rel=0.20; order=1; load=fixed resultant; probe=null; truth=3; probe_nodes=0; nodes=228; identical VTU nodal probe for every mesh variant; probe selection contained no nodes"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "box_hole_s2_c0",
+    "order": 1,
+    "h_rel": 0.2,
+    "probe_nodes": 0,
+    "dofs": 1293,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.9461710000177845
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": null,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p1",
+    "timestamp": "2026-08-12T02:56:18.828120+00:00",
+    "notes": "h_rel=0.20; order=1; load=fixed resultant; probe=null; truth=3; probe_nodes=0; nodes=447; identical VTU nodal probe for every mesh variant; probe selection contained no nodes"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "box_hole_s2_c0",
+    "order": 2,
+    "h_rel": 0.2,
+    "probe_nodes": 155,
+    "dofs": 4314,
+    "wall_time_s": {
+      "mesh": 0.2986979999986943,
+      "solve": 0.3183355999935884,
+      "total": 0.6170335999922827
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.2604411918042319,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p2",
+    "timestamp": "2026-08-12T02:56:20.659047+00:00",
+    "notes": "h_rel=0.20; order=2; load=fixed resultant; probe=2.21867642459; raw_peak_von_mises_pa=2218676.42459; nominal_pa=1000000; truth=3; probe_nodes=155; nodes=1491; identical VTU nodal probe for every mesh variant; gmsh_high_order_optimize=2; gmsh_high_order_optimize_attempts=2"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "box_hole_s2_c0",
+    "order": 2,
+    "h_rel": 0.2,
+    "probe_nodes": 0,
+    "dofs": 2145,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.925595999986399
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": null,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p2",
+    "timestamp": "2026-08-12T02:56:20.659047+00:00",
+    "notes": "h_rel=0.20; order=2; load=fixed resultant; probe=null; truth=3; probe_nodes=0; nodes=768; identical VTU nodal probe for every mesh variant; probe selection contained no nodes; hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 112 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 228 nodes, h_bulk=0.044/h_fine=0.022 m, fine_cells=14 transition=0 feature=14, snap max|d|=8.53e-08 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.03558 h_max=0.04939 m, levels L0=0 L1=14 | budget predicted=14 elems/41 DOF ceilings=589824/1769472 | mids projected=366 partial=6 reverted=4",
+    "projection": "hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 112 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 228 nodes, h_bulk=0.044/h_fine=0.022 m, fine_cells=14 transition=0 feature=14, snap max|d|=8.53e-08 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.03558 h_max=0.04939 m, levels L0=0 L1=14 | budget predicted=14 elems/41 DOF ceilings=589824/1769472 | mids projected=366 partial=6 reverted=4"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "box_hole_s2_c0",
+    "order": 2,
+    "h_rel": 0.2,
+    "probe_nodes": 0,
+    "dofs": 8118,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 1.639570500003174
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": null,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p2",
+    "timestamp": "2026-08-12T02:56:20.659047+00:00",
+    "notes": "h_rel=0.20; order=2; load=fixed resultant; probe=null; truth=3; probe_nodes=0; nodes=2754; identical VTU nodal probe for every mesh variant; probe selection contained no nodes; graded tet v6 (multi-level LEB geo + cap collapse/void carve): 1643 tets (0 bulk, 14 refined L1/L2, 14 feature, 14 seed), h_bulk=0.044/h_L2~0.011 m (L0/L1/L2), snap max|d|=9.35e-14 m mean|d|=2e-15 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.03558 h_max=0.04939 m, levels L0=0 L1=0 L2=14 | compact_orphans=53 | budget predicted=14 elems/41 DOF ceilings=589824/1769472 | mids projected=651 partial=3 reverted=5",
+    "projection": "graded tet v6 (multi-level LEB geo + cap collapse/void carve): 1643 tets (0 bulk, 14 refined L1/L2, 14 feature, 14 seed), h_bulk=0.044/h_L2~0.011 m (L0/L1/L2), snap max|d|=9.35e-14 m mean|d|=2e-15 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.03558 h_max=0.04939 m, levels L0=0 L1=0 L2=14 | compact_orphans=53 | budget predicted=14 elems/41 DOF ceilings=589824/1769472 | mids projected=651 partial=3 reverted=5"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "box_hole_s3_c0",
+    "order": 1,
+    "h_rel": 0.08,
+    "probe_nodes": 31,
+    "dofs": 1041,
+    "wall_time_s": {
+      "mesh": 0.24991930002579466,
+      "solve": 0.09791189999668859,
+      "total": 0.34783120002248324
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.36647715939965025,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p1",
+    "timestamp": "2026-08-12T02:58:37.642012+00:00",
+    "notes": "h_rel=0.08; order=1; load=fixed resultant; probe=1.9005685218; raw_peak_von_mises_pa=1900568.5218; nominal_pa=1000000; truth=3; probe_nodes=31; nodes=367; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "box_hole_s3_c0",
+    "order": 1,
+    "h_rel": 0.08,
+    "probe_nodes": 27,
+    "dofs": 2808,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 2.617876599979354
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.6628022719556507,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p1",
+    "timestamp": "2026-08-12T02:58:37.642012+00:00",
+    "notes": "h_rel=0.08; order=1; load=fixed resultant; probe=1.01159318413; raw_peak_von_mises_pa=1011593.18413; nominal_pa=1000000; truth=3; probe_nodes=27; nodes=975; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "box_hole_s3_c0",
+    "order": 1,
+    "h_rel": 0.08,
+    "probe_nodes": 275,
+    "dofs": 7314,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 5.20050929998979
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.008669472171503786,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p1",
+    "timestamp": "2026-08-12T02:58:37.642012+00:00",
+    "notes": "h_rel=0.08; order=1; load=fixed resultant; probe=2.97399158349; raw_peak_von_mises_pa=2973991.58349; nominal_pa=1000000; truth=3; probe_nodes=275; nodes=2489; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "box_hole_s3_c0",
+    "order": 2,
+    "h_rel": 0.08,
+    "probe_nodes": 182,
+    "dofs": 6099,
+    "wall_time_s": {
+      "mesh": 0.36220249999314547,
+      "solve": 0.3200285999919288,
+      "total": 0.6822310999850743
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.288344473341352,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p2",
+    "timestamp": "2026-08-12T02:58:45.875301+00:00",
+    "notes": "h_rel=0.08; order=2; load=fixed resultant; probe=2.13496657998; raw_peak_von_mises_pa=2134966.57998; nominal_pa=1000000; truth=3; probe_nodes=182; nodes=2096; identical VTU nodal probe for every mesh variant; gmsh_high_order_optimize=2; gmsh_high_order_optimize_attempts=2"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "box_hole_s3_c0",
+    "order": 2,
+    "h_rel": 0.08,
+    "probe_nodes": 117,
+    "dofs": 10014,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 5.254366799985291
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.660515387765437,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p2",
+    "timestamp": "2026-08-12T02:58:45.875301+00:00",
+    "notes": "h_rel=0.08; order=2; load=fixed resultant; probe=1.0184538367; raw_peak_von_mises_pa=1018453.8367; nominal_pa=1000000; truth=3; probe_nodes=117; nodes=3429; identical VTU nodal probe for every mesh variant; hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 576 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 975 nodes, h_bulk=0.03358/h_fine=0.01679 m, fine_cells=72 transition=0 feature=72, snap max|d|=2.62e-07 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.02077 h_max=0.03445 m, levels L0=0 L1=72 | budget predicted=232 elems/697 DOF ceilings=589824/1769472 | mids projected=1408 partial=2 reverted=0",
+    "projection": "hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 576 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 975 nodes, h_bulk=0.03358/h_fine=0.01679 m, fine_cells=72 transition=0 feature=72, snap max|d|=2.62e-07 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.02077 h_max=0.03445 m, levels L0=0 L1=72 | budget predicted=232 elems/697 DOF ceilings=589824/1769472 | mids projected=1408 partial=2 reverted=0"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "box_hole_s3_c0",
+    "order": 2,
+    "h_rel": 0.08,
+    "probe_nodes": 1732,
+    "dofs": 47877,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 15.101544700009981
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.31314834090035637,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p2",
+    "timestamp": "2026-08-12T02:58:45.875301+00:00",
+    "notes": "h_rel=0.08; order=2; load=fixed resultant; probe=3.9394450227; raw_peak_von_mises_pa=3939445.0227; nominal_pa=1000000; truth=3; probe_nodes=1732; nodes=16130; identical VTU nodal probe for every mesh variant; graded tet v6 (multi-level LEB geo + cap collapse/void carve): 10079 tets (0 bulk, 72 refined L1/L2, 68 feature, 72 seed), h_bulk=0.03358/h_L2~0.008395 m (L0/L1/L2), snap max|d|=0.00488 m mean|d|=8.02e-05 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.02077 h_max=0.03445 m, levels L0=0 L1=0 L2=72 | compact_orphans=146 | budget predicted=232 elems/697 DOF ceilings=589824/1769472 | mids projected=3242 partial=36 reverted=11",
+    "projection": "graded tet v6 (multi-level LEB geo + cap collapse/void carve): 10079 tets (0 bulk, 72 refined L1/L2, 68 feature, 72 seed), h_bulk=0.03358/h_L2~0.008395 m (L0/L1/L2), snap max|d|=0.00488 m mean|d|=8.02e-05 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.02077 h_max=0.03445 m, levels L0=0 L1=0 L2=72 | compact_orphans=146 | budget predicted=232 elems/697 DOF ceilings=589824/1769472 | mids projected=3242 partial=36 reverted=11"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "box_hole_s3_c0",
+    "order": 1,
+    "h_rel": 0.12,
+    "probe_nodes": 29,
+    "dofs": 738,
+    "wall_time_s": {
+      "mesh": 0.18983529999968596,
+      "solve": 0.07284320000326261,
+      "total": 0.26267850000294857
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.3468433910167765,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p1",
+    "timestamp": "2026-08-12T02:58:26.650921+00:00",
+    "notes": "h_rel=0.12; order=1; load=fixed resultant; probe=1.95946982695; raw_peak_von_mises_pa=1959469.82695; nominal_pa=1000000; truth=3; probe_nodes=29; nodes=263; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "box_hole_s3_c0",
+    "order": 1,
+    "h_rel": 0.12,
+    "probe_nodes": 25,
+    "dofs": 1296,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 1.165360100014368
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.6625274242175644,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p1",
+    "timestamp": "2026-08-12T02:58:26.650921+00:00",
+    "notes": "h_rel=0.12; order=1; load=fixed resultant; probe=1.01241772735; raw_peak_von_mises_pa=1012417.72735; nominal_pa=1000000; truth=3; probe_nodes=25; nodes=459; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "box_hole_s3_c0",
+    "order": 1,
+    "h_rel": 0.12,
+    "probe_nodes": 49,
+    "dofs": 3255,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 2.2113848000008147
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.6626428026065876,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p1",
+    "timestamp": "2026-08-12T02:58:26.650921+00:00",
+    "notes": "h_rel=0.12; order=1; load=fixed resultant; probe=1.01207159218; raw_peak_von_mises_pa=1012071.59218; nominal_pa=1000000; truth=3; probe_nodes=49; nodes=1117; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "box_hole_s3_c0",
+    "order": 2,
+    "h_rel": 0.12,
+    "probe_nodes": 168,
+    "dofs": 4305,
+    "wall_time_s": {
+      "mesh": 0.32500049998634495,
+      "solve": 0.2646035999932792,
+      "total": 0.5896040999796242
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.29809516140838976,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p2",
+    "timestamp": "2026-08-12T02:58:30.330138+00:00",
+    "notes": "h_rel=0.12; order=2; load=fixed resultant; probe=2.10571451577; raw_peak_von_mises_pa=2105714.51577; nominal_pa=1000000; truth=3; probe_nodes=168; nodes=1488; identical VTU nodal probe for every mesh variant; gmsh_high_order_optimize=2; gmsh_high_order_optimize_attempts=2"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "box_hole_s3_c0",
+    "order": 2,
+    "h_rel": 0.12,
+    "probe_nodes": 75,
+    "dofs": 4557,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 1.8542005000053905
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.6572771583694638,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p2",
+    "timestamp": "2026-08-12T02:58:30.330138+00:00",
+    "notes": "h_rel=0.12; order=2; load=fixed resultant; probe=1.02816852489; raw_peak_von_mises_pa=1028168.52489; nominal_pa=1000000; truth=3; probe_nodes=75; nodes=1581; identical VTU nodal probe for every mesh variant; hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 256 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 459 nodes, h_bulk=0.05037/h_fine=0.02519 m, fine_cells=32 transition=0 feature=32, snap max|d|=5.28e-14 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.02802 h_max=0.05167 m, levels L0=0 L1=32 | budget predicted=69 elems/207 DOF ceilings=589824/1769472 | mids projected=679 partial=2 reverted=0",
+    "projection": "hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 256 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 459 nodes, h_bulk=0.05037/h_fine=0.02519 m, fine_cells=32 transition=0 feature=32, snap max|d|=5.28e-14 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.02802 h_max=0.05167 m, levels L0=0 L1=32 | budget predicted=69 elems/207 DOF ceilings=589824/1769472 | mids projected=679 partial=2 reverted=0"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "box_hole_s3_c0",
+    "order": 2,
+    "h_rel": 0.12,
+    "probe_nodes": 304,
+    "dofs": 20721,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 4.727316999982577
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.6449779419354178,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p2",
+    "timestamp": "2026-08-12T02:58:30.330138+00:00",
+    "notes": "h_rel=0.12; order=2; load=fixed resultant; probe=1.06506617419; raw_peak_von_mises_pa=1065066.17419; nominal_pa=1000000; truth=3; probe_nodes=304; nodes=7011; identical VTU nodal probe for every mesh variant; graded tet v6 (multi-level LEB geo + cap collapse/void carve): 4261 tets (0 bulk, 32 refined L1/L2, 32 feature, 32 seed), h_bulk=0.05037/h_L2~0.01259 m (L0/L1/L2), snap max|d|=1.37e-13 m mean|d|=1.26e-15 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.02802 h_max=0.05167 m, levels L0=0 L1=0 L2=32 | compact_orphans=5 | budget predicted=69 elems/207 DOF ceilings=589824/1769472 | mids projected=1568 partial=1 reverted=0",
+    "projection": "graded tet v6 (multi-level LEB geo + cap collapse/void carve): 4261 tets (0 bulk, 32 refined L1/L2, 32 feature, 32 seed), h_bulk=0.05037/h_L2~0.01259 m (L0/L1/L2), snap max|d|=1.37e-13 m mean|d|=1.26e-15 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.02802 h_max=0.05167 m, levels L0=0 L1=0 L2=32 | compact_orphans=5 | budget predicted=69 elems/207 DOF ceilings=589824/1769472 | mids projected=1568 partial=1 reverted=0"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "box_hole_s3_c0",
+    "order": 1,
+    "h_rel": 0.2,
+    "probe_nodes": 29,
+    "dofs": 738,
+    "wall_time_s": {
+      "mesh": 0.24254609999479726,
+      "solve": 0.19164209999144077,
+      "total": 0.43418819998623803
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.3468433910167765,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p1",
+    "timestamp": "2026-08-12T02:58:20.873900+00:00",
+    "notes": "h_rel=0.20; order=1; load=fixed resultant; probe=1.95946982695; raw_peak_von_mises_pa=1959469.82695; nominal_pa=1000000; truth=3; probe_nodes=29; nodes=263; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "box_hole_s3_c0",
+    "order": 1,
+    "h_rel": 0.2,
+    "probe_nodes": 0,
+    "dofs": 621,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.6745642999885604
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": null,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p1",
+    "timestamp": "2026-08-12T02:58:20.873900+00:00",
+    "notes": "h_rel=0.20; order=1; load=fixed resultant; probe=null; truth=3; probe_nodes=0; nodes=228; identical VTU nodal probe for every mesh variant; probe selection contained no nodes"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "box_hole_s3_c0",
+    "order": 1,
+    "h_rel": 0.2,
+    "probe_nodes": 0,
+    "dofs": 1203,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 1.2480200999998488
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": null,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p1",
+    "timestamp": "2026-08-12T02:58:20.873900+00:00",
+    "notes": "h_rel=0.20; order=1; load=fixed resultant; probe=null; truth=3; probe_nodes=0; nodes=415; identical VTU nodal probe for every mesh variant; probe selection contained no nodes"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "box_hole_s3_c0",
+    "order": 2,
+    "h_rel": 0.2,
+    "probe_nodes": 168,
+    "dofs": 4305,
+    "wall_time_s": {
+      "mesh": 0.3057987000211142,
+      "solve": 0.328942400024971,
+      "total": 0.6347411000460852
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": 0.29809516140838976,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p2",
+    "timestamp": "2026-08-12T02:58:23.276872+00:00",
+    "notes": "h_rel=0.20; order=2; load=fixed resultant; probe=2.10571451577; raw_peak_von_mises_pa=2105714.51577; nominal_pa=1000000; truth=3; probe_nodes=168; nodes=1488; identical VTU nodal probe for every mesh variant; gmsh_high_order_optimize=2; gmsh_high_order_optimize_attempts=2"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "box_hole_s3_c0",
+    "order": 2,
+    "h_rel": 0.2,
+    "probe_nodes": 0,
+    "dofs": 2145,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 1.074000900000101
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": null,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p2",
+    "timestamp": "2026-08-12T02:58:23.276872+00:00",
+    "notes": "h_rel=0.20; order=2; load=fixed resultant; probe=null; truth=3; probe_nodes=0; nodes=768; identical VTU nodal probe for every mesh variant; probe selection contained no nodes; hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 112 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 228 nodes, h_bulk=0.076/h_fine=0.038 m, fine_cells=14 transition=0 feature=14, snap max|d|=1.58e-07 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.06401 h_max=0.08612 m, levels L0=0 L1=14 | budget predicted=15 elems/45 DOF ceilings=589824/1769472 | mids projected=366 partial=6 reverted=4",
+    "projection": "hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 112 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 228 nodes, h_bulk=0.076/h_fine=0.038 m, fine_cells=14 transition=0 feature=14, snap max|d|=1.58e-07 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.06401 h_max=0.08612 m, levels L0=0 L1=14 | budget predicted=15 elems/45 DOF ceilings=589824/1769472 | mids projected=366 partial=6 reverted=4"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "box_hole_s3_c0",
+    "order": 2,
+    "h_rel": 0.2,
+    "probe_nodes": 0,
+    "dofs": 7539,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 1.5959395999961998
+    },
+    "accuracy": {
+      "name": "scf_rel_err",
+      "value": null,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p2",
+    "timestamp": "2026-08-12T02:58:23.276872+00:00",
+    "notes": "h_rel=0.20; order=2; load=fixed resultant; probe=null; truth=3; probe_nodes=0; nodes=2555; identical VTU nodal probe for every mesh variant; probe selection contained no nodes; graded tet v6 (multi-level LEB geo + cap collapse/void carve): 1517 tets (0 bulk, 14 refined L1/L2, 14 feature, 14 seed), h_bulk=0.076/h_L2~0.019 m (L0/L1/L2), snap max|d|=6.07e-13 m mean|d|=6.88e-15 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.06401 h_max=0.08612 m, levels L0=0 L1=0 L2=14 | compact_orphans=62 | budget predicted=15 elems/45 DOF ceilings=589824/1769472 | mids projected=608 partial=4 reverted=16",
+    "projection": "graded tet v6 (multi-level LEB geo + cap collapse/void carve): 1517 tets (0 bulk, 14 refined L1/L2, 14 feature, 14 seed), h_bulk=0.076/h_L2~0.019 m (L0/L1/L2), snap max|d|=6.07e-13 m mean|d|=6.88e-15 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.06401 h_max=0.08612 m, levels L0=0 L1=0 L2=14 | compact_orphans=62 | budget predicted=15 elems/45 DOF ceilings=589824/1769472 | mids projected=608 partial=4 reverted=16"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "stepped_shaft_s0_c1",
+    "order": 1,
+    "h_rel": 0.08,
+    "probe_nodes": 8,
+    "dofs": 393,
+    "wall_time_s": {
+      "mesh": 0.1699965999869164,
+      "solve": 0.06460270000388846,
+      "total": 0.23459929999080487
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.2794969887867218,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p1",
+    "timestamp": "2026-08-12T02:59:50.712970+00:00",
+    "notes": "h_rel=0.08; order=1; load=fixed resultant; probe=5.56317758606e-06; truth=7.721241271e-06; probe_nodes=8; nodes=139; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s0_c1",
+    "order": 1,
+    "h_rel": 0.08,
+    "probe_nodes": null,
+    "dofs": null,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.5594457000261173
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": null,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p1",
+    "timestamp": "2026-08-12T02:59:50.712970+00:00",
+    "status": "failed",
+    "notes": "h_rel=0.08; order=1; load=fixed resultant; failed with exit 1 (no result); stage=native mesh + solve"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s0_c1",
+    "order": 1,
+    "h_rel": 0.08,
+    "probe_nodes": null,
+    "dofs": null,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 1.4123091000074055
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": null,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p1",
+    "timestamp": "2026-08-12T02:59:50.712970+00:00",
+    "status": "failed",
+    "notes": "h_rel=0.08; order=1; load=fixed resultant; failed with exit 1 (no result); stage=graded mesh + solve"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "stepped_shaft_s0_c1",
+    "order": 2,
+    "h_rel": 0.08,
+    "probe_nodes": 22,
+    "dofs": 2088,
+    "wall_time_s": {
+      "mesh": 3.0249069000128657,
+      "solve": 0.11058969999430701,
+      "total": 3.1354966000071727
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.062016953632613066,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p2",
+    "timestamp": "2026-08-12T02:59:52.931552+00:00",
+    "notes": "h_rel=0.08; order=2; load=fixed resultant; probe=8.20008913289e-06; truth=7.721241271e-06; probe_nodes=22; nodes=718; identical VTU nodal probe for every mesh variant; gmsh_high_order_optimize=2; gmsh_high_order_optimize_attempts=2"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s0_c1",
+    "order": 2,
+    "h_rel": 0.08,
+    "probe_nodes": null,
+    "dofs": null,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.40531770000234246
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": null,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p2",
+    "timestamp": "2026-08-12T02:59:52.931552+00:00",
+    "status": "failed",
+    "notes": "h_rel=0.08; order=2; load=fixed resultant; failed with exit 1 (no result); stage=native mesh + solve"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s0_c1",
+    "order": 2,
+    "h_rel": 0.08,
+    "probe_nodes": null,
+    "dofs": null,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 1.2470195999776479
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": null,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p2",
+    "timestamp": "2026-08-12T02:59:52.931552+00:00",
+    "status": "failed",
+    "notes": "h_rel=0.08; order=2; load=fixed resultant; failed with exit 1 (no result); stage=graded mesh + solve"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "stepped_shaft_s0_c1",
+    "order": 1,
+    "h_rel": 0.12,
+    "probe_nodes": 8,
+    "dofs": 288,
+    "wall_time_s": {
+      "mesh": 0.14631609999923967,
+      "solve": 0.05076009998447262,
+      "total": 0.19707619998371229
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.24859335711448988,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p1",
+    "timestamp": "2026-08-12T02:59:28.074717+00:00",
+    "notes": "h_rel=0.12; order=1; load=fixed resultant; probe=5.80179198235e-06; truth=7.721241271e-06; probe_nodes=8; nodes=104; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s0_c1",
+    "order": 1,
+    "h_rel": 0.12,
+    "probe_nodes": 9,
+    "dofs": 486,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.29404529999010265
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.14859538973900785,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p1",
+    "timestamp": "2026-08-12T02:59:28.074717+00:00",
+    "notes": "h_rel=0.12; order=1; load=fixed resultant; probe=6.57390041507e-06; truth=7.721241271e-06; probe_nodes=9; nodes=171; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s0_c1",
+    "order": 1,
+    "h_rel": 0.12,
+    "probe_nodes": 9,
+    "dofs": 1071,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.6126822000078391
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.23612666791648948,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p1",
+    "timestamp": "2026-08-12T02:59:28.074717+00:00",
+    "notes": "h_rel=0.12; order=1; load=fixed resultant; probe=5.8980502975e-06; truth=7.721241271e-06; probe_nodes=9; nodes=366; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "stepped_shaft_s0_c1",
+    "order": 2,
+    "h_rel": 0.12,
+    "probe_nodes": 22,
+    "dofs": 1467,
+    "wall_time_s": {
+      "mesh": 19.793222899985267,
+      "solve": 0.1009327000065241,
+      "total": 19.89415559999179
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.7381347694590057,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p2",
+    "timestamp": "2026-08-12T02:59:29.210119+00:00",
+    "notes": "h_rel=0.12; order=2; load=fixed resultant; probe=1.34205579165e-05; truth=7.721241271e-06; probe_nodes=22; nodes=511; identical VTU nodal probe for every mesh variant; gmsh_high_order_optimize=2; gmsh_high_order_optimize_attempts=2"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s0_c1",
+    "order": 2,
+    "h_rel": 0.12,
+    "probe_nodes": 21,
+    "dofs": 1503,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.47933169998577796
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.06577636680270624,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p2",
+    "timestamp": "2026-08-12T02:59:29.210119+00:00",
+    "notes": "h_rel=0.12; order=2; load=fixed resultant; probe=8.22911646901e-06; truth=7.721241271e-06; probe_nodes=21; nodes=510; identical VTU nodal probe for every mesh variant; hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 72 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 171 nodes, h_bulk=0.006764/h_fine=0.003382 m, fine_cells=9 transition=0 feature=9, snap max|d|=4.2e-06 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.003392 h_max=0.007291 m, levels L0=0 L1=9 | budget predicted=42 elems/127 DOF ceilings=589824/1769472 | mids projected=250 partial=4 reverted=6",
+    "projection": "hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 72 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 171 nodes, h_bulk=0.006764/h_fine=0.003382 m, fine_cells=9 transition=0 feature=9, snap max|d|=4.2e-06 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.003392 h_max=0.007291 m, levels L0=0 L1=9 | budget predicted=42 elems/127 DOF ceilings=589824/1769472 | mids projected=250 partial=4 reverted=6"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s0_c1",
+    "order": 2,
+    "h_rel": 0.12,
+    "probe_nodes": 28,
+    "dofs": 6630,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 1.0663911000010557
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.12452885868827289,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p2",
+    "timestamp": "2026-08-12T02:59:29.210119+00:00",
+    "notes": "h_rel=0.12; order=2; load=fixed resultant; probe=8.68275863413e-06; truth=7.721241271e-06; probe_nodes=28; nodes=2235; identical VTU nodal probe for every mesh variant; graded tet v6 (multi-level LEB geo + cap collapse/void carve): 1294 tets (0 bulk, 9 refined L1/L2, 9 feature, 9 seed), h_bulk=0.006764/h_L2~0.001691 m (L0/L1/L2), snap max|d|=4.2e-06 m mean|d|=2.09e-06 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.003392 h_max=0.007291 m, levels L0=0 L1=0 L2=9 | compact_orphans=14 | budget predicted=42 elems/127 DOF ceilings=589824/1769472 | mids projected=632 partial=6 reverted=1",
+    "projection": "graded tet v6 (multi-level LEB geo + cap collapse/void carve): 1294 tets (0 bulk, 9 refined L1/L2, 9 feature, 9 seed), h_bulk=0.006764/h_L2~0.001691 m (L0/L1/L2), snap max|d|=4.2e-06 m mean|d|=2.09e-06 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.003392 h_max=0.007291 m, levels L0=0 L1=0 L2=9 | compact_orphans=14 | budget predicted=42 elems/127 DOF ceilings=589824/1769472 | mids projected=632 partial=6 reverted=1"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "stepped_shaft_s0_c1",
+    "order": 1,
+    "h_rel": 0.2,
+    "probe_nodes": 8,
+    "dofs": 288,
+    "wall_time_s": {
+      "mesh": 0.16416949999984354,
+      "solve": 0.04611589998239651,
+      "total": 0.21028539998224005
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.24859335711448988,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p1",
+    "timestamp": "2026-08-12T02:59:07.189863+00:00",
+    "notes": "h_rel=0.20; order=1; load=fixed resultant; probe=5.80179198235e-06; truth=7.721241271e-06; probe_nodes=8; nodes=104; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s0_c1",
+    "order": 1,
+    "h_rel": 0.2,
+    "probe_nodes": 9,
+    "dofs": 270,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.27011290000518784
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.3664677895803818,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p1",
+    "timestamp": "2026-08-12T02:59:07.189863+00:00",
+    "notes": "h_rel=0.20; order=1; load=fixed resultant; probe=4.8916550496e-06; truth=7.721241271e-06; probe_nodes=9; nodes=99; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s0_c1",
+    "order": 1,
+    "h_rel": 0.2,
+    "probe_nodes": 6,
+    "dofs": 1695,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.6791038000083063
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.17282600474927412,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p1",
+    "timestamp": "2026-08-12T02:59:07.189863+00:00",
+    "notes": "h_rel=0.20; order=1; load=fixed resultant; probe=6.38680999043e-06; truth=7.721241271e-06; probe_nodes=6; nodes=570; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "stepped_shaft_s0_c1",
+    "order": 2,
+    "h_rel": 0.2,
+    "probe_nodes": 22,
+    "dofs": 1467,
+    "wall_time_s": {
+      "mesh": 17.96891319999122,
+      "solve": 0.07749650001642294,
+      "total": 18.046409700007644
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.718132324940269,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p2",
+    "timestamp": "2026-08-12T02:59:08.385813+00:00",
+    "notes": "h_rel=0.20; order=2; load=fixed resultant; probe=1.32661142164e-05; truth=7.721241271e-06; probe_nodes=22; nodes=511; identical VTU nodal probe for every mesh variant; gmsh_high_order_optimize=2; gmsh_high_order_optimize_attempts=2"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s0_c1",
+    "order": 2,
+    "h_rel": 0.2,
+    "probe_nodes": 21,
+    "dofs": 849,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.27403669999330305
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.06485129858640154,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p2",
+    "timestamp": "2026-08-12T02:59:08.385813+00:00",
+    "notes": "h_rel=0.20; order=2; load=fixed resultant; probe=7.22050874788e-06; truth=7.721241271e-06; probe_nodes=21; nodes=292; identical VTU nodal probe for every mesh variant; hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 40 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 99 nodes, h_bulk=0.012/h_fine=0.006 m, fine_cells=5 transition=0 feature=5, snap max|d|=4.2e-06 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.005317 h_max=0.01215 m, levels L0=0 L1=5 | budget predicted=9 elems/28 DOF ceilings=589824/1769472 | mids projected=133 partial=0 reverted=16",
+    "projection": "hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 40 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 99 nodes, h_bulk=0.012/h_fine=0.006 m, fine_cells=5 transition=0 feature=5, snap max|d|=4.2e-06 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.005317 h_max=0.01215 m, levels L0=0 L1=5 | budget predicted=9 elems/28 DOF ceilings=589824/1769472 | mids projected=133 partial=0 reverted=16"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s0_c1",
+    "order": 2,
+    "h_rel": 0.2,
+    "probe_nodes": 21,
+    "dofs": 10887,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 1.2904314999759663
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.05039139031907659,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p2",
+    "timestamp": "2026-08-12T02:59:08.385813+00:00",
+    "notes": "h_rel=0.20; order=2; load=fixed resultant; probe=8.11032535363e-06; truth=7.721241271e-06; probe_nodes=21; nodes=3644; identical VTU nodal probe for every mesh variant; graded tet v6 (multi-level LEB geo + cap collapse/void carve): 2260 tets (0 bulk, 5 refined L1/L2, 5 feature, 5 seed), h_bulk=0.012/h_L2~0.003 m (L0/L1/L2), snap max|d|=4.2e-06 m mean|d|=2.19e-06 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.005317 h_max=0.01215 m, levels L0=0 L1=0 L2=5 | compact_orphans=23 | budget predicted=9 elems/28 DOF ceilings=589824/1769472 | mids projected=766 partial=0 reverted=2",
+    "projection": "graded tet v6 (multi-level LEB geo + cap collapse/void carve): 2260 tets (0 bulk, 5 refined L1/L2, 5 feature, 5 seed), h_bulk=0.012/h_L2~0.003 m (L0/L1/L2), snap max|d|=4.2e-06 m mean|d|=2.19e-06 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.005317 h_max=0.01215 m, levels L0=0 L1=0 L2=5 | compact_orphans=23 | budget predicted=9 elems/28 DOF ceilings=589824/1769472 | mids projected=766 partial=0 reverted=2"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "stepped_shaft_s1_c1",
+    "order": 1,
+    "h_rel": 0.08,
+    "probe_nodes": 8,
+    "dofs": 342,
+    "wall_time_s": {
+      "mesh": 0.15367329999571666,
+      "solve": 0.15873600001214072,
+      "total": 0.3124093000078574
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.3251929302531583,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p1",
+    "timestamp": "2026-08-12T03:00:37.082856+00:00",
+    "notes": "h_rel=0.08; order=1; load=fixed resultant; probe=1.3619171896e-05; truth=2.018231952e-05; probe_nodes=8; nodes=122; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s1_c1",
+    "order": 1,
+    "h_rel": 0.08,
+    "probe_nodes": 25,
+    "dofs": 1950,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.8108695000119042
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.08241640812289705,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p1",
+    "timestamp": "2026-08-12T03:00:37.082856+00:00",
+    "notes": "h_rel=0.08; order=1; load=fixed resultant; probe=1.85189652376e-05; truth=2.018231952e-05; probe_nodes=25; nodes=675; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s1_c1",
+    "order": 1,
+    "h_rel": 0.08,
+    "probe_nodes": 32,
+    "dofs": 9243,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 2.6584015999978874
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.09709808345376254,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p1",
+    "timestamp": "2026-08-12T03:00:37.082856+00:00",
+    "notes": "h_rel=0.08; order=1; load=fixed resultant; probe=1.8222654975e-05; truth=2.018231952e-05; probe_nodes=32; nodes=3125; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "stepped_shaft_s1_c1",
+    "order": 2,
+    "h_rel": 0.08,
+    "probe_nodes": 22,
+    "dofs": 1812,
+    "wall_time_s": {
+      "mesh": 5.107769299997017,
+      "solve": 0.10162250002031215,
+      "total": 5.209391800017329
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.4402711748317755,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p2",
+    "timestamp": "2026-08-12T03:00:40.937356+00:00",
+    "notes": "h_rel=0.08; order=2; load=fixed resultant; probe=2.90680130459e-05; truth=2.018231952e-05; probe_nodes=22; nodes=626; identical VTU nodal probe for every mesh variant; gmsh_high_order_optimize=2; gmsh_high_order_optimize_attempts=2"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s1_c1",
+    "order": 2,
+    "h_rel": 0.08,
+    "probe_nodes": 65,
+    "dofs": 6951,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 1.6952658999944106
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.02131619216362932,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p2",
+    "timestamp": "2026-08-12T03:00:40.937356+00:00",
+    "notes": "h_rel=0.08; order=2; load=fixed resultant; probe=1.97521093188e-05; truth=2.018231952e-05; probe_nodes=65; nodes=2378; identical VTU nodal probe for every mesh variant; hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 416 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 675 nodes, h_bulk=0.009231/h_fine=0.004615 m, fine_cells=52 transition=0 feature=52, snap max|d|=0.000606 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.003429 h_max=0.009713 m, levels L0=0 L1=52 | budget predicted=134 elems/403 DOF ceilings=589824/1769472 | mids projected=862 partial=6 reverted=2",
+    "projection": "hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 416 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 675 nodes, h_bulk=0.009231/h_fine=0.004615 m, fine_cells=52 transition=0 feature=52, snap max|d|=0.000606 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.003429 h_max=0.009713 m, levels L0=0 L1=52 | budget predicted=134 elems/403 DOF ceilings=589824/1769472 | mids projected=862 partial=6 reverted=2"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s1_c1",
+    "order": 2,
+    "h_rel": 0.08,
+    "probe_nodes": 116,
+    "dofs": 64305,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 80.63449470000342
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.028887458168329997,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p2",
+    "timestamp": "2026-08-12T03:00:40.937356+00:00",
+    "notes": "h_rel=0.08; order=2; load=fixed resultant; probe=2.07653354309e-05; truth=2.018231952e-05; probe_nodes=116; nodes=21596; identical VTU nodal probe for every mesh variant; graded tet v6 (multi-level LEB geo + cap collapse/void carve): 14462 tets (0 bulk, 52 refined L1/L2, 32 feature, 52 seed), h_bulk=0.009231/h_L2~0.002308 m (L0/L1/L2), snap max|d|=8.13e-06 m mean|d|=4.49e-06 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.003429 h_max=0.009713 m, levels L0=0 L1=0 L2=52 | compact_orphans=40 | budget predicted=134 elems/403 DOF ceilings=589824/1769472 | mids projected=2715 partial=12 reverted=9",
+    "projection": "graded tet v6 (multi-level LEB geo + cap collapse/void carve): 14462 tets (0 bulk, 52 refined L1/L2, 32 feature, 52 seed), h_bulk=0.009231/h_L2~0.002308 m (L0/L1/L2), snap max|d|=8.13e-06 m mean|d|=4.49e-06 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.003429 h_max=0.009713 m, levels L0=0 L1=0 L2=52 | compact_orphans=40 | budget predicted=134 elems/403 DOF ceilings=589824/1769472 | mids projected=2715 partial=12 reverted=9"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "stepped_shaft_s1_c1",
+    "order": 1,
+    "h_rel": 0.12,
+    "probe_nodes": 8,
+    "dofs": 300,
+    "wall_time_s": {
+      "mesh": 0.14779319998342544,
+      "solve": 0.04896220000227913,
+      "total": 0.19675539998570457
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.2109570189577682,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p1",
+    "timestamp": "2026-08-12T03:00:17.471469+00:00",
+    "notes": "h_rel=0.12; order=1; load=fixed resultant; probe=1.59247175584e-05; truth=2.018231952e-05; probe_nodes=8; nodes=108; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s1_c1",
+    "order": 1,
+    "h_rel": 0.12,
+    "probe_nodes": 9,
+    "dofs": 486,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.3256554999970831
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.0710732822359693,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p1",
+    "timestamp": "2026-08-12T03:00:17.471469+00:00",
+    "notes": "h_rel=0.12; order=1; load=fixed resultant; probe=1.87478958286e-05; truth=2.018231952e-05; probe_nodes=9; nodes=171; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s1_c1",
+    "order": 1,
+    "h_rel": 0.12,
+    "probe_nodes": 9,
+    "dofs": 1356,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.6302833000081591
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.12931386313537335,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p1",
+    "timestamp": "2026-08-12T03:00:17.471469+00:00",
+    "notes": "h_rel=0.12; order=1; load=fixed resultant; probe=1.75724658158e-05; truth=2.018231952e-05; probe_nodes=9; nodes=461; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "stepped_shaft_s1_c1",
+    "order": 2,
+    "h_rel": 0.12,
+    "probe_nodes": 22,
+    "dofs": 1551,
+    "wall_time_s": {
+      "mesh": 16.676816299994243,
+      "solve": 0.08154129999456927,
+      "total": 16.758357599988813
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.4409841625629122,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p2",
+    "timestamp": "2026-08-12T03:00:18.664926+00:00",
+    "notes": "h_rel=0.12; order=2; load=fixed resultant; probe=2.90824027921e-05; truth=2.018231952e-05; probe_nodes=22; nodes=539; identical VTU nodal probe for every mesh variant; gmsh_high_order_optimize=2; gmsh_high_order_optimize_attempts=2"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s1_c1",
+    "order": 2,
+    "h_rel": 0.12,
+    "probe_nodes": 21,
+    "dofs": 1491,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.5459130000090227
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.031083825457064392,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p2",
+    "timestamp": "2026-08-12T03:00:18.664926+00:00",
+    "notes": "h_rel=0.12; order=2; load=fixed resultant; probe=2.08096632173e-05; truth=2.018231952e-05; probe_nodes=21; nodes=506; identical VTU nodal probe for every mesh variant; hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 72 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 171 nodes, h_bulk=0.01333/h_fine=0.006667 m, fine_cells=9 transition=0 feature=9, snap max|d|=8.13e-06 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.00953 h_max=0.01457 m, levels L0=0 L1=9 | budget predicted=40 elems/119 DOF ceilings=589824/1769472 | mids projected=257 partial=0 reverted=0",
+    "projection": "hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 72 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 171 nodes, h_bulk=0.01333/h_fine=0.006667 m, fine_cells=9 transition=0 feature=9, snap max|d|=8.13e-06 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.00953 h_max=0.01457 m, levels L0=0 L1=9 | budget predicted=40 elems/119 DOF ceilings=589824/1769472 | mids projected=257 partial=0 reverted=0"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s1_c1",
+    "order": 2,
+    "h_rel": 0.12,
+    "probe_nodes": 32,
+    "dofs": 8328,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 1.0601782999874558
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.1649300275604927,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p2",
+    "timestamp": "2026-08-12T03:00:18.664926+00:00",
+    "notes": "h_rel=0.12; order=2; load=fixed resultant; probe=2.35109900347e-05; truth=2.018231952e-05; probe_nodes=32; nodes=2807; identical VTU nodal probe for every mesh variant; graded tet v6 (multi-level LEB geo + cap collapse/void carve): 1624 tets (0 bulk, 9 refined L1/L2, 8 feature, 9 seed), h_bulk=0.01333/h_L2~0.003333 m (L0/L1/L2), snap max|d|=8.13e-06 m mean|d|=4.51e-06 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.00953 h_max=0.01457 m, levels L0=0 L1=0 L2=9 | budget predicted=40 elems/119 DOF ceilings=589824/1769472 | mids projected=791 partial=0 reverted=0",
+    "projection": "graded tet v6 (multi-level LEB geo + cap collapse/void carve): 1624 tets (0 bulk, 9 refined L1/L2, 8 feature, 9 seed), h_bulk=0.01333/h_L2~0.003333 m (L0/L1/L2), snap max|d|=8.13e-06 m mean|d|=4.51e-06 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.00953 h_max=0.01457 m, levels L0=0 L1=0 L2=9 | budget predicted=40 elems/119 DOF ceilings=589824/1769472 | mids projected=791 partial=0 reverted=0"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "stepped_shaft_s1_c1",
+    "order": 1,
+    "h_rel": 0.2,
+    "probe_nodes": 8,
+    "dofs": 300,
+    "wall_time_s": {
+      "mesh": 0.17726699999184348,
+      "solve": 0.14733209999394603,
+      "total": 0.3245990999857895
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.2109570189577682,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p1",
+    "timestamp": "2026-08-12T02:59:57.737375+00:00",
+    "notes": "h_rel=0.20; order=1; load=fixed resultant; probe=1.59247175584e-05; truth=2.018231952e-05; probe_nodes=8; nodes=108; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s1_c1",
+    "order": 1,
+    "h_rel": 0.2,
+    "probe_nodes": 9,
+    "dofs": 270,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.2815269000129774
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.28966227056072325,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p1",
+    "timestamp": "2026-08-12T02:59:57.737375+00:00",
+    "notes": "h_rel=0.20; order=1; load=fixed resultant; probe=1.43362630227e-05; truth=2.018231952e-05; probe_nodes=9; nodes=99; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s1_c1",
+    "order": 1,
+    "h_rel": 0.2,
+    "probe_nodes": 5,
+    "dofs": 1368,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.6108659000019543
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.15695717982180468,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p1",
+    "timestamp": "2026-08-12T02:59:57.737375+00:00",
+    "notes": "h_rel=0.20; order=1; load=fixed resultant; probe=1.70145595659e-05; truth=2.018231952e-05; probe_nodes=5; nodes=461; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "stepped_shaft_s1_c1",
+    "order": 2,
+    "h_rel": 0.2,
+    "probe_nodes": 22,
+    "dofs": 1551,
+    "wall_time_s": {
+      "mesh": 16.93024419998983,
+      "solve": 0.11021680000703782,
+      "total": 17.040460999996867
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.436015143699033,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p2",
+    "timestamp": "2026-08-12T02:59:58.993751+00:00",
+    "notes": "h_rel=0.20; order=2; load=fixed resultant; probe=2.89821164657e-05; truth=2.018231952e-05; probe_nodes=22; nodes=539; identical VTU nodal probe for every mesh variant; gmsh_high_order_optimize=2; gmsh_high_order_optimize_attempts=2"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s1_c1",
+    "order": 2,
+    "h_rel": 0.2,
+    "probe_nodes": 21,
+    "dofs": 855,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.23804729999392293
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.10714303194451144,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p2",
+    "timestamp": "2026-08-12T02:59:58.993751+00:00",
+    "notes": "h_rel=0.20; order=2; load=fixed resultant; probe=1.8019924615e-05; truth=2.018231952e-05; probe_nodes=21; nodes=294; identical VTU nodal probe for every mesh variant; hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 40 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 99 nodes, h_bulk=0.024/h_fine=0.012 m, fine_cells=5 transition=0 feature=5, snap max|d|=8.13e-06 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.01386 h_max=0.02428 m, levels L0=0 L1=5 | budget predicted=9 elems/26 DOF ceilings=589824/1769472 | mids projected=150 partial=0 reverted=0",
+    "projection": "hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 40 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 99 nodes, h_bulk=0.024/h_fine=0.012 m, fine_cells=5 transition=0 feature=5, snap max|d|=8.13e-06 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.01386 h_max=0.02428 m, levels L0=0 L1=5 | budget predicted=9 elems/26 DOF ceilings=589824/1769472 | mids projected=150 partial=0 reverted=0"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s1_c1",
+    "order": 2,
+    "h_rel": 0.2,
+    "probe_nodes": 13,
+    "dofs": 8865,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 1.1313534999790136
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.07703574031666675,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p2",
+    "timestamp": "2026-08-12T02:59:58.993751+00:00",
+    "notes": "h_rel=0.20; order=2; load=fixed resultant; probe=2.17370794455e-05; truth=2.018231952e-05; probe_nodes=13; nodes=2971; identical VTU nodal probe for every mesh variant; graded tet v6 (multi-level LEB geo + cap collapse/void carve): 1845 tets (0 bulk, 5 refined L1/L2, 5 feature, 5 seed), h_bulk=0.024/h_L2~0.006 m (L0/L1/L2), snap max|d|=8.11e-06 m mean|d|=4.85e-06 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.01386 h_max=0.02428 m, levels L0=0 L1=0 L2=5 | compact_orphans=13 | budget predicted=9 elems/26 DOF ceilings=589824/1769472 | mids projected=621 partial=0 reverted=0",
+    "projection": "graded tet v6 (multi-level LEB geo + cap collapse/void carve): 1845 tets (0 bulk, 5 refined L1/L2, 5 feature, 5 seed), h_bulk=0.024/h_L2~0.006 m (L0/L1/L2), snap max|d|=8.11e-06 m mean|d|=4.85e-06 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.01386 h_max=0.02428 m, levels L0=0 L1=0 L2=5 | compact_orphans=13 | budget predicted=9 elems/26 DOF ceilings=589824/1769472 | mids projected=621 partial=0 reverted=0"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "stepped_shaft_s2_c1",
+    "order": 1,
+    "h_rel": 0.08,
+    "probe_nodes": 8,
+    "dofs": 336,
+    "wall_time_s": {
+      "mesh": 0.20743680000305176,
+      "solve": 0.06166300000040792,
+      "total": 0.2690998000034597
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.28802766278016106,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p1",
+    "timestamp": "2026-08-12T03:02:23.543383+00:00",
+    "notes": "h_rel=0.08; order=1; load=fixed resultant; probe=2.14342046961e-05; truth=3.010538974e-05; probe_nodes=8; nodes=120; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s2_c1",
+    "order": 1,
+    "h_rel": 0.08,
+    "probe_nodes": null,
+    "dofs": null,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.43590760001097806
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": null,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p1",
+    "timestamp": "2026-08-12T03:02:23.543383+00:00",
+    "status": "failed",
+    "notes": "h_rel=0.08; order=1; load=fixed resultant; failed with exit 1 (no result); stage=native mesh + solve"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s2_c1",
+    "order": 1,
+    "h_rel": 0.08,
+    "probe_nodes": null,
+    "dofs": null,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 1.0412561999983154
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": null,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p1",
+    "timestamp": "2026-08-12T03:02:23.543383+00:00",
+    "status": "failed",
+    "notes": "h_rel=0.08; order=1; load=fixed resultant; failed with exit 1 (no result); stage=graded mesh + solve"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "stepped_shaft_s2_c1",
+    "order": 2,
+    "h_rel": 0.08,
+    "probe_nodes": 22,
+    "dofs": 1779,
+    "wall_time_s": {
+      "mesh": 46.569065699964995,
+      "solve": 0.20248909998917952,
+      "total": 46.771554799954174
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.39519242186319964,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p2",
+    "timestamp": "2026-08-12T03:02:25.303431+00:00",
+    "notes": "h_rel=0.08; order=2; load=fixed resultant; probe=4.20028116225e-05; truth=3.010538974e-05; probe_nodes=22; nodes=615; identical VTU nodal probe for every mesh variant; gmsh_high_order_optimize=1; gmsh_high_order_optimize_attempts=2,1"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s2_c1",
+    "order": 2,
+    "h_rel": 0.08,
+    "probe_nodes": null,
+    "dofs": null,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.36043669999344274
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": null,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p2",
+    "timestamp": "2026-08-12T03:02:25.303431+00:00",
+    "status": "failed",
+    "notes": "h_rel=0.08; order=2; load=fixed resultant; failed with exit 1 (no result); stage=native mesh + solve"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s2_c1",
+    "order": 2,
+    "h_rel": 0.08,
+    "probe_nodes": null,
+    "dofs": null,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.9264674999867566
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": null,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p2",
+    "timestamp": "2026-08-12T03:02:25.303431+00:00",
+    "status": "failed",
+    "notes": "h_rel=0.08; order=2; load=fixed resultant; failed with exit 1 (no result); stage=graded mesh + solve"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "stepped_shaft_s2_c1",
+    "order": 1,
+    "h_rel": 0.12,
+    "probe_nodes": 8,
+    "dofs": 291,
+    "wall_time_s": {
+      "mesh": 0.16268379997927696,
+      "solve": 0.046286199998576194,
+      "total": 0.20896999997785315
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.2276179407350732,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p1",
+    "timestamp": "2026-08-12T03:02:16.447443+00:00",
+    "notes": "h_rel=0.12; order=1; load=fixed resultant; probe=2.32528629224e-05; truth=3.010538974e-05; probe_nodes=8; nodes=105; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s2_c1",
+    "order": 1,
+    "h_rel": 0.12,
+    "probe_nodes": 9,
+    "dofs": 486,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.349665100016864
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.13728498811170078,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p1",
+    "timestamp": "2026-08-12T03:02:16.447443+00:00",
+    "notes": "h_rel=0.12; order=1; load=fixed resultant; probe=2.59723716674e-05; truth=3.010538974e-05; probe_nodes=9; nodes=171; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s2_c1",
+    "order": 1,
+    "h_rel": 0.12,
+    "probe_nodes": 9,
+    "dofs": 1131,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.6037477999925613
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.20610218347464926,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p1",
+    "timestamp": "2026-08-12T03:02:16.447443+00:00",
+    "notes": "h_rel=0.12; order=1; load=fixed resultant; probe=2.39006031802e-05; truth=3.010538974e-05; probe_nodes=9; nodes=386; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "stepped_shaft_s2_c1",
+    "order": 2,
+    "h_rel": 0.12,
+    "probe_nodes": 22,
+    "dofs": 1482,
+    "wall_time_s": {
+      "mesh": 4.272468099981779,
+      "solve": 0.12229679999290965,
+      "total": 4.394764899974689
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.7664226763437639,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p2",
+    "timestamp": "2026-08-12T03:02:17.644679+00:00",
+    "notes": "h_rel=0.12; order=2; load=fixed resultant; probe=5.31788431169e-05; truth=3.010538974e-05; probe_nodes=22; nodes=516; identical VTU nodal probe for every mesh variant; gmsh_high_order_optimize=2; gmsh_high_order_optimize_attempts=2"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s2_c1",
+    "order": 2,
+    "h_rel": 0.12,
+    "probe_nodes": 21,
+    "dofs": 1503,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.3870214000053238
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.08821586853002407,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p2",
+    "timestamp": "2026-08-12T03:02:17.644679+00:00",
+    "notes": "h_rel=0.12; order=2; load=fixed resultant; probe=3.27611628433e-05; truth=3.010538974e-05; probe_nodes=21; nodes=510; identical VTU nodal probe for every mesh variant; hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 72 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 171 nodes, h_bulk=0.02576/h_fine=0.01288 m, fine_cells=9 transition=0 feature=9, snap max|d|=1.6e-05 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.01663 h_max=0.02676 m, levels L0=0 L1=9 | budget predicted=46 elems/137 DOF ceilings=589824/1769472 | mids projected=249 partial=4 reverted=7",
+    "projection": "hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 72 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 171 nodes, h_bulk=0.02576/h_fine=0.01288 m, fine_cells=9 transition=0 feature=9, snap max|d|=1.6e-05 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.01663 h_max=0.02676 m, levels L0=0 L1=9 | budget predicted=46 elems/137 DOF ceilings=589824/1769472 | mids projected=249 partial=4 reverted=7"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s2_c1",
+    "order": 2,
+    "h_rel": 0.12,
+    "probe_nodes": 31,
+    "dofs": 6963,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 1.037521399994148
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.1243836097326877,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p2",
+    "timestamp": "2026-08-12T03:02:17.644679+00:00",
+    "notes": "h_rel=0.12; order=2; load=fixed resultant; probe=3.38500067883e-05; truth=3.010538974e-05; probe_nodes=31; nodes=2346; identical VTU nodal probe for every mesh variant; graded tet v6 (multi-level LEB geo + cap collapse/void carve): 1356 tets (0 bulk, 9 refined L1/L2, 8 feature, 9 seed), h_bulk=0.02576/h_L2~0.006439 m (L0/L1/L2), snap max|d|=1.6e-05 m mean|d|=8.14e-06 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.01663 h_max=0.02676 m, levels L0=0 L1=0 L2=9 | budget predicted=46 elems/137 DOF ceilings=589824/1769472 | mids projected=665 partial=4 reverted=0",
+    "projection": "graded tet v6 (multi-level LEB geo + cap collapse/void carve): 1356 tets (0 bulk, 9 refined L1/L2, 8 feature, 9 seed), h_bulk=0.02576/h_L2~0.006439 m (L0/L1/L2), snap max|d|=1.6e-05 m mean|d|=8.14e-06 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.01663 h_max=0.02676 m, levels L0=0 L1=0 L2=9 | budget predicted=46 elems/137 DOF ceilings=589824/1769472 | mids projected=665 partial=4 reverted=0"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "stepped_shaft_s2_c1",
+    "order": 1,
+    "h_rel": 0.2,
+    "probe_nodes": 8,
+    "dofs": 291,
+    "wall_time_s": {
+      "mesh": 0.18016960000386462,
+      "solve": 0.06417980001424439,
+      "total": 0.244349400018109
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.2276179407350732,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p1",
+    "timestamp": "2026-08-12T03:02:08.822462+00:00",
+    "notes": "h_rel=0.20; order=1; load=fixed resultant; probe=2.32528629224e-05; truth=3.010538974e-05; probe_nodes=8; nodes=105; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s2_c1",
+    "order": 1,
+    "h_rel": 0.2,
+    "probe_nodes": 9,
+    "dofs": 270,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.24318099999800324
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.38800370251459326,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p1",
+    "timestamp": "2026-08-12T03:02:08.822462+00:00",
+    "notes": "h_rel=0.20; order=1; load=fixed resultant; probe=1.84243870552e-05; truth=3.010538974e-05; probe_nodes=9; nodes=99; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s2_c1",
+    "order": 1,
+    "h_rel": 0.2,
+    "probe_nodes": 5,
+    "dofs": 1188,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.5798375000013039
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.20710333530980188,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p1",
+    "timestamp": "2026-08-12T03:02:08.822462+00:00",
+    "notes": "h_rel=0.20; order=1; load=fixed resultant; probe=2.3870463114e-05; truth=3.010538974e-05; probe_nodes=5; nodes=405; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "stepped_shaft_s2_c1",
+    "order": 2,
+    "h_rel": 0.2,
+    "probe_nodes": 22,
+    "dofs": 1482,
+    "wall_time_s": {
+      "mesh": 5.090889799990691,
+      "solve": 0.08094879999407567,
+      "total": 5.171838599984767
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.7717737914113667,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p2",
+    "timestamp": "2026-08-12T03:02:09.923967+00:00",
+    "notes": "h_rel=0.20; order=2; load=fixed resultant; probe=5.33399405216e-05; truth=3.010538974e-05; probe_nodes=22; nodes=516; identical VTU nodal probe for every mesh variant; gmsh_high_order_optimize=2; gmsh_high_order_optimize_attempts=2"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s2_c1",
+    "order": 2,
+    "h_rel": 0.2,
+    "probe_nodes": 21,
+    "dofs": 855,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.31052810000255704
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.072084469681701,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p2",
+    "timestamp": "2026-08-12T03:02:09.923967+00:00",
+    "notes": "h_rel=0.20; order=2; load=fixed resultant; probe=2.7935258686e-05; truth=3.010538974e-05; probe_nodes=21; nodes=294; identical VTU nodal probe for every mesh variant; hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 40 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 99 nodes, h_bulk=0.044/h_fine=0.022 m, fine_cells=5 transition=0 feature=5, snap max|d|=1.6e-05 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.02263 h_max=0.0446 m, levels L0=0 L1=5 | budget predicted=10 elems/30 DOF ceilings=589824/1769472 | mids projected=150 partial=0 reverted=0",
+    "projection": "hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 40 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 99 nodes, h_bulk=0.044/h_fine=0.022 m, fine_cells=5 transition=0 feature=5, snap max|d|=1.6e-05 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.02263 h_max=0.0446 m, levels L0=0 L1=5 | budget predicted=10 elems/30 DOF ceilings=589824/1769472 | mids projected=150 partial=0 reverted=0"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s2_c1",
+    "order": 2,
+    "h_rel": 0.2,
+    "probe_nodes": 15,
+    "dofs": 7491,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.9937681000155862
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.032152520246134096,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p2",
+    "timestamp": "2026-08-12T03:02:09.923967+00:00",
+    "notes": "h_rel=0.20; order=2; load=fixed resultant; probe=3.10733538931e-05; truth=3.010538974e-05; probe_nodes=15; nodes=2523; identical VTU nodal probe for every mesh variant; graded tet v6 (multi-level LEB geo + cap collapse/void carve): 1527 tets (0 bulk, 5 refined L1/L2, 5 feature, 5 seed), h_bulk=0.044/h_L2~0.011 m (L0/L1/L2), snap max|d|=1.6e-05 m mean|d|=8.73e-06 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.02263 h_max=0.0446 m, levels L0=0 L1=0 L2=5 | compact_orphans=19 | budget predicted=10 elems/30 DOF ceilings=589824/1769472 | mids projected=579 partial=1 reverted=0",
+    "projection": "graded tet v6 (multi-level LEB geo + cap collapse/void carve): 1527 tets (0 bulk, 5 refined L1/L2, 5 feature, 5 seed), h_bulk=0.044/h_L2~0.011 m (L0/L1/L2), snap max|d|=1.6e-05 m mean|d|=8.73e-06 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.02263 h_max=0.0446 m, levels L0=0 L1=0 L2=5 | compact_orphans=19 | budget predicted=10 elems/30 DOF ceilings=589824/1769472 | mids projected=579 partial=1 reverted=0"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "stepped_shaft_s3_c1",
+    "order": 1,
+    "h_rel": 0.08,
+    "probe_nodes": 8,
+    "dofs": 384,
+    "wall_time_s": {
+      "mesh": 0.14742839999962598,
+      "solve": 0.049099700001534075,
+      "total": 0.19652810000116006
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.26650720464155336,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p1",
+    "timestamp": "2026-08-12T03:03:48.241192+00:00",
+    "notes": "h_rel=0.08; order=1; load=fixed resultant; probe=3.64700593193e-05; truth=4.972108731e-05; probe_nodes=8; nodes=136; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s3_c1",
+    "order": 1,
+    "h_rel": 0.08,
+    "probe_nodes": null,
+    "dofs": null,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.4296098000195343
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": null,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p1",
+    "timestamp": "2026-08-12T03:03:48.241192+00:00",
+    "status": "failed",
+    "notes": "h_rel=0.08; order=1; load=fixed resultant; failed with exit 1 (no result); stage=native mesh + solve"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s3_c1",
+    "order": 1,
+    "h_rel": 0.08,
+    "probe_nodes": null,
+    "dofs": null,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 1.0208802999986801
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": null,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p1",
+    "timestamp": "2026-08-12T03:03:48.241192+00:00",
+    "status": "failed",
+    "notes": "h_rel=0.08; order=1; load=fixed resultant; failed with exit 1 (no result); stage=graded mesh + solve"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "stepped_shaft_s3_c1",
+    "order": 2,
+    "h_rel": 0.08,
+    "probe_nodes": 22,
+    "dofs": 2052,
+    "wall_time_s": {
+      "mesh": 2.584769500012044,
+      "solve": 0.19754019999527372,
+      "total": 2.7823097000073176
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.0047382574135433056,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p2",
+    "timestamp": "2026-08-12T03:03:49.901469+00:00",
+    "notes": "h_rel=0.08; order=2; load=fixed resultant; probe=4.99566786206e-05; truth=4.972108731e-05; probe_nodes=22; nodes=706; identical VTU nodal probe for every mesh variant; gmsh_high_order_optimize=2; gmsh_high_order_optimize_attempts=2"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s3_c1",
+    "order": 2,
+    "h_rel": 0.08,
+    "probe_nodes": null,
+    "dofs": null,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.3583113999920897
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": null,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p2",
+    "timestamp": "2026-08-12T03:03:49.901469+00:00",
+    "status": "failed",
+    "notes": "h_rel=0.08; order=2; load=fixed resultant; failed with exit 1 (no result); stage=native mesh + solve"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s3_c1",
+    "order": 2,
+    "h_rel": 0.08,
+    "probe_nodes": null,
+    "dofs": null,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.9488858999975491
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": null,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.08-p2",
+    "timestamp": "2026-08-12T03:03:49.901469+00:00",
+    "status": "failed",
+    "notes": "h_rel=0.08; order=2; load=fixed resultant; failed with exit 1 (no result); stage=graded mesh + solve"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "stepped_shaft_s3_c1",
+    "order": 1,
+    "h_rel": 0.12,
+    "probe_nodes": 8,
+    "dofs": 279,
+    "wall_time_s": {
+      "mesh": 0.1473411000042688,
+      "solve": 0.039060400013113394,
+      "total": 0.1864015000173822
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.21408380140175223,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p1",
+    "timestamp": "2026-08-12T03:03:30.779108+00:00",
+    "notes": "h_rel=0.12; order=1; load=fixed resultant; probe=3.90766079288e-05; truth=4.972108731e-05; probe_nodes=8; nodes=101; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s3_c1",
+    "order": 1,
+    "h_rel": 0.12,
+    "probe_nodes": 9,
+    "dofs": 486,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.38467990001663566
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.07121254968950586,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p1",
+    "timestamp": "2026-08-12T03:03:30.779108+00:00",
+    "notes": "h_rel=0.12; order=1; load=fixed resultant; probe=4.61803219093e-05; truth=4.972108731e-05; probe_nodes=9; nodes=171; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s3_c1",
+    "order": 1,
+    "h_rel": 0.12,
+    "probe_nodes": 9,
+    "dofs": 1053,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.520551699999487
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.1656032713526766,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p1",
+    "timestamp": "2026-08-12T03:03:30.779108+00:00",
+    "notes": "h_rel=0.12; order=1; load=fixed resultant; probe=4.14871125963e-05; truth=4.972108731e-05; probe_nodes=9; nodes=360; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "stepped_shaft_s3_c1",
+    "order": 2,
+    "h_rel": 0.12,
+    "probe_nodes": 22,
+    "dofs": 1431,
+    "wall_time_s": {
+      "mesh": 14.942339000001084,
+      "solve": 0.17355530001805164,
+      "total": 15.115894300019136
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.3231190372033861,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p2",
+    "timestamp": "2026-08-12T03:03:31.901250+00:00",
+    "notes": "h_rel=0.12; order=2; load=fixed resultant; probe=6.57869171703e-05; truth=4.972108731e-05; probe_nodes=22; nodes=499; identical VTU nodal probe for every mesh variant; gmsh_high_order_optimize=2; gmsh_high_order_optimize_attempts=2"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s3_c1",
+    "order": 2,
+    "h_rel": 0.12,
+    "probe_nodes": 21,
+    "dofs": 1515,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.35285819999990053
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.08471625715881935,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p2",
+    "timestamp": "2026-08-12T03:03:31.901250+00:00",
+    "notes": "h_rel=0.12; order=2; load=fixed resultant; probe=5.39332717288e-05; truth=4.972108731e-05; probe_nodes=21; nodes=514; identical VTU nodal probe for every mesh variant; hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 72 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 171 nodes, h_bulk=0.04439/h_fine=0.02219 m, fine_cells=9 transition=0 feature=9, snap max|d|=2.76e-05 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.02307 h_max=0.04622 m, levels L0=0 L1=9 | budget predicted=46 elems/137 DOF ceilings=589824/1769472 | mids projected=263 partial=0 reverted=0",
+    "projection": "hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 72 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 171 nodes, h_bulk=0.04439/h_fine=0.02219 m, fine_cells=9 transition=0 feature=9, snap max|d|=2.76e-05 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.02307 h_max=0.04622 m, levels L0=0 L1=9 | budget predicted=46 elems/137 DOF ceilings=589824/1769472 | mids projected=263 partial=0 reverted=0"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s3_c1",
+    "order": 2,
+    "h_rel": 0.12,
+    "probe_nodes": 31,
+    "dofs": 6489,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.8116265000135172
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.1372781200646015,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.12-p2",
+    "timestamp": "2026-08-12T03:03:31.901250+00:00",
+    "notes": "h_rel=0.12; order=2; load=fixed resultant; probe=5.65467047035e-05; truth=4.972108731e-05; probe_nodes=31; nodes=2188; identical VTU nodal probe for every mesh variant; graded tet v6 (multi-level LEB geo + cap collapse/void carve): 1260 tets (0 bulk, 9 refined L1/L2, 9 feature, 9 seed), h_bulk=0.04439/h_L2~0.0111 m (L0/L1/L2), snap max|d|=2.76e-05 m mean|d|=1.43e-05 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.02307 h_max=0.04622 m, levels L0=0 L1=0 L2=9 | budget predicted=46 elems/137 DOF ceilings=589824/1769472 | mids projected=636 partial=0 reverted=0",
+    "projection": "graded tet v6 (multi-level LEB geo + cap collapse/void carve): 1260 tets (0 bulk, 9 refined L1/L2, 9 feature, 9 seed), h_bulk=0.04439/h_L2~0.0111 m (L0/L1/L2), snap max|d|=2.76e-05 m mean|d|=1.43e-05 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.02307 h_max=0.04622 m, levels L0=0 L1=0 L2=9 | budget predicted=46 elems/137 DOF ceilings=589824/1769472 | mids projected=636 partial=0 reverted=0"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "stepped_shaft_s3_c1",
+    "order": 1,
+    "h_rel": 0.2,
+    "probe_nodes": 8,
+    "dofs": 279,
+    "wall_time_s": {
+      "mesh": 0.15592370001832023,
+      "solve": 0.05107049999060109,
+      "total": 0.20699420000892133
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.21408380140175223,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p1",
+    "timestamp": "2026-08-12T03:03:13.380892+00:00",
+    "notes": "h_rel=0.20; order=1; load=fixed resultant; probe=3.90766079288e-05; truth=4.972108731e-05; probe_nodes=8; nodes=101; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s3_c1",
+    "order": 1,
+    "h_rel": 0.2,
+    "probe_nodes": 9,
+    "dofs": 270,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.19620239999494515
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.31129592529844013,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p1",
+    "timestamp": "2026-08-12T03:03:13.380892+00:00",
+    "notes": "h_rel=0.20; order=1; load=fixed resultant; probe=3.4243115429e-05; truth=4.972108731e-05; probe_nodes=9; nodes=99; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s3_c1",
+    "order": 1,
+    "h_rel": 0.2,
+    "probe_nodes": 5,
+    "dofs": 1170,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.44902209998690523
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.1898153803546722,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p1",
+    "timestamp": "2026-08-12T03:03:13.380892+00:00",
+    "notes": "h_rel=0.20; order=1; load=fixed resultant; probe=4.02832602106e-05; truth=4.972108731e-05; probe_nodes=5; nodes=399; identical VTU nodal probe for every mesh variant"
+  },
+  {
+    "schema_version": 1,
+    "solver": "gmsh-mesh+polymesh-solver",
+    "version": "gmsh-4.13.1+polymesh-08f9f55",
+    "case_id": "stepped_shaft_s3_c1",
+    "order": 2,
+    "h_rel": 0.2,
+    "probe_nodes": 22,
+    "dofs": 1431,
+    "wall_time_s": {
+      "mesh": 15.235091499984264,
+      "solve": 0.0983758999791462,
+      "total": 15.33346739996341
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.3339096019651116,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p2",
+    "timestamp": "2026-08-12T03:03:14.265781+00:00",
+    "notes": "h_rel=0.20; order=2; load=fixed resultant; probe=6.6323435783e-05; truth=4.972108731e-05; probe_nodes=22; nodes=499; identical VTU nodal probe for every mesh variant; gmsh_high_order_optimize=2; gmsh_high_order_optimize_attempts=2"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s3_c1",
+    "order": 2,
+    "h_rel": 0.2,
+    "probe_nodes": 21,
+    "dofs": 855,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.2598660999792628
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.06477009490304139,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p2",
+    "timestamp": "2026-08-12T03:03:14.265781+00:00",
+    "notes": "h_rel=0.20; order=2; load=fixed resultant; probe=4.65006477662e-05; truth=4.972108731e-05; probe_nodes=21; nodes=294; identical VTU nodal probe for every mesh variant; hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 40 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 99 nodes, h_bulk=0.076/h_fine=0.038 m, fine_cells=5 transition=0 feature=5, snap max|d|=2.76e-05 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.03419 h_max=0.07703 m, levels L0=0 L1=5 | budget predicted=10 elems/29 DOF ceilings=589824/1769472 | mids projected=150 partial=0 reverted=0",
+    "projection": "hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 40 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 99 nodes, h_bulk=0.076/h_fine=0.038 m, fine_cells=5 transition=0 feature=5, snap max|d|=2.76e-05 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.03419 h_max=0.07703 m, levels L0=0 L1=5 | budget predicted=10 elems/29 DOF ceilings=589824/1769472 | mids projected=150 partial=0 reverted=0"
+  },
+  {
+    "schema_version": 1,
+    "solver": "polymesh-native-graded",
+    "version": "08f9f55",
+    "case_id": "stepped_shaft_s3_c1",
+    "order": 2,
+    "h_rel": 0.2,
+    "probe_nodes": 14,
+    "dofs": 7374,
+    "wall_time_s": {
+      "mesh": null,
+      "solve": null,
+      "total": 0.8698163999943063
+    },
+    "accuracy": {
+      "name": "tip_deflection_rel_err",
+      "value": 0.038574226196991336,
+      "unit": "ratio"
+    },
+    "label": "gmsh-peer-h0.20-p2",
+    "timestamp": "2026-08-12T03:03:14.265781+00:00",
+    "notes": "h_rel=0.20; order=2; load=fixed resultant; probe=5.16390397787e-05; truth=4.972108731e-05; probe_nodes=14; nodes=2484; identical VTU nodal probe for every mesh variant; graded tet v6 (multi-level LEB geo + cap collapse/void carve): 1499 tets (0 bulk, 5 refined L1/L2, 5 feature, 5 seed), h_bulk=0.076/h_L2~0.019 m (L0/L1/L2), snap max|d|=2.76e-05 m mean|d|=1.58e-05 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.03419 h_max=0.07703 m, levels L0=0 L1=0 L2=5 | compact_orphans=6 | budget predicted=10 elems/29 DOF ceilings=589824/1769472 | mids projected=577 partial=4 reverted=0",
+    "projection": "graded tet v6 (multi-level LEB geo + cap collapse/void carve): 1499 tets (0 bulk, 5 refined L1/L2, 5 feature, 5 seed), h_bulk=0.076/h_L2~0.019 m (L0/L1/L2), snap max|d|=2.76e-05 m mean|d|=1.58e-05 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.03419 h_max=0.07703 m, levels L0=0 L1=0 L2=5 | compact_orphans=6 | budget predicted=10 elems/29 DOF ceilings=589824/1769472 | mids projected=577 partial=4 reverted=0"
+  }
+]

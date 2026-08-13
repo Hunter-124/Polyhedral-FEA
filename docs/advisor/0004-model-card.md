@@ -301,12 +301,20 @@ same cause.
   rather than an argument.
 
   **In-sample false alarms are real and visible.** Of the 32 corpus parts,
-  `tube_s1` trips the gate at 6.68 against the 6.30 operating point — 6 % over.
-  `tube` is also the family that contributes no scorable cases and the one Gmsh
-  fails outright on, so the geometry sitting at the boundary is consistent rather
-  than surprising. Separately `tube_s2` is refused by the *feasibility* gate at a
-  distance of 5.70, which is a useful demonstration that the two mechanisms stay
-  distinct in practice and not only in the code.
+  `tube_s1` trips the gate at 6.684 against the 6.304 operating point — 6.0 % over,
+  on *training* geometry. One in 32, consistent with a q0.99 fit having a ~1 %
+  in-sample alarm rate by construction, but a false alarm nonetheless. Separately
+  `tube_s2` is refused by the *feasibility* gate at a distance of 5.704, inside the
+  OOD boundary — the two mechanisms firing on adjacent parts for different stated
+  reasons is the clearest evidence they are genuinely separate gates rather than
+  one wearing two labels.
+
+  This is not an isolated result. `tube` is also the family contributing no
+  scorable folds and the one Gmsh fails outright on, and those findings share a
+  cause: see [`tube` is the hardest family in the
+  corpus](0005-data-card.md#tube-is-the-hardest-family-in-the-corpus-and-four-measurements-say-so)
+  in the data card, where all four measurements are collected rather than repeated
+  a line at a time across three documents.
 
 The 15 offline CAD descriptors *hurt* held-out regret — a 1-NN classifier
 recovers the family from them alone at 32/32, so on a corpus this narrow they are

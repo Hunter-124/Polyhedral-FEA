@@ -6,6 +6,7 @@
 #include "adapt/hp_driver.hpp"
 #include "adapt/loop.hpp"
 #include "fea/boundary_faces.hpp"
+#include "fea/cell_quality.hpp"
 #include "fea/p_elevate.hpp"
 #include "fea/quadrature.hpp"
 #include "fea/poly_to_vem.hpp"
@@ -1147,73 +1148,10 @@ std::size_t project_quadratic_boundary_mids(
 
 namespace {
 
-struct VolumeRulePoint {
-    double weight = 0.0;
-    Eigen::Matrix<double, Eigen::Dynamic, 3> dn;
-};
-
-std::vector<VolumeRulePoint> make_volume_rule(fea::ElementType type) {
-    std::vector<fea::QuadraturePoint> quadrature;
-    if (type == fea::ElementType::kTet10) {
-        // A quadratic tetrahedral map has a cubic det(J).
-        quadrature = fea::tet_rule(3);
-    } else if (type == fea::ElementType::kHex20) {
-        // One order above the stiffness rule makes the curved-volume measure
-        // insensitive to the integration shortcut used by the solver.
-        quadrature = fea::hex_rule(4);
-    } else {
-        quadrature = fea::default_rule(type);
-    }
-    std::vector<VolumeRulePoint> out;
-    out.reserve(quadrature.size());
-    for (const auto& qp : quadrature) {
-        out.push_back({qp.weight, fea::eval_shape(type, qp.xi).dn});
-    }
-    return out;
-}
-
-const std::vector<VolumeRulePoint>& volume_rule(fea::ElementType type) {
-    static const auto rules = [] {
-        std::array<std::vector<VolumeRulePoint>, 6> value;
-        for (std::size_t i = 0; i < value.size(); ++i) {
-            value[i] = make_volume_rule(static_cast<fea::ElementType>(i));
-        }
-        return value;
-    }();
-    return rules[static_cast<std::size_t>(type)];
-}
-
-double physical_mesh_volume(const fea::NodalMesh& nodal) {
-    double total = 0.0;
-    for (const auto& element : nodal.elements) {
-        if (element.type == fea::ElementType::kPolyVem) {
-            double signed_volume = 0.0;
-            for (const auto& face : element.faces) {
-                if (face.size() < 3) {
-                    continue;
-                }
-                const Eigen::Vector3d& a = nodal.nodes[element.nodes[face[0]]];
-                for (std::size_t k = 1; k + 1 < face.size(); ++k) {
-                    const Eigen::Vector3d& b = nodal.nodes[element.nodes[face[k]]];
-                    const Eigen::Vector3d& c = nodal.nodes[element.nodes[face[k + 1]]];
-                    signed_volume += a.dot(b.cross(c)) / 6.0;
-                }
-            }
-            total += std::abs(signed_volume);
-            continue;
-        }
-        for (const auto& qp : volume_rule(element.type)) {
-            Eigen::Matrix3d jacobian = Eigen::Matrix3d::Zero();
-            for (std::size_t a = 0; a < element.nodes.size(); ++a) {
-                jacobian.noalias() +=
-                    qp.dn.row(static_cast<Eigen::Index>(a)).transpose() *
-                    nodal.nodes[element.nodes[a]].transpose();
-            }
-            total += qp.weight * std::abs(jacobian.determinant());
-        }
-    }
-    return total;
-}
+// The mesh volume measure lives in `fea::element_volume` / `fea::mesh_volume`
+// (fea/cell_quality.hpp). It used to be duplicated here; the copy in
+// `fea::element_centroid_stresses` had drifted into a wrong one, so the rule is
+// now defined once and every caller shares it.
 
 const char* geometry_volume_band(double relative_error) {
     if (relative_error > kGeometryVolumeHardLimit) {
@@ -1368,7 +1306,7 @@ GeometryVolumeAssessment measure_geometry_volume(const Model& model,
         return out;
     }
     const auto completeness =
-        mesh::evaluate_geometry_completeness(*model.cad, physical_mesh_volume(nodal));
+        mesh::evaluate_geometry_completeness(*model.cad, fea::mesh_volume(nodal));
     if (!completeness.available) {
         return out;
     }

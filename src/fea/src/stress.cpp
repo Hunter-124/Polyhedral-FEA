@@ -289,22 +289,7 @@ recover_element_centroid_stress(const NodalMesh& mesh, const Material& material,
             sample.centroid = centroid;
             sample.element_index = ei;
             sample.quality = sample_quality(mesh, element);
-            sample.volume = 0.0;
-            if (!element.faces.empty()) {
-                // Volume via divergence on face fan (same poly_volume idea).
-                for (const auto& face : element.faces) {
-                    if (face.size() < 3) {
-                        continue;
-                    }
-                    const Eigen::Vector3d& a = mesh.nodes[element.nodes[face[0]]];
-                    for (std::size_t k = 1; k + 1 < face.size(); ++k) {
-                        const Eigen::Vector3d& b = mesh.nodes[element.nodes[face[k]]];
-                        const Eigen::Vector3d& c = mesh.nodes[element.nodes[face[k + 1]]];
-                        sample.volume += (a.dot(b.cross(c))) / 6.0;
-                    }
-                }
-                sample.volume = std::abs(sample.volume);
-            }
+            sample.volume = element_volume(mesh, element);
             out.push_back(sample);
             continue;
         }
@@ -344,17 +329,15 @@ recover_element_centroid_stress(const NodalMesh& mesh, const Material& material,
         sample.stress = dmat * eps;
         sample.centroid = centroid;
         sample.element_index = ei;
-        sample.volume = std::abs(det); // reference-weight proxy; ok for ranking filters
+        // Was `std::abs(det)`: |det J| at a single reference point, with the
+        // reference domain's own measure dropped. Exact for tet4 only because
+        // the line below overrode it, and coincidentally exact for prism6
+        // (reference volume 1); 0.125x true for hex8/hex20 and a non-constant
+        // ~0.09x for pyramid5. Nothing read `.volume` yet, so it never reached
+        // the advisor's labels, but a volume-weighted average over these
+        // samples would have been silently wrong per element type.
+        sample.volume = element_volume(mesh, element);
         sample.quality = sample_quality(mesh, element);
-        if (element.type == ElementType::kTet4 && element.nodes.size() >= 4) {
-            // True tet volume for area-weight-ish volume metrics.
-            sample.volume = std::abs((mesh.nodes[element.nodes[1]] - mesh.nodes[element.nodes[0]])
-                                         .dot((mesh.nodes[element.nodes[2]] -
-                                               mesh.nodes[element.nodes[0]])
-                                                  .cross(mesh.nodes[element.nodes[3]] -
-                                                         mesh.nodes[element.nodes[0]]))) /
-                            6.0;
-        }
         out.push_back(sample);
     }
     return out;

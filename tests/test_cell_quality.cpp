@@ -305,3 +305,57 @@ TEST_CASE("ZZ global eta is dimensionless and relative") {
     REQUIRE(!marked.empty());
     REQUIRE(marked.size() < zz.element_eta.size());
 }
+
+// `ElementCentroidStress.volume` was `|det J|` at a single reference point,
+// with the reference domain's own measure dropped: 0.125x true for a hex,
+// ~0.09x for a pyramid, correct for tet4 only because a special case
+// overrode it. Nothing read the field yet, so nothing was corrupted, but any
+// volume-weighted average over these samples would have been wrong per element
+// type. There is now one definition, `fea::element_volume`, and this is the
+// contract that ties the samples to it.
+TEST_CASE("element volumes are the real thing, per element type") {
+    using polymesh::fea::ElementType;
+    using polymesh::fea::NodalElement;
+    using polymesh::fea::NodalMesh;
+
+    SECTION("a unit hex measures one, not one eighth") {
+        NodalMesh mesh;
+        mesh.nodes = {{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0},
+                      {0, 0, 1}, {1, 0, 1}, {1, 1, 1}, {0, 1, 1}};
+        mesh.elements.push_back(NodalElement{ElementType::kHex8, {0, 1, 2, 3, 4, 5, 6, 7}});
+        CHECK(polymesh::fea::element_volume(mesh, mesh.elements[0]) ==
+              Catch::Approx(1.0).margin(1e-14));
+    }
+
+    SECTION("six pyramids fanned from a hex centre sum to the hex") {
+        NodalMesh mesh;
+        mesh.nodes = {{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}, {0, 0, 1},
+                      {1, 0, 1}, {1, 1, 1}, {0, 1, 1}, {0.5, 0.5, 0.5}};
+        const std::vector<std::vector<std::uint32_t>> faces{
+            {0, 1, 2, 3}, {4, 7, 6, 5}, {0, 4, 5, 1},
+            {1, 5, 6, 2}, {2, 6, 7, 3}, {3, 7, 4, 0}};
+        for (const auto& face : faces) {
+            mesh.elements.push_back(NodalElement{
+                ElementType::kPyramid5, {face[0], face[1], face[2], face[3], 8}});
+        }
+        for (const auto& element : mesh.elements) {
+            CHECK(polymesh::fea::element_volume(mesh, element) ==
+                  Catch::Approx(1.0 / 6.0).margin(1e-14));
+        }
+        CHECK(polymesh::fea::mesh_volume(mesh) == Catch::Approx(1.0).margin(1e-14));
+    }
+
+    SECTION("stress sample volumes partition the mesh") {
+        const auto beam = cantilever(4, 1.0, 1e9);
+        const polymesh::fea::Material mat{.youngs_modulus = 1e9, .poissons_ratio = 0.3};
+        const auto samples =
+            polymesh::fea::recover_element_centroid_stress(beam.mesh, mat, beam.u);
+        REQUIRE(!samples.empty());
+        double sum = 0.0;
+        for (const auto& sample : samples) {
+            CHECK(sample.volume > 0.0);
+            sum += sample.volume;
+        }
+        CHECK(sum == Catch::Approx(polymesh::fea::mesh_volume(beam.mesh)).epsilon(1e-12));
+    }
+}

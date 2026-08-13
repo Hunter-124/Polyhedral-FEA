@@ -676,6 +676,17 @@ std::vector<Loop> resolve_boundary_loops(const NodalMesh& mesh) {
         }
     }
 
+    // A loop deactivated above is a genuinely interior face: it was matched
+    // exactly by another element's face, so both copies leave. What follows is
+    // different -- `suppress_opposing_partition` cancels a coarse face against
+    // the several finer faces that tile it from the other side, which is a
+    // GEOMETRIC judgement and can therefore be wrong. When it is, a real
+    // exterior facet disappears and the shell has a hole in it.
+    std::vector<bool> paired_out(loops.size());
+    for (std::size_t i = 0; i < loops.size(); ++i) {
+        paired_out[i] = !active[i];
+    }
+
     std::vector<std::size_t> partition_targets;
     for (std::size_t i = 0; i < loops.size(); ++i) {
         if (active[i] &&
@@ -688,6 +699,51 @@ std::vector<Loop> resolve_boundary_loops(const NodalMesh& mesh) {
               [&](std::size_t a, std::size_t b) { return loops[a].size() > loops[b].size(); });
     for (const std::size_t target : partition_targets) {
         suppress_opposing_partition(mesh, target, loops, active);
+    }
+
+    // So the suppression proposes and the shell disposes. Revive the minimum
+    // that closes it: only loops this step removed are eligible, never the
+    // exactly-paired interior faces, and reviving strictly reduces the number
+    // of once-used edges, so this terminates. Measured on sphere_box_s0 at
+    // h=0.0036 m with --mesher graded, where the tet complex is watertight
+    // (0 torn edges, no face used more than twice, 11036 free faces over 88612
+    // tets) and this function still reported 6 open edges.
+    for (int repair = 0; repair < 8; ++repair) {
+        std::map<Edge, int> edge_use;
+        for (std::size_t i = 0; i < loops.size(); ++i) {
+            if (!active[i]) {
+                continue;
+            }
+            for (std::size_t c = 0; c < loops[i].size(); ++c) {
+                ++edge_use[edge(loops[i][c], loops[i][(c + 1) % loops[i].size()])];
+            }
+        }
+        std::set<Edge> torn;
+        for (const auto& [e, count] : edge_use) {
+            if (count != 2) {
+                torn.insert(e);
+            }
+        }
+        if (torn.empty()) {
+            break;
+        }
+        std::size_t revived = 0;
+        for (std::size_t i = 0; i < loops.size(); ++i) {
+            if (active[i] || paired_out[i]) {
+                continue;
+            }
+            bool touches = false;
+            for (std::size_t c = 0; c < loops[i].size() && !touches; ++c) {
+                touches = torn.count(edge(loops[i][c], loops[i][(c + 1) % loops[i].size()])) > 0;
+            }
+            if (touches) {
+                active[i] = true;
+                ++revived;
+            }
+        }
+        if (revived == 0) {
+            break;
+        }
     }
 
     std::vector<Loop> boundary;
@@ -879,22 +935,34 @@ bool subdivide_curved_loop(const Loop& loop, const std::map<Edge, std::uint32_t>
 std::vector<std::array<std::uint32_t, 4>> extract_boundary_faces(const NodalMesh& mesh) {
     std::vector<std::array<std::uint32_t, 4>> boundary;
     for (const Loop& loop : resolve_boundary_loops(mesh)) {
+        // A 3- or 4-node loop IS the face; there is nothing to decide. The
+        // projection used to be computed here, thrown away, and its success
+        // used as a filter -- so a free face that happened to be degenerate
+        // (collinear, zero area) was silently dropped, punching a hole in the
+        // shell that the traction integral, the fidelity sampler and the
+        // renderer all consume. Measured on sphere_box_s0 at h=0.0036 m with
+        // --mesher graded: the tet complex was watertight and this function
+        // reported 6 open edges. Nothing is lost by keeping the face: a
+        // zero-area face integrates to zero (`traction.cpp` guards the
+        // zero-length normal), and the topology stays complete.
         if (loop.size() == 3) {
-            Projection projection;
-            if (project_loop(mesh, loop, projection)) {
-                boundary.push_back({loop[0], loop[1], loop[2], loop[2]});
-            }
+            boundary.push_back({loop[0], loop[1], loop[2], loop[2]});
         } else if (loop.size() == 4) {
-            Projection projection;
-            if (project_loop(mesh, loop, projection)) {
-                boundary.push_back({loop[0], loop[1], loop[2], loop[3]});
-            }
+            boundary.push_back({loop[0], loop[1], loop[2], loop[3]});
         } else {
             std::vector<std::array<std::uint32_t, 3>> triangles;
-            if (triangulate_loop(mesh, loop, triangles)) {
-                for (const auto& triangle : triangles) {
-                    boundary.push_back({triangle[0], triangle[1], triangle[2], triangle[2]});
+            if (!triangulate_loop(mesh, loop, triangles)) {
+                // Star and ear clipping both failed, which means the polygon is
+                // degenerate rather than merely awkward. Fan it anyway: a
+                // degenerate fan is zero-area and harmless, a missing facet is
+                // a hole.
+                triangles.clear();
+                for (std::size_t k = 1; k + 1 < loop.size(); ++k) {
+                    triangles.push_back({loop[0], loop[k], loop[k + 1]});
                 }
+            }
+            for (const auto& triangle : triangles) {
+                boundary.push_back({triangle[0], triangle[1], triangle[2], triangle[2]});
             }
         }
     }

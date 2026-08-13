@@ -3022,51 +3022,48 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
         if (out.fill_geometry_volume.relative_error > kGeometryVolumeHardLimit) {
             // Name the remedy, like the two sibling refusals do
             // (`enforce_feature_resolution` and `refuse_unresolvable_h`). A bare
-            // ratio is a dead end, and here it is worse than silent: on a mixed
-            // -level fill the error barely moves as h shrinks -- measured on
-            // unit_box.step, 0.3926 at h=0.1732 m against 0.3600 at h=0.105 m,
-            // a 39% reduction in h for a 4x larger mesh and the same refusal --
-            // so the obvious reading of "0.39 exceeds 0.1" walks the user down
-            // an asymptote. It only cleared when the fill came out uniform.
+            // ratio is a dead end, and here it is worse than silent: the error
+            // does not fall smoothly with h, so the obvious reading of "0.34
+            // exceeds 0.1" walks the user down an asymptote. Measured on
+            // channel_s0.step: 0.3351 at h=0.015 m, 0.3372 at h=0.012 m -- a 20%
+            // reduction in h made it WORSE -- and 1.102e-14 at h=0.0075 m. The
+            // recommended halving is that verified jump, not an extrapolation.
             //
-            // The two causes need different advice and are distinguishable from
-            // the mesh itself: pyramids exist only where the hex fill stitches a
-            // coarse cell to a 2:1 refined neighbour, so their presence IS the
-            // mixed-level signature. Both remedies below were verified by
-            // running them, not derived: unit_box.step at the same h=0.1732 m
-            // meshes to rel_err 1.71e-14 with --mesher graded_tet, and
-            // channel_s0.step, which fails uniform at h=0.015 m, meshes to
-            // rel_err 1.10e-14 at half that h.
+            // RETRACTED (see ADR-0030): this guard used to split on the presence
+            // of pyramid cells and blame the 2:1 conforming fan transition for
+            // "dropping the volume" on mixed-level fills, recommending
+            // --mesher graded_tet. That diagnosis was wrong. The fan was
+            // conforming and exact; `fea::pyramid_rule` integrated it over the
+            // wrong parametric domain and measured every pyramid at 0.6x its
+            // true volume, so the guard was reporting a defect in its own
+            // measuring stick. With the rule fixed, every mixed-level fill that
+            // used to be refused here passes at ~1e-13, and no case is known
+            // where the transition costs volume. Recommending graded_tet for a
+            // cause that does not exist would send users away from the better
+            // mesher on the strength of a retracted finding, so the branch is
+            // gone rather than reworded.
             const std::size_t n_pyramid = static_cast<std::size_t>(std::count_if(
                 out.mesh.elements.begin(), out.mesh.elements.end(),
                 [](const fea::NodalElement& e) {
                     return e.type == fea::ElementType::kPyramid5;
                 }));
-            const std::string remedy =
-                n_pyramid > 0
-                    ? std::format(
-                          "the fill is MIXED-LEVEL -- {} pyramid cells stitch coarse cells to "
-                          "their 2:1 refined neighbours, and that fan transition, not the "
-                          "resolution, is dropping the volume. Reducing -h a little does NOT "
-                          "fix this: it reproduces the same transition pattern and nearly the "
-                          "same error on a much larger mesh. Retry with --mesher graded_tet at "
-                          "this same h, or change -h enough that the fill comes out uniform "
-                          "(no pyramid cells)",
-                          n_pyramid)
-                    : std::format(
-                          "the fill is uniform (no transition cells), so this is "
-                          "under-resolution rather than a transition artefact: reduce -h to "
-                          "<= {:.6g} m or raise --max-elems/--max-dof to afford it",
-                          0.5 * h);
             // Both h values, because they differ: the fill snaps the requested
             // size to a whole number of cells, and a user told only the snapped
             // one cannot match it to the -h they typed.
             throw GeometryVolumeLimitError(
                 std::format("geometry fill-stage guard failed at h={:.6g} m (requested -h "
                             "{:.6g} m): mesh/BRep volume relative error {:.4g} exceeds hard "
-                            "limit {:.4g}; solid/void topology is incomplete; {} | {}",
+                            "limit {:.4g}; the lattice does not resolve the solid, so parts "
+                            "of it are missing from the fill. Reducing -h a little does NOT "
+                            "fix this -- the error is set by which features the lattice "
+                            "straddles, not by resolution in the small. Reduce -h to <= "
+                            "{:.6g} m, or raise --max-elems/--max-dof to afford it. (Fill "
+                            "census: {} cells, {} of them pyramid5 2:1 transition cells; the "
+                            "transition is conforming and volume-exact and is not the cause.)"
+                            " | {}",
                             fill_h, h, out.fill_geometry_volume.relative_error,
-                            kGeometryVolumeHardLimit, remedy, out.mesher_note),
+                            kGeometryVolumeHardLimit, 0.5 * h, out.mesh.elements.size(),
+                            n_pyramid, out.mesher_note),
                 out.fill_geometry_volume, false);
         }
     }

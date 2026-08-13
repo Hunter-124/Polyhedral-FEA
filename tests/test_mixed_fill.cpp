@@ -316,13 +316,18 @@ TEST_CASE("box-hole bore survives the coarse-grid parity ladder",
     }
 }
 
-// The fill-stage guard is the third of three refusals, and it was the only one
-// that reported a ratio without naming a way out. Worse, on a mixed-level fill
-// the ratio barely moves as h shrinks (measured on this exact part: 0.3926 at
-// h=0.1732 m, 0.3600 at h=0.105 m), so a bare number argues for the one move
-// that does not work. This pins the remedy TEXT and then RUNS it: a message
-// that recommends something untested is the defect it replaced.
-TEST_CASE("fill-stage guard names a remedy that works",
+// The 2:1 fan transition was accused, for an entire release cycle, of dropping
+// 36-40% of the solid volume on every mixed-level fill. It never did. The fan
+// is conforming and volume-exact; `fea::pyramid_rule` integrated it over the
+// reference PYRAMID with Duffy weights while `fea::eval_pyramid5` is a
+// collapsed-brick map on the CUBE, so every pyramid measured 0.6x its true
+// volume and the fill guard refused meshes for a defect in its own ruler.
+//
+// This pins the retraction where it can be measured: a mixed-level hybrid fill
+// at an h the guard used to refuse, asserted to be volume-exact AND to actually
+// be made of pyramids, so the test cannot pass by quietly ceasing to exercise
+// the transition.
+TEST_CASE("a mixed-level hybrid fill is volume-exact",
           "[cad][hybrid][geometry-completeness]") {
     constexpr char kUnitBox[] = "bench/geometries/public/unit_box.step";
     if (!polymesh::geom::occ_enabled()) {
@@ -333,8 +338,44 @@ TEST_CASE("fill-stage guard names a remedy that works",
     }
 
     const auto model = pipeline::Model::load(kUnitBox);
-    const double diagonal = (model.bbox_max - model.bbox_min).norm();
-    const double h = 0.1 * diagonal; // the advisor's clamp-box default action
+
+    // Every one of these was refused before the quadrature fix, with rel_err
+    // 0.400, 0.3926, 0.3813, 0.3719, 0.3649 and 0.3600 respectively.
+    for (const double h : {0.22, 0.20, 0.173205, 0.16, 0.14, 0.11}) {
+        CAPTURE(h);
+        const auto volume = pipeline::volume_mesh(model, h, pipeline::VolumeMesher::kHybrid,
+                                                  /*skin_layers=*/2, /*feature_refine=*/true);
+        const auto n_pyramid = std::count_if(
+            volume.mesh.elements.begin(), volume.mesh.elements.end(),
+            [](const fea::NodalElement& e) { return e.type == fea::ElementType::kPyramid5; });
+        INFO(volume.mesher_note);
+        // The fill really is the mixed-level, pyramid-stitched one under test.
+        REQUIRE(n_pyramid > 0);
+        REQUIRE(volume.fill_geometry_volume.available);
+        // Machine precision, not merely inside the 0.1 hard limit: the fan
+        // tiles the coarse cell exactly, so anything else is a new defect.
+        CHECK(volume.fill_geometry_volume.relative_error < 1e-10);
+    }
+}
+
+// The fill-stage guard is the third of three refusals, and it was the only one
+// that reported a ratio without naming a way out. Worse, the ratio does not
+// fall smoothly with h -- on this part a 20% reduction makes it worse -- so a
+// bare number argues for the one move that does not work. This pins the remedy
+// TEXT and then RUNS it: a message that recommends something untested is the
+// defect it replaced.
+TEST_CASE("fill-stage guard names a remedy that works",
+          "[cad][hybrid][geometry-completeness]") {
+    constexpr char kChannel[] = "bench/geometries/corpus/primitives/channel_s0.step";
+    if (!polymesh::geom::occ_enabled()) {
+        SKIP("OpenCASCADE disabled");
+    }
+    if (!std::filesystem::exists(kChannel)) {
+        SKIP("channel_s0.step missing");
+    }
+
+    const auto model = pipeline::Model::load(kChannel);
+    constexpr double h = 0.015; // measured rel_err 0.3351; 0.012 m is worse still
 
     bool refused = false;
     try {
@@ -347,19 +388,19 @@ TEST_CASE("fill-stage guard names a remedy that works",
         CHECK_FALSE(error.solved_stage);
         // The failing h is named, not just the error ratio.
         CHECK(what.find("fill-stage guard failed at h=") != std::string::npos);
-        // The cause is identified as the transition, not as resolution...
-        CHECK(what.find("MIXED-LEVEL") != std::string::npos);
-        CHECK(what.find("pyramid cells") != std::string::npos);
-        // ...the asymptote is called out explicitly, so nobody follows it...
+        // The asymptote is called out explicitly, so nobody follows it...
         CHECK(what.find("Reducing -h a little does NOT fix this") != std::string::npos);
-        // ...and a concrete alternative is named.
-        CHECK(what.find("--mesher graded_tet") != std::string::npos);
+        // ...and a concrete, executable size is named.
+        CHECK(what.find("Reduce -h to <= 0.0075 m") != std::string::npos);
+        // The retracted accusation must not come back.
+        CHECK(what.find("MIXED-LEVEL") == std::string::npos);
+        CHECK(what.find("--mesher graded_tet") == std::string::npos);
     }
     REQUIRE(refused);
 
-    // The recommendation is executed, at the SAME h the guard refused. If this
-    // ever stops clearing the guard, the message is lying and this test says so.
-    const auto remedy = pipeline::volume_mesh(model, h, pipeline::VolumeMesher::kGradedTet,
+    // The recommendation is executed. If this ever stops clearing the guard,
+    // the message is lying and this test says so.
+    const auto remedy = pipeline::volume_mesh(model, 0.5 * h, pipeline::VolumeMesher::kHybrid,
                                               /*skin_layers=*/2, /*feature_refine=*/true);
     INFO(remedy.mesher_note);
     REQUIRE(remedy.fill_geometry_volume.available);

@@ -50,6 +50,7 @@ Stages
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import os
@@ -1687,21 +1688,114 @@ def family_feature_report(work: Path, family: str) -> list[dict]:
     return out
 
 
+def feature_resolution_summary(rows: list[dict]) -> dict:
+    """Every measured length against each rung's element size, per family.
+
+    Reported for all lengths rather than picking one "binding" feature, so no
+    judgement is baked in. The direction is stated explicitly because it is easy
+    to invert: length/h BELOW 1.0 means the feature is SMALLER than a single
+    element at that rung (under-resolved, and where an engine should refuse);
+    ABOVE 1.0 means the feature spans more than one element.
+    """
+    out: dict = {}
+    by_family: dict[str, list[dict]] = {}
+    for row in rows:
+        by_family.setdefault(row["family"], []).append(row)
+    for family, parts in sorted(by_family.items()):
+        suffix = f"_over_h_rung_c{RUNGS[0][1]}"
+        names = sorted(
+            {key[: -len(suffix)] for part in parts for key in part["ratios"]
+             if key.endswith(suffix)}
+        )
+        features = {}
+        for name in names:
+            per_rung = {}
+            for _, curvature in RUNGS:
+                key = f"{name}_over_h_rung_c{curvature}"
+                values = {part["part"]: part["ratios"][key] for part in parts
+                          if key in part["ratios"]}
+                if not values:
+                    continue
+                per_rung[f"rung_c{curvature}"] = {
+                    "min_over_h": min(values.values()),
+                    "max_over_h": max(values.values()),
+                    "parts_smaller_than_one_element": sorted(
+                        p for p, v in values.items() if v < 1.0
+                    ),
+                    "parts_larger_than_one_element": sorted(
+                        p for p, v in values.items() if v >= 1.0
+                    ),
+                    "per_part_over_h": dict(sorted(values.items())),
+                }
+            if not per_rung:
+                continue
+            everything = [v for rung in per_rung.values()
+                          for v in rung["per_part_over_h"].values()]
+            features[name] = {
+                "range_over_h_all_parts_and_rungs": [min(everything), max(everything)],
+                "by_rung": per_rung,
+            }
+        if not features:
+            continue
+        smallest = min(features, key=lambda n: features[n]["range_over_h_all_parts_and_rungs"][0])
+        out[family] = {
+            "direction": "length/h < 1.0 means the feature is SMALLER than one element at "
+            "that rung (under-resolved); > 1.0 means it spans more than one element",
+            "smallest_feature_relative_to_h": smallest,
+            "features": features,
+        }
+    return out
+
+
+
 def evidence_stage(result_paths: list[Path], families: list[str], work: Path,
-                   out_path: Path) -> int:
+                   out_path: Path, allow_partial: bool = False) -> int:
+    # Validate every input BEFORE touching the artifact. An evidence file that
+    # reports success on an incomplete input set is the same defect as a load-area
+    # gate that reports 0.0 when it cannot establish an expected area.
+    if not result_paths:
+        print("error: --stage evidence requires at least one --results file; "
+              "refusing to write anything", file=sys.stderr)
+        return 2
+    missing_files = [p for p in result_paths if not Path(p).is_file()]
+    if missing_files:
+        print(f"error: --results file(s) not found: {', '.join(str(p) for p in missing_files)}",
+              file=sys.stderr)
+        return 2
     merged: dict[str, dict] = {}
-    for path in result_paths or []:
-        for entry in load_json(path)["cases"]:
+    for path in result_paths:
+        payload = load_json(path)
+        if not isinstance(payload.get("cases"), list):
+            print(f"error: {path}: no 'cases' array; refusing to write anything",
+                  file=sys.stderr)
+            return 2
+        for entry in payload["cases"]:
             previous = merged.get(entry["case_id"])
             if previous is None or len(entry.get("rungs", [])) >= len(previous.get("rungs", [])):
                 merged[entry["case_id"]] = entry
+    expected = set(all_case_ids())
+    absent = sorted(expected - set(merged))
+    if absent and not allow_partial:
+        print(f"error: results cover {len(merged)} of {len(expected)} corpus cases; "
+              f"missing {len(absent)}: {', '.join(absent)}", file=sys.stderr)
+        print("the raw output for the analytic stepped_shaft *_c1 cases lives in "
+              "bench/reference/external/external-truth-validate.json, which must be passed "
+              "as a --results input alongside results/raw-*.json", file=sys.stderr)
+        print("refusing to write a partial artifact; pass --allow-partial to override",
+              file=sys.stderr)
+        return 2
     areas = [load_area_evidence(entry) for entry in sorted(merged.values(),
                                                            key=lambda e: e["case_id"])]
+    if not areas:
+        print("error: no cases survived parsing; refusing to write an empty artifact",
+              file=sys.stderr)
+        return 2
+    features = [row for family in families for row in family_feature_report(work, family)]
     drifts = [a["max_between_rung_area_drift"] for a in areas
               if a["max_between_rung_area_drift"] is not None]
     errors = [r["selected_vs_cad_expected_rel_err"] for a in areas for r in a["rungs"]
               if r.get("selected_vs_cad_expected_rel_err") is not None]
-    rings = {}
+    rings: dict[str, list[float]] = {}
     for a in areas:
         values = [r["wall_ring_over_end_face"] for r in a["rungs"]
                   if r.get("wall_ring_over_end_face") is not None]
@@ -1713,27 +1807,51 @@ def evidence_stage(result_paths: list[Path], families: list[str], work: Path,
         "pipeline": "gmsh-mesh -> calculix-solve -> probe",
         "gmsh_version": GMSH_VERSION,
         "calculix_version": CCX_VERSION,
-        "generated": datetime.now(timezone.utc).isoformat(),
+        "complete": not absent,
+        "cases_missing_from_inputs": absent,
         "summary": {
             "cases": len(areas),
+            "corpus_cases": len(expected),
             "max_between_rung_area_drift": max(drifts) if drifts else None,
             "max_selected_vs_cad_expected_rel_err": max(errors) if errors else None,
             "wall_ring_over_end_face_by_family": {
                 family: {"min": min(values), "max": max(values), "n_rungs": len(values)}
                 for family, values in sorted(rings.items())
             },
+            "feature_resolution_by_family": feature_resolution_summary(features),
         },
         "per_case_loaded_areas": areas,
-        "feature_sizes": [row for family in families
-                          for row in family_feature_report(work, family)],
+        "feature_sizes": features,
     }
+    # The content hash covers the payload with the hash field and the wall-clock
+    # stamp excluded, so "regenerates identically" is a checkable claim.
+    body = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    payload["content_sha256"] = hashlib.sha256(body.encode("utf-8")).hexdigest()
+    payload["content_sha256_covers"] = (
+        "sha256 of this payload serialised with sort_keys=True and compact separators, "
+        "excluding content_sha256, content_sha256_covers and generated"
+    )
+    payload["generated"] = datetime.now(timezone.utc).isoformat()
     dump_json(out_path, payload)
-    print(f"cases recorded: {len(areas)}")
-    print(f"max between-rung loaded-area drift: {payload['summary']['max_between_rung_area_drift']:.3e}")
-    print(f"max selected-vs-CAD area error:     {payload['summary']['max_selected_vs_cad_expected_rel_err']:.3e}")
-    for family, stats in payload["summary"]["wall_ring_over_end_face_by_family"].items():
+    summary = payload["summary"]
+    print(f"cases recorded: {summary['cases']} of {summary['corpus_cases']}"
+          f"{'' if payload['complete'] else ' (PARTIAL)'}")
+    for label, key in (("max between-rung loaded-area drift", "max_between_rung_area_drift"),
+                       ("max selected-vs-CAD area error", "max_selected_vs_cad_expected_rel_err")):
+        value = summary[key]
+        print(f"{label}: {'n/a' if value is None else format(value, '.3e')}")
+    for family, stats in summary["wall_ring_over_end_face_by_family"].items():
         print(f"wall-ring/end-face {family:<18} min {stats['min']:.3e} max {stats['max']:.3e}"
               f" over {stats['n_rungs']} rungs")
+    finest = f"rung_c{RUNGS[-1][1]}"
+    for family, stats in summary["feature_resolution_by_family"].items():
+        for name, feature in sorted(stats["features"].items()):
+            low, high = feature["range_over_h_all_parts_and_rungs"]
+            under = feature["by_rung"][finest]["parts_smaller_than_one_element"]
+            print(f"feature/h {family:<17}{name:<34}{low:.2f}-{high:.2f} x h"
+                  + (f"; SMALLER than one element at the finest rung on {', '.join(under)}"
+                     if under else "; at least one element everywhere at the finest rung"))
+    print(f"content_sha256: {payload['content_sha256']}")
     print("wrote", out_path)
     return 0
 
@@ -1774,6 +1892,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--mesh-only", action="store_true",
                    help="mesh and report size/selection stats without solving (cost probe)")
     p.add_argument("--keep", action="store_true", help="keep meshes and decks")
+    p.add_argument("--allow-partial", action="store_true",
+                   help="let --stage evidence write an artifact that does not cover every "
+                        "corpus case; the artifact records complete=false and what is missing")
     p.add_argument("--baseline", default="HEAD",
                    help="git revision the --stage audit table compares against")
     p.add_argument("--work", type=Path, help="work directory (default: TEMP/polymesh-truth)")
@@ -1794,6 +1915,7 @@ def main() -> int:
         return evidence_stage(
             args.results or [], args.family or [], work,
             args.out or OUT_DIR / "external-truth-load-evidence.json",
+            allow_partial=args.allow_partial,
         )
     RUNGS = RUNGS_ALL[: args.rungs]
     if args.stage == "write":

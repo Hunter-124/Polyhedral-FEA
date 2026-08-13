@@ -3,9 +3,11 @@
   "pipeline": "gmsh-mesh -> calculix-solve -> probe",
   "gmsh_version": "4.13.1",
   "calculix_version": "2.23",
-  "generated": "2026-08-13T06:11:03.512401+00:00",
+  "complete": true,
+  "cases_missing_from_inputs": [],
   "summary": {
     "cases": 96,
+    "corpus_cases": 96,
     "max_between_rung_area_drift": 0.010715468077321069,
     "max_selected_vs_cad_expected_rel_err": 9.766716949809138e-06,
     "wall_ring_over_end_face_by_family": {
@@ -48,6 +50,400 @@
         "min": 0.0,
         "max": 0.0,
         "n_rungs": 24
+      }
+    },
+    "feature_resolution_by_family": {
+      "perforated_plate": {
+        "direction": "length/h < 1.0 means the feature is SMALLER than one element at that rung (under-resolved); > 1.0 means it spans more than one element",
+        "smallest_feature_relative_to_h": "hole_radius",
+        "features": {
+          "hole_radius": {
+            "range_over_h_all_parts_and_rungs": [
+              0.40978345448093256,
+              0.806126141227588
+            ],
+            "by_rung": {
+              "rung_c24": {
+                "min_over_h": 0.40978345448093256,
+                "max_over_h": 0.555949062915578,
+                "parts_smaller_than_one_element": [
+                  "perforated_plate_s0",
+                  "perforated_plate_s1",
+                  "perforated_plate_s2",
+                  "perforated_plate_s3"
+                ],
+                "parts_larger_than_one_element": [],
+                "per_part_over_h": {
+                  "perforated_plate_s0": 0.464699460657315,
+                  "perforated_plate_s1": 0.40978345448093256,
+                  "perforated_plate_s2": 0.555949062915578,
+                  "perforated_plate_s3": 0.5542471423407126
+                }
+              },
+              "rung_c34": {
+                "min_over_h": 0.5941860089973522,
+                "max_over_h": 0.806126141227588,
+                "parts_smaller_than_one_element": [
+                  "perforated_plate_s0",
+                  "perforated_plate_s1",
+                  "perforated_plate_s2",
+                  "perforated_plate_s3"
+                ],
+                "parts_larger_than_one_element": [],
+                "per_part_over_h": {
+                  "perforated_plate_s0": 0.6738142179531067,
+                  "perforated_plate_s1": 0.5941860089973522,
+                  "perforated_plate_s2": 0.806126141227588,
+                  "perforated_plate_s3": 0.8036583563940333
+                }
+              }
+            }
+          },
+          "min_hole_to_free_face_clearance": {
+            "range_over_h_all_parts_and_rungs": [
+              2.513378385503855,
+              4.0931733479789
+            ],
+            "by_rung": {
+              "rung_c24": {
+                "min_over_h": 2.513378385503855,
+                "max_over_h": 2.8228781710199313,
+                "parts_smaller_than_one_element": [],
+                "parts_larger_than_one_element": [
+                  "perforated_plate_s0",
+                  "perforated_plate_s1",
+                  "perforated_plate_s2",
+                  "perforated_plate_s3"
+                ],
+                "per_part_over_h": {
+                  "perforated_plate_s0": 2.8228781710199313,
+                  "perforated_plate_s1": 2.513378385503855,
+                  "perforated_plate_s2": 2.6912842019744674,
+                  "perforated_plate_s3": 2.7335617851153944
+                }
+              },
+              "rung_c34": {
+                "min_over_h": 3.644398658980589,
+                "max_over_h": 4.0931733479789,
+                "parts_smaller_than_one_element": [],
+                "parts_larger_than_one_element": [
+                  "perforated_plate_s0",
+                  "perforated_plate_s1",
+                  "perforated_plate_s2",
+                  "perforated_plate_s3"
+                ],
+                "per_part_over_h": {
+                  "perforated_plate_s0": 4.0931733479789,
+                  "perforated_plate_s1": 3.644398658980589,
+                  "perforated_plate_s2": 3.902362092862977,
+                  "perforated_plate_s3": 3.9636645884173216
+                }
+              }
+            }
+          },
+          "min_ligament_between_holes": {
+            "range_over_h_all_parts_and_rungs": [
+              2.278079700954201,
+              4.789433629905904
+            ],
+            "by_rung": {
+              "rung_c24": {
+                "min_over_h": 2.278079700954201,
+                "max_over_h": 3.3030576757971755,
+                "parts_smaller_than_one_element": [],
+                "parts_larger_than_one_element": [
+                  "perforated_plate_s0",
+                  "perforated_plate_s1",
+                  "perforated_plate_s2",
+                  "perforated_plate_s3"
+                ],
+                "per_part_over_h": {
+                  "perforated_plate_s0": 3.3030576757971755,
+                  "perforated_plate_s1": 2.6209822785724968,
+                  "perforated_plate_s2": 2.282293441375413,
+                  "perforated_plate_s3": 2.278079700954201
+                }
+              },
+              "rung_c34": {
+                "min_over_h": 3.303215566383591,
+                "max_over_h": 4.789433629905904,
+                "parts_smaller_than_one_element": [],
+                "parts_larger_than_one_element": [
+                  "perforated_plate_s0",
+                  "perforated_plate_s1",
+                  "perforated_plate_s2",
+                  "perforated_plate_s3"
+                ],
+                "per_part_over_h": {
+                  "perforated_plate_s0": 4.789433629905904,
+                  "perforated_plate_s1": 3.8004243039301198,
+                  "perforated_plate_s2": 3.3093254899943485,
+                  "perforated_plate_s3": 3.303215566383591
+                }
+              }
+            }
+          },
+          "plate_thickness": {
+            "range_over_h_all_parts_and_rungs": [
+              0.6220981561392948,
+              1.236191485949688
+            ],
+            "by_rung": {
+              "rung_c24": {
+                "min_over_h": 0.6220981561392948,
+                "max_over_h": 0.8525458523790953,
+                "parts_smaller_than_one_element": [
+                  "perforated_plate_s0",
+                  "perforated_plate_s1",
+                  "perforated_plate_s2",
+                  "perforated_plate_s3"
+                ],
+                "parts_larger_than_one_element": [],
+                "per_part_over_h": {
+                  "perforated_plate_s0": 0.8525458523790953,
+                  "perforated_plate_s1": 0.6815776832280968,
+                  "perforated_plate_s2": 0.6220981561392948,
+                  "perforated_plate_s3": 0.7859262982846196
+                }
+              },
+              "rung_c34": {
+                "min_over_h": 0.9020423264019772,
+                "max_over_h": 1.236191485949688,
+                "parts_smaller_than_one_element": [
+                  "perforated_plate_s1",
+                  "perforated_plate_s2"
+                ],
+                "parts_larger_than_one_element": [
+                  "perforated_plate_s0",
+                  "perforated_plate_s3"
+                ],
+                "per_part_over_h": {
+                  "perforated_plate_s0": 1.236191485949688,
+                  "perforated_plate_s1": 0.9882876406807402,
+                  "perforated_plate_s2": 0.9020423264019772,
+                  "perforated_plate_s3": 1.1395931325126982
+                }
+              }
+            }
+          },
+          "shortest_cad_edge": {
+            "range_over_h_all_parts_and_rungs": [
+              0.6220981561392948,
+              1.236191485949688
+            ],
+            "by_rung": {
+              "rung_c24": {
+                "min_over_h": 0.6220981561392948,
+                "max_over_h": 0.8525458523790953,
+                "parts_smaller_than_one_element": [
+                  "perforated_plate_s0",
+                  "perforated_plate_s1",
+                  "perforated_plate_s2",
+                  "perforated_plate_s3"
+                ],
+                "parts_larger_than_one_element": [],
+                "per_part_over_h": {
+                  "perforated_plate_s0": 0.8525458523790953,
+                  "perforated_plate_s1": 0.6815776832280968,
+                  "perforated_plate_s2": 0.6220981561392948,
+                  "perforated_plate_s3": 0.7859262982846196
+                }
+              },
+              "rung_c34": {
+                "min_over_h": 0.9020423264019772,
+                "max_over_h": 1.236191485949688,
+                "parts_smaller_than_one_element": [
+                  "perforated_plate_s1",
+                  "perforated_plate_s2"
+                ],
+                "parts_larger_than_one_element": [
+                  "perforated_plate_s0",
+                  "perforated_plate_s3"
+                ],
+                "per_part_over_h": {
+                  "perforated_plate_s0": 1.236191485949688,
+                  "perforated_plate_s1": 0.9882876406807402,
+                  "perforated_plate_s2": 0.9020423264019772,
+                  "perforated_plate_s3": 1.1395931325126982
+                }
+              }
+            }
+          }
+        }
+      },
+      "tube": {
+        "direction": "length/h < 1.0 means the feature is SMALLER than one element at that rung (under-resolved); > 1.0 means it spans more than one element",
+        "smallest_feature_relative_to_h": "wall_thickness",
+        "features": {
+          "r_inner": {
+            "range_over_h_all_parts_and_rungs": [
+              1.0024461666599949,
+              1.8292141638151265
+            ],
+            "by_rung": {
+              "rung_c24": {
+                "min_over_h": 1.0024461666599949,
+                "max_over_h": 1.2615270095276736,
+                "parts_smaller_than_one_element": [],
+                "parts_larger_than_one_element": [
+                  "tube_s0",
+                  "tube_s1",
+                  "tube_s2",
+                  "tube_s3"
+                ],
+                "per_part_over_h": {
+                  "tube_s0": 1.0609095459915103,
+                  "tube_s1": 1.086790757819777,
+                  "tube_s2": 1.0024461666599949,
+                  "tube_s3": 1.2615270095276736
+                }
+              },
+              "rung_c34": {
+                "min_over_h": 1.4535469416569926,
+                "max_over_h": 1.8292141638151265,
+                "parts_smaller_than_one_element": [],
+                "parts_larger_than_one_element": [
+                  "tube_s0",
+                  "tube_s1",
+                  "tube_s2",
+                  "tube_s3"
+                ],
+                "per_part_over_h": {
+                  "tube_s0": 1.5383188416876898,
+                  "tube_s1": 1.5758465988386767,
+                  "tube_s2": 1.4535469416569926,
+                  "tube_s3": 1.8292141638151265
+                }
+              }
+            }
+          },
+          "r_outer": {
+            "range_over_h_all_parts_and_rungs": [
+              1.2897320926634037,
+              2.4585202967371473
+            ],
+            "by_rung": {
+              "rung_c24": {
+                "min_over_h": 1.2897320926634037,
+                "max_over_h": 1.6955312391290673,
+                "parts_smaller_than_one_element": [],
+                "parts_larger_than_one_element": [
+                  "tube_s0",
+                  "tube_s1",
+                  "tube_s2",
+                  "tube_s3"
+                ],
+                "per_part_over_h": {
+                  "tube_s0": 1.441189010956338,
+                  "tube_s1": 1.340626295783927,
+                  "tube_s2": 1.2897320926634037,
+                  "tube_s3": 1.6955312391290673
+                }
+              },
+              "rung_c34": {
+                "min_over_h": 1.8701115343619352,
+                "max_over_h": 2.4585202967371473,
+                "parts_smaller_than_one_element": [],
+                "parts_larger_than_one_element": [
+                  "tube_s0",
+                  "tube_s1",
+                  "tube_s2",
+                  "tube_s3"
+                ],
+                "per_part_over_h": {
+                  "tube_s0": 2.08972406588669,
+                  "tube_s1": 1.9439081288866944,
+                  "tube_s2": 1.8701115343619352,
+                  "tube_s3": 2.4585202967371473
+                }
+              }
+            }
+          },
+          "shortest_cad_edge": {
+            "range_over_h_all_parts_and_rungs": [
+              6.296025636920789,
+              11.48867666028844
+            ],
+            "by_rung": {
+              "rung_c24": {
+                "min_over_h": 6.296025636920789,
+                "max_over_h": 7.923225282957547,
+                "parts_smaller_than_one_element": [],
+                "parts_larger_than_one_element": [
+                  "tube_s0",
+                  "tube_s1",
+                  "tube_s2",
+                  "tube_s3"
+                ],
+                "per_part_over_h": {
+                  "tube_s0": 6.66321543677298,
+                  "tube_s1": 6.825766128020067,
+                  "tube_s2": 6.296025636920789,
+                  "tube_s3": 7.923225282957547
+                }
+              },
+              "rung_c34": {
+                "min_over_h": 9.129237173535145,
+                "max_over_h": 11.48867666028844,
+                "parts_smaller_than_one_element": [],
+                "parts_larger_than_one_element": [
+                  "tube_s0",
+                  "tube_s1",
+                  "tube_s2",
+                  "tube_s3"
+                ],
+                "per_part_over_h": {
+                  "tube_s0": 9.66166238332082,
+                  "tube_s1": 9.897360885629098,
+                  "tube_s2": 9.129237173535145,
+                  "tube_s3": 11.48867666028844
+                }
+              }
+            }
+          },
+          "wall_thickness": {
+            "range_over_h_all_parts_and_rungs": [
+              0.25383553796415004,
+              0.629306132922021
+            ],
+            "by_rung": {
+              "rung_c24": {
+                "min_over_h": 0.25383553796415004,
+                "max_over_h": 0.43400422960139384,
+                "parts_smaller_than_one_element": [
+                  "tube_s0",
+                  "tube_s1",
+                  "tube_s2",
+                  "tube_s3"
+                ],
+                "parts_larger_than_one_element": [],
+                "per_part_over_h": {
+                  "tube_s0": 0.38027946496482756,
+                  "tube_s1": 0.25383553796415004,
+                  "tube_s2": 0.2872859260034088,
+                  "tube_s3": 0.43400422960139384
+                }
+              },
+              "rung_c34": {
+                "min_over_h": 0.36806153004801756,
+                "max_over_h": 0.629306132922021,
+                "parts_smaller_than_one_element": [
+                  "tube_s0",
+                  "tube_s1",
+                  "tube_s2",
+                  "tube_s3"
+                ],
+                "parts_larger_than_one_element": [],
+                "per_part_over_h": {
+                  "tube_s0": 0.551405224199,
+                  "tube_s1": 0.36806153004801756,
+                  "tube_s2": 0.4165645927049427,
+                  "tube_s3": 0.629306132922021
+                }
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -5278,5 +5674,8 @@
         "shortest_cad_edge_over_h_rung_c34": 1.1395931325126982
       }
     }
-  ]
+  ],
+  "content_sha256": "e18ee2674f49d879104ab0fa09a42ce19c844a6ef2b0f4d436c84d1d2ee2b628",
+  "content_sha256_covers": "sha256 of this payload serialised with sort_keys=True and compact separators, excluding content_sha256, content_sha256_covers and generated",
+  "generated": "2026-08-13T06:24:13.081480+00:00"
 }

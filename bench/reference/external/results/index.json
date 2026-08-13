@@ -10,8 +10,20 @@
     "../../corpus/*.json : the references themselves, each carrying metric.provenance"
   ],
   "reproduce": [
+    "# generate raw per-rung output for a family (writes one raw-*.json)",
     "python bench/reference/external_truth.py --stage generate --family <family> --out <raw.json>",
-    "python bench/reference/external_truth.py --stage evidence --family tube --family perforated_plate --results <raw.json> ...",
+    "",
+    "# rebuild the evidence artifact. ALL 96 corpus cases must be covered or the stage",
+    "# refuses to write: results/raw-*.json holds 92, and the four analytic",
+    "# stepped_shaft_*_c1 cases live in ../external-truth-validate.json, so BOTH are required.",
+    "python bench/reference/external_truth.py --stage evidence --family tube --family perforated_plate $(for f in bench/reference/external/results/raw-*.json bench/reference/external/external-truth-validate.json; do printf -- '--results %s ' \"$f\"; done)",
+    "#   -> prints content_sha256; the artifact records the same value, computed over the",
+    "#      payload with generated/content_sha256/content_sha256_covers excluded, so two runs",
+    "#      of the same inputs are verifiably identical.",
+    "#   -> --allow-partial is the only way to write a subset, and it stamps complete=false",
+    "#      plus cases_missing_from_inputs into the artifact.",
+    "",
+    "# promote raw results into references, then rebuild the before/after audit",
     "python bench/reference/external_truth.py --stage write --approved --results <raw.json> ... --audit <audit.json>",
     "python bench/reference/external_truth.py --stage audit --baseline <git-rev>"
   ],
@@ -304,5 +316,10 @@
       "gmsh_version": "4.13.1",
       "calculix_version": "2.23"
     }
+  },
+  "required_inputs_for_a_complete_evidence_rebuild": {
+    "results/raw-*.json": "92 cases (6 original families + the two new ones + the 3-rung box_hole *_c0 runs)",
+    "../external-truth-validate.json": "the remaining 4 cases: stepped_shaft_s0_c1, s1_c1, s2_c1, s3_c1",
+    "total": 96
   }
 }

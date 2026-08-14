@@ -1,0 +1,74 @@
+# Training handoff — 3080 Ti box bring-up and run plan
+
+Written 2026-08-13, at HEAD `91e08b4`. Read this before the first training run
+starts. The mesher is now stable enough to label against: the tangle fix
+(S7 overlapped-sheet carve, `6822ea7` + `798ef79`) was the last known
+geometry-changing defect, and every fix this cycle changed graded_tet output,
+so **nothing labelled before `798ef79` is trustworthy for graded_tet rows**.
+
+## 0. What the box needs (bring-up checklist)
+
+1. Windows or Linux both fine; Linux preferred for long unattended runs.
+2. Install: git, CMake ≥ 3.26, a C++20 toolchain (MSVC 2022 or gcc-13),
+   Python 3.11 + numpy + pyvista, CUDA toolkit 12.x (3080 Ti = sm_86).
+3. Clone the repo; build `polymesh` + `polymesh_testlab` exactly as CI does.
+   Windows: `cmd /c "scripts\msvcbuild.bat cmake --build build -j <n> --target polymesh polymesh_testlab"`.
+4. Smoke test before any labelling: mesh `sphere_box_s0.step -h 0.0036
+   --mesher graded` and REQUIRE `rel_err≈1.1e-04, open=0 nonmanifold=0`, and
+   `icecream_cone.step -h 0.010` completing without the "buried" refusal.
+   If either differs from this document, STOP — the binaries don't match the
+   labels this plan assumes.
+5. SSH: enable sshd, put the main workstation's key in authorized_keys.
+   The driving session reaches it as `ssh://<box>/...`.
+
+## 1. Campaign regeneration (decided: everything, after the tangle fix)
+
+- 3,548 rows, all meshers. The 76 known-mislabelled rows and the 1,684
+  graded_tet rows are the reason; per-part geometry deltas measured up to
+  +653 % volume error change on sphere_box_s2 in earlier audits, and the S7
+  carve changed sphere_box/channel/stepped_shaft geometry again.
+- Shard by part family across both machines (this workstation + 3080 Ti);
+  campaign labelling is CPU-bound, so the GPU box's 3080 Ti is idle during
+  this phase — start GPU training only after its shard finishes.
+- Keep `bench/results/gmsh-peer.json` untouched (Gmsh-meshed, unaffected).
+- Acceptance: row counts identical to the old campaign, zero rows carrying a
+  `fill-stage guard` refusal that now succeeds (spot-check the 16 configs that
+  flipped in the earlier audit).
+
+## 2. Training tracks (all four selected, in dependency order)
+
+### 2a. Retrain the current advisor (first, cheap, de-risks the pipeline)
+- Existing 44-feature classifier, existing training script, clean campaign.
+- Checkpoint cadence: every epoch; keep the OOD veto (mahalanobis) —
+  unit_box must still veto with distance ≈ 61.8.
+- Acceptance: advisor smoke tests unchanged (plate_hole → graded_tet,
+  exit 0), held-out accuracy ≥ old model on the clean labels.
+
+### 2b. Learned error estimator / h-selector (second)
+- Label: (part features, mesher, h) → measured rel_err and DOF from the fresh
+  campaign; regression, not classification.
+- Deliverable: "cheapest mesh meeting tolerance X" — directly demoable.
+
+### 2c. Per-region size field GNN (the flagship, 1–3 day runs)
+- Needs a NEW label pipeline: adaptive solves (`local_refine`) as ground
+  truth for where refinement paid off. Design the label schema BEFORE
+  generating: (surface patch graph, curvature, feature distance) →
+  target h per patch.
+- 1–3 days on the 3080 Ti with checkpoints every 2 h and auto-resume;
+  validate on the 9-part matrix by meshing with the predicted size field and
+  comparing rel_err/DOF against uniform-h at equal budget.
+
+### 2d. Learned repair policy (research-grade, LAST)
+- Do not start until 2a–2c are delivered. The S4/S6/S7 failure modes this
+  cycle (pull-vs-carve, snap re-tangling) are the training curriculum:
+  imitation targets from the deterministic repair passes first, RL only if
+  imitation plateaus.
+
+## 3. Run discipline
+
+- 1–3 day ceiling per run, checkpoints mandatory, resume tested BEFORE the
+  long run (kill it at 10 min and resume once).
+- Every run logs: git SHA of the labelling binary, campaign snapshot hash,
+  seed. A model whose provenance can't be replayed is discarded.
+- Report negative results plainly; do not tune thresholds to make a run look
+  finished.

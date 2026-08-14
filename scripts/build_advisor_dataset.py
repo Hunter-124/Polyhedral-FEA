@@ -8,6 +8,7 @@ import argparse
 import csv
 import hashlib
 import json
+import math
 import sys
 from collections import Counter
 from datetime import datetime, timezone
@@ -125,6 +126,40 @@ def read_json(path: Path) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"{path}: expected a JSON object")
     return value
+
+
+#: What "the same answer" means when one pair was solved in two campaign
+#: directories. Wall-clock fields are excluded on purpose: mesh_ms and solve_ms
+#: differ between a 6-core and an 8-core box for the same mesh, and timing is not
+#: what determinism promises. Everything the engine decides is here.
+SAME_OUTCOME_FIELDS: tuple[str, ...] = (
+    "status", "n_elems", "n_nodes", "n_dof",
+    "geometry_fill_volume_err", "geometry_volume_err",
+)
+
+
+def same_outcome(left: dict[str, Any], right: dict[str, Any]) -> bool:
+    """Did two solves of one pair reach the same engine result?
+
+    A deterministic mesher owes this across hosts and toolchains (ADR-0032), and
+    the v4 regeneration measured it at corpus scale: 488 pairs were solved on
+    both hunter-pc (gcc 15) and livingroom-pc (gcc 16) and agreed on every field
+    below, accuracy included. When two unrankable directories agree there is
+    nothing to tie-break, so it is counted rather than reported as a collision.
+    """
+    for name in SAME_OUTCOME_FIELDS:
+        a, b = left.get(name), right.get(name)
+        if isinstance(a, float) and isinstance(b, float):
+            if not (a == b or (math.isnan(a) and math.isnan(b))):
+                return False
+        elif a != b:
+            return False
+    left_accuracy = (left.get("accuracy") or {}).get("rel_err")
+    right_accuracy = (right.get("accuracy") or {}).get("rel_err")
+    if isinstance(left_accuracy, float) and isinstance(right_accuracy, float):
+        return (left_accuracy == right_accuracy
+                or (math.isnan(left_accuracy) and math.isnan(right_accuracy)))
+    return left_accuracy == right_accuracy
 
 
 def campaign_records(campaign_dir: Path) -> Iterable[tuple[tuple[Any, ...], dict[str, Any]]]:
@@ -532,6 +567,8 @@ def main() -> int:
     superseded: Counter[tuple[str, str]] = Counter()
     #: Collisions CAMPAIGN_PRIORITY cannot order. Never silent.
     unordered: list[tuple[tuple[Any, ...], str, str]] = []
+    #: Same pair solved twice with the same answer — deterministic, not ambiguous.
+    identical_duplicates: Counter[tuple[str, str]] = Counter()
     #: Cross-check violations: the list preferred an older-engine row.
     marker_violations: list[str] = []
     skipped_probes: list[str] = []
@@ -562,6 +599,12 @@ def main() -> int:
             held_rank = campaign_rank(held_campaign)
             new_rank = campaign_rank(campaign)
             if held_rank is None or new_rank is None:
+                if same_outcome(held_row, row):
+                    # Two hosts solved the same pair and got the same answer, which
+                    # is what a deterministic mesher owes (ADR-0032). Nothing to
+                    # order: either row is the row. Counted, not warned about.
+                    identical_duplicates[(held_campaign, campaign)] += 1
+                    continue
                 # Cannot order these two. Keep the incumbent deterministically and
                 # report it, so a future re-run directory cannot inherit a tie-break
                 # by being sorted luckily.
@@ -685,6 +728,12 @@ def main() -> int:
               "newer-engine re-run of the same (cfg_id, part, tier)")
         for (loser, winner), count in sorted(superseded.items()):
             print(f"  {count:5d}  {loser}  ->  {winner}")
+    if identical_duplicates:
+        total = sum(identical_duplicates.values())
+        print(f"Identical cross-directory duplicates: {total} pair(s) solved twice "
+              "with the same engine result, so there is no tie to break")
+        for (first, second), count in sorted(identical_duplicates.items()):
+            print(f"  {count:5d}  {first}  ==  {second}")
     if unordered:
         parts = sorted({f"{a} vs {b}" for _, a, b in unordered})
         print(f"WARNING: {len(unordered)} collision(s) CAMPAIGN_PRIORITY cannot order; "

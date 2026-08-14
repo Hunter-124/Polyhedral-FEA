@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -36,7 +37,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-TESTLAB = ROOT / "build" / "apps" / "testlab" / "polymesh_testlab.exe"
+TESTLAB_DIR = ROOT / "build" / "apps" / "testlab"
 DEFAULT_PART = "bench/geometries/corpus/primitives/box_hole_s0_c0.case.json"
 
 
@@ -64,9 +65,25 @@ def campaign_json(part: str) -> dict[str, Any]:
     }
 
 
-def run_campaign(camp_dir: Path) -> subprocess.CompletedProcess[str]:
+def testlab_path() -> Path | None:
+    """The newest built testlab binary, or None when the tree has no build.
+
+    Windows builds ``polymesh_testlab.exe``, Linux builds it extensionless; this
+    verifier must run on either box and must not prefer a stale name.
+    """
+    candidates = [
+        cand
+        for cand in (TESTLAB_DIR / "polymesh_testlab.exe", TESTLAB_DIR / "polymesh_testlab")
+        if cand.is_file() and os.access(cand, os.X_OK)
+    ]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda c: c.stat().st_mtime)
+
+
+def run_campaign(camp_dir: Path, testlab: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [str(TESTLAB), "run", str(camp_dir)],
+        [str(testlab), "run", str(camp_dir)],
         cwd=str(ROOT), capture_output=True, text=True, check=False,
     )
 
@@ -91,8 +108,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--keep", action="store_true", help="keep the scratch directory")
     args = parser.parse_args(argv)
 
-    if not TESTLAB.is_file():
-        print(f"error: {TESTLAB} not found; build first")
+    testlab = testlab_path()
+    if testlab is None:
+        print(f"error: no polymesh_testlab under {TESTLAB_DIR}; build first")
         return 2
     if not (ROOT / args.part).is_file():
         print(f"error: part {args.part} not found")
@@ -114,7 +132,7 @@ def main(argv: list[str] | None = None) -> int:
         (base / "campaign.json").write_text(
             json.dumps(campaign_json(args.part), indent=2), encoding="utf-8")
         print("[1] baseline run (nothing obstructed)")
-        proc = run_campaign(base)
+        proc = run_campaign(base, testlab)
         base_rows = rows(base)
         check("exit code 0", proc.returncode == 0, f"rc={proc.returncode}")
         check("one row recorded", len(base_rows) == 1, f"rows={len(base_rows)}")
@@ -136,7 +154,7 @@ def main(argv: list[str] | None = None) -> int:
             json.dumps(campaign_json(args.part), indent=2), encoding="utf-8")
         (blocked / rel / "result.json").mkdir(parents=True)
         print("[2] obstructed run (a DIRECTORY sits where result.json must go)")
-        proc2 = run_campaign(blocked)
+        proc2 = run_campaign(blocked, testlab)
         blocked_rows = rows(blocked)
 
         # The invariant, stated three ways.

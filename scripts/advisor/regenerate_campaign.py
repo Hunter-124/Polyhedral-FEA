@@ -70,6 +70,8 @@ def stage_argv(batch: int, template: str, parts_glob: str | None,
         argv += ["--parts-glob", glob]
     if args.host_tag:
         argv += ["--host-tag", args.host_tag]
+    if args.skip_truth:
+        argv.append("--skip-truth")
     if args.dry_run:
         argv.append("--dry-run")
     return argv
@@ -86,6 +88,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--host-tag", default="",
                         help="campaign directory suffix, so two machines writing into the "
                              "same repo cannot collide (passed through to run_batch)")
+    parser.add_argument("--skip-truth", action="store_true",
+                        help="another host in this regeneration owns the truth campaign")
     parser.add_argument("--shards", type=int, default=4)
     parser.add_argument("--omp-threads", type=int, default=2)
     parser.add_argument("--dry-run", action="store_true")

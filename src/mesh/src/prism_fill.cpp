@@ -103,7 +103,9 @@ PrismFillOutput prism_fill_surface(const geom::TriSurface& surface,
         const auto xyz = to_xyz(i, j, k);
         return grid.index(xyz[0], xyz[1], xyz[2]);
     };
-    const auto is_inside = [&](int i, int j, int k) {
+    // -> bool, not deduced: `inside_xyz` is a std::vector<bool>, so the second
+    // return yields a proxy reference and libc++ rejects the mismatch outright.
+    const auto is_inside = [&](int i, int j, int k) -> bool {
         if (i < 0 || i >= ni || j < 0 || j >= nj || k < 0 || k >= nk) {
             return false;
         }

@@ -470,7 +470,8 @@ TEST_CASE("advisor recommend() latency", "[advisor][!benchmark]") {
     }
     std::sort(micros.begin(), micros.end());
     const auto pct = [&](double q) {
-        const auto index = static_cast<std::size_t>(q * (micros.size() - 1));
+        const auto index =
+            static_cast<std::size_t>(q * static_cast<double>(micros.size() - 1));
         return micros[index];
     };
 

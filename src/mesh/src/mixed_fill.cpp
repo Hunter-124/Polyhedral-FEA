@@ -933,7 +933,9 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
         return i >= 0 && i < nx && j >= 0 && j < ny && k >= 0 && k < nz &&
                coarse_inside[idx(i, j, k)];
     };
-    const auto fine_child_inside = [&](int I, int J, int K) {
+    // -> bool, not deduced: `inside` is a std::vector<bool>, whose element access
+    // returns a proxy reference, and libc++ rejects the deduced mismatch.
+    const auto fine_child_inside = [&](int I, int J, int K) -> bool {
         if (I < 0 || I >= 2 * nx || J < 0 || J >= 2 * ny || K < 0 || K >= 2 * nz) {
             return false;
         }

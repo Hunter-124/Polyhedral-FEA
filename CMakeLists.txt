@@ -48,9 +48,16 @@ endif()
 
 # Shared warning flags; every target links this.
 # COMPILE_LANGUAGE:CXX — do not pass host -W* flags to nvcc (it mis-parses -Werror).
+# POLYMESH_WERROR stays ON for CI and for every product build. It exists as a
+# switch because a *second* standard library is now part of verification: the
+# mesher's cross-toolchain determinism is proven by building with clang+libc++
+# and diffing the mesh, and libc++ raises a different -Wconversion set that has
+# nothing to do with the property under test.
+option(POLYMESH_WERROR "Treat warnings as errors (keep ON for CI and releases)" ON)
 add_library(polymesh_warnings INTERFACE)
 target_compile_options(polymesh_warnings INTERFACE
-    $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CXX_COMPILER_ID:GNU,Clang>>:-Wall -Wextra -Wpedantic -Wconversion -Werror>
+    $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CXX_COMPILER_ID:GNU,Clang>>:-Wall -Wextra -Wpedantic -Wconversion>
+    $<$<AND:$<BOOL:${POLYMESH_WERROR}>,$<COMPILE_LANGUAGE:CXX>,$<CXX_COMPILER_ID:GNU,Clang>>:-Werror>
 )
 
 # Accuracy-preserving performance flags applied to all product libraries/apps.

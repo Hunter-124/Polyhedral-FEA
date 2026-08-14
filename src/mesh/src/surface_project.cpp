@@ -734,8 +734,21 @@ SmoothStats smooth_boundary_nodes(const geom::TriSurface& surface,
     enum class Kind : std::uint8_t { kFree, kCrease, kFrozen };
     std::unordered_map<std::uint32_t, Kind> kind;
     kind.reserve(nbr.size());
-    const bool exact_owners = projection != nullptr && projection->target;
+    // Visit order for the whole smoothing pass. The classification query below
+    // and the re-projection at the Jacobi step both write shared per-node
+    // provenance through the exact oracle, so the visit sequence is mesh-level
+    // mutation state rather than a private scan: `nbr` bucket order differs
+    // between libstdc++ and MSVC (measured 2026-08-14: 5 of 24 corpus pairs
+    // disagreed, worst 264 vs 200 elements), so drive both loops from node ids
+    // in ascending order.
+    std::vector<std::uint32_t> nbr_ids;
+    nbr_ids.reserve(nbr.size());
     for (const auto& [ni, _] : nbr) {
+        nbr_ids.push_back(ni);
+    }
+    std::sort(nbr_ids.begin(), nbr_ids.end());
+    const bool exact_owners = projection != nullptr && projection->target;
+    for (const auto ni : nbr_ids) {
         Kind k = Kind::kFree;
         if (exact_owners) {
             // Classification is a side effect of the first exact target query;
@@ -793,7 +806,8 @@ SmoothStats smooth_boundary_nodes(const geom::TriSurface& surface,
         // Jacobi targets from the current state.
         std::vector<std::pair<std::uint32_t, Eigen::Vector3d>> targets;
         targets.reserve(nbr.size());
-        for (const auto& [ni, nb] : nbr) {
+        for (const auto ni : nbr_ids) {
+            const auto& nb = nbr.at(ni);
             const Kind k = kind[ni];
             if (k == Kind::kFrozen || nb.empty()) {
                 continue;

@@ -62,7 +62,14 @@ std::vector<std::uint32_t> boundary_nodes(const TetFillOutput& mesh) {
             bset.insert(key.c);
         }
     }
-    return std::vector<std::uint32_t>(bset.begin(), bset.end());
+    std::vector<std::uint32_t> out(bset.begin(), bset.end());
+    // bset iteration order is the libstdc++/MSVC bucket layout, so the free-
+    // boundary node list this function hands to sharp-edge snapping and to the
+    // Hausdorff sample set was STL-dependent. Sort ascending by node id: the
+    // list order is this function's contract, and any consumer that ever
+    // becomes order-sensitive must not silently fork the mesh per toolchain.
+    std::sort(out.begin(), out.end());
+    return out;
 }
 
 /// Deterministic unit-interval hash for lattice jitter (no RNG dependency).

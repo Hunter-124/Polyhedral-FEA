@@ -56,7 +56,7 @@ ROOT = Path(__file__).resolve().parents[2]
 CAMPAIGNS = ROOT / "bench" / "campaigns"
 ADVISOR_DIR = ROOT / "bench" / "advisor"
 THROUGHPUT_PATH = ADVISOR_DIR / "throughput.json"
-TESTLAB = ROOT / "build" / "apps" / "testlab" / "polymesh_testlab.exe"
+TESTLAB_DIR = ROOT / "build" / "apps" / "testlab"
 DATASET_BUILDER = ROOT / "scripts" / "build_advisor_dataset.py"
 PROMOTE_TRUTH = ROOT / "scripts" / "advisor" / "promote_truth.py"
 
@@ -493,7 +493,7 @@ def launch(directory: Path, omp_threads: int) -> tuple[int, float]:
     # a bare install with no numpy, which made warehouse_shots.py render nothing
     # for a whole regeneration while reporting only an exit code.
     env["POLYMESH_PYTHON"] = sys.executable
-    command = [str(TESTLAB), "resume", str(directory)]
+    command = [str(testlab_path()), "resume", str(directory)]
     started = time.monotonic()
     log_path = directory / "run.log"
     with log_path.open("a", encoding="utf-8", errors="replace") as log:
@@ -582,7 +582,7 @@ def run_truth_gate(dry_run: bool) -> bool:
     if not missing_cfgs:
         return False
     if dry_run:
-        print(f"  would run: {TESTLAB.name} resume {rel(directory)} (single process)")
+        print(f"  would run: polymesh_testlab resume {rel(directory)} (single process)")
         return False
 
     require_testlab()
@@ -610,9 +610,36 @@ def run_truth_gate(dry_run: bool) -> bool:
     return True
 
 
-def require_testlab() -> None:
-    if not TESTLAB.is_file():
-        raise SystemExit(f"testlab binary not found: {TESTLAB} (the lead owns builds)")
+def testlab_path() -> Path:
+    """The testlab binary to run, chosen by MTIME.
+
+    Every campaign on record so far was labelled on the Windows laptop, where the
+    build target is ``polymesh_testlab.exe``; the Linux boxes build it
+    extensionless. A clone that has been built under both names must not silently
+    run whichever one this script happened to spell, so take the newest and let
+    :func:`require_testlab` announce it (same reasoning as
+    ``render_showcase.cli_path``).
+    """
+    candidates = [
+        cand
+        for cand in (TESTLAB_DIR / "polymesh_testlab.exe", TESTLAB_DIR / "polymesh_testlab")
+        if cand.is_file() and os.access(cand, os.X_OK)
+    ]
+    if not candidates:
+        raise SystemExit(
+            f"testlab binary not found under {rel(TESTLAB_DIR)} "
+            "(the lead owns builds)"
+        )
+    return max(candidates, key=lambda c: c.stat().st_mtime)
+
+
+def require_testlab() -> Path:
+    binary = testlab_path()
+    stamp = datetime.fromtimestamp(
+        binary.stat().st_mtime, timezone.utc
+    ).strftime("%Y-%m-%d %H:%M:%SZ")
+    print(f"testlab: {rel(binary)} (built {stamp})")
+    return binary
 
 
 # ── reporting ───────────────────────────────────────────────────────────────

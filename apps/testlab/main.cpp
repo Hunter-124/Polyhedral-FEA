@@ -374,6 +374,26 @@ std::vector<MetricSpec> load_metrics(const fs::path& ref_path) {
                     ms.probe.select = parse_box(m["probe"]["select"]["box"]);
                 }
             }
+            // ADR-0023 and docs/validation/hand-calcs.md both say raw nodal
+            // sigma_vm_max is diagnostic only and prohibited as a score, and
+            // evaluate_probe carries the same comment — but nothing enforced it,
+            // so two fixture references kept scoring it. Measured consequence:
+            // smoke_bar's sigma_max rises with resolution (Spearman(DOF,
+            // rel_err) = +0.70; order 2 medians 2.7 decades of "error" against a
+            // 1 MPa uniform-bar hand-calc, peaking at 12.05) because a fully
+            // clamped end is a stress singularity the metric resolves better the
+            // finer the mesh. Every advisor trained on those rows learned that
+            // refining is catastrophic, and that one case dominated the
+            // corpus-wide macro-mean regret headline (docs/advisor/0008 S4).
+            if (ms.probe.kind == "max_von_mises" || ms.probe.kind == "max_vm") {
+                throw std::runtime_error(
+                    "reference " + ref_path.string() + " metric '" + ms.name +
+                    "' scores probe kind '" + ms.probe.kind +
+                    "'. Raw nodal max von "
+                    "Mises is singularity-sensitive and is a DIAGNOSTIC, never a "
+                    "score (ADR-0023). Use strain_energy, tip_deflection, "
+                    "sigma_p99, or a face-mean ratio.");
+            }
             ms.derivation = m.value("derivation", "");
             out.push_back(std::move(ms));
         }

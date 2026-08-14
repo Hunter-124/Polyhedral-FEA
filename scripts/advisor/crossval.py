@@ -337,18 +337,39 @@ def run_fold_seed(csv: Path | None, split: str, fold: int, n_folds: int | None,
 # aggregation
 # --------------------------------------------------------------------------- #
 
+#: Cases a fold needs before its mean carries the same weight as any other fold's.
+#:
+#: The macro mean is unweighted by design — a big family must not decide the
+#: headline — but that only works when the folds are comparable. They are not:
+#: family folds here hold between 1 and 6 cases, so a single case can move the
+#: corpus-wide number as much as six can. Measured (docs/advisor/0008 S4): the
+#: one-case `smoke_bar` fold shifted the advisor-minus-random gap by +0.19
+#: decades while the whole observed gap was +0.12, i.e. the headline was that
+#: fold. Undersized folds are reported, never dropped: `macro_mean_regret` still
+#: covers everything, and `macro_mean_regret_scored` is the comparable subset.
+MIN_FOLD_CASES = 3
+
+
 def aggregate(runs: list[dict[str, Any]], heads: list[str]) -> dict[str, Any]:
     """Macro-mean over folds of the per-seed mean, plus the seed spread.
 
     Macro over folds, never micro over cases: folds differ in size and a micro
-    average would let the biggest family decide the headline.
+    average would let the biggest family decide the headline. Folds smaller than
+    :data:`MIN_FOLD_CASES` are averaged separately as well, because an unweighted
+    mean over folds of 1 and folds of 6 is not the number it reads as.
     """
     out: dict[str, Any] = {"levels": {}}
+    fold_cases = {run["fold"]: run["levels"]["unconstrained"]["n_cases"] for run in runs}
+    scored_folds = {fold for fold, n in fold_cases.items() if n >= MIN_FOLD_CASES}
+    out["fold_cases"] = {str(fold): n for fold, n in sorted(fold_cases.items())}
+    out["min_fold_cases"] = MIN_FOLD_CASES
+    out["undersized_folds"] = sorted(fold for fold in fold_cases if fold not in scored_folds)
     levels = sorted({label for run in runs for label in run["levels"]})
     for label in levels:
         head_block: dict[str, Any] = {}
         for head in heads:
             per_chooser: dict[str, list[float]] = defaultdict(list)
+            scored: dict[str, list[float]] = defaultdict(list)
             seed_spread: dict[str, list[float]] = defaultdict(list)
             by_fold: dict[int, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
             for run in runs:
@@ -357,16 +378,22 @@ def aggregate(runs: list[dict[str, Any]], heads: list[str]) -> dict[str, Any]:
                     by_fold[run["fold"]][name].append(stats["mean_regret"])
             for fold, chooser_values in by_fold.items():
                 for name, values in chooser_values.items():
-                    per_chooser[name].append(float(np.mean(values)))
+                    fold_mean = float(np.mean(values))
+                    per_chooser[name].append(fold_mean)
+                    if fold in scored_folds:
+                        scored[name].append(fold_mean)
                     if len(values) > 1:
                         seed_spread[name].append(float(np.std(values, ddof=1)))
             head_block[head] = {
                 name: {
                     "macro_mean_regret": float(np.mean(values)),
+                    "macro_mean_regret_scored": (float(np.mean(scored[name]))
+                                                 if scored.get(name) else float("nan")),
                     "fold_std": float(np.std(values, ddof=1)) if len(values) > 1 else 0.0,
                     "mean_seed_std": (float(np.mean(seed_spread[name]))
                                       if seed_spread.get(name) else 0.0),
                     "n_folds": len(values),
+                    "n_folds_scored": len(scored.get(name, ())),
                 }
                 for name, values in sorted(per_chooser.items())
             }
@@ -439,14 +466,24 @@ def print_table(summary: dict[str, Any], head: str, label: str) -> None:
     block = summary["levels"].get(label, {}).get(head)
     if not block:
         return
+    undersized = summary.get("undersized_folds", [])
+    cases = summary.get("fold_cases", {})
     print(f"\n{head} regret, budget level {label} "
           f"(log10; 0 = chose the best feasible action)")
-    print(f"{'chooser':>16} | {'macro mean':>10} {'+- fold':>8} {'+- seed':>8} | {'x worse':>8}")
-    print("-" * 62)
-    for name, stats in sorted(block.items(), key=lambda kv: kv[1]["macro_mean_regret"]):
-        print(f"{name:>16} | {stats['macro_mean_regret']:>10.4f} "
+    print(f"{'chooser':>18} | {'>=%d cases' % summary.get('min_fold_cases', 0):>10} "
+          f"{'all folds':>10} {'+- fold':>8} {'+- seed':>8} | {'x worse':>8}")
+    print("-" * 74)
+    # Ordered by the comparable subset: an unweighted mean over folds of 1 and
+    # folds of 6 is not the number it reads as, and ranking by it hides that.
+    for name, stats in sorted(block.items(), key=lambda kv: kv[1]["macro_mean_regret_scored"]):
+        print(f"{name:>18} | {stats['macro_mean_regret_scored']:>10.4f} "
+              f"{stats['macro_mean_regret']:>10.4f} "
               f"{stats['fold_std']:>8.4f} {stats['mean_seed_std']:>8.4f} | "
-              f"{R.decades_to_factor(stats['macro_mean_regret']):>8.2f}")
+              f"{R.decades_to_factor(stats['macro_mean_regret_scored']):>8.2f}")
+    if undersized:
+        detail = ", ".join(f"fold {f} ({cases.get(str(f), '?')} case)" for f in undersized)
+        print(f"  ranked on the {block[next(iter(block))]['n_folds_scored']} folds with "
+              f">={summary.get('min_fold_cases')} cases; excluded from that column: {detail}")
 
 
 def print_tolerance_table(block: dict[str, Any], label: str) -> None:

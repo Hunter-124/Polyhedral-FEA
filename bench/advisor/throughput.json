@@ -334,6 +334,90 @@
       "rows_per_s": 0.5827,
       "mesh_ms_frac": 0.482,
       "mesh_cache_recommended": true
+    },
+    {
+      "batch": 1,
+      "started": "2026-08-14T22:05:40Z",
+      "wall_s": 13.0,
+      "pairs_total": 288,
+      "dedup_hits": 0,
+      "launched": 288,
+      "shards": [
+        {
+          "shard": 0,
+          "campaign": "advisor-batch-1-s0-hunter-pc",
+          "wall_s": 8.1,
+          "rows": 72,
+          "returncode": 0
+        },
+        {
+          "shard": 1,
+          "campaign": "advisor-batch-1-s1-hunter-pc",
+          "wall_s": 10.0,
+          "rows": 72,
+          "returncode": 0
+        },
+        {
+          "shard": 2,
+          "campaign": "advisor-batch-1-s2-hunter-pc",
+          "wall_s": 9.7,
+          "rows": 72,
+          "returncode": 0
+        },
+        {
+          "shard": 3,
+          "campaign": "advisor-batch-1-s3-hunter-pc",
+          "wall_s": 12.1,
+          "rows": 72,
+          "returncode": 0
+        }
+      ],
+      "rows_written": 288,
+      "rows_per_s": 22.0977,
+      "mesh_ms_frac": 0.9097,
+      "mesh_cache_recommended": true
+    },
+    {
+      "batch": 1,
+      "started": "2026-08-14T22:05:53Z",
+      "wall_s": 28.2,
+      "pairs_total": 288,
+      "dedup_hits": 0,
+      "launched": 288,
+      "shards": [
+        {
+          "shard": 0,
+          "campaign": "advisor-batch-1-s0-hunter-pc",
+          "wall_s": 12.7,
+          "rows": 72,
+          "returncode": 0
+        },
+        {
+          "shard": 1,
+          "campaign": "advisor-batch-1-s1-hunter-pc",
+          "wall_s": 17.9,
+          "rows": 72,
+          "returncode": 0
+        },
+        {
+          "shard": 2,
+          "campaign": "advisor-batch-1-s2-hunter-pc",
+          "wall_s": 17.2,
+          "rows": 72,
+          "returncode": 0
+        },
+        {
+          "shard": 3,
+          "campaign": "advisor-batch-1-s3-hunter-pc",
+          "wall_s": 27.4,
+          "rows": 72,
+          "returncode": 0
+        }
+      ],
+      "rows_written": 288,
+      "rows_per_s": 10.2082,
+      "mesh_ms_frac": 0.5187,
+      "mesh_cache_recommended": true
     }
   ]
 }

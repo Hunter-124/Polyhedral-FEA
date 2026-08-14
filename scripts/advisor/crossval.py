@@ -157,22 +157,30 @@ def advisor_scores(net: AdvisorNet, split: Split, cases: list[R.Case],
     net.eval()
     predicted = net(torch.from_numpy(np.ascontiguousarray(split.x, dtype=np.float32)))
     score = predicted["rel_err_rel"].numpy().reshape(-1).astype(np.float64)
+    # Absolute rel_err and DOF, kept separate from the case-relative score above:
+    # a tolerance is a level, so tolerance_chooser cannot use `rel_err_rel`.
+    absolute = predicted["rel_err"].numpy().reshape(-1).astype(np.float64)
+    dof = predicted["dof"].numpy().reshape(-1).astype(np.float64)
     # The model already predicts both terms of the efficiency objective, so a
     # chooser that optimises accuracy-per-DOF needs no retraining, no new head
     # and no change to the ONNX contract -- only a different combination of
     # heads at query time. Both are log10, so the sum is log10(rel_err x DOF).
-    efficiency = score + predicted["dof"].numpy().reshape(-1).astype(np.float64)
+    efficiency = score + dof
     failure = torch.sigmoid(predicted["failure_logit"]).numpy().reshape(-1).astype(np.float64)
     default_action = standardized_default_action(data)[ACTION_INDEX]
     scores: dict[str, np.ndarray] = {}
     eff: dict[str, np.ndarray] = {}
     fail: dict[str, np.ndarray] = {}
+    abs_err: dict[str, np.ndarray] = {}
+    cost: dict[str, np.ndarray] = {}
     requested: dict[str, np.ndarray] = {}
     for case in cases:
         rows = np.asarray(case.rows, dtype=int)
         scores[case.part] = score[rows]
         eff[case.part] = efficiency[rows]
         fail[case.part] = failure[rows]
+        abs_err[case.part] = absolute[rows]
+        cost[case.part] = dof[rows]
         # Pass 1 of advisor.cpp:recommend -- the policy is queried at the
         # default action, so the query row is this case's context with the
         # default action substituted in.
@@ -182,7 +190,7 @@ def advisor_scores(net: AdvisorNet, split: Split, cases: list[R.Case],
         requested[case.part] = decode_policy(
             out["policy"].numpy().reshape(-1).astype(np.float64), data)
     return {"rel_err_rel": scores, "efficiency": eff, "failure": fail,
-            "requested": requested}
+            "rel_err": abs_err, "dof": cost, "requested": requested}
 
 
 # --------------------------------------------------------------------------- #
@@ -250,10 +258,32 @@ def build_choosers(net: AdvisorNet, data: AdvisorData, seed: int, objective: str
         choosers[f"advisor_gated_{threshold:g}"] = R.gated_score_chooser(
             scores, risk, threshold)
 
+    # Track 2b: "cheapest mesh meeting tolerance X". A selector, not a ranker, so
+    # it is a separate chooser per target rather than a scored head -- the target
+    # is the user's input and changes the decision. Scored by
+    # `regret.cost_at_tolerance`, which is the only place violation rate appears.
+    #
+    # Both the raw selector and a margin-calibrated one, because the raw selector
+    # measured a 43-60 % violation rate on the v3 corpus: the rel_err head is not
+    # conservative, so "predicted to pass" and "passes" are different sets. The
+    # margin is fitted on the TRAINING cases of this fold only.
+    train_predictions = advisor_scores(net, data.train, train_cases, data)
+    margins: dict[str, dict[str, float]] = {}
+    for target in R.DOF_TARGETS:
+        choosers[f"advisor_tol_{target:g}"] = R.tolerance_chooser(
+            predictions["rel_err"], predictions["dof"], target)
+        margin, train_violation = R.fit_tolerance_margin(
+            train_cases, train_predictions["rel_err"], train_predictions["dof"], target)
+        choosers[f"advisor_tol_{target:g}_cal"] = R.tolerance_chooser(
+            predictions["rel_err"], predictions["dof"], target, margin)
+        margins[f"rel_err<={target:g}"] = {
+            "margin_decades": margin, "train_violation_rate": train_violation}
+
     meta = {
         "constant_train_regret": constant_train_regret,
         "family_lookup_hit_rate": hit_rate,
         "n_train_cases": len(train_cases),
+        "tolerance_margins": margins,
     }
     return choosers, val_cases, meta
 
@@ -269,6 +299,8 @@ def run_fold_seed(csv: Path | None, split: str, fold: int, n_folds: int | None,
                      bands=[(0.4, 0.6), (0.7, 0.9)],
                      allow_failed=args.include_failures)
     result["dof_to_target"] = R.dof_to_target(cases, choosers)
+    result["cost_at_tolerance"] = R.cost_at_tolerance(
+        cases, choosers, cost_head=args.budget_head)
     result["fold"] = fold
     result["seed"] = seed
     result["split_mode"] = data.split_mode
@@ -276,6 +308,7 @@ def run_fold_seed(csv: Path | None, split: str, fold: int, n_folds: int | None,
     result["n_val_rows"] = data.val.n_rows
     result["family_lookup_hit_rate"] = meta["family_lookup_hit_rate"]()
     result["constant_train_regret"] = meta["constant_train_regret"]
+    result["tolerance_margins"] = meta["tolerance_margins"]
 
     # Paired tests at the primary budget. `finest_action` is included because it
     # is the DEPLOYABLE trivial rule: `spend_budget` ranks by measured DOF and so
@@ -353,6 +386,51 @@ def aggregate(runs: list[dict[str, Any]], heads: list[str]) -> dict[str, Any]:
     return out
 
 
+def aggregate_tolerance(runs: list[dict[str, Any]]) -> dict[str, Any]:
+    """Macro-mean over folds of the tolerance selector's spend and violations.
+
+    Weighted by nothing and pooled over nothing: same discipline as
+    :func:`aggregate`, because the folds are families of very different size and
+    the tolerance question is per family. Seeds are averaged inside a fold first.
+    """
+    out: dict[str, Any] = {}
+    targets = sorted({label for run in runs for label in run.get("cost_at_tolerance", {})})
+    for label in targets:
+        by_fold: dict[int, dict[str, list[dict[str, Any]]]] = defaultdict(
+            lambda: defaultdict(list))
+        for run in runs:
+            for name, stats in run.get("cost_at_tolerance", {}).get(label, {}).items():
+                by_fold[run["fold"]][name].append(stats)
+        block: dict[str, Any] = {}
+        names = sorted({name for fold in by_fold.values() for name in fold})
+        for name in names:
+            violations: list[float] = []
+            regrets: list[float] = []
+            attempted = 0
+            for fold, per_chooser in by_fold.items():
+                seeds = per_chooser.get(name, [])
+                usable = [s for s in seeds if s["attempted"]]
+                if not usable:
+                    continue
+                attempted += int(usable[0]["attempted"])
+                violations.append(float(np.mean([s["violation_rate"] for s in usable])))
+                finite = [s["mean_cost_regret"] for s in usable
+                          if math.isfinite(s["mean_cost_regret"])]
+                if finite:
+                    regrets.append(float(np.mean(finite)))
+            block[name] = {
+                "macro_violation_rate": float(np.mean(violations)) if violations else float("nan"),
+                "macro_mean_cost_regret": float(np.mean(regrets)) if regrets else float("nan"),
+                # folds where the chooser satisfied nothing contribute a violation
+                # rate but no regret, so the two counts differ and both are shown.
+                "n_folds_violation": len(violations),
+                "n_folds_regret": len(regrets),
+                "reachable_cases": attempted,
+            }
+        out[label] = block
+    return out
+
+
 # --------------------------------------------------------------------------- #
 # reporting
 # --------------------------------------------------------------------------- #
@@ -369,6 +447,25 @@ def print_table(summary: dict[str, Any], head: str, label: str) -> None:
         print(f"{name:>16} | {stats['macro_mean_regret']:>10.4f} "
               f"{stats['fold_std']:>8.4f} {stats['mean_seed_std']:>8.4f} | "
               f"{R.decades_to_factor(stats['macro_mean_regret']):>8.2f}")
+
+
+def print_tolerance_table(block: dict[str, Any], label: str) -> None:
+    """Violation rate first, then spend: cheapness bought by missing the
+    tolerance is not a saving, so ordering by regret would rank the misses top."""
+    rows = block.get(label)
+    if not rows:
+        return
+    print(f"\ncheapest mesh within {label} — {next(iter(rows.values()))['reachable_cases']} "
+          "reachable cases (macro-mean over folds)")
+    print(f"{'chooser':>20} | {'violation':>9} | {'dof regret':>10} {'x dearer':>8} | folds")
+    print("-" * 66)
+    for name, stats in sorted(rows.items(),
+                              key=lambda kv: (kv[1]["macro_violation_rate"],
+                                              kv[1]["macro_mean_cost_regret"])):
+        print(f"{name:>20} | {stats['macro_violation_rate']:>8.1%} | "
+              f"{stats['macro_mean_cost_regret']:>10.4f} "
+              f"{R.decades_to_factor(stats['macro_mean_cost_regret']):>8.2f} | "
+              f"{stats['n_folds_regret']}/{stats['n_folds_violation']}")
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -433,6 +530,7 @@ def main(argv: list[str] | None = None) -> int:
 
     summary = aggregate(runs, [args.objective] + [h for h in R.SCORED_HEADS
                                                   if h != args.objective])
+    tolerance = aggregate_tolerance(runs)
     payload = {
         "provenance": provenance(probe, seed=args.seed0, epochs=args.epochs,
                                  seeds=len(seeds), include_failures=args.include_failures),
@@ -444,6 +542,7 @@ def main(argv: list[str] | None = None) -> int:
         "budget_head": args.budget_head,
         "epochs": args.epochs,
         "summary": summary,
+        "cost_at_tolerance": tolerance,
         "runs": runs,
     }
     out = args.out or REPORT_JSON
@@ -452,6 +551,14 @@ def main(argv: list[str] | None = None) -> int:
 
     for label in ("unconstrained", f"q{args.primary_quantile:g}", "q0.25"):
         print_table(summary, args.objective, label)
+
+    for label in sorted(tolerance):
+        print_tolerance_table(tolerance, label)
+    if tolerance:
+        print("\nCost regret is decades of extra DOF over the CHEAPEST MEASURED action that met "
+              "the tolerance,\naveraged over the picks that met it — so 0 is the floor and the "
+              "`oracle` row above is the\naccuracy oracle, which meets every reachable tolerance "
+              "by overspending. Read violation\nrate first: the selectors are ranked by it.")
 
     print("\npaired sign tests, pooled over folds and seeds "
           f"(budget q{args.primary_quantile:g}, {args.objective})")

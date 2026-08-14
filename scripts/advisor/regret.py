@@ -301,6 +301,89 @@ def gated_score_chooser(scores: dict[str, np.ndarray],
 
     return choose
 
+def tolerance_chooser(predicted_error: dict[str, np.ndarray],
+                      predicted_cost: dict[str, np.ndarray],
+                      tolerance: float,
+                      margin: float = 0.0) -> Chooser:
+    """Cheapest action the model *expects* to meet an absolute accuracy target.
+
+    The dual of :func:`score_chooser` under a budget, and the question a user
+    actually arrives with: not "what is the best mesh for 30 k DOF" but "what is
+    the cheapest mesh that gets me within 1 %". Nothing else here answers it,
+    because every other chooser ranks candidates and lets the budget do the
+    filtering, and a tolerance cannot be expressed as a budget.
+
+    The error prediction must be the ABSOLUTE ``rel_err`` head, never
+    ``rel_err_rel``: the latter is measured against the case's own median (see
+    ``dataset.RELATIVE_HEADS``), so comparing it to a tolerance would compare a
+    contrast against a level.
+
+    When no candidate is predicted to reach the target the fallback is the
+    most accurate candidate offered, not ``None``. Refusing to answer is the
+    OOD veto's job; a selector that silently declines on the hard cases would
+    report its violation rate only over the easy ones.
+
+    ``margin`` is a safety margin in decades, subtracted from the tolerance
+    before filtering: the head is not conservative, so admitting everything it
+    predicts to just barely pass admits everything whose residual happens to be
+    optimistic. Fit it on training cases with :func:`fit_tolerance_margin`;
+    choosing it on the cases being scored would be selection on the test set.
+    """
+    log_tolerance = math.log10(tolerance) - float(margin)
+
+    def choose(case: Case, feasible: np.ndarray) -> int | None:
+        if not feasible.any():
+            return None
+        error = np.asarray(predicted_error[case.part], dtype=np.float64)
+        cost = np.asarray(predicted_cost[case.part], dtype=np.float64)
+        offered = feasible & np.isfinite(error)
+        admissible = offered & (error <= log_tolerance)
+        if not admissible.any():
+            values = np.where(offered, error, np.inf)
+            return None if not np.isfinite(values).any() else int(np.argmin(values))
+        values = np.where(admissible & np.isfinite(cost), cost, np.inf)
+        return None if not np.isfinite(values).any() else int(np.argmin(values))
+
+    return choose
+
+
+def fit_tolerance_margin(cases: Sequence[Case],
+                         predicted_error: dict[str, np.ndarray],
+                         predicted_cost: dict[str, np.ndarray],
+                         tolerance: float,
+                         max_violation: float = 0.1,
+                         grid: Sequence[float] = tuple(np.arange(0.0, 2.01, 0.1)),
+                         error_head: str = "rel_err") -> tuple[float, float]:
+    """Smallest margin whose TRAINING violation rate is within ``max_violation``.
+
+    Smallest, not best: every extra decade of margin buys compliance with spend,
+    so the objective is the cheapest selector that keeps its promise rather than
+    the most cautious one. Returns ``(margin, achieved_violation_rate)``; if no
+    margin on the grid reaches the target the widest is returned with its
+    measured rate, so the caller can see the promise was not keepable and the
+    number is not silently a success.
+    """
+    log_target = math.log10(tolerance)
+    reachable = [case for case in cases
+                 if (case.valid[error_head] & (case.outcomes[error_head] <= log_target)).any()]
+    if not reachable:
+        return 0.0, float("nan")
+    worst = (0.0, float("nan"))
+    for margin in grid:
+        chooser = tolerance_chooser(predicted_error, predicted_cost, tolerance, margin)
+        satisfied = 0
+        for case in reachable:
+            pick = chooser(case, np.ones(case.n_actions, dtype=bool))
+            if pick is None or not case.valid[error_head][pick]:
+                continue
+            if case.outcomes[error_head][pick] <= log_target:
+                satisfied += 1
+        rate = 1.0 - satisfied / len(reachable)
+        worst = (float(margin), float(rate))
+        if rate <= max_violation:
+            return float(margin), float(rate)
+    return worst
+
 
 def nearest_action_chooser(targets: dict[str, np.ndarray],
                            action_matrix: dict[str, np.ndarray]) -> Chooser:
@@ -704,4 +787,67 @@ def dof_to_target(cases: Sequence[Case], choosers: dict[str, Chooser],
                 "reach_rate": float(reached / attempted) if attempted else float("nan"),
             }
         out[f"rel_err<={target:g}"] = rows
+    return out
+
+
+def cost_at_tolerance(cases: Sequence[Case], choosers: dict[str, Chooser],
+                      targets: Sequence[float] = DOF_TARGETS,
+                      cost_head: str = "dof",
+                      error_head: str = "rel_err") -> dict[str, Any]:
+    """What each chooser SPENDS to hit an accuracy target, and how often it misses.
+
+    :func:`dof_to_target` asks the same question of choosers that were built to
+    optimise something else, so it can only report what they happened to spend.
+    This scores the decision directly, against the cheapest measured action that
+    actually met the target -- the oracle a "cheapest mesh within X" claim is
+    implicitly compared to.
+
+    Only cases where the target is *reachable* are scored: if no measured action
+    meets it, every chooser must miss and the case separates nothing.
+
+    Two numbers, and neither is readable alone:
+
+    ``violation_rate`` -- the pick's MEASURED error exceeded the tolerance, or
+    the pick produced no measured error at all (an undelivered mesh is a missed
+    tolerance, not a missing datum). This is the number a user feels.
+
+    ``mean_cost_regret`` -- decades of extra ``cost_head`` over the cheapest
+    satisfying action, averaged over the picks that DID satisfy. Cheapness
+    bought by violating the tolerance is not a saving, so violations are
+    excluded here and counted there; a chooser that misses half the time can
+    post an excellent regret and is not better.
+    """
+    out: dict[str, Any] = {}
+    for target in targets:
+        log_target = math.log10(target)
+        rows: dict[str, dict[str, Any]] = {}
+        reachable: list[tuple[Case, float]] = []
+        for case in cases:
+            ok = case.valid[error_head] & case.valid[cost_head]
+            meets = ok & (case.outcomes[error_head] <= log_target)
+            if not meets.any():
+                continue
+            reachable.append((case, float(case.outcomes[cost_head][meets].min())))
+        for name, chooser in choosers.items():
+            regrets: list[float] = []
+            satisfied = 0
+            for case, cheapest in reachable:
+                pick = chooser(case, np.ones(case.n_actions, dtype=bool))
+                if pick is None or not case.valid[error_head][pick]:
+                    continue
+                if case.outcomes[error_head][pick] > log_target:
+                    continue
+                satisfied += 1
+                if case.valid[cost_head][pick]:
+                    regrets.append(float(case.outcomes[cost_head][pick]) - cheapest)
+            attempted = len(reachable)
+            rows[name] = {
+                "attempted": attempted,
+                "satisfied": satisfied,
+                "violation_rate": (float(1.0 - satisfied / attempted)
+                                   if attempted else float("nan")),
+                "mean_cost_regret": float(np.mean(regrets)) if regrets else float("nan"),
+                "median_cost_regret": float(np.median(regrets)) if regrets else float("nan"),
+            }
+        out[f"{error_head}<={target:g}"] = rows
     return out

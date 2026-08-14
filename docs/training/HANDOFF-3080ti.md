@@ -43,11 +43,24 @@ so **nothing labelled before `798ef79` is trustworthy for graded_tet rows**.
   unit_box must still veto with distance ≈ 61.8.
 - Acceptance: advisor smoke tests unchanged (plate_hole → graded_tet,
   exit 0), held-out accuracy ≥ old model on the clean labels.
+- **DONE 2026-08-14** (`b27b0e6`, `dada547`). Measured in
+  `docs/advisor/0006-clean-data-retrain.md`, including where it now loses: the
+  net still trails LightGBM on DOF by 2.4×, and macro-mean regret ranks the
+  learned choosers below `random` at the median budget.
 
 ### 2b. Learned error estimator / h-selector (second)
 - Label: (part features, mesher, h) → measured rel_err and DOF from the fresh
   campaign; regression, not classification.
 - Deliverable: "cheapest mesh meeting tolerance X" — directly demoable.
+- **MEASURED AND NOT DELIVERABLE, 2026-08-14** —
+  `docs/advisor/0007-tolerance-selector.md`. The selector needs no new head, and
+  on 12 family-held-out folds it is 2–5× cheaper than "ask for the finest mesh"
+  while missing the tolerance 1.3–2.6× more often, on both the net and LightGBM.
+  A conservative margin does not fix it: the sweep saturates at 2.0 decades
+  without reaching a 10 % violation rate. The scorer
+  (`regret.cost_at_tolerance`) is now wired into `crossval.py` and
+  `evaluate.py`, so any future attempt reports compliance next to regret. No
+  user-facing query path was built, deliberately.
 
 ### 2c. Per-region size field GNN (the flagship, 1–3 day runs)
 - Needs a NEW label pipeline: adaptive solves (`local_refine`) as ground

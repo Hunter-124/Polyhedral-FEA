@@ -1,6 +1,6 @@
 {
-  "generated_utc": "2026-08-13T23:10:24Z",
-  "git_rev": "12540b7",
+  "generated_utc": "2026-08-14T02:01:28Z",
+  "git_rev": "798ef79",
   "images": [
     {
       "file": "architecture.png",
@@ -65,7 +65,7 @@
       "dofs": null,
       "wall_time_s": null,
       "max_von_mises_pa": null,
-      "caption": "Close-up on the hole (identical camera in both panels, 40 mm window): uniform (--no-feature, h = 3.8 mm) vs feature-graded (h = 5.6 mm) sizing on the same part and mesher, h tuned to a matched element budget: 43,360 vs 44,124 cells (1.8% apart), 26,994 vs 28,686 DOF."
+      "caption": "Close-up on the hole (identical camera in both panels, 40 mm window): uniform (--no-feature, h = 3.8 mm) vs feature-graded (h = 5.6 mm) sizing on the same part and mesher, h tuned to a matched element budget: 43,360 vs 44,110 cells (1.7% apart), 26,994 vs 28,686 DOF."
     },
     {
       "file": "compare_grading.png#grade_feature",
@@ -78,7 +78,7 @@
       "dofs": 28686,
       "wall_time_s": null,
       "max_von_mises_pa": null,
-      "caption": "Tile of compare_grading.png: feature-graded sizing field, 9,562 nodes / 44,124 cells."
+      "caption": "Tile of compare_grading.png: feature-graded sizing field, 9,562 nodes / 44,110 cells."
     },
     {
       "file": "compare_grading.png#grade_uniform",
@@ -104,7 +104,7 @@
       "dofs": null,
       "wall_time_s": null,
       "max_von_mises_pa": null,
-      "caption": "Mesh-only renders of the same plate at h = 3 mm under 3 of 3 meshers \u2014 tet: 11,770 nodes / 53,760 cells \u00b7 graded: 36,102 nodes / 177,555 cells \u00b7 hybrid: 113,174 nodes / 329,286 cells. All are Cartesian grid-fill topologies, not Delaunay."
+      "caption": "Mesh-only renders of the same plate at h = 3 mm under 3 of 3 meshers \u2014 tet: 11,770 nodes / 53,760 cells \u00b7 graded: 36,091 nodes / 177,503 cells \u00b7 hybrid: 113,174 nodes / 329,286 cells. All are Cartesian grid-fill topologies, not Delaunay."
     },
     {
       "file": "compare_meshers.png#graded",
@@ -114,10 +114,10 @@
       "h": 0.003,
       "solve_command": "C:\\Users\\Yakub\\Desktop\\Polyhedral-FEA\\build\\apps\\cli\\polymesh.exe mesh tests\\fixtures\\parts\\plate_hole.step -h 0.003 --mesher graded -o build\\showcase\\cmp_graded.vtu",
       "render_command": "python3 scripts/render_showcase.py --only compare_meshers",
-      "dofs": 108306,
+      "dofs": 108273,
       "wall_time_s": null,
       "max_von_mises_pa": null,
-      "caption": "Tile of compare_meshers.png: graded mesher, 36,102 nodes / 177,555 cells."
+      "caption": "Tile of compare_meshers.png: graded mesher, 36,091 nodes / 177,503 cells."
     },
     {
       "file": "compare_meshers.png#hybrid",
@@ -154,7 +154,7 @@
       "solve_command": "C:\\Users\\Yakub\\Desktop\\Polyhedral-FEA\\build\\apps\\cli\\polymesh.exe solve tests\\fixtures\\parts\\cantilever.step -o build\\showcase\\cantilever.vtu -h 0.03 --mesher graded -E 2e+11 -nu 0.3 --load-dir 0 0 -1 --force 1000",
       "render_command": "python3 scripts/render_showcase.py --only cantilever",
       "dofs": 26283,
-      "wall_time_s": 9.431854400027078,
+      "wall_time_s": 12.141694199992344,
       "max_von_mises_pa": 6059088.4875616655,
       "caption": "Cantilever beam: von Mises stress on the graded mesh (h = 30 mm, 8,761 nodes / 44,832 elements, 26,283 DOF); root face fixed, -z resultant on tip face; displacement warped \u00d7200; colour range 0 \u2013 5.73 MPa (clipped at the 99th percentile of the visible surface field); peak nodal value 6.06 MPa at the clamped-face stress singularity."
     },
@@ -166,10 +166,10 @@
       "h": 0.012,
       "solve_command": "C:\\Users\\Yakub\\Desktop\\Polyhedral-FEA\\build\\apps\\cli\\polymesh.exe solve tests\\fixtures\\parts\\cylinder.step -o build\\showcase\\cylinder.vtu -h 0.012 --mesher graded -E 2e+11 -nu 0.3 --fix-box -1 -1 -1 1 1 0.015 --load-box -1 -1 0.195 1 1 1 --load-dir 0 0 1 --force 7853.98",
       "render_command": "python3 scripts/render_showcase.py --only cylinder",
-      "dofs": 26526,
-      "wall_time_s": 8.354196100030094,
-      "max_von_mises_pa": 2642077.053923446,
-      "caption": "Cylinder: von Mises stress on the graded mesh (h = 12 mm, 8,842 nodes / 42,524 elements, 26,526 DOF); base z < 0.015 m fixed, +z resultant on cap; displacement warped \u00d75000; colour range 0 \u2013 2.11 MPa (clipped at the 99th percentile of the visible surface field); peak nodal value 2.64 MPa at the clamped-face stress singularity."
+      "dofs": 26505,
+      "wall_time_s": 10.958332599955611,
+      "max_von_mises_pa": 2642646.9430658296,
+      "caption": "Cylinder: von Mises stress on the graded mesh (h = 12 mm, 8,835 nodes / 42,496 elements, 26,505 DOF); base z < 0.015 m fixed, +z resultant on cap; displacement warped \u00d75000; colour range 0 \u2013 2.11 MPa (clipped at the 99th percentile of the visible surface field); peak nodal value 2.64 MPa at the clamped-face stress singularity."
     },
     {
       "file": "gallery_icecream_cone.png",
@@ -179,10 +179,10 @@
       "h": 0.01,
       "solve_command": "C:\\Users\\Yakub\\Desktop\\Polyhedral-FEA\\build\\apps\\cli\\polymesh.exe solve tests\\fixtures\\parts\\icecream_cone.step -o build\\showcase\\icecream_cone.vtu -h 0.01 --mesher graded -E 2e+11 -nu 0.3 --fix-box -1 -1 -1 1 1 0.012 --load-box -1 -1 0.12 1 1 1 --load-dir 0 0 -1 --force 1000",
       "render_command": "python3 scripts/render_showcase.py --only icecream_cone",
-      "dofs": 10638,
-      "wall_time_s": 4.166966199991293,
-      "max_von_mises_pa": 4143822.408277289,
-      "caption": "Round ice-cream cone: von Mises stress on the graded mesh (h = 10 mm, 3,546 nodes / 16,196 elements, 10,638 DOF); foot z <= 0.012 m fixed, -z resultant on scoop; displacement warped \u00d75000; colour range 0 \u2013 3.52 MPa (clipped at the 99th percentile of the visible surface field); peak nodal value 4.14 MPa at the clamped-face stress singularity."
+      "dofs": 10623,
+      "wall_time_s": 4.874681000015698,
+      "max_von_mises_pa": 4143822.848632519,
+      "caption": "Round ice-cream cone: von Mises stress on the graded mesh (h = 10 mm, 3,541 nodes / 16,178 elements, 10,623 DOF); foot z <= 0.012 m fixed, -z resultant on scoop; displacement warped \u00d75000; colour range 0 \u2013 3.52 MPa (clipped at the 99th percentile of the visible surface field); peak nodal value 4.14 MPa at the clamped-face stress singularity."
     },
     {
       "file": "gallery_plate_hole.png",
@@ -192,10 +192,10 @@
       "h": 0.003,
       "solve_command": "C:\\Users\\Yakub\\Desktop\\Polyhedral-FEA\\build\\apps\\cli\\polymesh.exe solve tests\\fixtures\\parts\\plate_hole.step -o build\\showcase\\plate_hole.vtu -h 0.003 --mesher graded -E 2.1e+11 -nu 0.3 --load-dir 1 0 0 --force 1000",
       "render_command": "python3 scripts/render_showcase.py --only plate_hole",
-      "dofs": 108306,
-      "wall_time_s": 64.80576259997906,
-      "max_von_mises_pa": 3115853.2245675907,
-      "caption": "Plate with hole: von Mises stress on the graded mesh (h = 3 mm, 36,102 nodes / 177,555 elements, 108,306 DOF); min-x face fixed, +x resultant on max-x face; displacement warped \u00d75000; colour range 0 \u2013 2.9 MPa (clipped at the 99th percentile of the visible surface field); peak nodal value 3.12 MPa at the clamped-face stress singularity."
+      "dofs": 108273,
+      "wall_time_s": 79.88658410002245,
+      "max_von_mises_pa": 3115875.3815556187,
+      "caption": "Plate with hole: von Mises stress on the graded mesh (h = 3 mm, 36,091 nodes / 177,503 elements, 108,273 DOF); min-x face fixed, +x resultant on max-x face; displacement warped \u00d75000; colour range 0 \u2013 2.9 MPa (clipped at the 99th percentile of the visible surface field); peak nodal value 3.12 MPa at the clamped-face stress singularity."
     },
     {
       "file": "gallery_sphere.png",
@@ -206,7 +206,7 @@
       "solve_command": "C:\\Users\\Yakub\\Desktop\\Polyhedral-FEA\\build\\apps\\cli\\polymesh.exe solve tests\\fixtures\\parts\\sphere.step -o build\\showcase\\sphere.vtu -h 0.008 --mesher graded -E 2e+11 -nu 0.3 --fix-box -1 -1 -1 1 1 -0.04 --load-box -1 -1 0.04 1 1 1 --load-dir 0 0 -1 --force 3141.59",
       "render_command": "python3 scripts/render_showcase.py --only sphere",
       "dofs": 15135,
-      "wall_time_s": 5.389300999988336,
+      "wall_time_s": 5.735494499967899,
       "max_von_mises_pa": 2684281.7902045054,
       "caption": "Sphere: von Mises stress on the graded mesh (h = 8 mm, 5,045 nodes / 23,892 elements, 15,135 DOF); lower cap fixed, -z resultant on upper cap; displacement warped \u00d710000; colour range 0 \u2013 1.45 MPa (clipped at the 99th percentile of the visible surface field); peak nodal value 2.68 MPa at the clamped-face stress singularity."
     },
@@ -231,10 +231,10 @@
       "h": 0.003,
       "solve_command": "C:\\Users\\Yakub\\Desktop\\Polyhedral-FEA\\build\\apps\\cli\\polymesh.exe solve tests\\fixtures\\parts\\plate_hole.step -o build\\showcase\\plate_hole.vtu -h 0.003 --mesher graded -E 2.1e+11 -nu 0.3 --load-dir 1 0 0 --force 1000",
       "render_command": "python3 scripts/render_showcase.py --only hero",
-      "dofs": 108306,
-      "wall_time_s": 64.80576259997906,
-      "max_von_mises_pa": 3115853.2245675907,
-      "caption": "Flagship render: von Mises stress across the plate with hole on the feature-graded mesh, shot from a low oblique angle (h = 3 mm, 36,102 nodes / 177,555 elements, 108,306 DOF); min-x face fixed, +x resultant on max-x face; displacement warped \u00d75000; colour range 0 \u2013 2.9 MPa (clipped at the 99th percentile of the visible surface field); peak nodal value 3.12 MPa at the clamped-face stress singularity."
+      "dofs": 108273,
+      "wall_time_s": 79.88658410002245,
+      "max_von_mises_pa": 3115875.3815556187,
+      "caption": "Flagship render: von Mises stress across the plate with hole on the feature-graded mesh, shot from a low oblique angle (h = 3 mm, 36,091 nodes / 177,503 elements, 108,273 DOF); min-x face fixed, +x resultant on max-x face; displacement warped \u00d75000; colour range 0 \u2013 2.9 MPa (clipped at the 99th percentile of the visible surface field); peak nodal value 3.12 MPa at the clamped-face stress singularity."
     }
   ]
 }

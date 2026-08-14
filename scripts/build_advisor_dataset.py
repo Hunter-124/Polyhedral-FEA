@@ -32,6 +32,12 @@ OUTPUT_DIR = ROOT / "bench" / "advisor"
 # has zero error -- definitionally true and completely non-generalizable.
 TRUTH_CAMPAIGN_GLOB = "advisor-truth-*"
 
+#: Determinism and toolchain probes (ADR-0032). They deliberately re-solve pairs
+#: the real campaigns already own, with the SAME cfg_id, so admitting them would
+#: hand the builder two contradictory labels for one key and let directory sort
+#: order decide. They are evidence, not corpus.
+PROBE_CAMPAIGN_GLOBS: tuple[str, ...] = ("xcheck-*", "xstl-*")
+
 #: Explicit precedence when the SAME (cfg_id, part, tier) was solved more than
 #: once, newest engine first. The rank is stated here rather than inferred,
 #: because every implicit rule available is wrong in some case: directory sort
@@ -528,6 +534,7 @@ def main() -> int:
     unordered: list[tuple[tuple[Any, ...], str, str]] = []
     #: Cross-check violations: the list preferred an older-engine row.
     marker_violations: list[str] = []
+    skipped_probes: list[str] = []
     for campaign_dir in sorted(path for path in CAMPAIGNS.iterdir() if path.is_dir()):
         if fnmatch(campaign_dir.name, TRUTH_CAMPAIGN_GLOB):
             # promote_truth.py DEFINES each case's reference truth from these
@@ -535,6 +542,9 @@ def main() -> int:
             # them would teach the model that the overkill config has zero
             # error: definitionally true, completely non-generalizable.
             skipped_truth.append(campaign_dir.name)
+            continue
+        if any(fnmatch(campaign_dir.name, pattern) for pattern in PROBE_CAMPAIGN_GLOBS):
+            skipped_probes.append(campaign_dir.name)
             continue
         campaign = campaign_dir.name
         for key, row in campaign_records(campaign_dir):
@@ -715,6 +725,9 @@ def main() -> int:
     print(f"Truth campaigns skipped ({TRUTH_CAMPAIGN_GLOB}): "
           + (", ".join(skipped_truth) if skipped_truth else "none")
           + "  [their rel_err is ~0 by construction; promote_truth.py defines truth from them]")
+    if skipped_probes:
+        print("Determinism/toolchain probe campaigns skipped: " + ", ".join(skipped_probes)
+              + "  [ADR-0032 evidence; they re-solve corpus pairs under a different build]")
     print(f"Rows retained for the failure head: {failure_signal['rows']} "
           f"(health_not_ok={failure_signal['health_not_ok']}, "
           f"accuracy_untrusted={failure_signal['accuracy_untrusted']})")

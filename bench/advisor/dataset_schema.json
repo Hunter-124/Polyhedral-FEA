@@ -1,46 +1,39 @@
 {
   "schema": "advisor-dataset-schema-v1",
-  "source_row_schemas": [
-    "advisor-row-v3"
-  ],
+  "source_row_schemas": [],
   "truth": {
     "rederived_from": "row answers[] via probe kinds mirrored from apps/testlab/main.cpp",
-    "rows_rescored": 2571,
-    "rows_unscored": 325,
-    "unscored_reasons": {
-      "no_answers": 325
-    },
-    "n_files": 42,
-    "sha256": "1a7e8acea87c6941876a79ca85b2be984a7f7a13f96e29951b00de452cb2c82c",
-    "newest_mtime": "2026-08-13T04:10:17Z",
-    "roots": [
-      "bench/reference",
-      "bench/reference/corpus"
-    ]
+    "rows_rescored": 0,
+    "rows_unscored": 0,
+    "unscored_reasons": {},
+    "n_files": 0,
+    "sha256": null,
+    "newest_mtime": null,
+    "roots": []
   },
   "columns": [
     {
       "name": "schema",
       "role": "context",
-      "dtype": "string",
+      "dtype": "number",
       "description": "Source campaign-row schema version."
     },
     {
       "name": "campaign",
       "role": "context",
-      "dtype": "string",
+      "dtype": "number",
       "description": "Campaign directory containing the run."
     },
     {
       "name": "cfg_id",
       "role": "context",
-      "dtype": "string",
+      "dtype": "number",
       "description": "Stable campaign configuration identifier."
     },
     {
       "name": "part",
       "role": "context",
-      "dtype": "string",
+      "dtype": "number",
       "description": "Fixture part identifier joined to its case JSON."
     },
     {
@@ -262,7 +255,7 @@
     {
       "name": "mesher",
       "role": "action",
-      "dtype": "string",
+      "dtype": "number",
       "description": "Swept mesh-advisor action 'mesher'."
     },
     {
@@ -280,13 +273,13 @@
     {
       "name": "feature_refine",
       "role": "action",
-      "dtype": "boolean",
+      "dtype": "number",
       "description": "Swept mesh-advisor action 'feature_refine'."
     },
     {
       "name": "bc_grading",
       "role": "action",
-      "dtype": "boolean",
+      "dtype": "number",
       "description": "Swept mesh-advisor action 'bc_grading'."
     },
     {
@@ -304,7 +297,7 @@
     {
       "name": "p_elevate",
       "role": "action",
-      "dtype": "boolean",
+      "dtype": "number",
       "description": "Swept mesh-advisor action 'p_elevate'."
     },
     {
@@ -322,13 +315,13 @@
     {
       "name": "status",
       "role": "outcome",
-      "dtype": "string",
+      "dtype": "number",
       "description": "Campaign run completion or failure status."
     },
     {
       "name": "error",
       "role": "outcome",
-      "dtype": "string",
+      "dtype": "number",
       "description": "Top-level failure message; empty when the run produced no error. Primary signal for the advisor feasibility head."
     },
     {
@@ -372,348 +365,6 @@
       "role": "outcome",
       "dtype": "number",
       "description": "Campaign outcome 'geometry_volume_err'."
-    },
-    {
-      "name": "accuracy_metric",
-      "role": "outcome",
-      "dtype": "string",
-      "description": "Flattened accuracy outcome field 'metric'."
-    },
-    {
-      "name": "accuracy_rel_err",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened accuracy outcome field 'rel_err'."
-    },
-    {
-      "name": "accuracy_score",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened accuracy outcome field 'score'."
-    },
-    {
-      "name": "accuracy_trusted",
-      "role": "outcome",
-      "dtype": "boolean",
-      "description": "Flattened accuracy outcome field 'trusted'."
-    },
-    {
-      "name": "accuracy_truth",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened accuracy outcome field 'truth'."
-    },
-    {
-      "name": "accuracy_value",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened accuracy outcome field 'value'."
-    },
-    {
-      "name": "answers_authored_area_checked",
-      "role": "outcome",
-      "dtype": "boolean",
-      "description": "Flattened measured answer 'authored_area_checked'."
-    },
-    {
-      "name": "answers_authored_area_consistent",
-      "role": "outcome",
-      "dtype": "boolean",
-      "description": "Flattened measured answer 'authored_area_consistent'."
-    },
-    {
-      "name": "answers_authored_area_rel_diff",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened measured answer 'authored_area_rel_diff'."
-    },
-    {
-      "name": "answers_dominant_load_axis",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened measured answer 'dominant_load_axis'."
-    },
-    {
-      "name": "answers_load_area_rel_err",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened measured answer 'load_area_rel_err'."
-    },
-    {
-      "name": "answers_load_area_status",
-      "role": "outcome",
-      "dtype": "string",
-      "description": "Flattened measured answer 'load_area_status'."
-    },
-    {
-      "name": "answers_load_face_area",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened measured answer 'load_face_area'."
-    },
-    {
-      "name": "answers_mean_u_component",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened measured answer 'mean_u_component'."
-    },
-    {
-      "name": "answers_mean_ux",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened measured answer 'mean_ux'."
-    },
-    {
-      "name": "answers_mean_uz",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened measured answer 'mean_uz'."
-    },
-    {
-      "name": "answers_mesh_selected_area",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened measured answer 'mesh_selected_area'."
-    },
-    {
-      "name": "answers_n_load_faces",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened measured answer 'n_load_faces'."
-    },
-    {
-      "name": "answers_n_probe_nodes",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened measured answer 'n_probe_nodes'."
-    },
-    {
-      "name": "answers_n_quality_excluded",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened measured answer 'n_quality_excluded'."
-    },
-    {
-      "name": "answers_sigma_box_max",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened measured answer 'sigma_box_max'."
-    },
-    {
-      "name": "answers_sigma_face_mean",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened measured answer 'sigma_face_mean'."
-    },
-    {
-      "name": "answers_sigma_max",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened measured answer 'sigma_max'."
-    },
-    {
-      "name": "answers_sigma_p99",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened measured answer 'sigma_p99'."
-    },
-    {
-      "name": "answers_strain_energy",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened measured answer 'strain_energy'."
-    },
-    {
-      "name": "answers_tip_deflection",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened measured answer 'tip_deflection'."
-    },
-    {
-      "name": "answers_tip_deflection_max",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened measured answer 'tip_deflection_max'."
-    },
-    {
-      "name": "geo_fidelity_available",
-      "role": "outcome",
-      "dtype": "boolean",
-      "description": "Campaign outcome 'geo_fidelity_available'."
-    },
-    {
-      "name": "geo_fidelity_chamfer_mean",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Campaign outcome 'geo_fidelity_chamfer_mean'."
-    },
-    {
-      "name": "geo_fidelity_dist_max",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Campaign outcome 'geo_fidelity_dist_max'."
-    },
-    {
-      "name": "geo_fidelity_dist_p95",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Campaign outcome 'geo_fidelity_dist_p95'."
-    },
-    {
-      "name": "geo_fidelity_dist_p99",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Campaign outcome 'geo_fidelity_dist_p99'."
-    },
-    {
-      "name": "geo_fidelity_n_samples",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Campaign outcome 'geo_fidelity_n_samples'."
-    },
-    {
-      "name": "geo_fidelity_normal_angle_p95_rad",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Campaign outcome 'geo_fidelity_normal_angle_p95_rad'."
-    },
-    {
-      "name": "geo_fidelity_rel_volume_err",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Campaign outcome 'geo_fidelity_rel_volume_err'."
-    },
-    {
-      "name": "health_authored_area_consistent",
-      "role": "outcome",
-      "dtype": "boolean",
-      "description": "Flattened solve-health outcome 'authored_area_consistent'."
-    },
-    {
-      "name": "health_free_residual_rel",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened solve-health outcome 'free_residual_rel'."
-    },
-    {
-      "name": "health_load_area_ok",
-      "role": "outcome",
-      "dtype": "boolean",
-      "description": "Flattened solve-health outcome 'load_area_ok'."
-    },
-    {
-      "name": "health_load_area_rel_err",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened solve-health outcome 'load_area_rel_err'."
-    },
-    {
-      "name": "health_load_area_status",
-      "role": "outcome",
-      "dtype": "string",
-      "description": "Flattened solve-health outcome 'load_area_status'."
-    },
-    {
-      "name": "health_load_area_verified",
-      "role": "outcome",
-      "dtype": "boolean",
-      "description": "Flattened solve-health outcome 'load_area_verified'."
-    },
-    {
-      "name": "health_n_bc_dofs",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened solve-health outcome 'n_bc_dofs'."
-    },
-    {
-      "name": "health_n_orphans",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened solve-health outcome 'n_orphans'."
-    },
-    {
-      "name": "health_ok",
-      "role": "outcome",
-      "dtype": "boolean",
-      "description": "Flattened solve-health outcome 'ok'."
-    },
-    {
-      "name": "health_reaction_sum_err",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened solve-health outcome 'reaction_sum_err'."
-    },
-    {
-      "name": "quality_M1max",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened mesh-quality outcome 'M1max'."
-    },
-    {
-      "name": "quality_M2max",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened mesh-quality outcome 'M2max'."
-    },
-    {
-      "name": "quality_M6",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened mesh-quality outcome 'M6'."
-    },
-    {
-      "name": "quality_score",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened mesh-quality outcome 'score'."
-    },
-    {
-      "name": "scorecard_accuracy_rel_err",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened campaign scorecard outcome 'accuracy_rel_err'."
-    },
-    {
-      "name": "scorecard_chordal_efficiency_max",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened campaign scorecard outcome 'chordal_efficiency_max'."
-    },
-    {
-      "name": "scorecard_edge_hausdorff_over_h",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened campaign scorecard outcome 'edge_hausdorff_over_h'."
-    },
-    {
-      "name": "scorecard_health_ok",
-      "role": "outcome",
-      "dtype": "boolean",
-      "description": "Flattened campaign scorecard outcome 'health_ok'."
-    },
-    {
-      "name": "scorecard_min_element_quality",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened campaign scorecard outcome 'min_element_quality'."
-    },
-    {
-      "name": "scorecard_n_dof",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened campaign scorecard outcome 'n_dof'."
-    },
-    {
-      "name": "scorecard_normal_dev_deg_max",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened campaign scorecard outcome 'normal_dev_deg_max'."
-    },
-    {
-      "name": "scorecard_solve_residual_rel",
-      "role": "outcome",
-      "dtype": "number",
-      "description": "Flattened campaign scorecard outcome 'solve_residual_rel'."
     }
   ]
 }

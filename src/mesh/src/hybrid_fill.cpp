@@ -1406,66 +1406,84 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     // (star-centroid pulls strand at 299 on sphere_box; crease pulls pile both
     // sheets onto the crease and grow it to 706).
     {
-        constexpr int kOverlapPasses = 12;
-        for (int pass = 0; pass < kOverlapPasses; ++pass) {
-            const auto owners =
-                buried_free_tet_face_owners(out.mesh.nodes, out.mesh.tets, hc);
-            if (owners.empty()) {
-                break;
-            }
-            std::vector<char> kill(out.mesh.tets.size(), 0);
-            for (const auto ti : owners) {
-                kill[ti] = 1;
-            }
-            restrict_kill_to_shell(out.mesh.tets, kill);
-            std::size_t n_kill = static_cast<std::size_t>(
-                std::count(kill.begin(), kill.end(), static_cast<char>(1)));
-            if (n_kill == 0) {
-                // Every single-tet kill was vetoed: at a one-cell-thick
-                // overlap band each deletion alone would pinch the shell.
-                // Escalate to the whole node-neighbourhood of every stuck
-                // owner so the guard judges the band, not a pinch.
-                std::unordered_set<std::uint32_t> owner_nodes;
-                for (const auto ti : owners) {
-                    owner_nodes.insert(out.mesh.tets[ti].begin(), out.mesh.tets[ti].end());
+        constexpr int kOverlapPasses = 48;
+        const auto carve_to_clean = [&]() {
+            for (int pass = 0; pass < kOverlapPasses; ++pass) {
+                const auto owners =
+                    buried_free_tet_face_owners(out.mesh.nodes, out.mesh.tets, hc);
+                if (owners.empty()) {
+                    return;
                 }
-                std::fill(kill.begin(), kill.end(), static_cast<char>(0));
-                for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
-                    for (const auto ni : out.mesh.tets[ti]) {
-                        if (owner_nodes.count(ni)) {
-                            kill[ti] = 1;
-                            break;
-                        }
-                    }
+                std::vector<char> kill(out.mesh.tets.size(), 0);
+                for (const auto ti : owners) {
+                    kill[ti] = 1;
                 }
                 restrict_kill_to_shell(out.mesh.tets, kill);
-                n_kill = static_cast<std::size_t>(
+                std::size_t n_kill = static_cast<std::size_t>(
                     std::count(kill.begin(), kill.end(), static_cast<char>(1)));
-            }
-            if (n_kill == 0 || n_kill >= out.mesh.tets.size()) {
-                break;
-            }
-            std::size_t w = 0;
-            for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
-                if (!kill[ti]) {
-                    out.mesh.tets[w++] = out.mesh.tets[ti];
+                if (n_kill == 0) {
+                    // Every single-tet kill was vetoed: at a one-cell-thick
+                    // overlap band each deletion alone would pinch the shell.
+                    // Escalate to the whole node-neighbourhood of every stuck
+                    // owner so the guard judges the band, not a pinch.
+                    std::unordered_set<std::uint32_t> owner_nodes;
+                    for (const auto ti : owners) {
+                        owner_nodes.insert(out.mesh.tets[ti].begin(),
+                                           out.mesh.tets[ti].end());
+                    }
+                    std::fill(kill.begin(), kill.end(), static_cast<char>(0));
+                    for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+                        for (const auto ni : out.mesh.tets[ti]) {
+                            if (owner_nodes.count(ni)) {
+                                kill[ti] = 1;
+                                break;
+                            }
+                        }
+                    }
+                    restrict_kill_to_shell(out.mesh.tets, kill);
+                    n_kill = static_cast<std::size_t>(
+                        std::count(kill.begin(), kill.end(), static_cast<char>(1)));
                 }
+                if (n_kill == 0 || n_kill >= out.mesh.tets.size()) {
+                    return;
+                }
+                std::size_t w = 0;
+                for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+                    if (!kill[ti]) {
+                        out.mesh.tets[w++] = out.mesh.tets[ti];
+                    }
+                }
+                out.mesh.tets.resize(w);
+                // No snap inside the carve: re-projecting each freshly exposed
+                // layer regenerates the tangle mid-carve (measured 33 -> 58 on
+                // sphere_box_s0 at h = 3.6 mm).
             }
-            out.mesh.tets.resize(w);
-            // Deliberately NO snap here: snap is what creates these tangles,
-            // and re-projecting the freshly exposed layer regenerates them
-            // (measured 33 -> 58 buried on sphere_box_s0 at h = 3.6 mm). The
-            // exposed faces stay where they are — a fraction of a cell inside
-            // their own sheet, an honest divot where the CAD wedge is thinner
-            // than the mesh can resolve.
+        };
+        // Alternate carve -> snap toward the JOINT fixed point: no burial AND
+        // a snapped boundary. Carving alone leaves the exposed layer at raw
+        // positions, which costs real fidelity (plate_hole p99 off-surface
+        // 0.025 h -> 0.035 h); snapping alone re-creates the tangle. Most
+        // parts close the loop in one round; a near-tangent wedge that will
+        // not close ships the divot instead of the self-intersection.
+        constexpr int kAlternations = 3;
+        for (int round = 0; round < kAlternations; ++round) {
+            carve_to_clean();
+            if (count_buried_free_tet_faces(out.mesh.nodes, out.mesh.tets, hc).n_buried !=
+                0) {
+                break; // carve stranded: do not snap on top of a tangle
+            }
+            snap_round();
+            if (count_buried_free_tet_faces(out.mesh.nodes, out.mesh.tets, hc).n_buried ==
+                0) {
+                break; // snapped AND clean
+            }
         }
-        // Shell-guard vetoes can strand a shallow residue the carve cannot
-        // reach — finish it with the inward pull, which handles exactly the
-        // thin crossings that deletion must not (tube walls one cell thick).
-        // No snap after the pull: snap is what MAKES these tangles, and
-        // re-projecting the pulled nodes restores them (measured 33 -> 49).
-        // The pulled nodes sit a fraction of a cell inside their own sheet,
-        // which is an honest divot, not a self-intersection.
+        // The carve can expose sliver caps (cylinder_prism's min boundary
+        // aspect fell to 0.00077, floor 0.0025) — one more collapse round
+        // cleans them; it may itself re-expose or re-tangle, so it runs
+        // BEFORE the final carve + pull and the census gate stays last.
+        repair_round();
+        carve_to_clean();
         pull_buried_free_faces(out.mesh.nodes, out.mesh.tets, hc);
         if (const auto st =
                 count_buried_free_tet_faces(out.mesh.nodes, out.mesh.tets, hc);

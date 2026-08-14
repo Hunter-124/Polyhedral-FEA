@@ -19,6 +19,7 @@
 #include <queue>
 #include <set>
 #include <limits>
+#include <tuple>
 #include <span>
 #include <unordered_map>
 #include <unordered_set>
@@ -79,7 +80,15 @@ tet_boundary_nodes(const std::vector<std::array<std::uint32_t, 4>>& tets) {
             nodes.insert(key.c);
         }
     }
-    return {nodes.begin(), nodes.end()};
+    // Ascending node id, not unordered_set bucket order: this list is the
+    // iteration order of snap_round's boundary snap and per-node re-project,
+    // where each node moves, tests its skin tets, and reverts on inversion —
+    // so an earlier node's accepted move changes whether a later one inverts.
+    // With MSVC's bucket order the 3080 Ti corpus disagreed with gcc on 5 of
+    // 24 pairs (stepped_shaft_s2_c0 hybrid_zoo 264 vs 200 elements).
+    std::vector<std::uint32_t> out(nodes.begin(), nodes.end());
+    std::sort(out.begin(), out.end());
+    return out;
 }
 
 /// Edges of the free-face shell that are used a number of times other than two.
@@ -1357,6 +1366,14 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 }
             }
         }
+        // Deterministic order, and the reason is not tidiness: `smooth_boundary_nodes`
+        // relaxes and re-projects node positions in the order it is handed the
+        // faces, reverting moves that invert a tet, so the surviving coordinates
+        // depend on that order. Iterating `once` directly makes the mesh a
+        // function of libstdc++'s bucket layout: measured 2026-08-14, the same
+        // commit built with MSVC and with gcc disagreed on 5 of 24 corpus pairs
+        // (stepped_shaft_s2_c0 hybrid_zoo 264 vs 200 elements), which no
+        // floating-point flag reproduced (-ffp-contract=off changed nothing).
         std::vector<std::array<std::uint32_t, 4>> free_faces;
         free_faces.reserve(once.size() / 2);
         for (const auto& [key, tri] : once) {
@@ -1364,6 +1381,9 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 free_faces.push_back({tri[0], tri[1], tri[2], tri[2]});
             }
         }
+        std::sort(free_faces.begin(), free_faces.end(), [](const auto& l, const auto& r) {
+            return std::tie(l[0], l[1], l[2]) < std::tie(r[0], r[1], r[2]);
+        });
         const double vol_eps = 1e-14 * hc * hc * hc;
         smooth_boundary_nodes(
             surface, out.mesh.nodes, free_faces, hc,

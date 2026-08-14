@@ -8,6 +8,7 @@
 #include <cmath>
 #include <limits>
 #include <set>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -121,10 +122,22 @@ WallProjectStats wall_tangential_project(const geom::CadModel& cad,
             bset.insert(a);
             bset.insert(b);
         };
+        // fcounts iteration order decides the order neighbors are appended to
+        // nbr[a]; the centroid below sums those neighbor positions in list order,
+        // so an STL-dependent bucket walk changes the relaxed position in the last
+        // FP bits and can flip a Jacobian-guard revert. Walk free faces in sorted
+        // key order (MSVC vs gcc disagreed on 5/24 corpus pairs, 2026-08-14).
+        std::vector<FaceKey> free_keys;
+        free_keys.reserve(fcounts.size() / 2 + 8);
         for (const auto& [key, count] : fcounts) {
-            if (count != 1) {
-                continue;
+            if (count == 1) {
+                free_keys.push_back(key);
             }
+        }
+        std::sort(free_keys.begin(), free_keys.end(), [](const FaceKey& x, const FaceKey& y) {
+            return std::tie(x.a, x.b, x.c) < std::tie(y.a, y.b, y.c);
+        });
+        for (const auto& key : free_keys) {
             const auto& tri = forient[key];
             add_edge(tri[0], tri[1]);
             add_edge(tri[1], tri[2]);
@@ -147,6 +160,10 @@ WallProjectStats wall_tangential_project(const geom::CadModel& cad,
         }
         wall.push_back(ni);
     }
+    // bset is unordered, so wall inherited a bucket walk. wall drives the per-iter
+    // relaxation sweep and the residual sums below; sort ascending by node id so
+    // the visit order — and the FP accumulation order — is STL-independent.
+    std::sort(wall.begin(), wall.end());
     stats.n_wall_nodes = wall.size();
     if (wall.empty()) {
         return stats;
@@ -281,10 +298,15 @@ WallProjectStats wall_tangential_project(const geom::CadModel& cad,
 
     stats.n_moved = accepted.size();
 
-    // Residual of wall nodes vs BRep.
+    // Residual of wall nodes vs BRep. Sum over the sorted wall vector, filtered by
+    // wall_set, instead of walking wall_set directly: the FP accumulation order of
+    // mean_surface_residual would otherwise be a function of the hash buckets.
     double sum = 0.0;
     std::size_t n_res = 0;
-    for (std::uint32_t ni : wall_set) {
+    for (const std::uint32_t ni : wall) {
+        if (wall_set.count(ni) == 0) {
+            continue;
+        }
         if (const auto pr = project_target(nodes[ni], ni)) {
             sum += pr->distance;
             stats.max_surface_residual = std::max(stats.max_surface_residual, pr->distance);

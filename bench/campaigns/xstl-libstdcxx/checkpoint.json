@@ -1,0 +1,12 @@
+{
+  "campaign": "xstl-libstdcxx",
+  "completed_runs": 24,
+  "started_utc": "2026-08-14T17:20:41Z",
+  "state": "finished",
+  "survivors": [
+    "cfg-821713a4",
+    "cfg-99ed644e"
+  ],
+  "tier": 0,
+  "updated_utc": "2026-08-14T17:27:55Z"
+}

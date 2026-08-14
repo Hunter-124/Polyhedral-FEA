@@ -1,0 +1,73 @@
+{
+  "name": "xstl-libcxx",
+  "comment": "cross-standard-library determinism proof: clang + libc++, after the determinism fixes. Identical rows in both directories mean the mesh no longer depends on unordered_map/unordered_set iteration order.",
+  "warehouse": false,
+  "parts": [
+    "bench/geometries/corpus/primitives/box_hole_s0_c0.case.json",
+    "bench/geometries/corpus/primitives/box_hole_s2_c0.case.json",
+    "bench/geometries/corpus/primitives/channel_s0_c0.case.json",
+    "bench/geometries/corpus/primitives/channel_s2_c0.case.json",
+    "bench/geometries/corpus/primitives/l_bracket_s0_c0.case.json",
+    "bench/geometries/corpus/primitives/l_bracket_s2_c0.case.json",
+    "bench/geometries/corpus/primitives/plate_notch_s0_c0.case.json",
+    "bench/geometries/corpus/primitives/plate_notch_s2_c0.case.json",
+    "bench/geometries/corpus/primitives/sphere_box_s0_c0.case.json",
+    "bench/geometries/corpus/primitives/sphere_box_s2_c0.case.json",
+    "bench/geometries/corpus/primitives/stepped_shaft_s0_c0.case.json",
+    "bench/geometries/corpus/primitives/stepped_shaft_s2_c0.case.json"
+  ],
+  "tiers": [
+    {
+      "h_scale": 1.0,
+      "keep_frac": 1.0
+    }
+  ],
+  "grid": {
+    "mesher": [
+      "hybrid_zoo",
+      "graded_tet"
+    ],
+    "h_rel": [
+      0.08
+    ],
+    "order": [
+      1
+    ],
+    "element_tendency": [
+      0.0
+    ],
+    "feature_refine": [
+      true
+    ],
+    "bc_grading": [
+      true
+    ],
+    "skin_layers": [
+      2
+    ],
+    "adapt_passes": [
+      1
+    ],
+    "eta_target": [
+      0.02
+    ],
+    "adapt_leb_waves": [
+      2
+    ]
+  },
+  "score": {
+    "weights": {
+      "accuracy": 0.5,
+      "solve_ms": 0.25,
+      "mesh_ms": 0.25
+    }
+  },
+  "resources": {
+    "max_run_wall_s": 180,
+    "max_pack_wall_s": 21600,
+    "max_threads": 0,
+    "max_mem_gb": 0,
+    "max_dof": 150000,
+    "max_elems": 120000
+  }
+}

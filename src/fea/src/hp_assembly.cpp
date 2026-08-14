@@ -14,6 +14,7 @@
 #include <limits>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 namespace polymesh::fea {
 namespace {
@@ -475,9 +476,23 @@ HpSystem assemble_hp(const HpModel& model, const Material& material) {
     }
     Eigen::Index next = nverts;
 
+    // Edge/face blocks are numbered by ascending key (EdgeKey pair, Quad/TriKey
+    // arrays compare lexicographically) rather than in unordered_map bucket
+    // order: `next` hands out global mode index blocks, so bucket order would
+    // permute the whole p-elevated linear system. Measured 2026-08-14, the same
+    // commit under MSVC and gcc flipped one corpus pair from solve_fail to ok
+    // purely through that permutation changing the solve's rounding.
+    std::vector<EdgeKey> edge_keys;
+    edge_keys.reserve(edge_order.size());
+    for (const auto& [key, pe] : edge_order) {
+        edge_keys.push_back(key);
+    }
+    std::sort(edge_keys.begin(), edge_keys.end());
+
     // Edge blocks: pe-1 modes (orders 2..pe), global direction min->max id.
     std::unordered_map<EdgeKey, Eigen::Index, EdgeKeyHash> edge_base;
-    for (const auto& [key, pe] : edge_order) {
+    for (const auto& key : edge_keys) {
+        const int pe = edge_order[key];
         const int nm = n_edge_modes(pe);
         if (nm <= 0) {
             continue;
@@ -489,10 +504,18 @@ HpSystem assemble_hp(const HpModel& model, const Material& material) {
         next += nm;
     }
 
+    std::vector<QuadKey> quad_keys;
+    quad_keys.reserve(quad_order.size());
+    for (const auto& [key, pf] : quad_order) {
+        quad_keys.push_back(key);
+    }
+    std::sort(quad_keys.begin(), quad_keys.end());
+
     // Hex face blocks: (pf-1)^2 modes.
     std::unordered_map<QuadKey, Eigen::Index, QuadKeyHash> quad_base;
     std::unordered_map<QuadKey, int, QuadKeyHash> quad_pf;
-    for (const auto& [key, pf] : quad_order) {
+    for (const auto& key : quad_keys) {
+        const int pf = quad_order[key];
         const int nm = n_hex_face_modes(pf);
         if (nm <= 0) {
             continue;
@@ -505,10 +528,18 @@ HpSystem assemble_hp(const HpModel& model, const Material& material) {
         next += nm;
     }
 
+    std::vector<TriKey> tri_keys;
+    tri_keys.reserve(tri_order.size());
+    for (const auto& [key, pf] : tri_order) {
+        tri_keys.push_back(key);
+    }
+    std::sort(tri_keys.begin(), tri_keys.end());
+
     // Tet face blocks.
     std::unordered_map<TriKey, Eigen::Index, TriKeyHash> tri_base;
     std::unordered_map<TriKey, int, TriKeyHash> tri_pf;
-    for (const auto& [key, pf] : tri_order) {
+    for (const auto& key : tri_keys) {
+        const int pf = tri_order[key];
         const int nm = n_tet_face_modes(pf);
         if (nm <= 0) {
             continue;

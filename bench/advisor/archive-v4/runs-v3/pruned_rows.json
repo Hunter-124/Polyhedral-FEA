@@ -1,0 +1,2894 @@
+{
+  "total": 807,
+  "keys": [
+    "advisor-batch-1-s0-hunter-pc|cfg-2c8319fc|cylinder|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-2c8319fc|smoke_bar|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-9d819bdc|smoke_bar|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-a708135e|smoke_bar|0",
+    "advisor-batch-1-s0|cfg-07b2f487|cylinder|0",
+    "advisor-batch-1-s0|cfg-07b2f487|smoke_bar|0",
+    "advisor-batch-1-s0|cfg-10617741|cylinder|0",
+    "advisor-batch-1-s0|cfg-1a3643d8|plate_hole|0",
+    "advisor-batch-1-s0|cfg-1be8522b|plate_hole|0",
+    "advisor-batch-1-s0|cfg-1be8522b|smoke_bar|0",
+    "advisor-batch-1-s0|cfg-1cd6ae16|cylinder|0",
+    "advisor-batch-1-s0|cfg-1cd6ae16|smoke_bar|0",
+    "advisor-batch-1-s0|cfg-1daaf024|cylinder|0",
+    "advisor-batch-1-s0|cfg-1daaf024|plate_hole|0",
+    "advisor-batch-1-s0|cfg-1daaf024|smoke_bar|0",
+    "advisor-batch-1-s0|cfg-1daaf024|sphere|0",
+    "advisor-batch-1-s0|cfg-1db28041|plate_hole|0",
+    "advisor-batch-1-s0|cfg-1db28041|smoke_bar|0",
+    "advisor-batch-1-s0|cfg-244b652b|cantilever|0",
+    "advisor-batch-1-s0|cfg-244b652b|cylinder|0",
+    "advisor-batch-1-s0|cfg-244b652b|smoke_bar|0",
+    "advisor-batch-1-s0|cfg-244b652b|sphere|0",
+    "advisor-batch-1-s0|cfg-25013c1c|plate_hole|0",
+    "advisor-batch-1-s0|cfg-25cae84b|cylinder|0",
+    "advisor-batch-1-s0|cfg-289ed88e|cylinder|0",
+    "advisor-batch-1-s0|cfg-289ed88e|plate_hole|0",
+    "advisor-batch-1-s0|cfg-289ed88e|smoke_bar|0",
+    "advisor-batch-1-s0|cfg-289ed88e|sphere|0",
+    "advisor-batch-1-s0|cfg-2bf49c9f|plate_hole|0",
+    "advisor-batch-1-s0|cfg-2c8319fc|cylinder|0",
+    "advisor-batch-1-s0|cfg-2c8319fc|plate_hole|0",
+    "advisor-batch-1-s0|cfg-2c8319fc|smoke_bar|0",
+    "advisor-batch-1-s0|cfg-2c8319fc|sphere|0",
+    "advisor-batch-1-s0|cfg-339f6d8d|cylinder|0",
+    "advisor-batch-1-s0|cfg-358d3914|cylinder|0",
+    "advisor-batch-1-s0|cfg-3abc00cf|cylinder|0",
+    "advisor-batch-1-s0|cfg-3abc00cf|sphere|0",
+    "advisor-batch-1-s0|cfg-4039b73e|cylinder|0",
+    "advisor-batch-1-s0|cfg-4039b73e|smoke_bar|0",
+    "advisor-batch-1-s0|cfg-4039b73e|sphere|0",
+    "advisor-batch-1-s0|cfg-480c3d87|plate_hole|0",
+    "advisor-batch-1-s0|cfg-480c3d87|smoke_bar|0",
+    "advisor-batch-1-s0|cfg-480c3d87|sphere|0",
+    "advisor-batch-1-s0|cfg-5702fde1|plate_hole|0",
+    "advisor-batch-1-s0|cfg-5c843d96|cantilever|0",
+    "advisor-batch-1-s0|cfg-5c843d96|smoke_bar|0",
+    "advisor-batch-1-s0|cfg-67922491|cylinder|0",
+    "advisor-batch-1-s0|cfg-67922491|smoke_bar|0",
+    "advisor-batch-1-s0|cfg-77964214|cantilever|0",
+    "advisor-batch-1-s0|cfg-79113a9e|cylinder|0",
+    "advisor-batch-1-s0|cfg-79113a9e|plate_hole|0",
+    "advisor-batch-1-s0|cfg-9d819bdc|cantilever|0",
+    "advisor-batch-1-s0|cfg-9d819bdc|smoke_bar|0",
+    "advisor-batch-1-s0|cfg-a39e03ff|plate_hole|0",
+    "advisor-batch-1-s0|cfg-a39e03ff|smoke_bar|0",
+    "advisor-batch-1-s0|cfg-a5943023|cylinder|0",
+    "advisor-batch-1-s0|cfg-a708135e|cantilever|0",
+    "advisor-batch-1-s0|cfg-a708135e|cylinder|0",
+    "advisor-batch-1-s0|cfg-a708135e|smoke_bar|0",
+    "advisor-batch-1-s0|cfg-a91ff0a6|plate_hole|0",
+    "advisor-batch-1-s0|cfg-b670f9a6|cylinder|0",
+    "advisor-batch-1-s0|cfg-bd49c936|plate_hole|0",
+    "advisor-batch-1-s0|cfg-c0eb7123|plate_hole|0",
+    "advisor-batch-1-s0|cfg-c0eb7123|smoke_bar|0",
+    "advisor-batch-1-s0|cfg-c24e268e|cylinder|0",
+    "advisor-batch-1-s0|cfg-cd4d6395|smoke_bar|0",
+    "advisor-batch-1-s0|cfg-d09ca47d|cylinder|0",
+    "advisor-batch-1-s0|cfg-d286588d|cylinder|0",
+    "advisor-batch-1-s0|cfg-d286588d|smoke_bar|0",
+    "advisor-batch-1-s0|cfg-d286588d|sphere|0",
+    "advisor-batch-1-s0|cfg-d7995871|cylinder|0",
+    "advisor-batch-1-s0|cfg-e1d83414|cylinder|0",
+    "advisor-batch-1-s0|cfg-e25e61bb|smoke_bar|0",
+    "advisor-batch-1-s0|cfg-e61ac021|cylinder|0",
+    "advisor-batch-1-s0|cfg-f99c4239|cantilever|0",
+    "advisor-batch-1-s0|cfg-f99c4239|smoke_bar|0",
+    "advisor-batch-1-s0|cfg-fd1b959a|plate_hole|0",
+    "advisor-batch-1-s0|cfg-fd1b959a|smoke_bar|0",
+    "advisor-batch-1-s0|cfg-feb7e91d|cylinder|0",
+    "advisor-batch-1-s0|cfg-feb7e91d|plate_hole|0",
+    "advisor-batch-1-s0|cfg-feb7e91d|smoke_bar|0",
+    "advisor-batch-1-s0|cfg-feb7e91d|sphere|0",
+    "advisor-batch-1-s1|cfg-17f37a6f|cylinder|0",
+    "advisor-batch-1-s1|cfg-1c7e40f4|cylinder|0",
+    "advisor-batch-1-s1|cfg-1c7e40f4|sphere|0",
+    "advisor-batch-1-s1|cfg-1da428f7|cantilever|0",
+    "advisor-batch-1-s1|cfg-1da428f7|cylinder|0",
+    "advisor-batch-1-s1|cfg-1da428f7|smoke_bar|0",
+    "advisor-batch-1-s1|cfg-26768af2|plate_hole|0",
+    "advisor-batch-1-s1|cfg-2e7f3d05|plate_hole|0",
+    "advisor-batch-1-s1|cfg-2ffee2de|cylinder|0",
+    "advisor-batch-1-s1|cfg-2ffee2de|plate_hole|0",
+    "advisor-batch-1-s1|cfg-2ffee2de|sphere|0",
+    "advisor-batch-1-s1|cfg-3bd04605|cylinder|0",
+    "advisor-batch-1-s1|cfg-446dbbd2|cylinder|0",
+    "advisor-batch-1-s1|cfg-4a7a5b13|plate_hole|0",
+    "advisor-batch-1-s1|cfg-4abefc17|cylinder|0",
+    "advisor-batch-1-s1|cfg-4abefc17|plate_hole|0",
+    "advisor-batch-1-s1|cfg-4abefc17|sphere|0",
+    "advisor-batch-1-s1|cfg-4be9fc41|cylinder|0",
+    "advisor-batch-1-s1|cfg-50513e6f|cylinder|0",
+    "advisor-batch-1-s1|cfg-51bec4d2|plate_hole|0",
+    "advisor-batch-1-s1|cfg-63bd3b4e|cantilever|0",
+    "advisor-batch-1-s1|cfg-63bd3b4e|cylinder|0",
+    "advisor-batch-1-s1|cfg-63bd3b4e|sphere|0",
+    "advisor-batch-1-s1|cfg-69108570|cylinder|0",
+    "advisor-batch-1-s1|cfg-699aeefd|cylinder|0",
+    "advisor-batch-1-s1|cfg-699aeefd|sphere|0",
+    "advisor-batch-1-s1|cfg-6ba87f6f|cylinder|0",
+    "advisor-batch-1-s1|cfg-7388d637|cylinder|0",
+    "advisor-batch-1-s1|cfg-75c1199d|cantilever|0",
+    "advisor-batch-1-s1|cfg-75c1199d|cylinder|0",
+    "advisor-batch-1-s1|cfg-75c1199d|smoke_bar|0",
+    "advisor-batch-1-s1|cfg-7722d6cd|smoke_bar|0",
+    "advisor-batch-1-s1|cfg-77d5d498|cylinder|0",
+    "advisor-batch-1-s1|cfg-780a06ff|cylinder|0",
+    "advisor-batch-1-s1|cfg-82b654a8|cylinder|0",
+    "advisor-batch-1-s1|cfg-855544d0|cylinder|0",
+    "advisor-batch-1-s1|cfg-855544d0|plate_hole|0",
+    "advisor-batch-1-s1|cfg-8a6dbaac|plate_hole|0",
+    "advisor-batch-1-s1|cfg-8a6dbaac|sphere|0",
+    "advisor-batch-1-s1|cfg-8db857d0|cylinder|0",
+    "advisor-batch-1-s1|cfg-8db857d0|sphere|0",
+    "advisor-batch-1-s1|cfg-91741cf5|cylinder|0",
+    "advisor-batch-1-s1|cfg-98a49495|plate_hole|0",
+    "advisor-batch-1-s1|cfg-9a7172c4|plate_hole|0",
+    "advisor-batch-1-s1|cfg-9cf657a9|plate_hole|0",
+    "advisor-batch-1-s1|cfg-9e0d95a8|cantilever|0",
+    "advisor-batch-1-s1|cfg-9e0d95a8|plate_hole|0",
+    "advisor-batch-1-s1|cfg-9e0d95a8|sphere|0",
+    "advisor-batch-1-s1|cfg-a1189557|cylinder|0",
+    "advisor-batch-1-s1|cfg-a73acdf4|cylinder|0",
+    "advisor-batch-1-s1|cfg-aad27433|cylinder|0",
+    "advisor-batch-1-s1|cfg-aad27433|plate_hole|0",
+    "advisor-batch-1-s1|cfg-c4d6504e|cantilever|0",
+    "advisor-batch-1-s1|cfg-c4d6504e|cylinder|0",
+    "advisor-batch-1-s1|cfg-ccd99376|cylinder|0",
+    "advisor-batch-1-s1|cfg-d066ccea|cantilever|0",
+    "advisor-batch-1-s1|cfg-d066ccea|cylinder|0",
+    "advisor-batch-1-s1|cfg-d066ccea|smoke_bar|0",
+    "advisor-batch-1-s1|cfg-d472fcd3|cylinder|0",
+    "advisor-batch-1-s1|cfg-d9231bff|cylinder|0",
+    "advisor-batch-1-s1|cfg-d9231bff|plate_hole|0",
+    "advisor-batch-1-s1|cfg-d9231bff|sphere|0",
+    "advisor-batch-1-s1|cfg-dd7388cd|cylinder|0",
+    "advisor-batch-1-s1|cfg-dd7388cd|plate_hole|0",
+    "advisor-batch-1-s1|cfg-dd7388cd|sphere|0",
+    "advisor-batch-1-s1|cfg-e825d824|plate_hole|0",
+    "advisor-batch-1-s1|cfg-ea32b132|cylinder|0",
+    "advisor-batch-1-s1|cfg-f1652adf|cylinder|0",
+    "advisor-batch-1-s1|cfg-f1652adf|plate_hole|0",
+    "advisor-batch-1-s1|cfg-f43106e2|cylinder|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-9c14b37c|cylinder|0",
+    "advisor-batch-1-s2|cfg-047ce243|cylinder|0",
+    "advisor-batch-1-s2|cfg-047ce243|icecream_cone|0",
+    "advisor-batch-1-s2|cfg-047ce243|plate_hole|0",
+    "advisor-batch-1-s2|cfg-047ce243|smoke_bar|0",
+    "advisor-batch-1-s2|cfg-047ce243|sphere|0",
+    "advisor-batch-1-s2|cfg-06177b3d|cylinder|0",
+    "advisor-batch-1-s2|cfg-0ef3c388|cylinder|0",
+    "advisor-batch-1-s2|cfg-109c1dbe|cylinder|0",
+    "advisor-batch-1-s2|cfg-18c4744e|plate_hole|0",
+    "advisor-batch-1-s2|cfg-18c4744e|smoke_bar|0",
+    "advisor-batch-1-s2|cfg-23fdaf2a|icecream_cone|0",
+    "advisor-batch-1-s2|cfg-23fdaf2a|plate_hole|0",
+    "advisor-batch-1-s2|cfg-23fdaf2a|smoke_bar|0",
+    "advisor-batch-1-s2|cfg-27949710|sphere|0",
+    "advisor-batch-1-s2|cfg-2e8a12c4|smoke_bar|0",
+    "advisor-batch-1-s2|cfg-314eb82a|cylinder|0",
+    "advisor-batch-1-s2|cfg-3b3aa35c|cylinder|0",
+    "advisor-batch-1-s2|cfg-3b3aa35c|smoke_bar|0",
+    "advisor-batch-1-s2|cfg-4a1827a6|cantilever|0",
+    "advisor-batch-1-s2|cfg-4a1827a6|cylinder|0",
+    "advisor-batch-1-s2|cfg-4a1827a6|plate_hole|0",
+    "advisor-batch-1-s2|cfg-5960ba58|cylinder|0",
+    "advisor-batch-1-s2|cfg-5960ba58|plate_hole|0",
+    "advisor-batch-1-s2|cfg-62a8c888|cylinder|0",
+    "advisor-batch-1-s2|cfg-7503741f|cylinder|0",
+    "advisor-batch-1-s2|cfg-7573e330|cylinder|0",
+    "advisor-batch-1-s2|cfg-7573e330|smoke_bar|0",
+    "advisor-batch-1-s2|cfg-7b5aee3d|cantilever|0",
+    "advisor-batch-1-s2|cfg-7b5aee3d|smoke_bar|0",
+    "advisor-batch-1-s2|cfg-85ac4502|cylinder|0",
+    "advisor-batch-1-s2|cfg-85ac4502|smoke_bar|0",
+    "advisor-batch-1-s2|cfg-8b59c7c7|cylinder|0",
+    "advisor-batch-1-s2|cfg-8b59c7c7|smoke_bar|0",
+    "advisor-batch-1-s2|cfg-8b59c7c7|sphere|0",
+    "advisor-batch-1-s2|cfg-904b4dc4|cantilever|0",
+    "advisor-batch-1-s2|cfg-904b4dc4|cylinder|0",
+    "advisor-batch-1-s2|cfg-904b4dc4|smoke_bar|0",
+    "advisor-batch-1-s2|cfg-97fdde29|cylinder|0",
+    "advisor-batch-1-s2|cfg-9c14b37c|cantilever|0",
+    "advisor-batch-1-s2|cfg-9c14b37c|cylinder|0",
+    "advisor-batch-1-s2|cfg-9c14b37c|smoke_bar|0",
+    "advisor-batch-1-s2|cfg-9d9c56c4|cylinder|0",
+    "advisor-batch-1-s2|cfg-9d9c56c4|plate_hole|0",
+    "advisor-batch-1-s2|cfg-9d9c56c4|smoke_bar|0",
+    "advisor-batch-1-s2|cfg-a18fd7be|cantilever|0",
+    "advisor-batch-1-s2|cfg-a18fd7be|cylinder|0",
+    "advisor-batch-1-s2|cfg-ab5b5a5b|cylinder|0",
+    "advisor-batch-1-s2|cfg-ab5b5a5b|plate_hole|0",
+    "advisor-batch-1-s2|cfg-ab5b5a5b|smoke_bar|0",
+    "advisor-batch-1-s2|cfg-b1b11a33|cylinder|0",
+    "advisor-batch-1-s2|cfg-b32107c6|cylinder|0",
+    "advisor-batch-1-s2|cfg-b32107c6|smoke_bar|0",
+    "advisor-batch-1-s2|cfg-b8ac635b|cantilever|0",
+    "advisor-batch-1-s2|cfg-b8ac635b|cylinder|0",
+    "advisor-batch-1-s2|cfg-b8ac635b|smoke_bar|0",
+    "advisor-batch-1-s2|cfg-b9bb832b|cylinder|0",
+    "advisor-batch-1-s2|cfg-b9bb832b|smoke_bar|0",
+    "advisor-batch-1-s2|cfg-bce718be|cantilever|0",
+    "advisor-batch-1-s2|cfg-bce718be|cylinder|0",
+    "advisor-batch-1-s2|cfg-bce718be|smoke_bar|0",
+    "advisor-batch-1-s2|cfg-becb4822|cylinder|0",
+    "advisor-batch-1-s2|cfg-becb4822|smoke_bar|0",
+    "advisor-batch-1-s2|cfg-c23c742a|cylinder|0",
+    "advisor-batch-1-s2|cfg-c23c742a|smoke_bar|0",
+    "advisor-batch-1-s2|cfg-c23c742a|sphere|0",
+    "advisor-batch-1-s2|cfg-c48ecf61|icecream_cone|0",
+    "advisor-batch-1-s2|cfg-c48ecf61|plate_hole|0",
+    "advisor-batch-1-s2|cfg-c48ecf61|smoke_bar|0",
+    "advisor-batch-1-s2|cfg-c48ecf61|sphere|0",
+    "advisor-batch-1-s2|cfg-dc15301a|plate_hole|0",
+    "advisor-batch-1-s2|cfg-dfe61061|cantilever|0",
+    "advisor-batch-1-s2|cfg-dfe61061|cylinder|0",
+    "advisor-batch-1-s2|cfg-dfe61061|icecream_cone|0",
+    "advisor-batch-1-s2|cfg-dfe61061|smoke_bar|0",
+    "advisor-batch-1-s2|cfg-e7f14d51|cylinder|0",
+    "advisor-batch-1-s2|cfg-e7f14d51|smoke_bar|0",
+    "advisor-batch-1-s2|cfg-e925a143|cylinder|0",
+    "advisor-batch-1-s2|cfg-e925a143|plate_hole|0",
+    "advisor-batch-1-s2|cfg-f11ec541|cylinder|0",
+    "advisor-batch-1-s2|cfg-fe6fce41|icecream_cone|0",
+    "advisor-batch-1-s2|cfg-fe6fce41|plate_hole|0",
+    "advisor-batch-1-s2|cfg-fe6fce41|smoke_bar|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-144abf7e|icecream_cone|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-2f1f809f|smoke_bar|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-39fd557d|icecream_cone|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-94025c72|icecream_cone|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-9df5f2c0|smoke_bar|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-ab46fbc0|icecream_cone|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-af599d72|icecream_cone|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-b774a0c8|cylinder|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-ba509597|icecream_cone|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-d2cbe1c8|cylinder|0",
+    "advisor-batch-1-s3|cfg-069049ce|cylinder|0",
+    "advisor-batch-1-s3|cfg-06a4a731|cylinder|0",
+    "advisor-batch-1-s3|cfg-144abf7e|icecream_cone|0",
+    "advisor-batch-1-s3|cfg-14ba4d4a|cylinder|0",
+    "advisor-batch-1-s3|cfg-1ea6147d|plate_hole|0",
+    "advisor-batch-1-s3|cfg-21ce779f|icecream_cone|0",
+    "advisor-batch-1-s3|cfg-232875d0|smoke_bar|0",
+    "advisor-batch-1-s3|cfg-252b09d2|cylinder|0",
+    "advisor-batch-1-s3|cfg-2a2df0a2|cylinder|0",
+    "advisor-batch-1-s3|cfg-2ef2c26b|sphere|0",
+    "advisor-batch-1-s3|cfg-2f1f809f|cylinder|0",
+    "advisor-batch-1-s3|cfg-2f1f809f|smoke_bar|0",
+    "advisor-batch-1-s3|cfg-32192d05|cantilever|0",
+    "advisor-batch-1-s3|cfg-32192d05|cylinder|0",
+    "advisor-batch-1-s3|cfg-32192d05|plate_hole|0",
+    "advisor-batch-1-s3|cfg-327c12d2|icecream_cone|0",
+    "advisor-batch-1-s3|cfg-327c12d2|plate_hole|0",
+    "advisor-batch-1-s3|cfg-39cb2fd6|icecream_cone|0",
+    "advisor-batch-1-s3|cfg-39cb2fd6|plate_hole|0",
+    "advisor-batch-1-s3|cfg-3c34b7c0|cylinder|0",
+    "advisor-batch-1-s3|cfg-5dabcd4f|cylinder|0",
+    "advisor-batch-1-s3|cfg-5e153a03|smoke_bar|0",
+    "advisor-batch-1-s3|cfg-796c7b03|cylinder|0",
+    "advisor-batch-1-s3|cfg-7c8ea4d1|cylinder|0",
+    "advisor-batch-1-s3|cfg-7c8ea4d1|sphere|0",
+    "advisor-batch-1-s3|cfg-8744c6ec|cylinder|0",
+    "advisor-batch-1-s3|cfg-89a4d193|smoke_bar|0",
+    "advisor-batch-1-s3|cfg-94025c72|plate_hole|0",
+    "advisor-batch-1-s3|cfg-9cfc220b|cylinder|0",
+    "advisor-batch-1-s3|cfg-9df5f2c0|cylinder|0",
+    "advisor-batch-1-s3|cfg-9df5f2c0|plate_hole|0",
+    "advisor-batch-1-s3|cfg-9df5f2c0|smoke_bar|0",
+    "advisor-batch-1-s3|cfg-9f074c7e|cylinder|0",
+    "advisor-batch-1-s3|cfg-ab46fbc0|icecream_cone|0",
+    "advisor-batch-1-s3|cfg-af599d72|cylinder|0",
+    "advisor-batch-1-s3|cfg-af599d72|icecream_cone|0",
+    "advisor-batch-1-s3|cfg-b774a0c8|cylinder|0",
+    "advisor-batch-1-s3|cfg-b774a0c8|plate_hole|0",
+    "advisor-batch-1-s3|cfg-ba3fd679|icecream_cone|0",
+    "advisor-batch-1-s3|cfg-ba3fd679|plate_hole|0",
+    "advisor-batch-1-s3|cfg-ba509597|cylinder|0",
+    "advisor-batch-1-s3|cfg-bb5d3077|cylinder|0",
+    "advisor-batch-1-s3|cfg-c17301b0|cylinder|0",
+    "advisor-batch-1-s3|cfg-c17301b0|smoke_bar|0",
+    "advisor-batch-1-s3|cfg-c5352e83|cylinder|0",
+    "advisor-batch-1-s3|cfg-c5352e83|plate_hole|0",
+    "advisor-batch-1-s3|cfg-c790df79|cylinder|0",
+    "advisor-batch-1-s3|cfg-caf10f7d|smoke_bar|0",
+    "advisor-batch-1-s3|cfg-cd218003|cylinder|0",
+    "advisor-batch-1-s3|cfg-cf777405|smoke_bar|0",
+    "advisor-batch-1-s3|cfg-d0562d78|smoke_bar|0",
+    "advisor-batch-1-s3|cfg-d2cbe1c8|cylinder|0",
+    "advisor-batch-1-s3|cfg-d2cbe1c8|icecream_cone|0",
+    "advisor-batch-1-s3|cfg-d2cbe1c8|plate_hole|0",
+    "advisor-batch-1-s3|cfg-e3804a44|plate_hole|0",
+    "advisor-batch-1-s3|cfg-e3ed0a93|cylinder|0",
+    "advisor-batch-1-s3|cfg-e997b1be|cylinder|0",
+    "advisor-batch-1-s3|cfg-f8231c1a|cylinder|0",
+    "advisor-batch-1-s3|cfg-f8ee7aa5|cylinder|0",
+    "advisor-batch-1-s3|cfg-fc8839ec|cylinder|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-197de74f|channel_s0_c0|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-197de74f|channel_s0_c1|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-6547103a|l_bracket_s2_c2|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-af234445|sphere_box_s2_c0|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-dae54304|channel_s0_c0|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-dae54304|sphere_box_s0_c0|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-dae54304|sphere_box_s2_c2|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-eeb0f407|channel_s2_c0|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-eeb0f407|channel_s2_c2|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-eeb0f407|l_bracket_s0_c2|0",
+    "advisor-batch-2-s0-livingroom-pc|cfg-277b991c|l_bracket_s0_c0|0",
+    "advisor-batch-2-s0-livingroom-pc|cfg-277b991c|l_bracket_s0_c2|0",
+    "advisor-batch-2-s0|cfg-16bdf738|l_bracket_s0_c0|0",
+    "advisor-batch-2-s0|cfg-16bdf738|l_bracket_s2_c0|0",
+    "advisor-batch-2-s0|cfg-16bdf738|sphere_box_s0_c0|0",
+    "advisor-batch-2-s0|cfg-16bdf738|sphere_box_s0_c1|0",
+    "advisor-batch-2-s0|cfg-197de74f|l_bracket_s0_c0|0",
+    "advisor-batch-2-s0|cfg-197de74f|l_bracket_s0_c1|0",
+    "advisor-batch-2-s0|cfg-197de74f|l_bracket_s2_c0|0",
+    "advisor-batch-2-s0|cfg-197de74f|l_bracket_s2_c1|0",
+    "advisor-batch-2-s0|cfg-197de74f|l_bracket_s2_c2|0",
+    "advisor-batch-2-s0|cfg-197de74f|plate_notch_s0_c1|0",
+    "advisor-batch-2-s0|cfg-197de74f|plate_notch_s0_c2|0",
+    "advisor-batch-2-s0|cfg-197de74f|sphere_box_s0_c0|0",
+    "advisor-batch-2-s0|cfg-197de74f|sphere_box_s0_c1|0",
+    "advisor-batch-2-s0|cfg-197de74f|sphere_box_s0_c2|0",
+    "advisor-batch-2-s0|cfg-197de74f|sphere_box_s2_c0|0",
+    "advisor-batch-2-s0|cfg-5615708d|channel_s0_c1|0",
+    "advisor-batch-2-s0|cfg-5615708d|channel_s0_c2|0",
+    "advisor-batch-2-s0|cfg-5615708d|l_bracket_s0_c0|0",
+    "advisor-batch-2-s0|cfg-5615708d|l_bracket_s0_c2|0",
+    "advisor-batch-2-s0|cfg-5615708d|l_bracket_s2_c0|0",
+    "advisor-batch-2-s0|cfg-5615708d|l_bracket_s2_c1|0",
+    "advisor-batch-2-s0|cfg-6547103a|l_bracket_s0_c0|0",
+    "advisor-batch-2-s0|cfg-6547103a|l_bracket_s0_c1|0",
+    "advisor-batch-2-s0|cfg-6547103a|l_bracket_s0_c2|0",
+    "advisor-batch-2-s0|cfg-6547103a|plate_notch_s0_c1|0",
+    "advisor-batch-2-s0|cfg-6547103a|plate_notch_s2_c0|0",
+    "advisor-batch-2-s0|cfg-6547103a|sphere_box_s2_c0|0",
+    "advisor-batch-2-s0|cfg-af234445|channel_s0_c1|0",
+    "advisor-batch-2-s0|cfg-af234445|l_bracket_s0_c0|0",
+    "advisor-batch-2-s0|cfg-af234445|sphere_box_s0_c0|0",
+    "advisor-batch-2-s0|cfg-af234445|sphere_box_s2_c0|0",
+    "advisor-batch-2-s0|cfg-dae54304|channel_s0_c2|0",
+    "advisor-batch-2-s0|cfg-dae54304|l_bracket_s0_c0|0",
+    "advisor-batch-2-s0|cfg-dae54304|l_bracket_s0_c1|0",
+    "advisor-batch-2-s0|cfg-dae54304|l_bracket_s2_c0|0",
+    "advisor-batch-2-s0|cfg-dae54304|plate_notch_s0_c0|0",
+    "advisor-batch-2-s0|cfg-dae54304|plate_notch_s2_c1|0",
+    "advisor-batch-2-s0|cfg-dae54304|sphere_box_s0_c0|0",
+    "advisor-batch-2-s0|cfg-dae54304|sphere_box_s2_c0|0",
+    "advisor-batch-2-s0|cfg-dae54304|sphere_box_s2_c1|0",
+    "advisor-batch-2-s0|cfg-dae54304|sphere_box_s2_c2|0",
+    "advisor-batch-2-s0|cfg-eeb0f407|channel_s2_c2|0",
+    "advisor-batch-2-s0|cfg-eeb0f407|l_bracket_s0_c0|0",
+    "advisor-batch-2-s0|cfg-eeb0f407|l_bracket_s0_c1|0",
+    "advisor-batch-2-s0|cfg-eeb0f407|l_bracket_s0_c2|0",
+    "advisor-batch-2-s0|cfg-eeb0f407|sphere_box_s0_c0|0",
+    "advisor-batch-2-s0|cfg-eeb0f407|sphere_box_s0_c1|0",
+    "advisor-batch-2-s0|cfg-eeb0f407|sphere_box_s0_c2|0",
+    "advisor-batch-2-s0|cfg-eeb0f407|sphere_box_s2_c0|0",
+    "advisor-batch-2-s0|cfg-ffcd821e|channel_s0_c0|0",
+    "advisor-batch-2-s0|cfg-ffcd821e|l_bracket_s0_c0|0",
+    "advisor-batch-2-s0|cfg-ffcd821e|sphere_box_s2_c0|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-19863bd4|channel_s0_c0|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-19863bd4|channel_s0_c1|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-19863bd4|channel_s0_c2|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-56133ab6|l_bracket_s0_c2|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-65494611|channel_s0_c0|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-65494611|channel_s0_c1|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-65494611|channel_s0_c2|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-65494611|l_bracket_s2_c1|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-65494611|l_bracket_s2_c2|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-dadb3b7f|channel_s0_c0|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-dadb3b7f|channel_s0_c1|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-dadb3b7f|l_bracket_s0_c2|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-dadb3b7f|sphere_box_s0_c0|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-dadb3b7f|sphere_box_s2_c2|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-eeb9488c|channel_s2_c0|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-eeb9488c|channel_s2_c2|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-eeb9488c|l_bracket_s0_c2|0",
+    "advisor-batch-2-s1-livingroom-pc|cfg-27719197|l_bracket_s0_c0|0",
+    "advisor-batch-2-s1-livingroom-pc|cfg-27719197|l_bracket_s0_c2|0",
+    "advisor-batch-2-s1|cfg-16b3efb3|channel_s0_c1|0",
+    "advisor-batch-2-s1|cfg-16b3efb3|channel_s0_c2|0",
+    "advisor-batch-2-s1|cfg-16b3efb3|l_bracket_s0_c0|0",
+    "advisor-batch-2-s1|cfg-16b3efb3|l_bracket_s0_c2|0",
+    "advisor-batch-2-s1|cfg-16b3efb3|l_bracket_s2_c0|0",
+    "advisor-batch-2-s1|cfg-16b3efb3|sphere_box_s0_c0|0",
+    "advisor-batch-2-s1|cfg-19863bd4|l_bracket_s0_c0|0",
+    "advisor-batch-2-s1|cfg-19863bd4|l_bracket_s0_c1|0",
+    "advisor-batch-2-s1|cfg-19863bd4|l_bracket_s0_c2|0",
+    "advisor-batch-2-s1|cfg-19863bd4|l_bracket_s2_c0|0",
+    "advisor-batch-2-s1|cfg-19863bd4|l_bracket_s2_c1|0",
+    "advisor-batch-2-s1|cfg-19863bd4|l_bracket_s2_c2|0",
+    "advisor-batch-2-s1|cfg-19863bd4|plate_notch_s0_c1|0",
+    "advisor-batch-2-s1|cfg-19863bd4|plate_notch_s0_c2|0",
+    "advisor-batch-2-s1|cfg-19863bd4|plate_notch_s2_c2|0",
+    "advisor-batch-2-s1|cfg-19863bd4|sphere_box_s0_c0|0",
+    "advisor-batch-2-s1|cfg-19863bd4|sphere_box_s0_c1|0",
+    "advisor-batch-2-s1|cfg-19863bd4|sphere_box_s0_c2|0",
+    "advisor-batch-2-s1|cfg-19863bd4|sphere_box_s2_c0|0",
+    "advisor-batch-2-s1|cfg-56133ab6|channel_s0_c0|0",
+    "advisor-batch-2-s1|cfg-56133ab6|channel_s0_c2|0",
+    "advisor-batch-2-s1|cfg-56133ab6|l_bracket_s0_c0|0",
+    "advisor-batch-2-s1|cfg-56133ab6|l_bracket_s0_c2|0",
+    "advisor-batch-2-s1|cfg-56133ab6|l_bracket_s2_c0|0",
+    "advisor-batch-2-s1|cfg-65494611|l_bracket_s0_c0|0",
+    "advisor-batch-2-s1|cfg-65494611|l_bracket_s0_c1|0",
+    "advisor-batch-2-s1|cfg-65494611|l_bracket_s0_c2|0",
+    "advisor-batch-2-s1|cfg-65494611|l_bracket_s2_c2|0",
+    "advisor-batch-2-s1|cfg-65494611|plate_notch_s0_c1|0",
+    "advisor-batch-2-s1|cfg-65494611|sphere_box_s2_c0|0",
+    "advisor-batch-2-s1|cfg-af210e6e|channel_s0_c0|0",
+    "advisor-batch-2-s1|cfg-af210e6e|channel_s0_c1|0",
+    "advisor-batch-2-s1|cfg-af210e6e|l_bracket_s0_c0|0",
+    "advisor-batch-2-s1|cfg-af210e6e|sphere_box_s0_c0|0",
+    "advisor-batch-2-s1|cfg-af210e6e|sphere_box_s2_c0|0",
+    "advisor-batch-2-s1|cfg-dadb3b7f|channel_s0_c2|0",
+    "advisor-batch-2-s1|cfg-dadb3b7f|l_bracket_s0_c0|0",
+    "advisor-batch-2-s1|cfg-dadb3b7f|l_bracket_s0_c1|0",
+    "advisor-batch-2-s1|cfg-dadb3b7f|l_bracket_s0_c2|0",
+    "advisor-batch-2-s1|cfg-dadb3b7f|l_bracket_s2_c2|0",
+    "advisor-batch-2-s1|cfg-dadb3b7f|plate_notch_s0_c1|0",
+    "advisor-batch-2-s1|cfg-dadb3b7f|sphere_box_s0_c0|0",
+    "advisor-batch-2-s1|cfg-dadb3b7f|sphere_box_s0_c2|0",
+    "advisor-batch-2-s1|cfg-dadb3b7f|sphere_box_s2_c0|0",
+    "advisor-batch-2-s1|cfg-dadb3b7f|sphere_box_s2_c1|0",
+    "advisor-batch-2-s1|cfg-dadb3b7f|sphere_box_s2_c2|0",
+    "advisor-batch-2-s1|cfg-eeb9488c|channel_s2_c2|0",
+    "advisor-batch-2-s1|cfg-eeb9488c|l_bracket_s0_c0|0",
+    "advisor-batch-2-s1|cfg-eeb9488c|l_bracket_s0_c1|0",
+    "advisor-batch-2-s1|cfg-eeb9488c|l_bracket_s0_c2|0",
+    "advisor-batch-2-s1|cfg-eeb9488c|sphere_box_s0_c0|0",
+    "advisor-batch-2-s1|cfg-eeb9488c|sphere_box_s0_c1|0",
+    "advisor-batch-2-s1|cfg-eeb9488c|sphere_box_s0_c2|0",
+    "advisor-batch-2-s1|cfg-eeb9488c|sphere_box_s2_c0|0",
+    "advisor-batch-2-s1|cfg-ffcfb7f5|channel_s0_c0|0",
+    "advisor-batch-2-s1|cfg-ffcfb7f5|l_bracket_s0_c0|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-57078a16|channel_s0_c0|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-ac7d4883|l_bracket_s0_c1|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-c3f7fc8f|l_bracket_s2_c0|0",
+    "advisor-batch-2-s2|cfg-169e43de|channel_s0_c2|0",
+    "advisor-batch-2-s2|cfg-169e43de|l_bracket_s0_c0|0",
+    "advisor-batch-2-s2|cfg-16e7c9c4|channel_s0_c1|0",
+    "advisor-batch-2-s2|cfg-16e7c9c4|channel_s0_c2|0",
+    "advisor-batch-2-s2|cfg-16e7c9c4|l_bracket_s0_c0|0",
+    "advisor-batch-2-s2|cfg-16e7c9c4|l_bracket_s0_c1|0",
+    "advisor-batch-2-s2|cfg-16e7c9c4|l_bracket_s0_c2|0",
+    "advisor-batch-2-s2|cfg-16e7c9c4|l_bracket_s2_c0|0",
+    "advisor-batch-2-s2|cfg-16e7c9c4|l_bracket_s2_c2|0",
+    "advisor-batch-2-s2|cfg-16e7c9c4|plate_notch_s0_c1|0",
+    "advisor-batch-2-s2|cfg-277b991c|channel_s2_c2|0",
+    "advisor-batch-2-s2|cfg-277b991c|l_bracket_s0_c0|0",
+    "advisor-batch-2-s2|cfg-277b991c|l_bracket_s0_c1|0",
+    "advisor-batch-2-s2|cfg-277b991c|l_bracket_s0_c2|0",
+    "advisor-batch-2-s2|cfg-277b991c|l_bracket_s2_c0|0",
+    "advisor-batch-2-s2|cfg-277b991c|l_bracket_s2_c1|0",
+    "advisor-batch-2-s2|cfg-277b991c|l_bracket_s2_c2|0",
+    "advisor-batch-2-s2|cfg-277b991c|sphere_box_s0_c0|0",
+    "advisor-batch-2-s2|cfg-277b991c|sphere_box_s0_c1|0",
+    "advisor-batch-2-s2|cfg-277b991c|sphere_box_s0_c2|0",
+    "advisor-batch-2-s2|cfg-277b991c|sphere_box_s2_c0|0",
+    "advisor-batch-2-s2|cfg-43e1efcd|channel_s0_c0|0",
+    "advisor-batch-2-s2|cfg-43e1efcd|channel_s0_c2|0",
+    "advisor-batch-2-s2|cfg-43e1efcd|l_bracket_s0_c0|0",
+    "advisor-batch-2-s2|cfg-43e1efcd|l_bracket_s2_c1|0",
+    "advisor-batch-2-s2|cfg-43e1efcd|plate_notch_s0_c1|0",
+    "advisor-batch-2-s2|cfg-43e1efcd|sphere_box_s0_c2|0",
+    "advisor-batch-2-s2|cfg-43e1efcd|sphere_box_s2_c0|0",
+    "advisor-batch-2-s2|cfg-57078a16|channel_s0_c0|0",
+    "advisor-batch-2-s2|cfg-57078a16|channel_s0_c1|0",
+    "advisor-batch-2-s2|cfg-57078a16|l_bracket_s0_c0|0",
+    "advisor-batch-2-s2|cfg-57078a16|plate_notch_s0_c1|0",
+    "advisor-batch-2-s2|cfg-57078a16|sphere_box_s0_c1|0",
+    "advisor-batch-2-s2|cfg-57078a16|sphere_box_s2_c1|0",
+    "advisor-batch-2-s2|cfg-ac7d4883|l_bracket_s0_c0|0",
+    "advisor-batch-2-s2|cfg-c3f7fc8f|channel_s0_c0|0",
+    "advisor-batch-2-s2|cfg-c3f7fc8f|channel_s0_c2|0",
+    "advisor-batch-2-s2|cfg-c3f7fc8f|l_bracket_s0_c0|0",
+    "advisor-batch-2-s2|cfg-c3f7fc8f|l_bracket_s0_c1|0",
+    "advisor-batch-2-s2|cfg-c3f7fc8f|l_bracket_s2_c0|0",
+    "advisor-batch-2-s2|cfg-c3f7fc8f|sphere_box_s0_c2|0",
+    "advisor-batch-2-s2|cfg-c3f7fc8f|sphere_box_s2_c0|0",
+    "advisor-batch-2-s2|cfg-e61acb99|l_bracket_s0_c0|0",
+    "advisor-batch-2-s2|cfg-e61acb99|l_bracket_s0_c1|0",
+    "advisor-batch-2-s2|cfg-e61acb99|l_bracket_s0_c2|0",
+    "advisor-batch-2-s2|cfg-e61acb99|l_bracket_s2_c0|0",
+    "advisor-batch-2-s2|cfg-e61acb99|plate_notch_s0_c1|0",
+    "advisor-batch-2-s2|cfg-e61acb99|sphere_box_s0_c0|0",
+    "advisor-batch-2-s2|cfg-e61acb99|sphere_box_s2_c1|0",
+    "advisor-batch-2-s2|cfg-e61acb99|sphere_box_s2_c2|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-16a22cb5|l_bracket_s0_c2|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-16df753f|channel_s0_c1|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-16df753f|channel_s0_c2|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-ac859d08|l_bracket_s0_c2|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-c4005114|channel_s0_c0|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-c4005114|channel_s0_c1|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-c4005114|l_bracket_s2_c0|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-e61895c2|channel_s0_c1|0",
+    "advisor-batch-2-s3|cfg-16a22cb5|channel_s0_c2|0",
+    "advisor-batch-2-s3|cfg-16a22cb5|l_bracket_s0_c0|0",
+    "advisor-batch-2-s3|cfg-16a22cb5|l_bracket_s2_c1|0",
+    "advisor-batch-2-s3|cfg-16df753f|channel_s0_c1|0",
+    "advisor-batch-2-s3|cfg-16df753f|l_bracket_s0_c0|0",
+    "advisor-batch-2-s3|cfg-16df753f|l_bracket_s2_c0|0",
+    "advisor-batch-2-s3|cfg-16df753f|l_bracket_s2_c2|0",
+    "advisor-batch-2-s3|cfg-16df753f|plate_notch_s0_c1|0",
+    "advisor-batch-2-s3|cfg-27719197|channel_s2_c0|0",
+    "advisor-batch-2-s3|cfg-27719197|channel_s2_c2|0",
+    "advisor-batch-2-s3|cfg-27719197|l_bracket_s0_c0|0",
+    "advisor-batch-2-s3|cfg-27719197|l_bracket_s0_c1|0",
+    "advisor-batch-2-s3|cfg-27719197|l_bracket_s0_c2|0",
+    "advisor-batch-2-s3|cfg-27719197|l_bracket_s2_c0|0",
+    "advisor-batch-2-s3|cfg-27719197|l_bracket_s2_c1|0",
+    "advisor-batch-2-s3|cfg-27719197|l_bracket_s2_c2|0",
+    "advisor-batch-2-s3|cfg-27719197|sphere_box_s0_c0|0",
+    "advisor-batch-2-s3|cfg-27719197|sphere_box_s0_c1|0",
+    "advisor-batch-2-s3|cfg-27719197|sphere_box_s0_c2|0",
+    "advisor-batch-2-s3|cfg-27719197|sphere_box_s2_c0|0",
+    "advisor-batch-2-s3|cfg-43de06f6|channel_s0_c0|0",
+    "advisor-batch-2-s3|cfg-43de06f6|channel_s0_c2|0",
+    "advisor-batch-2-s3|cfg-43de06f6|l_bracket_s0_c0|0",
+    "advisor-batch-2-s3|cfg-43de06f6|plate_notch_s0_c1|0",
+    "advisor-batch-2-s3|cfg-43de06f6|sphere_box_s0_c2|0",
+    "advisor-batch-2-s3|cfg-43de06f6|sphere_box_s2_c0|0",
+    "advisor-batch-2-s3|cfg-570b72ed|l_bracket_s0_c0|0",
+    "advisor-batch-2-s3|cfg-570b72ed|plate_notch_s0_c1|0",
+    "advisor-batch-2-s3|cfg-570b72ed|sphere_box_s0_c1|0",
+    "advisor-batch-2-s3|cfg-570b72ed|sphere_box_s2_c1|0",
+    "advisor-batch-2-s3|cfg-ac859d08|l_bracket_s0_c0|0",
+    "advisor-batch-2-s3|cfg-ac859d08|l_bracket_s2_c1|0",
+    "advisor-batch-2-s3|cfg-c4005114|channel_s0_c0|0",
+    "advisor-batch-2-s3|cfg-c4005114|l_bracket_s0_c0|0",
+    "advisor-batch-2-s3|cfg-c4005114|l_bracket_s0_c1|0",
+    "advisor-batch-2-s3|cfg-c4005114|l_bracket_s2_c0|0",
+    "advisor-batch-2-s3|cfg-c4005114|l_bracket_s2_c2|0",
+    "advisor-batch-2-s3|cfg-c4005114|sphere_box_s2_c0|0",
+    "advisor-batch-2-s3|cfg-e61895c2|l_bracket_s0_c0|0",
+    "advisor-batch-2-s3|cfg-e61895c2|l_bracket_s0_c1|0",
+    "advisor-batch-2-s3|cfg-e61895c2|l_bracket_s0_c2|0",
+    "advisor-batch-2-s3|cfg-e61895c2|l_bracket_s2_c0|0",
+    "advisor-batch-2-s3|cfg-e61895c2|l_bracket_s2_c2|0",
+    "advisor-batch-2-s3|cfg-e61895c2|plate_notch_s0_c1|0",
+    "advisor-batch-2-s3|cfg-e61895c2|sphere_box_s2_c1|0",
+    "advisor-batch-2-s3|cfg-e61895c2|sphere_box_s2_c2|0",
+    "advisor-batch-3-s0-hunter-pc|cfg-11fef61e|channel_s0_c0|0",
+    "advisor-batch-3-s0-hunter-pc|cfg-11fef61e|channel_s0_c1|0",
+    "advisor-batch-3-s0-hunter-pc|cfg-11fef61e|channel_s0_c2|0",
+    "advisor-batch-3-s0-hunter-pc|cfg-1a7537a4|channel_s0_c0|0",
+    "advisor-batch-3-s0-hunter-pc|cfg-1a7537a4|channel_s0_c1|0",
+    "advisor-batch-3-s0-hunter-pc|cfg-1a7537a4|channel_s0_c2|0",
+    "advisor-batch-3-s0-hunter-pc|cfg-c20a413d|channel_s0_c0|0",
+    "advisor-batch-3-s0-hunter-pc|cfg-c20a413d|channel_s0_c1|0",
+    "advisor-batch-3-s0-hunter-pc|cfg-c20a413d|channel_s0_c2|0",
+    "advisor-batch-3-s0-hunter-pc|cfg-e15462bb|channel_s0_c0|0",
+    "advisor-batch-3-s0-hunter-pc|cfg-e15462bb|channel_s0_c1|0",
+    "advisor-batch-3-s0-hunter-pc|cfg-e15462bb|channel_s0_c2|0",
+    "advisor-batch-3-s0-livingroom-pc|cfg-11fef61e|l_bracket_s0_c1|0",
+    "advisor-batch-3-s0-livingroom-pc|cfg-1a7537a4|l_bracket_s0_c0|0",
+    "advisor-batch-3-s0-livingroom-pc|cfg-1a7537a4|l_bracket_s0_c2|0",
+    "advisor-batch-3-s0-livingroom-pc|cfg-1a7537a4|l_bracket_s2_c1|0",
+    "advisor-batch-3-s0-livingroom-pc|cfg-1a7537a4|l_bracket_s2_c2|0",
+    "advisor-batch-3-s0-livingroom-pc|cfg-c20a413d|l_bracket_s0_c1|0",
+    "advisor-batch-3-s0-livingroom-pc|cfg-e15462bb|l_bracket_s0_c0|0",
+    "advisor-batch-3-s0-livingroom-pc|cfg-e15462bb|l_bracket_s0_c2|0",
+    "advisor-batch-3-s0-livingroom-pc|cfg-e15462bb|l_bracket_s2_c2|0",
+    "advisor-batch-3-s0|cfg-11fef61e|channel_s0_c1|0",
+    "advisor-batch-3-s0|cfg-11fef61e|channel_s0_c2|0",
+    "advisor-batch-3-s0|cfg-11fef61e|l_bracket_s0_c1|0",
+    "advisor-batch-3-s0|cfg-11fef61e|l_bracket_s0_c2|0",
+    "advisor-batch-3-s0|cfg-11fef61e|l_bracket_s2_c0|0",
+    "advisor-batch-3-s0|cfg-11fef61e|l_bracket_s2_c1|0",
+    "advisor-batch-3-s0|cfg-11fef61e|l_bracket_s2_c2|0",
+    "advisor-batch-3-s0|cfg-1a7537a4|channel_s0_c0|0",
+    "advisor-batch-3-s0|cfg-1a7537a4|l_bracket_s0_c0|0",
+    "advisor-batch-3-s0|cfg-1a7537a4|l_bracket_s0_c1|0",
+    "advisor-batch-3-s0|cfg-1a7537a4|l_bracket_s0_c2|0",
+    "advisor-batch-3-s0|cfg-1a7537a4|l_bracket_s2_c0|0",
+    "advisor-batch-3-s0|cfg-1a7537a4|l_bracket_s2_c1|0",
+    "advisor-batch-3-s0|cfg-1a7537a4|l_bracket_s2_c2|0",
+    "advisor-batch-3-s0|cfg-1a7537a4|plate_notch_s0_c0|0",
+    "advisor-batch-3-s0|cfg-1a7537a4|plate_notch_s0_c2|0",
+    "advisor-batch-3-s0|cfg-1a7537a4|plate_notch_s2_c0|0",
+    "advisor-batch-3-s0|cfg-1a7537a4|sphere_box_s2_c1|0",
+    "advisor-batch-3-s0|cfg-1a7537a4|sphere_box_s2_c2|0",
+    "advisor-batch-3-s0|cfg-c20a413d|l_bracket_s0_c1|0",
+    "advisor-batch-3-s0|cfg-c20a413d|l_bracket_s0_c2|0",
+    "advisor-batch-3-s0|cfg-c20a413d|l_bracket_s2_c0|0",
+    "advisor-batch-3-s0|cfg-c20a413d|l_bracket_s2_c1|0",
+    "advisor-batch-3-s0|cfg-c20a413d|l_bracket_s2_c2|0",
+    "advisor-batch-3-s0|cfg-e15462bb|l_bracket_s0_c1|0",
+    "advisor-batch-3-s0|cfg-e15462bb|l_bracket_s0_c2|0",
+    "advisor-batch-3-s0|cfg-e15462bb|l_bracket_s2_c0|0",
+    "advisor-batch-3-s0|cfg-e15462bb|l_bracket_s2_c1|0",
+    "advisor-batch-3-s0|cfg-e15462bb|l_bracket_s2_c2|0",
+    "advisor-batch-3-s1-livingroom-pc|cfg-a35f86df|l_bracket_s0_c2|0",
+    "advisor-batch-3-s1-livingroom-pc|cfg-a35f86df|l_bracket_s2_c2|0",
+    "advisor-batch-3-s1-livingroom-pc|cfg-d91fb0f4|l_bracket_s2_c2|0",
+    "advisor-batch-3-s1-livingroom-pc|cfg-e8bbec46|l_bracket_s0_c0|0",
+    "advisor-batch-3-s1-livingroom-pc|cfg-e8bbec46|l_bracket_s0_c1|0",
+    "advisor-batch-3-s1-livingroom-pc|cfg-e8bbec46|l_bracket_s0_c2|0",
+    "advisor-batch-3-s1-livingroom-pc|cfg-e8bbec46|l_bracket_s2_c2|0",
+    "advisor-batch-3-s1-livingroom-pc|cfg-f3a1c5e1|l_bracket_s0_c2|0",
+    "advisor-batch-3-s1-livingroom-pc|cfg-f3a1c5e1|l_bracket_s2_c2|0",
+    "advisor-batch-3-s1|cfg-a35f86df|channel_s0_c2|0",
+    "advisor-batch-3-s1|cfg-a35f86df|l_bracket_s0_c0|0",
+    "advisor-batch-3-s1|cfg-a35f86df|l_bracket_s2_c1|0",
+    "advisor-batch-3-s1|cfg-a35f86df|l_bracket_s2_c2|0",
+    "advisor-batch-3-s1|cfg-d91fb0f4|l_bracket_s0_c0|0",
+    "advisor-batch-3-s1|cfg-d91fb0f4|l_bracket_s2_c0|0",
+    "advisor-batch-3-s1|cfg-d91fb0f4|l_bracket_s2_c2|0",
+    "advisor-batch-3-s1|cfg-e8bbec46|channel_s0_c0|0",
+    "advisor-batch-3-s1|cfg-e8bbec46|l_bracket_s0_c0|0",
+    "advisor-batch-3-s1|cfg-e8bbec46|l_bracket_s0_c1|0",
+    "advisor-batch-3-s1|cfg-e8bbec46|l_bracket_s2_c0|0",
+    "advisor-batch-3-s1|cfg-e8bbec46|l_bracket_s2_c1|0",
+    "advisor-batch-3-s1|cfg-e8bbec46|l_bracket_s2_c2|0",
+    "advisor-batch-3-s1|cfg-f3a1c5e1|l_bracket_s0_c0|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-116b3958|channel_s0_c0|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-116b3958|channel_s0_c1|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-116b3958|channel_s0_c2|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-5ff72b2a|channel_s0_c0|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-5ff72b2a|channel_s0_c1|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-5ff72b2a|channel_s0_c2|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-a1ad5ec9|channel_s0_c0|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-a1ad5ec9|channel_s0_c1|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-a1ad5ec9|channel_s0_c2|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-e04b39c3|channel_s0_c0|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-e04b39c3|channel_s0_c1|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-e04b39c3|channel_s0_c2|0",
+    "advisor-batch-3-s2-livingroom-pc|cfg-116b3958|l_bracket_s0_c1|0",
+    "advisor-batch-3-s2-livingroom-pc|cfg-116b3958|l_bracket_s2_c1|0",
+    "advisor-batch-3-s2-livingroom-pc|cfg-116b3958|l_bracket_s2_c2|0",
+    "advisor-batch-3-s2-livingroom-pc|cfg-5ff72b2a|l_bracket_s0_c0|0",
+    "advisor-batch-3-s2-livingroom-pc|cfg-5ff72b2a|l_bracket_s0_c2|0",
+    "advisor-batch-3-s2-livingroom-pc|cfg-5ff72b2a|l_bracket_s2_c2|0",
+    "advisor-batch-3-s2-livingroom-pc|cfg-a1ad5ec9|l_bracket_s0_c1|0",
+    "advisor-batch-3-s2-livingroom-pc|cfg-e04b39c3|l_bracket_s0_c0|0",
+    "advisor-batch-3-s2-livingroom-pc|cfg-e04b39c3|l_bracket_s0_c2|0",
+    "advisor-batch-3-s2-livingroom-pc|cfg-e04b39c3|l_bracket_s2_c2|0",
+    "advisor-batch-3-s2|cfg-116b3958|channel_s0_c0|0",
+    "advisor-batch-3-s2|cfg-116b3958|channel_s0_c2|0",
+    "advisor-batch-3-s2|cfg-116b3958|l_bracket_s0_c1|0",
+    "advisor-batch-3-s2|cfg-116b3958|l_bracket_s0_c2|0",
+    "advisor-batch-3-s2|cfg-116b3958|l_bracket_s2_c0|0",
+    "advisor-batch-3-s2|cfg-116b3958|l_bracket_s2_c1|0",
+    "advisor-batch-3-s2|cfg-116b3958|l_bracket_s2_c2|0",
+    "advisor-batch-3-s2|cfg-116b3958|plate_notch_s0_c0|0",
+    "advisor-batch-3-s2|cfg-5ff72b2a|l_bracket_s0_c0|0",
+    "advisor-batch-3-s2|cfg-5ff72b2a|l_bracket_s0_c1|0",
+    "advisor-batch-3-s2|cfg-5ff72b2a|l_bracket_s0_c2|0",
+    "advisor-batch-3-s2|cfg-5ff72b2a|l_bracket_s2_c0|0",
+    "advisor-batch-3-s2|cfg-5ff72b2a|l_bracket_s2_c1|0",
+    "advisor-batch-3-s2|cfg-5ff72b2a|l_bracket_s2_c2|0",
+    "advisor-batch-3-s2|cfg-a1ad5ec9|channel_s0_c0|0",
+    "advisor-batch-3-s2|cfg-a1ad5ec9|channel_s0_c1|0",
+    "advisor-batch-3-s2|cfg-a1ad5ec9|channel_s0_c2|0",
+    "advisor-batch-3-s2|cfg-a1ad5ec9|l_bracket_s0_c1|0",
+    "advisor-batch-3-s2|cfg-a1ad5ec9|l_bracket_s0_c2|0",
+    "advisor-batch-3-s2|cfg-a1ad5ec9|l_bracket_s2_c0|0",
+    "advisor-batch-3-s2|cfg-a1ad5ec9|l_bracket_s2_c1|0",
+    "advisor-batch-3-s2|cfg-a1ad5ec9|l_bracket_s2_c2|0",
+    "advisor-batch-3-s2|cfg-a1ad5ec9|plate_notch_s0_c0|0",
+    "advisor-batch-3-s2|cfg-e04b39c3|channel_s0_c1|0",
+    "advisor-batch-3-s2|cfg-e04b39c3|l_bracket_s0_c1|0",
+    "advisor-batch-3-s2|cfg-e04b39c3|l_bracket_s0_c2|0",
+    "advisor-batch-3-s2|cfg-e04b39c3|l_bracket_s2_c0|0",
+    "advisor-batch-3-s2|cfg-e04b39c3|l_bracket_s2_c1|0",
+    "advisor-batch-3-s2|cfg-e04b39c3|l_bracket_s2_c2|0",
+    "advisor-batch-3-s3-livingroom-pc|cfg-1ab25f2b|l_bracket_s0_c1|0",
+    "advisor-batch-3-s3-livingroom-pc|cfg-1ab25f2b|l_bracket_s2_c2|0",
+    "advisor-batch-3-s3-livingroom-pc|cfg-6b320550|l_bracket_s0_c0|0",
+    "advisor-batch-3-s3-livingroom-pc|cfg-6b320550|l_bracket_s0_c1|0",
+    "advisor-batch-3-s3-livingroom-pc|cfg-6b320550|l_bracket_s0_c2|0",
+    "advisor-batch-3-s3-livingroom-pc|cfg-6b320550|l_bracket_s2_c2|0",
+    "advisor-batch-3-s3-livingroom-pc|cfg-9ab082c9|l_bracket_s0_c1|0",
+    "advisor-batch-3-s3-livingroom-pc|cfg-9ab082c9|l_bracket_s0_c2|0",
+    "advisor-batch-3-s3-livingroom-pc|cfg-9ab082c9|l_bracket_s2_c2|0",
+    "advisor-batch-3-s3-livingroom-pc|cfg-bc1e79aa|l_bracket_s0_c1|0",
+    "advisor-batch-3-s3-livingroom-pc|cfg-bc1e79aa|l_bracket_s2_c2|0",
+    "advisor-batch-3-s3|cfg-1ab25f2b|channel_s0_c0|0",
+    "advisor-batch-3-s3|cfg-1ab25f2b|channel_s0_c1|0",
+    "advisor-batch-3-s3|cfg-1ab25f2b|channel_s0_c2|0",
+    "advisor-batch-3-s3|cfg-1ab25f2b|l_bracket_s2_c0|0",
+    "advisor-batch-3-s3|cfg-1ab25f2b|l_bracket_s2_c2|0",
+    "advisor-batch-3-s3|cfg-6b320550|l_bracket_s0_c0|0",
+    "advisor-batch-3-s3|cfg-6b320550|l_bracket_s0_c1|0",
+    "advisor-batch-3-s3|cfg-6b320550|l_bracket_s2_c0|0",
+    "advisor-batch-3-s3|cfg-6b320550|l_bracket_s2_c1|0",
+    "advisor-batch-3-s3|cfg-6b320550|l_bracket_s2_c2|0",
+    "advisor-batch-3-s3|cfg-9ab082c9|l_bracket_s0_c0|0",
+    "advisor-batch-3-s3|cfg-9ab082c9|l_bracket_s2_c2|0",
+    "advisor-batch-3-s3|cfg-bc1e79aa|channel_s0_c0|0",
+    "advisor-batch-3-s3|cfg-bc1e79aa|l_bracket_s0_c0|0",
+    "advisor-batch-3-s3|cfg-bc1e79aa|l_bracket_s0_c1|0",
+    "advisor-batch-3-s3|cfg-bc1e79aa|l_bracket_s0_c2|0",
+    "advisor-batch-3-s3|cfg-bc1e79aa|l_bracket_s2_c0|0",
+    "advisor-batch-3-s3|cfg-bc1e79aa|l_bracket_s2_c1|0",
+    "advisor-batch-3-s3|cfg-bc1e79aa|l_bracket_s2_c2|0",
+    "advisor-batch-4-s0-hunter-pc|cfg-99ed644e|channel_s0_c0|0",
+    "advisor-batch-4-s0-hunter-pc|cfg-99ed644e|channel_s0_c1|0",
+    "advisor-batch-4-s0-hunter-pc|cfg-99ed644e|channel_s0_c2|0",
+    "advisor-batch-4-s0-livingroom-pc|cfg-99ed644e|l_bracket_s0_c0|0",
+    "advisor-batch-4-s0-livingroom-pc|cfg-99ed644e|l_bracket_s0_c2|0",
+    "advisor-batch-4-s0-livingroom-pc|cfg-99ed644e|l_bracket_s2_c1|0",
+    "advisor-batch-4-s0-livingroom-pc|cfg-99ed644e|stepped_shaft_s0_c1|0",
+    "advisor-batch-4-s0|cfg-99ed644e|channel_s0_c0|0",
+    "advisor-batch-4-s0|cfg-99ed644e|channel_s0_c1|0",
+    "advisor-batch-4-s0|cfg-99ed644e|channel_s0_c2|0",
+    "advisor-batch-4-s0|cfg-99ed644e|channel_s2_c0|0",
+    "advisor-batch-4-s0|cfg-99ed644e|channel_s2_c1|0",
+    "advisor-batch-4-s0|cfg-99ed644e|l_bracket_s0_c0|0",
+    "advisor-batch-4-s0|cfg-99ed644e|l_bracket_s0_c1|0",
+    "advisor-batch-4-s0|cfg-99ed644e|l_bracket_s2_c0|0",
+    "advisor-batch-4-s0|cfg-99ed644e|l_bracket_s2_c1|0",
+    "advisor-batch-4-s0|cfg-99ed644e|l_bracket_s2_c2|0",
+    "advisor-batch-4-s0|cfg-99ed644e|plate_notch_s2_c2|0",
+    "advisor-batch-4-s0|cfg-99ed644e|sphere_box_s0_c1|0",
+    "advisor-batch-4-s0|cfg-99ed644e|sphere_box_s0_c2|0",
+    "advisor-batch-4-s0|cfg-99ed644e|sphere_box_s2_c0|0",
+    "advisor-batch-4-s0|cfg-99ed644e|sphere_box_s2_c1|0",
+    "advisor-batch-4-s0|cfg-99ed644e|sphere_box_s2_c2|0",
+    "advisor-batch-4-s0|cfg-99ed644e|stepped_shaft_s0_c1|0",
+    "advisor-batch-4-s0|cfg-99ed644e|stepped_shaft_s2_c0|0",
+    "advisor-batch-4-s0|cfg-99ed644e|stepped_shaft_s2_c1|0",
+    "advisor-batch-4-s0|cfg-99ed644e|stepped_shaft_s2_c2|0",
+    "advisor-batch-4-s1-hunter-pc|cfg-821713a4|channel_s0_c0|0",
+    "advisor-batch-4-s1-hunter-pc|cfg-821713a4|channel_s0_c2|0",
+    "advisor-batch-4-s1-livingroom-pc|cfg-821713a4|l_bracket_s0_c0|0",
+    "advisor-batch-4-s1-livingroom-pc|cfg-821713a4|l_bracket_s0_c1|0",
+    "advisor-batch-4-s1-livingroom-pc|cfg-821713a4|l_bracket_s0_c2|0",
+    "advisor-batch-4-s1-livingroom-pc|cfg-821713a4|l_bracket_s2_c0|0",
+    "advisor-batch-4-s1-livingroom-pc|cfg-821713a4|l_bracket_s2_c1|0",
+    "advisor-batch-4-s1-livingroom-pc|cfg-821713a4|l_bracket_s2_c2|0",
+    "advisor-batch-4-s1-livingroom-pc|cfg-821713a4|plate_notch_s0_c1|0",
+    "advisor-batch-4-s1-livingroom-pc|cfg-821713a4|plate_notch_s2_c1|0",
+    "advisor-batch-4-s1|cfg-821713a4|l_bracket_s0_c0|0",
+    "advisor-batch-4-s1|cfg-821713a4|l_bracket_s0_c1|0",
+    "advisor-batch-4-s1|cfg-821713a4|l_bracket_s0_c2|0",
+    "advisor-batch-4-s1|cfg-821713a4|l_bracket_s2_c0|0",
+    "advisor-batch-4-s1|cfg-821713a4|l_bracket_s2_c1|0",
+    "advisor-batch-4-s1|cfg-821713a4|l_bracket_s2_c2|0",
+    "advisor-batch-4-s1|cfg-821713a4|plate_notch_s0_c0|0",
+    "advisor-batch-4-s1|cfg-821713a4|plate_notch_s0_c1|0",
+    "advisor-batch-4-s1|cfg-821713a4|plate_notch_s2_c0|0",
+    "advisor-batch-4-s1|cfg-821713a4|stepped_shaft_s2_c0|0",
+    "advisor-batch-5-s0|cfg-2701a982|l_bracket_s0_c0|0",
+    "advisor-batch-5-s0|cfg-2701a982|l_bracket_s0_c1|0",
+    "advisor-batch-5-s0|cfg-2701a982|l_bracket_s0_c2|0",
+    "advisor-batch-5-s0|cfg-2701a982|l_bracket_s2_c0|0",
+    "advisor-batch-5-s0|cfg-2701a982|l_bracket_s2_c1|0",
+    "advisor-batch-5-s0|cfg-2701a982|l_bracket_s2_c2|0",
+    "advisor-batch-5-s0|cfg-2701a982|plate_notch_s0_c0|0",
+    "advisor-batch-5-s0|cfg-2701a982|plate_notch_s0_c1|0",
+    "advisor-batch-5-s0|cfg-2701a982|plate_notch_s0_c2|0",
+    "advisor-batch-5-s0|cfg-2701a982|plate_notch_s2_c0|0",
+    "advisor-batch-5-s0|cfg-2701a982|plate_notch_s2_c1|0",
+    "advisor-batch-5-s0|cfg-2701a982|plate_notch_s2_c2|0",
+    "advisor-batch-5-s0|cfg-2701a982|sphere_box_s0_c0|0",
+    "advisor-batch-5-s0|cfg-2701a982|sphere_box_s0_c1|0",
+    "advisor-batch-5-s0|cfg-2701a982|sphere_box_s0_c2|0",
+    "advisor-batch-5-s0|cfg-2701a982|sphere_box_s2_c0|0",
+    "advisor-batch-5-s0|cfg-2701a982|sphere_box_s2_c1|0",
+    "advisor-batch-5-s0|cfg-2701a982|sphere_box_s2_c2|0",
+    "advisor-batch-5-s1|cfg-a304c988|l_bracket_s0_c2|0",
+    "advisor-batch-5-s1|cfg-a304c988|l_bracket_s2_c0|0",
+    "advisor-batch-5-s1|cfg-a304c988|l_bracket_s2_c1|0",
+    "advisor-batch-5-s1|cfg-a304c988|l_bracket_s2_c2|0",
+    "advisor-batch-5-s1|cfg-a304c988|plate_notch_s0_c2|0",
+    "advisor-batch-5-s1|cfg-a304c988|plate_notch_s2_c1|0",
+    "advisor-batch-5-s1|cfg-a304c988|plate_notch_s2_c2|0",
+    "advisor-batch-5-s1|cfg-a304c988|sphere_box_s0_c2|0",
+    "advisor-batch-5-s1|cfg-a304c988|sphere_box_s2_c1|0",
+    "advisor-batch-5-s2|cfg-e54dfe75|channel_s0_c0|0",
+    "advisor-batch-5-s2|cfg-e54dfe75|channel_s0_c1|0",
+    "advisor-batch-5-s2|cfg-e54dfe75|channel_s0_c2|0",
+    "advisor-batch-5-s2|cfg-e54dfe75|l_bracket_s0_c1|0",
+    "advisor-batch-5-s2|cfg-e54dfe75|l_bracket_s0_c2|0",
+    "advisor-batch-5-s2|cfg-e54dfe75|l_bracket_s2_c0|0",
+    "advisor-batch-5-s2|cfg-e54dfe75|l_bracket_s2_c1|0",
+    "advisor-batch-5-s2|cfg-e54dfe75|l_bracket_s2_c2|0",
+    "advisor-batch-5-s2|cfg-e54dfe75|plate_notch_s0_c0|0",
+    "advisor-batch-5-s2|cfg-e54dfe75|plate_notch_s2_c0|0",
+    "advisor-batch-5-s2|cfg-e54dfe75|sphere_box_s0_c0|0",
+    "advisor-batch-5-s2|cfg-e54dfe75|sphere_box_s0_c1|0",
+    "advisor-batch-5-s2|cfg-e54dfe75|sphere_box_s0_c2|0",
+    "advisor-batch-5-s3|cfg-3b9e9ad7|channel_s0_c0|0",
+    "advisor-batch-5-s3|cfg-3b9e9ad7|channel_s0_c1|0",
+    "advisor-batch-5-s3|cfg-3b9e9ad7|channel_s0_c2|0",
+    "advisor-batch-5-s3|cfg-3b9e9ad7|l_bracket_s0_c0|0",
+    "advisor-batch-5-s3|cfg-3b9e9ad7|l_bracket_s0_c1|0",
+    "advisor-batch-5-s3|cfg-3b9e9ad7|l_bracket_s0_c2|0",
+    "advisor-batch-5-s3|cfg-3b9e9ad7|l_bracket_s2_c0|0",
+    "advisor-batch-5-s3|cfg-3b9e9ad7|l_bracket_s2_c1|0",
+    "advisor-batch-5-s3|cfg-3b9e9ad7|l_bracket_s2_c2|0",
+    "advisor-batch-5-s3|cfg-3b9e9ad7|plate_notch_s0_c0|0",
+    "advisor-batch-5-s3|cfg-3b9e9ad7|plate_notch_s0_c1|0",
+    "advisor-batch-5-s3|cfg-3b9e9ad7|plate_notch_s2_c0|0",
+    "advisor-batch-5-s3|cfg-3b9e9ad7|plate_notch_s2_c1|0",
+    "advisor-batch-5-s3|cfg-3b9e9ad7|plate_notch_s2_c2|0",
+    "advisor-batch-5-s3|cfg-3b9e9ad7|sphere_box_s0_c0|0"
+  ],
+  "runs": [
+    {
+      "run": 1,
+      "pruned": 262,
+      "per_head": {
+        "rel_err": 111,
+        "rel_err_rel": 111,
+        "geo_chamfer": 120,
+        "geo_p99": 120
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": false
+    },
+    {
+      "run": 2,
+      "pruned": 299,
+      "per_head": {
+        "rel_err": 98,
+        "rel_err_rel": 98,
+        "geo_chamfer": 107,
+        "geo_p99": 107
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": false
+    },
+    {
+      "run": 3,
+      "pruned": 109,
+      "per_head": {
+        "rel_err": 68,
+        "rel_err_rel": 56,
+        "geo_chamfer": 23,
+        "geo_p99": 26
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 4,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 5,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 6,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 7,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 8,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 9,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 10,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 11,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 12,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 13,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 14,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 15,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 16,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 17,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 18,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 19,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 20,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 21,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 22,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 23,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 24,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 25,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 26,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 27,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 28,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 29,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 30,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 31,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 32,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 33,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 34,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 35,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 36,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 37,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 38,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 39,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 40,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 41,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 42,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 43,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 44,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 45,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 46,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 47,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 48,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 49,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 50,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 51,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 52,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 53,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 54,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 55,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 56,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 57,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 58,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 59,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 60,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 61,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 62,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 63,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 64,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 65,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 66,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 67,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 68,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 69,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 70,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 71,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 72,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 73,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 74,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 75,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 76,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 77,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 78,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 79,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 80,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 81,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 82,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 83,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 84,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 85,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 86,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 87,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 88,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 89,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 90,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 91,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 92,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 93,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 94,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 95,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 96,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 97,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 98,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 99,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 100,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 101,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 102,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 103,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 104,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 105,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 106,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 107,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 108,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 109,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 110,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 111,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 112,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 113,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 114,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 115,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 116,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 117,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 118,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 119,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 120,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 121,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 122,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 123,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 124,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 125,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 126,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 127,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 128,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 129,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 130,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 131,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 132,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 133,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 134,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 135,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 136,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 137,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 138,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 139,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 140,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 141,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 142,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 143,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 144,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 145,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 146,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 147,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 148,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 149,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 150,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 670,
+      "cap_reached": true
+    },
+    {
+      "run": 151,
+      "pruned": 137,
+      "per_head": {
+        "rel_err": 38,
+        "rel_err_rel": 38,
+        "geo_chamfer": 92,
+        "geo_p99": 104
+      },
+      "fraction": 0.05,
+      "ceiling": 807,
+      "cap_reached": true
+    },
+    {
+      "run": 152,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 807,
+      "cap_reached": true
+    },
+    {
+      "run": 153,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 807,
+      "cap_reached": true
+    },
+    {
+      "run": 154,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 807,
+      "cap_reached": true
+    },
+    {
+      "run": 155,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 807,
+      "cap_reached": true
+    },
+    {
+      "run": 156,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 807,
+      "cap_reached": true
+    },
+    {
+      "run": 157,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 807,
+      "cap_reached": true
+    },
+    {
+      "run": 158,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 807,
+      "cap_reached": true
+    },
+    {
+      "run": 159,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 807,
+      "cap_reached": true
+    },
+    {
+      "run": 160,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 807,
+      "cap_reached": true
+    }
+  ]
+}

@@ -95,6 +95,14 @@ harder, or the advisor's failure mode got worse — and this document does not
 choose between them, because nothing measured here separates them. The next
 measurement is per-fold regret against fold difficulty on both datasets.
 
+**Answered in [0008](0008-v4-corpus-retrain.md) §4: neither reading is right.**
+A single one-case fold, `smoke_bar`, carries ~3.0 decades of regret against
+random's 0.909 and shifts the advisor-minus-random macro gap by +0.19 — the whole
+observed gap is +0.12. Excluding it the advisor leads random on this corpus
+(0.577 vs 0.652) and on the v4 corpus (0.640 vs 0.733), wins the median on both,
+and wins 7 folds of 11 on both. The macro mean was averaging one-case folds
+against six-case folds with equal weight.
+
 The failure head remains near chance (validation AUC 0.51–0.75 across runs,
 0.64 on the shipped checkpoint). It was near chance before the regeneration
 too; it is not a casualty of the clean data.

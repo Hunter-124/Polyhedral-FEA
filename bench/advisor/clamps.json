@@ -71,14 +71,6 @@
         "order": 1,
         "h_rel": 0.12,
         "adapt_passes": 1,
-        "eta_target": 0.02,
-        "measured_rows": 72
-      },
-      {
-        "mesher": "graded_tet",
-        "order": 1,
-        "h_rel": 0.12,
-        "adapt_passes": 1,
         "eta_target": 0.05,
         "measured_rows": 72
       },
@@ -279,14 +271,6 @@
         "order": 1,
         "h_rel": 0.12,
         "adapt_passes": 1,
-        "eta_target": 0.02,
-        "measured_rows": 72
-      },
-      {
-        "mesher": "hybrid_zoo",
-        "order": 1,
-        "h_rel": 0.12,
-        "adapt_passes": 1,
         "eta_target": 0.05,
         "measured_rows": 72
       },
@@ -355,7 +339,7 @@
         "measured_rows": 46
       }
     ],
-    "n_candidates": 40,
+    "n_candidates": 38,
     "order_collapsed_when_adapt_passes_positive": true,
     "collapse_evidence": "264 of 264 matched pairs differing only in order at adapt_passes > 0 are bit-identical in n_dof, n_nodes and rel_err",
     "observed_levels": {

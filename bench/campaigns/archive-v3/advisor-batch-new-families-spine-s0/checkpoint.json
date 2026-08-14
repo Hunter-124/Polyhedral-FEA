@@ -1,0 +1,12 @@
+{
+  "campaign": "advisor-batch-new-families-spine-s0",
+  "completed_runs": 48,
+  "started_utc": "2026-08-13T10:44:31Z",
+  "state": "finished",
+  "survivors": [
+    "cfg-d34d960b",
+    "cfg-ace0be5d"
+  ],
+  "tier": 0,
+  "updated_utc": "2026-08-13T11:31:04Z"
+}

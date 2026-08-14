@@ -1,80 +1,44 @@
 {
   "name": "advisor-batch-3-template",
-  "comment": "Batch 3: opens element_tendency and eta_target, which batch 1 pinned to a single value each, so the policy head had no signal on the shape and adaptivity dials.",
+  "comment": "Batch 3 / T4 - adaptive-dial factorial. adapt_leb_waves is inert at adapt_passes=0, so it is only varied here. order pinned to 1 to keep the block affordable; the spine carries order 2.",
   "warehouse": true,
   "parts": [
     "bench/geometries/corpus/primitives/box_hole_s0_c0.case.json",
     "bench/geometries/corpus/primitives/box_hole_s0_c1.case.json",
     "bench/geometries/corpus/primitives/box_hole_s0_c2.case.json",
-    "bench/geometries/corpus/primitives/box_hole_s1_c0.case.json",
-    "bench/geometries/corpus/primitives/box_hole_s1_c1.case.json",
-    "bench/geometries/corpus/primitives/box_hole_s1_c2.case.json",
     "bench/geometries/corpus/primitives/box_hole_s2_c0.case.json",
     "bench/geometries/corpus/primitives/box_hole_s2_c1.case.json",
     "bench/geometries/corpus/primitives/box_hole_s2_c2.case.json",
-    "bench/geometries/corpus/primitives/box_hole_s3_c0.case.json",
-    "bench/geometries/corpus/primitives/box_hole_s3_c1.case.json",
-    "bench/geometries/corpus/primitives/box_hole_s3_c2.case.json",
     "bench/geometries/corpus/primitives/channel_s0_c0.case.json",
     "bench/geometries/corpus/primitives/channel_s0_c1.case.json",
     "bench/geometries/corpus/primitives/channel_s0_c2.case.json",
-    "bench/geometries/corpus/primitives/channel_s1_c0.case.json",
-    "bench/geometries/corpus/primitives/channel_s1_c1.case.json",
-    "bench/geometries/corpus/primitives/channel_s1_c2.case.json",
     "bench/geometries/corpus/primitives/channel_s2_c0.case.json",
     "bench/geometries/corpus/primitives/channel_s2_c1.case.json",
     "bench/geometries/corpus/primitives/channel_s2_c2.case.json",
-    "bench/geometries/corpus/primitives/channel_s3_c0.case.json",
-    "bench/geometries/corpus/primitives/channel_s3_c1.case.json",
-    "bench/geometries/corpus/primitives/channel_s3_c2.case.json",
     "bench/geometries/corpus/primitives/l_bracket_s0_c0.case.json",
     "bench/geometries/corpus/primitives/l_bracket_s0_c1.case.json",
     "bench/geometries/corpus/primitives/l_bracket_s0_c2.case.json",
-    "bench/geometries/corpus/primitives/l_bracket_s1_c0.case.json",
-    "bench/geometries/corpus/primitives/l_bracket_s1_c1.case.json",
-    "bench/geometries/corpus/primitives/l_bracket_s1_c2.case.json",
     "bench/geometries/corpus/primitives/l_bracket_s2_c0.case.json",
     "bench/geometries/corpus/primitives/l_bracket_s2_c1.case.json",
     "bench/geometries/corpus/primitives/l_bracket_s2_c2.case.json",
-    "bench/geometries/corpus/primitives/l_bracket_s3_c0.case.json",
-    "bench/geometries/corpus/primitives/l_bracket_s3_c1.case.json",
-    "bench/geometries/corpus/primitives/l_bracket_s3_c2.case.json",
     "bench/geometries/corpus/primitives/plate_notch_s0_c0.case.json",
     "bench/geometries/corpus/primitives/plate_notch_s0_c1.case.json",
     "bench/geometries/corpus/primitives/plate_notch_s0_c2.case.json",
-    "bench/geometries/corpus/primitives/plate_notch_s1_c0.case.json",
-    "bench/geometries/corpus/primitives/plate_notch_s1_c1.case.json",
-    "bench/geometries/corpus/primitives/plate_notch_s1_c2.case.json",
     "bench/geometries/corpus/primitives/plate_notch_s2_c0.case.json",
     "bench/geometries/corpus/primitives/plate_notch_s2_c1.case.json",
     "bench/geometries/corpus/primitives/plate_notch_s2_c2.case.json",
-    "bench/geometries/corpus/primitives/plate_notch_s3_c0.case.json",
-    "bench/geometries/corpus/primitives/plate_notch_s3_c1.case.json",
-    "bench/geometries/corpus/primitives/plate_notch_s3_c2.case.json",
     "bench/geometries/corpus/primitives/sphere_box_s0_c0.case.json",
     "bench/geometries/corpus/primitives/sphere_box_s0_c1.case.json",
     "bench/geometries/corpus/primitives/sphere_box_s0_c2.case.json",
-    "bench/geometries/corpus/primitives/sphere_box_s1_c0.case.json",
-    "bench/geometries/corpus/primitives/sphere_box_s1_c1.case.json",
-    "bench/geometries/corpus/primitives/sphere_box_s1_c2.case.json",
     "bench/geometries/corpus/primitives/sphere_box_s2_c0.case.json",
     "bench/geometries/corpus/primitives/sphere_box_s2_c1.case.json",
     "bench/geometries/corpus/primitives/sphere_box_s2_c2.case.json",
-    "bench/geometries/corpus/primitives/sphere_box_s3_c0.case.json",
-    "bench/geometries/corpus/primitives/sphere_box_s3_c1.case.json",
-    "bench/geometries/corpus/primitives/sphere_box_s3_c2.case.json",
     "bench/geometries/corpus/primitives/stepped_shaft_s0_c0.case.json",
     "bench/geometries/corpus/primitives/stepped_shaft_s0_c1.case.json",
     "bench/geometries/corpus/primitives/stepped_shaft_s0_c2.case.json",
-    "bench/geometries/corpus/primitives/stepped_shaft_s1_c0.case.json",
-    "bench/geometries/corpus/primitives/stepped_shaft_s1_c1.case.json",
-    "bench/geometries/corpus/primitives/stepped_shaft_s1_c2.case.json",
     "bench/geometries/corpus/primitives/stepped_shaft_s2_c0.case.json",
     "bench/geometries/corpus/primitives/stepped_shaft_s2_c1.case.json",
-    "bench/geometries/corpus/primitives/stepped_shaft_s2_c2.case.json",
-    "bench/geometries/corpus/primitives/stepped_shaft_s3_c0.case.json",
-    "bench/geometries/corpus/primitives/stepped_shaft_s3_c1.case.json",
-    "bench/geometries/corpus/primitives/stepped_shaft_s3_c2.case.json"
+    "bench/geometries/corpus/primitives/stepped_shaft_s2_c2.case.json"
   ],
   "tiers": [
     {
@@ -88,11 +52,13 @@
       "graded_tet"
     ],
     "h_rel": [
-      0.16
+      0.12
+    ],
+    "order": [
+      1
     ],
     "element_tendency": [
-      -0.6,
-      0.6
+      0.0
     ],
     "feature_refine": [
       true
@@ -100,24 +66,19 @@
     "bc_grading": [
       true
     ],
-    "order": [
-      1,
-      2
-    ],
     "skin_layers": [
       2
     ],
     "adapt_passes": [
-      1
+      1,
+      2
     ],
     "eta_target": [
       0.005,
       0.05
     ],
-    "p_elevate": [
-      false
-    ],
     "adapt_leb_waves": [
+      1,
       2
     ]
   },
@@ -129,9 +90,11 @@
     }
   },
   "resources": {
-    "max_run_wall_s": 45,
-    "max_pack_wall_s": 86400,
+    "max_run_wall_s": 180,
+    "max_pack_wall_s": 21600,
     "max_threads": 0,
-    "max_mem_gb": 0
+    "max_mem_gb": 0,
+    "max_dof": 150000,
+    "max_elems": 120000
   }
 }

@@ -99,6 +99,36 @@ The failure head remains near chance (validation AUC 0.51–0.75 across runs,
 0.64 on the shipped checkpoint). It was near chance before the regeneration
 too; it is not a casualty of the clean data.
 
+### 4.1 The obvious fix for it was tried and is wrong
+
+`build_advisor_dataset.py` drops every row testlab marks
+`advisor_training_eligible: false` — a resolution refusal that produced no
+mesh. On the regenerated campaign that is **776 of the 1,101 refusals**, so the
+model was trained on a corpus in which the engine's most common refusal never
+happens. Restoring them as failure-head-only rows (`dataset.py` already masks
+every failure row out of every regression head) is the obvious repair, and it
+is a regression on every axis. Same held-out fold, same masked rows, train
+failure share 8 % → 28 %:
+
+| head | refusals excluded | refusals kept |
+|---|---|---|
+| rel_err | **0.559** | 0.711 |
+| rel_err_rel | **0.354** | 0.477 |
+| dof | **0.157** | 0.299 |
+| mesh_ms | **0.241** | 0.475 |
+| failure AUC | **0.72** | 0.53 |
+
+The failure head got *worse* with 3.5× more failure examples, which rules out
+"not enough examples" and points at the label. Trained directly on it,
+LightGBM scores AUC 0.874 and 0.780 on two held-out families, 0.432 on a
+third, and **0.372 on box_hole — worse than chance**, mean 0.614 over the four
+folds with both classes present. Refusal is family-local: what other families
+teach about it is actively misleading on some parts. Until a feature carries
+the refusal boundary itself — most plausibly the ratio of the smallest
+resolvable feature to the requested `h`, which the guard actually tests — these
+rows are noise with a label attached, and the exclusion stands as a measured
+result rather than an oversight.
+
 ## 5. Provenance
 
 - dataset `bench/advisor/dataset.csv`, 2,896 rows, sha256 `d911eb4f7af9a7cb…`

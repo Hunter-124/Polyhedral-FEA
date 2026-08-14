@@ -36,7 +36,7 @@ TRUTH_CAMPAIGN_GLOB = "advisor-truth-*"
 #: the real campaigns already own, with the SAME cfg_id, so admitting them would
 #: hand the builder two contradictory labels for one key and let directory sort
 #: order decide. They are evidence, not corpus.
-PROBE_CAMPAIGN_GLOBS: tuple[str, ...] = ("xcheck-*", "xstl-*")
+PROBE_CAMPAIGN_GLOBS: tuple[str, ...] = ("xcheck-*", "xstl-*", "probe-*")
 
 #: Explicit precedence when the SAME (cfg_id, part, tier) was solved more than
 #: once, newest engine first. The rank is stated here rather than inferred,

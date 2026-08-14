@@ -35,6 +35,58 @@ so **nothing labelled before `798ef79` is trustworthy for graded_tet rows**.
   `fill-stage guard` refusal that now succeeds (spot-check the 16 configs that
   flipped in the earlier audit).
 
+### 1.1 v4 regeneration — in flight since 2026-08-14, gcc only
+
+The v3 rows were superseded again by ADR-0032: the mesher no longer depends on
+the standard library's hash order, and every row on record was labelled on the
+laptop's MSVC build, which disagrees with the fixed mesher on part of the
+corpus. `bench/campaigns/advisor-*` moved whole into `archive-v4/`, and
+`bench/advisor/archive-v4/dataset-v3.csv` preserves the 2,896-row dataset every
+number in `docs/advisor/0006` and `0007` was measured on. `dataset.csv` is
+**empty** until the campaigns land.
+
+Scope: 3,528 batch pairs (stages 1–4) plus a **288**-pair truth campaign — the
+committed truth campaign had been the stale 72-case version, which is what the
+"216/288, 3 configs incomplete" gate message meant; it now covers all 96 cases,
+including the tube and perforated_plate families that had no reference solve.
+
+Split, both hosts on gcc, both verified to write byte-identical meshes
+(`plate_hole` at h = 4 mm, md5 `9f13124199…`, gcc 15 here and gcc 16 there):
+
+| host | threads | owns |
+| --- | --- | --- |
+| `hunter-pc` | 4 shards x 3 | the truth campaign, stage 1 (6 fixture parts x 288 cfgs), then box_hole, channel, l_bracket |
+| `livingroom-pc` | 4 shards x 2 | plate_notch, sphere_box, stepped_shaft (stages 2–4) |
+
+```sh
+# hunter-pc — owns truth, so no --skip-truth
+python3 scripts/advisor/regenerate_campaign.py --archive v4 \
+    --host-tag hunter-pc --shards 4 --omp-threads 3 --from-stage 1
+# either host, per family
+python3 scripts/advisor/regenerate_campaign.py --archive v4 \
+    --host-tag <host> --shards 4 --omp-threads N --from-stage 2 --skip-truth \
+    --parts-glob 'bench/geometries/corpus/primitives/<family>_s[02]_c[012].case.json'
+```
+
+Resume is free: `run_batch` skips any `(part, cfg_id)` already recorded under
+`bench/campaigns/advisor-*`, so re-running after a crash or a reboot re-plans
+against whatever landed.
+
+**Merging is manual and is not optional.** `--host-tag` keeps the two hosts'
+campaign directories apart; nothing merges them. When `livingroom-pc` finishes,
+commit and push its `bench/campaigns/advisor-*-livingroom-pc/` directories
+(results only — `runs/` is per-run artifacts and is not committed), pull them on
+`hunter-pc`, and rebuild:
+
+```sh
+python3 scripts/build_advisor_dataset.py    # union of every advisor-* directory
+python3 scripts/advisor/promote_truth.py --require-all
+```
+
+Only then is a retrain measuring the whole corpus. A retrain on one host's half
+is a family-truncated corpus, which is exactly the fold contamination the
+generation split exists to prevent.
+
 ## 2. Training tracks (all four selected, in dependency order)
 
 ### 2a. Retrain the current advisor (first, cheap, de-risks the pipeline)

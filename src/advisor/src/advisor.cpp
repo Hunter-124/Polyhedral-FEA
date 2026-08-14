@@ -522,6 +522,27 @@ void Advisor::Impl::apply_action(FeatureColumns& columns, const AdvisorDecision&
     columns["order"] = static_cast<double>(action.order);
     columns["order_idx"] = index_of(order_choices, action.order);
     columns["mesher_idx"] = index_of(mesher_choices, action.mesher);
+
+    // Scale-law inputs, mirroring `scripts/advisor/dataset.py:derived_features`.
+    // They depend on the ACTION as well as the part (h = h_rel * diag), so they
+    // are recomputed per candidate here rather than once in `to_columns`.
+    // Leaving them out is not neutral: `encode` would fill all four from the
+    // training median and score every part as if it were of average size.
+    const auto lg = [](double value) {
+        return value > 0.0 && std::isfinite(value) ? std::log10(value)
+                                                   : std::numeric_limits<double>::quiet_NaN();
+    };
+    const auto column_of = [&columns](const char* name) {
+        const auto it = columns.find(name);
+        return it == columns.end() ? std::numeric_limits<double>::quiet_NaN() : it->second;
+    };
+    const double log_volume = lg(column_of("volume"));
+    const double log_diag = lg(column_of("diag"));
+    const double log_h = log_diag + lg(action.h_rel);
+    columns["log10_volume"] = log_volume;
+    columns["log10_diag"] = log_diag;
+    columns["log10_h"] = log_h;
+    columns["log10_cells"] = log_volume - 3.0 * log_h;
 }
 
 FeatureColumns to_columns(const pipeline::CaseFeatures& f) {

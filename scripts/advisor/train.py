@@ -31,6 +31,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import shutil
 import sys
 import tempfile
 import time
@@ -67,6 +68,7 @@ from .prune import keep_mask, load_pruned, prune_run
 RUNS_DIR = ADVISOR_DIR / "runs"
 HISTORY_JSONL = RUNS_DIR / "history.jsonl"
 LATEST_CHECKPOINT = RUNS_DIR / "latest.pt"
+BEST_CHECKPOINT = RUNS_DIR / "best.pt"
 WEIGHTS_JSON = ADVISOR_DIR / "weights.json"
 BASELINE_JSON = ADVISOR_DIR / "baseline_metrics.json"
 
@@ -466,6 +468,43 @@ def save_checkpoint(path: Path, model: AdvisorNet, optimizer: torch.optim.Optimi
     }, path)
 
 
+#: The run loop optimises across many runs and its validation metrics
+#: oscillate: over the first clean-data retrain the final run was 13 % worse
+#: than the best on ``rel_err_rel``, 9 % on ``geo_p99`` and 81 % on
+#: ``solve_ms``. ``latest.pt`` is the RESUME point and must stay the last run,
+#: or warm starting would degenerate into greedy hill-climbing; ``best.pt`` is
+#: the SHIPPING point and is what evaluation and export read.
+#:
+#: Selection is on validation ``rel_err_rel_mae`` — the head that ranks
+#: actions (the absolute ``rel_err`` level does not generalise across parts)
+#: — and only within the current stage, because stage B ramps three more head
+#: weights in and its total loss is not comparable with stage A's.
+SELECTION_METRIC = "rel_err_rel_mae"
+
+
+def update_best_checkpoint(history: list[dict[str, Any]]) -> tuple[int, float] | None:
+    """Point ``best.pt`` at the best run of the newest stage. Returns (run, metric)."""
+    if not history:
+        return None
+    stage = history[-1].get("stage")
+    scored: list[tuple[float, int]] = []
+    for record in history:
+        if record.get("stage") != stage:
+            continue
+        value = (record.get("val") or {}).get(SELECTION_METRIC)
+        run = record.get("run")
+        if isinstance(value, (int, float)) and math.isfinite(value) and isinstance(run, int):
+            scored.append((float(value), run))
+    if not scored:
+        return None
+    metric, run = min(scored)
+    source = RUNS_DIR / f"{run:03d}" / "checkpoint.pt"
+    if not source.is_file():
+        return None
+    shutil.copyfile(source, BEST_CHECKPOINT)
+    return run, metric
+
+
 def build_model(data: AdvisorData, warm_start: Path | None) -> tuple[AdvisorNet, dict[str, Any] | None, str]:
     """Warm-start from ``latest.pt`` when its schema still matches the data."""
     config = data.model_config()
@@ -642,14 +681,16 @@ def run_training(args: argparse.Namespace) -> int:
         save_checkpoint(run_dir / "checkpoint.pt", model, optimizer, run, data)
         save_checkpoint(LATEST_CHECKPOINT, model, optimizer, run, data)
         append_history(record)
+        best = update_best_checkpoint(read_history())
 
         val_rel = val_metrics.get("rel_err_mae")
         val_text = f"{val_rel:.4f}" if isinstance(val_rel, float) and math.isfinite(val_rel) else "n/a"
+        best_text = f" best={best[0]:03d}({best[1]:.4f})" if best else ""
         print(f"run {run:03d} stage={stage}{' *A->B*' if transition else ''} "
               f"warm={warm} rows={train_tensors.n_rows} "
               f"val_rel_err_mae={val_text} penalty={penalty:.5f} "
               f"pruned={pruning['pruned_rows']}(+{pruning['pruned_total']} total) "
-              f"{seconds:.2f}s")
+              f"{seconds:.2f}s{best_text}")
     return 0
 
 

@@ -1,0 +1,1456 @@
+campaign advisor-batch-2-s3: 32 configs, 36 parts, 1 tiers
+  max_run_wall_s=180 (override all tiers)
+  max_pack_wall_s=21600
+tier 0: h_scale=1 keep_frac=1 survivors=8 max_run_wall_s=180
+  run cfg-16df753f part=box_hole_s0_c0 tier=0 ...
+  run cfg-16df753f part=box_hole_s0_c1 tier=0 ...
+  run cfg-16df753f part=box_hole_s0_c2 tier=0 ...
+  run cfg-16df753f part=box_hole_s2_c0 tier=0 ...
+  run cfg-16df753f part=box_hole_s2_c1 tier=0 ...
+  run cfg-16df753f part=box_hole_s2_c2 tier=0 ...
+  run cfg-16df753f part=channel_s0_c0 tier=0 ...
+  run cfg-16df753f part=channel_s0_c1 tier=0 ...
+  run cfg-16df753f part=channel_s0_c2 tier=0 ...
+  run cfg-16df753f part=channel_s2_c0 tier=0 ...
+  run cfg-16df753f part=channel_s2_c1 tier=0 ...
+  run cfg-16df753f part=channel_s2_c2 tier=0 ...
+  run cfg-16df753f part=l_bracket_s0_c0 tier=0 ...
+  run cfg-16df753f part=l_bracket_s0_c1 tier=0 ...
+  run cfg-16df753f part=l_bracket_s0_c2 tier=0 ...
+  run cfg-16df753f part=l_bracket_s2_c0 tier=0 ...
+  run cfg-16df753f part=l_bracket_s2_c1 tier=0 ...
+  run cfg-16df753f part=l_bracket_s2_c2 tier=0 ...
+  run cfg-16df753f part=plate_notch_s0_c0 tier=0 ...
+  run cfg-16df753f part=plate_notch_s0_c1 tier=0 ...
+  run cfg-16df753f part=plate_notch_s0_c2 tier=0 ...
+  run cfg-16df753f part=plate_notch_s2_c0 tier=0 ...
+  run cfg-16df753f part=plate_notch_s2_c1 tier=0 ...
+  run cfg-16df753f part=plate_notch_s2_c2 tier=0 ...
+  run cfg-16df753f part=sphere_box_s0_c0 tier=0 ...
+  run cfg-16df753f part=sphere_box_s0_c1 tier=0 ...
+  run cfg-16df753f part=sphere_box_s0_c2 tier=0 ...
+  run cfg-16df753f part=sphere_box_s2_c0 tier=0 ...
+  run cfg-16df753f part=sphere_box_s2_c1 tier=0 ...
+  run cfg-16df753f part=sphere_box_s2_c2 tier=0 ...
+  run cfg-16df753f part=stepped_shaft_s0_c0 tier=0 ...
+  run cfg-16df753f part=stepped_shaft_s0_c1 tier=0 ...
+  run cfg-16df753f part=stepped_shaft_s0_c2 tier=0 ...
+  run cfg-16df753f part=stepped_shaft_s2_c0 tier=0 ...
+  run cfg-16df753f part=stepped_shaft_s2_c1 tier=0 ...
+  run cfg-16df753f part=stepped_shaft_s2_c2 tier=0 ...
+  run cfg-16a22cb5 part=box_hole_s0_c0 tier=0 ...
+  run cfg-16a22cb5 part=box_hole_s0_c1 tier=0 ...
+  run cfg-16a22cb5 part=box_hole_s0_c2 tier=0 ...
+  run cfg-16a22cb5 part=box_hole_s2_c0 tier=0 ...
+  run cfg-16a22cb5 part=box_hole_s2_c1 tier=0 ...
+  run cfg-16a22cb5 part=box_hole_s2_c2 tier=0 ...
+  run cfg-16a22cb5 part=channel_s0_c0 tier=0 ...
+  run cfg-16a22cb5 part=channel_s0_c1 tier=0 ...
+  run cfg-16a22cb5 part=channel_s0_c2 tier=0 ...
+  run cfg-16a22cb5 part=channel_s2_c0 tier=0 ...
+  run cfg-16a22cb5 part=channel_s2_c1 tier=0 ...
+  run cfg-16a22cb5 part=channel_s2_c2 tier=0 ...
+  run cfg-16a22cb5 part=l_bracket_s0_c0 tier=0 ...
+  run cfg-16a22cb5 part=l_bracket_s0_c1 tier=0 ...
+  run cfg-16a22cb5 part=l_bracket_s0_c2 tier=0 ...
+  run cfg-16a22cb5 part=l_bracket_s2_c0 tier=0 ...
+  run cfg-16a22cb5 part=l_bracket_s2_c1 tier=0 ...
+  run cfg-16a22cb5 part=l_bracket_s2_c2 tier=0 ...
+  run cfg-16a22cb5 part=plate_notch_s0_c0 tier=0 ...
+  run cfg-16a22cb5 part=plate_notch_s0_c1 tier=0 ...
+  run cfg-16a22cb5 part=plate_notch_s0_c2 tier=0 ...
+  run cfg-16a22cb5 part=plate_notch_s2_c0 tier=0 ...
+  run cfg-16a22cb5 part=plate_notch_s2_c1 tier=0 ...
+  run cfg-16a22cb5 part=plate_notch_s2_c2 tier=0 ...
+  run cfg-16a22cb5 part=sphere_box_s0_c0 tier=0 ...
+  run cfg-16a22cb5 part=sphere_box_s0_c1 tier=0 ...
+  run cfg-16a22cb5 part=sphere_box_s0_c2 tier=0 ...
+  run cfg-16a22cb5 part=sphere_box_s2_c0 tier=0 ...
+  run cfg-16a22cb5 part=sphere_box_s2_c1 tier=0 ...
+  run cfg-16a22cb5 part=sphere_box_s2_c2 tier=0 ...
+  run cfg-16a22cb5 part=stepped_shaft_s0_c0 tier=0 ...
+  run cfg-16a22cb5 part=stepped_shaft_s0_c1 tier=0 ...
+  run cfg-16a22cb5 part=stepped_shaft_s0_c2 tier=0 ...
+  run cfg-16a22cb5 part=stepped_shaft_s2_c0 tier=0 ...
+  run cfg-16a22cb5 part=stepped_shaft_s2_c1 tier=0 ...
+  run cfg-16a22cb5 part=stepped_shaft_s2_c2 tier=0 ...
+  run cfg-c4005114 part=box_hole_s0_c0 tier=0 ...
+  run cfg-c4005114 part=box_hole_s0_c1 tier=0 ...
+  run cfg-c4005114 part=box_hole_s0_c2 tier=0 ...
+  run cfg-c4005114 part=box_hole_s2_c0 tier=0 ...
+  run cfg-c4005114 part=box_hole_s2_c1 tier=0 ...
+  run cfg-c4005114 part=box_hole_s2_c2 tier=0 ...
+  run cfg-c4005114 part=channel_s0_c0 tier=0 ...
+  run cfg-c4005114 part=channel_s0_c1 tier=0 ...
+  run cfg-c4005114 part=channel_s0_c2 tier=0 ...
+  run cfg-c4005114 part=channel_s2_c0 tier=0 ...
+  run cfg-c4005114 part=channel_s2_c1 tier=0 ...
+  run cfg-c4005114 part=channel_s2_c2 tier=0 ...
+  run cfg-c4005114 part=l_bracket_s0_c0 tier=0 ...
+  run cfg-c4005114 part=l_bracket_s0_c1 tier=0 ...
+  run cfg-c4005114 part=l_bracket_s0_c2 tier=0 ...
+  run cfg-c4005114 part=l_bracket_s2_c0 tier=0 ...
+  run cfg-c4005114 part=l_bracket_s2_c1 tier=0 ...
+  run cfg-c4005114 part=l_bracket_s2_c2 tier=0 ...
+  run cfg-c4005114 part=plate_notch_s0_c0 tier=0 ...
+  run cfg-c4005114 part=plate_notch_s0_c1 tier=0 ...
+  run cfg-c4005114 part=plate_notch_s0_c2 tier=0 ...
+  run cfg-c4005114 part=plate_notch_s2_c0 tier=0 ...
+  run cfg-c4005114 part=plate_notch_s2_c1 tier=0 ...
+  run cfg-c4005114 part=plate_notch_s2_c2 tier=0 ...
+  run cfg-c4005114 part=sphere_box_s0_c0 tier=0 ...
+  run cfg-c4005114 part=sphere_box_s0_c1 tier=0 ...
+  run cfg-c4005114 part=sphere_box_s0_c2 tier=0 ...
+  run cfg-c4005114 part=sphere_box_s2_c0 tier=0 ...
+  run cfg-c4005114 part=sphere_box_s2_c1 tier=0 ...
+  run cfg-c4005114 part=sphere_box_s2_c2 tier=0 ...
+  run cfg-c4005114 part=stepped_shaft_s0_c0 tier=0 ...
+  run cfg-c4005114 part=stepped_shaft_s0_c1 tier=0 ...
+  run cfg-c4005114 part=stepped_shaft_s0_c2 tier=0 ...
+  run cfg-c4005114 part=stepped_shaft_s2_c0 tier=0 ...
+  run cfg-c4005114 part=stepped_shaft_s2_c1 tier=0 ...
+  run cfg-c4005114 part=stepped_shaft_s2_c2 tier=0 ...
+  run cfg-43de06f6 part=box_hole_s0_c0 tier=0 ...
+  run cfg-43de06f6 part=box_hole_s0_c1 tier=0 ...
+  run cfg-43de06f6 part=box_hole_s0_c2 tier=0 ...
+  run cfg-43de06f6 part=box_hole_s2_c0 tier=0 ...
+  run cfg-43de06f6 part=box_hole_s2_c1 tier=0 ...
+  run cfg-43de06f6 part=box_hole_s2_c2 tier=0 ...
+  run cfg-43de06f6 part=channel_s0_c0 tier=0 ...
+  run cfg-43de06f6 part=channel_s0_c1 tier=0 ...
+  run cfg-43de06f6 part=channel_s0_c2 tier=0 ...
+  run cfg-43de06f6 part=channel_s2_c0 tier=0 ...
+  run cfg-43de06f6 part=channel_s2_c1 tier=0 ...
+  run cfg-43de06f6 part=channel_s2_c2 tier=0 ...
+  run cfg-43de06f6 part=l_bracket_s0_c0 tier=0 ...
+  run cfg-43de06f6 part=l_bracket_s0_c1 tier=0 ...
+  run cfg-43de06f6 part=l_bracket_s0_c2 tier=0 ...
+  run cfg-43de06f6 part=l_bracket_s2_c0 tier=0 ...
+  run cfg-43de06f6 part=l_bracket_s2_c1 tier=0 ...
+  run cfg-43de06f6 part=l_bracket_s2_c2 tier=0 ...
+  run cfg-43de06f6 part=plate_notch_s0_c0 tier=0 ...
+  run cfg-43de06f6 part=plate_notch_s0_c1 tier=0 ...
+  run cfg-43de06f6 part=plate_notch_s0_c2 tier=0 ...
+  run cfg-43de06f6 part=plate_notch_s2_c0 tier=0 ...
+  run cfg-43de06f6 part=plate_notch_s2_c1 tier=0 ...
+  run cfg-43de06f6 part=plate_notch_s2_c2 tier=0 ...
+  run cfg-43de06f6 part=sphere_box_s0_c0 tier=0 ...
+  run cfg-43de06f6 part=sphere_box_s0_c1 tier=0 ...
+  run cfg-43de06f6 part=sphere_box_s0_c2 tier=0 ...
+  run cfg-43de06f6 part=sphere_box_s2_c0 tier=0 ...
+  run cfg-43de06f6 part=sphere_box_s2_c1 tier=0 ...
+  run cfg-43de06f6 part=sphere_box_s2_c2 tier=0 ...
+  run cfg-43de06f6 part=stepped_shaft_s0_c0 tier=0 ...
+  run cfg-43de06f6 part=stepped_shaft_s0_c1 tier=0 ...
+  run cfg-43de06f6 part=stepped_shaft_s0_c2 tier=0 ...
+  run cfg-43de06f6 part=stepped_shaft_s2_c0 tier=0 ...
+  run cfg-43de06f6 part=stepped_shaft_s2_c1 tier=0 ...
+  run cfg-43de06f6 part=stepped_shaft_s2_c2 tier=0 ...
+  run cfg-e61895c2 part=box_hole_s0_c0 tier=0 ...
+  run cfg-e61895c2 part=box_hole_s0_c1 tier=0 ...
+  run cfg-e61895c2 part=box_hole_s0_c2 tier=0 ...
+  run cfg-e61895c2 part=box_hole_s2_c0 tier=0 ...
+  run cfg-e61895c2 part=box_hole_s2_c1 tier=0 ...
+  run cfg-e61895c2 part=box_hole_s2_c2 tier=0 ...
+  run cfg-e61895c2 part=channel_s0_c0 tier=0 ...
+  run cfg-e61895c2 part=channel_s0_c1 tier=0 ...
+  run cfg-e61895c2 part=channel_s0_c2 tier=0 ...
+  run cfg-e61895c2 part=channel_s2_c0 tier=0 ...
+  run cfg-e61895c2 part=channel_s2_c1 tier=0 ...
+  run cfg-e61895c2 part=channel_s2_c2 tier=0 ...
+  run cfg-e61895c2 part=l_bracket_s0_c0 tier=0 ...
+  run cfg-e61895c2 part=l_bracket_s0_c1 tier=0 ...
+  run cfg-e61895c2 part=l_bracket_s0_c2 tier=0 ...
+  run cfg-e61895c2 part=l_bracket_s2_c0 tier=0 ...
+  run cfg-e61895c2 part=l_bracket_s2_c1 tier=0 ...
+  run cfg-e61895c2 part=l_bracket_s2_c2 tier=0 ...
+  run cfg-e61895c2 part=plate_notch_s0_c0 tier=0 ...
+  run cfg-e61895c2 part=plate_notch_s0_c1 tier=0 ...
+  run cfg-e61895c2 part=plate_notch_s0_c2 tier=0 ...
+  run cfg-e61895c2 part=plate_notch_s2_c0 tier=0 ...
+  run cfg-e61895c2 part=plate_notch_s2_c1 tier=0 ...
+  run cfg-e61895c2 part=plate_notch_s2_c2 tier=0 ...
+  run cfg-e61895c2 part=sphere_box_s0_c0 tier=0 ...
+  run cfg-e61895c2 part=sphere_box_s0_c1 tier=0 ...
+  run cfg-e61895c2 part=sphere_box_s0_c2 tier=0 ...
+  run cfg-e61895c2 part=sphere_box_s2_c0 tier=0 ...
+  run cfg-e61895c2 part=sphere_box_s2_c1 tier=0 ...
+  run cfg-e61895c2 part=sphere_box_s2_c2 tier=0 ...
+  run cfg-e61895c2 part=stepped_shaft_s0_c0 tier=0 ...
+  run cfg-e61895c2 part=stepped_shaft_s0_c1 tier=0 ...
+  run cfg-e61895c2 part=stepped_shaft_s0_c2 tier=0 ...
+  run cfg-e61895c2 part=stepped_shaft_s2_c0 tier=0 ...
+  run cfg-e61895c2 part=stepped_shaft_s2_c1 tier=0 ...
+  run cfg-e61895c2 part=stepped_shaft_s2_c2 tier=0 ...
+  run cfg-ac859d08 part=box_hole_s0_c0 tier=0 ...
+  run cfg-ac859d08 part=box_hole_s0_c1 tier=0 ...
+  run cfg-ac859d08 part=box_hole_s0_c2 tier=0 ...
+  run cfg-ac859d08 part=box_hole_s2_c0 tier=0 ...
+  run cfg-ac859d08 part=box_hole_s2_c1 tier=0 ...
+  run cfg-ac859d08 part=box_hole_s2_c2 tier=0 ...
+  run cfg-ac859d08 part=channel_s0_c0 tier=0 ...
+  run cfg-ac859d08 part=channel_s0_c1 tier=0 ...
+  run cfg-ac859d08 part=channel_s0_c2 tier=0 ...
+  run cfg-ac859d08 part=channel_s2_c0 tier=0 ...
+  run cfg-ac859d08 part=channel_s2_c1 tier=0 ...
+  run cfg-ac859d08 part=channel_s2_c2 tier=0 ...
+  run cfg-ac859d08 part=l_bracket_s0_c0 tier=0 ...
+  run cfg-ac859d08 part=l_bracket_s0_c1 tier=0 ...
+  run cfg-ac859d08 part=l_bracket_s0_c2 tier=0 ...
+  run cfg-ac859d08 part=l_bracket_s2_c0 tier=0 ...
+  run cfg-ac859d08 part=l_bracket_s2_c1 tier=0 ...
+  run cfg-ac859d08 part=l_bracket_s2_c2 tier=0 ...
+  run cfg-ac859d08 part=plate_notch_s0_c0 tier=0 ...
+  run cfg-ac859d08 part=plate_notch_s0_c1 tier=0 ...
+  run cfg-ac859d08 part=plate_notch_s0_c2 tier=0 ...
+  run cfg-ac859d08 part=plate_notch_s2_c0 tier=0 ...
+  run cfg-ac859d08 part=plate_notch_s2_c1 tier=0 ...
+  run cfg-ac859d08 part=plate_notch_s2_c2 tier=0 ...
+  run cfg-ac859d08 part=sphere_box_s0_c0 tier=0 ...
+  run cfg-ac859d08 part=sphere_box_s0_c1 tier=0 ...
+  run cfg-ac859d08 part=sphere_box_s0_c2 tier=0 ...
+  run cfg-ac859d08 part=sphere_box_s2_c0 tier=0 ...
+  run cfg-ac859d08 part=sphere_box_s2_c1 tier=0 ...
+  run cfg-ac859d08 part=sphere_box_s2_c2 tier=0 ...
+  run cfg-ac859d08 part=stepped_shaft_s0_c0 tier=0 ...
+  run cfg-ac859d08 part=stepped_shaft_s0_c1 tier=0 ...
+  run cfg-ac859d08 part=stepped_shaft_s0_c2 tier=0 ...
+  run cfg-ac859d08 part=stepped_shaft_s2_c0 tier=0 ...
+  run cfg-ac859d08 part=stepped_shaft_s2_c1 tier=0 ...
+  run cfg-ac859d08 part=stepped_shaft_s2_c2 tier=0 ...
+  run cfg-27719197 part=box_hole_s0_c0 tier=0 ...
+  run cfg-27719197 part=box_hole_s0_c1 tier=0 ...
+  run cfg-27719197 part=box_hole_s0_c2 tier=0 ...
+  run cfg-27719197 part=box_hole_s2_c0 tier=0 ...
+  run cfg-27719197 part=box_hole_s2_c1 tier=0 ...
+  run cfg-27719197 part=box_hole_s2_c2 tier=0 ...
+  run cfg-27719197 part=channel_s0_c0 tier=0 ...
+  run cfg-27719197 part=channel_s0_c1 tier=0 ...
+  run cfg-27719197 part=channel_s0_c2 tier=0 ...
+  run cfg-27719197 part=channel_s2_c0 tier=0 ...
+  run cfg-27719197 part=channel_s2_c1 tier=0 ...
+  run cfg-27719197 part=channel_s2_c2 tier=0 ...
+  run cfg-27719197 part=l_bracket_s0_c0 tier=0 ...
+  run cfg-27719197 part=l_bracket_s0_c1 tier=0 ...
+  run cfg-27719197 part=l_bracket_s0_c2 tier=0 ...
+  run cfg-27719197 part=l_bracket_s2_c0 tier=0 ...
+  run cfg-27719197 part=l_bracket_s2_c1 tier=0 ...
+  run cfg-27719197 part=l_bracket_s2_c2 tier=0 ...
+  run cfg-27719197 part=plate_notch_s0_c0 tier=0 ...
+  run cfg-27719197 part=plate_notch_s0_c1 tier=0 ...
+  run cfg-27719197 part=plate_notch_s0_c2 tier=0 ...
+  run cfg-27719197 part=plate_notch_s2_c0 tier=0 ...
+  run cfg-27719197 part=plate_notch_s2_c1 tier=0 ...
+  run cfg-27719197 part=plate_notch_s2_c2 tier=0 ...
+  run cfg-27719197 part=sphere_box_s0_c0 tier=0 ...
+  run cfg-27719197 part=sphere_box_s0_c1 tier=0 ...
+  run cfg-27719197 part=sphere_box_s0_c2 tier=0 ...
+  run cfg-27719197 part=sphere_box_s2_c0 tier=0 ...
+  run cfg-27719197 part=sphere_box_s2_c1 tier=0 ...
+  run cfg-27719197 part=sphere_box_s2_c2 tier=0 ...
+  run cfg-27719197 part=stepped_shaft_s0_c0 tier=0 ...
+  run cfg-27719197 part=stepped_shaft_s0_c1 tier=0 ...
+  run cfg-27719197 part=stepped_shaft_s0_c2 tier=0 ...
+  run cfg-27719197 part=stepped_shaft_s2_c0 tier=0 ...
+  run cfg-27719197 part=stepped_shaft_s2_c1 tier=0 ...
+  run cfg-27719197 part=stepped_shaft_s2_c2 tier=0 ...
+  run cfg-570b72ed part=box_hole_s0_c0 tier=0 ...
+  run cfg-570b72ed part=box_hole_s0_c1 tier=0 ...
+  run cfg-570b72ed part=box_hole_s0_c2 tier=0 ...
+  run cfg-570b72ed part=box_hole_s2_c0 tier=0 ...
+  run cfg-570b72ed part=box_hole_s2_c1 tier=0 ...
+  run cfg-570b72ed part=box_hole_s2_c2 tier=0 ...
+  run cfg-570b72ed part=channel_s0_c0 tier=0 ...
+  run cfg-570b72ed part=channel_s0_c1 tier=0 ...
+  run cfg-570b72ed part=channel_s0_c2 tier=0 ...
+  run cfg-570b72ed part=channel_s2_c0 tier=0 ...
+  run cfg-570b72ed part=channel_s2_c1 tier=0 ...
+  run cfg-570b72ed part=channel_s2_c2 tier=0 ...
+  run cfg-570b72ed part=l_bracket_s0_c0 tier=0 ...
+  run cfg-570b72ed part=l_bracket_s0_c1 tier=0 ...
+  run cfg-570b72ed part=l_bracket_s0_c2 tier=0 ...
+  run cfg-570b72ed part=l_bracket_s2_c0 tier=0 ...
+  run cfg-570b72ed part=l_bracket_s2_c1 tier=0 ...
+  run cfg-570b72ed part=l_bracket_s2_c2 tier=0 ...
+  run cfg-570b72ed part=plate_notch_s0_c0 tier=0 ...
+  run cfg-570b72ed part=plate_notch_s0_c1 tier=0 ...
+  run cfg-570b72ed part=plate_notch_s0_c2 tier=0 ...
+  run cfg-570b72ed part=plate_notch_s2_c0 tier=0 ...
+  run cfg-570b72ed part=plate_notch_s2_c1 tier=0 ...
+  run cfg-570b72ed part=plate_notch_s2_c2 tier=0 ...
+  run cfg-570b72ed part=sphere_box_s0_c0 tier=0 ...
+  run cfg-570b72ed part=sphere_box_s0_c1 tier=0 ...
+  run cfg-570b72ed part=sphere_box_s0_c2 tier=0 ...
+  run cfg-570b72ed part=sphere_box_s2_c0 tier=0 ...
+  run cfg-570b72ed part=sphere_box_s2_c1 tier=0 ...
+  run cfg-570b72ed part=sphere_box_s2_c2 tier=0 ...
+  run cfg-570b72ed part=stepped_shaft_s0_c0 tier=0 ...
+  run cfg-570b72ed part=stepped_shaft_s0_c1 tier=0 ...
+  run cfg-570b72ed part=stepped_shaft_s0_c2 tier=0 ...
+  run cfg-570b72ed part=stepped_shaft_s2_c0 tier=0 ...
+  run cfg-570b72ed part=stepped_shaft_s2_c1 tier=0 ...
+  run cfg-570b72ed part=stepped_shaft_s2_c2 tier=0 ...
+Could not find platform independent libraries <prefix>
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16a22cb5\box_hole_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16a22cb5\box_hole_s0_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16a22cb5\box_hole_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16a22cb5\channel_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16a22cb5\channel_s0_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16a22cb5\channel_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16a22cb5\l_bracket_s2_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16a22cb5\l_bracket_s2_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16a22cb5\l_bracket_s2_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16a22cb5\plate_notch_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16a22cb5\plate_notch_s0_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16a22cb5\plate_notch_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16a22cb5\plate_notch_s2_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16a22cb5\plate_notch_s2_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16a22cb5\plate_notch_s2_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16a22cb5\sphere_box_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16a22cb5\sphere_box_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16df753f\box_hole_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16df753f\box_hole_s0_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16df753f\box_hole_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16df753f\channel_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16df753f\channel_s0_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16df753f\channel_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16df753f\l_bracket_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16df753f\l_bracket_s0_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16df753f\l_bracket_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16df753f\l_bracket_s2_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16df753f\l_bracket_s2_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16df753f\l_bracket_s2_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16df753f\plate_notch_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16df753f\plate_notch_s0_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16df753f\plate_notch_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16df753f\plate_notch_s2_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16df753f\plate_notch_s2_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16df753f\plate_notch_s2_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16df753f\sphere_box_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16df753f\sphere_box_s0_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16df753f\sphere_box_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16df753f\sphere_box_s2_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16df753f\sphere_box_s2_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-16df753f\sphere_box_s2_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-27719197\channel_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-27719197\channel_s0_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-27719197\channel_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-43de06f6\box_hole_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-43de06f6\box_hole_s0_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-43de06f6\box_hole_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-43de06f6\channel_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-43de06f6\channel_s0_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-43de06f6\channel_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-43de06f6\l_bracket_s2_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-43de06f6\l_bracket_s2_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-43de06f6\l_bracket_s2_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-43de06f6\plate_notch_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-43de06f6\plate_notch_s0_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-43de06f6\plate_notch_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-43de06f6\plate_notch_s2_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-43de06f6\plate_notch_s2_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-43de06f6\plate_notch_s2_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-43de06f6\sphere_box_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-43de06f6\sphere_box_s0_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-43de06f6\sphere_box_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-43de06f6\sphere_box_s2_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-43de06f6\sphere_box_s2_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-43de06f6\sphere_box_s2_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-570b72ed\box_hole_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-570b72ed\box_hole_s0_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-570b72ed\box_hole_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-570b72ed\channel_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-570b72ed\channel_s0_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-570b72ed\channel_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-570b72ed\l_bracket_s2_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-570b72ed\l_bracket_s2_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-570b72ed\l_bracket_s2_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-570b72ed\plate_notch_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-570b72ed\plate_notch_s0_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-570b72ed\plate_notch_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-570b72ed\plate_notch_s2_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-570b72ed\plate_notch_s2_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-570b72ed\plate_notch_s2_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-570b72ed\sphere_box_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-570b72ed\sphere_box_s0_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-570b72ed\sphere_box_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-570b72ed\sphere_box_s2_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-570b72ed\sphere_box_s2_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-570b72ed\sphere_box_s2_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-ac859d08\box_hole_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-ac859d08\box_hole_s0_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-ac859d08\box_hole_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-ac859d08\channel_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-ac859d08\channel_s0_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-ac859d08\channel_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-ac859d08\l_bracket_s2_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-ac859d08\l_bracket_s2_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-ac859d08\l_bracket_s2_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-ac859d08\plate_notch_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-ac859d08\plate_notch_s0_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-ac859d08\plate_notch_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-ac859d08\plate_notch_s2_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-ac859d08\plate_notch_s2_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-ac859d08\plate_notch_s2_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-ac859d08\sphere_box_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-ac859d08\sphere_box_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-c4005114\box_hole_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-c4005114\box_hole_s0_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-c4005114\box_hole_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-c4005114\channel_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-c4005114\channel_s0_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-c4005114\channel_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-c4005114\l_bracket_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-c4005114\l_bracket_s0_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-c4005114\l_bracket_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-c4005114\l_bracket_s2_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-c4005114\l_bracket_s2_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-c4005114\l_bracket_s2_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-c4005114\plate_notch_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-c4005114\plate_notch_s0_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-c4005114\plate_notch_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-c4005114\plate_notch_s2_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-c4005114\plate_notch_s2_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-c4005114\plate_notch_s2_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-e61895c2\box_hole_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-e61895c2\box_hole_s0_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-e61895c2\box_hole_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-e61895c2\channel_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-e61895c2\channel_s0_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-e61895c2\channel_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-e61895c2\l_bracket_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-e61895c2\l_bracket_s0_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-e61895c2\l_bracket_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-e61895c2\l_bracket_s2_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-e61895c2\l_bracket_s2_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-e61895c2\l_bracket_s2_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-e61895c2\plate_notch_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-e61895c2\plate_notch_s0_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-e61895c2\plate_notch_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-e61895c2\plate_notch_s2_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-e61895c2\plate_notch_s2_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-e61895c2\plate_notch_s2_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-e61895c2\sphere_box_s0_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-e61895c2\sphere_box_s0_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-e61895c2\sphere_box_s0_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-e61895c2\sphere_box_s2_c0\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-e61895c2\sphere_box_s2_c1\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+FAIL bench\campaigns\advisor-batch-2-s3\runs\cfg-e61895c2\sphere_box_s2_c2\t0\mesh.vtu: Could not find platform independent libraries <prefix>
+Traceback (most recent call last):
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\vtu_wire_png.py", line 23, in <module>
+    import figstyle as fs  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Yakub\Desktop\Polyhedral-FEA\scripts\figstyle.py", line 45, in <module>
+    import numpy as np
+ModuleNotFoundError: No module named 'numpy'
+warehouse_shots: 0 rendered, 0 skipped (exists), 145 failed (145 mesh.vtu total)
+on_finish warehouse_shots exited 1
+finished: 288 runs → bench/campaigns/advisor-batch-2-s3\results.jsonl

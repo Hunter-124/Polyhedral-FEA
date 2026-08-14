@@ -1,0 +1,14 @@
+{
+  "cg_iter": 1916,
+  "cg_resid": 9.8541553505236e-09,
+  "elapsed_ms": 92561.4647,
+  "n_elems": 13126,
+  "n_nodes": 21223,
+  "phase": "recover",
+  "phase_frac": 0.5,
+  "run": {
+    "cfg_id": "cfg-97015a68",
+    "part": "box_hole_s0_c0",
+    "tier": 0
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "campaign": "advisor-batch-2-s2",
+  "completed_runs": 288,
+  "started_utc": "2026-08-13T07:25:13Z",
+  "state": "finished",
+  "survivors": [
+    "cfg-16e7c9c4",
+    "cfg-169e43de",
+    "cfg-c3f7fc8f",
+    "cfg-43e1efcd",
+    "cfg-e61acb99",
+    "cfg-ac7d4883",
+    "cfg-277b991c",
+    "cfg-57078a16"
+  ],
+  "tier": 0,
+  "updated_utc": "2026-08-13T08:55:47Z"
+}

@@ -544,10 +544,20 @@ def run_shard(shard: int, rects: list[Rect], omp_threads: int) -> list[dict[str,
     return report
 
 
-def run_truth_gate(dry_run: bool) -> bool:
-    """Run advisor-truth-0 to completion first. Returns True if it executed."""
+def run_truth_gate(dry_run: bool, skip: bool = False) -> bool:
+    """Run advisor-truth-0 to completion first. Returns True if it executed.
+
+    ``skip`` exists for multi-host regenerations: the truth campaign carries no
+    host tag, so exactly one machine may own it. The others pass ``skip`` and
+    pick its rows up when the directories are merged. Skipping on every host
+    would train on provisional truth, which is why this is a flag and not a
+    default.
+    """
     directory = CAMPAIGNS / TRUTH_CAMPAIGN
     campaign_path = directory / "campaign.json"
+    if skip:
+        print(f"truth gate: skipped by request — another host owns {TRUTH_CAMPAIGN}")
+        return False
     if not campaign_path.is_file():
         print(f"truth gate: {rel(campaign_path)} absent — nothing to run yet")
         return False
@@ -748,6 +758,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                              "Set it when more than one machine labels into the same repo so "
                              "their campaign directories cannot collide on merge")
     parser.add_argument("--dry-run", action="store_true", help="plan and print; write and launch nothing")
+    parser.add_argument("--skip-truth", action="store_true",
+                        help="do not run the truth campaign: another host in this "
+                             "regeneration owns it (see run_truth_gate)")
     args = parser.parse_args(argv)
     if args.shards < 1:
         parser.error("--shards must be >= 1")
@@ -762,7 +775,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"cfg_id mirror verified against {checked} recorded row(s)")
 
     # Truth first: the gate may add rows, so the batch plan is built afterwards.
-    run_truth_gate(args.dry_run)
+    run_truth_gate(args.dry_run, args.skip_truth)
     plan = make_plan(args)
     print_plan(plan, args)
 

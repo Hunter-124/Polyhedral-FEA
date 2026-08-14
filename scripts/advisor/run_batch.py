@@ -561,6 +561,28 @@ def run_truth_gate(dry_run: bool, skip: bool = False) -> bool:
     if not campaign_path.is_file():
         print(f"truth gate: {rel(campaign_path)} absent — nothing to run yet")
         return False
+    if not PROMOTE_TRUTH.is_file():
+        raise SystemExit(
+            f"missing {rel(PROMOTE_TRUTH)}: overkill truths are provisional until "
+            "promoted, refusing to launch batch shards"
+        )
+    # Cheapest question first: could this campaign change a reference value at
+    # all? Every corpus metric now carries an analytic or external-* source, and
+    # promotion refuses those by design, so running 288 order-2 adaptive solves
+    # to refuse all 188 metrics is hours spent to produce nothing. It stays a
+    # runtime check rather than a deletion because a newly added family lands
+    # with provisional seeds and makes the campaign useful again the same day.
+    promotable = subprocess.run(
+        [sys.executable, rel(PROMOTE_TRUTH), "--check-promotable"],
+        cwd=str(ROOT), check=False,
+    )
+    if promotable.returncode == 3:
+        print("truth gate: skipped — no corpus reference is promotable "
+              "(see the line above); the campaign could only refuse every metric")
+        return False
+    if promotable.returncode != 0:
+        raise SystemExit(f"promote_truth.py --check-promotable exited "
+                         f"{promotable.returncode}")
     truth = read_json(campaign_path)
     configs = expand_grid(truth.get("grid", {}))
     truth_parts: list[str] = []
@@ -610,11 +632,6 @@ def run_truth_gate(dry_run: bool, skip: bool = False) -> bool:
     print(f"  truth campaign exited {code} after {wall / 60.0:.1f} min")
     if code != 0:
         raise SystemExit("truth campaign failed; refusing to launch batch shards on partial truth")
-    if not PROMOTE_TRUTH.is_file():
-        raise SystemExit(
-            f"missing {rel(PROMOTE_TRUTH)}: overkill truths are provisional until "
-            "promoted, refusing to launch batch shards"
-        )
     # --require-all: non-zero if any non-analytic corpus reference is still
     # provisional after promotion, i.e. the batch would train on fake truth.
     promote = subprocess.run(

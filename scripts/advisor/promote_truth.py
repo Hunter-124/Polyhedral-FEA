@@ -107,6 +107,11 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--require-all", action="store_true",
                         help="exit non-zero if any non-analytic corpus truth is still "
                              "provisional after promotion")
+    parser.add_argument("--check-promotable", action="store_true",
+                        help="write nothing and answer one question: is any corpus "
+                             "metric still this repo's to promote? Exit 0 if yes, "
+                             "3 if every metric is protected, i.e. solving the truth "
+                             "campaign could not change a single reference value")
     parser.add_argument("--part", action="append", default=None, metavar="PART",
                         help="only promote these parts (repeatable). Naming a part "
                              "whose truth is protected is an error, not a silent skip")
@@ -259,8 +264,41 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
         stream.write("\n")
 
 
+def check_promotable() -> int:
+    """Exit code for ``--check-promotable``: 0 if a metric is still ours, else 3.
+
+    The truth campaign is 288 order-2 adaptive solves. Once every corpus metric
+    carries an ``analytic`` or ``external-*`` source, promotion refuses all of
+    them by design, so those solves cannot change one reference value and the
+    gate that runs them is spending hours to produce nothing. This answers that
+    question cheaply, before the campaign starts, from the references alone.
+    """
+    total = 0
+    promotable: list[tuple[str, str]] = []
+    for path in sorted(REFERENCE_DIR.glob("*.json")):
+        reference = json.loads(path.read_text(encoding="utf-8"))
+        for metric in reference.get("metrics", []):
+            total += 1
+            if protected_source(metric) is None:
+                promotable.append((str(reference.get("part", path.stem)),
+                                   str(metric.get("name", "<unnamed>"))))
+    if not promotable:
+        print(f"promotable: 0 of {total} corpus metric(s) — every reference is "
+              "analytic or external, so the truth campaign cannot change any of them")
+        return 3
+    print(f"promotable: {len(promotable)} of {total} corpus metric(s) still this "
+          "repo's to promote:")
+    for part, metric in promotable[:12]:
+        print(f"  {part}: {metric}")
+    if len(promotable) > 12:
+        print(f"  ... and {len(promotable) - 12} more")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    if args.check_promotable:
+        return check_promotable()
     results_paths = truth_results_paths(args.campaign)
     if not results_paths:
         print(f"error: no results.jsonl under bench/campaigns/{args.campaign}"

@@ -585,7 +585,7 @@ def main() -> int:
     source_schema_counts: Counter[str] = Counter()
     excluded_legacy_sources: Counter[str] = Counter()
     excluded_legacy_rows = 0
-    excluded_geometry_rows = 0
+    geometry_refusal_rows = 0
 
     schema_counts: Counter[str] = Counter()
     failure_signal: Counter[str] = Counter()
@@ -602,8 +602,27 @@ def main() -> int:
             excluded_legacy_rows += 1
             excluded_legacy_sources[campaign] += 1
             continue
+        # `advisor_training_eligible: false` marks a resolution refusal
+        # (`GeometryVolumeLimitError`): no mesh was produced, so the row has no
+        # honest accuracy, geometry or cost target. It is excluded outright.
+        #
+        # Keeping it as a failure-head-only row was tried and MEASURED WORSE, so
+        # this exclusion is a result, not an oversight. Adding the 776 refusals
+        # (train failure share 8 % -> 28 %) moved every validation number the
+        # wrong way on the same held-out fold and the same masked rows:
+        # rel_err 0.559 -> 0.711, dof 0.157 -> 0.299, mesh_ms 0.241 -> 0.475 --
+        # a 17k-parameter shared trunk spends capacity on them -- and the
+        # failure head itself fell from AUC 0.72 to 0.53.
+        #
+        # The reason it cannot pay is that refusal does not transfer across
+        # families. LightGBM trained directly on the failure label scores AUC
+        # 0.87 and 0.78 on two held-out families, 0.43 on a third and 0.37 on
+        # box_hole -- WORSE than chance, i.e. what other families teach about
+        # refusal is actively misleading there, mean 0.61 over four folds. Until
+        # a feature carries the refusal boundary itself, these rows are noise
+        # with a label attached.
         if row.get("advisor_training_eligible") is False:
-            excluded_geometry_rows += 1
+            geometry_refusal_rows += 1
             continue
 
         schema_counts[source_schema] += 1
@@ -672,8 +691,9 @@ def main() -> int:
             for campaign, count in sorted(excluded_legacy_sources.items())
         )
         print(f"Legacy rows excluded from training dataset: {excluded_legacy_rows} ({excluded})")
-    if excluded_geometry_rows:
-        print(f"Egregious geometry rows excluded from training: {excluded_geometry_rows}")
+    if geometry_refusal_rows:
+        print(f"Resolution-refusal rows excluded (measured worse when kept): "
+              f"{geometry_refusal_rows}")
 
     # Truth provenance: a dataset must be self-describing about the references
     # that scored it, because accuracy is now re-derived at build time and the

@@ -335,6 +335,48 @@ TEST_CASE("a graded sphere has no boundary node carved into its interior") {
     CHECK(highest < 0.10 * kH);
 }
 
+// The S7 overlapped-sheet carve. Snap gives every boundary node its exact CAD
+// owner, so at a concave crease two sheets project onto their own face patches
+// and can interpenetrate with every tet positive and every edge manifold. The
+// only census that sees it is point-in-foreign-tet. Pre-fix ship counts: 9
+// buried free faces on icecream_cone at h = 10 mm (rendered as black holes in
+// the showcase), ~500 on sphere_box_s0 at h = 3.6 mm at the near-tangent
+// pocket/box junction.
+TEST_CASE("graded fills ship no free face buried inside another cell") {
+    if (!polymesh::geom::occ_enabled()) {
+        SKIP("OpenCASCADE disabled");
+    }
+    struct Case {
+        const char* path;
+        double h;
+    };
+    const Case cases[] = {
+        {"tests/fixtures/parts/icecream_cone.step", 0.010},
+        {"bench/geometries/corpus/primitives/sphere_box_s0.step", 0.0036},
+    };
+    for (const auto& c : cases) {
+        if (!std::filesystem::exists(c.path)) {
+            continue;
+        }
+        DYNAMIC_SECTION(c.path << " h=" << c.h) {
+            const auto model = polymesh::pipeline::Model::load(c.path);
+            REQUIRE(model.cad);
+            std::vector<polymesh::mesh::BoundarySupport> provenance;
+            polymesh::mesh::BoundaryProjectionContext projection;
+            REQUIRE(polymesh::pipeline::make_boundary_projection(
+                *model.cad, c.h, &projection, &provenance));
+            const auto fill = polymesh::mesh::graded_tet_fill_surface(
+                model.surface, model.bbox_min, model.bbox_max, c.h, 2, {}, 0.0, {}, 0.0,
+                0.0, &projection);
+            const auto stats = polymesh::mesh::count_buried_free_tet_faces(
+                fill.mesh.nodes, fill.mesh.tets, fill.h_coarse > 0.0 ? fill.h_coarse : c.h);
+            INFO("free faces " << stats.n_free_faces << ", buried " << stats.n_buried);
+            REQUIRE(stats.n_free_faces > 0);
+            CHECK(stats.n_buried == 0);
+        }
+    }
+}
+
 TEST_CASE("ice-cream cone STEP is one closed fused solid with stable coarse selections") {
     if (!polymesh::geom::occ_enabled()) {
         SKIP("OpenCASCADE disabled");

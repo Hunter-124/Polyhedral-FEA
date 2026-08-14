@@ -18,6 +18,7 @@
 
 #include <array>
 #include <cstdint>
+#include <span>
 #include <vector>
 
 namespace polymesh::mesh {
@@ -45,5 +46,42 @@ double tet_signed_volume(const Eigen::Vector3d& a, const Eigen::Vector3d& b,
 /// Positive volumes and finite coordinates for every tet in `out`.
 /// @param min_volume Lower bound on |V|, m³ (0 = any positive).
 void check_tet_fill_geometry(const TetFillOutput& out, double min_volume = 0.0);
+
+/// Census of boundary self-intersection in an all-tet mesh.
+///
+/// A free face is *buried* when its centroid lies strictly inside a tet it
+/// does not belong to: two positive-volume sheets interpenetrate, typically at
+/// a concave CAD crease where each sheet's nodes snap to their own face patch.
+/// Watertight and orientation censuses cannot see this — every tet is
+/// positive, every edge manifold — but renderers show the buried faces as
+/// holes and any downstream contact/BC selection on them is wrong.
+struct BuriedFaceStats {
+    std::size_t n_free_faces = 0;
+    std::size_t n_buried = 0;
+};
+
+/// Count buried free faces. `h` sizes the spatial hash (use the fill spacing).
+BuriedFaceStats count_buried_free_tet_faces(std::span<const Eigen::Vector3d> nodes,
+                                            std::span<const std::array<std::uint32_t, 4>> tets,
+                                            double h);
+
+
+/// Owner tets of buried free faces, deduplicated. The owners are overlapping
+/// volume — the same material is inside another cell too — so the remedy is
+/// deletion (shell-guarded, then re-snap), not node motion: pulling nodes at a
+/// near-tangent crease piles both sheets onto the crease and multiplies the
+/// crossings (measured: 299 → 706 buried on sphere_box_s0 at h = 3.6 mm).
+std::vector<std::uint32_t>
+buried_free_tet_face_owners(std::span<const Eigen::Vector3d> nodes,
+                            std::span<const std::array<std::uint32_t, 4>> tets, double h);
+
+/// Finisher for shallow residue after the overlap carve: pull each buried
+/// face's nodes toward the centroid of their incident tet star (inward, off
+/// the foreign sheet), bisecting so no incident tet inverts. Deep or
+/// near-tangent overlap MUST be carved first — pulling cannot resolve it.
+/// Returns buried faces remaining (0 = clean).
+std::size_t pull_buried_free_faces(std::vector<Eigen::Vector3d>& nodes,
+                                   std::span<const std::array<std::uint32_t, 4>> tets,
+                                   double h, int max_iters = 8);
 
 } // namespace polymesh::mesh

@@ -12,6 +12,8 @@
 #include <format>
 #include <map>
 #include <set>
+#include <span>
+#include <unordered_map>
 
 namespace polymesh::mesh {
 namespace {
@@ -48,6 +50,250 @@ void check_tet_fill_geometry(const TetFillOutput& out, double min_volume) {
                 "check_tet_fill_geometry: tet {} non-positive volume {:.3e}", e, v));
         }
     }
+}
+
+namespace {
+
+// Free faces of an all-tet mesh with their owning tet.
+struct FreeTetFace {
+    std::array<std::uint32_t, 3> nodes;
+    std::uint32_t owner;
+};
+
+std::vector<FreeTetFace> free_tet_faces(std::span<const std::array<std::uint32_t, 4>> tets) {
+    static constexpr int kTF[4][3] = {{0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}};
+    std::map<std::array<std::uint32_t, 3>, std::pair<int, std::uint32_t>> census;
+    for (std::size_t ti = 0; ti < tets.size(); ++ti) {
+        for (const auto& f : kTF) {
+            std::array<std::uint32_t, 3> key{{tets[ti][static_cast<std::size_t>(f[0])],
+                                              tets[ti][static_cast<std::size_t>(f[1])],
+                                              tets[ti][static_cast<std::size_t>(f[2])]}};
+            std::sort(key.begin(), key.end());
+            auto& slot = census[key];
+            ++slot.first;
+            slot.second = static_cast<std::uint32_t>(ti);
+        }
+    }
+    std::vector<FreeTetFace> free;
+    for (const auto& [key, slot] : census) {
+        if (slot.first == 1) {
+            free.push_back({key, slot.second});
+        }
+    }
+    return free;
+}
+
+// Spatial hash of tet bounding boxes on a cubic grid of pitch `cell`.
+class TetGrid {
+public:
+    TetGrid(std::span<const Eigen::Vector3d> nodes,
+            std::span<const std::array<std::uint32_t, 4>> tets, double cell)
+        : nodes_(nodes), tets_(tets), cell_(cell) {
+        for (std::size_t ti = 0; ti < tets.size(); ++ti) {
+            Eigen::Vector3d lo = nodes[tets[ti][0]];
+            Eigen::Vector3d hi = lo;
+            for (int k = 1; k < 4; ++k) {
+                lo = lo.cwiseMin(nodes[tets[ti][static_cast<std::size_t>(k)]]);
+                hi = hi.cwiseMax(nodes[tets[ti][static_cast<std::size_t>(k)]]);
+            }
+            const auto a = key_of(lo);
+            const auto b = key_of(hi);
+            for (long long i = a[0]; i <= b[0]; ++i) {
+                for (long long j = a[1]; j <= b[1]; ++j) {
+                    for (long long k = a[2]; k <= b[2]; ++k) {
+                        buckets_[pack(i, j, k)].push_back(static_cast<std::uint32_t>(ti));
+                    }
+                }
+            }
+        }
+    }
+
+    /// Index of a tet strictly containing `p` that is not `owner` and shares
+    /// no node with `face` — the burying tet. SIZE_MAX when none.
+    std::size_t buried_in(const Eigen::Vector3d& p, const std::array<std::uint32_t, 3>& face,
+                          std::uint32_t owner) const {
+        const auto k = key_of(p);
+        const auto it = buckets_.find(pack(k[0], k[1], k[2]));
+        if (it == buckets_.end()) {
+            return SIZE_MAX;
+        }
+        for (const auto ti : it->second) {
+            if (ti == owner) {
+                continue;
+            }
+            const auto& t = tets_[ti];
+            if (std::find(t.begin(), t.end(), face[0]) != t.end() ||
+                std::find(t.begin(), t.end(), face[1]) != t.end() ||
+                std::find(t.begin(), t.end(), face[2]) != t.end()) {
+                continue;
+            }
+            if (strictly_inside(p, t)) {
+                return ti;
+            }
+        }
+        return SIZE_MAX;
+    }
+
+private:
+    std::array<long long, 3> key_of(const Eigen::Vector3d& p) const {
+        return {static_cast<long long>(std::floor(p.x() / cell_)),
+                static_cast<long long>(std::floor(p.y() / cell_)),
+                static_cast<long long>(std::floor(p.z() / cell_))};
+    }
+    static std::uint64_t pack(long long i, long long j, long long k) {
+        const auto u = [](long long v) {
+            return static_cast<std::uint64_t>(v + (1LL << 20)) & ((1ULL << 21) - 1);
+        };
+        return (u(i) << 42) | (u(j) << 21) | u(k);
+    }
+    bool strictly_inside(const Eigen::Vector3d& p, const std::array<std::uint32_t, 4>& t) const {
+        const Eigen::Vector3d& a = nodes_[t[0]];
+        const double v = tet_signed_volume_impl(a, nodes_[t[1]], nodes_[t[2]], nodes_[t[3]]);
+        if (!(v > 0.0)) {
+            return false;
+        }
+        // Strictly interior: every barycentric coordinate above a relative
+        // floor. A centroid ON a shared face (healthy adjacency) has one
+        // coordinate ~0 and MUST NOT count as buried.
+        const double tol = 1e-6;
+        const double l1 = tet_signed_volume_impl(a, p, nodes_[t[2]], nodes_[t[3]]) / v;
+        if (l1 < tol) {
+            return false;
+        }
+        const double l2 = tet_signed_volume_impl(a, nodes_[t[1]], p, nodes_[t[3]]) / v;
+        if (l2 < tol) {
+            return false;
+        }
+        const double l3 = tet_signed_volume_impl(a, nodes_[t[1]], nodes_[t[2]], p) / v;
+        if (l3 < tol) {
+            return false;
+        }
+        return 1.0 - l1 - l2 - l3 > tol;
+    }
+
+    std::span<const Eigen::Vector3d> nodes_;
+    std::span<const std::array<std::uint32_t, 4>> tets_;
+    double cell_;
+    std::unordered_map<std::uint64_t, std::vector<std::uint32_t>> buckets_;
+};
+
+// (buried free face index, index of the tet burying it)
+std::vector<std::pair<std::size_t, std::size_t>>
+buried_face_ids(std::span<const Eigen::Vector3d> nodes, const std::vector<FreeTetFace>& free,
+                const TetGrid& grid) {
+    std::vector<std::pair<std::size_t, std::size_t>> out;
+    for (std::size_t fi = 0; fi < free.size(); ++fi) {
+        const auto& f = free[fi];
+        const Eigen::Vector3d c =
+            (nodes[f.nodes[0]] + nodes[f.nodes[1]] + nodes[f.nodes[2]]) / 3.0;
+        if (const auto ti = grid.buried_in(c, f.nodes, f.owner); ti != SIZE_MAX) {
+            out.push_back({fi, ti});
+        }
+    }
+    return out;
+}
+
+} // namespace
+
+BuriedFaceStats count_buried_free_tet_faces(std::span<const Eigen::Vector3d> nodes,
+                                            std::span<const std::array<std::uint32_t, 4>> tets,
+                                            double h) {
+    BuriedFaceStats stats;
+    if (tets.empty() || !(h > 0.0)) {
+        return stats;
+    }
+    const auto free = free_tet_faces(tets);
+    stats.n_free_faces = free.size();
+    const TetGrid grid(nodes, tets, h);
+    stats.n_buried = buried_face_ids(nodes, free, grid).size();
+    return stats;
+}
+
+std::vector<std::uint32_t>
+buried_free_tet_face_owners(std::span<const Eigen::Vector3d> nodes,
+                            std::span<const std::array<std::uint32_t, 4>> tets, double h) {
+    std::vector<std::uint32_t> owners;
+    if (tets.empty() || !(h > 0.0)) {
+        return owners;
+    }
+    const auto free = free_tet_faces(tets);
+    const TetGrid grid(nodes, tets, h);
+    for (const auto& [fi, buryer] : buried_face_ids(nodes, free, grid)) {
+        owners.push_back(free[fi].owner);
+    }
+    std::sort(owners.begin(), owners.end());
+    owners.erase(std::unique(owners.begin(), owners.end()), owners.end());
+    return owners;
+}
+
+std::size_t pull_buried_free_faces(std::vector<Eigen::Vector3d>& nodes,
+                                   std::span<const std::array<std::uint32_t, 4>> tets,
+                                   double h, int max_iters) {
+    if (tets.empty() || !(h > 0.0)) {
+        return 0;
+    }
+    const auto free = free_tet_faces(tets);
+    std::unordered_map<std::uint32_t, std::vector<std::uint32_t>> star;
+    for (std::size_t ti = 0; ti < tets.size(); ++ti) {
+        for (const auto ni : tets[ti]) {
+            star[ni].push_back(static_cast<std::uint32_t>(ti));
+        }
+    }
+    const auto star_ok = [&](std::uint32_t ni) {
+        for (const auto ti : star[ni]) {
+            const auto& t = tets[ti];
+            if (tet_signed_volume_impl(nodes[t[0]], nodes[t[1]], nodes[t[2]], nodes[t[3]]) <=
+                0.0) {
+                return false;
+            }
+        }
+        return true;
+    };
+    for (int iter = 0; iter < max_iters; ++iter) {
+        const TetGrid grid(nodes, tets, h);
+        const auto buried = buried_face_ids(nodes, free, grid);
+        if (buried.empty()) {
+            return 0;
+        }
+        bool any_moved = false;
+        for (const auto& [fi, buryer] : buried) {
+            for (const auto ni : free[fi].nodes) {
+                Eigen::Vector3d target = Eigen::Vector3d::Zero();
+                std::size_t n_used = 0;
+                for (const auto ti : star[ni]) {
+                    for (const auto o : tets[ti]) {
+                        target += nodes[o];
+                        ++n_used;
+                    }
+                }
+                if (n_used == 0) {
+                    continue;
+                }
+                target /= static_cast<double>(n_used);
+                const Eigen::Vector3d saved = nodes[ni];
+                double frac = 0.5;
+                bool moved = false;
+                for (int cut = 0; cut < 4; ++cut) {
+                    nodes[ni] = saved + frac * (target - saved);
+                    if (star_ok(ni)) {
+                        moved = true;
+                        break;
+                    }
+                    frac *= 0.5;
+                }
+                if (!moved) {
+                    nodes[ni] = saved;
+                } else {
+                    any_moved = true;
+                }
+            }
+        }
+        if (!any_moved) {
+            break;
+        }
+    }
+    const TetGrid grid(nodes, tets, h);
+    return buried_face_ids(nodes, free, grid).size();
 }
 
 TetFillOutput tet_fill_surface(const geom::TriSurface& surface,

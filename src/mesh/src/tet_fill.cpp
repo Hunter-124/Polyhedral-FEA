@@ -108,10 +108,16 @@ public:
         }
     }
 
-    /// Index of a tet strictly containing `p` that is not `owner` and shares
-    /// no node with `face` — the burying tet. SIZE_MAX when none.
+    /// Index of a tet strictly containing `p` other than `owner` — the
+    /// burying tet. SIZE_MAX when none. Tets sharing nodes with `face` are
+    /// deliberately NOT excluded: at a concave crease the two crossed sheets
+    /// usually share the crease nodes, and excluding node-sharers hid exactly
+    /// the 9 flipped faces on icecream_cone's junction ring. Healthy adjacency
+    /// is already excluded by the strict barycentric floor — a centroid ON a
+    /// neighbour's face has a ~0 coordinate and never counts.
     std::size_t buried_in(const Eigen::Vector3d& p, const std::array<std::uint32_t, 3>& face,
                           std::uint32_t owner) const {
+        (void)face;
         const auto k = key_of(p);
         const auto it = buckets_.find(pack(k[0], k[1], k[2]));
         if (it == buckets_.end()) {
@@ -121,13 +127,7 @@ public:
             if (ti == owner) {
                 continue;
             }
-            const auto& t = tets_[ti];
-            if (std::find(t.begin(), t.end(), face[0]) != t.end() ||
-                std::find(t.begin(), t.end(), face[1]) != t.end() ||
-                std::find(t.begin(), t.end(), face[2]) != t.end()) {
-                continue;
-            }
-            if (strictly_inside(p, t)) {
+            if (strictly_inside(p, tets_[ti])) {
                 return ti;
             }
         }

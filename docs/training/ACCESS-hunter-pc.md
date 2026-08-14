@@ -43,24 +43,60 @@ RSA      SHA256:26/70fjfVvMR1FRfPL01DeacX672gv1ezxQljEkqRnk
 ECDSA    SHA256:SFfYeLRbkf0QRkBmveVKC3F3pT89ZfnDC7vaApPJwz0
 ```
 
-## 3. Enrolling the laptop's key
+## 3. Enrolling a key — this is what "it's not working" was
 
-`sshd` on the box allows `publickey` and `password`; `PermitRootLogin` is
-`prohibit-password` and keyboard-interactive is off. Only `livingroom-pc`'s key
-is in `authorized_keys` today, so the laptop must enrol its own once:
+The laptop (`192.168.0.122`) **does** reach this box. Its attempt at
+2026-08-14 11:25 got through TCP and key exchange (`op=start … res=success` in
+the audit log) and failed at exactly one step:
 
-```sh
-ssh-keygen -t ed25519 -C laptop-to-hunter-pc      # if the laptop has no key yet
-ssh-copy-id -i ~/.ssh/id_ed25519.pub hunter@hunter-pc.local
+```
+op=pubkey acct="hunter" addr=192.168.0.122 terminal=ssh res=failed
+Connection closed by authenticating user hunter 192.168.0.122 port 61583 [preauth]
 ```
 
-`ssh-copy-id` prompts for the `hunter` account password. **That password is
-delivered out of band and is never committed here.** After enrolment, verify
-key-only login works:
+So the network, the firewall, the address and the account are all fine: the
+laptop's public key simply is not in this account's `authorized_keys`, and a
+non-interactive agent never falls back to the password prompt. Nothing about the
+box needs changing — the key needs enrolling.
+
+`sshd` allows `publickey` and `password`; `PermitRootLogin` is
+`prohibit-password` and keyboard-interactive is off. `LogLevel VERBOSE` is now
+set (`/etc/ssh/sshd_config.d/10-loglevel-verbose.conf`), so a future failure logs
+the fingerprint of the key that was offered instead of only "Permission denied".
+
+### The repo is the enrolment channel
+
+A public key is not a secret, so it can travel in this public repository — which
+is the only channel an agent on another machine can use unattended. From the
+laptop:
 
 ```sh
-ssh -o BatchMode=yes hunter@hunter-pc.local 'hostname; nvidia-smi -L'
+ssh-keygen -t ed25519 -C laptop-to-hunter-pc      # only if it has no key yet
+cp ~/.ssh/id_ed25519.pub docs/training/authorized-keys/laptop.pub
+git add docs/training/authorized-keys/laptop.pub && git commit && git push
 ```
+
+Then, on this box (a human runs this; enrolment is never automatic):
+
+```sh
+git pull && ./scripts/enroll_lan_keys.sh --dry-run   # names each key + fingerprint
+./scripts/enroll_lan_keys.sh                         # appends the new ones
+```
+
+Re-running is a no-op, non-keys are rejected, and a key already present is
+reported rather than duplicated. Verified end to end on 2026-08-14 with
+`livingroom-pc`'s key, which failed `op=pubkey` the same way the laptop did and
+logged in immediately after enrolment:
+
+```sh
+$ ssh -o BatchMode=yes hunter@hunter-pc.local 'hostname; nvidia-smi -L'
+LOGIN-OK as hunter@hunter-pc
+NVIDIA GeForce RTX 3080 Ti
+```
+
+`ssh-copy-id -i ~/.ssh/id_ed25519.pub hunter@hunter-pc.local` also works if
+someone can type the account password interactively; that password is delivered
+out of band and is never committed here.
 
 ## 4. Verified state of the box (2026-08-14)
 

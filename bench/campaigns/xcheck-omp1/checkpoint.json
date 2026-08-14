@@ -1,0 +1,12 @@
+{
+  "campaign": "xcheck-omp1",
+  "completed_runs": 8,
+  "started_utc": "2026-08-14T16:06:47Z",
+  "state": "finished",
+  "survivors": [
+    "cfg-821713a4",
+    "cfg-99ed644e"
+  ],
+  "tier": 0,
+  "updated_utc": "2026-08-14T16:08:53Z"
+}

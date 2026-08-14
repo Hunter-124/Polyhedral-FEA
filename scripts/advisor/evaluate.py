@@ -108,6 +108,8 @@ def main() -> int:
 
     results: dict[str, Any] = R.score(cases, choosers, budget_head=args.budget_head)
     results["dof_to_target"] = R.dof_to_target(cases, choosers)
+    results["cost_at_tolerance"] = R.cost_at_tolerance(
+        cases, choosers, cost_head=args.budget_head)
     results["split_mode"] = data.split_mode
     results["fold"] = data.fold
     results["n_folds"] = data.n_folds
@@ -183,6 +185,22 @@ def main() -> int:
             spend = f"{10 ** median:>9.0f} DOF" if median == median else "  censored"
             print(f"    {name:>16}: reached {stats['reached']}/{stats['attempted']} "
                   f"({stats['reach_rate']:>4.0%})  median {spend}")
+
+    print("\ncheapest mesh meeting a relative-error tolerance "
+          "(violation rate first: a cheap mesh that misses the tolerance is not a saving)")
+    for target, rows in results["cost_at_tolerance"].items():
+        usable = {k: v for k, v in rows.items() if v["attempted"]}
+        if not usable:
+            continue
+        print(f"  {target}  ({next(iter(usable.values()))['attempted']} reachable cases):")
+        ranked = sorted(usable.items(),
+                        key=lambda kv: (kv[1]["violation_rate"], kv[1]["mean_cost_regret"]))
+        for name, stats in ranked:
+            regret = stats["mean_cost_regret"]
+            spend = (f"{R.decades_to_factor(regret):>5.2f}x cheapest"
+                     if regret == regret else "   no satisfying pick")
+            print(f"    {name:>20}: violated {stats['violation_rate']:>5.1%}  "
+                  f"satisfied {stats['satisfied']:>3}/{stats['attempted']}  {spend}")
 
     print("\nRegret in log10 units; 0 = chose the best feasible action the campaign ran.")
     print("Budget levels are quantiles of each case's own candidate cost distribution.")

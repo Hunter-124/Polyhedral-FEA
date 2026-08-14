@@ -127,12 +127,52 @@ polymesh mesh tests/fixtures/parts/icecream_cone.step -h 0.010
   → completes, no "buried" refusal  as required
 ```
 
-The handoff says to STOP on a mismatch, so this is flagged rather than waved
-through: the topology half of the gate passes and the volume error is *lower*
-than the recorded figure, not worse. The recorded figure was measured on the
-laptop's MSVC build; this is a gcc Release build of the same commit, which is
-the most likely source of the difference, but that has not been proven here.
-Resolve it before trusting labels produced on this box for graded_tet rows.
+The handoff says to STOP on a mismatch, so it was measured rather than waved
+through, and the answer is in §4.1: the gate value differs because the toolchain
+differs, the difference is real, and it is not confined to this one number.
+
+### 4.1 Resolved 2026-08-14 — gcc and MSVC do not agree on every mesh
+
+Three campaigns were run on this box against 24 `(part, cfg)` pairs already
+labelled on the laptop, at the batch-4 grid (`h_rel` 0.08, `hybrid_zoo` and
+`graded_tet`, 12 parts, one case each): `bench/campaigns/xcheck-gcc-1`, then
+`xcheck-omp1` and `xcheck-omp12` re-running the divergent parts at
+`OMP_NUM_THREADS` 1 and 12. None are named `advisor-*`, so `run_batch.py`'s
+permanent pair suppression never sees them.
+
+**This box is deterministic.** Every value in the three runs is identical —
+element counts, volume errors, statuses — so reduction order, thread count and
+run-to-run noise are ruled out. Two consecutive `polymesh solve` invocations of
+the gate command also return the same `rel_err = 5.214e-05` exactly.
+
+**19 of 24 pairs reproduce the MSVC labels; 5 do not.**
+
+| part | mesher | MSVC | gcc |
+| --- | --- | --- | --- |
+| `sphere_box_s0_c0` | graded_tet | `solve_fail`, no mesh | `ok`, 21,256 elems, err 4.7e-04 |
+| `stepped_shaft_s2_c0` | hybrid_zoo | 264 elems, err 0.05742 | 200 elems, err 0.06195 |
+| `stepped_shaft_s0_c0` | graded_tet | 12,671 elems | 12,662 elems |
+| `stepped_shaft_s2_c0` | graded_tet | 11,171 elems | 11,173 elems |
+| `plate_notch_s0_c0` | graded_tet | 6,426 elems | 6,424 elems |
+
+The element-count deltas are single digits, but they propagate: the worst
+`geometry_volume_err` change over the 24 pairs is +94 % (`stepped_shaft_s0_c0`
+graded_tet, 5.06e-05 → 9.81e-05), and one status flips outright. So the two
+builds make different decisions at floating-point-sensitive tie-breaks in the
+mesher, at a rate of about 1 pair in 5 on this grid.
+
+What follows for labelling, and it is a constraint rather than a defect:
+
+- Labels from this box are **internally consistent and reproducible**, and are
+  fine for any campaign generation that is labelled entirely here.
+- They are **not interchangeable per-pair with the existing corpus**, all of
+  which was labelled on the laptop's MSVC build
+  (`scripts/advisor/run_batch.py:616`). Never re-label part of a family here and
+  leave the rest MSVC: the advisor splits by family, so a mixed family puts a
+  toolchain artefact inside a fold.
+- The gate value in `HANDOFF-3080ti.md` §0.4 is an MSVC figure. On gcc the gate
+  is `rel_err = 5.214e-05`, `open=0 nonmanifold=0`, and that is what a future
+  bring-up on this box should compare against.
 
 ## 5. Notes for long unattended runs
 

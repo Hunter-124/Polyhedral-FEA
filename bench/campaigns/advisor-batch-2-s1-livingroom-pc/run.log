@@ -253,3 +253,24 @@ tier 0: h_scale=1 keep_frac=1 survivors=8 max_run_wall_s=180
 warehouse_shots: 0 rendered, 84 skipped (exists), 0 failed (84 mesh.vtu total)
 finished: 48 runs → /home/liveuser/Polyhedral-FEA/bench/campaigns/advisor-batch-2-s1-livingroom-pc/results.jsonl
 === exit 0 after 6.5s
+
+=== 2026-08-14T20:17:02Z OMP_NUM_THREADS=2 :: /home/liveuser/Polyhedral-FEA/build/apps/testlab/polymesh_testlab resume /home/liveuser/Polyhedral-FEA/bench/campaigns/advisor-batch-2-s1-livingroom-pc
+campaign advisor-batch-2-s1-livingroom-pc: 32 configs, 6 parts, 1 tiers
+  max_run_wall_s=180 (override all tiers)
+  max_pack_wall_s=21600
+tier 0: h_scale=1 keep_frac=1 survivors=1 max_run_wall_s=180
+  run cfg-27719197 part=l_bracket_s0_c0 tier=0 ...
+  run cfg-27719197 part=l_bracket_s0_c1 tier=0 ...
+  run cfg-27719197 part=l_bracket_s0_c2 tier=0 ...
+  run cfg-27719197 part=l_bracket_s2_c0 tier=0 ...
+  run cfg-27719197 part=l_bracket_s2_c1 tier=0 ...
+  run cfg-27719197 part=l_bracket_s2_c2 tier=0 ...
+wrote bench/campaigns/advisor-batch-2-s1-livingroom-pc/runs/cfg-27719197/l_bracket_s0_c0/t0/wire.png
+wrote bench/campaigns/advisor-batch-2-s1-livingroom-pc/runs/cfg-27719197/l_bracket_s0_c1/t0/wire.png
+wrote bench/campaigns/advisor-batch-2-s1-livingroom-pc/runs/cfg-27719197/l_bracket_s0_c2/t0/wire.png
+wrote bench/campaigns/advisor-batch-2-s1-livingroom-pc/runs/cfg-27719197/l_bracket_s2_c0/t0/wire.png
+wrote bench/campaigns/advisor-batch-2-s1-livingroom-pc/runs/cfg-27719197/l_bracket_s2_c1/t0/wire.png
+wrote bench/campaigns/advisor-batch-2-s1-livingroom-pc/runs/cfg-27719197/l_bracket_s2_c2/t0/wire.png
+warehouse_shots: 6 rendered, 84 skipped (exists), 0 failed (90 mesh.vtu total)
+finished: 6 runs → /home/liveuser/Polyhedral-FEA/bench/campaigns/advisor-batch-2-s1-livingroom-pc/results.jsonl
+=== exit 0 after 4.9s

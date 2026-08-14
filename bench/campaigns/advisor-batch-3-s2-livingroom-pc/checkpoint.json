@@ -1,7 +1,7 @@
 {
   "campaign": "advisor-batch-3-s2-livingroom-pc",
   "completed_runs": 24,
-  "started_utc": "2026-08-14T19:31:12Z",
+  "started_utc": "2026-08-14T20:17:10Z",
   "state": "finished",
   "survivors": [
     "cfg-e04b39c3",
@@ -10,5 +10,5 @@
     "cfg-a1ad5ec9"
   ],
   "tier": 0,
-  "updated_utc": "2026-08-14T19:31:15Z"
+  "updated_utc": "2026-08-14T20:17:58Z"
 }

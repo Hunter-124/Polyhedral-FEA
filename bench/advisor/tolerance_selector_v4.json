@@ -1,0 +1,4708 @@
+{
+  "provenance": {
+    "git_revision": "6ccc2cf230daed80148b547094a5b09712b705cf-dirty",
+    "created_utc": "2026-08-14T21:25:05Z",
+    "python": "3.14.6",
+    "numpy": "2.4.6",
+    "torch": "2.12.1+cu129",
+    "seed": 1234,
+    "dataset_csv": "/home/hunter/Desktop/Polyhedral-FEA/bench/advisor/dataset.csv",
+    "dataset_sha256": "5b009fe57b111e0f9a6cc5e28b86cb575c62dbb19dcc77a367d65509bff0d4da",
+    "dataset_rows": 2752,
+    "split_mode": "family",
+    "fold": 0,
+    "n_folds": 12,
+    "held_out_groups": [
+      "box_hole"
+    ],
+    "n_inputs": 62,
+    "n_actions": 9,
+    "geometry_features": [
+      "geo_curved_area_frac",
+      "geo_cyl_area_frac",
+      "geo_plane_area_frac",
+      "geo_other_area_frac",
+      "geo_min_curv_radius_rel",
+      "geo_log_curv_radius_mean",
+      "geo_log_curv_radius_std",
+      "geo_n_faces",
+      "geo_n_edges",
+      "geo_face_area_cv",
+      "geo_aspect_max",
+      "geo_aspect_mid",
+      "geo_volume_frac",
+      "geo_area_over_v23",
+      "geo_min_face_size_rel"
+    ],
+    "geometry_features_sha256": "406a2ef57e7c4fe4bed37ecc6b92207fec7a18f9ac31f42e7f4f9dbdf6f67fc4",
+    "epochs": 40,
+    "seeds": 1,
+    "include_failures": false
+  },
+  "split_mode": "family",
+  "n_folds": 12,
+  "folds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+  ],
+  "models": [
+    "net",
+    "lgbm"
+  ],
+  "max_violation": 0.1,
+  "cost_at_tolerance": {
+    "rel_err<=0.01": {
+      "finest_action": {
+        "macro_violation_rate": 0.8104166666666667,
+        "macro_mean_cost_regret": 0.23735036452611288,
+        "n_folds_violation": 8,
+        "n_folds_regret": 3,
+        "reachable_cases": 25
+      },
+      "lgbm_tol_0.01": {
+        "macro_violation_rate": 0.8291666666666666,
+        "macro_mean_cost_regret": 0.3585450450579325,
+        "n_folds_violation": 8,
+        "n_folds_regret": 4,
+        "reachable_cases": 25
+      },
+      "lgbm_tol_0.01_cal": {
+        "macro_violation_rate": 0.8604166666666666,
+        "macro_mean_cost_regret": 0.2799821893374125,
+        "n_folds_violation": 8,
+        "n_folds_regret": 4,
+        "reachable_cases": 25
+      },
+      "lgbm_tol_0.05": {
+        "macro_violation_rate": 0.9020833333333333,
+        "macro_mean_cost_regret": 0.04287981986999512,
+        "n_folds_violation": 8,
+        "n_folds_regret": 4,
+        "reachable_cases": 25
+      },
+      "lgbm_tol_0.05_cal": {
+        "macro_violation_rate": 0.8604166666666666,
+        "macro_mean_cost_regret": 0.2799821893374125,
+        "n_folds_violation": 8,
+        "n_folds_regret": 4,
+        "reachable_cases": 25
+      },
+      "lgbm_tol_0.1": {
+        "macro_violation_rate": 0.8020833333333334,
+        "macro_mean_cost_regret": 0.0,
+        "n_folds_violation": 8,
+        "n_folds_regret": 4,
+        "reachable_cases": 25
+      },
+      "lgbm_tol_0.1_cal": {
+        "macro_violation_rate": 0.8604166666666666,
+        "macro_mean_cost_regret": 0.2799821893374125,
+        "n_folds_violation": 8,
+        "n_folds_regret": 4,
+        "reachable_cases": 25
+      },
+      "net_tol_0.01": {
+        "macro_violation_rate": 0.8229166666666667,
+        "macro_mean_cost_regret": 0.46358482042948407,
+        "n_folds_violation": 8,
+        "n_folds_regret": 3,
+        "reachable_cases": 25
+      },
+      "net_tol_0.01_cal": {
+        "macro_violation_rate": 0.8020833333333334,
+        "macro_mean_cost_regret": 0.48632627725601196,
+        "n_folds_violation": 8,
+        "n_folds_regret": 4,
+        "reachable_cases": 25
+      },
+      "net_tol_0.05": {
+        "macro_violation_rate": 0.8291666666666666,
+        "macro_mean_cost_regret": 0.11613742510477702,
+        "n_folds_violation": 8,
+        "n_folds_regret": 3,
+        "reachable_cases": 25
+      },
+      "net_tol_0.05_cal": {
+        "macro_violation_rate": 0.8229166666666667,
+        "macro_mean_cost_regret": 0.46358482042948407,
+        "n_folds_violation": 8,
+        "n_folds_regret": 3,
+        "reachable_cases": 25
+      },
+      "net_tol_0.1": {
+        "macro_violation_rate": 0.85,
+        "macro_mean_cost_regret": 0.0,
+        "n_folds_violation": 8,
+        "n_folds_regret": 2,
+        "reachable_cases": 25
+      },
+      "net_tol_0.1_cal": {
+        "macro_violation_rate": 0.8229166666666667,
+        "macro_mean_cost_regret": 0.46358482042948407,
+        "n_folds_violation": 8,
+        "n_folds_regret": 3,
+        "reachable_cases": 25
+      },
+      "oracle": {
+        "macro_violation_rate": 0.0,
+        "macro_mean_cost_regret": 0.2608028590679169,
+        "n_folds_violation": 8,
+        "n_folds_regret": 8,
+        "reachable_cases": 25
+      },
+      "spend_budget": {
+        "macro_violation_rate": 0.76875,
+        "macro_mean_cost_regret": 0.3828407923380534,
+        "n_folds_violation": 8,
+        "n_folds_regret": 3,
+        "reachable_cases": 25
+      }
+    },
+    "rel_err<=0.05": {
+      "finest_action": {
+        "macro_violation_rate": 0.33333333333333337,
+        "macro_mean_cost_regret": 0.9090085313433692,
+        "n_folds_violation": 9,
+        "n_folds_regret": 7,
+        "reachable_cases": 31
+      },
+      "lgbm_tol_0.01": {
+        "macro_violation_rate": 0.5,
+        "macro_mean_cost_regret": 0.6563704411188761,
+        "n_folds_violation": 9,
+        "n_folds_regret": 6,
+        "reachable_cases": 31
+      },
+      "lgbm_tol_0.01_cal": {
+        "macro_violation_rate": 0.42592592592592593,
+        "macro_mean_cost_regret": 0.6308945152494643,
+        "n_folds_violation": 9,
+        "n_folds_regret": 6,
+        "reachable_cases": 31
+      },
+      "lgbm_tol_0.05": {
+        "macro_violation_rate": 0.425925925925926,
+        "macro_mean_cost_regret": 0.49460772105625705,
+        "n_folds_violation": 9,
+        "n_folds_regret": 7,
+        "reachable_cases": 31
+      },
+      "lgbm_tol_0.05_cal": {
+        "macro_violation_rate": 0.42592592592592593,
+        "macro_mean_cost_regret": 0.6308945152494643,
+        "n_folds_violation": 9,
+        "n_folds_regret": 6,
+        "reachable_cases": 31
+      },
+      "lgbm_tol_0.1": {
+        "macro_violation_rate": 0.3333333333333333,
+        "macro_mean_cost_regret": 0.3101816872755686,
+        "n_folds_violation": 9,
+        "n_folds_regret": 8,
+        "reachable_cases": 31
+      },
+      "lgbm_tol_0.1_cal": {
+        "macro_violation_rate": 0.42592592592592593,
+        "macro_mean_cost_regret": 0.6308945152494643,
+        "n_folds_violation": 9,
+        "n_folds_regret": 6,
+        "reachable_cases": 31
+      },
+      "net_tol_0.01": {
+        "macro_violation_rate": 0.5925925925925926,
+        "macro_mean_cost_regret": 0.5166461865107218,
+        "n_folds_violation": 9,
+        "n_folds_regret": 6,
+        "reachable_cases": 31
+      },
+      "net_tol_0.01_cal": {
+        "macro_violation_rate": 0.48148148148148157,
+        "macro_mean_cost_regret": 0.5074786004566011,
+        "n_folds_violation": 9,
+        "n_folds_regret": 7,
+        "reachable_cases": 31
+      },
+      "net_tol_0.05": {
+        "macro_violation_rate": 0.5185185185185185,
+        "macro_mean_cost_regret": 0.6584905604521434,
+        "n_folds_violation": 9,
+        "n_folds_regret": 6,
+        "reachable_cases": 31
+      },
+      "net_tol_0.05_cal": {
+        "macro_violation_rate": 0.48148148148148157,
+        "macro_mean_cost_regret": 0.4797726699284145,
+        "n_folds_violation": 9,
+        "n_folds_regret": 7,
+        "reachable_cases": 31
+      },
+      "net_tol_0.1": {
+        "macro_violation_rate": 0.5555555555555555,
+        "macro_mean_cost_regret": 0.7266029172473484,
+        "n_folds_violation": 9,
+        "n_folds_regret": 6,
+        "reachable_cases": 31
+      },
+      "net_tol_0.1_cal": {
+        "macro_violation_rate": 0.5740740740740741,
+        "macro_mean_cost_regret": 0.5009578863779703,
+        "n_folds_violation": 9,
+        "n_folds_regret": 6,
+        "reachable_cases": 31
+      },
+      "oracle": {
+        "macro_violation_rate": 0.0,
+        "macro_mean_cost_regret": 0.6653862750088728,
+        "n_folds_violation": 9,
+        "n_folds_regret": 9,
+        "reachable_cases": 31
+      },
+      "spend_budget": {
+        "macro_violation_rate": 0.4444444444444444,
+        "macro_mean_cost_regret": 1.3379510376188488,
+        "n_folds_violation": 9,
+        "n_folds_regret": 6,
+        "reachable_cases": 31
+      }
+    },
+    "rel_err<=0.1": {
+      "finest_action": {
+        "macro_violation_rate": 0.1481481481481481,
+        "macro_mean_cost_regret": 1.0973763624827066,
+        "n_folds_violation": 9,
+        "n_folds_regret": 8,
+        "reachable_cases": 31
+      },
+      "lgbm_tol_0.01": {
+        "macro_violation_rate": 0.48148148148148145,
+        "macro_mean_cost_regret": 0.7878448393609788,
+        "n_folds_violation": 9,
+        "n_folds_regret": 6,
+        "reachable_cases": 31
+      },
+      "lgbm_tol_0.01_cal": {
+        "macro_violation_rate": 0.4074074074074074,
+        "macro_mean_cost_regret": 0.7705082615216573,
+        "n_folds_violation": 9,
+        "n_folds_regret": 6,
+        "reachable_cases": 31
+      },
+      "lgbm_tol_0.05": {
+        "macro_violation_rate": 0.40740740740740744,
+        "macro_mean_cost_regret": 0.5401592481703986,
+        "n_folds_violation": 9,
+        "n_folds_regret": 7,
+        "reachable_cases": 31
+      },
+      "lgbm_tol_0.05_cal": {
+        "macro_violation_rate": 0.4074074074074074,
+        "macro_mean_cost_regret": 0.7705082615216573,
+        "n_folds_violation": 9,
+        "n_folds_regret": 6,
+        "reachable_cases": 31
+      },
+      "lgbm_tol_0.1": {
+        "macro_violation_rate": 0.3148148148148149,
+        "macro_mean_cost_regret": 0.42218401531378424,
+        "n_folds_violation": 9,
+        "n_folds_regret": 8,
+        "reachable_cases": 31
+      },
+      "lgbm_tol_0.1_cal": {
+        "macro_violation_rate": 0.4074074074074074,
+        "macro_mean_cost_regret": 0.7705082615216573,
+        "n_folds_violation": 9,
+        "n_folds_regret": 6,
+        "reachable_cases": 31
+      },
+      "net_tol_0.01": {
+        "macro_violation_rate": 0.5185185185185185,
+        "macro_mean_cost_regret": 0.8920472807354397,
+        "n_folds_violation": 9,
+        "n_folds_regret": 6,
+        "reachable_cases": 31
+      },
+      "net_tol_0.01_cal": {
+        "macro_violation_rate": 0.42592592592592593,
+        "macro_mean_cost_regret": 0.7771771816980272,
+        "n_folds_violation": 9,
+        "n_folds_regret": 7,
+        "reachable_cases": 31
+      },
+      "net_tol_0.05": {
+        "macro_violation_rate": 0.4629629629629629,
+        "macro_mean_cost_regret": 0.9091720528072781,
+        "n_folds_violation": 9,
+        "n_folds_regret": 6,
+        "reachable_cases": 31
+      },
+      "net_tol_0.05_cal": {
+        "macro_violation_rate": 0.42592592592592593,
+        "macro_mean_cost_regret": 0.7040036133357457,
+        "n_folds_violation": 9,
+        "n_folds_regret": 7,
+        "reachable_cases": 31
+      },
+      "net_tol_0.1": {
+        "macro_violation_rate": 0.4629629629629629,
+        "macro_mean_cost_regret": 0.9653408474392361,
+        "n_folds_violation": 9,
+        "n_folds_regret": 6,
+        "reachable_cases": 31
+      },
+      "net_tol_0.1_cal": {
+        "macro_violation_rate": 0.5185185185185185,
+        "macro_mean_cost_regret": 0.7724306530422634,
+        "n_folds_violation": 9,
+        "n_folds_regret": 6,
+        "reachable_cases": 31
+      },
+      "oracle": {
+        "macro_violation_rate": 0.0,
+        "macro_mean_cost_regret": 0.751745828875789,
+        "n_folds_violation": 9,
+        "n_folds_regret": 9,
+        "reachable_cases": 31
+      },
+      "spend_budget": {
+        "macro_violation_rate": 0.25925925925925924,
+        "macro_mean_cost_regret": 1.430011052177066,
+        "n_folds_violation": 9,
+        "n_folds_regret": 7,
+        "reachable_cases": 31
+      }
+    }
+  },
+  "runs": [
+    {
+      "fold": 0,
+      "held_out_groups": [
+        "box_hole"
+      ],
+      "n_val_cases": 3,
+      "cost_at_tolerance": {
+        "rel_err<=0.1": {
+          "oracle": {
+            "attempted": 3,
+            "satisfied": 3,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.2351075808207194,
+            "median_cost_regret": 0.3526613712310791
+          },
+          "finest_action": {
+            "attempted": 3,
+            "satisfied": 3,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.2993560632069905,
+            "median_cost_regret": 1.3657004833221436
+          },
+          "spend_budget": {
+            "attempted": 3,
+            "satisfied": 3,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.2993560632069905,
+            "median_cost_regret": 1.3657004833221436
+          },
+          "net_tol_0.1": {
+            "attempted": 3,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 3,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05": {
+            "attempted": 3,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 3,
+            "satisfied": 2,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.3526613712310791,
+            "median_cost_regret": 0.3526613712310791
+          },
+          "net_tol_0.01": {
+            "attempted": 3,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 3,
+            "satisfied": 2,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.3526613712310791,
+            "median_cost_regret": 0.3526613712310791
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 3,
+            "satisfied": 2,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.8591940402984619,
+            "median_cost_regret": 0.8591940402984619
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 3,
+            "satisfied": 2,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.8591940402984619,
+            "median_cost_regret": 0.8591940402984619
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 3,
+            "satisfied": 2,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.8591940402984619,
+            "median_cost_regret": 0.8591940402984619
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 3,
+            "satisfied": 2,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.8591940402984619,
+            "median_cost_regret": 0.8591940402984619
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 3,
+            "satisfied": 2,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.8591940402984619,
+            "median_cost_regret": 0.8591940402984619
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 3,
+            "satisfied": 2,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.8591940402984619,
+            "median_cost_regret": 0.8591940402984619
+          }
+        },
+        "rel_err<=0.05": {
+          "oracle": {
+            "attempted": 3,
+            "satisfied": 3,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.2351075808207194,
+            "median_cost_regret": 0.3526613712310791
+          },
+          "finest_action": {
+            "attempted": 3,
+            "satisfied": 3,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.2993560632069905,
+            "median_cost_regret": 1.3657004833221436
+          },
+          "spend_budget": {
+            "attempted": 3,
+            "satisfied": 3,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.2993560632069905,
+            "median_cost_regret": 1.3657004833221436
+          },
+          "net_tol_0.1": {
+            "attempted": 3,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 3,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05": {
+            "attempted": 3,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 3,
+            "satisfied": 2,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.3526613712310791,
+            "median_cost_regret": 0.3526613712310791
+          },
+          "net_tol_0.01": {
+            "attempted": 3,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 3,
+            "satisfied": 2,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.3526613712310791,
+            "median_cost_regret": 0.3526613712310791
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 3,
+            "satisfied": 2,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.8591940402984619,
+            "median_cost_regret": 0.8591940402984619
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 3,
+            "satisfied": 2,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.8591940402984619,
+            "median_cost_regret": 0.8591940402984619
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 3,
+            "satisfied": 2,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.8591940402984619,
+            "median_cost_regret": 0.8591940402984619
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 3,
+            "satisfied": 2,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.8591940402984619,
+            "median_cost_regret": 0.8591940402984619
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 3,
+            "satisfied": 2,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.8591940402984619,
+            "median_cost_regret": 0.8591940402984619
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 3,
+            "satisfied": 2,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.8591940402984619,
+            "median_cost_regret": 0.8591940402984619
+          }
+        },
+        "rel_err<=0.01": {
+          "oracle": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "finest_action": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "spend_budget": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          }
+        }
+      },
+      "tolerance_margins": {
+        "net": {
+          "rel_err<=0.1": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.4285714285714286
+          },
+          "rel_err<=0.05": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.5
+          },
+          "rel_err<=0.01": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.84
+          }
+        },
+        "lgbm": {
+          "rel_err<=0.1": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.1785714285714286
+          },
+          "rel_err<=0.05": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.2142857142857143
+          },
+          "rel_err<=0.01": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.76
+          }
+        }
+      }
+    },
+    {
+      "fold": 1,
+      "held_out_groups": [
+        "cantilever"
+      ],
+      "n_val_cases": 1,
+      "cost_at_tolerance": {
+        "rel_err<=0.1": {
+          "oracle": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.3889052867889404,
+            "median_cost_regret": 1.3889052867889404
+          },
+          "finest_action": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "spend_budget": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.4037764072418213,
+            "median_cost_regret": 1.4037764072418213
+          },
+          "net_tol_0.1": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          }
+        },
+        "rel_err<=0.05": {
+          "oracle": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.3889052867889404,
+            "median_cost_regret": 1.3889052867889404
+          },
+          "finest_action": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "spend_budget": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.4037764072418213,
+            "median_cost_regret": 1.4037764072418213
+          },
+          "net_tol_0.1": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          }
+        },
+        "rel_err<=0.01": {
+          "oracle": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.5215764045715332,
+            "median_cost_regret": 0.5215764045715332
+          },
+          "finest_action": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "spend_budget": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          }
+        }
+      },
+      "tolerance_margins": {
+        "net": {
+          "rel_err<=0.1": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.4666666666666667
+          },
+          "rel_err<=0.05": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.4666666666666667
+          },
+          "rel_err<=0.01": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.8333333333333334
+          }
+        },
+        "lgbm": {
+          "rel_err<=0.1": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.16666666666666663
+          },
+          "rel_err<=0.05": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.19999999999999996
+          },
+          "rel_err<=0.01": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.75
+          }
+        }
+      }
+    },
+    {
+      "fold": 2,
+      "held_out_groups": [
+        "channel"
+      ],
+      "n_val_cases": 6,
+      "cost_at_tolerance": {
+        "rel_err<=0.1": {
+          "oracle": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.747933824857076,
+            "median_cost_regret": 0.5268886089324951
+          },
+          "finest_action": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.4223584334055583,
+            "median_cost_regret": 1.5911093950271606
+          },
+          "spend_budget": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.4223584334055583,
+            "median_cost_regret": 1.5911093950271606
+          },
+          "net_tol_0.1": {
+            "attempted": 6,
+            "satisfied": 5,
+            "violation_rate": 0.16666666666666663,
+            "mean_cost_regret": 1.70683012008667,
+            "median_cost_regret": 1.6999318599700928
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 6,
+            "satisfied": 5,
+            "violation_rate": 0.16666666666666663,
+            "mean_cost_regret": 1.6148179054260254,
+            "median_cost_regret": 1.5467545986175537
+          },
+          "net_tol_0.05": {
+            "attempted": 6,
+            "satisfied": 5,
+            "violation_rate": 0.16666666666666663,
+            "mean_cost_regret": 1.70683012008667,
+            "median_cost_regret": 1.6999318599700928
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 6,
+            "satisfied": 5,
+            "violation_rate": 0.16666666666666663,
+            "mean_cost_regret": 1.6148179054260254,
+            "median_cost_regret": 1.5467545986175537
+          },
+          "net_tol_0.01": {
+            "attempted": 6,
+            "satisfied": 5,
+            "violation_rate": 0.16666666666666663,
+            "mean_cost_regret": 1.6148179054260254,
+            "median_cost_regret": 1.5467545986175537
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 6,
+            "satisfied": 5,
+            "violation_rate": 0.16666666666666663,
+            "mean_cost_regret": 1.6148179054260254,
+            "median_cost_regret": 1.5467545986175537
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.5406986474990845,
+            "median_cost_regret": 0.14276337623596191
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.4223584334055583,
+            "median_cost_regret": 1.5911093950271606
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.7900652488072714,
+            "median_cost_regret": 0.7480998039245605
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.4223584334055583,
+            "median_cost_regret": 1.5911093950271606
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.3712764581044514,
+            "median_cost_regret": 1.5145207643508911
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.4223584334055583,
+            "median_cost_regret": 1.5911093950271606
+          }
+        },
+        "rel_err<=0.05": {
+          "oracle": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.15964738527933756,
+            "median_cost_regret": 0.12068092823028564
+          },
+          "finest_action": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.8340719938278198,
+            "median_cost_regret": 0.7072025537490845
+          },
+          "spend_budget": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.8340719938278198,
+            "median_cost_regret": 0.7072025537490845
+          },
+          "net_tol_0.1": {
+            "attempted": 6,
+            "satisfied": 5,
+            "violation_rate": 0.16666666666666663,
+            "mean_cost_regret": 1.0008863925933837,
+            "median_cost_regret": 1.414405107498169
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 6,
+            "satisfied": 4,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.6306139230728149,
+            "median_cost_regret": 0.6306139230728149
+          },
+          "net_tol_0.05": {
+            "attempted": 6,
+            "satisfied": 5,
+            "violation_rate": 0.16666666666666663,
+            "mean_cost_regret": 1.0008863925933837,
+            "median_cost_regret": 1.414405107498169
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 6,
+            "satisfied": 4,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.6306139230728149,
+            "median_cost_regret": 0.6306139230728149
+          },
+          "net_tol_0.01": {
+            "attempted": 6,
+            "satisfied": 4,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.6306139230728149,
+            "median_cost_regret": 0.6306139230728149
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 6,
+            "satisfied": 4,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.6306139230728149,
+            "median_cost_regret": 0.6306139230728149
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 6,
+            "satisfied": 5,
+            "violation_rate": 0.16666666666666663,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.8340719938278198,
+            "median_cost_regret": 0.7072025537490845
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.20177880922953287,
+            "median_cost_regret": 0.0
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.8340719938278198,
+            "median_cost_regret": 0.7072025537490845
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.782990018526713,
+            "median_cost_regret": 0.6306139230728149
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.8340719938278198,
+            "median_cost_regret": 0.7072025537490845
+          }
+        },
+        "rel_err<=0.01": {
+          "oracle": {
+            "attempted": 4,
+            "satisfied": 4,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.005619049072265625,
+            "median_cost_regret": 0.0
+          },
+          "finest_action": {
+            "attempted": 4,
+            "satisfied": 1,
+            "violation_rate": 0.75,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "spend_budget": {
+            "attempted": 4,
+            "satisfied": 1,
+            "violation_rate": 0.75,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.1": {
+            "attempted": 4,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 4,
+            "satisfied": 1,
+            "violation_rate": 0.75,
+            "mean_cost_regret": 1.042342185974121,
+            "median_cost_regret": 1.042342185974121
+          },
+          "net_tol_0.05": {
+            "attempted": 4,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 4,
+            "satisfied": 1,
+            "violation_rate": 0.75,
+            "mean_cost_regret": 1.042342185974121,
+            "median_cost_regret": 1.042342185974121
+          },
+          "net_tol_0.01": {
+            "attempted": 4,
+            "satisfied": 1,
+            "violation_rate": 0.75,
+            "mean_cost_regret": 1.042342185974121,
+            "median_cost_regret": 1.042342185974121
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 4,
+            "satisfied": 1,
+            "violation_rate": 0.75,
+            "mean_cost_regret": 1.042342185974121,
+            "median_cost_regret": 1.042342185974121
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 4,
+            "satisfied": 1,
+            "violation_rate": 0.75,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 4,
+            "satisfied": 1,
+            "violation_rate": 0.75,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 4,
+            "satisfied": 1,
+            "violation_rate": 0.75,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 4,
+            "satisfied": 1,
+            "violation_rate": 0.75,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 4,
+            "satisfied": 2,
+            "violation_rate": 0.5,
+            "mean_cost_regret": 0.5211710929870605,
+            "median_cost_regret": 0.5211710929870605
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 4,
+            "satisfied": 1,
+            "violation_rate": 0.75,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          }
+        }
+      },
+      "tolerance_margins": {
+        "net": {
+          "rel_err<=0.1": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.56
+          },
+          "rel_err<=0.05": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.52
+          },
+          "rel_err<=0.01": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.8571428571428572
+          }
+        },
+        "lgbm": {
+          "rel_err<=0.1": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.24
+          },
+          "rel_err<=0.05": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.28
+          },
+          "rel_err<=0.01": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.7619047619047619
+          }
+        }
+      }
+    },
+    {
+      "fold": 3,
+      "held_out_groups": [
+        "cylinder"
+      ],
+      "n_val_cases": 1,
+      "cost_at_tolerance": {
+        "rel_err<=0.1": {
+          "oracle": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.8392424583435059,
+            "median_cost_regret": 1.8392424583435059
+          },
+          "finest_action": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.27732253074646,
+            "median_cost_regret": 1.27732253074646
+          },
+          "spend_budget": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 2.160837173461914,
+            "median_cost_regret": 2.160837173461914
+          },
+          "net_tol_0.1": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.8691091537475586,
+            "median_cost_regret": 1.8691091537475586
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.8691091537475586,
+            "median_cost_regret": 1.8691091537475586
+          },
+          "net_tol_0.05": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.8691091537475586,
+            "median_cost_regret": 1.8691091537475586
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.8691091537475586,
+            "median_cost_regret": 1.8691091537475586
+          },
+          "net_tol_0.01": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.8691091537475586,
+            "median_cost_regret": 1.8691091537475586
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.8691091537475586,
+            "median_cost_regret": 1.8691091537475586
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.5336024761199951,
+            "median_cost_regret": 0.5336024761199951
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.5336024761199951,
+            "median_cost_regret": 0.5336024761199951
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.5336024761199951,
+            "median_cost_regret": 0.5336024761199951
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.5336024761199951,
+            "median_cost_regret": 0.5336024761199951
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.5336024761199951,
+            "median_cost_regret": 0.5336024761199951
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.5336024761199951,
+            "median_cost_regret": 0.5336024761199951
+          }
+        },
+        "rel_err<=0.05": {
+          "oracle": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.8392424583435059,
+            "median_cost_regret": 1.8392424583435059
+          },
+          "finest_action": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "spend_budget": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 2.160837173461914,
+            "median_cost_regret": 2.160837173461914
+          },
+          "net_tol_0.1": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.8691091537475586,
+            "median_cost_regret": 1.8691091537475586
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.8691091537475586,
+            "median_cost_regret": 1.8691091537475586
+          },
+          "net_tol_0.05": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.8691091537475586,
+            "median_cost_regret": 1.8691091537475586
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.8691091537475586,
+            "median_cost_regret": 1.8691091537475586
+          },
+          "net_tol_0.01": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.8691091537475586,
+            "median_cost_regret": 1.8691091537475586
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.8691091537475586,
+            "median_cost_regret": 1.8691091537475586
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.5336024761199951,
+            "median_cost_regret": 0.5336024761199951
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.5336024761199951,
+            "median_cost_regret": 0.5336024761199951
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.5336024761199951,
+            "median_cost_regret": 0.5336024761199951
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.5336024761199951,
+            "median_cost_regret": 0.5336024761199951
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.5336024761199951,
+            "median_cost_regret": 0.5336024761199951
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.5336024761199951,
+            "median_cost_regret": 0.5336024761199951
+          }
+        },
+        "rel_err<=0.01": {
+          "oracle": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.7129487991333008,
+            "median_cost_regret": 0.7129487991333008
+          },
+          "finest_action": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "spend_budget": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.034543514251709,
+            "median_cost_regret": 1.034543514251709
+          },
+          "net_tol_0.1": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          }
+        }
+      },
+      "tolerance_margins": {
+        "net": {
+          "rel_err<=0.1": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.5
+          },
+          "rel_err<=0.05": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.5
+          },
+          "rel_err<=0.01": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.8333333333333334
+          }
+        },
+        "lgbm": {
+          "rel_err<=0.1": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.19999999999999996
+          },
+          "rel_err<=0.05": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.23333333333333328
+          },
+          "rel_err<=0.01": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.75
+          }
+        }
+      }
+    },
+    {
+      "fold": 4,
+      "held_out_groups": [
+        "icecream_cone"
+      ],
+      "n_val_cases": 1,
+      "cost_at_tolerance": {
+        "rel_err<=0.1": {
+          "oracle": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "finest_action": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "spend_budget": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          }
+        },
+        "rel_err<=0.05": {
+          "oracle": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "finest_action": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "spend_budget": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          }
+        },
+        "rel_err<=0.01": {
+          "oracle": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "finest_action": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "spend_budget": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          }
+        }
+      },
+      "tolerance_margins": {
+        "net": {
+          "rel_err<=0.1": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.4838709677419355
+          },
+          "rel_err<=0.05": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.4838709677419355
+          },
+          "rel_err<=0.01": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.84
+          }
+        },
+        "lgbm": {
+          "rel_err<=0.1": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.19354838709677424
+          },
+          "rel_err<=0.05": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.22580645161290325
+          },
+          "rel_err<=0.01": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.76
+          }
+        }
+      }
+    },
+    {
+      "fold": 5,
+      "held_out_groups": [
+        "l_bracket"
+      ],
+      "n_val_cases": 6,
+      "cost_at_tolerance": {
+        "rel_err<=0.1": {
+          "oracle": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.9613845348358154,
+            "median_cost_regret": 1.0062508583068848
+          },
+          "finest_action": {
+            "attempted": 6,
+            "satisfied": 5,
+            "violation_rate": 0.16666666666666663,
+            "mean_cost_regret": 1.2315126419067384,
+            "median_cost_regret": 1.1787104606628418
+          },
+          "spend_budget": {
+            "attempted": 6,
+            "satisfied": 5,
+            "violation_rate": 0.16666666666666663,
+            "mean_cost_regret": 1.2315126419067384,
+            "median_cost_regret": 1.1787104606628418
+          },
+          "net_tol_0.1": {
+            "attempted": 6,
+            "satisfied": 5,
+            "violation_rate": 0.16666666666666663,
+            "mean_cost_regret": 1.1288134574890136,
+            "median_cost_regret": 1.0091257095336914
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 6,
+            "satisfied": 2,
+            "violation_rate": 0.6666666666666667,
+            "mean_cost_regret": 0.1776599884033203,
+            "median_cost_regret": 0.1776599884033203
+          },
+          "net_tol_0.05": {
+            "attempted": 6,
+            "satisfied": 5,
+            "violation_rate": 0.16666666666666663,
+            "mean_cost_regret": 0.9060961723327636,
+            "median_cost_regret": 0.8337912559509277
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 6,
+            "satisfied": 3,
+            "violation_rate": 0.5,
+            "mean_cost_regret": 0.1184399922688802,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.01": {
+            "attempted": 6,
+            "satisfied": 2,
+            "violation_rate": 0.6666666666666667,
+            "mean_cost_regret": 0.8953597545623779,
+            "median_cost_regret": 0.8953597545623779
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.3553199768066406,
+            "median_cost_regret": 0.3553199768066406
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.8321032524108887,
+            "median_cost_regret": 0.8321032524108887
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 6,
+            "satisfied": 5,
+            "violation_rate": 0.16666666666666663,
+            "mean_cost_regret": 0.7073765754699707,
+            "median_cost_regret": 0.5129954814910889
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 6,
+            "satisfied": 2,
+            "violation_rate": 0.6666666666666667,
+            "mean_cost_regret": 1.2448452711105347,
+            "median_cost_regret": 1.2448452711105347
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 6,
+            "satisfied": 5,
+            "violation_rate": 0.16666666666666663,
+            "mean_cost_regret": 0.7073765754699707,
+            "median_cost_regret": 0.5129954814910889
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 6,
+            "satisfied": 5,
+            "violation_rate": 0.16666666666666663,
+            "mean_cost_regret": 0.7073765754699707,
+            "median_cost_regret": 0.5129954814910889
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 6,
+            "satisfied": 5,
+            "violation_rate": 0.16666666666666663,
+            "mean_cost_regret": 0.7073765754699707,
+            "median_cost_regret": 0.5129954814910889
+          }
+        },
+        "rel_err<=0.05": {
+          "oracle": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.8131317297617594,
+            "median_cost_regret": 0.9168124198913574
+          },
+          "finest_action": {
+            "attempted": 6,
+            "satisfied": 4,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 1.1619867086410522,
+            "median_cost_regret": 1.2567476034164429
+          },
+          "spend_budget": {
+            "attempted": 6,
+            "satisfied": 4,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 1.1619867086410522,
+            "median_cost_regret": 1.2567476034164429
+          },
+          "net_tol_0.1": {
+            "attempted": 6,
+            "satisfied": 3,
+            "violation_rate": 0.5,
+            "mean_cost_regret": 0.9310603936513265,
+            "median_cost_regret": 0.8302488327026367
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 6,
+            "satisfied": 2,
+            "violation_rate": 0.6666666666666667,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.05": {
+            "attempted": 6,
+            "satisfied": 4,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.574923574924469,
+            "median_cost_regret": 0.4784712791442871
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 6,
+            "satisfied": 3,
+            "violation_rate": 0.5,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.01": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.09412980079650879,
+            "median_cost_regret": 0.09412980079650879
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.47678327560424805,
+            "median_cost_regret": 0.47678327560424805
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 6,
+            "satisfied": 4,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.5068166255950928,
+            "median_cost_regret": 0.25649774074554443
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 1.5142710208892822,
+            "median_cost_regret": 1.5142710208892822
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 6,
+            "satisfied": 4,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.5068166255950928,
+            "median_cost_regret": 0.25649774074554443
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 6,
+            "satisfied": 4,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.5068166255950928,
+            "median_cost_regret": 0.25649774074554443
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 6,
+            "satisfied": 4,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.5068166255950928,
+            "median_cost_regret": 0.25649774074554443
+          }
+        },
+        "rel_err<=0.01": {
+          "oracle": {
+            "attempted": 5,
+            "satisfied": 5,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.18477268218994142,
+            "median_cost_regret": 0.0004925727844238281
+          },
+          "finest_action": {
+            "attempted": 5,
+            "satisfied": 3,
+            "violation_rate": 0.4,
+            "mean_cost_regret": 0.11397886276245117,
+            "median_cost_regret": 0.17041730880737305
+          },
+          "spend_budget": {
+            "attempted": 5,
+            "satisfied": 3,
+            "violation_rate": 0.4,
+            "mean_cost_regret": 0.11397886276245117,
+            "median_cost_regret": 0.17041730880737305
+          },
+          "net_tol_0.1": {
+            "attempted": 5,
+            "satisfied": 1,
+            "violation_rate": 0.8,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 5,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05": {
+            "attempted": 5,
+            "satisfied": 1,
+            "violation_rate": 0.8,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 5,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01": {
+            "attempted": 5,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 5,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 5,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 5,
+            "satisfied": 1,
+            "violation_rate": 0.8,
+            "mean_cost_regret": 0.17151927947998047,
+            "median_cost_regret": 0.17151927947998047
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 5,
+            "satisfied": 1,
+            "violation_rate": 0.8,
+            "mean_cost_regret": 0.17151927947998047,
+            "median_cost_regret": 0.17151927947998047
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 5,
+            "satisfied": 1,
+            "violation_rate": 0.8,
+            "mean_cost_regret": 0.17151927947998047,
+            "median_cost_regret": 0.17151927947998047
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 5,
+            "satisfied": 1,
+            "violation_rate": 0.8,
+            "mean_cost_regret": 0.17151927947998047,
+            "median_cost_regret": 0.17151927947998047
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 5,
+            "satisfied": 1,
+            "violation_rate": 0.8,
+            "mean_cost_regret": 0.17151927947998047,
+            "median_cost_regret": 0.17151927947998047
+          }
+        }
+      },
+      "tolerance_margins": {
+        "net": {
+          "rel_err<=0.1": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.43999999999999995
+          },
+          "rel_err<=0.05": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.48
+          },
+          "rel_err<=0.01": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.8
+          }
+        },
+        "lgbm": {
+          "rel_err<=0.1": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.19999999999999996
+          },
+          "rel_err<=0.05": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.19999999999999996
+          },
+          "rel_err<=0.01": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.75
+          }
+        }
+      }
+    },
+    {
+      "fold": 6,
+      "held_out_groups": [
+        "plate_hole"
+      ],
+      "n_val_cases": 1,
+      "cost_at_tolerance": {
+        "rel_err<=0.1": {
+          "oracle": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "finest_action": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "spend_budget": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          }
+        },
+        "rel_err<=0.05": {
+          "oracle": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "finest_action": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "spend_budget": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          }
+        },
+        "rel_err<=0.01": {
+          "oracle": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "finest_action": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "spend_budget": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          }
+        }
+      },
+      "tolerance_margins": {
+        "net": {
+          "rel_err<=0.1": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.4838709677419355
+          },
+          "rel_err<=0.05": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.4838709677419355
+          },
+          "rel_err<=0.01": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.84
+          }
+        },
+        "lgbm": {
+          "rel_err<=0.1": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.19354838709677424
+          },
+          "rel_err<=0.05": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.22580645161290325
+          },
+          "rel_err<=0.01": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.76
+          }
+        }
+      }
+    },
+    {
+      "fold": 7,
+      "held_out_groups": [
+        "plate_notch"
+      ],
+      "n_val_cases": 6,
+      "cost_at_tolerance": {
+        "rel_err<=0.1": {
+          "oracle": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.7481604417165121,
+            "median_cost_regret": 0.7954638004302979
+          },
+          "finest_action": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.39742644627889,
+            "median_cost_regret": 1.1564393043518066
+          },
+          "spend_budget": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.3991349538167317,
+            "median_cost_regret": 1.1575655937194824
+          },
+          "net_tol_0.1": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 1.0872923533121746,
+            "median_cost_regret": 0.802639365196228
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.9729968706766764,
+            "median_cost_regret": 0.5710935592651367
+          },
+          "net_tol_0.05": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.9729968706766764,
+            "median_cost_regret": 0.5710935592651367
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.9729968706766764,
+            "median_cost_regret": 0.5710935592651367
+          },
+          "net_tol_0.01": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.9729968706766764,
+            "median_cost_regret": 0.5710935592651367
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.9729968706766764,
+            "median_cost_regret": 0.5710935592651367
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.32990070184071857,
+            "median_cost_regret": 0.0
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.6737949450810751,
+            "median_cost_regret": 0.6664144992828369
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.32990070184071857,
+            "median_cost_regret": 0.0
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.6737949450810751,
+            "median_cost_regret": 0.6664144992828369
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.6737949450810751,
+            "median_cost_regret": 0.6664144992828369
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.6737949450810751,
+            "median_cost_regret": 0.6664144992828369
+          }
+        },
+        "rel_err<=0.05": {
+          "oracle": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.7481604417165121,
+            "median_cost_regret": 0.7954638004302979
+          },
+          "finest_action": {
+            "attempted": 6,
+            "satisfied": 4,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 1.142668604850769,
+            "median_cost_regret": 1.1426578760147095
+          },
+          "spend_budget": {
+            "attempted": 6,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1": {
+            "attempted": 6,
+            "satisfied": 3,
+            "violation_rate": 0.5,
+            "mean_cost_regret": 0.5585615634918213,
+            "median_cost_regret": 0.5710935592651367
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 6,
+            "satisfied": 4,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.5060242414474487,
+            "median_cost_regret": 0.5522955656051636
+          },
+          "net_tol_0.05": {
+            "attempted": 6,
+            "satisfied": 4,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.5060242414474487,
+            "median_cost_regret": 0.5522955656051636
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 6,
+            "satisfied": 4,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.5060242414474487,
+            "median_cost_regret": 0.5522955656051636
+          },
+          "net_tol_0.01": {
+            "attempted": 6,
+            "satisfied": 4,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.5060242414474487,
+            "median_cost_regret": 0.5522955656051636
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 6,
+            "satisfied": 4,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.5060242414474487,
+            "median_cost_regret": 0.5522955656051636
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.32990070184071857,
+            "median_cost_regret": 0.0
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.6737949450810751,
+            "median_cost_regret": 0.6664144992828369
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.32990070184071857,
+            "median_cost_regret": 0.0
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.6737949450810751,
+            "median_cost_regret": 0.6664144992828369
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.6737949450810751,
+            "median_cost_regret": 0.6664144992828369
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.6737949450810751,
+            "median_cost_regret": 0.6664144992828369
+          }
+        },
+        "rel_err<=0.01": {
+          "oracle": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.1951833963394165,
+            "median_cost_regret": 0.06763577461242676
+          },
+          "finest_action": {
+            "attempted": 6,
+            "satisfied": 4,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.5980722308158875,
+            "median_cost_regret": 0.5640811920166016
+          },
+          "spend_budget": {
+            "attempted": 6,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1": {
+            "attempted": 6,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.34841227531433105,
+            "median_cost_regret": 0.34841227531433105
+          },
+          "net_tol_0.05": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.34841227531433105,
+            "median_cost_regret": 0.34841227531433105
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.34841227531433105,
+            "median_cost_regret": 0.34841227531433105
+          },
+          "net_tol_0.01": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.34841227531433105,
+            "median_cost_regret": 0.34841227531433105
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.34841227531433105,
+            "median_cost_regret": 0.34841227531433105
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 6,
+            "satisfied": 3,
+            "violation_rate": 0.5,
+            "mean_cost_regret": 0.18693916002909342,
+            "median_cost_regret": 0.21240520477294922
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 6,
+            "satisfied": 3,
+            "violation_rate": 0.5,
+            "mean_cost_regret": 0.18693916002909342,
+            "median_cost_regret": 0.21240520477294922
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 6,
+            "satisfied": 3,
+            "violation_rate": 0.5,
+            "mean_cost_regret": 0.18693916002909342,
+            "median_cost_regret": 0.21240520477294922
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 6,
+            "satisfied": 3,
+            "violation_rate": 0.5,
+            "mean_cost_regret": 0.18693916002909342,
+            "median_cost_regret": 0.21240520477294922
+          }
+        }
+      },
+      "tolerance_margins": {
+        "net": {
+          "rel_err<=0.1": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.6
+          },
+          "rel_err<=0.05": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.52
+          },
+          "rel_err<=0.01": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.8421052631578947
+          }
+        },
+        "lgbm": {
+          "rel_err<=0.1": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.24
+          },
+          "rel_err<=0.05": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.28
+          },
+          "rel_err<=0.01": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.8421052631578947
+          }
+        }
+      }
+    },
+    {
+      "fold": 8,
+      "held_out_groups": [
+        "smoke_bar"
+      ],
+      "n_val_cases": 1,
+      "cost_at_tolerance": {
+        "rel_err<=0.1": {
+          "oracle": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.2632415294647217,
+            "median_cost_regret": 0.2632415294647217
+          },
+          "finest_action": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.8962504863739014,
+            "median_cost_regret": 0.8962504863739014
+          },
+          "spend_budget": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.2632415294647217,
+            "median_cost_regret": 0.2632415294647217
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          }
+        },
+        "rel_err<=0.05": {
+          "oracle": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.2632415294647217,
+            "median_cost_regret": 0.2632415294647217
+          },
+          "finest_action": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.8962504863739014,
+            "median_cost_regret": 0.8962504863739014
+          },
+          "spend_budget": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.2632415294647217,
+            "median_cost_regret": 0.2632415294647217
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          }
+        },
+        "rel_err<=0.01": {
+          "oracle": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.08715033531188965,
+            "median_cost_regret": 0.08715033531188965
+          },
+          "finest_action": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "spend_budget": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          }
+        }
+      },
+      "tolerance_margins": {
+        "net": {
+          "rel_err<=0.1": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.4666666666666667
+          },
+          "rel_err<=0.05": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.4666666666666667
+          },
+          "rel_err<=0.01": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.8333333333333334
+          }
+        },
+        "lgbm": {
+          "rel_err<=0.1": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.16666666666666663
+          },
+          "rel_err<=0.05": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.19999999999999996
+          },
+          "rel_err<=0.01": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.75
+          }
+        }
+      }
+    },
+    {
+      "fold": 9,
+      "held_out_groups": [
+        "sphere"
+      ],
+      "n_val_cases": 1,
+      "cost_at_tolerance": {
+        "rel_err<=0.1": {
+          "oracle": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.24379968643188477,
+            "median_cost_regret": 0.24379968643188477
+          },
+          "finest_action": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.16528749465942383,
+            "median_cost_regret": 0.16528749465942383
+          },
+          "spend_budget": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.05": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.01": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.004775524139404297,
+            "median_cost_regret": 0.004775524139404297
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          }
+        },
+        "rel_err<=0.05": {
+          "oracle": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.24379968643188477,
+            "median_cost_regret": 0.24379968643188477
+          },
+          "finest_action": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.16528749465942383,
+            "median_cost_regret": 0.16528749465942383
+          },
+          "spend_budget": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.05": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.01": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.004775524139404297,
+            "median_cost_regret": 0.004775524139404297
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          }
+        },
+        "rel_err<=0.01": {
+          "oracle": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.24379968643188477,
+            "median_cost_regret": 0.24379968643188477
+          },
+          "finest_action": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "spend_budget": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.05": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.01": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 1,
+            "satisfied": 1,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 1,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          }
+        }
+      },
+      "tolerance_margins": {
+        "net": {
+          "rel_err<=0.1": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.5
+          },
+          "rel_err<=0.05": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.5
+          },
+          "rel_err<=0.01": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.875
+          }
+        },
+        "lgbm": {
+          "rel_err<=0.1": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.16666666666666663
+          },
+          "rel_err<=0.05": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.19999999999999996
+          },
+          "rel_err<=0.01": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.75
+          }
+        }
+      }
+    },
+    {
+      "fold": 10,
+      "held_out_groups": [
+        "sphere_box"
+      ],
+      "n_val_cases": 6,
+      "cost_at_tolerance": {
+        "rel_err<=0.1": {
+          "oracle": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.3379371166229248,
+            "median_cost_regret": 0.24867451190948486
+          },
+          "finest_action": {
+            "attempted": 6,
+            "satisfied": 5,
+            "violation_rate": 0.16666666666666663,
+            "mean_cost_regret": 1.0894968032836914,
+            "median_cost_regret": 1.167677879333496
+          },
+          "spend_budget": {
+            "attempted": 6,
+            "satisfied": 5,
+            "violation_rate": 0.16666666666666663,
+            "mean_cost_regret": 1.093101692199707,
+            "median_cost_regret": 1.167677879333496
+          },
+          "net_tol_0.1": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.05": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.01": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 6,
+            "satisfied": 3,
+            "violation_rate": 0.5,
+            "mean_cost_regret": 0.27533499399820965,
+            "median_cost_regret": 0.24418044090270996
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 6,
+            "satisfied": 2,
+            "violation_rate": 0.6666666666666667,
+            "mean_cost_regret": 0.01873147487640381,
+            "median_cost_regret": 0.01873147487640381
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 6,
+            "satisfied": 5,
+            "violation_rate": 0.16666666666666663,
+            "mean_cost_regret": 0.4267230987548828,
+            "median_cost_regret": 0.27517271041870117
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 6,
+            "satisfied": 2,
+            "violation_rate": 0.6666666666666667,
+            "mean_cost_regret": 0.01873147487640381,
+            "median_cost_regret": 0.01873147487640381
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 6,
+            "satisfied": 5,
+            "violation_rate": 0.16666666666666663,
+            "mean_cost_regret": 0.4267230987548828,
+            "median_cost_regret": 0.27517271041870117
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.581824541091919,
+            "median_cost_regret": 0.581824541091919
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 6,
+            "satisfied": 5,
+            "violation_rate": 0.16666666666666663,
+            "mean_cost_regret": 0.4267230987548828,
+            "median_cost_regret": 0.27517271041870117
+          }
+        },
+        "rel_err<=0.05": {
+          "oracle": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.29724037647247314,
+            "median_cost_regret": 0.24867451190948486
+          },
+          "finest_action": {
+            "attempted": 6,
+            "satisfied": 4,
+            "violation_rate": 0.33333333333333337,
+            "mean_cost_regret": 0.8634383678436279,
+            "median_cost_regret": 0.8634383678436279
+          },
+          "spend_budget": {
+            "attempted": 6,
+            "satisfied": 2,
+            "violation_rate": 0.6666666666666667,
+            "mean_cost_regret": 1.167677879333496,
+            "median_cost_regret": 1.167677879333496
+          },
+          "net_tol_0.1": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.05": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.01": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 6,
+            "satisfied": 3,
+            "violation_rate": 0.5,
+            "mean_cost_regret": 0.1939415136973063,
+            "median_cost_regret": 0.0
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 6,
+            "satisfied": 2,
+            "violation_rate": 0.6666666666666667,
+            "mean_cost_regret": 0.01873147487640381,
+            "median_cost_regret": 0.01873147487640381
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 6,
+            "satisfied": 5,
+            "violation_rate": 0.16666666666666663,
+            "mean_cost_regret": 0.3778870105743408,
+            "median_cost_regret": 0.27517271041870117
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 6,
+            "satisfied": 2,
+            "violation_rate": 0.6666666666666667,
+            "mean_cost_regret": 0.01873147487640381,
+            "median_cost_regret": 0.01873147487640381
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 6,
+            "satisfied": 5,
+            "violation_rate": 0.16666666666666663,
+            "mean_cost_regret": 0.3778870105743408,
+            "median_cost_regret": 0.27517271041870117
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.581824541091919,
+            "median_cost_regret": 0.581824541091919
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 6,
+            "satisfied": 5,
+            "violation_rate": 0.16666666666666663,
+            "mean_cost_regret": 0.3778870105743408,
+            "median_cost_regret": 0.27517271041870117
+          }
+        },
+        "rel_err<=0.01": {
+          "oracle": {
+            "attempted": 6,
+            "satisfied": 6,
+            "violation_rate": 0.0,
+            "mean_cost_regret": 0.13537251949310303,
+            "median_cost_regret": 0.0
+          },
+          "finest_action": {
+            "attempted": 6,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "spend_budget": {
+            "attempted": 6,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1": {
+            "attempted": 6,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 6,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05": {
+            "attempted": 6,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 6,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01": {
+            "attempted": 6,
+            "satisfied": 0,
+            "violation_rate": 1.0,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.5545506477355957,
+            "median_cost_regret": 0.5545506477355957
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.7614703178405762,
+            "median_cost_regret": 0.7614703178405762
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.0,
+            "median_cost_regret": 0.0
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.7614703178405762,
+            "median_cost_regret": 0.7614703178405762
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.5545506477355957,
+            "median_cost_regret": 0.5545506477355957
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 6,
+            "satisfied": 1,
+            "violation_rate": 0.8333333333333334,
+            "mean_cost_regret": 0.7614703178405762,
+            "median_cost_regret": 0.7614703178405762
+          }
+        }
+      },
+      "tolerance_margins": {
+        "net": {
+          "rel_err<=0.1": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.4
+          },
+          "rel_err<=0.05": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.4
+          },
+          "rel_err<=0.01": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.8421052631578947
+          }
+        },
+        "lgbm": {
+          "rel_err<=0.1": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.19999999999999996
+          },
+          "rel_err<=0.05": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.24
+          },
+          "rel_err<=0.01": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.736842105263158
+          }
+        }
+      }
+    },
+    {
+      "fold": 11,
+      "held_out_groups": [
+        "stepped_shaft"
+      ],
+      "n_val_cases": 0,
+      "cost_at_tolerance": {
+        "rel_err<=0.1": {
+          "oracle": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "finest_action": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "spend_budget": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          }
+        },
+        "rel_err<=0.05": {
+          "oracle": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "finest_action": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "spend_budget": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          }
+        },
+        "rel_err<=0.01": {
+          "oracle": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "finest_action": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "spend_budget": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.1_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.05_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "net_tol_0.01_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.1_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.05_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          },
+          "lgbm_tol_0.01_cal": {
+            "attempted": 0,
+            "satisfied": 0,
+            "violation_rate": NaN,
+            "mean_cost_regret": NaN,
+            "median_cost_regret": NaN
+          }
+        }
+      },
+      "tolerance_margins": {
+        "net": {
+          "rel_err<=0.1": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.4838709677419355
+          },
+          "rel_err<=0.05": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.4838709677419355
+          },
+          "rel_err<=0.01": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.84
+          }
+        },
+        "lgbm": {
+          "rel_err<=0.1": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.19354838709677424
+          },
+          "rel_err<=0.05": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.22580645161290325
+          },
+          "rel_err<=0.01": {
+            "margin_decades": 2.0,
+            "calibration_violation_rate": 0.76
+          }
+        }
+      }
+    }
+  ]
+}

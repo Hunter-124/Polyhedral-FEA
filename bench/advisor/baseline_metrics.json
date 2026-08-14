@@ -2,50 +2,50 @@
   "model": "lightgbm.LGBMRegressor",
   "targets": {
     "rel_err": {
-      "val_mae": 0.27319006815833097,
-      "val_rmse": 0.4579159537826972,
-      "n_train": 1742,
-      "n_val": 396
+      "val_mae": 0.6553451559222861,
+      "val_rmse": 0.819493189585573,
+      "n_train": 2223,
+      "n_val": 138
     },
     "rel_err_rel": {
-      "val_mae": 0.22370194751945788,
-      "val_rmse": 0.37591649385624093,
-      "n_train": 1742,
-      "n_val": 396
+      "val_mae": 0.3847847312059381,
+      "val_rmse": 0.5199434081087774,
+      "n_train": 2223,
+      "n_val": 138
     },
     "geo_chamfer": {
-      "val_mae": 0.06112336758442675,
-      "val_rmse": 0.2087372030174455,
-      "n_train": 1742,
-      "n_val": 396
+      "val_mae": 0.3740103874982582,
+      "val_rmse": 0.7108215894964797,
+      "n_train": 2409,
+      "n_val": 162
     },
     "geo_p99": {
-      "val_mae": 0.07331156353138722,
-      "val_rmse": 0.17385957752907896,
-      "n_train": 1742,
-      "n_val": 396
+      "val_mae": 0.3573372559384271,
+      "val_rmse": 0.5293646033875901,
+      "n_train": 2409,
+      "n_val": 162
     },
     "dof": {
-      "val_mae": 0.02321082047651904,
-      "val_rmse": 0.045623834455152605,
-      "n_train": 1742,
-      "n_val": 396
+      "val_mae": 0.06612589310468238,
+      "val_rmse": 0.0974049384110561,
+      "n_train": 2409,
+      "n_val": 162
     },
     "mesh_ms": {
-      "val_mae": 0.05599659849128937,
-      "val_rmse": 0.08700893449696102,
-      "n_train": 1742,
-      "n_val": 396
+      "val_mae": 0.10005056416912184,
+      "val_rmse": 0.14687183632431197,
+      "n_train": 2409,
+      "n_val": 162
     },
     "solve_ms": {
-      "val_mae": 0.06814352132819486,
-      "val_rmse": 0.09432567321161078,
-      "n_train": 1742,
-      "n_val": 396
+      "val_mae": 0.11609043100832285,
+      "val_rmse": 0.15689318209214398,
+      "n_train": 2409,
+      "n_val": 162
     }
   },
-  "n_train": 2784,
-  "n_val": 672,
+  "n_train": 2680,
+  "n_val": 216,
   "params": {
     "n_estimators": 300,
     "learning_rate": 0.05,
@@ -82,6 +82,21 @@
     "fix_load_dist_over_diag",
     "load_axis_alignment",
     "poisson",
+    "geo_curved_area_frac",
+    "geo_cyl_area_frac",
+    "geo_plane_area_frac",
+    "geo_other_area_frac",
+    "geo_min_curv_radius_rel",
+    "geo_log_curv_radius_mean",
+    "geo_log_curv_radius_std",
+    "geo_n_faces",
+    "geo_n_edges",
+    "geo_face_area_cv",
+    "geo_aspect_max",
+    "geo_aspect_mid",
+    "geo_volume_frac",
+    "geo_area_over_v23",
+    "geo_min_face_size_rel",
     "case_poisson",
     "case_n_fix_regions",
     "case_n_load_regions",
@@ -92,14 +107,17 @@
     "h_rel",
     "eta_target",
     "adapt_passes",
-    "p_elevate",
     "element_tendency",
     "skin_layers",
     "feature_refine",
     "bc_grading",
     "adapt_leb_waves",
+    "log10_volume",
+    "log10_diag",
+    "log10_h",
+    "log10_cells",
     "order_idx",
     "mesher_idx"
   ],
-  "timestamp": "2026-08-12T10:24:31Z"
+  "timestamp": "2026-08-14T13:53:25Z"
 }

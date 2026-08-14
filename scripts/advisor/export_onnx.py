@@ -64,7 +64,17 @@ from .dataset import (
 from .model import AdvisorNet
 
 MODEL_ONNX = ADVISOR_DIR / "model.onnx"
+#: The shipped graph must be the shipped model: ``best.pt`` (best validation
+#: ``rel_err_rel`` of the current stage), not the trainer's ``latest.pt``
+#: resume point, which is simply the last run.
 LATEST_CHECKPOINT = ADVISOR_DIR / "runs" / "latest.pt"
+BEST_CHECKPOINT = ADVISOR_DIR / "runs" / "best.pt"
+
+
+def default_checkpoint() -> Path:
+    return BEST_CHECKPOINT if BEST_CHECKPOINT.is_file() else LATEST_CHECKPOINT
+
+
 FIXTURE_DIR = ROOT / "tests" / "fixtures" / "advisor_tiny"
 
 #: Keys in ``clamps.json`` that the C++ reads *after* inference. They affect no
@@ -282,7 +292,7 @@ def normalization_drift(saved: dict[str, Any], fresh: dict[str, Any]) -> list[st
 
 
 def run_export(args: argparse.Namespace) -> int:
-    checkpoint = Path(args.checkpoint) if args.checkpoint else LATEST_CHECKPOINT
+    checkpoint = Path(args.checkpoint) if args.checkpoint else default_checkpoint()
     data = load_from_args(args)
     net, payload = load_trained(checkpoint, data)
 
@@ -732,7 +742,7 @@ def run_tiny_fixture(args: argparse.Namespace) -> int:
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--checkpoint", default=None, help="checkpoint to export (default runs/latest.pt)")
+    parser.add_argument("--checkpoint", default=None, help="checkpoint to export (default runs/best.pt, else runs/latest.pt)")
     parser.add_argument("--output", default=None, help="output .onnx path (default bench/advisor/model.onnx)")
     parser.add_argument("--csv", default=None, help="dataset CSV override")
     add_split_args(parser)

@@ -126,9 +126,45 @@ CONTINUOUS_ACTION_COLUMNS: list[str] = [
 ]
 CATEGORICAL_INDEX_COLUMNS: list[str] = ["order_idx", "mesher_idx"]
 
+#: Scale-law inputs, derived per row rather than read from the CSV.
+#:
+#: Element count obeys ``n ~ volume / h^3`` and the cost heads are log10
+#: targets, so the relationship the cost heads need is LINEAR in these four
+#: and in nothing the raw columns offer: ``h`` itself is not an input at all
+#: (only the dimensionless ``h_rel``), and ``volume`` spans several decades
+#: across the corpus, which standardisation compresses into a spike.
+#:
+#: Measured on the clean regenerated dataset with a family-held-out split, the
+#: net without these features predicted DOF to a validation MAE of 0.70 in
+#: log10 -- a factor of five -- while a LightGBM baseline on the same split and
+#: the same columns reached 0.059, because trees can recover a ratio by
+#: splitting where a standardised MLP cannot.
+DERIVED_FEATURE_COLUMNS: list[str] = [
+    "log10_volume", "log10_diag", "log10_h", "log10_cells",
+]
+
+
+def derived_features(volume: float, diag: float, h_rel: float) -> dict[str, float]:
+    """The four scale-law inputs. Non-positive or missing inputs give NaN,
+    which the loader imputes like any other absent column."""
+
+    def lg(value: float) -> float:
+        return math.log10(value) if value > 0.0 and math.isfinite(value) else math.nan
+
+    log_v = lg(volume)
+    log_d = lg(diag)
+    log_h = log_d + lg(h_rel)  # h = h_rel * diag, and the CSV carries no h_rel-free h
+    return {
+        "log10_volume": log_v,
+        "log10_diag": log_d,
+        "log10_h": log_h,
+        "log10_cells": log_v - 3.0 * log_h,
+    }
+
+
 INPUT_COLUMNS: list[str] = (
     FEATURE_COLUMNS + GEOMETRY_FEATURE_COLUMNS + CASE_COLUMNS
-    + CONTINUOUS_ACTION_COLUMNS + CATEGORICAL_INDEX_COLUMNS
+    + CONTINUOUS_ACTION_COLUMNS + DERIVED_FEATURE_COLUMNS + CATEGORICAL_INDEX_COLUMNS
 )
 PASSTHROUGH_COLUMNS: list[str] = list(CATEGORICAL_INDEX_COLUMNS)
 
@@ -637,6 +673,7 @@ def _raw_matrix(rows: list[dict[str, str]], mesher_choices: list[str]) -> np.nda
     mesher_unknown = float(len(mesher_choices))
     order_col = INPUT_COLUMNS.index("order_idx")
     mesher_col = INPUT_COLUMNS.index("mesher_idx")
+    derived_cols = [INPUT_COLUMNS.index(name) for name in DERIVED_FEATURE_COLUMNS]
     for r, row in enumerate(rows):
         for name, c in zip(plain, plain_cols):
             x[r, c] = to_float(row.get(name))
@@ -656,6 +693,11 @@ def _raw_matrix(rows: list[dict[str, str]], mesher_choices: list[str]) -> np.nda
             x[r, order_col] = order_unknown
         mesher_value = str(row.get("mesher", "") or "").strip()
         x[r, mesher_col] = float(mesher_lookup.get(mesher_value, int(mesher_unknown)))
+        derived = derived_features(to_float(row.get("volume")),
+                                   to_float(row.get("diag")),
+                                   to_float(row.get("h_rel")))
+        for name, c in zip(DERIVED_FEATURE_COLUMNS, derived_cols):
+            x[r, c] = derived[name]
     return x
 
 

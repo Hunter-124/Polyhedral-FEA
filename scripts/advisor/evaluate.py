@@ -50,8 +50,18 @@ from .crossval import build_choosers  # noqa: E402
 from .dataset import ADVISOR_DIR, add_split_args, group_of, load_from_args  # noqa: E402
 from .model import AdvisorNet  # noqa: E402
 
+#: ``latest.pt`` is the trainer's resume point — the LAST run, not the best
+#: one. Evaluation reports what would ship, so it reads ``best.pt`` (the best
+#: validation ``rel_err_rel`` of the current stage) whenever the trainer has
+#: written one, and only falls back to the resume point for old run
+#: directories that predate best-checkpoint selection.
 LATEST_CHECKPOINT = ADVISOR_DIR / "runs" / "latest.pt"
+BEST_CHECKPOINT = ADVISOR_DIR / "runs" / "best.pt"
 REPORT_JSON = ADVISOR_DIR / "action_selection.json"
+
+
+def default_checkpoint() -> Path:
+    return BEST_CHECKPOINT if BEST_CHECKPOINT.is_file() else LATEST_CHECKPOINT
 
 
 def spearman(a: np.ndarray, b: np.ndarray) -> float:
@@ -79,7 +89,7 @@ def main() -> int:
     args = parser.parse_args()
     torch.set_num_threads(args.threads)
 
-    checkpoint = Path(args.checkpoint) if args.checkpoint else LATEST_CHECKPOINT
+    checkpoint = Path(args.checkpoint) if args.checkpoint else default_checkpoint()
     if not checkpoint.is_file():
         raise SystemExit(f"no checkpoint at {checkpoint}; run scripts/advisor/train.py first")
     payload = torch.load(checkpoint, map_location="cpu", weights_only=False)

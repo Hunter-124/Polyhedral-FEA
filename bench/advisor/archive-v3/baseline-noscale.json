@@ -1,0 +1,119 @@
+{
+  "model": "lightgbm.LGBMRegressor",
+  "targets": {
+    "rel_err": {
+      "val_mae": 0.7086360415842418,
+      "val_rmse": 0.8933508909802642,
+      "n_train": 2223,
+      "n_val": 138
+    },
+    "rel_err_rel": {
+      "val_mae": 0.3710193783954555,
+      "val_rmse": 0.5195707381115411,
+      "n_train": 2223,
+      "n_val": 138
+    },
+    "geo_chamfer": {
+      "val_mae": 0.2316514687008502,
+      "val_rmse": 0.42076087029063997,
+      "n_train": 2409,
+      "n_val": 162
+    },
+    "geo_p99": {
+      "val_mae": 0.30867282430416276,
+      "val_rmse": 0.45568919851168244,
+      "n_train": 2409,
+      "n_val": 162
+    },
+    "dof": {
+      "val_mae": 0.059236937702297446,
+      "val_rmse": 0.08375401441541212,
+      "n_train": 2409,
+      "n_val": 162
+    },
+    "mesh_ms": {
+      "val_mae": 0.09199584879943135,
+      "val_rmse": 0.14141633785825655,
+      "n_train": 2409,
+      "n_val": 162
+    },
+    "solve_ms": {
+      "val_mae": 0.15581657022818793,
+      "val_rmse": 0.18731744203414857,
+      "n_train": 2409,
+      "n_val": 162
+    }
+  },
+  "n_train": 2680,
+  "n_val": 216,
+  "params": {
+    "n_estimators": 300,
+    "learning_rate": 0.05,
+    "num_leaves": 31,
+    "min_child_samples": 5,
+    "n_jobs": 4,
+    "random_state": 1234,
+    "verbose": -1
+  },
+  "input_columns": [
+    "bbox_dx",
+    "bbox_dy",
+    "bbox_dz",
+    "diag",
+    "volume",
+    "surface_area",
+    "sa_over_v23",
+    "n_faces",
+    "n_sharp_edges",
+    "sharp_edge_len_total",
+    "curved_frac",
+    "kappa_max_h",
+    "kappa_mean_h",
+    "thin_min_over_diag",
+    "thin_p10_over_diag",
+    "min_feature_h",
+    "n_fix_faces",
+    "n_load_faces",
+    "fix_area_frac",
+    "load_area_frac",
+    "load_dir_x",
+    "load_dir_y",
+    "load_dir_z",
+    "fix_load_dist_over_diag",
+    "load_axis_alignment",
+    "poisson",
+    "geo_curved_area_frac",
+    "geo_cyl_area_frac",
+    "geo_plane_area_frac",
+    "geo_other_area_frac",
+    "geo_min_curv_radius_rel",
+    "geo_log_curv_radius_mean",
+    "geo_log_curv_radius_std",
+    "geo_n_faces",
+    "geo_n_edges",
+    "geo_face_area_cv",
+    "geo_aspect_max",
+    "geo_aspect_mid",
+    "geo_volume_frac",
+    "geo_area_over_v23",
+    "geo_min_face_size_rel",
+    "case_poisson",
+    "case_n_fix_regions",
+    "case_n_load_regions",
+    "case_load_dir_x",
+    "case_load_dir_y",
+    "case_load_dir_z",
+    "case_traction_magnitude",
+    "h_rel",
+    "eta_target",
+    "adapt_passes",
+    "element_tendency",
+    "skin_layers",
+    "feature_refine",
+    "bc_grading",
+    "adapt_leb_waves",
+    "order_idx",
+    "mesher_idx"
+  ],
+  "timestamp": "2026-08-14T13:35:10Z"
+}

@@ -1,11 +1,11 @@
 {
   "campaign": "advisor-batch-4-s0-livingroom-pc",
   "completed_runs": 6,
-  "started_utc": "2026-08-14T19:31:18Z",
+  "started_utc": "2026-08-14T20:18:58Z",
   "state": "finished",
   "survivors": [
     "cfg-99ed644e"
   ],
   "tier": 0,
-  "updated_utc": "2026-08-14T19:31:26Z"
+  "updated_utc": "2026-08-14T20:19:22Z"
 }

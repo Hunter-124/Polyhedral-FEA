@@ -1,12 +1,5 @@
 {
   "part": "icecream_cone",
-  "metrics": [
-    {
-      "name": "sigma_max",
-      "value": 1.0e6,
-      "tol": 1.0,
-      "probe": { "kind": "max_von_mises" },
-      "derivation": "docs/validation/hand-calcs.md#icecream-cone"
-    }
-  ]
+  "comment": "No scored metric, deliberately. hand-calcs.md#icecream-cone: the fused frustum/sphere solid has no elementary elasticity solution under this partial-surface traction, and the historical sigma_max entry was calibrated to a superseded pyramid/sphere fixture -- 'not a validated truth for this geometry and must not support a solver-accuracy claim'. It scored raw nodal max von Mises, which ADR-0023 prohibits as a score and load_metrics now rejects. Restore a metric here only as the frozen Richardson family for strain energy and face-mean displacement the doc calls for; until then this part gates BRep validity, mesh fidelity, load-resultant conservation and quality, not solver accuracy.",
+  "metrics": []
 }

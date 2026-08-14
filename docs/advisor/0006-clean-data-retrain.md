@@ -95,13 +95,17 @@ harder, or the advisor's failure mode got worse — and this document does not
 choose between them, because nothing measured here separates them. The next
 measurement is per-fold regret against fold difficulty on both datasets.
 
-**Answered in [0008](0008-v4-corpus-retrain.md) §4: neither reading is right.**
-A single one-case fold, `smoke_bar`, carries ~3.0 decades of regret against
-random's 0.909 and shifts the advisor-minus-random macro gap by +0.19 — the whole
-observed gap is +0.12. Excluding it the advisor leads random on this corpus
-(0.577 vs 0.652) and on the v4 corpus (0.640 vs 0.733), wins the median on both,
-and wins 7 folds of 11 on both. The macro mean was averaging one-case folds
-against six-case folds with equal weight.
+**Answered in [0008](0008-v4-corpus-retrain.md) §4: it was a bad label, not a
+bad model and not a harder corpus.** The one-case `smoke_bar` fold carried ~3.0
+decades of regret and shifted the advisor-minus-random macro gap by +0.19 when
+the whole observed gap was +0.12. Its reference scored raw nodal max von Mises
+on a fully clamped bar — a quantity that *diverges* under refinement
+(Spearman(DOF, rel_err) = +0.70), so the advisor was charged three decades for
+correctly choosing a finer discretisation, and every model trained on those rows
+learned that order 2 is catastrophic. ADR-0023 already prohibited that probe as
+a score; nothing enforced it. With the metric corrected to strain energy the
+fold drops to 1.114 against random's 0.497 and the advisor leads random on the
+raw macro mean (0.601 vs 0.687).
 
 The failure head remains near chance (validation AUC 0.51–0.75 across runs,
 0.64 on the shipped checkpoint). It was near chance before the regeneration

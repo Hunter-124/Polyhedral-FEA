@@ -64,7 +64,34 @@ Von Mises stress for uniaxial tension:
   = 1.0 \times 10^{6}\,\mathrm{Pa}.
 \]
 
-**Metric `sigma_vm`:** value \(1.0\times 10^{6}\), relative tolerance \(2\,\%\).
+**Not a score.** The continuum field above is uniform, but the case clamps all
+three DOFs on \(x\approx 0\), which suppresses Poisson contraction there and
+puts a stress singularity on the clamped edge. Raw nodal
+\(\sigma_{\mathrm{vm}}^{\max}\) therefore does not converge to \(10^6\): it
+*grows* with resolution as the discretisation resolves the corner. Measured over
+the 288 campaign rows for this part, Spearman\((\mathrm{DOF},\,
+\text{rel\_err}) = +0.70\), order-2 rows have a median relative error of 2.7 and
+a maximum of 12.05 — \(\sigma_{\mathrm{vm}}^{\max} = 1.3\times10^{7}\,\mathrm{Pa}\)
+against a \(10^6\) reference. It is the same prohibition ADR-0023 and the
+cylinder section already state; smoke-bar simply predated it. `sigma_vm` is a
+**diagnostic**, and `load_metrics` (apps/testlab/main.cpp) now refuses any
+reference that scores probe kind `max_von_mises`.
+
+### Strain energy (primary campaign score)
+
+Uniform uniaxial field, \(\varepsilon_{xx} = \sigma_{xx}/E\), over
+\(V = L\,w\,h = 0.1\cdot 0.01\cdot 0.01 = 1.0\times10^{-5}\,\mathrm{m}^3\):
+
+\[
+U = \tfrac12 \frac{\sigma_{xx}^2}{E} V
+  = \tfrac12 \frac{(10^{6})^2}{2.0\times10^{11}}\cdot 10^{-5}
+  = 2.5 \times 10^{-5}\,\mathrm{J}.
+\]
+
+**Metric `strain_energy`:** value \(2.5\times 10^{-5}\,\mathrm{J}\), relative
+tolerance \(15\,\%\). Probe = `strain_energy` (\(\tfrac12\mathbf{u}^T K\mathbf{u}\)).
+A global energy functional converges from below under refinement, so unlike the
+nodal maximum it rewards a better mesh instead of punishing one.
 
 ### Tip axial displacement
 
@@ -80,8 +107,12 @@ u_x(L)
 
 (Poisson contraction of the cross-section does not affect \(u_x\).)
 
-**Metric `tip_ux`:** value \(5.0\times 10^{-7}\,\mathrm{m}\), relative
-tolerance \(2\,\%\). Probe = mean \(u_x\) on the \(x=L\) face nodes.
+**Metric `tip_deflection`:** value \(5.0\times 10^{-7}\,\mathrm{m}\), relative
+tolerance \(15\,\%\). Probe = `tip_deflection` (face-mean \(|\mathbf{u}|\) on the
+loaded end face), the same probe and band the cylinder uses; it catches BC and
+rigid-body-mode regressions and is nearly mesh-insensitive. The former 2 %
+`tip_ux` band belonged to the retired analytic-gate framing, not to a campaign
+score.
 
 ---
 

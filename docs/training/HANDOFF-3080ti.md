@@ -35,20 +35,24 @@ so **nothing labelled before `798ef79` is trustworthy for graded_tet rows**.
   `fill-stage guard` refusal that now succeeds (spot-check the 16 configs that
   flipped in the earlier audit).
 
-### 1.1 v4 regeneration — in flight since 2026-08-14, gcc only
+### 1.1 v4 regeneration — COMPLETE 2026-08-14, gcc only
 
 The v3 rows were superseded again by ADR-0032: the mesher no longer depends on
 the standard library's hash order, and every row on record was labelled on the
 laptop's MSVC build, which disagrees with the fixed mesher on part of the
 corpus. `bench/campaigns/advisor-*` moved whole into `archive-v4/`, and
 `bench/advisor/archive-v4/dataset-v3.csv` preserves the 2,896-row dataset every
-number in `docs/advisor/0006` and `0007` was measured on. `dataset.csv` is
-**empty** until the campaigns land.
+number in `docs/advisor/0006` and `0007` was measured on. `dataset.csv` is now
+the v4 corpus: **2,752 training rows** from 3,528 labelled pairs.
 
-Scope: 3,528 batch pairs (stages 1–4) plus a **288**-pair truth campaign — the
-committed truth campaign had been the stale 72-case version, which is what the
-"216/288, 3 configs incomplete" gate message meant; it now covers all 96 cases,
-including the tube and perforated_plate families that had no reference solve.
+Scope: 3,528 batch pairs (stages 1–4). The 288-pair truth campaign was **not**
+run and should not be: every corpus reference carries an `analytic` or
+`external-gmsh-mesh+calculix-solver` source, promotion refuses all of them, and
+`run_batch` now asks `promote_truth --check-promotable` before spending a single
+order-2 adaptive solve on it. (The committed truth campaign had also been the
+stale 72-case version, which is what the "216/288, 3 configs incomplete" gate
+message meant; it now covers all 96 cases, for whenever a provisional family
+makes it useful again.)
 
 Split, both hosts on gcc, both verified to write byte-identical meshes
 (`plate_hole` at h = 4 mm, md5 `9f13124199…`, gcc 15 here and gcc 16 there):
@@ -91,14 +95,22 @@ generation split exists to prevent.
 
 ### 2a. Retrain the current advisor (first, cheap, de-risks the pipeline)
 - Existing 44-feature classifier, existing training script, clean campaign.
-- Checkpoint cadence: every epoch; keep the OOD veto (mahalanobis) —
-  unit_box must still veto with distance ≈ 61.8.
+- Checkpoint cadence: every epoch; keep the OOD veto (mahalanobis) — unit_box
+  must still veto. The distance itself is training-distribution dependent and
+  moved 61.8 (v3) → 44.76 (v4); "still vetoes" is the contract, not the number.
 - Acceptance: advisor smoke tests unchanged (plate_hole → graded_tet,
   exit 0), held-out accuracy ≥ old model on the clean labels.
-- **DONE 2026-08-14** (`b27b0e6`, `dada547`). Measured in
-  `docs/advisor/0006-clean-data-retrain.md`, including where it now loses: the
-  net still trails LightGBM on DOF by 2.4×, and macro-mean regret ranks the
-  learned choosers below `random` at the median budget.
+- **DONE 2026-08-14** (`b27b0e6`, `dada547`) on the v3 corpus. Measured in
+  `docs/advisor/0006-clean-data-retrain.md`, including where it lost: the net
+  trailed LightGBM on DOF by 2.4×, and macro-mean regret ranked the learned
+  choosers below `random` at the median budget.
+- **REDONE on the v4 corpus 2026-08-14** — `docs/advisor/0008-v4-corpus-retrain.md`.
+  Validation `rel_err_mae` 0.5201, `advisor_argmin` beats `finest_action` 85–40
+  (p = 0.0001) and now leads `random` on the macro mean (0.601 vs 0.687). The
+  acceptance line above earned its keep: on an intermediate model it failed
+  (plate_hole → hybrid_zoo), which is what exposed the `smoke_bar` label defect;
+  after the fix it passes again (graded_tet, exit 0, no veto, advisor suite
+  10/10).
 
 ### 2b. Learned error estimator / h-selector (second)
 - Label: (part features, mesher, h) → measured rel_err and DOF from the fresh

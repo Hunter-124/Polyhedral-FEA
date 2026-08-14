@@ -864,7 +864,14 @@ SmoothStats smooth_boundary_nodes(const geom::TriSurface& surface,
             nodes[ni] = p;
         }
         // Inversion guard: revert moved offenders until the mesh is clean.
-        for (int guard = 0; guard < 32; ++guard) {
+        // The cascade MUST run to a fixed point: at a concave crease, reverting
+        // one node routinely inverts a neighbour's tet, and an iteration cap
+        // here once left 920 inverted tets behind on icecream_cone.step — which
+        // the caller then "fixed" by re-winding them, producing watertight,
+        // positive-volume, mutually OVERLAPPING tets (9 boundary faces buried
+        // inside other cells). Termination is guaranteed: every iteration
+        // erases at least one node from `moved`, and each node reverts once.
+        while (true) {
             std::set<std::uint32_t> offenders;
             collect_offenders(offenders);
             bool reverted = false;

@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <format>
 #include <cstdint>
 #include <map>
 #include <queue>
@@ -914,6 +915,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     };
     snap_round();
 
+
     // Capture projection-resistant boundary nodes exactly once. Repair may
     // expose interior lattice nodes; treating those newly exposed nodes as
     // fresh juts on every round peels successive healthy layers from the
@@ -1390,6 +1392,90 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     // inversion-safe and does not remove cells, so finish on a snapped boundary
     // rather than leaving those new faces at raw lattice coordinates.
     snap_round();
+
+    // S7 overlapped-sheet carve. Snap gives every node its exact CAD owner, so
+    // at a concave crease two sheets project onto their own face patches and
+    // can legally interpenetrate — every tet positive, every edge manifold,
+    // and free faces buried strictly inside other cells (icecream_cone at
+    // h = 10 mm shipped 9, sphere_box_s0 at h = 3.6 mm shipped ~500; rendered
+    // as holes). Born in the FIRST snap round (596 buried immediately on
+    // sphere_box), so no downstream smoothing can prevent it. A buried face's
+    // owner tet is doubly-counted volume — the same material is inside another
+    // cell too — so the remedy is deletion under the shell guard, then re-snap
+    // for the newly exposed layer; node-pulling is the rejected variant
+    // (star-centroid pulls strand at 299 on sphere_box; crease pulls pile both
+    // sheets onto the crease and grow it to 706).
+    {
+        constexpr int kOverlapPasses = 12;
+        for (int pass = 0; pass < kOverlapPasses; ++pass) {
+            const auto owners =
+                buried_free_tet_face_owners(out.mesh.nodes, out.mesh.tets, hc);
+            if (owners.empty()) {
+                break;
+            }
+            std::vector<char> kill(out.mesh.tets.size(), 0);
+            for (const auto ti : owners) {
+                kill[ti] = 1;
+            }
+            restrict_kill_to_shell(out.mesh.tets, kill);
+            std::size_t n_kill = static_cast<std::size_t>(
+                std::count(kill.begin(), kill.end(), static_cast<char>(1)));
+            if (n_kill == 0) {
+                // Every single-tet kill was vetoed: at a one-cell-thick
+                // overlap band each deletion alone would pinch the shell.
+                // Escalate to the whole node-neighbourhood of every stuck
+                // owner so the guard judges the band, not a pinch.
+                std::unordered_set<std::uint32_t> owner_nodes;
+                for (const auto ti : owners) {
+                    owner_nodes.insert(out.mesh.tets[ti].begin(), out.mesh.tets[ti].end());
+                }
+                std::fill(kill.begin(), kill.end(), static_cast<char>(0));
+                for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+                    for (const auto ni : out.mesh.tets[ti]) {
+                        if (owner_nodes.count(ni)) {
+                            kill[ti] = 1;
+                            break;
+                        }
+                    }
+                }
+                restrict_kill_to_shell(out.mesh.tets, kill);
+                n_kill = static_cast<std::size_t>(
+                    std::count(kill.begin(), kill.end(), static_cast<char>(1)));
+            }
+            if (n_kill == 0 || n_kill >= out.mesh.tets.size()) {
+                break;
+            }
+            std::size_t w = 0;
+            for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+                if (!kill[ti]) {
+                    out.mesh.tets[w++] = out.mesh.tets[ti];
+                }
+            }
+            out.mesh.tets.resize(w);
+            // Deliberately NO snap here: snap is what creates these tangles,
+            // and re-projecting the freshly exposed layer regenerates them
+            // (measured 33 -> 58 buried on sphere_box_s0 at h = 3.6 mm). The
+            // exposed faces stay where they are — a fraction of a cell inside
+            // their own sheet, an honest divot where the CAD wedge is thinner
+            // than the mesh can resolve.
+        }
+        // Shell-guard vetoes can strand a shallow residue the carve cannot
+        // reach — finish it with the inward pull, which handles exactly the
+        // thin crossings that deletion must not (tube walls one cell thick).
+        // No snap after the pull: snap is what MAKES these tangles, and
+        // re-projecting the pulled nodes restores them (measured 33 -> 49).
+        // The pulled nodes sit a fraction of a cell inside their own sheet,
+        // which is an honest divot, not a self-intersection.
+        pull_buried_free_faces(out.mesh.nodes, out.mesh.tets, hc);
+        if (const auto st =
+                count_buried_free_tet_faces(out.mesh.nodes, out.mesh.tets, hc);
+            st.n_buried != 0) {
+            throw ValidityError(std::format(
+                "graded_tet_fill_surface: {} boundary faces remain buried inside "
+                "other cells after the overlap carve — self-intersecting boundary",
+                st.n_buried));
+        }
+    }
 
     // Rebuild boundary quads as exterior tris padded for pipeline display
     // (quad[3]=quad[2] for pure tris is OK — pipeline may re-extract).

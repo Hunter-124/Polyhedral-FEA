@@ -350,13 +350,18 @@ def load_parts(parts_glob: str | None, template: dict[str, Any]) -> tuple[list[t
     return parts, source
 
 
-def build_rects(batch: int, plan: Plan, shards: int) -> list[Rect]:
+def build_rects(batch: int, plan: Plan, shards: int, host_tag: str = "") -> list[Rect]:
     """Decompose the missing pairs into per-shard campaign rectangles.
 
     Missing pairs are grouped by the exact set of parts a config still needs;
     each group is a true ``configs x parts`` rectangle, which is the only thing
     a campaign.json can express. Configs inside a group are dealt out
     round-robin so the shards get near-equal pair counts.
+
+    ``host_tag`` goes into the directory name so two machines labelling disjoint
+    part families in the same repo never write to the same campaign directory.
+    Dedup is by ``(part, cfg_id)`` and reads every ``advisor-*`` directory, so
+    once both hosts' results are merged the union is what the next plan sees.
     """
     part_order = {part_id: i for i, (part_id, _) in enumerate(plan.parts)}
     case_of = dict(plan.parts)
@@ -390,6 +395,8 @@ def build_rects(batch: int, plan: Plan, shards: int) -> list[Rect]:
         assigned = per_shard[shard]
         for index, (signature, cfg_ids) in enumerate(assigned):
             name = f"advisor-batch-{batch}-s{shard}"
+            if host_tag:
+                name = f"{name}-{host_tag}"
             if len(assigned) > 1:
                 name = f"{name}-g{index}"
             part_ids = tuple(sorted(signature, key=lambda p: part_order[p]))
@@ -429,7 +436,7 @@ def make_plan(args: argparse.Namespace) -> Plan:
         scanned=scanned,
         parts_source=parts_source,
     )
-    plan.rects = build_rects(args.batch, plan, args.shards)
+    plan.rects = build_rects(args.batch, plan, args.shards, args.host_tag)
     return plan
 
 
@@ -736,6 +743,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--shards", type=int, default=SHARDS, help=f"concurrent testlab processes (default {SHARDS})")
     parser.add_argument("--omp-threads", type=int, default=OMP_THREADS_PER_SHARD,
                         help=f"OMP_NUM_THREADS per shard (default {OMP_THREADS_PER_SHARD})")
+    parser.add_argument("--host-tag", default="",
+                        help="suffix for campaign directory names, e.g. --host-tag hunter-pc. "
+                             "Set it when more than one machine labels into the same repo so "
+                             "their campaign directories cannot collide on merge")
     parser.add_argument("--dry-run", action="store_true", help="plan and print; write and launch nothing")
     args = parser.parse_args(argv)
     if args.shards < 1:

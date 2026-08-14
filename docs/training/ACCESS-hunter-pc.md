@@ -107,3 +107,20 @@ Resolve it before trusting labels produced on this box for graded_tet rows.
   session, so a dropped link does not kill a 1–3 day run.
 - The box's `authorized_keys` already trusts `livingroom-pc`, so that machine can
   be used as a jump host if the laptop's link to this subnet is flaky.
+
+## 6. Launching a batch on this box
+
+`run_batch.py --dry-run` was exercised here after the corpus regeneration and
+plans correctly: the cfg_id mirror re-verifies against 3,885 recorded rows and
+the truth gate is reached. Two things it reports that the driver must decide:
+
+- The truth campaign is **216/288 pairs, 3 configs incomplete** — the
+  regenerated corpus is wider than the one `advisor-truth-0` was solved against,
+  so `run_batch.py` will re-run the truth gate before any batch. Budget for it.
+- `--campaign-template` has no usable default in this clone: the built-in
+  `bench/campaigns/advisor-pilot-1/campaign.json` does not exist. Pass a real
+  one, e.g. `bench/campaigns/advisor-batch-3-template/campaign.json`.
+
+Shard sizing in `run_batch.py` (`SHARDS = 4`, `OMP_THREADS_PER_SHARD = 2`) is
+hard-coded for a 6C/12T machine, which is exactly this box; override with
+`--shards/--omp-threads` when driving anything else.

@@ -78,6 +78,12 @@ struct MixedFillOutput {
     std::size_t n_tet = 0;
     std::size_t n_poly = 0; // native-poly VEM transition (or other) cells
     double boundary_max_distance = 0.0;
+    /// Boundary nodes the exact CAD oracle returned no target for — they are not
+    /// moved and cannot appear in `boundary_max_distance`, so they must be counted
+    /// separately or the fidelity figure hides them.
+    std::size_t n_boundary_no_target = 0;
+    /// Boundary nodes left further than 0.2 h from the surface.
+    std::size_t n_boundary_residual_tail = 0;
     int skin_layers = 0;
     std::size_t n_feature_skin_cells = 0;
     std::size_t n_fine_cells = 0;       // coarse cells refined to 2×2×2

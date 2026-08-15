@@ -1789,6 +1789,17 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
             const double thr = 0.08 * h_snap;
             double max_resid = 0.0;
             std::size_t reprojection_poll = 0;
+            // A boundary node the exact oracle cannot give a target for is not
+            // moved AND was not counted, so `snap max|d|` could not see it — the
+            // mesher's own fidelity figure was blind to precisely the nodes that
+            // failed. Count them, and count the tail left above 0.2 h, and report
+            // both. Measured 2026-08-15 on ellipsoid_boss_s1 (h_rel 0.03, hybrid):
+            // 23 of 5974 boundary nodes sit 0.30-0.48 h INSIDE the boss, all on
+            // the one face OCC represents as a BSplineSurface rather than an
+            // analytic sphere (sphere_box, which this code meshes cleanly, gets
+            // GeomAbs_Sphere), and refinement does not shrink the fraction.
+            std::size_t n_no_target = 0;
+            std::size_t n_residual_tail = 0;
             for (const auto ni : bnodes) {
                 if ((reprojection_poll++ & 63U) == 0U) {
                     poll_cancel();
@@ -1799,6 +1810,7 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
                 const auto target = mesh::boundary_projection_target(
                     model.surface, fill.nodes[ni], ni, projection);
                 if (!target) {
+                    ++n_no_target;
                     continue;
                 }
                 double resid = target->distance;
@@ -1824,9 +1836,14 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
                         fill.nodes[ni] = saved;
                     }
                 }
+                if (resid > 0.2 * h_snap) {
+                    ++n_residual_tail;
+                }
                 max_resid = std::max(max_resid, resid);
             }
             fill.boundary_max_distance = max_resid;
+            fill.n_boundary_no_target = n_no_target;
+            fill.n_boundary_residual_tail = n_residual_tail;
             poll_cancel();
             // Tangential smoothing: even out lattice-stair spacing on curved
             // walls / hole rims (crease nodes relax along the crease). Moves
@@ -2097,6 +2114,11 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
                 fill.n_transition_cells, fill.n_feature_skin_cells, fill.boundary_max_distance,
                 turn_deg > 0.0 ? std::format(", curv_turn≤{:.0f}°/cell", turn_deg)
                                : std::string{});
+        }
+        if (fill.n_boundary_no_target > 0 || fill.n_boundary_residual_tail > 0) {
+            out.mesher_note += std::format(
+                " | boundary tail: {} node(s) with no exact CAD target, {} left >0.2 h off",
+                fill.n_boundary_no_target, fill.n_boundary_residual_tail);
         }
         if (n_pyramid_split_to_tets > 0) {
             out.mesher_note += std::format(

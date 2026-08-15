@@ -159,46 +159,64 @@ regeneration to validate. Reachable only well below the training grid (h=0.005 o
 `cylinder` is h_rel 0.024 against a grid of 0.10–0.20), which is why no labelled row
 has hit it.
 
-## Open: the ellipsoidal boss defeats both boundary snaps
+## Open: the ellipsoidal boss, and where the wall gets stuck
 
-The three new families were added to test non-circular curvature, and two of them
-pass cleanly and converge. `lobed_shaft` and `twisted_loft` — a C2 periodic
-B-spline section and a doubly-curved twisted NURBS loft — mesh with positive worst
-cell quality at every resolution tried, and hybrid converges properly on
-`lobed_shaft`: exact-BRep p99/h 0.0191 → 0.0105, boundary normal p99 26.8° → 0.2°,
-relative volume error 0.0067 → 0.0017 from h_rel 0.06 to 0.03. Curvature-driven
-sizing on a non-circular spline wall works.
+The three new families were added to test non-circular curvature. Two pass cleanly
+and converge: `lobed_shaft` and `twisted_loft` — a C2 periodic B-spline section and
+a doubly-curved twisted NURBS loft — mesh with positive worst cell quality at every
+resolution tried, and hybrid converges properly on `lobed_shaft`, exact-BRep p99/h
+0.0191 -> 0.0105, boundary normal p99 26.8deg -> 0.2deg, relative volume error
+0.0067 -> 0.0017 from h_rel 0.06 to 0.03. Curvature-driven sizing on a non-circular
+spline wall works.
 
-`ellipsoid_boss` does not, in either mesher, at any resolution measured:
+`ellipsoid_boss` carries a boundary tail that refinement does not shrink:
 
-| run | h_rel | worst cell | inverted | p99/h | normal p99 |
-| --- | --- | --- | --- | --- | --- |
-| hybrid | auto | +0.0200 (hex8) | 0 | 0.342 | 85.0° |
-| hybrid | 0.06 | **-0.2607 (pyramid5)** | **5** | 0.781 | 90.0° |
-| hybrid | 0.03 | +0.0200 (hex8) | 0 | 0.968 | 85.1° |
-| graded | auto | +5.6e-06 | 0 | 0.638 | 89.8° |
-| graded | 0.06 | +2.1e-04 | 0 | 0.893 | 89.5° |
-| graded | 0.03 | +1.3e-03 | 0 | **1.844** | — |
+| run | h_rel | worst cell | inverted | p95/h | p99/h | max/h |
+| --- | --- | --- | --- | --- | --- | --- |
+| hybrid | auto | +0.0200 (hex8) | 0 | — | 0.342 | 0.729 |
+| hybrid | 0.06 | **-0.2607 (pyramid5)** | **5** | — | 0.781 | — |
+| hybrid | 0.03 | +0.0200 (hex8) | 0 | **0.0060** | 0.967 | 2.141 |
+| graded | 0.03 | +1.3e-03 (tet4) | 0 | — | 1.844 | — |
 
-A p99/h approaching or exceeding 1 means the boundary is a whole cell off the CAD
-surface for most of its nodes — the snap is refusing nearly every move — and a
-boundary-normal p99 of 85–90° means the facets it did place are close to
-perpendicular to the surface they represent. Refinement makes it *worse*, not
-better, which rules out under-resolution as the explanation. The graded run at
-h_rel 0.03 then fails to solve at all (CG breaks down, residual 2.1e7), consistent
-with the sliver chain above.
+The p95 is the number that frames it: at h_rel 0.03, **95% of boundary nodes are on
+the surface to 0.006 h**, and the CAD->mesh direction is clean at p99 0.068 h, so no
+region of the surface is missing. It is a tail, not a wholesale failure — 23 of 5974
+boundary nodes measure 0.30-0.48 h off analytically, every one of them on the boss
+and *inside* it (ellipsoid implicit q = 0.74-0.85), none anywhere else on the part.
 
-The 5 inverted pyramids at h_rel 0.06 survive the decomposition of decision 1
-because their two assembly split tets are not positively oriented either, so there
-is no valid representation to ship them as — those cells are broken in every
-measure, and the snap gate that should have refused the move that broke them did
-not. That is the thread to pull first.
+Two candidate causes were tested and eliminated by measurement:
 
-What distinguishes this part from `sphere_box`, which the same code meshes well, is
-that the boss's two principal curvatures differ by a factor of (a/c)² ≈ 2 at the
-pole and vary continuously over the surface, so the projection's local
-closest-point problem has no constant scale. Nothing else in the corpus has that,
-which is why nothing else caught it.
+- **Not the projection oracle.** `scene.cpp` now counts boundary nodes for which
+  `boundary_projection_target` returns nothing — it returned a target for **all 5974**
+  (0 failures). This mattered because OCC represents this boss as a
+  `GeomAbs_BSplineSurface`, where `sphere_box`, which the same code meshes cleanly,
+  gets an analytic `GeomAbs_Sphere`; the NURBS path is not the problem.
+  That counter also closed a reporting hole: an unprojectable node was skipped
+  *and* omitted from `boundary_max_distance`, so the mesher's own `snap max|d|`
+  figure could not see the nodes that failed. Both counts are now in the mesher note.
+- **Not interior room.** The reprojection accepts a move only while every incident
+  cell stays valid, and 256 nodes were left above 0.2 h, so the moves are being
+  refused rather than missed. Adding the interior relaxation that fixed
+  `hex_fill_surface` (sphere M1max 6.9e-4 -> 1.1e-16) to the hybrid path moved
+  p99/h only 0.967 -> 0.875 with the 256-node tail unchanged, so it was reverted:
+  100 lines and label churn on every hybrid mesh is not worth 0.09.
+
+What remains is the binding constraint itself: `hex_ok` requires
+`hex8_shape_quality >= 0.02`, and on a stair-stepped lattice the travel needed to
+reach a small doubly-curved boss stretches the cell behind the wall below that floor.
+Refinement does not relieve it, which is the informative part — if the boss were
+merely under-resolved, halving h would halve the relative travel. So the next step is
+the size field, not the snap: check whether the `curv_turn <= 15 deg/cell` criterion
+refines a surface whose two principal curvatures differ by (a/c)^2 and vary
+continuously, or whether it reads a single curvature scale and under-refines the boss
+at every h. Nothing else in the corpus has that property, which is why nothing else
+caught it.
+
+The 5 inverted pyramids at h_rel 0.06 are a separate, smaller thread: they survive the
+decomposition of decision 1 because their two assembly split tets are not positively
+oriented either, so there is no valid representation to ship them as. Those cells are
+broken in every measure, and the snap gate that should have refused the move that
+broke them did not.
 
 ## Consequences
 

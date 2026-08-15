@@ -33,6 +33,28 @@ enum class ElementType : std::uint8_t {
     kPolyVem
 };
 
+/// Stable short name of an element type, for diagnostics that must say WHICH
+/// kind of cell a measured number belongs to.
+constexpr const char* element_type_name(ElementType type) {
+    switch (type) {
+    case ElementType::kTet4:
+        return "tet4";
+    case ElementType::kTet10:
+        return "tet10";
+    case ElementType::kHex8:
+        return "hex8";
+    case ElementType::kHex20:
+        return "hex20";
+    case ElementType::kPrism6:
+        return "prism6";
+    case ElementType::kPyramid5:
+        return "pyramid5";
+    case ElementType::kPolyVem:
+        return "polyvem";
+    }
+    return "unknown";
+}
+
 /// Number of nodes for an element type.
 constexpr int element_num_nodes(ElementType type) {
     switch (type) {

@@ -99,7 +99,7 @@ bool pyramid_bad(const std::array<std::uint32_t, 5>& n,
         return true;
     }
     return shape_floor > 0.0 &&
-           validity::pyramid_shape_quality(p0, p1, p2, p3, p4) < shape_floor;
+           validity::pyramid_split_shape_quality(p0, p1, p2, p3, p4) < shape_floor;
 }
 
 void orient_pyramid_winding(MixedCell& pyr, const std::vector<Eigen::Vector3d>& nodes);
@@ -1327,7 +1327,7 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                     const Eigen::Vector3d nrm =
                         (lattice[f1] - lattice[f0]).cross(lattice[f2] - lattice[f0]);
                     const bool ccw = nrm.dot(a - lattice[f0]) > 0.0;
-                    q = std::min(q, validity::pyramid_shape_quality(
+                    q = std::min(q, validity::pyramid_split_shape_quality(
                                         snapped[f0], snapped[ccw ? f1 : f3], snapped[f2],
                                         snapped[ccw ? f3 : f1], a));
                 }
@@ -1385,7 +1385,7 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                 for (std::size_t ci = fan.first; ci < fan.end; ++ci) {
                     const auto& cell = out.cells[ci];
                     if (cell.kind == MixedCellKind::kPyramid5) {
-                        q = std::min(q, validity::pyramid_shape_quality(
+                        q = std::min(q, validity::pyramid_split_shape_quality(
                                             site(cell.nodes[0]), site(cell.nodes[1]),
                                             site(cell.nodes[2]), site(cell.nodes[3]), a));
                     } else if (cell.kind == MixedCellKind::kTet4) {
@@ -1511,7 +1511,7 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                     for (const auto* cell : fit->second) {
                         if (cell->kind == MixedCellKind::kPyramid5) {
                             q = std::min(
-                                q, validity::pyramid_shape_quality(
+                                q, validity::pyramid_split_shape_quality(
                                        out.nodes[cell->nodes[0]], out.nodes[cell->nodes[1]],
                                        out.nodes[cell->nodes[2]], out.nodes[cell->nodes[3]], a));
                         } else {
@@ -1580,7 +1580,7 @@ std::size_t repair_mixed_fan_apices(MixedFillOutput& fill, double shape_floor) {
             for (const auto* cell : fit->second) {
                 if (cell->kind == MixedCellKind::kPyramid5) {
                     q = std::min(
-                        q, validity::pyramid_shape_quality(
+                        q, validity::pyramid_split_shape_quality(
                                fill.nodes[cell->nodes[0]], fill.nodes[cell->nodes[1]],
                                fill.nodes[cell->nodes[2]], fill.nodes[cell->nodes[3]], a));
                 } else {

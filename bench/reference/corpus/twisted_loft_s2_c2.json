@@ -1,0 +1,53 @@
+{
+  "part": "twisted_loft_s2_c2",
+  "geometry": "bench/geometries/corpus/primitives/twisted_loft_s2.step",
+  "family": "twisted_loft",
+  "truth_source": "provisional",
+  "notes": "Provisional first-order beam surrogate; not a validated truth. Replaced by the advisor-truth-0 overkill reference solve via scripts/advisor/promote_truth.py.",
+  "metrics": [
+    {
+      "name": "strain_energy",
+      "value": 0.002094233525,
+      "tol": 1.0,
+      "probe": {
+        "kind": "strain_energy"
+      },
+      "derivation": "docs/validation/hand-calcs.md#corpus-primitives-provisional",
+      "source": "provisional",
+      "inputs": {
+        "E": 210000000000.0,
+        "span_m": 0.22,
+        "section_area_m2": 0.002690314607,
+        "transverse_extent_m": 0.0614760387,
+        "I_equivalent_m4": 8.472929137e-07,
+        "axial_traction_Pa": 105869.3105,
+        "transverse_traction_Pa": 169681.1395,
+        "delta_axial_m": 1.109107062e-07,
+        "delta_transverse_m": 9.106061109e-06,
+        "model": "axial P*L/(E*A) + Euler-Bernoulli P*L^3/(3*E*I) on an equivalent rectangular section; U = 0.5 * sum(P_i * delta_i)"
+      }
+    },
+    {
+      "name": "tip_deflection",
+      "value": 9.106736523e-06,
+      "tol": 1.0,
+      "probe": {
+        "kind": "tip_deflection"
+      },
+      "derivation": "docs/validation/hand-calcs.md#corpus-primitives-provisional",
+      "source": "provisional",
+      "inputs": {
+        "E": 210000000000.0,
+        "span_m": 0.22,
+        "section_area_m2": 0.002690314607,
+        "transverse_extent_m": 0.0614760387,
+        "I_equivalent_m4": 8.472929137e-07,
+        "axial_traction_Pa": 105869.3105,
+        "transverse_traction_Pa": 169681.1395,
+        "delta_axial_m": 1.109107062e-07,
+        "delta_transverse_m": 9.106061109e-06,
+        "model": "axial P*L/(E*A) + Euler-Bernoulli P*L^3/(3*E*I) on an equivalent rectangular section; U = 0.5 * sum(P_i * delta_i)"
+      }
+    }
+  ]
+}

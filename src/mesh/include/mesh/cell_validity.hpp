@@ -120,19 +120,161 @@ inline double pyramid_min_split_volume(const Eigen::Vector3d& p0, const Eigen::V
                : pyramid_split_volume_diag02(p0, p1, p2, p3, p4);
 }
 
-/// Normalized pyramid shape: min quality of the two assembly split tets scaled
-/// by the lattice nominal (square base, apex over the centre at half the base
-/// width — the hex→pyramid expand cell — whose split tets score exactly 0.25),
-/// over the SAME diagonal the assembly splits (pyramid_split_diagonal), so the
-/// gate and the integrator always agree.
-inline double pyramid_shape_quality(const Eigen::Vector3d& p0, const Eigen::Vector3d& p1,
-                                    const Eigen::Vector3d& p2, const Eigen::Vector3d& p3,
-                                    const Eigen::Vector3d& p4) {
+/// Base-corner triples of the pyramid (base quad 0..3 CCW, apex 4). Same rows
+/// `fea::cell_quality` uses: at base corner i the right-handed edge triple is
+/// (next, prev, apex). The apex itself is a collapsed point of the reference
+/// map, so it has no Jacobian.
+inline constexpr std::array<std::array<int, 3>, 4> kPyramidBaseCorners{{
+    {{1, 3, 4}},
+    {{2, 0, 4}},
+    {{3, 1, 4}},
+    {{0, 2, 4}},
+}};
+
+/// 1/√2 — the base-corner scaled Jacobian a regular (all-edges-equal) pyramid
+/// attains, so the normalized measure below is 1.0 for that cell.
+inline constexpr double kPyramidCornerIdeal = 0.7071067811865476;
+
+/// Min base-corner scaled Jacobian, normalized so a regular pyramid scores 1.0
+/// (the lattice hex→pyramid expand cell scores 0.816). Negative ⇒ a base corner
+/// has folded: the isoparametric map turns inside out there even when both
+/// assembly split tets still have positive volume.
+inline double pyramid_min_corner_scaled_jacobian(const Eigen::Vector3d& p0,
+                                                 const Eigen::Vector3d& p1,
+                                                 const Eigen::Vector3d& p2,
+                                                 const Eigen::Vector3d& p3,
+                                                 const Eigen::Vector3d& p4) {
+    const std::array<Eigen::Vector3d, 5> p{{p0, p1, p2, p3, p4}};
+    double lo = std::numeric_limits<double>::infinity();
+    for (std::size_t i = 0; i < kPyramidBaseCorners.size(); ++i) {
+        const auto& t = kPyramidBaseCorners[i];
+        const Eigen::Vector3d& o = p[i];
+        const Eigen::Vector3d e1 = p[static_cast<std::size_t>(t[0])] - o;
+        const Eigen::Vector3d e2 = p[static_cast<std::size_t>(t[1])] - o;
+        const Eigen::Vector3d e3 = p[static_cast<std::size_t>(t[2])] - o;
+        const double den = e1.norm() * e2.norm() * e3.norm();
+        if (!(den > 0.0)) {
+            return 0.0;
+        }
+        lo = std::min(lo, e1.dot(e2.cross(e3)) / den / kPyramidCornerIdeal);
+    }
+    return std::clamp(lo, -1.0, 1.0);
+}
+
+/// Volume / mean-edge³ the all-edges-equal pyramid attains — the normalizer of
+/// the collapse term below.
+inline constexpr double kPyramidVolumeIdeal = 0.23570226039551587;
+
+/// Signed volume / mean-edge³, normalized so a regular pyramid scores 1.0. The
+/// volume is the divergence-theorem sum over the five outward faces, the warped
+/// base fanned from its own centroid — the same value `fea::cell_quality`
+/// integrates, so no split diagonal biases it.
+inline double pyramid_volume_collapse(const Eigen::Vector3d& p0, const Eigen::Vector3d& p1,
+                                      const Eigen::Vector3d& p2, const Eigen::Vector3d& p3,
+                                      const Eigen::Vector3d& p4) {
+    const std::array<Eigen::Vector3d, 5> p{{p0, p1, p2, p3, p4}};
+    static constexpr std::array<std::array<int, 2>, 8> kEdges{{
+        {{0, 1}}, {{1, 2}}, {{2, 3}}, {{3, 0}}, {{0, 4}}, {{1, 4}}, {{2, 4}}, {{3, 4}},
+    }};
+    double edge_sum = 0.0;
+    for (const auto& e : kEdges) {
+        edge_sum += (p[static_cast<std::size_t>(e[1])] - p[static_cast<std::size_t>(e[0])]).norm();
+    }
+    const double mean_edge = edge_sum / static_cast<double>(kEdges.size());
+    if (!(mean_edge > 0.0)) {
+        return 0.0;
+    }
+    struct Face {
+        int n;
+        std::array<int, 4> v;
+    };
+    static constexpr std::array<Face, 5> kFaces{{
+        {4, {{0, 3, 2, 1}}},
+        {3, {{0, 1, 4, 0}}},
+        {3, {{1, 2, 4, 0}}},
+        {3, {{2, 3, 4, 0}}},
+        {3, {{3, 0, 4, 0}}},
+    }};
+    const Eigen::Vector3d& origin = p[0];
+    double volume = 0.0;
+    for (const auto& f : kFaces) {
+        Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
+        for (int k = 0; k < f.n; ++k) {
+            centroid += p[static_cast<std::size_t>(f.v[static_cast<std::size_t>(k)])];
+        }
+        centroid = centroid / static_cast<double>(f.n) - origin;
+        for (int k = 0; k < f.n; ++k) {
+            const Eigen::Vector3d a =
+                p[static_cast<std::size_t>(f.v[static_cast<std::size_t>(k)])] - origin;
+            const Eigen::Vector3d b =
+                p[static_cast<std::size_t>(f.v[static_cast<std::size_t>((k + 1) % f.n)])] - origin;
+            volume += a.dot(b.cross(centroid)) / 6.0;
+        }
+    }
+    return volume / (mean_edge * mean_edge * mean_edge) / kPyramidVolumeIdeal;
+}
+
+/// Normalized quality of the two split tets the FE assembly actually integrates:
+/// min quality of the pair, scaled by the lattice nominal (square base, apex over
+/// the centre at half the base width — the hex→pyramid expand cell — whose split
+/// tets score exactly 0.25), over the SAME diagonal the assembly splits
+/// (`pyramid_split_diagonal`), so the gate and the integrator always agree.
+///
+/// This is the snapping/smoothing gate. It deliberately does NOT include the
+/// volume-collapse or base-corner terms: adding either makes the gate stricter
+/// than the mesh can satisfy while still reaching the wall, and the snap then
+/// buys cell shape by retreating boundary nodes — measured 2026-08-15, folding
+/// the collapse term in here took the hybrid sphere's M1max from 1.7e-16 to
+/// 0.037 at h=0.15*extent. A corner fold is instead cured at conversion, for
+/// free, by `pyramid_corner_folded`.
+inline double pyramid_split_shape_quality(const Eigen::Vector3d& p0, const Eigen::Vector3d& p1,
+                                          const Eigen::Vector3d& p2, const Eigen::Vector3d& p3,
+                                          const Eigen::Vector3d& p4) {
     const double q02 =
         std::min(tet_shape_quality(p0, p1, p2, p4), tet_shape_quality(p0, p2, p3, p4));
     const double q13 =
         std::min(tet_shape_quality(p1, p2, p3, p4), tet_shape_quality(p1, p3, p0, p4));
     return 4.0 * (pyramid_split_diagonal(p0, p1, p2, p3) == 1 ? q13 : q02);
+}
+
+/// Full normalized pyramid shape — the representation measure above AND the
+/// base-corner scaled Jacobian, i.e. the same worst-of measure
+/// `fea::cell_quality` reports for a kPyramid5.
+///
+/// The two differ on exactly one defect: a base quad that boundary snapping
+/// warped until one of its corners folded. Measured 2026-08-15 on
+/// icecream_cone h=0.008 hybrid, 960 of 24286 shipped pyramids scored < 0 under
+/// `fea::cell_quality` (every one corner-driven) while the representation
+/// measure rated all of them >= 0.0608 — so no offender collector ever saw
+/// them and 4% of the product mesh went out with a folded isoparametric map.
+///
+/// Unsnapping the wall is the wrong cure (measured: icecream_cone h=0.008 exact
+/// BRep p99/h 0.019 → 0.107 when this measure gates the snap). A corner-folded
+/// pyramid whose split halves are healthy is the union of those two healthy
+/// tets, which is also exactly the stiffness the assembly builds from it — so
+/// `mesh_from_mixed_cells` ships it AS those two tets: same geometry, same
+/// stiffness, no folded cell. This measure is therefore the honest report and
+/// the decomposition trigger, never a reason to move a boundary node.
+inline double pyramid_shape_quality(const Eigen::Vector3d& p0, const Eigen::Vector3d& p1,
+                                    const Eigen::Vector3d& p2, const Eigen::Vector3d& p3,
+                                    const Eigen::Vector3d& p4) {
+    return std::min({pyramid_split_shape_quality(p0, p1, p2, p3, p4),
+                     pyramid_min_corner_scaled_jacobian(p0, p1, p2, p3, p4),
+                     pyramid_volume_collapse(p0, p1, p2, p3, p4)});
+}
+
+/// True when the pyramid's base-corner Jacobian has folded below the shape floor
+/// while both assembly split tets still have positive volume — the cell the
+/// conversion must ship as two tets instead of one pyramid. The second condition
+/// is validity, not quality: the split is worth taking whenever the two tets are
+/// right-handed, because a positive-volume tet of any aspect beats a cell whose
+/// map is inside out.
+inline bool pyramid_corner_folded(const Eigen::Vector3d& p0, const Eigen::Vector3d& p1,
+                                  const Eigen::Vector3d& p2, const Eigen::Vector3d& p3,
+                                  const Eigen::Vector3d& p4,
+                                  double shape_floor = kCellShapeFloor) {
+    return pyramid_min_corner_scaled_jacobian(p0, p1, p2, p3, p4) < shape_floor &&
+           pyramid_min_split_volume(p0, p1, p2, p3, p4) > 0.0;
 }
 
 inline constexpr std::array<std::array<double, 3>, 8> kHexCornerSigns{{

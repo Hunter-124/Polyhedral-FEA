@@ -1,0 +1,53 @@
+{
+  "part": "ellipsoid_boss_s2_c0",
+  "geometry": "bench/geometries/corpus/primitives/ellipsoid_boss_s2.step",
+  "family": "ellipsoid_boss",
+  "truth_source": "provisional",
+  "notes": "Provisional first-order beam surrogate; not a validated truth. Replaced by the advisor-truth-0 overkill reference solve via scripts/advisor/promote_truth.py.",
+  "metrics": [
+    {
+      "name": "strain_energy",
+      "value": 0.003647949491,
+      "tol": 1.0,
+      "probe": {
+        "kind": "strain_energy"
+      },
+      "derivation": "docs/validation/hand-calcs.md#corpus-primitives-provisional",
+      "source": "provisional",
+      "inputs": {
+        "E": 210000000000.0,
+        "span_m": 0.2503472756,
+        "section_area_m2": 0.006120053763,
+        "transverse_extent_m": 0.1018669781,
+        "I_equivalent_m4": 5.292255921e-06,
+        "axial_traction_Pa": 1000000.0,
+        "transverse_traction_Pa": 0.0,
+        "delta_axial_m": 1.192129884e-06,
+        "delta_transverse_m": 0.0,
+        "model": "axial P*L/(E*A) + Euler-Bernoulli P*L^3/(3*E*I) on an equivalent rectangular section; U = 0.5 * sum(P_i * delta_i)"
+      }
+    },
+    {
+      "name": "tip_deflection",
+      "value": 1.192129884e-06,
+      "tol": 1.0,
+      "probe": {
+        "kind": "tip_deflection"
+      },
+      "derivation": "docs/validation/hand-calcs.md#corpus-primitives-provisional",
+      "source": "provisional",
+      "inputs": {
+        "E": 210000000000.0,
+        "span_m": 0.2503472756,
+        "section_area_m2": 0.006120053763,
+        "transverse_extent_m": 0.1018669781,
+        "I_equivalent_m4": 5.292255921e-06,
+        "axial_traction_Pa": 1000000.0,
+        "transverse_traction_Pa": 0.0,
+        "delta_axial_m": 1.192129884e-06,
+        "delta_transverse_m": 0.0,
+        "model": "axial P*L/(E*A) + Euler-Bernoulli P*L^3/(3*E*I) on an equivalent rectangular section; U = 0.5 * sum(P_i * delta_i)"
+      }
+    }
+  ]
+}

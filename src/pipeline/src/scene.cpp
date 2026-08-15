@@ -1520,41 +1520,27 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
             // A pyramid is a single cell, not two independently quality-scored
             // tetrahedra. Require both halves of the conformity-safe assembly
             // split to stay positively oriented, then apply the shared shape
-            // floor to VTK/PyVista's signed pyramid volume (the mean of both
-            // base-diagonal volume sums). Using the minimum split-tet aspect
-            // here made a healthy asymmetric pyramid fail and forced boundary
-            // nodes back off the surface.
+            // floor to the normalized signed pyramid volume. The collapse term is
+            // shared with `fea::cell_quality` now
+            // (mesh::validity::pyramid_volume_collapse) instead of being spelled
+            // out a second time here; the numbers are identical, since the mean of
+            // both base-diagonal volume sums IS the centroid-fanned volume.
+            //
+            // What this gate deliberately does NOT test is the base-corner scaled
+            // Jacobian: a fold there is cured for free at conversion, by shipping
+            // the cell as the two tets the assembly already builds from it, and
+            // testing it here would instead retreat the wall (measured: hybrid
+            // sphere M1max 1.7e-16 -> 0.037 at h=0.15*extent).
             const auto pyramid_ok = [&](const mesh::MixedCell& cell) {
                 const Eigen::Vector3d& p0 = fill.nodes[cell.nodes[0]];
                 const Eigen::Vector3d& p1 = fill.nodes[cell.nodes[1]];
                 const Eigen::Vector3d& p2 = fill.nodes[cell.nodes[2]];
                 const Eigen::Vector3d& p3 = fill.nodes[cell.nodes[3]];
                 const Eigen::Vector3d& p4 = fill.nodes[cell.nodes[4]];
-                const double v02a = mesh::validity::tet_signed_volume(p0, p1, p2, p4);
-                const double v02b = mesh::validity::tet_signed_volume(p0, p2, p3, p4);
-                const double v13a = mesh::validity::tet_signed_volume(p1, p2, p3, p4);
-                const double v13b = mesh::validity::tet_signed_volume(p1, p3, p0, p4);
-                double v0 = v02a;
-                double v1 = v02b;
-                if (mesh::validity::pyramid_split_diagonal(p0, p1, p2, p3) == 1) {
-                    v0 = v13a;
-                    v1 = v13b;
-                }
-                if (v0 <= vol_eps || v1 <= vol_eps) {
+                if (mesh::validity::pyramid_min_split_volume(p0, p1, p2, p3, p4) <= vol_eps) {
                     return false;
                 }
-                const double mean_edge =
-                    ((p1 - p0).norm() + (p2 - p1).norm() + (p3 - p2).norm() +
-                     (p0 - p3).norm() + (p4 - p0).norm() + (p4 - p1).norm() +
-                     (p4 - p2).norm() + (p4 - p3).norm()) /
-                    8.0;
-                constexpr double kRegularPyramidVolumeRatio = 0.23570226039551587;
-                const double volume = 0.5 * (v02a + v02b + v13a + v13b);
-                const double collapse = mean_edge > 0.0
-                                            ? volume / (mean_edge * mean_edge * mean_edge) /
-                                                  kRegularPyramidVolumeRatio
-                                            : 0.0;
-                return volume > vol_eps && collapse >= kMinShape;
+                return mesh::validity::pyramid_volume_collapse(p0, p1, p2, p3, p4) >= kMinShape;
             };
             // The hex8 check `cell_valid` used to only promise: min detJ over
             // the centre and the 2×2×2 Gauss points the assembly integrates at.
@@ -1921,10 +1907,96 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
             poll_cancel();
 
         }
+        // Corner-fold decomposition floor: the same normalized cell-shape floor
+        // every mesher gate uses, so "folded" means one thing in this codebase.
+        constexpr double kMinShapeConvert = mesh::validity::kCellShapeFloor;
+        std::size_t n_pyramid_split_to_tets = 0;
         out.mesh.nodes = std::move(fill.nodes);
         out.mesh.elements.reserve(fill.cells.size());
+
+        // Which pyramid5 cells ship as their two assembly tets. A base quad is
+        // shared by the fans of the two lattice cells across it, so triangulating
+        // it on one side only leaves the shared face non-conforming (measured:
+        // the boundary-shell guard reports 2152 edges used by three or more
+        // faces). The split diagonal depends only on the base quad, so splitting
+        // BOTH sides is conforming; the mark therefore propagates from a folded
+        // cell to whoever shares its base. Side faces are triangles already, so
+        // this closes in one round — no cascade.
+        std::vector<char> split_pyramid(fill.cells.size(), 0);
+        {
+            // Same winding normalization the emission below applies, so the fold
+            // is measured on the cell that actually ships (the corner Jacobian
+            // is sign-sensitive: an inverted stored winding would otherwise read
+            // as folded).
+            const auto oriented = [&](const mesh::MixedCell& cell) {
+                std::array<std::uint32_t, 5> p{{cell.nodes[0], cell.nodes[1], cell.nodes[2],
+                                                cell.nodes[3], cell.nodes[4]}};
+                const auto& xa = out.mesh.nodes[p[4]];
+                const double vtk_volume =
+                    0.5 * (mesh::validity::tet_signed_volume(out.mesh.nodes[p[0]],
+                                                             out.mesh.nodes[p[1]],
+                                                             out.mesh.nodes[p[2]], xa) +
+                           mesh::validity::tet_signed_volume(out.mesh.nodes[p[0]],
+                                                             out.mesh.nodes[p[2]],
+                                                             out.mesh.nodes[p[3]], xa) +
+                           mesh::validity::tet_signed_volume(out.mesh.nodes[p[1]],
+                                                             out.mesh.nodes[p[2]],
+                                                             out.mesh.nodes[p[3]], xa) +
+                           mesh::validity::tet_signed_volume(out.mesh.nodes[p[1]],
+                                                             out.mesh.nodes[p[3]],
+                                                             out.mesh.nodes[p[0]], xa));
+                if (vtk_volume < 0.0) {
+                    std::swap(p[1], p[3]);
+                }
+                return p;
+            };
+            std::map<std::array<std::uint32_t, 4>, std::vector<std::size_t>> base_owners;
+            std::vector<char> folded(fill.cells.size(), 0);
+            std::vector<char> splittable(fill.cells.size(), 0);
+            for (std::size_t ci = 0; ci < fill.cells.size(); ++ci) {
+                const auto& cell = fill.cells[ci];
+                if (cell.kind != mesh::MixedCellKind::kPyramid5) {
+                    continue;
+                }
+                const auto p = oriented(cell);
+                std::array<std::uint32_t, 4> key{{p[0], p[1], p[2], p[3]}};
+                std::sort(key.begin(), key.end());
+                base_owners[key].push_back(ci);
+                const auto& x0 = out.mesh.nodes[p[0]];
+                const auto& x1 = out.mesh.nodes[p[1]];
+                const auto& x2 = out.mesh.nodes[p[2]];
+                const auto& x3 = out.mesh.nodes[p[3]];
+                const auto& x4 = out.mesh.nodes[p[4]];
+                // Splittable = both assembly tets have positive volume. The bar
+                // is validity, NOT the shape floor: two positive tets are
+                // strictly better than one folded pyramid whatever their aspect,
+                // and a floor here refused splits whose tets were no worse than
+                // cells the mesh already ships (measured on cylinder_prism.stl
+                // h=0.12·extent, where one -0.082 pyramid survived beside
+                // shipped 0.005 tets).
+                splittable[ci] = static_cast<char>(
+                    mesh::validity::pyramid_min_split_volume(x0, x1, x2, x3, x4) > 0.0);
+                folded[ci] = static_cast<char>(
+                    mesh::validity::pyramid_corner_folded(x0, x1, x2, x3, x4, kMinShapeConvert));
+            }
+            for (const auto& [key, owners] : base_owners) {
+                (void)key;
+                const bool any_folded = std::any_of(
+                    owners.begin(), owners.end(), [&](std::size_t ci) { return folded[ci] != 0; });
+                const bool all_splittable =
+                    std::all_of(owners.begin(), owners.end(),
+                                [&](std::size_t ci) { return splittable[ci] != 0; });
+                if (!any_folded || !all_splittable) {
+                    continue; // nothing folded here, or a partner could not be split safely
+                }
+                for (const auto ci : owners) {
+                    split_pyramid[ci] = 1;
+                }
+            }
+        }
         std::size_t conversion_poll = 0;
-        for (const auto& cell : fill.cells) {
+        for (std::size_t ci = 0; ci < fill.cells.size(); ++ci) {
+            const auto& cell = fill.cells[ci];
             if ((conversion_poll++ & 255U) == 0U) {
                 poll_cancel();
             }
@@ -1952,11 +2024,38 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
                 if (vtk_volume < 0.0) {
                     std::swap(p[1], p[3]);
                 }
+                // A base corner folded by the boundary snap makes the kPyramid5
+                // isoparametric map turn inside out there, even with both
+                // assembly split tets healthy — `fea::cell_quality` reports the
+                // cell inverted and every consumer that trusts the map is
+                // wrong. Ship it as the two tets the assembly would have built
+                // from it (`element_stiffness` splits kPyramid5 along exactly
+                // this diagonal): identical geometry, identical stiffness,
+                // conforming (the diagonal depends only on the shared base
+                // quad), and no folded cell leaves the mesher. Unsnapping the
+                // wall instead costs real fidelity — measured on icecream_cone
+                // h=0.008, exact-BRep p99/h 0.019 → 0.107.
+                const int diagonal = mesh::validity::pyramid_split_diagonal(
+                    out.mesh.nodes[p[0]], out.mesh.nodes[p[1]], out.mesh.nodes[p[2]],
+                    out.mesh.nodes[p[3]]);
+                if (split_pyramid[ci] != 0) {
+                    const auto emit = [&](std::size_t a, std::size_t b, std::size_t c) {
+                        out.mesh.elements.push_back(fea::NodalElement{
+                            fea::ElementType::kTet4, {p[a], p[b], p[c], p[4]}});
+                    };
+                    if (diagonal == 1) {
+                        emit(1, 2, 3);
+                        emit(1, 3, 0);
+                    } else {
+                        emit(0, 1, 2);
+                        emit(0, 2, 3);
+                    }
+                    ++n_pyramid_split_to_tets;
+                    continue;
+                }
                 // VTK/PyVista triangulate pyramid5 along local 0-2. Rotate the
                 // cyclic base so it is the conformity-safe assembly diagonal.
-                if (mesh::validity::pyramid_split_diagonal(
-                        out.mesh.nodes[p[0]], out.mesh.nodes[p[1]], out.mesh.nodes[p[2]],
-                        out.mesh.nodes[p[3]]) == 1) {
+                if (diagonal == 1) {
                     std::rotate(p.begin(), p.begin() + 1, p.begin() + 4);
                 }
                 out.mesh.elements.push_back(fea::NodalElement{fea::ElementType::kPyramid5,
@@ -1998,6 +2097,11 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
                 fill.n_transition_cells, fill.n_feature_skin_cells, fill.boundary_max_distance,
                 turn_deg > 0.0 ? std::format(", curv_turn≤{:.0f}°/cell", turn_deg)
                                : std::string{});
+        }
+        if (n_pyramid_split_to_tets > 0) {
+            out.mesher_note += std::format(
+                " | {} corner-folded pyramid5 shipped as their 2 assembly tets",
+                n_pyramid_split_to_tets);
         }
         if (size_field) {
             out.mesher_note += std::format(

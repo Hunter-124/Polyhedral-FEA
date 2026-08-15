@@ -12,6 +12,7 @@
 // residuals. Thresholds from measured product fills at fixed equal h (not
 // auto-h). ADR-0015: scores measure lattice+snap fidelity, not CAD Delaunay.
 
+#include "fea/cell_quality.hpp"
 #include "fea/boundary_faces.hpp"
 #include "fea/nodal_mesh.hpp"
 #include "geom/stl.hpp"
@@ -117,6 +118,15 @@ struct Scorecard {
     std::size_t n_elems = 0;
     std::size_t n_nodes = 0;
     double h = 0.0;
+    /// Worst `fea::cell_quality` over the SHIPPED cells, every element type.
+    /// M6 is tet-only by construction, so on a mixed mesh it cannot see a
+    /// folded pyramid at all: measured 2026-08-15, hybrid on this sphere at
+    /// h=0.15·extent shipped cells at -0.837 while M6 read a healthy tet and
+    /// the composite scored 0.85. A scorecard that can be blinded by element
+    /// type is not a scorecard, so this number is asserted separately.
+    double worst_cell_quality = 0.0;
+    /// Element type owning that worst cell.
+    std::string worst_cell_type = "n/a";
 };
 
 Scorecard score_volume(const pipeline::Model& model, double h, pipeline::VolumeMesher mesher,
@@ -177,9 +187,28 @@ Scorecard score_volume(const pipeline::Model& model, double h, pipeline::VolumeM
     const double mesh_vol = nodal_mesh_volume(vol.mesh);
     auto tets = tet_connectivity(vol.mesh);
     const std::vector<std::array<std::uint32_t, 4>>* tet_ptr = tets.empty() ? nullptr : &tets;
-
     sc.m = mesh::evaluate_curved_mesh_quality(model.surface, vol.mesh.nodes, faces, h,
                                               mesh_vol, ref_volume, circ, tet_ptr);
+    {
+        // Which element type owns the worst shipped cell: a scorecard that only
+        // reports the number cannot tell a fill defect from a snap defect.
+        const auto q = fea::cell_quality(vol.mesh);
+        double lo = std::numeric_limits<double>::infinity();
+        for (std::size_t i = 0; i < q.size(); ++i) {
+            if (std::isfinite(q[i]) && q[i] < lo) {
+                lo = q[i];
+                switch (vol.mesh.elements[i].type) {
+                case fea::ElementType::kTet4: sc.worst_cell_type = "tet4"; break;
+                case fea::ElementType::kHex8: sc.worst_cell_type = "hex8"; break;
+                case fea::ElementType::kPyramid5: sc.worst_cell_type = "pyr5"; break;
+                case fea::ElementType::kPrism6: sc.worst_cell_type = "prism6"; break;
+                case fea::ElementType::kPolyVem: sc.worst_cell_type = "polyvem"; break;
+                default: sc.worst_cell_type = "other"; break;
+                }
+            }
+        }
+    }
+    sc.worst_cell_quality = fea::summarize_cell_quality(vol.mesh).min;
     return sc;
 }
 
@@ -191,12 +220,12 @@ Scorecard score_volume(const pipeline::Model& model, double h, pipeline::VolumeM
 void dump_score(const Scorecard& sc) {
     WARN(
         std::format("{}: score={:.4f} M1max={:.4g} M2max={:.4g} M3={:.4g} M4={:.4g} M5={:.4g} "
-                    "M6={:.4g}{} elems={} nodes={} h={:.4g}",
+                    "M6={:.4g}{} qmin_all={:.4g}({}) elems={} nodes={} h={:.4g}",
                     sc.mesher, sc.m.composite_score, sc.m.m1_max, sc.m.m2_max,
                     sc.m.m3_rel_volume_err, sc.m.m4_radial_rel, sc.m.m5_max_azimuth_gap,
                     sc.m.m6_min_boundary_aspect,
                     sc.m.has_tet_aspect ? "(tet)" : (sc.m.m6_from_free_faces ? "(face)" : "(n/a)"),
-                    sc.n_elems, sc.n_nodes, sc.h));
+                    sc.worst_cell_quality, sc.worst_cell_type, sc.n_elems, sc.n_nodes, sc.h));
 }
 
 // --- Frozen thresholds (hybrid re-baselined 2026-08-08; see below) ---
@@ -218,6 +247,33 @@ void dump_score(const Scorecard& sc) {
 // local-fine + fan path): 0.7047 / 0.7079 / 0.4750 — so saturation is worth
 // +0.14/+0.11/+0.06 composite here and the floors below are the *better* of the
 // two hybrid profiles available today.
+//
+// 2026-08-15 — no floor below moved. Measured now: hex 0.8503 graded 0.8007
+// hybrid 0.8200 / 0.8604 0.7924 0.7938 / 0.5678 0.5279 0.5476.
+//
+// What changed is what the meshes SHIP. Before this date the hybrid sphere and
+// cylinder_prism meshes contained no tet4 at all, so `tet_connectivity` handed
+// `evaluate_curved_mesh_quality` a null pointer, M6 fell back to the free-face
+// measure, and that fallback is deliberately left out of `composite_score` —
+// those meshes were scored on five of six metrics. They also shipped inverted
+// cells: `fea::cell_quality` min was -0.5691 (sphere), -0.133 (cylinder_prism)
+// and -0.2763 (hole plate), all folded pyramid5 base corners that no mesher gate
+// measured (see mesh::validity::pyramid_shape_quality). Those cells now ship as
+// the two tets the FE assembly already built from them — same nodes (3161 /
+// 8185, unchanged), same geometry, same stiffness (fea/src/assembly.cpp splits
+// kPyramid5 along `pyramid_split_diagonal`) — so M6 becomes tet-measured and
+// enters the composite: sphere 0.8434 -> 0.8200, cylinder 0.8222 -> 0.7938, hole
+// plate 0.5344 -> 0.5476. M1max moves for the same reason (sphere 1.7e-16 ->
+// 0.0012 = 0.008 h): the free-face sample is now two triangle centroids per
+// warped quad instead of one quad centroid, and a triangle centroid of a warped
+// quad does not lie on the surface. No boundary node moved.
+//
+// `worst_cell_quality` is asserted positive from here on, which is strictly
+// stronger than the margin those composite floors used to carry.
+//
+// hex moved too, and only upward: `hex_fill_surface` now relaxes interior nodes
+// between two snap rounds, so the sphere reaches M1max 1.1e-16 instead of 6.9e-4
+// (score 0.8494 -> 0.8503) and the hole plate 7.2e-12 instead of 9.6e-12.
 
 constexpr double kHexFloorSphere = 0.70;
 constexpr double kHexFloorCylinder = 0.70;
@@ -227,8 +283,8 @@ constexpr double kHexFloorHole = 0.40;
 constexpr double kGradedFloorSphere = 0.75;
 constexpr double kGradedFloorCylinder = 0.74;
 constexpr double kGradedFloorHole = 0.48;
-constexpr double kHybridFloorSphere = 0.80;    // measured 0.8434 (2026-08-08)
-constexpr double kHybridFloorCylinder = 0.78;  // measured 0.8222 (2026-08-08)
+constexpr double kHybridFloorSphere = 0.80;    // measured 0.8200 (2026-08-15)
+constexpr double kHybridFloorCylinder = 0.78;  // measured 0.7938 (2026-08-15)
 constexpr double kHybridFloorHole = 0.50;      // measured 0.5344 (2026-08-08)
 
 // Relative competitiveness: graded (all-tet, pays the M6 tet-aspect term hex
@@ -326,6 +382,16 @@ TEST_CASE("curved scorecard: sphere hex passes, graded/hybrid lag or fail bar",
     REQUIRE(graded.m.m1_max <= kGradedResidualFrac * h);
     REQUIRE(graded.m.m6_min_boundary_aspect >= kMinBoundaryAspect);
     // Post-fix: hybrid v4 (conforming fan transitions) matches or beats hex.
+    // No mesh may ship a cell its own quality measure calls inverted. This is
+    // where the folded pyramid5 defect would reappear: before 2026-08-15 the
+    // composite floors above passed on meshes whose worst shipped cell measured
+    // -0.5691 (sphere), -0.133 (cylinder_prism) and -0.2763 (hole plate), because
+    // M6 is tet-only and could not see a pyramid at all. kHexFill is exempt by
+    // design and says so at `hex_bad`: a hex8 is assembled isoparametrically, so
+    // its corner scaled Jacobian is not what the solver integrates, and gating on
+    // it costs 3 decades of boundary fidelity for shape the solver never uses.
+    REQUIRE(graded.worst_cell_quality > 0.0);
+    REQUIRE(hybrid.worst_cell_quality > 0.0);
     REQUIRE(hybrid.m.composite_score >= kHybridFloorSphere);
     REQUIRE(hybrid.m.composite_score >= hex.m.composite_score * kHybridKeepFraction);
     REQUIRE(hybrid.m.m1_max <= kResidualFrac * h);
@@ -369,6 +435,16 @@ TEST_CASE("curved scorecard: cylinder_prism hex ranks above graded/hybrid",
     REQUIRE(graded.m.composite_score >= hex.m.composite_score * kGradedKeepFraction);
     REQUIRE(graded.m.m1_max <= kGradedResidualFrac * h);
     REQUIRE(graded.m.m6_min_boundary_aspect >= kMinBoundaryAspect);
+    // No mesh may ship a cell its own quality measure calls inverted. This is
+    // where the folded pyramid5 defect would reappear: before 2026-08-15 the
+    // composite floors above passed on meshes whose worst shipped cell measured
+    // -0.5691 (sphere), -0.133 (cylinder_prism) and -0.2763 (hole plate), because
+    // M6 is tet-only and could not see a pyramid at all. kHexFill is exempt by
+    // design and says so at `hex_bad`: a hex8 is assembled isoparametrically, so
+    // its corner scaled Jacobian is not what the solver integrates, and gating on
+    // it costs 3 decades of boundary fidelity for shape the solver never uses.
+    REQUIRE(graded.worst_cell_quality > 0.0);
+    REQUIRE(hybrid.worst_cell_quality > 0.0);
     REQUIRE(hybrid.m.composite_score >= kHybridFloorCylinder);
     REQUIRE(hybrid.m.composite_score >= hex.m.composite_score * kHybridKeepFraction);
     REQUIRE(hybrid.m.m1_max <= kResidualFrac * h);
@@ -422,6 +498,16 @@ TEST_CASE("curved scorecard: hole plate test.stl graded residual / ranking",
     REQUIRE(graded.m.composite_score >= hex.m.composite_score * kGradedKeepFraction);
     REQUIRE(graded.m.m1_max <= kGradedResidualFrac * h);
     REQUIRE(graded.m.m6_min_boundary_aspect >= kMinBoundaryAspect);
+    // No mesh may ship a cell its own quality measure calls inverted. This is
+    // where the folded pyramid5 defect would reappear: before 2026-08-15 the
+    // composite floors above passed on meshes whose worst shipped cell measured
+    // -0.5691 (sphere), -0.133 (cylinder_prism) and -0.2763 (hole plate), because
+    // M6 is tet-only and could not see a pyramid at all. kHexFill is exempt by
+    // design and says so at `hex_bad`: a hex8 is assembled isoparametrically, so
+    // its corner scaled Jacobian is not what the solver integrates, and gating on
+    // it costs 3 decades of boundary fidelity for shape the solver never uses.
+    REQUIRE(graded.worst_cell_quality > 0.0);
+    REQUIRE(hybrid.worst_cell_quality > 0.0);
     REQUIRE(hybrid.m.composite_score >= kHybridFloorHole);
     REQUIRE(hybrid.m.composite_score >= hex.m.composite_score * kHybridKeepFraction);
     REQUIRE(hybrid.m.m1_max <= kResidualFrac * h);

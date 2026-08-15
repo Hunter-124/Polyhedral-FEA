@@ -628,8 +628,46 @@ snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d
                     moved[r.node] = good * span;
                 }
             }
+            // The recovery above is a sequence of LOCAL decisions: each node is
+            // re-pushed while its own incident star is valid, but a later node's
+            // push can re-break a cell an earlier node shares, and that earlier
+            // node is never revisited. This whole-mesh sweep used to be computed
+            // and then thrown away — "mandatory final whole-mesh proof" that
+            // proved nothing, because no caller of this function reads the
+            // offender set. Measured 2026-08-15 on ellipsoid_boss_s1 hybrid at
+            // auto h: 4 hex8 cells left the snap at fea::cell_quality -0.99 with
+            // 7 of 8 nodes recovered to 0.5-0.7 h of travel.
+            //
+            // So act on it: retreat every recovered node that still participates
+            // in a bad cell, all the way back, and re-prove. Each iteration
+            // permanently drops at least one node from `recovered_span`, so this
+            // terminates in at most one pass per recovered node.
+            std::unordered_map<std::uint32_t, Eigen::Vector3d> recovered_origin;
+            recovered_origin.reserve(recover.size());
+            for (const auto& r : recover) {
+                recovered_origin.emplace(r.node, r.original);
+            }
             offenders.clear();
-            collect_offenders(offenders); // mandatory final whole-mesh proof
+            collect_offenders(offenders);
+            while (!offenders.empty()) {
+                bool retreated = false;
+                for (const auto ni : offenders) {
+                    const auto it = recovered_origin.find(ni);
+                    if (it == recovered_origin.end()) {
+                        continue; // not something this recovery pass moved
+                    }
+                    nodes[ni] = it->second;
+                    moved.erase(ni);
+                    recovered_origin.erase(it);
+                    ++stats.n_unsnapped;
+                    retreated = true;
+                }
+                if (!retreated) {
+                    break; // remaining offenders predate this snap; not ours to fix
+                }
+                offenders.clear();
+                collect_offenders(offenders);
+            }
         }
     } else {
         // Compatibility path for legacy fill callers: the old bounded

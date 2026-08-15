@@ -61,15 +61,27 @@ try:  # pragma: no cover - import guard mirrors scripts/gen_cad_parts.py
     from OCP.Bnd import Bnd_Box
     from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut, BRepAlgoAPI_Fuse
     from OCP.BRepBndLib import BRepBndLib
+    from OCP.BRepBuilderAPI import (
+        BRepBuilderAPI_GTransform,
+        BRepBuilderAPI_MakeEdge,
+        BRepBuilderAPI_MakeFace,
+        BRepBuilderAPI_MakeWire,
+    )
+    from OCP.BRepGProp import BRepGProp
+    from OCP.BRepOffsetAPI import BRepOffsetAPI_ThruSections
     from OCP.BRepPrimAPI import (
         BRepPrimAPI_MakeBox,
         BRepPrimAPI_MakeCylinder,
+        BRepPrimAPI_MakePrism,
         BRepPrimAPI_MakeSphere,
     )
-    from OCP.gp import gp_Ax2, gp_Dir, gp_Pnt
+    from OCP.GeomAPI import GeomAPI_Interpolate
+    from OCP.GProp import GProp_GProps
+    from OCP.gp import gp_Ax2, gp_Dir, gp_GTrsf, gp_Mat, gp_Pnt, gp_Vec, gp_XYZ
     from OCP.IFSelect import IFSelect_RetDone
     from OCP.ShapeFix import ShapeFix_Shape
     from OCP.STEPControl import STEPControl_Reader
+    from OCP.TColgp import TColgp_HArray1OfPnt
 except ImportError as exc:  # pragma: no cover
     print(
         "error: OCP (OpenCASCADE Python bindings) is required to generate the corpus.\n"
@@ -105,6 +117,16 @@ FAMILIES = (
     # which at six families is unmeasurable (slope CI [-0.051, +0.043]).
     "tube",
     "perforated_plate",
+    # Added 2026-08-15: every curved surface in the eight families above is a
+    # plane, a circular cylinder, a circular cone or a sphere, so curvature is
+    # zero, constant, or constant along one principal direction, and a curved
+    # wall is always a surface of revolution. These three break that:
+    # `ellipsoid_boss` has two continuously varying principal curvatures,
+    # `lobed_shaft` a non-circular C2 periodic B-spline section, `twisted_loft` a
+    # doubly-curved NURBS wall with no analytic surface anywhere.
+    "ellipsoid_boss",
+    "lobed_shaft",
+    "twisted_loft",
 )
 
 #: Nominal overall size (m) of each size regime. Same band as tests/fixtures/parts.
@@ -121,6 +143,9 @@ SEEDS = (
     600013, 600027, 600041, 600059,  # sphere_box       s0..s3
     700001, 700019, 700033, 700061,  # tube             s0..s3
     800011, 800029, 800047, 800063,  # perforated_plate s0..s3
+    900007, 900023, 900041, 900067,  # ellipsoid_boss   s0..s3
+    1000003, 1000033, 1000037, 1000081,  # lobed_shaft  s0..s3
+    1100009, 1100021, 1100053, 1100077,  # twisted_loft s0..s3
 )
 
 MATERIAL = {"E": 2.1e11, "nu": 0.3, "rho": 7850}
@@ -194,6 +219,120 @@ def _cut(first, second, name: str):
     if not op.IsDone():
         raise RuntimeError(f"{name}: boolean cut failed")
     return _healed(op.Shape(), name)
+
+
+def _ellipsoid(center: tuple[float, float, float], radii: tuple[float, float, float],
+               name: str):
+    """Sphere scaled anisotropically — a genuine non-spherical curved surface.
+
+    Every corpus surface before this one is a plane, a circular cylinder, a
+    circular cone or a sphere: curvature is either zero, constant, or constant
+    along one principal direction. An ellipsoid's two principal curvatures both
+    vary continuously over the surface, and no cross-section is a circle, so a
+    chordal-deviation size field and a curvature-driven refinement band have to
+    resolve a field rather than a single number.
+    """
+    unit = BRepPrimAPI_MakeSphere(gp_Pnt(0.0, 0.0, 0.0), 1.0).Shape()
+    gtrsf = gp_GTrsf()
+    gtrsf.SetVectorialPart(
+        gp_Mat(radii[0], 0.0, 0.0, 0.0, radii[1], 0.0, 0.0, 0.0, radii[2]))
+    gtrsf.SetTranslationPart(gp_XYZ(*center))
+    op = BRepBuilderAPI_GTransform(unit, gtrsf, True)
+    op.Build()
+    if not op.IsDone():
+        raise RuntimeError(f"{name}: anisotropic scale of the unit sphere failed")
+    return _healed(op.Shape(), name)
+
+
+def _closed_spline_wire(points: list[tuple[float, float, float]], name: str):
+    """Periodic interpolating B-spline through `points` as one closed wire.
+
+    `GeomAPI_Interpolate` with `PeriodicFlag=True` yields a C2 periodic curve, so
+    the resulting surface has no artificial crease anywhere — the mesher's sharp
+    edge detector must find NO feature edge on it, which is what makes these
+    families a real test of curvature-driven sizing rather than of feature
+    capture. The first point must not be repeated at the end (OCC closes it).
+    """
+    array = TColgp_HArray1OfPnt(1, len(points))
+    for index, (x, y, z) in enumerate(points, start=1):
+        array.SetValue(index, gp_Pnt(x, y, z))
+    interp = GeomAPI_Interpolate(array, True, 1.0e-9)
+    interp.Perform()
+    if not interp.IsDone():
+        raise RuntimeError(f"{name}: periodic spline interpolation failed")
+    edge = BRepBuilderAPI_MakeEdge(interp.Curve()).Edge()
+    wire = BRepBuilderAPI_MakeWire(edge)
+    if not wire.IsDone():
+        raise RuntimeError(f"{name}: spline wire construction failed")
+    return wire.Wire()
+
+
+def _lobed_section(*, plane_x: float, mean_r: float, lobes: int, lobe_frac: float,
+                   phase: float, aspect: float, n: int = 48
+                   ) -> list[tuple[float, float, float]]:
+    """Sample points of a closed, non-circular, lobed section in the x = const plane.
+
+    r(theta) = mean_r * (1 + lobe_frac * cos(lobes * theta + phase)), then scaled
+    by `aspect` in z. `lobe_frac` < 1/(lobes^2 - 1) keeps the curve convex, which
+    is checked by the caller through the BRep validity gate rather than assumed.
+    """
+    points: list[tuple[float, float, float]] = []
+    for i in range(n):
+        theta = 2.0 * math.pi * i / n
+        radius = mean_r * (1.0 + lobe_frac * math.cos(lobes * theta + phase))
+        points.append((plane_x, radius * math.cos(theta),
+                       aspect * radius * math.sin(theta)))
+    return points
+
+
+def _extruded_section(points: list[tuple[float, float, float]], length: float, name: str):
+    """Prism a closed spline section along +x into a solid."""
+    face = BRepBuilderAPI_MakeFace(_closed_spline_wire(points, name))
+    if not face.IsDone():
+        raise RuntimeError(f"{name}: spline section is not a valid planar face")
+    prism = BRepPrimAPI_MakePrism(face.Face(), gp_Vec(length, 0.0, 0.0))
+    prism.Build()
+    if not prism.IsDone():
+        raise RuntimeError(f"{name}: extrusion of the spline section failed")
+    return _healed(prism.Shape(), name)
+
+
+def _lofted_sections(sections: list[list[tuple[float, float, float]]], name: str):
+    """Loft closed spline sections into one solid with a doubly-curved wall."""
+    loft = BRepOffsetAPI_ThruSections(True, False, 1.0e-7)
+    for section in sections:
+        loft.AddWire(_closed_spline_wire(section, name))
+    loft.Build()
+    if not loft.IsDone():
+        raise RuntimeError(f"{name}: loft through the spline sections failed")
+    return _healed(loft.Shape(), name)
+
+
+def _face_area_at(shape, axis: int, coord: float, name: str, *, tol: float = 1e-9) -> float:
+    """Exact CAD area of the planar face whose centroid sits at `coord` on `axis`.
+
+    Spline-bounded end faces have no closed-form area, so the authored
+    `expected_area` must come from the BRep itself rather than from a formula the
+    section sampling only approximates.
+    """
+    from OCP.TopAbs import TopAbs_FACE  # local: only this helper needs it
+    from OCP.TopExp import TopExp_Explorer
+
+    best = 0.0
+    found = False
+    explorer = TopExp_Explorer(shape, TopAbs_FACE)
+    while explorer.More():
+        face = explorer.Current()
+        props = GProp_GProps()
+        BRepGProp.SurfaceProperties_s(face, props)
+        centre = props.CentreOfMass()
+        if abs(centre.Coord(axis + 1) - coord) <= tol:
+            best += float(props.Mass())
+            found = True
+        explorer.Next()
+    if not found:
+        raise RuntimeError(f"{name}: no planar face centred at axis {axis} = {coord}")
+    return best
 
 
 def occ_bbox(shape) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
@@ -565,6 +704,161 @@ def build_perforated_plate(name: str, scale: float, rng: random.Random) -> Geome
     )
 
 
+def build_ellipsoid_boss(name: str, scale: float, rng: random.Random) -> Geometry:
+    """Prismatic box with an ELLIPSOIDAL boss fused onto its +x face (one solid).
+
+    `sphere_box` with the one property that made the sphere easy removed. A
+    sphere has a single constant curvature, so a curvature-driven size field
+    resolves it with one number and a chordal-deviation estimate is exact
+    everywhere. On this boss the two principal curvatures vary continuously and
+    their ratio at the +x pole is (a/c)^2 against (a/b)^2 at the equator, so the
+    size field has to be a field. Nothing else in the corpus asks that.
+    """
+    length = r10(scale)
+    half_w = r10(scale * jitter(rng, 0.20, 0.30))
+    radius_x = r10(half_w * jitter(rng, 0.55, 0.80))
+    # Anisotropy is drawn well away from 1.0 so the part can never degenerate
+    # into the sphere family it exists to be different from.
+    ratio_y = r10(jitter(rng, 0.55, 0.72))
+    ratio_z = r10(jitter(rng, 1.25, 1.55))
+    radius_y = r10(radius_x * ratio_y)
+    radius_z = r10(radius_x * ratio_z)
+    if radius_z >= half_w:
+        # The boss must stay inside the box's cross-section in z, or the fused
+        # solid grows a second silhouette and the bbox end slab stops selecting
+        # the boss alone.
+        radius_z = r10(0.85 * half_w)
+    body = _box((0.0, -half_w, -half_w), (length, 2.0 * half_w, 2.0 * half_w))
+    boss = _ellipsoid((length, 0.0, 0.0), (radius_x, radius_y, radius_z), name)
+    shape = _fuse(body, boss, name)
+    # Half an ellipsoid's area has no elementary form; Thomsen's approximation is
+    # accurate to ~1.06% for these ratios, and the case does not guard on it
+    # (guard_end_area=False) precisely because the loaded face is curved.
+    p = 1.6075
+    thomsen = 4.0 * math.pi * (
+        ((radius_x * radius_y) ** p + (radius_x * radius_z) ** p
+         + (radius_y * radius_z) ** p) / 3.0) ** (1.0 / p)
+    return Geometry(
+        name=name, family="ellipsoid_boss", regime=-1, seed=-1, shape=shape,
+        lo=(0.0, -half_w, -half_w), hi=(r10(length + radius_x), half_w, half_w),
+        axis=0, transverse=2,
+        end_area=r10(0.5 * thomsen), guard_end_area=False,
+        load_region="spherical_cap",
+        fix_axis=0, fix_side="lo",
+        fix_char_len=r10(2.0 * half_w), load_char_len=radius_x,
+        span=r10(length + radius_x),
+        params={"length": length, "half_w": half_w, "boss_radius_x": radius_x,
+                "boss_radius_y": radius_y, "boss_radius_z": radius_z,
+                "boss_aspect_y": ratio_y, "boss_aspect_z": r10(radius_z / radius_x),
+                "curvature_ratio_pole": r10((radius_x / radius_z) ** 2),
+                "box_section_area": r10(4.0 * half_w * half_w)},
+        analytic=None,
+        load_face_boundary="curved_surface",
+    )
+
+
+def build_lobed_shaft(name: str, scale: float, rng: random.Random) -> Geometry:
+    """Cam-like lobed shaft: a closed periodic B-spline section extruded along +x.
+
+    The wall is a ruled B-spline surface whose curvature varies around the
+    section between a tight lobe crest and a slack valley (ratio ~4-8 here), and
+    it is C2 everywhere — the sharp-edge detector must find no feature edge on
+    the wall at all, so refinement there can only come from curvature. Both end
+    faces are planar with a spline boundary, which is the `curved` load path.
+    """
+    length = r10(scale)
+    mean_r = r10(scale * jitter(rng, 0.10, 0.15))
+    lobes = 3 if rng.random() < 0.5 else 4
+    # Convexity bound for r(theta) = R(1 + f cos(n theta)) is f < 1/(n^2 - 1):
+    # 0.125 for 3 lobes, 0.0667 for 4. Stay clearly inside it so the section is
+    # convex and the extrusion cannot self-intersect.
+    lobe_frac = r10(jitter(rng, 0.35, 0.60) / float(lobes * lobes - 1))
+    aspect = r10(jitter(rng, 0.72, 0.95))
+    phase = r10(jitter(rng, 0.0, 0.5 * math.pi))
+    section = _lobed_section(plane_x=0.0, mean_r=mean_r, lobes=lobes,
+                             lobe_frac=lobe_frac, phase=phase, aspect=aspect)
+    shape = _extruded_section(section, length, name)
+    end_area = r10(_face_area_at(shape, 0, length, name))
+    r_max = r10(mean_r * (1.0 + lobe_frac))
+    r_min = r10(mean_r * (1.0 - lobe_frac))
+    return Geometry(
+        name=name, family="lobed_shaft", regime=-1, seed=-1, shape=shape,
+        lo=(0.0, r10(-r_max), r10(-aspect * r_max)),
+        hi=(length, r_max, r10(aspect * r_max)),
+        axis=0, transverse=2,
+        end_area=end_area, guard_end_area=True,
+        load_region="end_slab",
+        fix_axis=0, fix_side="lo",
+        fix_char_len=r10(2.0 * r_max),
+        # Same reasoning as `tube`: an end slab scaled off the diameter also
+        # encloses a ring of the spline wall. The section here is solid, so the
+        # slab only has to stay far thinner than one element; scale it off the
+        # smallest radius, which is the tightest length the wall offers.
+        load_char_len=r10(0.5 * r_min),
+        span=length,
+        params={"length": length, "mean_r": mean_r, "lobes": float(lobes),
+                "lobe_frac": lobe_frac, "aspect": aspect, "phase": phase,
+                "r_max": r_max, "r_min": r_min,
+                "end_area": end_area,
+                "crest_over_valley_curvature": r10(
+                    (1.0 + lobe_frac * (1.0 + float(lobes * lobes)))
+                    / max(1.0 - lobe_frac * (1.0 + float(lobes * lobes)), 1e-6)),
+                "slenderness_L_over_D": r10(length / (2.0 * r_max))},
+        analytic=None,
+        load_face_boundary="curved",
+    )
+
+
+def build_twisted_loft(name: str, scale: float, rng: random.Random) -> Geometry:
+    """Solid lofted through three DIFFERENT lobed spline sections along +x.
+
+    The strongest curved test in the corpus: the wall is a doubly-curved NURBS
+    surface (curvature varies both around the section and along the axis, and the
+    sections are rotated relative to one another so the surface is twisted), with
+    no analytic surface anywhere and no sharp edge except the two end rims. It
+    exists to break the assumption every earlier curved family shares — that a
+    curved wall is a surface of revolution whose size field is one-dimensional.
+    """
+    length = r10(scale)
+    root_r = r10(scale * jitter(rng, 0.11, 0.16))
+    waist_r = r10(root_r * jitter(rng, 0.62, 0.78))
+    tip_r = r10(root_r * jitter(rng, 0.80, 1.05))
+    lobes = 3
+    lobe_frac = r10(jitter(rng, 0.35, 0.60) / float(lobes * lobes - 1))
+    twist = r10(jitter(rng, 0.35, 0.75))  # radians of section rotation per section
+    sections = [
+        _lobed_section(plane_x=0.0, mean_r=root_r, lobes=lobes,
+                       lobe_frac=lobe_frac, phase=0.0, aspect=1.0),
+        _lobed_section(plane_x=r10(0.5 * length), mean_r=waist_r, lobes=lobes,
+                       lobe_frac=lobe_frac, phase=twist,
+                       aspect=r10(jitter(rng, 0.78, 0.92))),
+        _lobed_section(plane_x=length, mean_r=tip_r, lobes=lobes,
+                       lobe_frac=lobe_frac, phase=r10(2.0 * twist), aspect=1.0),
+    ]
+    shape = _lofted_sections(sections, name)
+    end_area = r10(_face_area_at(shape, 0, length, name))
+    r_max = r10(max(root_r, waist_r, tip_r) * (1.0 + lobe_frac))
+    return Geometry(
+        name=name, family="twisted_loft", regime=-1, seed=-1, shape=shape,
+        lo=(0.0, r10(-r_max), r10(-r_max)), hi=(length, r_max, r_max),
+        axis=0, transverse=2,
+        end_area=end_area, guard_end_area=True,
+        load_region="end_slab",
+        fix_axis=0, fix_side="lo",
+        fix_char_len=r10(2.0 * root_r),
+        load_char_len=r10(0.5 * tip_r * (1.0 - lobe_frac)),
+        span=length,
+        params={"length": length, "root_r": root_r, "waist_r": waist_r,
+                "tip_r": tip_r, "lobes": float(lobes), "lobe_frac": lobe_frac,
+                "twist_rad": twist, "end_area": end_area,
+                "waist_over_root": r10(waist_r / root_r),
+                "taper_ratio": r10(tip_r / root_r),
+                "slenderness_L_over_D": r10(length / (2.0 * r_max))},
+        analytic=None,
+        load_face_boundary="curved",
+    )
+
+
 BUILDERS = {
     "box_hole": build_box_hole,
     "l_bracket": build_l_bracket,
@@ -574,6 +868,9 @@ BUILDERS = {
     "sphere_box": build_sphere_box,
     "tube": build_tube,
     "perforated_plate": build_perforated_plate,
+    "ellipsoid_boss": build_ellipsoid_boss,
+    "lobed_shaft": build_lobed_shaft,
+    "twisted_loft": build_twisted_loft,
 }
 
 
@@ -1026,7 +1323,7 @@ def _boxes_intersect(box: list[list[float]],
 
 
 ACCEPTED_PROBE_KINDS = frozenset({
-    # apps/testlab/main.cpp evaluate_probe(), lines 1281-1318.
+    # apps/testlab/main.cpp evaluate_probe(), lines 1582-1631.
     "mean_vm", "mean_von_mises", "face_mean_vm",
     "mean_vm_over_nominal", "scf_mean", "scf",
     "max_von_mises", "max_vm", "max_vm_over_nominal",
@@ -1034,6 +1331,17 @@ ACCEPTED_PROBE_KINDS = frozenset({
     "strain_energy", "energy",
     "max_displacement", "tip_deflection",
     "mean_ux_on_face", "mean_uz_on_face",
+    # Box-local nodal peak (`sigma_box_max`). evaluate_probe has accepted both
+    # since it gained them, but this list did not, so `--check` reported the four
+    # box_hole Howland SCF references as unusable for 4 corpus generations. They
+    # are usable: a nodal peak is only prohibited as a score where it DIVERGES
+    # under refinement, and the maximum beside a smooth circular hole in tension
+    # is finite (ADR-0023; contrast the clamped-edge singularity that made
+    # smoke_bar's max_von_mises reference punish the advisor for refining, which
+    # is why `load_metrics` rejects the unrestricted max_* kinds outright).
+    # Authoring one of these against a re-entrant corner or a clamped edge is
+    # still a defect this list cannot catch.
+    "peak_vm", "peak_vm_over_nominal",
 })
 
 

@@ -102,6 +102,104 @@ not buy the measure with geometry.
    hybrid `quality_min` **-0.9939 → +0.0200**, 4 inverted cells → 0, p99/h
    0.342 → 0.319.
 
+5. **The graded fill relaxes interior slivers (S6).** S4 collapses sliver caps and
+   S5 peels the flakes that gain a free face, so both are boundary-facing by
+   construction; a sliver wedged in the interior survives them. Its non-boundary
+   nodes now relax toward their edge-neighbour centroid, a move kept only when the
+   worst aspect over the node's whole incident star strictly improves. Boundary
+   nodes are frozen, so it cannot cost a micron of fidelity, and monotone
+   acceptance means it cannot make any cell worse than it found it.
+   `cylinder` h=0.005 worst aspect **4.17e-05 → 5.86e-04** (14×) at identical
+   element count, p99/h and volume error. It is a no-op wherever quality is already
+   sound: the three scorecard geometries measure graded 0.8007 / 0.7924 / 0.5279
+   with M6 0.02545 / 0.05093 / 0.03059 — unchanged to every digit.
+
+## Open: the graded sliver chain
+
+S6 raised the floor; it did not close the hole. `cylinder` at h=0.005 with the
+graded mesher still ships a mesh `solve_elastostatics` cannot solve: both
+preconditioners break down at a true relative residual of 1.3e6, on 194,098 valid
+tets with a closed shell, zero inverted cells and a 0.001 relative volume error.
+The cause is scale, not validity — min edge 1.9e-05 m against a nominal 8.5e-03
+(0.004 h), and element stiffness scales with edge length, so the matrix spreads
+over three extra decades. `hybrid` and `tet` solve the same part at the same h
+(hybrid's own worst cell is 2.1e-06 and CG converges, so a sliver alone is not
+sufficient — the short EDGE is what hurts).
+
+Measured stage by stage, min tet aspect through the graded carve/snap alternations:
+
+| stage | min edge / h | min aspect |
+| --- | --- | --- |
+| entering the alternation loop | 0.0021 | 1.20e-04 |
+| after carve 1 | 0.0174 | 2.76e-04 |
+| after snap 1 | 0.0059 | 1.58e-05 |
+| after snap 2 | 0.0008 | 6.79e-06 |
+| after snap 3 | 0.0007 | 7.53e-07 |
+| after the final repair round | 0.0020 | 4.17e-05 |
+
+Each `snap_round` costs a decade. Its offender predicate is
+`tet_signed_volume > 1e-14·h³` — a machine-degeneracy test, precisely what
+`mesh/cell_validity.hpp` was written to replace, and the graded fill never got that
+treatment. Two fixes were tried and **both reverted, because neither made the solve
+work**:
+
+- a `1e-3` normalized shape floor on that predicate: min edge improved
+  9.5e-06 → 1.9e-05 but min aspect went 4.17e-05 → 1.58e-05 and CG still broke down;
+- a short-edge collapse phase in S4 (any edge below 0.05 h, through the existing
+  `try_collapse` with its tear and volume censuses): produced a byte-identical mesh,
+  because the offending edge is created *after* the last repair round.
+
+The table also shows the mesh already enters the alternation loop at 1.2e-04, so the
+chain starts upstream of the carve/snap loop, in the LEB refine + first snap. Curing
+it means giving the graded snap a real shape floor AND a repair that runs after the
+final carve/pull without re-burying faces — the ordering the current code
+deliberately avoids ("the census gate stays last"). That is a re-engineering of the
+graded snap pipeline, not a threshold change, and it needs a corpus-scale
+regeneration to validate. Reachable only well below the training grid (h=0.005 on
+`cylinder` is h_rel 0.024 against a grid of 0.10–0.20), which is why no labelled row
+has hit it.
+
+## Open: the ellipsoidal boss defeats both boundary snaps
+
+The three new families were added to test non-circular curvature, and two of them
+pass cleanly and converge. `lobed_shaft` and `twisted_loft` — a C2 periodic
+B-spline section and a doubly-curved twisted NURBS loft — mesh with positive worst
+cell quality at every resolution tried, and hybrid converges properly on
+`lobed_shaft`: exact-BRep p99/h 0.0191 → 0.0105, boundary normal p99 26.8° → 0.2°,
+relative volume error 0.0067 → 0.0017 from h_rel 0.06 to 0.03. Curvature-driven
+sizing on a non-circular spline wall works.
+
+`ellipsoid_boss` does not, in either mesher, at any resolution measured:
+
+| run | h_rel | worst cell | inverted | p99/h | normal p99 |
+| --- | --- | --- | --- | --- | --- |
+| hybrid | auto | +0.0200 (hex8) | 0 | 0.342 | 85.0° |
+| hybrid | 0.06 | **-0.2607 (pyramid5)** | **5** | 0.781 | 90.0° |
+| hybrid | 0.03 | +0.0200 (hex8) | 0 | 0.968 | 85.1° |
+| graded | auto | +5.6e-06 | 0 | 0.638 | 89.8° |
+| graded | 0.06 | +2.1e-04 | 0 | 0.893 | 89.5° |
+| graded | 0.03 | +1.3e-03 | 0 | **1.844** | — |
+
+A p99/h approaching or exceeding 1 means the boundary is a whole cell off the CAD
+surface for most of its nodes — the snap is refusing nearly every move — and a
+boundary-normal p99 of 85–90° means the facets it did place are close to
+perpendicular to the surface they represent. Refinement makes it *worse*, not
+better, which rules out under-resolution as the explanation. The graded run at
+h_rel 0.03 then fails to solve at all (CG breaks down, residual 2.1e7), consistent
+with the sliver chain above.
+
+The 5 inverted pyramids at h_rel 0.06 survive the decomposition of decision 1
+because their two assembly split tets are not positively oriented either, so there
+is no valid representation to ship them as — those cells are broken in every
+measure, and the snap gate that should have refused the move that broke them did
+not. That is the thread to pull first.
+
+What distinguishes this part from `sphere_box`, which the same code meshes well, is
+that the boss's two principal curvatures differ by a factor of (a/c)² ≈ 2 at the
+pole and vary continuously over the surface, so the projection's local
+closest-point problem has no constant scale. Nothing else in the corpus has that,
+which is why nothing else caught it.
+
 ## Consequences
 
 - The hybrid sphere and `cylinder_prism` meshes used to contain no `tet4` at all, so

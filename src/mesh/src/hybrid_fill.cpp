@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "mesh/hybrid_fill.hpp"
 
+#include "mesh/cell_validity.hpp"
 #include "mesh/cell_stamp.hpp"
 #include "mesh/grid_classify.hpp"
 #include "mesh/local_refine.hpp"
@@ -1172,6 +1173,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                     }
                 }
             }
+
             if (!any) {
                 break;
             }
@@ -1512,6 +1514,137 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 "graded_tet_fill_surface: {} boundary faces remain buried inside "
                 "other cells after the overlap carve — self-intersecting boundary",
                 st.n_buried));
+        }
+    }
+
+    // S6 interior sliver relaxation.
+    //
+    // S4 collapses sliver caps and S5 peels the flakes that gain a free face, so
+    // both are boundary-facing by construction. A sliver wedged in the INTERIOR
+    // survives them, and it is not merely a quality complaint: measured
+    // 2026-08-15 on tests/fixtures/parts/cylinder.step at h=0.005 with the
+    // graded mesher, the mesh shipped 194,098 valid tets whose worst aspect was
+    // 4.17e-05, and the elastostatic solve then failed outright — CG broke down
+    // under both preconditioners with a true relative residual of 1.9e6. A cell
+    // three decades below the shape floor conditions the stiffness matrix out of
+    // the solver's reach, so the mesher owns this, not the solver.
+    //
+    // The cure is room, exactly as in `hex_fill_surface`: a sliver's non-boundary
+    // nodes relax toward the centroid of their edge neighbours, and a move is kept
+    // only when the worst aspect over the node's whole incident star strictly
+    // improves. Boundary nodes are frozen, so this cannot cost one micron of
+    // boundary fidelity, and monotone acceptance means it cannot make any cell
+    // worse than it found it.
+    {
+        constexpr double kSliverFloor = 0.01; // ~half kCellShapeFloor: cure, not polish
+        constexpr int kRelaxPasses = 6;
+        const auto aspect = [&](const std::array<std::uint32_t, 4>& n) {
+            const Eigen::Vector3d& a = out.mesh.nodes[n[0]];
+            const Eigen::Vector3d& b = out.mesh.nodes[n[1]];
+            const Eigen::Vector3d& c = out.mesh.nodes[n[2]];
+            const Eigen::Vector3d& d = out.mesh.nodes[n[3]];
+            return validity::tet_shape_quality(a, b, c, d);
+        };
+        std::vector<std::vector<std::uint32_t>> incident(out.mesh.nodes.size());
+        for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+            for (const auto ni : out.mesh.tets[ti]) {
+                incident[ni].push_back(static_cast<std::uint32_t>(ti));
+            }
+        }
+        // Boundary nodes are every node on a face used by exactly one tet.
+        std::vector<char> frozen(out.mesh.nodes.size(), 0);
+        {
+            static constexpr int kTris[4][3] = {{0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}};
+            std::map<std::array<std::uint32_t, 3>, int> face_use;
+            for (const auto& t : out.mesh.tets) {
+                for (const auto& f : kTris) {
+                    std::array<std::uint32_t, 3> key{
+                        {t[static_cast<std::size_t>(f[0])], t[static_cast<std::size_t>(f[1])],
+                         t[static_cast<std::size_t>(f[2])]}};
+                    std::sort(key.begin(), key.end());
+                    ++face_use[key];
+                }
+            }
+            for (const auto& [key, uses] : face_use) {
+                if (uses == 1) {
+                    for (const auto ni : key) {
+                        frozen[ni] = 1;
+                    }
+                }
+            }
+        }
+        // Neighbour lists, ascending node id: the acceptance test reads the shared
+        // node array, so visit order is mesh-level mutation state (ADR-0032).
+        std::vector<std::vector<std::uint32_t>> nbrs(out.mesh.nodes.size());
+        {
+            std::set<std::pair<std::uint32_t, std::uint32_t>> seen;
+            for (const auto& t : out.mesh.tets) {
+                for (int i = 0; i < 4; ++i) {
+                    for (int j = i + 1; j < 4; ++j) {
+                        const auto a = t[static_cast<std::size_t>(i)];
+                        const auto b = t[static_cast<std::size_t>(j)];
+                        if (a == b) {
+                            continue;
+                        }
+                        const auto key = std::minmax(a, b);
+                        if (!seen.insert({key.first, key.second}).second) {
+                            continue;
+                        }
+                        nbrs[a].push_back(b);
+                        nbrs[b].push_back(a);
+                    }
+                }
+            }
+        }
+        const auto worst_incident = [&](std::uint32_t ni) {
+            double lo = 1.0;
+            for (const auto ti : incident[ni]) {
+                lo = std::min(lo, aspect(out.mesh.tets[ti]));
+            }
+            return lo;
+        };
+        for (int pass = 0; pass < kRelaxPasses; ++pass) {
+            // Nodes of every sliver tet, ascending, deduplicated.
+            std::set<std::uint32_t> targets;
+            for (const auto& t : out.mesh.tets) {
+                if (aspect(t) >= kSliverFloor) {
+                    continue;
+                }
+                for (const auto ni : t) {
+                    if (frozen[ni] == 0 && !nbrs[ni].empty()) {
+                        targets.insert(ni);
+                    }
+                }
+            }
+            if (targets.empty()) {
+                break;
+            }
+            std::size_t n_moved = 0;
+            for (const auto ni : targets) {
+                Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
+                for (const auto other : nbrs[ni]) {
+                    centroid += out.mesh.nodes[other];
+                }
+                centroid /= static_cast<double>(nbrs[ni].size());
+                const Eigen::Vector3d saved = out.mesh.nodes[ni];
+                const double before = worst_incident(ni);
+                bool kept = false;
+                for (const double omega : {0.7, 0.4, 0.2}) {
+                    out.mesh.nodes[ni] = saved + omega * (centroid - saved);
+                    if (worst_incident(ni) > before) {
+                        kept = true;
+                        break;
+                    }
+                }
+                if (kept) {
+                    ++n_moved;
+                } else {
+                    out.mesh.nodes[ni] = saved;
+                }
+            }
+            if (n_moved == 0) {
+                break;
+            }
         }
     }
 

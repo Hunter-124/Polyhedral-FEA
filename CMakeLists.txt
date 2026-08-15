@@ -25,7 +25,7 @@ option(POLYMESH_WITH_GEOGRAM
     "Vendor Geogram PSM (ConvexCell + predicates) for restricted CVT (G1/ADR-0025)" ON)
 option(POLYMESH_BUILD_TESTS "Build the test suite" ON)
 option(POLYMESH_WITH_ADVISOR
-    "Build the learned mesh advisor inference module (ADR-0027; prebuilt ONNX Runtime)" ON)
+    "Build the learned polymesh::mesh polymesh::advisor inference module (ADR-0027; prebuilt ONNX Runtime)" ON)
 # Host CPU ISA tuning. Default OFF: on some GCC+Eigen combos, -march=x86-64-v3
 # or -march=native has corrupted heaps (double free) in patch/Tier-0 tests.
 # Safe speed comes from -O3 (Release) + OpenMP. Enable only after ctest is green.
@@ -112,9 +112,15 @@ if(POLYMESH_ENABLE_LTO)
 endif()
 
 # Prefer multi-threaded Eigen dense kernels when OpenMP is present (still double).
-# Do NOT define EIGEN_DONT_PARALLELIZE.
-find_package(Eigen3 REQUIRED)
-find_package(nlohmann_json 3.11 REQUIRED)
+# An embedding host may already provide these imported targets. Re-resolving
+# dependencies can mix Eigen versions across the static-library boundary, which
+# is undefined behavior, and can similarly select a conflicting JSON package.
+if(NOT TARGET Eigen3::Eigen)
+    find_package(Eigen3 REQUIRED)
+endif()
+if(NOT TARGET nlohmann_json::nlohmann_json)
+    find_package(nlohmann_json 3.11 REQUIRED)
+endif()
 
 # Resolve OpenMP once for all modules (fea assembly, mesh classify, ZZ, SpMV).
 set(POLYMESH_OPENMP_FOUND FALSE)

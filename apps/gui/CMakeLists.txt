@@ -74,7 +74,7 @@ add_executable(polymesh-gui
 target_include_directories(polymesh-gui PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(polymesh-gui
     PRIVATE
-        pipeline
+        polymesh::pipeline
         gui_testlab_data
         imgui_lib
         ${POLYMESH_GUI_GL_LIBS}

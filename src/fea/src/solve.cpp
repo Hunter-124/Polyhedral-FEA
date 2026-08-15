@@ -16,6 +16,29 @@
 
 namespace polymesh::fea {
 
+namespace {
+
+// Eigen exposes IncompleteCholesky::shift() only from 5.0 on; 3.4 (Ubuntu LTS,
+// and the version Chudware pins) keeps the escalated shift private. The value is
+// diagnostic only, so report the exact final shift where the accessor exists and
+// the requested initial shift otherwise, labelled so a log is never misread.
+template <class T>
+concept HasShiftAccessor = requires(const T& ic) {
+    { ic.shift() } -> std::convertible_to<double>;
+};
+
+template <class T>
+std::string ichol_shift_text(const T& ic, double requested_initial_shift) {
+    if constexpr (HasShiftAccessor<T>) {
+        return std::format("{}", ic.shift());
+    } else {
+        return std::format("{} (initial; final not exposed by this Eigen)",
+                           requested_initial_shift);
+    }
+}
+
+} // namespace
+
 SolveMethod select_solve_method(Eigen::Index nfree, const SolveOptions& options) {
     switch (options.method) {
     case SolveMethod::kDirect:
@@ -273,35 +296,38 @@ Eigen::VectorXd solve_reduced(const Eigen::SparseMatrix<double>& kff,
         // Its default initial shift (1e-3) makes ten attempts ending near
         // 0.256 on the scaled matrix. Continue at the next shift scale before
         // giving up on IC and falling back to Jacobi.
+        constexpr double kIcDefaultInitialShift = 1e-3;
         Eigen::IncompleteCholesky<double> ichol;
         ichol.compute(kff);
         if (ichol.info() == Eigen::Success) {
-            const std::string name =
-                std::format("incomplete Cholesky (shift={})", ichol.shift());
+            const std::string name = std::format(
+                "incomplete Cholesky (shift={})", ichol_shift_text(ichol, kIcDefaultInitialShift));
             run_attempt(name, ichol);
         } else {
+            const std::string failed_shift = ichol_shift_text(ichol, kIcDefaultInitialShift);
             attempts.push_back(std::format(
-                "incomplete Cholesky: factorization failed after shift {}", ichol.shift()));
+                "incomplete Cholesky: factorization failed after shift {}", failed_shift));
             emit_note(std::format(
                 "CG incomplete Cholesky factorization failed after shift {}; "
                 "retrying with initial shift {}",
-                ichol.shift(), kIcRetryInitialShift));
+                failed_shift, kIcRetryInitialShift));
 
             ichol.setInitialShift(kIcRetryInitialShift);
             ichol.factorize(kff); // reuse the already-computed AMD ordering
             if (ichol.info() == Eigen::Success) {
                 const std::string name = std::format(
                     "shifted incomplete Cholesky (initial shift={}, final shift={})",
-                    kIcRetryInitialShift, ichol.shift());
+                    kIcRetryInitialShift, ichol_shift_text(ichol, kIcRetryInitialShift));
                 run_attempt(name, ichol);
             } else {
+                const std::string retry_shift = ichol_shift_text(ichol, kIcRetryInitialShift);
                 attempts.push_back(std::format(
                     "shifted incomplete Cholesky: factorization failed after shift {}",
-                    ichol.shift()));
+                    retry_shift));
                 emit_note(std::format(
                     "CG shifted incomplete Cholesky factorization failed after shift {}; "
                     "using Jacobi",
-                    ichol.shift()));
+                    retry_shift));
             }
         }
 

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: BSD-3-Clause
-add_library(adapt
+add_library(polymesh_adapt
     src/error.cpp
     src/graded_sizing.cpp
     src/metric_field.cpp
@@ -7,5 +7,6 @@ add_library(adapt
     src/sizing_field.cpp
     src/hp_driver.cpp
 )
-target_include_directories(adapt PUBLIC include)
-target_link_libraries(adapt PUBLIC geom mesh Eigen3::Eigen PRIVATE polymesh_warnings polymesh_perf)
+add_library(polymesh::adapt ALIAS polymesh_adapt)
+target_include_directories(polymesh_adapt PUBLIC include)
+target_link_libraries(polymesh_adapt PUBLIC polymesh::geom polymesh::mesh Eigen3::Eigen PRIVATE polymesh_warnings polymesh_perf)

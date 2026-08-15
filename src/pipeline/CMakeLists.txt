@@ -2,11 +2,12 @@
 # Headless app pipeline: import → regions → mesh → solve.
 # No GUI/OpenGL dependencies. apps/gui and tests both consume this.
 
-add_library(pipeline
+add_library(polymesh_pipeline
     src/scene.cpp
 )
-target_include_directories(pipeline PUBLIC include)
-target_link_libraries(pipeline
-    PUBLIC geom mesh fea adapt Eigen3::Eigen
+add_library(polymesh::pipeline ALIAS polymesh_pipeline)
+target_include_directories(polymesh_pipeline PUBLIC include)
+target_link_libraries(polymesh_pipeline
+    PUBLIC polymesh::geom polymesh::mesh polymesh::fea polymesh::adapt Eigen3::Eigen
     PRIVATE polymesh_warnings polymesh_perf
 )

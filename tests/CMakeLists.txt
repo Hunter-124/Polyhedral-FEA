@@ -85,7 +85,7 @@ target_include_directories(polymesh_tests PRIVATE .
     ${CMAKE_SOURCE_DIR}/apps/testlab
 )
 target_link_libraries(polymesh_tests
-    PRIVATE geom mesh adapt fea bench_harness pipeline Catch2::Catch2WithMain polymesh_warnings
+    PRIVATE polymesh::geom polymesh::mesh polymesh::adapt polymesh::fea polymesh::bench_harness polymesh::pipeline Catch2::Catch2WithMain polymesh_warnings
 )
 
 
@@ -101,9 +101,9 @@ endif()
 
 # Advisor inference needs the ONNX Runtime module; the test is only meaningful
 # in a build that has it.
-if(TARGET advisor)
+if(TARGET polymesh::advisor)
     target_sources(polymesh_tests PRIVATE test_advisor_inference.cpp)
-    target_link_libraries(polymesh_tests PRIVATE advisor nlohmann_json::nlohmann_json)
+    target_link_libraries(polymesh_tests PRIVATE polymesh::advisor nlohmann_json::nlohmann_json)
     polymesh_stage_onnxruntime(polymesh_tests)
 endif()
 

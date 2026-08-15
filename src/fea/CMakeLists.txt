@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: BSD-3-Clause
-add_library(fea
+add_library(polymesh_fea
     src/material.cpp
     src/backend.cpp
     src/spmv.cpp
@@ -23,17 +23,18 @@ add_library(fea
     src/p_elevate.cpp
     src/poly_to_vem.cpp
 )
-target_include_directories(fea PUBLIC include)
-target_link_libraries(fea PUBLIC mesh Eigen3::Eigen PRIVATE polymesh_warnings polymesh_perf)
+add_library(polymesh::fea ALIAS polymesh_fea)
+target_include_directories(polymesh_fea PUBLIC include)
+target_link_libraries(polymesh_fea PUBLIC polymesh::mesh Eigen3::Eigen PRIVATE polymesh_warnings polymesh_perf)
 
 if(POLYMESH_WITH_CUDA)
-    target_sources(fea PRIVATE src/backend_cuda.cu)
-    target_compile_definitions(fea PUBLIC POLYMESH_WITH_CUDA)
-    target_link_libraries(fea PUBLIC CUDA::cudart)
+    target_sources(polymesh_fea PRIVATE src/backend_cuda.cu)
+    target_compile_definitions(polymesh_fea PUBLIC POLYMESH_WITH_CUDA)
+    target_link_libraries(polymesh_fea PUBLIC CUDA::cudart)
 endif()
 
 # OpenMP for assemble_stiffness, ZZ recovery, stress, SpMV (F1+). Serial if missing.
 if(POLYMESH_OPENMP_FOUND)
-    target_link_libraries(fea PUBLIC OpenMP::OpenMP_CXX)
-    target_compile_definitions(fea PUBLIC POLYMESH_WITH_OPENMP)
+    target_link_libraries(polymesh_fea PUBLIC OpenMP::OpenMP_CXX)
+    target_compile_definitions(polymesh_fea PUBLIC POLYMESH_WITH_OPENMP)
 endif()

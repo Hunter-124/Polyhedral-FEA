@@ -67,17 +67,18 @@ if(_ort_implib)
         IMPORTED_IMPLIB "${onnxruntime_SOURCE_DIR}/${_ort_implib}")
 endif()
 
-add_library(advisor
+add_library(polymesh_advisor
     src/advisor.cpp
 )
-target_include_directories(advisor PUBLIC include)
-target_link_libraries(advisor
-    PUBLIC pipeline
+add_library(polymesh::advisor ALIAS polymesh_advisor)
+target_include_directories(polymesh_advisor PUBLIC include)
+target_link_libraries(polymesh_advisor
+    PUBLIC polymesh::pipeline
     PRIVATE onnxruntime nlohmann_json::nlohmann_json polymesh_warnings polymesh_perf
 )
 # ORT's C++ header is exception-based and warns under -Wconversion on GCC/Clang;
 # it is a vendored third-party header, not ours to fix.
-target_include_directories(advisor SYSTEM PRIVATE "${onnxruntime_SOURCE_DIR}/include")
+target_include_directories(polymesh_advisor SYSTEM PRIVATE "${onnxruntime_SOURCE_DIR}/include")
 
 # Every executable that links advisor needs onnxruntime.dll beside it on
 # Windows. The path goes through the cache because a CMake function body reads

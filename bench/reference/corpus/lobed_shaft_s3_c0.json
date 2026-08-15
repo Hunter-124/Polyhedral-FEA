@@ -1,0 +1,53 @@
+{
+  "part": "lobed_shaft_s3_c0",
+  "geometry": "bench/geometries/corpus/primitives/lobed_shaft_s3.step",
+  "family": "lobed_shaft",
+  "truth_source": "provisional",
+  "notes": "Provisional first-order beam surrogate; not a validated truth. Replaced by the advisor-truth-0 overkill reference solve via scripts/advisor/promote_truth.py.",
+  "metrics": [
+    {
+      "name": "strain_energy",
+      "value": 0.005583118071,
+      "tol": 1.0,
+      "probe": {
+        "kind": "strain_energy"
+      },
+      "derivation": "docs/validation/hand-calcs.md#corpus-primitives-provisional",
+      "source": "provisional",
+      "inputs": {
+        "E": 210000000000.0,
+        "span_m": 0.38,
+        "section_area_m2": 0.00617081471,
+        "transverse_extent_m": 0.09069841762,
+        "I_equivalent_m4": 4.230197852e-06,
+        "axial_traction_Pa": 1000000.0,
+        "transverse_traction_Pa": 0.0,
+        "delta_axial_m": 1.80952381e-06,
+        "delta_transverse_m": 0.0,
+        "model": "axial P*L/(E*A) + Euler-Bernoulli P*L^3/(3*E*I) on an equivalent rectangular section; U = 0.5 * sum(P_i * delta_i)"
+      }
+    },
+    {
+      "name": "tip_deflection",
+      "value": 1.80952381e-06,
+      "tol": 1.0,
+      "probe": {
+        "kind": "tip_deflection"
+      },
+      "derivation": "docs/validation/hand-calcs.md#corpus-primitives-provisional",
+      "source": "provisional",
+      "inputs": {
+        "E": 210000000000.0,
+        "span_m": 0.38,
+        "section_area_m2": 0.00617081471,
+        "transverse_extent_m": 0.09069841762,
+        "I_equivalent_m4": 4.230197852e-06,
+        "axial_traction_Pa": 1000000.0,
+        "transverse_traction_Pa": 0.0,
+        "delta_axial_m": 1.80952381e-06,
+        "delta_transverse_m": 0.0,
+        "model": "axial P*L/(E*A) + Euler-Bernoulli P*L^3/(3*E*I) on an equivalent rectangular section; U = 0.5 * sum(P_i * delta_i)"
+      }
+    }
+  ]
+}

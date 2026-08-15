@@ -1273,6 +1273,27 @@ int cmd_diag(std::span<char*> args) {
     const auto q = polymesh::fea::summarize_cell_quality(vol.mesh);
     const double q_min = q.min;
     const double q_mean = q.mean;
+    // Which element type owns the worst cell, and how many cells are inverted.
+    // `quality_min` on its own cannot tell a fill defect from a snap defect, and
+    // a single number hides whether one cell or a thousand are folded.
+    std::string q_min_type = "n/a";
+    std::size_t n_inverted = 0;
+    {
+        const auto per_cell = polymesh::fea::cell_quality(vol.mesh);
+        double lo = std::numeric_limits<double>::infinity();
+        for (std::size_t i = 0; i < per_cell.size(); ++i) {
+            if (!std::isfinite(per_cell[i])) {
+                continue;
+            }
+            if (per_cell[i] < 0.0) {
+                ++n_inverted;
+            }
+            if (per_cell[i] < lo) {
+                lo = per_cell[i];
+                q_min_type = polymesh::fea::element_type_name(vol.mesh.elements[i].type);
+            }
+        }
+    }
 
     const auto fidelity_faces = polymesh::fea::extract_boundary_faces(vol.mesh);
     constexpr std::size_t kBRepSurfaceSampleCeiling = 10'000;
@@ -1430,7 +1451,8 @@ int cmd_diag(std::span<char*> args) {
         "  \"import\": {{ \"vertices\": {}, \"triangles\": {}, \"bbox_diag\": {:.6g}, "
         "\"cad_brep\": {} }},\n"
         "  \"mesh\": {{ \"h\": {:.6g}, \"nodes\": {}, \"elements\": {}, "
-        "\"quality_min\": {:.4g}, \"quality_mean\": {:.4g}, "
+        "\"quality_min\": {:.4g}, \"quality_min_type\": \"{}\", "
+        "\"n_inverted_cells\": {}, \"quality_mean\": {:.4g}, "
         "\"geometry_seeds\": {}, \"bc_seeds\": {} }},\n"
         "  \"timing_ms\": {{ \"import\": {:.3f}, \"mesh\": {:.3f}, \"solve\": {:.3f} }},\n"
         "  \"mesh_throughput_elem_per_s\": {:.1f},\n"
@@ -1442,7 +1464,8 @@ int cmd_diag(std::span<char*> args) {
         "}}\n",
         model.name, mesher_name, model.surface.vertices.size(), model.surface.triangles.size(),
         bbox_diag, model.cad ? "true" : "false", h, vol.mesh.nodes.size(),
-        vol.mesh.elements.size(), q_min, q_mean, plan.n_geometry_seeds, plan.n_bc_seeds,
+        vol.mesh.elements.size(), q_min, q_min_type, n_inverted, q_mean,
+        plan.n_geometry_seeds, plan.n_bc_seeds,
         import_ms, mesh_ms, solve_ms, mesh_throughput, fidelity_json,
         solved ? "true" : "false", dof, max_vm, max_u, global_eta, mesh_size_note,
         vol.mesher_note);

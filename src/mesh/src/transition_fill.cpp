@@ -68,7 +68,7 @@ bool cell_inverted(const TransitionCell& cell, const std::vector<Eigen::Vector3d
         return true;
     }
     return shape_floor > 0.0 &&
-           validity::pyramid_shape_quality(p0, p1, p2, p3, p4) < shape_floor;
+           validity::pyramid_split_shape_quality(p0, p1, p2, p3, p4) < shape_floor;
 }
 
 } // namespace

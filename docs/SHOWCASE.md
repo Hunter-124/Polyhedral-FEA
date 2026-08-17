@@ -115,7 +115,7 @@ python scripts/render_showcase.py --only icecream_cone
 ![Mesher comparison](assets/showcase/compare_meshers.png)
 
 **`compare_meshers.png`** — the same plate at h = 3 mm through three meshers:
-`tet` (11,770 nodes / 53,760 cells), `graded` (36,104 / 177,560) and `hybrid`
+`tet` (11,770 nodes / 53,760 cells), `graded` (36,122 / 177,663) and `hybrid`
 (113,174 / 329,510), whose finer run includes conforming transition cells.
 All four panels share one camera on a 60 mm window across the hole (6 hole
 radii): at whole-plate scale the three topologies read as identical grey
@@ -136,11 +136,24 @@ samples under a hard attempt/storage ceiling; sharp mesh edges are classified
 independently by a ≥30° boundary dihedral. These are sampled directional
 distributions, not a Hausdorff-distance claim.
 
-| Mesher | mesh→BRep p99 / h | BRep→mesh p99 / h | sharp BRep edge→mesh p99 / h | normal p99 |
-|---|---:|---:|---:|---:|
-| graded | 0.0175 | 0.00392 | 0.322 | 20.9° |
-| hybrid | 0.00999 | 0.0201 | 0.311 | 4.67° |
-| varyhedron | 0.0174 | 0.00361 | 0.322 | 20.9° |
+The **node** column is the one a mesher fully controls: where it puts a
+boundary node. It is zero to machine precision on all three paths since
+[ADR-0035](decisions/0035-boundary-conformity.md). The mesh→BRep column stays
+non-zero because it also samples facet centroids and edge midpoints, and a
+straight facet spanning a curve always carries the chord sag h²κ/8 — a
+discretisation property of a linear-element mesh, not a placement error.
+
+| Mesher | boundary node → BRep p99 / h | mesh→BRep p99 / h | BRep→mesh p99 / h | sharp BRep edge→mesh p99 / h | normal p99 |
+|---|---:|---:|---:|---:|---:|
+| graded | **0** | 0.0112 | 0.00392 | 0.0321 | 4.54° |
+| hybrid | **0** | 0.00806 | 0.0125 | 0.0741 | 0.52° |
+| varyhedron | **0** | 0.00948 | 0.00339 | 0.0363 | 3.29° |
+
+Before ADR-0035 the same matrix read: graded mesh→BRep 0.0175 with sharp-edge
+0.322 and normal p99 20.9°, hybrid 0.00999 / 0.311 / 4.67°, varyhedron 0.0174 /
+0.322 / 20.9°. The sharp-edge column improved by an order of magnitude because
+crease nodes are now pinned to the exact edge curve instead of to the nearest
+point of a face.
 
 Source and executable provenance:
 [`mesher-fidelity-plate-hole-current.json`](../bench/results/mesher-fidelity-plate-hole-current.json).
@@ -204,6 +217,54 @@ logarithmic radial grading cut SCF error from **3.06%** to **0.70%**
 python scripts/render_showcase.py --only compare_grading
 ```
 
+## Boundary conformity
+
+Every boundary node sits on the exact BRep, not near it
+([ADR-0035](decisions/0035-boundary-conformity.md)). This section exists
+because the previous figures did not: a reader looking at them reported that
+round surfaces carried random defects and a curved-to-planar edge rendered as a
+chamfer, and both were real. The renders draw the mesh VTU verbatim
+(`extract_surface`, flat shading, element edges on), so there was nowhere for a
+defect to hide.
+
+Three structural causes, all removed:
+
+- fills snapped to the **tessellation** rather than the BRep, and two of the six
+  meshers were never given the exact oracle at all;
+- no mesher called `project_point_on_edge`, so a 90° crease was reconstructed
+  from the nearest point of a *face*, and varyhedron's 35 % "edge attraction"
+  blend chamfered the remaining 65 % by construction;
+- the snap's unsnap ladder silently kept partial projections, leaving nodes up
+  to 0.6 h off the CAD while reporting nothing.
+
+Boundary-node distance to the exact BRep, p99 as a fraction of h, at h = 8 mm:
+
+| Part | mesher | before | after |
+|---|---|---:|---:|
+| sphere | graded | 0.039 | **2.9e-15** |
+| cylinder | graded | 0.045 | **2.8e-15** |
+| plate_hole | tet | 0.218 | **0** |
+| icecream_cone | varyhedron | 0.039 | **3.7e-15** |
+
+Normal-angle p99 (mesh facet vs BRep normal) falls from 30° to 4.4° on the
+graded sphere and to 0.52° on the hybrid plate. No mesh in the fixture set
+ships an inverted cell any more: the sphere hybrid at h = 3 mm went from
+`quality_min` −0.837 to +0.0022, with the 38 cells still under the shape floor
+**reported** in the mesher note and in `diag --json` as
+`mesh.n_below_shape_floor` rather than passed off as clean.
+
+What a Fourier transform contributes here is spacing, not geometry: a closed
+crease chain is re-spaced by low-passing the deviation of its arclength
+parameters from a uniform chain, and every pin target is still the exact OCC
+curve projection. Fourier chooses *where along the curve* a node sits, never
+where the curve is.
+
+Two limits stay on the page because they are still true. The plain Kuhn tet
+lattice cannot resolve a feature smaller than its cell — plate_hole's 6 mm disc
+at h = 3 mm still leaves isolated nodes 0.22 h out — and once every node is on
+the surface, the residual mesh→BRep distance is the sagitta h²κ/8 of a straight
+facet across a curve, which is the floor of any linear-element mesh.
+
 ## Spectral sizing
 
 The sizing field the meshers consume is FFT-filtered before it is used
@@ -232,7 +293,7 @@ the default and again with `--no-spectral`:
 | Part | With spectral | Without |
 |---|---|---|
 | `sphere.step`, h = 8 mm (`mesh`) | 41 seeds from 51 geometry sources, 9,194 cells | 51 seeds, 9,194 cells |
-| `icecream_cone.step`, h = 8 mm (`diag`) | 43 denoised edge-curve sources; 27,399 cells, `quality_min` 0.02098, mesh→BRep p99/h 0.03878, peak VM 2.35535e7 Pa | 27,399 cells, 0.02098, 0.03878, 2.35535e7 Pa |
+| `icecream_cone.step`, h = 8 mm (`diag`) | 43 denoised edge-curve sources; 27,368 cells, `quality_min` 0.02098, boundary-node→BRep p99/h 3.7e-15, mesh→BRep p99/h 0.0364, peak VM 2.35799e7 Pa | 27,368 cells, 0.02098, 3.7e-15, 0.0364, 2.35799e7 Pa |
 
 So on fixtures whose curvature was already smooth, the filter is measurably a
 no-op in mesh output while emitting a smaller, denoised source set. The payoff

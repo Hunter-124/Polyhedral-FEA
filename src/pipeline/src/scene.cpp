@@ -1340,6 +1340,121 @@ namespace {
 // `fea::element_centroid_stresses` had drifted into a wrong one, so the rule is
 // now defined once and every caller shares it.
 
+/// Final ship gate: relax the cells that are actually being emitted.
+///
+/// Every mesher gates its OWN cells during snap, with its own predicate over
+/// its own intermediate zoo. What ships is `fea::NodalMesh`, and the measure
+/// the product reports is `fea::cell_quality` — the pyramid a hybrid fill
+/// gated as a pyramid may ship as two assembly tets, an LEB child may be
+/// carved after its last gate, and neither is re-measured. This sweep closes
+/// that gap the way ADR-0033 requires: measure the cell that ships, and if it
+/// is below the floor, give it room by relaxing its INTERIOR nodes only
+/// (boundary nodes carry the exact-BRep placement and must not move).
+///
+/// Returns the number of cells still below the floor, which the caller reports
+/// rather than hides.
+std::size_t relax_cells_below_shape_floor(fea::NodalMesh& mesh,
+                                          std::span<const std::array<std::uint32_t, 4>>
+                                              boundary_faces,
+                                          double floor_value, int rounds = 4) {
+    if (mesh.elements.empty() || mesh.nodes.empty()) {
+        return 0;
+    }
+    std::vector<char> on_boundary(mesh.nodes.size(), 0);
+    for (const auto& face : boundary_faces) {
+        for (const auto ni : face) {
+            if (ni < on_boundary.size()) {
+                on_boundary[ni] = 1;
+            }
+        }
+    }
+    std::vector<std::vector<std::uint32_t>> incident(mesh.nodes.size());
+    std::vector<std::vector<std::uint32_t>> neighbours(mesh.nodes.size());
+    for (std::size_t ei = 0; ei < mesh.elements.size(); ++ei) {
+        const auto& nodes = mesh.elements[ei].nodes;
+        for (const auto ni : nodes) {
+            if (ni >= incident.size()) {
+                continue;
+            }
+            incident[ni].push_back(static_cast<std::uint32_t>(ei));
+            for (const auto other : nodes) {
+                if (other != ni && other < mesh.nodes.size()) {
+                    neighbours[ni].push_back(other);
+                }
+            }
+        }
+    }
+    for (auto& list : neighbours) {
+        std::sort(list.begin(), list.end());
+        list.erase(std::unique(list.begin(), list.end()), list.end());
+    }
+
+    // Accept a relaxation when it raises the WORST cell of the moved node's
+    // star. Demanding the whole star clear the floor rejects every move on a
+    // star that is below the floor to begin with — which is the only star this
+    // sweep is ever called on.
+    const auto star_min_quality = [&](std::uint32_t ni) {
+        double worst = std::numeric_limits<double>::infinity();
+        for (const auto ei : incident[ni]) {
+            const double q = fea::cell_quality(mesh, mesh.elements[ei]);
+            if (std::isfinite(q)) {
+                worst = std::min(worst, q);
+            }
+        }
+        return worst;
+    };
+
+    std::size_t remaining = 0;
+    for (int round = 0; round < rounds; ++round) {
+        // Ascending element index, then ascending node id: the acceptance test
+        // reads the shared node array, so visit order is mutation state.
+        std::vector<std::uint32_t> targets;
+        for (std::size_t ei = 0; ei < mesh.elements.size(); ++ei) {
+            const double q = fea::cell_quality(mesh, mesh.elements[ei]);
+            if (!std::isfinite(q) || q >= floor_value) {
+                continue;
+            }
+            for (const auto ni : mesh.elements[ei].nodes) {
+                if (ni < on_boundary.size() && on_boundary[ni] == 0 &&
+                    !neighbours[ni].empty()) {
+                    targets.push_back(ni);
+                }
+            }
+        }
+        std::sort(targets.begin(), targets.end());
+        targets.erase(std::unique(targets.begin(), targets.end()), targets.end());
+        if (targets.empty()) {
+            break;
+        }
+        bool moved_any = false;
+        for (const auto ni : targets) {
+            Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
+            for (const auto other : neighbours[ni]) {
+                centroid += mesh.nodes[other];
+            }
+            centroid /= static_cast<double>(neighbours[ni].size());
+            const Eigen::Vector3d saved = mesh.nodes[ni];
+            const double before = star_min_quality(ni);
+            mesh.nodes[ni] = saved + 0.5 * (centroid - saved);
+            if (!(star_min_quality(ni) > before)) {
+                mesh.nodes[ni] = saved;
+            } else {
+                moved_any = true;
+            }
+        }
+        if (!moved_any) {
+            break;
+        }
+    }
+    for (const auto& element : mesh.elements) {
+        const double q = fea::cell_quality(mesh, element);
+        if (std::isfinite(q) && q < floor_value) {
+            ++remaining;
+        }
+    }
+    return remaining;
+}
+
 struct BoundaryShellTopology {
     std::size_t n_edges = 0;
     /// Used by one face: a hole in the shell.
@@ -3296,6 +3411,21 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
         auto exterior = fea::extract_boundary_faces(out.mesh);
         if (!exterior.empty()) {
             out.boundary_quads = std::move(exterior);
+        }
+    }
+
+    // Ship gate (ADR-0035): the cells that leave this function are measured
+    // with the product's own `fea::cell_quality`, not with whatever predicate
+    // each mesher used internally over its own intermediate zoo. Cells under
+    // the floor get interior room; whatever is left is reported, never hidden.
+    {
+        const std::size_t below_floor = relax_cells_below_shape_floor(
+            out.mesh, out.boundary_quads, mesh::validity::kCellShapeFloor);
+        out.n_cells_below_shape_floor = below_floor;
+        if (below_floor > 0) {
+            out.mesher_note +=
+                std::format(" | ship_gate {} cells below shape floor {:.3g}", below_floor,
+                            mesh::validity::kCellShapeFloor);
         }
     }
 

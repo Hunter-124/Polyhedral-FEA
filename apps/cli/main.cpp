@@ -1512,7 +1512,7 @@ int cmd_diag(std::span<char*> args) {
         "\"cad_brep\": {} }},\n"
         "  \"mesh\": {{ \"h\": {:.6g}, \"nodes\": {}, \"elements\": {}, "
         "\"quality_min\": {:.4g}, \"quality_min_type\": \"{}\", "
-        "\"n_inverted_cells\": {}, \"quality_mean\": {:.4g}, "
+        "\"n_inverted_cells\": {}, \"n_below_shape_floor\": {}, \"quality_mean\": {:.4g}, "
         "\"geometry_seeds\": {}, \"bc_seeds\": {} }},\n"
         "  \"spectral\": {},\n"
         "  \"timing_ms\": {{ \"import\": {:.3f}, \"mesh\": {:.3f}, \"solve\": {:.3f} }},\n"
@@ -1525,7 +1525,8 @@ int cmd_diag(std::span<char*> args) {
         "}}\n",
         model.name, mesher_name, model.surface.vertices.size(), model.surface.triangles.size(),
         bbox_diag, model.cad ? "true" : "false", h, vol.mesh.nodes.size(),
-        vol.mesh.elements.size(), q_min, q_min_type, n_inverted, q_mean,
+        vol.mesh.elements.size(), q_min, q_min_type, n_inverted,
+        vol.n_cells_below_shape_floor, q_mean,
         plan.n_geometry_seeds, plan.n_bc_seeds, spectral_json,
         import_ms, mesh_ms, solve_ms, mesh_throughput, fidelity_json,
         solved ? "true" : "false", dof, max_vm, max_u, global_eta, mesh_size_note,

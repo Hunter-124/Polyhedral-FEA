@@ -442,9 +442,11 @@ struct VolumeMeshOutput {
     // triangle (used to map picked regions to constraint/load node sets).
     std::map<std::uint32_t, int> boundary_node_region;
     std::string mesher_note;
+    /// Cells still under `mesh::validity::kCellShapeFloor` after the ship gate
+    /// relaxation, measured with `fea::cell_quality` on the emitted mesh.
+    std::size_t n_cells_below_shape_floor = 0;
     GeometryVolumeAssessment fill_geometry_volume;
     GeometryVolumeAssessment solved_geometry_volume;
-
 };
 /// Volume fill of a closed model surface.
 /// @param h Coarse target edge length, metres (must be > 0; call resolve_mesh_size first).

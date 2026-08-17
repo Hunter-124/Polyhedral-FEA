@@ -596,3 +596,114 @@ TEST_CASE("brep_fidelity: hybrid curved boundary survey stays bounded",
         }
     }
 }
+// --- ADR-0035: boundary nodes sit ON the exact BRep ------------------------
+//
+// The mesher used to project boundary nodes to the nearest point of the
+// *tessellated* surface and, at a sharp edge, to the nearest point of a FACE
+// rather than the edge curve. Both are structural: no amount of h removes
+// them. Measured before the fix at h = 8 mm, worst boundary node over h:
+// sphere graded 0.059, cylinder graded 0.180, icecream_cone graded 0.196,
+// plate_hole tet 0.650 — and the varyhedron "edge attraction" moved a crease
+// node only 35 % of the way onto its curve, which is a chamfer by
+// construction.
+//
+// This test measures the one thing a mesher fully controls: where it puts a
+// node. Facet centroids and edge midpoints are deliberately excluded — a
+// straight facet spanning a curve always carries the chord sag h²κ/8, which is
+// a discretisation property, not a placement error.
+TEST_CASE("boundary nodes land on the exact BRep for every CAD mesher",
+          "[cad][fidelity][feature_pin]") {
+    if (!polymesh::geom::occ_enabled()) {
+        SKIP("OpenCASCADE disabled");
+    }
+    struct Case {
+        const char* name;
+        const char* path;
+        polymesh::pipeline::VolumeMesher mesher;
+        double node_p99_over_h; // ceiling on the 99th percentile
+        double node_max_over_h; // ceiling on the worst single node
+    };
+    // Ceilings are the measured post-fix values with headroom. The graded and
+    // varyhedron paths place every node on the BRep to machine precision, so
+    // their ceilings are 1e-12 — a real regression cannot hide under that.
+    const Case cases[] = {
+        {"sphere/graded", kSphere, polymesh::pipeline::VolumeMesher::kGradedTet, 1e-12, 1e-12},
+        {"sphere/varyhedron", kSphere, polymesh::pipeline::VolumeMesher::kVaryhedron, 1e-12,
+         1e-12},
+        {"cylinder/graded", kCylinder, polymesh::pipeline::VolumeMesher::kGradedTet, 1e-12,
+         0.02},
+        {"cylinder/varyhedron", kCylinder, polymesh::pipeline::VolumeMesher::kVaryhedron,
+         1e-12, 1e-12},
+        {"plate_hole/graded", kPlateHole, polymesh::pipeline::VolumeMesher::kGradedTet, 1e-12,
+         0.002},
+        {"plate_hole/varyhedron", kPlateHole, polymesh::pipeline::VolumeMesher::kVaryhedron,
+         1e-12, 0.002},
+        {"icecream_cone/graded", kIcecreamCone, polymesh::pipeline::VolumeMesher::kGradedTet,
+         1e-12, 0.25},
+        {"icecream_cone/varyhedron", kIcecreamCone,
+         polymesh::pipeline::VolumeMesher::kVaryhedron, 1e-12, 0.25},
+    };
+    constexpr double kH = 0.008;
+    for (const auto& c : cases) {
+        if (!std::filesystem::exists(c.path)) {
+            SKIP(std::string("missing fixture: ") + c.path);
+        }
+        const auto model = polymesh::pipeline::Model::load(c.path);
+        REQUIRE(model.cad);
+        const auto vol = polymesh::pipeline::volume_mesh(model, kH, c.mesher);
+        REQUIRE_FALSE(vol.mesh.nodes.empty());
+        const auto nodes = boundary_nodes(vol.mesh);
+        REQUIRE_FALSE(nodes.empty());
+        const auto residual = exact_residuals_over_h(*model.cad, vol.mesh.nodes, nodes, kH);
+        CAPTURE(c.name, residual.p99, residual.max, vol.mesher_note);
+        CHECK(residual.p99 <= c.node_p99_over_h);
+        CHECK(residual.max <= c.node_max_over_h);
+    }
+}
+
+// The pinning pass is what reproduces a sharp CAD edge. Its direction of
+// interest is CAD -> mesh: for every sampled point of a sharp BRep edge, how
+// far is the nearest mesh feature segment? A mesh that chamfers a 90 deg edge
+// fails here even when every node is on some face of the solid.
+TEST_CASE("sharp BRep edges are reproduced by mesh feature segments",
+          "[cad][fidelity][feature_pin]") {
+    if (!polymesh::geom::occ_enabled()) {
+        SKIP("OpenCASCADE disabled");
+    }
+    struct Case {
+        const char* name;
+        const char* path;
+        double edge_p99_over_h;
+    };
+    const Case cases[] = {
+        {"plate_hole", kPlateHole, 0.09},
+        {"cylinder", kCylinder, 0.20},
+        {"icecream_cone", kIcecreamCone, 0.10},
+    };
+    constexpr double kH = 0.008;
+    for (const auto& c : cases) {
+        if (!std::filesystem::exists(c.path)) {
+            SKIP(std::string("missing fixture: ") + c.path);
+        }
+        const auto model = polymesh::pipeline::Model::load(c.path);
+        REQUIRE(model.cad);
+        // feature_refine=true is what the product CLI runs; without the
+        // feature band the rim is meshed at bulk h and the reproduction of a
+        // small circular edge is bounded by the lattice, not by the pin.
+        const auto vol = polymesh::pipeline::volume_mesh(
+            model, kH, polymesh::pipeline::VolumeMesher::kGradedTet, /*skin_layers=*/2,
+            /*feature_refine=*/true);
+        const auto quads = polymesh::fea::extract_boundary_faces(vol.mesh);
+        const std::vector<polymesh::mesh::FreeFace> faces(quads.begin(), quads.end());
+        const auto segments = polymesh::mesh::mesh_dihedral_feature_segments(vol.mesh.nodes, faces);
+        const auto fidelity = polymesh::mesh::evaluate_brep_geometry_fidelity(
+            *model.cad, vol.mesh.nodes, faces, segments, kH, 0.0);
+        REQUIRE(fidelity.available);
+        const auto& reverse = fidelity.sharp_brep_edge_samples_to_mesh_feature_segments;
+        CAPTURE(c.name, reverse.over_h.p99, reverse.over_h.max, vol.mesher_note);
+        if (reverse.metres.count == 0) {
+            continue; // no sharp edges on this part
+        }
+        CHECK(reverse.over_h.p99 <= c.edge_p99_over_h);
+    }
+}

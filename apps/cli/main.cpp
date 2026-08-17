@@ -196,7 +196,7 @@ std::optional<polymesh::pipeline::VolumeMesher> try_parse_mesher(const std::stri
 
 /// Lenient form kept for the `--mesher` flag's historical behaviour.
 polymesh::pipeline::VolumeMesher parse_mesher(const std::string& m) {
-    return try_parse_mesher(m).value_or(polymesh::pipeline::VolumeMesher::kHybrid);
+    return try_parse_mesher(m).value_or(polymesh::pipeline::VolumeMesher::kGradedTet);
 }
 
 struct BoxSel {
@@ -580,7 +580,7 @@ int cmd_mesh(std::span<char*> args) {
     const std::string path = args[2];
     double h = 0.0;
     std::string out_path;
-    auto mesher = polymesh::pipeline::VolumeMesher::kHybrid;
+    auto mesher = polymesh::pipeline::VolumeMesher::kGradedTet;
     int skin = 2;
     bool feature = true; // geometry (curvature/thin-wall) grading on by default
     bool spectral = true; // spectral sizing on by default (ADR-0034)
@@ -684,7 +684,7 @@ int cmd_solve(std::span<char*> args) {
     double E = 200e9;
     double nu = 0.3;
     std::string out_path;
-    auto mesher = polymesh::pipeline::VolumeMesher::kHybrid;
+    auto mesher = polymesh::pipeline::VolumeMesher::kGradedTet;
     int skin = 2;
     bool feature = true; // geometry grading on by default (CAD)
     bool spectral = true; // spectral sizing on by default (ADR-0034)

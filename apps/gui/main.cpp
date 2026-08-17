@@ -70,11 +70,11 @@ constexpr ImGuiWindowFlags kPanelFlags =
 struct App {
     std::optional<Model> model;
     SimSetup setup = [] {
-        // Product defaults: hybrid zoo + light adaptive loop (η-target stop).
+        // Product defaults: graded tet + light adaptive loop (η-target stop).
         // Graded multi-level LEB: L0 bulk / L1 features / L2 high-κ. Thin parts
-        // skip free-surface flood when feature grading is on. p-elev opt-in.
+        // skip free-surface flood when feature grading is on; curved solve geometry is default.
         SimSetup s;
-        s.mesher = VolumeMesher::kHybrid;
+        s.mesher = VolumeMesher::kGradedTet;
         s.adapt_passes = 2;
         s.eta_target = 0.12;
         s.adapt_leb_waves = 2;

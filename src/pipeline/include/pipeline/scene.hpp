@@ -159,7 +159,7 @@ struct SimSetup {
     /// 1 = one LEB (ADR-0016); 2–3 deepen local h before falling back to remesh.
     int adapt_leb_waves = 2;
     int skin_layers = 2; // graded-tet boundary skin depth (coarse cells)
-    VolumeMesher mesher = VolumeMesher::kHybrid;
+    VolumeMesher mesher = VolumeMesher::kGradedTet;
     /// Element-shape preference dial ∈ [-1, +1] (clamped). 0 = respect
     /// `mesher` as-is. Non-zero remaps hybrid-family (and soft-remaps
     /// hex/tet families) toward hex / fan-split hybrid / native-poly VEM /

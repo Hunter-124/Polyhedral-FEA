@@ -8,6 +8,7 @@
 #include "adapt/spectral_sizing.hpp"
 #include "fea/boundary_faces.hpp"
 #include "fea/cell_quality.hpp"
+#include "fea/element_validity.hpp"
 #include "fea/p_elevate.hpp"
 #include "fea/quadrature.hpp"
 #include "fea/poly_to_vem.hpp"
@@ -1480,6 +1481,468 @@ std::size_t relax_cells_below_shape_floor(fea::NodalMesh& mesh,
     return remaining;
 }
 
+/// Boundary conformity on the mesh that actually ships (ADR-0035).
+///
+/// Every mesher snaps *its own* boundary set — the lattice skin it built. What
+/// ships is `fea::extract_boundary_faces(out.mesh)`, the true element exterior,
+/// and the two are not the same set: a fan tet peeled after the snap, a pyramid
+/// shipped as two assembly tets, or an LEB child carved late can expose a node
+/// that was interior when the snap ran and is on the free surface when the mesh
+/// leaves. Those nodes were never candidates for projection, so they keep their
+/// raw lattice position — measured on sphere/hybrid at h = 8 mm: the branch's
+/// own worst boundary node sat 0.016 h off the exact BRep while the shipped
+/// mesh carried nodes 0.081 h off, visible as isolated flaps on the render.
+///
+/// This closes the loop for every mesher at once: project the true exterior
+/// through the same owner-aware oracle, accept a move only when every incident
+/// cell keeps `fea::cell_quality` at or above the shared floor (the measure the
+/// product reports, not each mesher's internal predicate), and open room by
+/// relaxing interior star nodes when the first attempt is refused.
+///
+/// The acceptance test is deliberately absolute rather than "improves": an
+/// earlier version of this pass accepted a cell at ~1e-11 quality because the
+/// move improved it, and the solver then refused the p-elevated element with
+/// "non-positive Jacobian". A node that cannot be placed above the floor stays
+/// where it is and is counted.
+struct ExteriorConformStats {
+    std::size_t n_candidates = 0;
+    std::size_t n_moved = 0;
+    std::size_t n_relax_rescued = 0;
+    std::size_t n_hex_fanned = 0; // hexes fanned into pyramids to free a node
+    std::size_t n_left = 0;       // still off the BRep by more than 1e-9 h
+    double worst_residual = 0.0;
+    bool reverted = false; // whole pass rolled back by the exit invariant
+};
+
+ExteriorConformStats
+conform_true_exterior(fea::NodalMesh& mesh,
+                      std::span<const std::array<std::uint32_t, 4>> boundary_faces,
+                      mesh::BoundaryProjectionContext* projection,
+                      const mesh::BoundaryFit* fit, double h, double floor_value) {
+    ExteriorConformStats stats;
+    if (mesh.elements.empty() || mesh.nodes.empty() || projection == nullptr || !(h > 0.0)) {
+        return stats;
+    }
+    std::vector<char> on_boundary(mesh.nodes.size(), 0);
+    for (const auto& face : boundary_faces) {
+        for (const auto ni : face) {
+            if (ni < on_boundary.size()) {
+                on_boundary[ni] = 1;
+            }
+        }
+    }
+    std::vector<std::vector<std::uint32_t>> incident;
+    std::vector<std::vector<std::uint32_t>> neighbours;
+    const auto rebuild_incidence = [&] {
+        on_boundary.resize(mesh.nodes.size(), 0);
+        incident.assign(mesh.nodes.size(), {});
+        neighbours.assign(mesh.nodes.size(), {});
+        for (std::size_t ei = 0; ei < mesh.elements.size(); ++ei) {
+            const auto& nodes = mesh.elements[ei].nodes;
+            for (const auto ni : nodes) {
+                if (ni >= incident.size()) {
+                    continue;
+                }
+                incident[ni].push_back(static_cast<std::uint32_t>(ei));
+                for (const auto other : nodes) {
+                    if (other != ni && other < mesh.nodes.size()) {
+                        neighbours[ni].push_back(other);
+                    }
+                }
+            }
+        }
+        for (auto& list : neighbours) {
+            std::sort(list.begin(), list.end());
+            list.erase(std::unique(list.begin(), list.end()), list.end());
+        }
+    };
+    rebuild_incidence();
+    const auto star_min_quality = [&](std::uint32_t ni) {
+        double worst = std::numeric_limits<double>::infinity();
+        for (const auto ei : incident[ni]) {
+            const double q = fea::cell_quality(mesh, mesh.elements[ei]);
+            if (std::isfinite(q)) {
+                worst = std::min(worst, q);
+            }
+        }
+        return worst;
+    };
+    // Two conditions, both necessary. `cell_quality` keeps the mesh solvable in
+    // the shape sense the product reports; `element_jacobians_positive` is the
+    // assembly's own integrability test, and it is the one that catches the
+    // near-degenerate acceptances a quality floor lets through (measured: a
+    // quality-accepted move shipped det J = -6.085e-09 on icecream_cone/graded).
+    const auto star_ok = [&](std::uint32_t ni) {
+        const double q = star_min_quality(ni);
+        if (std::isfinite(q) && q < floor_value) {
+            return false;
+        }
+        return fea::star_jacobians_positive(mesh, incident[ni]);
+    };
+    // Room for one refused node. Interior star neighbours carry no geometry
+    // constraint, so moving them costs no fidelity; the boundary neighbours may
+    // only slide ALONG their own owner geometry, which changes spacing and not
+    // placement. Both tiers are validated with the same rule the node move
+    // uses — quality never worse, and always integrable, because a Laplacian
+    // nudge that only watched `cell_quality` shipped det J = -1.911e-09 on
+    // icecream_cone/varyhedron.
+    const auto try_nudge = [&](std::uint32_t ni, bool tangential) {
+        if (neighbours[ni].empty()) {
+            return false;
+        }
+        const double cap = 0.25 * h;
+        Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
+        for (const auto other : neighbours[ni]) {
+            centroid += mesh.nodes[other];
+        }
+        centroid /= static_cast<double>(neighbours[ni].size());
+        const Eigen::Vector3d saved = mesh.nodes[ni];
+        const Eigen::Vector3d step = 0.5 * (centroid - saved);
+        const double len = step.norm();
+        const double before = star_min_quality(ni);
+        Eigen::Vector3d moved = saved + (len > cap ? step * (cap / len) : step);
+        if (tangential) {
+            const auto back = mesh::owned_boundary_projection_target(moved, ni, projection);
+            if (!back || (back->point - saved).norm() > cap) {
+                return false;
+            }
+            moved = back->point;
+        }
+        mesh.nodes[ni] = moved;
+        const double after = star_min_quality(ni);
+        const bool ok = (!std::isfinite(after) || after >= std::min(before, floor_value)) &&
+                        (std::isfinite(after) ? after > 0.0 : true) &&
+                        fea::star_jacobians_positive(mesh, incident[ni]);
+        if (!ok) {
+            mesh.nodes[ni] = saved;
+            return false;
+        }
+        return (mesh.nodes[ni] - saved).squaredNorm() > 0.0;
+    };
+    const auto open_room = [&](std::uint32_t seed) {
+        bool moved_any = false;
+        for (const auto ni : neighbours[seed]) {
+            if (on_boundary[ni] == 0) {
+                moved_any = try_nudge(ni, /*tangential=*/false) || moved_any;
+            }
+        }
+        if (moved_any) {
+            return true;
+        }
+        // A hex-blocked node has no interior corner to give — measured on
+        // sphere/hybrid, `open_room` rescued none of 34 stragglers through the
+        // interior tier alone. The star's other WALL nodes are the only degrees
+        // of freedom left, and sliding them along the surface is free.
+        for (const auto ni : neighbours[seed]) {
+            if (ni != seed && on_boundary[ni] != 0) {
+                moved_any = try_nudge(ni, /*tangential=*/true) || moved_any;
+            }
+        }
+        return moved_any;
+    };
+
+    std::vector<std::uint32_t> exterior;
+    for (std::uint32_t ni = 0; ni < mesh.nodes.size(); ++ni) {
+        if (on_boundary[ni] != 0 && !incident[ni].empty()) {
+            exterior.push_back(ni);
+        }
+    }
+    const double eps = 1e-9 * h;
+    // Exact resolution only. `boundary_projection_target` falls back to the
+    // TESSELLATION when a node has no latched owner, and that fallback is
+    // exactly how one visible defect survived every earlier pass: on
+    // sphere/hybrid, 34 nodes reported a ~0 residual against the triangulation
+    // while sitting 0.085 h off the true sphere, because OCC's facets are that
+    // far off it at this deflection. A node with no owner is therefore
+    // projected freely onto the BRep instead, which also latches an owner.
+    const auto resolve = [&](std::uint32_t ni) -> std::optional<mesh::BoundaryTarget> {
+        auto target = mesh::owned_boundary_projection_target(mesh.nodes[ni], ni, projection);
+        if (!target && fit != nullptr && fit->cad != nullptr) {
+            if (const auto free_projection =
+                    geom::project_point_on_surface(*fit->cad, mesh.nodes[ni])) {
+                target = mesh::BoundaryTarget{free_projection->point, free_projection->distance};
+            }
+        }
+        return target;
+    };
+    // Constrained march instead of one all-or-nothing jump: take the largest
+    // legal fraction of the remaining gap, re-project onto the same owner, and
+    // repeat. Every accepted step strictly reduces the distance to the owner's
+    // exact geometry, and the acceptance rule is the ship gate's — never make
+    // the worst incident cell worse, never leave a star non-positive or below
+    // the floor it started above. Returns the residual left.
+    // The owner projection is not the measured quantity. A node whose latched
+    // owner is a far face can be walked toward a point that IS on the BRep and
+    // still end up FARTHER from the nearest surface, because the straight
+    // segment leaves the local patch — measured on icecream_cone/cvt_poly,
+    // where an unguarded march took the worst node from 0.503 h to 1.799 h. So
+    // every step must also not increase the free distance to the shape, which
+    // is exactly what the fidelity metric reports.
+    const auto free_distance = [&](std::uint32_t ni) {
+        if (fit == nullptr || fit->cad == nullptr) {
+            return 0.0;
+        }
+        const auto projected = geom::project_point_on_surface(*fit->cad, mesh.nodes[ni]);
+        return projected ? projected->distance : 0.0;
+    };
+    const auto march = [&](std::uint32_t ni, bool* relaxed) {
+        for (int step = 0; step < 6; ++step) {
+            const auto now = resolve(ni);
+            if (!now || now->distance <= eps) {
+                break;
+            }
+            const Eigen::Vector3d saved = mesh.nodes[ni];
+            const double before = star_min_quality(ni);
+            const double floor_here = std::min(before, floor_value);
+            const double free_before = free_distance(ni);
+            bool advanced = false;
+            for (const double frac : {1.0, 0.5, 0.25, 0.125}) {
+                mesh.nodes[ni] = saved + frac * (now->point - saved);
+                const double after = star_min_quality(ni);
+                if ((!std::isfinite(after) || after >= floor_here) &&
+                    fea::star_jacobians_positive(mesh, incident[ni]) &&
+                    free_distance(ni) <= free_before) {
+                    advanced = true;
+                    break;
+                }
+                mesh.nodes[ni] = saved;
+            }
+            if (advanced) {
+                continue;
+            }
+            if (relaxed != nullptr && !*relaxed && open_room(ni)) {
+                *relaxed = true;
+                continue;
+            }
+            break;
+        }
+        return free_distance(ni);
+    };
+
+    // Whole-pass insurance. Every individual acceptance above is local — it
+    // proves its own star did not get worse — and locality is not the same
+    // promise as "the shipped mesh did not get worse". On cvt_poly, whose cells
+    // are already degenerate (quality ~1e-14), the local rule let the count of
+    // sub-floor cells drift up while the minimum stayed put. So the pass is also
+    // judged as a whole, against the two numbers the product reports, and
+    // reverted wholesale if either moved the wrong way.
+    const auto mesh_quality_census = [&] {
+        std::pair<double, std::size_t> census{std::numeric_limits<double>::infinity(), 0};
+        for (const auto& element : mesh.elements) {
+            const double q = fea::cell_quality(mesh, element);
+            if (!std::isfinite(q)) {
+                continue;
+            }
+            census.first = std::min(census.first, q);
+            if (q < floor_value) {
+                ++census.second;
+            }
+        }
+        return census;
+    };
+    const auto entry_nodes = mesh.nodes;
+    const auto entry_elements = mesh.elements;
+    const auto entry_census = mesh_quality_census();
+
+    std::vector<std::uint32_t> stuck;
+    for (const auto ni : exterior) {
+        const double start = free_distance(ni);
+        if (start <= eps) {
+            continue;
+        }
+        ++stats.n_candidates;
+        bool relaxed_here = false;
+        const double left = march(ni, &relaxed_here);
+        if (left < start) {
+            ++stats.n_moved;
+            if (relaxed_here) {
+                ++stats.n_relax_rescued;
+            }
+        }
+        if (left > eps) {
+            stuck.push_back(ni);
+        }
+    }
+
+    // Conforming hex relief. What is left is blocked by a hexahedron already
+    // saturated at the shape floor (measured on sphere/hybrid: every straggler
+    // had exactly one incident hex at quality 0.020081, four e-5 above the
+    // floor, so even a 0.125 step took it under). A hex has no interior corner
+    // and its neighbours are hexes too, so no amount of relaxation helps.
+    //
+    // Fanning the hex into six pyramids over its own six quad faces changes no
+    // face — the pyramid bases ARE the hex faces — so it is conforming with
+    // every neighbour and the boundary shell is untouched. The apex is a new
+    // interior node with full freedom, and a pyramid tolerates the wall motion
+    // a hex refuses. The pipeline already ships pyramids from this mesher, so
+    // nothing downstream is new.
+    // The whole phase is judged as one unit and rolled back if it does not pay:
+    // on icecream_cone/hex it fanned 20 hexes, moved no node at all, and left
+    // 29 cells below the floor. A relief that buys nothing must cost nothing.
+    if (!stuck.empty()) {
+        const auto mesh_worst_quality = [&] {
+            double worst = std::numeric_limits<double>::infinity();
+            for (const auto& element : mesh.elements) {
+                const double q = fea::cell_quality(mesh, element);
+                if (std::isfinite(q)) {
+                    worst = std::min(worst, q);
+                }
+            }
+            return worst;
+        };
+        const auto count_below_floor = [&] {
+            std::size_t n = 0;
+            for (const auto& element : mesh.elements) {
+                const double q = fea::cell_quality(mesh, element);
+                if (std::isfinite(q) && q < floor_value) {
+                    ++n;
+                }
+            }
+            return n;
+        };
+        const auto saved_nodes = mesh.nodes;
+        const auto saved_elements = mesh.elements;
+        const double quality_before = mesh_worst_quality();
+        const std::size_t below_before = count_below_floor();
+        double residual_before = 0.0;
+        for (const auto ni : stuck) {
+            residual_before += free_distance(ni);
+        }
+        static constexpr int kHexFaces[6][4] = {{0, 1, 2, 3}, {4, 5, 6, 7}, {0, 1, 5, 4},
+                                                {1, 2, 6, 5}, {2, 3, 7, 6}, {3, 0, 4, 7}};
+        std::set<std::uint32_t> hexes;
+        for (const auto ni : stuck) {
+            for (const auto ei : incident[ni]) {
+                if (mesh.elements[ei].type == fea::ElementType::kHex8 &&
+                    mesh.elements[ei].nodes.size() == 8) {
+                    hexes.insert(ei);
+                }
+            }
+        }
+        for (const auto ei : hexes) {
+            const auto corners = mesh.elements[ei].nodes;
+            Eigen::Vector3d centre = Eigen::Vector3d::Zero();
+            for (const auto ni : corners) {
+                centre += mesh.nodes[ni];
+            }
+            centre /= 8.0;
+            const auto apex = static_cast<std::uint32_t>(mesh.nodes.size());
+            mesh.nodes.push_back(centre);
+            std::array<fea::NodalElement, 6> fan{};
+            bool ok = true;
+            for (int f = 0; f < 6 && ok; ++f) {
+                std::array<std::uint32_t, 4> base{
+                    {corners[static_cast<std::size_t>(kHexFaces[f][0])],
+                     corners[static_cast<std::size_t>(kHexFaces[f][1])],
+                     corners[static_cast<std::size_t>(kHexFaces[f][2])],
+                     corners[static_cast<std::size_t>(kHexFaces[f][3])]}};
+                // Orientation is decided by measurement, not by trusting a face
+                // table: whichever winding gives the pyramid a positive split
+                // volume is the one that ships.
+                if (mesh::validity::pyramid_min_split_volume(
+                        mesh.nodes[base[0]], mesh.nodes[base[1]], mesh.nodes[base[2]],
+                        mesh.nodes[base[3]], centre) <= 0.0) {
+                    std::swap(base[1], base[3]);
+                }
+                if (mesh::validity::pyramid_min_split_volume(
+                        mesh.nodes[base[0]], mesh.nodes[base[1]], mesh.nodes[base[2]],
+                        mesh.nodes[base[3]], centre) <= 0.0) {
+                    ok = false;
+                    break;
+                }
+                fan[static_cast<std::size_t>(f)] = fea::NodalElement{
+                    fea::ElementType::kPyramid5,
+                    {base[0], base[1], base[2], base[3], apex}};
+                // A positive volume is not enough. Fanning an already tight hex
+                // produced pyramids far under the floor and shipped 71 cells
+                // below it, quality_min -0.159, on sphere/hybrid — a worse mesh
+                // bought with a better boundary. Every child must clear the
+                // floor and be integrable, measured before anything is
+                // committed (`cell_quality` reads only `mesh.nodes`, and the
+                // apex is already in place).
+                const auto& child = fan[static_cast<std::size_t>(f)];
+                const double q = fea::cell_quality(mesh, child);
+                ok = std::isfinite(q) && q >= floor_value &&
+                     fea::element_jacobians_positive(mesh, child);
+            }
+            if (!ok) {
+                mesh.nodes.pop_back();
+                continue;
+            }
+            mesh.elements[ei] = fan[0];
+            for (std::size_t f = 1; f < fan.size(); ++f) {
+                mesh.elements.push_back(fan[f]);
+            }
+            ++stats.n_hex_fanned;
+        }
+        if (stats.n_hex_fanned > 0) {
+            rebuild_incidence();
+        }
+        std::size_t moved_here = 0;
+        double residual_after = 0.0;
+        for (const auto ni : stuck) {
+            const double before = free_distance(ni);
+            bool relaxed_here = false;
+            const double left = march(ni, &relaxed_here);
+            residual_after += left;
+            if (left < before) {
+                ++moved_here;
+            }
+        }
+        std::size_t nonintegrable = 0;
+        for (const auto& element : mesh.elements) {
+            if (!fea::element_jacobians_positive(mesh, element)) {
+                ++nonintegrable;
+            }
+        }
+        const bool paid = moved_here > 0 && residual_after < residual_before;
+        // On a mesh that is already degenerate (cvt_poly ships quality ~1e-14)
+        // a "worst quality did not drop" test is toothless — it let the count of
+        // sub-floor cells grow 807 → 855 while the minimum stayed put. Count is
+        // therefore part of the contract too.
+        const bool kept_shape = mesh_worst_quality() >= std::min(quality_before, floor_value) &&
+                                nonintegrable == 0 && count_below_floor() <= below_before;
+        if (!paid || !kept_shape) {
+            mesh.nodes = saved_nodes;
+            mesh.elements = saved_elements;
+            stats.n_hex_fanned = 0;
+            rebuild_incidence();
+        } else {
+            stats.n_moved += moved_here;
+        }
+        for (const auto ni : stuck) {
+            const double left = free_distance(ni);
+            if (left > eps) {
+                ++stats.n_left;
+                stats.worst_residual = std::max(stats.worst_residual, left);
+            }
+        }
+    }
+
+    // Features last, on the same shipped node set and under the same gate: a
+    // node exposed late can be a crease node nobody pinned.
+    if (fit != nullptr && fit->can_pin()) {
+        const auto node_offends = [&](std::uint32_t ni) { return !star_ok(ni); };
+        mesh::pin_feature_nodes(*fit->cad, *fit->topo, mesh.nodes, exterior, h, node_offends,
+                                projection->provenance);
+    }
+
+    std::size_t nonintegrable_exit = 0;
+    for (const auto& element : mesh.elements) {
+        if (!fea::element_jacobians_positive(mesh, element)) {
+            ++nonintegrable_exit;
+        }
+    }
+    const auto exit_census = mesh_quality_census();
+    if (nonintegrable_exit > 0 || exit_census.second > entry_census.second ||
+        exit_census.first < std::min(entry_census.first, floor_value)) {
+        mesh.nodes = entry_nodes;
+        mesh.elements = entry_elements;
+        stats.reverted = true;
+    }
+    return stats;
+}
+
 struct BoundaryShellTopology {
     std::size_t n_edges = 0;
     /// Used by one face: a hole in the shell.
@@ -1973,12 +2436,132 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
                 }
                 return false;
             };
+            // Interior room for the snap, the mechanism tet_fill/hex_fill
+            // already use (ADR-0035). Without it a boundary node whose star is
+            // a stair fold retreats to its raw lattice site: measured on
+            // sphere/hybrid at h = 8 mm, isolated flaps up to 0.081 h off the
+            // exact BRep while every other conforming mesher reached machine
+            // precision. This needs adjacency for EVERY node, not just the
+            // boundary ones `snap_node_cells` tracks, because the nodes being
+            // opened up are interior.
+            std::vector<std::vector<std::size_t>> all_node_cells(fill.nodes.size());
+            std::vector<std::vector<std::uint32_t>> nbrs(fill.nodes.size());
+            {
+                std::set<std::pair<std::uint32_t, std::uint32_t>> seen;
+                const auto link = [&](std::uint32_t u, std::uint32_t v) {
+                    if (u == v) {
+                        return;
+                    }
+                    const auto key = std::minmax(u, v);
+                    if (!seen.insert({key.first, key.second}).second) {
+                        return;
+                    }
+                    nbrs[u].push_back(v);
+                    nbrs[v].push_back(u);
+                };
+                for (std::size_t ci = 0; ci < fill.cells.size(); ++ci) {
+                    const auto& cell = fill.cells[ci];
+                    std::span<const std::uint32_t> members =
+                        cell.kind == mesh::MixedCellKind::kPolyVem
+                            ? std::span<const std::uint32_t>(cell.poly_nodes)
+                            : std::span<const std::uint32_t>(cell.nodes.data(), cell.n_nodes);
+                    for (const auto ni : members) {
+                        all_node_cells[ni].push_back(ci);
+                    }
+                    for (std::size_t a = 0; a < members.size(); ++a) {
+                        for (std::size_t b = a + 1; b < members.size(); ++b) {
+                            link(members[a], members[b]);
+                        }
+                    }
+                }
+            }
+            const auto any_node_offends = [&](std::uint32_t ni) {
+                if (ni >= all_node_cells.size()) {
+                    return false;
+                }
+                for (const auto ci : all_node_cells[ni]) {
+                    if (!snap_cell_valid(fill.cells[ci])) {
+                        return true;
+                    }
+                }
+                return false;
+            };
+            const auto reproject_node = [&](std::uint32_t ni, const Eigen::Vector3d& p) {
+                const auto target =
+                    mesh::boundary_projection_target(model.surface, p, ni, projection);
+                return target ? target->point : p;
+            };
+            const auto relax_neighborhood = [&](std::uint32_t seed) {
+                if (seed >= all_node_cells.size()) {
+                    return false;
+                }
+                std::vector<std::uint32_t> ring;
+                std::vector<std::uint32_t> wall;
+                for (const auto ci : all_node_cells[seed]) {
+                    const auto& cell = fill.cells[ci];
+                    std::span<const std::uint32_t> members =
+                        cell.kind == mesh::MixedCellKind::kPolyVem
+                            ? std::span<const std::uint32_t>(cell.poly_nodes)
+                            : std::span<const std::uint32_t>(cell.nodes.data(), cell.n_nodes);
+                    for (const auto ni : members) {
+                        if (ni == seed || nbrs[ni].empty()) {
+                            continue;
+                        }
+                        (is_snap_node[ni] == 0 ? ring : wall).push_back(ni);
+                    }
+                }
+                const auto dedup = [](std::vector<std::uint32_t>& v) {
+                    std::sort(v.begin(), v.end());
+                    v.erase(std::unique(v.begin(), v.end()), v.end());
+                };
+                dedup(ring);
+                dedup(wall);
+                bool moved_any = false;
+                const double cap = 0.25 * h_snap;
+                const auto nudge = [&](std::uint32_t ni, bool tangential) {
+                    Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
+                    for (const auto other : nbrs[ni]) {
+                        centroid += fill.nodes[other];
+                    }
+                    centroid /= static_cast<double>(nbrs[ni].size());
+                    const Eigen::Vector3d saved = fill.nodes[ni];
+                    const Eigen::Vector3d step = 0.5 * (centroid - saved);
+                    const double len = step.norm();
+                    Eigen::Vector3d moved = saved + (len > cap ? step * (cap / len) : step);
+                    if (tangential) {
+                        // A wall node may only slide ALONG the surface: it is
+                        // re-projected through the same owner-aware oracle, so
+                        // it stays on its own face/edge and only its spacing
+                        // changes. A projection that runs away is abandoned.
+                        moved = reproject_node(ni, moved);
+                        if ((moved - saved).norm() > cap) {
+                            return;
+                        }
+                    }
+                    fill.nodes[ni] = moved;
+                    if (any_node_offends(ni)) {
+                        fill.nodes[ni] = saved;
+                    } else if ((fill.nodes[ni] - saved).squaredNorm() > 0.0) {
+                        moved_any = true;
+                    }
+                };
+                for (const auto ni : ring) {
+                    nudge(ni, /*tangential=*/false);
+                }
+                if (!moved_any) {
+                    for (const auto ni : wall) {
+                        nudge(ni, /*tangential=*/true);
+                    }
+                }
+                return moved_any;
+            };
             fill.boundary_max_distance =
                 mesh::snap_boundary_nodes(
                     model.surface, fill.nodes, bnodes, h_snap, collect_snap_offenders,
                     /*max_move_frac=*/1.25, /*passes=*/8, edges,
                     [&] { mesh::repair_mixed_fan_apices(fill, kMinShape); }, snap_node_offends,
-                    /*defer_coupled=*/fill.n_pyramid > 0 || fill.n_tet > 0, projection)
+                    /*defer_coupled=*/fill.n_pyramid > 0 || fill.n_tet > 0, projection,
+                    relax_neighborhood)
                     .max_residual;
             poll_cancel();
             // Peel snap-flattened fan tets: a full wall snap can pull all three
@@ -2256,9 +2839,33 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
                     model.surface, fill.nodes, final_boundary_nodes, h_snap,
                     collect_final_offenders, /*max_move_frac=*/1.25, /*passes=*/4, edges,
                     [&] { mesh::repair_mixed_fan_apices(fill, kMinShape); },
-                    final_node_offends, /*defer_coupled=*/true, projection)
+                    final_node_offends, /*defer_coupled=*/true, projection, relax_neighborhood)
                     .max_residual;
             poll_cancel();
+            // Hard-pin CAD vertices and sharp edge curves, exactly as the
+            // tet/hex/graded fills do. Without this the mixed fill was the one
+            // CAD-backed path with no pinning at all: it reached the exact
+            // surface but reconstructed a 90° crease as whatever chamfer the
+            // lattice happened to cut. Pin, even out the free surface, pin
+            // again — smoothing can slide a chain node a little off its curve,
+            // and the second pass is what makes the crease exact.
+            if (fit != nullptr && fit->can_pin()) {
+                std::vector<mesh::BoundarySupport>* pin_provenance =
+                    projection != nullptr ? projection->provenance : nullptr;
+                mesh::pin_feature_nodes(*fit->cad, *fit->topo, fill.nodes, final_boundary_nodes,
+                                        h_snap, final_node_offends, pin_provenance);
+                poll_cancel();
+                mesh::smooth_boundary_nodes(model.surface, fill.nodes, fill.boundary_quads,
+                                            h_snap, collect_final_offenders, /*passes=*/3,
+                                            /*relax=*/0.5, /*feature_edges=*/{}, projection);
+                poll_cancel();
+                const auto pin = mesh::pin_feature_nodes(*fit->cad, *fit->topo, fill.nodes,
+                                                         final_boundary_nodes, h_snap,
+                                                         final_node_offends, pin_provenance);
+                fill.boundary_max_distance =
+                    std::max(fill.boundary_max_distance, pin.worst_node_distance);
+                poll_cancel();
+            }
 
         }
         // Corner-fold decomposition floor: the same normalized cell-shape floor
@@ -3439,6 +4046,23 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
         }
     }
 
+    // Exterior conformity gate (ADR-0035): the snap ran on each mesher's own
+    // lattice skin; the mesh ships the true element exterior extracted just
+    // above. Conform THAT set, so a node exposed by a late peel/split is not
+    // shipped at its raw lattice site.
+    if (projection != nullptr) {
+        const auto ext = conform_true_exterior(out.mesh, out.boundary_quads, projection, fit,
+                                               fill_h > 0.0 ? fill_h : h,
+                                               mesh::validity::kCellShapeFloor);
+        if (ext.n_candidates > 0) {
+            out.mesher_note += std::format(
+                " | exterior_gate cand={} moved={} relax_rescued={} hex_fanned={} left={} "
+                "worst|d|={:.3g} m{}",
+                ext.n_candidates, ext.n_moved, ext.n_relax_rescued, ext.n_hex_fanned,
+                ext.n_left, ext.worst_residual, ext.reverted ? " REVERTED" : "");
+        }
+    }
+
     // Ship gate (ADR-0035): the cells that leave this function are measured
     // with the product's own `fea::cell_quality`, not with whatever predicate
     // each mesher used internally over its own intermediate zoo. Cells under
@@ -3451,6 +4075,23 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
             out.mesher_note +=
                 std::format(" | ship_gate {} cells below shape floor {:.3g}", below_floor,
                             mesh::validity::kCellShapeFloor);
+        }
+        // Integrability is a separate question from shape, and it is the one the
+        // solver actually asks: `element_stiffness` refuses any element with a
+        // non-positive Jacobian at a quadrature point. Counting it here means a
+        // mesh that would abort the solve says so in its own note instead of
+        // failing later with a bare error.
+        std::size_t nonintegrable = 0;
+        for (const auto& element : out.mesh.elements) {
+            if (!fea::element_jacobians_positive(out.mesh, element)) {
+                ++nonintegrable;
+            }
+        }
+        if (nonintegrable > 0) {
+            out.mesher_note +=
+                std::format(" | ship_gate {} non-integrable cells (det J <= 0 at a quadrature "
+                            "point)",
+                            nonintegrable);
         }
     }
 

@@ -151,10 +151,10 @@ struct SimSetup {
     /// Stop adapt when global ZZ relative indicator \(\eta \le\) this value.
     /// Dimensionless (energy-norm style); **0 = disabled** (run all passes).
     double eta_target = 0.0;
-    /// p-elevate smooth (non-Dörfler) linear elements to tet10/hex20 after the
-    /// last h-adapt pass (or after the single solve when adapt_passes=0).
-    /// When false, still auto-enables if adapt_passes > 0 (hp product path).
-    bool p_elevate = false;
+    /// Use quadratic isoparametric CAD geometry for the authoritative solve
+    /// mesh. Product default: rounded boundaries are solved, exported and
+    /// rendered from projected tet10/hex20 geometry rather than straight chords.
+    bool p_elevate = true;
     /// Extra Rivara LEB waves per adapt pass (seed-ball re-mark, no re-solve).
     /// 1 = one LEB (ADR-0016); 2–3 deepen local h before falling back to remesh.
     int adapt_leb_waves = 2;
@@ -404,8 +404,6 @@ struct SolveResult {
     std::vector<std::array<std::uint32_t, 4>> boundary_quads;
     std::string mesh_note; // e.g. element/node counts, mesher version
     GeometryVolumeAssessment fill_geometry_volume;
-    /// Target mesh size used for curved display-only boundary projection.
-    double display_h = 0.0;
     GeometryVolumeAssessment solved_geometry_volume;
 
 };
@@ -432,18 +430,24 @@ std::size_t project_quadratic_boundary_mids(
     mesh::BoundaryProjectionContext* projection, double h,
     std::vector<std::uint32_t>* reverted_nodes = nullptr,
     std::vector<std::uint32_t>* partial_nodes = nullptr);
-/// A quadratic copy used only for display/export, plus parent endpoints for
-/// every node added by promotion. The authoritative solve mesh is unchanged.
-struct CurvedDisplayMesh {
+/// The authoritative curved volume discretisation used for solve and export.
+/// Pyramid5 cells are first replaced by the same conformity-safe tet split the
+/// assembler integrates, then every tet4/hex8 is promoted and its free boundary
+/// mids are projected onto the exact BRep. LinearConstraints is non-empty only
+/// when an unsupported linear element remains beside a promoted edge.
+struct CurvedGeometryResult {
     fea::NodalMesh mesh;
-    std::vector<std::optional<std::array<std::uint32_t, 2>>> added_node_parents;
+    fea::LinearConstraints constraints;
+    std::size_t n_h_refined = 0;
+    std::size_t n_pyramids_split = 0;
+    std::size_t n_promoted = 0;
+    std::size_t n_projected = 0;
+    std::size_t n_partial = 0;
+    std::size_t n_reverted = 0;
 };
 
-/// Promote a mesh copy and project its boundary mids onto the exact CAD BRep.
-/// New-node parents are ordered by node id starting at the input node count, so
-/// callers can interpolate p1 point fields without modifying solved data.
-CurvedDisplayMesh curved_display_mesh(const Model& model,
-                                      const fea::NodalMesh& mesh, double h);
+CurvedGeometryResult curve_volume_geometry(const Model& model,
+                                           const fea::NodalMesh& mesh, double h);
 
 /// Volume mesh from closed surface: tet4 grid fill (P2 v1) with stair-cased
 /// boundary quads for region mapping / rendering.
@@ -456,6 +460,8 @@ struct VolumeMeshOutput {
     // triangle (used to map picked regions to constraint/load node sets).
     std::map<std::uint32_t, int> boundary_node_region;
     std::string mesher_note;
+    /// Effective linear edge scale used by exact curved-boundary projection.
+    double geometry_h = 0.0;
     /// Cells still under `mesh::validity::kCellShapeFloor` after the ship gate
     /// relaxation, measured with `fea::cell_quality` on the emitted mesh.
     std::size_t n_cells_below_shape_floor = 0;

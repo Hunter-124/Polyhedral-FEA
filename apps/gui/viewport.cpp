@@ -4,6 +4,7 @@
 #include "colormap.hpp"
 #include "fea/boundary_faces.hpp"
 #include "fea/nodal_mesh.hpp"
+#include "fea/traction.hpp"
 #include "theme.hpp"
 
 // OpenGL 3.3 core for offscreen FBO + shaders.
@@ -457,94 +458,58 @@ void Viewport::set_mesh(const VolumeMeshOutput& mesh_out) {
         }
     }
 
-    const auto& nodes = mesh_out.mesh.nodes;
-    const auto polys = fea::extract_boundary_polys(mesh_out.mesh);
-
-    std::vector<float> data;         // fill: pos3 + normal3 + rgba4
-    data.reserve(polys.size() * 12 * 10);
-    std::vector<float> edata;        // edges: pos3 + rgba4
-    edata.reserve(polys.size() * 8 * 7);
+    const auto surface = fea::tessellate_boundary_surface(mesh_out.mesh, 8);
+    std::vector<float> data;  // fill: pos3 + normal3 + rgba4
+    data.reserve(surface.triangles.size() * 3 * 10);
+    std::vector<float> edata; // edges: pos3 + rgba4
+    edata.reserve(surface.triangles.size() * 6 * 7);
     const float er = 0.02f, eg = 0.02f, eb = 0.04f, ea = 1.0f;
     mesh_bounds_.reset();
 
-    for (std::size_t pi = 0; pi < polys.size(); ++pi) {
-        const auto& lp = polys[pi];
-        if (lp.size() < 3) {
-            continue;
-        }
-        bool ok = true;
-        Eigen::Vector3d c = Eigen::Vector3d::Zero();
-        for (auto vi : lp) {
-            if (vi >= nodes.size()) {
-                ok = false;
-                break;
-            }
-            c += nodes[vi];
-        }
-        if (!ok) {
-            continue;
-        }
-        for (auto vi : lp) {
-            mesh_bounds_.add(nodes[vi]);
-        }
-        c /= static_cast<double>(lp.size());
-        // Newell normal: robust for non-planar / concave polygons.
-        Eigen::Vector3d nrm = Eigen::Vector3d::Zero();
-        for (std::size_t i = 0; i < lp.size(); ++i) {
-            const auto& p = nodes[lp[i]];
-            const auto& q = nodes[lp[(i + 1) % lp.size()]];
-            nrm.x() += (p.y() - q.y()) * (p.z() + q.z());
-            nrm.y() += (p.z() - q.z()) * (p.x() + q.x());
-            nrm.z() += (p.x() - q.x()) * (p.y() + q.y());
-        }
+    for (std::size_t ti = 0; ti < surface.triangles.size(); ++ti) {
+        const auto& tri = surface.triangles[ti];
+        const Eigen::Vector3d& a = surface.samples[tri[0]].position;
+        const Eigen::Vector3d& b = surface.samples[tri[1]].position;
+        const Eigen::Vector3d& c = surface.samples[tri[2]].position;
+        mesh_bounds_.add(a);
+        mesh_bounds_.add(b);
+        mesh_bounds_.add(c);
+        Eigen::Vector3d nrm = (b - a).cross(c - a);
         const double nn = nrm.norm();
-        if (nn > 1e-30) {
-            nrm /= nn;
-        } else {
-            nrm = Eigen::Vector3d::UnitZ();
+        nrm = nn > 1e-30 ? Eigen::Vector3d(nrm / nn)
+                         : Eigen::Vector3d::UnitZ();
+
+        fea::ElementType type = fea::ElementType::kTet4;
+        const auto source = surface.samples[tri[0]].source_nodes[0];
+        if (source < node_set.size() && node_set[source]) {
+            type = node_type[source];
         }
-        fea::ElementType t = fea::ElementType::kTet4;
-        for (auto vi : lp) {
-            if (vi < node_set.size() && node_set[vi]) {
-                t = node_type[vi];
-                break;
-            }
-        }
-        auto rgb = type_color(t);
-        // Per-facet brightness jitter so adjacent cells stay distinct.
-        const std::uint32_t hsh =
-            static_cast<std::uint32_t>(pi) * 2654435761u ^ lp[0] * 73856093u ^
-            lp[1] * 19349663u;
-        const float shade = (hsh & 1u) ? 1.0f : 0.82f;
+        auto rgb = type_color(type);
+        const std::uint32_t hash =
+            static_cast<std::uint32_t>(ti) * 2654435761u ^ source * 73856093u;
+        const float shade = (hash & 1u) ? 1.0f : 0.82f;
         rgb[0] *= shade;
         rgb[1] *= shade;
         rgb[2] *= shade;
-        auto emit_fill = [&](const Eigen::Vector3d& p) {
-            data.push_back(static_cast<float>(p.x()));
-            data.push_back(static_cast<float>(p.y()));
-            data.push_back(static_cast<float>(p.z()));
-            data.push_back(static_cast<float>(nrm.x()));
-            data.push_back(static_cast<float>(nrm.y()));
-            data.push_back(static_cast<float>(nrm.z()));
-            data.insert(data.end(), {rgb[0], rgb[1], rgb[2], 1.0f});
+        const auto emit_fill = [&](const Eigen::Vector3d& p) {
+            data.insert(data.end(),
+                        {static_cast<float>(p.x()), static_cast<float>(p.y()),
+                         static_cast<float>(p.z()), static_cast<float>(nrm.x()),
+                         static_cast<float>(nrm.y()), static_cast<float>(nrm.z()),
+                         rgb[0], rgb[1], rgb[2], 1.0f});
         };
-        auto emit_edge = [&](const Eigen::Vector3d& p) {
-            edata.push_back(static_cast<float>(p.x()));
-            edata.push_back(static_cast<float>(p.y()));
-            edata.push_back(static_cast<float>(p.z()));
-            edata.push_back(er);
-            edata.push_back(eg);
-            edata.push_back(eb);
-            edata.push_back(ea);
+        const auto emit_edge = [&](const Eigen::Vector3d& p) {
+            edata.insert(edata.end(),
+                         {static_cast<float>(p.x()), static_cast<float>(p.y()),
+                          static_cast<float>(p.z()), er, eg, eb, ea});
         };
-        for (std::size_t i = 0; i < lp.size(); ++i) {
-            const Eigen::Vector3d& p = nodes[lp[i]];
-            const Eigen::Vector3d& q = nodes[lp[(i + 1) % lp.size()]];
-            emit_fill(c);
-            emit_fill(p);
-            emit_fill(q);
-            emit_edge(p);
-            emit_edge(q);
+        emit_fill(a);
+        emit_fill(b);
+        emit_fill(c);
+        for (const auto& edge :
+             {std::pair{&a, &b}, std::pair{&b, &c}, std::pair{&c, &a}}) {
+            emit_edge(*edge.first);
+            emit_edge(*edge.second);
         }
     }
     mesh_vertex_count_ = static_cast<int>(data.size() / 10);
@@ -564,18 +529,45 @@ void Viewport::set_result(const SolveResult& result) {
     result_scalar_vm_.clear();
     result_scalar_u_.clear();
     result_scalar_eta_.clear();
-    result_quads_ = result.boundary_quads;
-    result_disp_ = result.displacement;
-    const auto& nodes = result.volume_mesh.nodes;
-    result_rest_.reserve(nodes.size());
-    for (const auto& n : nodes) {
-        result_rest_.push_back(n);
+    result_quads_.clear();
+    const auto surface =
+        polymesh::fea::tessellate_boundary_surface(result.volume_mesh, 8);
+    result_rest_.reserve(surface.samples.size());
+    result_scalar_vm_.reserve(surface.samples.size());
+    result_scalar_u_.reserve(surface.samples.size());
+    result_scalar_eta_.reserve(surface.samples.size());
+    result_disp_ = Eigen::VectorXd::Zero(
+        3 * static_cast<Eigen::Index>(surface.samples.size()));
+    const auto interpolate_scalar =
+        [](const polymesh::fea::SurfaceSample& sample,
+           const std::vector<double>& values) {
+            double value = 0.0;
+            for (std::size_t i = 0; i < sample.count; ++i) {
+                const auto node = sample.source_nodes[i];
+                if (node < values.size()) {
+                    value += sample.weights[i] * values[node];
+                }
+            }
+            return value;
+        };
+    for (std::size_t si = 0; si < surface.samples.size(); ++si) {
+        const auto& sample = surface.samples[si];
+        result_rest_.push_back(sample.position);
+        result_scalar_vm_.push_back(interpolate_scalar(sample, result.von_mises));
+        result_scalar_u_.push_back(interpolate_scalar(sample, result.u_magnitude));
+        result_scalar_eta_.push_back(interpolate_scalar(sample, result.nodal_eta));
+        for (std::size_t i = 0; i < sample.count; ++i) {
+            const Eigen::Index base =
+                3 * static_cast<Eigen::Index>(sample.source_nodes[i]);
+            if (base + 2 < result.displacement.size()) {
+                result_disp_.segment<3>(3 * static_cast<Eigen::Index>(si)) +=
+                    sample.weights[i] * result.displacement.segment<3>(base);
+            }
+        }
     }
-    result_scalar_vm_ = result.von_mises;
-    result_scalar_u_ = result.u_magnitude;
-    result_scalar_eta_ = result.nodal_eta;
-    if (result_scalar_eta_.size() != nodes.size()) {
-        result_scalar_eta_.assign(nodes.size(), 0.0);
+    result_quads_.reserve(surface.triangles.size());
+    for (const auto& tri : surface.triangles) {
+        result_quads_.push_back({tri[0], tri[1], tri[2], tri[2]});
     }
     // Also upload undeformed mesh boundary for mesh-preview after solve.
     VolumeMeshOutput preview;

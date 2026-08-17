@@ -17,6 +17,7 @@
 #include "fea/traction.hpp"
 #include "fea/vem.hpp"
 #include "fea/vtu.hpp"
+#include "mesh/local_refine.hpp"
 #include "fea/zz.hpp"
 #include "geom/cad_model.hpp"
 #include "geom/cad_geometry_features.hpp"
@@ -1081,6 +1082,10 @@ bool quadratic_incident_valid(const fea::NodalMesh& nodal_mesh,
             return false;
         }
     }
+    const double quality = fea::cell_quality(nodal_mesh, element);
+    if (!std::isfinite(quality) || quality < mesh::validity::kCellShapeFloor) {
+        return false;
+    }
     return true;
 }
 
@@ -1225,6 +1230,13 @@ std::size_t project_quadratic_boundary_mids(
     if (boundary_mids.empty()) {
         return 0;
     }
+    std::unordered_map<std::uint32_t, Eigen::Vector3d> saved_positions;
+    saved_positions.reserve(boundary_mids.size());
+    for (const auto& edge : boundary_mids) {
+        if (edge.mid < nodal_mesh.nodes.size()) {
+            saved_positions.try_emplace(edge.mid, nodal_mesh.nodes[edge.mid]);
+        }
+    }
 
     std::unordered_map<std::uint32_t, std::vector<std::size_t>> incident;
     incident.reserve(boundary_mids.size());
@@ -1352,39 +1364,225 @@ std::size_t project_quadratic_boundary_mids(
         }
         continue;
     }
+    // Midpoint moves share cells. A sequence can pass every local line search
+    // and still make their combined curved mapping unacceptable, so close with
+    // a whole-cell rollback and feed those edges to the caller's h-refinement
+    // fallback.
+    for (int round = 0; round < 4; ++round) {
+        std::set<std::uint32_t> rollback;
+        for (const auto& element : nodal_mesh.elements) {
+            const double quality = fea::cell_quality(nodal_mesh, element);
+            if (fea::element_jacobians_positive(nodal_mesh, element) &&
+                std::isfinite(quality) &&
+                quality >= mesh::validity::kCellShapeFloor) {
+                continue;
+            }
+            for (const auto node : element.nodes) {
+                if (saved_positions.contains(node)) {
+                    rollback.insert(node);
+                }
+            }
+        }
+        if (rollback.empty()) {
+            break;
+        }
+        bool changed = false;
+        for (const auto node : rollback) {
+            const auto& saved = saved_positions.at(node);
+            if ((nodal_mesh.nodes[node] - saved).squaredNorm() > 0.0) {
+                nodal_mesh.nodes[node] = saved;
+                changed = true;
+            }
+            if (reverted_nodes != nullptr) {
+                reverted_nodes->push_back(node);
+            }
+        }
+        if (!changed) {
+            break;
+        }
+    }
+    if (reverted_nodes != nullptr) {
+        std::sort(reverted_nodes->begin(), reverted_nodes->end());
+        reverted_nodes->erase(
+            std::unique(reverted_nodes->begin(), reverted_nodes->end()),
+            reverted_nodes->end());
+    }
+    if (partial_nodes != nullptr) {
+        std::sort(partial_nodes->begin(), partial_nodes->end());
+        partial_nodes->erase(
+            std::unique(partial_nodes->begin(), partial_nodes->end()),
+            partial_nodes->end());
+    }
     return projected;
 }
 
-CurvedDisplayMesh curved_display_mesh(const Model& model,
-                                      const fea::NodalMesh& source, double h) {
-    CurvedDisplayMesh display;
-    display.mesh = fea::promote_to_quadratic(source);
-    if (display.mesh.nodes.size() == source.nodes.size()) {
-        return display;
+CurvedGeometryResult curve_volume_geometry(const Model& model,
+                                           const fea::NodalMesh& source, double h) {
+    CurvedGeometryResult result;
+    result.mesh.nodes = source.nodes;
+    result.mesh.elements.reserve(source.elements.size());
+    for (const auto& element : source.elements) {
+        if (element.type != fea::ElementType::kPyramid5 || element.nodes.size() != 5) {
+            result.mesh.elements.push_back(element);
+            continue;
+        }
+        const auto& p = element.nodes;
+        const int diagonal = mesh::validity::pyramid_split_diagonal(
+            source.nodes[p[0]], source.nodes[p[1]], source.nodes[p[2]],
+            source.nodes[p[3]]);
+        const auto emit = [&](std::uint32_t a, std::uint32_t b, std::uint32_t c) {
+            result.mesh.elements.push_back(fea::NodalElement{
+                fea::ElementType::kTet4, {a, b, c, p[4]}});
+        };
+        if (diagonal == 1) {
+            emit(p[1], p[2], p[3]);
+            emit(p[1], p[3], p[0]);
+        } else {
+            emit(p[0], p[1], p[2]);
+            emit(p[0], p[2], p[3]);
+        }
+        ++result.n_pyramids_split;
     }
 
-    const auto boundary_mids = quadratic_boundary_mids(display.mesh);
-    std::map<std::uint32_t, std::array<std::uint32_t, 2>> parents_by_mid;
-    for (const auto& edge : boundary_mids) {
-        parents_by_mid.try_emplace(edge.mid, std::array{edge.a, edge.b});
-    }
-    display.added_node_parents.resize(display.mesh.nodes.size() - source.nodes.size());
-    for (std::size_t node = source.nodes.size(); node < display.mesh.nodes.size(); ++node) {
-        const auto found = parents_by_mid.find(static_cast<std::uint32_t>(node));
-        if (found != parents_by_mid.end()) {
-            display.added_node_parents[node - source.nodes.size()] = found->second;
+    fea::NodalMesh linear_mesh = result.mesh;
+    for (int attempt = 0; attempt < 4; ++attempt) {
+        std::vector<std::size_t> promote;
+        promote.reserve(linear_mesh.elements.size());
+        for (std::size_t i = 0; i < linear_mesh.elements.size(); ++i) {
+            const auto type = linear_mesh.elements[i].type;
+            if (type == fea::ElementType::kTet4 || type == fea::ElementType::kHex8) {
+                promote.push_back(i);
+            }
+        }
+        auto elevated = fea::p_elevate_with_constraints(linear_mesh, promote);
+        result.mesh = std::move(elevated.mesh);
+        const fea::NodalMesh straight_mesh = result.mesh;
+        result.constraints = std::move(elevated.constraints);
+        result.n_promoted = elevated.n_promoted;
+
+        std::vector<std::uint32_t> reverted;
+        std::vector<std::uint32_t> partial;
+        std::map<std::uint32_t, std::array<std::uint32_t, 2>> parents;
+        for (const auto& edge : quadratic_boundary_mids(result.mesh)) {
+            parents.try_emplace(edge.mid, std::array{edge.a, edge.b});
+        }
+        if (model.cad && h > 0.0) {
+            std::vector<mesh::BoundarySupport> provenance;
+            mesh::BoundaryProjectionContext projection;
+            if (make_boundary_projection(*model.cad, h, &projection, &provenance)) {
+                result.n_projected = project_quadratic_boundary_mids(
+                    result.mesh, *model.cad, &projection, h, &reverted, &partial);
+            }
+        }
+        bool curved_mesh_valid = true;
+        for (const auto& element : result.mesh.elements) {
+            const double quality = fea::cell_quality(result.mesh, element);
+            curved_mesh_valid =
+                curved_mesh_valid &&
+                fea::element_jacobians_positive(result.mesh, element) &&
+                std::isfinite(quality) &&
+                quality >= mesh::validity::kCellShapeFloor;
+        }
+        if (!curved_mesh_valid) {
+            result.mesh = straight_mesh;
+            partial.clear();
+            reverted.clear();
+            for (const auto& [mid, edge] : parents) {
+                (void)edge;
+                reverted.push_back(mid);
+            }
+        }
+        result.n_partial = partial.size();
+        result.n_reverted = reverted.size();
+        if ((partial.empty() && reverted.empty()) || attempt == 3) {
+            break;
+        }
+
+        bool pure_linear_tet = true;
+        for (const auto& element : linear_mesh.elements) {
+            pure_linear_tet =
+                pure_linear_tet && element.type == fea::ElementType::kTet4;
+        }
+        if (!pure_linear_tet) {
+            break;
+        }
+        std::set<std::array<std::uint32_t, 2>> offending_edges;
+        for (const auto node : partial) {
+            if (const auto found = parents.find(node); found != parents.end()) {
+                auto edge = found->second;
+                std::sort(edge.begin(), edge.end());
+                offending_edges.insert(edge);
+            }
+        }
+        for (const auto node : reverted) {
+            if (const auto found = parents.find(node); found != parents.end()) {
+                auto edge = found->second;
+                std::sort(edge.begin(), edge.end());
+                offending_edges.insert(edge);
+            }
+        }
+        mesh::TetFillOutput linear;
+        linear.nodes = linear_mesh.nodes;
+        linear.tets.reserve(linear_mesh.elements.size());
+        std::vector<std::size_t> marked;
+        for (std::size_t i = 0; i < linear_mesh.elements.size(); ++i) {
+            const auto& nodes = linear_mesh.elements[i].nodes;
+            std::array<std::uint32_t, 4> tet{
+                nodes[0], nodes[1], nodes[2], nodes[3]};
+            linear.tets.push_back(tet);
+            for (int a = 0; a < 4; ++a) {
+                for (int b = a + 1; b < 4; ++b) {
+                    auto edge = std::array{
+                        tet[static_cast<std::size_t>(a)],
+                        tet[static_cast<std::size_t>(b)]};
+                    std::sort(edge.begin(), edge.end());
+                    if (offending_edges.contains(edge)) {
+                        marked.push_back(i);
+                    }
+                }
+            }
+        }
+        std::sort(marked.begin(), marked.end());
+        marked.erase(std::unique(marked.begin(), marked.end()), marked.end());
+        if (marked.empty()) {
+            break;
+        }
+        mesh::LocalRefineStats refine_stats;
+        auto refined = mesh::local_refine_tets(
+            linear, marked, &refine_stats, &model.surface);
+        if (refine_stats.n_new_nodes == 0) {
+            break;
+        }
+        bool refined_shape_ok = true;
+        for (const auto& tet : refined.tets) {
+            refined_shape_ok =
+                refined_shape_ok &&
+                mesh::validity::tet_shape_quality(
+                    refined.nodes[tet[0]], refined.nodes[tet[1]],
+                    refined.nodes[tet[2]], refined.nodes[tet[3]]) >=
+                    mesh::validity::kCellShapeFloor;
+        }
+        if (!refined_shape_ok) {
+            break;
+        }
+        result.n_h_refined += refine_stats.n_bisections;
+        linear_mesh.nodes = std::move(refined.nodes);
+        linear_mesh.elements.clear();
+        linear_mesh.elements.reserve(refined.tets.size());
+        for (const auto& tet : refined.tets) {
+            linear_mesh.elements.push_back(
+                fea::NodalElement{fea::ElementType::kTet4,
+                                  {tet[0], tet[1], tet[2], tet[3]}});
         }
     }
-
-    if (!model.cad || !(h > 0.0)) {
-        return display;
+    result.mesh.check_validity();
+    for (const auto& element : result.mesh.elements) {
+        if (!fea::element_jacobians_positive(result.mesh, element)) {
+            throw std::runtime_error(
+                "curve_volume_geometry: curved promotion produced a non-integrable cell");
+        }
     }
-    std::vector<mesh::BoundarySupport> provenance;
-    mesh::BoundaryProjectionContext projection;
-    if (make_boundary_projection(*model.cad, h, &projection, &provenance)) {
-        project_quadratic_boundary_mids(display.mesh, *model.cad, &projection, h);
-    }
-    return display;
+    return result;
 }
 
 namespace {
@@ -1544,6 +1742,8 @@ struct ExteriorConformStats {
     std::size_t n_left = 0;       // still off the BRep by more than 1e-9 h
     std::size_t n_kink_relieved = 0; // face nodes slid to lower a facet kink
     double worst_residual = 0.0;
+    std::uint32_t worst_node = 0;
+    Eigen::Vector3d worst_position = Eigen::Vector3d::Zero();
     bool reverted = false; // whole pass rolled back by the exit invariant
 };
 
@@ -1947,7 +2147,11 @@ conform_true_exterior(fea::NodalMesh& mesh,
             const double left = free_distance(ni);
             if (left > eps) {
                 ++stats.n_left;
-                stats.worst_residual = std::max(stats.worst_residual, left);
+                if (left > stats.worst_residual) {
+                    stats.worst_residual = left;
+                    stats.worst_node = ni;
+                    stats.worst_position = mesh.nodes[ni];
+                }
             }
         }
     }
@@ -2440,10 +2644,7 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
     boundary_fit.topo = cad_topology.get();
     boundary_fit.projection = projection;
     const mesh::BoundaryFit* fit = projection != nullptr ? &boundary_fit : nullptr;
-    // Per-cell turning-angle refinement threshold (feature_refine paths): refine
-    // where the surface turns more than this per bulk cell (h·κ). Angle-based,
-    // so gentle curves / big bores stay coarse and flats never refine — replaces
-    // the capped seed-ball scheme (coarse rings mid-bore, fine islands on flats).
+    // Per-cell turning-angle refinement threshold for local curvature grading.
     constexpr double kCurvatureTurnDeg = 15.0;
     if (mesher == VolumeMesher::kHybrid || mesher == VolumeMesher::kHybridVem) {
         // SPEC hybrid zoo: hex bulk @ h + 2:1 fine @ h/2 on feature/curvature
@@ -3359,6 +3560,24 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
                         fill.boundary_max_distance);
     } else if (mesher == VolumeMesher::kGradedTet) {
         std::vector<geom::SharpEdge> edges;
+        double graded_h = h;
+        double curved_area_fraction = 0.0;
+        if (cad_topology != nullptr && !cad_topology->faces.empty()) {
+            double total_area = 0.0;
+            double curved_area = 0.0;
+            for (const auto& face : cad_topology->faces) {
+                total_area += face.area;
+                if (face.kind != geom::CadSurfaceKind::kPlane) {
+                    curved_area += face.area;
+                }
+            }
+            if (total_area > 0.0) {
+                curved_area_fraction = curved_area / total_area;
+            }
+            if (curved_area_fraction >= 0.25) {
+                graded_h = 0.5 * h;
+            }
+        }
         double feature_band = 0.0;
         // Caller a-posteriori adapt seeds keep ball semantics; curvature is now
         // the per-cell turning-angle criterion inside the fill (no caps, no
@@ -3373,7 +3592,7 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
             edges = geom::detect_sharp_edges(model.surface, 30.0);
             if (!edges.empty()) {
                 // Crease band ~ two bulk cells so hole rims get a clear L1/L2 shell.
-                feature_band = 2.0 * h;
+                feature_band = 2.0 * graded_h;
             }
             turn_deg = kCurvatureTurnDeg;
             const auto thick = geom::estimate_local_thickness(model.surface);
@@ -3385,7 +3604,7 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
                     continue;
                 }
                 ++n_finite;
-                if (thick.thickness[i] < 2.5 * h) {
+                if (thick.thickness[i] < 2.5 * graded_h) {
                     thin_pts.push_back(model.surface.vertices[i]);
                 }
             }
@@ -3394,11 +3613,12 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
                 thin_pts.size() * 3 > model.surface.vertices.size(); // > ~1/3 thin
             if (!globally_thin && !thin_pts.empty()) {
                 if (band <= 0.0) {
-                    band = 1.6 * h;
+                    band = 1.6 * graded_h;
                 }
                 // Spatial thinning: min sep 0.75 h, capped, caller seeds first.
                 constexpr std::size_t kMaxGeoSeeds = 256;
-                const double min_sep2 = (0.75 * h) * (0.75 * h);
+                const double min_sep2 =
+                    (0.75 * graded_h) * (0.75 * graded_h);
                 for (const auto& p : thin_pts) {
                     if (seeds.size() >= kMaxGeoSeeds) {
                         break;
@@ -3422,11 +3642,12 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
             }
         }
         if (band <= 0.0 && !seeds.empty()) {
-            band = 1.6 * h;
+            band = 1.6 * graded_h;
         }
         auto graded = mesh::graded_tet_fill_surface(
-            model.surface, model.bbox_min, model.bbox_max, h, std::max(1, skin_layers), edges,
-            feature_band, seeds, band, turn_deg, fit, size_field);
+            model.surface, model.bbox_min, model.bbox_max, graded_h,
+            std::max(1, skin_layers), edges, feature_band, seeds, band, turn_deg,
+            fit, size_field);
         fill_h = graded.h_fine;
         out.mesh.nodes = std::move(graded.mesh.nodes);
         out.mesh.elements.reserve(graded.mesh.tets.size());
@@ -3447,7 +3668,8 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
         bnodes.erase(std::unique(bnodes.begin(), bnodes.end()), bnodes.end());
         const auto conf = mesh::surface_conformity(model.surface, out.mesh.nodes, bnodes);
         const char* budget_note =
-            (graded.h_fine > (h / static_cast<double>(graded.subdivision)) * 1.05)
+            (graded.h_fine >
+             (graded_h / static_cast<double>(graded.subdivision)) * 1.05)
                 ? ", h raised to cell budget"
                 : "";
         out.mesher_note = std::format(
@@ -3461,6 +3683,12 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
             conf.max_distance, conf.mean_distance, budget_note,
             turn_deg > 0.0 ? std::format(", curv_turn≤{:.0f}°/cell", turn_deg) : std::string{},
             n_thin_seeds > 0 ? std::format(", thin_seeds={}", n_thin_seeds) : std::string{});
+        if (graded_h < h) {
+            out.mesher_note += std::format(
+                " | curved-area={:.1f}% accuracy lattice h={:.4g} m "
+                "(0.5x requested)",
+                100.0 * curved_area_fraction, graded_h);
+        }
         if (size_field) {
             out.mesher_note += std::format(
                 " | size_field h_min={:.4g} h_max={:.4g} m, levels L0={} L1={} L2={}{}",
@@ -4265,9 +4493,12 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
         if (ext.n_candidates > 0) {
             out.mesher_note += std::format(
                 " | exterior_gate cand={} moved={} relax_rescued={} hex_fanned={} left={} "
+                "worst_node={} worst_xyz=({:.6g},{:.6g},{:.6g}) "
                 "worst|d|={:.3g} m kink_relieved={}{}",
                 ext.n_candidates, ext.n_moved, ext.n_relax_rescued, ext.n_hex_fanned,
-                ext.n_left, ext.worst_residual, ext.n_kink_relieved,
+                ext.n_left, ext.worst_node, ext.worst_position.x(),
+                ext.worst_position.y(), ext.worst_position.z(), ext.worst_residual,
+                ext.n_kink_relieved,
                 ext.reverted ? " REVERTED" : "");
         }
     }
@@ -4477,6 +4708,7 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
             std::format(" | budget predicted={:.0f} elems/{:.0f} DOF ceilings={}/{}",
                         predicted_elems, predicted_dof, max_elems, max_dof);
     }
+    out.geometry_h = fill_h > 0.0 ? fill_h : h;
     out.mesh.check_validity();
     return out;
 }
@@ -4776,6 +5008,16 @@ void SolveJob::start_mesh(const Model& model, const SimSetup& setup) {
                 refinement.refine_seeds, refinement.seed_band, setup.element_tendency,
                 resolved.element_ceiling, resolved.dof_ceiling, resolved.auto_chosen ? 3 : 0,
                 mesh_cancel_check, refinement.size_field);
+            if (setup.p_elevate) {
+                auto curved = curve_volume_geometry(model, mesh_only_.mesh, h);
+                mesh_only_.mesh = std::move(curved.mesh);
+                mesh_only_.boundary_quads = fea::extract_boundary_faces(mesh_only_.mesh);
+                mesh_only_.mesher_note += std::format(
+                    " | curved_volume promoted={} pyramid_split={} projected={} "
+                    "partial={} reverted={}",
+                    curved.n_promoted, curved.n_pyramids_split, curved.n_projected,
+                    curved.n_partial, curved.n_reverted);
+            }
             publish_live_mesh(mesh_only_);
             checkpoint();
             mesh_only_.mesher_note =
@@ -5335,12 +5577,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
             // D3: p-elevate smooth linear elems after last h-pass (or single solve).
             // Explicit flag or auto when adapt_passes > 0 — but never on huge meshes
             // (tet10 ~3–4× DOF; was a common OOM path with graded+feature floods).
-            constexpr std::size_t kPElevateMaxNodes = 40000;
-            const bool want_p_elevate = setup.p_elevate || setup.adapt_passes > 0;
-            auto p_elevate_allowed = [&]() {
-                return want_p_elevate && vol.mesh.nodes.size() <= kPElevateMaxNodes;
-            };
-            const bool do_p_elevate = want_p_elevate; // gate per-call via p_elevate_allowed
+            const bool do_p_elevate = setup.p_elevate;
             fea::LinearConstraints p_constraints;
             const auto active_p_constraints = [&]() -> const fea::LinearConstraints* {
                 return p_constraints.empty() ? nullptr : &p_constraints;
@@ -5474,136 +5711,37 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                                               {}, {}, hp_policy, h_geo);
             };
 
-            auto maybe_p_elevate = [&](const std::vector<std::size_t>& elevate_idx,
+            auto maybe_p_elevate = [&](const std::vector<std::size_t>&,
                                        std::string& note_suffix) {
-                if (!do_p_elevate || elevate_idx.empty()) {
-                    if (do_p_elevate && elevate_idx.empty()) {
-                        note_suffix = " p-elev=0";
-                    }
+                if (!do_p_elevate) {
                     return false;
                 }
-                if (!p_elevate_allowed()) {
-                    note_suffix = std::format(" p-elev skipped (nodes {}>{} budget)",
-                                              vol.mesh.nodes.size(), kPElevateMaxNodes);
-                    return false;
-                }
-                // Only elevate still-linear zoo elements (driver may re-list p=2).
-                std::vector<std::size_t> linear;
-                linear.reserve(elevate_idx.size());
-                for (auto e : elevate_idx) {
-                    if (e >= vol.mesh.elements.size()) {
-                        continue;
-                    }
-                    const auto t = vol.mesh.elements[e].type;
-                    if (t == fea::ElementType::kTet4 || t == fea::ElementType::kHex8) {
-                        linear.push_back(e);
-                    }
-                }
-                if (linear.empty()) {
-                    note_suffix = " p-elev=0";
-                    return false;
-                }
-                const auto before = vol.mesh.nodes.size();
-                auto elevated = fea::p_elevate_with_constraints(vol.mesh, linear);
-                vol.mesh = std::move(elevated.mesh);
-                p_constraints = std::move(elevated.constraints);
+                const std::size_t before = vol.mesh.nodes.size();
+                auto curved = curve_volume_geometry(model, vol.mesh, h_use);
+                const bool changed =
+                    curved.n_promoted > 0 || curved.n_pyramids_split > 0;
+                p_constraints = std::move(curved.constraints);
+                vol.mesh = std::move(curved.mesh);
+                vol.boundary_quads = fea::extract_boundary_faces(vol.mesh);
                 extend_boundary_regions();
                 apply_bcs();
-                if (solve_projection != nullptr && model.cad) {
-                    std::vector<std::uint32_t> reverted;
-                    std::vector<std::uint32_t> partial;
-                    const std::size_t projected = project_quadratic_boundary_mids(
-                        vol.mesh, *model.cad, solve_projection, h, &reverted, &partial);
-                    vol.mesher_note += std::format(
-                        " | mids projected={} partial={} reverted={}", projected,
-                        partial.size(), reverted.size());
-                }
                 remove_slave_dirichlet();
                 const auto counts = fea::count_element_types(vol.mesh);
                 note_suffix = std::format(
-                    " p-elev={} rejected={} n+{} constrained-mid={} (tet10={} hex20={})",
-                    elevated.n_promoted, elevated.n_rejected,
-                    vol.mesh.nodes.size() - before, elevated.n_constrained_midside,
-                    counts.tet10, counts.hex20);
+                    " curved-volume={} pyramid-split={} n+{} constrained-mid={} "
+                    "(tet10={} hex20={} projected={} partial={} reverted={})",
+                    curved.n_promoted, curved.n_pyramids_split,
+                    vol.mesh.nodes.size() - before,
+                    p_constraints.size() / 3, counts.tet10, counts.hex20,
+                    curved.n_projected, curved.n_partial, curved.n_reverted);
+                vol.mesher_note += note_suffix;
                 report("recover", 0.5,
-                       std::format("p-elevate… ({} accepted, {} rejected)",
-                                   elevated.n_promoted, elevated.n_rejected),
+                       std::format("curving authoritative volume… ({} promoted)",
+                                   curved.n_promoted),
                        /*pass=*/0, pass_count);
-                return true;
+                return changed;
             };
 
-            // Geometry-driven hp hybrid (pre-solve): elevate bulk elements whose
-            // centroids sit deep inside, away from the free surface / curved skin.
-            // Leaves linear tets near features (high κ / boundary) for cheaper
-            // resolution of gradients while bulk gets p=2 economy.
-            auto maybe_geo_p_elevate = [&]() {
-                if (!do_p_elevate || !setup.use_feature_grading) {
-                    return;
-                }
-                if (!p_elevate_allowed()) {
-                    vol.mesher_note =
-                        std::format("{} | geo-hp skipped (nodes {}>{} budget)",
-                                    vol.mesher_note, vol.mesh.nodes.size(), kPElevateMaxNodes);
-                    return;
-                }
-                if (setup.mesher != VolumeMesher::kGradedTet &&
-                    setup.mesher != VolumeMesher::kVaryhedron &&
-                    setup.mesher != VolumeMesher::kTetFill &&
-                    setup.mesher != VolumeMesher::kHybrid &&
-                    setup.mesher != VolumeMesher::kHybridVem) {
-                    return;
-                }
-                const double bulk_band = 1.75 * h_use;
-                const auto cents = element_centroids(vol.mesh);
-                std::vector<std::size_t> bulk;
-                bulk.reserve(cents.size() / 2);
-                for (std::size_t e = 0; e < cents.size(); ++e) {
-                    const auto& el = vol.mesh.elements[e];
-                    if (el.type != fea::ElementType::kTet4 &&
-                        el.type != fea::ElementType::kHex8) {
-                        continue;
-                    }
-                    const double d =
-                        geom::distance_to_surface_vertices(model.surface, cents[e]);
-                    if (d >= bulk_band) {
-                        bulk.push_back(e);
-                    }
-                }
-                if (bulk.empty()) {
-                    return;
-                }
-                // Cap: never elevate more than 70% of linear elems in one shot.
-                const std::size_t cap = std::max<std::size_t>(1, (cents.size() * 7) / 10);
-                if (bulk.size() > cap) {
-                    bulk.resize(cap);
-                }
-                const auto before = vol.mesh.nodes.size();
-                auto elevated = fea::p_elevate_with_constraints(vol.mesh, bulk);
-                vol.mesh = std::move(elevated.mesh);
-                p_constraints = std::move(elevated.constraints);
-                extend_boundary_regions();
-                apply_bcs();
-                if (solve_projection != nullptr && model.cad) {
-                    std::vector<std::uint32_t> reverted;
-                    std::vector<std::uint32_t> partial;
-                    const std::size_t projected = project_quadratic_boundary_mids(
-                        vol.mesh, *model.cad, solve_projection, h, &reverted, &partial);
-                    vol.mesher_note += std::format(
-                        " | mids projected={} partial={} reverted={}", projected,
-                        partial.size(), reverted.size());
-                }
-                remove_slave_dirichlet();
-                const auto counts = fea::count_element_types(vol.mesh);
-                vol.mesher_note = std::format(
-                    "{} | geo-hp: p-elev bulk {} rejected={} (tet10={} n+{})",
-                    vol.mesher_note, elevated.n_promoted, elevated.n_rejected,
-                    counts.tet10, vol.mesh.nodes.size() - before);
-                report("recover", 0.3,
-                       std::format("geo hp-elevate… ({} accepted, {} rejected)",
-                                   elevated.n_promoted, elevated.n_rejected),
-                       0, pass_count);
-            };
-            maybe_geo_p_elevate();
             checkpoint();
 
             auto mesh_is_all_tet4 = [](const fea::NodalMesh& m) {
@@ -5800,10 +5938,6 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         publish_live_mesh(vol); // local LEB also changes connectivity
                     }
                     apply_bcs();
-                    // Re-apply geometry hp after remesh so bulk stays quadratic.
-                    if (!did_local) {
-                        maybe_geo_p_elevate();
-                    }
                     pass_mesh_ms = std::chrono::duration<double, std::milli>(
                                        std::chrono::steady_clock::now() - adapt_mesh_t0)
                                        .count();
@@ -5863,7 +5997,6 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         vol.mesher_note, hp_note, zz_try.global_eta, setup.eta_target, pass,
                         setup.adapt_passes, h_use, pnote);
                     r.volume_mesh = std::move(vol.mesh);
-                    r.display_h = h_use;
                     r.boundary_quads = std::move(vol.boundary_quads);
                     fill_result_fields(r, zz_try, u_try);
                     r.fill_geometry_volume = vol.fill_geometry_volume;
@@ -5900,11 +6033,20 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                                       "adapt growth cap stop: next pass predicted {:.0f} "
                                       "DOF exceeds DOF ceiling {}",
                                       next_dof, resolved.dof_ceiling);
+                        std::string pnote;
+                        if (maybe_p_elevate(hp_plan.p_mark, pnote)) {
+                            publish_live_mesh(vol);
+                            update_solved_geometry_volume(model, vol);
+                            u_try = fea::solve_elastostatics(
+                                vol.mesh, material, bc, loads,
+                                solve_options_with_progress(pass, pass_count),
+                                active_p_constraints());
+                            zz_try = fea::recover_zz(vol.mesh, material, u_try);
+                        }
                         SolveResult r;
-                        r.mesh_note =
-                            std::format("{} | {} | {}", vol.mesher_note, hp_note, reason);
+                        r.mesh_note = std::format("{} | {} | {}{}", vol.mesher_note,
+                                                  hp_note, reason, pnote);
                         r.volume_mesh = std::move(vol.mesh);
-                        r.display_h = h_use;
                         r.boundary_quads = std::move(vol.boundary_quads);
                         fill_result_fields(r, zz_try, u_try);
                         r.fill_geometry_volume = vol.fill_geometry_volume;
@@ -5940,7 +6082,6 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         SolveResult r;
                         r.mesh_note = std::format("{} | {} | adapt early-stop h={:.4g}{}",
                                                   vol.mesher_note, hp_note, h_use, pnote);
-                        r.display_h = h_use;
                         r.volume_mesh = std::move(vol.mesh);
                         r.boundary_quads = std::move(vol.boundary_quads);
                         fill_result_fields(r, zz_try, u_try);
@@ -5949,23 +6090,6 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
 
                         result_ = std::move(r);
                         break;
-                    }
-                    // Mid-loop p-raise when driver prefers p and marks few h cells.
-                    if (!hp_plan.p_mark.empty() &&
-                        hp_plan.h_mark.size() * 4 < hp_plan.p_mark.size()) {
-                        std::string pnote;
-                        if (maybe_p_elevate(hp_plan.p_mark, pnote)) {
-                            publish_live_mesh(vol);
-                            update_solved_geometry_volume(model, vol);
-
-                            u_try = fea::solve_elastostatics(
-                                vol.mesh, material, bc, loads,
-                                solve_options_with_progress(pass, pass_count),
-                                active_p_constraints());
-                            zz_try = fea::recover_zz(vol.mesh, material, u_try);
-                            vol.mesher_note =
-                                std::format("{} | mid-loop{}", vol.mesher_note, pnote);
-                        }
                     }
                     h_use = std::max(sug.h_next, h_adapt_floor);
                     adapt_seeds = sug.refine_seeds;
@@ -6001,7 +6125,6 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 r.mesh_note = std::format("{} | {} | adapt_passes={} h={:.4g} seeds={}{}",
                                           vol.mesher_note, hp_note, setup.adapt_passes, h_use,
                                           adapt_seeds.size(), pnote);
-                r.display_h = h_use;
                 r.volume_mesh = std::move(vol.mesh);
                 r.boundary_quads = std::move(vol.boundary_quads);
                 fill_result_fields(r, zz_try, u_try);

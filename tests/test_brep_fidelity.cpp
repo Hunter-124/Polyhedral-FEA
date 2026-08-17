@@ -461,7 +461,7 @@ TEST_CASE("brep_fidelity: quadratic plate-hole boundary mids lie on the exact BR
     CHECK(total_pre_outliers > 0);
 }
 
-TEST_CASE("brep_fidelity: graded selective p-elevation stays stiffness-valid",
+TEST_CASE("brep_fidelity: graded authoritative curvature stays stiffness-valid",
           "[cad][fidelity][regression]") {
     if (!polymesh::geom::occ_enabled()) {
         SKIP("OpenCASCADE disabled");
@@ -512,13 +512,17 @@ TEST_CASE("brep_fidelity: graded selective p-elevation stays stiffness-valid",
             FAIL(job.status_text());
         }
         if (job.state() == polymesh::pipeline::SolveJob::State::kCancelled) {
-            FAIL("graded selective p-elevation was cancelled");
+            FAIL("graded authoritative curvature was cancelled");
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     REQUIRE(result);
-    CHECK(result->mesh_note.find("geo-hp: p-elev bulk") != std::string::npos);
-    CHECK(result->mesh_note.find("mids projected=") != std::string::npos);
+    const auto counts = polymesh::fea::count_element_types(result->volume_mesh);
+    CHECK(counts.tet10 > 0);
+    CHECK(counts.tet4 == 0);
+    CHECK(result->displacement.size() ==
+          3 * static_cast<Eigen::Index>(result->volume_mesh.nodes.size()));
+    CHECK(result->mesh_note.find("curved-volume=") != std::string::npos);
 }
 
 // The local h/2 classifier creates live/void child faces that the old

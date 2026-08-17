@@ -77,8 +77,9 @@ python scripts/render_showcase.py --only cantilever
 ![cylinder](assets/showcase/gallery_cylinder.png)
 
 Curved-wall solid imported from STEP. Curvature-driven sizing refines the
-cylindrical face while the bulk stays coarse. h = 12 mm, 8,840 nodes / 42,517
-elements, 26,520 DOF.
+cylindrical face while the bulk stays coarse; the exported display skin uses
+projected quadratic mids while the solve stays linear. h = 12 mm, 8,908 nodes /
+42,768 elements, 26,724 solved DOF.
 
 ```sh
 python scripts/render_showcase.py --only cylinder
@@ -88,10 +89,10 @@ python scripts/render_showcase.py --only cylinder
 
 ![sphere](assets/showcase/gallery_sphere.png)
 
-Closed curved B-rep — the hardest case for a Cartesian grid fill. Shows the
-stair-cased boundary honestly, with the feature-graded skin layers absorbing the
-curvature ([ADR-0015](decisions/0015-grid-fill-limits.md)). h = 8 mm, 5,045
-nodes / 23,892 elements, 15,135 DOF.
+Closed curved B-rep — the hardest case for a Cartesian grid fill. The
+feature-graded linear solve mesh remains authoritative, while the rendered
+display copy promotes and projects its boundary mids onto the BRep. h = 8 mm,
+5,045 solved nodes / 23,892 elements, 15,135 solved DOF.
 
 ```sh
 python scripts/render_showcase.py --only sphere
@@ -104,7 +105,7 @@ python scripts/render_showcase.py --only sphere
 One watertight 3D Boolean solid: a round truncated cone fused into an
 overlapping spherical scoop. The committed STEP is reloaded through
 OpenCASCADE, meshed at h = 10 mm, and solved with a conserved downward
-resultant on the scoop: 3,545 nodes / 16,184 elements, 10,635 DOF.
+resultant on the scoop: 3,535 solved nodes / 16,143 elements, 10,605 solved DOF.
 
 ```sh
 python scripts/render_showcase.py --only icecream_cone
@@ -307,22 +308,28 @@ reverts wholesale otherwise, which is why the experimental packed-poly mesher,
 whose cells are already degenerate at ~1e-14, comes out at exactly its previous
 numbers instead of slightly worse.
 
-Three limits stay on the page because they are still true, and one of them is
-what a reader still sees. The **uniform** Cartesian tet fill is bounded by the
-cell-shape floor rather than by the projector: placing one straggler on its exact
-target drives incident cells to quality −0.05, so the snap stops at the floor and
-every such part ships `quality_min = 0.0200` exactly. Three refinement schemes
-were tried against it and none pays — the constraint is scale-invariant, since
-halving h halves the required travel and the available room together
-([ADR-0035 §6](decisions/0035-boundary-conformity.md) records the numbers so
-nobody repeats them). The graded path still carries needle facets at its 2:1
-transitions, which needs re-triangulation rather than node motion. And once every
-node is on the surface, the residual mesh→BRep distance is the sagitta h²κ/8 of a
-straight facet across a curve: the showcase scoop is R = 25 mm at h = 10 mm, so
-that sag is 0.5 mm, 2 % of the radius, and it is exactly the faceting visible in
-the gallery renders. It is the floor of any linear-element mesh, and removing it
-means curved boundary geometry, which this codebase has only on the p-elevated
-path.
+Two meshing limits stay on the page because they remain true; the display-only
+chordal limit is now closed. The **uniform** Cartesian tet fill is bounded by
+the cell-shape floor rather than by the projector: placing one straggler on its
+exact target drives incident cells to quality −0.05, so the snap stops at the
+floor and every such part ships `quality_min = 0.0200` exactly. The proposed
+per-level LEB sequence is already the graded algorithm — pre-snap, project each
+new free midpoint, then snap the complete shell — and its uniform-path
+experiment reached sphere p99 0.032 h only by creating 94 sub-floor cells
+([ADR-0035 §6](decisions/0035-boundary-conformity.md)).
+
+The graded path still carries needle facets at 2:1 transitions. Hybrid avoids
+them with quad/pyramid transitions and varyhedron builds a different restricted
+Voronoi skin; neither contains a tet-shell operation that can be ported. A real
+fix requires coupled 2↔3 or 3↔2 volume-tet flips, not a surface-only
+re-triangulation that disagrees with the emitted elements.
+
+For display/export, the h²κ/8 chordal floor is removed without changing solved
+DOF, BCs, loads, quality or advisor labels: a copy of the authoritative linear
+mesh is promoted to quadratic, its free boundary mids are projected through the
+owner-stable BRep oracle, and linear result fields are interpolated onto those
+display-only mids. On the sphere at h = 8 mm the rendered facet-normal
+deviation is mean 0.66°, p99 2.19°, max 3.28°.
 
 ## Spectral sizing
 

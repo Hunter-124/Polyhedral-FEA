@@ -1,7 +1,7 @@
 {
   "schema": "polymesh.mesher-fidelity.v2",
-  "generated_utc": "2026-08-17T20:40:04.987210+00:00",
-  "label": "exterior-conformity-gate-kink-relief",
+  "generated_utc": "2026-08-17T22:12:44.691591+00:00",
+  "label": "curved display/export boundary geometry",
   "part": "tests/fixtures/parts/plate_hole.step",
   "part_sha256": "a482377fd70a3a28de4972b375b47b7a2b82fd14f51475940f596ff67dc7a350",
   "h_m": 0.006,
@@ -12,14 +12,14 @@
   },
   "provenance": {
     "git": {
-      "commit": "7fbb1e3e3ad1a82aea02961a6e22d28a9769a187",
+      "commit": "ec6789e970f0e3daed65e5337176bfcb7108261b",
       "working_tree_dirty": true
     },
     "executable": {
       "path": "build-fpoff/apps/cli/polymesh",
-      "sha256": "d1521bdd1aba7c7d8c94340f4ea703e80363721b3edb7869950a5da70d8e9996",
-      "bytes": 3830248,
-      "mtime_ns": 1786998383775851940
+      "sha256": "9ef4c1dab096f7936afd81e3e1e1ade640168c254c55f782a33cfbbbfde315a8",
+      "bytes": 3835056,
+      "mtime_ns": 1787004292747089993
     }
   },
   "commands": [
@@ -78,7 +78,7 @@
       "elements": 43767,
       "nodes": 9505,
       "quality_min": 0.02334,
-      "mesh_ms": 9111.26,
+      "mesh_ms": 9324.151,
       "mesh_to_brep_p99_over_h": 0.0093901582,
       "mesh_to_brep_max_over_h": 0.149112183,
       "brep_to_mesh_p99_over_h": 0.0037205982,
@@ -94,7 +94,7 @@
       "elements": 9120,
       "nodes": 11970,
       "quality_min": 0.02,
-      "mesh_ms": 8758.572,
+      "mesh_ms": 8817.589,
       "mesh_to_brep_p99_over_h": 0.0137452619,
       "mesh_to_brep_max_over_h": 0.121171645,
       "brep_to_mesh_p99_over_h": 0.00697110799,
@@ -110,7 +110,7 @@
       "elements": 43781,
       "nodes": 9508,
       "quality_min": 0.02015,
-      "mesh_ms": 11175.448,
+      "mesh_ms": 11247.198,
       "mesh_to_brep_p99_over_h": 0.00906214733,
       "mesh_to_brep_max_over_h": 0.124048522,
       "brep_to_mesh_p99_over_h": 0.00339598893,
@@ -154,11 +154,11 @@
         "n_pred_after": 1347.71
       },
       "timing_ms": {
-        "import": 6.875,
-        "mesh": 9111.26,
+        "import": 6.95,
+        "mesh": 9324.151,
         "solve": 0.0
       },
-      "mesh_throughput_elem_per_s": 4803.6,
+      "mesh_throughput_elem_per_s": 4693.9,
       "fidelity": {
         "available": true,
         "brep_valid": true,
@@ -289,11 +289,11 @@
         "n_pred_after": 1347.71
       },
       "timing_ms": {
-        "import": 6.672,
-        "mesh": 8758.572,
+        "import": 6.756,
+        "mesh": 8817.589,
         "solve": 0.0
       },
-      "mesh_throughput_elem_per_s": 1041.3,
+      "mesh_throughput_elem_per_s": 1034.3,
       "fidelity": {
         "available": true,
         "brep_valid": true,
@@ -424,11 +424,11 @@
         "n_pred_after": 1347.71
       },
       "timing_ms": {
-        "import": 6.828,
-        "mesh": 11175.448,
+        "import": 6.776,
+        "mesh": 11247.198,
         "solve": 0.0
       },
-      "mesh_throughput_elem_per_s": 3917.6,
+      "mesh_throughput_elem_per_s": 3892.6,
       "fidelity": {
         "available": true,
         "brep_valid": true,

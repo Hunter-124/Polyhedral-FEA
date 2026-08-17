@@ -298,19 +298,15 @@ is therefore not a valid fix.
 has a 6 mm radius against a 7.8 mm cell. No node placement fixes a feature
 smaller than the element; the residual there is the lattice, not the projector.
 
-**The chordal floor.** With every node exactly on the surface, the remaining
-mesh→BRep distance is the sagitta of a straight facet across a curve, h²κ/8.
-That is the floor of a linear-element mesh, it is why the combined statistic
-(0.05–0.20 h on curved parts) does not reach zero even when the node statistic
-does, and it is what remains visible as faceting in a render: the showcase
-scoop is R = 25 mm at h = 10 mm, so the sag is 0.5 mm, 2% of the radius.
-Removing it means curved boundary geometry, which this codebase has as
-`project_quadratic_boundary_mids` on the p-elevated path — the linear mesh
-cannot be made smoother than its own chords. Quoting node conformity as "the
-mesh matches the CAD" is only honest with that sentence attached.
+**The chordal floor is closed for display/export.** Linear solve geometry still
+has the expected h²κ/8 sagitta, but every CAD-backed CLI mesh export and Studio
+preview now renders a quadratic copy: `promote_to_quadratic`, exact BRep
+projection of free boundary mids, and p1 interpolation of solved point fields.
+Physics boundary faces, BC/load selection, quality, advisor labels and solved
+DOF remain corner-only and unchanged. On the sphere at h = 8 mm, rendered
+facet-normal deviation is mean 0.66°, p99 2.19°, max 3.28°.
 
 ## 7. Consequences
-
 - Two regression tests in `tests/test_brep_fidelity.cpp` (`[feature_pin]`):
   boundary nodes on the exact BRep for eight part × mesher pairs with ceilings
   at 1e-12·h where the mesher is exact, and sharp BRep edges reproduced by mesh

@@ -5,10 +5,10 @@
   ],
   "truth": {
     "rederived_from": "row answers[] via probe kinds mirrored from apps/testlab/main.cpp",
-    "rows_rescored": 2462,
-    "rows_unscored": 290,
+    "rows_rescored": 2369,
+    "rows_unscored": 303,
     "unscored_reasons": {
-      "no_answers": 290
+      "no_answers": 303
     },
     "n_files": 42,
     "sha256": "815720eeed7a8adcb0cefa27f917e2f2ada428a9308c44d02511443821d10350",

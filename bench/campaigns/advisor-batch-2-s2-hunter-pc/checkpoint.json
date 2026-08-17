@@ -1,11 +1,15 @@
 {
   "campaign": "advisor-batch-2-s2-hunter-pc",
-  "completed_runs": 6,
-  "started_utc": "2026-08-14T20:19:16Z",
+  "completed_runs": 180,
+  "started_utc": "2026-08-17T06:36:20Z",
   "state": "finished",
   "survivors": [
-    "cfg-57078a16"
+    "cfg-16e7c9c4",
+    "cfg-dae54304",
+    "cfg-43e1efcd",
+    "cfg-16bdf738",
+    "cfg-277b991c"
   ],
   "tier": 0,
-  "updated_utc": "2026-08-14T20:19:18Z"
+  "updated_utc": "2026-08-17T06:38:53Z"
 }

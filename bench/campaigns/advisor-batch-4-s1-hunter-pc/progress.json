@@ -1,12 +1,14 @@
 {
-  "cg_iter": null,
-  "cg_resid": null,
-  "elapsed_ms": 0.0,
-  "phase": "done",
-  "phase_frac": 1.0,
+  "cg_iter": 624,
+  "cg_resid": 1.4155832844170397,
+  "elapsed_ms": 12518.448187,
+  "n_elems": 11104,
+  "n_nodes": 16958,
+  "phase": "solve",
+  "phase_frac": 0.0208,
   "run": {
-    "cfg_id": "",
-    "part": "",
+    "cfg_id": "cfg-821713a4",
+    "part": "stepped_shaft_s2_c1",
     "tier": 0
   }
 }

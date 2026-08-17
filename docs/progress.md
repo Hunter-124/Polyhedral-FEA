@@ -155,6 +155,44 @@ Gating is unchanged: poly-VEM is still **not** the product default (M5 remains
 not promoted) — these fixes make the VEM path correct where it is used, they do
 not promote it. Tet FE remains the default accuracy claim.
 
+**Exact-BRep boundary conformity (2026-08-17, ADR-0035):** the defect was
+reported from the rendered figures — *round surfaces have weird random
+defects, and edges are the same; a curved edge looks chamfered instead of a
+straight 90°* — and the figures were right. Suite **434/434 green** (OCC on).
+
+- Every Cartesian fill snapped to the **tessellation**, and only four of the
+  six meshers were even given the exact oracle: plain tet and hex fill had
+  zero crease awareness. `geom::project_point_on_edge` was never called by any
+  mesher, so a 90° crease was reconstructed from the nearest point of a
+  *face*; varyhedron's 35 % "edge attraction" blend then chamfered the
+  remaining 65 % by construction. The unsnap ladder quietly kept partial
+  projections: 9 of 584 moved nodes on icecream_cone fully retreated, yet the
+  worst node sat 0.60 h off the CAD.
+- New `mesh::pin_feature_nodes` hard-pins boundary nodes onto exact CAD
+  vertices and sharp edge curves, all-or-nothing, with separate capture
+  (0.5 h) and travel (0.35 h) radii. Closed crease chains are re-spaced
+  through a periodic low-pass of their arclength-parameter deviation
+  (`geom::lowpass_signal_periodic`, moved out of `adapt::spectral` so a mesh
+  pass can reach it): **Fourier chooses where along the curve a node sits,
+  never where the curve is.**
+- `snap_boundary_nodes` gained a `RelaxNeighborhoodFn`, called whenever the
+  projection cannot be kept whole; tet/hex fill relax star interior nodes and
+  fall back to tangential re-projected wall nodes when the stair cell has no
+  interior corner. The ship gate `relax_cells_below_shape_floor` re-measures
+  every emitted cell with `fea::cell_quality` and reports the remainder as
+  `mesh.n_below_shape_floor` (ADR-0033's rule at the last hand-off).
+- Measured at h = 8 mm, boundary-node p99 over h: sphere graded 0.039 →
+  **2.9e-15**, cylinder graded 0.045 → **2.8e-15**, plate_hole tet 0.218 →
+  **0**, icecream_cone graded 0.052 → **3.4e-15**. Normal-angle p99 30° →
+  **4.4°**. Inverted cells gone: sphere hybrid h = 3 mm quality_min −0.837 →
+  +0.0022 with 38 cells honestly reported below the floor; icecream_cone
+  hybrid −0.742/−0.779 → +0.020 with none.
+- Still open and documented rather than hidden: the plain Kuhn tet lattice on
+  an under-resolved 6 mm disc (0.22 h at h = 3 mm), 2:1 LEB facet folds on
+  smooth walls (`mesh_feature_to_sharp_brep_edge` p99 ≈ 18 h on icecream_cone
+  while the CAD→mesh direction is 0.049 h), and the h²κ/8 chordal floor of any
+  linear-element mesh.
+
 **Spectral sizing + coarsening + budget advisor + CG equilibration (2026-08-16,
 ADR-0034):** one wave, four mechanisms, suite **432/432 green** (OCC on).
 

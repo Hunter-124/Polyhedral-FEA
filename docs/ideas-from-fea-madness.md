@@ -10,7 +10,7 @@ Most of its scope is already covered here, usually with more rigor:
 hybrid variable-order elements (ADR-0003), VEM for polyhedra (ADR-0003),
 feature/curvature-driven sizing (P3), ZZ recovery + adaptivity (P5), STEP via
 OpenCASCADE (ADR-0001), ImGui desktop app (shipped), GPU acceleration
-(ADR-0008), and a verification culture (BENCHMARKS.md — far stronger than its
+(ADR-0008), and a verification culture ([docs/benchmarks.md](benchmarks.md) — far stronger than its
 "validate accuracy claims" paragraph). Its GUI vision (liquid-glass ribbon)
 is superseded by the owner's Interwebz v2 style pivot.
 

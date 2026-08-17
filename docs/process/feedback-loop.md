@@ -64,20 +64,35 @@ Target knobs when applying (scope: `src/pipeline/`, docs):
 | Feature refine | pipeline feature seeds | Campaign grid key `feature_refine` |
 | Per-condition presets | future: geom→mesher map | Prefer curved vs prismatic split |
 
-## Provisional findings (settings-frontier-1, partial)
+## Final findings (settings-frontier-1, finished)
 
-As of the first analysis pass the campaign was still **running** (tier 0,
-~23 / 96 tier-0 runs). Snapshot only — re-run the script when finished.
+**Finished 2026-07-13**: `checkpoint.json` state `finished`, **150 completed
+runs**, tier 2, ok-rate 100 %. Full record:
+[`bench/campaigns/settings-frontier-1/SURVIVORS.md`](../../bench/campaigns/settings-frontier-1/SURVIVORS.md)
+(+ `PARETO.md` / `PARETO.json`).
 
-| Observation | Provisional takeaway |
-|-------------|----------------------|
-| Top composite configs bias **hex-leaning** (`element_tendency=-0.75`) with hex / hybrid_zoo / graded_tet nearly tied on prismatic bars | Keep product default mesher `kHybrid` + tendency `0` until full frontier; hex bias is a candidate preset for prismatic parts |
-| `element_tendency=0.9` (tet extreme) expensive / low composite on early runs | Do not default near +1 |
-| `plate_hole` (curved) accuracy still weak at coarse tier (~SCF rel_err ~0.23) | Need finer tiers + full grid before curved presets |
-| One `graded_tet` solve_fail on plate_hole | Track ok-rate before promoting tet defaults |
-| Smoke campaign: hex ≫ hybrid_zoo on smoke_bar at order 1 | Consistent with hex strength on simple prisms |
+**Survivors (tier-2 keep, 6 configs):**
 
-**No code default changes applied** this pass (`apply_code_defaults=false`).
+| cfg_id | config (approx) |
+|--------|-----------------|
+| cfg-e07cd50d | hybrid_vem, tendency=-0.75, feature_refine=true |
+| cfg-1b696ce7 | graded_tet, tendency=-0.75, feature_refine=true |
+| cfg-dc413db0 | hybrid_vem, tendency=-0.75, feature_refine=false |
+| cfg-ff7ccfde | hex, tendency=0, feature_refine=true |
+| cfg-02e4c7a5 | hex, tendency=-0.75, feature_refine=true |
+| cfg-50b7a344 | hybrid_zoo, tendency=-0.75, feature_refine=false |
+
+Tooling top score was `cfg-1ea46b97` (hex, tendency=0, feature_refine=false)
+and `analyze_campaign.py` set `apply_code_defaults=true` (finished + 100 %
+ok-rate). **Product defaults were NOT flipped** — the survivor table is
+dominated by hex-leaning configs, but tier-2 rows show *identical*
+`rel_err` / DOF across different meshers on the same part (suspicious
+collapse), and ADR-0023 keeps tet FE / hybrid_zoo as the accuracy claim
+until M9-frozen curved-STEP campaigns say otherwise. All four candidate knob
+changes (mesher→hex, tendency→0.9, feature_refine→false, order) were
+**documented and rejected**; `order=1` was already default. Any future
+default change must re-validate on `varyhedron-baseline-m9` +
+`vem-gate-m5` first.
 
 ## Procedure after campaign finishes
 

@@ -1,15 +1,22 @@
 # Advisor measure-first program (canonical agent plan)
 
-**Status:** active (2026-07-12)  
+**Status:** board complete / frozen (re-dated 2026-08-16; opened 2026-07-12)  
 **Normative decisions:** [ADR-0023](../decisions/0023-measure-first-tet-primary-cvt-path.md),
 [ADR-0024](../decisions/0024-advisor-measure-answers.md)  
 **Board:** [docs/dag/PROGRAM.yaml](../dag/PROGRAM.yaml) Lane **M** (+ CVT/G nodes)  
 **Bootstrap:** [docs/dag/AGENT_BOOTSTRAP.md](../dag/AGENT_BOOTSTRAP.md)
 
-This file is the **single map** of the external geometry/FEA advisor guidance.
-If a future agent is unsure what to build next, read this first, then the ADRs,
-then claim a `todo` node on the program board. Do **not** re-open ranked
-decisions without new evidence.
+> **2026-08-16 status.** The *methodology* below (five-number scorecard,
+> anti-cheat truth layers, never-score-raw-nodal-max) is still in force and
+> still normative for any new campaign. The *program board* this plan drove is
+> finished: M0–M13 and G0–G4 are all `done` in `docs/dag/PROGRAM.yaml`, and
+> the M5 VEM-gate campaign is concluded with its verdict recorded in
+> `bench/campaigns/vem-gate-m5/GATE.md`. This file is therefore **no longer
+> the single map of what to build next.** The active program is the learned
+> mesh advisor corpus/retrain work — ADR-0026/0027, ADR-0028–0033, and
+> `docs/advisor/` (live tracker: `docs/advisor/0003-training-log.md`).
+> Read those first; read this plan for the measurement rules they still
+> inherit. Do **not** re-open ranked decisions without new evidence.
 
 ---
 
@@ -188,14 +195,15 @@ Shewchuk predicates public domain OK. Verdict BSD for quality. fTetWild MPL plug
 | **9** | Wall tangential + OCC project | M10 | **done** |
 | **9b** | Cylinder load normal-filter + GUI measure-first | — | **done** (post-m10 smoke 4/4) |
 | **9c** | expected_area sphere + M13 frozen sphere energy/tip | M12, M13 | **done** (icecream face-tags deferred) |
-| **10** | Vendor Geogram + Lloyd CVT + constrained sites | G1–G3 | **next** (G0 done) |
-| **11** | Clipped Voronoi poly export | G4 | after G1–G3 |
-| **12** | VEM gate campaign | M5 | after metrics + poly path |
+| **10** | Vendor Geogram + Lloyd CVT + constrained sites | G1–G3 | **done** |
+| **11** | Clipped Voronoi poly export | G4 | **done** |
+| **12** | VEM gate campaign | M5 | **concluded** — verdict FAIL headline promotion, recorded in `bench/campaigns/vem-gate-m5/GATE.md`; product claim stays tet FE, poly VEM ships |
 | **later** | BRep face tags; sphere Legendre ref (~1 day); p>1 + curved edges; frame fields research | … | not two-week core |
 
-**Near-term 3–5 day order (advisor Q2):**  
-**(c) freeze baseline → (a) wall project → (b) Lloyd CVT.**  
-Never start CVT before freeze + projection.
+**2026-08-16:** the M + G lanes above are complete; this table is historical.
+The live execution order is the advisor corpus/retrain program —
+`docs/advisor/0003-training-log.md` and `docs/dag/PROGRAM.yaml` are the
+current board.
 
 ---
 

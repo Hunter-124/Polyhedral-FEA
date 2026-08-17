@@ -212,22 +212,24 @@ cost/accuracy frontier without paying for the whole grid at full resolution.
 
 Start here and follow the includes:
 
-- `src/fea/hierarchical.hpp` — the p-basis: 1-D Lobatto functions, per-entity
-  modes on tet and hex, single-element stiffness. Read the header comment
-  first; it states the nesting/minimum-rule contract.
-- `src/fea/hp_assembly.hpp` — turns a mesh of hierarchical elements into one
-  global system: per-entity DOF numbering, the minimum rule, the solve, and
-  the energy-norm error used to check convergence.
+- `src/fea/include/fea/hierarchical.hpp` — the p-basis: 1-D Lobatto functions,
+  per-entity modes on tet and hex, single-element stiffness. Read the header
+  comment first; it states the nesting/minimum-rule contract.
+- `src/fea/include/fea/hp_assembly.hpp` — turns a mesh of hierarchical elements
+  into one global system: per-entity DOF numbering, the minimum rule, the solve,
+  and the energy-norm error used to check convergence.
 - `tests/test_hierarchical.cpp`, `tests/test_hp_assembly.cpp` — the proofs.
   If you change the basis or the assembler, these tell you immediately whether
   conformity and convergence still hold.
-- `src/fea/assembly.cpp` + `src/fea/vem.hpp` — mixed FE+VEM scatter into one K.
-- `src/mesh/mixed_fill.hpp` (`native_poly_transitions`) and
-  `VolumeMesher::kHybridVem` in `src/pipeline/scene.hpp` — unsplit transition
-  cells as VEM PolyCells next to FE hex.
+- `src/fea/src/assembly.cpp` + `src/fea/include/fea/vem.hpp` — mixed FE+VEM
+  scatter into one K.
+- `src/mesh/include/mesh/mixed_fill.hpp` (`native_poly_transitions`) and
+  `VolumeMesher::kHybridVem` in `src/pipeline/include/pipeline/scene.hpp` —
+  unsplit transition cells as VEM PolyCells next to FE hex.
 - `tests/test_fe_vem_assembly.cpp` — FE/VEM interface constant-strain gate.
-- `src/adapt/hp_driver.hpp` — joint (h, p, shape) decisions; `drive_hp` plan
-  feeds seeds, p-elevate indices, and mesher tendency in `pipeline/scene.cpp`.
+- `src/adapt/include/adapt/hp_driver.hpp` — joint (h, p, shape) decisions;
+  `drive_hp` plan feeds seeds, p-elevate indices, and mesher tendency in
+  `src/pipeline/src/scene.cpp`.
 - `tests/test_hp_driver.cpp` — synthetic indicator gates for the driver.
 - `docs/decisions/0019-mixed-fe-vem-adaptive-order-core.md` — the *why* behind
   every choice above, and the staging plan.

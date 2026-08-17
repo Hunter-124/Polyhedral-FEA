@@ -1,6 +1,6 @@
 # ADR-0026: Anisotropic metric-field adaptivity, and making the size field real
 
-- Status: accepted (2026-08-09); `adapt::MetricField` + size-field-driven fills in progress
+- Status: accepted (2026-08-09); shipped as `adapt::Metric3d` + `adapt::MetricGrid` (`src/adapt/include/adapt/metric_field.hpp`) — the name `MetricField` used below was never built
 - Decision: D26
 - Related: ADR-0016 (LEB), ADR-0018 (graded LEB conformity), ADR-0019 (mixed FE/VEM adaptive order), ADR-0023 (measure-first)
 - Program: [docs/plans/variable-everything-and-advisor.md](../plans/variable-everything-and-advisor.md) §Phase 1
@@ -40,6 +40,10 @@ orders of magnitude (<https://arxiv.org/pdf/2201.02806>).
 ## Decision
 
 ### 1. `adapt::MetricField` is the new sizing contract
+
+> Shipped as `adapt::Metric3d` (the SPD tensor) + `adapt::MetricGrid` in
+> `src/adapt/include/adapt/metric_field.hpp`; nothing named `MetricField`
+> exists. Every operation described below is carried by those two types.
 
 One SPD \(3\times3\) metric per point. A unit edge in the metric satisfies
 \(\sqrt{e^{\top}Me}=1\), so \(\lambda_i = 1/h_i^2\). The type provides

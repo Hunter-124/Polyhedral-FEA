@@ -1,6 +1,6 @@
 # ADR-0029: Independent truth, mesh-independent load, and gates that cannot fake success
 
-- Status: accepted (2026-08-13); references replaced and engine fixes shipped, corpus regeneration and retraining in progress
+- Status: accepted (2026-08-13); complete — references replaced, engine fixes shipped, and corpus regeneration plus the v2→v3→v4 retrains landed ([advisor 0006–0008](../advisor/0008-v4-corpus-retrain.md))
 - Decision: D29
 - Related: ADR-0023 (measure-first), ADR-0024 (advisor measure answers), ADR-0027 (learned advisor), ADR-0028 (boundary-conformance hardening)
 - Evidence: commits `625b26a`, `f238bc3`, `74fbc06`, `8e8806b`, `895f46b`, `eada0a0`, `b37a2df`, `8e8bcb9`, `eb7d8ae`, `76ecdf3`; [`bench/reference/external/`](../../bench/reference/external); [`bench/advisor/corpus_evidence.json`](../../bench/advisor/corpus_evidence.json); [`apps/testlab/load_area.hpp`](../../apps/testlab/load_area.hpp); [`tests/test_load_area_gate.cpp`](../../tests/test_load_area_gate.cpp); [`tests/test_truth_guard.cpp`](../../tests/test_truth_guard.cpp); [`tests/test_run_artifacts.cpp`](../../tests/test_run_artifacts.cpp)

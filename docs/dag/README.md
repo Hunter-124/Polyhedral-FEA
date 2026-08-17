@@ -1,5 +1,12 @@
 # Program DAG — how to pick up work
 
+> **FROZEN / HISTORICAL (2026-08-16):** this board covers the program only
+> through node G4 (2026-07-13). All later work — ADR-0026 through ADR-0033
+> and the learned-advisor v2→v4 corpus program — is tracked in
+> [docs/advisor/0003-training-log.md](../advisor/0003-training-log.md) and
+> the ADR set instead. Read those first; the claim/parallelism protocol
+> below describes how the Lane M/G board was worked, not the active program.
+
 This directory is the coordination point for the adaptive-polyhedral-core
 program.
 

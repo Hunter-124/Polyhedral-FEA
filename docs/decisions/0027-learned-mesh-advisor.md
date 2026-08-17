@@ -1,6 +1,6 @@
 # ADR-0027: Learned mesh advisor — action-conditioned outcomes, not a winner classifier
 
-- Status: accepted (2026-08-09); telemetry + pilot campaign in progress, no model trained yet
+- Status: accepted (2026-08-09); §1–§5 and §8 shipped (v2→v4 models, see [docs/advisor/](../advisor/0001-architecture.md)). **§6 and §7 were reversed in practice** — see the notes in those sections.
 - Decision: D27
 - Related: ADR-0023 (measure-first), ADR-0026 (metric adaptivity — the advisor's actuator), ADR-0022 (experiment warehouse)
 - Program: [docs/plans/variable-everything-and-advisor.md](../plans/variable-everything-and-advisor.md) §Phase 3
@@ -88,6 +88,14 @@ singularities — and record the rejection reason.
 
 ### 6. Corpus and licensing
 
+> **Reversed (2026-08).** No external corpus was ever ingested; there is no
+> SFEM/MFCAD++/ABC loader in `scripts/` or `src/`. The shipped corpus is
+> entirely procedurally self-generated
+> (`scripts/gen_primitive_corpus.py`, `scripts/build_advisor_dataset.py`), as
+> recorded in [docs/advisor/0005-data-card.md](../advisor/0005-data-card.md).
+> The licensing analysis below is retained as the reason external corpora were
+> not used.
+
 Primary, commercially clean: **SFEM** (MIT, ~16k STEP with fixed-facet masks,
 loads and FEniCSx elastic fields), **MFCAD++** (CC BY, 59,665 STEP), one **ABC**
 chunk behind an OCCT solid gate and a licence-provenance gate, plus our own
@@ -101,6 +109,10 @@ be established at scale. Every training manifest records the union of input
 licences.
 
 ### 7. Deployment: LightGBM C API, no Python at runtime
+
+> **Reversed (2026-08).** Inference ships through **ONNX Runtime 1.28.0 (CPU)**,
+> not the LightGBM C API — `src/advisor` links onnxruntime. See the Deployment
+> section of [docs/advisor/0001-architecture.md](../advisor/0001-architecture.md).
 
 Train in Python (LightGBM, pinned), ship inference through the LightGBM C API
 from vcpkg — about 4 MiB on Windows, single-threaded, deterministic, with a

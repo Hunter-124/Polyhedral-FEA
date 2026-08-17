@@ -6,7 +6,7 @@
 
 The order below is the ranking: early ideas are the best bets after balancing accuracy, credibility, implementation cost, and the actual i7-9750H/RTX 2070 workstation. “Guaranteed” always means *under explicit assumptions*—linear elasticity, admissible loads/BCs, adequate quadrature, valid geometry, and a correct implementation—not marketing shorthand.
 
-**[WL-01] Compile manufactured elasticity problems into regression gates** — `verification` · impact H · effort M · risk L
+**[WL-01] Compile manufactured elasticity problems into regression gates** — `verification` · impact H · effort M · risk L · **SHIPPED** (`tests/test_mms_convergence.cpp`, `tests/support/mms.hpp`, MMS coverage in `test_hp_assembly.cpp`/`test_vem.cpp`, energy rates p=1..4 gated in CI)
 - *What:* Build a symbolic MMS generator that starts from a smooth displacement field, differentiates $\sigma=C:\varepsilon(u)$, and emits body forces, tractions, Dirichlet data, and exact displacement/stress norms. Run systematic refinement for every production element family, VEM order, and geometry path, fitting observed convergence order rather than merely checking one answer.
 - *Why it wins:* MMS catches sign, Jacobian, quadrature, assembly, BC, and stress-recovery defects that reference-answer tests can all share; an observed-order gate is far harder to game than a single tolerance.
 - *Prior art:* Aycock, Rebelo & Craven, “Method of Manufactured Solutions Code Verification of Elastostatic Solid Mechanics Problems in a Commercial Finite Element Solver” ([arXiv:1902.07608](https://arxiv.org/abs/1902.07608)).

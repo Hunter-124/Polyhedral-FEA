@@ -12,6 +12,7 @@
 //   4. the bounded sample budget that makes the metric affordable per run.
 
 #include "fea/boundary_faces.hpp"
+#include "fea/element_validity.hpp"
 #include "fea/p_elevate.hpp"
 #include "fea/traction.hpp"
 #include "geom/cad_model.hpp"
@@ -23,6 +24,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <filesystem>
@@ -356,6 +358,7 @@ TEST_CASE("brep_fidelity: quadratic plate-hole boundary mids lie on the exact BR
 
     const auto model = polymesh::pipeline::Model::load(kPlateHole);
     REQUIRE(model.cad);
+    std::size_t total_pre_outliers = 0;
     for (const double h_rel : {0.12, 0.10}) {
         const double h = h_rel * (model.bbox_max - model.bbox_min).norm();
         const auto vol =
@@ -382,7 +385,15 @@ TEST_CASE("brep_fidelity: quadratic plate-hole boundary mids lie on the exact BR
                 ++pre_outliers;
             }
         }
-        REQUIRE(pre_outliers > 0);
+        // NOT `pre_outliers > 0` per resolution. Since the exterior conformity
+        // gate (ADR-0035) lands the linear boundary on the exact BRep, a chord
+        // midpoint between two exact nodes on a planar or ruled patch is exact
+        // too: plate_hole at h_rel = 0.12 measures a chord max of 5.2e-16·h,
+        // with zero outliers, and demanding a defective fixture there would be
+        // demanding that the mesher be worse. The guard that this test still
+        // exercises the projection pass is therefore taken over the whole
+        // resolution sweep, below.
+        total_pre_outliers += pre_outliers;
 
         std::vector<polymesh::mesh::BoundarySupport> provenance;
         polymesh::mesh::BoundaryProjectionContext projection;
@@ -444,6 +455,10 @@ TEST_CASE("brep_fidelity: quadratic plate-hole boundary mids lie on the exact BR
         CHECK(std::includes(limited_set.begin(), limited_set.end(), post_outliers.begin(),
                             post_outliers.end()));
     }
+    // Somewhere in the sweep the chord midpoints must actually miss the BRep,
+    // otherwise this test would pass without the projection pass doing anything
+    // (measured: 20 outliers of 960 mids at h_rel = 0.10).
+    CHECK(total_pre_outliers > 0);
 }
 
 TEST_CASE("brep_fidelity: graded selective p-elevation stays stiffness-valid",
@@ -705,5 +720,80 @@ TEST_CASE("sharp BRep edges are reproduced by mesh feature segments",
             continue; // no sharp edges on this part
         }
         CHECK(reverse.over_h.p99 <= c.edge_p99_over_h);
+    }
+}
+
+// The exterior conformity gate (ADR-0035). Two claims, both about the mesh that
+// actually ships rather than about any mesher's own intermediate boundary set:
+// every emitted element is integrable by the assembly's own rule, and the true
+// element exterior — not the lattice skin the snap ran on — is on the BRep.
+TEST_CASE("brep_fidelity: the shipped exterior conforms and every cell is integrable",
+          "[cad][fidelity][exterior_gate]") {
+    if (!polymesh::geom::occ_enabled()) {
+        SKIP("OpenCASCADE disabled");
+    }
+    struct Case {
+        const char* path;
+        polymesh::pipeline::VolumeMesher mesher;
+        const char* name;
+        double node_p99_over_h; // ceiling on the shipped boundary NODES
+    };
+    // Ceilings are the measured numbers plus headroom, per part×mesher, because
+    // what the lattice can reach differs: the conforming meshers land on the
+    // BRep to machine precision, while the uniform Cartesian tet fill is bounded
+    // by its own cell-shape floor (ADR-0035 §5) and only improves.
+    const std::array<Case, 6> cases{{
+        {kSphere, polymesh::pipeline::VolumeMesher::kGradedTet, "sphere/graded", 1e-12},
+        {kSphere, polymesh::pipeline::VolumeMesher::kVaryhedron, "sphere/varyhedron", 1e-12},
+        {kSphere, polymesh::pipeline::VolumeMesher::kHybrid, "sphere/hybrid", 0.01},
+        {kIcecreamCone, polymesh::pipeline::VolumeMesher::kHybrid, "cone/hybrid", 1e-12},
+        {kIcecreamCone, polymesh::pipeline::VolumeMesher::kGradedTet, "cone/graded", 1e-12},
+        {kPlateHole, polymesh::pipeline::VolumeMesher::kVaryhedron, "plate_hole/varyhedron",
+         1e-12},
+    }};
+    constexpr double kH = 0.008;
+    for (const auto& c : cases) {
+        if (!std::filesystem::exists(c.path)) {
+            SKIP(std::string("missing fixture: ") + c.path);
+        }
+        const auto model = polymesh::pipeline::Model::load(c.path);
+        REQUIRE(model.cad);
+        const auto vol = polymesh::pipeline::volume_mesh(model, kH, c.mesher,
+                                                         /*skin_layers=*/2,
+                                                         /*feature_refine=*/true);
+        // Integrability of what ships. This is the claim `fea::cell_quality`
+        // cannot make: a cell can clear the shape floor and still have a
+        // non-positive Jacobian at a quadrature point, which is exactly how an
+        // earlier version of the gate shipped det J = -6.085e-09.
+        std::size_t nonintegrable = 0;
+        for (const auto& element : vol.mesh.elements) {
+            if (!polymesh::fea::element_jacobians_positive(vol.mesh, element)) {
+                ++nonintegrable;
+            }
+        }
+        CAPTURE(c.name, vol.mesher_note);
+        CHECK(nonintegrable == 0);
+
+        const auto quads = polymesh::fea::extract_boundary_faces(vol.mesh);
+        REQUIRE_FALSE(quads.empty());
+        std::set<std::uint32_t> exterior;
+        for (const auto& quad : quads) {
+            exterior.insert(quad.begin(), quad.end());
+        }
+        std::vector<double> residuals;
+        residuals.reserve(exterior.size());
+        for (const auto node : exterior) {
+            const auto exact =
+                polymesh::geom::project_point_on_surface(*model.cad, vol.mesh.nodes[node]);
+            if (exact) {
+                residuals.push_back(exact->distance / kH);
+            }
+        }
+        REQUIRE_FALSE(residuals.empty());
+        std::sort(residuals.begin(), residuals.end());
+        const double p99 = residuals[static_cast<std::size_t>(
+            0.99 * static_cast<double>(residuals.size() - 1))];
+        CAPTURE(p99, residuals.back(), residuals.size());
+        CHECK(p99 <= c.node_p99_over_h);
     }
 }

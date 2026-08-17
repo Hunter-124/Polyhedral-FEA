@@ -16,6 +16,7 @@ add_library(polymesh_fea
     src/traction.cpp
     src/stress.cpp
     src/cell_quality.cpp
+    src/element_validity.cpp
     src/msh.cpp
     src/vtu.cpp
     src/zz.cpp

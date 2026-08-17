@@ -1510,6 +1510,7 @@ struct ExteriorConformStats {
     std::size_t n_relax_rescued = 0;
     std::size_t n_hex_fanned = 0; // hexes fanned into pyramids to free a node
     std::size_t n_left = 0;       // still off the BRep by more than 1e-9 h
+    std::size_t n_kink_relieved = 0; // face nodes slid to lower a facet kink
     double worst_residual = 0.0;
     bool reverted = false; // whole pass rolled back by the exit invariant
 };
@@ -1925,6 +1926,181 @@ conform_true_exterior(fea::NodalMesh& mesh,
         const auto node_offends = [&](std::uint32_t ni) { return !star_ok(ni); };
         mesh::pin_feature_nodes(*fit->cad, *fit->topo, mesh.nodes, exterior, h, node_offends,
                                 projection->provenance);
+    }
+
+    // Facet-kink relief.
+    //
+    // With every boundary node exactly on the BRep the surface can still LOOK
+    // wrong, and this is the defect a user actually sees: the shipped exterior
+    // of the showcase cone (graded, h = 10 mm) carries adjacent facet pairs
+    // whose planes differ by up to 77.8°, with a mean of 6.0°, because the
+    // grading transitions leave needle facets next to bulk ones (adjacent area
+    // ratios up to 9.8). A kink between two exact facets is not a placement
+    // error, it is a *spacing* error, and spacing is the one degree of freedom
+    // a node on a face still has.
+    //
+    // So: find the kinked boundary edges, slide the free-face nodes around them
+    // along their own surface (re-projected through the owner oracle, so the
+    // placement never changes), and keep only moves that lower the worst kink
+    // in the node's own boundary neighbourhood. Crease and corner nodes are
+    // never touched — their owner is an edge or a vertex, and sliding them is
+    // exactly what would blunt the feature the pinning pass just made exact.
+    {
+        struct Facet {
+            std::array<std::uint32_t, 4> nodes{};
+            int count = 3;
+        };
+        std::vector<Facet> facets;
+        facets.reserve(boundary_faces.size());
+        for (const auto& face : boundary_faces) {
+            Facet f;
+            f.nodes = face;
+            f.count = (face[3] == face[2]) ? 3 : 4;
+            bool valid = true;
+            for (int i = 0; i < f.count; ++i) {
+                valid = valid && f.nodes[static_cast<std::size_t>(i)] < mesh.nodes.size();
+            }
+            if (valid) {
+                facets.push_back(f);
+            }
+        }
+        const auto facet_normal = [&](const Facet& f) {
+            Eigen::Vector3d n = (mesh.nodes[f.nodes[1]] - mesh.nodes[f.nodes[0]])
+                                    .cross(mesh.nodes[f.nodes[2]] - mesh.nodes[f.nodes[0]]);
+            const double norm = n.norm();
+            return norm > 1e-18 ? Eigen::Vector3d(n / norm) : Eigen::Vector3d::Zero().eval();
+        };
+        std::map<std::pair<std::uint32_t, std::uint32_t>, std::vector<std::size_t>> edge_facets;
+        std::vector<std::vector<std::size_t>> node_facets(mesh.nodes.size());
+        for (std::size_t fi = 0; fi < facets.size(); ++fi) {
+            const auto& f = facets[fi];
+            for (int i = 0; i < f.count; ++i) {
+                const auto a = f.nodes[static_cast<std::size_t>(i)];
+                const auto b = f.nodes[static_cast<std::size_t>((i + 1) % f.count)];
+                if (a != b) {
+                    edge_facets[{std::min(a, b), std::max(a, b)}].push_back(fi);
+                }
+                node_facets[a].push_back(fi);
+            }
+        }
+        for (auto& list : node_facets) {
+            std::sort(list.begin(), list.end());
+            list.erase(std::unique(list.begin(), list.end()), list.end());
+        }
+        // Worst plane-to-plane angle among the manifold boundary edges of the
+        // facets around one node — the quantity a move has to lower.
+        const auto node_worst_kink = [&](std::uint32_t ni) {
+            double worst = 0.0;
+            for (const auto fi : node_facets[ni]) {
+                const auto& f = facets[fi];
+                for (int i = 0; i < f.count; ++i) {
+                    const auto a = f.nodes[static_cast<std::size_t>(i)];
+                    const auto b = f.nodes[static_cast<std::size_t>((i + 1) % f.count)];
+                    if (a == b) {
+                        continue;
+                    }
+                    const auto it = edge_facets.find({std::min(a, b), std::max(a, b)});
+                    if (it == edge_facets.end() || it->second.size() != 2) {
+                        continue;
+                    }
+                    const Eigen::Vector3d n0 = facet_normal(facets[it->second[0]]);
+                    const Eigen::Vector3d n1 = facet_normal(facets[it->second[1]]);
+                    if (n0.isZero() || n1.isZero()) {
+                        worst = std::numbers::pi; // degenerate facet: always worse
+                        continue;
+                    }
+                    worst = std::max(worst,
+                                     std::acos(std::clamp(std::abs(n0.dot(n1)), 0.0, 1.0)));
+                }
+            }
+            return worst;
+        };
+        const auto* provenance = projection->provenance;
+        // Face-owned nodes slide; edge- and vertex-owned nodes never do, because
+        // sliding them is what would blunt the crease the pinning pass just made
+        // exact. Broadening this to unowned nodes as well was measured and
+        // changed nothing on any fixture, so it is not carried.
+        const auto slidable = [&](std::uint32_t ni) {
+            if (provenance == nullptr || ni >= provenance->size()) {
+                return false;
+            }
+            return (*provenance)[ni].kind == mesh::BoundarySupportKind::kCadFace;
+        };
+        const double kink_threshold = 25.0 * std::numbers::pi / 180.0;
+        for (int round = 0; round < 4; ++round) {
+            std::vector<std::uint32_t> candidates;
+            for (const auto& [edge, owners] : edge_facets) {
+                if (owners.size() != 2) {
+                    continue;
+                }
+                const Eigen::Vector3d n0 = facet_normal(facets[owners[0]]);
+                const Eigen::Vector3d n1 = facet_normal(facets[owners[1]]);
+                if (n0.isZero() || n1.isZero() ||
+                    std::acos(std::clamp(std::abs(n0.dot(n1)), 0.0, 1.0)) >= kink_threshold) {
+                    for (const auto fi : owners) {
+                        const auto& f = facets[fi];
+                        for (int i = 0; i < f.count; ++i) {
+                            candidates.push_back(f.nodes[static_cast<std::size_t>(i)]);
+                        }
+                    }
+                }
+            }
+            std::sort(candidates.begin(), candidates.end());
+            candidates.erase(std::unique(candidates.begin(), candidates.end()),
+                             candidates.end());
+            std::size_t moved = 0;
+            for (const auto ni : candidates) {
+                if (!slidable(ni)) {
+                    continue;
+                }
+                // Umbrella centroid over the boundary neighbours only: an
+                // interior neighbour would pull the node off its own face.
+                Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
+                std::size_t n_used = 0;
+                for (const auto fi : node_facets[ni]) {
+                    const auto& f = facets[fi];
+                    for (int i = 0; i < f.count; ++i) {
+                        const auto other = f.nodes[static_cast<std::size_t>(i)];
+                        if (other != ni) {
+                            centroid += mesh.nodes[other];
+                            ++n_used;
+                        }
+                    }
+                }
+                if (n_used == 0) {
+                    continue;
+                }
+                centroid /= static_cast<double>(n_used);
+                const Eigen::Vector3d saved = mesh.nodes[ni];
+                const double kink_before = node_worst_kink(ni);
+                const double quality_before_node = star_min_quality(ni);
+                bool accepted = false;
+                for (const double relax : {0.5, 0.25, 0.125}) {
+                    const Eigen::Vector3d slid = saved + relax * (centroid - saved);
+                    const auto back = mesh::owned_boundary_projection_target(slid, ni, projection);
+                    if (!back) {
+                        break;
+                    }
+                    mesh.nodes[ni] = back->point;
+                    const double after = star_min_quality(ni);
+                    if (node_worst_kink(ni) < kink_before &&
+                        (!std::isfinite(after) ||
+                         after >= std::min(quality_before_node, floor_value)) &&
+                        fea::star_jacobians_positive(mesh, incident[ni])) {
+                        accepted = true;
+                        break;
+                    }
+                    mesh.nodes[ni] = saved;
+                }
+                if (accepted) {
+                    ++moved;
+                }
+            }
+            stats.n_kink_relieved += moved;
+            if (moved == 0) {
+                break;
+            }
+        }
     }
 
     std::size_t nonintegrable_exit = 0;
@@ -4057,9 +4233,10 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
         if (ext.n_candidates > 0) {
             out.mesher_note += std::format(
                 " | exterior_gate cand={} moved={} relax_rescued={} hex_fanned={} left={} "
-                "worst|d|={:.3g} m{}",
+                "worst|d|={:.3g} m kink_relieved={}{}",
                 ext.n_candidates, ext.n_moved, ext.n_relax_rescued, ext.n_hex_fanned,
-                ext.n_left, ext.worst_residual, ext.reverted ? " REVERTED" : "");
+                ext.n_left, ext.worst_residual, ext.n_kink_relieved,
+                ext.reverted ? " REVERTED" : "");
         }
     }
 

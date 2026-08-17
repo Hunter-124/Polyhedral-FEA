@@ -444,7 +444,17 @@ mesh_dihedral_feature_segments(const std::vector<Eigen::Vector3d>& nodes,
         if (normals.size() != 2) {
             continue;
         }
-        const double cosine = std::clamp(normals[0].dot(normals[1]), -1.0, 1.0);
+        // Angle between the two facet PLANES, which is what a crease is. The
+        // signed dot product measured the angle between two winding-dependent
+        // normals instead, so a pair of neighbouring faces that the boundary
+        // extraction happened to wind oppositely read as a 180° crease. That
+        // over-detection is the whole of the "spurious mesh creases" ADR-0035
+        // §5(b) recorded as an open mesher defect: on icecream_cone/graded it
+        // reported 177 feature segments where the geometry has 47, and the
+        // phantom ones are scattered over smooth walls, which is why their
+        // distance to the nearest sharp BRep edge came out at 0.81 of the
+        // bounding-box diagonal.
+        const double cosine = std::clamp(std::abs(normals[0].dot(normals[1])), 0.0, 1.0);
         if (std::acos(cosine) < threshold) {
             continue;
         }

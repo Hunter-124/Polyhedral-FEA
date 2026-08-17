@@ -1120,6 +1120,26 @@ bool make_boundary_projection(const geom::CadModel& cad, double h,
             exact = geom::project_point_on_edge(*cad_ptr, owner.id, p);
         } else if (owner.kind == mesh::BoundarySupportKind::kCadFace) {
             exact = geom::project_point_on_face(*cad_ptr, owner.id, p);
+            // Ownership exists so a node cannot drift across a trimmed face or
+            // a sharp edge, not so a misclassification can pin it in mid-air.
+            // A node that latched a face it cannot reach — classified at its
+            // raw lattice site, then found on the far side of a bore rim — is
+            // projected onto that face's nearest trimmed point forever and
+            // ships O(h) off the solid (measured on plate_hole tet at
+            // h = 3 mm: 4 nodes stuck 0.22 h out, drawn as flaps standing off
+            // the hole). When the owned projection is more than half a cell
+            // away and the free whole-shape projection is materially closer,
+            // the classification was wrong: adopt the better face and record
+            // it. Edges and vertices stay immutable — those owners are
+            // features, not conveniences.
+            if (exact && exact->distance > 0.5 * h) {
+                if (auto free_target = geom::project_point_on_surface(*cad_ptr, p);
+                    free_target && free_target->distance < 0.5 * exact->distance &&
+                    free_target->face_id != geom::kInvalidCadSupportId) {
+                    owner = {mesh::BoundarySupportKind::kCadFace, free_target->face_id};
+                    exact = std::move(free_target);
+                }
+            }
         } else {
             exact = geom::project_point_on_surface(*cad_ptr, p);
             if (!exact) {
@@ -1436,7 +1456,12 @@ std::size_t relax_cells_below_shape_floor(fea::NodalMesh& mesh,
             const Eigen::Vector3d saved = mesh.nodes[ni];
             const double before = star_min_quality(ni);
             mesh.nodes[ni] = saved + 0.5 * (centroid - saved);
-            if (!(star_min_quality(ni) > before)) {
+            const double after = star_min_quality(ni);
+            // Improvement is not enough: a move from -1e-3 to -9e-11 is an
+            // improvement and still ships an inverted cell, which the solver
+            // then refuses with "non-positive Jacobian". Never leave a star
+            // non-positive, and never make a positive star worse.
+            if (!(after > before) || !(after > 0.0)) {
                 mesh.nodes[ni] = saved;
             } else {
                 moved_any = true;

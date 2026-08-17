@@ -43,6 +43,17 @@ slivers to keep the solver happy.
   ([src/adapt/include/adapt/hp_driver.hpp](src/adapt/include/adapt/hp_driver.hpp),
   [docs/solver-core.md](docs/solver-core.md),
   [tests/test_hp_driver.cpp](tests/test_hp_driver.cpp)).
+- **Spectral sizing, and an adapt loop that can also coarsen.** The sizing field
+  is FFT-filtered before the mesher sees it: CAD-edge curvature is denoised by
+  energy-truncated inverse FFT before it emits chordal sources, and spectrally
+  insignificant fine bands merge into the coarse field, with a geometry-only
+  floor re-imposed so a real feature is never blurred. The adapt loop gained the
+  missing direction — an anti-Dörfler insignificant tail plus a size-vs-demand
+  gate lets it *coarsen* a-posteriori over-refinement instead of only ever
+  refining
+  ([ADR-0034](docs/decisions/0034-spectral-sizing-and-coarsening.md),
+  [src/adapt/include/adapt/spectral_sizing.hpp](src/adapt/include/adapt/spectral_sizing.hpp),
+  [tests/test_spectral_sizing.cpp](tests/test_spectral_sizing.cpp)).
 - **Native-polyhedron transition cells instead of sliver fans.** A 2:1
   coarse/fine interface is emitted as **one** polyhedral VEM cell whose faces
   match its neighbours exactly (single quad against a bulk hex, four child quads

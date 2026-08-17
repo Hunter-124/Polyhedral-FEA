@@ -1088,7 +1088,8 @@ bool quadratic_incident_valid(const fea::NodalMesh& nodal_mesh,
 
 bool make_boundary_projection(const geom::CadModel& cad, double h,
                               mesh::BoundaryProjectionContext* ctx,
-                              std::vector<mesh::BoundarySupport>* provenance) {
+                              std::vector<mesh::BoundarySupport>* provenance,
+                              std::shared_ptr<const geom::CadTopology>* topology_out) {
     if (ctx == nullptr || provenance == nullptr || cad.empty()) {
         if (ctx != nullptr) {
             *ctx = {};
@@ -1096,7 +1097,16 @@ bool make_boundary_projection(const geom::CadModel& cad, double h,
         return false;
     }
 
-    auto topology = std::make_shared<geom::CadTopology>(geom::extract_topology(cad, 10));
+    // 32 interior samples per edge, not 10: the polyline is the capture test
+    // and the arclength parameterization for the feature pin (ADR-0035), and
+    // a 10-sample circle has a 4.9%·R chord sag — a fifth of a cell on a small
+    // bore, enough to mis-capture a crease node. The pin target itself is
+    // always the exact OCC curve projection, so this only sharpens the
+    // classification, never the geometry.
+    auto topology = std::make_shared<geom::CadTopology>(geom::extract_topology(cad, 32));
+    if (topology_out != nullptr) {
+        *topology_out = topology;
+    }
     const geom::CadModel* cad_ptr = &cad;
     ctx->provenance = provenance;
     ctx->target =
@@ -1592,15 +1602,19 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
 
     // One exact BRep oracle and one compact owner slot per eventual mesh node.
     // Unknown nodes classify on their first snap; known owners remain immutable.
+    //
+    // Every CAD-backed mesher gets this, not just the four that used to be
+    // listed: plain tet and hex fill were snapping to the tessellation with no
+    // crease awareness at all, which is why their sharp edges came out
+    // chamfered and their curved walls carried lattice sawtooth (ADR-0035).
     std::vector<mesh::BoundarySupport> boundary_provenance;
     mesh::BoundaryProjectionContext projection_context;
     mesh::BoundaryProjectionContext* projection = nullptr;
-    if (model.cad && !model.cad->empty() &&
-        (mesher == VolumeMesher::kHybrid || mesher == VolumeMesher::kHybridVem ||
-         mesher == VolumeMesher::kGradedTet || mesher == VolumeMesher::kVaryhedron)) {
+    std::shared_ptr<const geom::CadTopology> cad_topology;
+    if (model.cad && !model.cad->empty()) {
         try {
             if (make_boundary_projection(*model.cad, h, &projection_context,
-                                         &boundary_provenance)) {
+                                         &boundary_provenance, &cad_topology)) {
                 projection = &projection_context;
             }
         } catch (const std::exception& e) {
@@ -1610,6 +1624,11 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
             throw std::runtime_error("exact BRep projection setup failed");
         }
     }
+    mesh::BoundaryFit boundary_fit;
+    boundary_fit.cad = model.cad ? &*model.cad : nullptr;
+    boundary_fit.topo = cad_topology.get();
+    boundary_fit.projection = projection;
+    const mesh::BoundaryFit* fit = projection != nullptr ? &boundary_fit : nullptr;
     // Per-cell turning-angle refinement threshold (feature_refine paths): refine
     // where the surface turns more than this per bulk cell (h·κ). Angle-based,
     // so gentle curves / big bores stay coarse and flats never refine — replaces
@@ -2318,7 +2337,8 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
                 fill.classification_refinement_levels, fill.classification_volume_error);
         }
     } else if (mesher == VolumeMesher::kHexFill || mesher == VolumeMesher::kHexVem) {
-        auto fill = mesh::hex_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
+        auto fill = mesh::hex_fill_surface(model.surface, model.bbox_min, model.bbox_max, h,
+                                           /*snap_boundary=*/true, fit);
         fill_h = fill.h;
         out.mesh.nodes = std::move(fill.nodes);
         out.mesh.elements.reserve(fill.hexes.size());
@@ -2451,7 +2471,7 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
         }
         auto graded = mesh::graded_tet_fill_surface(
             model.surface, model.bbox_min, model.bbox_max, h, std::max(1, skin_layers), edges,
-            feature_band, seeds, band, turn_deg, projection, size_field);
+            feature_band, seeds, band, turn_deg, fit, size_field);
         fill_h = graded.h_fine;
         out.mesh.nodes = std::move(graded.mesh.nodes);
         out.mesh.elements.reserve(graded.mesh.tets.size());
@@ -2986,7 +3006,7 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
             const double h_tet = std::max(h, 1e-9);
             auto tet_fill =
                 mesh::tet_fill_surface(model.surface, model.bbox_min, model.bbox_max, h_tet,
-                                       /*snap_boundary=*/true);
+                                       /*snap_boundary=*/true, fit);
             std::vector<mesh::DomainTet> dtets;
             dtets.reserve(tet_fill.tets.size());
             for (const auto& t : tet_fill.tets) {
@@ -3215,7 +3235,29 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
             grid.nx, grid.ny, grid.nz, h,
             topo_ptr ? ", geom_source=brep_topology" : ", geom_source=surface_class");
     } else {
-        auto fill = mesh::tet_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
+        auto fill = mesh::tet_fill_surface(model.surface, model.bbox_min, model.bbox_max, h,
+                                           /*snap_boundary=*/true, fit);
+        const auto owner_name = [](mesh::BoundarySupportKind k) {
+            switch (k) {
+            case mesh::BoundarySupportKind::kCadVertex:
+                return "cad_vertex";
+            case mesh::BoundarySupportKind::kCadEdge:
+                return "cad_edge";
+            case mesh::BoundarySupportKind::kCadFace:
+                return "cad_face";
+            case mesh::BoundarySupportKind::kUnknown:
+                break;
+            }
+            return "unknown";
+        };
+        const std::string conformity_note = std::format(
+            " | conformity snap_moved={} unsnapped={} relax_rescued={} "
+            "pin_edge={} pin_vertex={} pin_chains={} pin_rejected={} pin_res={:.3g} m "
+            "worst_node={} d={:.3g} m owner={}",
+            fill.snap.n_moved, fill.snap.n_unsnapped, fill.snap.n_relax_rescued,
+            fill.pin.edge_pinned, fill.pin.vertex_pinned, fill.pin.chains,
+            fill.pin.rejected, fill.pin.max_edge_residual, fill.pin.worst_node,
+            fill.pin.worst_node_distance, owner_name(fill.pin.worst_node_owner));
         fill_h = fill.h;
         out.mesh.nodes = std::move(fill.nodes);
         out.mesh.elements.reserve(fill.tets.size());
@@ -3245,6 +3287,7 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
             "minQ={:.3f}, meanQ={:.3f}, slivers={}, snap max|d|={:.3g} m mean|d|={:.3g} m",
             out.mesh.elements.size(), out.mesh.nodes.size(), fill_h, q.min_aspect,
             q.mean_aspect, q.n_sliver, conf.max_distance, conf.mean_distance);
+        out.mesher_note += conformity_note;
     }
 
     // Prefer true element exterior faces for display/region skin so tet/prism

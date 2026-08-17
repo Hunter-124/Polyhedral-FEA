@@ -26,6 +26,7 @@
 // Everything is double-only and deterministic (fixed grids, no randomness).
 
 #include "adapt/sizing_field.hpp"
+#include "geom/signal_fft.hpp"
 
 #include <Eigen/Core>
 
@@ -38,30 +39,14 @@
 
 namespace polymesh::adapt::spectral {
 
-/// In-place iterative radix-2 Cooley–Tukey FFT. `a.size()` must be a power of
-/// two ≥ 2. inverse=true applies the 1/N-scaled inverse. Throws
-/// std::invalid_argument on a non-power-of-two size.
-void fft_inplace(std::vector<std::complex<double>>& a, bool inverse);
-
-/// What an energy truncation did.
-struct FilterReport {
-    std::size_t modes_total = 0;  // modes considered (DC excluded)
-    std::size_t modes_kept = 0;   // modes retained by the truncation
-    double energy_total = 0.0;    // Σ|F(k)|² over considered modes
-    double energy_kept = 0.0;     // energy retained
-    double energy_fraction = 0.0; // requested capture fraction
-};
-
-/// Smooth a 1-D signal sampled at `stations` (need not be uniform): resample
-/// uniformly, even-reflect to suppress the periodic-wrap discontinuity, FFT,
-/// keep the dominant modes capturing `energy_fraction` of spectral energy,
-/// inverse, then interpolate back to the original stations. Output size equals
-/// input size. Fewer than 3 samples (or non-finite input) returns a copy of
-/// `values` with a zeroed report.
-std::vector<double> lowpass_signal(std::span<const double> stations,
-                                   std::span<const double> values,
-                                   double energy_fraction,
-                                   FilterReport* report = nullptr);
+// Fourier primitives live in geom (`adapt` links `mesh`, so mesh passes that
+// need the transform cannot include an adapt header). Re-exported here so the
+// sizing pipeline keeps one spelling.
+using geom::FilterReport;
+using geom::fft_inplace;
+using geom::lowpass_signal;
+using geom::lowpass_signal_periodic;
+using geom::truncate_modes;
 
 /// Cartesian scalar-field grid, x-fastest. Dims are powers of two so the
 /// separable 3-D FFT never needs padding.

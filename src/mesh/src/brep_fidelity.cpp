@@ -203,12 +203,15 @@ BRepGeometryFidelity evaluate_brep_geometry_fidelity(
         max_boundary_samples);
 
     std::vector<double> mesh_to_brep;
+    std::vector<double> node_to_brep;
     mesh_to_brep.reserve(boundary_nodes.size() / stride + free_faces.size() / stride +
                          boundary_edges.size() / stride + 3);
+    node_to_brep.reserve(boundary_nodes.size() / stride + 1);
     for (std::size_t i = 0; i < boundary_nodes.size(); i += stride) {
         if (const auto projected =
                 geom::project_point_on_surface(model, nodes[boundary_nodes[i]])) {
             mesh_to_brep.push_back(projected->distance);
+            node_to_brep.push_back(projected->distance);
         }
     }
 
@@ -259,6 +262,8 @@ BRepGeometryFidelity evaluate_brep_geometry_fidelity(
     }
     out.mesh_boundary_samples_to_brep_surface =
         summarize_distances(mesh_to_brep, h, bbox_diagonal);
+    out.mesh_boundary_nodes_to_brep_surface =
+        summarize_distances(node_to_brep, h, bbox_diagonal);
     out.mesh_boundary_normal_angle_to_brep_normal = summarize_samples(normal_angles);
 
     const geom::TriSurface mesh_boundary = boundary_surface(nodes, free_faces);

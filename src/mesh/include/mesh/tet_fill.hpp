@@ -12,6 +12,7 @@
 // pipeline converts TetFillOutput into fea::NodalMesh for the frozen solver.
 
 #include "geom/tri_surface.hpp"
+#include "mesh/feature_pin.hpp"
 #include "mesh/poly_mesh.hpp"
 
 #include <Eigen/Core>
@@ -30,14 +31,22 @@ struct TetFillOutput {
     /// Outer quads of the voxel lattice (region mapping / rendering).
     std::vector<std::array<std::uint32_t, 4>> boundary_quads;
     double h = 0.0; // grid spacing used, metres
+    /// Boundary conformity accounting for the mesher note (ADR-0035).
+    SnapStats snap;
+    FeaturePinReport pin;
 };
 
 /// Fill the interior of `surface` (assumed closed, outward CCW) at spacing `h` (metres).
 /// Bbox corners are metres. Throws ValidityError on empty volume or absurd grid size.
+///
+/// @param fit Optional exact-BRep boundary fitting (ADR-0035): the snap
+///        projects to the CAD oracle instead of the tessellation, sharp edges
+///        and CAD vertices are hard-pinned, and the free surface is smoothed
+///        with owner-aware re-projection. Null keeps the tessellated path.
 TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
                                const Eigen::Vector3d& bbox_min,
                                const Eigen::Vector3d& bbox_max, double h,
-                               bool snap_boundary = true);
+                               bool snap_boundary = true, const BoundaryFit* fit = nullptr);
 
 /// Signed tet volume, m³ (positive for right-handed a,b,c,d).
 double tet_signed_volume(const Eigen::Vector3d& a, const Eigen::Vector3d& b,

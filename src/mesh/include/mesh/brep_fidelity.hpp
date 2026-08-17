@@ -48,6 +48,12 @@ struct BRepGeometryFidelity {
     geom::BRepInspection brep;
 
     DistanceDistribution mesh_boundary_samples_to_brep_surface;
+    /// Boundary NODES only, no face centroids or edge midpoints. Nodes are the
+    /// only samples a mesher can place exactly on the BRep; centroid and
+    /// midpoint samples always carry the linear-facet chord sag h²κ/8, so a
+    /// combined statistic cannot tell "the mesher missed the surface" from
+    /// "a flat facet spans a curve" (ADR-0035).
+    DistanceDistribution mesh_boundary_nodes_to_brep_surface;
     DistanceDistribution brep_surface_samples_to_mesh_boundary;
     std::size_t brep_surface_sample_face_count = 0;
     std::size_t brep_surface_uv_attempt_count = 0;

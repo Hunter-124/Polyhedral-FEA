@@ -317,7 +317,8 @@ snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d
                     const CollectOffendersFn& collect_offenders, double max_move_frac,
                     int passes, std::span<const geom::SharpEdge> feature_edges,
                     const RepairInteriorFn& repair_interior, const NodeOffendsFn& node_offends,
-                    bool defer_coupled, BoundaryProjectionContext* projection) {
+                    bool defer_coupled, BoundaryProjectionContext* projection,
+                    const RelaxNeighborhoodFn& relax_neighborhood) {
     SnapStats stats;
     if (boundary_nodes.empty() || !(h > 0.0) || !std::isfinite(h) || !collect_offenders) {
         return stats;
@@ -507,14 +508,48 @@ snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d
             double bad = from;
             double good = -1.0;
             static constexpr double kKeep[] = {0.75, 0.5, 0.25, 0.0};
-            for (const double keep : kKeep) {
-                const double f = from * keep;
-                nodes[worst] = orig + f * (full - orig);
-                if (!node_offends(worst)) {
-                    good = f;
+            const auto run_ladder = [&](bool include_full) {
+                bad = from;
+                good = -1.0;
+                if (include_full) {
+                    // Only on a retry: the node is currently AT `from` and was
+                    // picked because it offends there, so testing 1.0 first is
+                    // wasted work — unless relaxation has since opened room.
+                    nodes[worst] = orig + from * (full - orig);
+                    if (!node_offends(worst)) {
+                        good = from;
+                        return;
+                    }
+                }
+                for (const double keep : kKeep) {
+                    const double f = from * keep;
+                    nodes[worst] = orig + f * (full - orig);
+                    if (!node_offends(worst)) {
+                        good = f;
+                        return;
+                    }
+                    bad = f;
+                }
+            };
+            run_ladder(/*include_full=*/false);
+            // Relax whenever the projection cannot be kept WHOLE, not only
+            // when every fraction fails. The common case on a curved wall is
+            // not a full retreat (measured: 9 of 584 nodes on icecream_cone)
+            // but a partial keep — the ladder settles at 0.25 of the move and
+            // leaves the node 0.6 h off the CAD while reporting nothing. The
+            // cell that blocks it is a stair fold whose other corners are
+            // interior and unconstrained, so open that room and retry; the
+            // relaxation is validity-gated and touches interior nodes only,
+            // which cannot cost boundary fidelity (ADR-0035).
+            for (int round = 0; good < from && round < 3 && relax_neighborhood; ++round) {
+                if (!relax_neighborhood(worst)) {
                     break;
                 }
-                bad = f;
+                const double before = good;
+                run_ladder(/*include_full=*/true);
+                if (good > before) {
+                    ++stats.n_relax_rescued;
+                }
             }
             if (good < 0.0) {
                 if (!defer_coupled) {

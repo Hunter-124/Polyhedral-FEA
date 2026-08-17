@@ -6,6 +6,7 @@
 // Optional limited surface snap (≤0.75 h) with Jacobian safety — not Delaunay.
 
 #include "geom/tri_surface.hpp"
+#include "mesh/feature_pin.hpp"
 
 #include <Eigen/Core>
 
@@ -25,9 +26,12 @@ struct HexFillOutput {
 
 /// Uniform Cartesian hex8 fill. `h` and bbox corners in metres.
 /// @param snap_boundary Pull free-boundary nodes toward the STL (Jacobian-safe).
+/// @param fit Optional exact-BRep boundary fitting (ADR-0035): snap through
+///        the CAD oracle, hard-pin sharp edges and CAD vertices, smooth the
+///        free surface with owner-aware re-projection. Null = tessellated path.
 HexFillOutput hex_fill_surface(const geom::TriSurface& surface,
                                const Eigen::Vector3d& bbox_min,
                                const Eigen::Vector3d& bbox_max, double h,
-                               bool snap_boundary = true);
+                               bool snap_boundary = true, const BoundaryFit* fit = nullptr);
 
 } // namespace polymesh::mesh

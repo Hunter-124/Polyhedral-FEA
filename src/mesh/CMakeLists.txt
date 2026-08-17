@@ -6,6 +6,7 @@ add_library(polymesh_mesh
     src/prism_fill.cpp
     src/quality.cpp
     src/surface_project.cpp
+    src/feature_pin.cpp
     src/surface_metrics.cpp
     src/brep_fidelity.cpp
     src/grid_classify.cpp

@@ -96,7 +96,7 @@
         "h_rel": 0.14,
         "adapt_passes": 0,
         "eta_target": 0.0,
-        "measured_rows": 62
+        "measured_rows": 58
       },
       {
         "mesher": "graded_tet",
@@ -104,7 +104,7 @@
         "h_rel": 0.2,
         "adapt_passes": 0,
         "eta_target": 0.0,
-        "measured_rows": 48
+        "measured_rows": 44
       },
       {
         "mesher": "graded_tet",
@@ -128,7 +128,7 @@
         "h_rel": 0.14,
         "adapt_passes": 0,
         "eta_target": 0.0,
-        "measured_rows": 62
+        "measured_rows": 58
       },
       {
         "mesher": "graded_tet",
@@ -136,7 +136,7 @@
         "h_rel": 0.2,
         "adapt_passes": 0,
         "eta_target": 0.0,
-        "measured_rows": 48
+        "measured_rows": 44
       },
       {
         "mesher": "hex",
@@ -152,7 +152,7 @@
         "h_rel": 0.14,
         "adapt_passes": 0,
         "eta_target": 0.0,
-        "measured_rows": 59
+        "measured_rows": 51
       },
       {
         "mesher": "hex",
@@ -160,7 +160,7 @@
         "h_rel": 0.2,
         "adapt_passes": 0,
         "eta_target": 0.0,
-        "measured_rows": 47
+        "measured_rows": 39
       },
       {
         "mesher": "hex",
@@ -176,7 +176,7 @@
         "h_rel": 0.14,
         "adapt_passes": 0,
         "eta_target": 0.0,
-        "measured_rows": 59
+        "measured_rows": 51
       },
       {
         "mesher": "hex",
@@ -184,7 +184,7 @@
         "h_rel": 0.2,
         "adapt_passes": 0,
         "eta_target": 0.0,
-        "measured_rows": 47
+        "measured_rows": 39
       },
       {
         "mesher": "hybrid_vem",
@@ -200,7 +200,7 @@
         "h_rel": 0.14,
         "adapt_passes": 0,
         "eta_target": 0.0,
-        "measured_rows": 58
+        "measured_rows": 54
       },
       {
         "mesher": "hybrid_vem",
@@ -208,7 +208,7 @@
         "h_rel": 0.2,
         "adapt_passes": 0,
         "eta_target": 0.0,
-        "measured_rows": 46
+        "measured_rows": 42
       },
       {
         "mesher": "hybrid_vem",
@@ -224,7 +224,7 @@
         "h_rel": 0.14,
         "adapt_passes": 0,
         "eta_target": 0.0,
-        "measured_rows": 58
+        "measured_rows": 54
       },
       {
         "mesher": "hybrid_vem",
@@ -232,7 +232,7 @@
         "h_rel": 0.2,
         "adapt_passes": 0,
         "eta_target": 0.0,
-        "measured_rows": 46
+        "measured_rows": 42
       },
       {
         "mesher": "hybrid_zoo",
@@ -296,7 +296,7 @@
         "h_rel": 0.14,
         "adapt_passes": 0,
         "eta_target": 0.0,
-        "measured_rows": 58
+        "measured_rows": 54
       },
       {
         "mesher": "hybrid_zoo",
@@ -304,7 +304,7 @@
         "h_rel": 0.2,
         "adapt_passes": 0,
         "eta_target": 0.0,
-        "measured_rows": 46
+        "measured_rows": 42
       },
       {
         "mesher": "hybrid_zoo",
@@ -328,7 +328,7 @@
         "h_rel": 0.14,
         "adapt_passes": 0,
         "eta_target": 0.0,
-        "measured_rows": 58
+        "measured_rows": 54
       },
       {
         "mesher": "hybrid_zoo",
@@ -336,7 +336,7 @@
         "h_rel": 0.2,
         "adapt_passes": 0,
         "eta_target": 0.0,
-        "measured_rows": 46
+        "measured_rows": 42
       }
     ],
     "n_candidates": 38,

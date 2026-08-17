@@ -1,10 +1,10 @@
 {
   "provenance": {
-    "git_revision": "b37a2dff97a2fc4a10f4f13e7fa8c2d368874488-dirty",
-    "created_utc": "2026-08-13T06:09:51Z",
-    "python": "3.11.9",
-    "numpy": "2.4.4",
-    "torch": "2.11.0+cpu"
+    "git_revision": "ca9ae2e578f6c7cf92e2db0ecead36161b4f2252-dirty",
+    "created_utc": "2026-08-17T07:54:15Z",
+    "python": "3.14.6",
+    "numpy": "2.4.6",
+    "torch": "2.12.1+cu129"
   },
   "descriptor_distances": {
     "descriptor_columns": [
@@ -392,7 +392,7 @@
         "slope_decades_per_family": -0.0017357081204528826,
         "ci95": [
           -0.050793240109113055,
-          0.04630381595136239
+          0.04630381595136244
         ],
         "indistinguishable_from_flat": true,
         "degenerate_constant_series": false,
@@ -413,7 +413,7 @@
       "advisor_gated_0.05": {
         "slope_decades_per_family": -0.003606084790749037,
         "ci95": [
-          -0.05146139041970616,
+          -0.0514613904197061,
           0.04506262548949282
         ],
         "indistinguishable_from_flat": true,
@@ -425,7 +425,7 @@
         "slope_decades_per_family": -0.00025791309449823494,
         "ci95": [
           -0.048459786821217155,
-          0.04633194217998846
+          0.04633194217998856
         ],
         "indistinguishable_from_flat": true,
         "degenerate_constant_series": false,
@@ -446,7 +446,7 @@
       "advisor_gated_0.35": {
         "slope_decades_per_family": 0.0037258267437358093,
         "ci95": [
-          -0.04554616628793306,
+          -0.045546166287933024,
           0.05072091296706684
         ],
         "indistinguishable_from_flat": true,
@@ -458,7 +458,7 @@
         "slope_decades_per_family": 0.0023202133464072508,
         "ci95": [
           -0.04544105751003699,
-          0.04856991594858478
+          0.048569915948584806
         ],
         "indistinguishable_from_flat": true,
         "degenerate_constant_series": false,
@@ -479,8 +479,8 @@
       "advisor_policy": {
         "slope_decades_per_family": -0.011678502019099452,
         "ci95": [
-          -0.04578382276911021,
-          0.024278851617989733
+          -0.04578382276911009,
+          0.024278851617989688
         ],
         "indistinguishable_from_flat": true,
         "degenerate_constant_series": false,
@@ -491,7 +491,7 @@
         "slope_decades_per_family": -0.001520771623235494,
         "ci95": [
           -0.03103093393581297,
-          0.02760476253892121
+          0.027604762538921135
         ],
         "indistinguishable_from_flat": true,
         "degenerate_constant_series": false,
@@ -502,7 +502,7 @@
         "slope_decades_per_family": -0.000288052480350889,
         "ci95": [
           -0.029790702597813915,
-          0.030773594802723667
+          0.030773594802723608
         ],
         "indistinguishable_from_flat": true,
         "degenerate_constant_series": false,
@@ -513,7 +513,7 @@
         "slope_decades_per_family": -0.001520771623235494,
         "ci95": [
           -0.029971735268743253,
-          0.027687142812644318
+          0.027687142812644304
         ],
         "indistinguishable_from_flat": true,
         "degenerate_constant_series": false,
@@ -523,8 +523,8 @@
       "finest_action": {
         "slope_decades_per_family": 0.0007180830435202619,
         "ci95": [
-          -0.03500382549542769,
-          0.03587918268864922
+          -0.035003825495427715,
+          0.035879182688649265
         ],
         "indistinguishable_from_flat": true,
         "degenerate_constant_series": false,

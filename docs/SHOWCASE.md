@@ -23,10 +23,12 @@ A one-line index of the same assets lives in
 ![Hero stress render](assets/showcase/hero.png)
 
 **`hero.png`** — `plate_hole` solved on the feature-graded mesher, shot from a
-low oblique angle across the whole plate (h = 3 mm, 35,386 nodes / 174,234
-elements, 106,158 DOF; min-x face fixed, conserved +x resultant on max-x).
+low oblique angle across the whole plate (h = 3 mm, 36,104 nodes / 177,560
+elements, 108,312 DOF; min-x face fixed, conserved +x resultant on max-x).
 von Mises is shown on the surface with displacement warped ×5000. The colour
-range spans the full field, 0 – 3.84e6 Pa. Exact values per image live in
+range is 0 – 2.9 MPa, clipped at the 99th percentile of the visible surface
+field; the true peak nodal value is 3.12 MPa, at the clamped-face singularity.
+Exact values per image live in
 [`manifest.json`](assets/showcase/manifest.json).
 
 ```sh
@@ -51,7 +53,7 @@ solve` invocation per part is in the manifest too.
 
 Flat plate with a central hole — the canonical stress-riser benchmark geometry.
 Feature-aware grading concentrates elements around the hole where the gradient
-lives. h = 3 mm, 35,386 nodes / 174,234 elements, 106,158 DOF.
+lives. h = 3 mm, 36,104 nodes / 177,560 elements, 108,312 DOF.
 
 ```sh
 python scripts/render_showcase.py --only plate_hole
@@ -75,8 +77,8 @@ python scripts/render_showcase.py --only cantilever
 ![cylinder](assets/showcase/gallery_cylinder.png)
 
 Curved-wall solid imported from STEP. Curvature-driven sizing refines the
-cylindrical face while the bulk stays coarse. h = 12 mm, 8,823 nodes / 42,443
-elements, 26,469 DOF.
+cylindrical face while the bulk stays coarse. h = 12 mm, 8,840 nodes / 42,517
+elements, 26,520 DOF.
 
 ```sh
 python scripts/render_showcase.py --only cylinder
@@ -88,8 +90,8 @@ python scripts/render_showcase.py --only cylinder
 
 Closed curved B-rep — the hardest case for a Cartesian grid fill. Shows the
 stair-cased boundary honestly, with the feature-graded skin layers absorbing the
-curvature ([ADR-0015](decisions/0015-grid-fill-limits.md)). h = 8 mm, 4,646
-nodes / 22,698 elements, 13,938 DOF.
+curvature ([ADR-0015](decisions/0015-grid-fill-limits.md)). h = 8 mm, 5,045
+nodes / 23,892 elements, 15,135 DOF.
 
 ```sh
 python scripts/render_showcase.py --only sphere
@@ -102,7 +104,7 @@ python scripts/render_showcase.py --only sphere
 One watertight 3D Boolean solid: a round truncated cone fused into an
 overlapping spherical scoop. The committed STEP is reloaded through
 OpenCASCADE, meshed at h = 10 mm, and solved with a conserved downward
-resultant on the scoop: 3,250 nodes / 15,301 elements, 9,750 DOF.
+resultant on the scoop: 3,545 nodes / 16,184 elements, 10,635 DOF.
 
 ```sh
 python scripts/render_showcase.py --only icecream_cone
@@ -113,9 +115,13 @@ python scripts/render_showcase.py --only icecream_cone
 ![Mesher comparison](assets/showcase/compare_meshers.png)
 
 **`compare_meshers.png`** — the same plate at h = 3 mm through three meshers:
-`tet` (11,770 nodes / 53,760 cells), `graded` (35,386 / 174,234) and `hybrid`
-(113,088 / 329,094), whose finer run includes conforming transition cells.
-Labels and counts are burned into the tiles. All three are Cartesian grid-fill
+`tet` (11,770 nodes / 53,760 cells), `graded` (36,104 / 177,560) and `hybrid`
+(113,174 / 329,510), whose finer run includes conforming transition cells.
+All four panels share one camera on a 60 mm window across the hole (6 hole
+radii): at whole-plate scale the three topologies read as identical grey
+sheets, and the cell zoo only becomes legible at the feature. The faceted rim
+of the uniform `tet` fill, the graded rings hugging the bore, and the hybrid's
+hex bulk are the three things to compare. All are Cartesian grid-fill
 topologies, not Delaunay
 ([ADR-0015](decisions/0015-grid-fill-limits.md)). This is the visual form of the
 `--mesher` dial documented in the [README CLI section](../README.md#cli); the
@@ -184,8 +190,8 @@ python scripts/render_showcase.py --only compare_meshers
 
 **`compare_grading.png`** — uniform (`--no-feature`, h = 3.8 mm) versus
 feature-graded sizing (h = 5.6 mm) on the same part and mesher, with `h` tuned
-so the two legs land on a **matched element budget**: 43,360 vs 45,308 cells,
-4.5% apart (26,988 vs 29,055 DOF — the grid quantizes too hard to hit equal DOF
+so the two legs land on a **matched element budget**: 43,360 vs 44,110 cells,
+1.7% apart (26,994 vs 28,686 DOF — the grid quantizes too hard to hit equal DOF
 exactly, so the honest control is element count; both figures are printed in
 the tile footers and the manifest). The comparison is therefore about *where*
 the elements went, not how many there are. Same principle as the Kirsch
@@ -198,9 +204,52 @@ logarithmic radial grading cut SCF error from **3.06%** to **0.70%**
 python scripts/render_showcase.py --only compare_grading
 ```
 
+## Spectral sizing
+
+The sizing field the meshers consume is FFT-filtered before it is used
+([ADR-0034](decisions/0034-spectral-sizing-and-coarsening.md)), and the CLI
+prints what the filter did on every `mesh` / `solve` run:
+
+```text
+spectral: 55706/262143 modes kept (99.50% energy), 43 denoised edge-curve seeds,
+          N_pred 1574 → 1577
+```
+
+Three uses, each matched to what a Fourier transform is actually good for:
+
+| Where | What it does |
+|---|---|
+| CAD edges | κ(s) from OCC carries parameterization noise; an energy-truncated inverse FFT recovers the smooth curvature before it emits chordal size sources |
+| Sizing field | modes below the 99.5% energy cut are dropped, so isolated seed artifacts merge into the surrounding coarse field |
+| Element budget | the Σvol/h³ density integral is the same N_pred contract the CVT path uses, so a cap can be met by one uniform scale after truncation |
+
+A geometry-only floor is re-imposed after filtering, which is why this is safe
+to leave on: trimming can raise `h` in a spectrally weak band but never inside a
+real curvature or thin-wall demand. On the clean public fixtures that shows up
+as a leaner seed set at unchanged mesh output. Two measured A/Bs, both with and
+without `--no-spectral`:
+
+| Part | With spectral | Without |
+|---|---|---|
+| `sphere.step`, h = 8 mm (`mesh`) | 41 seeds from 51 geometry sources, 9,194 cells | 51 seeds, 9,194 cells |
+| `icecream_cone.step`, h = 8 mm (`diag`) | 43 denoised edge-curve sources; 27,399 cells, `quality_min` 0.02098, mesh→BRep p99/h 0.03878, peak VM 2.35535e7 Pa | 27,399 cells, 0.02098, 0.03878, 2.35535e7 Pa |
+
+So on fixtures whose curvature was already smooth, the filter is measurably a
+no-op in mesh output while emitting a smaller, denoised source set — which is
+the honest claim. The value is on noisy real-world curvature, and the numbers
+above are what these parts actually show.
+
+`diag --json` carries the same numbers as a `spectral` block for the
+self-improve loop, and campaigns opt in per run with `"spectral_smooth": true`.
+
+```sh
+polymesh mesh tests/fixtures/parts/icecream_cone.step -h 0.008          # on by default
+polymesh mesh tests/fixtures/parts/icecream_cone.step -h 0.008 --no-spectral
+```
+
 ## Benchmark charts
 
-All three charts are plotted directly from committed JSON/reports — the script
+All four charts are plotted directly from committed JSON/reports — the script
 reads the files, it does not carry the numbers.
 
 ```sh
@@ -272,16 +321,50 @@ The manufactured field is generated from a randomized seed at test time so its
 coefficients cannot be memorized or hardcoded
 ([docs/benchmarks.md](benchmarks.md)).
 
+### `bench_advisor_budget.png`
+
+![Advisor under a DOF budget](assets/showcase/bench_advisor_budget.png)
+
+The learned mesh advisor choosing under a hard DOF cap
+([ADR-0034](decisions/0034-spectral-sizing-and-coarsening.md)). Each point is
+one real CLI run — `polymesh solve --advisor bench/advisor --advisor-max-dof N`
+— plotted at the DOF budget it was given against the predicted per-case
+relative-error score of the action it chose. The advisor enumerates its
+measured candidate grid, drops candidates whose predicted DOF exceeds the cap,
+and ranks what survives; labels name the action wherever it changes.
+
+| Part | no cap | 8k cap | 2k cap |
+|---|---|---|---|
+| `box_hole_s0` | graded_tet p2, 66.2k DOF | hex p2, 4.7k DOF | hex p1, 1.6k DOF |
+| `plate_notch_s0` | graded_tet p2, 50.4k DOF | hex p2, 6.5k DOF | hex p1, 1.8k DOF |
+| `stepped_shaft_s0` | hybrid_zoo p1, 6.4k DOF | hybrid_zoo p1, 6.4k DOF | **refused** |
+
+`stepped_shaft_s0` at a 2,000-DOF cap is the interesting cell: the cheapest
+action the model scores still predicts 2.6k DOF, so the advisor returns its
+clamp-box defaults with every prediction suppressed rather than an action it
+cannot afford. A budget that cannot be met is reported, not rounded away.
+
+Source: [`bench/results/advisor-budget-sweep.json`](../bench/results/advisor-budget-sweep.json)
+(21 runs), regenerated by
+[`scripts/sweep_advisor_budget.py`](../scripts/sweep_advisor_budget.py). The DOF
+figures are the model's own predictions — its held-out DOF error is about
+0.5 decades, so the cap is a feasibility filter, not a guarantee.
+
 ## Architecture diagram
 
 ![Architecture](assets/showcase/architecture.png)
 
 **`architecture.png`** — the pipeline as a dark-theme diagram: STEP/B-rep import
-→ feature analysis → sizing field → hybrid meshers (tet / hex / prism / pyramid
-/ polyhedron) → mixed FE+VEM assembly into one global stiffness matrix → linear
-solve (SimplicialLDLT or CG) → Zienkiewicz–Zhu recovery and error estimate →
-hp-adapt driver → back to the sizing field, or out to VTU. The same graph is
-kept as mermaid source in the [README](../README.md#architecture).
+→ feature analysis (curvature, thin-wall, FFT edge denoise) → spectral-trimmed
+sizing field → hybrid meshers (tet / hex / prism / pyramid / polyhedron) → mixed
+FE+VEM assembly into one global stiffness matrix → linear solve (SimplicialLDLT,
+or CG on the diagonally equilibrated system) → Zienkiewicz–Zhu recovery and
+error estimate → hp-adapt driver, which returns a refine, coarsen or p-elevate
+decision to the sizing field rather than remeshing from scratch. The learned
+mesh advisor hangs off feature analysis: it reads the same case features and
+proposes the mesher, `h`, adapt schedule and order, filtered by a DOF budget
+when one is given. The same graph is kept as mermaid source in the
+[README](../README.md#architecture).
 
 ```sh
 python scripts/render_showcase.py --only architecture
@@ -323,7 +406,8 @@ POLYMESH_GUI_SHOT=$PWD/docs/assets/showcase/gui_studio.png \
   so an unclipped scale would render one hot node and an otherwise dark part.
   Nothing about the underlying solution is altered — only the mapping from value
   to colour.
-- **Charts** (`bench_dof_time.png`, `bench_tier1.png`, `bench_mms.png`) are
+- **Charts** (`bench_dof_time.png`, `bench_tier1.png`, `bench_mms.png`,
+  `bench_advisor_budget.png`) are
   generated by `scripts/plot_benchmarks.py`, which reads committed benchmark
   artifacts — [`bench/results/*.json`](../bench/results) and
   [`bench/reports/p1-gate1-convergence.md`](../bench/reports/p1-gate1-convergence.md).
@@ -351,11 +435,17 @@ POLYMESH_GUI_SHOT=$PWD/docs/assets/showcase/gui_studio.png \
   the mesher, not the solver, was the variable. Raw per-rung solver output and
   the per-metric before/after audit are committed under
   [`bench/reference/external/`](../bench/reference/external).
-- **Advisor figures on this page predate that rebuild.** Any accuracy-derived
-  advisor number shown here was measured against the retired references and on a
-  split later found to leak; the corpus is being regenerated. Structural findings
-  survive, magnitudes will move. See the
-  [model card](advisor/0004-model-card.md) for which is which.
+- **The advisor chart plots predictions, not measured accuracy.** Every value in
+  `bench_advisor_budget.png` is the shipped model's own head output for the
+  action it chose, which is the quantity the chooser actually optimizes; it is
+  not a measured error, and the DOF axis is a predicted DOF with roughly
+  half-a-decade held-out error. The model behind it is the v4 corpus retrain
+  ([`docs/advisor/0008-v4-corpus-retrain.md`](advisor/0008-v4-corpus-retrain.md)).
+  Older advisor figures elsewhere in the docs predate that rebuild: any
+  accuracy-derived advisor number measured against the retired self-generated
+  references is flagged in the
+  [model card](advisor/0004-model-card.md), whose structural findings survive
+  while magnitudes moved.
 
 ## Reproduce
 

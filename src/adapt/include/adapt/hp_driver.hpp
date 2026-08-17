@@ -27,6 +27,12 @@
 //      feedback-loop). Highest utility wins. Ties break in fixed order
 //      h > p > shape > none, then by element index for full determinism
 //      (seed only reorders equal-utility shape votes, not the primary pick).
+//   5. Coarsen (lowest priority). Only when an element would otherwise stay
+//      at kNone: if it lies in the anti-Dörfler tail (insignificant η² mass)
+//      and its h is finer than the a-priori geometry demand allows
+//      (h < h_geometry / coarsen_geom_factor), the mesh is needlessly fine
+//      there, so the action is coarsen toward the geometry-tolerated size.
+//      Coarsen may never override an h / p / shape decision.
 //
 // The driver does not hardcode benchmark answers: callers supply synthetic or
 // measured indicators. Product path uses ZZ η + geometry sizing attributes;
@@ -51,6 +57,7 @@ enum class HpAction : std::uint8_t {
     kHRefine = 1,
     kPRaise = 2,
     kShapeChange = 3,
+    kCoarsen = 4,
 };
 
 /// Preferred bulk / transition form for the next mesh pass.
@@ -70,6 +77,9 @@ struct ElementHpSignal {
     double surplus = 0.0;    // hierarchical p→p+1 surplus ≥ 0 (or estimate)
     int p = 1;               // current polynomial order
     int p_max = 4;           // order cap for this element shape
+    /// A-priori geometry size demand at the centroid, m (from feature / curvature
+    /// sizing). 0 = unknown → the coarsen gate stays closed for this element.
+    double h_geometry = 0.0;
     /// Shape fitness in [0, 1]; higher = better match. Relative differences drive votes.
     double hex_fit = 0.5;
     double tet_fit = 0.5;
@@ -99,6 +109,16 @@ struct HpDriverPolicy {
     double cost_shape = 3.5; // remesh / formulation switch
     /// Dörfler θ used when building the h-mark set from h-candidates.
     double dorfler_theta = 0.3;
+    /// Anti-Dörfler tail error mass: elements in the cumulative-η² tail below
+    /// this share are coarsen candidates (see dorfler_coarsen_mark).
+    double coarsen_theta = 0.02;
+    /// Coarsen only when h < h_geometry / factor: the element must be finer
+    /// than geometry needs by at least this factor. 1.5 (not 2.0) so a single
+    /// halving wave of over-resolution (h = h_geometry/2) is already
+    /// recoverable instead of sticking.
+    double coarsen_geom_factor = 1.5;
+    /// Suggested global h multiplier for a pure-coarsen pass (bounded rise).
+    double h_coarsen_raise = 1.25;
     /// Deterministic seed (currently reserved for future stochastic tie noise;
     /// primary decisions do not depend on it).
     std::uint64_t seed = 0;
@@ -123,6 +143,7 @@ struct HpDriverPlan {
     std::vector<std::size_t> h_mark;     // elements marked for h-refine
     std::vector<std::size_t> p_mark;     // elements marked for p-raise
     std::vector<std::size_t> shape_mark; // elements voting shape change
+    std::vector<std::size_t> coarsen_mark; // elements marked for coarsening
     ShapeTendency global_shape = ShapeTendency::kKeep;
     /// Uniform / seeded h suggestion built from h-mark centroids (may be empty seeds).
     AdaptSuggestion h_suggestion{};
@@ -131,6 +152,7 @@ struct HpDriverPlan {
     std::size_t n_h = 0;
     std::size_t n_p = 0;
     std::size_t n_shape = 0;
+    std::size_t n_coarsen = 0;
     std::size_t n_none = 0;
 };
 
@@ -140,9 +162,11 @@ ElementHpDecision decide_element(const ElementHpSignal& s, const HpDriverPolicy&
 
 /// Full mesh plan. `signals.size()` must match `centroids.size()` when centroids
 /// are provided (used for h_suggestion seeds). Empty centroids ⇒ no seeds.
+/// `h_ceiling` > 0 caps the suggested global h rise of a pure-coarsen pass;
+/// 0 = h_next may not exceed h_uniform.
 HpDriverPlan drive_hp(std::span<const ElementHpSignal> signals, const HpDriverPolicy& policy,
                       std::span<const Eigen::Vector3d> centroids = {},
-                      double h_uniform = 0.0);
+                      double h_uniform = 0.0, double h_ceiling = 0.0);
 
 /// Estimate hierarchical surplus from ZZ η ranking when modal surpluses are absent.
 /// High-η Dörfler elements get a small surplus (non-smooth); complement gets
@@ -153,6 +177,7 @@ std::vector<double> estimate_surplus_from_zz(const std::vector<double>& element_
 /// Build per-element signals from parallel arrays. Lengths must match (or be 1
 /// for scalar broadcast of h / p). `thickness[i] <= 0` means “not a thin wall”.
 /// Missing fit arrays (empty) default to 0.5. Missing surplus → estimate from η.
+/// Missing h_geometry (empty) → 0.0 = unknown, coarsen gate closed.
 std::vector<ElementHpSignal> make_hp_signals(std::span<const double> h,
                                              std::span<const double> kappa,
                                              std::span<const double> thickness,
@@ -162,7 +187,8 @@ std::vector<ElementHpSignal> make_hp_signals(std::span<const double> h,
                                              std::span<const double> hex_fit = {},
                                              std::span<const double> tet_fit = {},
                                              std::span<const double> poly_fit = {},
-                                             const HpDriverPolicy& policy = {});
+                                             const HpDriverPolicy& policy = {},
+                                             std::span<const double> h_geometry = {});
 
 /// Human-readable one-line summary for mesh notes / CLI.
 std::string summarize_hp_plan(const HpDriverPlan& plan);

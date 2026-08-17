@@ -75,6 +75,20 @@ struct AdvisorDecision {
 
     bool vetoed = false;
 
+    /// True when the refusal was caused by the caller's `max_dof` budget: every
+    /// scored candidate action's predicted dof head exceeded the budget, so
+    /// the chooser returned the clamp-box defaults with all predictions
+    /// suppressed exactly like the OOD/veto refusals. `vetoed` is also set —
+    /// it says a refusal happened, this says WHY — so a caller can tell
+    /// "nothing affordable exists" apart from "this part is out of
+    /// distribution" or "the feasibility head vetoed".
+    ///
+    /// Treat the budget as a feasibility filter, not a guarantee: the dof head
+    /// is a learned predictor whose held-out MAE is ~0.5 in log10 (about a 3x
+    /// factor in linear dof), so a candidate just under the budget can land
+    /// over it in reality.
+    bool budget_refusal = false;
+
     /// True when a raw policy output fell outside the clamp box and was
     /// projected back onto it. The advisor is honest about being overruled.
     bool clamped = false;
@@ -130,8 +144,22 @@ public:
     /// outcome heads are re-evaluated at the action the policy proposed, so
     /// `failure_prob` scores the action actually being recommended. Action
     /// columns present in `columns` are overwritten by the queried action.
+    ///
+    /// The `max_dof` overloads add a budget to the gated-enumeration chooser:
+    /// after the feasibility gate and before the accuracy ranking, every
+    /// candidate whose dof head (`10^dof_log10`) exceeds `max_dof` is dropped.
+    /// `max_dof == 0` disables the budget and reproduces the historical
+    /// decision exactly. A budget that empties the candidate set is a refusal
+    /// (`budget_refusal`), never a relaxation: the advisor does not answer an
+    /// affordability question with an unaffordable action. The budget applies
+    /// to the enumerated candidate grid only; a legacy artifact without
+    /// `clamps.json:candidate_grid` has no enumeration to filter and ignores it.
     [[nodiscard]] AdvisorDecision recommend(const FeatureColumns& columns) const;
+    [[nodiscard]] AdvisorDecision recommend(const FeatureColumns& columns,
+                                            double max_dof) const;
     [[nodiscard]] AdvisorDecision recommend(const pipeline::CaseFeatures& features) const;
+    [[nodiscard]] AdvisorDecision recommend(const pipeline::CaseFeatures& features,
+                                            double max_dof) const;
 
     /// One unmodified forward pass on exactly these columns. This is the
     /// what-if entry point — scoring a configuration the advisor did not

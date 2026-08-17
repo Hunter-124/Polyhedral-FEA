@@ -37,6 +37,38 @@ std::vector<std::size_t> dorfler_mark(const std::vector<double>& element_eta, do
     return marked;
 }
 
+std::vector<std::size_t> dorfler_coarsen_mark(const std::vector<double>& element_eta,
+                                              double theta) {
+    if (!(theta > 0.0 && theta <= 1.0)) {
+        throw std::invalid_argument("dorfler_coarsen_mark: theta must be in (0,1]");
+    }
+    const auto n = element_eta.size();
+    std::vector<std::size_t> order(n);
+    std::iota(order.begin(), order.end(), 0);
+    std::sort(order.begin(), order.end(),
+              [&](std::size_t a, std::size_t b) { return element_eta[a] < element_eta[b]; });
+    double total = 0.0;
+    for (double e : element_eta) {
+        total += e * e;
+    }
+    if (total <= 0.0) {
+        return {};
+    }
+    const double budget = theta * total;
+    double acc = 0.0;
+    std::vector<std::size_t> marked;
+    for (auto i : order) {
+        const double e2 = element_eta[i] * element_eta[i];
+        if (acc + e2 > budget) {
+            break;
+        }
+        marked.push_back(i);
+        acc += e2;
+    }
+    std::sort(marked.begin(), marked.end());
+    return marked;
+}
+
 std::vector<std::size_t> mark_smooth(const std::vector<double>& element_eta, double theta) {
     const auto n = element_eta.size();
     const auto high = dorfler_mark(element_eta, theta);

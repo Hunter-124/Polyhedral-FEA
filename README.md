@@ -459,6 +459,16 @@ Other useful flags: `--skin n` (graded fine skin layers, default 2),
 (promote smooth tet4/hex8 → tet10/hex20; auto-on with `--adapt > 0`),
 `--bc-grade`, `-E` (Pa), `-nu`. Run `$CLI` with no args for full help.
 
+Spectral sizing (ADR-0034, on by default in the CLI; `--no-spectral` opts
+out): CAD-edge curvature is FFT-denoised before it emits chordal size
+sources, and the fused size field is energy-truncated on a Cartesian grid so
+spectrally insignificant fine bands merge into the coarse field. A
+geometry-only floor is re-imposed after filtering, so trimming can never blur
+a real feature; `mesh`/`solve` print the kept/total mode counts and the
+before/after density predictions, and `diag --json` carries a `spectral`
+block. With `--advisor DIR`, `--advisor-max-dof N` drops candidate actions
+whose predicted DOF exceeds N (refusal → clamp-box defaults when none fit).
+
 Load flags (`solve` and `diag`): `--load-dir x y z` (direction, normalized;
 default `0 1 0`), `--force N` (total resultant in newtons over the loaded
 faces, default 1000), `--traction Pa` (pressure instead of a total force —

@@ -8,10 +8,13 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <Eigen/Eigenvalues>
+
 #include <cmath>
 #include <cstdint>
 #include <limits>
 #include <string>
+#include <vector>
 
 using namespace polymesh::fea;
 using namespace polymesh::test_support;
@@ -236,9 +239,20 @@ TEST_CASE("forced CG matches direct LDLT on small cantilever") {
     // 1000-iteration budget. 1e-10 is attainable and still two orders tighter
     // than the displacement-agreement contract below.
     opt_cg.cg_tol = 1e-10;
+    std::string cg_notes;
+    opt_cg.on_note = [&](std::string_view note) {
+        if (!cg_notes.empty()) {
+            cg_notes += '\n';
+        }
+        cg_notes += note;
+    };
     const auto u_direct =
         solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, opt_direct);
     const auto u_cg = solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, opt_cg);
+
+    // This forced-CG solve runs the equilibrated cascade; the same tolerance
+    // contract must still hold.
+    CHECK(cg_notes.find("equilibrated") != std::string::npos);
 
     const double tip_d = mean_tip_uz(setup.mesh, u_direct, setup.length);
     const double tip_cg = mean_tip_uz(setup.mesh, u_cg, setup.length);
@@ -422,4 +436,100 @@ TEST_CASE("auto path selects CG above threshold and solves large free system") {
     const auto u_direct =
         solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, defaults);
     CHECK((u - u_direct).norm() / u_direct.norm() < 1e-6);
+}
+
+TEST_CASE("symmetric_diagonal_scaling equilibrates an SPD matrix to unit diagonal") {
+    // Diagonally dominant SPD with diagonal spread 25x (4, 9, 100).
+    const std::vector<Eigen::Triplet<double>> triplets = {
+        {0, 0, 4.0}, {0, 1, 1.0},  {0, 2, 0.5},  //
+        {1, 0, 1.0}, {1, 1, 9.0},  {1, 2, -1.0}, //
+        {2, 0, 0.5}, {2, 1, -1.0}, {2, 2, 100.0},
+    };
+    Eigen::SparseMatrix<double> a(3, 3);
+    a.setFromTriplets(triplets.begin(), triplets.end());
+
+    const Eigen::VectorXd s = symmetric_diagonal_scaling(a);
+    REQUIRE(s.size() == 3);
+    CHECK(std::abs(s[0] - 0.5) < 1e-15);
+    CHECK(std::abs(s[1] - 1.0 / 3.0) < 1e-15);
+    CHECK(std::abs(s[2] - 0.1) < 1e-15);
+
+    // The exact congruence S·A·S has unit diagonal and stays SPD.
+    const Eigen::Matrix3d scaled = s.asDiagonal() * Eigen::Matrix3d(a) * s.asDiagonal();
+    for (int i = 0; i < 3; ++i) {
+        CHECK(std::abs(scaled(i, i) - 1.0) < 1e-15);
+    }
+    const Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eig(scaled);
+    REQUIRE(eig.info() == Eigen::Success);
+    CHECK(eig.eigenvalues().minCoeff() > 0.0);
+}
+
+TEST_CASE("symmetric_diagonal_scaling rejects a non-positive diagonal") {
+    // Missing (zero) diagonal entry: not SPD.
+    const std::vector<Eigen::Triplet<double>> zero_diag = {
+        {0, 1, 1.0},
+        {1, 0, 1.0},
+        {1, 1, 4.0},
+    };
+    Eigen::SparseMatrix<double> a(2, 2);
+    a.setFromTriplets(zero_diag.begin(), zero_diag.end());
+    CHECK_THROWS_AS(symmetric_diagonal_scaling(a), polymesh::fea::FeaError);
+
+    // Explicitly negative diagonal entry: not SPD.
+    const std::vector<Eigen::Triplet<double>> neg_diag = {
+        {0, 0, -2.0},
+        {0, 1, 1.0},
+        {1, 0, 1.0},
+        {1, 1, 4.0},
+    };
+    Eigen::SparseMatrix<double> b(2, 2);
+    b.setFromTriplets(neg_diag.begin(), neg_diag.end());
+    CHECK_THROWS_AS(symmetric_diagonal_scaling(b), polymesh::fea::FeaError);
+}
+
+TEST_CASE("equilibrated CG converges on a diagonally heterogeneous MPC system") {
+    // An MPC master column picks up weight²-scaled stiffness, so a weight of
+    // 1e3 spreads the K_ff diagonal by ~1e6 — the MPC/graded-mesh case
+    // symmetric diagonal equilibration exists for.
+    auto setup = make_cantilever_hex(12, 2, 2);
+
+    std::vector<std::uint32_t> free_nodes;
+    for (std::size_t i = 0; i < setup.mesh.nodes.size(); ++i) {
+        if (setup.mesh.nodes[i][0] > 1e-12) {
+            free_nodes.push_back(static_cast<std::uint32_t>(i));
+        }
+    }
+    REQUIRE(free_nodes.size() >= 2);
+    LinearConstraints constraints;
+    constraints.add(LinearConstraint{
+        .slave_dof = 3 * free_nodes.back() + 2,
+        .masters = {{3 * free_nodes.front() + 2, 1e3}},
+    });
+
+    SolveOptions opt_cg;
+    opt_cg.method = SolveMethod::kCG;
+    double final_residual = std::numeric_limits<double>::infinity();
+    std::string notes;
+    opt_cg.on_progress = [&](int, int, double residual) { final_residual = residual; };
+    opt_cg.on_note = [&](std::string_view note) {
+        if (!notes.empty()) {
+            notes += '\n';
+        }
+        notes += note;
+    };
+    const Eigen::VectorXd u_cg =
+        solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, opt_cg, &constraints);
+
+    INFO(notes);
+    CHECK(notes.find("equilibrated") != std::string::npos);
+    // The completion residual is the true relative residual of the original
+    // (physical) system and must meet the acceptance contract.
+    CHECK(final_residual <= opt_cg.cg_accept_tol);
+
+    // The direct path solves the identical reduced system; CG must agree.
+    SolveOptions opt_direct;
+    opt_direct.method = SolveMethod::kDirect;
+    const Eigen::VectorXd u_direct = solve_elastostatics(
+        setup.mesh, kSteel, setup.bc, setup.loads, opt_direct, &constraints);
+    CHECK((u_cg - u_direct).norm() / u_direct.norm() < 1e-5);
 }

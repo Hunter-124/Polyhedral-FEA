@@ -11,6 +11,7 @@ add_executable(polymesh_tests
     test_sizing_field.cpp
     test_graded_sizing.cpp
     test_metric_field.cpp
+    test_spectral_sizing.cpp
     test_reference_case.cpp
     test_backend.cpp
     test_spmv.cpp

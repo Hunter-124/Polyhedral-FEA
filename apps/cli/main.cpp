@@ -51,18 +51,18 @@ int usage() {
                "commands:\n"
                "  check <part.step|.brep>    validate CAD geometry\n"
                "  mesh  <part> [-h m] [-o out.vtu] [--mesher name] [--skin n]\n"
-               "              [--no-feature] [--element-tendency t]\n"
+               "              [--no-feature] [--element-tendency t] [--no-spectral]\n"
                "              [--max-elems N] [--max-dof N]\n"
                "              [--fix-box x0 y0 z0 x1 y1 z1] [--load-box x0 y0 z0 x1 y1 z1]\n"
                "                             geometry+BC-aware volume mesh; optional VTU\n"
                "  solve <part.step|.brep|.msh> -o out.vtu [-h m] [-E Pa] [-nu r]\n"
                "              [--mesher name] [--skin n] [--no-feature] [--adapt n]\n"
                "              [--eta-target η] [--p-elevate] [--p-elevate-uniform]\n"
-               "              [--element-tendency t]\n"
+               "              [--element-tendency t] [--no-spectral]\n"
                "              [--max-elems N] [--max-dof N] [--max-mem GB]\n"
                "              [--fix-box ...6] [--load-box ...6] [--bc-grade]\n"
                "              [--load-dir x y z] [--force N] [--traction Pa]\n"
-               "              [--advisor <model_dir>] (CAD inputs only)\n"
+               "              [--advisor <model_dir>] [--advisor-max-dof N] (CAD inputs only)\n"
                "                             CAD: mesh + BCs + VTU; Gmsh: solve the imported\n"
                "                             volume mesh directly. Default BCs fix min-x and\n"
                "                             load max-x; boxes override selection.\n"
@@ -104,7 +104,14 @@ int usage() {
                "--advisor DIR: pick mesher/h/adapt/p-order with the learned mesh advisor\n"
                "               (DIR holds model.onnx, normalization.json, clamps.json);\n"
                "               every value is clamped and the decision is logged as JSON\n"
-               "--max-elems N: pre-flight element ceiling (0=589824 default)\n"
+               "--max-elems N: pre-flight element ceiling (0=589824 default); auto-h\n"
+               "               clamps to fit and over-ceiling meshes coarsen-and-retry;\n"
+               "               with spectral sizing on (default) the size field is\n"
+               "               FFT-trimmed first (insignificant fine bands merge, ADR-0034)\n"
+               "--no-spectral: disable FFT sizing-field trimming and CAD-edge curvature\n"
+               "               denoise (campaign-baseline behavior)\n"
+               "--advisor-max-dof N: with --advisor, drop candidate actions whose\n"
+               "               predicted DOF exceeds N; refusal (defaults) if none fit\n"
                "--max-dof N: pre-flight/adapt DOF ceiling (0=1769472 default)\n"
                "\n"
                "default BC selection: nodes in a 0.51·h slab at min-x (fixed) / max-x\n"
@@ -576,6 +583,7 @@ int cmd_mesh(std::span<char*> args) {
     auto mesher = polymesh::pipeline::VolumeMesher::kHybrid;
     int skin = 2;
     bool feature = true; // geometry (curvature/thin-wall) grading on by default
+    bool spectral = true; // spectral sizing on by default (ADR-0034)
     double element_tendency = 0.0;
     std::size_t max_elems = 0;
     std::size_t max_dof = 0;
@@ -596,6 +604,10 @@ int cmd_mesh(std::span<char*> args) {
             feature = true; // accepted for back-compat (now the default)
         } else if (std::strcmp(args[i], "--no-feature") == 0) {
             feature = false;
+        } else if (std::strcmp(args[i], "--spectral") == 0) {
+            spectral = true; // accepted for symmetry (now the default)
+        } else if (std::strcmp(args[i], "--no-spectral") == 0) {
+            spectral = false;
         } else if (std::strcmp(args[i], "--element-tendency") == 0 && i + 1 < args.size()) {
             element_tendency = std::atof(args[++i]);
         } else if (std::strcmp(args[i], "--max-elems") == 0) {
@@ -625,7 +637,8 @@ int cmd_mesh(std::span<char*> args) {
 
     // Geometry + simulation-setup (BC/load box) aware refinement plan → seeds.
     const auto regions = make_regions(fix_box, load_box);
-    const auto plan = polymesh::pipeline::build_refinement_plan(model, h, regions, feature);
+    const auto plan = polymesh::pipeline::build_refinement_plan(model, h, regions, feature,
+                                                                spectral, 0);
     auto vol = polymesh::pipeline::volume_mesh(
         model, h, mesher, skin, feature, plan.refine_seeds, plan.seed_band, element_tendency,
         resolved.element_ceiling, resolved.dof_ceiling, resolved.auto_chosen ? 3 : 0, {},
@@ -637,6 +650,14 @@ int cmd_mesh(std::span<char*> args) {
                 vol.mesh.nodes.size(), vol.mesh.elements.size(), h, plan.n_geometry_seeds,
                 plan.n_bc_seeds, plan.refine_seeds.size(), plan.seed_band, plan.h_fine,
                 resolved.note.c_str(), vol.mesher_note.c_str());
+    if (plan.spectral.applied) {
+        std::printf("spectral: %zu/%zu modes kept (%.2f%% energy), %zu denoised edge-curve "
+                    "seeds, N_pred %.4g → %.4g%s\n",
+                    plan.spectral.modes_kept, plan.spectral.modes_total,
+                    100.0 * plan.spectral.energy_kept, plan.spectral.n_edge_curve_seeds,
+                    plan.spectral.predicted_before, plan.spectral.predicted_after,
+                    plan.spectral.budget_met ? "" : " (budget not met — geometry floor)");
+    }
     if (!out_path.empty()) {
         const auto quality = polymesh::fea::tet4_cell_quality(vol.mesh);
         std::vector<polymesh::fea::VtuCellData> cdata;
@@ -659,6 +680,7 @@ int cmd_solve(std::span<char*> args) {
     auto mesher = polymesh::pipeline::VolumeMesher::kHybrid;
     int skin = 2;
     bool feature = true; // geometry grading on by default (CAD)
+    bool spectral = true; // spectral sizing on by default (ADR-0034)
     int adapt_passes = 0;
     double eta_target = 0.0;
     bool p_elevate = false;
@@ -671,6 +693,7 @@ int cmd_solve(std::span<char*> args) {
     BoxSel fix_box, load_box;
     LoadSpec load_spec;
     std::string advisor_dir;
+    std::size_t advisor_max_dof = 0; // 0 = no advisor budget (ADR-0034)
     for (std::size_t i = 3; i < args.size(); ++i) {
         if (std::strcmp(args[i], "-h") == 0 && i + 1 < args.size()) {
             h = std::atof(args[++i]);
@@ -691,6 +714,10 @@ int cmd_solve(std::span<char*> args) {
             feature = true; // accepted for back-compat (now the default)
         } else if (std::strcmp(args[i], "--no-feature") == 0) {
             feature = false;
+        } else if (std::strcmp(args[i], "--spectral") == 0) {
+            spectral = true; // accepted for symmetry (now the default)
+        } else if (std::strcmp(args[i], "--no-spectral") == 0) {
+            spectral = false;
         } else if (std::strcmp(args[i], "--fix-box") == 0) {
             if (!parse_box6(args, i, fix_box)) {
                 return usage();
@@ -732,6 +759,10 @@ int cmd_solve(std::span<char*> args) {
             bc_grade = true;
         } else if (std::strcmp(args[i], "--advisor") == 0 && i + 1 < args.size()) {
             advisor_dir = args[++i];
+        } else if (std::strcmp(args[i], "--advisor-max-dof") == 0) {
+            if (!parse_ceiling(args, i, advisor_max_dof)) {
+                return usage();
+            }
         } else if (std::strcmp(args[i], "--load-dir") == 0 ||
                    std::strcmp(args[i], "--force") == 0 ||
                    std::strcmp(args[i], "--traction") == 0) {
@@ -792,7 +823,9 @@ int cmd_solve(std::span<char*> args) {
         }
         const auto features = polymesh::pipeline::extract_case_features(
             *model, advisor_fix, advisor_load, load_spec.dir, nu);
-        const auto decision = polymesh::advisor::advisor_recommend(advisor_dir, features);
+        const polymesh::advisor::Advisor advisor(advisor_dir);
+        const auto decision =
+            advisor.recommend(features, static_cast<double>(advisor_max_dof));
         std::printf("advisor: %s\n", polymesh::advisor::to_json(decision).c_str());
         const double diag = (model->bbox_max - model->bbox_min).norm();
         const auto resolved_mesher = try_parse_mesher(decision.mesher);
@@ -909,13 +942,23 @@ int cmd_solve(std::span<char*> args) {
             regions.push_back({lo, hi, 0.5});
         }
         const auto plan =
-            polymesh::pipeline::build_refinement_plan(*model, h_use, regions, feature);
+            polymesh::pipeline::build_refinement_plan(*model, h_use, regions, feature,
+                                                      spectral, 0);
         seeds = plan.refine_seeds;
         seed_band = plan.seed_band;
         size_field = plan.size_field;
         std::printf(
             "refine: %zu geometry + %zu BC seeds → %zu seeds, band=%.4g m, h_fine=%.4g m\n",
             plan.n_geometry_seeds, plan.n_bc_seeds, seeds.size(), seed_band, plan.h_fine);
+        if (plan.spectral.applied) {
+            std::printf(
+                "spectral: %zu/%zu modes kept (%.2f%% energy), %zu denoised edge-curve "
+                "seeds, N_pred %.4g → %.4g%s\n",
+                plan.spectral.modes_kept, plan.spectral.modes_total,
+                100.0 * plan.spectral.energy_kept, plan.spectral.n_edge_curve_seeds,
+                plan.spectral.predicted_before, plan.spectral.predicted_after,
+                plan.spectral.budget_met ? "" : " (budget not met — geometry floor)");
+        }
     }
     auto mesh_now = [&](polymesh::pipeline::VolumeMesher m) {
         if (msh_input) {
@@ -1185,6 +1228,7 @@ int cmd_diag(std::span<char*> args) {
     double h = 0.0;
     auto mesher = polymesh::pipeline::VolumeMesher::kVaryhedron;
     bool do_solve = true;
+    bool spectral = true; // spectral sizing on by default (ADR-0034)
     std::size_t max_elems = 0;
     std::size_t max_dof = 0;
     double max_mem_gb = 0.0;
@@ -1200,6 +1244,10 @@ int cmd_diag(std::span<char*> args) {
             json_path = args[++i];
         } else if (std::strcmp(args[i], "--no-solve") == 0) {
             do_solve = false;
+        } else if (std::strcmp(args[i], "--spectral") == 0) {
+            spectral = true; // accepted for symmetry (now the default)
+        } else if (std::strcmp(args[i], "--no-spectral") == 0) {
+            spectral = false;
         } else if (std::strcmp(args[i], "--max-elems") == 0) {
             if (!parse_ceiling(args, i, max_elems)) {
                 return usage();
@@ -1256,7 +1304,8 @@ int cmd_diag(std::span<char*> args) {
     // BC/load boxes feed the refinement plan too, so bc_seeds is a real
     // measurement instead of a structural zero.
     const auto plan = polymesh::pipeline::build_refinement_plan(
-        model, h, make_regions(fix_box, load_box), /*use_geometry=*/true);
+        model, h, make_regions(fix_box, load_box), /*use_geometry=*/true, spectral,
+        /*spectral_budget=*/0);
 
     t0 = clock::now();
     auto vol = polymesh::pipeline::volume_mesh(
@@ -1444,6 +1493,15 @@ int cmd_diag(std::span<char*> args) {
         fidelity.mesh_feature_segment_count, fidelity.max_sharp_edge_chordal_efficiency,
         relative_volume);
 
+    const std::string spectral_json = std::format(
+        "{{ \"applied\": {}, \"modes_kept\": {}, \"modes_total\": {}, "
+        "\"energy_kept\": {:.6g}, \"edge_curve_seeds\": {}, "
+        "\"n_pred_before\": {:.6g}, \"n_pred_after\": {:.6g} }}",
+        plan.spectral.applied ? "true" : "false", plan.spectral.modes_kept,
+        plan.spectral.modes_total, plan.spectral.energy_kept,
+        plan.spectral.n_edge_curve_seeds, plan.spectral.predicted_before,
+        plan.spectral.predicted_after);
+
     const std::string json = std::format(
         "{{\n"
         "  \"part\": \"{}\",\n"
@@ -1454,6 +1512,7 @@ int cmd_diag(std::span<char*> args) {
         "\"quality_min\": {:.4g}, \"quality_min_type\": \"{}\", "
         "\"n_inverted_cells\": {}, \"quality_mean\": {:.4g}, "
         "\"geometry_seeds\": {}, \"bc_seeds\": {} }},\n"
+        "  \"spectral\": {},\n"
         "  \"timing_ms\": {{ \"import\": {:.3f}, \"mesh\": {:.3f}, \"solve\": {:.3f} }},\n"
         "  \"mesh_throughput_elem_per_s\": {:.1f},\n"
         "  \"fidelity\": {},\n"
@@ -1465,7 +1524,7 @@ int cmd_diag(std::span<char*> args) {
         model.name, mesher_name, model.surface.vertices.size(), model.surface.triangles.size(),
         bbox_diag, model.cad ? "true" : "false", h, vol.mesh.nodes.size(),
         vol.mesh.elements.size(), q_min, q_min_type, n_inverted, q_mean,
-        plan.n_geometry_seeds, plan.n_bc_seeds,
+        plan.n_geometry_seeds, plan.n_bc_seeds, spectral_json,
         import_ms, mesh_ms, solve_ms, mesh_throughput, fidelity_json,
         solved ? "true" : "false", dof, max_vm, max_u, global_eta, mesh_size_note,
         vol.mesher_note);

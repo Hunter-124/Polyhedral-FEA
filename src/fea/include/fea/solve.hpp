@@ -110,6 +110,16 @@ struct SolveDecision {
     std::string note;
 };
 
+/// Symmetric diagonal (Jacobi) equilibration of an SPD sparse matrix: returns
+/// s_i = 1/sqrt(a_ii). Throws FeaError if any diagonal entry is ≤ 0 (the
+/// matrix is not SPD). With S = diag(s) the exact congruence S·A·S has unit
+/// diagonal and identical eigenvector structure up to scaling. Used to
+/// equilibrate K_ff before preconditioning: MPC transforms and graded meshes
+/// spread the diagonal over orders of magnitude, which degrades incomplete
+/// Cholesky.
+[[nodiscard]] Eigen::VectorXd
+symmetric_diagonal_scaling(const Eigen::SparseMatrix<double>& spd);
+
 /// Returns the concrete method `kAuto` (or an explicit method) will use for the
 /// given free-DOF count. Useful for tests and diagnostics.
 [[nodiscard]] SolveMethod select_solve_method(Eigen::Index nfree,

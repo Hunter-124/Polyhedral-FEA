@@ -23,6 +23,17 @@ namespace polymesh::adapt {
 std::vector<std::size_t> dorfler_mark(const std::vector<double>& element_eta,
                                       double theta = 0.3);
 
+/// Anti-Dörfler marking: the insignificant tail. Sort ascending by η and take
+/// the largest prefix whose cumulative η² ≤ θ * total η² (smallest error mass
+/// first). Returns element indices in ascending order (empty when total η² is
+/// zero — nothing is provably insignificant). θ in (0,1], default 0.02.
+/// Only η² *shares* matter, so this is invariant to a common scale factor on
+/// `element_eta` and consumes `fea::ZzRecovery::element_eta` (dimensionless,
+/// volume-weighted relative energy-norm shares) directly. Any volume weighting
+/// belongs in the indicator, never here.
+std::vector<std::size_t> dorfler_coarsen_mark(const std::vector<double>& element_eta,
+                                              double theta = 0.02);
+
 /// Smooth (low-error) complement of Dörfler: candidates for p-elevation.
 /// Returns element indices not in the high-η Dörfler set (ascending order).
 /// When total η² is zero, returns all indices (entire mesh is smooth).

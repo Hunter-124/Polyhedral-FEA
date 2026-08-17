@@ -5,6 +5,7 @@ add_library(polymesh_adapt
     src/metric_field.cpp
     src/loop.cpp
     src/sizing_field.cpp
+    src/spectral_sizing.cpp
     src/hp_driver.cpp
 )
 add_library(polymesh::adapt ALIAS polymesh_adapt)

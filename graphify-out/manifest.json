@@ -1,7 +1,7 @@
 {
   "apps/cli/main.cpp": {
-    "mtime": 1786935828.958008,
-    "ast_hash": "0430946c029cbe7f7f702f257e117610",
+    "mtime": 1786944594.4513485,
+    "ast_hash": "d630d40446662036a6941df4d3ab1530",
     "semantic_hash": ""
   },
   "apps/gui/main.cpp": {
@@ -215,13 +215,13 @@
     "semantic_hash": ""
   },
   "src/pipeline/include/pipeline/scene.hpp": {
-    "mtime": 1786934278.5777822,
-    "ast_hash": "25d74c1e11927a42c67a3164541b15b8",
+    "mtime": 1786944582.3174486,
+    "ast_hash": "a7fc9f73c2737b64e1467fc2ef8f5050",
     "semantic_hash": ""
   },
   "src/pipeline/src/scene.cpp": {
-    "mtime": 1786935169.0704312,
-    "ast_hash": "4fa9693e0b23d68c6c252ba49480d7ef",
+    "mtime": 1786947165.8123941,
+    "ast_hash": "05391f1a62be3837a416164635c33eca",
     "semantic_hash": ""
   },
   "tests/support/mms.cpp": {
@@ -365,8 +365,8 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1786936262.7794626,
-    "ast_hash": "39969a41683506d807e3f73b0f83cb22",
+    "mtime": 1786939976.903491,
+    "ast_hash": "0dcdf66b98824be9b3b8e1ff3950c46d",
     "semantic_hash": ""
   },
   "apps/cli/CMakeLists.txt": {
@@ -445,8 +445,8 @@
     "semantic_hash": ""
   },
   "docs/progress.md": {
-    "mtime": 1786936390.0744224,
-    "ast_hash": "fc40e41bacb83ceefbadbbe408d95f6d",
+    "mtime": 1786947846.0936575,
+    "ast_hash": "7d71ac21bd03b7017f35aae2c9c70948",
     "semantic_hash": ""
   },
   "docs/spec.md": {
@@ -470,13 +470,13 @@
     "semantic_hash": ""
   },
   "src/geom/CMakeLists.txt": {
-    "mtime": 1786834074.8990188,
-    "ast_hash": "25126dae7fa2d7f1dc6cf89451d6d797",
+    "mtime": 1786942762.3513575,
+    "ast_hash": "a09c456337455272d028c79c87700619",
     "semantic_hash": ""
   },
   "src/mesh/CMakeLists.txt": {
-    "mtime": 1786834074.9000287,
-    "ast_hash": "6f0ac44919c029901a796c47059b3637",
+    "mtime": 1786942832.8925376,
+    "ast_hash": "7af5b10745e878b50b1b848d47f0b01c",
     "semantic_hash": ""
   },
   "src/pipeline/CMakeLists.txt": {
@@ -665,13 +665,13 @@
     "semantic_hash": ""
   },
   "src/mesh/include/mesh/hex_fill.hpp": {
-    "mtime": 1783727444.5900607,
-    "ast_hash": "cd1a1938f8df22e01b6affb6475cf473",
+    "mtime": 1786942972.173651,
+    "ast_hash": "a179af181d28ddb91a2cd1d87f86379c",
     "semantic_hash": ""
   },
   "src/mesh/include/mesh/hybrid_fill.hpp": {
-    "mtime": 1786681659.7816277,
-    "ast_hash": "11610f809559fd9cdbabff4069f2619c",
+    "mtime": 1786943511.6466105,
+    "ast_hash": "40727a402e5f9f658b7db13ade8c0083",
     "semantic_hash": ""
   },
   "src/mesh/include/mesh/local_refine.hpp": {
@@ -695,13 +695,13 @@
     "semantic_hash": ""
   },
   "src/mesh/include/mesh/surface_project.hpp": {
-    "mtime": 1786235125.8703241,
-    "ast_hash": "524fff490cb64d643756d96d29e9a520",
+    "mtime": 1786942883.4503748,
+    "ast_hash": "f1c4ec22b05df169f73d3d9aafb642ed",
     "semantic_hash": ""
   },
   "src/mesh/include/mesh/tet_fill.hpp": {
-    "mtime": 1786681659.7816277,
-    "ast_hash": "98921736b3c2497918111e46ee9469a6",
+    "mtime": 1786943137.4862995,
+    "ast_hash": "160129fab5e6afd0ea90bf8bc07d0eff",
     "semantic_hash": ""
   },
   "src/mesh/include/mesh/transition_fill.hpp": {
@@ -715,13 +715,13 @@
     "semantic_hash": ""
   },
   "src/mesh/src/hex_fill.cpp": {
-    "mtime": 1786818541.3405728,
-    "ast_hash": "329e10d72efaae2bc85cec3f744015be",
+    "mtime": 1786942988.8305147,
+    "ast_hash": "d27730f2f80603efa7fabbed0acd2726",
     "semantic_hash": ""
   },
   "src/mesh/src/hybrid_fill.cpp": {
-    "mtime": 1786820950.4409854,
-    "ast_hash": "9a0e3561812ac4f63aade1d6c9d98e44",
+    "mtime": 1786944294.882816,
+    "ast_hash": "91f261453ed70b181d966c0c459431a6",
     "semantic_hash": ""
   },
   "src/mesh/src/local_refine.cpp": {
@@ -745,13 +745,13 @@
     "semantic_hash": ""
   },
   "src/mesh/src/surface_project.cpp": {
-    "mtime": 1786820217.2581198,
-    "ast_hash": "e8415af6c686f86c092911bf6dc57c4d",
+    "mtime": 1786943328.2667398,
+    "ast_hash": "7c35d174958024ee6e23a971b3d49fe7",
     "semantic_hash": ""
   },
   "src/mesh/src/tet_fill.cpp": {
-    "mtime": 1786681659.7826278,
-    "ast_hash": "3489fb6319e6285d18ffdd12a94c4c34",
+    "mtime": 1786943457.8696804,
+    "ast_hash": "64f167667189be9f45125852db5f3c33",
     "semantic_hash": ""
   },
   "src/mesh/src/transition_fill.cpp": {
@@ -1510,8 +1510,8 @@
     "semantic_hash": ""
   },
   "src/mesh/src/varyhedron_fill.cpp": {
-    "mtime": 1786727712.805993,
-    "ast_hash": "6b8757bc3bbcbfa18205edbf52f6642c",
+    "mtime": 1786943572.7967408,
+    "ast_hash": "b7239eda152baa4ca9e6ae8ec7220965",
     "semantic_hash": ""
   },
   "tests/fixtures/parts/cylinder.case.json": {
@@ -1890,8 +1890,8 @@
     "semantic_hash": ""
   },
   "tests/test_geometry_fidelity.cpp": {
-    "mtime": 1786681659.784664,
-    "ast_hash": "e6bd81b8082cff6838b73c821875d1cd",
+    "mtime": 1786943881.096776,
+    "ast_hash": "52abc5144a17c9ec7a03bff275755d53",
     "semantic_hash": ""
   },
   "apps/gui/colormap.hpp": {
@@ -1910,23 +1910,23 @@
     "semantic_hash": ""
   },
   "docs/assets/showcase/manifest.json": {
-    "mtime": 1786681659.749628,
-    "ast_hash": "d1c4d94691f291d5cdd204109bed9986",
+    "mtime": 1786953666.2087545,
+    "ast_hash": "2f342723b1e15bd9e7188e81da2126ce",
     "semantic_hash": ""
   },
   "scripts/make_compare_grid.py": {
-    "mtime": 1786681659.7766278,
-    "ast_hash": "c38f17e54e0c327e680a8a193df9ac6d",
+    "mtime": 1786938431.0684686,
+    "ast_hash": "a699ecf50cf3aec0293049790e093046",
     "semantic_hash": ""
   },
   "scripts/plot_benchmarks.py": {
-    "mtime": 1786681659.7776277,
-    "ast_hash": "e8844e2575941938e44f5aecc240b6f0",
+    "mtime": 1786938849.8481839,
+    "ast_hash": "3fa54c1e781dfeee528436808e213d5a",
     "semantic_hash": ""
   },
   "scripts/render_showcase.py": {
-    "mtime": 1786681659.7776277,
-    "ast_hash": "075137c438657cbb1408fbaa1869586d",
+    "mtime": 1786939169.2576559,
+    "ast_hash": "548296f40fee62fb4365abdc412df093",
     "semantic_hash": ""
   },
   "src/fea/include/fea/cell_quality.hpp": {
@@ -1955,73 +1955,73 @@
     "semantic_hash": ""
   },
   "docs/SHOWCASE.md": {
-    "mtime": 1786681659.7186282,
-    "ast_hash": "6fbc5f3568c99d52af4789be19a90015",
+    "mtime": 1786953939.2223096,
+    "ast_hash": "3cca868955bb7cd0dc69f31b6205c110",
     "semantic_hash": ""
   },
   "docs/assets/showcase/OVERVIEW.md": {
-    "mtime": 1786681659.7266283,
-    "ast_hash": "40d0853ef28ebccd207cb6bf413b8bc0",
+    "mtime": 1786953877.9916556,
+    "ast_hash": "79a7dd9bcfa5fbac675e79a69045fc0e",
     "semantic_hash": ""
   },
   "docs/assets/showcase/architecture.png": {
-    "mtime": 1786681659.7276282,
-    "ast_hash": "76d0aa0a4db842ed04c22db24aa28883",
+    "mtime": 1786953665.957595,
+    "ast_hash": "e020c84b17f0c8dd364befcf937fc91d",
     "semantic_hash": ""
   },
   "docs/assets/showcase/bench_dof_time.png": {
-    "mtime": 1786681659.7286282,
-    "ast_hash": "07570d70b06c79fcb0ec023c583ed8d6",
+    "mtime": 1786953665.991788,
+    "ast_hash": "e76c2fdc8b41681aa802406f8e2ba680",
     "semantic_hash": ""
   },
   "docs/assets/showcase/bench_mms.png": {
-    "mtime": 1786681659.729628,
-    "ast_hash": "f5dd5d31e704b0b9961b81c83cf00efb",
+    "mtime": 1786953666.0087943,
+    "ast_hash": "0e71443100a6d47150a47d39c5ff7481",
     "semantic_hash": ""
   },
   "docs/assets/showcase/bench_tier1.png": {
-    "mtime": 1786681659.7316282,
-    "ast_hash": "df43252b549a5645d7c3dede0b6cff8e",
+    "mtime": 1786953666.0251997,
+    "ast_hash": "701bcddfa3254809770fced80b5e0cbb",
     "semantic_hash": ""
   },
   "docs/assets/showcase/compare_grading.png": {
-    "mtime": 1786681659.733628,
-    "ast_hash": "b5d9d0dfaa208986171e61d1ddc7ef25",
+    "mtime": 1786953666.0405498,
+    "ast_hash": "819a112e8bdc0539b414112c788d912f",
     "semantic_hash": ""
   },
   "docs/assets/showcase/compare_meshers.png": {
-    "mtime": 1786681659.7376282,
-    "ast_hash": "8637d71b7982e89b8c4f6e681c55d920",
+    "mtime": 1786953666.059656,
+    "ast_hash": "052830729b1a04cafa697c5d24b7cecb",
     "semantic_hash": ""
   },
   "docs/assets/showcase/gallery_cantilever.png": {
-    "mtime": 1786681659.740628,
-    "ast_hash": "f823ef0bf8164575847b4411176fb5cb",
+    "mtime": 1786953666.0773773,
+    "ast_hash": "e333d604b12e004e472964e176634bbd",
     "semantic_hash": ""
   },
   "docs/assets/showcase/gallery_cylinder.png": {
-    "mtime": 1786681659.742628,
-    "ast_hash": "0b42a479fc6c47410b2ce70df33e1e75",
+    "mtime": 1786953666.0939844,
+    "ast_hash": "077c0c287a247c0f07d067ba23e3a73a",
     "semantic_hash": ""
   },
   "docs/assets/showcase/gallery_icecream_cone.png": {
-    "mtime": 1786681659.743628,
-    "ast_hash": "afae908e369f5c366edeec462112c519",
+    "mtime": 1786953666.110894,
+    "ast_hash": "a71219e1e1351a602b35aa2b7c2c0414",
     "semantic_hash": ""
   },
   "docs/assets/showcase/gallery_plate_hole.png": {
-    "mtime": 1786681659.745628,
-    "ast_hash": "b396aa7a6caf865c355e8bd27279f0e1",
+    "mtime": 1786953666.1280634,
+    "ast_hash": "b9dde4d3c42ee89bef499e573e26e7d2",
     "semantic_hash": ""
   },
   "docs/assets/showcase/gallery_sphere.png": {
-    "mtime": 1786681659.7486281,
-    "ast_hash": "ea39a519dfa1eebb3c0c56a6a2014105",
+    "mtime": 1786953666.1457555,
+    "ast_hash": "0ae95cdb9b252e6b0fb092890fde6419",
     "semantic_hash": ""
   },
   "docs/assets/showcase/hero.png": {
-    "mtime": 1786681659.749628,
-    "ast_hash": "eda364bc8b45eaf1e7b44e2e244fec36",
+    "mtime": 1786953666.1629877,
+    "ast_hash": "57ebef30323b05e23126fc067be97ac5",
     "semantic_hash": ""
   },
   "src/fea/include/fea/resource_budget.hpp": {
@@ -2045,7 +2045,7 @@
     "semantic_hash": ""
   },
   "docs/assets/showcase/gui_studio.png": {
-    "mtime": 1786217270.581774,
+    "mtime": 1786939919.0221632,
     "ast_hash": "0680f5840f9edc702560ba377305592f",
     "semantic_hash": ""
   },
@@ -2075,13 +2075,13 @@
     "semantic_hash": ""
   },
   "src/mesh/include/mesh/brep_fidelity.hpp": {
-    "mtime": 1786681659.7816277,
-    "ast_hash": "2b9b1fc0a2c96e84c76d76fcff849a16",
+    "mtime": 1786943251.9623635,
+    "ast_hash": "0b5ea6aa3edd252c39c4b24b576d7eb9",
     "semantic_hash": ""
   },
   "src/mesh/src/brep_fidelity.cpp": {
-    "mtime": 1786681659.7816277,
-    "ast_hash": "abe20046f6a09046190ccfdb06dfa6d1",
+    "mtime": 1786943243.571432,
+    "ast_hash": "c145462b81db469a8051c4106ad753cc",
     "semantic_hash": ""
   },
   "tests/test_surface_project.cpp": {
@@ -4560,18 +4560,18 @@
     "semantic_hash": ""
   },
   "bench/advisor/calibration.json": {
-    "mtime": 1786746752.5234969,
-    "ast_hash": "f805d95bbbf1576b2efb8eb498843642",
+    "mtime": 1786953011.1768093,
+    "ast_hash": "0d840e872792b2a92a3c625625ee8d6e",
     "semantic_hash": ""
   },
   "bench/advisor/clamps.json": {
-    "mtime": 1786746756.0738833,
-    "ast_hash": "37a40dd7d0d38b545ec1726012ff2131",
+    "mtime": 1786952963.6002219,
+    "ast_hash": "75a8e406f5d7c65bdfa4be8170c44300",
     "semantic_hash": ""
   },
   "bench/advisor/corpus_evidence.json": {
-    "mtime": 1786681659.5638602,
-    "ast_hash": "c1490c6e2f5039e9037a87c9c4ee23d5",
+    "mtime": 1786953257.78737,
+    "ast_hash": "7089bec2c090067051b023b6d9f45beb",
     "semantic_hash": ""
   },
   "bench/advisor/crossval_final.json": {
@@ -4605,8 +4605,8 @@
     "semantic_hash": ""
   },
   "bench/advisor/dataset_schema.json": {
-    "mtime": 1786745196.601539,
-    "ast_hash": "af53bd5ee09eb8875ccbd37513f1f649",
+    "mtime": 1786952304.498348,
+    "ast_hash": "ad24750007643ddb7968c7dae4d3907d",
     "semantic_hash": ""
   },
   "bench/advisor/learning_curve.json": {
@@ -4615,23 +4615,23 @@
     "semantic_hash": ""
   },
   "bench/advisor/normalization.json": {
-    "mtime": 1786746756.0734196,
-    "ast_hash": "b9a31751eda02f632b14fbd0cadfc4b6",
+    "mtime": 1786952963.5998516,
+    "ast_hash": "0d08098a6d3a08d19c7bf9c2e963bce2",
     "semantic_hash": ""
   },
   "bench/advisor/ood.json": {
-    "mtime": 1786746754.6038935,
-    "ast_hash": "844dfe01d69246ab5144b19573603c60",
+    "mtime": 1786953012.8207881,
+    "ast_hash": "2e82fa05eb1cac5c571e25464cec00b7",
     "semantic_hash": ""
   },
   "bench/advisor/throughput.json": {
-    "mtime": 1786745181.693374,
-    "ast_hash": "68c23ddb51819eaa96021981cde2ba33",
+    "mtime": 1786952304.5342307,
+    "ast_hash": "86e59a363aa714230ceea76c81435015",
     "semantic_hash": ""
   },
   "bench/advisor/tolerance_selector.json": {
-    "mtime": 1786724407.5770597,
-    "ast_hash": "05df2c0f4cd64e8316ab4351f68c529a",
+    "mtime": 1786953221.5929537,
+    "ast_hash": "f08a4391d21eb0f091e92d745a79c2e3",
     "semantic_hash": ""
   },
   "bench/advisor/tolerance_selector_v4.json": {
@@ -4645,398 +4645,233 @@
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-1-s0-hunter-pc/campaign.json": {
-    "mtime": 1786745153.4700503,
-    "ast_hash": "2c91e0162366aa00d14afacc7270f951",
+    "mtime": 1786947681.219233,
+    "ast_hash": "4829152ce90f5f7f073b2de74c326f54",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-1-s0-hunter-pc/checkpoint.json": {
-    "mtime": 1786745165.9032147,
-    "ast_hash": "9e802c86de71874b4c9714b5f91fe3a6",
+    "mtime": 1786947750.9234362,
+    "ast_hash": "bf8c410ad2b261d3dba3573d0e177077",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-1-s0-hunter-pc/progress.json": {
-    "mtime": 1786745165.9032147,
+    "mtime": 1786947750.9234362,
     "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-1-s1-hunter-pc/campaign.json": {
-    "mtime": 1786745153.4714925,
-    "ast_hash": "4a6237c1d630d3d0c3a3897af0f29956",
+    "mtime": 1786947681.219429,
+    "ast_hash": "631292580e84b40828e0c2a2fe1e06c6",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-1-s1-hunter-pc/checkpoint.json": {
-    "mtime": 1786745171.1231792,
-    "ast_hash": "0e16d662da16ba790e22084fe0e07321",
+    "mtime": 1786947827.2018123,
+    "ast_hash": "d5e12b7d66d835ddd2df3b5adf36784e",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-1-s1-hunter-pc/progress.json": {
-    "mtime": 1786745171.1231792,
+    "mtime": 1786947827.2018123,
     "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-1-s2-hunter-pc/campaign.json": {
-    "mtime": 1786745153.473016,
-    "ast_hash": "6902c288cf9682c4ff4b20855168e8e5",
+    "mtime": 1786947681.2196188,
+    "ast_hash": "e7d556c1ae6dcdab854bdce435bf8e7f",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-1-s2-hunter-pc/checkpoint.json": {
-    "mtime": 1786745170.3251846,
-    "ast_hash": "ab8052e4c2d5e9b3731ccef6f4e5062d",
+    "mtime": 1786947748.5214558,
+    "ast_hash": "789eb392fff1c194ccc4655ccc07165f",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-1-s2-hunter-pc/progress.json": {
-    "mtime": 1786745170.3251846,
+    "mtime": 1786947748.5214558,
     "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-1-s3-hunter-pc/campaign.json": {
-    "mtime": 1786745153.4749887,
-    "ast_hash": "fd09c978e679e5b07532a8f4d253d24d",
+    "mtime": 1786947681.2197514,
+    "ast_hash": "2ecef54cffc6eb22c5a3bef46cb0d611",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-1-s3-hunter-pc/checkpoint.json": {
-    "mtime": 1786745180.5331154,
-    "ast_hash": "3127f5339f691140b9ae033db1f7121d",
+    "mtime": 1786947830.3587863,
+    "ast_hash": "c81da9528235d7214b5dec7f9f708a2c",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-1-s3-hunter-pc/progress.json": {
-    "mtime": 1786745180.5331154,
+    "mtime": 1786947830.3587863,
     "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-2-s0-hunter-pc/campaign.json": {
-    "mtime": 1786742189.762133,
-    "ast_hash": "3490b1fae24bf8e05ecf9766da2fdc3a",
+    "mtime": 1786948580.0155559,
+    "ast_hash": "2ceb955c34f6685ab0bf07ffe713923e",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-2-s0-hunter-pc/checkpoint.json": {
-    "mtime": 1786742189.762133,
-    "ast_hash": "e8fbb70ff085bcb096d9d82ba6cf2cda",
+    "mtime": 1786949285.9148393,
+    "ast_hash": "41471ff74f8a8d1225823f42abf731fa",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-2-s0-hunter-pc/progress.json": {
-    "mtime": 1786738757.416526,
-    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-2-s0-livingroom-pc/campaign.json": {
-    "mtime": 1786742189.7061334,
-    "ast_hash": "52a3986c3b6e9c886a467fd516a60311",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-2-s0-livingroom-pc/checkpoint.json": {
-    "mtime": 1786742189.7061334,
-    "ast_hash": "028b871f4064d4dab179c594411dd128",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-2-s0-livingroom-pc/progress.json": {
-    "mtime": 1786736771.216331,
+    "mtime": 1786949285.9148393,
     "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-2-s1-hunter-pc/campaign.json": {
-    "mtime": 1786742189.7641327,
-    "ast_hash": "b60c48d15efc2b20c491a93318ceed9b",
+    "mtime": 1786948580.0157146,
+    "ast_hash": "67d50eea5561e5dcd313e4153319fc2d",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-2-s1-hunter-pc/checkpoint.json": {
-    "mtime": 1786742189.7641327,
-    "ast_hash": "6c7a67dde59c04fd2acffec6a98e821b",
+    "mtime": 1786949286.8748314,
+    "ast_hash": "a78bab63029b7d681e45a900ba0a6ece",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-2-s1-hunter-pc/progress.json": {
-    "mtime": 1786738757.421526,
-    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-2-s1-livingroom-pc/campaign.json": {
-    "mtime": 1786742189.7091331,
-    "ast_hash": "0c361234d8c392638c06410514cbc7ca",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-2-s1-livingroom-pc/checkpoint.json": {
-    "mtime": 1786742189.7091331,
-    "ast_hash": "d2fdcfc6c452be140a653c7892eb80e4",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-2-s1-livingroom-pc/progress.json": {
-    "mtime": 1786736771.217582,
+    "mtime": 1786949286.8748314,
     "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-2-s2-hunter-pc/campaign.json": {
-    "mtime": 1786742189.7661328,
-    "ast_hash": "c03532690163457d07a0e545e003bf79",
+    "mtime": 1786948580.0158596,
+    "ast_hash": "884442e1c6d47915bcb727e22b8a7db5",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-2-s2-hunter-pc/checkpoint.json": {
-    "mtime": 1786742189.7661328,
-    "ast_hash": "d48ff60e57f79692974cbf344487ad33",
+    "mtime": 1786948733.744374,
+    "ast_hash": "3b1a8834d60ffea91b82cb4b485e7e3e",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-2-s2-hunter-pc/progress.json": {
-    "mtime": 1786742189.7661328,
-    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-2-s2-livingroom-pc/campaign.json": {
-    "mtime": 1786742189.7121332,
-    "ast_hash": "0bedc9ca472dbbcde897c187c9486d71",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-2-s2-livingroom-pc/checkpoint.json": {
-    "mtime": 1786742189.7121332,
-    "ast_hash": "66fec17611af8184a84a71258651bd7c",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-2-s2-livingroom-pc/progress.json": {
-    "mtime": 1786736771.2188354,
+    "mtime": 1786948733.744374,
     "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-2-s3-hunter-pc/campaign.json": {
-    "mtime": 1786742189.7681327,
-    "ast_hash": "b0ec0e9af769e3a274ffe0fade407661",
+    "mtime": 1786948580.0159914,
+    "ast_hash": "eead5925b7b48f8d15dbdc1fbc832775",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-2-s3-hunter-pc/checkpoint.json": {
-    "mtime": 1786742189.7681327,
-    "ast_hash": "d876907a7ecbba003512379fc9841ea1",
+    "mtime": 1786948734.5423675,
+    "ast_hash": "38fda3b012be861df8758ec0c9d8f02a",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-2-s3-hunter-pc/progress.json": {
-    "mtime": 1786742189.7681327,
-    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-2-s3-livingroom-pc/campaign.json": {
-    "mtime": 1786742189.7141333,
-    "ast_hash": "2fe843364e14a4ab35bc64de53fcf6ae",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-2-s3-livingroom-pc/checkpoint.json": {
-    "mtime": 1786742189.7141333,
-    "ast_hash": "e6839bfe20611419b0f775817f76c189",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-2-s3-livingroom-pc/progress.json": {
-    "mtime": 1786736771.2197921,
+    "mtime": 1786948734.5423675,
     "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-2-template/campaign.json": {
-    "mtime": 1786721337.91906,
+    "mtime": 1786946798.2162364,
     "ast_hash": "f4ca35937666538681f3ff9f77805b8d",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-3-s0-hunter-pc/campaign.json": {
-    "mtime": 1786742189.7691329,
-    "ast_hash": "03c7f9b7e9f151371bc6af89b3b34008",
+    "mtime": 1786949349.6317177,
+    "ast_hash": "ffd6eafc4ef3d549a7e551fabbaaf7d7",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-3-s0-hunter-pc/checkpoint.json": {
-    "mtime": 1786742189.7691329,
-    "ast_hash": "930d3256f8ea0214db8c6fb2b60ce88b",
+    "mtime": 1786949640.6189263,
+    "ast_hash": "f8da9072f6a5e72e84f897b4bca73f89",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-3-s0-hunter-pc/progress.json": {
-    "mtime": 1786742189.7691329,
-    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-3-s0-livingroom-pc/campaign.json": {
-    "mtime": 1786742189.7151332,
-    "ast_hash": "ea01bda275a3e09b9ebee52a4129e80f",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-3-s0-livingroom-pc/checkpoint.json": {
-    "mtime": 1786742189.7151332,
-    "ast_hash": "e665efe79c9ecdf39e728e3edde00bae",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-3-s0-livingroom-pc/progress.json": {
-    "mtime": 1786736771.2206855,
+    "mtime": 1786949640.6189263,
     "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-3-s1-hunter-pc/campaign.json": {
-    "mtime": 1786742189.7701328,
-    "ast_hash": "86605c1788f1dfad2fb0f0f15d8616d4",
+    "mtime": 1786949349.6318798,
+    "ast_hash": "9a39c08b3f3d49704c216573db40420e",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-3-s1-hunter-pc/checkpoint.json": {
-    "mtime": 1786742189.7701328,
-    "ast_hash": "cea982d27c6f21f4697ebad0b6ee6432",
+    "mtime": 1786949828.0003872,
+    "ast_hash": "39b293dde683fd4447655390d3ab53fe",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-3-s1-hunter-pc/progress.json": {
-    "mtime": 1786742189.7701328,
-    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-3-s1-livingroom-pc/campaign.json": {
-    "mtime": 1786742189.716133,
-    "ast_hash": "e61868ab66b41dec2dddfc072f0dc38a",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-3-s1-livingroom-pc/checkpoint.json": {
-    "mtime": 1786742189.716133,
-    "ast_hash": "cf44596d0e898704590cc7d24b846a5f",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-3-s1-livingroom-pc/progress.json": {
-    "mtime": 1786736771.221282,
+    "mtime": 1786949828.0003872,
     "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-3-s2-hunter-pc/campaign.json": {
-    "mtime": 1786742189.7701328,
-    "ast_hash": "6dae8412e11f7bf74e7d2282c33a7ed8",
+    "mtime": 1786949349.6320176,
+    "ast_hash": "81bc1c7a6e82b8833eb261cefa26cb6f",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-3-s2-hunter-pc/checkpoint.json": {
-    "mtime": 1786742189.7701328,
-    "ast_hash": "c435cd81c54cd831988fcd1cbe185d8e",
+    "mtime": 1786949618.0681114,
+    "ast_hash": "1ca134c16f78d71bc565b5280289ec01",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-3-s2-hunter-pc/progress.json": {
-    "mtime": 1786742189.7701328,
-    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-3-s2-livingroom-pc/campaign.json": {
-    "mtime": 1786742189.7171333,
-    "ast_hash": "7a87e10cce0c47d22cee60b085effdf3",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-3-s2-livingroom-pc/checkpoint.json": {
-    "mtime": 1786742189.7171333,
-    "ast_hash": "1c6203f1c8dfaa80d64d772a339d0647",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-3-s2-livingroom-pc/progress.json": {
-    "mtime": 1786736771.2218943,
+    "mtime": 1786949618.0691113,
     "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-3-s3-hunter-pc/campaign.json": {
-    "mtime": 1786742189.7701328,
-    "ast_hash": "f9b26eb6fb8703ee3b6cea70beb8ea98",
+    "mtime": 1786949349.6321478,
+    "ast_hash": "0bdf66c97e4e4e7458bbe70af51234f3",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-3-s3-hunter-pc/checkpoint.json": {
-    "mtime": 1786742189.7701328,
-    "ast_hash": "91f1dc443a367e71f66ab1b3171c128e",
+    "mtime": 1786949789.6887019,
+    "ast_hash": "1cd2f98dee16006c25077afb8be0e46c",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-3-s3-hunter-pc/progress.json": {
-    "mtime": 1786742189.7701328,
-    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-3-s3-livingroom-pc/campaign.json": {
-    "mtime": 1786742189.7181332,
-    "ast_hash": "efcd1d51c44d0c9f692614ad9d26c3a8",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-3-s3-livingroom-pc/checkpoint.json": {
-    "mtime": 1786742189.7181332,
-    "ast_hash": "ce3dfc01f2666e6506be33e62524bbfe",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-3-s3-livingroom-pc/progress.json": {
-    "mtime": 1786736771.2225678,
+    "mtime": 1786949789.6897018,
     "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-3-template/campaign.json": {
-    "mtime": 1786721337.92506,
+    "mtime": 1786946798.2203522,
     "ast_hash": "8fbd3b68b5a3b30011c07f9569fd9954",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-4-s0-hunter-pc/campaign.json": {
-    "mtime": 1786742189.7711327,
-    "ast_hash": "e888e1e69f350e77431175a4ebc68e20",
+    "mtime": 1786952195.6901531,
+    "ast_hash": "22bfdb9f7099740da4f689bb4b85c732",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-4-s0-hunter-pc/checkpoint.json": {
-    "mtime": 1786742189.7711327,
-    "ast_hash": "c49031d908935ff96f5b1ba4eca2d6fc",
+    "mtime": 1786952302.451877,
+    "ast_hash": "a7e1f92fddadba9222c057dc3a9f2b50",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-4-s0-hunter-pc/progress.json": {
-    "mtime": 1786742189.7711327,
-    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-4-s0-livingroom-pc/campaign.json": {
-    "mtime": 1786742189.7191331,
-    "ast_hash": "80bfaeffc8315c865f6416d25de72891",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-4-s0-livingroom-pc/checkpoint.json": {
-    "mtime": 1786742189.7191331,
-    "ast_hash": "4717b59592340a5d2251dc7fa49dad16",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-4-s0-livingroom-pc/progress.json": {
-    "mtime": 1786736771.2230463,
+    "mtime": 1786952302.451877,
     "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-4-s1-hunter-pc/campaign.json": {
-    "mtime": 1786742189.7711327,
-    "ast_hash": "c8505019d096a52820e061e63950ffeb",
+    "mtime": 1786949853.1323922,
+    "ast_hash": "63462adb43a7ec248aa49e5bff874b44",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-4-s1-hunter-pc/checkpoint.json": {
-    "mtime": 1786742189.7711327,
-    "ast_hash": "1b8a372b44b7bc2a44a1a0b50bfab31b",
+    "mtime": 1786952176.4669306,
+    "ast_hash": "8dd68c0b05b0b9e0efb12d2311d77304",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-4-s1-hunter-pc/progress.json": {
-    "mtime": 1786742189.7711327,
-    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-4-s1-livingroom-pc/campaign.json": {
-    "mtime": 1786742189.7191331,
-    "ast_hash": "4215da4c75e4e28ff7ae73ecc4efe790",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-4-s1-livingroom-pc/checkpoint.json": {
-    "mtime": 1786742189.7191331,
-    "ast_hash": "9e99bfcf5b3c9560840ba8444df77176",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-batch-4-s1-livingroom-pc/progress.json": {
-    "mtime": 1786736771.2233768,
-    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "mtime": 1786952188.985826,
+    "ast_hash": "b918f09e70a2323b34434fa2f43087c0",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-4-template/campaign.json": {
-    "mtime": 1786729835.6184971,
+    "mtime": 1786946798.2217062,
     "ast_hash": "d086977a57b78ee77d818297ce8fa1d4",
     "semantic_hash": ""
   },
   "bench/campaigns/advisor-batch-template/campaign.json": {
-    "mtime": 1786721337.9267404,
+    "mtime": 1786946798.2217062,
     "ast_hash": "f1eb451abd7f9e02474dcaa36b85446f",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-truth-0/campaign.json": {
-    "mtime": 1786730131.123595,
-    "ast_hash": "ec4961cc8c507e4490bd79b3146c1cc1",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-truth-0/checkpoint.json": {
-    "mtime": 1786735273.343947,
-    "ast_hash": "e7774d2f3f7ae721d270e978fb23ad3e",
-    "semantic_hash": ""
-  },
-  "bench/campaigns/advisor-truth-0/progress.json": {
-    "mtime": 1786735294.37277,
-    "ast_hash": "e19dcbe525c0dbc2ca47cbbc0536915d",
     "semantic_hash": ""
   },
   "bench/campaigns/archive-v2/advisor-batch-1-s0/campaign.json": {
@@ -7135,8 +6970,8 @@
     "semantic_hash": ""
   },
   "src/adapt/include/adapt/spectral_sizing.hpp": {
-    "mtime": 1786930832.7703867,
-    "ast_hash": "254bd075c852d48275b86d4e01997715",
+    "mtime": 1786942739.5675423,
+    "ast_hash": "ddf54fe121a791665ddec4afce7b726c",
     "semantic_hash": ""
   },
   "src/adapt/src/metric_field.cpp": {
@@ -7145,8 +6980,8 @@
     "semantic_hash": ""
   },
   "src/adapt/src/spectral_sizing.cpp": {
-    "mtime": 1786933124.602577,
-    "ast_hash": "c25280def141b9d74b8744963e73c56d",
+    "mtime": 1786942757.8703938,
+    "ast_hash": "32ccd1ecb55cb8949038424f2cab6fa0",
     "semantic_hash": ""
   },
   "src/advisor/include/advisor/advisor.hpp": {
@@ -7210,8 +7045,8 @@
     "semantic_hash": ""
   },
   "tests/test_brep_fidelity.cpp": {
-    "mtime": 1786681659.784664,
-    "ast_hash": "16c73c0e41e06236b3782dc02528eed5",
+    "mtime": 1786945184.3485496,
+    "ast_hash": "28ff4cfd90d7206a7838f960c1a6eb51",
     "semantic_hash": ""
   },
   "tests/test_case_features.cpp": {
@@ -7275,8 +7110,8 @@
     "semantic_hash": ""
   },
   "docs/advisor/0004-model-card.md": {
-    "mtime": 1786746975.7427986,
-    "ast_hash": "51131c2b116ad3efd5c3200be2febf00",
+    "mtime": 1786953389.5168176,
+    "ast_hash": "47c589d00953dc371eb561a41544ca49",
     "semantic_hash": ""
   },
   "docs/advisor/0005-data-card.md": {
@@ -7557,6 +7392,2036 @@
   "docs/validation/figures/truth_independence.png": {
     "mtime": 1786681659.757628,
     "ast_hash": "b4a28ac48a7c86cd03ecf71a95177dc7",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/dataset_schema-v4.json": {
+    "mtime": 1786947673.4070704,
+    "ast_hash": "af53bd5ee09eb8875ccbd37513f1f649",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/001/activations.json": {
+    "mtime": 1786745420.0264907,
+    "ast_hash": "023aec08a4ea92d2dc565bdc060504ce",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/001/metrics.json": {
+    "mtime": 1786745420.003491,
+    "ast_hash": "689cf666a9079638331885047f0cf829",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/002/activations.json": {
+    "mtime": 1786745421.013484,
+    "ast_hash": "bd0b6fb52189e5eda78368dfec3a6e26",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/002/metrics.json": {
+    "mtime": 1786745420.9905276,
+    "ast_hash": "b2f700fb1c457e54d269a9eb1290badb",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/003/activations.json": {
+    "mtime": 1786745421.8694782,
+    "ast_hash": "57ef08aac6d657f87fb159d7a1cfb19b",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/003/metrics.json": {
+    "mtime": 1786745421.8464785,
+    "ast_hash": "76655428db5e0b50b643fd768437c965",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/004/activations.json": {
+    "mtime": 1786745422.7054727,
+    "ast_hash": "b5858f605056def35b3d01661a4b35a8",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/004/metrics.json": {
+    "mtime": 1786745422.6824727,
+    "ast_hash": "a267cab77e59f52ec8177141fed93b14",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/005/activations.json": {
+    "mtime": 1786745423.6064665,
+    "ast_hash": "1bf4ab25d3a323b03703713b048a216f",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/005/metrics.json": {
+    "mtime": 1786745423.5834665,
+    "ast_hash": "fca364f907cdaca48679c78308a2ffd3",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/006/activations.json": {
+    "mtime": 1786745424.4744606,
+    "ast_hash": "c5dfc775a6710de7970d816861272be5",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/006/metrics.json": {
+    "mtime": 1786745424.4514608,
+    "ast_hash": "f98f15b194ec25b1ee455402d8fde235",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/007/activations.json": {
+    "mtime": 1786745425.3664546,
+    "ast_hash": "609c8a32d15a9bb77a2c1e9229c67b2e",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/007/metrics.json": {
+    "mtime": 1786745425.3424547,
+    "ast_hash": "f055e804fd2deeaf66414b6b9b22fe18",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/008/activations.json": {
+    "mtime": 1786745426.2474487,
+    "ast_hash": "fb2535941c1290433b54127943f86fea",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/008/metrics.json": {
+    "mtime": 1786745426.2204487,
+    "ast_hash": "6b264d221e52588f15fac163d74fb5d2",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/009/activations.json": {
+    "mtime": 1786745427.1844423,
+    "ast_hash": "aee94cff7d3d3963d989688d9257c829",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/009/metrics.json": {
+    "mtime": 1786745427.1594424,
+    "ast_hash": "1caa94a14aa3eb4da1c7bbc0578f9cde",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/010/activations.json": {
+    "mtime": 1786745428.107436,
+    "ast_hash": "6cdcf723f13359f67503c79bc56f33b2",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/010/metrics.json": {
+    "mtime": 1786745428.0814362,
+    "ast_hash": "b476107f47ca700357b39c9011e4a996",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/011/activations.json": {
+    "mtime": 1786745439.891356,
+    "ast_hash": "7428861b07441f62a6aa60a9482af39d",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/011/metrics.json": {
+    "mtime": 1786745439.8603563,
+    "ast_hash": "10c2210a29277fa50d5a498fbfa8223b",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/012/activations.json": {
+    "mtime": 1786745447.3123057,
+    "ast_hash": "a42f13ca288206d83ccdc60e499d4d24",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/012/metrics.json": {
+    "mtime": 1786745447.247306,
+    "ast_hash": "5a486dc9ef400351ffd1b64ca958ddbe",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/013/activations.json": {
+    "mtime": 1786745458.2742314,
+    "ast_hash": "f09c855c520f614394dd38ad3646bf81",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/013/metrics.json": {
+    "mtime": 1786745458.2402315,
+    "ast_hash": "9e4d5de0ba72447b66211ca012926fe9",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/014/activations.json": {
+    "mtime": 1786745463.3151972,
+    "ast_hash": "0928f6adddec5888aacbb714c0dbbc79",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/014/metrics.json": {
+    "mtime": 1786745463.2661974,
+    "ast_hash": "61ded341d4b44cb2f0e2b4a74bcd0d2e",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/015/activations.json": {
+    "mtime": 1786745470.8881457,
+    "ast_hash": "66ffda4a92aa501eeb9b856365ddfdec",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/015/metrics.json": {
+    "mtime": 1786745470.8452137,
+    "ast_hash": "45a5961acbfdbc822dff2e6b78e4156f",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/016/activations.json": {
+    "mtime": 1786745477.470101,
+    "ast_hash": "f39bf2ac84fd7736e09fc9f8655f71e0",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/016/metrics.json": {
+    "mtime": 1786745477.4361014,
+    "ast_hash": "d059c79f59bd0630b35a105ef3038f67",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/017/activations.json": {
+    "mtime": 1786745485.9260437,
+    "ast_hash": "aded0fd61c8be920661b6193bb6fd7e9",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/017/metrics.json": {
+    "mtime": 1786745485.893044,
+    "ast_hash": "fd8cac177d7bee84d584378231b8390a",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/018/activations.json": {
+    "mtime": 1786745495.613978,
+    "ast_hash": "2b754d84f5b0a95b3b1f67b37e9d8ddb",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/018/metrics.json": {
+    "mtime": 1786745495.5609784,
+    "ast_hash": "3f4af97c76c26975bb348019e6e95275",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/019/activations.json": {
+    "mtime": 1786745502.8289292,
+    "ast_hash": "f26eb4d9eb209c754f8cc83c30db8aa1",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/019/metrics.json": {
+    "mtime": 1786745502.7999294,
+    "ast_hash": "a42642e33d18f59bba124e504286d468",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/020/activations.json": {
+    "mtime": 1786745509.5888832,
+    "ast_hash": "a4b546bdf91f8cea61aa42f658d65c04",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/020/metrics.json": {
+    "mtime": 1786745509.5418835,
+    "ast_hash": "c6aab89b3cd108bd20279c57f1144557",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/021/activations.json": {
+    "mtime": 1786745519.210818,
+    "ast_hash": "69c6e67b872c90608e7e426a735516c3",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/021/metrics.json": {
+    "mtime": 1786745519.180818,
+    "ast_hash": "c8622efdbcdd4852c3ae3a2c7390b21d",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/022/activations.json": {
+    "mtime": 1786745523.34479,
+    "ast_hash": "dbcb62a6cda5722b0c12b3147879c94b",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/022/metrics.json": {
+    "mtime": 1786745523.32179,
+    "ast_hash": "291a5028428d5fd2d9bf4d9581bf7412",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/023/activations.json": {
+    "mtime": 1786745529.7937462,
+    "ast_hash": "36fbd55e12a5fb679e9e57bfb0c165f6",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/023/metrics.json": {
+    "mtime": 1786745529.7597463,
+    "ast_hash": "5be6b14670b47a8a8231115c1e583991",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/024/activations.json": {
+    "mtime": 1786745538.6996858,
+    "ast_hash": "56c5d7f4c95d7093ac9138ed3c8280cb",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/024/metrics.json": {
+    "mtime": 1786745538.668686,
+    "ast_hash": "5e52532d5debde94f5ed73570b061390",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/025/activations.json": {
+    "mtime": 1786745548.0526223,
+    "ast_hash": "506dcbf642f172b4883596c5276db284",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/025/metrics.json": {
+    "mtime": 1786745548.0096226,
+    "ast_hash": "ac894ae2f90912069149c947a6a31f2a",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/026/activations.json": {
+    "mtime": 1786745557.2795596,
+    "ast_hash": "5b9faea9d8d15b2367260560e4d580ad",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/026/metrics.json": {
+    "mtime": 1786745557.2505598,
+    "ast_hash": "4308986f3bc4a7209f3b96bbd4c92924",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/027/activations.json": {
+    "mtime": 1786745562.4785244,
+    "ast_hash": "4ea7f5da729b97f71e0bc3260b920298",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/027/metrics.json": {
+    "mtime": 1786745562.4485247,
+    "ast_hash": "97aeceeef0ca203288e238aae7375c4a",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/028/activations.json": {
+    "mtime": 1786745570.938467,
+    "ast_hash": "6ec2fdb753f454d80f6136170fad93e9",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/028/metrics.json": {
+    "mtime": 1786745570.8894675,
+    "ast_hash": "6db190fb754932f4a3d96557c90c752c",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/029/activations.json": {
+    "mtime": 1786745579.8574066,
+    "ast_hash": "5e81adc77d161043717668f32d08b98a",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/029/metrics.json": {
+    "mtime": 1786745579.803407,
+    "ast_hash": "f1de1b31e31af6fda9a8cbd0ccc4cfd5",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/030/activations.json": {
+    "mtime": 1786745585.9593651,
+    "ast_hash": "2f82ab1e6a558c2442449e990e8438c1",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/030/metrics.json": {
+    "mtime": 1786745585.9063656,
+    "ast_hash": "bd85b8b8898ef42cafc2222ebfac448f",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/031/activations.json": {
+    "mtime": 1786745593.2783155,
+    "ast_hash": "c573d3fa64e5ed0de2dd2d0c8ab158aa",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/031/metrics.json": {
+    "mtime": 1786745593.2463157,
+    "ast_hash": "8ee809f52ea395c8862433d4196862a1",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/032/activations.json": {
+    "mtime": 1786745601.6272588,
+    "ast_hash": "c4ee586780832aa35265e445c7824265",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/032/metrics.json": {
+    "mtime": 1786745601.5652592,
+    "ast_hash": "821987330afab3b8cd247b3a3a19ae73",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/033/activations.json": {
+    "mtime": 1786745609.1492078,
+    "ast_hash": "37ec6c5601e3450dd5ccad6943e71771",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/033/metrics.json": {
+    "mtime": 1786745609.0952082,
+    "ast_hash": "583faa9e8a232214dbcacb82ee8ef2e3",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/034/activations.json": {
+    "mtime": 1786745614.7501698,
+    "ast_hash": "29146a98884c152ad830fe9251b62274",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/034/metrics.json": {
+    "mtime": 1786745614.6992087,
+    "ast_hash": "b703104704b17865976f1f7d8659e4de",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/035/activations.json": {
+    "mtime": 1786745619.595137,
+    "ast_hash": "f041706431bbc85ea7b026a94cfc6dab",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/035/metrics.json": {
+    "mtime": 1786745619.5481372,
+    "ast_hash": "23eea6e28c23d549bcd568e6f0069656",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/036/activations.json": {
+    "mtime": 1786745627.0460865,
+    "ast_hash": "d3baad7a26ee991b90818d6fca559fa6",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/036/metrics.json": {
+    "mtime": 1786745627.0150867,
+    "ast_hash": "c8fbe145828612a0c16a10c32485281c",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/037/activations.json": {
+    "mtime": 1786745638.9490056,
+    "ast_hash": "fee43f99148e291612c89a5edabbbd27",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/037/metrics.json": {
+    "mtime": 1786745638.894006,
+    "ast_hash": "22cb5766a4a9d8d8cc149948e0d40d99",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/038/activations.json": {
+    "mtime": 1786745648.6839397,
+    "ast_hash": "fc76831b057868c5d93796ea0cc6a572",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/038/metrics.json": {
+    "mtime": 1786745648.62794,
+    "ast_hash": "fd89ad2ed42b6ff67a0f1aba1ce7ad28",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/039/activations.json": {
+    "mtime": 1786745656.4928868,
+    "ast_hash": "89c5c2759dff80b3f3015b32f88e4449",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/039/metrics.json": {
+    "mtime": 1786745656.446887,
+    "ast_hash": "1d453ea91e6688ed2d4675ff62d581e7",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/040/activations.json": {
+    "mtime": 1786745665.2318275,
+    "ast_hash": "ae98f3312368026162453010c3737a41",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/040/metrics.json": {
+    "mtime": 1786745665.2008276,
+    "ast_hash": "173802321bb3a8a5a34d9a3df6f8d477",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/041/activations.json": {
+    "mtime": 1786745670.6777904,
+    "ast_hash": "572cbc43d8e702ee31f7de5b37f6d6fd",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/041/metrics.json": {
+    "mtime": 1786745670.6227908,
+    "ast_hash": "a9395c9834602ab16c04cde99678a17c",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/042/activations.json": {
+    "mtime": 1786745674.699763,
+    "ast_hash": "17ea22fe984762daecff36bc27c7b404",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/042/metrics.json": {
+    "mtime": 1786745674.6377635,
+    "ast_hash": "deb1557adb05557d4c325d8cff9e841c",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/043/activations.json": {
+    "mtime": 1786745682.250712,
+    "ast_hash": "a845fdc99ab9ac21a73b7782b51a87e5",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/043/metrics.json": {
+    "mtime": 1786745682.2097123,
+    "ast_hash": "75d1d6e1db8db3a1dfc54123be61bbd1",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/044/activations.json": {
+    "mtime": 1786745689.2036648,
+    "ast_hash": "b1fe40f111e56fa0cdc46762b108ac87",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/044/metrics.json": {
+    "mtime": 1786745689.170665,
+    "ast_hash": "1b5a6766c7c161dd137aee3f73b996e9",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/045/activations.json": {
+    "mtime": 1786745697.6866074,
+    "ast_hash": "c7b3cfce5ba54b72c222518f7c914252",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/045/metrics.json": {
+    "mtime": 1786745697.6286077,
+    "ast_hash": "1440a5bf64fd031d65b270e3f1b1b628",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/046/activations.json": {
+    "mtime": 1786745707.461541,
+    "ast_hash": "cdee71fa5b165d60942c147a3ecba800",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/046/metrics.json": {
+    "mtime": 1786745707.426541,
+    "ast_hash": "f8324e5c8884e8e896265cd5e968a25d",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/047/activations.json": {
+    "mtime": 1786745715.3974872,
+    "ast_hash": "54eaa01772860197050648f3e3bef8bb",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/047/metrics.json": {
+    "mtime": 1786745715.3654873,
+    "ast_hash": "4619ada94c616df9745864cb191c9f27",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/048/activations.json": {
+    "mtime": 1786745723.670431,
+    "ast_hash": "87df77a0de15f155d668cdd5ace30696",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/048/metrics.json": {
+    "mtime": 1786745723.6364312,
+    "ast_hash": "3ce5d94a27d76631e6e994fbd73e39eb",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/049/activations.json": {
+    "mtime": 1786745734.5333574,
+    "ast_hash": "7f70ff6676175c441133b02926899402",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/049/metrics.json": {
+    "mtime": 1786745734.4813576,
+    "ast_hash": "aa6c64a831402e89a686da7411bb3e92",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/050/activations.json": {
+    "mtime": 1786745740.7133155,
+    "ast_hash": "5b61681d4d51a64b5349f511761a257b",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/050/metrics.json": {
+    "mtime": 1786745740.6813157,
+    "ast_hash": "907b09f934a29dd01e753d06c862e7ef",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/051/activations.json": {
+    "mtime": 1786745746.4852762,
+    "ast_hash": "9e20815c50c107594e4049fdde628c61",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/051/metrics.json": {
+    "mtime": 1786745746.4392765,
+    "ast_hash": "cee58ac97e3dc3614793d3f210d3bcb7",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/052/activations.json": {
+    "mtime": 1786745755.8832126,
+    "ast_hash": "3569b28836be1327adc5b74acc643c27",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/052/metrics.json": {
+    "mtime": 1786745755.8512127,
+    "ast_hash": "0a0ffe090e12800662413867550998b5",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/053/activations.json": {
+    "mtime": 1786745765.528147,
+    "ast_hash": "b3de86c08a06bc3c7b3898fd721a87b3",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/053/metrics.json": {
+    "mtime": 1786745765.4651475,
+    "ast_hash": "f8318daefdb426804f44ca21a6f6065f",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/054/activations.json": {
+    "mtime": 1786745772.4551,
+    "ast_hash": "f66650f6d095ecd669affd5b705593f1",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/054/metrics.json": {
+    "mtime": 1786745772.4091783,
+    "ast_hash": "f1da1afdccd1471f9965508fe94c1ff5",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/055/activations.json": {
+    "mtime": 1786745783.1810272,
+    "ast_hash": "e2f1608788abafd0b57cd162108fa10a",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/055/metrics.json": {
+    "mtime": 1786745783.1510274,
+    "ast_hash": "9f94e89c7c76818d8a640fc6aa32555d",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/056/activations.json": {
+    "mtime": 1786745795.1779459,
+    "ast_hash": "e31dfa9f36f62d1fd7ab07170524f6c6",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/056/metrics.json": {
+    "mtime": 1786745795.1479461,
+    "ast_hash": "b05926206f8ba37df516f5edeff2d0bd",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/057/activations.json": {
+    "mtime": 1786745803.0768924,
+    "ast_hash": "4f4098071b29a7d54aed15fad8e3bc5e",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/057/metrics.json": {
+    "mtime": 1786745803.0508926,
+    "ast_hash": "8dcfc08fba92e512f73531c3341041ec",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/058/activations.json": {
+    "mtime": 1786745812.9108257,
+    "ast_hash": "87169349813dc7a8305cd02f00888869",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/058/metrics.json": {
+    "mtime": 1786745812.868826,
+    "ast_hash": "b9d49b26eb3e1c70ac41f7b3de0a529a",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/059/activations.json": {
+    "mtime": 1786745818.9527845,
+    "ast_hash": "cd4604452a65c4378ec67ddb2a5280f0",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/059/metrics.json": {
+    "mtime": 1786745818.9237847,
+    "ast_hash": "7b55c72343b91bde346d5460b40bc890",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/060/activations.json": {
+    "mtime": 1786745827.6997254,
+    "ast_hash": "68b95f33a0aac2b523e78497324bb4f4",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/060/metrics.json": {
+    "mtime": 1786745827.6307259,
+    "ast_hash": "06381d5fd4f4eb8f89c0f3ff1d17f765",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/061/activations.json": {
+    "mtime": 1786745833.2916873,
+    "ast_hash": "4c6831249005c3cc780a3fe7fd97d540",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/061/metrics.json": {
+    "mtime": 1786745833.2516875,
+    "ast_hash": "0c4e5bbe549c23633e059290cf62f978",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/062/activations.json": {
+    "mtime": 1786745844.3066127,
+    "ast_hash": "555069659a119c7ffb5be776777521f3",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/062/metrics.json": {
+    "mtime": 1786745844.2656128,
+    "ast_hash": "263eb02a4236a8bab0ea0d5319974a97",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/063/activations.json": {
+    "mtime": 1786745852.7285554,
+    "ast_hash": "7df237ebcdc56bc78c6286e5a8e49608",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/063/metrics.json": {
+    "mtime": 1786745852.6495562,
+    "ast_hash": "dbf56c8384c87f3d4f2493935fd0e56a",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/064/activations.json": {
+    "mtime": 1786745866.6814609,
+    "ast_hash": "6bbc5160338438de5610fb77ead3efd8",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/064/metrics.json": {
+    "mtime": 1786745866.646461,
+    "ast_hash": "0673a63b697dd9e59c5100fb50668039",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/065/activations.json": {
+    "mtime": 1786745875.9953976,
+    "ast_hash": "9d05d4d35631eacf01b7e0e477f60c13",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/065/metrics.json": {
+    "mtime": 1786745875.964398,
+    "ast_hash": "75f686a0537c3f8ba649b0756f3954fa",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/066/activations.json": {
+    "mtime": 1786745885.5903325,
+    "ast_hash": "79791d896270e573669c2a1dddc1b1fa",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/066/metrics.json": {
+    "mtime": 1786745885.524333,
+    "ast_hash": "f59f1608f37985dcbad962d6fe15b21e",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/067/activations.json": {
+    "mtime": 1786745892.3482869,
+    "ast_hash": "daaaee9149b000daa8ad0e1ae1fc99bd",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/067/metrics.json": {
+    "mtime": 1786745892.2942872,
+    "ast_hash": "34883555ff11c16e45c001b8dd2440ad",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/068/activations.json": {
+    "mtime": 1786745902.0632207,
+    "ast_hash": "c0062dd6d9784b2818391a0b5692b4db",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/068/metrics.json": {
+    "mtime": 1786745901.9862213,
+    "ast_hash": "905b379a611de1782830a1181e5f827a",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/069/activations.json": {
+    "mtime": 1786745914.2651381,
+    "ast_hash": "313b0cd374fcaa8b3b959e48f9d497ab",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/069/metrics.json": {
+    "mtime": 1786745914.2211385,
+    "ast_hash": "2e5c7bc761b330b8ceff485dae347c2e",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/070/activations.json": {
+    "mtime": 1786745919.6651015,
+    "ast_hash": "d37a3dcffc65d71fb52a22bc096167a4",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/070/metrics.json": {
+    "mtime": 1786745919.625248,
+    "ast_hash": "47005f30ad5af86a17623207b2f6dc30",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/071/activations.json": {
+    "mtime": 1786745925.5540614,
+    "ast_hash": "d2d39d6c232535a3f8bd2cbb3bd660e3",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/071/metrics.json": {
+    "mtime": 1786745925.4990618,
+    "ast_hash": "05f677caeb30eecdd4e4c1027ad8d0ba",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/072/activations.json": {
+    "mtime": 1786745932.9480114,
+    "ast_hash": "3da9d76539e9cbb432546dbb0b37d305",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/072/metrics.json": {
+    "mtime": 1786745932.9160116,
+    "ast_hash": "0d08a8d47cf359d3ab35c18f93c94b46",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/073/activations.json": {
+    "mtime": 1786745942.597946,
+    "ast_hash": "35c9306e5c40fd23963bcb92ce2d1e11",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/073/metrics.json": {
+    "mtime": 1786745942.5679462,
+    "ast_hash": "27819fe310c1108a724938826ac0384e",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/074/activations.json": {
+    "mtime": 1786745952.1018815,
+    "ast_hash": "0590bea53e565ac80568ca5de3f31fa8",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/074/metrics.json": {
+    "mtime": 1786745952.0698817,
+    "ast_hash": "1451cc0a2af34e5f5baa0f8fd9e80d57",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/075/activations.json": {
+    "mtime": 1786745956.74485,
+    "ast_hash": "b1ca4295da5c17bd2cdee2f28c7347e3",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/075/metrics.json": {
+    "mtime": 1786745956.6988502,
+    "ast_hash": "33178bd09f6ec87f84c9d23821d31cc4",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/076/activations.json": {
+    "mtime": 1786745961.302819,
+    "ast_hash": "2fba34763518f9c9a2bf8a957846f720",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/076/metrics.json": {
+    "mtime": 1786745961.271819,
+    "ast_hash": "50424df1a290d99b3515c07aa2595554",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/077/activations.json": {
+    "mtime": 1786745972.4587433,
+    "ast_hash": "47fe126978c8c3529460a6d574036160",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/077/metrics.json": {
+    "mtime": 1786745972.4287436,
+    "ast_hash": "1da5647b27e097a2c7e16b2397a25aa4",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/078/activations.json": {
+    "mtime": 1786745979.2077,
+    "ast_hash": "db6ab060955a4285cc328395606763d6",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/078/metrics.json": {
+    "mtime": 1786745979.1497002,
+    "ast_hash": "5c158a62cff6ebf0e86e35452bc746bf",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/079/activations.json": {
+    "mtime": 1786745986.4266572,
+    "ast_hash": "143e0a0124bfddd139aede05b1517a6d",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/079/metrics.json": {
+    "mtime": 1786745986.3936574,
+    "ast_hash": "9d40b97b398afee6154e2ac52990a235",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/080/activations.json": {
+    "mtime": 1786746000.956571,
+    "ast_hash": "51e6a2668cecdea790b85d4671a9f3d6",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/080/metrics.json": {
+    "mtime": 1786746000.9245713,
+    "ast_hash": "87292d3a8d19031ade5715d0b108e3d9",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/081/activations.json": {
+    "mtime": 1786746007.5935318,
+    "ast_hash": "e00e12aac9b0bed7aa983bfe68c02da1",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/081/metrics.json": {
+    "mtime": 1786746007.562532,
+    "ast_hash": "f1a4718b7dba7893a954995a92a494bb",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/082/activations.json": {
+    "mtime": 1786746014.5414906,
+    "ast_hash": "9fa63ca3e5ce76d59d5abe2258640e2b",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/082/metrics.json": {
+    "mtime": 1786746014.492491,
+    "ast_hash": "f7d37a247d1e44aed6b884250d907064",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/083/activations.json": {
+    "mtime": 1786746025.1094282,
+    "ast_hash": "c2a620747ebe3bfd9975ed769a223165",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/083/metrics.json": {
+    "mtime": 1786746025.0514283,
+    "ast_hash": "61d4bddb16eb36a8f3ff8b68f03b1911",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/084/activations.json": {
+    "mtime": 1786746030.1223984,
+    "ast_hash": "3a9ff534b0df198b3028d89951ddac55",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/084/metrics.json": {
+    "mtime": 1786746030.0773988,
+    "ast_hash": "57d29cfe0654c6ecd597f0130af49081",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/085/activations.json": {
+    "mtime": 1786746038.1563509,
+    "ast_hash": "11bfec6b747d47aae100194f0853fe95",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/085/metrics.json": {
+    "mtime": 1786746038.0743513,
+    "ast_hash": "795801b33c6f2b960e7c3d7678c5fa76",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/086/activations.json": {
+    "mtime": 1786746051.3422728,
+    "ast_hash": "27998bae6bf4ce9133f31617be52d214",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/086/metrics.json": {
+    "mtime": 1786746051.311357,
+    "ast_hash": "57b15a204649a4a00aea34475a2e6e05",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/087/activations.json": {
+    "mtime": 1786746059.2632258,
+    "ast_hash": "9165b7e4af420aa95bfecd77353a161e",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/087/metrics.json": {
+    "mtime": 1786746059.220226,
+    "ast_hash": "6d1f94c00ec9af32084d32a7ff759fe7",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/088/activations.json": {
+    "mtime": 1786746073.0451443,
+    "ast_hash": "ed45865f60ee8b634fd4bdc12107290a",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/088/metrics.json": {
+    "mtime": 1786746073.0151443,
+    "ast_hash": "1900ee824038c47db8442aad45c29f01",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/089/activations.json": {
+    "mtime": 1786746082.552088,
+    "ast_hash": "0e38b6a0a77003dc81f16302c45feef0",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/089/metrics.json": {
+    "mtime": 1786746082.4990883,
+    "ast_hash": "a270dfffa396b1b3ad06b467698d36c3",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/090/activations.json": {
+    "mtime": 1786746091.292036,
+    "ast_hash": "75eb77cb6d11a3560d4651d471c2813f",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/090/metrics.json": {
+    "mtime": 1786746091.2592368,
+    "ast_hash": "58ee6fae0b4338480bafea52026f2efa",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/091/activations.json": {
+    "mtime": 1786746100.1389837,
+    "ast_hash": "7a9962c1298502873fea6f23bd026427",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/091/metrics.json": {
+    "mtime": 1786746100.0482256,
+    "ast_hash": "405ee0a162f67dd167d600f5e2d3be9d",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/092/activations.json": {
+    "mtime": 1786746107.363941,
+    "ast_hash": "0a40fb691fb92ac9bb64147cc86bea02",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/092/metrics.json": {
+    "mtime": 1786746107.3179412,
+    "ast_hash": "08a53d14a8d1a0e8873bceac1ccbed2c",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/093/activations.json": {
+    "mtime": 1786746115.2498944,
+    "ast_hash": "eff6696a47fdb900ed4904113ed2ed76",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/093/metrics.json": {
+    "mtime": 1786746115.2238944,
+    "ast_hash": "343105eb7a8397cab407478b85c27e83",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/094/activations.json": {
+    "mtime": 1786746120.7668617,
+    "ast_hash": "beec3ebc34f8ab5003ec3f7643609365",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/094/metrics.json": {
+    "mtime": 1786746120.7118618,
+    "ast_hash": "feda36bf918b8c691cdb619d57feb748",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/095/activations.json": {
+    "mtime": 1786746134.0767827,
+    "ast_hash": "c34d32ecd18be17a58a0dfd5ba9e622a",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/095/metrics.json": {
+    "mtime": 1786746134.021783,
+    "ast_hash": "808d660aa5e48e2f1b6a95c7a3718442",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/096/activations.json": {
+    "mtime": 1786746154.0556645,
+    "ast_hash": "475b6527b3724fe641d4f780cca52c77",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/096/metrics.json": {
+    "mtime": 1786746153.9956648,
+    "ast_hash": "e8920ab4c5521e25d53229dd6823317a",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/097/activations.json": {
+    "mtime": 1786746166.962588,
+    "ast_hash": "53658b7229205bf1398cdae02e1501eb",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/097/metrics.json": {
+    "mtime": 1786746166.9005885,
+    "ast_hash": "3164175a87b1c4d5c939f25da0fef1a3",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/098/activations.json": {
+    "mtime": 1786746182.0994983,
+    "ast_hash": "1fb680424ae149174c4ef18b42f860a3",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/098/metrics.json": {
+    "mtime": 1786746182.0294988,
+    "ast_hash": "0c73ce14c8f315f592b2008c3ff2bf7b",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/099/activations.json": {
+    "mtime": 1786746190.27645,
+    "ast_hash": "696712f72d667c27b8d62c3f15f298f4",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/099/metrics.json": {
+    "mtime": 1786746190.2404501,
+    "ast_hash": "5d8ab8ef9d62eec15511d6e9fbc16c9c",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/100/activations.json": {
+    "mtime": 1786746200.7093883,
+    "ast_hash": "aac8617bee6677fe589206895cde48d6",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/100/metrics.json": {
+    "mtime": 1786746200.6433885,
+    "ast_hash": "ed675c186ab9560e837c705059127a6f",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/101/activations.json": {
+    "mtime": 1786746211.9213219,
+    "ast_hash": "e483d7d022d8673986795dc8019ab4b1",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/101/metrics.json": {
+    "mtime": 1786746211.8643222,
+    "ast_hash": "ed8ef40c8b9f2ccc8b56d19c21594fb0",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/102/activations.json": {
+    "mtime": 1786746227.248231,
+    "ast_hash": "f772e7253641fc8f1450cafb3e2aad82",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/102/metrics.json": {
+    "mtime": 1786746227.1772316,
+    "ast_hash": "3980876c22880db381ad3665b14a42a5",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/103/activations.json": {
+    "mtime": 1786746234.2661896,
+    "ast_hash": "d77aa67d6d50a6e7006d47ed9ec6d3b8",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/103/metrics.json": {
+    "mtime": 1786746234.2041898,
+    "ast_hash": "72dcadbe5ac7481c3276d931d6a274ac",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/104/activations.json": {
+    "mtime": 1786746248.371106,
+    "ast_hash": "8b5ffeaaf0d64d7c644ae57f566fbc53",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/104/metrics.json": {
+    "mtime": 1786746248.3141062,
+    "ast_hash": "912849a2608900ec8da155346ce3abf2",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/105/activations.json": {
+    "mtime": 1786746261.4110286,
+    "ast_hash": "0db487afb69a6e5f92a71b8abcbe5bcc",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/105/metrics.json": {
+    "mtime": 1786746261.349029,
+    "ast_hash": "4deea493e8a167a4e89bd5500cbf80d7",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/106/activations.json": {
+    "mtime": 1786746271.5959685,
+    "ast_hash": "83613f6807b13d4b5dff507e35c1ceee",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/106/metrics.json": {
+    "mtime": 1786746271.5301988,
+    "ast_hash": "9facc6f3096dd7c21074372c23202cf2",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/107/activations.json": {
+    "mtime": 1786746279.936919,
+    "ast_hash": "4b7e5066e70837927831cd6173cfa06d",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/107/metrics.json": {
+    "mtime": 1786746279.8829193,
+    "ast_hash": "6d15faf3905cf4488ef30e14647aa476",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/108/activations.json": {
+    "mtime": 1786746289.5948617,
+    "ast_hash": "eacb3a6526a516ad3943c885f965a077",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/108/metrics.json": {
+    "mtime": 1786746289.564862,
+    "ast_hash": "35c46880e0432db970bcdca346bbaaff",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/109/activations.json": {
+    "mtime": 1786746298.0098119,
+    "ast_hash": "12f8c05c186f5d3f42a7754ce35a2fcf",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/109/metrics.json": {
+    "mtime": 1786746297.9768121,
+    "ast_hash": "6ed59e83c8579c2558de9d87ddaa0366",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/110/activations.json": {
+    "mtime": 1786746304.7977717,
+    "ast_hash": "7fd9acf159fce95c2210224f25340327",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/110/metrics.json": {
+    "mtime": 1786746304.761772,
+    "ast_hash": "faed264f67da42f0ba0b20b8d127e68c",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/111/activations.json": {
+    "mtime": 1786746316.7087011,
+    "ast_hash": "1f93fed62777ae3967ad8dc556f9cb27",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/111/metrics.json": {
+    "mtime": 1786746316.6777015,
+    "ast_hash": "44737043afe20965fd981a5d4be63aad",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/112/activations.json": {
+    "mtime": 1786746326.7816415,
+    "ast_hash": "a690dcfbaef25279f3e3e3a4ac8118b6",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/112/metrics.json": {
+    "mtime": 1786746326.719642,
+    "ast_hash": "d4c1898ac915fb61bf104a5002b3e903",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/113/activations.json": {
+    "mtime": 1786746338.7535708,
+    "ast_hash": "8fa32c6f3a627955eab18e5e326f0700",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/113/metrics.json": {
+    "mtime": 1786746338.725571,
+    "ast_hash": "ae5c77f2d18e2d3e0bdc6498e30b6191",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/114/activations.json": {
+    "mtime": 1786746345.8295288,
+    "ast_hash": "810c67228b96c5b3009ac68ae4045853",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/114/metrics.json": {
+    "mtime": 1786746345.796529,
+    "ast_hash": "a3934aa1a716d938dc62de239eb1b22c",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/115/activations.json": {
+    "mtime": 1786746357.9234571,
+    "ast_hash": "51fb24a7efc27b232389df4004c9030d",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/115/metrics.json": {
+    "mtime": 1786746357.8904574,
+    "ast_hash": "fe7d8df80e20d7cb254806f20ceb9068",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/116/activations.json": {
+    "mtime": 1786746368.940392,
+    "ast_hash": "60c56727f3b4d94d1babc1411e1dd7a2",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/116/metrics.json": {
+    "mtime": 1786746368.8993921,
+    "ast_hash": "f41a6f8903e7a41d5741953db094614c",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/117/activations.json": {
+    "mtime": 1786746376.5163472,
+    "ast_hash": "dc37150110788e358a3d493e9b578eeb",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/117/metrics.json": {
+    "mtime": 1786746376.4853473,
+    "ast_hash": "fc7ecec4fc4485839f8aa6933a65d3bf",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/118/activations.json": {
+    "mtime": 1786746383.5393054,
+    "ast_hash": "6d4faa8c55f3df67253851f10194602f",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/118/metrics.json": {
+    "mtime": 1786746383.5033057,
+    "ast_hash": "1414dc525107a7b38ea1606bb201849c",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/119/activations.json": {
+    "mtime": 1786746391.9272559,
+    "ast_hash": "e069e672b83341d8b692e395b07c6558",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/119/metrics.json": {
+    "mtime": 1786746391.883256,
+    "ast_hash": "5ac6369003e67c58372128c0288bf6ff",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/120/activations.json": {
+    "mtime": 1786746398.999214,
+    "ast_hash": "a63fbd396038ecec11bbaad0ed0d0d70",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/120/metrics.json": {
+    "mtime": 1786746398.965217,
+    "ast_hash": "f1c262bd715e01805db272c89e72ca91",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/121/activations.json": {
+    "mtime": 1786746409.940149,
+    "ast_hash": "c58f44bba8bbbb79e4e672e66e46c2bf",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/121/metrics.json": {
+    "mtime": 1786746409.8901494,
+    "ast_hash": "64c9cef84099ce9bcb0606cab9015586",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/122/activations.json": {
+    "mtime": 1786746422.1520767,
+    "ast_hash": "9d84ab4c652d1c0bbc6d75d8e930c34f",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/122/metrics.json": {
+    "mtime": 1786746422.0960772,
+    "ast_hash": "2c25e4b05e32957cc9fa8026d53b3497",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/123/activations.json": {
+    "mtime": 1786746436.2749932,
+    "ast_hash": "0b5650de4c6a82137be8309a97d74473",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/123/metrics.json": {
+    "mtime": 1786746436.2422884,
+    "ast_hash": "2215556805da8c7c52087b86bafe9845",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/124/activations.json": {
+    "mtime": 1786746443.7809486,
+    "ast_hash": "0f65f4e5882c4ee46371bc387278073a",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/124/metrics.json": {
+    "mtime": 1786746443.722949,
+    "ast_hash": "f1b1d37988f06fd8761b894e74c7ae54",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/125/activations.json": {
+    "mtime": 1786746450.2389104,
+    "ast_hash": "006ac4d79d4466c8358ac99ef11981bc",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/125/metrics.json": {
+    "mtime": 1786746450.2139106,
+    "ast_hash": "557e7a243750514cdf5d379517987ef9",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/126/activations.json": {
+    "mtime": 1786746461.450844,
+    "ast_hash": "d3891d52ddadc48452343d33c074e884",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/126/metrics.json": {
+    "mtime": 1786746461.3948443,
+    "ast_hash": "942982a27c31a76566128574f1b3f9cd",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/127/activations.json": {
+    "mtime": 1786746476.505755,
+    "ast_hash": "67871a68e24834406a3183342b8a57da",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/127/metrics.json": {
+    "mtime": 1786746476.460755,
+    "ast_hash": "009599d763bb10bebd76103f9136d471",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/128/activations.json": {
+    "mtime": 1786746488.7686822,
+    "ast_hash": "0e29147aa883cb34ad813d69fe884bba",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/128/metrics.json": {
+    "mtime": 1786746488.7286825,
+    "ast_hash": "00f1dd6357ebe0b7fcc3fc42fa3c83f7",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/129/activations.json": {
+    "mtime": 1786746506.9565747,
+    "ast_hash": "7bfbdc4a733946e8fa3e5c97a4d7a2d0",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/129/metrics.json": {
+    "mtime": 1786746506.9235747,
+    "ast_hash": "4ce7a636ecad53c412a6a17c46f62498",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/130/activations.json": {
+    "mtime": 1786746518.2275078,
+    "ast_hash": "8de5a1ab3be4ee863d4efb50f92413b1",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/130/metrics.json": {
+    "mtime": 1786746518.194508,
+    "ast_hash": "f8ca19558a309eee501dfdf26acb6de8",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/131/activations.json": {
+    "mtime": 1786746534.5014114,
+    "ast_hash": "85834740cb3706e9f0bfcbf277e9e33b",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/131/metrics.json": {
+    "mtime": 1786746534.3964121,
+    "ast_hash": "59caf4afaa0e1db8b1a89dfd3f404cda",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/132/activations.json": {
+    "mtime": 1786746550.8443148,
+    "ast_hash": "4376c01662b5116ff2b56d3c707cacc3",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/132/metrics.json": {
+    "mtime": 1786746550.809315,
+    "ast_hash": "527c9d62f8d8014b8430669483cef9e3",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/133/activations.json": {
+    "mtime": 1786746565.7012267,
+    "ast_hash": "8da6b8b67f2f06af77a134e43282905d",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/133/metrics.json": {
+    "mtime": 1786746565.661227,
+    "ast_hash": "3d4fe7e7f85fb003346b48159c789af1",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/134/activations.json": {
+    "mtime": 1786746573.2291822,
+    "ast_hash": "ab9c54d8a96d8bbd1509373616fdaf7a",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/134/metrics.json": {
+    "mtime": 1786746573.2041824,
+    "ast_hash": "007bda477ec86b9af6a349834d097622",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/135/activations.json": {
+    "mtime": 1786746580.6401381,
+    "ast_hash": "caba05489e9f4b44878c54415aaad8c2",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/135/metrics.json": {
+    "mtime": 1786746580.6091385,
+    "ast_hash": "7d7c30e12ff98b7d0bbad91165beff1b",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/136/activations.json": {
+    "mtime": 1786746590.2060816,
+    "ast_hash": "1ff19cda63a0d17de58ab7aa7b8ac91a",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/136/metrics.json": {
+    "mtime": 1786746590.1750817,
+    "ast_hash": "b570ac81cef5b398bd1dee6f7e28e960",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/137/activations.json": {
+    "mtime": 1786746602.3450098,
+    "ast_hash": "3d82b387c3de57ed4b911a193e0df099",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/137/metrics.json": {
+    "mtime": 1786746602.3032427,
+    "ast_hash": "16669badbd0f812e059d66df869441b8",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/138/activations.json": {
+    "mtime": 1786746612.0309525,
+    "ast_hash": "0fc152bc2459a71945952757231eeced",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/138/metrics.json": {
+    "mtime": 1786746611.9299529,
+    "ast_hash": "bcd6bd10317969f0fb2c686705314189",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/139/activations.json": {
+    "mtime": 1786746626.3228676,
+    "ast_hash": "697352cc0521172e8652eb57644472b9",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/139/metrics.json": {
+    "mtime": 1786746626.267868,
+    "ast_hash": "4ebb6885a5eb3bbf83def9423edcc0a7",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/140/activations.json": {
+    "mtime": 1786746639.625789,
+    "ast_hash": "9e7bf7795e2e4f87c4ce855d37c39b3c",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/140/metrics.json": {
+    "mtime": 1786746639.5677893,
+    "ast_hash": "111088e3e971cc00fe226f2ee3fe5f64",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/141/activations.json": {
+    "mtime": 1786746650.7177231,
+    "ast_hash": "76543010f4ba159459986b4ba7a9d856",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/141/metrics.json": {
+    "mtime": 1786746650.6437237,
+    "ast_hash": "bbc1d507a01809f2af9890f45a310411",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/142/activations.json": {
+    "mtime": 1786746660.868663,
+    "ast_hash": "ef93905fe70277a4c8849820d2cc98ae",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/142/metrics.json": {
+    "mtime": 1786746660.8376634,
+    "ast_hash": "c3894ac2de370c59766898b952b33335",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/143/activations.json": {
+    "mtime": 1786746676.4815707,
+    "ast_hash": "2b8acb6d615a14ab5425728f4f105c5c",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/143/metrics.json": {
+    "mtime": 1786746676.425571,
+    "ast_hash": "658ab3eac927fc23e11e304324c2a5b6",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/144/activations.json": {
+    "mtime": 1786746691.1814835,
+    "ast_hash": "edafcffc4b2527db341bf261a50e6c0b",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/144/metrics.json": {
+    "mtime": 1786746691.1444838,
+    "ast_hash": "3392ad7fead00cb063a06a3ebe5ebf09",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/145/activations.json": {
+    "mtime": 1786746696.355453,
+    "ast_hash": "d39ee7e0aa910bd6152ccd5147f42019",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/145/metrics.json": {
+    "mtime": 1786746696.3304532,
+    "ast_hash": "2291c6b0be411dedb0e073214654f20e",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/146/activations.json": {
+    "mtime": 1786746697.3324473,
+    "ast_hash": "1f3202876f0a1a7cd1f824d01b768c17",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/146/metrics.json": {
+    "mtime": 1786746697.309192,
+    "ast_hash": "bd8ccd763464b4dff2ad7666007b9db4",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/147/activations.json": {
+    "mtime": 1786746698.3094413,
+    "ast_hash": "32ae2e50bc78483f70ea9c273ee51ce9",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/147/metrics.json": {
+    "mtime": 1786746698.2844415,
+    "ast_hash": "2d6587854f6e43e83d0e8fb4f254bf4b",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/148/activations.json": {
+    "mtime": 1786746699.2544358,
+    "ast_hash": "57653284070fb63032111fbcac220939",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/148/metrics.json": {
+    "mtime": 1786746699.229436,
+    "ast_hash": "a4237630cf5bbc2b231d5b8eeb48335c",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/149/activations.json": {
+    "mtime": 1786746700.220498,
+    "ast_hash": "48fb90f1b92bd564ba141d07f4ac9e53",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/149/metrics.json": {
+    "mtime": 1786746700.1964302,
+    "ast_hash": "27e8869ba4ba76220bd6a5a3f31b5e96",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/150/activations.json": {
+    "mtime": 1786746701.2014244,
+    "ast_hash": "3bcbf39e2ae3131551583f88eabfe2c2",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/150/metrics.json": {
+    "mtime": 1786746701.1774244,
+    "ast_hash": "2eab82e8b09d5523d32d3824ea6b353b",
+    "semantic_hash": ""
+  },
+  "bench/advisor/archive-v5/runs-v4/pruned_rows.json": {
+    "mtime": 1786746701.1754243,
+    "ast_hash": "7975f27db5a9a069378b8296618b35ac",
+    "semantic_hash": ""
+  },
+  "bench/advisor/crossval_v5.json": {
+    "mtime": 1786953140.641868,
+    "ast_hash": "a67624a2b3065eac56824b8ac285975f",
+    "semantic_hash": ""
+  },
+  "bench/advisor/tolerance_selector_v5.json": {
+    "mtime": 1786953230.5521212,
+    "ast_hash": "f08a4391d21eb0f091e92d745a79c2e3",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/advisor-batch-1-s4-hunter-pc/campaign.json": {
+    "mtime": 1786947681.2198765,
+    "ast_hash": "766c8da64d289b990e80b19d3c269fed",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/advisor-batch-1-s4-hunter-pc/checkpoint.json": {
+    "mtime": 1786948418.374964,
+    "ast_hash": "da27b1bb25b99f7b7eaab95c8b0f05bf",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/advisor-batch-1-s4-hunter-pc/progress.json": {
+    "mtime": 1786948418.374964,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/advisor-batch-1-s5-hunter-pc/campaign.json": {
+    "mtime": 1786947681.2199996,
+    "ast_hash": "023a0ccc0879b509c9584dd37a3df63f",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/advisor-batch-1-s5-hunter-pc/checkpoint.json": {
+    "mtime": 1786948498.855303,
+    "ast_hash": "649eefe0d5e4afe23c58378479790fec",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/advisor-batch-1-s5-hunter-pc/progress.json": {
+    "mtime": 1786948498.855303,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/advisor-batch-2-s4-hunter-pc/campaign.json": {
+    "mtime": 1786948580.016146,
+    "ast_hash": "8c4076d3349d482e5cac0aa9e4cfb0a4",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/advisor-batch-2-s4-hunter-pc/checkpoint.json": {
+    "mtime": 1786949305.30668,
+    "ast_hash": "23a79473a3984e3001c7319035013fd6",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/advisor-batch-2-s4-hunter-pc/progress.json": {
+    "mtime": 1786949305.30668,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/advisor-batch-2-s5-hunter-pc/campaign.json": {
+    "mtime": 1786948580.0162747,
+    "ast_hash": "90d7e0085ec21d5d65d4ab1b990e8fa2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/advisor-batch-2-s5-hunter-pc/checkpoint.json": {
+    "mtime": 1786949304.2936883,
+    "ast_hash": "399a4e4ac4688e63484889392ba477ec",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/advisor-batch-2-s5-hunter-pc/progress.json": {
+    "mtime": 1786949304.2936883,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/advisor-batch-3-s4-hunter-pc/campaign.json": {
+    "mtime": 1786949349.6322782,
+    "ast_hash": "7d8ecd614b5963df4d9180ec11d7a6a0",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/advisor-batch-3-s4-hunter-pc/checkpoint.json": {
+    "mtime": 1786949539.569756,
+    "ast_hash": "be936b38ae0cc4bf5ba19e79817e661f",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/advisor-batch-3-s4-hunter-pc/progress.json": {
+    "mtime": 1786949539.569756,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/advisor-batch-3-s5-hunter-pc/campaign.json": {
+    "mtime": 1786949349.6324067,
+    "ast_hash": "b6fa4e7013a126c9ef8270297c489438",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/advisor-batch-3-s5-hunter-pc/checkpoint.json": {
+    "mtime": 1786949665.6387208,
+    "ast_hash": "38a42b8d5842d6a4532c9fa3328c8556",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/advisor-batch-3-s5-hunter-pc/progress.json": {
+    "mtime": 1786949665.6387208,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-1-s0-hunter-pc/campaign.json": {
+    "mtime": 1786946947.5420108,
+    "ast_hash": "2c91e0162366aa00d14afacc7270f951",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-1-s0-hunter-pc/checkpoint.json": {
+    "mtime": 1786946947.5420108,
+    "ast_hash": "9e802c86de71874b4c9714b5f91fe3a6",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-1-s0-hunter-pc/progress.json": {
+    "mtime": 1786946947.5420108,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-1-s1-hunter-pc/campaign.json": {
+    "mtime": 1786946947.547011,
+    "ast_hash": "4a6237c1d630d3d0c3a3897af0f29956",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-1-s1-hunter-pc/checkpoint.json": {
+    "mtime": 1786946947.547011,
+    "ast_hash": "0e16d662da16ba790e22084fe0e07321",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-1-s1-hunter-pc/progress.json": {
+    "mtime": 1786946947.547011,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-1-s2-hunter-pc/campaign.json": {
+    "mtime": 1786946947.5490108,
+    "ast_hash": "6902c288cf9682c4ff4b20855168e8e5",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-1-s2-hunter-pc/checkpoint.json": {
+    "mtime": 1786946947.5490108,
+    "ast_hash": "ab8052e4c2d5e9b3731ccef6f4e5062d",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-1-s2-hunter-pc/progress.json": {
+    "mtime": 1786946947.5490108,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-1-s3-hunter-pc/campaign.json": {
+    "mtime": 1786946947.5510108,
+    "ast_hash": "fd09c978e679e5b07532a8f4d253d24d",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-1-s3-hunter-pc/checkpoint.json": {
+    "mtime": 1786946947.5510108,
+    "ast_hash": "3127f5339f691140b9ae033db1f7121d",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-1-s3-hunter-pc/progress.json": {
+    "mtime": 1786946947.5510108,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-2-s0-hunter-pc/campaign.json": {
+    "mtime": 1786946947.5520108,
+    "ast_hash": "3490b1fae24bf8e05ecf9766da2fdc3a",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-2-s0-hunter-pc/checkpoint.json": {
+    "mtime": 1786946947.5520108,
+    "ast_hash": "e8fbb70ff085bcb096d9d82ba6cf2cda",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-2-s0-hunter-pc/progress.json": {
+    "mtime": 1786946947.5520108,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-2-s0-livingroom-pc/campaign.json": {
+    "mtime": 1786946947.5540109,
+    "ast_hash": "52a3986c3b6e9c886a467fd516a60311",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-2-s0-livingroom-pc/checkpoint.json": {
+    "mtime": 1786946947.5547757,
+    "ast_hash": "028b871f4064d4dab179c594411dd128",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-2-s0-livingroom-pc/progress.json": {
+    "mtime": 1786946947.5547757,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-2-s1-hunter-pc/campaign.json": {
+    "mtime": 1786946947.5550108,
+    "ast_hash": "b60c48d15efc2b20c491a93318ceed9b",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-2-s1-hunter-pc/checkpoint.json": {
+    "mtime": 1786946947.5550108,
+    "ast_hash": "6c7a67dde59c04fd2acffec6a98e821b",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-2-s1-hunter-pc/progress.json": {
+    "mtime": 1786946947.5560107,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-2-s1-livingroom-pc/campaign.json": {
+    "mtime": 1786946947.5570107,
+    "ast_hash": "0c361234d8c392638c06410514cbc7ca",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-2-s1-livingroom-pc/checkpoint.json": {
+    "mtime": 1786946947.5577834,
+    "ast_hash": "d2fdcfc6c452be140a653c7892eb80e4",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-2-s1-livingroom-pc/progress.json": {
+    "mtime": 1786946947.5577834,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-2-s2-hunter-pc/campaign.json": {
+    "mtime": 1786946947.5580108,
+    "ast_hash": "c03532690163457d07a0e545e003bf79",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-2-s2-hunter-pc/checkpoint.json": {
+    "mtime": 1786946947.5580108,
+    "ast_hash": "d48ff60e57f79692974cbf344487ad33",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-2-s2-hunter-pc/progress.json": {
+    "mtime": 1786946947.5580108,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-2-s2-livingroom-pc/campaign.json": {
+    "mtime": 1786946947.5590107,
+    "ast_hash": "0bedc9ca472dbbcde897c187c9486d71",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-2-s2-livingroom-pc/checkpoint.json": {
+    "mtime": 1786946947.559949,
+    "ast_hash": "66fec17611af8184a84a71258651bd7c",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-2-s2-livingroom-pc/progress.json": {
+    "mtime": 1786946947.559949,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-2-s3-hunter-pc/campaign.json": {
+    "mtime": 1786946947.5600107,
+    "ast_hash": "b0ec0e9af769e3a274ffe0fade407661",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-2-s3-hunter-pc/checkpoint.json": {
+    "mtime": 1786946947.5600107,
+    "ast_hash": "d876907a7ecbba003512379fc9841ea1",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-2-s3-hunter-pc/progress.json": {
+    "mtime": 1786946947.5600107,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-2-s3-livingroom-pc/campaign.json": {
+    "mtime": 1786946947.5610108,
+    "ast_hash": "2fe843364e14a4ab35bc64de53fcf6ae",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-2-s3-livingroom-pc/checkpoint.json": {
+    "mtime": 1786946947.562209,
+    "ast_hash": "e6839bfe20611419b0f775817f76c189",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-2-s3-livingroom-pc/progress.json": {
+    "mtime": 1786946947.562209,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-3-s0-hunter-pc/campaign.json": {
+    "mtime": 1786946947.562209,
+    "ast_hash": "03c7f9b7e9f151371bc6af89b3b34008",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-3-s0-hunter-pc/checkpoint.json": {
+    "mtime": 1786946947.562997,
+    "ast_hash": "930d3256f8ea0214db8c6fb2b60ce88b",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-3-s0-hunter-pc/progress.json": {
+    "mtime": 1786946947.562997,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-3-s0-livingroom-pc/campaign.json": {
+    "mtime": 1786946947.5630107,
+    "ast_hash": "ea01bda275a3e09b9ebee52a4129e80f",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-3-s0-livingroom-pc/checkpoint.json": {
+    "mtime": 1786946947.5636728,
+    "ast_hash": "e665efe79c9ecdf39e728e3edde00bae",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-3-s0-livingroom-pc/progress.json": {
+    "mtime": 1786946947.5636728,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-3-s1-hunter-pc/campaign.json": {
+    "mtime": 1786946947.5636728,
+    "ast_hash": "86605c1788f1dfad2fb0f0f15d8616d4",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-3-s1-hunter-pc/checkpoint.json": {
+    "mtime": 1786946947.564248,
+    "ast_hash": "cea982d27c6f21f4697ebad0b6ee6432",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-3-s1-hunter-pc/progress.json": {
+    "mtime": 1786946947.564248,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-3-s1-livingroom-pc/campaign.json": {
+    "mtime": 1786946947.564248,
+    "ast_hash": "e61868ab66b41dec2dddfc072f0dc38a",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-3-s1-livingroom-pc/checkpoint.json": {
+    "mtime": 1786946947.564535,
+    "ast_hash": "cf44596d0e898704590cc7d24b846a5f",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-3-s1-livingroom-pc/progress.json": {
+    "mtime": 1786946947.564535,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-3-s2-hunter-pc/campaign.json": {
+    "mtime": 1786946947.564535,
+    "ast_hash": "6dae8412e11f7bf74e7d2282c33a7ed8",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-3-s2-hunter-pc/checkpoint.json": {
+    "mtime": 1786946947.5649567,
+    "ast_hash": "c435cd81c54cd831988fcd1cbe185d8e",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-3-s2-hunter-pc/progress.json": {
+    "mtime": 1786946947.5649567,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-3-s2-livingroom-pc/campaign.json": {
+    "mtime": 1786946947.5649567,
+    "ast_hash": "7a87e10cce0c47d22cee60b085effdf3",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-3-s2-livingroom-pc/checkpoint.json": {
+    "mtime": 1786946947.5652907,
+    "ast_hash": "1c6203f1c8dfaa80d64d772a339d0647",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-3-s2-livingroom-pc/progress.json": {
+    "mtime": 1786946947.5652907,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-3-s3-hunter-pc/campaign.json": {
+    "mtime": 1786946947.5652907,
+    "ast_hash": "f9b26eb6fb8703ee3b6cea70beb8ea98",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-3-s3-hunter-pc/checkpoint.json": {
+    "mtime": 1786946947.5659564,
+    "ast_hash": "91f1dc443a367e71f66ab1b3171c128e",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-3-s3-hunter-pc/progress.json": {
+    "mtime": 1786946947.5659564,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-3-s3-livingroom-pc/campaign.json": {
+    "mtime": 1786946947.5659564,
+    "ast_hash": "efcd1d51c44d0c9f692614ad9d26c3a8",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-3-s3-livingroom-pc/checkpoint.json": {
+    "mtime": 1786946947.566309,
+    "ast_hash": "ce3dfc01f2666e6506be33e62524bbfe",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-3-s3-livingroom-pc/progress.json": {
+    "mtime": 1786946947.566309,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-4-s0-hunter-pc/campaign.json": {
+    "mtime": 1786946947.566309,
+    "ast_hash": "e888e1e69f350e77431175a4ebc68e20",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-4-s0-hunter-pc/checkpoint.json": {
+    "mtime": 1786946947.566723,
+    "ast_hash": "c49031d908935ff96f5b1ba4eca2d6fc",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-4-s0-hunter-pc/progress.json": {
+    "mtime": 1786946947.566723,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-4-s0-livingroom-pc/campaign.json": {
+    "mtime": 1786946947.566723,
+    "ast_hash": "80bfaeffc8315c865f6416d25de72891",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-4-s0-livingroom-pc/checkpoint.json": {
+    "mtime": 1786946947.5670636,
+    "ast_hash": "4717b59592340a5d2251dc7fa49dad16",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-4-s0-livingroom-pc/progress.json": {
+    "mtime": 1786946947.5670636,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-4-s1-hunter-pc/campaign.json": {
+    "mtime": 1786946947.5670636,
+    "ast_hash": "c8505019d096a52820e061e63950ffeb",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-4-s1-hunter-pc/checkpoint.json": {
+    "mtime": 1786946947.5672863,
+    "ast_hash": "1b8a372b44b7bc2a44a1a0b50bfab31b",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-4-s1-hunter-pc/progress.json": {
+    "mtime": 1786946947.5672863,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-4-s1-livingroom-pc/campaign.json": {
+    "mtime": 1786946947.5672863,
+    "ast_hash": "4215da4c75e4e28ff7ae73ecc4efe790",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-4-s1-livingroom-pc/checkpoint.json": {
+    "mtime": 1786946947.567496,
+    "ast_hash": "9e99bfcf5b3c9560840ba8444df77176",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-batch-4-s1-livingroom-pc/progress.json": {
+    "mtime": 1786946947.567496,
+    "ast_hash": "6d12a0a5e7fc1fd900fcc6da439d5da2",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-truth-0/campaign.json": {
+    "mtime": 1786946947.567496,
+    "ast_hash": "ec4961cc8c507e4490bd79b3146c1cc1",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-truth-0/checkpoint.json": {
+    "mtime": 1786946947.5677712,
+    "ast_hash": "e7774d2f3f7ae721d270e978fb23ad3e",
+    "semantic_hash": ""
+  },
+  "bench/campaigns/archive-v5/advisor-truth-0/progress.json": {
+    "mtime": 1786946947.5677712,
+    "ast_hash": "e19dcbe525c0dbc2ca47cbbc0536915d",
+    "semantic_hash": ""
+  },
+  "bench/results/advisor-budget-sweep.json": {
+    "mtime": 1786953269.1098049,
+    "ast_hash": "cb372a929b8de0ada6b9edbd8dcf122a",
+    "semantic_hash": ""
+  },
+  "scripts/sweep_advisor_budget.py": {
+    "mtime": 1786938512.6858294,
+    "ast_hash": "aedfc23ace9ceaf580f09e315166b610",
+    "semantic_hash": ""
+  },
+  "src/geom/include/geom/signal_fft.hpp": {
+    "mtime": 1786942698.9018722,
+    "ast_hash": "30556f53e5ce3805477c8ee8ee2f2351",
+    "semantic_hash": ""
+  },
+  "src/geom/src/signal_fft.cpp": {
+    "mtime": 1786942730.5606153,
+    "ast_hash": "68b7976be74c4be55747cae8fbc2983a",
+    "semantic_hash": ""
+  },
+  "src/mesh/include/mesh/feature_pin.hpp": {
+    "mtime": 1786943379.2963226,
+    "ast_hash": "ed5b93087d765f8bb397b9b735e93142",
+    "semantic_hash": ""
+  },
+  "src/mesh/src/feature_pin.cpp": {
+    "mtime": 1786946935.4021106,
+    "ast_hash": "0b945df176a5891789d611242e3b0ef8",
+    "semantic_hash": ""
+  },
+  "docs/advisor/0009-v5-mesher-conformity-retrain.md": {
+    "mtime": 1786953368.5999892,
+    "ast_hash": "bd66280d37222378d8b951a8e627b674",
+    "semantic_hash": ""
+  },
+  "docs/decisions/0035-boundary-conformity.md": {
+    "mtime": 1786945288.1426399,
+    "ast_hash": "e53335d4023d32513a405715f3e49ed0",
+    "semantic_hash": ""
+  },
+  "docs/assets/showcase/bench_advisor_budget.png": {
+    "mtime": 1786953665.9747334,
+    "ast_hash": "d17792b48a7d7a7e1b2d8c8402c2526c",
     "semantic_hash": ""
   }
 }

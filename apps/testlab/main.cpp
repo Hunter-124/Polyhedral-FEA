@@ -20,6 +20,7 @@
 #include "fea/vtu.hpp"
 #include "fea/zz.hpp"
 #include "geom/cad_topology.hpp"
+#include "geom/indicators.hpp"
 #include "geom/step.hpp"
 #include "mesh/brep_fidelity.hpp"
 #include "mesh/surface_metrics.hpp"
@@ -239,6 +240,10 @@ struct Config {
     /// geometry features before the solve. OFF by default so frozen campaign
     /// baselines are unchanged; a campaign opts in via `"bc_grading": true`.
     bool bc_grading = false;
+    /// Spectral sizing (ADR-0034): FFT-denoise CAD-edge curvature sources and
+    /// energy-truncate the fused size field. OFF by default so frozen campaign
+    /// baselines are unchanged; a campaign opts in via `"spectral_smooth": true`.
+    bool spectral_smooth = false;
     int skin_layers = 2;
     int adapt_passes = 0;
     double eta_target = 0.0;
@@ -305,7 +310,7 @@ Campaign load_campaign(const fs::path& path) {
         "mesher",          "feature_refine", "order",          "element_tendency",
         "bc_grading",      "curvature_turn_deg", "snap_boundary", "skin_layers",
         "adapt_passes",    "eta_target",      "p_elevate",     "adapt_leb_waves",
-        "h_rel"};
+        "spectral_smooth", "h_rel"};
     for (auto it = c.grid.begin(); it != c.grid.end(); ++it) {
         if (!kGridKeys.contains(it.key())) {
             throw std::runtime_error("unknown grid key '" + it.key() + "'");
@@ -553,6 +558,9 @@ std::vector<Config> expand_grid(const json& grid) {
         }
         if (values.contains("bc_grading")) {
             cfg.bc_grading = values["bc_grading"].get<bool>();
+        }
+        if (values.contains("spectral_smooth")) {
+            cfg.spectral_smooth = values["spectral_smooth"].get<bool>();
         }
         if (values.contains("curvature_turn_deg")) {
             cfg.curvature_turn_deg = values["curvature_turn_deg"].get<double>();
@@ -1795,9 +1803,34 @@ json geom_class_of(const pipeline::Model& model, double h_ref) {
     const Eigen::Vector3d ext = (model.bbox_max - model.bbox_min).cwiseAbs();
     const double min_ext = ext.minCoeff();
     const double max_ext = ext.maxCoeff();
-    // Faceted "curved" proxy: many triangles relative to 12-tri box.
-    const double ntri = static_cast<double>(model.surface.triangles.size());
-    const double curved_frac = std::clamp((ntri - 12.0) / std::max(ntri, 1.0), 0.0, 1.0);
+    // Curved-vertex fraction: the SAME definition the serving side reports in
+    // pipeline::CaseFeatures (src/pipeline/src/scene.cpp), so this campaign-row
+    // field and the advisor's live feature agree. Fraction of vertices whose
+    // curvature scaled by the bounding-box diagonal exceeds 1e-8, estimated by
+    // geom::estimate_vertex_curvature and guarded so a malformed or empty
+    // surface yields the finite zero default. The faceted proxy this replaces
+    // -- (ntri - 12) / ntri -- saturated to ~1.0 on any real triangulation.
+    double curved_frac = 0.0;
+    try {
+        const auto curvature = geom::estimate_vertex_curvature(model.surface);
+        const double bbox_diag = ext.norm();
+        std::size_t n = 0;
+        std::size_t curved = 0;
+        for (const double kappa : curvature.kappa) {
+            if (!(kappa >= 0.0) || !std::isfinite(kappa)) {
+                continue;
+            }
+            ++n;
+            if (kappa * bbox_diag > 1e-8) {
+                ++curved;
+            }
+        }
+        if (n > 0) {
+            curved_frac = static_cast<double>(curved) / static_cast<double>(n);
+        }
+    } catch (...) {
+        // Malformed or empty surfaces retain the finite zero default.
+    }
     const bool thin = (h_ref > 0.0) && (min_ext < 2.5 * h_ref);
     const double min_feature_h = (h_ref > 0.0) ? (min_ext / h_ref) : 0.0;
     (void)max_ext;
@@ -1841,6 +1874,7 @@ json action_json(const Config& cfg, double h, double h_rel) {
             {"skin_layers", cfg.skin_layers},
             {"feature_refine", cfg.feature_refine},
             {"bc_grading", cfg.bc_grading},
+            {"spectral_smooth", cfg.spectral_smooth},
             {"adapt_passes", cfg.adapt_passes},
             {"eta_target", cfg.eta_target},
             {"p_elevate", cfg.p_elevate},
@@ -2009,6 +2043,7 @@ pipeline::SimSetup adaptive_setup(const pipeline::Model& model, const PartCase& 
     setup.mesh_size = h;
     setup.use_feature_grading = cfg.feature_refine;
     setup.bc_grading = cfg.bc_grading;
+    setup.spectral_smooth = cfg.spectral_smooth;
     setup.adapt_passes = cfg.adapt_passes;
     setup.eta_target = cfg.eta_target;
     setup.p_elevate = cfg.p_elevate || cfg.order >= 2;

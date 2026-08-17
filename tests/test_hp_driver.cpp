@@ -9,6 +9,9 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+#include <limits>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -300,4 +303,200 @@ TEST_CASE("hp-driver: decisions are deterministic for fixed seed and inputs") {
     CHECK(a.global_shape == b.global_shape);
     CHECK(a.n_h == b.n_h);
     CHECK(a.n_p == b.n_p);
+}
+
+TEST_CASE("dorfler_coarsen_mark: insignificant tail respects error-mass budget") {
+    const std::vector<double> eta{1.0, 0.5, 0.1, 0.08, 0.05};
+    const double theta = 0.02;
+
+    double total = 0.0;
+    for (double e : eta) {
+        total += e * e;
+    }
+
+    const auto marked = adapt::dorfler_coarsen_mark(eta, theta);
+    REQUIRE(marked.size() == 3);
+    // Ascending indices; smallest-η elements first in the tail.
+    CHECK(std::is_sorted(marked.begin(), marked.end()));
+
+    double tail_mass = 0.0;
+    for (auto i : marked) {
+        tail_mass += eta[i] * eta[i];
+    }
+    CHECK(tail_mass <= theta * total + 1e-15);
+
+    // Maximality: adding the next-smallest unmarked η would exceed the budget.
+    double smallest_unmarked = std::numeric_limits<double>::max();
+    for (std::size_t i = 0; i < eta.size(); ++i) {
+        if (std::find(marked.begin(), marked.end(), i) == marked.end()) {
+            smallest_unmarked = std::min(smallest_unmarked, eta[i]);
+        }
+    }
+    REQUIRE(smallest_unmarked < std::numeric_limits<double>::max());
+    CHECK(tail_mass + smallest_unmarked * smallest_unmarked > theta * total);
+
+    // Scale invariance: a common factor must not change the mark set.
+    std::vector<double> scaled = eta;
+    for (double& e : scaled) {
+        e *= 1e3;
+    }
+    CHECK(adapt::dorfler_coarsen_mark(scaled, theta) == marked);
+
+    // Zero total error: nothing is provably insignificant.
+    const std::vector<double> zeros(5, 0.0);
+    CHECK(adapt::dorfler_coarsen_mark(zeros, theta).empty());
+
+    CHECK_THROWS_AS(adapt::dorfler_coarsen_mark(eta, 0.0), std::invalid_argument);
+    CHECK_THROWS_AS(adapt::dorfler_coarsen_mark(eta, 1.5), std::invalid_argument);
+}
+
+namespace {
+
+// Flat, smooth, p-capped signal: decide_element finds nothing to do (kNone),
+// so only the coarsen override can act on it.
+adapt::ElementHpSignal sleepy_signal(double h, double h_geometry) {
+    adapt::ElementHpSignal s;
+    s.h = h;
+    s.kappa = 0.0;
+    s.thickness = 0.0;
+    s.eta = 0.01;
+    s.surplus = 0.02; // ratio > smooth threshold → no h, no p benefit
+    s.p = 4;
+    s.p_max = 4; // p-capped
+    s.hex_fit = 0.5;
+    s.tet_fit = 0.5;
+    s.poly_fit = 0.5;
+    s.h_geometry = h_geometry;
+    return s;
+}
+
+} // namespace
+
+TEST_CASE("hp-driver: pure-coarsen pass marks fine cells and suggests bounded rise") {
+    adapt::HpDriverPolicy policy;
+    policy.coarsen_theta = 1.0; // every element qualifies as tail mass
+
+    const std::vector<double> h{0.1};
+    const std::vector<double> kappa(6, 0.0);
+    const std::vector<double> thick(6, 0.0);
+    const std::vector<double> eta(6, 0.01);
+    const std::vector<double> surplus(6, 0.02);
+    const std::vector<int> p{4};
+    const std::vector<double> h_geom{0.4}; // geometry tolerates 4× current h
+
+    const auto sigs =
+        adapt::make_hp_signals(h, kappa, thick, eta, surplus, p, {}, {}, {}, policy, h_geom);
+    REQUIRE(sigs.size() == 6);
+    for (const auto& s : sigs) {
+        CHECK(s.h_geometry == Catch::Approx(0.4));
+    }
+
+    const auto plan = adapt::drive_hp(sigs, policy, {}, 0.1, /*h_ceiling=*/0.12);
+    CHECK(plan.n_coarsen == 6);
+    CHECK(plan.coarsen_mark.size() == 6);
+    CHECK(plan.n_h == 0);
+    CHECK(plan.n_p == 0);
+    for (const auto& d : plan.decisions) {
+        CHECK(d.action == adapt::HpAction::kCoarsen);
+        CHECK(std::string(d.reason) == "coarsen-tail");
+        CHECK(d.h_next == Catch::Approx(0.4)); // revert to the full geometry demand
+    }
+    CHECK(plan.h_suggestion.n_marked == 0);
+    CHECK(plan.h_suggestion.refine_seeds.empty());
+    // Bounded global rise: min(h * 1.25, ceiling).
+    CHECK(plan.h_suggestion.h_next == Catch::Approx(0.12));
+    CHECK(plan.predicted_dof_factor < 1.0);
+    CHECK(plan.predicted_dof_factor > 0.0);
+    CHECK(adapt::summarize_hp_plan(plan).find("coarsen=6") != std::string::npos);
+
+    // No ceiling given: h_next may not exceed h_uniform.
+    const auto plan_nc = adapt::drive_hp(sigs, policy, {}, 0.1);
+    CHECK(plan_nc.n_coarsen == 6);
+    CHECK(plan_nc.h_suggestion.h_next == Catch::Approx(0.1));
+}
+
+TEST_CASE("hp-driver: geometry gate closes when mesh already matches demand") {
+    adapt::HpDriverPolicy policy;
+    policy.coarsen_theta = 1.0;
+
+    std::vector<adapt::ElementHpSignal> sigs;
+    for (int i = 0; i < 4; ++i) {
+        sigs.push_back(sleepy_signal(0.1, 0.1)); // h_geometry == h: no slack
+    }
+    const auto plan = adapt::drive_hp(sigs, policy, {}, 0.1, 0.2);
+    CHECK(plan.n_coarsen == 0);
+    CHECK(plan.coarsen_mark.empty());
+    for (const auto& d : plan.decisions) {
+        CHECK(d.action == adapt::HpAction::kNone);
+    }
+    // No coarsening → suggestion unchanged from pre-change behaviour.
+    CHECK(plan.h_suggestion.h_next == Catch::Approx(0.1));
+    CHECK(adapt::summarize_hp_plan(plan).find("coarsen=") == std::string::npos);
+}
+
+TEST_CASE("hp-driver: coarsen never overrides an h-refine decision") {
+    adapt::HpDriverPolicy policy;
+    policy.coarsen_theta = 1.0; // everything is in the insignificant tail
+
+    // Element 0: curved boundary → geometry gate forces h-refine, even though
+    // it is in the tail and geometry sizing would allow a larger cell.
+    auto curved = base_signal();
+    curved.h = 0.1;
+    curved.kappa = 6.0; // h·κ = 0.6 rad > 15°
+    curved.eta = 0.5;
+    curved.surplus = 0.6;
+    curved.h_geometry = 0.4;
+
+    std::vector<adapt::ElementHpSignal> sigs{curved};
+    for (int i = 0; i < 3; ++i) {
+        sigs.push_back(sleepy_signal(0.1, 0.4));
+    }
+
+    const auto plan = adapt::drive_hp(sigs, policy, {}, 0.1, 0.2);
+    REQUIRE(plan.decisions.size() == 4);
+    CHECK(plan.decisions[0].action == adapt::HpAction::kHRefine);
+    CHECK(plan.n_coarsen == 3);
+    CHECK(std::find(plan.coarsen_mark.begin(), plan.coarsen_mark.end(), 0) ==
+          plan.coarsen_mark.end());
+    CHECK(plan.n_h >= 1);
+}
+
+TEST_CASE("hp-driver: unset h_geometry keeps the pre-coarsen plan exactly") {
+    adapt::HpDriverPolicy policy;
+    policy.seed = 42;
+
+    // Same fixture as "drive_hp marks curved vs smooth regions correctly".
+    auto curved = base_signal();
+    curved.h = 0.1;
+    curved.kappa = 6.0;
+    curved.eta = 0.7;
+    curved.surplus = 0.6;
+
+    auto smooth = base_signal();
+    smooth.h = 0.1;
+    smooth.kappa = 0.0;
+    smooth.eta = 0.4;
+    smooth.surplus = 0.5;
+    smooth.p = 1;
+
+    auto quiet = base_signal();
+    quiet.eta = 1e-9;
+    quiet.surplus = 0.0;
+    quiet.kappa = 0.0;
+
+    std::vector<adapt::ElementHpSignal> sigs{curved, smooth, quiet};
+    std::vector<Eigen::Vector3d> cents{{0, 0, 0}, {1, 0, 0}, {2, 0, 0}};
+
+    const auto plan = adapt::drive_hp(sigs, policy, cents, 0.1);
+    CHECK(plan.n_coarsen == 0);
+    CHECK(plan.coarsen_mark.empty());
+    CHECK(plan.decisions[0].action == adapt::HpAction::kHRefine);
+    CHECK(plan.decisions[1].action == adapt::HpAction::kPRaise);
+    CHECK(plan.decisions[2].action == adapt::HpAction::kNone);
+    REQUIRE(plan.h_mark.size() == 1);
+    CHECK(plan.h_mark.front() == 0);
+    REQUIRE(plan.p_mark.size() == 1);
+    CHECK(plan.p_mark.front() == 1);
+    CHECK(plan.h_suggestion.h_next == Catch::Approx(0.075));
+    CHECK(plan.predicted_dof_factor >= 1.0);
 }

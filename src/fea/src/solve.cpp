@@ -72,6 +72,32 @@ SolveDecision decide_solve_method(Eigen::Index nfree, const SolveOptions& option
     return decision;
 }
 
+Eigen::VectorXd symmetric_diagonal_scaling(const Eigen::SparseMatrix<double>& spd) {
+    if (spd.rows() != spd.cols()) {
+        throw FeaError(std::format("symmetric_diagonal_scaling: matrix is not square ({}x{})",
+                                   spd.rows(), spd.cols()));
+    }
+    Eigen::VectorXd s(spd.rows());
+    for (Eigen::Index col = 0; col < spd.outerSize(); ++col) {
+        double diag = 0.0;
+        for (Eigen::SparseMatrix<double>::InnerIterator it(spd, col); it; ++it) {
+            if (it.row() == col) {
+                diag = it.value();
+                break;
+            }
+        }
+        // !(diag > 0) also rejects NaN; an SPD matrix needs a positive diagonal.
+        if (!(diag > 0.0)) {
+            throw FeaError(std::format(
+                "symmetric_diagonal_scaling: non-positive diagonal entry at index {} "
+                "(value={}); matrix is not SPD",
+                col, diag));
+        }
+        s[col] = 1.0 / std::sqrt(diag);
+    }
+    return s;
+}
+
 namespace {
 
 /// Iteration cap `kAuto` applies when the caller leaves `cg_max_iters` at 0.
@@ -266,6 +292,36 @@ Eigen::VectorXd solve_reduced(const Eigen::SparseMatrix<double>& kff,
                                attempt.true_relative_residual, attempt.reliable_restarts);
         };
 
+        // Symmetric diagonal equilibration: MPC transforms and graded meshes
+        // spread the K_ff diagonal over orders of magnitude, which degrades
+        // incomplete Cholesky. Solve the exact congruence K_hat = S·K·S,
+        // rhs_hat = S·rhs (unit diagonal) and unscale x = S·x_hat afterwards.
+        // A non-positive diagonal means the system is not SPD; keep the
+        // historical unscaled behaviour in that case.
+        Eigen::VectorXd scaling; // empty = not equilibrated
+        Eigen::SparseMatrix<double> kff_hat;
+        Eigen::VectorXd rhs_hat;
+        try {
+            scaling = symmetric_diagonal_scaling(kff);
+            kff_hat = kff; // same sparsity pattern; values equilibrated in one pass
+            for (Eigen::Index col = 0; col < kff_hat.outerSize(); ++col) {
+                for (Eigen::SparseMatrix<double>::InnerIterator it(kff_hat, col); it; ++it) {
+                    it.valueRef() *= scaling[it.row()] * scaling[it.col()];
+                }
+            }
+            rhs_hat = scaling.cwiseProduct(rhs);
+            emit_note("CG system equilibrated by symmetric diagonal scaling "
+                      "(S·K_ff·S has unit diagonal)");
+        } catch (const FeaError& e) {
+            scaling.resize(0);
+            emit_note(std::format("CG diagonal equilibration unavailable ({}); "
+                                  "solving the unscaled system",
+                                  e.what()));
+        }
+        const bool equilibrated = scaling.size() > 0;
+        const Eigen::SparseMatrix<double>& a = equilibrated ? kff_hat : kff;
+        const Eigen::VectorXd& b = equilibrated ? rhs_hat : rhs;
+
         std::vector<std::string> attempts;
         attempts.reserve(3);
         CgAttempt selected_attempt;
@@ -278,10 +334,29 @@ Eigen::VectorXd solve_reduced(const Eigen::SparseMatrix<double>& kff,
             emit_note(std::format("CG using {} (target tol={}, acceptance tol={}, "
                                   "max iterations={})",
                                   name, options.cg_tol, options.cg_accept_tol, max_iters));
-            CgAttempt attempt =
-                run_cg(kff, rhs, preconditioner, options.cg_tol, max_iters, report_every,
-                       options.on_progress);
+            CgAttempt attempt = run_cg(a, b, preconditioner, options.cg_tol, max_iters,
+                                       report_every, options.on_progress);
             total_iterations += attempt.iterations;
+            if (equilibrated) {
+                // The honesty contract measures the physical system: unscale
+                // x = S·x_hat, then independently recompute ‖b−K·x‖/‖b‖ in the
+                // original space for the summary, acceptance, and throw paths.
+                attempt.x = scaling.cwiseProduct(attempt.x);
+                const double rhs_norm = rhs.norm();
+                if (rhs_norm > 0.0) {
+                    const Eigen::VectorXd r = rhs - kff * attempt.x;
+                    attempt.true_relative_residual = r.norm() / rhs_norm;
+                } else {
+                    attempt.true_relative_residual = 0.0;
+                }
+                // Never claim target convergence the physical residual did not
+                // reach, and never withhold it when it did.
+                if (attempt.true_relative_residual <= options.cg_tol) {
+                    attempt.stop = CgStop::kConverged;
+                } else if (attempt.stop == CgStop::kConverged) {
+                    attempt.stop = CgStop::kAttainableAccuracy;
+                }
+            }
             attempts.push_back(attempt_summary(name, attempt));
             const bool converged = attempt.stop == CgStop::kConverged;
             if (!have_attempt || converged ||
@@ -295,34 +370,38 @@ Eigen::VectorXd solve_reduced(const Eigen::SparseMatrix<double>& kff,
         // Eigen's modified incomplete Cholesky is the primary preconditioner.
         // Its default initial shift (1e-3) makes ten attempts ending near
         // 0.256 on the scaled matrix. Continue at the next shift scale before
-        // giving up on IC and falling back to Jacobi.
+        // giving up on IC and falling back to Jacobi. Preconditioners are
+        // built on the equilibrated matrix when equilibration succeeded.
+        const std::string_view eq = equilibrated ? "equilibrated " : "";
         constexpr double kIcDefaultInitialShift = 1e-3;
         Eigen::IncompleteCholesky<double> ichol;
-        ichol.compute(kff);
+        ichol.compute(a);
         if (ichol.info() == Eigen::Success) {
-            const std::string name = std::format(
-                "incomplete Cholesky (shift={})", ichol_shift_text(ichol, kIcDefaultInitialShift));
+            const std::string name =
+                std::format("{}incomplete Cholesky (shift={})", eq,
+                            ichol_shift_text(ichol, kIcDefaultInitialShift));
             run_attempt(name, ichol);
         } else {
             const std::string failed_shift = ichol_shift_text(ichol, kIcDefaultInitialShift);
-            attempts.push_back(std::format(
-                "incomplete Cholesky: factorization failed after shift {}", failed_shift));
+            attempts.push_back(
+                std::format("{}incomplete Cholesky: factorization failed after shift {}", eq,
+                            failed_shift));
             emit_note(std::format(
                 "CG incomplete Cholesky factorization failed after shift {}; "
                 "retrying with initial shift {}",
                 failed_shift, kIcRetryInitialShift));
 
             ichol.setInitialShift(kIcRetryInitialShift);
-            ichol.factorize(kff); // reuse the already-computed AMD ordering
+            ichol.factorize(a); // reuse the already-computed AMD ordering
             if (ichol.info() == Eigen::Success) {
                 const std::string name = std::format(
-                    "shifted incomplete Cholesky (initial shift={}, final shift={})",
+                    "{}shifted incomplete Cholesky (initial shift={}, final shift={})", eq,
                     kIcRetryInitialShift, ichol_shift_text(ichol, kIcRetryInitialShift));
                 run_attempt(name, ichol);
             } else {
                 const std::string retry_shift = ichol_shift_text(ichol, kIcRetryInitialShift);
                 attempts.push_back(std::format(
-                    "shifted incomplete Cholesky: factorization failed after shift {}",
+                    "{}shifted incomplete Cholesky: factorization failed after shift {}", eq,
                     retry_shift));
                 emit_note(std::format(
                     "CG shifted incomplete Cholesky factorization failed after shift {}; "
@@ -335,8 +414,8 @@ Eigen::VectorXd solve_reduced(const Eigen::SparseMatrix<double>& kff,
             if (!attempts.empty() && ichol.info() == Eigen::Success) {
                 emit_note("CG incomplete Cholesky target not met; using Jacobi");
             }
-            const Eigen::DiagonalPreconditioner<double> jacobi(kff);
-            run_attempt("Jacobi", jacobi);
+            const Eigen::DiagonalPreconditioner<double> jacobi(a);
+            run_attempt(equilibrated ? "equilibrated Jacobi" : "Jacobi", jacobi);
         }
 
         const std::string provenance = join_attempts(attempts);

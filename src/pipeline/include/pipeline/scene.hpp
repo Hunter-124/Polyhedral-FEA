@@ -134,6 +134,14 @@ struct SimSetup {
     /// and fixed faces (loads finest) before any solve. Complements
     /// `use_feature_grading` (geometry). Off by default to preserve baselines.
     bool bc_grading = false;
+    /// Spectral sizing (ADR-0034): FFT-denoise CAD-edge curvature sources and
+    /// energy-truncate the fused size field on a Cartesian grid so
+    /// insignificant fine bands merge into the coarse field. A genuine
+    /// geometry demand is re-imposed after filtering. When `max_elems` is set
+    /// the ceiling also becomes a target (one uniform h scale). Off by default
+    /// in the library so campaign baselines are untouched; the CLI product
+    /// path enables it (opt-out with --no-spectral).
+    bool spectral_smooth = false;
     /// Max solve→ZZ→(LEB|seed-remesh) refine passes after the initial mesh.
     /// **0 = single mesh+solve** (no adapt). Prefer ≥1 with `eta_target` for
     /// fully adaptive product runs (stops early when η is small enough).
@@ -254,15 +262,15 @@ struct CaseFeatures {
     double load_axis_alignment = 0.0;
     double poisson = 0.0;
 
-    // --- exact-BRep descriptors, for the advisor's OOD test only -------------
+    // --- exact-BRep descriptors ------------------------------------------------
     //
     // Everything above is measured from the tessellation. These are read from
     // the BRep, and they exist because the mesh proxies cannot answer "is this
-    // part unlike anything I was trained on": `curved_frac` above saturates to
-    // ~1.0 for any real triangulation.
+    // part unlike anything I was trained on".
     //
-    // They are NOT network inputs. The shipped ONNX contract is 43 columns and
-    // these are not among them; they feed only the Mahalanobis distance in
+    // The shipped ONNX contract is the 62 columns of
+    // `bench/advisor/normalization.json:input_columns` and these geo_* columns
+    // are among them; they also feed the Mahalanobis distance in
     // `bench/advisor/ood.json`. `geo_available` is false when the build has no
     // OpenCASCADE or the model carries no BRep, and the advisor must then
     // decline to run the OOD test rather than testing imputed values.
@@ -290,6 +298,20 @@ CaseFeatures extract_case_features(const Model& model,
                                   std::span<const RefineRegion> load_regions,
                                   const Eigen::Vector3d& load_dir, double poisson);
 
+/// What the spectral sizing pass did (ADR-0034). Zeroed when spectral sizing
+/// was not requested or no size field existed to filter.
+struct SpectralSizingReport {
+    bool applied = false;
+    std::size_t modes_total = 0; // FFT modes considered (DC excluded)
+    std::size_t modes_kept = 0;  // modes surviving the energy truncation
+    double energy_kept = 0.0;    // retained spectral energy fraction [0,1]
+    double predicted_before = 0.0; // Σ vol/h³ before filtering
+    double predicted_after = 0.0;  // Σ vol/h³ after filtering (+ budget scale)
+    double h_scale = 1.0;          // uniform budget multiplier applied to h
+    bool budget_met = true;        // predicted_after ≤ budget (or no budget)
+    std::size_t n_edge_curve_seeds = 0; // denoised CAD-edge curvature sources
+};
+
 /// Fused geometry + boundary-condition refinement plan for `volume_mesh`.
 /// Geometry sources (curvature / thin-wall, a priori) and BC/load region
 /// sources (the simulation setup, a priori) are combined into one
@@ -303,6 +325,7 @@ struct RefinementPlan {
     double h_fine = 0.0;    // legacy alias for finest requested target, metres
     std::size_t n_geometry_seeds = 0;
     std::size_t n_bc_seeds = 0;
+    SpectralSizingReport spectral;
 };
 
 /// Build a fused geometry + BC size field for the graded tet and hybrid
@@ -310,9 +333,22 @@ struct RefinementPlan {
 /// When `use_geometry`, surface curvature / thin-wall sources finer than
 /// `h_coarse` are added. Each region contributes surface-face centroids at
 /// `target_fraction * h_coarse`. Empty sources produce an empty field/plan.
+///
+/// When `spectral` (ADR-0034): CAD-edge curvature is FFT-denoised before it
+/// emits chordal size sources, and the fused field is energy-truncated on a
+/// Cartesian grid so spectrally insignificant fine bands merge into the
+/// surrounding coarse field; a genuine geometry demand is re-imposed
+/// afterwards (elementwise min against the geometry-only field), so trimming
+/// can never blur a real feature. `spectral_budget` is a cap in Σvol/h³
+/// grid-density units (the CVT N_pred contract, ADR-0024 Q10 #4): after
+/// truncation, one uniform h scale lands the field prediction on the budget.
+/// It is only well-calibrated for meshers that honor the density contract
+/// directly; lattice-mesher element caps stay with resolve_mesh_size's
+/// measured pre-flight clamp and auto-retry, and those callers pass 0.
 RefinementPlan build_refinement_plan(const Model& model, double h_coarse,
                                      std::span<const RefineRegion> regions,
-                                     bool use_geometry = true);
+                                     bool use_geometry = true, bool spectral = false,
+                                     std::size_t spectral_budget = 0);
 /// Geometry-volume policy bands. Fill-stage errors above the hard limit never
 /// reach a solver; solved-stage errors at or above the truth limit remain
 /// useful advisor outcomes but may not define corpus truth.

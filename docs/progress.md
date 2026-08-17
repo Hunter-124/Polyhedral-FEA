@@ -155,6 +155,45 @@ Gating is unchanged: poly-VEM is still **not** the product default (M5 remains
 not promoted) — these fixes make the VEM path correct where it is used, they do
 not promote it. Tet FE remains the default accuracy claim.
 
+**Spectral sizing + coarsening + budget advisor + CG equilibration (2026-08-16,
+ADR-0034):** one wave, four mechanisms, suite **432/432 green** (OCC on).
+
+- New `adapt::spectral` module: deterministic double-only radix-2 FFT; CAD-edge
+  κ(s) denoise (even-reflect + 99.5% energy truncation) feeding chordal size
+  sources at the constant-relative-sag rule; Cartesian-grid spectral trimming
+  of the fused size field with a geometry-only floor re-imposed afterwards;
+  `enforce_element_budget` (truncate → one uniform h scale) for
+  density-contract callers. CLI mesh/solve/diag default ON (`--no-spectral`
+  opts out; library `SimSetup.spectral_smooth` and testlab `"spectral_smooth"`
+  default OFF — frozen baselines untouched). Measured: sphere h=0.008 seeds
+  51→41 with an identical 9,194-elem mesh; icecream_cone 95→37 seeds plus 43
+  denoised edge seeds, quality/stress/BRep-p99 bit-identical to base.
+- Coarsening lands: `dorfler_coarsen_mark` (insignificant tail, θ=0.02) +
+  `HpAction::kCoarsen` (lowest priority; only overrides kNone) gated on exact
+  per-element sizes (cube-root volume — the global-h proxy is gone from the
+  signal builder) vs the a-priori fused-field demand (≥1.5× finer). The adapt
+  loop suppresses the LEB fallback on coarsen passes, allows a bounded global
+  h rise (×1.25/pass, capped at the resolved h), and will not early-stop with
+  coarsen marks pending. plate_hole / cantilever adapt-2/3 campaigns green;
+  firing domain documented in the ADR (p-raise legitimately claims smooth
+  elements first on those parts).
+- Advisor: `recommend(..., max_dof)` budget-feasible gated enumeration +
+  `budget_refusal` honesty path + CLI `--advisor-max-dof`. Measured on
+  box_hole_s0: cap 3000 flips the choice from graded_tet p2 (pred DOF 66k) to
+  hex p1 (pred DOF 2.8k). Stale 43-column comments corrected to the true
+  62-column contract (geo_* are network inputs AND the OOD space); testlab
+  `curved_frac` no longer saturates (serving-side κ fraction; dataset was
+  verified already honest — no retrain implied).
+- CG: symmetric diagonal equilibration S·K_ff·S before the IC→Jacobi cascade,
+  with acceptance still measured on the original-space true residual.
+  Direct path and GATE-1 frozen files untouched; measured 58 iterations to
+  1.6e-9 on a diagonal-spread-10⁶ MPC case (LDLT parity < 1e-5); live on the
+  sphere solve smoke.
+- Deliberately not wired (measured): the spectral budget scale is not coupled
+  to lattice-mesher element ceilings — grid Σvol/h³ vs real counts diverge
+  ~20× part-dependently (sphere cap-8000 run: 432 predicted vs 9,456 actual),
+  so resolve + auto-retry remain the cap authority.
+
 ## Background / older phases
 
 **Track H (historical):** mesher honesty/perf overhaul; owner gate **A9** theme

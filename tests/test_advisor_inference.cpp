@@ -152,9 +152,11 @@ TEST_CASE("advisor requires ood.json and refuses rather than imputes", "[advisor
     REQUIRE(ood.at("operating_point").contains("threshold"));
 
     // The distance is fitted and evaluated in RAW feature units with the file's
-    // own center/scale, deliberately NOT reusing normalization.json: fifteen of
-    // the columns the shipped ood.json names are exact-BRep descriptors outside
-    // the 43-column ONNX contract, so they never appear in encode()'s output.
+    // own center/scale, deliberately NOT reusing normalization.json: the shipped
+    // ONNX contract (62 columns, geo_* exact-BRep descriptors included)
+    // standardizes with normalization.json's mean/std, a different space than
+    // ood.json's, so the OOD vector is assembled by name from the raw columns
+    // rather than read from encode()'s output.
     const auto names = ood.at("feature_columns").get<std::vector<std::string>>();
     REQUIRE_FALSE(names.empty());
     CHECK(ood.at("center").size() == names.size());
@@ -429,6 +431,196 @@ TEST_CASE("advisor guardrails: gated enumeration stays in the box and honours th
     // Recorded so a fixture that stops exercising it is visible rather than
     // silently reducing what this test covers.
     INFO("gate rejected every candidate on at least one case: " << saw_gate_bind);
+}
+
+TEST_CASE("advisor max_dof budget filter: gated enumeration respects the budget",
+          "[advisor]") {
+    if (!fixture_present()) {
+        SKIP("advisor_tiny fixture missing (python scripts/advisor/export_onnx.py "
+             "--tiny-fixture)");
+    }
+    const json parity = load(kFixtureDir / "parity.json");
+    const json clamps = load(kFixtureDir / "clamps.json");
+    const polymesh::advisor::Advisor advisor(kFixtureDir);
+    const auto defaults = advisor.defaults();
+    REQUIRE(clamps.contains("gate_threshold"));
+    const double gate_threshold = clamps.at("gate_threshold").get<double>();
+    REQUIRE(clamps.contains("candidate_grid"));
+    const json& actions = clamps.at("candidate_grid").at("actions");
+
+    // The same de-logging as advisor.cpp's from_log10, reimplemented here so
+    // the expectation never trusts the code path it is checking.
+    const auto dof_of = [](double dof_log10) {
+        if (!std::isfinite(dof_log10)) {
+            return std::numeric_limits<double>::quiet_NaN();
+        }
+        return std::pow(10.0, std::clamp(dof_log10, -30.0, 30.0));
+    };
+
+    struct Scored {
+        polymesh::advisor::AdvisorDecision action;
+        double score;
+        double risk;
+        double dof;
+    };
+    // Independently score every candidate, exactly as the gated-enumeration
+    // test above does: apply the action, read the heads, keep the finite rows.
+    const auto score_candidates =
+        [&](const polymesh::advisor::FeatureColumns& columns) {
+            std::vector<Scored> table;
+            for (const auto& action : actions) {
+                auto candidate = defaults;
+                candidate.mesher = action.value("mesher", defaults.mesher);
+                candidate.order = action.value("order", defaults.order);
+                candidate.h_rel = action.value("h_rel", defaults.h_rel);
+                candidate.eta_target = action.value("eta_target", defaults.eta_target);
+                candidate.adapt_passes =
+                    action.value("adapt_passes", defaults.adapt_passes);
+                auto query = columns;
+                advisor.apply_action(query, candidate);
+                const auto raw = advisor.evaluate(query);
+                if (!std::isfinite(raw.rel_err_rel)) {
+                    continue;
+                }
+                table.push_back({candidate, raw.rel_err_rel,
+                                 sigmoid(raw.failure_logit), dof_of(raw.dof_log10)});
+            }
+            return table;
+        };
+    const auto same_action = [](const polymesh::advisor::AdvisorDecision& a,
+                                const polymesh::advisor::AdvisorDecision& b) {
+        return a.mesher == b.mesher && a.order == b.order && a.h_rel == b.h_rel &&
+               a.eta_target == b.eta_target && a.adapt_passes == b.adapt_passes &&
+               a.p_elevate == b.p_elevate;
+    };
+    // NaN-aware: a refusal suppresses predictions AS NaN, and bit-for-bit means
+    // those compare equal too.
+    const auto same_number = [](double a, double b) {
+        return a == b || (std::isnan(a) && std::isnan(b));
+    };
+
+    // (a) max_dof = 0 disables the budget: the decision must reproduce the
+    // historical unfiltered one bit-for-bit on every parity case.
+    for (const auto& fixture_case : parity.at("cases")) {
+        INFO("case " << fixture_case.at("name").get<std::string>());
+        const auto columns = columns_of(fixture_case.at("features"));
+        const auto unfiltered = advisor.recommend(columns);
+        const auto budget_off = advisor.recommend(columns, 0.0);
+        CHECK(same_action(unfiltered, budget_off));
+        CHECK(unfiltered.vetoed == budget_off.vetoed);
+        CHECK(unfiltered.clamped == budget_off.clamped);
+        CHECK(unfiltered.note == budget_off.note);
+        CHECK(same_number(unfiltered.predicted_rel_err, budget_off.predicted_rel_err));
+        CHECK(same_number(unfiltered.predicted_rel_err_rel,
+                          budget_off.predicted_rel_err_rel));
+        CHECK(same_number(unfiltered.predicted_chamfer_mean,
+                          budget_off.predicted_chamfer_mean));
+        CHECK(same_number(unfiltered.predicted_dof, budget_off.predicted_dof));
+        CHECK(same_number(unfiltered.predicted_mesh_ms, budget_off.predicted_mesh_ms));
+        CHECK(same_number(unfiltered.predicted_solve_ms, budget_off.predicted_solve_ms));
+        CHECK(same_number(unfiltered.failure_prob, budget_off.failure_prob));
+        CHECK(same_number(unfiltered.ood_distance, budget_off.ood_distance));
+        CHECK_FALSE(budget_off.budget_refusal);
+    }
+
+    // (b)-(d) each need a case with at least one finitely scored candidate;
+    // find them from the fixture rather than assuming which parity case works.
+    bool exercised_pick = false;
+    bool exercised_refusal = false;
+    for (const auto& fixture_case : parity.at("cases")) {
+        const auto columns = columns_of(fixture_case.at("features"));
+        const auto table = score_candidates(columns);
+        if (table.empty()) {
+            continue;
+        }
+        // The budget refusal is checked AFTER the OOD refusals, so a case the
+        // advisor refuses as out-of-distribution cannot exercise it here.
+        const auto baseline = advisor.recommend(columns);
+        const bool ood_refused =
+            baseline.vetoed && baseline.note.find("distribution") != std::string::npos;
+
+        // (c) A budget below EVERY candidate's predicted dof empties the
+        // candidate set: refusal, mirroring the OOD refusal exactly — clamp-box
+        // defaults, every prediction suppressed, `vetoed` set — but flagged
+        // `budget_refusal` so a caller can tell it apart.
+        if (!exercised_refusal && !ood_refused) {
+            double min_dof = std::numeric_limits<double>::infinity();
+            for (const auto& row : table) {
+                min_dof = std::min(min_dof, row.dof);
+            }
+            REQUIRE(std::isfinite(min_dof));
+            REQUIRE(min_dof > 0.0);
+            const auto decision = advisor.recommend(columns, min_dof * 0.5);
+            CHECK(decision.budget_refusal);
+            CHECK(decision.vetoed);
+            CHECK(same_action(decision, defaults));
+            CHECK_FALSE(std::isfinite(decision.predicted_rel_err));
+            CHECK_FALSE(std::isfinite(decision.predicted_rel_err_rel));
+            CHECK_FALSE(std::isfinite(decision.predicted_chamfer_mean));
+            CHECK_FALSE(std::isfinite(decision.predicted_dof));
+            CHECK_FALSE(std::isfinite(decision.predicted_mesh_ms));
+            CHECK_FALSE(std::isfinite(decision.predicted_solve_ms));
+            CHECK_FALSE(std::isfinite(decision.failure_prob));
+            CHECK(decision.note.find("budget") != std::string::npos);
+            // ood_distance is retained on a refusal: it is the measurement,
+            // not a prediction, and it is identical to the unfiltered call's.
+            CHECK(decision.ood_distance == baseline.ood_distance);
+            exercised_refusal = true;
+        }
+
+        // (b)+(d) A budget that prices out only the cheapest gate-passing
+        // candidate: the chooser must return the cheapest SURVIVING candidate
+        // that respects the budget, and a candidate that passes the failure
+        // gate but sits over budget must be filtered — gate and budget compose.
+        if (!exercised_pick) {
+            std::vector<const Scored*> survivors;
+            for (const auto& row : table) {
+                if (row.risk <= gate_threshold) {
+                    survivors.push_back(&row);
+                }
+            }
+            if (survivors.size() < 2) {
+                continue;
+            }
+            std::sort(survivors.begin(), survivors.end(),
+                      [](const Scored* a, const Scored* b) { return a->score < b->score; });
+            const Scored& best = *survivors.front();
+            REQUIRE(best.dof > 0.0);
+            // Strictly under the known best candidate's predicted dof, so the
+            // unfiltered winner is exactly what the budget excludes.
+            const double max_dof = best.dof * 0.999;
+            const Scored* expected = nullptr;
+            bool saw_gate_passing_over_budget = false;
+            for (const Scored* row : survivors) {
+                if (row->dof > max_dof) {
+                    saw_gate_passing_over_budget = true; // (d): gate-passing, over budget
+                    continue;
+                }
+                expected = row; // survivors are score-sorted: first fit is cheapest
+                break;
+            }
+            if (expected == nullptr) {
+                continue;
+            }
+            CHECK(saw_gate_passing_over_budget);
+            const auto decision = advisor.recommend(columns, max_dof);
+            if (decision.vetoed) {
+                // Refused for an independent reason (OOD or the residual veto);
+                // this case cannot speak to the ranking. Try the next one.
+                continue;
+            }
+            CHECK_FALSE(decision.budget_refusal);
+            CHECK(same_action(decision, expected->action));
+            CHECK(decision.predicted_dof == Catch::Approx(expected->dof).epsilon(1e-9));
+            CHECK(decision.predicted_dof <= max_dof);
+            // The budget really did move the decision off the unfiltered best.
+            CHECK_FALSE(same_action(decision, best.action));
+            exercised_pick = true;
+        }
+    }
+    // The fixture is only proof if it actually reached both arms.
+    CHECK(exercised_pick);
+    CHECK(exercised_refusal);
 }
 
 // Not run by default: it is a measurement, not a pass/fail assertion, and the

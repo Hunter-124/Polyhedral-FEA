@@ -244,7 +244,8 @@ std::vector<ElementHpSignal> make_hp_signals(std::span<const double> h,
                                              std::span<const double> hex_fit,
                                              std::span<const double> tet_fit,
                                              std::span<const double> poly_fit,
-                                             const HpDriverPolicy& policy) {
+                                             const HpDriverPolicy& policy,
+                                             std::span<const double> h_geometry) {
     const std::size_t n = eta_zz.size();
     if (n == 0) {
         return {};
@@ -262,6 +263,7 @@ std::vector<ElementHpSignal> make_hp_signals(std::span<const double> h,
     check_len(hex_fit, "hex_fit");
     check_len(tet_fit, "tet_fit");
     check_len(poly_fit, "poly_fit");
+    check_len(h_geometry, "h_geometry");
     if (!p_orders.empty() && p_orders.size() != 1 && p_orders.size() != n) {
         throw std::invalid_argument("make_hp_signals: length mismatch: p");
     }
@@ -285,12 +287,14 @@ std::vector<ElementHpSignal> make_hp_signals(std::span<const double> h,
         s.hex_fit = at_or_broadcast(hex_fit, i, 0.5);
         s.tet_fit = at_or_broadcast(tet_fit, i, 0.5);
         s.poly_fit = at_or_broadcast(poly_fit, i, 0.5);
+        s.h_geometry = at_or_broadcast(h_geometry, i, 0.0);
     }
     return out;
 }
 
 HpDriverPlan drive_hp(std::span<const ElementHpSignal> signals, const HpDriverPolicy& policy,
-                      std::span<const Eigen::Vector3d> centroids, double h_uniform) {
+                      std::span<const Eigen::Vector3d> centroids, double h_uniform,
+                      double h_ceiling) {
     HpDriverPlan plan;
     const auto n = signals.size();
     if (!centroids.empty() && centroids.size() != n) {
@@ -316,9 +320,35 @@ HpDriverPlan drive_hp(std::span<const ElementHpSignal> signals, const HpDriverPo
         h_ref = sum / static_cast<double>(n);
     }
 
+    // Anti-Dörfler insignificant tail: coarsen candidates (lowest priority —
+    // may only override an otherwise-kNone decision). θ ≤ 0 disables coarsening.
+    std::unordered_set<std::size_t> coarsen_tail;
+    if (policy.coarsen_theta > 0.0) {
+        std::vector<double> eta_all(n, 0.0);
+        for (std::size_t i = 0; i < n; ++i) {
+            eta_all[i] = std::max(0.0, signals[i].eta);
+        }
+        const auto tail = dorfler_coarsen_mark(eta_all, policy.coarsen_theta);
+        coarsen_tail.insert(tail.begin(), tail.end());
+    }
+
     std::vector<double> h_eta(n, 0.0); // η restricted to h-candidates for Dörfler
     for (std::size_t i = 0; i < n; ++i) {
-        plan.decisions[i] = decide_element(signals[i], policy, max_eta);
+        const auto& s = signals[i];
+        plan.decisions[i] = decide_element(s, policy, max_eta);
+        // Coarsen override: only when nothing else fired, the element is in the
+        // insignificant tail, and the mesh is finer than geometry demands.
+        if (plan.decisions[i].action == HpAction::kNone && coarsen_tail.contains(i) &&
+            s.h > 0.0 && s.h_geometry > 0.0 && policy.coarsen_geom_factor > 0.0 &&
+            s.h < s.h_geometry / policy.coarsen_geom_factor) {
+            auto& d = plan.decisions[i];
+            d.action = HpAction::kCoarsen;
+            d.reason = "coarsen-tail";
+            // Revert to the full a-priori demand (never below current h): the
+            // remesh executor rebuilds from the size field, so the honest
+            // prediction target is the demand itself, not a halfway step.
+            d.h_next = std::max(s.h, s.h_geometry);
+        }
         switch (plan.decisions[i].action) {
         case HpAction::kHRefine:
             plan.h_mark.push_back(i);
@@ -337,6 +367,10 @@ HpDriverPlan drive_hp(std::span<const ElementHpSignal> signals, const HpDriverPo
         case HpAction::kShapeChange:
             plan.shape_mark.push_back(i);
             ++plan.n_shape;
+            break;
+        case HpAction::kCoarsen:
+            plan.coarsen_mark.push_back(i);
+            ++plan.n_coarsen;
             break;
         case HpAction::kNone:
         default:
@@ -404,7 +438,14 @@ HpDriverPlan drive_hp(std::span<const ElementHpSignal> signals, const HpDriverPo
         n > 0 ? static_cast<double>(sug.n_marked) / static_cast<double>(n) : 0.0;
     sug.seed_band = 1.5 * h_ref;
     if (sug.n_marked == 0 || sug.marked_fraction < 0.05) {
-        sug.h_next = h_ref;
+        if (plan.n_h == 0 && plan.n_coarsen > 0) {
+            // Pure-coarsen pass: suggest a bounded GLOBAL size rise. Seeds stay
+            // empty so the remesh reverts to base + geometry sizing.
+            const double ceiling = h_ceiling > 0.0 ? h_ceiling : h_ref;
+            sug.h_next = std::min(h_ref * policy.h_coarsen_raise, ceiling);
+        } else {
+            sug.h_next = h_ref;
+        }
     } else {
         sug.h_next = h_ref * policy.h_refine_factor;
         if (policy.h_min > 0.0) {
@@ -429,6 +470,18 @@ HpDriverPlan drive_hp(std::span<const ElementHpSignal> signals, const HpDriverPo
     plan.predicted_dof_factor =
         1.0 + frac_h * (policy.cost_h - 1.0) + frac_p * (policy.cost_p - 1.0) +
         frac_s * 0.25 * (policy.cost_shape - 1.0);
+    // Coarsening shrinks DOF ≈ (h_e / h_next_e)³ per coarsened element (3-D),
+    // applied multiplicatively to the refine-side estimate.
+    double coarsen_dof = 1.0;
+    for (auto i : plan.coarsen_mark) {
+        const double h_e = signals[i].h;
+        const double h_next = plan.decisions[i].h_next;
+        if (h_e > 0.0 && h_next > 0.0) {
+            const double r = h_e / h_next;
+            coarsen_dof *= r * r * r;
+        }
+    }
+    plan.predicted_dof_factor *= coarsen_dof;
 
     (void)policy.seed; // reserved for campaign-noise experiments
     return plan;
@@ -449,9 +502,13 @@ const char* shape_tendency_tag(ShapeTendency t) {
 }
 
 std::string summarize_hp_plan(const HpDriverPlan& plan) {
-    return std::format("hp-driver: h={} p={} shape={} none={} tendency={} dof×{:.2f}",
-                       plan.n_h, plan.n_p, plan.n_shape, plan.n_none,
-                       shape_tendency_tag(plan.global_shape), plan.predicted_dof_factor);
+    auto note = std::format("hp-driver: h={} p={} shape={} none={} tendency={} dof×{:.2f}",
+                            plan.n_h, plan.n_p, plan.n_shape, plan.n_none,
+                            shape_tendency_tag(plan.global_shape), plan.predicted_dof_factor);
+    if (plan.n_coarsen > 0) {
+        note += std::format(" coarsen={}", plan.n_coarsen);
+    }
+    return note;
 }
 
 } // namespace polymesh::adapt

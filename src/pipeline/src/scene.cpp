@@ -5,6 +5,7 @@
 #include "adapt/graded_sizing.hpp"
 #include "adapt/hp_driver.hpp"
 #include "adapt/loop.hpp"
+#include "adapt/spectral_sizing.hpp"
 #include "fea/boundary_faces.hpp"
 #include "fea/cell_quality.hpp"
 #include "fea/p_elevate.hpp"
@@ -620,16 +621,151 @@ std::vector<adapt::SizeSource> decimate_sources(std::vector<adapt::SizeSource> s
     return out;
 }
 
+/// Spectral truncation keeps the modes carrying this fraction of the spectral
+/// energy; the remainder (noise, sub-seed oscillation) is merged into the
+/// surrounding field. 0.995 is aggressive enough to trim isolated seed
+/// artifacts and conservative enough that any spatially extended feature
+/// survives verbatim.
+constexpr double kSpectralEnergyFraction = 0.995;
+
+/// Chordal size sources along curved CAD edges with FFT-denoised curvature
+/// (ADR-0034). OCC BRepLProp κ samples carry parameterization noise; the
+/// energy-truncated inverse FFT recovers the smooth κ(s), and the emitted
+/// source size follows the constant-relative-sag rule h = 0.25/κ (segment
+/// sagitta d = ℓ²κ/8 = 0.78% of the local radius of curvature — the same
+/// relative sag the surface-vertex rule adapt::geometry_size_sources uses).
+/// Flat edge runs (κ below the noise floor after denoise) emit nothing.
+std::vector<adapt::SizeSource> spectral_edge_sources(const Model& model, double h_min_geo,
+                                                     double h_coarse,
+                                                     SpectralSizingReport& report) {
+    std::vector<adapt::SizeSource> out;
+    if (!model.cad || model.cad->empty() || !(h_coarse > 0.0)) {
+        return out;
+    }
+    geom::CadTopology topo;
+    try {
+        topo = geom::extract_topology(*model.cad, /*samples_per_edge=*/32);
+    } catch (...) {
+        return out; // no usable BRep edges — surface-vertex sources still apply
+    }
+    for (const auto& edge : topo.edges) {
+        if (edge.feature == geom::CadEdgeFeature::kSeam) {
+            continue; // parameterization artifact, not geometry
+        }
+        const auto& pts = edge.samples;
+        const auto& kappa = edge.kappa_samples;
+        if (pts.size() < 8 || kappa.size() != pts.size()) {
+            continue;
+        }
+        std::vector<double> stations(pts.size(), 0.0);
+        for (std::size_t i = 1; i < pts.size(); ++i) {
+            stations[i] = stations[i - 1] + (pts[i] - pts[i - 1]).norm();
+        }
+        adapt::spectral::FilterReport edge_report;
+        const auto smooth =
+            adapt::spectral::lowpass_signal(stations, kappa, kSpectralEnergyFraction,
+                                            &edge_report);
+        if (smooth.size() != pts.size()) {
+            continue;
+        }
+        for (std::size_t i = 0; i < pts.size(); ++i) {
+            const double k = smooth[i];
+            if (!(k > 1e-9) || !std::isfinite(k)) {
+                continue; // denoised-flat run
+            }
+            const double h_edge =
+                std::clamp(0.25 / k, h_min_geo, h_coarse);
+            if (h_edge < h_coarse) {
+                out.push_back({pts[i], h_edge});
+            }
+        }
+    }
+    report.n_edge_curve_seeds = out.size();
+    return out;
+}
+
+/// Spectral wrap of a fused size field (ADR-0034): sample on a Cartesian grid,
+/// energy-truncate the spectrum (insignificant fine bands merge), re-impose
+/// the geometry-only demand (elementwise min — trimming can never blur a real
+/// feature), then optionally land the predicted element count on `budget`
+/// with one uniform h scale. `geo_field` must be the geometry-sources-only
+/// sizing (no BC/error seeds); pass an empty fn when no floor is wanted.
+mesh::SizeFieldFn apply_spectral_sizing(const Model& model,
+                                        const mesh::SizeFieldFn& field,
+                                        const mesh::SizeFieldFn& geo_field,
+                                        double h_fine, std::size_t budget,
+                                        SpectralSizingReport& report) {
+    if (!field || !(h_fine > 0.0)) {
+        return field;
+    }
+    const double target_spacing = 0.5 * h_fine;
+    adapt::spectral::Grid3d grid = adapt::spectral::sample_field_grid(
+        field, model.bbox_min, model.bbox_max, target_spacing);
+    report.predicted_before = adapt::spectral::predict_element_count(grid);
+    const double h_entry_min = grid.min_value();
+    const double h_entry_max = grid.max_value();
+
+    const auto filter =
+        adapt::spectral::lowpass_grid_energy(grid, kSpectralEnergyFraction);
+    report.modes_total = filter.modes_total;
+    report.modes_kept = filter.modes_kept;
+    report.energy_kept = filter.energy_total > 0.0
+                             ? filter.energy_kept / filter.energy_total
+                             : 1.0;
+
+    if (geo_field) {
+        // Geometry cap: the filter may raise h inside a weak-but-real feature;
+        // the geometry-only field (denoised curvature / thin-wall demand) is
+        // the authority there. min() can only refine, never coarsen.
+        for (int k = 0; k < grid.dims[2]; ++k) {
+            for (int j = 0; j < grid.dims[1]; ++j) {
+                for (int i = 0; i < grid.dims[0]; ++i) {
+                    const Eigen::Vector3d p =
+                        grid.origin +
+                        Eigen::Vector3d(static_cast<double>(i) * grid.spacing.x(),
+                                        static_cast<double>(j) * grid.spacing.y(),
+                                        static_cast<double>(k) * grid.spacing.z());
+                    double& v = grid.at(i, j, k);
+                    const double geo_h = geo_field(p);
+                    if (geo_h > 0.0 && std::isfinite(geo_h)) {
+                        v = std::min(v, geo_h);
+                    }
+                }
+            }
+        }
+    }
+
+    if (budget > 0) {
+        const double predicted = adapt::spectral::predict_element_count(grid);
+        if (predicted > static_cast<double>(budget)) {
+            report.h_scale =
+                std::cbrt(predicted / static_cast<double>(budget));
+            for (double& v : grid.values) {
+                v = std::clamp(v * report.h_scale, h_entry_min, h_entry_max);
+            }
+        }
+    }
+    report.predicted_after = adapt::spectral::predict_element_count(grid);
+    report.budget_met =
+        budget == 0 || report.predicted_after <= static_cast<double>(budget) * 1.001;
+    report.applied = true;
+
+    auto shared = std::make_shared<adapt::spectral::GridSizingField>(std::move(grid));
+    return [shared](const Eigen::Vector3d& p) { return shared->size_at(p); };
+}
+
 } // namespace
 
 RefinementPlan build_refinement_plan(const Model& model, double h_coarse,
                                      std::span<const RefineRegion> regions,
-                                     bool use_geometry) {
+                                     bool use_geometry, bool spectral,
+                                     std::size_t spectral_budget) {
     RefinementPlan plan;
     if (!(h_coarse > 0.0) || !std::isfinite(h_coarse)) {
         return plan;
     }
     std::vector<adapt::SizeSource> sources;
+    std::vector<adapt::SizeSource> geo_only; // spectral geometry floor
 
     // Geometry a-priori: curvature + thin-wall surface sources finer than the
     // bulk h. Flat, thick regions emit nothing, so the source set stays sparse.
@@ -639,6 +775,14 @@ RefinementPlan build_refinement_plan(const Model& model, double h_coarse,
         // ~1 seed per vertex on a real CAD part is far more than the grading
         // needs; keep the finest per half-h cell (field preserved, count bounded).
         geo = decimate_sources(std::move(geo), 0.5 * h_coarse);
+        if (spectral) {
+            // FFT-denoised CAD-edge chordal sources join the geometry set.
+            auto edge = spectral_edge_sources(model, h_min_geo, h_coarse, plan.spectral);
+            edge = decimate_sources(std::move(edge), 0.5 * h_coarse);
+            plan.spectral.n_edge_curve_seeds = edge.size();
+            geo.insert(geo.end(), edge.begin(), edge.end());
+            geo_only = geo; // copy: the spectral floor excludes BC seeds
+        }
         plan.n_geometry_seeds = geo.size();
         sources.insert(sources.end(), geo.begin(), geo.end());
     }
@@ -675,6 +819,40 @@ RefinementPlan build_refinement_plan(const Model& model, double h_coarse,
     plan.seed_band = sp.seed_band;
     plan.h_min = sp.h_fine;
     plan.h_fine = sp.h_fine;
+    if (spectral && plan.size_field) {
+        // Geometry-only floor: denoised curvature / thin-wall demand without
+        // BC seeds, so spectral trimming can never blur a real feature.
+        mesh::SizeFieldFn geo_field;
+        if (!geo_only.empty()) {
+            const auto geo_sp = adapt::seed_plan(geo_only, h_coarse, 1.5);
+            geo_field = adapt::size_field_from_sources(geo_only, geo_sp.h_fine,
+                                                       h_coarse, /*beta=*/1.0);
+        }
+        // Budget scale is deliberately NOT driven from the element ceiling
+        // here: the lattice meshers' real element counts diverge from the
+        // Σvol/h³ density model by part-dependent factors (fine bands, skin
+        // cells), so the pre-flight resolve + measured auto-retry remain the
+        // cap authority. The spectral budget API serves callers whose mesher
+        // honors the CVT density contract directly (ADR-0024 Q10 #4).
+        plan.size_field =
+            apply_spectral_sizing(model, plan.size_field, geo_field, sp.h_fine,
+                                  spectral_budget, plan.spectral);
+        if (plan.spectral.applied) {
+            // Seeds force fine balls regardless of the field; drop the ones
+            // the trimmed field no longer wants, or they silently defeat the
+            // trim on the ball-grading meshers. Keep the seed's own h demand:
+            // a seed survives where the filtered field still asks for < 3/4
+            // of the bulk size.
+            std::vector<Eigen::Vector3d> kept;
+            kept.reserve(plan.refine_seeds.size());
+            for (const auto& seed : plan.refine_seeds) {
+                if (plan.size_field(seed) < 0.75 * h_coarse) {
+                    kept.push_back(seed);
+                }
+            }
+            plan.refine_seeds = std::move(kept);
+        }
+    }
     return plan;
 }
 
@@ -3671,6 +3849,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
             double adapt_seed_band = 0.0;
             mesh::SizeFieldFn adapt_size_field;
             std::vector<adapt::SizeSource> src;
+            SpectralSizingReport spectral_report;
             // A-priori BC grading (ADR-0021): refine near loaded / fixed faces
             // before the first solve. Loads get the finest target (stress
             // concentrates under applied load); fixtures a moderate one.
@@ -3695,10 +3874,29 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 src.insert(src.end(), fix_src.begin(), fix_src.end());
             }
             // Geometry and BC sources share one continuous min-plus field.
+            // The geometry-only subset is ALSO kept as its own field: it is
+            // the coarsen gate's demand floor (ADR-0034). A-priori BC seeds
+            // are heuristic demands that a-posteriori evidence may retire;
+            // curvature / thin-wall demand may never be coarsened through.
+            std::vector<adapt::SizeSource> geo_only;
             if (setup.use_feature_grading) {
                 auto geo = adapt::geometry_size_sources(model.surface, 0.15 * h, h);
                 geo = decimate_sources(std::move(geo), 0.5 * h);
+                if (setup.spectral_smooth) {
+                    auto edge =
+                        spectral_edge_sources(model, 0.15 * h, h, spectral_report);
+                    edge = decimate_sources(std::move(edge), 0.5 * h);
+                    spectral_report.n_edge_curve_seeds = edge.size();
+                    geo.insert(geo.end(), edge.begin(), edge.end());
+                }
+                geo_only = geo;
                 src.insert(src.end(), geo.begin(), geo.end());
+            }
+            mesh::SizeFieldFn geo_size_field; // geometry-only demand field
+            if (!geo_only.empty()) {
+                const auto geo_sp = adapt::seed_plan(geo_only, h, 1.5);
+                geo_size_field = adapt::size_field_from_sources(geo_only, geo_sp.h_fine,
+                                                                h, /*beta=*/1.0);
             }
             if (!src.empty()) {
                 const auto plan = adapt::seed_plan(src, h, /*band_frac=*/1.5);
@@ -3706,6 +3904,23 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     adapt::size_field_from_sources(src, plan.h_fine, h, /*beta=*/1.0);
                 adapt_seeds = plan.refine_seeds;
                 adapt_seed_band = plan.seed_band;
+                if (setup.spectral_smooth && adapt_size_field) {
+                    // Trim only: the element ceiling stays with the measured
+                    // resolve + auto-retry path (see build_refinement_plan).
+                    adapt_size_field = apply_spectral_sizing(
+                        model, adapt_size_field, geo_size_field, plan.h_fine,
+                        /*budget=*/0, spectral_report);
+                    if (spectral_report.applied) {
+                        std::vector<Eigen::Vector3d> kept;
+                        kept.reserve(adapt_seeds.size());
+                        for (const auto& seed : adapt_seeds) {
+                            if (adapt_size_field(seed) < 0.75 * h) {
+                                kept.push_back(seed);
+                            }
+                        }
+                        adapt_seeds = std::move(kept);
+                    }
+                }
             }
             // D4: Dörfler element indices for optional local LEB before remesh.
             std::vector<std::size_t> adapt_marked;
@@ -3722,6 +3937,17 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
             checkpoint();
             // Keep resolved-h note on mesher_note for solve mesh_note (GUI/CLI).
             vol.mesher_note = std::format("{} | {}", resolved.note, vol.mesher_note);
+            if (spectral_report.applied) {
+                vol.mesher_note += std::format(
+                    " | spectral {}/{} modes ({:.1f}% energy), N_pred {:.4g}→{:.4g}{}",
+                    spectral_report.modes_kept, spectral_report.modes_total,
+                    100.0 * spectral_report.energy_kept,
+                    spectral_report.predicted_before, spectral_report.predicted_after,
+                    spectral_report.budget_met
+                        ? ""
+                        : std::format(" (budget {} not met — geometry floor binds)",
+                                      resolved.element_ceiling));
+            }
             report("assemble", 0.0,
                    std::format("assembling… ({} elements, {} nodes)", vol.mesh.elements.size(),
                                vol.mesh.nodes.size()),
@@ -4151,12 +4377,29 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
             auto build_hp_signals = [&](const std::vector<Eigen::Vector3d>& cents,
                                         const std::vector<double>& element_eta) {
                 const auto n = element_eta.size();
+                // Exact per-element sizes (cube-root volume): the global
+                // h_use is a stale proxy after any local refinement, and the
+                // coarsen gate compares element size against the a-priori
+                // demand — it only functions with measured sizes.
                 std::vector<double> h_loc(n, h_use);
                 std::vector<double> kappa(n, 0.0);
                 std::vector<double> thick(n, 0.0);
                 std::vector<int> p_ord(n, 1);
+                // A-priori size demand per element (ADR-0034 coarsen gate):
+                // the fused geometry+BC field at the centroid. Coarsening
+                // reverts a-posteriori over-refinement (LEB children, seed
+                // balls, the global-h ratchet) back to this demand — never
+                // below it, so curvature / thin-wall / BC bands are
+                // structurally protected. Where no field exists the demand is
+                // the bulk h itself (flat geometry tolerates it).
+                std::vector<double> h_geo(n, h);
+                const bool have_h_geo = static_cast<bool>(adapt_size_field);
                 for (std::size_t e = 0; e < n && e < vol.mesh.elements.size(); ++e) {
                     const auto& el = vol.mesh.elements[e];
+                    const double velem = fea::element_volume(vol.mesh, el);
+                    if (velem > 0.0 && std::isfinite(velem)) {
+                        h_loc[e] = std::cbrt(velem);
+                    }
                     if (el.type == fea::ElementType::kTet10 ||
                         el.type == fea::ElementType::kHex20) {
                         p_ord[e] = 2;
@@ -4171,10 +4414,16 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                             thick[e] = surf_thickness[vi];
                         }
                     }
+                    if (have_h_geo && e < cents.size()) {
+                        const double g = adapt_size_field(cents[e]);
+                        if (g > 0.0 && std::isfinite(g)) {
+                            h_geo[e] = g;
+                        }
+                    }
                 }
                 // Empty surplus → driver estimates from ZZ ranking.
                 return adapt::make_hp_signals(h_loc, kappa, thick, element_eta, {}, p_ord, {},
-                                              {}, {}, hp_policy);
+                                              {}, {}, hp_policy, h_geo);
             };
 
             auto maybe_p_elevate = [&](const std::vector<std::size_t>& elevate_idx,
@@ -4417,6 +4666,10 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 model.bbox_min, model.bbox_max, mesh::kDefaultMaxGridCells, grid_sub);
             const double h_adapt_floor = std::max(h * 0.35, h_grid_floor);
             hp_policy.h_min = h_adapt_floor;
+            // Coarsen passes (ADR-0034) may raise the global h suggestion, but
+            // never past the resolved a-priori size the user/campaign asked
+            // for — derefinement reverts toward the baseline, not beyond it.
+            const double h_adapt_ceiling = h;
 
             // Prefer mesher matching the last shape vote (mesher-tendency will own the
             // continuous dial; here we only flip discrete product meshers when the
@@ -4534,7 +4787,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 auto zz_try = fea::recover_zz(vol.mesh, material, u_try);
                 const auto cents = element_centroids(vol.mesh);
                 const auto signals = build_hp_signals(cents, zz_try.element_eta);
-                const auto hp_plan = adapt::drive_hp(signals, hp_policy, cents, h_use);
+                const auto hp_plan =
+                    adapt::drive_hp(signals, hp_policy, cents, h_use, h_adapt_ceiling);
                 last_shape_vote = hp_plan.global_shape;
                 const std::string hp_note = adapt::summarize_hp_plan(hp_plan);
                 if (setup.adapt_passes > 0 && pass_callback) {
@@ -4610,9 +4864,11 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         break;
                     }
                     const auto& sug = hp_plan.h_suggestion;
-                    // Early stop only when neither h nor p wants work.
+                    // Early stop only when neither h nor p wants work — and no
+                    // coarsen pass is pending (a coarsen remesh must run, or
+                    // over-resolved regions would stay fine forever).
                     if (sug.n_marked == 0 && sug.h_next >= h_use * 0.98 &&
-                        hp_plan.p_mark.empty()) {
+                        hp_plan.p_mark.empty() && hp_plan.coarsen_mark.empty()) {
                         std::string pnote;
 
                         // Still try mark_smooth fallback if driver was silent on p
@@ -4663,9 +4919,16 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     h_use = std::max(sug.h_next, h_adapt_floor);
                     adapt_seeds = sug.refine_seeds;
                     adapt_seed_band = sug.seed_band;
-                    adapt_marked = hp_plan.h_mark.empty()
-                                       ? adapt::dorfler_mark(zz_try.element_eta, 0.3)
-                                       : hp_plan.h_mark;
+                    if (!hp_plan.h_mark.empty()) {
+                        adapt_marked = hp_plan.h_mark;
+                    } else if (!hp_plan.coarsen_mark.empty()) {
+                        // Coarsen pass: LEB can only refine, so suppress the
+                        // Dörfler fallback — the remesh path must run and it
+                        // reverts unseeded regions to base + geometry sizing.
+                        adapt_marked.clear();
+                    } else {
+                        adapt_marked = adapt::dorfler_mark(zz_try.element_eta, 0.3);
+                    }
                     continue;
                 }
                 std::string pnote;

@@ -144,18 +144,21 @@ struct Advisor::Impl {
     /// Deliberately independent of the network's input vector. The distance is
     /// evaluated over `ood_columns` -- the FILE's column order, resolved by name
     /// from the caller's FeatureColumns, never a map iteration order, because a
-    /// wrong-order Mahalanobis still yields plausible-looking distances. Fifteen
-    /// of these columns are exact-BRep descriptors that are NOT network inputs
-    /// (the ONNX contract is 43 columns and excludes them), so this cannot read
-    /// `encode()`'s output: the values it needs are not in it.
+    /// wrong-order Mahalanobis still yields plausible-looking distances. This
+    /// cannot read `encode()`'s output even where the column sets overlap: the
+    /// values arrive in raw units and are scaled by ood.json's own
+    /// `center`/`scale`, a different standardization than normalization.json's
+    /// `mean`/`std`, so the encoded network row is the wrong space regardless.
+    /// (The shipped ONNX contract is the 62 columns of
+    /// normalization.json:input_columns, geo_* exact-BRep descriptors included;
+    /// ood.json:feature_columns is a separately fitted set that currently
+    /// overlaps it entirely, but nothing here assumes that.)
     ///
-    /// Values arrive in raw units and are scaled by the file's own
-    /// `center`/`scale` before the quadratic form. `ood_precision` is the k*k
-    /// inverse of the shrunk training covariance in that scaled space,
-    /// row-major. Fitting directly on raw columns instead gave a precision
-    /// matrix at condition number 2.97e20, past float64's 1/eps; the file's own
-    /// standardizer brings it to 1.25e11. Required, never defaulted -- see
-    /// load_ood().
+    /// `ood_precision` is the k*k inverse of the shrunk training covariance in
+    /// the file's scaled space, row-major. Fitting directly on raw columns
+    /// instead gave a precision matrix at condition number 2.97e20, past
+    /// float64's 1/eps; the file's own standardizer brings it to 1.25e11.
+    /// Required, never defaulted -- see load_ood().
     std::vector<std::string> ood_columns;
     std::vector<double> ood_center;
     std::vector<double> ood_scale;
@@ -364,11 +367,12 @@ void Advisor::Impl::load_ood(const std::filesystem::path& dir) {
     // a permutation would silently score a different distance.
     //
     // Note what is NOT checked here: whether these names appear in
-    // normalization.json:input_columns. They largely do not, and must not --
-    // fifteen of them are exact-BRep descriptors excluded from the 43-column
-    // ONNX contract precisely because they are family identifiers that hurt
-    // held-out regret. The OOD test and the network read overlapping but
-    // different feature sets, on purpose.
+    // normalization.json:input_columns. The two feature sets are fitted
+    // independently -- the OOD detector's columns are chosen for
+    // distribution-shift sensitivity, the network's (62 columns in the shipped
+    // contract, geo_* exact-BRep descriptors included) for held-out regret --
+    // so overlapping but different sets are both expected and fine, and the
+    // by-name resolution above is what keeps either side free to drift.
     ood_columns = names;
 
     const auto require_vector = [&](const char* key) {
@@ -582,10 +586,11 @@ FeatureColumns to_columns(const pipeline::CaseFeatures& f) {
         {"case_load_dir_z", f.load_dir_z},
     };
 
-    // Exact-BRep descriptors. These are NOT network inputs: the ONNX contract is
-    // the 43 columns of normalization.json:input_columns and none of these are
-    // among it, so encode() ignores them entirely. They exist for the
-    // out-of-distribution test in ood.json, which reads this map by name.
+    // Exact-BRep descriptors. The shipped ONNX contract is the 62 columns of
+    // normalization.json:input_columns and these are among it, so encode()
+    // consumes them when present (and imputes them when absent); they also
+    // feed the out-of-distribution test in ood.json, which reads this map by
+    // name in raw units under its own center/scale.
     //
     // Inserted only when the feature extractor actually measured them from a
     // BRep. When it did not -- no OpenCASCADE, or a model carrying no CAD -- the
@@ -719,15 +724,25 @@ AdvisorRawOutputs Advisor::evaluate(const FeatureColumns& columns) const {
 }
 
 AdvisorDecision Advisor::recommend(const pipeline::CaseFeatures& features) const {
-    return recommend(to_columns(features));
+    return recommend(features, 0.0);
+}
+
+AdvisorDecision Advisor::recommend(const pipeline::CaseFeatures& features,
+                                   double max_dof) const {
+    return recommend(to_columns(features), max_dof);
 }
 
 AdvisorDecision Advisor::recommend(const FeatureColumns& columns) const {
+    return recommend(columns, 0.0);
+}
+
+AdvisorDecision Advisor::recommend(const FeatureColumns& columns, double max_dof) const {
     const Impl& impl = *impl_;
     FeatureColumns query = columns;
 
     AdvisorDecision decision = impl.default_decision;
     bool clamped = false;
+    bool budget_refusal_pending = false;
 
     if (impl.candidates.empty()) {
         // Legacy artifact with no candidate grid: single-shot policy read. Kept
@@ -768,6 +783,7 @@ AdvisorDecision Advisor::recommend(const FeatureColumns& columns) const {
         AdvisorDecision best_any = impl.default_decision;
         bool have_survivor = false;
         bool have_any = false;
+        bool saw_over_budget = false;
 
         for (const AdvisorDecision& candidate : impl.candidates) {
                             impl.apply_action(query, candidate);
@@ -775,6 +791,20 @@ AdvisorDecision Advisor::recommend(const FeatureColumns& columns) const {
                             const double risk = sigmoid(out.failure_logit);
                             const double score = out.rel_err_rel;
                             if (!std::isfinite(score)) {
+                                continue;
+                            }
+                            // The max_dof budget is a hard feasibility filter,
+                            // applied after the feasibility head has scored the
+                            // candidate and before any ranking: an action the
+                            // caller cannot afford is dropped from BOTH pools,
+                            // so it is never returned -- not even by the
+                            // gate-binds fallback below, which exists to give
+                            // the veto the last word, not to spend budget the
+                            // caller does not have. The dof head is a learned
+                            // predictor (held-out MAE ~0.5 log10), so this is a
+                            // filter, not a guarantee.
+                            if (max_dof > 0.0 && from_log10(out.dof_log10) > max_dof) {
+                                saw_over_budget = true;
                                 continue;
                             }
                             // Tracked separately so a query where the gate
@@ -799,6 +829,12 @@ AdvisorDecision Advisor::recommend(const FeatureColumns& columns) const {
             decision = best_any;
             decision.note = "every candidate exceeded the feasibility gate; "
                             "best-ranked action returned and left to the veto";
+        } else if (saw_over_budget) {
+            // Every scored candidate was over the caller's budget. Declined
+            // below with the same suppression as the OOD refusal: the model's
+            // predictions for actions we will not recommend are not
+            // information the caller can act on.
+            budget_refusal_pending = true;
         }
         clamped = decision.clamped;
     }
@@ -825,9 +861,10 @@ AdvisorDecision Advisor::recommend(const FeatureColumns& columns) const {
     decision.failure_prob = sigmoid(scored.failure_logit);
 
     // The OOD test is evaluated over raw feature columns, NOT over encode()'s
-    // output: fifteen of the columns ood.json names are exact-BRep descriptors
-    // deliberately outside the 43-column ONNX contract, so they are not in the
-    // encoded row at all.
+    // output: ood.json standardizes with its own center/scale, a different
+    // space than normalization.json's mean/std, so the encoded row cannot
+    // serve it even though the shipped 62-column contract now includes every
+    // column ood.json names.
     //
     // mahalanobis() throws when a named column is missing or non-finite, because
     // imputing it would place an unknown part at the centre of the training
@@ -904,6 +941,16 @@ AdvisorDecision Advisor::recommend(const FeatureColumns& columns) const {
                       decision.ood_distance, impl.ood_threshold);
         return refuse(detail);
     }
+    // The budget refusal is checked after the OOD refusals (a part we cannot
+    // assess at all is the more fundamental "no") and before the feasibility
+    // veto (the budget, not the head, is the reason this recommendation is
+    // being refused). `budget_refusal` is what lets a caller tell it apart.
+    if (budget_refusal_pending) {
+        AdvisorDecision refused = refuse("max_dof budget excluded every scored candidate "
+                                         "action; defaults used");
+        refused.budget_refusal = true;
+        return refused;
+    }
     if (decision.failure_prob > impl.veto_threshold) {
         return refuse("feasibility head vetoed the recommendation; defaults used");
     }
@@ -934,6 +981,7 @@ std::string to_json(const AdvisorDecision& d) {
                    {"failure_prob", d.failure_prob},
                    {"ood_distance", d.ood_distance},
                    {"vetoed", d.vetoed},
+                   {"budget_refusal", d.budget_refusal},
                    {"clamped", d.clamped},
                    {"note", d.note}};
     return out.dump();

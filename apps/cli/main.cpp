@@ -662,7 +662,8 @@ int cmd_mesh(std::span<char*> args) {
         const auto quality = polymesh::fea::tet4_cell_quality(vol.mesh);
         std::vector<polymesh::fea::VtuCellData> cdata;
         cdata.push_back({.name = "quality", .scalars = quality});
-        polymesh::fea::write_vtu(out_path, vol.mesh, {}, cdata);
+        const auto display = polymesh::pipeline::curved_display_mesh(model, vol.mesh, h);
+        polymesh::fea::write_vtu(out_path, display.mesh, {}, cdata);
         std::printf("wrote %s\n", out_path.c_str());
     }
     return 0;

@@ -9,6 +9,7 @@
 // F12 / File menu / POLYMESH_GUI_SHOT capture the window to a PNG.
 
 #include "colormap.hpp"
+#include "fea/boundary_faces.hpp"
 #include "fea/backend.hpp"
 #include "fea/vtu.hpp"
 #include "pipeline/scene.hpp"
@@ -1361,6 +1362,11 @@ int run(int argc, char** argv) {
         if (auto live = app.job.poll_live_mesh(app.live_mesh_seen_gen)) {
             const bool was_mesh = app.mode == DisplayMode::kMeshPreview;
             app.mesh_preview = std::move(live);
+            if (app.model) {
+                auto display = pipeline::curved_display_mesh(
+                    *app.model, app.mesh_preview->mesh, app.setup.mesh_size);
+                app.mesh_preview->mesh = std::move(display.mesh);
+            }
             app.viewport.set_mesh(*app.mesh_preview);
             set_mesh_info(app, app.mesh_preview->mesher_note,
                           app.mesh_preview->mesh.nodes.size(),
@@ -1424,6 +1430,11 @@ int run(int argc, char** argv) {
         if (auto mesh = app.job.take_mesh()) {
             const bool was_mesh = app.mode == DisplayMode::kMeshPreview;
             app.mesh_preview = std::move(mesh);
+            if (app.model) {
+                auto display = pipeline::curved_display_mesh(
+                    *app.model, app.mesh_preview->mesh, app.setup.mesh_size);
+                app.mesh_preview->mesh = std::move(display.mesh);
+            }
             app.viewport.set_mesh(*app.mesh_preview);
             set_mesh_info(app, app.mesh_preview->mesher_note,
                           app.mesh_preview->mesh.nodes.size(),
@@ -1435,6 +1446,44 @@ int run(int argc, char** argv) {
         }
         if (auto result = app.job.take_result()) {
             app.result = std::move(result);
+            if (app.model) {
+                auto display = pipeline::curved_display_mesh(
+                    *app.model, app.result->volume_mesh, app.result->display_h);
+                const std::size_t base_nodes = app.result->volume_mesh.nodes.size();
+                auto interpolate = [&](std::vector<double>& values) {
+                    if (values.size() != base_nodes) {
+                        return;
+                    }
+                    values.reserve(display.mesh.nodes.size());
+                    for (const auto& parents : display.added_node_parents) {
+                        values.push_back(parents ? 0.5 * (values[(*parents)[0]] +
+                                                          values[(*parents)[1]])
+                                                 : 0.0);
+                    }
+                };
+                interpolate(app.result->von_mises);
+                interpolate(app.result->u_magnitude);
+                interpolate(app.result->nodal_eta);
+                Eigen::VectorXd displacement =
+                    Eigen::VectorXd::Zero(3 * static_cast<Eigen::Index>(
+                                                   display.mesh.nodes.size()));
+                displacement.head(app.result->displacement.size()) =
+                    app.result->displacement;
+                for (std::size_t i = 0; i < display.added_node_parents.size(); ++i) {
+                    if (const auto& parents = display.added_node_parents[i]) {
+                        displacement.segment<3>(
+                            3 * static_cast<Eigen::Index>(base_nodes + i)) =
+                            0.5 * (app.result->displacement.segment<3>(
+                                       3 * static_cast<Eigen::Index>((*parents)[0])) +
+                                   app.result->displacement.segment<3>(
+                                       3 * static_cast<Eigen::Index>((*parents)[1])));
+                    }
+                }
+                app.result->displacement = std::move(displacement);
+                app.result->volume_mesh = std::move(display.mesh);
+                app.result->boundary_quads =
+                    polymesh::fea::extract_boundary_faces(app.result->volume_mesh);
+            }
             app.viewport.set_result(*app.result);
             set_mesh_info(app, app.result->mesh_note, app.result->volume_mesh.nodes.size(),
                           app.result->volume_mesh.elements.size());

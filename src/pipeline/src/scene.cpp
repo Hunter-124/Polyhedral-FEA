@@ -1355,6 +1355,38 @@ std::size_t project_quadratic_boundary_mids(
     return projected;
 }
 
+CurvedDisplayMesh curved_display_mesh(const Model& model,
+                                      const fea::NodalMesh& source, double h) {
+    CurvedDisplayMesh display;
+    display.mesh = fea::promote_to_quadratic(source);
+    if (display.mesh.nodes.size() == source.nodes.size()) {
+        return display;
+    }
+
+    const auto boundary_mids = quadratic_boundary_mids(display.mesh);
+    std::map<std::uint32_t, std::array<std::uint32_t, 2>> parents_by_mid;
+    for (const auto& edge : boundary_mids) {
+        parents_by_mid.try_emplace(edge.mid, std::array{edge.a, edge.b});
+    }
+    display.added_node_parents.resize(display.mesh.nodes.size() - source.nodes.size());
+    for (std::size_t node = source.nodes.size(); node < display.mesh.nodes.size(); ++node) {
+        const auto found = parents_by_mid.find(static_cast<std::uint32_t>(node));
+        if (found != parents_by_mid.end()) {
+            display.added_node_parents[node - source.nodes.size()] = found->second;
+        }
+    }
+
+    if (!model.cad || !(h > 0.0)) {
+        return display;
+    }
+    std::vector<mesh::BoundarySupport> provenance;
+    mesh::BoundaryProjectionContext projection;
+    if (make_boundary_projection(*model.cad, h, &projection, &provenance)) {
+        project_quadratic_boundary_mids(display.mesh, *model.cad, &projection, h);
+    }
+    return display;
+}
+
 namespace {
 // The mesh volume measure lives in `fea::element_volume` / `fea::mesh_volume`
 // (fea/cell_quality.hpp). It used to be duplicated here; the copy in
@@ -5831,6 +5863,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         vol.mesher_note, hp_note, zz_try.global_eta, setup.eta_target, pass,
                         setup.adapt_passes, h_use, pnote);
                     r.volume_mesh = std::move(vol.mesh);
+                    r.display_h = h_use;
                     r.boundary_quads = std::move(vol.boundary_quads);
                     fill_result_fields(r, zz_try, u_try);
                     r.fill_geometry_volume = vol.fill_geometry_volume;
@@ -5871,6 +5904,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         r.mesh_note =
                             std::format("{} | {} | {}", vol.mesher_note, hp_note, reason);
                         r.volume_mesh = std::move(vol.mesh);
+                        r.display_h = h_use;
                         r.boundary_quads = std::move(vol.boundary_quads);
                         fill_result_fields(r, zz_try, u_try);
                         r.fill_geometry_volume = vol.fill_geometry_volume;
@@ -5906,6 +5940,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         SolveResult r;
                         r.mesh_note = std::format("{} | {} | adapt early-stop h={:.4g}{}",
                                                   vol.mesher_note, hp_note, h_use, pnote);
+                        r.display_h = h_use;
                         r.volume_mesh = std::move(vol.mesh);
                         r.boundary_quads = std::move(vol.boundary_quads);
                         fill_result_fields(r, zz_try, u_try);
@@ -5966,6 +6001,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 r.mesh_note = std::format("{} | {} | adapt_passes={} h={:.4g} seeds={}{}",
                                           vol.mesher_note, hp_note, setup.adapt_passes, h_use,
                                           adapt_seeds.size(), pnote);
+                r.display_h = h_use;
                 r.volume_mesh = std::move(vol.mesh);
                 r.boundary_quads = std::move(vol.boundary_quads);
                 fill_result_fields(r, zz_try, u_try);

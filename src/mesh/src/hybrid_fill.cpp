@@ -314,8 +314,9 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                         const Eigen::Vector3d& bbox_max, double h, int skin_layers,
                         std::span<const geom::SharpEdge> features, double feature_band,
                         std::span<const Eigen::Vector3d> refine_seeds, double seed_band,
-                        double curvature_turn_deg, BoundaryProjectionContext* projection,
+                        double curvature_turn_deg, const BoundaryFit* fit,
                         const SizeFieldFn& size_field) {
+    BoundaryProjectionContext* projection = fit != nullptr ? fit->projection : nullptr;
     if (!(h > 0.0) || !std::isfinite(h)) {
         throw ValidityError("graded_tet_fill_surface: h must be positive");
     }
@@ -1405,6 +1406,57 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                                                out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
             if (v < 0.0) {
                 std::swap(n[1], n[2]);
+            }
+        }
+        // Hard-pin CAD vertices and sharp edge curves. Smoothing has just
+        // evened the wall spacing, so this is where a crease becomes exact
+        // rather than "as close as the nearest face point happens to be" —
+        // the difference between a 90° edge and the chamfer it used to render
+        // as (ADR-0035).
+        if (fit != nullptr && fit->can_pin()) {
+            std::unordered_map<std::uint32_t, std::vector<std::size_t>> star;
+            for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+                for (const auto ni : out.mesh.tets[ti]) {
+                    star[ni].push_back(ti);
+                }
+            }
+            const auto node_offends = [&](std::uint32_t ni) {
+                const auto it = star.find(ni);
+                if (it == star.end()) {
+                    return false;
+                }
+                for (const auto ti : it->second) {
+                    const auto& n = out.mesh.tets[ti];
+                    const Eigen::Vector3d& a = out.mesh.nodes[n[0]];
+                    const Eigen::Vector3d& b = out.mesh.nodes[n[1]];
+                    const Eigen::Vector3d& c = out.mesh.nodes[n[2]];
+                    const Eigen::Vector3d& d = out.mesh.nodes[n[3]];
+                    // Shape floor, not just a positive volume: a sign-only
+                    // gate let the pin flatten a skin tet to quality 1e-4
+                    // (measured on cylinder graded, ADR-0033's failure mode).
+                    if (!(tet_signed_volume(a, b, c, d) > vol_eps) ||
+                        validity::tet_shape_quality(a, b, c, d) < validity::kCellShapeFloor) {
+                        return true;
+                    }
+                }
+                return false;
+            };
+            std::vector<std::uint32_t> bnodes;
+            for (const auto& f : free_faces) {
+                bnodes.insert(bnodes.end(), f.begin(), f.end());
+            }
+            std::sort(bnodes.begin(), bnodes.end());
+            bnodes.erase(std::unique(bnodes.begin(), bnodes.end()), bnodes.end());
+            out.mesh.pin = pin_feature_nodes(*fit->cad, *fit->topo, out.mesh.nodes, bnodes, hc,
+                                        node_offends,
+                                        projection != nullptr ? projection->provenance
+                                                              : nullptr);
+            for (auto& n : out.mesh.tets) {
+                const double v = tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
+                                                   out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
+                if (v < 0.0) {
+                    std::swap(n[1], n[2]);
+                }
             }
         }
     }

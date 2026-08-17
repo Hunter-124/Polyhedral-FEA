@@ -44,7 +44,8 @@ bool hex_bad(const std::array<std::uint32_t, 8>& hx,
 
 HexFillOutput hex_fill_surface(const geom::TriSurface& surface,
                                const Eigen::Vector3d& bbox_min,
-                               const Eigen::Vector3d& bbox_max, double h, bool snap_boundary) {
+                               const Eigen::Vector3d& bbox_max, double h, bool snap_boundary,
+                               const BoundaryFit* fit) {
     const CartesianGrid grid = make_bbox_grid(bbox_min, bbox_max, h);
     const auto inside = classify_cells_inside(surface, grid);
     const int nx = grid.nx, ny = grid.ny, nz = grid.nz;
@@ -193,17 +194,89 @@ HexFillOutput hex_fill_surface(const geom::TriSurface& surface,
             }
         };
 
+        // Node-local validity so the snap line-searches one node's own star
+        // instead of rescanning the mesh, and can call the interior relaxation
+        // below before any node is allowed to retreat (ADR-0035).
+        const auto node_offends = [&](std::uint32_t ni) {
+            if (ni >= node_hexes.size()) {
+                return false;
+            }
+            for (const auto ci : node_hexes[ni]) {
+                if (hex_bad(out.hexes[ci], out.nodes)) {
+                    return true;
+                }
+            }
+            return false;
+        };
+        const auto relax_neighborhood = [&](std::uint32_t seed) {
+            if (seed >= node_hexes.size()) {
+                return false;
+            }
+            std::vector<std::uint32_t> ring;
+            for (const auto ci : node_hexes[seed]) {
+                for (const auto ni : out.hexes[ci]) {
+                    if (on_boundary[ni] == 0 && !nbrs[ni].empty()) {
+                        ring.push_back(ni);
+                    }
+                }
+            }
+            std::sort(ring.begin(), ring.end());
+            ring.erase(std::unique(ring.begin(), ring.end()), ring.end());
+            bool moved_any = false;
+            for (const auto ni : ring) {
+                Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
+                for (const auto other : nbrs[ni]) {
+                    centroid += out.nodes[other];
+                }
+                centroid /= static_cast<double>(nbrs[ni].size());
+                const Eigen::Vector3d saved = out.nodes[ni];
+                const Eigen::Vector3d step = 0.5 * (centroid - saved);
+                const double cap = 0.25 * out.h;
+                const double len = step.norm();
+                out.nodes[ni] = saved + (len > cap ? step * (cap / len) : step);
+                if (node_offends(ni)) {
+                    out.nodes[ni] = saved;
+                } else if ((out.nodes[ni] - saved).squaredNorm() > 0.0) {
+                    moved_any = true;
+                }
+            }
+            return moved_any;
+        };
+
         // Two rounds: snap what the lattice allows, open the interior, snap the
         // stragglers into the new space. A third round moved nothing measurable.
+        mesh::BoundaryProjectionContext* projection =
+            fit != nullptr ? fit->projection : nullptr;
         out.boundary_max_distance =
             snap_boundary_nodes(surface, out.nodes, bnodes, out.h, collect_offenders,
-                                /*max_move_frac=*/0.75, /*passes=*/4)
+                                /*max_move_frac=*/0.75, /*passes=*/4, /*feature_edges=*/{},
+                                /*repair_interior=*/{}, node_offends,
+                                /*defer_coupled=*/false, projection, relax_neighborhood)
                 .max_residual;
         relax_interior(/*passes=*/4, /*omega=*/0.5);
         out.boundary_max_distance =
             snap_boundary_nodes(surface, out.nodes, bnodes, out.h, collect_offenders,
-                                /*max_move_frac=*/0.75, /*passes=*/4)
+                                /*max_move_frac=*/0.75, /*passes=*/4, /*feature_edges=*/{},
+                                /*repair_interior=*/{}, node_offends,
+                                /*defer_coupled=*/false, projection, relax_neighborhood)
                 .max_residual;
+
+        if (fit != nullptr && fit->can_pin()) {
+            std::vector<mesh::BoundarySupport>* provenance =
+                projection != nullptr ? projection->provenance : nullptr;
+            (void)pin_feature_nodes(*fit->cad, *fit->topo, out.nodes, bnodes, out.h,
+                                    node_offends, provenance);
+            smooth_boundary_nodes(surface, out.nodes, out.boundary_quads, out.h,
+                                  collect_offenders, /*passes=*/3, /*relax=*/0.5,
+                                  /*feature_edges=*/{}, projection);
+            (void)pin_feature_nodes(*fit->cad, *fit->topo, out.nodes, bnodes, out.h,
+                                    node_offends, provenance);
+            out.boundary_max_distance = 0.0;
+            for (const auto ni : bnodes) {
+                out.boundary_max_distance = std::max(
+                    out.boundary_max_distance, closest_on_surface(surface, out.nodes[ni]).distance);
+            }
+        }
     }
     return out;
 }

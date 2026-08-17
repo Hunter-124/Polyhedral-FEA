@@ -7,6 +7,7 @@ add_library(polymesh_geom
     src/cad_topology.cpp
     src/cad_geometry_features.cpp
     src/features.cpp
+    src/signal_fft.cpp
     src/indicators.cpp
 )
 add_library(polymesh::geom ALIAS polymesh_geom)

@@ -708,57 +708,28 @@ varyhedron_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     }
 
     // --- Scaffold: multi-level graded tet (dual-poly clustering → V11) ---
+    BoundaryFit fit;
+    fit.cad = cad;
+    fit.topo = topo;
+    fit.projection = projection;
     auto graded = graded_tet_fill_surface(surface, bbox_min, bbox_max, h, skin_layers,
                                           features, feature_band, seeds, seed_band,
-                                          curvature_turn_deg, projection);
+                                          curvature_turn_deg, &fit);
     out.mesh = std::move(graded.mesh);
     out.h_coarse = graded.h_coarse;
     out.h_fine = graded.h_fine;
     out.n_tets = out.mesh.tets.size();
 
-    // --- Edge-profile attraction: soft pull toward CAD edges, Jacobian-safe ---
+    // --- Hard feature pin: CAD vertices and sharp edge curves ---
+    //
+    // This replaces the old 35 %-weighted "edge attraction" blend. A blend can
+    // only ever move a node PART of the way onto a crease, so a 90° edge came
+    // out as a chamfer of the remaining 65 % — visible in every showcase
+    // render of a curved-to-planar transition. The pin puts the node on the
+    // exact OCC curve or not at all, and the same shape-floor gate that
+    // guarded the blend guards each pin (ADR-0035).
     if (topo != nullptr && !topo->edges.empty()) {
         const auto bnodes = boundary_nodes(out.mesh);
-        const double snap_band = 0.75 * std::max(h, 1e-12);
-        // Save pre-snap positions for offender revert.
-        std::vector<Eigen::Vector3d> saved = out.mesh.nodes;
-        for (std::uint32_t ni : bnodes) {
-            if (ni >= out.mesh.nodes.size()) {
-                continue;
-            }
-            auto& p = out.mesh.nodes[ni];
-            Eigen::Vector3d edge_target = Eigen::Vector3d::Zero();
-            double edge_distance = std::numeric_limits<double>::infinity();
-            bool have_edge_target = false;
-            if (projection != nullptr && projection->target &&
-                projection->provenance != nullptr && ni < projection->provenance->size() &&
-                (*projection->provenance)[ni].kind == BoundarySupportKind::kCadEdge) {
-                const auto target = boundary_projection_target(surface, p, ni, projection);
-                if (target) {
-                    edge_target = target->point;
-                    edge_distance = target->distance;
-                    have_edge_target = true;
-                }
-            } else if (projection == nullptr || !projection->target) {
-                // STL/legacy behavior: sampled sharp-edge attraction.
-                const auto q = geom::closest_edge(*topo, p, /*sharp_only=*/true);
-                if (q) {
-                    edge_target = q->closest;
-                    edge_distance = q->distance;
-                    have_edge_target = true;
-                }
-            }
-            if (!have_edge_target || edge_distance > snap_band) {
-                continue;
-            }
-            // Mild blend only (aggressive full project inverts boundary tets).
-            const double w = 0.35 * (1.0 - (edge_distance / snap_band));
-            p = p + w * (edge_target - p);
-        }
-
-        // Revert every node participating in an inverted or near-degenerate
-        // tet.  A sign-only gate allowed a positive 1e-18-quality sliver to
-        // survive the sharp-feature attraction.
         auto tet_bad = [&](const std::array<std::uint32_t, 4>& t) {
             const Eigen::Vector3d& a = out.mesh.nodes[t[0]];
             const Eigen::Vector3d& b = out.mesh.nodes[t[1]];
@@ -769,19 +740,28 @@ varyhedron_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             }
             return validity::tet_shape_quality(a, b, c, d) < validity::kCellShapeFloor;
         };
-        std::unordered_set<std::uint32_t> offenders;
-        for (const auto& t : out.mesh.tets) {
-            if (tet_bad(t)) {
-                offenders.insert(t[0]);
-                offenders.insert(t[1]);
-                offenders.insert(t[2]);
-                offenders.insert(t[3]);
+        std::unordered_map<std::uint32_t, std::vector<std::size_t>> star;
+        for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+            for (const auto ni : out.mesh.tets[ti]) {
+                star[ni].push_back(ti);
             }
         }
-        for (std::uint32_t ni : offenders) {
-            if (ni < out.mesh.nodes.size()) {
-                out.mesh.nodes[ni] = saved[ni];
+        const auto node_offends = [&](std::uint32_t ni) {
+            const auto it = star.find(ni);
+            if (it == star.end()) {
+                return false;
             }
+            for (const auto ti : it->second) {
+                if (tet_bad(out.mesh.tets[ti])) {
+                    return true;
+                }
+            }
+            return false;
+        };
+        if (cad != nullptr && !cad->empty()) {
+            out.mesh.pin = pin_feature_nodes(
+                *cad, *topo, out.mesh.nodes, bnodes, std::max(h, 1e-12), node_offends,
+                projection != nullptr ? projection->provenance : nullptr);
         }
 
         // Metric: free-boundary nodes (Hausdorff) + undirected free-face edges

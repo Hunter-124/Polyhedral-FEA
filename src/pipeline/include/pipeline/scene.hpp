@@ -9,6 +9,7 @@
 #include "fea/solve.hpp"
 #include "fea/stress.hpp"
 #include "geom/cad_model.hpp"
+#include "geom/cad_topology.hpp"
 #include "geom/tri_surface.hpp"
 #include "mesh/mixed_fill.hpp"
 #include "mesh/surface_project.hpp"
@@ -19,6 +20,7 @@
 #include <chrono>
 #include <functional>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <set>
@@ -409,9 +411,14 @@ struct SolveResult {
 /// Build the exact, owner-stable BRep projection oracle used by volume meshing
 /// and later p-elevation. The CadModel must outlive `ctx`.
 /// Returns false for an empty CAD model or null output storage.
+///
+/// `topology_out`, when given, receives the extracted CAD topology the oracle
+/// built for itself, so a caller can hard-pin sharp edges (ADR-0035) without
+/// paying for a second `geom::extract_topology`.
 bool make_boundary_projection(const geom::CadModel& cad, double h,
                               mesh::BoundaryProjectionContext* ctx,
-                              std::vector<mesh::BoundarySupport>* provenance);
+                              std::vector<mesh::BoundarySupport>* provenance,
+                              std::shared_ptr<const geom::CadTopology>* topology_out = nullptr);
 
 /// Project quadratic free-surface mid-edge nodes onto their exact BRep support.
 /// A full move that would invalidate an incident tet10/hex20 is backed off by

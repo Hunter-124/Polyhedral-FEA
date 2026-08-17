@@ -1470,6 +1470,7 @@ int cmd_diag(std::span<char*> args) {
         "{{\"available\":{},\"brep_valid\":{},\"brep_closed\":{},"
         "\"brep_volume_m3\":{:.9g},\"brep_surface_area_m2\":{:.9g},"
         "\"mesh_boundary_to_brep\":{},"
+        "\"mesh_boundary_nodes_to_brep\":{},"
         "\"brep_surface_samples_to_mesh_boundary\":{},"
         "\"brep_surface_sampler\":\"exact_trimmed_face_uv_grid\","
         "\"brep_surface_sample_ceiling\":{},\"brep_surface_sample_faces\":{},"
@@ -1484,6 +1485,7 @@ int cmd_diag(std::span<char*> args) {
         fidelity.brep.closed ? "true" : "false", fidelity.brep.volume,
         fidelity.brep.surface_area,
         distance_json(fidelity.mesh_boundary_samples_to_brep_surface),
+        distance_json(fidelity.mesh_boundary_nodes_to_brep_surface),
         distance_json(fidelity.brep_surface_samples_to_mesh_boundary),
         kBRepSurfaceSampleCeiling, fidelity.brep_surface_sample_face_count,
         fidelity.brep_surface_uv_attempt_count, fidelity.brep_surface_fallback_vertex_count,

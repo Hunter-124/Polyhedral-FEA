@@ -363,11 +363,13 @@ TEST_CASE("graded fills ship no free face buried inside another cell") {
             REQUIRE(model.cad);
             std::vector<polymesh::mesh::BoundarySupport> provenance;
             polymesh::mesh::BoundaryProjectionContext projection;
+            std::shared_ptr<const polymesh::geom::CadTopology> topology;
             REQUIRE(polymesh::pipeline::make_boundary_projection(
-                *model.cad, c.h, &projection, &provenance));
+                *model.cad, c.h, &projection, &provenance, &topology));
+            const polymesh::mesh::BoundaryFit fit{&*model.cad, topology.get(), &projection};
             const auto fill = polymesh::mesh::graded_tet_fill_surface(
                 model.surface, model.bbox_min, model.bbox_max, c.h, 2, {}, 0.0, {}, 0.0,
-                0.0, &projection);
+                0.0, &fit);
             const auto stats = polymesh::mesh::count_buried_free_tet_faces(
                 fill.mesh.nodes, fill.mesh.tets, fill.h_coarse > 0.0 ? fill.h_coarse : c.h);
             INFO("free faces " << stats.n_free_faces << ", buried " << stats.n_buried);
@@ -572,11 +574,13 @@ TEST_CASE("diagnostic: independently sum coarse graded volumes") {
         REQUIRE(model.cad);
         std::vector<polymesh::mesh::BoundarySupport> provenance;
         polymesh::mesh::BoundaryProjectionContext projection;
+        std::shared_ptr<const polymesh::geom::CadTopology> topology;
         REQUIRE(polymesh::pipeline::make_boundary_projection(
-            *model.cad, c.h, &projection, &provenance));
+            *model.cad, c.h, &projection, &provenance, &topology));
+        const polymesh::mesh::BoundaryFit fit{&*model.cad, topology.get(), &projection};
         const auto fill = polymesh::mesh::graded_tet_fill_surface(
             model.surface, model.bbox_min, model.bbox_max, c.h, 2, {}, 0.0, {}, 0.0, 0.0,
-            &projection);
+            &fit);
         double mesh_volume = 0.0;
         for (const auto& tet : fill.mesh.tets) {
             mesh_volume += std::abs(polymesh::mesh::tet_signed_volume(

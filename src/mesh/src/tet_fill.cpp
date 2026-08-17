@@ -298,7 +298,8 @@ std::size_t pull_buried_free_faces(std::vector<Eigen::Vector3d>& nodes,
 
 TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
                                const Eigen::Vector3d& bbox_min,
-                               const Eigen::Vector3d& bbox_max, double h, bool snap_boundary) {
+                               const Eigen::Vector3d& bbox_max, double h, bool snap_boundary,
+                               const BoundaryFit* fit) {
     const CartesianGrid grid = make_bbox_grid(bbox_min, bbox_max, h);
     const auto inside = classify_cells_inside(surface, grid);
     const int nx = grid.nx, ny = grid.ny, nz = grid.nz;
@@ -430,31 +431,191 @@ TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
                 incident[ni].push_back(ti);
             }
         }
-        // Multi-pass snap ≤0.75 h with Jacobian safety (shared helper; ADR-0015/B3).
-        snap_boundary_nodes(
-            surface, out.nodes, bnodes, h_snap,
-            [&](std::set<std::uint32_t>& offenders) {
-                for (const auto& n : out.tets) {
-                    if (tet_is_bad(n)) {
-                        offenders.insert(n.begin(), n.end());
+        // Interior room for the snap. A stair-fold cell blocks its boundary
+        // node's projection even though the fold's other corners are interior
+        // and unconstrained; without this the node retreats to its raw lattice
+        // site and lands O(h) off the CAD (ADR-0035).
+        std::vector<std::vector<std::uint32_t>> nbrs(out.nodes.size());
+        {
+            std::set<std::pair<std::uint32_t, std::uint32_t>> seen;
+            for (const auto& t : out.tets) {
+                for (int a = 0; a < 4; ++a) {
+                    for (int b = a + 1; b < 4; ++b) {
+                        const auto u = t[static_cast<std::size_t>(a)];
+                        const auto v = t[static_cast<std::size_t>(b)];
+                        const auto key = std::minmax(u, v);
+                        if (u == v || !seen.insert({key.first, key.second}).second) {
+                            continue;
+                        }
+                        nbrs[u].push_back(v);
+                        nbrs[v].push_back(u);
                     }
                 }
-            },
-            /*max_move_frac=*/0.75, /*passes=*/4, /*feature_edges=*/{},
-            /*repair_interior=*/{},
-            /*node_offends=*/
-            [&](std::uint32_t ni) {
-                const auto it = incident.find(ni);
-                if (it == incident.end()) {
-                    return false;
-                }
-                for (const auto ti : it->second) {
-                    if (tet_is_bad(out.tets[ti])) {
-                        return true;
-                    }
-                }
+            }
+        }
+        std::vector<char> on_boundary(out.nodes.size(), 0);
+        for (const auto ni : bnodes) {
+            on_boundary[ni] = 1;
+        }
+        const auto node_offends = [&](std::uint32_t ni) {
+            const auto it = incident.find(ni);
+            if (it == incident.end()) {
                 return false;
-            });
+            }
+            for (const auto ti : it->second) {
+                if (tet_is_bad(out.tets[ti])) {
+                    return true;
+                }
+            }
+            return false;
+        };
+        // Open room around one blocked boundary node.
+        //
+        // First choice is the interior of its star: those nodes carry no
+        // geometry constraint, so moving them is free. But a stair cell on a
+        // curved wall routinely has EVERY corner on the boundary (documented
+        // in hex_fill.cpp: 7 of 8 corners in boundary quads), and then the
+        // interior ring is empty and the node stays 0.5 h off the CAD. So the
+        // fallback slides the star's OTHER boundary nodes tangentially and
+        // re-projects them through the same exact oracle: they end up on the
+        // CAD exactly as before, just spaced differently, which is the only
+        // degree of freedom a fully-boundary stair cell has left.
+        const auto reproject = [&](std::uint32_t ni, const Eigen::Vector3d& p) {
+            if (fit == nullptr || fit->projection == nullptr) {
+                return closest_on_surface(surface, p).point;
+            }
+            const auto target = boundary_projection_target(surface, p, ni, fit->projection);
+            return target ? target->point : p;
+        };
+        const auto relax_neighborhood = [&](std::uint32_t seed) {
+            const auto it = incident.find(seed);
+            if (it == incident.end()) {
+                return false;
+            }
+            std::vector<std::uint32_t> ring;
+            std::vector<std::uint32_t> wall;
+            for (const auto ti : it->second) {
+                for (const auto ni : out.tets[ti]) {
+                    if (ni == seed || nbrs[ni].empty()) {
+                        continue;
+                    }
+                    (on_boundary[ni] == 0 ? ring : wall).push_back(ni);
+                }
+            }
+            auto dedup = [](std::vector<std::uint32_t>& v) {
+                std::sort(v.begin(), v.end());
+                v.erase(std::unique(v.begin(), v.end()), v.end());
+            };
+            dedup(ring);
+            dedup(wall);
+            bool moved_any = false;
+            const double cap = 0.25 * h_snap;
+            const auto nudge = [&](std::uint32_t ni, bool tangential) {
+                Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
+                for (const auto other : nbrs[ni]) {
+                    centroid += out.nodes[other];
+                }
+                centroid /= static_cast<double>(nbrs[ni].size());
+                const Eigen::Vector3d saved = out.nodes[ni];
+                const Eigen::Vector3d step = 0.5 * (centroid - saved);
+                const double len = step.norm();
+                Eigen::Vector3d moved = saved + (len > cap ? step * (cap / len) : step);
+                if (tangential) {
+                    moved = reproject(ni, moved);
+                    if ((moved - saved).norm() > cap) {
+                        return; // projection ran away; leave the wall alone
+                    }
+                }
+                out.nodes[ni] = moved;
+                if (node_offends(ni)) {
+                    out.nodes[ni] = saved;
+                } else if ((out.nodes[ni] - saved).squaredNorm() > 0.0) {
+                    moved_any = true;
+                }
+            };
+            for (const auto ni : ring) {
+                nudge(ni, /*tangential=*/false);
+            }
+            if (!moved_any) {
+                for (const auto ni : wall) {
+                    nudge(ni, /*tangential=*/true);
+                }
+            }
+            return moved_any;
+        };
+        const auto collect_offenders = [&](std::set<std::uint32_t>& offenders) {
+            for (const auto& n : out.tets) {
+                if (tet_is_bad(n)) {
+                    offenders.insert(n.begin(), n.end());
+                }
+            }
+        };
+        // Global interior relaxation between snap rounds, the scheme
+        // hex_fill_surface already uses: snap what the lattice allows, open
+        // the interior everywhere, snap the stragglers into the new space.
+        std::vector<std::uint32_t> interior;
+        for (std::uint32_t ni = 0; ni < out.nodes.size(); ++ni) {
+            if (on_boundary[ni] == 0 && !nbrs[ni].empty()) {
+                interior.push_back(ni);
+            }
+        }
+        const auto relax_interior = [&](int relax_passes, double omega) {
+            for (int pass = 0; pass < relax_passes; ++pass) {
+                for (const auto ni : interior) {
+                    Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
+                    for (const auto other : nbrs[ni]) {
+                        centroid += out.nodes[other];
+                    }
+                    centroid /= static_cast<double>(nbrs[ni].size());
+                    const Eigen::Vector3d saved = out.nodes[ni];
+                    out.nodes[ni] = saved + omega * (centroid - saved);
+                    if (node_offends(ni)) {
+                        out.nodes[ni] = saved;
+                    }
+                }
+            }
+        };
+
+        // Travel cap. 0.75 h is the historical tessellated default; with the
+        // exact oracle and interior relaxation in place a stair node on a
+        // slanted wall must be able to cross a half cell DIAGONAL (0.87 h) to
+        // reach the CAD at all, so the exact path uses the full 1.25 h the
+        // snap allows. Validity still gates every fraction of the move.
+        const bool exact = fit != nullptr && fit->projection != nullptr;
+        const auto run_snap = [&] {
+            return snap_boundary_nodes(
+                surface, out.nodes, bnodes, h_snap, collect_offenders,
+                /*max_move_frac=*/exact ? 1.25 : 0.75, /*passes=*/exact ? 6 : 4,
+                /*feature_edges=*/{}, /*repair_interior=*/{}, node_offends,
+                /*defer_coupled=*/false, exact ? fit->projection : nullptr,
+                relax_neighborhood);
+        };
+        out.snap = run_snap();
+        if (exact) {
+            relax_interior(/*relax_passes=*/4, /*omega=*/0.5);
+            out.snap = run_snap();
+        }
+
+        if (fit != nullptr && fit->can_pin()) {
+            // Hard-pin CAD vertices and sharp edge curves, then even out the
+            // free surface and pin once more: smoothing can slide a chain node
+            // a little off its curve, and the second pass is what makes the
+            // crease exact rather than nearly exact.
+            std::vector<BoundarySupport>* provenance =
+                fit->projection != nullptr ? fit->projection->provenance : nullptr;
+            out.pin = pin_feature_nodes(*fit->cad, *fit->topo, out.nodes, bnodes, h_snap,
+                                        node_offends, provenance);
+            smooth_boundary_nodes(surface, out.nodes, out.boundary_quads, h_snap,
+                                  collect_offenders, /*passes=*/3, /*relax=*/0.5,
+                                  /*feature_edges=*/{}, fit->projection);
+            const auto second = pin_feature_nodes(*fit->cad, *fit->topo, out.nodes, bnodes,
+                                                  h_snap, node_offends, provenance);
+            out.pin.edge_pinned = std::max(out.pin.edge_pinned, second.edge_pinned);
+            out.pin.vertex_pinned = std::max(out.pin.vertex_pinned, second.vertex_pinned);
+            out.pin.chains = std::max(out.pin.chains, second.chains);
+            out.pin.rejected += second.rejected;
+            out.pin.max_edge_residual = second.max_edge_residual;
+        }
 
         for (auto& n : out.tets) {
             const double v = tet_signed_volume_impl(out.nodes[n[0]], out.nodes[n[1]],

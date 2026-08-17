@@ -86,6 +86,7 @@ struct SnapStats {
     std::size_t n_candidates = 0;
     std::size_t n_moved = 0;
     std::size_t n_unsnapped = 0;
+    std::size_t n_relax_rescued = 0; // projections saved by interior relaxation
     double max_residual = 0.0; // metres, after snap/unsnap
 };
 
@@ -97,6 +98,16 @@ using RepairInteriorFn = std::function<void()>;
 /// caller should inspect only elements incident to `node`; omitting it keeps the
 /// compatibility global-scan path.
 using NodeOffendsFn = std::function<bool(std::uint32_t node)>;
+/// Open room for a boundary node that cannot keep any fraction of its
+/// projection: relax the INTERIOR nodes of its incident star toward their own
+/// neighbour centroids, accepting only moves that keep every incident cell
+/// valid. Returns true when something actually moved, i.e. the caller should
+/// retry the projection. Interior nodes carry no geometry constraint, so this
+/// cannot cost boundary fidelity — without it a stair-fold cell forces the
+/// node all the way back to its raw lattice site, which is the O(h)
+/// off-surface outlier the fidelity metric reports (ADR-0035).
+using RelaxNeighborhoodFn = std::function<bool(std::uint32_t node)>;
+
 
 /// Pull boundary lattice nodes toward the STL in multi-pass steps, then unsnap
 /// any node that participates in an inverted element (B3 / ADR-0015).
@@ -110,6 +121,8 @@ using NodeOffendsFn = std::function<bool(std::uint32_t node)>;
 ///        / hole-wall nodes still project to the surface.
 /// @param defer_coupled Keep locally irreparable fan nodes for a coupled
 ///        restore; pure hex/poly meshes leave this false for a linear scan.
+/// @param relax_neighborhood Optional interior-room opener; see
+///        RelaxNeighborhoodFn. Called before a node is allowed to retreat.
 SnapStats
 snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d>& nodes,
                     const std::vector<std::uint32_t>& boundary_nodes, double h,
@@ -117,7 +130,8 @@ snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d
                     int passes = 4, std::span<const geom::SharpEdge> feature_edges = {},
                     const RepairInteriorFn& repair_interior = {},
                     const NodeOffendsFn& node_offends = {}, bool defer_coupled = false,
-                    BoundaryProjectionContext* projection = nullptr);
+                    BoundaryProjectionContext* projection = nullptr,
+                    const RelaxNeighborhoodFn& relax_neighborhood = {});
 
 /// Result of a tangential boundary smoothing pass.
 struct SmoothStats {

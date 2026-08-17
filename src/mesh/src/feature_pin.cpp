@@ -160,11 +160,18 @@ FeaturePinReport pin_feature_nodes(const geom::CadModel& cad, const geom::CadTop
     }
 
     // ---- 2. Sharp edge chains -------------------------------------------
-    // Capture radius 0.5 h: wide enough that the lattice node straddling a
-    // crease is caught, narrow enough that a wall node one cell away is not
-    // dragged onto the edge (which would chamfer the crease from the other
-    // side).
+    // Two radii, and they do different jobs.
+    //
+    // `capture_r` decides who is *considered* a crease node: wide enough that
+    // the lattice node straddling a crease is caught.
+    //
+    // `travel_r` decides who is actually *moved*. Without it the pass drags
+    // wall nodes half a cell onto the rim and their incident faces come with
+    // them — visible in the compare_meshers tet tile as triangular flaps
+    // standing off the hole. A node further than this from the curve is not a
+    // crease node that drifted; it is a wall node, and its own face owns it.
     const double capture_r = 0.5 * h;
+    const double travel_r = 0.35 * h;
     for (const auto& edge : topo.edges) {
         if (edge.feature != geom::CadEdgeFeature::kSharp || edge.samples.size() < 2) {
             continue;
@@ -234,23 +241,24 @@ FeaturePinReport pin_feature_nodes(const geom::CadModel& cad, const geom::CadTop
             if (!exact) {
                 continue;
             }
-            // A re-spaced target must not teleport a node: cap travel at one
-            // cell so a chain with a bad parameter estimate degrades to the
-            // plain nearest-point pin instead of shuffling the crease.
-            if ((exact->point - nodes[pin.node]).norm() > 1.0 * h) {
+            // Two guards on the actual move. A re-spaced target must not
+            // teleport a node along the curve (fall back to the plain nearest
+            // point), and no pin may drag a node further than `travel_r`
+            // across the wall.
+            Eigen::Vector3d target = exact->point;
+            if ((target - nodes[pin.node]).norm() > travel_r) {
                 const auto direct = geom::project_point_on_edge(cad, edge.id, nodes[pin.node]);
                 if (!direct) {
                     continue;
                 }
-                if (!try_pin(nodes, pin.node, direct->point, node_offends)) {
-                    ++report.rejected;
-                    continue;
-                }
-            } else {
-                if (!try_pin(nodes, pin.node, exact->point, node_offends)) {
-                    ++report.rejected;
-                    continue;
-                }
+                target = direct->point;
+            }
+            if ((target - nodes[pin.node]).norm() > travel_r) {
+                continue; // a wall node, not a crease node that drifted
+            }
+            if (!try_pin(nodes, pin.node, target, node_offends)) {
+                ++report.rejected;
+                continue;
             }
             claimed.insert(pin.node);
             set_owner(provenance, pin.node, BoundarySupportKind::kCadEdge, edge.id);

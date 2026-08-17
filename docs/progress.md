@@ -235,6 +235,27 @@ the sphere and on the icecream cone* — and again the figures were right. Suite
   not sliding), the under-resolved 6 mm disc, and the h²κ/8 chordal floor that
   is what remains visible as faceting in any linear-element render.
 
+**Curved display/export boundary geometry + limit closure (2026-08-17):**
+
+- Linear solve meshes remain authoritative. CLI mesh exports and Studio previews
+  now promote a copy to tet10/hex20, project display-only boundary mids through
+  the exact owner-stable BRep oracle, and interpolate solved p1 displacement,
+  von Mises, displacement magnitude and nodal error onto those mids.
+- Sphere h = 8 mm display-normal deviation measures mean **0.66°**, p99
+  **2.19°**, max **3.28°**. The 16-case mesher diagnostic matrix is unchanged,
+  as intended: no solve DOF, BC/load selection, quality, fidelity label or
+  advisor input changed, so no advisor retraining was warranted.
+- The requested per-level LEB snap is already the graded implementation
+  sequence. Its uniform-path experiment is the recorded conformity-driven LEB
+  result: sphere p99 0.032 h with 94 sub-floor cells, so it cannot ship under
+  the no-worse-mesh invariant.
+- Hybrid and varyhedron do not contain a tet-shell transition operation to port.
+  They avoid graded needles with different volume topologies. Fixing graded
+  requires a new quality- and Jacobian-gated 2↔3/3↔2 tet flip kernel; changing
+  only extracted surface triangles would falsify the emitted volume mesh.
+- Suite **435/435 green** (three expected skips); showcase assets regenerated
+  from clean commit `ec6789e`.
+
 **Spectral sizing + coarsening + budget advisor + CG equilibration (2026-08-16,
 ADR-0034):** one wave, four mechanisms, suite **432/432 green** (OCC on).
 

@@ -29,7 +29,7 @@ performance in both meshing and solving, and offload to GPU wherever it wins
    accuracy; everything else is chosen by the system.
 5. **Verified accuracy**: every capability is validated against closed-form
    analytical solutions and manufactured solutions with demonstrated
-   convergence rates (see BENCHMARKS.md).
+   convergence rates (see [docs/benchmarks.md](benchmarks.md)).
 6. **Wins to demonstrate**: vs. a uniform 2nd-order tet baseline (our own
    solver, same tolerance), ≥5× fewer DOFs and ≥3× lower end-to-end wall time
    at equal or better energy-norm error on the benchmark geometry suite.

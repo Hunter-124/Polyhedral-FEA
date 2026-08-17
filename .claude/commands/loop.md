@@ -3,11 +3,12 @@ description: Autonomous plan → build → verify → improve loop for the curre
 ---
 
 You are running the autonomous improvement loop for the current phase of
-PolyMesh. Read CLAUDE.md, SPEC.md, PHASES.md, BENCHMARKS.md, and PROGRESS.md
-first. Identify the current phase and its exit criteria. Then loop:
+PolyMesh. Read CLAUDE.md, docs/spec.md, docs/phases.md, docs/benchmarks.md,
+and docs/progress.md first. Identify the current phase and its exit criteria.
+Then loop:
 
 ## 1. PLAN
-Build/refresh a DAG of tasks for this phase in PROGRESS.md: nodes = concrete
+Build/refresh a DAG of tasks for this phase in docs/progress.md: nodes = concrete
 tasks with acceptance checks, edges = dependencies. Pick the highest-leverage
 unblocked node. State in one paragraph: what you'll change, what benchmark(s)
 it should move, and your predicted effect. **Write the prediction down before
@@ -19,12 +20,22 @@ values, patch test sacred, SAFETY comments, units documented). Add/extend unit
 tests alongside.
 
 ## 3. VERIFY
-- `cargo fmt --check && cargo clippy --workspace -- -D warnings && cargo test --workspace`
-- Run the Tier-0 gates, then the benchmark tiers relevant to this phase:
-  `cargo run -p bench -- --tiers <relevant> --report bench/reports/$(date +%s).json`
+- `clang-format -i` on every touched `*.cpp` / `*.hpp` / `*.cu` under `apps/`,
+  `src/`, `tests/` (repo `.clang-format`; CI pins clang-format 18.1.8 and
+  gates with `clang-format --dry-run --Werror`).
+- `cmake --build build -j$(nproc) && ctest --test-dir build -j$(nproc) --output-on-failure`
+  — the full suite must stay green.
+- Run the Tier-0 gates, then the benchmark tiers relevant to this phase
+  (Catch2 cases by name, e.g. `ctest --test-dir build -R 'patch test|MMS'
+  --output-on-failure`; Tier-3 performance via `python3 bench/d6/run_tier3.py`),
+  and record the report under `bench/reports/`.
+- If the change can affect mesh ordering (unordered containers, smoothing,
+  DOF numbering): `./scripts/check_cross_stdlib_mesh.sh` must pass — meshes
+  byte-identical across libstdc++/libc++ builds (two-tree setup in the script
+  header).
 - Compare against the previous report AND against your step-1 prediction.
-  - Prediction matched → mark node done in PROGRESS.md, commit with a message
-    citing the benchmark deltas.
+  - Prediction matched → mark node done in docs/progress.md, commit with a
+    message citing the benchmark deltas.
   - Improved but for reasons you didn't predict → investigate before
     committing; unexplained improvements are how cheating hides.
   - Regressed or Tier-0 failure → diagnose, fix or revert. Never comment out,
@@ -34,7 +45,7 @@ tests alongside.
 ## 4. LOOP OR STOP
 - If phase exit criteria are not met and budget remains: go to 1.
 - If exit criteria ARE met: run `/audit`. Only after the audit passes, write a
-  phase summary in PROGRESS.md (what was built, final benchmark table,
+  phase summary in docs/progress.md (what was built, final benchmark table,
   trade-offs, open issues) and STOP for the ⛔ GATE — do not start the next
   phase without explicit human approval.
 - If stuck (3 consecutive iterations with no benchmark movement): STOP, write

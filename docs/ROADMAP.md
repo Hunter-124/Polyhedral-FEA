@@ -1,15 +1,24 @@
 # ROADMAP — Get PolyMesh off the ground
 
-Master execution plan. **PROGRESS.md** tracks what is done; this file is the
-target DAG. Phases map to `docs/phases.md` but GUI is pulled forward (ADR-0006).
+Master execution plan. [`docs/progress.md`](progress.md) tracks what is done;
+this file is the target DAG. Phases map to `docs/phases.md` but GUI is pulled
+forward (ADR-0006).
 
-> **2026-07-12 active program override:** packing / BRep / campaign work is
-> governed by the **advisor measure-first plan**, not ad-hoc ROADMAP track
-> reordering:
-> [`docs/plans/advisor-measure-first-program.md`](plans/advisor-measure-first-program.md)
-> · ADRs [0023](decisions/0023-measure-first-tet-primary-cvt-path.md) /
-> [0024](decisions/0024-advisor-measure-answers.md) · board
-> [`docs/dag/PROGRAM.yaml`](dag/PROGRAM.yaml) (Lanes **M** + **G**).
+> **2026-08-16 active program override:** the current program is the **learned
+> mesh advisor corpus/retrain program**, not ad-hoc ROADMAP track reordering:
+> [`docs/advisor/0001-architecture.md`](advisor/0001-architecture.md) ·
+> [`docs/advisor/0003-training-log.md`](advisor/0003-training-log.md) ·
+> [`docs/advisor/0008-v4-corpus-retrain.md`](advisor/0008-v4-corpus-retrain.md) ·
+> ADRs [0026](decisions/0026-anisotropic-metric-adaptivity.md)–
+> [0033](decisions/0033-a-gate-must-measure-what-ships.md) · training handoff
+> [`docs/training/HANDOFF-3080ti.md`](training/HANDOFF-3080ti.md). The 2026-07-12
+> measure-first program
+> ([`docs/plans/advisor-measure-first-program.md`](plans/advisor-measure-first-program.md),
+> ADRs [0023](decisions/0023-measure-first-tet-primary-cvt-path.md) /
+> [0024](decisions/0024-advisor-measure-answers.md), board
+> [`docs/dag/PROGRAM.yaml`](dag/PROGRAM.yaml), Lanes **M** + **G**) ran to
+> completion and is frozen; M5 (poly-VEM gate) was measured and not promoted —
+> [`bench/campaigns/vem-gate-m5/GATE.md`](../bench/campaigns/vem-gate-m5/GATE.md).
 
 ## Agent loop protocol (how to finish this)
 
@@ -21,7 +30,7 @@ Every autonomous session follows:
 3. VERIFY — cmake --build build -j && ctest --test-dir build
             for GUI: also smoke polymesh-gui with a fixture if DISPLAY is set
 4. COMMIT — Hunter-124 only, no AI attribution; push master
-5. UPDATE — mark todos + PROGRESS.md Done line; if stuck 3× → write blocker
+5. UPDATE — mark todos + docs/progress.md Done line; if stuck 3× → write blocker
 ```
 
 Hard rules (CLAUDE.md): patch test sacred, no hardcoded refs in product code,
@@ -172,4 +181,5 @@ A1 A3 ──> A2 A10 ──> A4 A5 A8 ──> A6 A7
 | E Verify | E1–E4 done; D6 Tier-3 scoreboard instrument on L-domain. |
 | F Perf | F1–F3 done: OpenMP assembly, auto CG above 50000 free DOFs (incomplete-Cholesky, bounded iterations), CSR SpMV + optional CUDA parity. |
 | G Release | G1–G4 done: README, examples/, header units, CI green (format+ctest+grep-audit). |
-| H Mesher | **Active.** Graded LEB conformity (ADR-0018), stamp hybrid, snap hash, plan/scoreboard. Remaining: H2 true hybrid FE, octa; solver precond only partially (H-V1: incomplete-Cholesky + bounded iterations landed 2026-08-08, mesh-aware preconditioner open). |
+| H Mesher | **Active.** Graded LEB conformity (ADR-0018), stamp hybrid, snap hash, plan/scoreboard. Mesher-quality wave landed (ADR-0030–0033): pyramid quadrature domain fixed ("fan transition volume loss" retracted), quadratic faces drawn through mid-edge nodes, graded torn shells closed (14/14 watertight), jut carve requires outside-the-solid, gates now measure the cell that ships (pyramid split-tet decomposition, hex interior relaxation, snap final-sweep fixed point, graded interior-sliver relaxation). Remaining: ADR-0033's two open defects — the graded sliver chain (`cylinder` graded h=0.005 unsolvable; graded-snap re-engineering) and the `ellipsoid_boss` boundary tail (next thread is the size field, not the snap) — plus H2 true hybrid FE, octa; solver precond only partially (H-V1: incomplete-Cholesky + bounded iterations landed 2026-08-08, mesh-aware preconditioner open). |
+| Advisor | **Active program.** Learned mesh advisor (ADR-0026–0029): v4 corpus shipped — 2,752 rows, 100 % procedural self-generated (8 families × 4 sizes × 3 loads = 96 cases), external Gmsh+CalculiX truth, leave-one-family-out evaluation, feasibility-gated enumeration deployed (ONNX Runtime CPU). "Cheapest mesh within tolerance" measured and **not shippable** yet ([`advisor/0007`](advisor/0007-tolerance-selector.md) / [`0008`](advisor/0008-v4-corpus-retrain.md)). Next: corpus regeneration post-ADR-0033 (folded-hybrid element counts are stale), then retrain. Tracker: [`advisor/0003-training-log.md`](advisor/0003-training-log.md). |

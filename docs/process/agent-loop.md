@@ -1,17 +1,23 @@
 # Agent loop — harness rules for finishing PolyMesh
 
 ## Source of truth
-1. **`docs/plans/advisor-measure-first-program.md`** — active measure-first /
-   CVT program (claim board nodes here first)  
-2. **`docs/ROADMAP.md`** — full epic DAG and exit criteria  
-3. **`docs/progress.md`** — done log + open issues  
-4. **In-session todos** — active epic only (≤12 items)  
-5. **`docs/phases.md`** — formal gates (do not skip ⛔ without owner)
+1. **`docs/advisor/0003-training-log.md`** + **`docs/training/HANDOFF-3080ti.md`** —
+   active learned-mesh-advisor corpus/retrain program (ADRs 0026–0027,
+   0028–0033; advisor docs `docs/advisor/0001–0008`)  
+2. **`docs/plans/advisor-measure-first-program.md`** — measure-first
+   methodology (scorecard, anti-cheat); its M/G program board is complete and
+   frozen (2026-08-16)  
+3. **`docs/ROADMAP.md`** — full epic DAG and exit criteria  
+4. **`docs/progress.md`** — done log + open issues  
+5. **In-session todos** — active epic only (≤12 items)  
+6. **`docs/phases.md`** — formal gates (do not skip ⛔ without owner)
 
-**Packing / CVT loops:** only after **M9 baseline freeze** (and wall
-projection M3b/M10 before Geogram). Reward signal is the five-number
-**scorecard + accuracy probes** in `results.jsonl` / `scorecard` — never wire
-PNG, residual alone, or raw nodal max stress. See the plan and
+**Packing / CVT loops:** the **M9 baseline freeze** and the Geogram CVT lane
+(M10, G0–G4) are **done** (2026-07-13), so this gate no longer blocks work;
+the M5 VEM gate concluded with its verdict in
+`bench/campaigns/vem-gate-m5/GATE.md`. The reward signal is still the
+five-number **scorecard + accuracy probes** in `results.jsonl` / `scorecard`
+— never wire PNG, residual alone, or raw nodal max stress. See the plan and
 `docs/dag/interfaces.md`.
 
 ## Session start checklist
@@ -50,9 +56,10 @@ After 3 failed attempts on the same ID:
 - Never require a human-only display test as the sole gate for a mesh/solver change  
 
 ## `/loop` vs this file
-`.claude/commands/loop.md` still says `cargo` (Rust-era). For C++ use:
-```bash
-cmake --build build -j$(nproc)
-ctest --test-dir build --output-on-failure
-```
-Prediction + benchmark comparison still apply for physics epics.
+`.claude/commands/loop.md` is current (updated 2026-08-16): it prescribes the
+same C++ flow as this file — `clang-format` on touched sources,
+`cmake --build build -j$(nproc)`, `ctest --test-dir build --output-on-failure`,
+plus `scripts/check_cross_stdlib_mesh.sh` for mesh-ordering changes. The two
+docs agree; this file is the harness-level policy, `/loop` is the per-phase
+iteration script. Prediction + benchmark comparison still apply for physics
+epics.

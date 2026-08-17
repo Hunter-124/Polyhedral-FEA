@@ -31,6 +31,13 @@ something**. Phase 1 makes them real; phase 3 learns them.
 
 ### 1.1 `adapt::MetricField` (new)
 
+> **Shipped under a different name (2026-08-16).** The type `adapt::MetricField`
+> below was never built under that name. What landed is `adapt::Metric3d` +
+> `adapt::MetricGrid` in `src/adapt/include/adapt/metric_field.hpp`; per
+> ADR-0026's own status note, anisotropy is *enabled* but not yet fully
+> *shipped* (the Mmg3d adapter and Hessian recovery remain the following
+> slice). The capability description below still stands as the design intent.
+
 One SPD 3×3 Riemannian metric field with:
 log-Euclidean interpolation, eigenvalue and aspect clamps, metric intersection,
 Alauzet gradation limiting, continuous-mesh complexity normalisation
@@ -106,6 +113,15 @@ score a raw nodal stress maximum.
 
 ### Corpus
 
+> **Superseded (2026-08-16).** The multi-source external corpus below was
+> **never ingested** — no SFEM, MFCAD++, ABC, or SimJEB data entered the
+> training set. The shipped corpus is 100 % procedurally self-generated
+> (`scripts/gen_primitive_corpus.py` + `scripts/build_advisor_dataset.py`);
+> per `docs/advisor/0005-data-card.md`, "no third-party CAD corpus is
+> included". The licensing analysis below is kept as the record of *why*
+> external sources stayed out (GrabCAD's cross-licence; SimJEB's NC-only
+> GrabCAD-derived CAD).
+
 | Source | Licence | Take | Role |
 |---|---|---|---|
 | [SFEM](https://huggingface.co/datasets/cmudrc/SFEM) | **MIT** | ~16k STEP + `fixed_facet_mask` + loads + FEniCSx elastic fields, ≈3 GB STEP | primary commercial-clean geometry+BC corpus |
@@ -120,6 +136,16 @@ and provenance cannot be established at scale. SimJEB's CAD is GrabCAD-derived
 and must stay out of any shipped checkpoint.
 
 ### Scale
+
+> **Superseded (2026-08-16).** The 1,200-problem / ~29k-solve plan below never
+> happened. What shipped (per `docs/advisor/0005-data-card.md`, final for this
+> cycle): **96 cases** — 8 procedural families × 4 size regimes × 3 load cases —
+> swept into a **2,412-row** `bench/advisor/dataset.csv`, against **96
+> reference truths (88 external Gmsh + CalculiX, 8 closed-form)**. The
+> literature-saturation argument below did hold at this smaller scale: at six
+> families the effect of adding a family on held-out regret was unmeasurable,
+> and eight families is where a 0.02-decade effect becomes detectable
+> (data card §Composition).
 
 1,200 independent (CAD, BC) problems × 24 mesh actions ≈ 29k candidate solves,
 plus 1,200 reference trajectories. ~10³ solver-hours. Start with a 20-geometry

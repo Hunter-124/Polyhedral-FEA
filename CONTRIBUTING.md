@@ -111,6 +111,8 @@ ADR-0020). Package names: Ubuntu `libocct-*-dev` set in README; Fedora
 │
 ├── apps/                     # EXECUTABLES ONLY — no core algorithms
 │   ├── cli/                  # polymesh CLI
+│   ├── bench/                # d6 tier-3 benchmark runner
+│   ├── testlab/              # campaign/probe harness (advisor corpus, gates)
 │   └── gui/                  # GLFW+ImGui presentation (theme, widgets, viewport)
 │
 ├── src/                      # LIBRARIES — linkable, testable, no windowing
@@ -118,6 +120,8 @@ ADR-0020). Package names: Ubuntu `libocct-*-dev` set in README; Fedora
 │   ├── mesh/                 # polyhedral mesh DS + validity + generators
 │   ├── adapt/                # sizing fields, error indicators, marking
 │   ├── fea/                  # elements, assembly, solve, stress (CPU/CUDA)
+│   ├── advisor/              # learned mesh advisor inference (ONNX Runtime;
+│   │                         #   POLYMESH_WITH_ADVISOR, ADR-0027)
 │   ├── bench/                # reference JSON loader only (anti-cheat boundary)
 │   └── pipeline/             # headless study: import → mesh → solve job
 │
@@ -135,9 +139,12 @@ ADR-0020). Package names: Ubuntu `libocct-*-dev` set in README; Fedora
 ### Dependency direction (do not invert)
 
 ```text
-apps/gui ──► pipeline ──► fea ──► mesh ──► geom
-apps/cli ──► pipeline / fea / mesh / geom / adapt
-tests    ──► same libraries as apps (never apps/* sources)
+apps/gui     ──► pipeline ──► fea ──► mesh ──► geom
+apps/cli     ──► pipeline / fea / mesh / geom / adapt
+apps/bench   ──► fea / bench_harness
+apps/testlab ──► geom / mesh / adapt / fea / pipeline / bench_harness / advisor
+advisor      ──► pipeline (public) + onnxruntime (private); never the reverse
+tests        ──► same libraries as apps (never apps/* sources)
 fea may use CUDA backend; CPU path always exists
 bench_harness loads bench/reference/* — ONLY module allowed to
 ```
@@ -163,6 +170,8 @@ bench_harness loads bench/reference/* — ONLY module allowed to
 | STL / surface / STEP (OCC) | `src/geom/` |
 | Sizing / adaptivity | `src/adapt/` |
 | Import → voxel/tet mesh → background solve | `src/pipeline/` |
+| Advisor inference / feature vector / ONNX model load | `src/advisor/` |
+| Campaign harness, probes, run artifacts | `apps/testlab/` |
 | Theme colors, Interwebz widgets, layout | `apps/gui/theme.*`, `widgets.*` |
 | 3D view / picking | `apps/gui/viewport.*` |
 | Analytical reference numbers | `bench/reference/*.json` **only** |

@@ -1,6 +1,6 @@
 # ADR-0028: Boundary-conformance hardening across meshing, solving, probes, and evidence
 
-- Status: accepted (2026-08-11); projection and evidence-path changes shipped, truth rerun precedes retraining
+- Status: accepted (2026-08-11); complete — projection and evidence-path changes shipped, and the truth rerun plus retrains it gated on landed (ADR-0029, [advisor 0006–0008](../advisor/0008-v4-corpus-retrain.md))
 - Decision: D28
 - Related: ADR-0012 (hybrid/graded tet), ADR-0022 (experiment warehouse), ADR-0023 (measure-first), ADR-0027 (learned advisor)
 - Evidence: commits `18ee534`, `92455f9`, `f23b4d1`, `cb73261`, `08f9f55`; `tests/test_brep_fidelity.cpp`; `bench/results/gmsh-peer.json`

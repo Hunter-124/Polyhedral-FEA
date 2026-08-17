@@ -1,5 +1,13 @@
 # Agent bootstrap — overnight / autonomous work on the DAG
 
+> **FROZEN / HISTORICAL (2026-08-16):** the DAG board this bootstrap works
+> covers only through node G4 (2026-07-13). All later work — ADR-0026
+> through ADR-0033 and the learned-advisor v2→v4 corpus program — is
+> tracked in [docs/advisor/0003-training-log.md](../advisor/0003-training-log.md)
+> and the ADR set instead. Read those first; the `OPEN NODES` section below
+> is the final historical state of the Lane M/G board, not the active
+> program.
+
 Paste the block below into a fresh AI agent harness (Claude Code, Grok, Codex,
 Cursor, aider, …) to have it work the program board autonomously. It is
 identity-agnostic: the agent asks who to attribute the work to and verifies it
@@ -84,36 +92,45 @@ GitHub: github.com/Hunter-124/Polyhedral-FEA, default branch master.
 - Before committing, re-verify `git config user.email` matches the identity the
   user gave you.
 
-=== OPEN NODES (read PROGRAM.yaml for the live list; typical order) ===
-As of 2026-07-12: **done** includes adaptive core (p-hierarchical*, fe-vem,
-mesher-tendency, hp-driver, gui-sim-controls, part-library, testlab, …) and
-**M0–M4, M6–M8**. **Active program = Lane M (measure-first) + G (CVT) on Lane V.**
+=== OPEN NODES — FINAL STATE, BOARD FROZEN 2026-07-13 ===
+This board is FROZEN (banner at the top of this file). The Lane M
+(measure-first) + Lane G (CVT) program below ran through G4 and is kept as
+the historical record — it is NOT the active program. The active program
+is the learned mesh advisor (ADR-0026 through ADR-0033); its live tracker
+is docs/advisor/0003-training-log.md. Read those first.
 
-**MUST READ FIRST (full plan — do not improvise a different strategy):**
+Final state as of 2026-07-13: **done** includes adaptive core
+(p-hierarchical*, fe-vem, mesher-tendency, hp-driver, gui-sim-controls,
+part-library, testlab, …), **M0–M4, M6–M14**, and **G0–G4** (vendor →
+Lloyd CVT → constrained sites → clipped Voronoi export). **M5 blocked:**
+the VEM gate campaign (bench/campaigns/vem-gate-m5/GATE.md) failed
+promotion — cvt_poly clears health + load_area on both parts but does not
+beat hybrid_zoo on accuracy (plate SCF 0.545 vs 0.512; cylinder SE 0.135
+vs 0.132). Product claim stays tet FE.
+
+The plan and ADRs that governed this lane, kept for archaeology:
   docs/plans/advisor-measure-first-program.md
-ADRs: 0020 (BRep), 0021 (varyhedron), 0022 (warehouse+grok), **0023** (strategy),
-**0024** (concrete Q&A: stress score, freeze→project→CVT, Geogram vendor,
+ADRs: 0020 (BRep), 0021 (varyhedron), 0022 (warehouse+grok), 0023 (strategy),
+0024 (concrete Q&A: stress score, freeze→project→CVT, Geogram vendor,
 chordal e, lfs balls, dual hard-block, tiers, traps).
 Process: docs/process/grok-loop.md. Board: docs/dag/PROGRAM.yaml.
-Every open M/G node note cites ADR-0024 Q# + that plan path — trust the notes.
 
-Normative order (ADR-0023/0024 — do not skip or reorder):
+Normative order as executed (ADR-0023/0024):
 1. **M0–M4 done:** probes, scorecard, sharp-only protect, N_pred
 2. **M6 done:** stress score = face-mean centroid VM + energy; never raw nodal max
 3. **M7 done:** chordal e = d/(ℓ²κ/8) with OCC κ + true mesh segments
 4. **M8 done:** protecting balls r=min(αh, β·lfs); corner shrink
-5. **M9 FREEZE baseline campaign** (done) on honest scorecard (before projection/CVT)
-6. **M10 done** wall tangential smooth + OCC surface project
-7. **G0 done** · **G1–G4 next** vendor → Lloyd CVT → constrained sites → clipped Voronoi
-8. **M5** VEM headline only if beats hybrid_zoo on frozen plate_hole+cylinder
-9. Dual-of-tet: HARD-BLOCK until G4. Frame fields: out of near-term horizon.
+5. **M9 done:** FREEZE baseline campaign on honest scorecard (before projection/CVT)
+6. **M10 done:** wall tangential smooth + OCC surface project
+7. **G0–G4 done:** vendor → Lloyd CVT → constrained sites → clipped Voronoi
+8. **M5 blocked:** VEM headline gate failed promotion (GATE.md numbers above)
+9. Dual-of-tet was HARD-BLOCKED until G4; frame fields stayed out of horizon.
 10. p>1 only with curved/isoparametric boundary in same work item (V6d deps M1)
-11. **V11** packing iterate: no "win" loops until M9; dual hard-block until G4
+11. **V11** packing iterate: no "win" loops ran until M9; dual hard-block until G4
 
-Side nodes (parallel when deps ready; not ahead of critical path):
+Side nodes (final state):
 - **M11–M14 done** (h_min, wall-clock, expected_area, sphere freeze-ref)
 - Icecream face-tags still design-only ([brep-face-tag-bc.md](../research/brep-face-tag-bc.md))
-- Start next session: [SESSION_HANDOFF_g1-cvt.md](../plans/SESSION_HANDOFF_g1-cvt.md)
 
 Substrate: sharp protect + graded tet + live BRep oracle.
 Reward: scorecard + accuracy — never wire PNG, never residual alone.

@@ -2,26 +2,39 @@
 
 ## Active (read this first)
 
-**Canonical plan:** [`docs/plans/advisor-measure-first-program.md`](plans/advisor-measure-first-program.md)  
-**ADRs:** [0023](decisions/0023-measure-first-tet-primary-cvt-path.md) ·
-[0024](decisions/0024-advisor-measure-answers.md)  
-**Board:** [`docs/dag/PROGRAM.yaml`](dag/PROGRAM.yaml) ·
-**Bootstrap:** [`docs/dag/AGENT_BOOTSTRAP.md`](dag/AGENT_BOOTSTRAP.md)  
+**Current program (2026-08): the learned mesh advisor corpus/retrain program.**
+**Canonical docs:**
+[`docs/advisor/0001-architecture.md`](advisor/0001-architecture.md) ·
+[`docs/advisor/0003-training-log.md`](advisor/0003-training-log.md) (live
+tracker) ·
+[`docs/advisor/0008-v4-corpus-retrain.md`](advisor/0008-v4-corpus-retrain.md)  
+**ADRs:** [0026](decisions/0026-anisotropic-metric-adaptivity.md) ·
+[0027](decisions/0027-learned-mesh-advisor.md) ·
+[0028](decisions/0028-boundary-conformance-hardening.md) ·
+[0029](decisions/0029-independent-truth-and-honest-gates.md) ·
+[0030](decisions/0030-the-ruler-was-wrong.md) ·
+[0031](decisions/0031-a-jut-has-a-side.md) ·
+[0032](decisions/0032-stl-order-determinism.md) ·
+[0033](decisions/0033-a-gate-must-measure-what-ships.md)  
+**Training box:** [`docs/training/HANDOFF-3080ti.md`](training/HANDOFF-3080ti.md)
+· [`docs/training/ACCESS-hunter-pc.md`](training/ACCESS-hunter-pc.md)  
 **Roadmap:** [`docs/ROADMAP.md`](ROADMAP.md) · **Agent loop:**
 [`docs/process/agent-loop.md`](process/agent-loop.md)
+
+**The 2026-07-13 measure-first / CVT board is finished and frozen.**
+[`docs/dag/PROGRAM.yaml`](dag/PROGRAM.yaml) is a historical record, not the
+live tracker. Its final state:
 
 | Status | Nodes | Notes |
 |--------|-------|--------|
 | **Done** | **M0–M14 (all), G0–G4, V6e, V10c** | Measure path + full Geogram CVT stack (vendor→Lloyd→sites→export) |
-| **In progress** | **M5** | Both parts **health+load_area OK**; SCF **0.545** vs hybrid 0.512, SE **0.135** vs 0.132 — `GATE.md` (not promoted) |
-| **Open** | V6d, V11, feedback-loop | campaign-1 **done** (settings-frontier-1 finished; defaults not flipped) |
+| **Frozen, not promoted** | **M5** | Both parts **health+load_area OK**; SCF **0.545** vs hybrid 0.512, SE **0.135** vs 0.132 — [`bench/campaigns/vem-gate-m5/GATE.md`](../bench/campaigns/vem-gate-m5/GATE.md) |
+| **Left open at freeze** | V6d, V11, feedback-loop | campaign-1 **done** (settings-frontier-1 finished; defaults not flipped) |
 | **Deferred** | icecream face-tags | Face-ID BC design |
 
-Order locked (ADR-0024 Q2): **freeze (done) → wall project (done) → CVT**. Dual
-hard-block until G4. Packing “win” loops measure **delta vs M9 freeze only**.
-Never score raw nodal max stress.
-
-**Handoff:** [`docs/plans/SESSION_HANDOFF_g1-cvt.md`](plans/SESSION_HANDOFF_g1-cvt.md).
+Board rules at freeze (ADR-0024 Q2): **freeze (done) → wall project (done) →
+CVT**. Packing “win” loops measured **delta vs M9 freeze only**. Never score raw
+nodal max stress.
 
 **Post-M10 smoke (2026-07-13):** cylinder+plate_hole × varyhedron+hybrid_zoo
 h_scale=5 → **4/4 `ok`**, `health_ok` + `load_area_ok` true; cylinder SE ~0.0034
@@ -162,6 +175,128 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-08-15: **Mesher-quality wave — a gate measures the cell that ships
+  (ADR-0033)** — pyramid/hex/graded gates now measure the cell that ships:
+  corner-folded pyramids ship as their two assembly split tets
+  (`icecream_cone` h=0.008 `quality_min` **−0.742 → +0.0201** at unchanged
+  p99/h); hex interior relaxation between snap rounds (sphere M1max
+  **6.9e-4 → 1.1e-16**); `snap_boundary_nodes` acts on its final sweep to a
+  fixed point (`ellipsoid_boss_s1` hybrid −0.9939 → +0.0200, 4 inverted cells →
+  0); graded interior-sliver relaxation (`cylinder` h=0.005 worst aspect
+  **4.17e-05 → 5.86e-04** at identical element count). Three new non-circular
+  curved corpus families: `lobed_shaft`, `twisted_loft`, `ellipsoid_boss`;
+  `lobed_shaft` hybrid converges (exact-BRep p99/h 0.0191 → 0.0105, boundary
+  normal p99 26.8° → 0.2°). `diag` reports `quality_min_type` +
+  `n_inverted_cells`. **Two open defects (ADR-0033):** the graded sliver chain —
+  `cylinder` graded h=0.005 still builds a mesh CG cannot solve (min edge
+  0.004 h; needs a graded-snap re-engineering, not a threshold change) — and the
+  `ellipsoid_boss` boundary tail (binding constraint `hex8_shape_quality >=
+  0.02` vs required wall travel; next thread is the size field, not the snap).
+  Advisor labels carrying element counts for folded hybrid meshes are stale —
+  corpus regeneration required before the next retrain. Suite 409/409; library
+  embeddable, builds on Eigen 3.4 (`aa5ae76`).
+- 2026-08-14: **v4 corpus regeneration + retrain
+  ([`docs/advisor/0008-v4-corpus-retrain.md`](advisor/0008-v4-corpus-retrain.md))**
+  — all MSVC-era v3 rows archived under `bench/campaigns/archive-v4/`; 3,528
+  pairs re-measured across hunter-pc (gcc 15) + livingroom-pc (gcc 16); the 488
+  pairs solved on both hosts agree **exactly** — ADR-0032's determinism holds at
+  corpus scale. Truth campaign dropped (every reference is now `analytic` or
+  `external-gmsh-mesh+calculix-solver`, promotion-proof: `promoted=0,
+  protected_refused=188`). The retrain found the fold eating the headline:
+  `smoke_bar`'s reference scored raw nodal max von Mises on a fully clamped bar
+  — a quantity that diverges under refinement — so the advisor was charged ~3
+  decades for correctly picking a finer mesh. `load_metrics` now rejects
+  `max_von_mises` references; fold regret **2.961 → 1.114**, best validation
+  `rel_err_mae` **0.6893 → 0.5201**, advisor leads `random` on the raw macro
+  mean (0.601 vs 0.687). Shipped v4: 2,752-row dataset, ONNX 62 columns parity
+  2.2e-06, `plate_hole --advisor` → graded_tet exit 0 (HANDOFF-3080ti §2a
+  acceptance holds). Tolerance selector re-measured on corrected labels: gap vs
+  `finest_action` closed 3× → 1.6×, still misses the promised tolerance — not
+  shipped.
+- 2026-08-14: **STL-order determinism (ADR-0032)** — mesher output depended on
+  `unordered_map`/`unordered_set` iteration order reaching mutations (hybrid
+  smoother, snap order, surface/wall project, varyhedron, hp DOF numbering):
+  replaying 24 (part, cfg) pairs MSVC→gcc reproduced only 19. Fix: iterate
+  sorted ids wherever order drives a mutation, selection, or index assignment.
+  `scripts/check_cross_stdlib_mesh.sh` (libstdc++ vs libc++, byte-identical
+  meshes on 4 part/mesher pairs) runs in CI; 409/409 ctest on the fixed tree.
+  Labelling standardises on gcc.
+- 2026-08-14: **Clean-data retrain
+  ([`docs/advisor/0006-clean-data-retrain.md`](advisor/0006-clean-data-retrain.md))**
+  — campaign regenerated on the post-untangle mesher: 3,672 rows re-measured;
+  corpus successes 54.7 % → 70.0 %, fill-stage guard refusals 28.4 % → 19.2 %.
+  Scale-law features added (`log10_volume/diag/h/cells`, mirrored in
+  `advisor.cpp`). `best.pt` now tracks best validation (`latest.pt` was 13 %
+  worse). Macro-mean regret ranked the advisor below `random` — answered in
+  0008 §4: a bad label, not a bad model. Refusal rows measured as family-local
+  noise (LightGBM AUC 0.372 on box_hole — worse than chance); the exclusion
+  stands as a measured result.
+- 2026-08-14: **"Cheapest mesh within X" measured, not shipped
+  ([`docs/advisor/0007-tolerance-selector.md`](advisor/0007-tolerance-selector.md))**
+  — tolerance selector scored over 12 family-held-out folds: selectors are 2–5×
+  cheaper than `finest_action` among satisfying picks but violate the tolerance
+  1.3–2.6× more often; no safety margin on a 0–2 decade grid reaches 10 %
+  violation. Ships as scorer + published number, not a feature.
+- 2026-08-13: **ADR-0030 "the ruler was wrong"** — the "fan transition loses
+  36–40 % of volume" defect **retracted**: `fea::pyramid_rule` integrated the
+  collapsed-brick map over the wrong domain (the exact rational 0.6); the rule
+  is now tensor-Gauss on the cube with a per-element volume-exactness test.
+  Display path splits quadratic faces through their mid-edge nodes (60° hex20
+  cylinder sector worst gap **4.019 → 1.022 mm**). One `fea::element_volume`
+  definition. Graded torn shells fixed — geometry deletion now proposes and the
+  shell disposes: **14/14 watertight** across both meshers and 7 parts;
+  `tube_s0` h=0.00125 graded rel_err 0.2446 → 0.09097; boundary-shell census in
+  every mesher note; `score_volume` requires closure before measuring.
+- 2026-08-13: **ADR-0031 "a jut has a side"** — the graded S5 void carve peeled
+  juts that were far from the surface but *inside* the solid (sphere craters);
+  a jut is now far **and** outside (one shared `outside_solid` oracle). Every
+  hole-bearing part re-measured bit-identical; graded-sphere test pins 0 carved
+  nodes.
+- 2026-08-13: **ADR-0029 independent truth + honest gates** — 64 of 72 corpus
+  references were self-generated (`overkill-reference`): truth now comes from an
+  external **Gmsh 4.13.1 + CalculiX 2.23** chain touching neither our mesher nor
+  solver (88 external + 8 closed-form references, validated against closed form
+  before adoption; our solver cross-checked to 3.4e-09 tip deflection on an
+  identical Gmsh mesh). Applied load made mesh-independent (traction rescaled by
+  `cad_rule_area / mesh_selected_area`; measured deficits up to **28.2 %**);
+  load-area gate is three-valued (`verified` / `rescaled_to_exact_cad` /
+  `unverified` — unverifiable is never a pass); truth promotion is an allowlist
+  (`scripts/truth_guard.py`); accuracy re-derived from raw `answers` at dataset
+  build time. Reference values moved a median **3.79 %**, up to **+88.4 %**.
+- 2026-08-13: **Advisor honest evaluation + gated enumeration ships** — the
+  part-hash split leaked (672/672 validation rows had a training twin);
+  splits are now leave-one-family-out with deployable baselines only. The
+  shipped chooser is feasibility-gated enumeration: `advisor_gated_0.05` 0.3468
+  `rel_err` regret at 10.0 % pick-failure vs `advisor_argmin` 0.4413 at 22.7 %,
+  paired sign test **38W-0L-262T, p = 7.3e-12**; ranking alone does not beat
+  `finest_action` (117W-136L-47T, p = 0.258) — the gate earns the win.
+  Calibration + OOD veto wired in (was validated but inert); cards and figures
+  regenerated with provenance.
+- 2026-08-12: **ADR-0028 boundary-conformance hardening** — order-2 mid-edge
+  nodes projected onto the exact B-rep behind a stiffness-quadrature validity
+  gate (two scaled epsilons, six bisection backoffs); `peak_vm` probes for peak
+  truths (the box_hole mean probe had a ~0.66 error floor vs the Kirsch peak);
+  `vtu_wire_png.py` renders by VTK topology; LEB termination guaranteed
+  (projected midpoint accepted only if both children ≤ 0.75× parent); ZZ patch
+  recovery bounded (SVD + L2-gain guard: box_hole_s2 probe max 10.79 → 2.979 MPa
+  vs Kirsch 3.0; external row rel err 2.595 → 0.0072). Row schema bumped
+  `advisor-row-v2` → `-v3`; retrain on post-fix rows only.
+- 2026-08-10: **Learned mesh advisor trained + wired into solve (ADR-0027, v2)**
+  — first trained model (training log M-A1): 24 procedural parts × 3 loads = 72
+  cases, batch 1 1536/1536 pairs, truth coverage 67/72; inference ships through
+  ONNX Runtime CPU. Advisor picks meshes ~6× more accurate than the default
+  where truth is real (`7cfaabf`). Also: solve imported Gmsh `.msh` meshes; tet10
+  mid-node import order fixed (`92455f9`).
+- 2026-08-09: **ADR-0026 variable-everything wave 1** — anisotropic metric
+  contract shipped as `adapt::Metric3d` + `adapt::MetricGrid`; real scalar size
+  fields now reach the graded/hybrid meshers via `mesh::SizeFieldFn`
+  (field-derived levels replace the binary ball test, 2:1 conformity preserved);
+  exact packed RVD cells admitted (`46cbdc1`); OpenCASCADE enabled on Windows.
+- 2026-07-14: **CVT poly mesher perf + poly VEM stress** — neighbour-restricted
+  clipping O(N²)→O(N·k); export emits one polyhedron per site (was fragmented
+  per tet); GUI renders polyhedral cells as true polygon facets; poly VEM
+  recovers von Mises stress (was identically 0) + direct solver for VEM
+  (`2789062`, `d0ec1ad`, `0e0532e`, `e57f73b`).
 - 2026-07-13: **G1–G4 done (CVT critical path)** —
   - G1: Geogram Delaunay+Predicates PSMs, `clip_convex_cell`, unit-cube smoke
   - G2: `lloyd_cvt` + ρ=1/h³ (`SizeFieldFn` same contract as N_pred)

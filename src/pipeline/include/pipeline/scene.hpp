@@ -404,6 +404,8 @@ struct SolveResult {
     std::vector<std::array<std::uint32_t, 4>> boundary_quads;
     std::string mesh_note; // e.g. element/node counts, mesher version
     GeometryVolumeAssessment fill_geometry_volume;
+    /// Target mesh size used for curved display-only boundary projection.
+    double display_h = 0.0;
     GeometryVolumeAssessment solved_geometry_volume;
 
 };
@@ -430,6 +432,18 @@ std::size_t project_quadratic_boundary_mids(
     mesh::BoundaryProjectionContext* projection, double h,
     std::vector<std::uint32_t>* reverted_nodes = nullptr,
     std::vector<std::uint32_t>* partial_nodes = nullptr);
+/// A quadratic copy used only for display/export, plus parent endpoints for
+/// every node added by promotion. The authoritative solve mesh is unchanged.
+struct CurvedDisplayMesh {
+    fea::NodalMesh mesh;
+    std::vector<std::optional<std::array<std::uint32_t, 2>>> added_node_parents;
+};
+
+/// Promote a mesh copy and project its boundary mids onto the exact CAD BRep.
+/// New-node parents are ordered by node id starting at the input node count, so
+/// callers can interpolate p1 point fields without modifying solved data.
+CurvedDisplayMesh curved_display_mesh(const Model& model,
+                                      const fea::NodalMesh& mesh, double h);
 
 /// Volume mesh from closed surface: tet4 grid fill (P2 v1) with stair-cased
 /// boundary quads for region mapping / rendering.

@@ -37,6 +37,7 @@ D6_JSON = REPO / "bench/results/polymesh-d6-l-domain.json"
 GATE1_JSON = REPO / "bench/results/polymesh-gate1-p1.json"
 GATE1_MD = REPO / "bench/reports/p1-gate1-convergence.md"
 PROGRESS_MD = REPO / "docs/progress.md"
+ADVISOR_SWEEP_JSON = REPO / "bench/results/advisor-budget-sweep.json"
 
 
 def rel(path: Path) -> str:
@@ -422,6 +423,114 @@ def plot_mms(outdir: Path) -> Path:
     return fs.finish(fig, out)
 
 
+# ---------------------------------------------------------------------------
+# (d) bench_advisor_budget.png
+# ---------------------------------------------------------------------------
+def plot_advisor_budget(outdir: Path) -> Path:
+    """What the learned advisor picks as the DOF cap tightens (ADR-0034).
+
+    Every point is a real CLI run recorded in the sweep JSON: the chosen
+    action's predicted per-case relative error (rel_err_rel — the ranking
+    score the chooser optimizes) against the budget it was given. Runs the
+    advisor refused (every candidate over budget) are drawn as refusal
+    markers, never silently dropped.
+    """
+    if not ADVISOR_SWEEP_JSON.is_file():
+        raise SystemExit(
+            f"missing {rel(ADVISOR_SWEEP_JSON)} — run "
+            "scripts/sweep_advisor_budget.py first")
+    payload = json.loads(ADVISOR_SWEEP_JSON.read_text())
+    records = payload["records"]
+    if not records:
+        raise SystemExit(f"{rel(ADVISOR_SWEEP_JSON)}: no records")
+
+    parts = sorted({r["part"] for r in records})
+    budgets = sorted({r["max_dof"] for r in records if r["max_dof"] > 0})
+    # x positions: log-spaced budgets, with the uncapped run one step past
+    # the loosest budget so it sits on the same axis.
+    x_of_budget = {b: i for i, b in enumerate(budgets)}
+    x_uncapped = len(budgets)
+
+    t = fs.theme()
+    n_runs = len(records)
+    n_refusals = sum(1 for r in records if r["budget_refusal"])
+    over = [
+        r for r in records
+        if not r["vetoed"] and r["max_dof"] > 0
+        and isinstance(r["predicted_dof"], (int, float))
+        and r["predicted_dof"] > r["max_dof"]
+    ]
+    # The verdict is computed from the records, not asserted in a string.
+    if over:
+        verdict = f"{len(over)} of {n_runs} capped runs picked OVER budget"
+    else:
+        verdict = (f"every capped pick inside its DOF budget "
+                   f"({n_runs} runs, {n_refusals} honest refusal"
+                   f"{'s' if n_refusals != 1 else ''})")
+    title = f"Learned mesh advisor under a DOF budget — {verdict}"
+    subtitle = (
+        "Per-case relative-error score (lower is better) of the action the "
+        "advisor picks at each cap. Labels name the action where it changes; "
+        "a refusal means no candidate action fit the budget."
+    )
+    footer = fs.footer_source(
+        ADVISOR_SWEEP_JSON, n=n_runs,
+        note="one CLI solve per point (polymesh solve --advisor "
+             "--advisor-max-dof N); predictions by the shipped ONNX model",
+    )
+    fs.assert_glyphs(title, subtitle, footer, *parts)
+
+    fig, axes = fs.figure(
+        title, subtitle=subtitle, footer=footer, size="hero", nrows=1,
+        ncols=len(parts),
+    )
+
+    for ax, part in zip(axes[0], parts):
+        # Uncapped (max_dof == 0) sorts last so the polyline walks the ladder
+        # left-to-right and ends at "no cap".
+        runs = sorted((r for r in records if r["part"] == part),
+                      key=lambda r: (r["max_dof"] == 0, r["max_dof"]))
+        xs, ys = [], []
+        last_action = None
+        for r in runs:
+            x = x_uncapped if r["max_dof"] == 0 else x_of_budget[r["max_dof"]]
+            if r["budget_refusal"]:
+                # Honest marker below the data band: the advisor declined
+                # rather than return an over-budget action.
+                ax.scatter([x], [0.02], marker="x", s=90, color=t.bad,
+                           linewidth=2.2, zorder=5,
+                           transform=ax.get_xaxis_transform())
+                ax.annotate("refused", (x, 0.06), xycoords=("data", "axes fraction"),
+                            ha="center", fontsize=fs.FONT_PT["annot"] - 1,
+                            color=t.bad)
+                continue
+            if not isinstance(r["predicted_rel_err_rel"], (int, float)):
+                continue
+            xs.append(x)
+            ys.append(r["predicted_rel_err_rel"])
+            action = f"{r['mesher']} p{r['order']}"
+            if action != last_action:
+                ax.annotate(action, (x, r["predicted_rel_err_rel"]),
+                            xytext=(0, 7), textcoords="offset points",
+                            ha="center", fontsize=fs.FONT_PT["annot"] - 1,
+                            color=t.muted)
+                last_action = action
+        ax.plot(xs, ys, color=t.accent, linewidth=1.8, zorder=3)
+        ax.scatter(xs, ys, s=34, color=t.accent, edgecolor=t.ink, linewidth=0.7,
+                   zorder=4)
+        fs.panel_title(ax, part)
+        ax.grid(axis="x", visible=False)
+
+    labels = [f"{b // 1000}k" for b in budgets] + ["no\ncap"]
+    for ax in axes[0]:
+        ax.set_xticks(list(x_of_budget.values()) + [x_uncapped], labels)
+    axes[0][0].set_ylabel("predicted rel_err_rel (lower is better)")
+    axes[0][1].set_xlabel("DOF budget (--advisor-max-dof)", labelpad=10)
+
+    out = outdir / "bench_advisor_budget.png"
+    return fs.finish(fig, out)
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Render PolyMesh benchmark charts.")
     ap.add_argument(
@@ -430,14 +539,15 @@ def main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument(
         "--only", action="append", default=[],
-        help="render only these charts (dof_time|tier1|mms); repeatable",
+        help="render only these charts (dof_time|tier1|mms|advisor_budget); repeatable",
     )
     args = ap.parse_args(argv)
 
     fs.use("light")
     args.outdir.mkdir(parents=True, exist_ok=True)
 
-    charts = {"dof_time": plot_dof_time, "tier1": plot_tier1, "mms": plot_mms}
+    charts = {"dof_time": plot_dof_time, "tier1": plot_tier1, "mms": plot_mms,
+              "advisor_budget": plot_advisor_budget}
     wanted = args.only or list(charts)
     unknown = [w for w in wanted if w not in charts]
     if unknown:

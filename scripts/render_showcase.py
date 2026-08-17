@@ -309,13 +309,25 @@ class MeshTile:
     stats: dict = field(default_factory=dict)
 
 
-# compare_meshers: one part, matched h, three topologies.
+# compare_meshers: one part, matched h, three topologies, one shared close-up
+# on the hole. Whole-plate tiles put the hole at a few percent of the frame
+# and the three topologies read as identical grey sheets; the 60 mm window
+# (6 hole radii) is where the cell zoo actually differs. The window is wider
+# than compare_grading's so the hybrid's hex bulk -> transition band fits.
+CMP_FOCUS = (0.0, 0.0, 0.005)
+CMP_WINDOW = 0.030
+CMP_VIEW = (0.15, -0.35, 1.00)
+CMP_UP = (0.0, 1.00, 0.35)
+CMP_SIZE = (1300, 1150)
 MESHER_TILES = [
-    MeshTile("cmp_tet", "tet  ·  Cartesian grid-fill tet4", "plate_hole", "tet", 0.003),
-    MeshTile("cmp_graded", "graded  ·  feature-graded tet4", "plate_hole", "graded", 0.003),
+    MeshTile("cmp_tet", "tet  ·  Cartesian grid-fill tet4", "plate_hole", "tet", 0.003,
+             size=CMP_SIZE, view=CMP_VIEW, up=CMP_UP, focus=CMP_FOCUS, window=CMP_WINDOW),
+    MeshTile("cmp_graded", "graded  ·  feature-graded tet4", "plate_hole", "graded", 0.003,
+             size=CMP_SIZE, view=CMP_VIEW, up=CMP_UP, focus=CMP_FOCUS, window=CMP_WINDOW),
     # At this part and h the hybrid path emits a mixed transition zoo, so the
     # label names the conforming transition cells rather than claiming all-hex.
-    MeshTile("cmp_hybrid", "hybrid  ·  hex bulk + transition cells", "plate_hole", "hybrid", 0.003),
+    MeshTile("cmp_hybrid", "hybrid  ·  hex bulk + transition cells", "plate_hole", "hybrid", 0.003,
+             size=CMP_SIZE, view=CMP_VIEW, up=CMP_UP, focus=CMP_FOCUS, window=CMP_WINDOW),
 ]
 
 # compare_grading: same mesher, only the sizing field differs. h values are
@@ -1000,20 +1012,21 @@ ARCH_FEEDBACK_Y = 0.575        # mid-gap lane for the return path
 #: 1 reads right-to-left and the row-to-row hop is a short vertical.
 ARCH_STAGES = [
     (0, 0, "STEP / B-rep CAD", "", True),
-    (1, 0, "feature analysis", "curvature \u00b7 thin-wall", False),
-    (2, 0, "gradient-limited\nsizing field", "", True),
-    (3, 0, "hybrid meshers", "tet \u00b7 hex \u00b7 prism \u00b7 pyramid \u00b7 poly-VEM", False),
+    (1, 0, "feature analysis", "curvature · thin-wall · FFT edge denoise", False),
+    (2, 0, "spectral-trimmed\nsizing field", "FFT energy truncation + budget", True),
+    (3, 0, "hybrid meshers", "tet · hex · prism · pyramid · poly-VEM", False),
     (3, 1, "unified FE + VEM\nassembly", "", False),
-    (2, 1, "solve", "LDLT / CG", True),
+    (2, 1, "solve", "LDLT / equilibrated CG", True),
     (1, 1, "ZZ error\nestimate", "", False),
-    (0, 1, "hp-adapt\ndecision", "", True),
+    (0, 1, "hp-adapt\ndecision", "refine · coarsen · p-elevate", True),
 ]
 
 #: side outputs: (x, y, label, source stage index)
 ARCH_SIDES = [
-    (0.19, 0.085, "bench harness", 6),
-    (0.505, 0.085, "GUI viewport", 5),
-    (0.735, 0.085, "VTU export", 5),
+    (0.14, 0.085, "learned mesh advisor\n(budget-feasible)", 1),
+    (0.36, 0.085, "bench harness", 6),
+    (0.58, 0.085, "GUI viewport", 5),
+    (0.80, 0.085, "VTU export", 5),
 ]
 
 
@@ -1030,7 +1043,8 @@ def render_architecture(out: Path) -> None:
     fig, axes = fs.figure(
         "PolyMesh pipeline",
         subtitle="STEP CAD to solved fields; the hp-adapt decision feeds back "
-                 "into the sizing field rather than into a remesh from scratch",
+                 "into the sizing field — refine, coarsen, or p-elevate — "
+                 "rather than remeshing from scratch",
         footer=fs.footer_source(Path(__file__),
                                note="drawn programmatically, no external "
                                     "diagram tool"),
@@ -1097,7 +1111,7 @@ def render_architecture(out: Path) -> None:
     ax.plot([fx, sx], [lane, lane], color=t.accent, linewidth=1.6,
             linestyle=(0, (5, 3)), zorder=2)
     arrow((sx, lane), (sx, sy - bh / 2), color=t.accent, dashed=True)
-    feedback = "refine / p-elevate"
+    feedback = "refine / coarsen / p-elevate"
     fs.assert_glyphs(feedback)
     # Accent ink on a page-coloured plate: the old dark blue on near-black was
     # invisible at any size.
@@ -1453,7 +1467,10 @@ def main(argv: list[str] | None = None) -> int:
                      f"topolog{'y' if len(MESHER_TILES) == 1 else 'ies'}")
             foot = (
                 f"plate_hole.step at h = {fmt_h(wanted[0].h)} for all "
-                f"{len(wanted)} variants \u00b7 {counts}. All are Cartesian "
+                f"{len(wanted)} variants · close-up on the hole, a "
+                f"{CMP_WINDOW * 2000.0:g} mm window "
+                f"(≈{CMP_WINDOW / HOLE_RADIUS_M:.1f} hole radii across) · "
+                f"{counts}. All are Cartesian "
                 f"grid-fill topologies (not Delaunay); only the cell zoo and "
                 f"grading differ. Identical camera, zoom and tile size in "
                 f"every panel (asserted, not assumed)."
@@ -1614,6 +1631,11 @@ def main(argv: list[str] | None = None) -> int:
          "Method-of-manufactured-solutions energy-norm convergence: frozen P1 "
          "elements at 0.997/0.997/2.000/2.000 against theory 1/1/2/2, and the "
          "hierarchical p-basis at 1.02/1.99/2.98/3.98 against theory 1/2/3/4."),
+        ("bench_advisor_budget.png", "advisor_budget",
+         "The learned mesh advisor under a DOF budget (ADR-0034): each point is "
+         "a real CLI run's chosen action — predicted per-case relative error vs "
+         "the --advisor-max-dof cap — with over-budget empties answered by an "
+         "honest refusal, never an unaffordable action."),
     ]
     chart_wanted = [c for c in chart_specs if want(c[0].removesuffix(".png"))]
     if chart_wanted and not args.no_charts:

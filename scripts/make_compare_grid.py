@@ -49,7 +49,7 @@ def theme() -> fs.Theme:
     return t if t.name == "dark" else fs.use("dark")
 
 
-GUTTER_FRAC = 0.0012        # separator width as a fraction of canvas width
+GUTTER_FRAC = 0.004         # separator width as a fraction of canvas width
 
 
 # ---------------------------------------------------------------------------

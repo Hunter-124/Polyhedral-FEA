@@ -1469,7 +1469,7 @@ def main(argv: list[str] | None = None) -> int:
                 f"plate_hole.step at h = {fmt_h(wanted[0].h)} for all "
                 f"{len(wanted)} variants · close-up on the hole, a "
                 f"{CMP_WINDOW * 2000.0:g} mm window "
-                f"(≈{CMP_WINDOW / HOLE_RADIUS_M:.1f} hole radii across) · "
+                f"(≈{CMP_WINDOW * 2000.0 / (HOLE_RADIUS_M * 1000.0):.1f} hole radii across) · "
                 f"{counts}. All are Cartesian "
                 f"grid-fill topologies (not Delaunay); only the cell zoo and "
                 f"grading differ. Identical camera, zoom and tile size in "

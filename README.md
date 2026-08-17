@@ -123,14 +123,15 @@ Full gallery, per-image provenance, and reproduce commands:
 
 ```mermaid
 flowchart TD
-    CAD["STEP / B-rep import<br/>(OpenCASCADE)"] --> FEAT["feature analysis<br/>curvature, thin wall, feature edges"]
-    FEAT --> SIZE["sizing field<br/>h(x) from geometry + BC boxes"]
+    CAD["STEP / B-rep import<br/>(OpenCASCADE)"] --> FEAT["feature analysis<br/>curvature, thin wall, FFT edge denoise"]
+    FEAT --> SIZE["spectral-trimmed sizing field<br/>h(x) from geometry + BC boxes"]
+    FEAT --> ADV["learned mesh advisor<br/>mesher / h / adapt / order, DOF-budget gated"]
     SIZE --> MESH["hybrid meshers<br/>tet · hex · prism · pyramid · polyhedron"]
     MESH --> ASM["FE + VEM assembly<br/>one global K, minimum rule"]
-    ASM --> SOLVE["linear solve<br/>SimplicialLDLT / CG"]
+    ASM --> SOLVE["linear solve<br/>SimplicialLDLT / equilibrated CG"]
     SOLVE --> ZZ["Zienkiewicz–Zhu<br/>recovery + error estimate"]
     ZZ --> ADAPT{"η ≤ target?"}
-    ADAPT -- "no" --> HP["hp-adapt driver<br/>score h / p / shape per element"]
+    ADAPT -- "no" --> HP["hp-adapt driver<br/>refine / coarsen / p-elevate per element"]
     HP --> SIZE
     ADAPT -- "yes" --> OUT["VTU export<br/>von Mises + displacement"]
 ```
@@ -143,10 +144,19 @@ Design narrative: [docs/solver-core.md](docs/solver-core.md).
 A compact multi-head MLP maps geometry + BC features and a candidate mesh action
 to accuracy, B-rep fidelity, cost, and failure risk
 ([ADR-0027](docs/decisions/0027-learned-mesh-advisor.md)). The shipped decision
-rule is **gated enumeration**: score every action in an explicit list of 20
-*measured* candidates, drop those the feasibility head expects to fail, and take
-the argmin of predicted per-case accuracy over the survivors. Hard runtime vetoes
-still run afterwards — the gate improves a choice, the veto refuses one.
+rule is **gated enumeration**: score every action in an explicit list of 38
+*measured* candidates (`bench/advisor/clamps.json`), drop those the feasibility
+head expects to fail, and take the argmin of predicted per-case accuracy over
+the survivors. Hard runtime vetoes still run afterwards — the gate improves a
+choice, the veto refuses one.
+
+`--advisor-max-dof N` adds a budget to that gate
+([ADR-0034](docs/decisions/0034-spectral-sizing-and-coarsening.md)): candidates
+whose predicted DOF exceeds the cap are dropped before ranking, and a cap that
+empties the candidate set returns clamp-box defaults with every prediction
+suppressed rather than an action the caller cannot afford. Measured behaviour
+per part and per cap:
+[`bench_advisor_budget.png`](docs/assets/showcase/bench_advisor_budget.png).
 
 ![Advisor mesh choices before and after](docs/advisor/figures/mesh_before_after.png)
 

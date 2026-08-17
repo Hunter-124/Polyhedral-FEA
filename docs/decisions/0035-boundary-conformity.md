@@ -258,6 +258,15 @@ recorded here so they are not tried again:
   quality_min 1.1e-05. Refining the pristine lattice instead of the snapped mesh
   kept quality but moved the worst node the wrong way (0.121 h → 0.300 h).
 
+- Per-level snapping during LEB. The graded path already implements the proposed
+  mechanism: it snaps lattice corners before refinement, projects every new
+  free-surface midpoint in `local_refine_tets`, then re-collects and snaps the
+  complete shell after the L1/L2 waves. Applying that same sequence to the
+  uniform path is therefore the already-measured conformity-driven LEB case
+  above, not a fourth independent mechanism: it reached sphere p99 0.032 h only
+  by shipping 94 sub-floor cells. Re-running it under another name would not
+  change the scale-invariant constraint.
+
 The reading is that the constraint is scale-invariant: halving h halves the
 required travel and the available room together. A uniform lattice conforms only
 by shipping cells below the floor, which is not a trade this project makes. The

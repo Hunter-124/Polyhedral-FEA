@@ -220,14 +220,14 @@ Three uses, each matched to what a Fourier transform is actually good for:
 | Where | What it does |
 |---|---|
 | CAD edges | κ(s) from OCC carries parameterization noise; an energy-truncated inverse FFT recovers the smooth curvature before it emits chordal size sources |
-| Sizing field | modes below the 99.5% energy cut are dropped, so isolated seed artifacts merge into the surrounding coarse field |
+| Sizing field | the dominant modes carrying 99.5% of the spectral energy are kept and the rest dropped, so isolated seed artifacts merge into the surrounding coarse field |
 | Element budget | the Σvol/h³ density integral is the same N_pred contract the CVT path uses, so a cap can be met by one uniform scale after truncation |
 
 A geometry-only floor is re-imposed after filtering, which is why this is safe
 to leave on: trimming can raise `h` in a spectrally weak band but never inside a
 real curvature or thin-wall demand. On the clean public fixtures that shows up
-as a leaner seed set at unchanged mesh output. Two measured A/Bs, both with and
-without `--no-spectral`:
+as a leaner seed set at unchanged mesh output. Two measured A/Bs, each run with
+the default and again with `--no-spectral`:
 
 | Part | With spectral | Without |
 |---|---|---|
@@ -235,9 +235,9 @@ without `--no-spectral`:
 | `icecream_cone.step`, h = 8 mm (`diag`) | 43 denoised edge-curve sources; 27,399 cells, `quality_min` 0.02098, mesh→BRep p99/h 0.03878, peak VM 2.35535e7 Pa | 27,399 cells, 0.02098, 0.03878, 2.35535e7 Pa |
 
 So on fixtures whose curvature was already smooth, the filter is measurably a
-no-op in mesh output while emitting a smaller, denoised source set — which is
-the honest claim. The value is on noisy real-world curvature, and the numbers
-above are what these parts actually show.
+no-op in mesh output while emitting a smaller, denoised source set. The payoff
+is on noisy real-world curvature; these fixtures are not where it shows, and the
+page says so rather than implying otherwise.
 
 `diag --json` carries the same numbers as a `spectral` block for the
 self-improve loop, and campaigns opt in per run with `"spectral_smooth": true`.

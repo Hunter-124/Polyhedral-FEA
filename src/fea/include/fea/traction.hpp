@@ -8,6 +8,7 @@
 
 #include <Eigen/Core>
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <span>
@@ -40,6 +41,23 @@ struct SurfaceFace {
     FaceType type = FaceType::kTri3;
     std::vector<std::uint32_t> nodes;
 };
+struct SurfaceSample {
+    Eigen::Vector3d position = Eigen::Vector3d::Zero();
+    std::array<std::uint32_t, 8> source_nodes{};
+    std::array<double, 8> weights{};
+    std::uint8_t count = 0;
+};
+
+struct SurfaceTessellation {
+    std::vector<SurfaceSample> samples;
+    std::vector<std::array<std::uint32_t, 3>> triangles;
+};
+
+/// Tessellate the actual isoparametric free surface, not its corner chords.
+/// Samples retain nodal interpolation weights so result fields and deformation
+/// use the same quadratic geometry solved by the volume elements.
+SurfaceTessellation tessellate_boundary_surface(const NodalMesh& mesh,
+                                                int subdivisions = 6);
 
 /// Traction field t(x), N/m^2, evaluated at a physical surface point.
 using Traction = std::function<Eigen::Vector3d(const Eigen::Vector3d&)>;

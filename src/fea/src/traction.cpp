@@ -262,6 +262,84 @@ std::vector<SurfaceFace> boundary_surface_faces(const NodalMesh& mesh) {
     return out;
 }
 
+SurfaceTessellation tessellate_boundary_surface(const NodalMesh& mesh,
+                                                int subdivisions) {
+    subdivisions = std::clamp(subdivisions, 1, 16);
+    SurfaceTessellation out;
+    const auto faces = boundary_surface_faces(mesh);
+    const auto sample = [&](const SurfaceFace& face, double u, double v) {
+        const auto shape = eval_face_shape(face.type, u, v);
+        SurfaceSample value;
+        value.count = static_cast<std::uint8_t>(face.nodes.size());
+        for (std::size_t i = 0; i < face.nodes.size(); ++i) {
+            value.source_nodes[i] = face.nodes[i];
+            value.weights[i] = shape.n[static_cast<Eigen::Index>(i)];
+            value.position += value.weights[i] * mesh.nodes[face.nodes[i]];
+        }
+        out.samples.push_back(value);
+        return static_cast<std::uint32_t>(out.samples.size() - 1);
+    };
+
+    for (const auto& face : faces) {
+        const bool quadratic =
+            face.type == FaceType::kTri6 || face.type == FaceType::kQuad8;
+        const int n = quadratic ? subdivisions : 1;
+        if (face.type == FaceType::kTri3 || face.type == FaceType::kTri6) {
+            std::vector<std::vector<std::uint32_t>> grid(
+                static_cast<std::size_t>(n + 1));
+            for (int i = 0; i <= n; ++i) {
+                auto& row = grid[static_cast<std::size_t>(i)];
+                row.reserve(static_cast<std::size_t>(n - i + 1));
+                for (int j = 0; j <= n - i; ++j) {
+                    row.push_back(sample(face, static_cast<double>(i) / n,
+                                         static_cast<double>(j) / n));
+                }
+            }
+            for (int i = 0; i < n; ++i) {
+                for (int j = 0; j < n - i; ++j) {
+                    const auto a = grid[static_cast<std::size_t>(i)]
+                                      [static_cast<std::size_t>(j)];
+                    const auto b = grid[static_cast<std::size_t>(i + 1)]
+                                      [static_cast<std::size_t>(j)];
+                    const auto c = grid[static_cast<std::size_t>(i)]
+                                      [static_cast<std::size_t>(j + 1)];
+                    out.triangles.push_back({a, b, c});
+                    if (j + 1 < n - i) {
+                        const auto d = grid[static_cast<std::size_t>(i + 1)]
+                                          [static_cast<std::size_t>(j + 1)];
+                        out.triangles.push_back({b, d, c});
+                    }
+                }
+            }
+            continue;
+        }
+
+        std::vector<std::uint32_t> grid;
+        grid.reserve(static_cast<std::size_t>((n + 1) * (n + 1)));
+        for (int i = 0; i <= n; ++i) {
+            const double u = -1.0 + 2.0 * static_cast<double>(i) / n;
+            for (int j = 0; j <= n; ++j) {
+                const double v = -1.0 + 2.0 * static_cast<double>(j) / n;
+                grid.push_back(sample(face, u, v));
+            }
+        }
+        const auto at = [&](int i, int j) {
+            return grid[static_cast<std::size_t>(i * (n + 1) + j)];
+        };
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j < n; ++j) {
+                const auto a = at(i, j);
+                const auto b = at(i + 1, j);
+                const auto c = at(i, j + 1);
+                const auto d = at(i + 1, j + 1);
+                out.triangles.push_back({a, b, d});
+                out.triangles.push_back({a, d, c});
+            }
+        }
+    }
+    return out;
+}
+
 Eigen::Vector3d surface_face_normal(const NodalMesh& mesh, const SurfaceFace& face) {
     if (face.nodes.size() < 3) {
         return Eigen::Vector3d::Zero();

@@ -643,6 +643,13 @@ int cmd_mesh(std::span<char*> args) {
         model, h, mesher, skin, feature, plan.refine_seeds, plan.seed_band, element_tendency,
         resolved.element_ceiling, resolved.dof_ceiling, resolved.auto_chosen ? 3 : 0, {},
         plan.size_field);
+    auto curved = polymesh::pipeline::curve_volume_geometry(model, vol.mesh, h);
+    vol.mesh = std::move(curved.mesh);
+    vol.boundary_quads = polymesh::fea::extract_boundary_faces(vol.mesh);
+    vol.mesher_note += std::format(
+        " | curved_volume promoted={} pyramid_split={} projected={} partial={} reverted={}",
+        curved.n_promoted, curved.n_pyramids_split, curved.n_projected,
+        curved.n_partial, curved.n_reverted);
     vol.mesh.check_validity();
     std::printf("mesh: %zu nodes, %zu elems, h=%.6g m\n"
                 "refine: %zu geometry + %zu BC seeds → %zu seeds, band=%.4g m, h_fine=%.4g m\n"
@@ -662,8 +669,7 @@ int cmd_mesh(std::span<char*> args) {
         const auto quality = polymesh::fea::tet4_cell_quality(vol.mesh);
         std::vector<polymesh::fea::VtuCellData> cdata;
         cdata.push_back({.name = "quality", .scalars = quality});
-        const auto display = polymesh::pipeline::curved_display_mesh(model, vol.mesh, h);
-        polymesh::fea::write_vtu(out_path, display.mesh, {}, cdata);
+        polymesh::fea::write_vtu(out_path, vol.mesh, {}, cdata);
         std::printf("wrote %s\n", out_path.c_str());
     }
     return 0;
@@ -684,8 +690,8 @@ int cmd_solve(std::span<char*> args) {
     bool spectral = true; // spectral sizing on by default (ADR-0034)
     int adapt_passes = 0;
     double eta_target = 0.0;
-    bool p_elevate = false;
-    bool p_elevate_uniform = false;
+    bool p_elevate = true;
+    bool p_elevate_uniform = true;
     double element_tendency = 0.0;
     bool bc_grade = false;
     std::size_t max_elems = 0;
@@ -1085,6 +1091,7 @@ int cmd_solve(std::span<char*> args) {
 
     Eigen::VectorXd u;
     polymesh::fea::ZzRecovery zz;
+    polymesh::fea::LinearConstraints curved_constraints;
 
     // Which elements get promoted. Default (selective) promotes only the
     // ZZ-smooth-marked subset, so an "order 2" run is really mixed p=1/p=2 with
@@ -1119,6 +1126,51 @@ int cmd_solve(std::span<char*> args) {
                                        p_elevate_mode, n_promoted, counts.tet10,
                                        counts.hex20);
     };
+    const auto curve_final_geometry = [&]() {
+        if (!model || !model->cad) {
+            return false;
+        }
+        const std::size_t n0 = vol.mesh.nodes.size();
+        auto curved =
+            polymesh::pipeline::curve_volume_geometry(*model, vol.mesh, h_use);
+        curved_constraints = std::move(curved.constraints);
+        vol.mesh = std::move(curved.mesh);
+        vol.boundary_quads = polymesh::fea::extract_boundary_faces(vol.mesh);
+        vol.mesher_note += std::format(
+            " | curved_volume promoted={} pyramid_split={} projected={} partial={} reverted={}",
+            curved.n_promoted, curved.n_pyramids_split, curved.n_projected,
+            curved.n_partial, curved.n_reverted);
+        report_p_elevate(curved.n_promoted, n0);
+        return true;
+    };
+    const auto solve_with_final_geometry = [&]() {
+        bool promoted = curve_final_geometry();
+        if (!promoted && p_elevate) {
+            const auto targets = elevate_targets();
+            if (!targets.empty()) {
+                const std::size_t n0 = vol.mesh.nodes.size();
+                vol.mesh = polymesh::fea::p_elevate(vol.mesh, targets);
+                project_quadratic_mids();
+                report_p_elevate(targets.size(), n0);
+                promoted = true;
+            }
+        }
+        if (!promoted) {
+            return;
+        }
+        vol.mesh.check_validity();
+        auto [bc2, loads2] = make_bc_loads(vol);
+        if (bc2.dof_values.empty()) {
+            throw std::runtime_error("solve: no fixture nodes after curved promotion");
+        }
+        if (model) {
+            polymesh::pipeline::update_solved_geometry_volume(*model, vol);
+        }
+        u = polymesh::fea::solve_elastostatics(
+            vol.mesh, mat, bc2, loads2, solve_options,
+            curved_constraints.empty() ? nullptr : &curved_constraints);
+        zz = polymesh::fea::recover_zz(vol.mesh, mat, u);
+    };
     for (int pass = 0; pass <= adapt_passes; ++pass) {
         if (pass > 0) {
             auto m = mesher;
@@ -1146,28 +1198,7 @@ int cmd_solve(std::span<char*> args) {
                 std::printf("eta-target stop: η=%.4g ≤ %.4g at pass %d/%d\n", zz.global_eta,
                             eta_target, pass, adapt_passes);
             }
-            if (p_elevate) {
-                const auto promote = elevate_targets();
-                if (!promote.empty()) {
-                    const auto n0 = vol.mesh.nodes.size();
-                    vol.mesh = polymesh::fea::p_elevate(vol.mesh, promote);
-                    project_quadratic_mids();
-                    vol.mesh.check_validity();
-                    auto [bc2, loads2] = make_bc_loads(vol);
-                    if (bc2.dof_values.empty()) {
-                        std::fputs("solve: no fixture nodes after p-elevate\n", stderr);
-                        return 1;
-                    }
-                    if (model) {
-                        polymesh::pipeline::update_solved_geometry_volume(*model, vol);
-                    }
-
-                    u = polymesh::fea::solve_elastostatics(vol.mesh, mat, bc2, loads2,
-                                                           solve_options);
-                    zz = polymesh::fea::recover_zz(vol.mesh, mat, u);
-                    report_p_elevate(promote.size(), n0);
-                }
-            }
+            solve_with_final_geometry();
             break;
         }
         if (pass < adapt_passes) {
@@ -1183,27 +1214,7 @@ int cmd_solve(std::span<char*> args) {
             const auto sug = polymesh::adapt::suggest_refine(cents, zz.element_eta, h_use, 0.3,
                                                              0.75, h * 0.35);
             if (sug.n_marked == 0 && sug.h_next >= h_use * 0.98) {
-                if (p_elevate) {
-                    const auto promote = elevate_targets();
-                    if (!promote.empty()) {
-                        const auto n0 = vol.mesh.nodes.size();
-                        vol.mesh = polymesh::fea::p_elevate(vol.mesh, promote);
-                        project_quadratic_mids();
-                        vol.mesh.check_validity();
-                        auto [bc2, loads2] = make_bc_loads(vol);
-                        if (model) {
-                            polymesh::pipeline::update_solved_geometry_volume(*model, vol);
-                        }
-
-                        u = polymesh::fea::solve_elastostatics(vol.mesh, mat, bc2, loads2,
-                                                               solve_options);
-                        zz = polymesh::fea::recover_zz(vol.mesh, mat, u);
-                        // Previously silent: a converged-early run promoted with
-                        // no promotion line at all, so neither a reader nor the
-                        // peer parser could tell what was actually solved.
-                        report_p_elevate(promote.size(), n0);
-                    }
-                }
+                solve_with_final_geometry();
                 break;
             }
             h_use = sug.h_next;
@@ -1353,6 +1364,14 @@ int cmd_diag(std::span<char*> args) {
         resolved.element_ceiling, resolved.dof_ceiling, resolved.auto_chosen ? 3 : 0, {},
         plan.size_field);
     const double mesh_ms = ms(clock::now() - t0);
+    auto curved = polymesh::pipeline::curve_volume_geometry(model, vol.mesh, h);
+    vol.mesh = std::move(curved.mesh);
+    const auto curved_constraints = std::move(curved.constraints);
+    vol.boundary_quads = polymesh::fea::extract_boundary_faces(vol.mesh);
+    vol.mesher_note += std::format(
+        " | curved_volume promoted={} pyramid_split={} projected={} partial={} reverted={}",
+        curved.n_promoted, curved.n_pyramids_split, curved.n_projected,
+        curved.n_partial, curved.n_reverted);
     vol.mesh.check_validity();
 
     // Measured per-cell quality for every element type (fea::cell_quality): the
@@ -1384,16 +1403,27 @@ int cmd_diag(std::span<char*> args) {
         }
     }
 
-    const auto fidelity_faces = polymesh::fea::extract_boundary_faces(vol.mesh);
+    const auto fidelity_surface =
+        polymesh::fea::tessellate_boundary_surface(vol.mesh, 8);
+    std::vector<Eigen::Vector3d> fidelity_nodes;
+    fidelity_nodes.reserve(fidelity_surface.samples.size());
+    for (const auto& sample : fidelity_surface.samples) {
+        fidelity_nodes.push_back(sample.position);
+    }
+    std::vector<polymesh::mesh::FreeFace> fidelity_faces;
+    fidelity_faces.reserve(fidelity_surface.triangles.size());
+    for (const auto& tri : fidelity_surface.triangles) {
+        fidelity_faces.push_back({tri[0], tri[1], tri[2], tri[2]});
+    }
     constexpr std::size_t kBRepSurfaceSampleCeiling = 10'000;
     polymesh::mesh::BRepGeometryFidelity fidelity;
     if (model.cad && !model.cad->empty()) {
         const auto feature_segments =
-            polymesh::mesh::mesh_dihedral_feature_segments(vol.mesh.nodes, fidelity_faces);
+            polymesh::mesh::mesh_dihedral_feature_segments(fidelity_nodes, fidelity_faces);
         const double mesh_volume =
-            polymesh::mesh::boundary_surface_volume(vol.mesh.nodes, fidelity_faces);
+            polymesh::mesh::boundary_surface_volume(fidelity_nodes, fidelity_faces);
         fidelity = polymesh::mesh::evaluate_brep_geometry_fidelity(
-            *model.cad, vol.mesh.nodes, fidelity_faces, feature_segments, h, mesh_volume,
+            *model.cad, fidelity_nodes, fidelity_faces, feature_segments, h, mesh_volume,
             kBRepSurfaceSampleCeiling);
     }
 
@@ -1434,8 +1464,9 @@ int cmd_diag(std::span<char*> args) {
                 std::fprintf(stderr, "diag: %.*s\n", static_cast<int>(note.size()),
                              note.data());
             };
-            const Eigen::VectorXd uu =
-                polymesh::fea::solve_elastostatics(vol.mesh, mat, bc, loads, solve_options);
+            const Eigen::VectorXd uu = polymesh::fea::solve_elastostatics(
+                vol.mesh, mat, bc, loads, solve_options,
+                curved_constraints.empty() ? nullptr : &curved_constraints);
             const auto zz = polymesh::fea::recover_zz(vol.mesh, mat, uu);
             solve_ms = ms(clock::now() - t0);
             global_eta = zz.global_eta;

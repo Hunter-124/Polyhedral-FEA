@@ -76,6 +76,43 @@ TEST_CASE("traction: boundary_surface_faces upgrades quadratic meshes", "[tracti
           Approx(fea::integrated_face_area(linear, lin_faces)).epsilon(1e-12));
 }
 
+TEST_CASE("traction: tessellation evaluates authoritative quadratic faces",
+          "[traction][curved]") {
+    auto mesh = promote_to_quadratic(
+        box_tet_mesh(1, 1, 1, Eigen::Vector3d(1.0, 1.0, 1.0)));
+    const auto faces = fea::boundary_surface_faces(mesh);
+    const auto curved =
+        std::find_if(faces.begin(), faces.end(), [](const fea::SurfaceFace& face) {
+            return face.type == fea::FaceType::kTri6;
+        });
+    REQUIRE(curved != faces.end());
+    REQUIRE(curved->nodes.size() == 6);
+    mesh.nodes[curved->nodes[3]].z() += 0.2;
+
+    const auto surface = fea::tessellate_boundary_surface(mesh, 4);
+    REQUIRE_FALSE(surface.samples.empty());
+    REQUIRE(surface.triangles.size() == faces.size() * 16);
+    bool saw_interpolated_position = false;
+    for (const auto& sample : surface.samples) {
+        double weight_sum = 0.0;
+        Eigen::Vector3d reconstructed = Eigen::Vector3d::Zero();
+        for (std::size_t i = 0; i < sample.count; ++i) {
+            weight_sum += sample.weights[i];
+            reconstructed +=
+                sample.weights[i] * mesh.nodes[sample.source_nodes[i]];
+        }
+        CHECK(weight_sum == Approx(1.0).margin(1e-12));
+        CHECK((sample.position - reconstructed).norm() < 1e-12);
+        const bool is_mesh_node =
+            std::any_of(mesh.nodes.begin(), mesh.nodes.end(),
+                        [&](const Eigen::Vector3d& node) {
+                            return (node - sample.position).norm() < 1e-12;
+                        });
+        saw_interpolated_position = saw_interpolated_position || !is_mesh_node;
+    }
+    CHECK(saw_interpolated_position);
+}
+
 TEST_CASE("traction: faces_within keeps only fully contained faces", "[traction]") {
     const Eigen::Vector3d size(1.0, 1.0, 1.0);
     const auto mesh = box_hex_mesh(4, 4, 1, size);

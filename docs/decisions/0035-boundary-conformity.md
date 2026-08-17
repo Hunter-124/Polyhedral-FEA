@@ -284,6 +284,16 @@ boundary-conforming re-triangulation at grading transitions — a mesher-topolog
 change — and the varyhedron and hybrid paths already reach 0.15 h and 0.025 h
 respectively, which is where to look for how it should be done.
 
+The reference paths do not contain a transition-shell operation that can be
+ported into the graded tet complex. `hybrid` avoids the defect by retaining
+quad/pyramid transition facets; `varyhedron` constructs a different restricted
+Voronoi boundary. The graded output is already a face-conforming tet complex,
+so changing one boundary diagonal requires a coupled 2↔3 or 3↔2 volume-tet
+flip, with the same shape-floor and integrability acceptance as every other
+repair. No such flip kernel exists in the repository. A surface-only
+re-triangulation would make display faces disagree with the volume elements and
+is therefore not a valid fix.
+
 **The Kuhn lattice on an under-resolved feature.** `icecream_cone`'s bottom disc
 has a 6 mm radius against a 7.8 mm cell. No node placement fixes a feature
 smaller than the element; the residual there is the lattice, not the projector.

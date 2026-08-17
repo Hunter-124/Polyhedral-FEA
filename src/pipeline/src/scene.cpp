@@ -1577,9 +1577,15 @@ CurvedGeometryResult curve_volume_geometry(const Model& model,
     }
     result.mesh.check_validity();
     for (const auto& element : result.mesh.elements) {
-        if (!fea::element_jacobians_positive(result.mesh, element)) {
-            throw std::runtime_error(
-                "curve_volume_geometry: curved promotion produced a non-integrable cell");
+        const double quality = fea::cell_quality(result.mesh, element);
+        if (!fea::element_jacobians_positive(result.mesh, element) ||
+            !std::isfinite(quality) ||
+            quality < mesh::validity::kCellShapeFloor) {
+            throw std::runtime_error(std::format(
+                "curve_volume_geometry: {} cell failed curved ship gate "
+                "(quality={:.6g}, floor={:.6g})",
+                fea::element_type_name(element.type), quality,
+                mesh::validity::kCellShapeFloor));
         }
     }
     return result;

@@ -607,6 +607,202 @@
       "rows_per_s": 0.0184,
       "mesh_ms_frac": 0.061,
       "mesh_cache_recommended": false
+    },
+    {
+      "batch": 1,
+      "started": "2026-08-17T17:27:00Z",
+      "wall_s": 946.4,
+      "pairs_total": 1728,
+      "dedup_hits": 0,
+      "launched": 1728,
+      "shards": [
+        {
+          "shard": 0,
+          "campaign": "advisor-batch-1-s0-hunter-pc",
+          "wall_s": 164.5,
+          "rows": 288,
+          "returncode": 0
+        },
+        {
+          "shard": 1,
+          "campaign": "advisor-batch-1-s1-hunter-pc",
+          "wall_s": 235.0,
+          "rows": 288,
+          "returncode": 0
+        },
+        {
+          "shard": 2,
+          "campaign": "advisor-batch-1-s2-hunter-pc",
+          "wall_s": 169.1,
+          "rows": 288,
+          "returncode": 0
+        },
+        {
+          "shard": 3,
+          "campaign": "advisor-batch-1-s3-hunter-pc",
+          "wall_s": 246.1,
+          "rows": 288,
+          "returncode": 0
+        },
+        {
+          "shard": 4,
+          "campaign": "advisor-batch-1-s4-hunter-pc",
+          "wall_s": 820.4,
+          "rows": 288,
+          "returncode": 0
+        },
+        {
+          "shard": 5,
+          "campaign": "advisor-batch-1-s5-hunter-pc",
+          "wall_s": 945.9,
+          "rows": 288,
+          "returncode": 0
+        }
+      ],
+      "rows_written": 1728,
+      "rows_per_s": 1.8259,
+      "mesh_ms_frac": 0.5108,
+      "mesh_cache_recommended": true
+    },
+    {
+      "batch": 2,
+      "started": "2026-08-17T17:47:46Z",
+      "wall_s": 1330.5,
+      "pairs_total": 1152,
+      "dedup_hits": 0,
+      "launched": 1152,
+      "shards": [
+        {
+          "shard": 0,
+          "campaign": "advisor-batch-2-s0-hunter-pc",
+          "wall_s": 1309.2,
+          "rows": 216,
+          "returncode": 0
+        },
+        {
+          "shard": 1,
+          "campaign": "advisor-batch-2-s1-hunter-pc",
+          "wall_s": 1309.3,
+          "rows": 216,
+          "returncode": 0
+        },
+        {
+          "shard": 2,
+          "campaign": "advisor-batch-2-s2-hunter-pc",
+          "wall_s": 236.2,
+          "rows": 180,
+          "returncode": 0
+        },
+        {
+          "shard": 3,
+          "campaign": "advisor-batch-2-s3-hunter-pc",
+          "wall_s": 234.7,
+          "rows": 180,
+          "returncode": 0
+        },
+        {
+          "shard": 4,
+          "campaign": "advisor-batch-2-s4-hunter-pc",
+          "wall_s": 1329.5,
+          "rows": 180,
+          "returncode": 0
+        },
+        {
+          "shard": 5,
+          "campaign": "advisor-batch-2-s5-hunter-pc",
+          "wall_s": 1329.5,
+          "rows": 180,
+          "returncode": 0
+        }
+      ],
+      "rows_written": 1152,
+      "rows_per_s": 0.8659,
+      "mesh_ms_frac": 0.7952,
+      "mesh_cache_recommended": true
+    },
+    {
+      "batch": 3,
+      "started": "2026-08-17T18:09:57Z",
+      "wall_s": 1750.9,
+      "pairs_total": 576,
+      "dedup_hits": 0,
+      "launched": 576,
+      "shards": [
+        {
+          "shard": 0,
+          "campaign": "advisor-batch-3-s0-hunter-pc",
+          "wall_s": 417.2,
+          "rows": 108,
+          "returncode": 0
+        },
+        {
+          "shard": 1,
+          "campaign": "advisor-batch-3-s1-hunter-pc",
+          "wall_s": 1750.1,
+          "rows": 108,
+          "returncode": 0
+        },
+        {
+          "shard": 2,
+          "campaign": "advisor-batch-3-s2-hunter-pc",
+          "wall_s": 373.9,
+          "rows": 108,
+          "returncode": 0
+        },
+        {
+          "shard": 3,
+          "campaign": "advisor-batch-3-s3-hunter-pc",
+          "wall_s": 1696.2,
+          "rows": 108,
+          "returncode": 0
+        },
+        {
+          "shard": 4,
+          "campaign": "advisor-batch-3-s4-hunter-pc",
+          "wall_s": 270.9,
+          "rows": 72,
+          "returncode": 0
+        },
+        {
+          "shard": 5,
+          "campaign": "advisor-batch-3-s5-hunter-pc",
+          "wall_s": 1192.9,
+          "rows": 72,
+          "returncode": 0
+        }
+      ],
+      "rows_written": 576,
+      "rows_per_s": 0.329,
+      "mesh_ms_frac": 0.6889,
+      "mesh_cache_recommended": true
+    },
+    {
+      "batch": 4,
+      "started": "2026-08-17T18:39:08Z",
+      "wall_s": 2792.0,
+      "pairs_total": 72,
+      "dedup_hits": 0,
+      "launched": 72,
+      "shards": [
+        {
+          "shard": 0,
+          "campaign": "advisor-batch-4-s0-hunter-pc",
+          "wall_s": 229.5,
+          "rows": 36,
+          "returncode": 0
+        },
+        {
+          "shard": 1,
+          "campaign": "advisor-batch-4-s1-hunter-pc",
+          "wall_s": 2791.2,
+          "rows": 36,
+          "returncode": 0
+        }
+      ],
+      "rows_written": 72,
+      "rows_per_s": 0.0258,
+      "mesh_ms_frac": 0.2632,
+      "mesh_cache_recommended": false
     }
   ]
 }

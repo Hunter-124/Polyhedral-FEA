@@ -839,6 +839,40 @@ int cmd_solve(std::span<char*> args) {
         }
         mesher = *resolved_mesher;
         h = std::max(decision.h_rel * diag, 1e-9);
+        // Feasibility probe. `h_rel` is a scale-free fraction of the bounding
+        // diagonal, and the model has no way to know that this part carries a
+        // feature finer than that fraction: the v6 advisor picks h_rel = 0.2 on
+        // plate_hole, and the Cartesian fill refuses the mesh outright
+        // ("feature unresolved ... a hole/void smaller than that level can
+        // disappear"), so the deployed path exited 1 on the flagship fixture.
+        //
+        // The verdict belongs to the engine, not to a proxy. Two scalar proxies
+        // were measured and both over-clamp: 2x the shortest CAD feature length
+        // takes the cylinder from h = 24.5 mm to 9.8 mm although it meshes
+        // cleanly at 24.5, and the smallest CAD face size takes the cone from
+        // 17.7 mm to 10.6 mm for the same reason. Clamping to the auto h0 is
+        // worse still (sphere 17.3 mm -> 3.4 mm, plate_hole past a 300 s
+        // timeout) since that default is far finer than any advisor action.
+        //
+        // So: probe-mesh at the chosen h, and when the fill refuses on feature
+        // resolution, refine by the factor the guard itself recommends (0.6)
+        // and probe again, at most three times. Nothing is clamped that meshes,
+        // and every refinement is reported.
+        double feature_clamped_from = 0.0;
+        std::string feature_clamp_reason;
+        for (int probe = 0; probe < 3; ++probe) {
+            try {
+                (void)polymesh::pipeline::volume_mesh(*model, h, mesher, skin, feature, {}, 0.0,
+                                                      element_tendency, max_elems, max_dof, 0);
+                break;
+            } catch (const polymesh::pipeline::GeometryVolumeLimitError& e) {
+                if (feature_clamped_from == 0.0) {
+                    feature_clamped_from = h;
+                    feature_clamp_reason = e.what();
+                }
+                h *= 0.6;
+            }
+        }
         adapt_passes = decision.adapt_passes;
         eta_target = decision.eta_target;
         // The solve path has one p-elevation step (tet4/hex8 -> tet10/hex20),
@@ -867,6 +901,11 @@ int cmd_solve(std::span<char*> args) {
                         "better)\n",
                         decision.mesher.c_str(), h, decision.h_rel, adapt_passes, eta_target,
                         decision.order, p_elevate ? 1 : 0, decision.predicted_rel_err_rel);
+        }
+        if (feature_clamped_from > 0.0) {
+            std::printf("advisor: h refined %.6g -> %.6g m — the fill refused the coarser "
+                        "mesh: %s\n",
+                        feature_clamped_from, h, feature_clamp_reason.c_str());
         }
         if (decision.order > 2) {
             std::printf("advisor: order %d executed as quadratic — this solve path has a "

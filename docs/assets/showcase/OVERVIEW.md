@@ -20,7 +20,7 @@ wall time, peak von Mises, exact commands) is in
 | `bench_mms.png` | Manufactured-solution energy-norm convergence: frozen P1 elements at 0.997 / 0.997 / 2.000 / 2.000 vs theory 1/1/2/2, hierarchical p-basis at 1.02 / 1.99 / 2.98 / 3.98 vs theory 1/2/3/4 | [`docs/progress.md`](../../progress.md) + the GATE-1 convergence report; `plot_benchmarks.py` |
 | `architecture.png` | Dark-theme pipeline diagram: STEP → features → sizing field → hybrid meshers → FE+VEM assembly → solve → ZZ estimate → hp-adapt loop → VTU | drawn programmatically in the Studio palette; `render_showcase.py --only architecture` |
 | `gui_studio.png` | PolyMesh Studio with a solved part: viewport, study setup, results panel (stress / deflection / η) | captured in-app via F12 or `POLYMESH_GUI_SHOT=<abs path>`; see [`../../SHOWCASE.md#gui`](../../SHOWCASE.md#gui) |
-| `bench_advisor_budget.png` | Advisor DOF-budget sweep: predicted DOF and chosen action across 21 `--advisor-max-dof` caps on the v5 model | [`bench/results/advisor-budget-sweep.json`](../../../bench/results/advisor-budget-sweep.json); `plot_benchmarks.py --only advisor_budget` |
+| `bench_advisor_budget.png` | Advisor DOF-budget sweep: predicted DOF and chosen action across 21 `--advisor-max-dof` caps on the v6 model | [`bench/results/advisor-budget-sweep.json`](../../../bench/results/advisor-budget-sweep.json); `plot_benchmarks.py --only advisor_budget` |
 | `manifest.json` | Provenance record for every image above (schema in [`../../SHOWCASE.md`](../../SHOWCASE.md)) | written by `render_showcase.py --all` |
 
 Every stress render states its displacement warp factor, the colour range, the

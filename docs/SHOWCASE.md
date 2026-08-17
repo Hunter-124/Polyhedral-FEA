@@ -116,7 +116,7 @@ python scripts/render_showcase.py --only icecream_cone
 
 **`compare_meshers.png`** — the same plate at h = 3 mm through three meshers:
 `tet` (11,770 nodes / 53,760 cells), `graded` (36,122 / 177,663) and `hybrid`
-(113,174 / 329,510), whose finer run includes conforming transition cells.
+(113,174 / 329,542), whose finer run includes conforming transition cells.
 All four panels share one camera on a 60 mm window across the hole (6 hole
 radii): at whole-plate scale the three topologies read as identical grey
 sheets, and the cell zoo only becomes legible at the feature. The faceted rim
@@ -145,15 +145,19 @@ discretisation property of a linear-element mesh, not a placement error.
 
 | Mesher | boundary node → BRep p99 / h | mesh→BRep p99 / h | BRep→mesh p99 / h | sharp BRep edge→mesh p99 / h | normal p99 |
 |---|---:|---:|---:|---:|---:|
-| graded | **0** | 0.0112 | 0.00392 | 0.0321 | 4.54° |
-| hybrid | **0** | 0.00806 | 0.0125 | 0.0741 | 0.52° |
-| varyhedron | **0** | 0.00948 | 0.00339 | 0.0363 | 3.29° |
+| graded | **0** | 0.00939 | 0.00372 | 0.0211 | 3.29° |
+| hybrid | **0** | 0.01375 | 0.00697 | 0.1075 | 2.38° |
+| varyhedron | **0** | 0.00906 | 0.00340 | 0.0287 | 3.10° |
 
 Before ADR-0035 the same matrix read: graded mesh→BRep 0.0175 with sharp-edge
 0.322 and normal p99 20.9°, hybrid 0.00999 / 0.311 / 4.67°, varyhedron 0.0174 /
 0.322 / 20.9°. The sharp-edge column improved by an order of magnitude because
 crease nodes are now pinned to the exact edge curve instead of to the nearest
-point of a face.
+point of a face; the second wave then took graded's crease column from 0.0321 to
+0.0211 and its normal p99 from 4.54° to 3.29°, and hybrid's normal p99 from 0.52°
+to 2.38° — the exterior gate trades a little facet-normal alignment on the hybrid
+path for the node placement and crease fidelity in the other columns, and the
+table is printed as measured rather than curated.
 
 Source and executable provenance:
 [`mesher-fidelity-plate-hole-current.json`](../bench/results/mesher-fidelity-plate-hole-current.json).
@@ -259,11 +263,66 @@ parameters from a uniform chain, and every pin target is still the exact OCC
 curve projection. Fourier chooses *where along the curve* a node sits, never
 where the curve is.
 
-Two limits stay on the page because they are still true. The plain Kuhn tet
-lattice cannot resolve a feature smaller than its cell — plate_hole's 6 mm disc
-at h = 3 mm still leaves isolated nodes 0.22 h out — and once every node is on
-the surface, the residual mesh→BRep distance is the sagitta h²κ/8 of a straight
-facet across a curve, which is the floor of any linear-element mesh.
+### The exterior that ships
+
+The same reader looked again and reported that the sphere and the cone *still*
+had visible surface defects, and that was right too. Conforming each mesher's own
+lattice skin is not the same as conforming the mesh that leaves: a fan tet peeled
+after the snap, a pyramid emitted as two assembly tets or an LEB child carved
+late all expose nodes that were interior when the snap ran. On sphere/hybrid the
+mixed-fill branch's own worst boundary node read 0.016 h while the shipped mesh
+carried nodes 0.085 h off the BRep, in visible flaps. And the owner oracle's
+fallback to the tessellation reported ~0 for exactly those nodes, because OCC's
+own facets are 0.085 h off this sphere at its deflection.
+
+A mesher-independent gate now conforms the extracted exterior, marching each node
+onto the BRep in whatever fraction keeps every incident cell integrable by
+`fea::element_jacobians_positive` — the assembly's own det J > 0 test, which
+`fea::cell_quality` cannot stand in for: a quality-accepted move once shipped
+det J = −6.1e-09. A hex saturated at the shape floor has no interior corner to
+give, so it is fanned into six pyramids over its own six faces (the bases *are*
+the hex faces, so nothing else sees a change).
+
+The last visible artifact was not placement at all but **spacing**. The showcase
+cone shipped adjacent facet planes differing by up to 77.8°, because grading
+transitions leave needle facets beside bulk ones. Sliding the face-owned nodes
+along their own surface — never the crease or corner nodes — lowers those kinks;
+the dihedral detector was also comparing *signed* normals, so an opposite winding
+read as a 180° crease and inflated the count from 47 to 177.
+
+Measured at h = 8 mm, second wave, before → after:
+
+| Part | mesher | metric | before | after |
+|---|---|---|---:|---:|
+| icecream_cone | varyhedron | feature p99 / h | 17.3 | **0.150** |
+| icecream_cone | hybrid | feature p99 / h | 1.16 | **0.025** |
+| icecream_cone | graded | normal p99 | 20.5° | **9.1°** |
+| sphere | hybrid | node p99 / h | 0.0062 | **5.9e-15** |
+| sphere | hexpyr | node p99 / h | 0.373 | **0.026** |
+| cylinder | hybrid | normal p99 | 19.2° | **0.27°** |
+
+The whole pass is judged on entry and exit — worst cell quality may not drop, the
+count of sub-floor cells may not grow, no cell may become non-integrable — and
+reverts wholesale otherwise, which is why the experimental packed-poly mesher,
+whose cells are already degenerate at ~1e-14, comes out at exactly its previous
+numbers instead of slightly worse.
+
+Three limits stay on the page because they are still true, and one of them is
+what a reader still sees. The **uniform** Cartesian tet fill is bounded by the
+cell-shape floor rather than by the projector: placing one straggler on its exact
+target drives incident cells to quality −0.05, so the snap stops at the floor and
+every such part ships `quality_min = 0.0200` exactly. Three refinement schemes
+were tried against it and none pays — the constraint is scale-invariant, since
+halving h halves the required travel and the available room together
+([ADR-0035 §6](decisions/0035-boundary-conformity.md) records the numbers so
+nobody repeats them). The graded path still carries needle facets at its 2:1
+transitions, which needs re-triangulation rather than node motion. And once every
+node is on the surface, the residual mesh→BRep distance is the sagitta h²κ/8 of a
+straight facet across a curve: the showcase scoop is R = 25 mm at h = 10 mm, so
+that sag is 0.5 mm, 2 % of the radius, and it is exactly the faceting visible in
+the gallery renders. It is the floor of any linear-element mesh, and removing it
+means curved boundary geometry, which this codebase has only on the p-elevated
+path.
 
 ## Spectral sizing
 

@@ -1,7 +1,7 @@
 {
   "schema": "polymesh.mesher-fidelity.v2",
-  "generated_utc": "2026-08-09T00:55:18.118871+00:00",
-  "label": "exact-brep-owner-safe-dihedral-bounded-surface",
+  "generated_utc": "2026-08-17T20:40:04.987210+00:00",
+  "label": "exterior-conformity-gate-kink-relief",
   "part": "tests/fixtures/parts/plate_hole.step",
   "part_sha256": "a482377fd70a3a28de4972b375b47b7a2b82fd14f51475940f596ff67dc7a350",
   "h_m": 0.006,
@@ -12,19 +12,19 @@
   },
   "provenance": {
     "git": {
-      "commit": "b710102035ff14d95712150529d7cdb5a829b91f",
+      "commit": "7fbb1e3e3ad1a82aea02961a6e22d28a9769a187",
       "working_tree_dirty": true
     },
     "executable": {
-      "path": "build/apps/cli/polymesh",
-      "sha256": "d10a59e277313b768761d86997e8bec26542bdce4eb672884db0e6c6dcf0f654",
-      "bytes": 2929744,
-      "mtime_ns": 1786236842156677293
+      "path": "build-fpoff/apps/cli/polymesh",
+      "sha256": "d1521bdd1aba7c7d8c94340f4ea703e80363721b3edb7869950a5da70d8e9996",
+      "bytes": 3830248,
+      "mtime_ns": 1786998383775851940
     }
   },
   "commands": [
     [
-      "build/apps/cli/polymesh",
+      "build-fpoff/apps/cli/polymesh",
       "diag",
       "tests/fixtures/parts/plate_hole.step",
       "-h",
@@ -40,7 +40,7 @@
       "600000"
     ],
     [
-      "build/apps/cli/polymesh",
+      "build-fpoff/apps/cli/polymesh",
       "diag",
       "tests/fixtures/parts/plate_hole.step",
       "-h",
@@ -56,7 +56,7 @@
       "600000"
     ],
     [
-      "build/apps/cli/polymesh",
+      "build-fpoff/apps/cli/polymesh",
       "diag",
       "tests/fixtures/parts/plate_hole.step",
       "-h",
@@ -75,51 +75,51 @@
   "summary": [
     {
       "mesher": "graded",
-      "elements": 44316,
-      "nodes": 9568,
-      "quality_min": 0.03033,
-      "mesh_ms": 5873.479,
-      "mesh_to_brep_p99_over_h": 0.0175168986,
-      "mesh_to_brep_max_over_h": 0.183449621,
-      "brep_to_mesh_p99_over_h": 0.00391541207,
-      "normal_p99_deg": 20.9256211,
-      "mesh_edge_to_brep_p99_over_h": 0.832205216,
-      "brep_edge_to_mesh_p99_over_h": 0.321799214,
-      "brep_vertex_to_mesh_p99_over_h": 0.366277658,
-      "relative_volume_error": 0.000802147884,
-      "mesh_feature_segments": 568
+      "elements": 43767,
+      "nodes": 9505,
+      "quality_min": 0.02334,
+      "mesh_ms": 9111.26,
+      "mesh_to_brep_p99_over_h": 0.0093901582,
+      "mesh_to_brep_max_over_h": 0.149112183,
+      "brep_to_mesh_p99_over_h": 0.0037205982,
+      "normal_p99_deg": 3.29159633,
+      "mesh_edge_to_brep_p99_over_h": 0.373340314,
+      "brep_edge_to_mesh_p99_over_h": 0.0211269694,
+      "brep_vertex_to_mesh_p99_over_h": 0,
+      "relative_volume_error": 8.97266678e-05,
+      "mesh_feature_segments": 507
     },
     {
       "mesher": "hybrid",
       "elements": 9120,
-      "nodes": 11980,
-      "quality_min": 0.02055,
-      "mesh_ms": 5200.441,
-      "mesh_to_brep_p99_over_h": 0.00998735241,
-      "mesh_to_brep_max_over_h": 0.16326851,
-      "brep_to_mesh_p99_over_h": 0.0201009037,
-      "normal_p99_deg": 4.66637745,
-      "mesh_edge_to_brep_p99_over_h": 0.41681508,
-      "brep_edge_to_mesh_p99_over_h": 0.310867277,
-      "brep_vertex_to_mesh_p99_over_h": 0.32653702,
-      "relative_volume_error": 9.03142394e-05,
-      "mesh_feature_segments": 512
+      "nodes": 11970,
+      "quality_min": 0.02,
+      "mesh_ms": 8758.572,
+      "mesh_to_brep_p99_over_h": 0.0137452619,
+      "mesh_to_brep_max_over_h": 0.121171645,
+      "brep_to_mesh_p99_over_h": 0.00697110799,
+      "normal_p99_deg": 2.38193089,
+      "mesh_edge_to_brep_p99_over_h": 0.416766913,
+      "brep_edge_to_mesh_p99_over_h": 0.107479605,
+      "brep_vertex_to_mesh_p99_over_h": 0,
+      "relative_volume_error": 0.000138824196,
+      "mesh_feature_segments": 493
     },
     {
       "mesher": "varyhedron",
-      "elements": 44316,
-      "nodes": 9568,
-      "quality_min": 0.03033,
-      "mesh_ms": 8298.038,
-      "mesh_to_brep_p99_over_h": 0.0174158884,
-      "mesh_to_brep_max_over_h": 0.183449621,
-      "brep_to_mesh_p99_over_h": 0.00360846247,
-      "normal_p99_deg": 20.9256211,
-      "mesh_edge_to_brep_p99_over_h": 0.825689283,
-      "brep_edge_to_mesh_p99_over_h": 0.32205296,
-      "brep_vertex_to_mesh_p99_over_h": 0.366277658,
-      "relative_volume_error": 0.000722137915,
-      "mesh_feature_segments": 568
+      "elements": 43781,
+      "nodes": 9508,
+      "quality_min": 0.02015,
+      "mesh_ms": 11175.448,
+      "mesh_to_brep_p99_over_h": 0.00906214733,
+      "mesh_to_brep_max_over_h": 0.124048522,
+      "brep_to_mesh_p99_over_h": 0.00339598893,
+      "normal_p99_deg": 3.10317449,
+      "mesh_edge_to_brep_p99_over_h": 0.328655739,
+      "brep_edge_to_mesh_p99_over_h": 0.0287446402,
+      "brep_vertex_to_mesh_p99_over_h": 0,
+      "relative_volume_error": 0.000105256587,
+      "mesh_feature_segments": 505
     }
   ],
   "runs": [
@@ -134,19 +134,31 @@
       },
       "mesh": {
         "h": 0.006,
-        "nodes": 9568,
-        "elements": 44316,
-        "quality_min": 0.03033,
-        "quality_mean": 0.2724,
-        "geometry_seeds": 64,
+        "nodes": 9505,
+        "elements": 43767,
+        "quality_min": 0.02334,
+        "quality_min_type": "tet4",
+        "n_inverted_cells": 0,
+        "n_below_shape_floor": 0,
+        "quality_mean": 0.2709,
+        "geometry_seeds": 116,
         "bc_seeds": 0
       },
+      "spectral": {
+        "applied": true,
+        "modes_kept": 15556,
+        "modes_total": 65535,
+        "energy_kept": 0.995001,
+        "edge_curve_seeds": 52,
+        "n_pred_before": 1345.28,
+        "n_pred_after": 1347.71
+      },
       "timing_ms": {
-        "import": 11.396,
-        "mesh": 5873.479,
+        "import": 6.875,
+        "mesh": 9111.26,
         "solve": 0.0
       },
-      "mesh_throughput_elem_per_s": 7545.1,
+      "mesh_throughput_elem_per_s": 4803.6,
       "fidelity": {
         "available": true,
         "brep_valid": true,
@@ -154,26 +166,37 @@
         "brep_volume_m3": 0.000196858407,
         "brep_surface_area_m2": 0.046,
         "mesh_boundary_to_brep": {
-          "count": 20388,
-          "rms_m": 5.03935471e-05,
-          "p95_m": 1.38777878e-17,
-          "p99_m": 0.000105101391,
-          "max_m": 0.00110069772,
-          "p95_over_h": 2.31296463e-15,
-          "p99_over_h": 0.0175168986,
-          "max_over_h": 0.183449621,
-          "p99_over_bbox": 0.000469557806
+          "count": 20760,
+          "rms_m": 1.97662614e-05,
+          "p95_m": 1.76833108e-06,
+          "p99_m": 5.63409492e-05,
+          "max_m": 0.000894673098,
+          "p95_over_h": 0.000294721847,
+          "p99_over_h": 0.0093901582,
+          "max_over_h": 0.149112183,
+          "p99_over_bbox": 0.000251712486
+        },
+        "mesh_boundary_nodes_to_brep": {
+          "count": 3460,
+          "rms_m": 1.45069706e-05,
+          "p95_m": 0,
+          "p99_m": 0,
+          "max_m": 0.000744291131,
+          "p95_over_h": 0,
+          "p99_over_h": 0,
+          "max_over_h": 0.124048522,
+          "p99_over_bbox": 0
         },
         "brep_surface_samples_to_mesh_boundary": {
           "count": 10000,
-          "rms_m": 4.34552199e-05,
+          "rms_m": 9.082318e-06,
           "p95_m": 3.46944695e-18,
-          "p99_m": 2.34924724e-05,
-          "max_m": 0.00140962169,
+          "p99_m": 2.23235892e-05,
+          "max_m": 0.000294761141,
           "p95_over_h": 5.78241159e-16,
-          "p99_over_h": 0.00391541207,
-          "max_over_h": 0.234936948,
-          "p99_over_bbox": 0.000104956496
+          "p99_over_h": 0.0037205982,
+          "max_over_h": 0.0491268569,
+          "p99_over_bbox": 9.97343179e-05
         },
         "brep_surface_sampler": "exact_trimmed_face_uv_grid",
         "brep_surface_sample_ceiling": 10000,
@@ -181,49 +204,49 @@
         "brep_surface_uv_attempts": 10000,
         "brep_surface_fallback_vertices": 0,
         "normal_angle": {
-          "count": 6796,
-          "rms_deg": 4.72901512,
-          "p95_deg": 1.08443981,
-          "p99_deg": 20.9256211,
-          "max_deg": 90
+          "count": 6920,
+          "rms_deg": 2.53946979,
+          "p95_deg": 1.18393701,
+          "p99_deg": 3.29159633,
+          "max_deg": 72.5744039
         },
         "mesh_feature_classifier": "boundary_dihedral_ge_30_deg",
         "mesh_feature_to_sharp_brep_edge": {
-          "count": 1704,
-          "rms_m": 0.00107843068,
-          "p95_m": 0.00250029613,
-          "p99_m": 0.0049932313,
-          "max_m": 0.00506108201,
-          "p95_over_h": 0.416716022,
-          "p99_over_h": 0.832205216,
-          "max_over_h": 0.843513668,
-          "p99_over_bbox": 0.0223080846
+          "count": 1521,
+          "rms_m": 0.000374361769,
+          "p95_m": 7.88511311e-05,
+          "p99_m": 0.00224004188,
+          "max_m": 0.00321969139,
+          "p95_over_h": 0.0131418552,
+          "p99_over_h": 0.373340314,
+          "max_over_h": 0.536615232,
+          "p99_over_bbox": 0.0100077567
         },
         "sharp_brep_edge_to_mesh_feature": {
           "count": 364,
-          "rms_m": 0.000345096921,
-          "p95_m": 0.000559628277,
-          "p99_m": 0.00193079528,
-          "max_m": 0.00212419524,
-          "p95_over_h": 0.0932713794,
-          "p99_over_h": 0.321799214,
-          "max_over_h": 0.354032539,
-          "p99_over_bbox": 0.00862614648
+          "rms_m": 4.52325525e-05,
+          "p95_m": 6.74684718e-05,
+          "p99_m": 0.000126761816,
+          "max_m": 0.000608408397,
+          "p95_over_h": 0.0112447453,
+          "p99_over_h": 0.0211269694,
+          "max_over_h": 0.101401399,
+          "p99_over_bbox": 0.000566329328
         },
         "brep_vertex_to_mesh_node": {
           "count": 10,
-          "rms_m": 0.000951470545,
-          "p95_m": 0.00213451507,
-          "p99_m": 0.00219766595,
-          "max_m": 0.00221345367,
-          "p95_over_h": 0.355752511,
-          "p99_over_h": 0.366277658,
-          "max_over_h": 0.368908944,
-          "p99_over_bbox": 0.0098184352
+          "rms_m": 0,
+          "p95_m": 0,
+          "p99_m": 0,
+          "max_m": 0,
+          "p95_over_h": 0,
+          "p99_over_h": 0,
+          "max_over_h": 0,
+          "p99_over_bbox": 0
         },
-        "mesh_feature_segments": 568,
-        "max_chordal_efficiency": 195.764584,
-        "relative_volume_error": 0.000802147884
+        "mesh_feature_segments": 507,
+        "max_chordal_efficiency": 199.623796,
+        "relative_volume_error": 8.97266678e-05
       },
       "solve": {
         "ran": false,
@@ -232,7 +255,8 @@
         "max_disp": 0,
         "global_eta": 0
       },
-      "mesher_note": "h=0.006 m (user, predicted 5556 elems)"
+      "mesh_size_note": "h=0.006 m (user, predicted 5556 elems)",
+      "mesher_note": "graded tet v6 (multi-level LEB geo + cap collapse/void carve): 43767 tets (56 bulk, 1088 refined L1/L2, 452 feature, 388 seed), h_bulk=0.005882/h_L2~0.001471 m (L0/L1/L2), snap max|d|=0.00111 m mean|d|=1.39e-06 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.005273 h_max=0.006 m, levels L0=56 L1=700 L2=388 | feature-aware classify L1 volume_err=0.001893 | exterior_gate cand=9 moved=10 relax_rescued=2 hex_fanned=0 left=2 worst|d|=0.000744 m kink_relieved=80 | compact_orphans=197 | geometry_fill_volume mesh=0.000196876 cad=0.000196858 rel_err=8.973e-05 band=clean | boundary_shell edges=10380 open=0 nonmanifold=0 | budget predicted=5556 elems/16667 DOF ceilings=200000/600000"
     },
     {
       "part": "plate_hole.step",
@@ -245,19 +269,31 @@
       },
       "mesh": {
         "h": 0.006,
-        "nodes": 11980,
+        "nodes": 11970,
         "elements": 9120,
-        "quality_min": 0.02055,
-        "quality_mean": 0.9853,
-        "geometry_seeds": 64,
+        "quality_min": 0.02,
+        "quality_min_type": "hex8",
+        "n_inverted_cells": 0,
+        "n_below_shape_floor": 0,
+        "quality_mean": 0.9884,
+        "geometry_seeds": 116,
         "bc_seeds": 0
       },
+      "spectral": {
+        "applied": true,
+        "modes_kept": 15556,
+        "modes_total": 65535,
+        "energy_kept": 0.995001,
+        "edge_curve_seeds": 52,
+        "n_pred_before": 1345.28,
+        "n_pred_after": 1347.71
+      },
       "timing_ms": {
-        "import": 9.543,
-        "mesh": 5200.441,
+        "import": 6.672,
+        "mesh": 8758.572,
         "solve": 0.0
       },
-      "mesh_throughput_elem_per_s": 1753.7,
+      "mesh_throughput_elem_per_s": 1041.3,
       "fidelity": {
         "available": true,
         "brep_valid": true,
@@ -265,26 +301,37 @@
         "brep_volume_m3": 0.000196858407,
         "brep_surface_area_m2": 0.046,
         "mesh_boundary_to_brep": {
-          "count": 21952,
-          "rms_m": 3.55490294e-05,
+          "count": 21888,
+          "rms_m": 2.10610456e-05,
           "p95_m": 0,
-          "p99_m": 5.99241144e-05,
-          "max_m": 0.00097961106,
+          "p99_m": 8.24715717e-05,
+          "max_m": 0.000727029872,
           "p95_over_h": 0,
-          "p99_over_h": 0.00998735241,
-          "max_over_h": 0.16326851,
-          "p99_over_bbox": 0.000267720868
+          "p99_over_h": 0.0137452619,
+          "max_over_h": 0.121171645,
+          "p99_over_bbox": 0.000368455353
+        },
+        "mesh_boundary_nodes_to_brep": {
+          "count": 5472,
+          "rms_m": 1.00411071e-05,
+          "p95_m": 0,
+          "p99_m": 0,
+          "max_m": 0.000214547552,
+          "p95_over_h": 0,
+          "p99_over_h": 0,
+          "max_over_h": 0.0357579253,
+          "p99_over_bbox": 0
         },
         "brep_surface_samples_to_mesh_boundary": {
           "count": 10000,
-          "rms_m": 4.59062836e-05,
+          "rms_m": 2.70337616e-05,
           "p95_m": 8.67361738e-19,
-          "p99_m": 0.000120605422,
-          "max_m": 0.0013520332,
+          "p99_m": 4.18266479e-05,
+          "max_m": 0.000792217598,
           "p95_over_h": 1.4456029e-16,
-          "p99_over_h": 0.0201009037,
-          "max_over_h": 0.225338866,
-          "p99_over_bbox": 0.000538824621
+          "p99_over_h": 0.00697110799,
+          "max_over_h": 0.132036266,
+          "p99_over_bbox": 0.00018686745
         },
         "brep_surface_sampler": "exact_trimmed_face_uv_grid",
         "brep_surface_sample_ceiling": 10000,
@@ -292,49 +339,49 @@
         "brep_surface_uv_attempts": 10000,
         "brep_surface_fallback_vertices": 0,
         "normal_angle": {
-          "count": 5488,
-          "rms_deg": 2.71183904,
+          "count": 5472,
+          "rms_deg": 1.77404193,
           "p95_deg": 0,
-          "p99_deg": 4.66637745,
-          "max_deg": 67.8879659
+          "p99_deg": 2.38193089,
+          "max_deg": 47.7649312
         },
         "mesh_feature_classifier": "boundary_dihedral_ge_30_deg",
         "mesh_feature_to_sharp_brep_edge": {
-          "count": 1536,
-          "rms_m": 0.000628010388,
-          "p95_m": 0.00197588769,
-          "p99_m": 0.00250089048,
-          "max_m": 0.00250122178,
-          "p95_over_h": 0.329314614,
-          "p99_over_h": 0.41681508,
-          "max_over_h": 0.416870296,
-          "p99_over_bbox": 0.0111731408
+          "count": 1479,
+          "rms_m": 0.000439900477,
+          "p95_m": 0.000750661313,
+          "p99_m": 0.00250060148,
+          "max_m": 0.00250389632,
+          "p95_over_h": 0.125110219,
+          "p99_over_h": 0.416766913,
+          "max_over_h": 0.417316053,
+          "p99_over_bbox": 0.0111718497
         },
         "sharp_brep_edge_to_mesh_feature": {
           "count": 364,
-          "rms_m": 0.000303618904,
-          "p95_m": 0.000335672896,
-          "p99_m": 0.00186520366,
-          "max_m": 0.00193947513,
-          "p95_over_h": 0.0559454826,
-          "p99_over_h": 0.310867277,
-          "max_over_h": 0.323245855,
-          "p99_over_bbox": 0.0083331051
+          "rms_m": 0.000117208477,
+          "p95_m": 0.000139704775,
+          "p99_m": 0.000644877633,
+          "max_m": 0.000899427556,
+          "p95_over_h": 0.0232841292,
+          "p99_over_h": 0.107479605,
+          "max_over_h": 0.149904593,
+          "p99_over_bbox": 0.00288109722
         },
         "brep_vertex_to_mesh_node": {
           "count": 10,
-          "rms_m": 0.000876190769,
-          "p95_m": 0.00195922212,
-          "p99_m": 0.00195922212,
-          "max_m": 0.00195922212,
-          "p95_over_h": 0.32653702,
-          "p99_over_h": 0.32653702,
-          "max_over_h": 0.32653702,
-          "p99_over_bbox": 0.00875314807
+          "rms_m": 0,
+          "p95_m": 0,
+          "p99_m": 0,
+          "max_m": 0,
+          "p95_over_h": 0,
+          "p99_over_h": 0,
+          "max_over_h": 0,
+          "p99_over_bbox": 0
         },
-        "mesh_feature_segments": 512,
-        "max_chordal_efficiency": 144.41293,
-        "relative_volume_error": 9.03142394e-05
+        "mesh_feature_segments": 493,
+        "max_chordal_efficiency": 52.0345458,
+        "relative_volume_error": 0.000138824196
       },
       "solve": {
         "ran": false,
@@ -343,7 +390,8 @@
         "max_disp": 0,
         "global_eta": 0
       },
-      "mesher_note": "h=0.006 m (user, predicted 5556 elems)"
+      "mesh_size_note": "h=0.006 m (user, predicted 5556 elems)",
+      "mesher_note": "hybrid zoo v4 (hex bulk@h + 2:1 fine@h/2 + conforming fan transition; not Delaunay): 9120 hex + 0 pyr raw \u2192 0 pyramid5 + 0 tet4, 11970 nodes, h_bulk=0.005882/h_fine=0.002941 m, fine_cells=1144 transition=0 feature=0, snap max|d|=0.000215 m, curv_turn\u226415\u00b0/cell | size_field h_min=0.005273 h_max=0.006 m, levels L0=0 L1=1144 | feature-aware classify L1 volume_err=0.001893 | exterior_gate cand=12 moved=0 relax_rescued=0 hex_fanned=0 left=12 worst|d|=0.000215 m kink_relieved=4 | geometry_fill_volume mesh=0.000196886 cad=0.000196858 rel_err=0.0001393 band=clean | boundary_shell edges=10944 open=0 nonmanifold=0 | budget predicted=5556 elems/16667 DOF ceilings=200000/600000"
     },
     {
       "part": "plate_hole.step",
@@ -356,19 +404,31 @@
       },
       "mesh": {
         "h": 0.006,
-        "nodes": 9568,
-        "elements": 44316,
-        "quality_min": 0.03033,
-        "quality_mean": 0.2718,
-        "geometry_seeds": 64,
+        "nodes": 9508,
+        "elements": 43781,
+        "quality_min": 0.02015,
+        "quality_min_type": "tet4",
+        "n_inverted_cells": 0,
+        "n_below_shape_floor": 0,
+        "quality_mean": 0.2702,
+        "geometry_seeds": 116,
         "bc_seeds": 0
       },
+      "spectral": {
+        "applied": true,
+        "modes_kept": 15556,
+        "modes_total": 65535,
+        "energy_kept": 0.995001,
+        "edge_curve_seeds": 52,
+        "n_pred_before": 1345.28,
+        "n_pred_after": 1347.71
+      },
       "timing_ms": {
-        "import": 8.926,
-        "mesh": 8298.038,
+        "import": 6.828,
+        "mesh": 11175.448,
         "solve": 0.0
       },
-      "mesh_throughput_elem_per_s": 5340.5,
+      "mesh_throughput_elem_per_s": 3917.6,
       "fidelity": {
         "available": true,
         "brep_valid": true,
@@ -376,26 +436,37 @@
         "brep_volume_m3": 0.000196858407,
         "brep_surface_area_m2": 0.046,
         "mesh_boundary_to_brep": {
-          "count": 20388,
-          "rms_m": 5.0501659e-05,
-          "p95_m": 1.38777878e-17,
-          "p99_m": 0.00010449533,
-          "max_m": 0.00110069772,
-          "p95_over_h": 2.31296463e-15,
-          "p99_over_h": 0.0174158884,
-          "max_over_h": 0.183449621,
-          "p99_over_bbox": 0.000466850129
+          "count": 20766,
+          "rms_m": 1.71374303e-05,
+          "p95_m": 3.29181134e-06,
+          "p99_m": 5.4372884e-05,
+          "max_m": 0.000744291131,
+          "p95_over_h": 0.000548635223,
+          "p99_over_h": 0.00906214733,
+          "max_over_h": 0.124048522,
+          "p99_over_bbox": 0.00024291983
+        },
+        "mesh_boundary_nodes_to_brep": {
+          "count": 3461,
+          "rms_m": 1.35066564e-05,
+          "p95_m": 0,
+          "p99_m": 0,
+          "max_m": 0.000744291131,
+          "p95_over_h": 0,
+          "p99_over_h": 0,
+          "max_over_h": 0.124048522,
+          "p99_over_bbox": 0
         },
         "brep_surface_samples_to_mesh_boundary": {
           "count": 10000,
-          "rms_m": 4.34422786e-05,
+          "rms_m": 7.30169367e-06,
           "p95_m": 3.46944695e-18,
-          "p99_m": 2.16507748e-05,
-          "max_m": 0.00140655524,
+          "p99_m": 2.03759336e-05,
+          "max_m": 0.000182351043,
           "p95_over_h": 5.78241159e-16,
-          "p99_over_h": 0.00360846247,
-          "max_over_h": 0.234425873,
-          "p99_over_bbox": 9.67284085e-05
+          "p99_over_h": 0.00339598893,
+          "max_over_h": 0.0303918405,
+          "p99_over_bbox": 9.10328451e-05
         },
         "brep_surface_sampler": "exact_trimmed_face_uv_grid",
         "brep_surface_sample_ceiling": 10000,
@@ -403,49 +474,49 @@
         "brep_surface_uv_attempts": 10000,
         "brep_surface_fallback_vertices": 0,
         "normal_angle": {
-          "count": 6796,
-          "rms_deg": 4.73113768,
-          "p95_deg": 1.05765927,
-          "p99_deg": 20.9256211,
-          "max_deg": 90
+          "count": 6922,
+          "rms_deg": 2.30356396,
+          "p95_deg": 1.16556352,
+          "p99_deg": 3.10317449,
+          "max_deg": 76.3237309
         },
         "mesh_feature_classifier": "boundary_dihedral_ge_30_deg",
         "mesh_feature_to_sharp_brep_edge": {
-          "count": 1704,
-          "rms_m": 0.00107642835,
-          "p95_m": 0.00250029613,
-          "p99_m": 0.0049541357,
-          "max_m": 0.00506108201,
-          "p95_over_h": 0.416716022,
-          "p99_over_h": 0.825689283,
-          "max_over_h": 0.843513668,
-          "p99_over_bbox": 0.0221334186
+          "count": 1515,
+          "rms_m": 0.000341746041,
+          "p95_m": 7.85925654e-05,
+          "p99_m": 0.00197193443,
+          "max_m": 0.00321969139,
+          "p95_over_h": 0.0130987609,
+          "p99_over_h": 0.328655739,
+          "max_over_h": 0.536615232,
+          "p99_over_bbox": 0.00880994242
         },
         "sharp_brep_edge_to_mesh_feature": {
           "count": 364,
-          "rms_m": 0.000345941867,
-          "p95_m": 0.000559628277,
-          "p99_m": 0.00193231776,
-          "max_m": 0.00212640055,
-          "p95_over_h": 0.0932713794,
-          "p99_over_h": 0.32205296,
-          "max_over_h": 0.354400091,
-          "p99_over_bbox": 0.00863294841
+          "rms_m": 4.10977414e-05,
+          "p95_m": 6.45446309e-05,
+          "p99_m": 0.000172467841,
+          "max_m": 0.000434365039,
+          "p95_over_h": 0.0107574385,
+          "p99_over_h": 0.0287446402,
+          "max_over_h": 0.0723941731,
+          "p99_over_bbox": 0.000770528535
         },
         "brep_vertex_to_mesh_node": {
           "count": 10,
-          "rms_m": 0.000951470545,
-          "p95_m": 0.00213451507,
-          "p99_m": 0.00219766595,
-          "max_m": 0.00221345367,
-          "p95_over_h": 0.355752511,
-          "p99_over_h": 0.366277658,
-          "max_over_h": 0.368908944,
-          "p99_over_bbox": 0.0098184352
+          "rms_m": 0,
+          "p95_m": 0,
+          "p99_m": 0,
+          "max_m": 0,
+          "p95_over_h": 0,
+          "p99_over_h": 0,
+          "max_over_h": 0,
+          "p99_over_bbox": 0
         },
-        "mesh_feature_segments": 568,
-        "max_chordal_efficiency": 186.115392,
-        "relative_volume_error": 0.000722137915
+        "mesh_feature_segments": 505,
+        "max_chordal_efficiency": 245.558886,
+        "relative_volume_error": 0.000105256587
       },
       "solve": {
         "ran": false,
@@ -454,7 +525,8 @@
         "max_disp": 0,
         "global_eta": 0
       },
-      "mesher_note": "h=0.006 m (user, predicted 5556 elems)"
+      "mesh_size_note": "h=0.006 m (user, predicted 5556 elems)",
+      "mesher_note": "varyhedron packing (sharp-only edge protect + interior bubble seeds + graded scaffold + sharp snap + wall OCC project; dual deferred; CVT target): 43781 tets, edge_seeds=102, r_protect=[0.00135,0.0027], sharp/smooth/seam=14/0/1, vol_seeds=0, pack_relax=6, pack_fill=0.0577, h_bulk=0.005882/h_fine=0.001471 m, edge_Hd=0.0433 m (rel=0.217, /h=7.22, e_chord=2.13e+03), wall_nodes=2881/moved=2470/iters=4, geom_source=brep_topology | exterior_gate cand=3 moved=4 relax_rescued=2 hex_fanned=0 left=2 worst|d|=0.000744 m kink_relieved=85 | compact_orphans=194 | geometry_fill_volume mesh=0.000196879 cad=0.000196858 rel_err=0.0001053 band=clean | boundary_shell edges=10383 open=0 nonmanifold=0 | budget predicted=5556 elems/16667 DOF ceilings=200000/600000"
     }
   ]
 }

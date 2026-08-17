@@ -7,7 +7,8 @@
 [`docs/advisor/0001-architecture.md`](advisor/0001-architecture.md) ·
 [`docs/advisor/0003-training-log.md`](advisor/0003-training-log.md) (live
 tracker) ·
-[`docs/advisor/0008-v4-corpus-retrain.md`](advisor/0008-v4-corpus-retrain.md)  
+[`docs/advisor/0010-v6-exterior-conformity-retrain.md`](advisor/0010-v6-exterior-conformity-retrain.md)
+(current generation)  
 **ADRs:** [0026](decisions/0026-anisotropic-metric-adaptivity.md) ·
 [0027](decisions/0027-learned-mesh-advisor.md) ·
 [0028](decisions/0028-boundary-conformance-hardening.md) ·
@@ -15,7 +16,8 @@ tracker) ·
 [0030](decisions/0030-the-ruler-was-wrong.md) ·
 [0031](decisions/0031-a-jut-has-a-side.md) ·
 [0032](decisions/0032-stl-order-determinism.md) ·
-[0033](decisions/0033-a-gate-must-measure-what-ships.md)  
+[0033](decisions/0033-a-gate-must-measure-what-ships.md) ·
+[0035](decisions/0035-boundary-conformity.md)  
 **Training box:** [`docs/training/HANDOFF-3080ti.md`](training/HANDOFF-3080ti.md)
 · [`docs/training/ACCESS-hunter-pc.md`](training/ACCESS-hunter-pc.md)  
 **Roadmap:** [`docs/ROADMAP.md`](ROADMAP.md) · **Agent loop:**

@@ -187,11 +187,51 @@ straight 90°* — and the figures were right. Suite **434/434 green** (OCC on).
   **4.4°**. Inverted cells gone: sphere hybrid h = 3 mm quality_min −0.837 →
   +0.0022 with 38 cells honestly reported below the floor; icecream_cone
   hybrid −0.742/−0.779 → +0.020 with none.
-- Still open and documented rather than hidden: the plain Kuhn tet lattice on
-  an under-resolved 6 mm disc (0.22 h at h = 3 mm), 2:1 LEB facet folds on
-  smooth walls (`mesh_feature_to_sharp_brep_edge` p99 ≈ 18 h on icecream_cone
-  while the CAD→mesh direction is 0.049 h), and the h²κ/8 chordal floor of any
-  linear-element mesh.
+- Still open and documented rather than hidden: see the second wave below, which
+  closed most of it and measured the rest properly.
+
+**Exterior conformity + facet kinks (2026-08-17, ADR-0035 §5–6):** the defect
+was reported again from the figures — *still seeing visible surface defects on
+the sphere and on the icecream cone* — and again the figures were right. Suite
+**435/435 green** (OCC on).
+
+- The first wave conformed each mesher's own lattice skin; what ships is
+  `fea::extract_boundary_faces`, the true element exterior. A fan tet peeled
+  after the snap, a pyramid emitted as two tets, an LEB child carved late — all
+  expose nodes that were interior when the snap ran. sphere/hybrid's own worst
+  boundary node read 0.016 h while the shipped mesh carried nodes 0.085 h off
+  the BRep. New mesher-independent `conform_true_exterior` gate.
+- Three mechanisms it needed: **exact resolution** (the owner-oracle fallback to
+  the tessellation reported ~0 for exactly the wrong nodes, because OCC's own
+  facets are 0.085 h off this sphere), a **constrained march** with interior and
+  tangential-wall room opening, monotone in the *measured* free distance, and
+  **conforming hex relief** — a hex saturated at the shape floor is fanned into
+  six pyramids over its own faces, gated per child and rolled back if it buys
+  nothing.
+- New `fea::element_jacobians_positive`: `cell_quality` is a shape measure, and
+  a quality-accepted move shipped det J = −6.085e-09. Every repair pass now
+  gates on the assembly's own rule, and the ship gate counts non-integrable
+  cells. Additive — no GATE-1 file changed.
+- **Facet kinks** were the visible defect: the showcase cone shipped adjacent
+  facet planes differing by up to 77.8°, because grading transitions leave
+  needle facets beside bulk ones. Kink relief slides face-owned nodes along
+  their own surface to lower the worst local kink; crease and corner nodes are
+  never slid. The dihedral detector also compared *signed* normals, so an
+  opposite winding read as a 180° crease — 177 reported segments where the
+  geometry has 47, which was most of the previously-recorded "spurious creases".
+- Measured at h = 8 mm: cone/varyhedron feature p99 **17.3 → 0.150 h**,
+  cone/hybrid **1.16 → 0.025 h**, sphere/hybrid node p99 **0.0062 → 5.9e-15**,
+  sphere/hexpyr node p99 **0.373 → 0.026**, sphere/octa **0.150 → 0.021**,
+  cylinder/hybrid normal p99 **19.2° → 0.27°**, cone/graded normal p99 **20.5°
+  → 9.12°**. No case regressed; the whole pass reverts wholesale if worst
+  quality drops, sub-floor count grows, or any cell becomes non-integrable.
+- Still open, with the failed attempts recorded so they are not repeated: the
+  uniform Cartesian `tet` fill is bounded by the cell-shape floor rather than by
+  the projector (three refinement schemes tried and measured — more snapping,
+  centroid Steiner relief, conformity-driven LEB — none pays), needle facets at
+  2:1 LEB transitions on the graded path (111 segments; needs re-triangulation,
+  not sliding), the under-resolved 6 mm disc, and the h²κ/8 chordal floor that
+  is what remains visible as faceting in any linear-element render.
 
 **Spectral sizing + coarsening + budget advisor + CG equilibration (2026-08-16,
 ADR-0034):** one wave, four mechanisms, suite **432/432 green** (OCC on).

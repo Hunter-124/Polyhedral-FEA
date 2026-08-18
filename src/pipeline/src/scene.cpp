@@ -1617,9 +1617,18 @@ CurvedGeometryResult curve_volume_geometry(const Model& model,
         if (marked.empty()) {
             break;
         }
+        // The fallback is opportunistic: if conformal refinement cannot clear
+        // these marks (LEB closure can fail on an already-graded 2:1 front), the
+        // straight-edged promotion above is still a correct mesh, so abandon the
+        // retry instead of failing the whole mesh/solve.
         mesh::LocalRefineStats refine_stats;
-        auto refined = mesh::local_refine_tets(
-            linear, marked, &refine_stats, &model.surface);
+        mesh::TetFillOutput refined;
+        try {
+            refined = mesh::local_refine_tets(linear, marked, &refine_stats,
+                                              &model.surface);
+        } catch (const std::exception&) {
+            break;
+        }
         if (refine_stats.n_new_nodes == 0) {
             break;
         }

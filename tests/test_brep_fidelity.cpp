@@ -525,6 +525,49 @@ TEST_CASE("brep_fidelity: graded authoritative curvature stays stiffness-valid",
     CHECK(result->mesh_note.find("curved-volume=") != std::string::npos);
 }
 
+// Studio's "mesh only" button calls SolveJob::start_mesh, which is a different
+// entry point from start(). It must hand back the same authoritative curved
+// geometry the solve would use — a linear preview beside a curved solve is what
+// made the old display-only pass so misleading.
+TEST_CASE("brep_fidelity: mesh-only preview is authoritative curved geometry",
+          "[cad][fidelity][regression]") {
+    if (!polymesh::geom::occ_enabled()) {
+        SKIP("OpenCASCADE disabled");
+    }
+    if (!std::filesystem::exists(kLBracket)) {
+        SKIP("l_bracket_s0.step missing");
+    }
+
+    const auto model = polymesh::pipeline::Model::load(kLBracket);
+    REQUIRE(model.cad);
+    polymesh::pipeline::SimSetup setup;
+    setup.mesh_size = 0.006;
+    setup.mesher = polymesh::pipeline::VolumeMesher::kGradedTet;
+    setup.use_feature_grading = true;
+    setup.p_elevate = true;
+    setup.max_elems = 400'000;
+    setup.max_dof = 1'500'000;
+
+    polymesh::pipeline::SolveJob job;
+    job.start_mesh(model, setup);
+    std::optional<polymesh::pipeline::VolumeMeshOutput> preview;
+    for (int poll = 0; poll < 12'000; ++poll) {
+        preview = job.take_mesh();
+        if (preview) {
+            break;
+        }
+        if (job.state() == polymesh::pipeline::SolveJob::State::kFailed) {
+            FAIL(job.status_text());
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    REQUIRE(preview);
+    const auto counts = polymesh::fea::count_element_types(preview->mesh);
+    CHECK(counts.tet4 == 0);
+    CHECK(counts.tet10 > 0);
+    CHECK(preview->mesher_note.find("curved_volume promoted=") != std::string::npos);
+}
+
 // The local h/2 classifier creates live/void child faces that the old
 // parent-face-only boundary list did not send through snapping. Provenance made
 // the pre-fix split explicit (worst sampled valid h, p99/max, normalized by h):

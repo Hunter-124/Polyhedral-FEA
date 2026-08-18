@@ -1418,8 +1418,68 @@ int cmd_diag(std::span<char*> args) {
     constexpr std::size_t kBRepSurfaceSampleCeiling = 10'000;
     polymesh::mesh::BRepGeometryFidelity fidelity;
     if (model.cad && !model.cad->empty()) {
-        const auto feature_segments =
-            polymesh::mesh::mesh_dihedral_feature_segments(fidelity_nodes, fidelity_faces);
+        const auto topology = polymesh::geom::extract_topology(*model.cad);
+        std::vector<polymesh::geom::MeshEdgeSegment> feature_segments;
+        std::set<std::array<std::uint32_t, 2>> visited_edges;
+        for (const auto& face : polymesh::fea::boundary_surface_faces(vol.mesh)) {
+            const int corners =
+                (face.type == polymesh::fea::FaceType::kTri3 ||
+                 face.type == polymesh::fea::FaceType::kTri6)
+                    ? 3
+                    : 4;
+            const bool quadratic =
+                face.type == polymesh::fea::FaceType::kTri6 ||
+                face.type == polymesh::fea::FaceType::kQuad8;
+            for (int edge_index = 0; edge_index < corners; ++edge_index) {
+                const std::uint32_t a =
+                    face.nodes[static_cast<std::size_t>(edge_index)];
+                const std::uint32_t b = face.nodes[
+                    static_cast<std::size_t>((edge_index + 1) % corners)];
+                auto key = std::array{a, b};
+                std::sort(key.begin(), key.end());
+                if (!visited_edges.insert(key).second) {
+                    continue;
+                }
+                const std::uint32_t mid =
+                    quadratic
+                        ? face.nodes[static_cast<std::size_t>(corners + edge_index)]
+                        : a;
+                const auto point = [&](double t) -> Eigen::Vector3d {
+                    if (!quadratic) {
+                        return ((1.0 - t) * vol.mesh.nodes[a] +
+                                t * vol.mesh.nodes[b]).eval();
+                    }
+                    const double wa = (1.0 - t) * (1.0 - 2.0 * t);
+                    const double wb = t * (2.0 * t - 1.0);
+                    const double wm = 4.0 * t * (1.0 - t);
+                    return (wa * vol.mesh.nodes[a] + wb * vol.mesh.nodes[b] +
+                            wm * vol.mesh.nodes[mid]).eval();
+                };
+                const auto edge_a =
+                    polymesh::geom::closest_edge(topology, point(0.0), true);
+                const auto edge_b =
+                    polymesh::geom::closest_edge(topology, point(1.0), true);
+                if (!edge_a || !edge_b || edge_a->edge_id != edge_b->edge_id) {
+                    continue;
+                }
+                const auto exact_a = polymesh::geom::project_point_on_edge(
+                    *model.cad, edge_a->edge_id, point(0.0));
+                const auto exact_b = polymesh::geom::project_point_on_edge(
+                    *model.cad, edge_a->edge_id, point(1.0));
+                const double edge_tol = 1e-6 * h;
+                if (!exact_a || !exact_b || exact_a->distance > edge_tol ||
+                    exact_b->distance > edge_tol) {
+                    continue;
+                }
+                Eigen::Vector3d previous = point(0.0);
+                for (int sample = 1; sample <= 8; ++sample) {
+                    const Eigen::Vector3d current =
+                        point(static_cast<double>(sample) / 8.0);
+                    feature_segments.push_back({previous, current});
+                    previous = current;
+                }
+            }
+        }
         const double mesh_volume =
             polymesh::mesh::boundary_surface_volume(fidelity_nodes, fidelity_faces);
         fidelity = polymesh::mesh::evaluate_brep_geometry_fidelity(
@@ -1547,7 +1607,7 @@ int cmd_diag(std::span<char*> args) {
         "\"brep_surface_sample_ceiling\":{},\"brep_surface_sample_faces\":{},"
         "\"brep_surface_uv_attempts\":{},\"brep_surface_fallback_vertices\":{},"
         "\"normal_angle\":{},"
-        "\"mesh_feature_classifier\":\"boundary_dihedral_ge_30_deg\","
+        "\"mesh_feature_classifier\":\"cad_owned_quadratic_boundary_edges\","
         "\"mesh_feature_to_sharp_brep_edge\":{},"
         "\"sharp_brep_edge_to_mesh_feature\":{},\"brep_vertex_to_mesh_node\":{},"
         "\"mesh_feature_segments\":{},\"max_chordal_efficiency\":{:.9g},"

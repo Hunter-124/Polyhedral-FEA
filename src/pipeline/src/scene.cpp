@@ -1473,6 +1473,56 @@ CurvedGeometryResult curve_volume_geometry(const Model& model,
                 result.n_projected = project_quadratic_boundary_mids(
                     result.mesh, *model.cad, &projection, h, &reverted, &partial);
             }
+            const auto topology = geom::extract_topology(*model.cad);
+            std::unordered_map<std::uint32_t, std::vector<std::size_t>>
+                edge_mid_incidence;
+            edge_mid_incidence.reserve(parents.size());
+            for (std::size_t ei = 0; ei < result.mesh.elements.size(); ++ei) {
+                for (const auto node : result.mesh.elements[ei].nodes) {
+                    if (parents.contains(node)) {
+                        edge_mid_incidence[node].push_back(ei);
+                    }
+                }
+            }
+            for (const auto& edge : quadratic_boundary_mids(result.mesh)) {
+                const auto a =
+                    geom::closest_edge(topology, result.mesh.nodes[edge.a], true);
+                const auto b =
+                    geom::closest_edge(topology, result.mesh.nodes[edge.b], true);
+                if (!a || !b || a->edge_id != b->edge_id) {
+                    continue;
+                }
+                const auto endpoint_a = geom::project_point_on_edge(
+                    *model.cad, a->edge_id, result.mesh.nodes[edge.a]);
+                const auto endpoint_b = geom::project_point_on_edge(
+                    *model.cad, a->edge_id, result.mesh.nodes[edge.b]);
+                if (!endpoint_a || !endpoint_b ||
+                    endpoint_a->distance > 1e-6 * h ||
+                    endpoint_b->distance > 1e-6 * h) {
+                    continue;
+                }
+                const auto exact = geom::project_point_on_edge(
+                    *model.cad, a->edge_id, result.mesh.nodes[edge.mid]);
+                if (!exact) {
+                    continue;
+                }
+                const Eigen::Vector3d saved_mid = result.mesh.nodes[edge.mid];
+                result.mesh.nodes[edge.mid] = exact->point;
+                bool valid = true;
+                for (const auto ei : edge_mid_incidence[edge.mid]) {
+                    const auto& element = result.mesh.elements[ei];
+                    const double quality = fea::cell_quality(result.mesh, element);
+                    valid = valid &&
+                            fea::element_jacobians_positive(result.mesh, element) &&
+                            std::isfinite(quality) &&
+                            quality >= mesh::validity::kCellShapeFloor;
+                }
+                if (!valid) {
+                    result.mesh.nodes[edge.mid] = saved_mid;
+                    continue;
+                }
+                ++result.n_projected;
+            }
         }
         bool curved_mesh_valid = true;
         for (const auto& element : result.mesh.elements) {
@@ -1746,6 +1796,11 @@ struct ExteriorConformStats {
     std::size_t n_relax_rescued = 0;
     std::size_t n_hex_fanned = 0; // hexes fanned into pyramids to free a node
     std::size_t n_left = 0;       // still off the BRep by more than 1e-9 h
+    std::size_t n_edge_pinned = 0;
+    std::size_t n_edge_chains = 0;
+    std::size_t n_pin_rejected = 0;
+    std::size_t n_connected_edges = 0;
+    std::string connected_edge_census;
     std::size_t n_kink_relieved = 0; // face nodes slid to lower a facet kink
     double worst_residual = 0.0;
     std::uint32_t worst_node = 0;
@@ -2166,8 +2221,139 @@ conform_true_exterior(fea::NodalMesh& mesh,
     // node exposed late can be a crease node nobody pinned.
     if (fit != nullptr && fit->can_pin()) {
         const auto node_offends = [&](std::uint32_t ni) { return !star_ok(ni); };
-        mesh::pin_feature_nodes(*fit->cad, *fit->topo, mesh.nodes, exterior, h, node_offends,
-                                projection->provenance);
+        const auto pin = mesh::pin_feature_nodes(
+            *fit->cad, *fit->topo, mesh.nodes, exterior, h, node_offends,
+            projection->provenance);
+        stats.n_edge_pinned = pin.edge_pinned;
+        stats.n_edge_chains = pin.chains;
+        stats.n_pin_rejected = pin.rejected;
+        std::set<std::pair<std::uint32_t, std::uint32_t>> boundary_edges;
+        for (const auto& face : boundary_faces) {
+            const int n = face[3] == face[2] ? 3 : 4;
+            for (int i = 0; i < n; ++i) {
+                const auto a = face[static_cast<std::size_t>(i)];
+                const auto b = face[static_cast<std::size_t>((i + 1) % n)];
+                if (a != b) {
+                    boundary_edges.insert(std::minmax(a, b));
+                }
+            }
+        }
+        const auto repair_edge = [&](std::uint32_t a, std::uint32_t b,
+                                     const Eigen::Vector3d& target_a,
+                                     const Eigen::Vector3d& target_b) {
+            const Eigen::Vector3d saved_a = mesh.nodes[a];
+            const Eigen::Vector3d saved_b = mesh.nodes[b];
+            mesh.nodes[a] = target_a;
+            mesh.nodes[b] = target_b;
+            std::set<std::uint32_t> candidates;
+            std::set<std::uint32_t> affected(incident[a].begin(), incident[a].end());
+            affected.insert(incident[b].begin(), incident[b].end());
+            for (const auto ei : affected) {
+                for (const auto node : mesh.elements[ei].nodes) {
+                    if (on_boundary[node] == 0) {
+                        candidates.insert(node);
+                    }
+                }
+            }
+            std::map<std::uint32_t, Eigen::Vector3d> saved;
+            for (const auto node : candidates) {
+                saved[node] = mesh.nodes[node];
+                affected.insert(incident[node].begin(), incident[node].end());
+            }
+            const auto objective = [&] {
+                double worst = std::numeric_limits<double>::infinity();
+                for (const auto ei : affected) {
+                    const auto& element = mesh.elements[ei];
+                    double quality = fea::cell_quality(mesh, element);
+                    if (!std::isfinite(quality)) {
+                        return -std::numeric_limits<double>::infinity();
+                    }
+                    if (!fea::element_jacobians_positive(mesh, element)) {
+                        quality = -std::abs(quality);
+                    }
+                    worst = std::min(worst, quality);
+                }
+                return worst;
+            };
+            constexpr double kCurvedEdgeQualityReserve = 0.0201;
+            if (objective() < kCurvedEdgeQualityReserve) {
+                for (const double step_size :
+                     {0.5 * h, 0.25 * h, 0.125 * h, 0.0625 * h, 0.03125 * h}) {
+                    for (int sweep = 0; sweep < 24; ++sweep) {
+                        bool changed = false;
+                        for (const auto node : candidates) {
+                            double best_quality = objective();
+                            Eigen::Vector3d best_position = mesh.nodes[node];
+                            for (int axis = 0; axis < 3; ++axis) {
+                                for (const double sign : {-1.0, 1.0}) {
+                                    Eigen::Vector3d trial = best_position;
+                                    trial[axis] += sign * step_size;
+                                    mesh.nodes[node] = trial;
+                                    const double quality = objective();
+                                    if (quality > best_quality + 1e-14) {
+                                        best_quality = quality;
+                                        best_position = trial;
+                                        changed = true;
+                                    }
+                                    mesh.nodes[node] = best_position;
+                                }
+                            }
+                        }
+                        if (!changed) {
+                            break;
+            }
+                }
+            }
+        }
+            if (objective() >= kCurvedEdgeQualityReserve) {
+                return true;
+            }
+            mesh.nodes[a] = saved_a;
+            mesh.nodes[b] = saved_b;
+            for (const auto& [node, position] : saved) {
+                mesh.nodes[node] = position;
+            }
+            return false;
+        };
+        std::map<std::size_t, std::size_t> connected_by_edge;
+        for (const auto& [a, b] : boundary_edges) {
+            const auto edge = geom::closest_edge(
+                *fit->topo, 0.5 * (mesh.nodes[a] + mesh.nodes[b]), true);
+            if (!edge || edge->distance > 4.0 * h) {
+                continue;
+            }
+            const auto target_a =
+                geom::project_point_on_edge(*fit->cad, edge->edge_id, mesh.nodes[a]);
+            const auto target_b =
+                geom::project_point_on_edge(*fit->cad, edge->edge_id, mesh.nodes[b]);
+            if (!target_a || !target_b ||
+                (target_a->point - mesh.nodes[a]).norm() > 4.0 * h ||
+                (target_b->point - mesh.nodes[b]).norm() > 4.0 * h) {
+                continue;
+            }
+            if (!repair_edge(a, b, target_a->point, target_b->point)) {
+                continue;
+            }
+            if (projection->provenance->size() < mesh.nodes.size()) {
+                projection->provenance->resize(mesh.nodes.size());
+            }
+            (*projection->provenance)[a] =
+                mesh::BoundarySupport{mesh::BoundarySupportKind::kCadEdge,
+                                      edge->edge_id};
+            (*projection->provenance)[b] =
+                mesh::BoundarySupport{mesh::BoundarySupportKind::kCadEdge,
+                                      edge->edge_id};
+            stats.n_edge_pinned += 2;
+            ++connected_by_edge[edge->edge_id];
+            ++stats.n_connected_edges;
+        }
+        for (const auto& [edge_id, count] : connected_by_edge) {
+            if (!stats.connected_edge_census.empty()) {
+                stats.connected_edge_census += ",";
+            }
+            stats.connected_edge_census +=
+                std::format("{}:{}", edge_id, count);
+        }
     }
 
     // Facet-kink relief.
@@ -4500,11 +4686,13 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
             out.mesher_note += std::format(
                 " | exterior_gate cand={} moved={} relax_rescued={} hex_fanned={} left={} "
                 "worst_node={} worst_xyz=({:.6g},{:.6g},{:.6g}) "
-                "worst|d|={:.3g} m kink_relieved={}{}",
+                "worst|d|={:.3g} m kink_relieved={} edge_pinned={} connected={} [{}] "
+                "chains={} pin_rejected={}{}",
                 ext.n_candidates, ext.n_moved, ext.n_relax_rescued, ext.n_hex_fanned,
                 ext.n_left, ext.worst_node, ext.worst_position.x(),
                 ext.worst_position.y(), ext.worst_position.z(), ext.worst_residual,
-                ext.n_kink_relieved,
+                ext.n_kink_relieved, ext.n_edge_pinned, ext.n_connected_edges,
+                ext.connected_edge_census, ext.n_edge_chains, ext.n_pin_rejected,
                 ext.reverted ? " REVERTED" : "");
         }
     }

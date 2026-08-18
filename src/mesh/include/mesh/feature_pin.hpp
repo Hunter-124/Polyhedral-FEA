@@ -86,10 +86,11 @@ struct FeaturePinReport {
 ///                      (0.75/0.5/0.25) and abandoned if no fraction is legal.
 /// @param provenance    Optional per-node owner slots, grown as needed, so the
 ///                      later smoothing/wall passes see the pins as owned.
-FeaturePinReport pin_feature_nodes(const geom::CadModel& cad, const geom::CadTopology& topo,
-                                   std::vector<Eigen::Vector3d>& nodes,
-                                   const std::vector<std::uint32_t>& boundary_nodes, double h,
-                                   const NodeOffendsFn& node_offends,
-                                   std::vector<BoundarySupport>* provenance = nullptr);
+FeaturePinReport pin_feature_nodes(
+    const geom::CadModel& cad, const geom::CadTopology& topo,
+    std::vector<Eigen::Vector3d>& nodes,
+    const std::vector<std::uint32_t>& boundary_nodes, double h,
+    const NodeOffendsFn& node_offends,
+    std::vector<BoundarySupport>* provenance = nullptr);
 
 } // namespace polymesh::mesh

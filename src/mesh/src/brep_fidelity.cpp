@@ -295,10 +295,21 @@ BRepGeometryFidelity evaluate_brep_geometry_fidelity(
     for (const auto& segment : mesh_feature_segments) {
         const Eigen::Vector3d points[] = {segment.a, 0.5 * (segment.a + segment.b), segment.b};
         for (const Eigen::Vector3d& p : points) {
-            if (p.allFinite()) {
-                if (const auto closest = geom::closest_edge(topology, p, true)) {
-                    mesh_feature_to_brep.push_back(closest->distance);
+            if (!p.allFinite()) {
+                continue;
+            }
+            double nearest = std::numeric_limits<double>::infinity();
+            for (const auto& edge : topology.edges) {
+                if (edge.feature != geom::CadEdgeFeature::kSharp) {
+                    continue;
                 }
+                if (const auto exact =
+                        geom::project_point_on_edge(model, edge.id, p)) {
+                    nearest = std::min(nearest, exact->distance);
+                }
+            }
+            if (std::isfinite(nearest)) {
+                mesh_feature_to_brep.push_back(nearest);
             }
         }
     }

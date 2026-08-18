@@ -293,10 +293,16 @@ This removes both sources of the visible rounded defects: under-resolved
 boundary topology and the h²κ/8 corner-chord floor. Studio evaluates the actual
 isoparametric surface at eight subdivisions; it no longer substitutes a
 display-only mesh. At requested h = 8 mm, sphere/cone/cylinder/plate-hole p99
-surface-to-BRep errors over bbox diagonal are 7.12e-6, 5.50e-5, 5.66e-6 and
+surface-to-BRep errors over bbox diagonal are 7.12e-6, 5.71e-5, 5.66e-6 and
 4.83e-5 respectively, all inside the 1e-4 (99.99%) target. Their curved-cell
-quality minima are 0.02542, 0.02460, 0.03250 and 0.02008 with zero inverted and
+quality minima are 0.02542, 0.02105, 0.03250 and 0.02110 with zero inverted and
 zero sub-floor cells.
+
+What is *not* closed: CAD → mesh sharp-edge coverage. Cone coverage p99 is
+1.96e-4 of bbox, but cylinder is 1.83e-2 and plate-with-hole 5.73e-3, while the
+mesh → CAD direction is 4.95e-6 on the same cylinder. The residual is therefore
+untraced rim chords — roughly 1–3% of the rim polygon — not chordal error, and
+it is reported rather than smoothed over.
 
 The uniform Cartesian `tet` baseline remains explicitly floor-bounded. It is no
 longer the product default, and its failed projection/refinement experiments

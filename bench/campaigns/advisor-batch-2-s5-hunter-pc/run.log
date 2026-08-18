@@ -1,5 +1,5 @@
 
-=== 2026-08-17T17:47:46Z OMP_NUM_THREADS=2 :: /home/hunter/Desktop/Polyhedral-FEA/build/apps/testlab/polymesh_testlab resume /home/hunter/Desktop/Polyhedral-FEA/bench/campaigns/advisor-batch-2-s5-hunter-pc
+=== 2026-08-18T02:40:01Z OMP_NUM_THREADS=2 :: /home/hunter/Desktop/Polyhedral-FEA/build/apps/testlab/polymesh_testlab resume /home/hunter/Desktop/Polyhedral-FEA/bench/campaigns/advisor-batch-2-s5-hunter-pc
 campaign advisor-batch-2-s5-hunter-pc: 32 configs, 36 parts, 1 tiers
   max_run_wall_s=180 (override all tiers)
   max_pack_wall_s=21600
@@ -205,6 +205,12 @@ wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-56133ab6/plate_notch
 wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-56133ab6/sphere_box_s0_c0/t0/wire.png
 wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-56133ab6/sphere_box_s0_c1/t0/wire.png
 wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-56133ab6/sphere_box_s0_c2/t0/wire.png
+wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-56133ab6/stepped_shaft_s0_c0/t0/wire.png
+wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-56133ab6/stepped_shaft_s0_c1/t0/wire.png
+wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-56133ab6/stepped_shaft_s0_c2/t0/wire.png
+wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-56133ab6/stepped_shaft_s2_c0/t0/wire.png
+wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-56133ab6/stepped_shaft_s2_c1/t0/wire.png
+wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-56133ab6/stepped_shaft_s2_c2/t0/wire.png
 wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-65494611/box_hole_s0_c0/t0/wire.png
 wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-65494611/box_hole_s0_c1/t0/wire.png
 wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-65494611/box_hole_s0_c2/t0/wire.png
@@ -247,6 +253,12 @@ wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-ac859d08/plate_notch
 wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-ac859d08/plate_notch_s2_c0/t0/wire.png
 wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-ac859d08/plate_notch_s2_c1/t0/wire.png
 wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-ac859d08/plate_notch_s2_c2/t0/wire.png
+wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-ac859d08/stepped_shaft_s0_c0/t0/wire.png
+wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-ac859d08/stepped_shaft_s0_c1/t0/wire.png
+wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-ac859d08/stepped_shaft_s0_c2/t0/wire.png
+wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-ac859d08/stepped_shaft_s2_c0/t0/wire.png
+wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-ac859d08/stepped_shaft_s2_c1/t0/wire.png
+wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-ac859d08/stepped_shaft_s2_c2/t0/wire.png
 wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-af210e6e/box_hole_s0_c0/t0/wire.png
 wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-af210e6e/box_hole_s0_c1/t0/wire.png
 wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-af210e6e/box_hole_s0_c2/t0/wire.png
@@ -271,6 +283,12 @@ wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-af210e6e/sphere_box_
 wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-af210e6e/sphere_box_s2_c0/t0/wire.png
 wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-af210e6e/sphere_box_s2_c1/t0/wire.png
 wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-af210e6e/sphere_box_s2_c2/t0/wire.png
+wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-af210e6e/stepped_shaft_s0_c0/t0/wire.png
+wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-af210e6e/stepped_shaft_s0_c1/t0/wire.png
+wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-af210e6e/stepped_shaft_s0_c2/t0/wire.png
+wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-af210e6e/stepped_shaft_s2_c0/t0/wire.png
+wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-af210e6e/stepped_shaft_s2_c1/t0/wire.png
+wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-af210e6e/stepped_shaft_s2_c2/t0/wire.png
 wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-c4005114/box_hole_s0_c0/t0/wire.png
 wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-c4005114/box_hole_s0_c1/t0/wire.png
 wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-c4005114/box_hole_s0_c2/t0/wire.png
@@ -289,12 +307,6 @@ wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-c4005114/plate_notch
 wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-c4005114/plate_notch_s2_c0/t0/wire.png
 wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-c4005114/plate_notch_s2_c1/t0/wire.png
 wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-c4005114/plate_notch_s2_c2/t0/wire.png
-wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-c4005114/sphere_box_s0_c0/t0/wire.png
-wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-c4005114/sphere_box_s0_c1/t0/wire.png
-wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-c4005114/sphere_box_s0_c2/t0/wire.png
-wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-c4005114/sphere_box_s2_c0/t0/wire.png
-wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-c4005114/sphere_box_s2_c1/t0/wire.png
-wrote bench/campaigns/advisor-batch-2-s5-hunter-pc/runs/cfg-c4005114/sphere_box_s2_c2/t0/wire.png
-warehouse_shots: 111 rendered, 0 skipped (exists), 0 failed (111 mesh.vtu total)
+warehouse_shots: 123 rendered, 0 skipped (exists), 0 failed (123 mesh.vtu total)
 finished: 180 runs → /home/hunter/Desktop/Polyhedral-FEA/bench/campaigns/advisor-batch-2-s5-hunter-pc/results.jsonl
-=== exit 0 after 1329.5s
+=== exit 0 after 1674.7s

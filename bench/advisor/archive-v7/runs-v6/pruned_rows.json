@@ -1,0 +1,2574 @@
+{
+  "total": 617,
+  "keys": [
+    "advisor-batch-1-s0-hunter-pc|cfg-0ef3c388|cantilever|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-0ef3c388|cylinder|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-0ef3c388|smoke_bar|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-10617741|cylinder|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-25cae84b|cylinder|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-289ed88e|cylinder|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-289ed88e|sphere|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-314eb82a|cantilever|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-480c3d87|cylinder|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-480c3d87|sphere|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-7ef81b71|cylinder|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-904b4dc4|cantilever|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-904b4dc4|cylinder|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-904b4dc4|plate_hole|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-9c14b37c|cantilever|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-9c14b37c|cylinder|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-a8be2964|cylinder|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-acb9e0a6|cylinder|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-b670f9a6|cylinder|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-b7207d3c|sphere|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-b8ac635b|cylinder|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-b8ac635b|plate_hole|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-c48ecf61|cylinder|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-c680f314|cantilever|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-dfe61061|cantilever|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-dfe61061|cylinder|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-dfe61061|icecream_cone|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-dfe61061|plate_hole|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-e1d83414|cantilever|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-e1d83414|cylinder|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-e1d83414|smoke_bar|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-e30475f1|cylinder|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-feb7e91d|cylinder|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-feb7e91d|smoke_bar|0",
+    "advisor-batch-1-s0-hunter-pc|cfg-feb7e91d|sphere|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-0a41b06f|cylinder|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-17f37a6f|cantilever|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-17f37a6f|cylinder|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-17f37a6f|smoke_bar|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-21ce779f|plate_hole|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-252b09d2|cantilever|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-252b09d2|cylinder|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-2ffee2de|cantilever|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-2ffee2de|cylinder|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-2ffee2de|sphere|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-3bd04605|cantilever|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-3bd04605|cylinder|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-3bd04605|smoke_bar|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-446dbbd2|cantilever|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-446dbbd2|cylinder|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-69108570|cylinder|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-749bfc42|cylinder|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-796c7b03|cantilever|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-796c7b03|cylinder|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-796c7b03|smoke_bar|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-8a6dbaac|cantilever|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-8a6dbaac|cylinder|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-8a6dbaac|sphere|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-94025c72|plate_hole|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-94025c72|smoke_bar|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-98a49495|smoke_bar|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-a1189557|sphere|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-ab46fbc0|plate_hole|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-af599d72|cylinder|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-af599d72|icecream_cone|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-af599d72|plate_hole|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-ba509597|cylinder|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-c00d3c9f|cylinder|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-c17301b0|cylinder|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-c369ced2|sphere|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-c790df79|cantilever|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-c790df79|cylinder|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-d066ccea|cantilever|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-d066ccea|cylinder|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-d066ccea|smoke_bar|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-d8a856c2|sphere|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-dd7388cd|cylinder|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-dd7388cd|sphere|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-e2ac80d2|sphere|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-ea32b132|cylinder|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-ea32b132|smoke_bar|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-f8ee7aa5|cylinder|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-fc9c396f|cantilever|0",
+    "advisor-batch-1-s1-hunter-pc|cfg-fc9c396f|cylinder|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-1a3643d8|sphere|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-1be8522b|cylinder|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-1daaf024|cantilever|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-1daaf024|cylinder|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-1daaf024|plate_hole|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-1daaf024|sphere|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-244b652b|plate_hole|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-244b652b|sphere|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-27949710|sphere|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-2a095f54|sphere|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-358d3914|cantilever|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-358d3914|cylinder|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-358d3914|plate_hole|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-3abc00cf|cantilever|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-3abc00cf|cylinder|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-3abc00cf|sphere|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-4039b73e|sphere|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-47518788|plate_hole|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-5702fde1|cylinder|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-5702fde1|plate_hole|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-5702fde1|smoke_bar|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-5abc7708|cylinder|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-67922491|cantilever|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-67922491|cylinder|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-67922491|sphere|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-70616bcb|cylinder|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-85ac4502|sphere|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-8b59c7c7|cantilever|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-8b59c7c7|cylinder|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-8b59c7c7|sphere|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-9d819bdc|smoke_bar|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-9d819bdc|sphere|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-9d9c56c4|cylinder|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-9d9c56c4|smoke_bar|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-ab5b5a5b|cylinder|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-ab5b5a5b|smoke_bar|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-af99ddd3|plate_hole|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-b1b11a33|cylinder|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-bce718be|cylinder|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-c5788dcf|plate_hole|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-d286588d|cylinder|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-d286588d|plate_hole|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-d286588d|sphere|0",
+    "advisor-batch-1-s2-hunter-pc|cfg-e7f14d51|cantilever|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-06a4a731|sphere|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-1c7e40f4|cylinder|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-1c7e40f4|smoke_bar|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-1c7e40f4|sphere|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-1da428f7|cantilever|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-1da428f7|cylinder|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-1da428f7|smoke_bar|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-1da428f7|sphere|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-20cf92e0|cylinder|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-26768af2|cylinder|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-2a2df0a2|cylinder|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-2a2df0a2|smoke_bar|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-2a2df0a2|sphere|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-2ef2c26b|sphere|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-2f1f809f|cantilever|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-2f1f809f|cylinder|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-2f1f809f|smoke_bar|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-3c34b7c0|cylinder|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-4a7a5b13|sphere|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-50513e6f|smoke_bar|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-63bd3b4e|cylinder|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-63bd3b4e|plate_hole|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-63bd3b4e|sphere|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-699aeefd|cylinder|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-699aeefd|sphere|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-6ba87f6f|cylinder|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-6ba87f6f|plate_hole|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-6ba87f6f|sphere|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-855544d0|cylinder|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-8db857d0|cantilever|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-8db857d0|cylinder|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-8db857d0|plate_hole|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-8db857d0|sphere|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-91741cf5|cylinder|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-9df5f2c0|cantilever|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-9df5f2c0|cylinder|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-9df5f2c0|smoke_bar|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-a73acdf4|sphere|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-adb1886f|cylinder|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-b1ca3f03|plate_hole|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-b3a708f0|cylinder|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-caf10f7d|smoke_bar|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-cd218003|cylinder|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-cd218003|smoke_bar|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-cd218003|sphere|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-d9231bff|cylinder|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-d9231bff|plate_hole|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-d9231bff|sphere|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-e579faff|cylinder|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-e648507d|cylinder|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-f43106e2|cylinder|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-f43106e2|plate_hole|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-f43106e2|sphere|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-f8231c1a|cylinder|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-fc8839ec|cylinder|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-fc8839ec|smoke_bar|0",
+    "advisor-batch-1-s3-hunter-pc|cfg-fc8839ec|sphere|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-047ce243|cantilever|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-047ce243|cylinder|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-047ce243|plate_hole|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-047ce243|sphere|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-06177b3d|sphere|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-0cbb0a36|sphere|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-109c1dbe|cylinder|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-109c1dbe|sphere|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-1db28041|cantilever|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-1db28041|cylinder|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-1db28041|plate_hole|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-1db28041|sphere|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-23fdaf2a|cylinder|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-2756f173|plate_hole|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-2c8319fc|cylinder|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-2c8319fc|plate_hole|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-2c8319fc|sphere|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-339f6d8d|cylinder|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-475eb5a6|icecream_cone|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-475eb5a6|plate_hole|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-475eb5a6|sphere|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-4a1827a6|cylinder|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-5c843d96|plate_hole|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-7573e330|cylinder|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-79113a9e|cylinder|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-7b5aee3d|cantilever|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-7b5aee3d|cylinder|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-a708135e|cantilever|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-a708135e|smoke_bar|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-a91ff0a6|cantilever|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-a91ff0a6|cylinder|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-a91ff0a6|plate_hole|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-b9bb832b|cylinder|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-b9bb832b|sphere|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-bc91db24|cylinder|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-c0eb7123|cantilever|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-c0eb7123|cylinder|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-c0eb7123|plate_hole|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-c0eb7123|sphere|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-c23c742a|icecream_cone|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-c23c742a|plate_hole|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-c23c742a|sphere|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-c24e268e|cylinder|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-c9778778|cylinder|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-cab1398e|cylinder|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-cd4d6395|plate_hole|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-fd1b959a|sphere|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-fe6fce41|cantilever|0",
+    "advisor-batch-1-s4-hunter-pc|cfg-fe6fce41|cylinder|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-144abf7e|cylinder|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-232875d0|cylinder|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-232875d0|sphere|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-2e7f3d05|cylinder|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-2e7f3d05|plate_hole|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-327c12d2|cylinder|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-327c12d2|smoke_bar|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-327c12d2|sphere|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-39fd557d|cylinder|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-4abefc17|cylinder|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-4abefc17|plate_hole|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-4abefc17|smoke_bar|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-51bec4d2|cylinder|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-51bec4d2|plate_hole|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-51bec4d2|sphere|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-587e9b79|icecream_cone|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-587e9b79|plate_hole|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-587e9b79|sphere|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-6018417e|sphere|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-75c1199d|cantilever|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-75c1199d|cylinder|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-75c1199d|smoke_bar|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-77d5d498|cylinder|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-780a06ff|cylinder|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-7beff229|plate_hole|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-7c8ea4d1|cylinder|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-7f85e9cd|cantilever|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-7f85e9cd|cylinder|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-82b654a8|cylinder|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-9cf657a9|sphere|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-9cfc220b|cylinder|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-9cfc220b|sphere|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-9e0d95a8|cylinder|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-9e0d95a8|plate_hole|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-9e0d95a8|sphere|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-aad27433|cylinder|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-ba3fd679|cylinder|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-ba3fd679|smoke_bar|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-bb5d3077|sphere|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-c4d6504e|cylinder|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-ccbe0205|smoke_bar|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-ccbe0205|sphere|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-cf777405|cylinder|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-cf777405|smoke_bar|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-d121ac75|plate_hole|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-d12d2f4e|cantilever|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-d2cbe1c8|cylinder|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-d2cbe1c8|icecream_cone|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-d2cbe1c8|plate_hole|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-d2cbe1c8|smoke_bar|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-d2cbe1c8|sphere|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-e3804a44|plate_hole|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-e6ffa4b8|cylinder|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-e815d595|sphere|0",
+    "advisor-batch-1-s5-hunter-pc|cfg-f1f29836|plate_hole|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-169e43de|channel_s0_c0|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-169e43de|channel_s0_c1|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-169e43de|l_bracket_s0_c0|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-169e43de|l_bracket_s0_c2|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-169e43de|l_bracket_s2_c0|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-169e43de|l_bracket_s2_c2|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-197de74f|channel_s0_c0|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-197de74f|channel_s0_c1|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-197de74f|l_bracket_s0_c0|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-197de74f|l_bracket_s0_c1|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-197de74f|l_bracket_s2_c1|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-197de74f|l_bracket_s2_c2|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-57078a16|l_bracket_s0_c1|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-57078a16|l_bracket_s2_c0|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-57078a16|l_bracket_s2_c2|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-57078a16|plate_notch_s2_c1|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-57078a16|sphere_box_s0_c1|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-57078a16|sphere_box_s2_c1|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-57078a16|sphere_box_s2_c2|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-e61acb99|channel_s0_c2|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-e61acb99|l_bracket_s0_c0|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-e61acb99|l_bracket_s0_c2|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-eeb0f407|l_bracket_s0_c0|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-eeb0f407|l_bracket_s0_c1|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-eeb0f407|l_bracket_s0_c2|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-eeb0f407|l_bracket_s2_c0|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-eeb0f407|l_bracket_s2_c1|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-eeb0f407|l_bracket_s2_c2|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-eeb0f407|sphere_box_s0_c0|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-eeb0f407|sphere_box_s2_c0|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-ffcd821e|channel_s0_c0|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-ffcd821e|channel_s0_c1|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-ffcd821e|channel_s0_c2|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-ffcd821e|l_bracket_s0_c0|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-ffcd821e|l_bracket_s0_c1|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-ffcd821e|l_bracket_s2_c0|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-ffcd821e|l_bracket_s2_c1|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-ffcd821e|l_bracket_s2_c2|0",
+    "advisor-batch-2-s0-hunter-pc|cfg-ffcd821e|sphere_box_s0_c0|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-16a22cb5|channel_s0_c1|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-16a22cb5|l_bracket_s0_c0|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-16a22cb5|l_bracket_s0_c2|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-16a22cb5|l_bracket_s2_c0|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-16a22cb5|l_bracket_s2_c1|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-16a22cb5|l_bracket_s2_c2|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-19863bd4|channel_s0_c0|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-19863bd4|channel_s0_c1|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-19863bd4|l_bracket_s0_c0|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-19863bd4|l_bracket_s0_c1|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-19863bd4|l_bracket_s2_c2|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-19863bd4|sphere_box_s0_c0|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-570b72ed|channel_s0_c1|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-570b72ed|channel_s0_c2|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-570b72ed|l_bracket_s0_c1|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-570b72ed|l_bracket_s0_c2|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-570b72ed|l_bracket_s2_c0|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-570b72ed|l_bracket_s2_c2|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-570b72ed|plate_notch_s2_c1|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-570b72ed|sphere_box_s0_c1|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-570b72ed|sphere_box_s2_c1|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-570b72ed|sphere_box_s2_c2|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-e61895c2|l_bracket_s0_c0|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-e61895c2|l_bracket_s0_c2|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-eeb9488c|l_bracket_s0_c0|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-eeb9488c|l_bracket_s0_c1|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-eeb9488c|l_bracket_s0_c2|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-eeb9488c|l_bracket_s2_c0|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-eeb9488c|l_bracket_s2_c1|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-eeb9488c|l_bracket_s2_c2|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-eeb9488c|sphere_box_s0_c0|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-eeb9488c|sphere_box_s2_c0|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-ffcfb7f5|channel_s0_c0|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-ffcfb7f5|channel_s0_c1|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-ffcfb7f5|l_bracket_s0_c0|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-ffcfb7f5|l_bracket_s0_c1|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-ffcfb7f5|l_bracket_s0_c2|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-ffcfb7f5|l_bracket_s2_c0|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-ffcfb7f5|l_bracket_s2_c1|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-ffcfb7f5|l_bracket_s2_c2|0",
+    "advisor-batch-2-s1-hunter-pc|cfg-ffcfb7f5|sphere_box_s0_c0|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-16bdf738|channel_s0_c0|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-16bdf738|channel_s0_c1|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-16bdf738|l_bracket_s0_c0|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-16bdf738|l_bracket_s0_c1|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-16bdf738|l_bracket_s2_c0|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-16e7c9c4|channel_s0_c1|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-16e7c9c4|l_bracket_s0_c0|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-16e7c9c4|l_bracket_s0_c1|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-16e7c9c4|l_bracket_s0_c2|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-16e7c9c4|l_bracket_s2_c0|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-16e7c9c4|l_bracket_s2_c1|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-16e7c9c4|sphere_box_s2_c2|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-277b991c|l_bracket_s0_c0|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-277b991c|l_bracket_s0_c1|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-277b991c|l_bracket_s0_c2|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-277b991c|l_bracket_s2_c0|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-277b991c|l_bracket_s2_c1|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-277b991c|l_bracket_s2_c2|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-277b991c|sphere_box_s0_c0|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-277b991c|sphere_box_s2_c0|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-43e1efcd|channel_s0_c0|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-43e1efcd|channel_s0_c1|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-43e1efcd|l_bracket_s0_c0|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-43e1efcd|l_bracket_s0_c1|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-43e1efcd|l_bracket_s2_c0|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-43e1efcd|l_bracket_s2_c2|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-43e1efcd|plate_notch_s0_c1|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-43e1efcd|sphere_box_s0_c2|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-43e1efcd|sphere_box_s2_c1|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-dae54304|l_bracket_s0_c0|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-dae54304|l_bracket_s0_c1|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-dae54304|l_bracket_s0_c2|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-dae54304|l_bracket_s2_c0|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-dae54304|l_bracket_s2_c1|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-dae54304|l_bracket_s2_c2|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-dae54304|sphere_box_s2_c0|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-dae54304|sphere_box_s2_c1|0",
+    "advisor-batch-2-s2-hunter-pc|cfg-dae54304|sphere_box_s2_c2|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-16b3efb3|channel_s0_c0|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-16b3efb3|channel_s0_c1|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-16b3efb3|l_bracket_s0_c0|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-16b3efb3|l_bracket_s0_c1|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-16b3efb3|l_bracket_s0_c2|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-16b3efb3|l_bracket_s2_c0|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-16b3efb3|l_bracket_s2_c2|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-16df753f|channel_s0_c2|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-16df753f|l_bracket_s0_c0|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-16df753f|l_bracket_s0_c1|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-16df753f|l_bracket_s0_c2|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-16df753f|l_bracket_s2_c0|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-16df753f|l_bracket_s2_c1|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-16df753f|sphere_box_s0_c0|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-27719197|l_bracket_s0_c0|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-27719197|l_bracket_s0_c1|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-27719197|l_bracket_s0_c2|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-27719197|l_bracket_s2_c0|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-27719197|l_bracket_s2_c1|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-27719197|l_bracket_s2_c2|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-27719197|sphere_box_s0_c0|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-27719197|sphere_box_s2_c0|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-27719197|sphere_box_s2_c2|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-43de06f6|channel_s0_c0|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-43de06f6|channel_s0_c1|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-43de06f6|l_bracket_s0_c0|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-43de06f6|l_bracket_s0_c1|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-43de06f6|l_bracket_s2_c0|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-43de06f6|l_bracket_s2_c2|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-43de06f6|plate_notch_s0_c1|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-43de06f6|sphere_box_s0_c2|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-43de06f6|sphere_box_s2_c1|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-dadb3b7f|l_bracket_s0_c0|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-dadb3b7f|l_bracket_s0_c1|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-dadb3b7f|l_bracket_s0_c2|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-dadb3b7f|l_bracket_s2_c0|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-dadb3b7f|l_bracket_s2_c2|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-dadb3b7f|sphere_box_s2_c0|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-dadb3b7f|sphere_box_s2_c1|0",
+    "advisor-batch-2-s3-hunter-pc|cfg-dadb3b7f|sphere_box_s2_c2|0",
+    "advisor-batch-2-s4-hunter-pc|cfg-5615708d|channel_s0_c0|0",
+    "advisor-batch-2-s4-hunter-pc|cfg-5615708d|channel_s0_c1|0",
+    "advisor-batch-2-s4-hunter-pc|cfg-5615708d|l_bracket_s0_c0|0",
+    "advisor-batch-2-s4-hunter-pc|cfg-5615708d|l_bracket_s0_c1|0",
+    "advisor-batch-2-s4-hunter-pc|cfg-5615708d|l_bracket_s0_c2|0",
+    "advisor-batch-2-s4-hunter-pc|cfg-5615708d|l_bracket_s2_c0|0",
+    "advisor-batch-2-s4-hunter-pc|cfg-6547103a|channel_s0_c1|0",
+    "advisor-batch-2-s4-hunter-pc|cfg-6547103a|l_bracket_s0_c0|0",
+    "advisor-batch-2-s4-hunter-pc|cfg-6547103a|l_bracket_s0_c2|0",
+    "advisor-batch-2-s4-hunter-pc|cfg-6547103a|l_bracket_s2_c1|0",
+    "advisor-batch-2-s4-hunter-pc|cfg-ac7d4883|channel_s0_c1|0",
+    "advisor-batch-2-s4-hunter-pc|cfg-ac7d4883|channel_s0_c2|0",
+    "advisor-batch-2-s4-hunter-pc|cfg-ac7d4883|l_bracket_s0_c0|0",
+    "advisor-batch-2-s4-hunter-pc|cfg-ac7d4883|l_bracket_s0_c1|0",
+    "advisor-batch-2-s4-hunter-pc|cfg-ac7d4883|l_bracket_s2_c0|0",
+    "advisor-batch-2-s4-hunter-pc|cfg-af234445|l_bracket_s0_c0|0",
+    "advisor-batch-2-s4-hunter-pc|cfg-af234445|l_bracket_s0_c1|0",
+    "advisor-batch-2-s4-hunter-pc|cfg-af234445|l_bracket_s2_c0|0",
+    "advisor-batch-2-s4-hunter-pc|cfg-af234445|l_bracket_s2_c2|0",
+    "advisor-batch-2-s4-hunter-pc|cfg-c3f7fc8f|l_bracket_s0_c0|0",
+    "advisor-batch-2-s4-hunter-pc|cfg-c3f7fc8f|l_bracket_s0_c1|0",
+    "advisor-batch-2-s4-hunter-pc|cfg-c3f7fc8f|l_bracket_s0_c2|0",
+    "advisor-batch-2-s4-hunter-pc|cfg-c3f7fc8f|l_bracket_s2_c0|0",
+    "advisor-batch-2-s4-hunter-pc|cfg-c3f7fc8f|l_bracket_s2_c1|0",
+    "advisor-batch-2-s4-hunter-pc|cfg-c3f7fc8f|l_bracket_s2_c2|0",
+    "advisor-batch-2-s4-hunter-pc|cfg-c3f7fc8f|plate_notch_s0_c2|0",
+    "advisor-batch-2-s4-hunter-pc|cfg-c3f7fc8f|sphere_box_s2_c0|0",
+    "advisor-batch-2-s4-hunter-pc|cfg-c3f7fc8f|sphere_box_s2_c1|0",
+    "advisor-batch-2-s4-hunter-pc|cfg-c3f7fc8f|sphere_box_s2_c2|0",
+    "advisor-batch-2-s5-hunter-pc|cfg-56133ab6|channel_s0_c0|0",
+    "advisor-batch-2-s5-hunter-pc|cfg-56133ab6|channel_s0_c1|0",
+    "advisor-batch-2-s5-hunter-pc|cfg-56133ab6|l_bracket_s0_c0|0",
+    "advisor-batch-2-s5-hunter-pc|cfg-56133ab6|l_bracket_s0_c1|0",
+    "advisor-batch-2-s5-hunter-pc|cfg-56133ab6|l_bracket_s0_c2|0",
+    "advisor-batch-2-s5-hunter-pc|cfg-56133ab6|l_bracket_s2_c0|0",
+    "advisor-batch-2-s5-hunter-pc|cfg-56133ab6|plate_notch_s0_c0|0",
+    "advisor-batch-2-s5-hunter-pc|cfg-65494611|l_bracket_s0_c0|0",
+    "advisor-batch-2-s5-hunter-pc|cfg-65494611|l_bracket_s0_c1|0",
+    "advisor-batch-2-s5-hunter-pc|cfg-65494611|l_bracket_s0_c2|0",
+    "advisor-batch-2-s5-hunter-pc|cfg-ac859d08|l_bracket_s0_c0|0",
+    "advisor-batch-2-s5-hunter-pc|cfg-ac859d08|l_bracket_s0_c1|0",
+    "advisor-batch-2-s5-hunter-pc|cfg-ac859d08|l_bracket_s2_c0|0",
+    "advisor-batch-2-s5-hunter-pc|cfg-af210e6e|l_bracket_s0_c0|0",
+    "advisor-batch-2-s5-hunter-pc|cfg-af210e6e|l_bracket_s0_c1|0",
+    "advisor-batch-2-s5-hunter-pc|cfg-c4005114|l_bracket_s0_c0|0",
+    "advisor-batch-2-s5-hunter-pc|cfg-c4005114|l_bracket_s0_c1|0",
+    "advisor-batch-2-s5-hunter-pc|cfg-c4005114|l_bracket_s0_c2|0",
+    "advisor-batch-2-s5-hunter-pc|cfg-c4005114|l_bracket_s2_c0|0",
+    "advisor-batch-2-s5-hunter-pc|cfg-c4005114|l_bracket_s2_c1|0",
+    "advisor-batch-2-s5-hunter-pc|cfg-c4005114|l_bracket_s2_c2|0",
+    "advisor-batch-2-s5-hunter-pc|cfg-c4005114|plate_notch_s0_c2|0",
+    "advisor-batch-2-s5-hunter-pc|cfg-c4005114|sphere_box_s2_c1|0",
+    "advisor-batch-2-s5-hunter-pc|cfg-c4005114|sphere_box_s2_c2|0",
+    "advisor-batch-3-s0-hunter-pc|cfg-116b3958|l_bracket_s0_c0|0",
+    "advisor-batch-3-s0-hunter-pc|cfg-116b3958|l_bracket_s2_c0|0",
+    "advisor-batch-3-s0-hunter-pc|cfg-116b3958|plate_notch_s0_c1|0",
+    "advisor-batch-3-s0-hunter-pc|cfg-c20a413d|l_bracket_s0_c0|0",
+    "advisor-batch-3-s0-hunter-pc|cfg-c20a413d|l_bracket_s2_c0|0",
+    "advisor-batch-3-s0-hunter-pc|cfg-e15462bb|l_bracket_s0_c0|0",
+    "advisor-batch-3-s0-hunter-pc|cfg-e15462bb|l_bracket_s0_c1|0",
+    "advisor-batch-3-s0-hunter-pc|cfg-e15462bb|l_bracket_s2_c0|0",
+    "advisor-batch-3-s0-hunter-pc|cfg-e15462bb|sphere_box_s0_c0|0",
+    "advisor-batch-3-s1-hunter-pc|cfg-a35f86df|channel_s0_c0|0",
+    "advisor-batch-3-s1-hunter-pc|cfg-a35f86df|channel_s0_c1|0",
+    "advisor-batch-3-s1-hunter-pc|cfg-a35f86df|channel_s0_c2|0",
+    "advisor-batch-3-s1-hunter-pc|cfg-a35f86df|l_bracket_s0_c0|0",
+    "advisor-batch-3-s1-hunter-pc|cfg-a35f86df|l_bracket_s0_c1|0",
+    "advisor-batch-3-s1-hunter-pc|cfg-a35f86df|l_bracket_s2_c1|0",
+    "advisor-batch-3-s1-hunter-pc|cfg-a35f86df|l_bracket_s2_c2|0",
+    "advisor-batch-3-s1-hunter-pc|cfg-bc1e79aa|channel_s0_c0|0",
+    "advisor-batch-3-s1-hunter-pc|cfg-bc1e79aa|channel_s0_c1|0",
+    "advisor-batch-3-s1-hunter-pc|cfg-bc1e79aa|channel_s0_c2|0",
+    "advisor-batch-3-s1-hunter-pc|cfg-bc1e79aa|l_bracket_s0_c0|0",
+    "advisor-batch-3-s1-hunter-pc|cfg-bc1e79aa|l_bracket_s2_c0|0",
+    "advisor-batch-3-s1-hunter-pc|cfg-bc1e79aa|l_bracket_s2_c1|0",
+    "advisor-batch-3-s1-hunter-pc|cfg-bc1e79aa|l_bracket_s2_c2|0",
+    "advisor-batch-3-s1-hunter-pc|cfg-f3a1c5e1|channel_s0_c1|0",
+    "advisor-batch-3-s1-hunter-pc|cfg-f3a1c5e1|l_bracket_s0_c0|0",
+    "advisor-batch-3-s1-hunter-pc|cfg-f3a1c5e1|l_bracket_s2_c1|0",
+    "advisor-batch-3-s1-hunter-pc|cfg-f3a1c5e1|l_bracket_s2_c2|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-1a7537a4|channel_s0_c0|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-1a7537a4|l_bracket_s0_c0|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-1a7537a4|l_bracket_s0_c1|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-1a7537a4|l_bracket_s0_c2|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-1a7537a4|l_bracket_s2_c0|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-1a7537a4|l_bracket_s2_c1|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-1a7537a4|l_bracket_s2_c2|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-1a7537a4|plate_notch_s0_c0|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-1a7537a4|plate_notch_s0_c2|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-1a7537a4|plate_notch_s2_c0|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-1a7537a4|plate_notch_s2_c1|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-1a7537a4|plate_notch_s2_c2|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-1a7537a4|sphere_box_s0_c0|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-1a7537a4|sphere_box_s2_c0|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-a1ad5ec9|l_bracket_s0_c0|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-a1ad5ec9|l_bracket_s2_c0|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-e04b39c3|l_bracket_s0_c0|0",
+    "advisor-batch-3-s2-hunter-pc|cfg-e04b39c3|l_bracket_s2_c0|0",
+    "advisor-batch-3-s3-hunter-pc|cfg-1ab25f2b|channel_s0_c0|0",
+    "advisor-batch-3-s3-hunter-pc|cfg-1ab25f2b|channel_s0_c1|0",
+    "advisor-batch-3-s3-hunter-pc|cfg-1ab25f2b|channel_s0_c2|0",
+    "advisor-batch-3-s3-hunter-pc|cfg-1ab25f2b|l_bracket_s0_c0|0",
+    "advisor-batch-3-s3-hunter-pc|cfg-1ab25f2b|l_bracket_s0_c1|0",
+    "advisor-batch-3-s3-hunter-pc|cfg-1ab25f2b|l_bracket_s2_c1|0",
+    "advisor-batch-3-s3-hunter-pc|cfg-1ab25f2b|l_bracket_s2_c2|0",
+    "advisor-batch-3-s3-hunter-pc|cfg-9ab082c9|l_bracket_s0_c0|0",
+    "advisor-batch-3-s3-hunter-pc|cfg-9ab082c9|l_bracket_s2_c1|0",
+    "advisor-batch-3-s3-hunter-pc|cfg-e8bbec46|channel_s0_c0|0",
+    "advisor-batch-3-s3-hunter-pc|cfg-e8bbec46|channel_s0_c1|0",
+    "advisor-batch-3-s3-hunter-pc|cfg-e8bbec46|channel_s0_c2|0",
+    "advisor-batch-3-s3-hunter-pc|cfg-e8bbec46|l_bracket_s0_c0|0",
+    "advisor-batch-3-s3-hunter-pc|cfg-e8bbec46|l_bracket_s0_c1|0",
+    "advisor-batch-3-s3-hunter-pc|cfg-e8bbec46|l_bracket_s2_c0|0",
+    "advisor-batch-3-s3-hunter-pc|cfg-e8bbec46|l_bracket_s2_c1|0",
+    "advisor-batch-3-s3-hunter-pc|cfg-e8bbec46|l_bracket_s2_c2|0",
+    "advisor-batch-3-s4-hunter-pc|cfg-11fef61e|l_bracket_s0_c0|0",
+    "advisor-batch-3-s4-hunter-pc|cfg-11fef61e|l_bracket_s2_c0|0",
+    "advisor-batch-3-s4-hunter-pc|cfg-5ff72b2a|l_bracket_s0_c0|0",
+    "advisor-batch-3-s4-hunter-pc|cfg-5ff72b2a|l_bracket_s2_c0|0",
+    "advisor-batch-3-s5-hunter-pc|cfg-6b320550|channel_s0_c1|0",
+    "advisor-batch-3-s5-hunter-pc|cfg-6b320550|l_bracket_s0_c0|0",
+    "advisor-batch-3-s5-hunter-pc|cfg-6b320550|l_bracket_s0_c1|0",
+    "advisor-batch-3-s5-hunter-pc|cfg-6b320550|l_bracket_s2_c0|0",
+    "advisor-batch-3-s5-hunter-pc|cfg-6b320550|l_bracket_s2_c1|0",
+    "advisor-batch-3-s5-hunter-pc|cfg-6b320550|l_bracket_s2_c2|0",
+    "advisor-batch-3-s5-hunter-pc|cfg-d91fb0f4|channel_s0_c1|0",
+    "advisor-batch-3-s5-hunter-pc|cfg-d91fb0f4|channel_s0_c2|0",
+    "advisor-batch-3-s5-hunter-pc|cfg-d91fb0f4|l_bracket_s0_c0|0",
+    "advisor-batch-3-s5-hunter-pc|cfg-d91fb0f4|l_bracket_s0_c1|0",
+    "advisor-batch-3-s5-hunter-pc|cfg-d91fb0f4|l_bracket_s2_c1|0",
+    "advisor-batch-4-s0-hunter-pc|cfg-99ed644e|channel_s0_c0|0",
+    "advisor-batch-4-s0-hunter-pc|cfg-99ed644e|channel_s0_c1|0",
+    "advisor-batch-4-s0-hunter-pc|cfg-99ed644e|channel_s0_c2|0",
+    "advisor-batch-4-s0-hunter-pc|cfg-99ed644e|channel_s2_c0|0",
+    "advisor-batch-4-s0-hunter-pc|cfg-99ed644e|channel_s2_c2|0",
+    "advisor-batch-4-s0-hunter-pc|cfg-99ed644e|l_bracket_s0_c0|0",
+    "advisor-batch-4-s0-hunter-pc|cfg-99ed644e|l_bracket_s0_c1|0",
+    "advisor-batch-4-s0-hunter-pc|cfg-99ed644e|l_bracket_s0_c2|0",
+    "advisor-batch-4-s0-hunter-pc|cfg-99ed644e|l_bracket_s2_c0|0",
+    "advisor-batch-4-s0-hunter-pc|cfg-99ed644e|l_bracket_s2_c1|0",
+    "advisor-batch-4-s0-hunter-pc|cfg-99ed644e|l_bracket_s2_c2|0",
+    "advisor-batch-4-s0-hunter-pc|cfg-99ed644e|plate_notch_s0_c1|0",
+    "advisor-batch-4-s0-hunter-pc|cfg-99ed644e|plate_notch_s2_c0|0",
+    "advisor-batch-4-s0-hunter-pc|cfg-99ed644e|plate_notch_s2_c2|0",
+    "advisor-batch-4-s0-hunter-pc|cfg-99ed644e|sphere_box_s0_c1|0",
+    "advisor-batch-4-s0-hunter-pc|cfg-99ed644e|sphere_box_s2_c0|0",
+    "advisor-batch-4-s0-hunter-pc|cfg-99ed644e|sphere_box_s2_c1|0",
+    "advisor-batch-4-s0-hunter-pc|cfg-99ed644e|sphere_box_s2_c2|0",
+    "advisor-batch-4-s0-hunter-pc|cfg-99ed644e|stepped_shaft_s0_c0|0",
+    "advisor-batch-4-s0-hunter-pc|cfg-99ed644e|stepped_shaft_s0_c2|0",
+    "advisor-batch-4-s0-hunter-pc|cfg-99ed644e|stepped_shaft_s2_c0|0",
+    "advisor-batch-4-s0-hunter-pc|cfg-99ed644e|stepped_shaft_s2_c2|0",
+    "advisor-batch-4-s1-hunter-pc|cfg-821713a4|channel_s0_c0|0",
+    "advisor-batch-4-s1-hunter-pc|cfg-821713a4|channel_s0_c1|0",
+    "advisor-batch-4-s1-hunter-pc|cfg-821713a4|channel_s0_c2|0",
+    "advisor-batch-4-s1-hunter-pc|cfg-821713a4|l_bracket_s0_c0|0",
+    "advisor-batch-4-s1-hunter-pc|cfg-821713a4|l_bracket_s0_c1|0",
+    "advisor-batch-4-s1-hunter-pc|cfg-821713a4|l_bracket_s0_c2|0",
+    "advisor-batch-4-s1-hunter-pc|cfg-821713a4|l_bracket_s2_c0|0",
+    "advisor-batch-4-s1-hunter-pc|cfg-821713a4|l_bracket_s2_c1|0",
+    "advisor-batch-4-s1-hunter-pc|cfg-821713a4|l_bracket_s2_c2|0",
+    "advisor-batch-4-s1-hunter-pc|cfg-821713a4|plate_notch_s0_c0|0",
+    "advisor-batch-4-s1-hunter-pc|cfg-821713a4|plate_notch_s0_c1|0",
+    "advisor-batch-4-s1-hunter-pc|cfg-821713a4|plate_notch_s0_c2|0",
+    "advisor-batch-4-s1-hunter-pc|cfg-821713a4|plate_notch_s2_c0|0",
+    "advisor-batch-4-s1-hunter-pc|cfg-821713a4|plate_notch_s2_c1|0",
+    "advisor-batch-4-s1-hunter-pc|cfg-821713a4|plate_notch_s2_c2|0",
+    "advisor-batch-4-s1-hunter-pc|cfg-821713a4|sphere_box_s0_c2|0",
+    "advisor-batch-4-s1-hunter-pc|cfg-821713a4|stepped_shaft_s2_c0|0",
+    "advisor-batch-4-s1-hunter-pc|cfg-821713a4|stepped_shaft_s2_c2|0"
+  ],
+  "runs": [
+    {
+      "run": 1,
+      "pruned": 276,
+      "per_head": {
+        "rel_err": 100,
+        "rel_err_rel": 100,
+        "geo_chamfer": 111,
+        "geo_p99": 111
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": false
+    },
+    {
+      "run": 2,
+      "pruned": 248,
+      "per_head": {
+        "rel_err": 86,
+        "rel_err_rel": 86,
+        "geo_chamfer": 97,
+        "geo_p99": 97
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": false
+    },
+    {
+      "run": 3,
+      "pruned": 93,
+      "per_head": {
+        "rel_err": 49,
+        "rel_err_rel": 39,
+        "geo_chamfer": 23,
+        "geo_p99": 43
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 4,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 5,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 6,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 7,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 8,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 9,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 10,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 11,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 12,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 13,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 14,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 15,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 16,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 17,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 18,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 19,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 20,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 21,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 22,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 23,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 24,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 25,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 26,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 27,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 28,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 29,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 30,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 31,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 32,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 33,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 34,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 35,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 36,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 37,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 38,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 39,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 40,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 41,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 42,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 43,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 44,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 45,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 46,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 47,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 48,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 49,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 50,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 51,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 52,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 53,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 54,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 55,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 56,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 57,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 58,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 59,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 60,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 61,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 62,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 63,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 64,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 65,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 66,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 67,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 68,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 69,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 70,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 71,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 72,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 73,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 74,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 75,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 76,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 77,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 78,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 79,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 80,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 81,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 82,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 83,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 84,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 85,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 86,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 87,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 88,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 89,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 90,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 91,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 92,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 93,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 94,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 95,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 96,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 97,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 98,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 99,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 100,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 101,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 102,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 103,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 104,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 105,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 106,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 107,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 108,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 109,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 110,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 111,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 112,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 113,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 114,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 115,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 116,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 117,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 118,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 119,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 120,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 121,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 122,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 123,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 124,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 125,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 126,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 127,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 128,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 129,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 130,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 131,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 132,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 133,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 134,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 135,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 136,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 137,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 138,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 139,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 140,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 141,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 142,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 143,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 144,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 145,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 146,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 147,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 148,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 149,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    },
+    {
+      "run": 150,
+      "pruned": 0,
+      "per_head": {
+        "rel_err": 0,
+        "rel_err_rel": 0,
+        "geo_chamfer": 0,
+        "geo_p99": 0
+      },
+      "fraction": 0.05,
+      "ceiling": 617,
+      "cap_reached": true
+    }
+  ]
+}

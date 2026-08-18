@@ -1,5 +1,5 @@
 
-=== 2026-08-17T18:39:08Z OMP_NUM_THREADS=2 :: /home/hunter/Desktop/Polyhedral-FEA/build/apps/testlab/polymesh_testlab resume /home/hunter/Desktop/Polyhedral-FEA/bench/campaigns/advisor-batch-4-s0-hunter-pc
+=== 2026-08-18T03:19:12Z OMP_NUM_THREADS=2 :: /home/hunter/Desktop/Polyhedral-FEA/build/apps/testlab/polymesh_testlab resume /home/hunter/Desktop/Polyhedral-FEA/bench/campaigns/advisor-batch-4-s0-hunter-pc
 campaign advisor-batch-4-s0-hunter-pc: 2 configs, 36 parts, 1 tiers
   max_run_wall_s=180 (override all tiers)
   max_pack_wall_s=21600
@@ -78,4 +78,4 @@ wrote bench/campaigns/advisor-batch-4-s0-hunter-pc/runs/cfg-99ed644e/stepped_sha
 wrote bench/campaigns/advisor-batch-4-s0-hunter-pc/runs/cfg-99ed644e/stepped_shaft_s2_c2/t0/wire.png
 warehouse_shots: 36 rendered, 0 skipped (exists), 0 failed (36 mesh.vtu total)
 finished: 36 runs → /home/hunter/Desktop/Polyhedral-FEA/bench/campaigns/advisor-batch-4-s0-hunter-pc/results.jsonl
-=== exit 0 after 229.5s
+=== exit 0 after 417.9s

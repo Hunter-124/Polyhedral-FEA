@@ -76,10 +76,10 @@ python scripts/render_showcase.py --only cantilever
 
 ![cylinder](assets/showcase/gallery_cylinder.png)
 
-Curved-wall solid imported from STEP. Curvature-driven sizing refines the
-cylindrical face while the bulk stays coarse; the exported display skin uses
-projected quadratic mids while the solve stays linear. h = 12 mm, 8,908 nodes /
-42,768 elements, 26,724 solved DOF.
+Curved-wall solid imported from STEP. Curvature-dominant sizing uses a 0.5×
+accuracy lattice, then the **authoritative solve mesh** is promoted to
+tet10/hex20 and its boundary mids are projected onto the exact BRep. The same
+curved volume elements are assembled, exported, and rendered.
 
 ```sh
 python scripts/render_showcase.py --only cylinder
@@ -89,10 +89,10 @@ python scripts/render_showcase.py --only cylinder
 
 ![sphere](assets/showcase/gallery_sphere.png)
 
-Closed curved B-rep — the hardest case for a Cartesian grid fill. The
-feature-graded linear solve mesh remains authoritative, while the rendered
-display copy promotes and projects its boundary mids onto the BRep. h = 8 mm,
-5,045 solved nodes / 23,892 elements, 15,135 solved DOF.
+Closed curved B-rep — the hardest case for a Cartesian grid fill. The shipped
+mesh is no longer a linear solve hidden behind a smoothed render: graded
+boundary topology, projected tet10 geometry, stiffness assembly, VTU export and
+Studio all consume the same authoritative node set.
 
 ```sh
 python scripts/render_showcase.py --only sphere
@@ -101,11 +101,10 @@ python scripts/render_showcase.py --only sphere
 ### `gallery_icecream_cone.png`
 
 ![icecream_cone](assets/showcase/gallery_icecream_cone.png)
-
 One watertight 3D Boolean solid: a round truncated cone fused into an
-overlapping spherical scoop. The committed STEP is reloaded through
-OpenCASCADE, meshed at h = 10 mm, and solved with a conserved downward
-resultant on the scoop: 3,535 solved nodes / 16,143 elements, 10,605 solved DOF.
+overlapping spherical scoop. Sharp CAD-edge paths are recovered through the
+boundary graph under the same cell-quality/Jacobian gate, and the projected
+quadratic volume mesh is solved directly.
 
 ```sh
 python scripts/render_showcase.py --only icecream_cone
@@ -308,28 +307,31 @@ reverts wholesale otherwise, which is why the experimental packed-poly mesher,
 whose cells are already degenerate at ~1e-14, comes out at exactly its previous
 numbers instead of slightly worse.
 
-Two meshing limits stay on the page because they remain true; the display-only
-chordal limit is now closed. The **uniform** Cartesian tet fill is bounded by
-the cell-shape floor rather than by the projector: placing one straggler on its
-exact target drives incident cells to quality −0.05, so the snap stops at the
-floor and every such part ships `quality_min = 0.0200` exactly. The proposed
-per-level LEB sequence is already the graded algorithm — pre-snap, project each
-new free midpoint, then snap the complete shell — and its uniform-path
-experiment reached sphere p99 0.032 h only by creating 94 sub-floor cells
-([ADR-0035 §6](decisions/0035-boundary-conformity.md)).
+The old display-only workaround is gone. CAD-backed product paths now ship and
+solve the curved mesh itself:
 
-The graded path still carries needle facets at 2:1 transitions. Hybrid avoids
-them with quad/pyramid transitions and varyhedron builds a different restricted
-Voronoi skin; neither contains a tet-shell operation that can be ported. A real
-fix requires coupled 2↔3 or 3↔2 volume-tet flips, not a surface-only
-re-triangulation that disagrees with the emitted elements.
+- Curvature-dominant BReps use a **0.5× authoritative accuracy lattice**.
+- Pyramid transition cells are split with the same conformity-safe diagonal
+  used by assembly, then every tet4/hex8 is promoted to tet10/hex20.
+- Boundary mids are projected onto exact BRep faces; boundary-graph paths along
+  sharp CAD edges are pinned as coupled endpoint moves with local interior-star
+  optimisation.
+- Every accepted corner, edge and midpoint move must retain
+  `quality ≥ 0.02` and positive sampled Jacobians. Invalid combined midpoint
+  moves are rolled back and trigger local h-refinement rather than shipping a
+  malformed cell.
+- Studio tessellates the actual isoparametric faces at eight subdivisions and
+  interpolates solved fields with the same shape weights. That rendering is a
+  faithful sampling of the solved tet10/hex20 geometry, not a substitute mesh.
 
-For display/export, the h²κ/8 chordal floor is removed without changing solved
-DOF, BCs, loads, quality or advisor labels: a copy of the authoritative linear
-mesh is promoted to quadratic, its free boundary mids are projected through the
-owner-stable BRep oracle, and linear result fields are interpolated onto those
-display-only mids. On the sphere at h = 8 mm the rendered facet-normal
-deviation is mean 0.66°, p99 2.19°, max 3.28°.
+At requested h = 8 mm, the product graded path now measures p99 surface-to-BRep
+error over bbox diagonal of **7.12e-6 sphere**, **5.50e-5 cone**,
+**5.66e-6 cylinder**, and **4.83e-5 plate-with-hole**: every rounded corpus part
+is inside the 1e-4 (99.99%) target. Their tet10 `quality_min` values are
+0.02542, 0.02460, 0.03250, and 0.02008 respectively, with zero inverted or
+sub-floor cells. The cone's p99 facet-normal deviation is 2.59°; its 90°
+maximum is the mathematical cone apex/declared sharp BRep feature, not a smooth
+wall defect.
 
 ## Spectral sizing
 

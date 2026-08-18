@@ -346,6 +346,32 @@ The recovery pass is priced in the mesher note (`edge_pass=… ms`). Branch-and-
 bound worst-quality evaluation brought it from 22.7 s to 6.2 s on plate_hole at
 h = 6 mm, where the promotion itself costs a further 2.3 s.
 
+### Reproducing the curved-versus-chordal difference
+
+`polymesh render` rasterizes the *same* isoparametric surface Studio paints
+(`fea::tessellate_boundary_surface`), so the claim can be checked without a GPU
+or a window, and `--stats` measures each rendered facet normal against the exact
+BRep:
+
+```bash
+polymesh render tests/fixtures/parts/icecream_cone.step -h 0.012 \
+    -o cone_curved.png --stats cone_curved.json
+polymesh render tests/fixtures/parts/icecream_cone.step -h 0.012 --no-curved \
+    -o cone_chordal.png --stats cone_chordal.json
+```
+
+Both runs solve the identical 25 311-cell mesh; only the geometry order differs.
+Measured facet-normal deviation from the exact BRep (mean / p99):
+
+| part | curved | chordal (`--no-curved`) |
+|---|---|---|
+| sphere, h = 12 mm | 0.122° / 0.362° | 0.967° / 2.965° |
+| icecream cone, h = 12 mm | 0.438° / 5.195° | 1.816° / 7.711° |
+
+The cone's curved p99 is dominated by facets whose centroid sits on its apex
+vertex and rim, where the exact normal is discontinuous by construction; its
+85.1° maximum is that apex, not a smooth-wall defect.
+
 ## Spectral sizing
 
 The sizing field the meshers consume is FFT-filtered before it is used

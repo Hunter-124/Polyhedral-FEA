@@ -568,6 +568,48 @@ TEST_CASE("brep_fidelity: mesh-only preview is authoritative curved geometry",
     CHECK(preview->mesher_note.find("curved_volume promoted=") != std::string::npos);
 }
 
+// Auto sizing has to price curved geometry in, or "mesh only" on a rounded part
+// silently ships ~8× the cells and ~12× the DOF the interactive ceiling allows.
+TEST_CASE("brep_fidelity: auto h keeps curved geometry inside the DOF ceiling",
+          "[cad][fidelity][regression]") {
+    if (!polymesh::geom::occ_enabled()) {
+        SKIP("OpenCASCADE disabled");
+    }
+    const std::filesystem::path sphere = "tests/fixtures/parts/sphere.step";
+    if (!std::filesystem::exists(sphere)) {
+        SKIP("sphere.step missing");
+    }
+
+    const auto model = polymesh::pipeline::Model::load(sphere);
+    REQUIRE(model.cad);
+    polymesh::pipeline::SimSetup setup;
+    setup.mesh_size = 0.0; // auto
+    setup.mesher = polymesh::pipeline::VolumeMesher::kGradedTet;
+    setup.use_feature_grading = true;
+    setup.p_elevate = true;
+    setup.max_elems = 120'000;
+    setup.max_dof = 300'000;
+
+    polymesh::pipeline::SolveJob job;
+    job.start_mesh(model, setup);
+    std::optional<polymesh::pipeline::VolumeMeshOutput> preview;
+    for (int poll = 0; poll < 24'000; ++poll) {
+        preview = job.take_mesh();
+        if (preview) {
+            break;
+        }
+        if (job.state() == polymesh::pipeline::SolveJob::State::kFailed) {
+            FAIL(job.status_text());
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    REQUIRE(preview);
+    const auto counts = polymesh::fea::count_element_types(preview->mesh);
+    CHECK(counts.tet10 > 0);
+    CHECK(3 * preview->mesh.nodes.size() <= setup.max_dof);
+    CHECK(preview->mesh.elements.size() <= setup.max_elems);
+}
+
 // The local h/2 classifier creates live/void child faces that the old
 // parent-face-only boundary list did not send through snapping. Provenance made
 // the pre-fix split explicit (worst sampled valid h, p99/max, normalized by h):

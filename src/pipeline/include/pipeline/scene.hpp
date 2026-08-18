@@ -217,9 +217,15 @@ struct ResolvedMeshSize {
 };
 
 /// Single source of truth for default h0 (mesh-only, solve, CLI when -h omitted).
+/// `curved_geometry` and `cad_topology` price ADR-0035 curved CAD geometry into
+/// the auto budget: a curvature-dominated BRep is filled on the half-size
+/// lattice and promoted to tet10/hex20, so auto sizing must reserve ~8× cells
+/// and ~4.4 DOF per cell instead of 3.
 ResolvedMeshSize resolve_mesh_size(const Model& model, double requested_h,
                                    double sharp_angle_deg = 30.0,
-                                   std::size_t max_elems = 0, std::size_t max_dof = 0);
+                                   std::size_t max_elems = 0, std::size_t max_dof = 0,
+                                   bool curved_geometry = false,
+                                   const geom::CadTopology* cad_topology = nullptr);
 
 /// A boundary-condition / load selection region (world AABB) used to grade the
 /// mesh toward the **simulation setup**, not just the geometry (ADR-0021).

@@ -170,9 +170,35 @@ double predict_mesh_elements(const Model& model, double h) {
     return kElementsPerCell * bbox_volume / (h * h * h);
 }
 
+// Curved-geometry cost policy, shared by the mesher and the auto-h budget so
+// interactive sizing cannot be blown by a factor the resolver never saw.
+// A curvature-dominated BRep is meshed on a half-size lattice (8× the cells),
+// and tet10/hex20 promotion carries ~1.45 nodes per cell (measured on the
+// rounded corpus), i.e. ~4.4 DOF per cell instead of 3.
+constexpr double kCurvedAreaLatticeFraction = 0.25;
+constexpr double kCurvedLatticeScale = 0.5;
+constexpr double kCurvedLatticeElementFactor = 8.0;
+constexpr double kCurvedDofPerElement = 4.4;
+
+double cad_curved_area_fraction(const geom::CadTopology* topology) {
+    if (topology == nullptr || topology->faces.empty()) {
+        return 0.0;
+    }
+    double total_area = 0.0;
+    double curved_area = 0.0;
+    for (const auto& face : topology->faces) {
+        total_area += face.area;
+        if (face.kind != geom::CadSurfaceKind::kPlane) {
+            curved_area += face.area;
+        }
+    }
+    return total_area > 0.0 ? curved_area / total_area : 0.0;
+}
+
 ResolvedMeshSize resolve_mesh_size(const Model& model, double requested_h,
                                    double sharp_angle_deg, std::size_t max_elems,
-                                   std::size_t max_dof) {
+                                   std::size_t max_dof, bool curved_geometry,
+                                   const geom::CadTopology* cad_topology) {
     ResolvedMeshSize out;
     out.element_ceiling = max_elems == 0 ? kDefaultMaxMeshElems : max_elems;
     out.dof_ceiling = max_dof == 0 ? kDefaultMaxMeshDof : max_dof;
@@ -322,8 +348,24 @@ ResolvedMeshSize resolve_mesh_size(const Model& model, double requested_h,
     // amplification. Measured public hybrid auto meshes reach ~3.1× N_pred;
     // use 4× headroom so the ceiling binds before fill rather than after it.
     constexpr double kAutoPredictionSafety = 4.0;
-    const std::size_t dof_elem_ceiling = std::max<std::size_t>(1, out.dof_ceiling / 3);
-    const std::size_t effective_elem_ceiling = std::min(out.element_ceiling, dof_elem_ceiling);
+    // Curved CAD geometry costs more per requested h: a curvature-dominated
+    // BRep is filled on the half-size lattice and every cell carries mid-edge
+    // nodes. Auto sizing has to spend that up front or the interactive ceiling
+    // is exceeded by ~8× cells and ~12× DOF after the fact.
+    const double lattice_factor =
+        curved_geometry && cad_curved_area_fraction(cad_topology) >=
+                               kCurvedAreaLatticeFraction
+            ? kCurvedLatticeElementFactor
+            : 1.0;
+    const double dof_per_element = curved_geometry ? kCurvedDofPerElement : 3.0;
+    const std::size_t dof_elem_ceiling = std::max<std::size_t>(
+        1, static_cast<std::size_t>(static_cast<double>(out.dof_ceiling) /
+                                    (dof_per_element * lattice_factor)));
+    const std::size_t elem_ceiling_scaled = std::max<std::size_t>(
+        1, static_cast<std::size_t>(static_cast<double>(out.element_ceiling) /
+                                    lattice_factor));
+    const std::size_t effective_elem_ceiling =
+        std::min(elem_ceiling_scaled, dof_elem_ceiling);
     const Eigen::Vector3d positive_extent = extent_vec.cwiseMax(0.0);
     const double bbox_volume =
         std::max(positive_extent[0] * positive_extent[1] * positive_extent[2], 0.0);
@@ -344,7 +386,7 @@ ResolvedMeshSize resolve_mesh_size(const Model& model, double requested_h,
         std::isfinite(cad_min_edge) ? std::format(", CAD_edge≈{:.3g}", cad_min_edge)
                                     : std::string{});
     if (out.ceiling_clamped) {
-        if (effective_elem_ceiling == out.element_ceiling) {
+        if (effective_elem_ceiling == elem_ceiling_scaled) {
             out.note = std::format(
                 "auto h clamped from {:.4g} to {:.4g} m (element ceiling {}) | "
                 "predicted {:.0f} elems ({})",
@@ -3844,22 +3886,10 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
     } else if (mesher == VolumeMesher::kGradedTet) {
         std::vector<geom::SharpEdge> edges;
         double graded_h = h;
-        double curved_area_fraction = 0.0;
-        if (cad_topology != nullptr && !cad_topology->faces.empty()) {
-            double total_area = 0.0;
-            double curved_area = 0.0;
-            for (const auto& face : cad_topology->faces) {
-                total_area += face.area;
-                if (face.kind != geom::CadSurfaceKind::kPlane) {
-                    curved_area += face.area;
-                }
-            }
-            if (total_area > 0.0) {
-                curved_area_fraction = curved_area / total_area;
-            }
-            if (curved_area_fraction >= 0.25) {
-                graded_h = 0.5 * h;
-            }
+        const double curved_area_fraction =
+            cad_curved_area_fraction(cad_topology ? cad_topology.get() : nullptr);
+        if (curved_area_fraction >= kCurvedAreaLatticeFraction) {
+            graded_h = kCurvedLatticeScale * h;
         }
         double feature_band = 0.0;
         // Caller a-posteriori adapt seeds keep ball semantics; curvature is now
@@ -5282,8 +5312,19 @@ void SolveJob::start_mesh(const Model& model, const SimSetup& setup) {
             // sharp corners for uniform meshers — that forced h→h_min on every
             // CAD box and ~8× DOF, which freezes interactive "mesh only".
             // Feature grading is applied as feature_refine (graded skin / bands).
-            const auto resolved = resolve_mesh_size(model, setup.mesh_size, 30.0,
-                                                    setup.max_elems, setup.max_dof);
+            const bool curved_geometry =
+                setup.p_elevate && model.cad && !model.cad->empty();
+            std::optional<geom::CadTopology> auto_topology;
+            if (curved_geometry) {
+                try {
+                    auto_topology = geom::extract_topology(*model.cad);
+                } catch (...) {
+                    auto_topology.reset();
+                }
+            }
+            const auto resolved = resolve_mesh_size(
+                model, setup.mesh_size, 30.0, setup.max_elems, setup.max_dof,
+                curved_geometry, auto_topology ? &*auto_topology : nullptr);
             const double h = resolved.h;
             report("mesh", 0.15, std::format("meshing… ({}, h={:.4g} m)", resolved.note, h));
             checkpoint();
@@ -5414,8 +5455,19 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
         try {
             // Global h from D5 only (same as start_mesh). Feature grading is
             // feature_refine on graded fills — not global h→h_min at corners.
-            const auto resolved = resolve_mesh_size(model, setup.mesh_size, 30.0,
-                                                    setup.max_elems, setup.max_dof);
+            const bool curved_geometry =
+                setup.p_elevate && model.cad && !model.cad->empty();
+            std::optional<geom::CadTopology> auto_topology;
+            if (curved_geometry) {
+                try {
+                    auto_topology = geom::extract_topology(*model.cad);
+                } catch (...) {
+                    auto_topology.reset();
+                }
+            }
+            const auto resolved = resolve_mesh_size(
+                model, setup.mesh_size, 30.0, setup.max_elems, setup.max_dof,
+                curved_geometry, auto_topology ? &*auto_topology : nullptr);
             const double h = resolved.h;
             double h_use = h;
             report("mesh", 0.15, std::format("meshing… ({}, h={:.4g} m)", resolved.note, h), 0,

@@ -173,12 +173,17 @@ double predict_mesh_elements(const Model& model, double h) {
 // Curved-geometry cost policy, shared by the mesher and the auto-h budget so
 // interactive sizing cannot be blown by a factor the resolver never saw.
 // A curvature-dominated BRep is meshed on a half-size lattice (8× the cells),
-// and tet10/hex20 promotion carries ~1.45 nodes per cell (measured on the
-// rounded corpus), i.e. ~4.4 DOF per cell instead of 3.
+// and tet10/hex20 promotion carries mid-edge nodes, i.e. well over 3 DOF per
+// element. Measured 3·nodes/elements at auto h on the current fixtures:
+//   sphere 4.44, icecream_cone 4.41, cylinder 4.36, plate_hole 4.51,
+//   cantilever 4.47
+// so 4.6 keeps the worst measured case inside the ceiling with ~2% margin. It
+// must stay above the measured maximum: the resolver only gets one shot before
+// the fill runs, and 4.4 let the sphere ship 1.9% over an interactive DOF cap.
 constexpr double kCurvedAreaLatticeFraction = 0.25;
 constexpr double kCurvedLatticeScale = 0.5;
 constexpr double kCurvedLatticeElementFactor = 8.0;
-constexpr double kCurvedDofPerElement = 4.4;
+constexpr double kCurvedDofPerElement = 4.6;
 
 double cad_curved_area_fraction(const geom::CadTopology* topology) {
     if (topology == nullptr || topology->faces.empty()) {
@@ -615,6 +620,14 @@ namespace {
 /// side `cell`. Preserves the size field (where the mesh must be fine) while
 /// capping seed count, so the gradient limiter and ball-grading meshers do not
 /// choke on ~1 seed per surface vertex (tens of thousands on a real CAD part).
+///
+/// Buckets are anchored on the source set's own bbox centre, not on world zero.
+/// A world-anchored lattice puts an arbitrary cell wall somewhere in the part, so
+/// a source and its exact mirror can fall in cells of different widths relative
+/// to the symmetry plane and one of the pair survives decimation alone. The
+/// centre-anchored partition maps onto itself under reflection about any bbox
+/// mid-plane, and min-h is commutative, so the surviving set is mirror-symmetric
+/// whenever the input is.
 std::vector<adapt::SizeSource> decimate_sources(std::vector<adapt::SizeSource> src,
                                                 double cell) {
     if (!(cell > 0.0) || src.size() < 2) {
@@ -632,13 +645,21 @@ std::vector<adapt::SizeSource> decimate_sources(std::vector<adapt::SizeSource> s
             return h;
         }
     };
+    Eigen::Vector3d lo = src.front().x;
+    Eigen::Vector3d hi = src.front().x;
+    for (const auto& s : src) {
+        lo = lo.cwiseMin(s.x);
+        hi = hi.cwiseMax(s.x);
+    }
+    const Eigen::Vector3d anchor = 0.5 * (lo + hi);
     std::unordered_map<Key, std::size_t, KeyHash> best;
     best.reserve(src.size());
     const double inv = 1.0 / cell;
     for (std::size_t i = 0; i < src.size(); ++i) {
-        const Key k{static_cast<long>(std::floor(src[i].x.x() * inv)),
-                    static_cast<long>(std::floor(src[i].x.y() * inv)),
-                    static_cast<long>(std::floor(src[i].x.z() * inv))};
+        const Eigen::Vector3d d = (src[i].x - anchor) * inv;
+        const Key k{static_cast<long>(std::floor(d.x())),
+                    static_cast<long>(std::floor(d.y())),
+                    static_cast<long>(std::floor(d.z()))};
         auto [it, inserted] = best.try_emplace(k, i);
         if (!inserted && src[i].h < src[it->second].h) {
             it->second = i;

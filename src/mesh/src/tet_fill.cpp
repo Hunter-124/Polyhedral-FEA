@@ -3,6 +3,7 @@
 
 #include "mesh/cell_validity.hpp"
 #include "mesh/grid_classify.hpp"
+#include "mesh/lattice_split.hpp"
 #include "mesh/surface_project.hpp"
 
 #include <Eigen/Geometry>
@@ -300,7 +301,9 @@ TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
                                const Eigen::Vector3d& bbox_min,
                                const Eigen::Vector3d& bbox_max, double h, bool snap_boundary,
                                const BoundaryFit* fit) {
-    const CartesianGrid grid = make_bbox_grid(bbox_min, bbox_max, h);
+    // Even cell counts per axis: the alternating split below only mirrors about
+    // a bbox mid-plane when the count crossed by that plane is even.
+    const CartesianGrid grid = make_bbox_grid_even(bbox_min, bbox_max, h);
     const auto inside = classify_cells_inside(surface, grid);
     const int nx = grid.nx, ny = grid.ny, nz = grid.nz;
 
@@ -338,15 +341,7 @@ TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
                     node_at(i, j + 1, k + 1),
                 }};
 
-                static constexpr std::array<std::array<int, 4>, 6> tets{{
-                    {{0, 1, 2, 6}},
-                    {{0, 2, 3, 6}},
-                    {{0, 1, 5, 6}},
-                    {{0, 3, 7, 6}},
-                    {{0, 4, 5, 6}},
-                    {{0, 4, 7, 6}},
-                }};
-                for (const auto& t : tets) {
+                for (const auto& t : kLatticeTetsKuhn[lattice_cell_variant(i, j, k)]) {
                     std::array<std::uint32_t, 4> n{{c[static_cast<std::size_t>(t[0])],
                                                     c[static_cast<std::size_t>(t[1])],
                                                     c[static_cast<std::size_t>(t[2])],

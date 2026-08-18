@@ -122,17 +122,19 @@ TEST_CASE("tet_fill unit box has no diagonal voids (ray parity)") {
         REQUIRE(mx[0] == Catch::Approx(1.0).margin(1e-12));
         REQUIRE(mx[1] == Catch::Approx(1.0).margin(1e-12));
         REQUIRE(mx[2] == Catch::Approx(1.0).margin(1e-12));
-        // Volume of Kuhn-split voxels ≈ box volume (all cells inside).
+        // Volume of the split voxels ≈ box volume (all cells inside).
         double vol = 0.0;
         for (const auto& n : fill.tets) {
             vol += tet_signed_volume(fill.nodes[n[0]], fill.nodes[n[1]], fill.nodes[n[2]],
                                      fill.nodes[n[3]]);
         }
         REQUIRE(vol == Catch::Approx(1.0).margin(1e-9));
-        // 6 tets per interior voxel; unit box must fill every voxel in the lattice.
+        // 6 tets per interior voxel (alternating Kuhn, mesh/lattice_split.hpp);
+        // the unit box must fill every voxel of the even-count lattice.
         REQUIRE(fill.tets.size() % 6 == 0);
         const auto n_vox = fill.tets.size() / 6;
-        const int nx = std::max(1, static_cast<int>(std::ceil(1.0 / h - 1e-14)));
+        int nx = std::max(1, static_cast<int>(std::ceil(1.0 / h - 1e-14)));
+        nx += nx % 2;
         REQUIRE(n_vox == static_cast<std::size_t>(nx) * nx * nx);
     }
 }

@@ -108,6 +108,44 @@ using NodeOffendsFn = std::function<bool(std::uint32_t node)>;
 /// off-surface outlier the fidelity metric reports (ADR-0035).
 using RelaxNeighborhoodFn = std::function<bool(std::uint32_t node)>;
 
+/// Reflection-equivariant ordering key for a point: the quantised distance from
+/// a mirror-invariant centre, per axis.
+///
+/// Every pass that moves, merges or deletes a cell after testing its incident
+/// star is order-dependent by construction — an earlier accepted decision
+/// decides whether a later one is legal. ADR-0032 made that order
+/// platform-independent by driving it from ascending node id or from a tet's
+/// index. Neither mirrors, so a cell and its mirror image saw different
+/// predecessor states and their accept/reject outcomes diverged. Measured on
+/// `cylinder.step` at h = 8 mm, whose tessellation is exactly mirror-symmetric:
+/// the sliver-collapse round dropped the mirrored-tet fraction from
+/// 99.83/100/100% to 98.35/96.91/98.97%, and the tangential smoothing pass then
+/// amplified that seed to 91.4/86.8/93.4%.
+///
+/// Distance from the centre is mirror-invariant, and quantising it to 1e-9 of the
+/// bbox diagonal makes a mirror pair key bit-identically — so comparing keys is
+/// equivariant, and a mirror pair is adjacent in any order derived from them
+/// (ADR-0036).
+struct MirrorKeyFrame {
+    Eigen::Vector3d center = Eigen::Vector3d::Zero();
+    double inv_quantum = 0.0;
+
+    [[nodiscard]] std::array<long long, 3> key(const Eigen::Vector3d& p) const {
+        const Eigen::Vector3d d = (p - center).cwiseAbs() * inv_quantum;
+        return {static_cast<long long>(d.x()), static_cast<long long>(d.y()),
+                static_cast<long long>(d.z())};
+    }
+};
+
+/// Frame spanning every node in `nodes` (an empty range yields a degenerate
+/// frame whose keys are all zero, which orders nothing and breaks nothing).
+MirrorKeyFrame mirror_key_frame(const std::vector<Eigen::Vector3d>& nodes);
+
+/// Sort `ids` by `MirrorKeyFrame::key`, node id as the final tie-break, using a
+/// frame spanning only the referenced nodes.
+void sort_mirror_canonical(const std::vector<Eigen::Vector3d>& nodes,
+                           std::vector<std::uint32_t>& ids);
+
 
 /// Pull boundary lattice nodes toward the STL in multi-pass steps, then unsnap
 /// any node that participates in an inverted element (B3 / ADR-0015).

@@ -324,14 +324,27 @@ solve the curved mesh itself:
   interpolates solved fields with the same shape weights. That rendering is a
   faithful sampling of the solved tet10/hex20 geometry, not a substitute mesh.
 
-At requested h = 8 mm, the product graded path now measures p99 surface-to-BRep
-error over bbox diagonal of **7.12e-6 sphere**, **5.50e-5 cone**,
+At requested h = 8 mm, the product graded path measures p99 surface-to-BRep
+error over bbox diagonal of **7.12e-6 sphere**, **5.71e-5 cone**,
 **5.66e-6 cylinder**, and **4.83e-5 plate-with-hole**: every rounded corpus part
-is inside the 1e-4 (99.99%) target. Their tet10 `quality_min` values are
-0.02542, 0.02460, 0.03250, and 0.02008 respectively, with zero inverted or
-sub-floor cells. The cone's p99 facet-normal deviation is 2.59°; its 90°
-maximum is the mathematical cone apex/declared sharp BRep feature, not a smooth
-wall defect.
+is inside the 1e-4 (99.99%) target. Their curved-cell `quality_min` values are
+0.02542, 0.02105, 0.03250 and 0.02110, with zero inverted and zero sub-floor
+cells, and relative volume errors of 3.1e-5, 5.9e-5, 2.1e-5 and 7.7e-6.
+Facet-normal p99 is 0.335° / 2.77° / 0.195° / 0.773°; the cone's 90° maximum is
+its declared BRep apex vertex, not a smooth-wall defect.
+
+Two honest residuals remain in the CAD → mesh **edge-coverage** direction, which
+asks how far a sampled sharp BRep edge is from the nearest classified mesh
+feature curve. Cone coverage p99 is 1.96e-4 of bbox, but cylinder is 1.83e-2 and
+plate-with-hole 5.73e-3. The mesh-side error is tiny in the other direction
+(4.95e-6 cylinder), so this is not chordal error: a handful of rim chords are
+missing from the traced polygon, and a single missing chord puts the rim samples
+in its middle at half a chord from the nearest classified curve. Rim tracing is
+about 97–99% complete, not 100%.
+
+The recovery pass is priced in the mesher note (`edge_pass=… ms`). Branch-and-
+bound worst-quality evaluation brought it from 22.7 s to 6.2 s on plate_hole at
+h = 6 mm, where the promotion itself costs a further 2.3 s.
 
 ## Spectral sizing
 

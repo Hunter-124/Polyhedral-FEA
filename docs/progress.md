@@ -242,26 +242,35 @@ the sphere and on the icecream cone* — and again the figures were right. Suite
   tet10/hex20; exact face and sharp-edge projections are accepted only above
   `quality = 0.02` with positive sampled Jacobians.
 - A boundary-graph sharp-edge pass now pins connected CAD-edge segments as
-  coupled endpoint moves. When that pin would consume the curved-cell reserve,
-  a deterministic local pattern search moves only the affected interior star;
-  the move is committed only when every touched cell clears the ship gates.
+  coupled endpoint moves. When the pin would push a touched cell under the
+  shared shape floor, a deterministic local pattern search moves only the
+  affected interior star; the move is committed only when every touched cell
+  clears the ship gates, otherwise the pin is abandoned.
 - Studio no longer draws four flat triangles as a proxy for each quadratic
   face. It evaluates the solved isoparametric surface at eight subdivisions and
   applies the same interpolation weights to displacement, von Mises,
   displacement magnitude and nodal η.
 - Graded h = 8 mm rounded corpus, actual solved mesh:
   sphere p99/bbox **7.12e-6**, qmin **0.02542**, normal p99 **0.335°**;
-  cone **5.50e-5**, **0.02460**, **2.59°**; cylinder **5.66e-6**,
-  **0.03250**, **0.195°**; plate-hole **4.83e-5**, **0.02008**,
-  **0.818°**. All four are below the **1e-4 / 99.99%** surface target,
+  cone **5.71e-5**, **0.02105**, **2.77°**; cylinder **5.66e-6**,
+  **0.03250**, **0.195°**; plate-hole **4.83e-5**, **0.02110**,
+  **0.773°**. All four are below the **1e-4 / 99.99%** surface target,
   with zero inverted and zero sub-floor cells.
 - Exact sharp-edge diagnostics now classify CAD-owned quadratic boundary edges
   and use exact OCC curve projection in the mesh→BRep direction instead of the
-  sampled-polyline distance floor. Cone CAD-edge coverage p99 is 23.6 μm at
-  h = 8 mm; all BRep vertices are exact.
+  sampled-polyline distance floor. Mesh→CAD edge error is 2.4e-4 (cone),
+  5.0e-6 (cylinder) and 1.6e-4 (plate-hole) of bbox. The reverse coverage
+  direction is the remaining gap: 2.0e-4 cone but 1.8e-2 cylinder and 5.7e-3
+  plate-hole, caused by a few untraced rim chords rather than chordal error.
+- The recovery pass is priced in the mesher note (`edge_pass=… ms`):
+  branch-and-bound worst-quality evaluation cut it from 22.7 s to 6.2 s on
+  plate_hole at h = 6 mm, and `--no-curved` ships the linear mesh for anyone who
+  needs the old cost.
 - Advisor labels changed because the product default, element order, DOF census
   and rounded-part mesh counts changed; generation-v7 archive/regeneration and
   retraining are required rather than reusing v6 labels.
+- Suite **433/436 green** (three expected skips: two OCC-disabled cases and the
+  CUDA parity case).
 
 **Spectral sizing + coarsening + budget advisor + CG equilibration (2026-08-16,
 ADR-0034):** one wave, four mechanisms, suite **432/432 green** (OCC on).

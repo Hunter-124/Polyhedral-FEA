@@ -98,12 +98,12 @@ Eigen::Vector3d polyline_point(const std::vector<Eigen::Vector3d>& samples,
 }
 
 } // namespace
-
-FeaturePinReport pin_feature_nodes(const geom::CadModel& cad, const geom::CadTopology& topo,
-                                   std::vector<Eigen::Vector3d>& nodes,
-                                   const std::vector<std::uint32_t>& boundary_nodes, double h,
-                                   const NodeOffendsFn& node_offends,
-                                   std::vector<BoundarySupport>* provenance) {
+FeaturePinReport pin_feature_nodes(
+    const geom::CadModel& cad, const geom::CadTopology& topo,
+    std::vector<Eigen::Vector3d>& nodes,
+    const std::vector<std::uint32_t>& boundary_nodes, double h,
+    const NodeOffendsFn& node_offends,
+    std::vector<BoundarySupport>* provenance) {
     FeaturePinReport report;
     if (boundary_nodes.empty() || topo.empty() || cad.empty() || !(h > 0.0) ||
         !std::isfinite(h)) {
@@ -180,6 +180,7 @@ FeaturePinReport pin_feature_nodes(const geom::CadModel& cad, const geom::CadTop
         if (!(stations.back() > 0.0)) {
             continue;
         }
+        bool used = false;
 
         struct Pinned {
             std::uint32_t node;
@@ -234,7 +235,7 @@ FeaturePinReport pin_feature_nodes(const geom::CadModel& cad, const geom::CadTop
             }
         }
 
-        bool used = false;
+
         for (const auto& pin : chain) {
             const Eigen::Vector3d seed = polyline_point(edge.samples, stations, pin.t);
             const auto exact = geom::project_point_on_edge(cad, edge.id, seed);

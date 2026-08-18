@@ -23,8 +23,8 @@ A one-line index of the same assets lives in
 ![Hero stress render](assets/showcase/hero.png)
 
 **`hero.png`** — `plate_hole` solved on the feature-graded mesher, shot from a
-low oblique angle across the whole plate (h = 3 mm, 36,104 nodes / 177,560
-elements, 108,312 DOF; min-x face fixed, conserved +x resultant on max-x).
+low oblique angle across the whole plate (h = 6 mm, 66,440 nodes / 43,907 curved
+cells, 199,320 DOF; min-x face fixed, conserved +x resultant on max-x).
 von Mises is shown on the surface with displacement warped ×5000. The colour
 range is 0 – 2.9 MPa, clipped at the 99th percentile of the visible surface
 field; the true peak nodal value is 3.12 MPa, at the clamped-face singularity.
@@ -53,7 +53,9 @@ solve` invocation per part is in the manifest too.
 
 Flat plate with a central hole — the canonical stress-riser benchmark geometry.
 Feature-aware grading concentrates elements around the hole where the gradient
-lives. h = 3 mm, 36,104 nodes / 177,560 elements, 108,312 DOF.
+lives. h = 6 mm, 43,907 curved cells, **199,320 solved DOF**, 257 s wall. h was
+3 mm while the shipped mesh was straight-edged; the exact curved boundary now
+renders a smoother hole at ~1/8 the cells.
 
 ```sh
 python scripts/render_showcase.py --only plate_hole
@@ -64,8 +66,9 @@ python scripts/render_showcase.py --only plate_hole
 ![cantilever](assets/showcase/gallery_cantilever.png)
 
 End-loaded cantilever: linear bending stress distribution, maximum at the
-clamped root. h = 30 mm, 8,761 nodes / 44,832 elements, 26,283 DOF. This is the
-geometry behind the Timoshenko tip-deflection verification (1.50% error,
+clamped root. h = 30 mm, 44,832 curved cells, **193,971 solved DOF**, 47 s wall.
+This is the geometry behind the Timoshenko tip-deflection verification (1.50%
+error,
 [bench/reports/p1-gate1-convergence.md](../bench/reports/p1-gate1-convergence.md)).
 
 ```sh
@@ -79,7 +82,8 @@ python scripts/render_showcase.py --only cantilever
 Curved-wall solid imported from STEP. Curvature-dominant sizing uses a 0.5×
 accuracy lattice, then the **authoritative solve mesh** is promoted to
 tet10/hex20 and its boundary mids are projected onto the exact BRep. The same
-curved volume elements are assembled, exported, and rendered.
+curved volume elements are assembled, exported, and rendered. h = 12 mm,
+**555,543 solved DOF**, 684 s wall.
 
 ```sh
 python scripts/render_showcase.py --only cylinder
@@ -92,7 +96,8 @@ python scripts/render_showcase.py --only cylinder
 Closed curved B-rep — the hardest case for a Cartesian grid fill. The shipped
 mesh is no longer a linear solve hidden behind a smoothed render: graded
 boundary topology, projected tet10 geometry, stiffness assembly, VTU export and
-Studio all consume the same authoritative node set.
+Studio all consume the same authoritative node set. h = 8 mm, **541,323 solved
+DOF**, 112 s wall.
 
 ```sh
 python scripts/render_showcase.py --only sphere
@@ -104,7 +109,8 @@ python scripts/render_showcase.py --only sphere
 One watertight 3D Boolean solid: a round truncated cone fused into an
 overlapping spherical scoop. Sharp CAD-edge paths are recovered through the
 boundary graph under the same cell-quality/Jacobian gate, and the projected
-quadratic volume mesh is solved directly.
+quadratic volume mesh is solved directly. h = 10 mm, **282,048 solved DOF**,
+84 s wall.
 
 ```sh
 python scripts/render_showcase.py --only icecream_cone
@@ -114,9 +120,9 @@ python scripts/render_showcase.py --only icecream_cone
 
 ![Mesher comparison](assets/showcase/compare_meshers.png)
 
-**`compare_meshers.png`** — the same plate at h = 3 mm through three meshers:
-`tet` (11,770 nodes / 53,760 cells), `graded` (36,122 / 177,663) and `hybrid`
-(113,174 / 329,542), whose finer run includes conforming transition cells.
+**`compare_meshers.png`** — the same plate at h = 6 mm through three meshers,
+all three now on curved CAD geometry: `tet` (35,940 DOF), `graded` (199,320) and
+`hybrid` (134,748), whose transition zoo carries conforming mixed cells.
 All four panels share one camera on a 60 mm window across the hole (6 hole
 radii): at whole-plate scale the three topologies read as identical grey
 sheets, and the cell zoo only becomes legible at the feature. The faceted rim
@@ -207,10 +213,11 @@ python scripts/render_showcase.py --only compare_meshers
 
 **`compare_grading.png`** — uniform (`--no-feature`, h = 3.8 mm) versus
 feature-graded sizing (h = 5.6 mm) on the same part and mesher, with `h` tuned
-so the two legs land on a **matched element budget**: 43,360 vs 44,110 cells,
-1.7% apart (26,994 vs 28,686 DOF — the grid quantizes too hard to hit equal DOF
-exactly, so the honest control is element count; both figures are printed in
-the tile footers and the manifest). The comparison is therefore about *where*
+so the two legs land on a **matched element budget**: 43,358 vs 44,268 cells,
+2.1% apart (194,112 vs 201,318 DOF on the curved geometry — the grid quantizes
+too hard to hit equal DOF exactly, so the honest control is element count; both
+figures are printed in the tile footers and the manifest).
+The comparison is therefore about *where*
 the elements went, not how many there are. Same principle as the Kirsch
 equal-DOF result, which had the
 finer control of a structured annular mesh: at an identical 648 free DOFs,

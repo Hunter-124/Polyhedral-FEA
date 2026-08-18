@@ -190,7 +190,11 @@ PARTS: list[Part] = [
         title="Plate with hole",
         step="plate_hole.step",
         mesher="graded",
-        h=0.003,
+        # h was 3 mm when the shipped mesh was straight-edged and only a fine
+        # lattice could round the hole. ADR-0035 puts the boundary on the exact
+        # BRep instead, so 6 mm now renders a smoother hole than 3 mm ever did —
+        # at ~1/8 the cells, which keeps this figure reproducible in minutes.
+        h=0.006,
         E=2.1e11,
         nu=0.3,
         view=(0.25, -0.60, 1.00),
@@ -320,13 +324,13 @@ CMP_VIEW = (0.15, -0.35, 1.00)
 CMP_UP = (0.0, 1.00, 0.35)
 CMP_SIZE = (1300, 1150)
 MESHER_TILES = [
-    MeshTile("cmp_tet", "tet  ·  Cartesian grid-fill tet4", "plate_hole", "tet", 0.003,
+    MeshTile("cmp_tet", "tet  ·  Cartesian grid-fill tet4", "plate_hole", "tet", 0.006,
              size=CMP_SIZE, view=CMP_VIEW, up=CMP_UP, focus=CMP_FOCUS, window=CMP_WINDOW),
-    MeshTile("cmp_graded", "graded  ·  feature-graded tet4", "plate_hole", "graded", 0.003,
+    MeshTile("cmp_graded", "graded  ·  feature-graded tet4", "plate_hole", "graded", 0.006,
              size=CMP_SIZE, view=CMP_VIEW, up=CMP_UP, focus=CMP_FOCUS, window=CMP_WINDOW),
     # At this part and h the hybrid path emits a mixed transition zoo, so the
     # label names the conforming transition cells rather than claiming all-hex.
-    MeshTile("cmp_hybrid", "hybrid  ·  hex bulk + transition cells", "plate_hole", "hybrid", 0.003,
+    MeshTile("cmp_hybrid", "hybrid  ·  hex bulk + transition cells", "plate_hole", "hybrid", 0.006,
              size=CMP_SIZE, view=CMP_VIEW, up=CMP_UP, focus=CMP_FOCUS, window=CMP_WINDOW),
 ]
 
@@ -345,6 +349,9 @@ GRADE_VIEW = (0.15, -0.35, 1.00)
 GRADE_UP = (0.0, 1.00, 0.35)
 GRADING_TILES = [
     MeshTile("grade_uniform", "uniform sizing field  (--no-feature)", "plate_hole",
+             # 3.8 mm against the graded leg's 5.6 mm is the matched-element-budget
+             # control this figure exists for; promotion adds no cells, so curved
+             # geometry does not change the pairing.
              "graded", 0.0038, no_feature=True, size=(GRADE_W, GRADE_H),
              view=GRADE_VIEW, up=GRADE_UP, focus=GRADE_FOCUS, window=GRADE_WINDOW),
     MeshTile("grade_feature", "feature-graded sizing field", "plate_hole",

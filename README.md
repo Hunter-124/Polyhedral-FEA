@@ -425,7 +425,7 @@ corruption on this toolchain; leave them off unless you re-verify with `ctest`.
 
 ### CLI
 
-`check` and `mesh` take CAD (`.step .stp .brep .brp`); `solve` also accepts
+`check`, `mesh`, `diag` and `render` take CAD (`.step .stp .brep .brp`); `solve` also accepts
 Gmsh `.msh`. Advisor features require CAD, so `--advisor` is rejected for
 `.msh`. Fixture: [`bench/geometries/public/unit_box.step`](bench/geometries/public/unit_box.step)
 (1 m axis-aligned box).
@@ -465,6 +465,13 @@ $CLI solve $BOX --load-box 0.99 -1 -1 2 2 2 --load-dir 0 -1 0 --traction 2e6 \
 # (hard-bounded reverse sampling), mesh quality, per-phase timings, and η.
 $CLI diag tests/fixtures/parts/pipe.step --json /tmp/pipe.json
 
+# Headless render: rasterize the exact same boundary tessellation the Studio
+# viewport paints — no GL, no window, no Xvfb. --stats adds a numeric report
+# whose normal_deviation_deg is the facet-normal angle to the exact B-rep, so
+# `--no-curved` visibly and measurably degrades it.
+$CLI render tests/fixtures/parts/sphere.step -h 0.02 -o /tmp/sphere.png \
+  --wireframe --stats /tmp/sphere.json
+
 # Runtime stack: e.g. "cpu | OpenMP 16 threads | Eigen serial (no nest)"
 $CLI backend
 ```
@@ -479,6 +486,20 @@ Other useful flags: `--skin n` (graded fine skin layers, default 2),
 (shape dial in [-1,+1]: hex ↔ fan hybrid ↔ poly VEM ↔ tet), `--p-elevate`
 (promote smooth tet4/hex8 → tet10/hex20; auto-on with `--adapt > 0`),
 `--bc-grade`, `-E` (Pa), `-nu`. Run `$CLI` with no args for full help.
+
+Render flags (`render`): `--subdiv N` (tessellation subdivisions per quadratic
+boundary face, default 8 — the value the Studio viewport uses), `--size WxH`
+(default `1200x900`), `--azimuth DEG` / `--elevation DEG` (orbit camera,
+defaults 35 / 25; the projection is orthographic, so a view is reproducible
+from those two numbers), `--wireframe` (overlay the tessellation triangle
+edges), and `--stats out.json`. The stats report carries node/element counts,
+the element-type census, triangle count, covered and silhouette pixel counts,
+and `normal_deviation_deg` — the mean/p99/max angle between each rendered
+facet normal and the exact B-rep normal at its centroid, labelled with the
+`normal_reference` actually used. On `tests/fixtures/parts/sphere.step` at
+`-h 0.02` the curved default measures p99 0.34°; the same run with
+`--no-curved` measures 2.72°, which is the chordal error the curved geometry
+removes.
 
 Spectral sizing (ADR-0034, on by default in the CLI; `--no-spectral` opts
 out): CAD-edge curvature is FFT-denoised before it emits chordal size

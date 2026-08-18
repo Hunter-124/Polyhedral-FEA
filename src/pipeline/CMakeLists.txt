@@ -4,6 +4,7 @@
 
 add_library(polymesh_pipeline
     src/scene.cpp
+    src/surface_render.cpp
 )
 add_library(polymesh::pipeline ALIAS polymesh_pipeline)
 target_include_directories(polymesh_pipeline PUBLIC include)

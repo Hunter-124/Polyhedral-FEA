@@ -1,5 +1,5 @@
 
-=== 2026-08-17T17:27:00Z OMP_NUM_THREADS=2 :: /home/hunter/Desktop/Polyhedral-FEA/build/apps/testlab/polymesh_testlab resume /home/hunter/Desktop/Polyhedral-FEA/bench/campaigns/advisor-batch-1-s1-hunter-pc
+=== 2026-08-18T02:17:43Z OMP_NUM_THREADS=2 :: /home/hunter/Desktop/Polyhedral-FEA/build/apps/testlab/polymesh_testlab resume /home/hunter/Desktop/Polyhedral-FEA/bench/campaigns/advisor-batch-1-s1-hunter-pc
 campaign advisor-batch-1-s1-hunter-pc: 288 configs, 6 parts, 1 tiers
   max_run_wall_s=45 (override all tiers)
   max_pack_wall_s=86400
@@ -294,6 +294,7 @@ tier 0: h_scale=1 keep_frac=1 survivors=48 max_run_wall_s=45
   run cfg-f8ee7aa5 part=icecream_cone tier=0 ...
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-0a41b06f/cantilever/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-0a41b06f/cylinder/t0/wire.png
+wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-0a41b06f/icecream_cone/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-0a41b06f/smoke_bar/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-0a41b06f/sphere/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-0d22c294/cantilever/t0/wire.png
@@ -305,7 +306,7 @@ wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-14ba4d4a/cantilever/
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-14ba4d4a/cylinder/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-14ba4d4a/smoke_bar/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-17f37a6f/cantilever/t0/wire.png
-wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-17f37a6f/cylinder/t0/wire.png
+wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-17f37a6f/icecream_cone/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-17f37a6f/smoke_bar/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-17f37a6f/sphere/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-211bf33c/cantilever/t0/wire.png
@@ -320,6 +321,7 @@ wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-21ce779f/smoke_bar/t
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-21ce779f/sphere/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-252b09d2/cantilever/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-252b09d2/cylinder/t0/wire.png
+wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-252b09d2/icecream_cone/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-252b09d2/smoke_bar/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-252b09d2/sphere/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-2ffee2de/cantilever/t0/wire.png
@@ -340,14 +342,17 @@ wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-39cb2fd6/smoke_bar/t
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-39cb2fd6/sphere/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-3bd04605/cantilever/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-3bd04605/cylinder/t0/wire.png
+wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-3bd04605/icecream_cone/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-3bd04605/smoke_bar/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-3bd04605/sphere/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-446dbbd2/cantilever/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-446dbbd2/cylinder/t0/wire.png
+wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-446dbbd2/icecream_cone/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-446dbbd2/smoke_bar/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-446dbbd2/sphere/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-4a1471ac/cantilever/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-4a1471ac/cylinder/t0/wire.png
+wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-4a1471ac/icecream_cone/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-4a1471ac/plate_hole/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-4a1471ac/smoke_bar/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-4a1471ac/sphere/t0/wire.png
@@ -358,6 +363,7 @@ wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-5dabcd4f/smoke_bar/t
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-5dabcd4f/sphere/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-5e153a03/cantilever/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-5e153a03/cylinder/t0/wire.png
+wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-5e153a03/icecream_cone/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-5e153a03/smoke_bar/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-5e153a03/sphere/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-69108570/cantilever/t0/wire.png
@@ -368,6 +374,7 @@ wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-749bfc42/cylinder/t0
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-749bfc42/smoke_bar/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-796c7b03/cantilever/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-796c7b03/cylinder/t0/wire.png
+wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-796c7b03/icecream_cone/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-796c7b03/smoke_bar/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-796c7b03/sphere/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-89a4d193/cantilever/t0/wire.png
@@ -383,6 +390,7 @@ wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-8ca3a281/smoke_bar/t
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-8ca3a281/sphere/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-8d06af20/cantilever/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-8d06af20/cylinder/t0/wire.png
+wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-8d06af20/icecream_cone/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-8d06af20/plate_hole/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-8d06af20/smoke_bar/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-8d06af20/sphere/t0/wire.png
@@ -402,6 +410,7 @@ wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-98a49495/smoke_bar/t
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-98a49495/sphere/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-a1189557/cantilever/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-a1189557/cylinder/t0/wire.png
+wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-a1189557/icecream_cone/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-a1189557/smoke_bar/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-a1189557/sphere/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-a77106d9/cantilever/t0/wire.png
@@ -442,24 +451,27 @@ wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-c32197ce/cylinder/t0
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-c32197ce/smoke_bar/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-c369ced2/cantilever/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-c369ced2/cylinder/t0/wire.png
+wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-c369ced2/icecream_cone/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-c369ced2/smoke_bar/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-c369ced2/sphere/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-c790df79/cantilever/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-c790df79/cylinder/t0/wire.png
+wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-c790df79/icecream_cone/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-c790df79/smoke_bar/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-c790df79/sphere/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-d066ccea/cantilever/t0/wire.png
-wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-d066ccea/cylinder/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-d066ccea/smoke_bar/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-d0e1553f/cantilever/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-d0e1553f/cylinder/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-d0e1553f/smoke_bar/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-d472fcd3/cantilever/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-d472fcd3/cylinder/t0/wire.png
+wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-d472fcd3/icecream_cone/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-d472fcd3/smoke_bar/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-d472fcd3/sphere/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-d51075cd/cantilever/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-d51075cd/cylinder/t0/wire.png
+wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-d51075cd/icecream_cone/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-d51075cd/plate_hole/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-d51075cd/smoke_bar/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-d51075cd/sphere/t0/wire.png
@@ -474,6 +486,7 @@ wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-dd7388cd/smoke_bar/t
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-dd7388cd/sphere/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-e2ac80d2/cantilever/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-e2ac80d2/cylinder/t0/wire.png
+wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-e2ac80d2/icecream_cone/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-e2ac80d2/smoke_bar/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-e2ac80d2/sphere/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-e3ed0a93/cantilever/t0/wire.png
@@ -487,13 +500,15 @@ wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-ea32b132/smoke_bar/t
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-ea32b132/sphere/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-f8ee7aa5/cantilever/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-f8ee7aa5/cylinder/t0/wire.png
+wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-f8ee7aa5/icecream_cone/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-f8ee7aa5/plate_hole/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-f8ee7aa5/smoke_bar/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-f8ee7aa5/sphere/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-fc9c396f/cantilever/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-fc9c396f/cylinder/t0/wire.png
+wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-fc9c396f/icecream_cone/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-fc9c396f/smoke_bar/t0/wire.png
 wrote bench/campaigns/advisor-batch-1-s1-hunter-pc/runs/cfg-fc9c396f/sphere/t0/wire.png
-warehouse_shots: 202 rendered, 0 skipped (exists), 0 failed (202 mesh.vtu total)
+warehouse_shots: 217 rendered, 0 skipped (exists), 0 failed (217 mesh.vtu total)
 finished: 288 runs → /home/hunter/Desktop/Polyhedral-FEA/bench/campaigns/advisor-batch-1-s1-hunter-pc/results.jsonl
-=== exit 0 after 235.0s
+=== exit 0 after 461.8s

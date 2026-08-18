@@ -1,7 +1,7 @@
 {
   "provenance": {
-    "git_revision": "ee1cd649af8ea8703c793d4ddd79d63addd7b016-dirty",
-    "created_utc": "2026-08-17T19:53:45Z",
+    "git_revision": "05dc94c9ccff298df1f3e2ee2da3430982f83224-dirty",
+    "created_utc": "2026-08-18T03:32:47Z",
     "python": "3.14.6",
     "numpy": "2.4.6",
     "torch": "2.12.1+cu129"

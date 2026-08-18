@@ -2,427 +2,8 @@
   "batches": [
     {
       "batch": 1,
-      "started": "2026-08-12T09:00:02Z",
-      "wall_s": 2261.8,
-      "pairs_total": 1536,
-      "dedup_hits": 0,
-      "launched": 1536,
-      "shards": [
-        {
-          "shard": 0,
-          "campaign": "advisor-batch-1-s0",
-          "wall_s": 1180.8,
-          "rows": 384,
-          "returncode": 0
-        },
-        {
-          "shard": 1,
-          "campaign": "advisor-batch-1-s1",
-          "wall_s": 1317.9,
-          "rows": 384,
-          "returncode": 0
-        },
-        {
-          "shard": 2,
-          "campaign": "advisor-batch-1-s2",
-          "wall_s": 2006.9,
-          "rows": 384,
-          "returncode": 0
-        },
-        {
-          "shard": 3,
-          "campaign": "advisor-batch-1-s3",
-          "wall_s": 2259.4,
-          "rows": 384,
-          "returncode": 0
-        }
-      ],
-      "rows_written": 1536,
-      "rows_per_s": 0.6791,
-      "mesh_ms_frac": 0.5397,
-      "mesh_cache_recommended": true
-    },
-    {
-      "batch": 2,
-      "started": "2026-08-12T09:42:04Z",
-      "wall_s": 1181.2,
-      "pairs_total": 2304,
-      "dedup_hits": 1536,
-      "launched": 768,
-      "shards": [
-        {
-          "shard": 0,
-          "campaign": "advisor-batch-2-s0",
-          "wall_s": 661.4,
-          "rows": 192,
-          "returncode": 0
-        },
-        {
-          "shard": 1,
-          "campaign": "advisor-batch-2-s1",
-          "wall_s": 723.0,
-          "rows": 192,
-          "returncode": 0
-        },
-        {
-          "shard": 2,
-          "campaign": "advisor-batch-2-s2",
-          "wall_s": 1042.0,
-          "rows": 192,
-          "returncode": 0
-        },
-        {
-          "shard": 3,
-          "campaign": "advisor-batch-2-s3",
-          "wall_s": 1163.2,
-          "rows": 192,
-          "returncode": 0
-        }
-      ],
-      "rows_written": 768,
-      "rows_per_s": 0.6502,
-      "mesh_ms_frac": 0.5551,
-      "mesh_cache_recommended": true
-    },
-    {
-      "batch": 3,
-      "started": "2026-08-12T10:07:53Z",
-      "wall_s": 537.8,
-      "pairs_total": 1152,
-      "dedup_hits": 0,
-      "launched": 1152,
-      "shards": [
-        {
-          "shard": 0,
-          "campaign": "advisor-batch-3-s0",
-          "wall_s": 533.9,
-          "rows": 288,
-          "returncode": 0
-        },
-        {
-          "shard": 1,
-          "campaign": "advisor-batch-3-s1",
-          "wall_s": 531.6,
-          "rows": 288,
-          "returncode": 0
-        },
-        {
-          "shard": 2,
-          "campaign": "advisor-batch-3-s2",
-          "wall_s": 535.2,
-          "rows": 288,
-          "returncode": 0
-        },
-        {
-          "shard": 3,
-          "campaign": "advisor-batch-3-s3",
-          "wall_s": 527.2,
-          "rows": 288,
-          "returncode": 0
-        }
-      ],
-      "rows_written": 1152,
-      "rows_per_s": 2.1421,
-      "mesh_ms_frac": 0.7337,
-      "mesh_cache_recommended": true
-    },
-    {
-      "batch": 3,
-      "started": "2026-08-12T10:18:05Z",
-      "wall_s": 2.4,
-      "pairs_total": 1152,
-      "dedup_hits": 1152,
-      "launched": 0,
-      "shards": [],
-      "rows_written": 0,
-      "rows_per_s": 0.0,
-      "mesh_ms_frac": 0.0,
-      "mesh_cache_recommended": false
-    },
-    {
-      "batch": 1,
-      "started": "2026-08-14T10:13:06Z",
-      "wall_s": 1053.3,
-      "pairs_total": 1728,
-      "dedup_hits": 0,
-      "launched": 1728,
-      "shards": [
-        {
-          "shard": 0,
-          "campaign": "advisor-batch-1-s0",
-          "wall_s": 646.7,
-          "rows": 432,
-          "returncode": 0
-        },
-        {
-          "shard": 1,
-          "campaign": "advisor-batch-1-s1",
-          "wall_s": 868.3,
-          "rows": 432,
-          "returncode": 0
-        },
-        {
-          "shard": 2,
-          "campaign": "advisor-batch-1-s2",
-          "wall_s": 733.2,
-          "rows": 432,
-          "returncode": 0
-        },
-        {
-          "shard": 3,
-          "campaign": "advisor-batch-1-s3",
-          "wall_s": 1050.7,
-          "rows": 432,
-          "returncode": 0
-        }
-      ],
-      "rows_written": 1728,
-      "rows_per_s": 1.6406,
-      "mesh_ms_frac": 0.4848,
-      "mesh_cache_recommended": true
-    },
-    {
-      "batch": 2,
-      "started": "2026-08-14T10:30:40Z",
-      "wall_s": 2989.4,
-      "pairs_total": 1152,
-      "dedup_hits": 0,
-      "launched": 1152,
-      "shards": [
-        {
-          "shard": 0,
-          "campaign": "advisor-batch-2-s0",
-          "wall_s": 839.3,
-          "rows": 288,
-          "returncode": 0
-        },
-        {
-          "shard": 1,
-          "campaign": "advisor-batch-2-s1",
-          "wall_s": 835.9,
-          "rows": 288,
-          "returncode": 0
-        },
-        {
-          "shard": 2,
-          "campaign": "advisor-batch-2-s2",
-          "wall_s": 2965.2,
-          "rows": 288,
-          "returncode": 0
-        },
-        {
-          "shard": 3,
-          "campaign": "advisor-batch-2-s3",
-          "wall_s": 2965.0,
-          "rows": 288,
-          "returncode": 0
-        }
-      ],
-      "rows_written": 1152,
-      "rows_per_s": 0.3854,
-      "mesh_ms_frac": 0.8246,
-      "mesh_cache_recommended": true
-    },
-    {
-      "batch": 3,
-      "started": "2026-08-14T11:20:30Z",
-      "wall_s": 5524.3,
-      "pairs_total": 576,
-      "dedup_hits": 0,
-      "launched": 576,
-      "shards": [
-        {
-          "shard": 0,
-          "campaign": "advisor-batch-3-s0",
-          "wall_s": 1291.2,
-          "rows": 144,
-          "returncode": 0
-        },
-        {
-          "shard": 1,
-          "campaign": "advisor-batch-3-s1",
-          "wall_s": 5521.9,
-          "rows": 144,
-          "returncode": 0
-        },
-        {
-          "shard": 2,
-          "campaign": "advisor-batch-3-s2",
-          "wall_s": 1275.0,
-          "rows": 144,
-          "returncode": 0
-        },
-        {
-          "shard": 3,
-          "campaign": "advisor-batch-3-s3",
-          "wall_s": 5474.7,
-          "rows": 144,
-          "returncode": 0
-        }
-      ],
-      "rows_written": 576,
-      "rows_per_s": 0.1043,
-      "mesh_ms_frac": 0.6329,
-      "mesh_cache_recommended": true
-    },
-    {
-      "batch": 4,
-      "started": "2026-08-14T12:52:36Z",
-      "wall_s": 2144.9,
-      "pairs_total": 72,
-      "dedup_hits": 0,
-      "launched": 72,
-      "shards": [
-        {
-          "shard": 0,
-          "campaign": "advisor-batch-4-s0",
-          "wall_s": 472.4,
-          "rows": 36,
-          "returncode": 0
-        },
-        {
-          "shard": 1,
-          "campaign": "advisor-batch-4-s1",
-          "wall_s": 2142.6,
-          "rows": 36,
-          "returncode": 0
-        }
-      ],
-      "rows_written": 72,
-      "rows_per_s": 0.0336,
-      "mesh_ms_frac": 0.3997,
-      "mesh_cache_recommended": true
-    },
-    {
-      "batch": 5,
-      "started": "2026-08-14T13:28:21Z",
-      "wall_s": 247.1,
-      "pairs_total": 144,
-      "dedup_hits": 0,
-      "launched": 144,
-      "shards": [
-        {
-          "shard": 0,
-          "campaign": "advisor-batch-5-s0",
-          "wall_s": 63.1,
-          "rows": 36,
-          "returncode": 0
-        },
-        {
-          "shard": 1,
-          "campaign": "advisor-batch-5-s1",
-          "wall_s": 63.4,
-          "rows": 36,
-          "returncode": 0
-        },
-        {
-          "shard": 2,
-          "campaign": "advisor-batch-5-s2",
-          "wall_s": 244.8,
-          "rows": 36,
-          "returncode": 0
-        },
-        {
-          "shard": 3,
-          "campaign": "advisor-batch-5-s3",
-          "wall_s": 240.8,
-          "rows": 36,
-          "returncode": 0
-        }
-      ],
-      "rows_written": 144,
-      "rows_per_s": 0.5827,
-      "mesh_ms_frac": 0.482,
-      "mesh_cache_recommended": true
-    },
-    {
-      "batch": 1,
-      "started": "2026-08-14T22:05:40Z",
-      "wall_s": 13.0,
-      "pairs_total": 288,
-      "dedup_hits": 0,
-      "launched": 288,
-      "shards": [
-        {
-          "shard": 0,
-          "campaign": "advisor-batch-1-s0-hunter-pc",
-          "wall_s": 8.1,
-          "rows": 72,
-          "returncode": 0
-        },
-        {
-          "shard": 1,
-          "campaign": "advisor-batch-1-s1-hunter-pc",
-          "wall_s": 10.0,
-          "rows": 72,
-          "returncode": 0
-        },
-        {
-          "shard": 2,
-          "campaign": "advisor-batch-1-s2-hunter-pc",
-          "wall_s": 9.7,
-          "rows": 72,
-          "returncode": 0
-        },
-        {
-          "shard": 3,
-          "campaign": "advisor-batch-1-s3-hunter-pc",
-          "wall_s": 12.1,
-          "rows": 72,
-          "returncode": 0
-        }
-      ],
-      "rows_written": 288,
-      "rows_per_s": 22.0977,
-      "mesh_ms_frac": 0.9097,
-      "mesh_cache_recommended": true
-    },
-    {
-      "batch": 1,
-      "started": "2026-08-14T22:05:53Z",
-      "wall_s": 28.2,
-      "pairs_total": 288,
-      "dedup_hits": 0,
-      "launched": 288,
-      "shards": [
-        {
-          "shard": 0,
-          "campaign": "advisor-batch-1-s0-hunter-pc",
-          "wall_s": 12.7,
-          "rows": 72,
-          "returncode": 0
-        },
-        {
-          "shard": 1,
-          "campaign": "advisor-batch-1-s1-hunter-pc",
-          "wall_s": 17.9,
-          "rows": 72,
-          "returncode": 0
-        },
-        {
-          "shard": 2,
-          "campaign": "advisor-batch-1-s2-hunter-pc",
-          "wall_s": 17.2,
-          "rows": 72,
-          "returncode": 0
-        },
-        {
-          "shard": 3,
-          "campaign": "advisor-batch-1-s3-hunter-pc",
-          "wall_s": 27.4,
-          "rows": 72,
-          "returncode": 0
-        }
-      ],
-      "rows_written": 288,
-      "rows_per_s": 10.2082,
-      "mesh_ms_frac": 0.5187,
-      "mesh_cache_recommended": true
-    },
-    {
-      "batch": 1,
-      "started": "2026-08-17T06:21:21Z",
-      "wall_s": 898.5,
+      "started": "2026-08-18T02:17:43Z",
+      "wall_s": 1337.3,
       "pairs_total": 1728,
       "dedup_hits": 0,
       "launched": 1728,
@@ -430,55 +11,55 @@
         {
           "shard": 0,
           "campaign": "advisor-batch-1-s0-hunter-pc",
-          "wall_s": 150.3,
+          "wall_s": 311.6,
           "rows": 288,
           "returncode": 0
         },
         {
           "shard": 1,
           "campaign": "advisor-batch-1-s1-hunter-pc",
-          "wall_s": 222.4,
+          "wall_s": 461.8,
           "rows": 288,
           "returncode": 0
         },
         {
           "shard": 2,
           "campaign": "advisor-batch-1-s2-hunter-pc",
-          "wall_s": 152.7,
+          "wall_s": 316.2,
           "rows": 288,
           "returncode": 0
         },
         {
           "shard": 3,
           "campaign": "advisor-batch-1-s3-hunter-pc",
-          "wall_s": 229.3,
+          "wall_s": 417.1,
           "rows": 288,
           "returncode": 0
         },
         {
           "shard": 4,
           "campaign": "advisor-batch-1-s4-hunter-pc",
-          "wall_s": 818.8,
+          "wall_s": 1219.6,
           "rows": 288,
           "returncode": 0
         },
         {
           "shard": 5,
           "campaign": "advisor-batch-1-s5-hunter-pc",
-          "wall_s": 898.0,
+          "wall_s": 1336.7,
           "rows": 288,
           "returncode": 0
         }
       ],
       "rows_written": 1728,
-      "rows_per_s": 1.9231,
-      "mesh_ms_frac": 0.4094,
+      "rows_per_s": 1.2922,
+      "mesh_ms_frac": 0.7176,
       "mesh_cache_recommended": true
     },
     {
       "batch": 2,
-      "started": "2026-08-17T06:36:20Z",
-      "wall_s": 769.3,
+      "started": "2026-08-18T02:40:01Z",
+      "wall_s": 1676.6,
       "pairs_total": 1152,
       "dedup_hits": 0,
       "launched": 1152,
@@ -486,55 +67,55 @@
         {
           "shard": 0,
           "campaign": "advisor-batch-2-s0-hunter-pc",
-          "wall_s": 757.0,
+          "wall_s": 1515.7,
           "rows": 216,
           "returncode": 0
         },
         {
           "shard": 1,
           "campaign": "advisor-batch-2-s1-hunter-pc",
-          "wall_s": 757.7,
+          "wall_s": 1516.5,
           "rows": 216,
           "returncode": 0
         },
         {
           "shard": 2,
           "campaign": "advisor-batch-2-s2-hunter-pc",
-          "wall_s": 202.5,
+          "wall_s": 495.3,
           "rows": 180,
           "returncode": 0
         },
         {
           "shard": 3,
           "campaign": "advisor-batch-2-s3-hunter-pc",
-          "wall_s": 203.7,
+          "wall_s": 495.1,
           "rows": 180,
           "returncode": 0
         },
         {
           "shard": 4,
           "campaign": "advisor-batch-2-s4-hunter-pc",
-          "wall_s": 768.6,
+          "wall_s": 1675.8,
           "rows": 180,
           "returncode": 0
         },
         {
           "shard": 5,
           "campaign": "advisor-batch-2-s5-hunter-pc",
-          "wall_s": 767.8,
+          "wall_s": 1674.7,
           "rows": 180,
           "returncode": 0
         }
       ],
       "rows_written": 1152,
-      "rows_per_s": 1.4975,
-      "mesh_ms_frac": 0.7568,
+      "rows_per_s": 0.6871,
+      "mesh_ms_frac": 0.8896,
       "mesh_cache_recommended": true
     },
     {
       "batch": 3,
-      "started": "2026-08-17T06:49:09Z",
-      "wall_s": 503.1,
+      "started": "2026-08-18T03:07:58Z",
+      "wall_s": 673.6,
       "pairs_total": 576,
       "dedup_hits": 0,
       "launched": 576,
@@ -542,244 +123,55 @@
         {
           "shard": 0,
           "campaign": "advisor-batch-3-s0-hunter-pc",
-          "wall_s": 319.6,
+          "wall_s": 576.4,
           "rows": 108,
           "returncode": 0
         },
         {
           "shard": 1,
           "campaign": "advisor-batch-3-s1-hunter-pc",
-          "wall_s": 502.3,
+          "wall_s": 668.0,
           "rows": 108,
           "returncode": 0
         },
         {
           "shard": 2,
           "campaign": "advisor-batch-3-s2-hunter-pc",
-          "wall_s": 297.9,
+          "wall_s": 490.6,
           "rows": 108,
           "returncode": 0
         },
         {
           "shard": 3,
           "campaign": "advisor-batch-3-s3-hunter-pc",
-          "wall_s": 464.5,
+          "wall_s": 672.7,
           "rows": 108,
           "returncode": 0
         },
         {
           "shard": 4,
           "campaign": "advisor-batch-3-s4-hunter-pc",
-          "wall_s": 210.8,
+          "wall_s": 361.0,
           "rows": 72,
           "returncode": 0
         },
         {
           "shard": 5,
           "campaign": "advisor-batch-3-s5-hunter-pc",
-          "wall_s": 333.0,
+          "wall_s": 440.4,
           "rows": 72,
           "returncode": 0
         }
       ],
       "rows_written": 576,
-      "rows_per_s": 1.1448,
-      "mesh_ms_frac": 0.6358,
+      "rows_per_s": 0.8551,
+      "mesh_ms_frac": 0.9482,
       "mesh_cache_recommended": true
     },
     {
       "batch": 4,
-      "started": "2026-08-17T07:36:35Z",
-      "wall_s": 108.8,
-      "pairs_total": 72,
-      "dedup_hits": 70,
-      "launched": 2,
-      "shards": [
-        {
-          "shard": 0,
-          "campaign": "advisor-batch-4-s0-hunter-pc",
-          "wall_s": 108.0,
-          "rows": 2,
-          "returncode": 0
-        }
-      ],
-      "rows_written": 2,
-      "rows_per_s": 0.0184,
-      "mesh_ms_frac": 0.061,
-      "mesh_cache_recommended": false
-    },
-    {
-      "batch": 1,
-      "started": "2026-08-17T17:27:00Z",
-      "wall_s": 946.4,
-      "pairs_total": 1728,
-      "dedup_hits": 0,
-      "launched": 1728,
-      "shards": [
-        {
-          "shard": 0,
-          "campaign": "advisor-batch-1-s0-hunter-pc",
-          "wall_s": 164.5,
-          "rows": 288,
-          "returncode": 0
-        },
-        {
-          "shard": 1,
-          "campaign": "advisor-batch-1-s1-hunter-pc",
-          "wall_s": 235.0,
-          "rows": 288,
-          "returncode": 0
-        },
-        {
-          "shard": 2,
-          "campaign": "advisor-batch-1-s2-hunter-pc",
-          "wall_s": 169.1,
-          "rows": 288,
-          "returncode": 0
-        },
-        {
-          "shard": 3,
-          "campaign": "advisor-batch-1-s3-hunter-pc",
-          "wall_s": 246.1,
-          "rows": 288,
-          "returncode": 0
-        },
-        {
-          "shard": 4,
-          "campaign": "advisor-batch-1-s4-hunter-pc",
-          "wall_s": 820.4,
-          "rows": 288,
-          "returncode": 0
-        },
-        {
-          "shard": 5,
-          "campaign": "advisor-batch-1-s5-hunter-pc",
-          "wall_s": 945.9,
-          "rows": 288,
-          "returncode": 0
-        }
-      ],
-      "rows_written": 1728,
-      "rows_per_s": 1.8259,
-      "mesh_ms_frac": 0.5108,
-      "mesh_cache_recommended": true
-    },
-    {
-      "batch": 2,
-      "started": "2026-08-17T17:47:46Z",
-      "wall_s": 1330.5,
-      "pairs_total": 1152,
-      "dedup_hits": 0,
-      "launched": 1152,
-      "shards": [
-        {
-          "shard": 0,
-          "campaign": "advisor-batch-2-s0-hunter-pc",
-          "wall_s": 1309.2,
-          "rows": 216,
-          "returncode": 0
-        },
-        {
-          "shard": 1,
-          "campaign": "advisor-batch-2-s1-hunter-pc",
-          "wall_s": 1309.3,
-          "rows": 216,
-          "returncode": 0
-        },
-        {
-          "shard": 2,
-          "campaign": "advisor-batch-2-s2-hunter-pc",
-          "wall_s": 236.2,
-          "rows": 180,
-          "returncode": 0
-        },
-        {
-          "shard": 3,
-          "campaign": "advisor-batch-2-s3-hunter-pc",
-          "wall_s": 234.7,
-          "rows": 180,
-          "returncode": 0
-        },
-        {
-          "shard": 4,
-          "campaign": "advisor-batch-2-s4-hunter-pc",
-          "wall_s": 1329.5,
-          "rows": 180,
-          "returncode": 0
-        },
-        {
-          "shard": 5,
-          "campaign": "advisor-batch-2-s5-hunter-pc",
-          "wall_s": 1329.5,
-          "rows": 180,
-          "returncode": 0
-        }
-      ],
-      "rows_written": 1152,
-      "rows_per_s": 0.8659,
-      "mesh_ms_frac": 0.7952,
-      "mesh_cache_recommended": true
-    },
-    {
-      "batch": 3,
-      "started": "2026-08-17T18:09:57Z",
-      "wall_s": 1750.9,
-      "pairs_total": 576,
-      "dedup_hits": 0,
-      "launched": 576,
-      "shards": [
-        {
-          "shard": 0,
-          "campaign": "advisor-batch-3-s0-hunter-pc",
-          "wall_s": 417.2,
-          "rows": 108,
-          "returncode": 0
-        },
-        {
-          "shard": 1,
-          "campaign": "advisor-batch-3-s1-hunter-pc",
-          "wall_s": 1750.1,
-          "rows": 108,
-          "returncode": 0
-        },
-        {
-          "shard": 2,
-          "campaign": "advisor-batch-3-s2-hunter-pc",
-          "wall_s": 373.9,
-          "rows": 108,
-          "returncode": 0
-        },
-        {
-          "shard": 3,
-          "campaign": "advisor-batch-3-s3-hunter-pc",
-          "wall_s": 1696.2,
-          "rows": 108,
-          "returncode": 0
-        },
-        {
-          "shard": 4,
-          "campaign": "advisor-batch-3-s4-hunter-pc",
-          "wall_s": 270.9,
-          "rows": 72,
-          "returncode": 0
-        },
-        {
-          "shard": 5,
-          "campaign": "advisor-batch-3-s5-hunter-pc",
-          "wall_s": 1192.9,
-          "rows": 72,
-          "returncode": 0
-        }
-      ],
-      "rows_written": 576,
-      "rows_per_s": 0.329,
-      "mesh_ms_frac": 0.6889,
-      "mesh_cache_recommended": true
-    },
-    {
-      "batch": 4,
-      "started": "2026-08-17T18:39:08Z",
-      "wall_s": 2792.0,
+      "started": "2026-08-18T03:19:12Z",
+      "wall_s": 418.9,
       "pairs_total": 72,
       "dedup_hits": 0,
       "launched": 72,
@@ -787,22 +179,22 @@
         {
           "shard": 0,
           "campaign": "advisor-batch-4-s0-hunter-pc",
-          "wall_s": 229.5,
+          "wall_s": 417.9,
           "rows": 36,
           "returncode": 0
         },
         {
           "shard": 1,
           "campaign": "advisor-batch-4-s1-hunter-pc",
-          "wall_s": 2791.2,
+          "wall_s": 297.0,
           "rows": 36,
           "returncode": 0
         }
       ],
       "rows_written": 72,
-      "rows_per_s": 0.0258,
-      "mesh_ms_frac": 0.2632,
-      "mesh_cache_recommended": false
+      "rows_per_s": 0.1719,
+      "mesh_ms_frac": 0.9447,
+      "mesh_cache_recommended": true
     }
   ]
 }

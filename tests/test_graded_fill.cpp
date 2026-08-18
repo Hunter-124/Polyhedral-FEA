@@ -11,7 +11,11 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstdint>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 using namespace polymesh::mesh;
@@ -247,4 +251,117 @@ TEST_CASE("cylinder_prism graded+feature notes curvature seeds and snaps") {
                      vol.mesher_note.find("thin_seeds") != std::string::npos ||
                      vol.mesher_note.find("feature") != std::string::npos;
     REQUIRE(geo);
+}
+
+namespace {
+
+/// Fraction of tets whose reflection about the node-set mid-plane normal to
+/// `axis` is also a tet of the same mesh. 1.0 means the tiling is exactly
+/// mirror-symmetric; the single-orientation Kuhn lattice scored 0.0.
+double mirror_tet_fraction(const std::vector<Eigen::Vector3d>& nodes,
+                           const std::vector<std::array<std::uint32_t, 4>>& tets, int axis) {
+    if (tets.empty()) {
+        return 0.0;
+    }
+    Eigen::Vector3d lo = nodes.front();
+    Eigen::Vector3d hi = nodes.front();
+    for (const auto& p : nodes) {
+        lo = lo.cwiseMin(p);
+        hi = hi.cwiseMax(p);
+    }
+    const double quantum = 1e-9 * (hi - lo).norm();
+    const double inv_q = quantum > 0.0 ? 1.0 / quantum : 0.0;
+    const double plane = lo[axis] + hi[axis];
+    using GridKey = std::array<long long, 3>;
+    struct GridHash {
+        std::size_t operator()(const GridKey& k) const noexcept {
+            std::size_t h = static_cast<std::size_t>(k[0]) * 73856093ULL;
+            h ^= static_cast<std::size_t>(k[1]) * 19349663ULL + (h << 6) + (h >> 2);
+            h ^= static_cast<std::size_t>(k[2]) * 83492791ULL + (h << 6) + (h >> 2);
+            return h;
+        }
+    };
+    const auto grid_key = [&](const Eigen::Vector3d& p) {
+        return GridKey{static_cast<long long>(std::llround(p.x() * inv_q)),
+                       static_cast<long long>(std::llround(p.y() * inv_q)),
+                       static_cast<long long>(std::llround(p.z() * inv_q))};
+    };
+    std::unordered_map<GridKey, std::uint32_t, GridHash> at;
+    at.reserve(nodes.size() * 2);
+    for (std::uint32_t i = 0; i < nodes.size(); ++i) {
+        at.emplace(grid_key(nodes[i]), i);
+    }
+    using TetKey = std::array<std::uint32_t, 4>;
+    struct TetHash {
+        std::size_t operator()(const TetKey& k) const noexcept {
+            std::size_t h = 0;
+            for (const auto v : k) {
+                h ^= static_cast<std::size_t>(v) * 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+            }
+            return h;
+        }
+    };
+    std::unordered_set<TetKey, TetHash> present;
+    present.reserve(tets.size() * 2);
+    for (const auto& t : tets) {
+        TetKey k = t;
+        std::sort(k.begin(), k.end());
+        present.insert(k);
+    }
+    std::size_t mirrored = 0;
+    for (const auto& t : tets) {
+        TetKey k{};
+        bool ok = true;
+        for (int v = 0; v < 4 && ok; ++v) {
+            Eigen::Vector3d p = nodes[t[static_cast<std::size_t>(v)]];
+            p[axis] = plane - p[axis];
+            const auto it = at.find(grid_key(p));
+            if (it == at.end()) {
+                ok = false;
+            } else {
+                k[static_cast<std::size_t>(v)] = it->second;
+            }
+        }
+        if (!ok) {
+            continue;
+        }
+        std::sort(k.begin(), k.end());
+        mirrored += present.count(k);
+    }
+    return static_cast<double>(mirrored) / static_cast<double>(tets.size());
+}
+
+} // namespace
+
+// The lattice tiling itself must be mirror-symmetric: a symmetric part meshed on
+// a symmetric lattice may not come out visibly slanted. Single-orientation Kuhn
+// scored exactly 0.0 here on every axis while its NODES were 100% symmetric,
+// which is what made the defect invisible to node-level checks.
+TEST_CASE("lattice tilings mirror about every bbox mid-plane", "[mesher][symmetry]") {
+    const auto s = unit_box();
+    SECTION("uniform tet fill") {
+        for (const double h : {0.25, 0.2, 1.0 / 6.0}) {
+            const auto fill = tet_fill_surface(s, {0, 0, 0}, {1, 1, 1}, h, false);
+            REQUIRE_FALSE(fill.tets.empty());
+            for (int axis = 0; axis < 3; ++axis) {
+                INFO("uniform h=" << h << " axis=" << axis);
+                REQUIRE(mirror_tet_fraction(fill.nodes, fill.tets, axis) == 1.0);
+            }
+        }
+    }
+    SECTION("graded fill with a symmetric size field") {
+        // Radial field: finer toward the box centre, so LEB marks are symmetric
+        // about all three mid-planes and only the closure can break symmetry.
+        const SizeFieldFn field = [](const Eigen::Vector3d& x) {
+            const double r = (x - Eigen::Vector3d::Constant(0.5)).norm();
+            return 0.08 + 0.30 * r;
+        };
+        const auto fill = graded_tet_fill_surface(s, {0, 0, 0}, {1, 1, 1}, 0.2, 1, {}, 0.0, {},
+                                                 0.0, 0.0, nullptr, field);
+        REQUIRE_FALSE(fill.mesh.tets.empty());
+        for (int axis = 0; axis < 3; ++axis) {
+            INFO("graded axis=" << axis << " tets=" << fill.mesh.tets.size());
+            REQUIRE(mirror_tet_fraction(fill.mesh.nodes, fill.mesh.tets, axis) == 1.0);
+        }
+    }
 }

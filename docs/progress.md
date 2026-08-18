@@ -17,7 +17,8 @@ tracker) ·
 [0031](decisions/0031-a-jut-has-a-side.md) ·
 [0032](decisions/0032-stl-order-determinism.md) ·
 [0033](decisions/0033-a-gate-must-measure-what-ships.md) ·
-[0035](decisions/0035-boundary-conformity.md)  
+[0035](decisions/0035-boundary-conformity.md) ·
+[0036](decisions/0036-a-symmetric-part-gets-a-symmetric-tiling.md)  
 **Training box:** [`docs/training/HANDOFF-3080ti.md`](training/HANDOFF-3080ti.md)
 · [`docs/training/ACCESS-hunter-pc.md`](training/ACCESS-hunter-pc.md)  
 **Roadmap:** [`docs/ROADMAP.md`](ROADMAP.md) · **Agent loop:**

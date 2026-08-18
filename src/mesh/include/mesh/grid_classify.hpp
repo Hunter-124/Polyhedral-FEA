@@ -102,12 +102,20 @@ std::vector<bool> classify_cells_inside(const geom::TriSurface& surface,
 /// Only parents whose eight child samples mix solid and void are locally
 /// refined by callers; uniform interior and exterior parents remain coarse.
 /// `max_refinement_levels == 0` returns the original centre classification.
+///
+/// `even_cells` rounds each axis up to an even count so every bbox mid-plane
+/// falls on a lattice plane. Tet fills built on the alternating 5-tet split
+/// (mesh/lattice_split.hpp) require it — their checkerboard parity only mirrors
+/// about a plane when the cell count crossed by that plane is even. The mixed
+/// hex/pyramid fill does not: its cells are self-mirror, and its 2:1 closure was
+/// tuned on the odd-permitting lattice.
 FeatureAwareClassification classify_cells_feature_aware(
     const geom::TriSurface& surface, const Eigen::Vector3d& bbox_min,
     const Eigen::Vector3d& bbox_max, double h,
     long max_cells = kDefaultMaxGridCells, double relative_volume_tolerance = 0.01,
     int max_refinement_levels = 4,
-    const std::function<double(const Eigen::Vector3d&)>& size_field = {});
+    const std::function<double(const Eigen::Vector3d&)>& size_field = {},
+    bool even_cells = false);
 
 /// Even-odd with rays along axis 0/1/2 (prism sweep uses longest axis).
 std::vector<bool> classify_cells_inside_axis(const geom::TriSurface& surface,

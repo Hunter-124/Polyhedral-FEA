@@ -104,6 +104,8 @@ TEST_CASE("empty size fields preserve graded and hybrid fill bytes", "[sizefield
 TEST_CASE("linear size field gives monotone graded density", "[sizefield][mesher]") {
     const auto model = polymesh::testsupport::box_model(1.0, 1.0, 1.0);
     std::array<std::size_t, 3> totals{};
+    std::array<std::size_t, 3> l1{};
+    std::array<std::size_t, 3> l2{};
     std::array<std::size_t, 2> base_halves{};
     constexpr std::array<double, 3> scales{{1.0, 0.75, 0.5}};
     for (std::size_t run = 0; run < scales.size(); ++run) {
@@ -115,13 +117,20 @@ TEST_CASE("linear size field gives monotone graded density", "[sizefield][mesher
             model.surface, model.bbox_min, model.bbox_max, 0.25, 1, {}, 0.0, {}, 0.0, 0.0,
             nullptr, field);
         totals[run] = fill.mesh.tets.size();
+        l1[run] = fill.n_level1_cells;
+        l2[run] = fill.n_level2_cells;
         if (run == 0) {
             base_halves = half_tet_counts(fill);
         }
     }
-    INFO("linear field tets scale 1.0/0.75/0.5 = " << totals[0] << "/" << totals[1]
-                                                          << "/" << totals[2]);
+    // Level counts come along because a mesh whose element total ignores the
+    // extra marked cells is the signature of a lattice split whose longest-edge
+    // bisection has lost its cell-local terminal edge (see mesh/lattice_split.hpp).
+    INFO("linear field tets scale 1.0/0.75/0.5 = "
+         << totals[0] << "/" << totals[1] << "/" << totals[2] << " L1 cells " << l1[0] << "/"
+         << l1[1] << "/" << l1[2] << " L2 cells " << l2[0] << "/" << l2[1] << "/" << l2[2]);
     REQUIRE(base_halves[0] > base_halves[1]);
+    REQUIRE(l1[0] < l1[1]);
     REQUIRE(totals[0] < totals[1]);
     REQUIRE(totals[1] < totals[2]);
 }

@@ -4,6 +4,7 @@
 #include "mesh/cell_validity.hpp"
 #include "mesh/cell_stamp.hpp"
 #include "mesh/grid_classify.hpp"
+#include "mesh/lattice_split.hpp"
 #include "mesh/local_refine.hpp"
 #include "mesh/poly_mesh.hpp"
 #include "mesh/quality.hpp"
@@ -29,22 +30,18 @@
 namespace polymesh::mesh {
 namespace {
 
-// Kuhn 6-tet split of a unit cube with corners numbered as hex8.
-constexpr std::array<std::array<int, 4>, 6> kCubeTets{{
-    {{0, 1, 2, 6}},
-    {{0, 2, 3, 6}},
-    {{0, 1, 5, 6}},
-    {{0, 3, 7, 6}},
-    {{0, 4, 5, 6}},
-    {{0, 4, 7, 6}},
-}};
+// Lattice cell → tets: mirror-symmetric alternating 5-tet split
+// (mesh/lattice_split.hpp). Replaced the Kuhn 6-tet table, which leaned every
+// cell the same way and left the tiling with no mirror symmetry at all.
 
 constexpr int kFaceNbr[6][3] = {{-1, 0, 0}, {1, 0, 0},  {0, -1, 0},
                                 {0, 1, 0},  {0, 0, -1}, {0, 0, 1}};
 
-// Exterior triangular faces of a tet mesh (appear once). Returns node ids.
+// Exterior triangular faces of a tet mesh (appear once). Returns node ids in the
+// order the snap/smooth rounds must visit them (see the sort below).
 std::vector<std::uint32_t>
-tet_boundary_nodes(const std::vector<std::array<std::uint32_t, 4>>& tets) {
+tet_boundary_nodes(const std::vector<std::array<std::uint32_t, 4>>& tets,
+                   const std::vector<Eigen::Vector3d>& nodes) {
     struct FaceKey {
         std::uint32_t a, b, c;
         bool operator==(const FaceKey& o) const { return a == o.a && b == o.b && c == o.c; }
@@ -72,23 +69,50 @@ tet_boundary_nodes(const std::vector<std::array<std::uint32_t, 4>>& tets) {
                              t[static_cast<std::size_t>(f[2])])];
         }
     }
-    std::unordered_set<std::uint32_t> nodes;
-    nodes.reserve(count.size());
+    std::unordered_set<std::uint32_t> nodes_set;
+    nodes_set.reserve(count.size());
     for (const auto& [key, c] : count) {
         if (c == 1) {
-            nodes.insert(key.a);
-            nodes.insert(key.b);
-            nodes.insert(key.c);
+            nodes_set.insert(key.a);
+            nodes_set.insert(key.b);
+            nodes_set.insert(key.c);
         }
     }
-    // Ascending node id, not unordered_set bucket order: this list is the
-    // iteration order of snap_round's boundary snap and per-node re-project,
-    // where each node moves, tests its skin tets, and reverts on inversion —
-    // so an earlier node's accepted move changes whether a later one inverts.
-    // With MSVC's bucket order the 3080 Ti corpus disagreed with gcc on 5 of
-    // 24 pairs (stepped_shaft_s2_c0 hybrid_zoo 264 vs 200 elements).
-    std::vector<std::uint32_t> out(nodes.begin(), nodes.end());
-    std::sort(out.begin(), out.end());
+    std::vector<std::uint32_t> out(nodes_set.begin(), nodes_set.end());
+    // Mirror-canonical order, not bucket order and not ascending node id: this
+    // list is the iteration order of snap_round's boundary snap and per-node
+    // re-project, where each node moves, tests its skin tets, and reverts on
+    // inversion — so an earlier node's accepted move changes whether a later one
+    // inverts. Bucket order alone disagreed across standard libraries (ADR-0032:
+    // the 3080 Ti corpus split from gcc on 5 of 24 pairs, stepped_shaft_s2_c0
+    // hybrid_zoo 264 vs 200 elements), which ascending node id fixed. Node ids do
+    // not mirror, though, so id order gave a node and its mirror image different
+    // predecessor sets and the accept/reject outcomes diverged.
+    //
+    // Sorting on distance-from-centre per axis, quantised so a mirror pair keys
+    // bit-identically, makes a node and its mirror image adjacent in the order
+    // with the same predecessor set up to reflection. Ties fall back to node id so
+    // the order stays total and platform-independent.
+    if (out.size() > 1) {
+        Eigen::Vector3d lo = nodes[out.front()];
+        Eigen::Vector3d hi = lo;
+        for (const auto ni : out) {
+            lo = lo.cwiseMin(nodes[ni]);
+            hi = hi.cwiseMax(nodes[ni]);
+        }
+        const Eigen::Vector3d center = 0.5 * (lo + hi);
+        const double quantum = 1e-9 * (hi - lo).norm();
+        const double inv_q = quantum > 0.0 ? 1.0 / quantum : 0.0;
+        std::vector<std::array<long long, 3>> key(nodes.size());
+        for (const auto ni : out) {
+            const Eigen::Vector3d d = (nodes[ni] - center).cwiseAbs() * inv_q;
+            key[ni] = {static_cast<long long>(d.x()), static_cast<long long>(d.y()),
+                       static_cast<long long>(d.z())};
+        }
+        std::sort(out.begin(), out.end(), [&](std::uint32_t a, std::uint32_t b) {
+            return key[a] != key[b] ? key[a] < key[b] : a < b;
+        });
+    }
     return out;
 }
 
@@ -344,12 +368,14 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     const double h_budget =
         min_h_for_cell_budget(bbox_min, bbox_max, kGradedMaxCells, /*subdivision=*/1);
     const double h_use = (h_budget > 0.0) ? std::max(h, h_budget) : h;
-    // The h/2 classifier is sampling-only. The coarse Kuhn lattice remains at
-    // the requested h; mixed parents are marked for local LEB below.
+    // The h/2 classifier is sampling-only. The coarse lattice remains at the
+    // requested h; mixed parents are marked for local LEB below. Cell counts are
+    // even so the alternating 5-tet split mirrors about the bbox mid-planes.
     const int classification_levels = projection != nullptr ? 1 : 0;
     auto classification = classify_cells_feature_aware(
         surface, bbox_min, bbox_max, h_use, static_cast<long>(kGradedMaxCells),
-        /*relative_volume_tolerance=*/0.01, classification_levels, size_field);
+        /*relative_volume_tolerance=*/0.01, classification_levels, size_field,
+        /*even_cells=*/true);
     const CartesianGrid& grid = classification.grid;
     const auto& inside = classification.inside;
     const int nx = grid.nx, ny = grid.ny, nz = grid.nz;
@@ -562,7 +588,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             node_at(i + 1, j + 1, k + 1),
             node_at(i, j + 1, k + 1),
         }};
-        for (const auto& t : kCubeTets) {
+        for (const auto& t : kLatticeTetsKuhn[lattice_cell_variant(i, j, k)]) {
             std::array<std::uint32_t, 4> n{
                 {c[static_cast<std::size_t>(t[0])], c[static_cast<std::size_t>(t[1])],
                  c[static_cast<std::size_t>(t[2])], c[static_cast<std::size_t>(t[3])]}};
@@ -695,7 +721,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     // Pre-LEB snap of lattice corners so LEB mid-edges start closer to the CAD
     // (cleaner hole rims; midpoints of two on-surface nodes ≈ on surface).
     {
-        std::vector<std::uint32_t> pre_snap = tet_boundary_nodes(out.mesh.tets);
+        std::vector<std::uint32_t> pre_snap = tet_boundary_nodes(out.mesh.tets, out.mesh.nodes);
         if (!pre_snap.empty()) {
             std::unordered_set<std::uint32_t> bset(pre_snap.begin(), pre_snap.end());
             std::vector<std::size_t> skin_tets;
@@ -843,7 +869,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     // corners after refine). Run as a reusable round: the S5 void carve below
     // exposes fresh (never-snapped) lattice faces that need a second round.
     const auto snap_round = [&]() {
-        std::vector<std::uint32_t> snap_nodes = tet_boundary_nodes(out.mesh.tets);
+        std::vector<std::uint32_t> snap_nodes = tet_boundary_nodes(out.mesh.tets, out.mesh.nodes);
         if (snap_nodes.empty()) {
             return;
         }
@@ -952,7 +978,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     // carve above: a jut is a node that is far from the surface AND outside it.
     const double initial_jut_threshold = 0.15 * hc;
     std::unordered_set<std::uint32_t> initial_juts;
-    for (const auto ni : tet_boundary_nodes(out.mesh.tets)) {
+    for (const auto ni : tet_boundary_nodes(out.mesh.tets, out.mesh.nodes)) {
         const Eigen::Vector3d& p = out.mesh.nodes[ni];
         if (closest_on_surface(surface, p).distance > initial_jut_threshold &&
             outside_solid(p)) {
@@ -1016,7 +1042,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 return v;
             };
             const double volume_before = total_volume();
-            const auto bvec = tet_boundary_nodes(out.mesh.tets);
+            const auto bvec = tet_boundary_nodes(out.mesh.tets, out.mesh.nodes);
             const std::unordered_set<std::uint32_t> bset(bvec.begin(), bvec.end());
             std::unordered_map<std::uint32_t, std::vector<std::size_t>> incident;
             incident.reserve(out.mesh.nodes.size());

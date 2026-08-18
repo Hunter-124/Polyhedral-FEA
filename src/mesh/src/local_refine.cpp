@@ -45,20 +45,102 @@ bool tet_has_edge(const std::array<std::uint32_t, 4>& tet, EdgeKey e) {
     return has_a && has_b;
 }
 
-/// Longest edge; ties → lexicographically smaller ordered endpoint pair.
+/// Reflection-equivariant tie-break frame for longest-edge selection.
+///
+/// A lattice tet has several equal-longest edges — the central tet of the
+/// alternating 5-tet split (mesh/lattice_split.hpp) is regular, so all six tie —
+/// which means the tie-break, not the lengths, decides the whole refinement
+/// pattern. Node indices do not mirror, so breaking ties on them handed
+/// mirror-image tets non-mirror-image edges and left graded meshes visibly
+/// asymmetric on symmetric parts (measured: 22–76% of tets had a mirror image).
+///
+/// Folding every candidate into the octant of its own tet's centroid removes the
+/// reflection: a tet and its mirror image fold to the *same* point set, so the
+/// same folded edge wins in both and the two answers are exact mirror images.
+/// Lattice cell counts are even, so no cell — and therefore no tet centroid —
+/// straddles a bbox mid-plane, and the octant sign is never ambiguous.
+struct MirrorFold {
+    Eigen::Vector3d center = Eigen::Vector3d::Zero();
+    /// Absolute slack for "same length" / "same folded coordinate". Mirrored
+    /// coordinates agree to a few ulp, never exactly, so every comparison that
+    /// decides a tie needs slack far above ulp and far below any real spacing.
+    double tol = 0.0;
+};
+
+MirrorFold make_mirror_fold(const std::vector<Eigen::Vector3d>& nodes) {
+    Eigen::Vector3d lo = nodes.front();
+    Eigen::Vector3d hi = nodes.front();
+    for (const auto& p : nodes) {
+        lo = lo.cwiseMin(p);
+        hi = hi.cwiseMax(p);
+    }
+    MirrorFold f;
+    f.center = 0.5 * (lo + hi);
+    f.tol = 1e-11 * (hi - lo).norm();
+    return f;
+}
+
+/// Longest edge; ties → the edge that is lexicographically smallest in the
+/// tet's own folded octant frame (see `MirrorFold`).
 EdgeKey longest_edge(const std::array<std::uint32_t, 4>& tet,
-                     const std::vector<Eigen::Vector3d>& nodes) {
+                     const std::vector<Eigen::Vector3d>& nodes, const MirrorFold& fold) {
+    const Eigen::Vector3d centroid =
+        0.25 * (nodes[tet[0]] + nodes[tet[1]] + nodes[tet[2]] + nodes[tet[3]]);
+    Eigen::Vector3d sign;
+    for (int d = 0; d < 3; ++d) {
+        sign[d] = centroid[d] >= fold.center[d] ? 1.0 : -1.0;
+    }
+    using EdgeCoords = std::array<Eigen::Vector3d, 2>;
+    const auto folded_edge = [&](const EdgeKey& e) {
+        EdgeCoords p{(nodes[e.first] - fold.center).cwiseProduct(sign),
+                     (nodes[e.second] - fold.center).cwiseProduct(sign)};
+        for (int d = 0; d < 3; ++d) {
+            if (p[0][d] < p[1][d] - fold.tol) {
+                break;
+            }
+            if (p[1][d] < p[0][d] - fold.tol) {
+                std::swap(p[0], p[1]);
+                break;
+            }
+        }
+        return p;
+    };
+    const auto folded_less = [&](const EdgeCoords& x, const EdgeCoords& y) {
+        for (int v = 0; v < 2; ++v) {
+            for (int d = 0; d < 3; ++d) {
+                if (x[v][d] < y[v][d] - fold.tol) {
+                    return true;
+                }
+                if (y[v][d] < x[v][d] - fold.tol) {
+                    return false;
+                }
+            }
+        }
+        return false;
+    };
+
     EdgeKey best = make_edge(tet[0], tet[1]);
     double best_len2 = (nodes[tet[0]] - nodes[tet[1]]).squaredNorm();
+    EdgeCoords best_key = folded_edge(best);
     for (int i = 0; i < 4; ++i) {
         for (int j = i + 1; j < 4; ++j) {
             const EdgeKey e =
                 make_edge(tet[static_cast<std::size_t>(i)], tet[static_cast<std::size_t>(j)]);
             const double len2 = (nodes[e.first] - nodes[e.second]).squaredNorm();
-            if (len2 > best_len2 + 1e-30 ||
-                (std::abs(len2 - best_len2) <= 1e-30 && e < best)) {
-                best_len2 = len2;
+            // Relative slack: mirrored edges have equal lengths only to a few
+            // ulp, and an absolute epsilon on squared lengths would rank one of
+            // them strictly longer.
+            const double len_eps = 1e-12 * std::max(len2, best_len2);
+            const bool longer = len2 > best_len2 + len_eps;
+            const bool tied = !longer && len2 >= best_len2 - len_eps;
+            if (!longer && !tied) {
+                continue;
+            }
+            const EdgeCoords key = folded_edge(e);
+            if (longer || folded_less(key, best_key)) {
+                best_len2 = std::max(len2, best_len2);
                 best = e;
+                best_key = key;
             }
         }
     }
@@ -329,6 +411,10 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
         return it->second;
     };
 
+    // Frame for the reflection-equivariant longest-edge tie-break. Built once
+    // from the input lattice: every midpoint added below lands inside it.
+    const MirrorFold fold = make_mirror_fold(nodes);
+
     // Each iteration bisects one terminal LEPP edge (all live sharers at once).
     const std::size_t max_iters = tets.size() * 64 + 1024 + remaining.size() * 8;
     for (std::size_t iter = 0; iter < max_iters && !remaining.empty(); ++iter) {
@@ -346,7 +432,7 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
 
         // LEPP walk to a terminal edge (edge whose all live sharers have it as longest).
         std::size_t walk = seed;
-        EdgeKey edge = longest_edge(tets[walk], nodes);
+        EdgeKey edge = longest_edge(tets[walk], nodes, fold);
         std::unordered_map<EdgeKey, int, EdgeHash> seen_edges;
         seen_edges.reserve(64);
         for (int lepp = 0; lepp < 4096; ++lepp) {
@@ -368,7 +454,7 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
                 if (!tet_has_edge(tets[n], edge)) {
                     continue; // stale index safety
                 }
-                const EdgeKey en = longest_edge(tets[n], nodes);
+                const EdgeKey en = longest_edge(tets[n], nodes, fold);
                 if (en != edge) {
                     walk = n;
                     edge = en;

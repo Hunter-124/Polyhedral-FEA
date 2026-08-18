@@ -279,7 +279,7 @@ FeatureAwareClassification classify_cells_feature_aware(
     const geom::TriSurface& surface, const Eigen::Vector3d& bbox_min,
     const Eigen::Vector3d& bbox_max, double h, long max_cells,
     double relative_volume_tolerance, int max_refinement_levels,
-    const std::function<double(const Eigen::Vector3d&)>& size_field) {
+    const std::function<double(const Eigen::Vector3d&)>& size_field, bool even_cells) {
     validate_h_bbox(bbox_min, bbox_max, h, "classify_cells_feature_aware");
     if (max_cells < 1) {
         throw ValidityError("classify_cells_feature_aware: max_cells must be positive");
@@ -312,7 +312,11 @@ FeatureAwareClassification classify_cells_feature_aware(
     };
 
     FeatureAwareClassification out;
-    out.grid = make_bbox_grid(bbox_min, bbox_max, h, max_cells);
+    // Even cell counts (opt-in) put every bbox mid-plane on a lattice plane, as
+    // the alternating 5-tet split in mesh/lattice_split.hpp requires.
+    out.grid = even_cells
+                   ? make_bbox_grid_even(bbox_min, bbox_max, h, /*min_cells=*/2, max_cells)
+                   : make_bbox_grid(bbox_min, bbox_max, h, max_cells);
     out.inside = classify_cells_inside(surface, out.grid);
     out.surface_volume = surface_volume;
     out.classified_volume =

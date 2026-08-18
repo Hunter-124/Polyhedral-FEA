@@ -313,6 +313,14 @@ mathematically correct; the smooth-wall p99 is 2.59°. Exact sharp-edge
 diagnostics now classify CAD-owned quadratic boundary edges and use exact OCC
 curve projection, not sampled-polyline chord distance.
 
+**The element *pattern* was still asymmetric.** Everything above measures where
+boundary nodes land, not what the tiling looks like. The single-orientation Kuhn
+split leaned every cell the same way: on a plain box at h = 8 mm, 100% of nodes
+had an exact mirror partner and **0%** of the tets did. That is
+[ADR-0036](0036-a-symmetric-part-gets-a-symmetric-tiling.md), which also records
+the remaining ceiling — OCC's tessellation of a symmetric part is not symmetric,
+and the sizing/stamping passes still read it.
+
 ## 7. Consequences
 - Two regression tests in `tests/test_brep_fidelity.cpp` (`[feature_pin]`):
   boundary nodes on the exact BRep for eight part × mesher pairs with ceilings

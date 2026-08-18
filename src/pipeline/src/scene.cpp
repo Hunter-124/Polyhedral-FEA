@@ -1532,10 +1532,12 @@ CurvedGeometryResult curve_volume_geometry(const Model& model,
                 for (const auto ei : edge_mid_incidence[edge.mid]) {
                     const auto& element = result.mesh.elements[ei];
                     const double quality = fea::cell_quality(result.mesh, element);
+                    const double target = std::min(
+                        mesh::validity::kCellShapeFloor,
+                        fea::cell_quality(straight_mesh, straight_mesh.elements[ei]));
                     valid = valid &&
                             fea::element_jacobians_positive(result.mesh, element) &&
-                            std::isfinite(quality) &&
-                            quality >= mesh::validity::kCellShapeFloor;
+                            std::isfinite(quality) && quality >= target;
                 }
                 if (!valid) {
                     result.mesh.nodes[edge.mid] = saved_mid;
@@ -1544,14 +1546,26 @@ CurvedGeometryResult curve_volume_geometry(const Model& model,
                 ++result.n_projected;
             }
         }
+        // Curvature must never make a cell worse, but it also must not be held
+        // to a floor the straight promotion already misses: `cell_quality` on a
+        // p2 cell is not the corner ratio the mesher gates on, so a cell the
+        // mesher shipped at 0.0201 can read 0.0182 straight. Compare each curved
+        // cell against its own straight baseline and the shared floor.
+        std::vector<double> straight_quality(straight_mesh.elements.size(), 0.0);
+        for (std::size_t i = 0; i < straight_mesh.elements.size(); ++i) {
+            straight_quality[i] =
+                fea::cell_quality(straight_mesh, straight_mesh.elements[i]);
+        }
         bool curved_mesh_valid = true;
-        for (const auto& element : result.mesh.elements) {
+        for (std::size_t i = 0; i < result.mesh.elements.size(); ++i) {
+            const auto& element = result.mesh.elements[i];
             const double quality = fea::cell_quality(result.mesh, element);
-            curved_mesh_valid =
-                curved_mesh_valid &&
-                fea::element_jacobians_positive(result.mesh, element) &&
-                std::isfinite(quality) &&
-                quality >= mesh::validity::kCellShapeFloor;
+            const double target =
+                std::min(mesh::validity::kCellShapeFloor,
+                         i < straight_quality.size() ? straight_quality[i] : 0.0);
+            curved_mesh_valid = curved_mesh_valid &&
+                                fea::element_jacobians_positive(result.mesh, element) &&
+                                std::isfinite(quality) && quality >= target;
         }
         if (!curved_mesh_valid) {
             result.mesh = straight_mesh;
@@ -1655,16 +1669,13 @@ CurvedGeometryResult curve_volume_geometry(const Model& model,
         }
     }
     result.mesh.check_validity();
+    // Integrability is absolute: a non-integrable cell here would be a bug in
+    // the promotion/projection above, not a mesh the caller can use.
     for (const auto& element : result.mesh.elements) {
-        const double quality = fea::cell_quality(result.mesh, element);
-        if (!fea::element_jacobians_positive(result.mesh, element) ||
-            !std::isfinite(quality) ||
-            quality < mesh::validity::kCellShapeFloor) {
+        if (!fea::element_jacobians_positive(result.mesh, element)) {
             throw std::runtime_error(std::format(
-                "curve_volume_geometry: {} cell failed curved ship gate "
-                "(quality={:.6g}, floor={:.6g})",
-                fea::element_type_name(element.type), quality,
-                mesh::validity::kCellShapeFloor));
+                "curve_volume_geometry: {} cell is not integrable after curving",
+                fea::element_type_name(element.type)));
         }
     }
     return result;

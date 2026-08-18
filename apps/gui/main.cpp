@@ -1362,13 +1362,6 @@ int run(int argc, char** argv) {
         if (auto live = app.job.poll_live_mesh(app.live_mesh_seen_gen)) {
             const bool was_mesh = app.mode == DisplayMode::kMeshPreview;
             app.mesh_preview = std::move(live);
-            if (app.model) {
-                auto curved = pipeline::curve_volume_geometry(
-                    *app.model, app.mesh_preview->mesh, app.mesh_preview->geometry_h);
-                app.mesh_preview->mesh = std::move(curved.mesh);
-                app.mesh_preview->boundary_quads =
-                    fea::extract_boundary_faces(app.mesh_preview->mesh);
-            }
             app.viewport.set_mesh(*app.mesh_preview);
             set_mesh_info(app, app.mesh_preview->mesher_note,
                           app.mesh_preview->mesh.nodes.size(),
@@ -1432,13 +1425,6 @@ int run(int argc, char** argv) {
         if (auto mesh = app.job.take_mesh()) {
             const bool was_mesh = app.mode == DisplayMode::kMeshPreview;
             app.mesh_preview = std::move(mesh);
-            if (app.model) {
-                auto curved = pipeline::curve_volume_geometry(
-                    *app.model, app.mesh_preview->mesh, app.mesh_preview->geometry_h);
-                app.mesh_preview->mesh = std::move(curved.mesh);
-                app.mesh_preview->boundary_quads =
-                    fea::extract_boundary_faces(app.mesh_preview->mesh);
-            }
             app.viewport.set_mesh(*app.mesh_preview);
             set_mesh_info(app, app.mesh_preview->mesher_note,
                           app.mesh_preview->mesh.nodes.size(),

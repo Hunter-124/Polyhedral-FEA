@@ -274,37 +274,38 @@ graded / hybrid / varyhedron paths exist for conformity and reach machine
 precision; `tet` is the uniform baseline, and its residual is reported in its
 own mesher note rather than smoothed over.
 
-**Needle facets at 2:1 LEB transitions.** After the winding correction and kink
-relief, the graded path still carries 111 boundary segments (of ~3700 manifold
-edges) whose facet planes differ by more than 30° on smooth walls, and sliding
-cannot fix them: they are needle facets created by the 2:1 transition itself,
-with adjacent facet areas at 4–30% of the median. Broadening the slidable set to
-unowned nodes was measured and changed nothing. Removing them needs
-boundary-conforming re-triangulation at grading transitions — a mesher-topology
-change — and the varyhedron and hybrid paths already reach 0.15 h and 0.025 h
-respectively, which is where to look for how it should be done.
+**Product rounded geometry is closed on the authoritative mesh.** A
+surface-only diagonal flip was the wrong primitive: it cannot change the volume
+cell that owns the face, and measured 2→3 cavity candidates either failed the
+shape floor or did not cover the sharp BRep path. The accepted mechanism is:
 
-The reference paths do not contain a transition-shell operation that can be
-ported into the graded tet complex. `hybrid` avoids the defect by retaining
-quad/pyramid transition facets; `varyhedron` constructs a different restricted
-Voronoi boundary. The graded output is already a face-conforming tet complex,
-so changing one boundary diagonal requires a coupled 2↔3 or 3↔2 volume-tet
-flip, with the same shape-floor and integrability acceptance as every other
-repair. No such flip kernel exists in the repository. A surface-only
-re-triangulation would make display faces disagree with the volume elements and
-is therefore not a valid fix.
+1. route product CAD meshing through graded tets by default;
+2. use a 0.5× lattice when non-planar BRep faces occupy at least 25% of area;
+3. recover connected sharp-edge segments in the boundary graph and pin both
+   endpoints as one validity-gated move, opening only the affected interior
+   star through deterministic pattern search when necessary;
+4. promote the resulting volume cells to tet10/hex20, project face mids and
+   CAD-edge mids through exact OCC owners, and refine locally when a midpoint
+   cannot be accepted;
+5. assemble, solve, export, diagnose and render that same higher-order mesh.
 
-**The Kuhn lattice on an under-resolved feature.** `icecream_cone`'s bottom disc
-has a 6 mm radius against a 7.8 mm cell. No node placement fixes a feature
-smaller than the element; the residual there is the lattice, not the projector.
+This removes both sources of the visible rounded defects: under-resolved
+boundary topology and the h²κ/8 corner-chord floor. Studio evaluates the actual
+isoparametric surface at eight subdivisions; it no longer substitutes a
+display-only mesh. At requested h = 8 mm, sphere/cone/cylinder/plate-hole p99
+surface-to-BRep errors over bbox diagonal are 7.12e-6, 5.50e-5, 5.66e-6 and
+4.83e-5 respectively, all inside the 1e-4 (99.99%) target. Their curved-cell
+quality minima are 0.02542, 0.02460, 0.03250 and 0.02008 with zero inverted and
+zero sub-floor cells.
 
-**The chordal floor is closed for display/export.** Linear solve geometry still
-has the expected h²κ/8 sagitta, but every CAD-backed CLI mesh export and Studio
-preview now renders a quadratic copy: `promote_to_quadratic`, exact BRep
-projection of free boundary mids, and p1 interpolation of solved point fields.
-Physics boundary faces, BC/load selection, quality, advisor labels and solved
-DOF remain corner-only and unchanged. On the sphere at h = 8 mm, rendered
-facet-normal deviation is mean 0.66°, p99 2.19°, max 3.28°.
+The uniform Cartesian `tet` baseline remains explicitly floor-bounded. It is no
+longer the product default, and its failed projection/refinement experiments
+remain recorded above rather than being hidden behind the curved graded result.
+
+The cone apex is a declared BRep singular vertex. Its 90° maximum normal jump is
+mathematically correct; the smooth-wall p99 is 2.59°. Exact sharp-edge
+diagnostics now classify CAD-owned quadratic boundary edges and use exact OCC
+curve projection, not sampled-polyline chord distance.
 
 ## 7. Consequences
 - Two regression tests in `tests/test_brep_fidelity.cpp` (`[feature_pin]`):
@@ -336,3 +337,12 @@ facet-normal deviation is mean 0.66°, p99 2.19°, max 3.28°.
   face, so the advisor corpus is regenerated and retrained a second time. The
   v5 generation is archived whole under `bench/campaigns/archive-v6/` and
   `bench/advisor/archive-v6/`.
+- The authoritative-geometry wave changes element order, solve DOF, product
+  mesher defaults, curved-part counts and every mesh-derived advisor label.
+  Generation v6 is archived whole under `bench/campaigns/archive-v7/` and
+  `bench/advisor/archive-v7/`; generation v7 is regenerated from the final
+  binary and retrained before publication.
+- `tests/test_traction_selection.cpp` verifies that boundary tessellation
+  evaluates the authoritative quadratic shape functions and retains exact
+  nodal interpolation weights. The graded solve regression verifies tet10-only
+  solve geometry and a displacement vector covering every quadratic node.

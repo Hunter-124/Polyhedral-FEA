@@ -256,8 +256,10 @@ TEST_CASE("volume_mesh: element_tendency changes cell-kind mix", "[tendency]") {
     REQUIRE(c_tet.tet != c_hex.hex);
 }
 
-TEST_CASE("SimSetup.element_tendency defaults to 0", "[tendency]") {
+TEST_CASE("SimSetup defaults: neutral tendency, curved graded product geometry",
+          "[tendency]") {
     polymesh::pipeline::SimSetup s;
     REQUIRE(s.element_tendency == 0.0);
-    REQUIRE(s.mesher == VolumeMesher::kHybrid);
+    REQUIRE(s.mesher == VolumeMesher::kGradedTet);
+    REQUIRE(s.p_elevate);
 }

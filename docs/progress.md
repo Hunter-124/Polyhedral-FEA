@@ -227,34 +227,41 @@ the sphere and on the icecream cone* — and again the figures were right. Suite
   cylinder/hybrid normal p99 **19.2° → 0.27°**, cone/graded normal p99 **20.5°
   → 9.12°**. No case regressed; the whole pass reverts wholesale if worst
   quality drops, sub-floor count grows, or any cell becomes non-integrable.
-- Still open, with the failed attempts recorded so they are not repeated: the
-  uniform Cartesian `tet` fill is bounded by the cell-shape floor rather than by
-  the projector (three refinement schemes tried and measured — more snapping,
-  centroid Steiner relief, conformity-driven LEB — none pays), needle facets at
-  2:1 LEB transitions on the graded path (111 segments; needs re-triangulation,
-  not sliding), the under-resolved 6 mm disc, and the h²κ/8 chordal floor that
-  is what remains visible as faceting in any linear-element render.
+- The uniform Cartesian `tet` fill remains floor-bounded and is no longer the
+  product default. Three measured refinement schemes (more snapping, centroid
+  Steiner relief, conformity-driven LEB) all violated the shared shape floor.
 
-**Curved display/export boundary geometry + limit closure (2026-08-17):**
+**Authoritative curved solve geometry (2026-08-17):**
 
-- Linear solve meshes remain authoritative. CLI mesh exports and Studio previews
-  now promote a copy to tet10/hex20, project display-only boundary mids through
-  the exact owner-stable BRep oracle, and interpolate solved p1 displacement,
-  von Mises, displacement magnitude and nodal error onto those mids.
-- Sphere h = 8 mm display-normal deviation measures mean **0.66°**, p99
-  **2.19°**, max **3.28°**. The 16-case mesher diagnostic matrix is unchanged,
-  as intended: no solve DOF, BC/load selection, quality, fidelity label or
-  advisor input changed, so no advisor retraining was warranted.
-- The requested per-level LEB snap is already the graded implementation
-  sequence. Its uniform-path experiment is the recorded conformity-driven LEB
-  result: sphere p99 0.032 h with 94 sub-floor cells, so it cannot ship under
-  the no-worse-mesh invariant.
-- Hybrid and varyhedron do not contain a tet-shell transition operation to port.
-  They avoid graded needles with different volume topologies. Fixing graded
-  requires a new quality- and Jacobian-gated 2↔3/3↔2 tet flip kernel; changing
-  only extracted surface triangles would falsify the emitted volume mesh.
-- Suite **435/435 green** (three expected skips); showcase assets regenerated
-  from clean commit `ec6789e`.
+- The display-only approach was removed. CAD-backed product mesh/solve paths
+  now use the same projected quadratic volume mesh for stiffness assembly, VTU
+  export, diagnostics and Studio. `SimSetup` and CLI product defaults select the
+  graded path with curved solve geometry enabled.
+- Curvature-dominant BReps use a 0.5× accuracy lattice. Pyramids are converted
+  through the assembly-consistent diagonal; tet4/hex8 cells are promoted to
+  tet10/hex20; exact face and sharp-edge projections are accepted only above
+  `quality = 0.02` with positive sampled Jacobians.
+- A boundary-graph sharp-edge pass now pins connected CAD-edge segments as
+  coupled endpoint moves. When that pin would consume the curved-cell reserve,
+  a deterministic local pattern search moves only the affected interior star;
+  the move is committed only when every touched cell clears the ship gates.
+- Studio no longer draws four flat triangles as a proxy for each quadratic
+  face. It evaluates the solved isoparametric surface at eight subdivisions and
+  applies the same interpolation weights to displacement, von Mises,
+  displacement magnitude and nodal η.
+- Graded h = 8 mm rounded corpus, actual solved mesh:
+  sphere p99/bbox **7.12e-6**, qmin **0.02542**, normal p99 **0.335°**;
+  cone **5.50e-5**, **0.02460**, **2.59°**; cylinder **5.66e-6**,
+  **0.03250**, **0.195°**; plate-hole **4.83e-5**, **0.02008**,
+  **0.818°**. All four are below the **1e-4 / 99.99%** surface target,
+  with zero inverted and zero sub-floor cells.
+- Exact sharp-edge diagnostics now classify CAD-owned quadratic boundary edges
+  and use exact OCC curve projection in the mesh→BRep direction instead of the
+  sampled-polyline distance floor. Cone CAD-edge coverage p99 is 23.6 μm at
+  h = 8 mm; all BRep vertices are exact.
+- Advisor labels changed because the product default, element order, DOF census
+  and rounded-part mesh counts changed; generation-v7 archive/regeneration and
+  retraining are required rather than reusing v6 labels.
 
 **Spectral sizing + coarsening + budget advisor + CG equilibration (2026-08-16,
 ADR-0034):** one wave, four mechanisms, suite **432/432 green** (OCC on).

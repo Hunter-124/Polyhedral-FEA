@@ -311,6 +311,51 @@ ConformityStats surface_conformity(const geom::TriSurface& surface,
     return s;
 }
 
+MirrorKeyFrame mirror_key_frame(const std::vector<Eigen::Vector3d>& nodes) {
+    MirrorKeyFrame f;
+    if (nodes.empty()) {
+        return f;
+    }
+    Eigen::Vector3d lo = nodes.front();
+    Eigen::Vector3d hi = lo;
+    for (const auto& p : nodes) {
+        lo = lo.cwiseMin(p);
+        hi = hi.cwiseMax(p);
+    }
+    f.center = 0.5 * (lo + hi);
+    const double quantum = 1e-9 * (hi - lo).norm();
+    f.inv_quantum = quantum > 0.0 ? 1.0 / quantum : 0.0;
+    return f;
+}
+
+void sort_mirror_canonical(const std::vector<Eigen::Vector3d>& nodes,
+                          std::vector<std::uint32_t>& ids) {
+    if (ids.size() < 2) {
+        return;
+    }
+    MirrorKeyFrame frame;
+    {
+        Eigen::Vector3d lo = nodes[ids.front()];
+        Eigen::Vector3d hi = lo;
+        for (const auto ni : ids) {
+            lo = lo.cwiseMin(nodes[ni]);
+            hi = hi.cwiseMax(nodes[ni]);
+        }
+        frame.center = 0.5 * (lo + hi);
+        const double quantum = 1e-9 * (hi - lo).norm();
+        frame.inv_quantum = quantum > 0.0 ? 1.0 / quantum : 0.0;
+    }
+    // Key array over the whole node range: the comparator must be cheap and must
+    // not recompute a key per comparison.
+    std::vector<std::array<long long, 3>> key(nodes.size());
+    for (const auto ni : ids) {
+        key[ni] = frame.key(nodes[ni]);
+    }
+    std::sort(ids.begin(), ids.end(), [&](std::uint32_t a, std::uint32_t b) {
+        return key[a] != key[b] ? key[a] < key[b] : a < b;
+    });
+}
+
 SnapStats
 snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d>& nodes,
                     const std::vector<std::uint32_t>& boundary_nodes, double h,
@@ -456,19 +501,38 @@ snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d
         std::set<std::uint32_t> offenders;
         collect_offenders(offenders);
         const std::size_t max_steps = 8 * original.size() + 1;
+        // Retreat order decides the result: freeing one node routinely legalises
+        // its neighbour. On a symmetric mesh a node and its mirror image offend by
+        // the same amount, so a node-id tie-break retreats one of the pair and
+        // keeps the other (ADR-0036).
+        const MirrorKeyFrame mkey = mirror_key_frame(nodes);
         for (std::size_t step = 0; step < max_steps && !original.empty(); ++step) {
             const auto pick_worst = [&](bool skip_deferred) {
                 std::uint32_t picked = 0xffffffffu;
                 double picked_move = -1.0;
+                std::array<long long, 3> picked_key{};
                 for (const auto ni : offenders) {
                     const auto it = moved.find(ni);
                     if (it == moved.end() || (skip_deferred && deferred.count(ni) != 0) ||
                         !node_offends(ni)) {
                         continue;
                     }
-                    if (it->second > picked_move) {
+                    const double move = it->second;
+                    const double eps = 1e-12 * std::max(std::abs(move), std::abs(picked_move));
+                    if (move > picked_move + eps) {
                         picked = ni;
-                        picked_move = it->second;
+                        picked_move = move;
+                        picked_key = mkey.key(nodes[ni]);
+                        continue;
+                    }
+                    if (move < picked_move - eps) {
+                        continue;
+                    }
+                    const auto key = mkey.key(nodes[ni]);
+                    if (key < picked_key || (key == picked_key && ni < picked)) {
+                        picked = ni;
+                        picked_move = move;
+                        picked_key = key;
                     }
                 }
                 return picked;
@@ -812,14 +876,15 @@ SmoothStats smooth_boundary_nodes(const geom::TriSurface& surface,
     // provenance through the exact oracle, so the visit sequence is mesh-level
     // mutation state rather than a private scan: `nbr` bucket order differs
     // between libstdc++ and MSVC (measured 2026-08-14: 5 of 24 corpus pairs
-    // disagreed, worst 264 vs 200 elements), so drive both loops from node ids
-    // in ascending order.
+    // disagreed, worst 264 vs 200 elements). Ascending node id fixed that but is
+    // not mirror-equivariant, and this pass was the single largest symmetry loss
+    // in the graded fill — see `sort_mirror_canonical` (ADR-0036).
     std::vector<std::uint32_t> nbr_ids;
     nbr_ids.reserve(nbr.size());
     for (const auto& [ni, _] : nbr) {
         nbr_ids.push_back(ni);
     }
-    std::sort(nbr_ids.begin(), nbr_ids.end());
+    sort_mirror_canonical(nodes, nbr_ids);
     const bool exact_owners = projection != nullptr && projection->target;
     for (const auto ni : nbr_ids) {
         Kind k = Kind::kFree;

@@ -168,10 +168,10 @@ size-field sources at all, the sphere still measures 68–72% — so roughly a t
 of the remaining asymmetry is the mesher's own tessellation-driven stamping and
 carving, not the sizing plan.
 
-Closing this means taking curvature from the exact BRep — per-face principal
+Closing this meant taking curvature from the exact BRep — per-face principal
 curvature samples on `geom::CadTopology`, the face analogue of the
-`CadEdge::kappa_samples` that `spectral_edge_sources` already uses — and is left
-open here rather than half-done.
+`CadEdge::kappa_samples` that `spectral_edge_sources` already uses. That landed
+as the follow-up in §8; what is genuinely still open is listed at its end.
 
 ## 7. Consequences
 
@@ -194,3 +194,84 @@ open here rather than half-done.
 - `tet_boundary_nodes` takes node positions. ADR-0032's ascending-node-id order
   is superseded by the mirror-canonical order, which is equally deterministic
   across standard libraries.
+
+## 8. Follow-up: the order-dependent passes and the tessellation ceiling
+
+Two further pieces landed on top of the split, each measured the same way.
+
+**Every accept/reject pass is now reflection-equivariant.** The stage-by-stage
+attribution on `cylinder.step` (whose tessellation is exactly mirror-symmetric,
+so any asymmetry is the mesher's own) put the losses at, in order: the tangential
+smoothing pass (−7 to −11 points of mirrored tets), the sliver-collapse round
+(−1.5 to −3 points, and the seed the smoothing then amplified ~5×), and the
+snap's coupled retreat (nothing measurable on this part). The fixes share one
+mechanism, `mesh::MirrorKeyFrame` (quantised per-axis distance from the node-set
+bbox centre — mirror-invariant, so a mirror pair keys bit-identically):
+
+- `snap_boundary_nodes`' retreat loop picks the worst offender by moved distance
+  with the key, not the node id, breaking ties — a node and its mirror offend by
+  the same amount, and the id tie-break retreated one of the pair and kept the
+  other.
+- `smooth_boundary_nodes` visits nodes in mirror-canonical order
+  (`sort_mirror_canonical`), as does the feature-pin pass.
+- The collapse round's phase A ranks merge candidates by (distance, key, id);
+  phase B visits caps worst-aspect-first with key tie-breaks, tries candidate
+  edges shortest-first with key tie-breaks, and — when both collapse directions
+  are legal — keeps the direction whose incident star survives in better shape
+  (`collapse_score`, the star's worst post-collapse aspect; aspect is
+  mirror-invariant, so mirrored caps collapse in mirrored directions).
+
+Visit order was the one place a symmetric choice lost to a quality choice, and
+the measured record matters: index order fails the sphere scorecard (M1max
+0.035 h), centre-out radial order passes the sphere (0.0095 h) but destroys the
+hole plate (M1max 4.76 — centre-out starts at the hole rim, the one boundary
+that must not move first), and worst-aspect-first passes both (sphere 0.0095 h
+against the 0.0123 h baseline, hole plate composite 0.530 at parity). Quality
+order also beats the baseline it replaced.
+
+**Curvature sizing reads the exact BRep.** `geom::CadFace` carries `samples` /
+`kappa_samples` — max |principal curvature| from `BRepLProp_SLProps` on a uv grid
+inside the trimmed face, so the value is a property of the surface, not of the
+tessellation (a sphere comes out at κ = 20.000 1/m everywhere; the same part's
+tessellation-derived estimate spans 17.7–145.9). `build_refinement_plan` prefers
+it whenever `Model::cad` is populated and reports `geo_curv=brep|tessellation`;
+the thin-wall term still comes from the tessellation. On the sphere this removes
+all 55 tessellation-noise seeds (was refining a uniformly-curved surface
+non-uniformly), and it is what moved the sphere's y/z mirror fraction to
+95.9/83.1%.
+
+Final mirrored-tet fractions (`--no-curved`, 1e-6·diag tolerance) and the
+curved-geometry fidelity matrix:
+
+| part | h | x | y | z |
+|---|---|---|---|---|
+| cantilever, `tet` | 10 mm | 100% | 100% | 100% |
+| cantilever, `graded` | 10 mm | 100% | 100% | 100% |
+| cylinder, `graded` | 8 mm | 87.6% | 89.7% | 89.7% |
+| sphere, `graded` | 8 mm | 75.4% | 95.9% | 83.1% |
+| plate_hole, `graded` | 6 mm | 81.7% | 83.8% | 94.3% |
+
+| part | q_min | below floor | surface p99/bbox | normal p99° |
+|---|---|---|---|---|
+| sphere | 0.0207 | 0 | 6.9e-6 | 0.253 |
+| icecream_cone | 0.0205 | 0 | 1.42e-4 | 5.12 |
+| cylinder | 0.0221 | 0 | 1.8e-5 | 0.347 |
+| plate_hole | 0.0210 | 0 | 4.5e-6 | 0.366 |
+
+Reported, not smoothed over: the collapse rework lets the cylinder's q_min fall
+from 0.053 to 0.022. The collapse gate can never create a cell below its star's
+pre-collapse minimum (healthy cells may not drop below 0.04, sub-0.04 cells may
+only improve), so the 0.022 cell was born in the snap/LEB stages and merely
+survives a different survivor selection — but the margin above the 0.02 floor is
+now thin on curved parts and worth watching. The cylinder's surface p99 moved
+5.6e-6 → 1.8e-5 for the same reason, still well inside the 1e-4 bar.
+
+**Still open.** What remains asymmetric is what still reads `Model::surface`:
+`stamp_curvature_cells`'s per-cell turning angle (worth 12 points of plate
+symmetry when ablated), `classify_cells_inside`'s z-ray parity, and the
+jut/carve thresholds — all fed by a tessellation that is itself 0–6%
+mirror-symmetric on the sphere and plate. Closing those means either an exact
+BRep inside/outside classifier for boundary cells or a symmetry-exploiting
+tessellation; neither is small, and the renders are no longer visibly wrong, so
+they are left open here rather than half-done.
+

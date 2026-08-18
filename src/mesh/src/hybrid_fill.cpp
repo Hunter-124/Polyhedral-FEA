@@ -1053,16 +1053,21 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             }
             std::vector<char> removed(out.mesh.tets.size(), 0);
             bool any = false;
-            const auto try_collapse = [&](std::uint32_t dead, std::uint32_t surv) {
+            // Viability/quality of merging `dead` into `surv`, as the worst
+            // post-collapse aspect over the incident star, or -infinity when the
+            // merge is not legal. Pure: reads the mesh, never mutates it, so a
+            // collapse direction can be *chosen* on quality before it is applied.
+            const auto collapse_score = [&](std::uint32_t dead, std::uint32_t surv) {
                 // Never pull the surface inward: a boundary node may only merge
                 // into another boundary node.
                 if (bset.count(dead) && !bset.count(surv)) {
-                    return false;
+                    return -std::numeric_limits<double>::infinity();
                 }
                 const auto it = incident.find(dead);
                 if (it == incident.end()) {
-                    return false;
+                    return -std::numeric_limits<double>::infinity();
                 }
+                double worst = std::numeric_limits<double>::infinity();
                 for (const auto tj : it->second) {
                     if (removed[tj]) {
                         continue;
@@ -1091,9 +1096,17 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                     const bool was_healthy = aspect_before >= kKeepAspect;
                     if (v <= 0.0 || (was_healthy && v <= vol_eps) ||
                         (aspect_after < kKeepAspect && aspect_after < aspect_before)) {
-                        return false;
+                        return -std::numeric_limits<double>::infinity();
                     }
+                    worst = std::min(worst, aspect_after);
                 }
+                return worst;
+            };
+            const auto try_collapse = [&](std::uint32_t dead, std::uint32_t surv) {
+                if (!std::isfinite(collapse_score(dead, surv))) {
+                    return false;
+                }
+                const auto it = incident.find(dead);
                 for (const auto tj : it->second) {
                     if (removed[tj]) {
                         continue;
@@ -1122,6 +1135,11 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 return true;
             };
 
+            // Collapse decisions are sequential and their inputs tie constantly on
+            // a symmetric mesh (equal edge lengths, equal aspects), so every
+            // ordering below runs through this frame instead of node/tet indices,
+            // which do not mirror (ADR-0036).
+            const MirrorKeyFrame mkey = mirror_key_frame(out.mesh.nodes);
             // Phase A — void juts: boundary nodes whose projection the snap had
             // to reject (hole-rim stair chords poking into the void) merge into
             // an adjacent on-surface boundary node instead of leaving a spike.
@@ -1149,7 +1167,18 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                         cand.push_back({(out.mesh.nodes[nn] - out.mesh.nodes[ni]).norm(), nn});
                     }
                 }
-                std::sort(cand.begin(), cand.end());
+                // Distance ties break on the mirror key, not the node id, so a
+                // jut and its mirror image merge toward mirrored neighbours
+                // (ADR-0036).
+                std::sort(cand.begin(), cand.end(),
+                          [&](const auto& x, const auto& y) {
+                              if (x.first != y.first) {
+                                  return x.first < y.first;
+                              }
+                              const auto kx = mkey.key(out.mesh.nodes[x.second]);
+                              const auto ky = mkey.key(out.mesh.nodes[y.second]);
+                              return kx != ky ? kx < ky : x.second < y.second;
+                          });
                 cand.erase(std::unique(cand.begin(), cand.end(),
                                        [](const auto& x, const auto& y) {
                                            return x.second == y.second;
@@ -1166,38 +1195,103 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 }
             }
 
-            // Phase B — sliver caps: collapse the shortest viable edge.
+            // Phase B — sliver caps: collapse the shortest viable edge of the
+            // worst cap first. Visit order measured across three candidates on
+            // the STL scorecards (graded column): index order fails the sphere
+            // residual (M1max 0.035 h), centre-out radial order passes the sphere
+            // (0.0095 h) but destroys the hole plate (M1max 4.76 — centre-out
+            // starts at the hole rim, the one boundary that must not move first),
+            // and worst-aspect-first passes both (sphere 0.0095 h, hole plate
+            // composite 0.530 at parity with the old index order's 0.5304).
+            // Quality, not geometry, is the only order that respects both.
+            const auto& mkey_b = mkey;
+            const auto tet_center_b = [&](std::size_t ti) {
+                const auto& n = out.mesh.tets[ti];
+                return 0.25 * (out.mesh.nodes[n[0]] + out.mesh.nodes[n[1]] +
+                               out.mesh.nodes[n[2]] + out.mesh.nodes[n[3]]);
+            };
+            std::vector<std::size_t> cap_order;
             for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+                if (!removed[ti] && aspect_of(out.mesh.tets[ti]) < kCapAspect) {
+                    cap_order.push_back(ti);
+                }
+            }
+            std::sort(cap_order.begin(), cap_order.end(), [&](std::size_t a, std::size_t b) {
+                const double qa = aspect_of(out.mesh.tets[a]);
+                const double qb = aspect_of(out.mesh.tets[b]);
+                if (qa != qb) {
+                    return qa < qb;
+                }
+                const auto ka = mkey_b.key(tet_center_b(a));
+                const auto kb = mkey_b.key(tet_center_b(b));
+                return ka != kb ? ka < kb : a < b;
+            });
+            for (const auto ti : cap_order) {
                 if (removed[ti] || aspect_of(out.mesh.tets[ti]) >= kCapAspect) {
                     continue;
                 }
                 const auto tet = out.mesh.tets[ti];
-                // Candidate edges by ascending length.
+                // Candidate edges by ascending length; the six edges of a lattice
+                // cap tie on length constantly, and the tie-break decides which
+                // edge collapses — keys, not ids, so a mirrored cap tries its
+                // edges in mirrored order (ADR-0036).
                 std::array<std::pair<double, std::array<std::uint32_t, 2>>, 6> edges_len{};
                 int ne = 0;
                 for (int p = 0; p < 4; ++p) {
                     for (int q2 = p + 1; q2 < 4; ++q2) {
-                        const auto a = tet[static_cast<std::size_t>(p)];
-                        const auto b = tet[static_cast<std::size_t>(q2)];
+                        const std::uint32_t a = tet[static_cast<std::size_t>(p)];
+                        const std::uint32_t b = tet[static_cast<std::size_t>(q2)];
                         edges_len[static_cast<std::size_t>(ne++)] = {
                             (out.mesh.nodes[a] - out.mesh.nodes[b]).norm(), {a, b}};
                     }
                 }
+                const auto edge_key_hi = [&](std::array<std::uint32_t, 2> e) {
+                    const auto k0 = mkey.key(out.mesh.nodes[e[0]]);
+                    const auto k1 = mkey.key(out.mesh.nodes[e[1]]);
+                    return k1 < k0 ? k1 : k0;
+                };
                 std::sort(edges_len.begin(), edges_len.end(),
-                          [](const auto& x, const auto& y) { return x.first < y.first; });
+                          [&](const auto& x, const auto& y) {
+                              if (x.first != y.first) {
+                                  return x.first < y.first;
+                              }
+                              const auto kx = edge_key_hi(x.second);
+                              const auto ky = edge_key_hi(y.second);
+                              return kx != ky ? kx < ky : x.second[0] < y.second[0];
+                          });
                 bool done = false;
                 for (int e = 0; e < ne && !done; ++e) {
-                    for (int dir = 0; dir < 2 && !done; ++dir) {
-                        const std::uint32_t dead = edges_len[static_cast<std::size_t>(e)]
-                                                       .second[static_cast<std::size_t>(dir)];
-                        const std::uint32_t surv =
-                            edges_len[static_cast<std::size_t>(e)]
-                                .second[static_cast<std::size_t>(1 - dir)];
-                        if (node_remap[dead] != dead || node_remap[surv] != surv) {
-                            continue;
-                        }
-                        done = try_collapse(dead, surv);
+                    const std::uint32_t a = edges_len[static_cast<std::size_t>(e)].second[0];
+                    const std::uint32_t b = edges_len[static_cast<std::size_t>(e)].second[1];
+                    if (node_remap[a] != a || node_remap[b] != b) {
+                        continue;
                     }
+                    // When both directions are legal, keep the one whose incident
+                    // star survives in better shape. Aspect is mirror-invariant,
+                    // so a cap and its mirror image collapse in mirrored
+                    // directions. An exact score tie — the norm on a symmetric
+                    // lattice — falls back to farther-from-centre.
+                    const double sa = collapse_score(a, b); // a dies
+                    const double sb = collapse_score(b, a); // b dies
+                    if (!std::isfinite(sa) && !std::isfinite(sb)) {
+                        continue;
+                    }
+                    std::uint32_t dead;
+                    std::uint32_t surv;
+                    if (sa > sb) {
+                        dead = a;
+                        surv = b;
+                    } else if (sb > sa) {
+                        dead = b;
+                        surv = a;
+                    } else {
+                        const auto ka = mkey.key(out.mesh.nodes[a]);
+                        const auto kb = mkey.key(out.mesh.nodes[b]);
+                        const bool a_dies = ka < kb || (ka == kb && a < b);
+                        dead = a_dies ? a : b;
+                        surv = a_dies ? b : a;
+                    }
+                    done = try_collapse(dead, surv);
                 }
             }
 

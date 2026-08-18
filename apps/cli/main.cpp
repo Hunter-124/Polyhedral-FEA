@@ -57,7 +57,7 @@ int usage() {
                "                             geometry+BC-aware volume mesh; optional VTU\n"
                "  solve <part.step|.brep|.msh> -o out.vtu [-h m] [-E Pa] [-nu r]\n"
                "              [--mesher name] [--skin n] [--no-feature] [--adapt n]\n"
-               "              [--eta-target η] [--p-elevate] [--p-elevate-uniform]\n"
+               "              [--eta-target η] [--no-curved] [--p-elevate-uniform]\n"
                "              [--element-tendency t] [--no-spectral]\n"
                "              [--max-elems N] [--max-dof N] [--max-mem GB]\n"
                "              [--fix-box ...6] [--load-box ...6] [--bc-grade]\n"
@@ -95,11 +95,12 @@ int usage() {
                "              available system memory)\n"
                "--adapt n: ZZ→Dörfler remesh passes (local seeds on graded path)\n"
                "--eta-target η: stop adapt when global ZZ η ≤ η (0=off; needs --adapt)\n"
-               "--p-elevate: promote ZZ-smooth tet4/hex8 → tet10/hex20 (auto-on --adapt>0);\n"
-               "             the unmarked remainder stays linear, so the mesh is mixed p\n"
-               "--p-elevate-uniform: promote EVERY tet4/hex8 instead of the smooth-marked\n"
-               "             subset → uniformly quadratic, for true order-2 parity with\n"
-               "             Gmsh peers; implies --p-elevate\n"
+               "--no-curved: ship the straight-edged linear mesh instead of the exact\n"
+               "             curved CAD geometry. Default for a CAD part is curved: the\n"
+               "             solve/export mesh is tet10/hex20 with boundary mids on the\n"
+               "             BRep (ADR-0035), so this flag is the opt-out, not the opt-in\n"
+               "--p-elevate-uniform: promote every tet4/hex8 on a non-CAD (STL) mesh too,\n"
+               "             for order-2 parity with Gmsh peers on tessellated input\n"
                "--bc-grade: force a-priori BC grading from the default cantilever faces\n"
                "--advisor DIR: pick mesher/h/adapt/p-order with the learned mesh advisor\n"
                "               (DIR holds model.onnx, normalization.json, clamps.json);\n"
@@ -585,6 +586,7 @@ int cmd_mesh(std::span<char*> args) {
     bool feature = true; // geometry (curvature/thin-wall) grading on by default
     bool spectral = true; // spectral sizing on by default (ADR-0034)
     double element_tendency = 0.0;
+    bool curved = true; // exact curved CAD solve/export geometry (ADR-0035)
     std::size_t max_elems = 0;
     std::size_t max_dof = 0;
     BoxSel fix_box, load_box;
@@ -602,6 +604,8 @@ int cmd_mesh(std::span<char*> args) {
             }
         } else if (std::strcmp(args[i], "--feature") == 0) {
             feature = true; // accepted for back-compat (now the default)
+        } else if (std::strcmp(args[i], "--no-curved") == 0) {
+            curved = false;
         } else if (std::strcmp(args[i], "--no-feature") == 0) {
             feature = false;
         } else if (std::strcmp(args[i], "--spectral") == 0) {
@@ -643,13 +647,16 @@ int cmd_mesh(std::span<char*> args) {
         model, h, mesher, skin, feature, plan.refine_seeds, plan.seed_band, element_tendency,
         resolved.element_ceiling, resolved.dof_ceiling, resolved.auto_chosen ? 3 : 0, {},
         plan.size_field);
-    auto curved = polymesh::pipeline::curve_volume_geometry(model, vol.mesh, h);
-    vol.mesh = std::move(curved.mesh);
-    vol.boundary_quads = polymesh::fea::extract_boundary_faces(vol.mesh);
-    vol.mesher_note += std::format(
-        " | curved_volume promoted={} pyramid_split={} projected={} partial={} reverted={}",
-        curved.n_promoted, curved.n_pyramids_split, curved.n_projected,
-        curved.n_partial, curved.n_reverted);
+    if (curved) {
+        auto shaped = polymesh::pipeline::curve_volume_geometry(model, vol.mesh, h);
+        vol.mesh = std::move(shaped.mesh);
+        vol.boundary_quads = polymesh::fea::extract_boundary_faces(vol.mesh);
+        vol.mesher_note += std::format(
+            " | curved_volume promoted={} pyramid_split={} projected={} partial={} "
+            "reverted={} h_refined={}",
+            shaped.n_promoted, shaped.n_pyramids_split, shaped.n_projected,
+            shaped.n_partial, shaped.n_reverted, shaped.n_h_refined);
+    }
     vol.mesh.check_validity();
     std::printf("mesh: %zu nodes, %zu elems, h=%.6g m\n"
                 "refine: %zu geometry + %zu BC seeds → %zu seeds, band=%.4g m, h_fine=%.4g m\n"
@@ -687,6 +694,7 @@ int cmd_solve(std::span<char*> args) {
     auto mesher = polymesh::pipeline::VolumeMesher::kGradedTet;
     int skin = 2;
     bool feature = true; // geometry grading on by default (CAD)
+    bool curved = true; // exact curved CAD solve/export geometry (ADR-0035)
     bool spectral = true; // spectral sizing on by default (ADR-0034)
     int adapt_passes = 0;
     double eta_target = 0.0;
@@ -721,6 +729,8 @@ int cmd_solve(std::span<char*> args) {
             feature = true; // accepted for back-compat (now the default)
         } else if (std::strcmp(args[i], "--no-feature") == 0) {
             feature = false;
+        } else if (std::strcmp(args[i], "--no-curved") == 0) {
+            curved = false;
         } else if (std::strcmp(args[i], "--spectral") == 0) {
             spectral = true; // accepted for symmetry (now the default)
         } else if (std::strcmp(args[i], "--no-spectral") == 0) {
@@ -1127,20 +1137,21 @@ int cmd_solve(std::span<char*> args) {
                                        counts.hex20);
     };
     const auto curve_final_geometry = [&]() {
-        if (!model || !model->cad) {
+        if (!curved || !model || !model->cad) {
             return false;
         }
         const std::size_t n0 = vol.mesh.nodes.size();
-        auto curved =
+        auto shaped =
             polymesh::pipeline::curve_volume_geometry(*model, vol.mesh, h_use);
-        curved_constraints = std::move(curved.constraints);
-        vol.mesh = std::move(curved.mesh);
+        curved_constraints = std::move(shaped.constraints);
+        vol.mesh = std::move(shaped.mesh);
         vol.boundary_quads = polymesh::fea::extract_boundary_faces(vol.mesh);
         vol.mesher_note += std::format(
-            " | curved_volume promoted={} pyramid_split={} projected={} partial={} reverted={}",
-            curved.n_promoted, curved.n_pyramids_split, curved.n_projected,
-            curved.n_partial, curved.n_reverted);
-        report_p_elevate(curved.n_promoted, n0);
+            " | curved_volume promoted={} pyramid_split={} projected={} partial={} "
+            "reverted={} h_refined={}",
+            shaped.n_promoted, shaped.n_pyramids_split, shaped.n_projected,
+            shaped.n_partial, shaped.n_reverted, shaped.n_h_refined);
+        report_p_elevate(shaped.n_promoted, n0);
         return true;
     };
     const auto solve_with_final_geometry = [&]() {
@@ -1280,6 +1291,7 @@ int cmd_diag(std::span<char*> args) {
     auto mesher = polymesh::pipeline::VolumeMesher::kVaryhedron;
     bool do_solve = true;
     bool spectral = true; // spectral sizing on by default (ADR-0034)
+    bool curved = true; // exact curved CAD solve/export geometry (ADR-0035)
     std::size_t max_elems = 0;
     std::size_t max_dof = 0;
     double max_mem_gb = 0.0;
@@ -1295,6 +1307,8 @@ int cmd_diag(std::span<char*> args) {
             json_path = args[++i];
         } else if (std::strcmp(args[i], "--no-solve") == 0) {
             do_solve = false;
+        } else if (std::strcmp(args[i], "--no-curved") == 0) {
+            curved = false;
         } else if (std::strcmp(args[i], "--spectral") == 0) {
             spectral = true; // accepted for symmetry (now the default)
         } else if (std::strcmp(args[i], "--no-spectral") == 0) {
@@ -1364,14 +1378,18 @@ int cmd_diag(std::span<char*> args) {
         resolved.element_ceiling, resolved.dof_ceiling, resolved.auto_chosen ? 3 : 0, {},
         plan.size_field);
     const double mesh_ms = ms(clock::now() - t0);
-    auto curved = polymesh::pipeline::curve_volume_geometry(model, vol.mesh, h);
-    vol.mesh = std::move(curved.mesh);
-    const auto curved_constraints = std::move(curved.constraints);
-    vol.boundary_quads = polymesh::fea::extract_boundary_faces(vol.mesh);
-    vol.mesher_note += std::format(
-        " | curved_volume promoted={} pyramid_split={} projected={} partial={} reverted={}",
-        curved.n_promoted, curved.n_pyramids_split, curved.n_projected,
-        curved.n_partial, curved.n_reverted);
+    polymesh::fea::LinearConstraints curved_constraints;
+    if (curved) {
+        auto shaped = polymesh::pipeline::curve_volume_geometry(model, vol.mesh, h);
+        vol.mesh = std::move(shaped.mesh);
+        curved_constraints = std::move(shaped.constraints);
+        vol.boundary_quads = polymesh::fea::extract_boundary_faces(vol.mesh);
+        vol.mesher_note += std::format(
+            " | curved_volume promoted={} pyramid_split={} projected={} partial={} "
+            "reverted={} h_refined={}",
+            shaped.n_promoted, shaped.n_pyramids_split, shaped.n_projected,
+            shaped.n_partial, shaped.n_reverted, shaped.n_h_refined);
+    }
     vol.mesh.check_validity();
 
     // Measured per-cell quality for every element type (fea::cell_quality): the

@@ -2473,23 +2473,19 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
             }
             vol.mesh.check_validity();
             if (cfg.order >= 2 || cfg.p_elevate) {
-                vol.mesh = fea::promote_to_quadratic(vol.mesh);
-                if (model.cad && !model.cad->empty()) {
-                    std::vector<mesh::BoundarySupport> provenance;
-                    mesh::BoundaryProjectionContext projection;
-                    if (pipeline::make_boundary_projection(
-                            *model.cad, h, &projection, &provenance)) {
-                        std::vector<std::uint32_t> reverted;
-                        std::vector<std::uint32_t> partial;
-                        const std::size_t projected =
-                            pipeline::project_quadratic_boundary_mids(
-                                vol.mesh, *model.cad, &projection, h, &reverted,
-                                &partial);
-                        vol.mesher_note += std::format(
-                            " | mids projected={} partial={} reverted={}",
-                            projected, partial.size(), reverted.size());
-                    }
-                }
+                // Use the product's own curved-geometry construction rather than
+                // a local promote+project copy: pyramid split, exact face and
+                // sharp-edge mids, shape-floor rollback and h-refinement
+                // fallback all have to be identical, or the advisor learns from
+                // meshes the shipped pipeline never builds.
+                auto shaped = pipeline::curve_volume_geometry(model, vol.mesh, h);
+                vol.mesh = std::move(shaped.mesh);
+                vol.boundary_quads = fea::extract_boundary_faces(vol.mesh);
+                vol.mesher_note += std::format(
+                    " | curved_volume promoted={} pyramid_split={} projected={}"
+                    " partial={} reverted={} h_refined={}",
+                    shaped.n_promoted, shaped.n_pyramids_split, shaped.n_projected,
+                    shaped.n_partial, shaped.n_reverted, shaped.n_h_refined);
                 vol.mesh.check_validity();
             }
             pipeline::update_solved_geometry_volume(model, vol);

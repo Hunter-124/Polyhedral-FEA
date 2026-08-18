@@ -138,31 +138,87 @@ double GradedSizing::size_at(const Eigen::Vector3d& point) const {
     return std::clamp(h, h_min_, h_max_);
 }
 
-std::vector<SizeSource> geometry_size_sources(const geom::TriSurface& surface, double h_min,
-                                              double h_max, double curvature_fraction,
-                                              double thickness_fraction) {
+namespace {
+
+/// Emit one source per surface vertex whose demanded h is strictly finer than
+/// `h_max`, clamped into [h_min, h_max]. `demand(i)` returns h_max when vertex
+/// i asks for nothing, which is also the sparsity rule: flat, thick vertices
+/// never become sources, so only the geometrically interesting regions cost
+/// anything downstream. Shared by all three public source builders so the
+/// emit / clamp / sparsity rule exists once.
+template <class Demand>
+std::vector<SizeSource> emit_vertex_sources(const geom::TriSurface& surface, double h_min,
+                                            double h_max, Demand demand) {
     std::vector<SizeSource> out;
     if (surface.vertices.empty()) {
         return out;
     }
-    const auto curv = geom::estimate_vertex_curvature(surface);
-    const auto thick = geom::estimate_local_thickness(surface);
     out.reserve(surface.vertices.size() / 4 + 1);
     for (std::size_t i = 0; i < surface.vertices.size(); ++i) {
-        double h = h_max;
-        const double kappa = (i < curv.kappa.size()) ? curv.kappa[i] : 0.0;
-        if (kappa > 1e-12) {
-            // h ≈ c / κ (κ ≈ 1/R ⇒ h ≈ c·R): resolve the local turn.
-            h = std::min(h, curvature_fraction / kappa);
-        }
-        if (i < thick.thickness.size() && geom::has_finite_thickness(thick.thickness[i])) {
-            h = std::min(h, thickness_fraction * thick.thickness[i]);
-        }
-        if (h < h_max) { // only geometrically interesting vertices become sources
+        const double h = demand(i);
+        if (h < h_max) {
             out.push_back(SizeSource{surface.vertices[i], std::clamp(h, h_min, h_max)});
         }
     }
     return out;
+}
+
+/// h ≈ c / κ (κ ≈ 1/R ⇒ h ≈ c·R): resolve the local turn. h_max when flat.
+double curvature_demand(const geom::VertexCurvature& curv, std::size_t i, double h_max,
+                        double curvature_fraction) {
+    const double kappa = (i < curv.kappa.size()) ? curv.kappa[i] : 0.0;
+    if (kappa > 1e-12) {
+        return std::min(h_max, curvature_fraction / kappa);
+    }
+    return h_max;
+}
+
+/// A fraction of the local wall thickness, so a thin wall gets several elements
+/// across it. h_max where the ray cast found no opposing wall.
+double thickness_demand(const geom::VertexThickness& thick, std::size_t i, double h_max,
+                        double thickness_fraction) {
+    if (i < thick.thickness.size() && geom::has_finite_thickness(thick.thickness[i])) {
+        return std::min(h_max, thickness_fraction * thick.thickness[i]);
+    }
+    return h_max;
+}
+
+} // namespace
+
+std::vector<SizeSource> curvature_size_sources(const geom::TriSurface& surface, double h_min,
+                                               double h_max, double curvature_fraction) {
+    if (surface.vertices.empty()) {
+        return {};
+    }
+    const auto curv = geom::estimate_vertex_curvature(surface);
+    return emit_vertex_sources(surface, h_min, h_max, [&](std::size_t i) {
+        return curvature_demand(curv, i, h_max, curvature_fraction);
+    });
+}
+
+std::vector<SizeSource> thickness_size_sources(const geom::TriSurface& surface, double h_min,
+                                               double h_max, double thickness_fraction) {
+    if (surface.vertices.empty()) {
+        return {};
+    }
+    const auto thick = geom::estimate_local_thickness(surface);
+    return emit_vertex_sources(surface, h_min, h_max, [&](std::size_t i) {
+        return thickness_demand(thick, i, h_max, thickness_fraction);
+    });
+}
+
+std::vector<SizeSource> geometry_size_sources(const geom::TriSurface& surface, double h_min,
+                                              double h_max, double curvature_fraction,
+                                              double thickness_fraction) {
+    if (surface.vertices.empty()) {
+        return {};
+    }
+    const auto curv = geom::estimate_vertex_curvature(surface);
+    const auto thick = geom::estimate_local_thickness(surface);
+    return emit_vertex_sources(surface, h_min, h_max, [&](std::size_t i) {
+        return std::min(curvature_demand(curv, i, h_max, curvature_fraction),
+                        thickness_demand(thick, i, h_max, thickness_fraction));
+    });
 }
 
 std::vector<SizeSource> point_size_sources(std::span<const Eigen::Vector3d> points, double h) {

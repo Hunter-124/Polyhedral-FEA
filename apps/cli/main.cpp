@@ -712,10 +712,12 @@ int cmd_mesh(std::span<char*> args) {
     }
     vol.mesh.check_validity();
     std::printf("mesh: %zu nodes, %zu elems, h=%.6g m\n"
-                "refine: %zu geometry + %zu BC seeds → %zu seeds, band=%.4g m, h_fine=%.4g m\n"
+                "refine: %zu geometry + %zu BC seeds → %zu seeds, band=%.4g m, h_fine=%.4g m, "
+                "geo_curv=%s\n"
                 "%s\n%s\n",
                 vol.mesh.nodes.size(), vol.mesh.elements.size(), h, plan.n_geometry_seeds,
                 plan.n_bc_seeds, plan.refine_seeds.size(), plan.seed_band, plan.h_fine,
+                plan.geometry_curvature_from_brep ? "brep" : "tessellation",
                 resolved.note.c_str(), vol.mesher_note.c_str());
     if (plan.spectral.applied) {
         std::printf("spectral: %zu/%zu modes kept (%.2f%% energy), %zu denoised edge-curve "
@@ -1057,8 +1059,10 @@ int cmd_solve(std::span<char*> args) {
         seed_band = plan.seed_band;
         size_field = plan.size_field;
         std::printf(
-            "refine: %zu geometry + %zu BC seeds → %zu seeds, band=%.4g m, h_fine=%.4g m\n",
-            plan.n_geometry_seeds, plan.n_bc_seeds, seeds.size(), seed_band, plan.h_fine);
+            "refine: %zu geometry + %zu BC seeds → %zu seeds, band=%.4g m, h_fine=%.4g m, "
+            "geo_curv=%s\n",
+            plan.n_geometry_seeds, plan.n_bc_seeds, seeds.size(), seed_band, plan.h_fine,
+            plan.geometry_curvature_from_brep ? "brep" : "tessellation");
         if (plan.spectral.applied) {
             std::printf(
                 "spectral: %zu/%zu modes kept (%.2f%% energy), %zu denoised edge-curve "
@@ -1682,7 +1686,7 @@ int cmd_diag(std::span<char*> args) {
         "  \"mesh\": {{ \"h\": {:.6g}, \"nodes\": {}, \"elements\": {}, "
         "\"quality_min\": {:.4g}, \"quality_min_type\": \"{}\", "
         "\"n_inverted_cells\": {}, \"n_below_shape_floor\": {}, \"quality_mean\": {:.4g}, "
-        "\"geometry_seeds\": {}, \"bc_seeds\": {} }},\n"
+        "\"geometry_seeds\": {}, \"bc_seeds\": {}, \"geo_curv\": \"{}\" }},\n"
         "  \"spectral\": {},\n"
         "  \"timing_ms\": {{ \"import\": {:.3f}, \"mesh\": {:.3f}, \"solve\": {:.3f} }},\n"
         "  \"mesh_throughput_elem_per_s\": {:.1f},\n"
@@ -1697,7 +1701,8 @@ int cmd_diag(std::span<char*> args) {
         bbox_diag, model.cad ? "true" : "false", h, vol.mesh.nodes.size(),
         vol.mesh.elements.size(), q_min, q_min_type, n_inverted,
         vol.n_cells_below_shape_floor, q_mean,
-        plan.n_geometry_seeds, plan.n_bc_seeds, spectral_json,
+        plan.n_geometry_seeds, plan.n_bc_seeds,
+        plan.geometry_curvature_from_brep ? "brep" : "tessellation", spectral_json,
         import_ms, mesh_ms, solve_ms, mesh_throughput, fidelity_json,
         solved ? "true" : "false", dof, max_vm, max_u, global_eta, mesh_size_note,
         vol.mesher_note);

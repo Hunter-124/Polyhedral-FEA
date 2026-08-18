@@ -77,11 +77,43 @@ class GradedSizing final : public SizingField {
     std::vector<std::uint32_t> items_;       // source indices bucketed
 };
 
+/// Curvature-driven size sources from the *tessellation*: one per surface
+/// vertex whose discrete-curvature demand `curvature_fraction / kappa` is finer
+/// than `h_max`, clamped to [h_min, h_max].
+///
+/// Discrete per-vertex curvature is only as symmetric as the triangulation it
+/// is read from, and OCC's triangulation of a mirror-symmetric part is not
+/// mirror-symmetric (ADR-0036 §6). Callers holding a BRep should prefer the
+/// exact per-face samples on `geom::CadFace::kappa_samples`; this function is
+/// the STL / no-CAD path.
+std::vector<SizeSource> curvature_size_sources(const geom::TriSurface& surface, double h_min,
+                                               double h_max,
+                                               double curvature_fraction = 0.25);
+
+/// Thin-wall size sources: one per surface vertex whose local thickness asks
+/// for `thickness_fraction * thickness` finer than `h_max`, clamped to
+/// [h_min, h_max]. Thickness is a ray-cast property of the closed surface with
+/// no exact-BRep analogue in this codebase, so this stays the tessellation
+/// reading on every path.
+std::vector<SizeSource> thickness_size_sources(const geom::TriSurface& surface, double h_min,
+                                               double h_max,
+                                               double thickness_fraction = 0.35);
+
 /// Geometry-driven size sources: one per surface vertex whose curvature or
 /// thin-wall target is finer than `h_max`. h = min(curvature_fraction / kappa,
 /// thickness_fraction * thickness), clamped to [h_min, h_max]. Flat, thick
 /// vertices emit no source, keeping the source set sparse (only the
 /// geometrically interesting regions cost anything downstream).
+///
+/// The per-vertex `min` is what this returns, not the concatenation of
+/// `curvature_size_sources` and `thickness_size_sources`. Those two source sets
+/// induce the *same* size field — `size_at` already takes a min over sources
+/// and both sets are pinned to the same vertex, so
+/// min(h_a + βd, h_b + βd) = min(h_a, h_b) + βd — but not the same source
+/// *count*, and the count is reported (RefinementPlan::n_geometry_seeds, the
+/// diag JSON `geometry_seeds`). Keeping the min form keeps that observable
+/// byte-identical while all three functions share one implementation of each
+/// rule.
 std::vector<SizeSource> geometry_size_sources(const geom::TriSurface& surface, double h_min,
                                               double h_max, double curvature_fraction = 0.25,
                                               double thickness_fraction = 0.35);

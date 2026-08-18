@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "geom/cad_model.hpp"
 #include "geom/cad_topology.hpp"
+#include "geom/indicators.hpp"
 #include "geom/step.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -9,6 +10,7 @@
 
 #include <cmath>
 #include <filesystem>
+#include <limits>
 
 using polymesh::geom::CadEdgeFeature;
 using polymesh::geom::CadModel;
@@ -296,4 +298,67 @@ TEST_CASE("extract_topology fills kappa_samples on curved edges when OCC") {
         }
     }
     CHECK(curved_with_kappa >= 1);
+}
+
+// ADR-0036 §6: mesh decisions read from the tessellation cannot be
+// mirror-symmetric, because OCC's tessellation of a mirror-symmetric part is
+// not. The exact per-face curvature samples are the replacement, and the thing
+// that has to be true of them is that they are tessellation-independent. A
+// sphere is the sharpest available witness: its exact curvature is the constant
+// 1/R everywhere, so any spread at all in `CadFace::kappa_samples` would be a
+// discretization artifact leaking in.
+TEST_CASE("CadFace kappa_samples are exact where tessellation curvature is not") {
+    if (!occ_enabled()) {
+        SKIP("OpenCASCADE not enabled");
+    }
+    const std::filesystem::path path = "tests/fixtures/parts/sphere.step";
+    if (!std::filesystem::exists(path)) {
+        SKIP("sphere.step missing");
+    }
+    const CadModel model = CadModel::load_step(path);
+    const auto topo = extract_topology(model, 32);
+
+    double exact_lo = std::numeric_limits<double>::infinity();
+    double exact_hi = 0.0;
+    std::size_t n_exact = 0;
+    for (const auto& f : topo.faces) {
+        REQUIRE(f.kappa_samples.size() == f.samples.size());
+        if (f.kind == polymesh::geom::CadSurfaceKind::kPlane) {
+            // Planar faces are skipped: zero curvature costs nothing to know.
+            CHECK(f.samples.empty());
+            continue;
+        }
+        for (double k : f.kappa_samples) {
+            exact_lo = std::min(exact_lo, k);
+            exact_hi = std::max(exact_hi, k);
+        }
+        n_exact += f.samples.size();
+    }
+    // A 32×32 uv grid on the one spherical face, all of it inside the trim.
+    CHECK(n_exact == 1024);
+    REQUIRE(exact_hi > 0.0);
+    // Constant to a few 1e-3: this is the property tessellation curvature does
+    // not have, and the reason exact sizing can mirror.
+    CHECK(exact_hi / exact_lo == Catch::Approx(1.0).margin(3e-3));
+
+    const auto surface = model.tessellate();
+    const auto tess = polymesh::geom::estimate_vertex_curvature(surface);
+    double tess_lo = std::numeric_limits<double>::infinity();
+    double tess_hi = 0.0;
+    for (double k : tess.kappa) {
+        if (k > 1e-12) {
+            tess_lo = std::min(tess_lo, k);
+            tess_hi = std::max(tess_hi, k);
+        }
+    }
+    REQUIRE(tess_hi > 0.0);
+    REQUIRE(tess_lo > 0.0);
+    // Same sphere, same deflection the product meshes at: the discrete estimate
+    // spreads by a factor of ~8 (measured 17.70…145.87 1/m at R = 0.05 m,
+    // exact 20.0). Assert only that it is nowhere near constant, so the test
+    // pins the contrast rather than one OCC version's triangulation.
+    CHECK(tess_hi / tess_lo > 2.0);
+    // And the exact value is the true 1/R, which the tessellation straddles.
+    CHECK(tess_lo < exact_lo);
+    CHECK(tess_hi > exact_hi);
 }

@@ -333,6 +333,13 @@ struct RefinementPlan {
     double h_fine = 0.0;    // legacy alias for finest requested target, metres
     std::size_t n_geometry_seeds = 0;
     std::size_t n_bc_seeds = 0;
+    /// True when the curvature term of the geometry sources was read from the
+    /// exact BRep faces (geom::CadFace::kappa_samples) rather than from
+    /// per-vertex discrete curvature on the tessellation. Reported as
+    /// `geo_curv=brep|tessellation`: the two are not interchangeable, because
+    /// only the exact read is mirror-symmetric on a mirror-symmetric part
+    /// (ADR-0036 §6). False for STL inputs, which have no BRep to read.
+    bool geometry_curvature_from_brep = false;
     SpectralSizingReport spectral;
 };
 

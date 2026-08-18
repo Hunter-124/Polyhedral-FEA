@@ -58,6 +58,31 @@ struct CadFace {
     CadSurfaceKind kind = CadSurfaceKind::kOther;
     double area = 0.0;
     std::vector<std::uint32_t> edge_ids;
+    /// Sample points strictly inside the trimmed face, in model coordinates
+    /// (metres): the face's TopLoc_Location is applied. Empty for kPlane (a
+    /// plane has zero curvature everywhere, so the grid would cost without
+    /// telling anyone anything) and empty when OCC is disabled.
+    ///
+    /// These are *exact* surface properties evaluated on the BRep, deliberately
+    /// independent of any triangulation. That independence is the whole point:
+    /// OCC's tessellation of a mirror-symmetric part is itself not
+    /// mirror-symmetric, so any curvature estimated from it cannot be either.
+    /// Measured at the product's own deflection (5e-4·bbox_diag, 0.2 rad), the
+    /// fraction of tessellation vertices with an exact mirror partner is
+    /// sphere x 0.00% / y 99.69% / z 1.33%, plate_hole x 5.97% (cylinder is the
+    /// only 100%); the sphere's seam meridian and poles put facets in entirely
+    /// different places on the two sides of the yz-plane. A uv grid on the
+    /// analytic surface has no such seam bias, so a mesh decision sized from
+    /// `kappa_samples` can be mirror-symmetric where one sized from
+    /// `geom::estimate_vertex_curvature` cannot (ADR-0036 §6).
+    std::vector<Eigen::Vector3d> samples;
+    /// max(|κ_max|, |κ_min|) principal curvature magnitude (1/m) at each
+    /// sample, same length as `samples` when filled (OCC BRepLProp_SLProps;
+    /// the larger magnitude is what sets the chordal sag, so it is the one that
+    /// drives sizing). Samples where IsCurvatureDefined() is false are dropped
+    /// from both vectors rather than recorded as zero — an undefined umbilic is
+    /// not a flat spot.
+    std::vector<double> kappa_samples;
 };
 
 /// Topology + sampled geometry for a CadModel BRep.
@@ -83,6 +108,12 @@ struct CadTopology {
 ///
 /// When OCC is available, each edge's `kappa_samples` is filled with curvature
 /// magnitude at the same parameters as `samples` (empty if unavailable).
+///
+/// Non-planar faces additionally get `samples` / `kappa_samples`: a
+/// `samples_per_edge` × `samples_per_edge` uv grid over BRepTools::UVBounds,
+/// keeping only the points BRepTopAdaptor_FClass2d puts inside the trimmed
+/// face at the face tolerance. `samples_per_edge` is reused deliberately —
+/// one knob sets curve and surface sampling density together.
 [[nodiscard]] CadTopology extract_topology(const CadModel& model,
                                            int samples_per_edge = 8);
 

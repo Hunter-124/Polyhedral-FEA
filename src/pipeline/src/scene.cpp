@@ -693,25 +693,47 @@ std::vector<adapt::SizeSource> decimate_sources(std::vector<adapt::SizeSource> s
 /// survives verbatim.
 constexpr double kSpectralEnergyFraction = 0.995;
 
+/// Chordal sagitta rule numerator. A segment of length ℓ = c/κ on geometry of
+/// curvature κ = 1/R has sagitta d = ℓ²κ/8 = c²R/8, i.e. a *relative* sag
+/// d/R = c²/8 that is independent of R. c = 0.25 sets that at 0.78% of the
+/// local radius of curvature, which is the value the surface-vertex rule
+/// (adapt::curvature_size_sources' curvature_fraction) has always used; edge
+/// and face sizing share it so a curved edge and the curved face it bounds ask
+/// for the same size instead of fighting at their shared boundary.
+constexpr double kCurvatureSagittaFraction = 0.25;
+
+/// uv / arc-length sampling density for the exact-BRep sizing reads. 32 gives
+/// 34 stations per curve and a 32×32 uv grid per non-planar face — enough that
+/// the FFT edge denoise has a usable spectrum, and cheap because
+/// extract_topology skips the grid on planar faces entirely.
+constexpr int kCadSizingSamples = 32;
+
+/// BRep topology for the sizing reads, or an empty topology when the model has
+/// no CAD (STL / .msh input) or OCC cannot walk it. Walking the BRep once and
+/// sharing the result keeps face-curvature and edge-curvature sizing on the
+/// same sample stations.
+geom::CadTopology cad_sizing_topology(const Model& model) {
+    if (!model.cad || model.cad->empty()) {
+        return {};
+    }
+    try {
+        return geom::extract_topology(*model.cad, kCadSizingSamples);
+    } catch (...) {
+        return {};
+    }
+}
+
 /// Chordal size sources along curved CAD edges with FFT-denoised curvature
 /// (ADR-0034). OCC BRepLProp κ samples carry parameterization noise; the
 /// energy-truncated inverse FFT recovers the smooth κ(s), and the emitted
-/// source size follows the constant-relative-sag rule h = 0.25/κ (segment
-/// sagitta d = ℓ²κ/8 = 0.78% of the local radius of curvature — the same
-/// relative sag the surface-vertex rule adapt::geometry_size_sources uses).
+/// source size follows the constant-relative-sag rule h = c/κ.
 /// Flat edge runs (κ below the noise floor after denoise) emit nothing.
-std::vector<adapt::SizeSource> spectral_edge_sources(const Model& model, double h_min_geo,
-                                                     double h_coarse,
+std::vector<adapt::SizeSource> spectral_edge_sources(const geom::CadTopology& topo,
+                                                     double h_min_geo, double h_coarse,
                                                      SpectralSizingReport& report) {
     std::vector<adapt::SizeSource> out;
-    if (!model.cad || model.cad->empty() || !(h_coarse > 0.0)) {
+    if (!(h_coarse > 0.0)) {
         return out;
-    }
-    geom::CadTopology topo;
-    try {
-        topo = geom::extract_topology(*model.cad, /*samples_per_edge=*/32);
-    } catch (...) {
-        return out; // no usable BRep edges — surface-vertex sources still apply
     }
     for (const auto& edge : topo.edges) {
         if (edge.feature == geom::CadEdgeFeature::kSeam) {
@@ -739,13 +761,57 @@ std::vector<adapt::SizeSource> spectral_edge_sources(const Model& model, double 
                 continue; // denoised-flat run
             }
             const double h_edge =
-                std::clamp(0.25 / k, h_min_geo, h_coarse);
+                std::clamp(kCurvatureSagittaFraction / k, h_min_geo, h_coarse);
             if (h_edge < h_coarse) {
                 out.push_back({pts[i], h_edge});
             }
         }
     }
     report.n_edge_curve_seeds = out.size();
+    return out;
+}
+
+/// Curvature size sources read from the **exact BRep faces**: the same
+/// constant-relative-sag rule h = c/κ as spectral_edge_sources, applied to
+/// `geom::CadFace::kappa_samples` (max |principal curvature| on a uv grid
+/// inside the trim) instead of to a discrete per-vertex estimate on the
+/// triangulation.
+///
+/// This is the whole point of ADR-0036 §6: OCC's tessellation of a
+/// mirror-symmetric part is not mirror-symmetric (sphere: 0.00% of tessellation
+/// vertices have an exact mirror partner across x, 1.33% across z; plate_hole
+/// 5.97% across x), so a size field seeded from tessellation curvature cannot
+/// be mirror-symmetric and neither can the element pattern it drives. A uv grid
+/// on the analytic surface has no seam or pole bias — measured on sphere.step
+/// the exact samples give κ = 20.000 1/m at every one of 1024 stations
+/// (max/min = 1.0) where the tessellation estimate spans 17.70…145.87 1/m
+/// (max/min = 8.24).
+///
+/// No FFT denoise here: an analytic κ has no parameterization noise to remove
+/// (that is what the edge path is compensating for), and filtering would
+/// re-introduce a dependence on the sample ordering.
+std::vector<adapt::SizeSource> cad_face_curvature_sources(const geom::CadTopology& topo,
+                                                          double h_min_geo, double h_coarse) {
+    std::vector<adapt::SizeSource> out;
+    if (!(h_coarse > 0.0)) {
+        return out;
+    }
+    for (const auto& face : topo.faces) {
+        if (face.kappa_samples.size() != face.samples.size()) {
+            continue;
+        }
+        for (std::size_t i = 0; i < face.samples.size(); ++i) {
+            const double k = face.kappa_samples[i];
+            if (!(k > 1e-9) || !std::isfinite(k)) {
+                continue; // exactly flat: nothing to resolve
+            }
+            const double h_face =
+                std::clamp(kCurvatureSagittaFraction / k, h_min_geo, h_coarse);
+            if (h_face < h_coarse) {
+                out.push_back({face.samples[i], h_face});
+            }
+        }
+    }
     return out;
 }
 
@@ -836,13 +902,31 @@ RefinementPlan build_refinement_plan(const Model& model, double h_coarse,
     // bulk h. Flat, thick regions emit nothing, so the source set stays sparse.
     if (use_geometry) {
         const double h_min_geo = 0.15 * h_coarse; // floor: avoid runaway fine
-        auto geo = adapt::geometry_size_sources(model.surface, h_min_geo, h_coarse);
+
+        // One extraction serves both exact-BRep reads (faces for curvature,
+        // edges for the FFT-denoised chordal rule) so the BRep is walked once.
+        const geom::CadTopology topo = cad_sizing_topology(model);
+
+        std::vector<adapt::SizeSource> geo;
+        if (!topo.faces.empty()) {
+            // Exact BRep available: curvature comes from the analytic faces, so
+            // the sizing plan no longer inherits the tessellation's broken
+            // mirror symmetry (ADR-0036 §6). Thin-wall demand has no exact
+            // analogue — local thickness is a ray cast through the closed
+            // surface — so it keeps coming from the tessellation.
+            plan.geometry_curvature_from_brep = true;
+            geo = cad_face_curvature_sources(topo, h_min_geo, h_coarse);
+            auto thick = adapt::thickness_size_sources(model.surface, h_min_geo, h_coarse);
+            geo.insert(geo.end(), thick.begin(), thick.end());
+        } else {
+            geo = adapt::geometry_size_sources(model.surface, h_min_geo, h_coarse);
+        }
         // ~1 seed per vertex on a real CAD part is far more than the grading
         // needs; keep the finest per half-h cell (field preserved, count bounded).
         geo = decimate_sources(std::move(geo), 0.5 * h_coarse);
         if (spectral) {
             // FFT-denoised CAD-edge chordal sources join the geometry set.
-            auto edge = spectral_edge_sources(model, h_min_geo, h_coarse, plan.spectral);
+            auto edge = spectral_edge_sources(topo, h_min_geo, h_coarse, plan.spectral);
             edge = decimate_sources(std::move(edge), 0.5 * h_coarse);
             plan.spectral.n_edge_curve_seeds = edge.size();
             geo.insert(geo.end(), edge.begin(), edge.end());
@@ -5533,8 +5617,9 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 auto geo = adapt::geometry_size_sources(model.surface, 0.15 * h, h);
                 geo = decimate_sources(std::move(geo), 0.5 * h);
                 if (setup.spectral_smooth) {
+                    const geom::CadTopology topo = cad_sizing_topology(model);
                     auto edge =
-                        spectral_edge_sources(model, 0.15 * h, h, spectral_report);
+                        spectral_edge_sources(topo, 0.15 * h, h, spectral_report);
                     edge = decimate_sources(std::move(edge), 0.5 * h);
                     spectral_report.n_edge_curve_seeds = edge.size();
                     geo.insert(geo.end(), edge.begin(), edge.end());

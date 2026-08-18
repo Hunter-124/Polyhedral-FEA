@@ -16,11 +16,15 @@
 #include <BRepGProp.hxx>
 #include <BRepGProp_Face.hxx>
 #include <BRepLProp_CLProps.hxx>
+#include <BRepLProp_SLProps.hxx>
+#include <BRepTools.hxx>
+#include <BRepTopAdaptor_FClass2d.hxx>
 #include <BRep_Tool.hxx>
 #include <GProp_GProps.hxx>
 #include <Geom2d_Curve.hxx>
 #include <GeomAbs_SurfaceType.hxx>
 #include <Standard_Failure.hxx>
+#include <TopAbs_State.hxx>
 #include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
@@ -303,6 +307,89 @@ void classify_edges(const TopoDS_Shape& shape,
     }
 }
 
+/// Fill `cf.samples` / `cf.kappa_samples` with exact principal-curvature
+/// samples on the trimmed face. `n_per_dir` uv stations per parameter
+/// direction; stations sit at cell centres of an n×n subdivision of the uv box
+/// rather than on its edges, so nothing lands on the parameter boundary where
+/// FClass2d has to arbitrate and where a seam curve makes the answer
+/// tolerance-dependent. Interior placement also makes the station set
+/// symmetric about the uv-box centre, which is what lets a symmetric surface
+/// produce a symmetric sample set.
+void sample_face_curvature(const TopoDS_Face& f, int n_per_dir, CadFace& cf) {
+    if (n_per_dir < 1) {
+        n_per_dir = 1;
+    }
+    Standard_Real umin = 0.0;
+    Standard_Real umax = 0.0;
+    Standard_Real vmin = 0.0;
+    Standard_Real vmax = 0.0;
+    try {
+        BRepTools::UVBounds(f, umin, umax, vmin, vmax);
+    } catch (const Standard_Failure&) {
+        return;
+    }
+    const double du = static_cast<double>(umax - umin);
+    const double dv = static_cast<double>(vmax - vmin);
+    if (!(du > 0.0) || !(dv > 0.0) || !std::isfinite(du) || !std::isfinite(dv)) {
+        return;
+    }
+
+    // Containment is a property of the trimming wires in uv space, which do not
+    // depend on the face's orientation flag: TopAbs_REVERSED flips the natural
+    // normal, not the uv domain. Normalizing to FORWARD makes that explicit so
+    // the IN/OUT reading cannot silently follow the flag, and curvature
+    // *magnitude* is normal-sign independent anyway.
+    TopoDS_Face probe = f;
+    probe.Orientation(TopAbs_FORWARD);
+    const double tol = static_cast<double>(BRep_Tool::Tolerance(f));
+
+    try {
+        BRepAdaptor_Surface surf(f, Standard_True);
+        // BRepAdaptor_Surface::Value/D1/D2 apply the face's TopLoc_Location, so
+        // both the points and the curvatures come out in model coordinates.
+        BRepLProp_SLProps props(surf, 2, 1.0e-9);
+        BRepTopAdaptor_FClass2d classifier(probe, tol);
+        const std::size_t budget =
+            static_cast<std::size_t>(n_per_dir) * static_cast<std::size_t>(n_per_dir);
+        cf.samples.reserve(budget);
+        cf.kappa_samples.reserve(budget);
+        const double inv_n = 1.0 / static_cast<double>(n_per_dir);
+        for (int iu = 0; iu < n_per_dir; ++iu) {
+            const double su = (static_cast<double>(iu) + 0.5) * inv_n;
+            const double u = static_cast<double>(umin) + su * du;
+            for (int iv = 0; iv < n_per_dir; ++iv) {
+                const double sv = (static_cast<double>(iv) + 0.5) * inv_n;
+                const double v = static_cast<double>(vmin) + sv * dv;
+                if (classifier.Perform(gp_Pnt2d(u, v)) != TopAbs_IN) {
+                    continue; // outside the trim, or in a hole
+                }
+                double kappa = 0.0;
+                gp_Pnt p;
+                try {
+                    props.SetParameters(u, v);
+                    if (!props.IsCurvatureDefined()) {
+                        continue;
+                    }
+                    const double k_max = std::abs(static_cast<double>(props.MaxCurvature()));
+                    const double k_min = std::abs(static_cast<double>(props.MinCurvature()));
+                    kappa = std::max(k_max, k_min);
+                    if (!std::isfinite(kappa)) {
+                        continue;
+                    }
+                    p = props.Value();
+                } catch (const Standard_Failure&) {
+                    continue;
+                }
+                cf.samples.emplace_back(p.X(), p.Y(), p.Z());
+                cf.kappa_samples.push_back(kappa);
+            }
+        }
+    } catch (const Standard_Failure&) {
+        cf.samples.clear();
+        cf.kappa_samples.clear();
+    }
+}
+
 #endif // POLYMESH_WITH_OCC
 
 } // namespace
@@ -454,6 +541,13 @@ CadTopology extract_topology(const CadModel& model, int samples_per_edge) {
         GProp_GProps props;
         BRepGProp::SurfaceProperties(f, props);
         cf.area = props.Mass();
+
+        // A plane's curvature is identically zero, so a uv grid on it can only
+        // report what its kind already says. Skip it and the grid cost is paid
+        // exactly where curvature exists.
+        if (cf.kind != CadSurfaceKind::kPlane) {
+            sample_face_curvature(f, samples_per_edge, cf);
+        }
 
         for (TopExp_Explorer exp(f, TopAbs_EDGE); exp.More(); exp.Next()) {
             const TopoDS_Edge& e = TopoDS::Edge(exp.Current());

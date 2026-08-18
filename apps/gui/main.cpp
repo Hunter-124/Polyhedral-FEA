@@ -440,9 +440,9 @@ void draw_study_panel(App& app) {
     }
     {
         int m = static_cast<int>(app.setup.mesher);
-        // Order matches VolumeMesher enum. Hybrid zoo is the SPEC default path.
+        // Order matches VolumeMesher enum. Graded tet is the product default.
         static const char* kMeshers[] = {
-            "tet (grid)",   "hex (grid)",    "hex VEM (grid)", "graded tet (legacy)",
+            "tet (grid)",   "hex (grid)",    "hex VEM (grid)", "graded tet (default)",
             "hex+pyramid",  "prism (grid)",  "hybrid zoo",     "octa (exp)",
             "hybrid VEM",   "Varyhedron",    "CVT poly (G4)",
         };
@@ -451,9 +451,10 @@ void draw_study_panel(App& app) {
         }
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip(
-                "hybrid zoo (default): hex bulk + pyramid skin → all-pyramid FE.\n"
+                "graded tet (default): multi-level LEB size field; CAD parts are\n"
+                "solved on projected tet10 geometry (ADR-0035, 'curved solve geometry').\n"
+                "hybrid zoo: hex bulk + pyramid skin → all-pyramid FE.\n"
                 "hybrid VEM: hex FE bulk + native poly VEM transitions (ADR-0019).\n"
-                "graded tet (legacy): multi-level LEB size field.\n"
                 "Varyhedron: variable poly packing (ADR-0021). Sharp-only edge protect;\n"
                 "tet FE is the default product claim; VEM gated. Measure-first path:\n"
                 "health + scorecard before packing loops (ADR-0023/24). STEP product\n"

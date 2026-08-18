@@ -23,6 +23,7 @@
 #include "mesh/brep_fidelity.hpp"
 #include "mesh/tet_fill.hpp"
 #include "pipeline/scene.hpp"
+#include "pipeline/surface_render.hpp"
 
 #include <Eigen/Eigenvalues>
 
@@ -34,6 +35,7 @@
 #include <cstring>
 #include <format>
 #include <limits>
+#include <map>
 #include <optional>
 #include <set>
 #include <span>
@@ -71,6 +73,11 @@ int usage() {
                "              [--fix-box ...6] [--load-box ...6]\n"
                "              [--load-dir x y z] [--force N] [--traction Pa]\n"
                "                             JSON diagnostics: fidelity, quality, timings\n"
+               "  render <part> -o out.png [-h m] [--mesher name] [--no-curved]\n"
+               "              [--subdiv N] [--size WxH] [--azimuth DEG] [--elevation DEG]\n"
+               "              [--wireframe] [--stats out.json]\n"
+               "                             headless PNG of the same boundary surface the\n"
+               "                             Studio viewport paints — no GL, no window\n"
                "  backend                    print compute backend + OpenMP/opt summary\n"
                "\n"
                "inputs: CAD (.step .stp .brep .brp); solve also accepts Gmsh 2.x ASCII .msh.\n"
@@ -114,6 +121,18 @@ int usage() {
                "--advisor-max-dof N: with --advisor, drop candidate actions whose\n"
                "               predicted DOF exceeds N; refusal (defaults) if none fit\n"
                "--max-dof N: pre-flight/adapt DOF ceiling (0=1769472 default)\n"
+               "--subdiv N: render/tessellation subdivisions per quadratic boundary face\n"
+               "               (default 8, the value the Studio viewport uses); linear\n"
+               "               faces have no interior to subdivide and ignore it\n"
+               "--size WxH: render pixel size (default 1200x900)\n"
+               "--azimuth DEG / --elevation DEG: orbit camera angles for `render`,\n"
+               "               degrees (defaults 35 / 25); the projection is orthographic\n"
+               "               so a view is reproducible from these two numbers\n"
+               "--wireframe: overlay the tessellation triangle edges on the render\n"
+               "--stats out.json: numeric render report — node/element counts, element-type\n"
+               "               census, triangle count, covered/silhouette pixels, and the\n"
+               "               facet-normal deviation against the exact BRep normal\n"
+               "               (omitted for non-CAD input, which has no exact normal)\n"
                "\n"
                "default BC selection: nodes in a 0.51·h slab at min-x (fixed) / max-x\n"
                "              (loaded). If a slab captures too few nodes to act as a\n"
@@ -198,6 +217,40 @@ std::optional<polymesh::pipeline::VolumeMesher> try_parse_mesher(const std::stri
 /// Lenient form kept for the `--mesher` flag's historical behaviour.
 polymesh::pipeline::VolumeMesher parse_mesher(const std::string& m) {
     return try_parse_mesher(m).value_or(polymesh::pipeline::VolumeMesher::kGradedTet);
+}
+
+/// Every enumerator, spelled exactly as `parse_mesher` accepts it, so a
+/// reported name round-trips through `--mesher`. An earlier `default: "other"`
+/// silently mislabelled five of the eleven meshers — `--mesher hex` (the
+/// hex-fill baseline every scorecard compares against) reported "other", so no
+/// campaign row could tell hex from hexvem, prism or octa. No `default` here: a
+/// new mesher must fail the -Wswitch build, not report "other".
+const char* mesher_name(polymesh::pipeline::VolumeMesher mesher) {
+    switch (mesher) {
+    case polymesh::pipeline::VolumeMesher::kTetFill:
+        return "tet";
+    case polymesh::pipeline::VolumeMesher::kHexFill:
+        return "hex";
+    case polymesh::pipeline::VolumeMesher::kHexVem:
+        return "hexvem";
+    case polymesh::pipeline::VolumeMesher::kGradedTet:
+        return "graded";
+    case polymesh::pipeline::VolumeMesher::kHexPyramid:
+        return "hexpyr";
+    case polymesh::pipeline::VolumeMesher::kPrismSweep:
+        return "prism";
+    case polymesh::pipeline::VolumeMesher::kHybrid:
+        return "hybrid";
+    case polymesh::pipeline::VolumeMesher::kOctahedral:
+        return "octa";
+    case polymesh::pipeline::VolumeMesher::kHybridVem:
+        return "hybridvem";
+    case polymesh::pipeline::VolumeMesher::kVaryhedron:
+        return "varyhedron";
+    case polymesh::pipeline::VolumeMesher::kCvtPoly:
+        return "cvt_poly";
+    }
+    return "unknown"; // only reachable from an out-of-range int cast
 }
 
 struct BoxSel {
@@ -1558,39 +1611,6 @@ int cmd_diag(std::span<char*> args) {
         }
     }
 
-    // Every enumerator, spelled exactly as `parse_mesher` accepts it, so the
-    // reported name round-trips through `--mesher`. The old `default: "other"`
-    // silently mislabelled five of the eleven meshers — `--mesher hex` (the
-    // hex-fill baseline every scorecard compares against) reported "other", so
-    // no campaign row could tell hex from hexvem, prism or octa. No `default`
-    // here: a new mesher must fail the -Wswitch build, not report "other".
-    const std::string mesher_name = [&]() -> const char* {
-        switch (mesher) {
-        case polymesh::pipeline::VolumeMesher::kTetFill:
-            return "tet";
-        case polymesh::pipeline::VolumeMesher::kHexFill:
-            return "hex";
-        case polymesh::pipeline::VolumeMesher::kHexVem:
-            return "hexvem";
-        case polymesh::pipeline::VolumeMesher::kGradedTet:
-            return "graded";
-        case polymesh::pipeline::VolumeMesher::kHexPyramid:
-            return "hexpyr";
-        case polymesh::pipeline::VolumeMesher::kPrismSweep:
-            return "prism";
-        case polymesh::pipeline::VolumeMesher::kHybrid:
-            return "hybrid";
-        case polymesh::pipeline::VolumeMesher::kOctahedral:
-            return "octa";
-        case polymesh::pipeline::VolumeMesher::kHybridVem:
-            return "hybridvem";
-        case polymesh::pipeline::VolumeMesher::kVaryhedron:
-            return "varyhedron";
-        case polymesh::pipeline::VolumeMesher::kCvtPoly:
-            return "cvt_poly";
-        }
-        return "unknown"; // only reachable from an out-of-range int cast
-    }();
     const double mesh_throughput =
         mesh_ms > 0.0 ? static_cast<double>(vol.mesh.elements.size()) / (mesh_ms / 1000.0)
                       : 0.0;
@@ -1672,7 +1692,8 @@ int cmd_diag(std::span<char*> args) {
         "  \"mesh_size_note\": \"{}\",\n"
         "  \"mesher_note\": \"{}\"\n"
         "}}\n",
-        model.name, mesher_name, model.surface.vertices.size(), model.surface.triangles.size(),
+        model.name, mesher_name(mesher), model.surface.vertices.size(),
+        model.surface.triangles.size(),
         bbox_diag, model.cad ? "true" : "false", h, vol.mesh.nodes.size(),
         vol.mesh.elements.size(), q_min, q_min_type, n_inverted,
         vol.n_cells_below_shape_floor, q_mean,
@@ -1692,6 +1713,184 @@ int cmd_diag(std::span<char*> args) {
         std::printf("wrote %s\n", json_path.c_str());
     }
     std::fputs(json.c_str(), stdout);
+    return 0;
+}
+
+/// `WxH` render size. Rejects anything that is not two positive integers so a
+/// typo cannot silently render at the default size.
+bool parse_size(const char* text, int& width, int& height) {
+    char* end = nullptr;
+    const long w = std::strtol(text, &end, 10);
+    if (end == text || (*end != 'x' && *end != 'X')) {
+        return false;
+    }
+    const char* rest = end + 1;
+    const long hgt = std::strtol(rest, &end, 10);
+    if (end == rest || *end != '\0' || w < 1 || hgt < 1 || w > 16384 || hgt > 16384) {
+        return false;
+    }
+    width = static_cast<int>(w);
+    height = static_cast<int>(hgt);
+    return true;
+}
+
+int cmd_render(std::span<char*> args) {
+    if (args.size() < 3) {
+        return usage();
+    }
+    const std::string path = args[2];
+    double h = 0.0;
+    std::string out_path;
+    std::string stats_path;
+    auto mesher = polymesh::pipeline::VolumeMesher::kGradedTet;
+    bool curved = true;  // exact curved CAD geometry (ADR-0035); --no-curved opts out
+    bool feature = true; // same geometry grading the product mesh path uses
+    bool spectral = true;
+    int subdiv = 8; // the subdivision count the Studio viewport tessellates with
+    polymesh::pipeline::RenderView view;
+    for (std::size_t i = 3; i < args.size(); ++i) {
+        if (std::strcmp(args[i], "-h") == 0 && i + 1 < args.size()) {
+            h = std::atof(args[++i]);
+        } else if (std::strcmp(args[i], "-o") == 0 && i + 1 < args.size()) {
+            out_path = args[++i];
+        } else if (std::strcmp(args[i], "--mesher") == 0 && i + 1 < args.size()) {
+            mesher = parse_mesher(args[++i]);
+        } else if (std::strcmp(args[i], "--no-curved") == 0) {
+            curved = false;
+        } else if (std::strcmp(args[i], "--no-feature") == 0) {
+            feature = false;
+        } else if (std::strcmp(args[i], "--no-spectral") == 0) {
+            spectral = false;
+        } else if (std::strcmp(args[i], "--subdiv") == 0 && i + 1 < args.size()) {
+            // Clamped to the tessellator's own range so --stats reports the
+            // subdivision count that was actually used.
+            subdiv = std::clamp(std::atoi(args[++i]), 1, 16);
+        } else if (std::strcmp(args[i], "--size") == 0 && i + 1 < args.size()) {
+            if (!parse_size(args[++i], view.width, view.height)) {
+                return usage();
+            }
+        } else if (std::strcmp(args[i], "--azimuth") == 0 && i + 1 < args.size()) {
+            view.azimuth_deg = std::atof(args[++i]);
+        } else if (std::strcmp(args[i], "--elevation") == 0 && i + 1 < args.size()) {
+            view.elevation_deg = std::atof(args[++i]);
+        } else if (std::strcmp(args[i], "--wireframe") == 0) {
+            view.wireframe = true;
+        } else if (std::strcmp(args[i], "--stats") == 0 && i + 1 < args.size()) {
+            stats_path = args[++i];
+        } else {
+            return usage();
+        }
+    }
+    if (out_path.empty()) {
+        std::fputs("render: -o out.png is required\n", stderr);
+        return usage();
+    }
+
+    const auto model = polymesh::pipeline::Model::load(path);
+    const auto resolved = polymesh::pipeline::resolve_mesh_size(model, h, 30.0, 0, 0);
+    h = resolved.h;
+
+    // Exactly the product mesh path `polymesh mesh` runs, so the render can only
+    // show geometry the shipped mesher actually produced.
+    const auto plan =
+        polymesh::pipeline::build_refinement_plan(model, h, {}, feature, spectral, 0);
+    auto vol = polymesh::pipeline::volume_mesh(
+        model, h, mesher, 2, feature, plan.refine_seeds, plan.seed_band, 0.0,
+        resolved.element_ceiling, resolved.dof_ceiling, resolved.auto_chosen ? 3 : 0, {},
+        plan.size_field);
+    if (curved) {
+        auto shaped = polymesh::pipeline::curve_volume_geometry(model, vol.mesh, h);
+        vol.mesh = std::move(shaped.mesh);
+    }
+    vol.mesh.check_validity();
+
+    // Never re-derive a surface here: the point of the tool is to rasterize the
+    // very tessellation the Studio viewport uploads.
+    const auto surface = polymesh::fea::tessellate_boundary_surface(vol.mesh, subdiv);
+    const auto render = polymesh::pipeline::render_surface(vol.mesh, surface, view);
+    if (!polymesh::pipeline::write_png(out_path, render.image)) {
+        std::fprintf(stderr, "render: cannot write %s\n", out_path.c_str());
+        return 1;
+    }
+
+    std::map<std::string, std::size_t> census;
+    for (const auto& element : vol.mesh.elements) {
+        ++census[polymesh::fea::element_type_name(element.type)];
+    }
+    std::string census_text;
+    std::string census_json;
+    for (const auto& [name, count] : census) {
+        if (!census_text.empty()) {
+            census_text += " ";
+            census_json += ",";
+        }
+        census_text += std::format("{}={}", name, count);
+        census_json += std::format("\"{}\":{}", name, count);
+    }
+
+    std::printf("render: %zu nodes, %zu elems (%s), %zu triangles (subdiv=%d), "
+                "h=%.6g m, curved=%s → %s (%dx%d, %zu px covered)\n",
+                vol.mesh.nodes.size(), vol.mesh.elements.size(), census_text.c_str(),
+                surface.triangles.size(), subdiv, h, curved ? "true" : "false",
+                out_path.c_str(), render.image.width, render.image.height,
+                render.coverage.pixels_covered);
+
+    if (stats_path.empty()) {
+        return 0;
+    }
+    // The facet-normal audit is the number that separates curved from chordal
+    // geometry, so it is measured against the exact BRep whenever one exists and
+    // labelled with the reference it actually used. Non-CAD input has no exact
+    // normal at all: the field is then omitted rather than reported as zero.
+    std::string normal_json;
+    if (model.cad && !model.cad->empty()) {
+        auto deviation =
+            polymesh::pipeline::exact_facet_normal_deviation(*model.cad, surface);
+        const char* reference = "exact_brep";
+        if (deviation.samples == 0) {
+            deviation = polymesh::pipeline::tessellated_facet_normal_deviation(
+                model.surface, surface);
+            reference = "tessellated_surface";
+        }
+        if (deviation.samples > 0) {
+            normal_json = std::format(
+                "  \"normal_reference\": \"{}\",\n"
+                "  \"normal_deviation_deg\": {{ \"samples\": {}, \"mean\": {:.6g}, "
+                "\"p99\": {:.6g}, \"max\": {:.6g} }},\n",
+                reference, deviation.samples, deviation.mean, deviation.p99, deviation.max);
+        }
+    }
+    const std::string json = std::format(
+        "{{\n"
+        "  \"part\": \"{}\",\n"
+        "  \"mesher\": \"{}\",\n"
+        "  \"h\": {:.6g},\n"
+        "  \"curved\": {},\n"
+        "  \"subdiv\": {},\n"
+        "  \"nodes\": {},\n"
+        "  \"elements\": {},\n"
+        "  \"element_types\": {{{}}},\n"
+        "  \"triangles\": {},\n"
+        "  \"width\": {},\n"
+        "  \"height\": {},\n"
+        "  \"pixels_covered\": {},\n"
+        "  \"silhouette_area_px\": {},\n"
+        "{}"
+        "  \"png\": \"{}\"\n"
+        "}}\n",
+        model.name, mesher_name(mesher), h, curved ? "true" : "false", subdiv,
+        vol.mesh.nodes.size(), vol.mesh.elements.size(), census_json,
+        surface.triangles.size(), render.image.width, render.image.height,
+        render.coverage.pixels_covered, render.coverage.silhouette_area_px, normal_json,
+        out_path);
+    std::FILE* file = std::fopen(stats_path.c_str(), "w");
+    if (file == nullptr) {
+        std::fprintf(stderr, "render: cannot write %s\n", stats_path.c_str());
+        return 1;
+    }
+    std::fputs(json.c_str(), file);
+    std::fclose(file);
+    std::printf("wrote %s\n", stats_path.c_str());
     return 0;
 }
 
@@ -1716,6 +1915,9 @@ int main(int argc, char** argv) {
         }
         if (command == "diag") {
             return cmd_diag(args);
+        }
+        if (command == "render") {
+            return cmd_render(args);
         }
         if (command == "backend" && args.size() == 2) {
             polymesh::fea::init_runtime_performance();

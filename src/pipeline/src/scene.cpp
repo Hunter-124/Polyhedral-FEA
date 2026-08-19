@@ -1269,6 +1269,7 @@ bool make_boundary_projection(const geom::CadModel& cad, double h,
     }
     const geom::CadModel* cad_ptr = &cad;
     ctx->provenance = provenance;
+    ctx->topology = topology;
     ctx->target =
         [cad_ptr, topology = std::move(topology),
          h](const Eigen::Vector3d& p,
@@ -1307,6 +1308,20 @@ bool make_boundary_projection(const geom::CadModel& cad, double h,
             }
 
             const double feature_slack = 0.08 * h;
+            // The crease preference exists to capture lattice stair nodes that
+            // sit O(h) off the surface near a sharp rim. It must not claim a
+            // node whose home face is decisively closer than the crease:
+            // measured on icecream_cone at h = 8 mm, a cone-wall edge midpoint
+            // 4 um from its face was pinned to the foot rim 580 um away
+            // (580 <= 4 + 0.08 h passed), and the quadratic patch through it
+            // dipped 140 um below the base plane. The absolute slack alone
+            // cannot separate "on the face next to the rim" from "stair node
+            // of the rim"; the ratio can — a genuine crease node has the two
+            // distances within a small multiple of each other.
+            const auto crease_competes = [&](double crease_distance) {
+                return crease_distance <= exact->distance + feature_slack &&
+                       crease_distance <= 4.0 * exact->distance + 1e-3 * h;
+            };
             bool chose_vertex = false;
             const geom::CadVertex* nearest_vertex = nullptr;
             double vertex_distance = std::numeric_limits<double>::infinity();
@@ -1318,7 +1333,7 @@ bool make_boundary_projection(const geom::CadModel& cad, double h,
                 }
             }
             if (nearest_vertex != nullptr && vertex_distance <= 0.40 * h &&
-                vertex_distance <= exact->distance + feature_slack) {
+                crease_competes(vertex_distance)) {
                 auto vertex_exact =
                     geom::project_point_on_vertex(*cad_ptr, nearest_vertex->id, p);
                 if (vertex_exact) {
@@ -1331,7 +1346,7 @@ bool make_boundary_projection(const geom::CadModel& cad, double h,
             if (!chose_vertex && owner.kind == mesh::BoundarySupportKind::kUnknown) {
                 const auto nearest_edge = geom::closest_edge(*topology, p, true);
                 if (nearest_edge && nearest_edge->distance <= 0.55 * h &&
-                    nearest_edge->distance <= exact->distance + feature_slack) {
+                    crease_competes(nearest_edge->distance)) {
                     auto edge_exact =
                         geom::project_point_on_edge(*cad_ptr, nearest_edge->edge_id, p);
                     if (edge_exact) {
@@ -1484,8 +1499,55 @@ std::size_t project_quadratic_boundary_mids(
                 target = mesh::BoundaryTarget{exact->point, exact->distance};
             }
         } else {
-            target =
-                mesh::owned_boundary_projection_target(saved, edge.mid, projection, mirror);
+            // Endpoints that both sit on the same sharp edge own the mid
+            // jointly even when their provenance KINDS differ: a rim node is
+            // legitimately on the edge and on a face at once, so kind
+            // disagreement says nothing. Without this the chord mid of a rim
+            // edge free-classified to the face (distance ~0, the chord is in
+            // the face plane) and bowed off the rim — measured on
+            // icecream_cone at h = 8 mm: a 1.9 mm foot-rim edge's mid sat
+            // 74 um inside the rim circle.
+            if (projection->topology != nullptr) {
+                const double tol = 1e-3 * h;
+                const Eigen::Vector3d qa =
+                    mesh::mirror_fold(mirror, nodal_mesh.nodes[edge.a]);
+                const Eigen::Vector3d qb =
+                    mesh::mirror_fold(mirror, nodal_mesh.nodes[edge.b]);
+                double best = std::numeric_limits<double>::infinity();
+                std::uint32_t best_id = 0;
+                bool found = false;
+                for (const auto& topo_edge : projection->topology->edges) {
+                    if (topo_edge.feature != geom::CadEdgeFeature::kSharp) {
+                        continue;
+                    }
+                    const auto pa = geom::project_point_on_edge(cad, topo_edge.id, qa);
+                    const auto pb = geom::project_point_on_edge(cad, topo_edge.id, qb);
+                    if (!pa || !pb) {
+                        continue;
+                    }
+                    const double both = std::max(pa->distance, pb->distance);
+                    if (both <= tol && both < best) {
+                        best = both;
+                        best_id = topo_edge.id;
+                        found = true;
+                    }
+                }
+                if (found) {
+                    const Eigen::Vector3d query = mesh::mirror_fold(mirror, saved);
+                    if (auto on_edge = geom::project_point_on_edge(cad, best_id, query)) {
+                        on_edge->point = mesh::mirror_unfold(mirror, on_edge->point, saved);
+                        on_edge->distance = (on_edge->point - saved).norm();
+                        commit_owner(edge.mid,
+                                     mesh::BoundarySupport{
+                                         mesh::BoundarySupportKind::kCadEdge, best_id});
+                        target = mesh::BoundaryTarget{on_edge->point, on_edge->distance};
+                    }
+                }
+            }
+            if (!target) {
+                target = mesh::owned_boundary_projection_target(saved, edge.mid, projection,
+                                                                mirror);
+            }
         }
         if (!target) {
             if (reverted_nodes != nullptr) {

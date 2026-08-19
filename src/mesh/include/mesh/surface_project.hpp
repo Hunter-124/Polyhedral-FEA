@@ -4,6 +4,7 @@
 // Closest-point projection onto a triangle surface, boundary conformity
 // metrics, and Jacobian-safe limited surface snap for Cartesian fills.
 
+#include "geom/cad_topology.hpp"
 #include "geom/features.hpp"
 #include "geom/tri_surface.hpp"
 #include "mesh/mirror.hpp"
@@ -13,6 +14,7 @@
 #include <array>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <set>
 #include <span>
@@ -67,6 +69,11 @@ using BoundaryTargetFn = std::function<std::optional<BoundaryTarget>(
 struct BoundaryProjectionContext {
     std::vector<BoundarySupport>* provenance = nullptr;
     BoundaryTargetFn target;
+    /// Sharp-edge table the oracle classified against, when it is CAD-backed.
+    /// Lets a mid-edge node inherit an edge owner its endpoints share even
+    /// when their provenance kinds differ (a rim node is on the edge AND on a
+    /// face). Null on the legacy tessellation path.
+    std::shared_ptr<const geom::CadTopology> topology;
 };
 
 /// Resolve only through the exact owner-aware oracle. Returns nullopt when no

@@ -12,6 +12,7 @@
 #include "geom/features.hpp"
 #include "geom/tri_surface.hpp"
 #include "mesh/cvt_lloyd.hpp"
+#include "mesh/mirror.hpp"
 #include "mesh/tet_fill.hpp"
 #include "mesh/feature_pin.hpp"
 #include "mesh/surface_project.hpp"
@@ -56,12 +57,17 @@ struct GradedTetFillOutput {
 /// marks L1; more than twice it marks L2 — contiguous, inert on flats.
 /// `fit` carries the exact BRep oracle plus the topology used to hard-pin
 /// sharp edges and CAD vertices (ADR-0035); null keeps the tessellated path.
+/// `mirror` carries the verified reflection symmetry of the geometry
+/// (mesh/mirror.hpp): the classification, every cell mark and every geometry
+/// query then answer identically for a cell and its mirror image, which is what
+/// makes the delivered element pattern mirror-symmetric on a symmetric part.
+/// Null leaves every decision on its raw tessellated input.
 GradedTetFillOutput graded_tet_fill_surface(
     const geom::TriSurface& surface, const Eigen::Vector3d& bbox_min,
     const Eigen::Vector3d& bbox_max, double h, int skin_layers = 2,
     std::span<const geom::SharpEdge> features = {}, double feature_band = 0.0,
     std::span<const Eigen::Vector3d> refine_seeds = {}, double seed_band = 0.0,
     double curvature_turn_deg = 0.0, const BoundaryFit* fit = nullptr,
-    const SizeFieldFn& size_field = {});
+    const SizeFieldFn& size_field = {}, const MirrorFrame* mirror = nullptr);
 
 } // namespace polymesh::mesh

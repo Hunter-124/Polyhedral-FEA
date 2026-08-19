@@ -3,6 +3,7 @@
 #include "geom/stl.hpp"
 #include "mesh/grid_classify.hpp"
 #include "mesh/hybrid_fill.hpp"
+#include "mesh/mirror.hpp"
 #include "mesh/surface_project.hpp"
 #include "mesh/tet_fill.hpp"
 #include "pipeline/scene.hpp"
@@ -14,6 +15,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <filesystem>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -362,6 +364,87 @@ TEST_CASE("lattice tilings mirror about every bbox mid-plane", "[mesher][symmetr
         for (int axis = 0; axis < 3; ++axis) {
             INFO("graded axis=" << axis << " tets=" << fill.mesh.tets.size());
             REQUIRE(mirror_tet_fraction(fill.mesh.nodes, fill.mesh.tets, axis) == 1.0);
+        }
+    }
+}
+
+// The product contract, on the product path: a part whose exact BRep is
+// mirror-symmetric ships a mesh whose ELEMENTS are mirror-symmetric, not merely
+// whose nodes are.
+//
+// This is a whole-pipeline assertion on purpose. Every stage between the lattice
+// and the shipped mesh was measured breaking it independently — the tessellated
+// classification, the curvature and feature stamps, the sliver-cap collapse, the
+// tangential smoothing, the feature pin's Fourier re-spacing, the exterior
+// conform gate's kink relief and sharp-edge recovery, and the buried-face pull —
+// so a fill-only test would pass while the shipped VTU stayed asymmetric
+// (measured: mesher exit 100/100/100%, shipped 98.96/98.79/99.61% on cylinder).
+//
+// Exactly 1.0 is the assertion, not a floor. The fold and the orbit locks make
+// the symmetry structural: any fraction below 1.0 means some pass decided
+// something in one octant that it did not decide in the others, and the number to
+// chase is which pass, not what threshold to accept (ADR-0036 §7).
+TEST_CASE("a mirror-symmetric CAD part ships a mirror-symmetric mesh",
+          "[cad][mesher][symmetry]") {
+    struct Case {
+        const char* name;
+        const char* path;
+        double h;
+        bool feature_refine;
+        // Mid-planes that are true symmetry planes of the exact solid. The cone is
+        // apex-up: its z mid-plane is not one, and must not be asserted.
+        std::array<bool, 3> plane;
+    };
+    const Case cases[] = {
+        // Both grading paths: `feature_refine` off exercises the plain skin/LEB
+        // fill, on exercises the feature band, the curvature stamp and the pin.
+        {"cylinder", "tests/fixtures/parts/cylinder.step", 0.012, false,
+         {{true, true, true}}},
+        {"cylinder/feature", "tests/fixtures/parts/cylinder.step", 0.012, true,
+         {{true, true, true}}},
+        {"plate_hole", "tests/fixtures/parts/plate_hole.step", 0.008, false,
+         {{true, true, true}}},
+        {"plate_hole/feature", "tests/fixtures/parts/plate_hole.step", 0.008, true,
+         {{true, true, true}}},
+        {"sphere/feature", "tests/fixtures/parts/sphere.step", 0.012, true,
+         {{true, true, true}}},
+        {"icecream_cone", "tests/fixtures/parts/icecream_cone.step", 0.012, false,
+         {{true, true, false}}},
+        {"icecream_cone/feature", "tests/fixtures/parts/icecream_cone.step", 0.012, true,
+         {{true, true, false}}},
+    };
+    for (const auto& c : cases) {
+        if (!std::filesystem::exists(c.path)) {
+            SKIP(std::string("missing fixture: ") + c.path);
+        }
+        const auto model = polymesh::pipeline::Model::load(c.path);
+        REQUIRE(model.cad);
+        const auto frame =
+            detect_mirror_frame(*model.cad, model.bbox_min, model.bbox_max);
+        for (int axis = 0; axis < 3; ++axis) {
+            INFO(c.name << " detected plane axis=" << axis);
+            REQUIRE(frame.plane[static_cast<std::size_t>(axis)] ==
+                    c.plane[static_cast<std::size_t>(axis)]);
+        }
+        const auto vol = polymesh::pipeline::volume_mesh(
+            model, c.h, polymesh::pipeline::VolumeMesher::kGradedTet, /*skin_layers=*/2,
+            c.feature_refine);
+        REQUIRE_FALSE(vol.mesh.elements.empty());
+        std::vector<std::array<std::uint32_t, 4>> tets;
+        tets.reserve(vol.mesh.elements.size());
+        for (const auto& element : vol.mesh.elements) {
+            REQUIRE(element.type == polymesh::fea::ElementType::kTet4);
+            tets.push_back({element.nodes[0], element.nodes[1], element.nodes[2],
+                            element.nodes[3]});
+        }
+        for (int axis = 0; axis < 3; ++axis) {
+            if (!c.plane[static_cast<std::size_t>(axis)]) {
+                continue;
+            }
+            const double fraction = mirror_tet_fraction(vol.mesh.nodes, tets, axis);
+            INFO(c.name << " axis=" << axis << " tets=" << tets.size()
+                        << " note=" << vol.mesher_note);
+            REQUIRE(fraction == 1.0);
         }
     }
 }

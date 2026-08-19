@@ -37,6 +37,33 @@ namespace {
 constexpr int kFaceNbr[6][3] = {{-1, 0, 0}, {1, 0, 0},  {0, -1, 0},
                                 {0, 1, 0},  {0, 0, -1}, {0, 0, 1}};
 
+/// Ordering key for a geometric scalar that must treat a mirrored pair's values
+/// as EQUAL, so the tie falls through to the mirror key rather than being
+/// decided by rounding noise.
+///
+/// Measured need: once every stage's decisions are folded (mesh/mirror.hpp), the
+/// cylinder lattice reaches the sliver-collapse round at exactly 100/100/100%
+/// mirrored tets and leaves it at 99.80/99.21/98.93%, which the tangential
+/// smoothing then amplifies to 99.1/92.9/91.2%. The round's inputs tie in exact
+/// arithmetic — a cap and its mirror image have the same aspect, the same six
+/// edge lengths, the same collapse scores — but their coordinates are reflections
+/// computed in floating point, so each quantity differs in the last ulp or two.
+/// Comparing those raw values ordered mirrored caps by that noise and collapsed
+/// them in unmirrored directions.
+///
+/// Quantising at 1e-9 of the quantity's own scale is nine orders above the noise
+/// and nine below any difference this mesher acts on. It is a quantisation and
+/// not an epsilon comparison on purpose: an epsilon comparison is not transitive,
+/// and `std::sort` requires a strict weak ordering.
+[[nodiscard]] long long tie_key(double value, double scale) {
+    if (!std::isfinite(value)) {
+        return value > 0.0 ? std::numeric_limits<long long>::max()
+                           : std::numeric_limits<long long>::min();
+    }
+    const double quantum = 1e-9 * (scale > 0.0 ? scale : 1.0);
+    return static_cast<long long>(std::llround(value / quantum));
+}
+
 // Exterior triangular faces of a tet mesh (appear once). Returns node ids in the
 // order the snap/smooth rounds must visit them (see the sort below).
 std::vector<std::uint32_t>
@@ -339,7 +366,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                         std::span<const geom::SharpEdge> features, double feature_band,
                         std::span<const Eigen::Vector3d> refine_seeds, double seed_band,
                         double curvature_turn_deg, const BoundaryFit* fit,
-                        const SizeFieldFn& size_field) {
+                        const SizeFieldFn& size_field, const MirrorFrame* mirror) {
     BoundaryProjectionContext* projection = fit != nullptr ? fit->projection : nullptr;
     if (!(h > 0.0) || !std::isfinite(h)) {
         throw ValidityError("graded_tet_fill_surface: h must be positive");
@@ -376,6 +403,15 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         surface, bbox_min, bbox_max, h_use, static_cast<long>(kGradedMaxCells),
         /*relative_volume_tolerance=*/0.01, classification_levels, size_field,
         /*even_cells=*/true);
+    // Every decision below is taken in one octant and mirrored into the others
+    // when the geometry is verified mirror-symmetric. The classification is the
+    // first and most consequential of them: which cells hold material decides the
+    // whole element pattern, and it is read off a tessellation that is measurably
+    // not mirror-symmetric (ADR-0036 §7).
+    const CanonicalCellMap cell_orbit =
+        mirror != nullptr ? canonical_cell_map(classification.grid, *mirror)
+                          : CanonicalCellMap{};
+    symmetrise_classification(classification, cell_orbit);
     const CartesianGrid& grid = classification.grid;
     const auto& inside = classification.inside;
     const int nx = grid.nx, ny = grid.ny, nz = grid.nz;
@@ -386,6 +422,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         return i >= 0 && i < nx && j >= 0 && j < ny && k >= 0 && k < nz &&
                inside[idx(i, j, k)];
     };
+
 
     // Face-only boundary distance (coarse hops).
     std::vector<int> dist(inside.size(), -1);
@@ -541,6 +578,26 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 refine_level[c] = std::max<std::uint8_t>(refine_level[c], 1);
                 is_feature[c] = 1;
             }
+        }
+    }
+
+    // Every mark above is stamped from the tessellation — feature edges detected
+    // on facet normals, per-cell turning angle from facet triangles, a size field
+    // sampled at cell centroids — so a cell and its mirror image can disagree
+    // about their own refinement level even on a part whose exact geometry is
+    // symmetric. Ablating the curvature stamp alone moved plate_hole from
+    // 82/83/97% mirrored tets to 94/95/97%, which is the size of the effect.
+    // Take the low-side octant's answer for the whole orbit: on a verified
+    // symmetry the true answer is symmetric, so the disagreement is aliasing.
+    if (cell_orbit.active()) {
+        const auto level_before = refine_level;
+        const auto feature_before = is_feature;
+        const auto seed_before = is_seed;
+        for (std::size_t c = 0; c < inside.size(); ++c) {
+            const auto source = cell_orbit.canonical[c];
+            refine_level[c] = level_before[source];
+            is_feature[c] = feature_before[source];
+            is_seed[c] = seed_before[source];
         }
     }
 
@@ -713,7 +770,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         LocalRefineStats st;
         // S1: project free-surface LEB mids onto STL (avoid hole-void chords).
         auto refined = local_refine_tets(std::move(out.mesh.nodes), std::move(out.mesh.tets),
-                                         marked, &st, &surface);
+                                         marked, &st, &surface, mirror);
         out.mesh.nodes = std::move(refined.nodes);
         out.mesh.tets = std::move(refined.tets);
     };
@@ -748,7 +805,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                     }
                 },
                 /*max_move_frac=*/1.05, /*passes=*/5, features, {}, {},
-                /*defer_coupled=*/false, projection);
+                /*defer_coupled=*/false, projection, {}, mirror);
             for (auto& n : out.mesh.tets) {
                 const double v = tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
                                                    out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
@@ -778,7 +835,14 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     // on the surface, and a point whose nearest triangle is missing, both count
     // as inside: every caller here uses this to authorise DELETING material, so
     // the ambiguous answer has to be the one that keeps it.
-    const auto outside_solid = [&surface](const Eigen::Vector3d& p) {
+    //
+    // The whole test runs on the folded point: reflection preserves the sign of
+    // (p − cp)·n because it reflects both vectors, so the folded answer is the
+    // same answer, and a tet and its mirror image are now condemned or spared
+    // together. Deciding each in its own octant is how a carve could take a cell
+    // on one side of a symmetric part and leave its mirror image standing.
+    const auto outside_solid = [&surface, mirror](const Eigen::Vector3d& raw) {
+        const Eigen::Vector3d p = mirror_fold(mirror, raw);
         const auto cp = closest_on_surface(surface, p);
         if (cp.triangle >= surface.triangles.size()) {
             return false;
@@ -787,6 +851,12 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         const Eigen::Vector3d n = (surface.vertices[tri[1]] - surface.vertices[tri[0]])
                                       .cross(surface.vertices[tri[2]] - surface.vertices[tri[0]]);
         return (p - cp.point).dot(n) > 0.0;
+    };
+
+    // Distance from `p` to the surface, answered in the canonical octant.
+    // Reflection is an isometry, so this is the same distance.
+    const auto surface_distance = [&surface, mirror](const Eigen::Vector3d& p) {
+        return closest_on_surface(surface, mirror_fold(mirror, p)).distance;
     };
 
 
@@ -901,7 +971,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         // Use max(hc, ~cell diagonal) scale via frac>1; soft-unsnap keeps quality.
         snap_boundary_nodes(surface, out.mesh.nodes, snap_nodes, hc, collect_invert,
                             /*max_move_frac=*/1.15, /*passes=*/7, features, {}, {},
-                            /*defer_coupled=*/false, projection);
+                            /*defer_coupled=*/false, projection, {}, mirror);
         // Per-node accept/reject re-project for residual outliers (hole kinks).
         // Full projection; keep only if no skin tet inverts.
         {
@@ -910,8 +980,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 if (ni >= out.mesh.nodes.size()) {
                     continue;
                 }
-                const auto target =
-                    boundary_projection_target(surface, out.mesh.nodes[ni], ni, projection);
+                const auto target = boundary_projection_target(
+                    surface, out.mesh.nodes[ni], ni, projection, mirror);
                 if (!target || !(target->distance > thr) || target->distance > 2.5 * hc) {
                     continue;
                 }
@@ -952,7 +1022,6 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     };
     snap_round();
 
-
     // Capture projection-resistant boundary nodes exactly once. Repair may
     // expose interior lattice nodes; treating those newly exposed nodes as
     // fresh juts on every round peels successive healthy layers from the
@@ -980,7 +1049,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     std::unordered_set<std::uint32_t> initial_juts;
     for (const auto ni : tet_boundary_nodes(out.mesh.tets, out.mesh.nodes)) {
         const Eigen::Vector3d& p = out.mesh.nodes[ni];
-        if (closest_on_surface(surface, p).distance > initial_jut_threshold &&
+        if (surface_distance(p) > initial_jut_threshold &&
             outside_solid(p)) {
             initial_juts.insert(ni);
         }
@@ -1140,6 +1209,97 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             // ordering below runs through this frame instead of node/tet indices,
             // which do not mirror (ADR-0036).
             const MirrorKeyFrame mkey = mirror_key_frame(out.mesh.nodes);
+
+            // Collapse the whole reflection orbit or none of it.
+            //
+            // Ordering the decisions equivariantly is not enough here, and the
+            // measurement says so: with every geometry query folded and every tie
+            // broken on a mirror-invariant key, cylinder.step at h = 8 mm still
+            // entered this round at 100/100/100% mirrored tets and left it at
+            // 99.7/98.8/99.4%, with 170 of 1880 collapses lacking a mirror image —
+            // all on the curved wall, none within four cells of a mid-plane. The
+            // mechanism is coupling along a ring of caps: a greedy sweep that
+            // merges adjacent wall nodes commits a matching, and a matching chosen
+            // one cap at a time need not be mirror-symmetric even when every
+            // individual choice is.
+            //
+            // So a collapse is applied to every reflected copy of itself at once,
+            // and refused unless
+            //   * every reflected copy of both endpoints exists and is still live,
+            //   * every copy is legal on its own (`collapse_score` finite), and
+            //   * the copies' incident stars are pairwise DISJOINT.
+            // The disjointness requirement is what makes applying them in sequence
+            // equivalent to applying them simultaneously: with disjoint stars no
+            // copy can change another's legality. It refuses collapses within a
+            // cell of a mid-plane, and a node ON a plane — whose two candidate
+            // survivors are reflections of each other — can never collapse, which
+            // is correct: either choice would break the symmetry it sits on.
+            const double orbit_tol = mkey.inv_quantum > 0.0 ? 1.0 / mkey.inv_quantum : 0.0;
+            const MirrorNodeOrbit orbit =
+                mirror != nullptr ? MirrorNodeOrbit(*mirror, out.mesh.nodes, orbit_tol)
+                                  : MirrorNodeOrbit(MirrorFrame{}, out.mesh.nodes, 0.0);
+            const auto collapse_orbit = [&](std::uint32_t dead, std::uint32_t surv) {
+                if (!orbit.active()) {
+                    return try_collapse(dead, surv);
+                }
+                std::vector<std::pair<std::uint32_t, std::uint32_t>> copies;
+                copies.reserve(8);
+                copies.emplace_back(dead, surv);
+                for (unsigned mask = 1; mask <= orbit.reflection_count(); ++mask) {
+                    const std::uint32_t d2 = orbit.reflected(dead, mask);
+                    const std::uint32_t s2 = orbit.reflected(surv, mask);
+                    if (d2 == MirrorNodeOrbit::npos || s2 == MirrorNodeOrbit::npos) {
+                        return false;
+                    }
+                    if (d2 == dead && s2 == surv) {
+                        continue; // this reflection fixes the edge
+                    }
+                    if (d2 == dead || s2 == surv || d2 == surv || s2 == dead) {
+                        return false; // edge meets its own reflection
+                    }
+                    if (std::find(copies.begin(), copies.end(),
+                                  std::pair<std::uint32_t, std::uint32_t>{d2, s2}) !=
+                        copies.end()) {
+                        continue;
+                    }
+                    copies.emplace_back(d2, s2);
+                }
+                // Disjointness is required BETWEEN copies, never within one: a
+                // copy's own two endpoints necessarily share the tets on the edge
+                // being collapsed.
+                std::unordered_set<std::size_t> other_stars;
+                for (const auto& [d2, s2] : copies) {
+                    if (node_remap[d2] != d2 || node_remap[s2] != s2) {
+                        return false;
+                    }
+                    if (!std::isfinite(collapse_score(d2, s2))) {
+                        return false;
+                    }
+                    std::vector<std::size_t> star;
+                    for (const auto node : {d2, s2}) {
+                        const auto it = incident.find(node);
+                        if (it == incident.end()) {
+                            return false;
+                        }
+                        for (const auto tj : it->second) {
+                            if (!removed[tj]) {
+                                star.push_back(tj);
+                            }
+                        }
+                    }
+                    for (const auto tj : star) {
+                        if (other_stars.count(tj) != 0) {
+                            return false; // copies interact: not independent
+                        }
+                    }
+                    other_stars.insert(star.begin(), star.end());
+                }
+                bool applied = false;
+                for (const auto& [d2, s2] : copies) {
+                    applied = try_collapse(d2, s2) || applied;
+                }
+                return applied;
+            };
             // Phase A — void juts: boundary nodes whose projection the snap had
             // to reject (hole-rim stair chords poking into the void) merge into
             // an adjacent on-surface boundary node instead of leaving a spike.
@@ -1147,7 +1307,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 if (node_remap[ni] != ni || !initial_juts.contains(ni)) {
                     continue;
                 }
-                const double resid = closest_on_surface(surface, out.mesh.nodes[ni]).distance;
+                const double resid = surface_distance(out.mesh.nodes[ni]);
                 if (resid <= 0.15 * hc) {
                     continue;
                 }
@@ -1168,12 +1328,16 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                     }
                 }
                 // Distance ties break on the mirror key, not the node id, so a
-                // jut and its mirror image merge toward mirrored neighbours
-                // (ADR-0036).
+                // jut and its mirror image merge toward mirrored neighbours. The
+                // length itself is compared through `tie_key`: mirrored lengths
+                // agree only to the last ulp, and ordering on that noise is what
+                // sent mirrored juts to unmirrored survivors (ADR-0036).
                 std::sort(cand.begin(), cand.end(),
                           [&](const auto& x, const auto& y) {
-                              if (x.first != y.first) {
-                                  return x.first < y.first;
+                              const auto lx = tie_key(x.first, hc);
+                              const auto ly = tie_key(y.first, hc);
+                              if (lx != ly) {
+                                  return lx < ly;
                               }
                               const auto kx = mkey.key(out.mesh.nodes[x.second]);
                               const auto ky = mkey.key(out.mesh.nodes[y.second]);
@@ -1185,11 +1349,10 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                                        }),
                            cand.end());
                 for (const auto& [len, surv] : cand) {
-                    if (closest_on_surface(surface, out.mesh.nodes[surv]).distance >
-                        0.05 * hc) {
+                    if (surface_distance(out.mesh.nodes[surv]) > 0.05 * hc) {
                         continue;
                     }
-                    if (try_collapse(ni, surv)) {
+                    if (collapse_orbit(ni, surv)) {
                         break;
                     }
                 }
@@ -1217,8 +1380,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 }
             }
             std::sort(cap_order.begin(), cap_order.end(), [&](std::size_t a, std::size_t b) {
-                const double qa = aspect_of(out.mesh.tets[a]);
-                const double qb = aspect_of(out.mesh.tets[b]);
+                const auto qa = tie_key(aspect_of(out.mesh.tets[a]), 1.0);
+                const auto qb = tie_key(aspect_of(out.mesh.tets[b]), 1.0);
                 if (qa != qb) {
                     return qa < qb;
                 }
@@ -1245,19 +1408,34 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                             (out.mesh.nodes[a] - out.mesh.nodes[b]).norm(), {a, b}};
                     }
                 }
-                const auto edge_key_hi = [&](std::array<std::uint32_t, 2> e) {
+                // A cap's six edges must be tried in mirrored order, so the
+                // tie-break has to identify an EDGE mirror-invariantly, not just
+                // its lower endpoint: two edges sharing that endpoint tie, and the
+                // tie then fell to the node id, which does not mirror. Measured on
+                // cylinder.step at h = 8 mm with every geometry query folded, that
+                // single tie decided 164 of 2032 collapses differently on the two
+                // sides of the y mid-plane. The sorted pair of endpoint mirror keys
+                // is unique per edge here: no lattice edge joins two nodes of the
+                // same reflection orbit, because even cell counts keep every cell —
+                // and therefore every tet and every edge — off the mid-planes.
+                using EdgeMirrorKey = std::array<std::array<long long, 3>, 2>;
+                const auto edge_mirror_key = [&](std::array<std::uint32_t, 2> e) {
                     const auto k0 = mkey.key(out.mesh.nodes[e[0]]);
                     const auto k1 = mkey.key(out.mesh.nodes[e[1]]);
-                    return k1 < k0 ? k1 : k0;
+                    return k1 < k0 ? EdgeMirrorKey{{k1, k0}} : EdgeMirrorKey{{k0, k1}};
                 };
                 std::sort(edges_len.begin(), edges_len.end(),
                           [&](const auto& x, const auto& y) {
-                              if (x.first != y.first) {
-                                  return x.first < y.first;
+                              const auto lx = tie_key(x.first, hc);
+                              const auto ly = tie_key(y.first, hc);
+                              if (lx != ly) {
+                                  return lx < ly;
                               }
-                              const auto kx = edge_key_hi(x.second);
-                              const auto ky = edge_key_hi(y.second);
-                              return kx != ky ? kx < ky : x.second[0] < y.second[0];
+                              const auto kx = edge_mirror_key(x.second);
+                              const auto ky = edge_mirror_key(y.second);
+                              return kx != ky ? kx < ky
+                                              : std::min(x.second[0], x.second[1]) <
+                                                    std::min(y.second[0], y.second[1]);
                           });
                 bool done = false;
                 for (int e = 0; e < ne && !done; ++e) {
@@ -1269,19 +1447,25 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                     // When both directions are legal, keep the one whose incident
                     // star survives in better shape. Aspect is mirror-invariant,
                     // so a cap and its mirror image collapse in mirrored
-                    // directions. An exact score tie — the norm on a symmetric
-                    // lattice — falls back to farther-from-centre.
+                    // directions — but only when the two scores are compared
+                    // through `tie_key`. On a symmetric lattice the scores tie
+                    // exactly in exact arithmetic and differ in the last ulp in
+                    // floating point, so a raw comparison picked the direction
+                    // from that noise and mirrored caps collapsed opposite ways.
+                    // A genuine tie falls back to farther-from-centre.
                     const double sa = collapse_score(a, b); // a dies
                     const double sb = collapse_score(b, a); // b dies
                     if (!std::isfinite(sa) && !std::isfinite(sb)) {
                         continue;
                     }
+                    const auto qa = tie_key(sa, 1.0);
+                    const auto qb = tie_key(sb, 1.0);
                     std::uint32_t dead;
                     std::uint32_t surv;
-                    if (sa > sb) {
+                    if (qa > qb) {
                         dead = a;
                         surv = b;
-                    } else if (sb > sa) {
+                    } else if (qb > qa) {
                         dead = b;
                         surv = a;
                     } else {
@@ -1291,7 +1475,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                         dead = a_dies ? a : b;
                         surv = a_dies ? b : a;
                     }
-                    done = try_collapse(dead, surv);
+                    done = collapse_orbit(dead, surv);
                 }
             }
 
@@ -1520,7 +1704,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                     }
                 }
             },
-            /*passes=*/3, /*relax=*/0.5, features, projection);
+            /*passes=*/3, /*relax=*/0.5, features, projection, mirror);
         for (auto& n : out.mesh.tets) {
             const double v = tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
                                                out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
@@ -1567,10 +1751,9 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             }
             std::sort(bnodes.begin(), bnodes.end());
             bnodes.erase(std::unique(bnodes.begin(), bnodes.end()), bnodes.end());
-            out.mesh.pin = pin_feature_nodes(*fit->cad, *fit->topo, out.mesh.nodes, bnodes, hc,
-                                        node_offends,
-                                        projection != nullptr ? projection->provenance
-                                                              : nullptr);
+            out.mesh.pin = pin_feature_nodes(
+                *fit->cad, *fit->topo, out.mesh.nodes, bnodes, hc, node_offends,
+                projection != nullptr ? projection->provenance : nullptr, mirror);
             for (auto& n : out.mesh.tets) {
                 const double v = tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
                                                    out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
@@ -1678,7 +1861,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         // BEFORE the final carve + pull and the census gate stays last.
         repair_round();
         carve_to_clean();
-        pull_buried_free_faces(out.mesh.nodes, out.mesh.tets, hc);
+        pull_buried_free_faces(out.mesh.nodes, out.mesh.tets, hc, /*max_iters=*/8,
+                               mirror);
         if (const auto st =
                 count_buried_free_tet_faces(out.mesh.nodes, out.mesh.tets, hc);
             st.n_buried != 0) {
@@ -1776,21 +1960,27 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             return lo;
         };
         for (int pass = 0; pass < kRelaxPasses; ++pass) {
-            // Nodes of every sliver tet, ascending, deduplicated.
-            std::set<std::uint32_t> targets;
+            // Nodes of every sliver tet, deduplicated, visited in mirror-canonical
+            // order. This is a Gauss-Seidel sweep on the shared node array — an
+            // accepted move changes whether the next node's move improves its own
+            // star — so ascending node id gave a node and its mirror image
+            // different predecessors here too (ADR-0036).
+            std::set<std::uint32_t> target_set;
             for (const auto& t : out.mesh.tets) {
                 if (aspect(t) >= kSliverFloor) {
                     continue;
                 }
                 for (const auto ni : t) {
                     if (frozen[ni] == 0 && !nbrs[ni].empty()) {
-                        targets.insert(ni);
+                        target_set.insert(ni);
                     }
                 }
             }
-            if (targets.empty()) {
+            if (target_set.empty()) {
                 break;
             }
+            std::vector<std::uint32_t> targets(target_set.begin(), target_set.end());
+            sort_mirror_canonical(out.mesh.nodes, targets);
             std::size_t n_moved = 0;
             for (const auto ni : targets) {
                 Eigen::Vector3d centroid = Eigen::Vector3d::Zero();

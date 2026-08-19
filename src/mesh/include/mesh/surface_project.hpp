@@ -6,6 +6,7 @@
 
 #include "geom/features.hpp"
 #include "geom/tri_surface.hpp"
+#include "mesh/mirror.hpp"
 
 #include <Eigen/Core>
 
@@ -71,15 +72,23 @@ struct BoundaryProjectionContext {
 /// Resolve only through the exact owner-aware oracle. Returns nullopt when no
 /// oracle is installed or the immutable owner cannot be projected. This is the
 /// no-triangle-fallback entry point for later wall/CVT passes.
+///
+/// `mirror` folds the query into the canonical octant of the geometry's verified
+/// reflection symmetry and reflects the answer back (mesh/mirror.hpp), so a node
+/// and its mirror image are projected to mirrored points and classify to the same
+/// owner. Without it the two see different tessellation, different nearest
+/// features and different owners, and the mesh loses the symmetry the lattice had.
 [[nodiscard]] std::optional<BoundaryTarget>
 owned_boundary_projection_target(const Eigen::Vector3d& p, std::uint32_t node,
-                                 BoundaryProjectionContext* context);
+                                 BoundaryProjectionContext* context,
+                                 const MirrorFrame* mirror = nullptr);
 
 /// Resolve a node target through the exact owner-aware oracle when present,
-/// otherwise through the legacy TriSurface closest-point path.
+/// otherwise through the legacy TriSurface closest-point path. `mirror` as above.
 [[nodiscard]] std::optional<BoundaryTarget>
 boundary_projection_target(const geom::TriSurface& surface, const Eigen::Vector3d& p,
-                           std::uint32_t node, BoundaryProjectionContext* context = nullptr);
+                           std::uint32_t node, BoundaryProjectionContext* context = nullptr,
+                           const MirrorFrame* mirror = nullptr);
 
 /// Result of a Jacobian-safe boundary snap.
 struct SnapStats {
@@ -161,6 +170,9 @@ void sort_mirror_canonical(const std::vector<Eigen::Vector3d>& nodes,
 ///        restore; pure hex/poly meshes leave this false for a linear scan.
 /// @param relax_neighborhood Optional interior-room opener; see
 ///        RelaxNeighborhoodFn. Called before a node is allowed to retreat.
+/// @param mirror Optional verified reflection symmetry: every projection,
+///        closest-point and feature-capture query is answered in the canonical
+///        octant and reflected back, so mirrored nodes snap to mirrored targets.
 SnapStats
 snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d>& nodes,
                     const std::vector<std::uint32_t>& boundary_nodes, double h,
@@ -169,7 +181,8 @@ snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d
                     const RepairInteriorFn& repair_interior = {},
                     const NodeOffendsFn& node_offends = {}, bool defer_coupled = false,
                     BoundaryProjectionContext* projection = nullptr,
-                    const RelaxNeighborhoodFn& relax_neighborhood = {});
+                    const RelaxNeighborhoodFn& relax_neighborhood = {},
+                    const MirrorFrame* mirror = nullptr);
 
 /// Result of a tangential boundary smoothing pass.
 struct SmoothStats {
@@ -192,6 +205,7 @@ SmoothStats smooth_boundary_nodes(const geom::TriSurface& surface,
                                   double h, const CollectOffendersFn& collect_offenders,
                                   int passes = 2, double relax = 0.5,
                                   std::span<const geom::SharpEdge> feature_edges = {},
-                                  BoundaryProjectionContext* projection = nullptr);
+                                  BoundaryProjectionContext* projection = nullptr,
+                                  const MirrorFrame* mirror = nullptr);
 
 } // namespace polymesh::mesh

@@ -7,6 +7,7 @@
 // (and any solid whose face diagonals align with cell centres).
 
 #include "geom/tri_surface.hpp"
+#include "mesh/mirror.hpp"
 
 #include <Eigen/Core>
 
@@ -116,6 +117,43 @@ FeatureAwareClassification classify_cells_feature_aware(
     int max_refinement_levels = 4,
     const std::function<double(const Eigen::Vector3d&)>& size_field = {},
     bool even_cells = false);
+
+/// Cell-orbit bookkeeping for a lattice that mirrors about the planes of a
+/// verified `MirrorFrame`.
+///
+/// A cell (i,j,k) reflects to (n-1-i, j, k) about the x mid-plane, exactly, in
+/// index arithmetic — no floating-point comparison decides it. That is why the
+/// classifier symmetrises through this map instead of folding the sample point:
+/// the orbit is discovered in integers, so a cell and its mirror image are
+/// guaranteed to receive the same answer, not merely a nearly-equal one.
+struct CanonicalCellMap {
+    /// Flat index of each cell's orbit representative (the low-side octant).
+    std::vector<std::uint32_t> canonical;
+    /// Bit `a` set when reaching the representative reflected axis `a`. Callers
+    /// holding per-child data must permute it by this mask.
+    std::vector<std::uint8_t> flipped;
+    /// Axes actually folded — a frame plane that does not coincide with the
+    /// grid's own mid-plane is dropped rather than approximated.
+    std::array<bool, 3> axis{{false, false, false}};
+
+    [[nodiscard]] bool active() const { return !canonical.empty(); }
+};
+
+/// Orbit map of `grid` under the planes of `frame`. Empty (inactive) when the
+/// frame has no plane, or when no frame plane lands on a grid mid-plane within
+/// 1e-9 of the grid diagonal.
+CanonicalCellMap canonical_cell_map(const CartesianGrid& grid, const MirrorFrame& frame);
+
+/// Replace every cell's classification with its orbit representative's, child
+/// mask bits permuted to the cell's own octant, and recompute the mixed-cell
+/// count and classified volume from the result.
+///
+/// Copying the representative — rather than taking the union or the majority —
+/// is the honest choice: on a geometry verified mirror-symmetric the true answer
+/// is symmetric, so any disagreement between a cell and its mirror image is
+/// tessellation aliasing, and one octant's answer is as good as the other's.
+void symmetrise_classification(FeatureAwareClassification& classification,
+                               const CanonicalCellMap& map);
 
 /// Even-odd with rays along axis 0/1/2 (prism sweep uses longest axis).
 std::vector<bool> classify_cells_inside_axis(const geom::TriSurface& surface,

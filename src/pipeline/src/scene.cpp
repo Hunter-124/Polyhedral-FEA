@@ -2000,11 +2000,45 @@ ExteriorConformStats
 conform_true_exterior(fea::NodalMesh& mesh,
                       std::span<const std::array<std::uint32_t, 4>> boundary_faces,
                       mesh::BoundaryProjectionContext* projection,
-                      const mesh::BoundaryFit* fit, double h, double floor_value) {
+                      const mesh::BoundaryFit* fit, double h, double floor_value,
+                      const mesh::MirrorFrame* mirror) {
     ExteriorConformStats stats;
     if (mesh.elements.empty() || mesh.nodes.empty() || projection == nullptr || !(h > 0.0)) {
         return stats;
     }
+    // Reflection orbit over the node set this pass receives. Every mesher stage
+    // upstream is exactly mirror-symmetric by construction (mesh/mirror.hpp), and
+    // this pass then moved nodes one at a time under a quality gate, which is
+    // order-dependent: measured on cylinder.step at h = 8 mm the mesher handed the
+    // pipeline a 100/100/100% mirrored mesh and the shipped VTU read
+    // 98.96/98.79/99.61%. So each accepted move here is applied to a whole orbit
+    // or to none of it.
+    const mesh::MirrorNodeOrbit orbit(mirror != nullptr ? *mirror : mesh::MirrorFrame{},
+                                      mesh.nodes, [&] {
+                                          const mesh::MirrorKeyFrame frame =
+                                              mesh::mirror_key_frame(mesh.nodes);
+                                          return frame.inv_quantum > 0.0
+                                                     ? 1.0 / frame.inv_quantum
+                                                     : 0.0;
+                                      }());
+    // Orbit copies of `node`, itself included, or empty when any copy is missing.
+    const auto orbit_of = [&](std::uint32_t node) {
+        std::vector<std::uint32_t> group{node};
+        if (!orbit.active()) {
+            return group;
+        }
+        for (unsigned mask = 1; mask <= orbit.reflection_count(); ++mask) {
+            const std::uint32_t other = orbit.reflected(node, mask);
+            if (other == mesh::MirrorNodeOrbit::npos) {
+                group.clear();
+                return group;
+            }
+            if (std::find(group.begin(), group.end(), other) == group.end()) {
+                group.push_back(other);
+            }
+        }
+        return group;
+    };
     std::vector<char> on_boundary(mesh.nodes.size(), 0);
     for (const auto& face : boundary_faces) {
         for (const auto ni : face) {
@@ -2084,7 +2118,8 @@ conform_true_exterior(fea::NodalMesh& mesh,
         const double before = star_min_quality(ni);
         Eigen::Vector3d moved = saved + (len > cap ? step * (cap / len) : step);
         if (tangential) {
-            const auto back = mesh::owned_boundary_projection_target(moved, ni, projection);
+            const auto back =
+                mesh::owned_boundary_projection_target(moved, ni, projection, mirror);
             if (!back || (back->point - saved).norm() > cap) {
                 return false;
             }
@@ -2411,7 +2446,7 @@ conform_true_exterior(fea::NodalMesh& mesh,
         const auto node_offends = [&](std::uint32_t ni) { return !star_ok(ni); };
         const auto pin = mesh::pin_feature_nodes(
             *fit->cad, *fit->topo, mesh.nodes, exterior, h, node_offends,
-            projection->provenance);
+            projection->provenance, mirror);
         stats.n_edge_pinned = pin.edge_pinned;
         stats.n_edge_chains = pin.chains;
         stats.n_pin_rejected = pin.rejected;
@@ -2429,7 +2464,9 @@ conform_true_exterior(fea::NodalMesh& mesh,
         }
         const auto repair_edge = [&](std::uint32_t a, std::uint32_t b,
                                      const Eigen::Vector3d& target_a,
-                                     const Eigen::Vector3d& target_b) {
+                                     const Eigen::Vector3d& target_b,
+                                     std::vector<std::pair<std::uint32_t, Eigen::Vector3d>>*
+                                         undo) {
             const Eigen::Vector3d saved_a = mesh.nodes[a];
             const Eigen::Vector3d saved_b = mesh.nodes[b];
             mesh.nodes[a] = target_a;
@@ -2450,6 +2487,10 @@ conform_true_exterior(fea::NodalMesh& mesh,
             std::sort(candidates.begin(), candidates.end());
             candidates.erase(std::unique(candidates.begin(), candidates.end()),
                              candidates.end());
+            // The pattern search below is a Gauss-Seidel sweep over these interior
+            // nodes, so their visit order decides where each one lands. Ascending
+            // node id does not mirror; the mirror key does.
+            mesh::sort_mirror_canonical(mesh.nodes, candidates);
             std::vector<Eigen::Vector3d> saved;
             saved.reserve(candidates.size());
             for (const auto node : candidates) {
@@ -2492,10 +2533,32 @@ conform_true_exterior(fea::NodalMesh& mesh,
                             double best_quality =
                                 objective(-std::numeric_limits<double>::infinity());
                             Eigen::Vector3d best_position = mesh.nodes[node];
+                            // Trial directions are taken in the node's OWN folded
+                            // frame: a node in a high octant tries the reflected
+                            // step first, so a node and its mirror image walk
+                            // mirrored paths through this greedy search. Fixed
+                            // ±axis order would hand them different first
+                            // improvements and place them asymmetrically.
+                            Eigen::Vector3d fold_sign = Eigen::Vector3d::Ones();
+                            if (mirror != nullptr) {
+                                for (int axis = 0; axis < 3; ++axis) {
+                                    if (mirror->plane[static_cast<std::size_t>(axis)] &&
+                                        mesh.nodes[node][axis] > mirror->center[axis]) {
+                                        fold_sign[axis] = -1.0;
+                                    }
+                                }
+                            }
                             for (int axis = 0; axis < 3; ++axis) {
                                 for (const double sign : {-1.0, 1.0}) {
                                     Eigen::Vector3d trial = best_position;
-                                    trial[axis] += sign * step_size;
+                                    trial[axis] += sign * fold_sign[axis] * step_size;
+                                    if (mirror != nullptr) {
+                                        // A node on a plane may only move within
+                                        // it; the normal step cancels and the
+                                        // trial is a no-op.
+                                        trial = mirror->clamp_to_planes(trial,
+                                                                        mesh.nodes[node]);
+                                    }
                                     mesh.nodes[node] = trial;
                                     const double quality = objective(best_quality);
                                     if (quality > best_quality + 1e-14) {
@@ -2520,6 +2583,13 @@ conform_true_exterior(fea::NodalMesh& mesh,
                 }
             }
             if (objective(floor_value) >= floor_value) {
+                if (undo != nullptr) {
+                    undo->emplace_back(a, saved_a);
+                    undo->emplace_back(b, saved_b);
+                    for (std::size_t ci = 0; ci < candidates.size(); ++ci) {
+                        undo->emplace_back(candidates[ci], saved[ci]);
+                    }
+                }
                 return true;
             }
             mesh.nodes[a] = saved_a;
@@ -2559,27 +2629,96 @@ conform_true_exterior(fea::NodalMesh& mesh,
             edge_target.emplace(node, target);
             return target;
         };
-        for (const auto& [a, b] : boundary_edges) {
-            const auto target_a = target_of(a);
-            const auto target_b = target_of(b);
-            if (!target_a.valid || !target_b.valid ||
-                target_a.edge_id != target_b.edge_id) {
+        // Edges are visited in mirror-canonical order and repaired in whole
+        // orbits: `repair_edge` moves interior nodes to buy the quality its own
+        // gate demands, so a repair accepted on one side and refused on the other
+        // leaves the two sides of a symmetric part genuinely different.
+        std::vector<std::pair<std::uint32_t, std::uint32_t>> edge_order(boundary_edges.begin(),
+                                                                       boundary_edges.end());
+        {
+            const mesh::MirrorKeyFrame ekey = mesh::mirror_key_frame(mesh.nodes);
+            std::sort(edge_order.begin(), edge_order.end(),
+                      [&](const auto& x, const auto& y) {
+                          const auto kx = ekey.key(0.5 * (mesh.nodes[x.first] +
+                                                          mesh.nodes[x.second]));
+                          const auto ky = ekey.key(0.5 * (mesh.nodes[y.first] +
+                                                          mesh.nodes[y.second]));
+                          return kx != ky ? kx < ky : x < y;
+                      });
+        }
+        std::set<std::pair<std::uint32_t, std::uint32_t>> repaired;
+        for (const auto& [a, b] : edge_order) {
+            if (repaired.count(std::minmax(a, b)) != 0) {
                 continue;
             }
-            const std::uint32_t edge_id = target_a.edge_id;
-            if (!repair_edge(a, b, target_a.point, target_b.point)) {
+            // Orbit copies of this edge, as node pairs.
+            std::vector<std::pair<std::uint32_t, std::uint32_t>> copies{{a, b}};
+            bool orbit_complete = true;
+            if (orbit.active()) {
+                for (unsigned mask = 1; mask <= orbit.reflection_count(); ++mask) {
+                    const std::uint32_t a2 = orbit.reflected(a, mask);
+                    const std::uint32_t b2 = orbit.reflected(b, mask);
+                    if (a2 == mesh::MirrorNodeOrbit::npos ||
+                        b2 == mesh::MirrorNodeOrbit::npos) {
+                        orbit_complete = false;
+                        break;
+                    }
+                    if (boundary_edges.count(std::minmax(a2, b2)) == 0) {
+                        orbit_complete = false;
+                        break;
+                    }
+                    if (std::find(copies.begin(), copies.end(),
+                                  std::pair<std::uint32_t, std::uint32_t>{a2, b2}) ==
+                        copies.end()) {
+                        copies.emplace_back(a2, b2);
+                    }
+                }
+            }
+            if (!orbit_complete) {
+                continue;
+            }
+            bool all_valid = true;
+            for (const auto& [a2, b2] : copies) {
+                const auto ta = target_of(a2);
+                const auto tb = target_of(b2);
+                if (!ta.valid || !tb.valid || ta.edge_id != tb.edge_id) {
+                    all_valid = false;
+                    break;
+                }
+            }
+            if (!all_valid) {
+                continue;
+            }
+            std::vector<std::pair<std::uint32_t, Eigen::Vector3d>> undo;
+            bool all_repaired = true;
+            for (const auto& [a2, b2] : copies) {
+                const auto ta = target_of(a2);
+                const auto tb = target_of(b2);
+                if (!repair_edge(a2, b2, ta.point, tb.point, &undo)) {
+                    all_repaired = false;
+                    break;
+                }
+            }
+            if (!all_repaired) {
+                for (auto it = undo.rbegin(); it != undo.rend(); ++it) {
+                    mesh.nodes[it->first] = it->second;
+                }
                 continue;
             }
             if (projection->provenance->size() < mesh.nodes.size()) {
                 projection->provenance->resize(mesh.nodes.size());
             }
-            (*projection->provenance)[a] =
-                mesh::BoundarySupport{mesh::BoundarySupportKind::kCadEdge, edge_id};
-            (*projection->provenance)[b] =
-                mesh::BoundarySupport{mesh::BoundarySupportKind::kCadEdge, edge_id};
-            stats.n_edge_pinned += 2;
-            ++connected_by_edge[edge_id];
-            ++stats.n_connected_edges;
+            for (const auto& [a2, b2] : copies) {
+                const std::uint32_t edge_id = target_of(a2).edge_id;
+                (*projection->provenance)[a2] =
+                    mesh::BoundarySupport{mesh::BoundarySupportKind::kCadEdge, edge_id};
+                (*projection->provenance)[b2] =
+                    mesh::BoundarySupport{mesh::BoundarySupportKind::kCadEdge, edge_id};
+                stats.n_edge_pinned += 2;
+                ++connected_by_edge[edge_id];
+                ++stats.n_connected_edges;
+                repaired.insert(std::minmax(a2, b2));
+            }
         }
         stats.edge_pass_ms =
             std::chrono::duration<double, std::milli>(
@@ -2714,51 +2853,113 @@ conform_true_exterior(fea::NodalMesh& mesh,
             std::sort(candidates.begin(), candidates.end());
             candidates.erase(std::unique(candidates.begin(), candidates.end()),
                              candidates.end());
+            // Mirror-canonical visit order: this is a Gauss-Seidel sweep on the
+            // shared node array under a quality gate, so an accepted slide decides
+            // whether the next one is legal.
+            mesh::sort_mirror_canonical(mesh.nodes, candidates);
             std::size_t moved = 0;
+            std::vector<char> done(mesh.nodes.size(), 0);
             for (const auto ni : candidates) {
-                if (!slidable(ni)) {
+                if (!slidable(ni) || done[ni] != 0) {
                     continue;
                 }
-                // Umbrella centroid over the boundary neighbours only: an
-                // interior neighbour would pull the node off its own face.
-                Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
-                std::size_t n_used = 0;
-                for (const auto fi : node_facets[ni]) {
-                    const auto& f = facets[fi];
-                    for (int i = 0; i < f.count; ++i) {
-                        const auto other = f.nodes[static_cast<std::size_t>(i)];
-                        if (other != ni) {
-                            centroid += mesh.nodes[other];
-                            ++n_used;
+                // The whole orbit slides together or not at all. A slide is a
+                // tangential move under a local quality gate, so accepting it on
+                // one side and refusing it on the other is exactly the asymmetry
+                // this pass used to introduce.
+                const auto group = orbit_of(ni);
+                if (group.empty()) {
+                    continue;
+                }
+                bool orbit_slidable = true;
+                for (const auto node : group) {
+                    orbit_slidable = orbit_slidable && slidable(node);
+                }
+                if (!orbit_slidable) {
+                    continue;
+                }
+                std::vector<Eigen::Vector3d> group_saved;
+                group_saved.reserve(group.size());
+                for (const auto node : group) {
+                    group_saved.push_back(mesh.nodes[node]);
+                }
+                // One relax value for the whole orbit, tested on every member
+                // before any of them is kept. Letting each member walk its own
+                // 0.5/0.25/0.125 ladder is not equivalent: the acceptance test
+                // compares kink and quality values that tie in exact arithmetic
+                // across a mirror pair, so the ladders could stop at different
+                // rungs and slide mirrored nodes by different amounts (measured on
+                // icecream_cone at h = 12 mm without feature refinement: 10 nodes
+                // and 144 tets lost their mirror image about y).
+                std::vector<Eigen::Vector3d> centroid(group.size());
+                std::vector<double> kink_before(group.size());
+                std::vector<double> quality_before(group.size());
+                bool have_centroids = true;
+                for (std::size_t gi = 0; gi < group.size(); ++gi) {
+                    const auto node = group[gi];
+                    // Umbrella centroid over the boundary neighbours only: an
+                    // interior neighbour would pull the node off its own face.
+                    Eigen::Vector3d sum = Eigen::Vector3d::Zero();
+                    std::size_t n_used = 0;
+                    for (const auto fi : node_facets[node]) {
+                        const auto& f = facets[fi];
+                        for (int i = 0; i < f.count; ++i) {
+                            const auto other = f.nodes[static_cast<std::size_t>(i)];
+                            if (other != node) {
+                                sum += mesh.nodes[other];
+                                ++n_used;
+                            }
                         }
                     }
+                    if (n_used == 0) {
+                        have_centroids = false;
+                        break;
+                    }
+                    centroid[gi] = sum / static_cast<double>(n_used);
+                    kink_before[gi] = node_worst_kink(node);
+                    quality_before[gi] = star_min_quality(node);
                 }
-                if (n_used == 0) {
+                if (!have_centroids) {
                     continue;
                 }
-                centroid /= static_cast<double>(n_used);
-                const Eigen::Vector3d saved = mesh.nodes[ni];
-                const double kink_before = node_worst_kink(ni);
-                const double quality_before_node = star_min_quality(ni);
-                bool accepted = false;
+                bool all_accepted = false;
                 for (const double relax : {0.5, 0.25, 0.125}) {
-                    const Eigen::Vector3d slid = saved + relax * (centroid - saved);
-                    const auto back = mesh::owned_boundary_projection_target(slid, ni, projection);
-                    if (!back) {
+                    bool step_ok = true;
+                    for (std::size_t gi = 0; gi < group.size() && step_ok; ++gi) {
+                        const auto node = group[gi];
+                        const Eigen::Vector3d slid =
+                            group_saved[gi] + relax * (centroid[gi] - group_saved[gi]);
+                        const auto back = mesh::owned_boundary_projection_target(
+                            slid, node, projection, mirror);
+                        if (!back) {
+                            step_ok = false;
+                            break;
+                        }
+                        mesh.nodes[node] = back->point;
+                    }
+                    if (step_ok) {
+                        for (std::size_t gi = 0; gi < group.size() && step_ok; ++gi) {
+                            const auto node = group[gi];
+                            const double after = star_min_quality(node);
+                            step_ok = node_worst_kink(node) < kink_before[gi] &&
+                                      (!std::isfinite(after) ||
+                                       after >= std::min(quality_before[gi], floor_value)) &&
+                                      fea::star_jacobians_positive(mesh, incident[node]);
+                        }
+                    }
+                    if (step_ok) {
+                        all_accepted = true;
                         break;
                     }
-                    mesh.nodes[ni] = back->point;
-                    const double after = star_min_quality(ni);
-                    if (node_worst_kink(ni) < kink_before &&
-                        (!std::isfinite(after) ||
-                         after >= std::min(quality_before_node, floor_value)) &&
-                        fea::star_jacobians_positive(mesh, incident[ni])) {
-                        accepted = true;
-                        break;
+                    for (std::size_t gi = 0; gi < group.size(); ++gi) {
+                        mesh.nodes[group[gi]] = group_saved[gi];
                     }
-                    mesh.nodes[ni] = saved;
                 }
-                if (accepted) {
+                if (!all_accepted) {
+                    continue;
+                }
+                for (const auto node : group) {
+                    done[node] = 1;
                     ++moved;
                 }
             }
@@ -3074,6 +3275,35 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
     boundary_fit.topo = cad_topology.get();
     boundary_fit.projection = projection;
     const mesh::BoundaryFit* fit = projection != nullptr ? &boundary_fit : nullptr;
+    // Verified reflection symmetry of the geometry (mesh/mirror.hpp). Detected
+    // from the exact BRep when there is one, and from the tessellation itself
+    // when the tessellation IS the geometry (STL input, OCC-disabled build).
+    //
+    // This is what makes a symmetric part come out with a symmetric element
+    // pattern: without it every mesher decision is read off a tessellation that
+    // is not mirror-symmetric (sphere x: 0.00% of tessellation vertices have an
+    // exact mirror partner), so a cell and its mirror image genuinely disagree.
+    // Detection is dense and tight — every exact face sample is reflected and
+    // must land back on the solid — so an asymmetric part simply gets no frame
+    // and no fold.
+    const mesh::MirrorFrame mirror_frame =
+        (model.cad && !model.cad->empty())
+            ? mesh::detect_mirror_frame(*model.cad, model.bbox_min, model.bbox_max)
+            : mesh::detect_mirror_frame(model.surface);
+    const mesh::MirrorFrame* mirror = mirror_frame.any() ? &mirror_frame : nullptr;
+    const auto mirror_note = [&]() -> std::string {
+        if (mirror == nullptr) {
+            return " | mirror=none";
+        }
+        std::string axes;
+        for (int a = 0; a < 3; ++a) {
+            if (mirror_frame.plane[static_cast<std::size_t>(a)]) {
+                axes += "xyz"[a];
+            }
+        }
+        return std::format(" | mirror={} (reflected-sample residual {:.2g}·diag)", axes,
+                           mirror_frame.max_residual_over_diag);
+    };
     // Per-cell turning-angle refinement threshold for local curvature grading.
     constexpr double kCurvatureTurnDeg = 15.0;
     if (mesher == VolumeMesher::kHybrid || mesher == VolumeMesher::kHybridVem) {
@@ -4065,7 +4295,7 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
         auto graded = mesh::graded_tet_fill_surface(
             model.surface, model.bbox_min, model.bbox_max, graded_h,
             std::max(1, skin_layers), edges, feature_band, seeds, band, turn_deg,
-            fit, size_field);
+            fit, size_field, mirror);
         fill_h = graded.h_fine;
         out.mesh.nodes = std::move(graded.mesh.nodes);
         out.mesh.elements.reserve(graded.mesh.tets.size());
@@ -4123,6 +4353,7 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
                 graded.classification_refinement_levels,
                 graded.classification_volume_error);
         }
+        out.mesher_note += mirror_note();
     } else if (mesher == VolumeMesher::kOctahedral) {
         // Experimental BCC octahedra → tet4 (ADR-0019). Not a product claim.
         auto fill = mesh::octa_fill_surface(model.surface, model.bbox_min, model.bbox_max, h);
@@ -4607,7 +4838,7 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
             const double h_tet = std::max(h, 1e-9);
             auto tet_fill =
                 mesh::tet_fill_surface(model.surface, model.bbox_min, model.bbox_max, h_tet,
-                                       /*snap_boundary=*/true, fit);
+                                       /*snap_boundary=*/true, fit, mirror);
             std::vector<mesh::DomainTet> dtets;
             dtets.reserve(tet_fill.tets.size());
             for (const auto& t : tet_fill.tets) {
@@ -4837,7 +5068,7 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
             topo_ptr ? ", geom_source=brep_topology" : ", geom_source=surface_class");
     } else {
         auto fill = mesh::tet_fill_surface(model.surface, model.bbox_min, model.bbox_max, h,
-                                           /*snap_boundary=*/true, fit);
+                                           /*snap_boundary=*/true, fit, mirror);
         const auto owner_name = [](mesh::BoundarySupportKind k) {
             switch (k) {
             case mesh::BoundarySupportKind::kCadVertex:
@@ -4889,6 +5120,7 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
             out.mesh.elements.size(), out.mesh.nodes.size(), fill_h, q.min_aspect,
             q.mean_aspect, q.n_sliver, conf.max_distance, conf.mean_distance);
         out.mesher_note += conformity_note;
+        out.mesher_note += mirror_note();
     }
 
     // Prefer true element exterior faces for display/region skin so tet/prism
@@ -4907,7 +5139,7 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
     if (projection != nullptr) {
         const auto ext = conform_true_exterior(out.mesh, out.boundary_quads, projection, fit,
                                                fill_h > 0.0 ? fill_h : h,
-                                               mesh::validity::kCellShapeFloor);
+                                               mesh::validity::kCellShapeFloor, mirror);
         if (ext.n_candidates > 0 || ext.n_edge_pinned > 0 ||
             ext.n_kink_relieved > 0) {
             out.mesher_note += std::format(

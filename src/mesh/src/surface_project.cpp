@@ -917,25 +917,31 @@ SmoothStats smooth_boundary_nodes(const geom::TriSurface& surface,
             }
         }
     }
-    // Fan a face into triangles once: centroid and area of the polygon, from the
-    // node positions as they stand.
-    auto face_measure = [&](std::uint32_t fi) {
-        const auto& q = boundary_faces[fi];
-        Eigen::Vector3d moment = Eigen::Vector3d::Zero();
-        double area = 0.0;
-        for (int k = 1; k + 1 < 4; ++k) {
-            const Eigen::Vector3d& a = nodes[q[0]];
-            const Eigen::Vector3d& b = nodes[q[static_cast<std::size_t>(k)]];
-            const Eigen::Vector3d& c = nodes[q[static_cast<std::size_t>(k + 1)]];
-            const double t_area = 0.5 * (b - a).cross(c - a).norm();
-            if (!(t_area > 0.0)) {
-                continue;
+    // Centroid and area of every free face, refreshed once per relaxation pass.
+    // A face is shared by three or four nodes, so evaluating it per node instead
+    // would fan the same triangle areas out three or four times per pass.
+    std::vector<std::pair<double, Eigen::Vector3d>> face_measure(boundary_faces.size());
+    auto refresh_face_measures = [&] {
+        for (std::size_t fi = 0; fi < boundary_faces.size(); ++fi) {
+            const auto& q = boundary_faces[fi];
+            Eigen::Vector3d moment = Eigen::Vector3d::Zero();
+            double area = 0.0;
+            // Fan the quad; a tri arrives with its last node duplicated, so its
+            // second fan triangle is degenerate and drops out on its own.
+            for (int k = 1; k + 1 < 4; ++k) {
+                const Eigen::Vector3d& a = nodes[q[0]];
+                const Eigen::Vector3d& b = nodes[q[static_cast<std::size_t>(k)]];
+                const Eigen::Vector3d& c = nodes[q[static_cast<std::size_t>(k + 1)]];
+                const double t_area = 0.5 * (b - a).cross(c - a).norm();
+                if (!(t_area > 0.0)) {
+                    continue;
+                }
+                area += t_area;
+                moment += t_area * ((a + b + c) / 3.0);
             }
-            area += t_area;
-            moment += t_area * ((a + b + c) / 3.0);
+            face_measure[fi] = {area, area > 0.0 ? Eigen::Vector3d(moment / area)
+                                                 : Eigen::Vector3d::Zero()};
         }
-        return std::pair{area, area > 0.0 ? Eigen::Vector3d(moment / area)
-                                         : Eigen::Vector3d::Zero()};
     };
 
     // Crease classification: node sits on a sharp CAD edge. Near-crease wall
@@ -981,30 +987,28 @@ SmoothStats smooth_boundary_nodes(const geom::TriSurface& surface,
         for (std::size_t i = 0; i < nodes.size(); ++i) {
             node_key[i] = frame.key(nodes[i]);
         }
-        auto face_key = [&](std::uint32_t fi) {
-            std::array<std::array<long long, 3>, 4> k{};
-            for (int c = 0; c < 4; ++c) {
-                k[static_cast<std::size_t>(c)] =
-                    node_key[boundary_faces[fi][static_cast<std::size_t>(c)]];
-            }
-            std::sort(k.begin(), k.end());
-            return k;
-        };
-        auto face_ids = [&](std::uint32_t fi) {
+        // One key per face, built once: a comparator that rebuilt them would sort
+        // four triples on every comparison.
+        struct FaceOrder {
+            std::array<std::array<long long, 3>, 4> key{};
             std::array<std::uint32_t, 4> ids{};
-            for (int c = 0; c < 4; ++c) {
-                ids[static_cast<std::size_t>(c)] =
-                    boundary_faces[fi][static_cast<std::size_t>(c)];
-            }
-            std::sort(ids.begin(), ids.end());
-            return ids;
         };
+        std::vector<FaceOrder> order(boundary_faces.size());
+        for (std::size_t fi = 0; fi < boundary_faces.size(); ++fi) {
+            for (int c = 0; c < 4; ++c) {
+                const auto ni = boundary_faces[fi][static_cast<std::size_t>(c)];
+                order[fi].key[static_cast<std::size_t>(c)] =
+                    ni < nodes.size() ? node_key[ni] : std::array<long long, 3>{};
+                order[fi].ids[static_cast<std::size_t>(c)] = ni;
+            }
+            std::sort(order[fi].key.begin(), order[fi].key.end());
+            std::sort(order[fi].ids.begin(), order[fi].ids.end());
+        }
         for (auto& [ni, list] : inc) {
             (void)ni;
             std::sort(list.begin(), list.end(), [&](std::uint32_t a, std::uint32_t b) {
-                const auto ka = face_key(a);
-                const auto kb = face_key(b);
-                return ka != kb ? ka < kb : face_ids(a) < face_ids(b);
+                return order[a].key != order[b].key ? order[a].key < order[b].key
+                                                    : order[a].ids < order[b].ids;
             });
         }
     }
@@ -1066,6 +1070,7 @@ SmoothStats smooth_boundary_nodes(const geom::TriSurface& surface,
 
     std::unordered_map<std::uint32_t, Eigen::Vector3d> moved; // pre-pass position
     for (int pass = 0; pass < passes; ++pass) {
+        refresh_face_measures();
         // Jacobi targets from the current state.
         std::vector<std::pair<std::uint32_t, Eigen::Vector3d>> targets;
         targets.reserve(nbr.size());
@@ -1138,7 +1143,7 @@ SmoothStats smooth_boundary_nodes(const geom::TriSurface& surface,
                 Eigen::Vector3d moment = Eigen::Vector3d::Zero();
                 double area_sum = 0.0;
                 for (const auto fi : it->second) {
-                    const auto [area, c] = face_measure(fi);
+                    const auto& [area, c] = face_measure[fi];
                     if (!(area > 0.0)) {
                         continue;
                     }

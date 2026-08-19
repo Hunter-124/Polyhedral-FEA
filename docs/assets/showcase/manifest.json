@@ -1,6 +1,6 @@
 {
-  "generated_utc": "2026-08-19T17:40:23Z",
-  "git_rev": "2f6307d",
+  "generated_utc": "2026-08-19T17:45:43Z",
+  "git_rev": "92a1fab",
   "images": [
     {
       "file": "architecture.png",
@@ -26,7 +26,7 @@
       "dofs": null,
       "wall_time_s": null,
       "max_von_mises_pa": null,
-      "caption": "The learned mesh advisor under a DOF budget (ADR-0034): each point is a real CLI run's chosen action \u2014 predicted per-case relative error vs the --advisor-max-dof cap \u2014 with over-budget empties answered by an honest refusal, never an unaffordable action."
+      "caption": "The learned mesh advisor under a DOF budget (ADR-0034): the action it picks at each --advisor-max-dof cap, against that action's predicted per-case relative-error score. 0 of the 18 capped picks is over budget and this sweep contains no refusal. 13 of the 21 invoked CLI solves exited nonzero \u2014 the picked action failed to mesh or solve \u2014 and those points are ringed; every plotted score is the shipped ONNX model's prediction, not a measured outcome."
     },
     {
       "file": "bench_dof_time.png",
@@ -39,7 +39,7 @@
       "dofs": null,
       "wall_time_s": null,
       "max_von_mises_pa": null,
-      "caption": "Feature-graded vs PolyMesh's own frozen uniform tet10 baseline on the D6 L-domain: 6,384 -> 1,248 DOF and 2.762 s -> 0.227 s at the same energy deficit band. Internal self-comparison, not a comparison against any external solver."
+      "caption": "Feature-graded vs PolyMesh's own frozen uniform tet10 baseline on the D6 L-domain: 6,384 -> 1,248 DOF and 2.762 s -> 0.227 s, bought at an energy deficit of 0.0888% against the baseline's 0.0854% \u2014 1.04x as large, not parity. Internal self-comparison, not a comparison against any external solver; single run, no repeats."
     },
     {
       "file": "bench_mms.png",
@@ -52,7 +52,7 @@
       "dofs": null,
       "wall_time_s": null,
       "max_von_mises_pa": null,
-      "caption": "Method-of-manufactured-solutions energy-norm convergence: frozen P1 elements at 0.997/0.997/2.000/2.000 against theory 1/1/2/2, and the hierarchical p-basis at 1.02/1.99/2.98/3.98 against theory 1/2/3/4."
+      "caption": "Method-of-manufactured-solutions energy-norm convergence: frozen P1 elements at 0.997/0.997/2.000/2.000 against theory 1/1/2/2, and the hierarchical p-basis at 1.02/1.99/2.98/3.98 against theory 1/2/3/4. No measured order falls more than 0.7% below theory; p=1 sits 2.0% above it, so the bound is one-sided."
     },
     {
       "file": "bench_tier1.png",
@@ -65,7 +65,7 @@
       "dofs": null,
       "wall_time_s": null,
       "max_von_mises_pa": null,
-      "caption": "Tier-1 analytical verification: every case inside tolerance, measured on structured parametric verification meshes rather than product Cartesian grid-fill meshes."
+      "caption": "Tier-1 analytical verification: all 5 cases inside tolerance, the widest margin spending 0.7% of its budget and the narrowest 59%, measured on structured parametric verification meshes rather than product Cartesian grid-fill meshes."
     },
     {
       "file": "compare_grading.png",

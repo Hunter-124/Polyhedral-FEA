@@ -1406,7 +1406,8 @@ def main(argv: list[str] | None = None) -> int:
             flag = "  <- flagship (also hero.png)" if part.name == FLAGSHIP else ""
             print(f"  {part.name:14s} mesher={part.mesher:7s} h={fmt_h(part.h):>8s}{flag}")
         print("other image stems: compare_meshers, compare_grading, architecture,")
-        print("                   bench_dof_time, bench_tier1, bench_mms")
+        print("                   bench_dof_time, bench_tier1, bench_mms,")
+        print("                   bench_advisor_budget, hero")
         return 0
 
     wanted = set(args.only)
@@ -1714,22 +1715,29 @@ def main(argv: list[str] | None = None) -> int:
     chart_specs = [
         ("bench_dof_time.png", "dof_time",
          "Feature-graded vs PolyMesh's own frozen uniform tet10 baseline on the D6 "
-         "L-domain: 6,384 -> 1,248 DOF and 2.762 s -> 0.227 s at the same energy "
-         "deficit band. Internal self-comparison, not a comparison against any "
-         "external solver."),
+         "L-domain: 6,384 -> 1,248 DOF and 2.762 s -> 0.227 s, bought at an energy "
+         "deficit of 0.0888% against the baseline's 0.0854% — 1.04x as large, not "
+         "parity. Internal self-comparison, not a comparison against any external "
+         "solver; single run, no repeats."),
         ("bench_tier1.png", "tier1",
-         "Tier-1 analytical verification: every case inside tolerance, measured on "
+         "Tier-1 analytical verification: all 5 cases inside tolerance, the widest "
+         "margin spending 0.7% of its budget and the narrowest 59%, measured on "
          "structured parametric verification meshes rather than product Cartesian "
          "grid-fill meshes."),
         ("bench_mms.png", "mms",
          "Method-of-manufactured-solutions energy-norm convergence: frozen P1 "
          "elements at 0.997/0.997/2.000/2.000 against theory 1/1/2/2, and the "
-         "hierarchical p-basis at 1.02/1.99/2.98/3.98 against theory 1/2/3/4."),
+         "hierarchical p-basis at 1.02/1.99/2.98/3.98 against theory 1/2/3/4. No "
+         "measured order falls more than 0.7% below theory; p=1 sits 2.0% above "
+         "it, so the bound is one-sided."),
         ("bench_advisor_budget.png", "advisor_budget",
-         "The learned mesh advisor under a DOF budget (ADR-0034): each point is "
-         "a real CLI run's chosen action — predicted per-case relative error vs "
-         "the --advisor-max-dof cap — with over-budget empties answered by an "
-         "honest refusal, never an unaffordable action."),
+         "The learned mesh advisor under a DOF budget (ADR-0034): the action it "
+         "picks at each --advisor-max-dof cap, against that action's predicted "
+         "per-case relative-error score. 0 of the 18 capped picks is over budget "
+         "and this sweep contains no refusal. 13 of the 21 invoked CLI solves "
+         "exited nonzero — the picked action failed to mesh or solve — and those "
+         "points are ringed; every plotted score is the shipped ONNX model's "
+         "prediction, not a measured outcome."),
     ]
     chart_wanted = [c for c in chart_specs if want(c[0].removesuffix(".png"))]
     if chart_wanted and not args.no_charts:

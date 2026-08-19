@@ -89,8 +89,9 @@ int usage() {
                "--skin n: graded fine skin layers (default 2)\n"
                "--no-feature: disable geometry (curvature/thin-wall) grading (default on)\n"
                "--element-tendency t: shape dial in [-1,+1] (hex↔fan hybrid↔poly VEM↔tet)\n"
-               "--fix-box / --load-box: BC/load selection AABBs; the mesh grades finer\n"
-               "              toward them (loads finest) — geometry + simulation setup\n"
+               "--fix-box / --load-box: BC/load selection AABBs. They select the *boundary*\n"
+               "              nodes and faces inside the box, never interior nodes, and the\n"
+               "              mesh grades finer toward them (loads finest)\n"
                "--load-dir x y z: load direction (normalized; default 0 1 0)\n"
                "--force N: total resultant force in newtons over the loaded faces\n"
                "              (default 1000); applied as a consistent traction ∫Nᵗt dS\n"
@@ -379,30 +380,42 @@ std::string selection_note(const BcSelection& sel, bool is_fix) {
 // Select one cantilever end. `end` is -1 for the min-x end (default fixture)
 // and +1 for the max-x end (default load). An explicit box wins; otherwise the
 // x-slab is used, with the normal-aligned boundary-face fallback (RANK 12).
+//
+// Every branch selects only nodes on the boundary surface. A selection box names
+// a region of the boundary; it is not a volume of material to freeze. Clamping
+// every interior node inside the box embeds a rigid inclusion: an element whose
+// nodes are all inside it has identically zero strain, hence identically zero
+// stress, and the union of those elements ends on a one-element staircase whose
+// height varies with the local tiling. Measured on the showcase cylinder
+// (`--fix-box -1 -1 -1 1 1 0.015`, h = 12 mm, 161,976 tet10): 49,660 elements
+// (30.7%) were exactly strain-free and the boundary of that blob wandered by a
+// full element, which is the jagged zero-stress transition the gallery render
+// showed just above the clamp. The library path never had the defect —
+// scene.cpp's collect_bcs() walks `boundary_node_region`, i.e. boundary nodes
+// only — so the CLI was the outlier.
 BcSelection select_end(const polymesh::fea::NodalMesh& mesh,
                        const std::vector<polymesh::fea::SurfaceFace>& all_faces,
                        std::size_t n_boundary_nodes, const BoxSel& box, double xmin,
                        double xmax, double tol, int end) {
     BcSelection sel;
+    constexpr double kInf = std::numeric_limits<double>::infinity();
     if (box.set) {
         sel.from_box = true;
-        for (std::uint32_t i = 0; i < mesh.nodes.size(); ++i) {
-            const Eigen::Vector3d& p = mesh.nodes[i];
-            if (p.x() >= box.lo.x() && p.x() <= box.hi.x() && p.y() >= box.lo.y() &&
-                p.y() <= box.hi.y() && p.z() >= box.lo.z() && p.z() <= box.hi.z()) {
-                sel.nodes.push_back(i);
-            }
-        }
         sel.region = polymesh::fea::LoadRegion{box.lo, box.hi};
+        sel.nodes = polymesh::fea::boundary_nodes_within(mesh, all_faces, *sel.region);
         sel.faces = polymesh::fea::faces_touching(mesh, all_faces, *sel.region);
         return sel;
     }
-    for (std::uint32_t i = 0; i < mesh.nodes.size(); ++i) {
-        const double x = mesh.nodes[i].x();
-        if (end < 0 ? (x <= xmin + tol) : (x >= xmax - tol)) {
-            sel.nodes.push_back(i);
-        }
-    }
+    // The default slab as a region: one open end, so it is the same rule as a
+    // box with two infinite bounds. `sel.region` stays unset — a slab is only
+    // ever used to name an end FACE, so its faces come from `faces_within` and
+    // no load is clipped to it.
+    const polymesh::fea::LoadRegion slab =
+        end < 0 ? polymesh::fea::LoadRegion{Eigen::Vector3d::Constant(-kInf),
+                                            {xmin + tol, kInf, kInf}}
+                : polymesh::fea::LoadRegion{{xmax - tol, -kInf, -kInf},
+                                            Eigen::Vector3d::Constant(kInf)};
+    sel.nodes = polymesh::fea::boundary_nodes_within(mesh, all_faces, slab);
     sel.slab_nodes = sel.nodes.size();
     const auto need = sane_selection_minimum(n_boundary_nodes);
     if (sel.nodes.size() >= need) {
@@ -447,13 +460,7 @@ BcSelection select_end(const polymesh::fea::NodalMesh& mesh,
 }
 
 std::size_t count_boundary_nodes(const std::vector<polymesh::fea::SurfaceFace>& faces) {
-    std::vector<std::uint32_t> ids;
-    for (const auto& f : faces) {
-        ids.insert(ids.end(), f.nodes.begin(), f.nodes.end());
-    }
-    std::sort(ids.begin(), ids.end());
-    ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
-    return ids.size();
+    return polymesh::fea::boundary_face_nodes(faces).size();
 }
 
 // Pressure is a normal surface load: when a box includes a strip of adjacent

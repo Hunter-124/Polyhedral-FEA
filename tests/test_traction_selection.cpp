@@ -346,3 +346,67 @@ TEST_CASE("traction: a region that contains a face integrates it exactly as befo
     CHECK(clipped.area == Approx(plain.area).epsilon(1e-14));
     CHECK((clipped.loads - plain.loads).norm() <= 1e-12 * plain.loads.norm());
 }
+
+// A fixture selection box names a region of the boundary surface too, not a
+// volume of material to freeze. These pin the difference, because the volume
+// rule is silently wrong rather than loudly wrong: it solves, and the answer is
+// a rigid inclusion with a mesh-shaped boundary.
+TEST_CASE("traction: a boundary selection never reaches an interior node",
+          "[traction]") {
+    const Eigen::Vector3d size(1.0, 1.0, 1.0);
+    const auto mesh = promote_to_quadratic(box_tet_mesh(4, 4, 4, size));
+    const auto faces = fea::boundary_surface_faces(mesh);
+    const auto boundary = fea::boundary_face_nodes(faces);
+    REQUIRE(boundary.size() < mesh.nodes.size()); // there ARE interior nodes
+
+    // A slab through the lower half of the box: the volume rule reaches material
+    // the surface rule cannot.
+    const fea::LoadRegion slab{{-1.0, -1.0, -1.0}, {2.0, 2.0, 0.5}};
+    const auto surface_sel = fea::boundary_nodes_within(mesh, faces, slab);
+    const auto volume_sel = nodes_in_region(mesh, slab);
+    REQUIRE(!surface_sel.empty());
+    CHECK(surface_sel.size() < volume_sel.size());
+    CHECK(std::is_sorted(surface_sel.begin(), surface_sel.end()));
+    for (const auto id : surface_sel) {
+        CHECK(std::binary_search(boundary.begin(), boundary.end(), id));
+        const Eigen::Vector3d& p = mesh.nodes[id];
+        CHECK((p.array() >= slab.lo.array()).all());
+        CHECK((p.array() <= slab.hi.array()).all());
+    }
+    // Every boundary node the volume rule would have taken is taken.
+    for (const auto id : volume_sel) {
+        if (std::binary_search(boundary.begin(), boundary.end(), id)) {
+            CHECK(std::binary_search(surface_sel.begin(), surface_sel.end(), id));
+        }
+    }
+}
+
+TEST_CASE("traction: a boundary selection leaves no element fully constrained",
+          "[traction]") {
+    // The property that decides whether a solve has a rigid inclusion in it: an
+    // element whose every node is prescribed has identically zero strain, so its
+    // stress is identically zero however the rest of the part is loaded, and the
+    // union of such elements ends on a one-element staircase set by the tiling.
+    const Eigen::Vector3d size(1.0, 1.0, 1.0);
+    const fea::LoadRegion slab{{-1.0, -1.0, -1.0}, {2.0, 2.0, 0.5}};
+    for (const int n : {3, 4, 6}) {
+        const auto mesh = promote_to_quadratic(box_tet_mesh(n, n, n, size));
+        const auto faces = fea::boundary_surface_faces(mesh);
+        const auto surface_sel = fea::boundary_nodes_within(mesh, faces, slab);
+        const auto volume_sel = nodes_in_region(mesh, slab);
+
+        const auto fully_constrained = [&](const std::vector<std::uint32_t>& sel) {
+            std::size_t count = 0;
+            for (const auto& el : mesh.elements) {
+                const bool all_in =
+                    std::all_of(el.nodes.begin(), el.nodes.end(), [&](std::uint32_t id) {
+                        return std::binary_search(sel.begin(), sel.end(), id);
+                    });
+                count += all_in ? 1 : 0;
+            }
+            return count;
+        };
+        CHECK(fully_constrained(volume_sel) > 0);
+        CHECK(fully_constrained(surface_sel) == 0);
+    }
+}

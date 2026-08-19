@@ -649,6 +649,42 @@ std::vector<SurfaceFace> faces_within(const std::vector<SurfaceFace>& faces,
     return out;
 }
 
+std::vector<std::uint32_t> boundary_face_nodes(const std::vector<SurfaceFace>& faces) {
+    std::vector<std::uint32_t> ids;
+    std::size_t total = 0;
+    for (const auto& f : faces) {
+        total += f.nodes.size();
+    }
+    ids.reserve(total);
+    for (const auto& f : faces) {
+        ids.insert(ids.end(), f.nodes.begin(), f.nodes.end());
+    }
+    std::sort(ids.begin(), ids.end());
+    ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
+    return ids;
+}
+
+std::vector<std::uint32_t> boundary_nodes_within(const NodalMesh& mesh,
+                                                 const std::vector<SurfaceFace>& faces,
+                                                 const LoadRegion& region) {
+    // Walk the boundary ids rather than all nodes and test membership: the
+    // boundary set is O(N^(2/3)) of the mesh, and it is already sorted, so the
+    // result comes out ascending without a second sort.
+    const auto ids = boundary_face_nodes(faces);
+    std::vector<std::uint32_t> out;
+    out.reserve(ids.size());
+    for (const auto id : ids) {
+        if (id >= mesh.nodes.size()) {
+            continue;
+        }
+        const Eigen::Vector3d& p = mesh.nodes[id];
+        if ((p.array() >= region.lo.array()).all() && (p.array() <= region.hi.array()).all()) {
+            out.push_back(id);
+        }
+    }
+    return out;
+}
+
 std::vector<SurfaceFace> faces_touching(const NodalMesh& mesh,
                                         const std::vector<SurfaceFace>& faces,
                                         const LoadRegion& region) {

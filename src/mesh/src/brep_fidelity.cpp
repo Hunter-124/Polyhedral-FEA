@@ -7,6 +7,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <limits>
 #include <map>
 #include <numbers>
@@ -207,11 +209,29 @@ BRepGeometryFidelity evaluate_brep_geometry_fidelity(
     mesh_to_brep.reserve(boundary_nodes.size() / stride + free_faces.size() / stride +
                          boundary_edges.size() / stride + 3);
     node_to_brep.reserve(boundary_nodes.size() / stride + 1);
+
+    // POLYMESH_FIDELITY_DUMP=<path>: write the 64 worst mesh->BRep samples as
+    // "kind distance_m x y z" lines so a tail regression can be located on the
+    // part instead of inferred from quantiles. Diagnostic only; unset = off.
+    struct WorstSample {
+        double distance;
+        char kind;
+        Eigen::Vector3d point;
+    };
+    std::vector<WorstSample> worst_samples;
+    const char* const dump_path = std::getenv("POLYMESH_FIDELITY_DUMP");
+    const auto note_sample = [&](double distance, char kind, const Eigen::Vector3d& p) {
+        if (dump_path != nullptr) {
+            worst_samples.push_back({distance, kind, p});
+        }
+    };
+
     for (std::size_t i = 0; i < boundary_nodes.size(); i += stride) {
         if (const auto projected =
                 geom::project_point_on_surface(model, nodes[boundary_nodes[i]])) {
             mesh_to_brep.push_back(projected->distance);
             node_to_brep.push_back(projected->distance);
+            note_sample(projected->distance, 'n', nodes[boundary_nodes[i]]);
         }
     }
 
@@ -237,6 +257,7 @@ BRepGeometryFidelity evaluate_brep_geometry_fidelity(
             continue;
         }
         mesh_to_brep.push_back(projected->distance);
+        note_sample(projected->distance, 'c', centroid);
 
         Eigen::Vector3d mesh_normal =
             (nodes[face[1]] - nodes[face[0]]).cross(nodes[face[2]] - nodes[face[0]]);
@@ -258,6 +279,7 @@ BRepGeometryFidelity evaluate_brep_geometry_fidelity(
         const Eigen::Vector3d midpoint = 0.5 * (nodes[a] + nodes[b]);
         if (const auto projected = geom::project_point_on_surface(model, midpoint)) {
             mesh_to_brep.push_back(projected->distance);
+            note_sample(projected->distance, 'm', midpoint);
         }
     }
     out.mesh_boundary_samples_to_brep_surface =
@@ -265,6 +287,22 @@ BRepGeometryFidelity evaluate_brep_geometry_fidelity(
     out.mesh_boundary_nodes_to_brep_surface =
         summarize_distances(node_to_brep, h, bbox_diagonal);
     out.mesh_boundary_normal_angle_to_brep_normal = summarize_samples(normal_angles);
+
+    if (dump_path != nullptr) {
+        std::sort(worst_samples.begin(), worst_samples.end(),
+                  [](const WorstSample& x, const WorstSample& y) {
+                      return x.distance > y.distance;
+                  });
+        if (std::FILE* file = std::fopen(dump_path, "w")) {
+            const std::size_t limit = std::min<std::size_t>(worst_samples.size(), 64);
+            for (std::size_t i = 0; i < limit; ++i) {
+                const WorstSample& s = worst_samples[i];
+                std::fprintf(file, "%c %.9g %.9g %.9g %.9g\n", s.kind, s.distance,
+                             s.point.x(), s.point.y(), s.point.z());
+            }
+            std::fclose(file);
+        }
+    }
 
     const geom::TriSurface mesh_boundary = boundary_surface(nodes, free_faces);
     if (!mesh_boundary.triangles.empty()) {

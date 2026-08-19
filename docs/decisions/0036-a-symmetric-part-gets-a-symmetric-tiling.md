@@ -451,3 +451,25 @@ refuse only moves whose orbit is incomplete.
   odd-permitting lattice (§3), so its *cells* do not mirror to begin with.
 - The advisor's v8 retrain is still outstanding, and every mesh-derived label moved
   again with this change.
+
+### 9.5 Symmetry was necessary and not sufficient
+
+With the mirrored-tet fraction at exactly 1.0 the sphere's stress band still read
+as serrated, and the follow-up measurement is in
+[ADR-0037](0037-a-box-selection-is-a-region.md). Two findings belong here because
+they close out what §9 could and could not do.
+
+The azimuthal spectrum of the surviving jag had appreciable amplitude only at
+multiples of four — a lattice signature, not asymmetry — so §9 removed the right
+defect and the remaining one was uniformity. Half of it was not in the mesher at
+all: `--load-box` was resolved to whole faces, so the traction stopped on a
+staircase whose low-wavenumber content correlated +0.92 with the iso-line wander.
+The other half is element size spread on the curved wall, which the tangential
+smoothing pass was not equalising because its target's fixed point was the
+neighbour centroid rather than equal element size.
+
+`smooth_boundary_nodes` gained a new free-node target as a result, and its
+incident-face lists are sorted on the same reflection-invariant
+`MirrorKeyFrame` key the adjacency lists use, for the same reason: the target is a
+floating-point accumulation and a node and its image must walk their mirrored
+faces in the same order. The seven-case fraction stays at exactly 1.0.

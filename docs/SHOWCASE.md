@@ -26,8 +26,9 @@ A one-line index of the same assets lives in
 low oblique angle across the whole plate (h = 6 mm, 77,796 nodes / 52,016 curved
 cells, 233,388 DOF; min-x face fixed, conserved +x resultant on max-x).
 von Mises is shown on the surface with displacement warped ×5000. The colour
-range is 0 – 2.9 MPa, clipped at the 99th percentile of the visible surface
-field; the true peak nodal value is 3.12 MPa, at the clamped-face singularity.
+range is 0 – 2.51 MPa, clipped at the 99th percentile of the visible surface
+field; the true peak nodal value is 3.08 MPa, at a boundary-condition
+singularity.
 Exact values per image live in
 [`manifest.json`](assets/showcase/manifest.json).
 
@@ -43,9 +44,11 @@ with the displacement field warped for visibility. Every caption in
 [`manifest.json`](assets/showcase/manifest.json) states the element size, node /
 element / DOF counts, the boundary conditions, the warp factor, the colour range
 **and the percentile it was clipped at**, plus the true unclipped peak nodal
-value — which sits at a clamped face on every one of these parts and is a
-boundary-condition singularity, not a physical stress. The exact `polymesh
-solve` invocation per part is in the manifest too.
+value — a boundary-condition singularity, not a physical stress, whose node
+coordinates the caption now prints rather than assuming it sits at a clamped
+face: on the cylinder the load box reaches 5 mm down the wall, so the peak sits
+on the loaded top rim instead. The exact `polymesh solve` invocation per part is
+in the manifest too.
 
 ### `gallery_plate_hole.png`
 
@@ -53,7 +56,7 @@ solve` invocation per part is in the manifest too.
 
 Flat plate with a central hole — the canonical stress-riser benchmark geometry.
 Feature-aware grading concentrates elements around the hole where the gradient
-lives. h = 6 mm, 52,016 curved cells, **233,388 solved DOF**, 102 s wall. h was
+lives. h = 6 mm, 52,016 curved cells, **233,388 solved DOF**, 105 s wall. h was
 3 mm while the shipped mesh was straight-edged; the exact curved boundary now
 renders a smoother hole at ~1/8 the cells.
 
@@ -66,7 +69,7 @@ python scripts/render_showcase.py --only plate_hole
 ![cantilever](assets/showcase/gallery_cantilever.png)
 
 End-loaded cantilever: linear bending stress distribution, maximum at the
-clamped root. h = 30 mm, 44,832 curved cells, **193,971 solved DOF**, 51 s wall.
+clamped root. h = 30 mm, 44,832 curved cells, **193,971 solved DOF**, 53 s wall.
 This is the geometry behind the Timoshenko tip-deflection verification (1.50%
 error,
 [bench/reports/p1-gate1-convergence.md](../bench/reports/p1-gate1-convergence.md)).
@@ -83,7 +86,11 @@ Curved-wall solid imported from STEP. Curvature-dominant sizing uses a 0.5×
 accuracy lattice, then the **authoritative solve mesh** is promoted to
 tet10/hex20 and its boundary mids are projected onto the exact BRep. The same
 curved volume elements are assembled, exported, and rendered. h = 12 mm,
-**687,399 solved DOF**, 294 s wall.
+**703,599 solved DOF**, 376 s wall. Its load box selects the cap plus the top
+5 mm of wall, and since [ADR-0037](decisions/0037-a-box-selection-is-a-region.md)
+the traction is integrated over exactly that region instead of over whole faces,
+so a +z shear now runs up to the sharp top rim: the peak nodal value is 16.2 MPa
+there, against 1.54 MPa at the clamped base.
 
 ```sh
 python scripts/render_showcase.py --only cylinder
@@ -96,8 +103,8 @@ python scripts/render_showcase.py --only cylinder
 Closed curved B-rep — the hardest case for a Cartesian grid fill. The shipped
 mesh is no longer a linear solve hidden behind a smoothed render: graded
 boundary topology, projected tet10 geometry, stiffness assembly, VTU export and
-Studio all consume the same authoritative node set. h = 8 mm, **520,551 solved
-DOF**, 89 s wall.
+Studio all consume the same authoritative node set. h = 8 mm, **521,271 solved
+DOF**, 77 s wall.
 
 ```sh
 python scripts/render_showcase.py --only sphere
@@ -109,8 +116,8 @@ python scripts/render_showcase.py --only sphere
 One watertight 3D Boolean solid: a round truncated cone fused into an
 overlapping spherical scoop. Sharp CAD-edge paths are recovered through the
 boundary graph under the same cell-quality/Jacobian gate, and the projected
-quadratic volume mesh is solved directly. h = 10 mm, **380,667 solved DOF**,
-79 s wall.
+quadratic volume mesh is solved directly. h = 10 mm, **379,815 solved DOF**,
+86 s wall.
 
 ```sh
 python scripts/render_showcase.py --only icecream_cone
@@ -213,8 +220,8 @@ python scripts/render_showcase.py --only compare_meshers
 
 **`compare_grading.png`** — uniform (`--no-feature`, h = 4.2 mm) versus
 feature-graded sizing (h = 5.6 mm) on the same part and mesher, with `h` tuned
-so the two legs land on a **matched element budget**: 43,024 vs 45,424 cells,
-5.6% apart (190,320 vs 206,436 DOF on the curved geometry — the grid quantizes
+so the two legs land on a **matched element budget**: 42,960 vs 45,096 cells,
+5.0% apart (190,032 vs 204,888 DOF on the curved geometry — the grid quantizes
 too hard to hit equal DOF exactly, so the honest control is element count; both
 figures are printed in the tile footers and the manifest).
 The comparison is therefore about *where*
@@ -332,13 +339,19 @@ solve the curved mesh itself:
   faithful sampling of the solved tet10/hex20 geometry, not a substitute mesh.
 
 At requested h = 8 mm, the product graded path measures p99 surface-to-BRep
-error over bbox diagonal of **7.12e-6 sphere**, **5.71e-5 cone**,
-**5.66e-6 cylinder**, and **4.83e-5 plate-with-hole**: every rounded corpus part
-is inside the 1e-4 (99.99%) target. Their curved-cell `quality_min` values are
-0.02542, 0.02105, 0.03250 and 0.02110, with zero inverted and zero sub-floor
-cells, and relative volume errors of 3.1e-5, 5.9e-5, 2.1e-5 and 7.7e-6.
-Facet-normal p99 is 0.335° / 2.77° / 0.195° / 0.773°; the cone's 90° maximum is
-its declared BRep apex vertex, not a smooth-wall defect.
+error over bbox diagonal of **8.23e-6 sphere**, **1.23e-4 cone**,
+**2.39e-5 cylinder** and **1.02e-5 plate-with-hole**. Three of the four are
+inside the 1e-4 (99.99%) target and the cone is not: its sharp rim is the
+pre-existing residual recorded in
+[ADR-0035](decisions/0035-boundary-conformity.md) §6, and the area-weighted wall
+relaxation of
+[ADR-0037](decisions/0037-a-box-selection-is-a-region.md) moved it from 1.43e-4
+toward the bar rather than through it. Their curved-cell `quality_min` values are
+0.06338, 0.02012, 0.05276 and 0.02072, with zero inverted and zero sub-floor
+cells, and relative volume errors of 3.9e-5, 6.7e-5, 1.2e-5 and 6.8e-6.
+Facet-normal p99 is 0.320° / 4.46° / 4.16° / 0.664°; the ~90° maxima on the cone,
+cylinder and plate are declared BRep sharp edges and the cone's apex vertex, not
+smooth-wall defects.
 
 Two honest residuals remain in the CAD → mesh **edge-coverage** direction, which
 asks how far a sampled sharp BRep edge is from the nearest classified mesh

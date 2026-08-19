@@ -98,6 +98,12 @@ struct Model {
     std::string name;
     /// Original filesystem path when loaded from disk (for BRep re-open).
     std::string source_path;
+    /// Verified reflection symmetry of the geometry (mesh/mirror.hpp), filled by
+    /// `load`. Held on the model rather than detected per fill because detection
+    /// costs one exact BRep projection per face sample per axis and the solve path
+    /// needs the same answer several times — once per auto-h attempt in the mesher
+    /// and once more in the curved promotion.
+    mesh::MirrorFrame mirror;
 
     static Model load(const std::string& path, double sharp_angle_deg = 30.0);
 };
@@ -438,11 +444,18 @@ bool make_boundary_projection(const geom::CadModel& cad, double h,
 /// six bisection steps; only a move with no valid positive fraction is reverted.
 /// Returns the number projected to the 0.02h fidelity band. Optional outputs
 /// identify true reverts and backed-off nodes that remain outside that band.
+/// `mirror` folds every mid-node projection into the canonical octant of the
+/// geometry's verified reflection symmetry (mesh/mirror.hpp), so a quadratic mid
+/// and its mirror image are projected to mirrored points and classify to the same
+/// owner. Without it the curved boundary loses the symmetry the linear one has:
+/// measured on cylinder.step at h = 8 mm, 99.89% of tet10 elements mirrored
+/// against 100% of the tet4 elements they came from.
 std::size_t project_quadratic_boundary_mids(
     fea::NodalMesh& mesh, const geom::CadModel& cad,
     mesh::BoundaryProjectionContext* projection, double h,
     std::vector<std::uint32_t>* reverted_nodes = nullptr,
-    std::vector<std::uint32_t>* partial_nodes = nullptr);
+    std::vector<std::uint32_t>* partial_nodes = nullptr,
+    const mesh::MirrorFrame* mirror = nullptr);
 /// The authoritative curved volume discretisation used for solve and export.
 /// Pyramid5 cells are first replaced by the same conformity-safe tet split the
 /// assembler integrates, then every tet4/hex8 is promoted and its free boundary

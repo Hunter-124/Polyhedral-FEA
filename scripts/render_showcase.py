@@ -236,7 +236,14 @@ PARTS: list[Part] = [
         margin=1.04,
         fix_box=(-1, -1, -1, 1, 1, 0.015),
         load_box=(-1, -1, 0.195, 1, 1, 1),
-        bc_note="base z < 0.015 m fixed, +z resultant on cap",
+        # The box reaches 5 mm down the wall, and since ADR-0037 the traction is
+        # integrated over exactly that region rather than over whole faces, so say
+        # so: the cap alone cannot be selected by an axis-aligned box without a
+        # knife-edge plane at z = 200 mm, which cost 11% of the cap area when
+        # tried (7.007e-3 against 7.854e-3 m^2) because snapped cap nodes land on
+        # both sides of it.
+        bc_note="base z < 0.015 m fixed, +z resultant on the surface above "
+                "z = 0.195 m (cap plus the top 5 mm of wall)",
         load_dir=(0.0, 0.0, 1.0),
         force_n=7853.981633974483,
     ),
@@ -873,10 +880,19 @@ def render_stress(
     p.close()
 
     if clipped:
+        # Do not assert WHICH boundary condition the peak sits on. This caption
+        # used to say "at the clamped-face stress singularity", and on the
+        # cylinder that is simply false: the load box reaches 5 mm down the wall,
+        # so a +z shear traction runs up to the sharp top rim and the peak node
+        # (16.2 MPa) sits there at r = 50 mm, z = 200 mm, while the clamped base
+        # peaks at 1.54 MPa. Print where the peak actually is and let the reader
+        # match it against the stated BCs.
+        peak_at = np.asarray(grid.points)[int(np.argmax(vm))] * 1e3
         clip_note = (
             f"colour range 0 \u2013 {fs.si(hi, 'Pa')} ({clip_rule_text()}); "
-            f"peak nodal value {fs.si(true_max, 'Pa')} at the clamped-face "
-            f"stress singularity"
+            f"peak nodal value {fs.si(true_max, 'Pa')} at a boundary-condition "
+            f"singularity, node at ({peak_at[0]:.0f}, {peak_at[1]:.0f}, "
+            f"{peak_at[2]:.0f}) mm"
         )
     else:
         clip_note = (

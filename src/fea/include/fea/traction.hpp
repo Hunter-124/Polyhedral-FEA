@@ -143,9 +143,13 @@ std::vector<SurfaceFace> faces_touching(const NodalMesh& mesh,
 /// existed, as the fully-constrained fraction of all elements: cylinder 30.7%
 /// (49,660 of 161,976), sphere 6.7%, icecream_cone 6.1%, plate_hole 2.9%,
 /// cantilever 1.7% — visible in every gallery render as a jagged flat-coloured
-/// blob against the clamp. Restricted to the boundary, no element is fully
-/// constrained on any of the five and the stress field is continuous into the
-/// clamp.
+/// blob against the clamp. Restricted to the boundary, four of the five drop to
+/// zero fully-constrained elements and the stress field is continuous into the
+/// clamp. The cone keeps 8 of 86,512 (0.009%): its foot is a 6 mm-radius disc and
+/// the corner between that disc and the wall above it is thinner than one
+/// element, so those elements have all ten nodes on the boundary surface and are
+/// strain-free by geometry rather than by selection. Any fixture patch enclosing
+/// a region thinner than an element does that, and resolution is the only fix.
 std::vector<std::uint32_t> boundary_nodes_within(const NodalMesh& mesh,
                                                  const std::vector<SurfaceFace>& faces,
                                                  const LoadRegion& region);

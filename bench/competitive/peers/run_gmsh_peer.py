@@ -512,7 +512,23 @@ def probe_vtu(
     path: Path, metric: dict, load_box: list[list[float]], fix_box: list[list[float]]
 ) -> tuple[float | None, int, int, int]:
     points, arrays = parse_vtu(path)
-    fixed_nodes = sum(point_in_box(point, fix_box) for point in points)
+    # Prescribed nodes are MEASURED off the field, not re-derived from the box.
+    # This used to count every node inside `fix_box`, which stopped matching the
+    # engine when a fixture box became a selection of the boundary surface rather
+    # than of every node in a volume of space (fea::boundary_nodes_within): the
+    # interior nodes of the slab are free now, so the box rule over-counted the
+    # constrained set and under-reported active DOF on exactly the rows this
+    # matrix compares. A prescribed DOF is exactly zero in the exported field,
+    # while a free node in a loaded part is not, so counting exact zeros reads the
+    # constraint the solve actually applied, for a peer VTU as much as for ours.
+    displacement_all = arrays.get("displacement")
+    if displacement_all is None or len(displacement_all) != 3 * len(points):
+        raise RuntimeError(f"{path}: missing or malformed displacement point data")
+    fixed_nodes = sum(
+        1
+        for index in range(len(points))
+        if displacement_all[3 * index : 3 * index + 3] == [0.0, 0.0, 0.0]
+    )
     active_dofs = 3 * (len(points) - fixed_nodes)
     kind = metric["probe"]["kind"]
     if kind == "peak_vm_over_nominal":

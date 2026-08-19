@@ -246,3 +246,103 @@ TEST_CASE("traction: an empty face set is reported as zero area, not silently lo
     CHECK(load.loads.norm() == 0.0);
     CHECK(load.conservation_error == Approx(100.0));
 }
+
+// A box selection names a region of the boundary surface. The whole-face rule
+// ("accept a face when every node is inside") stops the loaded patch on a
+// staircase of element edges, so the applied traction depends on the tiling; the
+// region integrators clip to the box instead. These tests pin that difference.
+namespace {
+
+// Nodes of `mesh` inside `region` — what --fix-box / --load-box select.
+std::vector<std::uint32_t> nodes_in_region(const fea::NodalMesh& mesh,
+                                           const fea::LoadRegion& region) {
+    std::vector<std::uint32_t> out;
+    for (std::uint32_t i = 0; i < mesh.nodes.size(); ++i) {
+        const Eigen::Vector3d& p = mesh.nodes[i];
+        if ((p.array() >= region.lo.array()).all() && (p.array() <= region.hi.array()).all()) {
+            out.push_back(i);
+        }
+    }
+    return out;
+}
+
+} // namespace
+
+TEST_CASE("traction: a load region is integrated at the box plane, not at a face staircase",
+          "[traction]") {
+    // Top face z = 1 of the unit box, cut at x = 0.375. On a 4x4 tiling that
+    // plane runs through the middle of the second column of quads, so the
+    // whole-face rule can only reach x = 0.25.
+    const Eigen::Vector3d size(1.0, 1.0, 1.0);
+    const fea::LoadRegion region{{-0.5, -0.5, 1.0}, {0.375, 1.5, 1.5}};
+    const double exact = 0.375 * size.y();
+
+    const auto mesh = box_hex_mesh(4, 4, 2, size);
+    const auto faces = fea::boundary_surface_faces(mesh);
+
+    const auto whole = fea::faces_within(faces, nodes_in_region(mesh, region));
+    CHECK(fea::integrated_face_area(mesh, whole) == Approx(0.25 * size.y()).epsilon(1e-12));
+
+    const auto touching = fea::faces_touching(mesh, faces, region);
+    CHECK(touching.size() > whole.size());
+    CHECK(fea::integrated_region_area(mesh, touching, region) == Approx(exact).epsilon(1e-12));
+
+    // Same region, three tilings none of whose element edges land on the plane:
+    // the clipped area is a property of the region, the staircase is not.
+    for (const int n : {3, 5, 7}) {
+        const auto other = box_hex_mesh(n, n, 2, size);
+        const auto other_faces = fea::boundary_surface_faces(other);
+        CHECK(fea::integrated_region_area(
+                  other, fea::faces_touching(other, other_faces, region), region) ==
+              Approx(exact).epsilon(1e-12));
+        CHECK(fea::integrated_face_area(
+                  other, fea::faces_within(other_faces, nodes_in_region(other, region))) !=
+              Approx(exact).epsilon(1e-6));
+    }
+}
+
+TEST_CASE("traction: a region load conserves the resultant and only loads the region",
+          "[traction]") {
+    const Eigen::Vector3d size(1.0, 1.0, 1.0);
+    const fea::LoadRegion region{{-0.5, -0.5, 1.0}, {0.375, 1.5, 1.5}};
+    const auto mesh = box_hex_mesh(4, 4, 2, size);
+    const auto faces = fea::boundary_surface_faces(mesh);
+    const auto touching = fea::faces_touching(mesh, faces, region);
+
+    const Eigen::Vector3d total(0.0, 0.0, -1234.5);
+    const auto load = fea::consistent_region_load(mesh, touching, region, total);
+    CHECK(load.area == Approx(0.375).epsilon(1e-12));
+    CHECK(load.conservation_error < 1e-9);
+    CHECK((nodal_sum(load.loads) - total).norm() < 1e-9);
+
+    // The traction is uniform over the clipped patch, so a node's share is the
+    // integral of its shape function over that patch: strictly positive for the
+    // nodes bounding the cut column and exactly zero beyond it.
+    for (std::uint32_t i = 0; i < mesh.nodes.size(); ++i) {
+        const Eigen::Vector3d& p = mesh.nodes[i];
+        const bool reachable = p.z() > 1.0 - 1e-12 && p.x() < 0.5 + 1e-12;
+        if (!reachable) {
+            CHECK(load.loads.segment<3>(3 * static_cast<Eigen::Index>(i)).norm() == 0.0);
+        }
+    }
+}
+
+TEST_CASE("traction: a region that contains a face integrates it exactly as before",
+          "[traction]") {
+    // The clip is a no-op on faces it does not cut, including the quadratic ones:
+    // a region swallowing the whole top face must reproduce consistent_face_load
+    // to round-off, so nothing that already worked moved.
+    const Eigen::Vector3d size(1.0, 1.0, 1.0);
+    const auto mesh = promote_to_quadratic(box_tet_mesh(3, 3, 2, size));
+    const auto faces = fea::boundary_surface_faces(mesh);
+    const auto top = fea::faces_within(faces, nodes_at_max_z(mesh, size.z()));
+    REQUIRE(!top.empty());
+    REQUIRE(top.front().type == fea::FaceType::kTri6);
+
+    const fea::LoadRegion region{{-1.0, -1.0, 1.0}, {2.0, 2.0, 2.0}};
+    const Eigen::Vector3d total(0.0, 0.0, 600.0);
+    const auto plain = fea::consistent_face_load(mesh, top, total);
+    const auto clipped = fea::consistent_region_load(mesh, top, region, total);
+    CHECK(clipped.area == Approx(plain.area).epsilon(1e-14));
+    CHECK((clipped.loads - plain.loads).norm() <= 1e-12 * plain.loads.norm());
+}

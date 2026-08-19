@@ -348,6 +348,11 @@ struct BcSelection {
     bool face_fallback = false; // slab was degenerate → normal-aligned faces
     double fallback_band = 0.0; // end band as a fraction of the x extent
     bool from_box = false;
+    // Set for a box selection: `faces` is then the set the box *touches*, and
+    // the load is integrated over their intersection with this region instead of
+    // over whole faces. A slab or normal-aligned fallback selection has no
+    // region — those are face sets by construction, not a volume of space.
+    std::optional<polymesh::fea::LoadRegion> region;
 };
 
 // Node count a default selection must reach to count as a face rather than a
@@ -388,7 +393,8 @@ BcSelection select_end(const polymesh::fea::NodalMesh& mesh,
                 sel.nodes.push_back(i);
             }
         }
-        sel.faces = polymesh::fea::faces_within(all_faces, sel.nodes);
+        sel.region = polymesh::fea::LoadRegion{box.lo, box.hi};
+        sel.faces = polymesh::fea::faces_touching(mesh, all_faces, *sel.region);
         return sel;
     }
     for (std::uint32_t i = 0; i < mesh.nodes.size(); ++i) {
@@ -552,15 +558,21 @@ std::string constraint_defect(const polymesh::fea::NodalMesh& mesh,
     return {};
 }
 
-// Energy-conjugate nodal loads for `spec`: integrate complete boundary faces,
-// or, when a legitimate coarse selection has nodes but no complete face,
-// preserve the requested resultant with a documented per-node fallback.
+// Energy-conjugate nodal loads for `spec`. A box selection carries a `region`:
+// the traction is then integrated over the part of `faces` inside the box, so
+// the loaded patch ends on the box plane instead of on a staircase of element
+// edges (fea::consistent_region_load). Everything else integrates complete
+// faces, or, when a legitimate coarse selection has nodes but no complete face,
+// preserves the requested resultant with a documented per-node fallback.
 Eigen::VectorXd build_loads(const polymesh::fea::NodalMesh& mesh,
                             const std::vector<polymesh::fea::SurfaceFace>& faces,
                             std::span<const std::uint32_t> fallback_nodes,
                             const LoadSpec& spec, const char* what, std::FILE* report,
+                            const std::optional<polymesh::fea::LoadRegion>& region,
                             std::optional<double> exact_pressure_area = std::nullopt) {
-    const double mesh_area = polymesh::fea::integrated_face_area(mesh, faces);
+    const double mesh_area =
+        region.has_value() ? polymesh::fea::integrated_region_area(mesh, faces, *region)
+                           : polymesh::fea::integrated_face_area(mesh, faces);
     if (fallback_nodes.empty() && !(mesh_area > 0.0)) {
         throw std::runtime_error(std::format(
             "{}: the load selection is empty — widen --load-box or refine with -h.", what));
@@ -582,7 +594,9 @@ Eigen::VectorXd build_loads(const polymesh::fea::NodalMesh& mesh,
     double conservation_error = total.norm();
     const bool node_fallback = !(mesh_area > 0.0);
     if (!node_fallback) {
-        auto applied = polymesh::fea::consistent_face_load(mesh, faces, total);
+        auto applied = region.has_value()
+                           ? polymesh::fea::consistent_region_load(mesh, faces, *region, total)
+                           : polymesh::fea::consistent_face_load(mesh, faces, total);
         loads = std::move(applied.loads);
         resultant = applied.resultant;
         conservation_error = applied.conservation_error;
@@ -594,12 +608,13 @@ Eigen::VectorXd build_loads(const polymesh::fea::NodalMesh& mesh,
         }
         conservation_error = (resultant - total).norm();
     }
+    const char* area_kind = region.has_value() ? "clipped area" : "area";
     const std::string area_note =
         node_fallback ? std::format("node fallback={}", fallback_nodes.size())
                       : (exact_pressure_area.has_value()
-                             ? std::format("mesh area={:.9g} m², CAD area={:.9g} m²",
+                             ? std::format("mesh {}={:.9g} m², CAD area={:.9g} m²", area_kind,
                                            mesh_area, pressure_area)
-                             : std::format("area={:.9g} m²", mesh_area));
+                             : std::format("{}={:.9g} m²", area_kind, mesh_area));
     std::fprintf(report,
                  "load: %zu faces, %s, %s → |F|=%.9g N along (%.4g %.4g %.4g) | "
                  "Σf=(%.9g %.9g %.9g) N, conservation err=%.3g N\n",
@@ -1146,7 +1161,7 @@ int cmd_solve(std::span<char*> args) {
                 defect));
         }
         auto loads = build_loads(v.mesh, load_faces, load_sel.nodes, load_spec, "solve",
-                                 stdout, exact_pressure_area);
+                                 stdout, load_sel.region, exact_pressure_area);
         return std::pair{std::move(bc), std::move(loads)};
     };
 
@@ -1590,7 +1605,7 @@ int cmd_diag(std::span<char*> args) {
         if (!bc.dof_values.empty() && !load_sel.nodes.empty()) {
             Eigen::VectorXd loads =
                 build_loads(vol.mesh, load_faces, load_sel.nodes, load_spec, "diag", stderr,
-                            exact_pressure_area);
+                            load_sel.region, exact_pressure_area);
             const polymesh::fea::Material mat{.youngs_modulus = 200e9, .poissons_ratio = 0.3};
             t0 = clock::now();
             polymesh::fea::SolveOptions solve_options;

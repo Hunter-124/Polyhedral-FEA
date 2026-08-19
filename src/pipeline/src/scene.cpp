@@ -2157,7 +2157,11 @@ conform_true_exterior(fea::NodalMesh& mesh,
     // uses — quality never worse, and always integrable, because a Laplacian
     // nudge that only watched `cell_quality` shipped det J = -1.911e-09 on
     // icecream_cone/varyhedron.
-    const auto try_nudge = [&](std::uint32_t ni, bool tangential) {
+    // One node's Laplacian nudge. `try_nudge_orbit` below is what callers use:
+    // a nudge accepted on one side of a symmetric part and refused on the other is
+    // itself an asymmetry, and this pass runs on nodes the snap could not place,
+    // which is exactly where a symmetric part has symmetric trouble.
+    const auto try_nudge_one = [&](std::uint32_t ni, bool tangential) {
         if (neighbours[ni].empty()) {
             return false;
         }
@@ -2191,9 +2195,36 @@ conform_true_exterior(fea::NodalMesh& mesh,
         }
         return (mesh.nodes[ni] - saved).squaredNorm() > 0.0;
     };
+    const auto try_nudge = [&](std::uint32_t ni, bool tangential) {
+        const auto group = orbit_of(ni);
+        if (group.empty()) {
+            return false; // incomplete orbit: leave the node alone
+        }
+        std::vector<Eigen::Vector3d> saved;
+        saved.reserve(group.size());
+        for (const auto node : group) {
+            saved.push_back(mesh.nodes[node]);
+        }
+        bool all_moved = true;
+        for (const auto node : group) {
+            if (!try_nudge_one(node, tangential)) {
+                all_moved = false;
+                break;
+            }
+        }
+        if (!all_moved) {
+            for (std::size_t gi = 0; gi < group.size(); ++gi) {
+                mesh.nodes[group[gi]] = saved[gi];
+            }
+            return false;
+        }
+        return true;
+    };
     const auto open_room = [&](std::uint32_t seed) {
         bool moved_any = false;
-        for (const auto ni : neighbours[seed]) {
+        std::vector<std::uint32_t> ring = neighbours[seed];
+        mesh::sort_mirror_canonical(mesh.nodes, ring);
+        for (const auto ni : ring) {
             if (on_boundary[ni] == 0) {
                 moved_any = try_nudge(ni, /*tangential=*/false) || moved_any;
             }
@@ -2205,7 +2236,7 @@ conform_true_exterior(fea::NodalMesh& mesh,
         // sphere/hybrid, `open_room` rescued none of 34 stragglers through the
         // interior tier alone. The star's other WALL nodes are the only degrees
         // of freedom left, and sliding them along the surface is free.
-        for (const auto ni : neighbours[seed]) {
+        for (const auto ni : ring) {
             if (ni != seed && on_boundary[ni] != 0) {
                 moved_any = try_nudge(ni, /*tangential=*/true) || moved_any;
             }
@@ -2219,6 +2250,9 @@ conform_true_exterior(fea::NodalMesh& mesh,
             exterior.push_back(ni);
         }
     }
+    // Mirror-canonical order: the march below moves nodes and opens room in their
+    // neighbourhoods, so an earlier node decides what a later one can do.
+    mesh::sort_mirror_canonical(mesh.nodes, exterior);
     const double eps = 1e-9 * h;
     // Exact resolution only. `boundary_projection_target` falls back to the
     // TESSELLATION when a node has no latched owner, and that fallback is
@@ -2260,38 +2294,83 @@ conform_true_exterior(fea::NodalMesh& mesh,
         const auto projected = geom::project_point_on_surface(*fit->cad, mesh.nodes[ni]);
         return projected ? projected->distance : 0.0;
     };
-    const auto march = [&](std::uint32_t ni, bool* relaxed) {
+    // The march advances a whole reflection orbit in lockstep: one step fraction
+    // for every member, accepted only when every member's own gate accepts it.
+    // Marching each node separately is not equivalent — the members' gates read
+    // quality values that tie across a mirror pair, so their fraction ladders can
+    // stop at different rungs and place mirrored nodes differently (the same
+    // failure mode the collapse round showed, ADR-0036 Section 9.2).
+    const auto march_group = [&](const std::vector<std::uint32_t>& group, bool* relaxed) {
         for (int step = 0; step < 6; ++step) {
-            const auto now = resolve(ni);
-            if (!now || now->distance <= eps) {
+            std::vector<mesh::BoundaryTarget> now;
+            now.reserve(group.size());
+            bool have_targets = true;
+            for (const auto node : group) {
+                const auto target = resolve(node);
+                if (!target || target->distance <= eps) {
+                    have_targets = false;
+                    break;
+                }
+                now.push_back(*target);
+            }
+            if (!have_targets) {
                 break;
             }
-            const Eigen::Vector3d saved = mesh.nodes[ni];
-            const double before = star_min_quality(ni);
-            const double floor_here = std::min(before, floor_value);
-            const double free_before = free_distance(ni);
+            std::vector<Eigen::Vector3d> saved;
+            std::vector<double> floor_here;
+            std::vector<double> free_before;
+            saved.reserve(group.size());
+            floor_here.reserve(group.size());
+            free_before.reserve(group.size());
+            for (const auto node : group) {
+                saved.push_back(mesh.nodes[node]);
+                floor_here.push_back(std::min(star_min_quality(node), floor_value));
+                free_before.push_back(free_distance(node));
+            }
             bool advanced = false;
             for (const double frac : {1.0, 0.5, 0.25, 0.125}) {
-                mesh.nodes[ni] = saved + frac * (now->point - saved);
-                const double after = star_min_quality(ni);
-                if ((!std::isfinite(after) || after >= floor_here) &&
-                    fea::star_jacobians_positive(mesh, incident[ni]) &&
-                    free_distance(ni) <= free_before) {
+                for (std::size_t gi = 0; gi < group.size(); ++gi) {
+                    mesh.nodes[group[gi]] = saved[gi] + frac * (now[gi].point - saved[gi]);
+                }
+                bool step_ok = true;
+                for (std::size_t gi = 0; gi < group.size() && step_ok; ++gi) {
+                    const auto node = group[gi];
+                    const double after = star_min_quality(node);
+                    step_ok = (!std::isfinite(after) || after >= floor_here[gi]) &&
+                              fea::star_jacobians_positive(mesh, incident[node]) &&
+                              free_distance(node) <= free_before[gi];
+                }
+                if (step_ok) {
                     advanced = true;
                     break;
                 }
-                mesh.nodes[ni] = saved;
+                for (std::size_t gi = 0; gi < group.size(); ++gi) {
+                    mesh.nodes[group[gi]] = saved[gi];
+                }
             }
             if (advanced) {
                 continue;
             }
-            if (relaxed != nullptr && !*relaxed && open_room(ni)) {
+            bool opened = false;
+            if (relaxed != nullptr && !*relaxed) {
+                for (const auto node : group) {
+                    opened = open_room(node) || opened;
+                }
+            }
+            if (opened) {
                 *relaxed = true;
                 continue;
             }
             break;
         }
-        return free_distance(ni);
+        return free_distance(group.front());
+    };
+    const auto march = [&](std::uint32_t ni, bool* relaxed) {
+        const auto group = orbit_of(ni);
+        if (group.empty()) {
+            return free_distance(ni); // incomplete orbit: no move is symmetric
+        }
+        return march_group(group, relaxed);
     };
 
     // Whole-pass insurance. Every individual acceptance above is local — it

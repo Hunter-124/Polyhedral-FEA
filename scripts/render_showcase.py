@@ -349,10 +349,14 @@ GRADE_VIEW = (0.15, -0.35, 1.00)
 GRADE_UP = (0.0, 1.00, 0.35)
 GRADING_TILES = [
     MeshTile("grade_uniform", "uniform sizing field  (--no-feature)", "plate_hole",
-             # 3.8 mm against the graded leg's 5.6 mm is the matched-element-budget
+             # 4.2 mm against the graded leg's 5.6 mm is the matched-element-budget
              # control this figure exists for; promotion adds no cells, so curved
-             # geometry does not change the pairing.
-             "graded", 0.0038, no_feature=True, size=(GRADE_W, GRADE_H),
+             # geometry does not change the pairing. Re-tuned from 3.8 mm when the
+             # mirror-symmetric even-cell lattice (ADR-0036) moved the counts: the
+             # legs are 43,024 vs 45,424 cells, and the lattice quantises hard
+             # enough that the neighbouring h gives 48,256 — 5.3% low against 6.2%
+             # high, so this is the closest pairing available.
+             "graded", 0.0042, no_feature=True, size=(GRADE_W, GRADE_H),
              view=GRADE_VIEW, up=GRADE_UP, focus=GRADE_FOCUS, window=GRADE_WINDOW),
     MeshTile("grade_feature", "feature-graded sizing field", "plate_hole",
              "graded", 0.0056, size=(GRADE_W, GRADE_H),

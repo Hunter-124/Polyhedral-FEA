@@ -863,6 +863,13 @@ SmoothStats smooth_boundary_nodes(const geom::TriSurface& surface,
     if (boundary_faces.empty() || !(h > 0.0) || !std::isfinite(h) || !collect_offenders) {
         return stats;
     }
+    // Capped at 10: the pass count is shared with the crease-chain relaxation
+    // above, which slides nodes ALONG a sharp edge and is not idempotent.
+    // Measured on cantilever.step at h = 10 mm with the wall relaxation below
+    // held fixed, raising the graded mesher's 3 passes to 8 dropped the worst
+    // cell shape quality from 0.135 to 0.093, and 20 passes to 0.058 — on a box,
+    // whose planar walls had no spacing left to win. More passes are only worth
+    // it on a part that is all curved wall, and nothing here is.
     passes = std::clamp(passes, 1, 10);
     relax = std::clamp(relax, 0.05, 1.0);
     (void)grid_for(surface);
@@ -890,6 +897,46 @@ SmoothStats smooth_boundary_nodes(const geom::TriSurface& surface,
             }
         }
     }
+
+    // Node -> incident free faces. The free-node relaxation target is an
+    // area-weighted mean of these faces' centroids, which needs the faces
+    // themselves and not just the edge graph.
+    std::unordered_map<std::uint32_t, std::vector<std::uint32_t>> inc;
+    for (std::size_t fi = 0; fi < boundary_faces.size(); ++fi) {
+        for (int c = 0; c < 4; ++c) {
+            const auto ni = boundary_faces[fi][static_cast<std::size_t>(c)];
+            if (ni >= nodes.size()) {
+                continue;
+            }
+            auto& list = inc[ni];
+            // A tri arrives as a quad with a duplicated last node, so a corner
+            // can repeat within one face.
+            if (std::find(list.begin(), list.end(), static_cast<std::uint32_t>(fi)) ==
+                list.end()) {
+                list.push_back(static_cast<std::uint32_t>(fi));
+            }
+        }
+    }
+    // Fan a face into triangles once: centroid and area of the polygon, from the
+    // node positions as they stand.
+    auto face_measure = [&](std::uint32_t fi) {
+        const auto& q = boundary_faces[fi];
+        Eigen::Vector3d moment = Eigen::Vector3d::Zero();
+        double area = 0.0;
+        for (int k = 1; k + 1 < 4; ++k) {
+            const Eigen::Vector3d& a = nodes[q[0]];
+            const Eigen::Vector3d& b = nodes[q[static_cast<std::size_t>(k)]];
+            const Eigen::Vector3d& c = nodes[q[static_cast<std::size_t>(k + 1)]];
+            const double t_area = 0.5 * (b - a).cross(c - a).norm();
+            if (!(t_area > 0.0)) {
+                continue;
+            }
+            area += t_area;
+            moment += t_area * ((a + b + c) / 3.0);
+        }
+        return std::pair{area, area > 0.0 ? Eigen::Vector3d(moment / area)
+                                         : Eigen::Vector3d::Zero()};
+    };
 
     // Crease classification: node sits on a sharp CAD edge. Near-crease wall
     // nodes must not be smoothed across the crease, so anything within the
@@ -922,6 +969,45 @@ SmoothStats smooth_boundary_nodes(const geom::TriSurface& surface,
         sort_mirror_canonical(nodes, list);
     }
     sort_mirror_canonical(nodes, nbr_ids);
+    // Same reason for the incident-face lists: the area-weighted sum below is a
+    // floating-point accumulation, and a node and its mirror image must walk
+    // their (mirrored) faces in the same sequence for the two sums to round
+    // identically. Key a face by the sorted mirror keys of its corners, which is
+    // reflection-invariant; the corner ids only break ties between faces whose
+    // corners quantise identically.
+    {
+        const MirrorKeyFrame frame = mirror_key_frame(nodes);
+        std::vector<std::array<long long, 3>> node_key(nodes.size());
+        for (std::size_t i = 0; i < nodes.size(); ++i) {
+            node_key[i] = frame.key(nodes[i]);
+        }
+        auto face_key = [&](std::uint32_t fi) {
+            std::array<std::array<long long, 3>, 4> k{};
+            for (int c = 0; c < 4; ++c) {
+                k[static_cast<std::size_t>(c)] =
+                    node_key[boundary_faces[fi][static_cast<std::size_t>(c)]];
+            }
+            std::sort(k.begin(), k.end());
+            return k;
+        };
+        auto face_ids = [&](std::uint32_t fi) {
+            std::array<std::uint32_t, 4> ids{};
+            for (int c = 0; c < 4; ++c) {
+                ids[static_cast<std::size_t>(c)] =
+                    boundary_faces[fi][static_cast<std::size_t>(c)];
+            }
+            std::sort(ids.begin(), ids.end());
+            return ids;
+        };
+        for (auto& [ni, list] : inc) {
+            (void)ni;
+            std::sort(list.begin(), list.end(), [&](std::uint32_t a, std::uint32_t b) {
+                const auto ka = face_key(a);
+                const auto kb = face_key(b);
+                return ka != kb ? ka < kb : face_ids(a) < face_ids(b);
+            });
+        }
+    }
     const bool exact_owners = projection != nullptr && projection->target;
     for (const auto ni : nbr_ids) {
         Kind k = Kind::kFree;
@@ -1011,11 +1097,59 @@ SmoothStats smooth_boundary_nodes(const geom::TriSurface& surface,
                 centroid = 0.5 * (nodes[cn[0]] + nodes[cn[1]]);
                 n_used = 2;
             } else {
-                for (const auto o : nb) {
-                    centroid += nodes[o];
-                    ++n_used;
+                // Free wall node: relax toward the AREA-WEIGHTED mean of the
+                // incident faces' centroids.
+                //
+                // This target decomposes exactly into two pieces. Write c_f for
+                // face centroids, A_f for their areas, Ā for the mean area:
+                //
+                //   Σ A_f c_f / Σ A_f − p  =  Σ (A_f − Ā) c_f / Σ A_f
+                //                                       + (Σ c_f / n − p)
+                //
+                // The first term is a pure area-imbalance signal: it vanishes
+                // when every incident face has the same area and otherwise pulls
+                // the node INTO the oversized face, shrinking it. The second is
+                // plain regularisation toward the 1-ring. Their sum is what gets
+                // both properties, and each alone is measurably worse. Measured
+                // on sphere.step at h = 8 mm (5776 skin triangles, equivalent
+                // equilateral edge length, and the min triangle angle at the 1st
+                // percentile):
+                //
+                //   neighbour centroid (the old target) p95/p05 2.15, max/min
+                //     3.46, azimuthal size spread in the loaded band 14.5%,
+                //     min-angle p01 26.7 deg
+                //   area imbalance alone      1.67 / 2.11 / 10.3% / 20.3 deg
+                //   equal edge lengths        1.77 / 2.38 / 10.6% / 22.2 deg
+                //   area-weighted centroid    1.78 / 2.52 / 10.6% / 26.4 deg
+                //
+                // So the two size-only objectives buy their uniformity by
+                // skewing triangles (min-angle p01 down a quarter, and the
+                // surface-normal p99 against the exact sphere 1.9 -> 4.2 deg),
+                // while the area-weighted centroid buys the same uniformity at
+                // the baseline's shape. The old target is also not merely weaker:
+                // it gets WORSE with more passes (p95/p05 2.15 at 3 passes, 2.20
+                // at 8, 2.33 at 20) because the neighbour centroid's fixed point
+                // is not equal spacing, so iterating it converges to the wrong
+                // configuration rather than slowly to the right one.
+                const auto it = inc.find(ni);
+                if (it == inc.end()) {
+                    continue;
                 }
-                centroid /= static_cast<double>(n_used);
+                Eigen::Vector3d moment = Eigen::Vector3d::Zero();
+                double area_sum = 0.0;
+                for (const auto fi : it->second) {
+                    const auto [area, c] = face_measure(fi);
+                    if (!(area > 0.0)) {
+                        continue;
+                    }
+                    moment += area * c;
+                    area_sum += area;
+                }
+                if (!(area_sum > 0.0)) {
+                    continue;
+                }
+                centroid = moment / area_sum;
+                n_used = it->second.size();
             }
             if (n_used == 0) {
                 continue;

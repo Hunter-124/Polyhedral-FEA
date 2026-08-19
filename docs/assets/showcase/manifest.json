@@ -1,6 +1,6 @@
 {
-  "generated_utc": "2026-08-19T05:28:35Z",
-  "git_rev": "ccadabe",
+  "generated_utc": "2026-08-19T17:15:07Z",
+  "git_rev": "ac18b09",
   "images": [
     {
       "file": "architecture.png",
@@ -167,9 +167,9 @@
       "solve_command": "/home/hunter/Desktop/Polyhedral-FEA/build/apps/cli/polymesh solve tests/fixtures/parts/cantilever.step -o build/showcase/cantilever.vtu -h 0.03 --mesher graded -E 2e+11 -nu 0.3 --load-dir 0 0 -1 --force 1000",
       "render_command": "python3 scripts/render_showcase.py --only cantilever",
       "dofs": 193971,
-      "wall_time_s": 53.43378624098841,
-      "max_von_mises_pa": 5854812.882520885,
-      "caption": "Cantilever beam: von Mises stress on the graded mesh (h = 30 mm, 64,657 nodes / 44,832 elements, 193,971 DOF); root face fixed, -z resultant on tip face; displacement warped \u00d7200; colour range 0 \u2013 5.47 MPa (clipped at the 99th percentile of the visible surface field); peak nodal value 5.85 MPa at a boundary-condition singularity, node at (22, 100, 0) mm."
+      "wall_time_s": 74.0489581139991,
+      "max_von_mises_pa": 8636700.927316928,
+      "caption": "Cantilever beam: von Mises stress on the graded mesh (h = 30 mm, 64,657 nodes / 44,832 elements, 193,971 DOF); root face fixed, -z resultant on tip face; displacement warped \u00d7200; colour range 0 \u2013 5.59 MPa (clipped at the 99th percentile of the visible surface field); peak nodal value 8.64 MPa at a boundary-condition singularity, node at (22, 50, 100) mm."
     },
     {
       "file": "gallery_cylinder.png",
@@ -177,12 +177,12 @@
       "part": "cylinder",
       "mesher": "graded",
       "h": 0.012,
-      "solve_command": "/home/hunter/Desktop/Polyhedral-FEA/build/apps/cli/polymesh solve tests/fixtures/parts/cylinder.step -o build/showcase/cylinder.vtu -h 0.012 --mesher graded -E 2e+11 -nu 0.3 --fix-box -1 -1 -1 1 1 0.015 --load-box -1 -1 0.195 1 1 1 --load-dir 0 0 1 --force 7853.98",
+      "solve_command": "/home/hunter/Desktop/Polyhedral-FEA/build/apps/cli/polymesh solve tests/fixtures/parts/cylinder.step -o build/showcase/cylinder.vtu -h 0.012 --mesher graded -E 2e+11 -nu 0.3 --fix-box -1 -1 -1 1 1 0.002 --load-box -1 -1 0.195 1 1 1 --load-dir 0 0 1 --force 7853.98",
       "render_command": "python3 scripts/render_showcase.py --only cylinder",
       "dofs": 703599,
-      "wall_time_s": 376.0716394530027,
-      "max_von_mises_pa": 16239746.715162328,
-      "caption": "Cylinder: von Mises stress on the graded mesh (h = 12 mm, 234,533 nodes / 161,976 elements, 703,599 DOF); base z < 0.015 m fixed, +z resultant on the surface above z = 0.195 m (cap plus the top 5 mm of wall); displacement warped \u00d75000; colour range 0 \u2013 2.92 MPa (clipped at the 99th percentile of the visible surface field); peak nodal value 16.2 MPa at a boundary-condition singularity, node at (20, 46, 200) mm."
+      "wall_time_s": 780.0668553810101,
+      "max_von_mises_pa": 16239748.535560204,
+      "caption": "Cylinder: von Mises stress on the graded mesh (h = 12 mm, 234,533 nodes / 161,976 elements, 703,599 DOF); base face (z = 0) fixed, +z resultant on the surface above z = 0.195 m (cap plus the top 5 mm of wall); displacement warped \u00d75000; colour range 0 \u2013 2.93 MPa (clipped at the 99th percentile of the visible surface field); peak nodal value 16.2 MPa at a boundary-condition singularity, node at (-20, -46, 200) mm."
     },
     {
       "file": "gallery_icecream_cone.png",
@@ -193,9 +193,9 @@
       "solve_command": "/home/hunter/Desktop/Polyhedral-FEA/build/apps/cli/polymesh solve tests/fixtures/parts/icecream_cone.step -o build/showcase/icecream_cone.vtu -h 0.01 --mesher graded -E 2e+11 -nu 0.3 --fix-box -1 -1 -1 1 1 0.012 --load-box -1 -1 0.12 1 1 1 --load-dir 0 0 -1 --force 1000",
       "render_command": "python3 scripts/render_showcase.py --only icecream_cone",
       "dofs": 379815,
-      "wall_time_s": 86.15351028298028,
-      "max_von_mises_pa": 4509391.787901214,
-      "caption": "Round ice-cream cone: von Mises stress on the graded mesh (h = 10 mm, 126,605 nodes / 86,512 elements, 379,815 DOF); foot z <= 0.012 m fixed, -z resultant on scoop; displacement warped \u00d75000; colour range 0 \u2013 3.07 MPa (clipped at the 99th percentile of the visible surface field); peak nodal value 4.51 MPa at a boundary-condition singularity, node at (9, 0, 13) mm."
+      "wall_time_s": 115.16996374202427,
+      "max_von_mises_pa": 8674042.218502693,
+      "caption": "Round ice-cream cone: von Mises stress on the graded mesh (h = 10 mm, 126,605 nodes / 86,512 elements, 379,815 DOF); foot z <= 0.012 m fixed, -z resultant on scoop; displacement warped \u00d75000; colour range 0 \u2013 4.86 MPa (clipped at the 99th percentile of the visible surface field); peak nodal value 8.67 MPa at a boundary-condition singularity, node at (0, -9, 11) mm."
     },
     {
       "file": "gallery_plate_hole.png",
@@ -206,9 +206,9 @@
       "solve_command": "/home/hunter/Desktop/Polyhedral-FEA/build/apps/cli/polymesh solve tests/fixtures/parts/plate_hole.step -o build/showcase/plate_hole.vtu -h 0.006 --mesher graded -E 2.1e+11 -nu 0.3 --load-dir 1 0 0 --force 1000",
       "render_command": "python3 scripts/render_showcase.py --only plate_hole",
       "dofs": 233388,
-      "wall_time_s": 104.92727871699026,
-      "max_von_mises_pa": 3083333.951715659,
-      "caption": "Plate with hole: von Mises stress on the graded mesh (h = 6 mm, 77,796 nodes / 52,016 elements, 233,388 DOF); min-x face fixed, +x resultant on max-x face; displacement warped \u00d75000; colour range 0 \u2013 2.51 MPa (clipped at the 99th percentile of the visible surface field); peak nodal value 3.08 MPa at a boundary-condition singularity, node at (0, -10, 1) mm."
+      "wall_time_s": 155.71759036998264,
+      "max_von_mises_pa": 3082453.342736916,
+      "caption": "Plate with hole: von Mises stress on the graded mesh (h = 6 mm, 77,796 nodes / 52,016 elements, 233,388 DOF); min-x face fixed, +x resultant on max-x face; displacement warped \u00d75000; colour range 0 \u2013 2.51 MPa (clipped at the 99th percentile of the visible surface field); peak nodal value 3.08 MPa at a boundary-condition singularity, node at (0, -10, 9) mm."
     },
     {
       "file": "gallery_sphere.png",
@@ -219,9 +219,9 @@
       "solve_command": "/home/hunter/Desktop/Polyhedral-FEA/build/apps/cli/polymesh solve tests/fixtures/parts/sphere.step -o build/showcase/sphere.vtu -h 0.008 --mesher graded -E 2e+11 -nu 0.3 --fix-box -1 -1 -1 1 1 -0.04 --load-box -1 -1 0.04 1 1 1 --load-dir 0 0 -1 --force 3141.59",
       "render_command": "python3 scripts/render_showcase.py --only sphere",
       "dofs": 521271,
-      "wall_time_s": 77.31861404603114,
-      "max_von_mises_pa": 3181837.849719643,
-      "caption": "Sphere: von Mises stress on the graded mesh (h = 8 mm, 173,757 nodes / 121,232 elements, 521,271 DOF); lower cap fixed, -z resultant on upper cap; displacement warped \u00d710000; colour range 0 \u2013 1.6 MPa (clipped at the 99th percentile of the visible surface field); peak nodal value 3.18 MPa at a boundary-condition singularity, node at (-17, 25, -40) mm."
+      "wall_time_s": 112.25404431897914,
+      "max_von_mises_pa": 4312893.369063631,
+      "caption": "Sphere: von Mises stress on the graded mesh (h = 8 mm, 173,757 nodes / 121,232 elements, 521,271 DOF); lower cap fixed, -z resultant on upper cap; displacement warped \u00d710000; colour range 0 \u2013 2 MPa (clipped at the 99th percentile of the visible surface field); peak nodal value 4.31 MPa at a boundary-condition singularity, node at (17, -25, -40) mm."
     },
     {
       "file": "gui_studio.png",
@@ -245,9 +245,9 @@
       "solve_command": "/home/hunter/Desktop/Polyhedral-FEA/build/apps/cli/polymesh solve tests/fixtures/parts/plate_hole.step -o build/showcase/plate_hole.vtu -h 0.006 --mesher graded -E 2.1e+11 -nu 0.3 --load-dir 1 0 0 --force 1000",
       "render_command": "python3 scripts/render_showcase.py --only hero",
       "dofs": 233388,
-      "wall_time_s": 104.92727871699026,
-      "max_von_mises_pa": 3083333.951715659,
-      "caption": "Flagship render: von Mises stress across the plate with hole on the feature-graded mesh, shot from a low oblique angle (h = 6 mm, 77,796 nodes / 52,016 elements, 233,388 DOF); min-x face fixed, +x resultant on max-x face; displacement warped \u00d75000; colour range 0 \u2013 2.51 MPa (clipped at the 99th percentile of the visible surface field); peak nodal value 3.08 MPa at a boundary-condition singularity, node at (0, -10, 1) mm."
+      "wall_time_s": 155.71759036998264,
+      "max_von_mises_pa": 3082453.342736916,
+      "caption": "Flagship render: von Mises stress across the plate with hole on the feature-graded mesh, shot from a low oblique angle (h = 6 mm, 77,796 nodes / 52,016 elements, 233,388 DOF); min-x face fixed, +x resultant on max-x face; displacement warped \u00d75000; colour range 0 \u2013 2.51 MPa (clipped at the 99th percentile of the visible surface field); peak nodal value 3.08 MPa at a boundary-condition singularity, node at (0, -10, 9) mm."
     }
   ]
 }

@@ -121,7 +121,7 @@ Source: [bench/reports/p1-gate1-convergence.md](bench/reports/p1-gate1-convergen
 
 | Experiment | Baseline | PolyMesh | Delta | Source |
 |---|---|---|---|---|
-| L-domain singularity, geometry-graded vs uniform tet10 at matched strain-energy accuracy (0.0854% vs 0.0888% energy deficit) | 6384 DOF, 2.762 s | 1248 DOF, 0.227 s | 5.12× fewer DOFs, 12.2× lower wall time | [bench/results/polymesh-d6-l-domain.json](bench/results/polymesh-d6-l-domain.json) |
+| L-domain singularity, geometry-graded vs uniform tet10; the graded mesh's energy deficit is 1.04× the baseline's (0.0888% against 0.0854%), not equal to it | 6384 DOF, 2.762 s | 1248 DOF, 0.227 s | 5.12× fewer DOFs, 12.2× lower wall time | [bench/results/polymesh-d6-l-domain.json](bench/results/polymesh-d6-l-domain.json) |
 | Kirsch SCF error at identical 648 free DOFs, feature-aware logarithmic radial grading vs linear | 3.06% error | 0.70% error | 4.4× tighter at zero DOF cost | [docs/progress.md](docs/progress.md) |
 | Hybrid meshing wall time on a 28,656-element mesh, after replacing brute-force closest-point search with a uniform spatial index | 25.5 s | 5.1 s | ~5× faster, results unchanged | [docs/progress.md](docs/progress.md) |
 
@@ -566,6 +566,19 @@ faces, never as lumped point forces, and the run prints the resulting nodal-load
 sum next to the requested resultant as a conservation check. `diag` accepts
 `--fix-box` and `--load-box` too, so a diagnostics run can reproduce the exact
 boundary conditions of a solve.
+
+`--fix-box` and `--load-box` name a region of the **boundary surface**, and they
+select the boundary nodes and faces inside it — never interior nodes. Constraining
+the interior would embed a rigid inclusion: an element whose nodes all fall inside
+a fixture box has identically zero strain, so its stress is identically zero, and
+the union of such elements ends on a one-element staircase set by the tiling
+rather than by the problem. That was the shipped behaviour until recently, and it
+froze 30.7% of the showcase cylinder's elements solid
+([ADR-0038](docs/decisions/0038-a-fixture-is-applied-to-the-boundary.md)). A load
+region goes one step further and is integrated at the box plane rather than over
+whole faces, so the applied traction does not depend on which element edges happen
+to fall inside
+([ADR-0037](docs/decisions/0037-a-box-selection-is-a-region.md)).
 
 ### Rendering
 

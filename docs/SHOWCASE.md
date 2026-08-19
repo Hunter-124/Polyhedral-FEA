@@ -56,7 +56,7 @@ in the manifest too.
 
 Flat plate with a central hole — the canonical stress-riser benchmark geometry.
 Feature-aware grading concentrates elements around the hole where the gradient
-lives. h = 6 mm, 52,016 curved cells, **233,388 solved DOF**, 105 s wall. h was
+lives. h = 6 mm, 52,016 curved cells, **233,388 solved DOF**, 156 s wall. h was
 3 mm while the shipped mesh was straight-edged; the exact curved boundary now
 renders a smoother hole at ~1/8 the cells.
 
@@ -69,7 +69,7 @@ python scripts/render_showcase.py --only plate_hole
 ![cantilever](assets/showcase/gallery_cantilever.png)
 
 End-loaded cantilever: linear bending stress distribution, maximum at the
-clamped root. h = 30 mm, 44,832 curved cells, **193,971 solved DOF**, 53 s wall.
+clamped root. h = 30 mm, 44,832 curved cells, **193,971 solved DOF**, 74 s wall.
 This is the geometry behind the Timoshenko tip-deflection verification (1.50%
 error,
 [bench/reports/p1-gate1-convergence.md](../bench/reports/p1-gate1-convergence.md)).
@@ -86,11 +86,14 @@ Curved-wall solid imported from STEP. Curvature-dominant sizing uses a 0.5×
 accuracy lattice, then the **authoritative solve mesh** is promoted to
 tet10/hex20 and its boundary mids are projected onto the exact BRep. The same
 curved volume elements are assembled, exported, and rendered. h = 12 mm,
-**703,599 solved DOF**, 376 s wall. Its load box selects the cap plus the top
+**703,599 solved DOF**, 780 s wall. Its load box selects the cap plus the top
 5 mm of wall, and since [ADR-0037](decisions/0037-a-box-selection-is-a-region.md)
 the traction is integrated over exactly that region instead of over whole faces,
-so a +z shear now runs up to the sharp top rim: the peak nodal value is 16.2 MPa
-there, against 1.54 MPa at the clamped base.
+so a +z shear runs up to the sharp top rim: the peak nodal value is 16.24 MPa
+there, against 3.49 MPa just above the clamped base face and a nominal 0.998 MPa
+in the mid-wall (F/A = 1.000 MPa exactly). The fixture is the z = 0 face alone
+since [ADR-0038](decisions/0038-a-fixture-is-applied-to-the-boundary.md); it used
+to be every node below z = 15 mm, which froze 30.7% of the elements solid.
 
 ```sh
 python scripts/render_showcase.py --only cylinder
@@ -104,7 +107,7 @@ Closed curved B-rep — the hardest case for a Cartesian grid fill. The shipped
 mesh is no longer a linear solve hidden behind a smoothed render: graded
 boundary topology, projected tet10 geometry, stiffness assembly, VTU export and
 Studio all consume the same authoritative node set. h = 8 mm, **521,271 solved
-DOF**, 77 s wall.
+DOF**, 112 s wall.
 
 ```sh
 python scripts/render_showcase.py --only sphere
@@ -117,7 +120,7 @@ One watertight 3D Boolean solid: a round truncated cone fused into an
 overlapping spherical scoop. Sharp CAD-edge paths are recovered through the
 boundary graph under the same cell-quality/Jacobian gate, and the projected
 quadratic volume mesh is solved directly. h = 10 mm, **379,815 solved DOF**,
-86 s wall.
+115 s wall.
 
 ```sh
 python scripts/render_showcase.py --only icecream_cone
@@ -449,8 +452,10 @@ python scripts/plot_benchmarks.py
 ![DOF and time benchmark](assets/showcase/bench_dof_time.png)
 
 D6 L-domain instrument: geometry-graded tet10 versus PolyMesh's **own frozen
-uniform tet10 baseline** at matched strain-energy accuracy (energy deficit
-0.0854% uniform vs 0.0888% graded).
+uniform tet10 baseline**. The graded mesh does not match the baseline's
+strain-energy accuracy — its energy deficit is 0.0888% against the baseline's
+0.0854%, i.e. 1.04× as large — so the DOF and time it saves are bought at a
+measured 4% higher deficit, not at parity.
 
 | Leg | DOF | Total wall time |
 |---|---:|---:|
@@ -514,29 +519,39 @@ coefficients cannot be memorized or hardcoded
 ![Advisor under a DOF budget](assets/showcase/bench_advisor_budget.png)
 
 The learned mesh advisor choosing under a hard DOF cap
-([ADR-0034](decisions/0034-spectral-sizing-and-coarsening.md)). Each point is
-one real CLI run — `polymesh solve --advisor bench/advisor --advisor-max-dof N`
+([ADR-0034](decisions/0034-spectral-sizing-and-coarsening.md)). Each point is one
+invoked CLI run — `polymesh solve --advisor bench/advisor --advisor-max-dof N`
 — plotted at the DOF budget it was given against the predicted per-case
-relative-error score of the action it chose. The advisor enumerates its
-measured candidate grid, drops candidates whose predicted DOF exceeds the cap,
-and ranks what survives; labels name the action wherever it changes.
+relative-error score of the action it chose. The advisor enumerates its measured
+candidate grid, drops candidates whose predicted DOF exceeds the cap, and ranks
+what survives; each coloured step holds one action until a looser cap buys a
+better one.
 
-| Part | no cap | 8k cap | 2k cap |
+What the shipped sweep records, read off the JSON:
+
+| Part | 2k cap | 4k cap | 8k .. 64k and no cap |
 |---|---|---|---|
-| `box_hole_s0` | graded_tet p2, 66.2k DOF | hex p2, 4.7k DOF | hex p1, 1.6k DOF |
-| `plate_notch_s0` | graded_tet p2, 50.4k DOF | hex p2, 6.5k DOF | hex p1, 1.8k DOF |
-| `stepped_shaft_s0` | hybrid_zoo p1, 6.4k DOF | hybrid_zoo p1, 6.4k DOF | **refused** |
+| `box_hole_s0` | graded_tet p1, 1.6k predicted DOF | hex p2, 2.8k | hybrid_vem p2, 6.4k |
+| `plate_notch_s0` | hybrid_zoo p2, 1.9k | hybrid_vem p2, 2.6k | hybrid_vem p2, 2.6k |
+| `stepped_shaft_s0` | hybrid_zoo p1, h 0.1, 0.9k | hybrid_zoo p1, h 0.08 + 1 adapt, 2.4k | hybrid_zoo p1, h 0.08 + 1 adapt, 2.4k |
 
-`stepped_shaft_s0` at a 2,000-DOF cap is the interesting cell: the cheapest
-action the model scores still predicts 2.6k DOF, so the advisor returns its
-clamp-box defaults with every prediction suppressed rather than an action it
-cannot afford. A budget that cannot be met is reported, not rounded away.
+Every capped pick in this sweep predicts a DOF count under its cap — 0 of the 18
+capped, non-vetoed runs is over budget — and no run was refused. Earlier text
+here described a refusal for `stepped_shaft_s0` at a 2,000-DOF cap; the sweep as
+committed does not contain one, and the figure's title states the count it
+computes rather than an anecdote.
+
+Two caveats the figure now carries on its face. The DOF figures are the model's
+own predictions, and its held-out DOF error is about 0.5 decades, so a cap is a
+feasibility filter and not a guarantee. And of the 21 invoked solves, **13 exited
+nonzero**: the picked action failed to mesh or solve — every `hybrid_vem p2` pick
+plus `plate_notch_s0`'s `hybrid_zoo p2` at the 2k cap. The plotted score is the
+model's prediction, not a measured outcome, so the marks stand; the failure count
+belongs beside them.
 
 Source: [`bench/results/advisor-budget-sweep.json`](../bench/results/advisor-budget-sweep.json)
 (21 runs), regenerated by
-[`scripts/sweep_advisor_budget.py`](../scripts/sweep_advisor_budget.py). The DOF
-figures are the model's own predictions — its held-out DOF error is about
-0.5 decades, so the cap is a feasibility filter, not a guarantee.
+[`scripts/sweep_advisor_budget.py`](../scripts/sweep_advisor_budget.py).
 
 ## Architecture diagram
 

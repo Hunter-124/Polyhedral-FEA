@@ -234,7 +234,19 @@ PARTS: list[Part] = [
         view=(1.00, -0.95, 0.30),
         up=(0.0, 0.0, 1.0),
         margin=1.04,
-        fix_box=(-1, -1, -1, 1, 1, 0.015),
+        # The base FACE, not a 15 mm slab of the wall. A selection box names a
+        # region of the boundary surface (ADR-0037, extended to fixtures), so
+        # z <= 15 mm used to clamp the outer wall up to 15 mm as well, and the
+        # upper edge of that strip is an artificial clamped-patch boundary with a
+        # genuine stress singularity on it: at h = 12 mm it showed as a ring of
+        # one-element hot spots a fifteenth of the way up the wall, which no real
+        # fixture produces. 2 mm still contains the whole z = 0 face (its nodes
+        # snap to z = 0 exactly), and the mesh does not move at all: `polymesh
+        # mesh` at h = 12 mm with this box and with the old 15 mm one both emit
+        # 234,533 nodes / 161,976 cells from the same 124 BC seeds, and the two
+        # VTUs are bit-identical (sha256 68d2c65498704034 both). So this changes
+        # the boundary condition and nothing else.
+        fix_box=(-1, -1, -1, 1, 1, 0.002),
         load_box=(-1, -1, 0.195, 1, 1, 1),
         # The box reaches 5 mm down the wall, and since ADR-0037 the traction is
         # integrated over exactly that region rather than over whole faces, so say
@@ -242,7 +254,7 @@ PARTS: list[Part] = [
         # knife-edge plane at z = 200 mm, which cost 11% of the cap area when
         # tried (7.007e-3 against 7.854e-3 m^2) because snapped cap nodes land on
         # both sides of it.
-        bc_note="base z < 0.015 m fixed, +z resultant on the surface above "
+        bc_note="base face (z = 0) fixed, +z resultant on the surface above "
                 "z = 0.195 m (cap plus the top 5 mm of wall)",
         load_dir=(0.0, 0.0, 1.0),
         force_n=7853.981633974483,
@@ -1028,32 +1040,55 @@ def render_mesh(
 # Two rows of four stages, serpentine, so the diagram is ~2:1 instead of the
 # 4:1 letterbox graphviz produced at rankdir=LR (its panels and 15 pt labels
 # were sub-pixel once a README scaled it to 900 px). Positions are axes
-# fractions; the row gap is left empty on purpose because the feedback edge
-# runs through it.
-ARCH_ROW_Y = (0.80, 0.335)
+# fractions of the panel figstyle lays out for an 11.0 x 5.5 in figure with a
+# 1-line title, 2-line subtitle and 2-line footer: measured 10.436 x 3.712 in,
+# so 1 in is 0.0958 in x and 0.2694 in y and the panel is 2.8x wider than tall.
+#
+# The vertical positions are one budget that fills the panel edge to edge:
+#   0.012 margin | 0.091 tap | 0.085 stub | 0.205 row 0 | 0.161 feedback lane
+#   | 0.205 row 1 | 0.095 stub | 0.091 tap | 0.012 margin
+# The previous layout ended at 0.888 and started at 0.043, which left a 74 px
+# empty band across the top of the frame with both stage rows sitting low.
+ARCH_AX_IN = (10.436, 3.712)   # measured panel size in inches, see above
+
+ARCH_ROW_Y = (0.6655, 0.2995)  # stage row centres
 ARCH_COL_X = (0.13, 0.375, 0.62, 0.865)
-ARCH_BOX = (0.215, 0.175)      # (width, height) of a stage box
-ARCH_FEEDBACK_Y = 0.575        # mid-gap lane for the return path
+ARCH_BOX = (0.205, 0.205)      # (width, height) of a stage box
+ARCH_FEEDBACK_Y = 0.454        # mid-gap lane for the return path
+ARCH_TEXT_GAP = 0.021          # label block to detail block, 0.078 in
+ARCH_TAP_PAD = 0.023           # tap chip: text block to chip edge, 0.085 in
 
 #: (column, row, label, detail, accent) -- rows are laid out serpentine, so row
-#: 1 reads right-to-left and the row-to-row hop is a short vertical.
+#: 1 reads right-to-left and the row-to-row hop is a short vertical. Detail
+#: lines are pre-wrapped: a stage box is 0.205 wide, so at 8.5 pt one detail
+#: line may not exceed 0.178 axes fractions (1.86 in) and still keep a 10 pt
+#: side margin. Unwrapped, "curvature · thin-wall · FFT edge denoise" measured
+#: 0.223 (2.32 in) and overprinted the box to its right; the mesher list
+#: measured 0.210 and touched both walls.
 ARCH_STAGES = [
     (0, 0, "STEP / B-rep CAD", "", True),
-    (1, 0, "feature analysis", "curvature · thin-wall · FFT edge denoise", False),
+    (1, 0, "feature analysis", "curvature · thin-wall\nFFT edge denoise", False),
     (2, 0, "spectral-trimmed\nsizing field", "FFT energy truncation + budget", True),
-    (3, 0, "hybrid meshers", "tet · hex · prism · pyramid · poly-VEM", False),
+    (3, 0, "hybrid meshers", "tet · hex · prism\npyramid · poly-VEM", False),
     (3, 1, "unified FE + VEM\nassembly", "", False),
     (2, 1, "solve", "LDLT / equilibrated CG", True),
     (1, 1, "ZZ error\nestimate", "", False),
     (0, 1, "hp-adapt\ndecision", "refine · coarsen · p-elevate", True),
 ]
 
-#: side outputs: (x, y, label, source stage index)
+#: side outputs: (x, y, width, label, source stage index). These are taps, not
+#: stages -- page-coloured fill, hairline edge, annotation type and a height
+#: that follows the label, so they cannot be misread as pipeline steps.
+#: Each x lies inside its source box's x-extent (centre +/- 0.1025) so the tap
+#: is a straight vertical stub. The learned advisor hangs *above* row 0 because
+#: its source (feature analysis) is in row 0: from the bottom row it needed a
+#: 0.24-wide diagonal that crossed the feedback lane and read as an edge into
+#: the hp-adapt box. Widths are the measured 9 pt label width plus ~0.21 in.
 ARCH_SIDES = [
-    (0.14, 0.085, "learned mesh advisor\n(budget-feasible)", 1),
-    (0.36, 0.085, "bench harness", 6),
-    (0.58, 0.085, "GUI viewport", 5),
-    (0.80, 0.085, "VTU export", 5),
+    (0.375, 0.9205, 0.175, "learned mesh advisor\n(budget-feasible)", 1),
+    (0.335, 0.0570, 0.135, "bench harness", 6),
+    (0.545, 0.0570, 0.123, "GUI viewport", 5),
+    (0.700, 0.0570, 0.113, "VTU export", 5),
 ]
 
 
@@ -1061,8 +1096,17 @@ def _arch_center(col: int, row: int) -> tuple[float, float]:
     return ARCH_COL_X[col], ARCH_ROW_Y[row]
 
 
+def _arch_line_h(pt: float, n: int = 1, linespacing: float = 1.35) -> float:
+    """Height of ``n`` lines of ``pt`` type, in axes fractions of the panel.
+
+    Checked against the rendered extents: 10 pt at 1.35 measures 0.1875 in,
+    0.0505 of the 3.712 in panel, which is what this returns.
+    """
+    return n * pt * linespacing / 72.0 / ARCH_AX_IN[1]
+
+
 def render_architecture(out: Path) -> None:
-    """Pipeline diagram: two rows, tight feedback lane, theme contrast."""
+    """Pipeline diagram: two rows, tight feedback lane, subordinate taps."""
     from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 
     t = theme()
@@ -1084,35 +1128,54 @@ def render_architecture(out: Path) -> None:
     ax.set_facecolor(t.bg)
     ax.grid(False)
 
-    def box(cx: float, cy: float, w: float, h: float, label: str, detail: str,
-            *, edge: str, ink: str) -> None:
-        fs.assert_glyphs(label, detail)
+    def plate(cx: float, cy: float, w: float, h: float, *, edge: str,
+              face: str, lw: float, rounding: float) -> None:
         ax.add_patch(FancyBboxPatch(
             (cx - w / 2, cy - h / 2), w, h,
-            boxstyle="round,pad=0.004,rounding_size=0.02",
-            linewidth=1.4, edgecolor=edge, facecolor=t.panel, zorder=3,
+            boxstyle=f"round,pad=0.004,rounding_size={rounding}",
+            linewidth=lw, edgecolor=edge, facecolor=face, zorder=3,
         ))
-        dy = 0.022 if detail else 0.0
-        ax.text(cx, cy + dy, label, ha="center", va="center", zorder=4,
-                fontsize=fs.FONT_PT["label"], color=ink,
-                linespacing=1.35)
+
+    def stack(cx: float, cy: float, label: str, detail: str, *,
+              label_pt: float, ink: str, detail_pt: float = 0.0,
+              detail_ink: str = "") -> None:
+        """Centre label and detail as one block inside a box.
+
+        The old code offset the label by a fixed 0.022 and pinned the detail
+        0.032 above the floor, which only balanced for a 1-line label with a
+        1-line detail; a wrapped detail then sat off-centre in its box.
+        """
+        fs.assert_glyphs(label, detail)
+        h_label = _arch_line_h(label_pt, label.count("\n") + 1)
+        h_detail = _arch_line_h(detail_pt, detail.count("\n") + 1, 1.3) \
+            if detail else 0.0
+        gap = ARCH_TEXT_GAP if detail else 0.0
+        top = cy + (h_label + gap + h_detail) / 2
+        ax.text(cx, top, label, ha="center", va="top", zorder=4,
+                fontsize=label_pt, color=ink, linespacing=1.35)
         if detail:
-            ax.text(cx, cy - h / 2 + 0.032, detail, ha="center", va="center",
-                    zorder=4, fontsize=fs.FONT_PT["annot"] - 0.5, color=t.muted)
+            ax.text(cx, top - h_label - gap, detail, ha="center", va="top",
+                    zorder=4, fontsize=detail_pt, color=detail_ink,
+                    linespacing=1.3)
 
     def arrow(p0, p1, *, color: str, dashed: bool = False,
-              connect: str = "arc3,rad=0.0") -> None:
+              scale: float = 13.0, lw: float = 1.6) -> None:
         ax.add_patch(FancyArrowPatch(
-            p0, p1, arrowstyle="-|>", mutation_scale=13,
-            linewidth=1.6, color=color, zorder=2,
+            p0, p1, arrowstyle="-|>", mutation_scale=scale,
+            linewidth=lw, color=color, zorder=2,
             linestyle=(0, (5, 3)) if dashed else "solid",
-            connectionstyle=connect, shrinkA=0, shrinkB=0,
+            shrinkA=0, shrinkB=0,
         ))
 
+    # Stage weight: accent stroke for the four decision stages, t.rule for the
+    # rest. t.grid (#2A3240) on t.panel (#161B22) was a 1.3:1 edge that
+    # disappeared once the taps below it carried the same weight.
     for col, row, label, detail, accent in ARCH_STAGES:
         cx, cy = _arch_center(col, row)
-        box(cx, cy, bw, bh, label, detail,
-            edge=t.accent if accent else t.grid, ink=t.ink)
+        plate(cx, cy, bw, bh, edge=t.accent if accent else t.rule,
+              face=t.panel, lw=1.6 if accent else 1.4, rounding=0.02)
+        stack(cx, cy, label, detail, label_pt=fs.FONT_PT["label"], ink=t.ink,
+              detail_pt=fs.FONT_PT["annot"] - 0.5, detail_ink=t.muted)
 
     # in-row flow: row 0 left-to-right, row 1 right-to-left (serpentine)
     for row, cols in ((0, (0, 1, 2)), (1, (3, 2, 1))):
@@ -1133,27 +1196,31 @@ def render_architecture(out: Path) -> None:
     fx, fy = _arch_center(0, 1)
     sx, sy = _arch_center(2, 0)
     lane = ARCH_FEEDBACK_Y
-    ax.plot([fx, fx], [fy + bh / 2, lane], color=t.accent, linewidth=1.6,
-            linestyle=(0, (5, 3)), zorder=2)
-    ax.plot([fx, sx], [lane, lane], color=t.accent, linewidth=1.6,
-            linestyle=(0, (5, 3)), zorder=2)
+    ax.plot([fx, fx, sx], [fy + bh / 2, lane, lane], color=t.accent,
+            linewidth=1.6, linestyle=(0, (5, 3)), zorder=2,
+            solid_joinstyle="miter")
     arrow((sx, lane), (sx, sy - bh / 2), color=t.accent, dashed=True)
     feedback = "refine / coarsen / p-elevate"
     fs.assert_glyphs(feedback)
-    # Accent ink on a page-coloured plate: the old dark blue on near-black was
-    # invisible at any size.
-    ax.text((fx + sx) / 2, lane, feedback, ha="center", va="center", zorder=5,
-            fontsize=fs.FONT_PT["annot"], color=t.accent,
-            bbox=dict(facecolor=t.bg, edgecolor=t.accent, linewidth=0.8,
-                      boxstyle="round,pad=0.32"))
+    # Above the lane, not on it: the old plate sat on the dashed run *and* on
+    # the advisor diagonal that crossed it. At 0.022 the label clears the lane
+    # by 13 px and the row-0 boxes above it by 31 px at 164 dpi, so it reads as
+    # the lane's label rather than as a caption under "feature analysis".
+    ax.text((fx + sx) / 2, lane + 0.022, feedback, ha="center", va="bottom",
+            zorder=5, fontsize=fs.FONT_PT["annot"], color=t.accent)
 
-    # side outputs: subordinate but legible
-    for sxc, syc, label, src in ARCH_SIDES:
-        box(sxc, syc, 0.19, 0.085, label, "", edge=t.muted, ink=t.muted)
+    # side outputs: taps, deliberately lighter than the stages they hang off
+    for tx, ty, tw, label, src in ARCH_SIDES:
+        th = _arch_line_h(fs.FONT_PT["annot"], label.count("\n") + 1) \
+            + 2 * ARCH_TAP_PAD
+        plate(tx, ty, tw, th, edge=t.grid, face=t.bg, lw=1.0, rounding=0.012)
+        stack(tx, ty, label, "", label_pt=fs.FONT_PT["annot"], ink=t.muted)
         col, row = ARCH_STAGES[src][0], ARCH_STAGES[src][1]
-        px, py = _arch_center(col, row)
-        arrow((px, py - bh / 2), (sxc, syc + 0.085 / 2), color=t.muted,
-              connect="arc3,rad=0.08")
+        _, py = _arch_center(col, row)
+        above = ty > py
+        arrow((tx, py + (bh / 2 if above else -bh / 2)),
+              (tx, ty + (-th / 2 if above else th / 2)),
+              color=t.rule, scale=10.0, lw=1.2)
 
     fs.finish(fig, out)
 

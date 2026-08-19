@@ -420,14 +420,34 @@ push `brep_fidelity: graded authoritative curvature stays stiffness-valid` past 
 120 s solve budget under `ctest -j10`. With the frame on the model the whole suite
 runs 160 s against 180 s detecting per ask, and 167 s before this work.
 
-### 9.4 Still open
+### 9.4 The `tet` mesher, and what is still open
 
-- **The `tet` and `hybrid` meshers are not there yet.** Plain `tet` reaches
-  100/100/99.2% on the cylinder and 98.6% on plate_hole but only 27–36% on the
-  sphere: its stair boundary sends far more nodes through the snap's coupled
-  retreat and the exterior gate's stuck-node nudges, neither of which is
-  orbit-locked. `hybrid`'s mixed hex/pyramid fill is further out — it deliberately
-  keeps the odd-permitting lattice (§3), so its *cells* do not mirror to begin
-  with. Both show in `compare_meshers.png`; the product default `graded` is exact.
+The exterior conform gate is shared, so orbit-locking its stuck-node march and its
+Laplacian nudges (one step fraction per orbit, tested on every member) carries the
+plain `tet` mesher too:
+
+| part, `tet` at the graded h | before §9 | after |
+|---|---|---|
+| cantilever | 100 / 100 / 100% | 100 / 100 / 100% |
+| plate_hole | 84.9 / 80.1 / 100% | **100 / 100 / 100%** |
+| cylinder | 2.6 / 0.2 / 61.3% | **100 / 100 / 100%** |
+| sphere | 3.3 / 1.8 / 0.4% | 63.5 / 62.9 / 65.0% |
+| icecream_cone | 7.9 / 7.0% | 16.9 / 15.6% |
+
+Boundary fidelity is unchanged by the locks, measured against the same build with
+them removed: sphere p99 1.0213e-3 against 1.0298e-3 of the bbox, plate_hole
+2.1176e-5 against 2.1176e-5, q_min identical on both. The locks are free here; they
+refuse only moves whose orbit is incomplete.
+
+**Still open.**
+
+- The sphere and cone under `tet` are limited by `snap_boundary_nodes`' coupled
+  retreat, which is not orbit-locked. A stair-cased sphere sends nearly every
+  boundary node through it, which is why that mesher stalls at ~63% while the same
+  code path is inert on the graded fill. Its typical residual is small — the median
+  mirror-partner distance is 1.7e-8 of the diagonal — but 14% of nodes exceed the
+  1e-6 tolerance the fraction counts at.
+- `hybrid`'s mixed hex/pyramid fill is further out: it deliberately keeps the
+  odd-permitting lattice (§3), so its *cells* do not mirror to begin with.
 - The advisor's v8 retrain is still outstanding, and every mesh-derived label moved
   again with this change.

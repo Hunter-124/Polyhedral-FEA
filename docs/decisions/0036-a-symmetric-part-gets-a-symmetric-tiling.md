@@ -386,11 +386,39 @@ retired: the cylinder and plate q_min are back above 0.05, 2.5× the 0.02 floor.
 cone stays the ADR-0035 §6 sharp-rim item — its surface p99 sits in the same
 5e-5–1.5e-4 band it has always occupied and is not a symmetry effect.
 
+The **curved** geometry the solver actually integrates gets the same treatment:
+`project_quadratic_boundary_mids` and the sharp-edge mid recovery in
+`curve_volume_geometry` fold their queries and visit mids in mirror-canonical
+order, because a mid's line search is judged against cells it shares with its
+neighbours. Measured on the tet10 mesh (`polymesh mesh` without `--no-curved`):
+
+| part | mirrored tet10 elements | note |
+|---|---|---|
+| sphere | 100% / 100% / 100% | |
+| plate_hole | 100% / 100% / 100% | |
+| cylinder | 100% / 100% / 100% | was 99.89/99.96/99.98% unfolded |
+| icecream_cone | 99.83% / 100% / n/a | 96 of 55k mid nodes, all within a cell of the apex |
+
+The cone's 96 nodes are the one measured exception and they are not a decision
+asymmetry: their mirror-partner distances are 3e-7–5e-6 of the bbox diagonal —
+above the 1e-6 tolerance the fraction is counted at, but far below any mesh
+length — and they sit within one cell of the cone apex, where the surface
+parameterisation is singular and OCC's own projection converges to a
+correspondingly loose point. The apex is a parametric singularity, not a pass that
+forgot to fold.
+
 `tests/test_graded_fill.cpp` asserts the contract end-to-end on cylinder,
 plate_hole, sphere and cone, with and without feature refinement, at **exactly
 1.0** rather than a floor: any fraction below 1.0 means some pass decided something
 in one octant it did not decide in the others, and the number to chase is which
 pass, not which threshold to accept.
+
+Detection is a property of the model, so `Model` carries the frame and `Model::load`
+fills it once. The solve path asks several times — once per auto-h attempt in the
+mesher and again in the curved promotion — and detecting per ask cost enough to
+push `brep_fidelity: graded authoritative curvature stays stiffness-valid` past its
+120 s solve budget under `ctest -j10`. With the frame on the model the whole suite
+runs 160 s against 180 s detecting per ask, and 167 s before this work.
 
 ### 9.4 Still open
 
@@ -401,7 +429,5 @@ pass, not which threshold to accept.
   orbit-locked. `hybrid`'s mixed hex/pyramid fill is further out — it deliberately
   keeps the odd-permitting lattice (§3), so its *cells* do not mirror to begin
   with. Both show in `compare_meshers.png`; the product default `graded` is exact.
-- Detection costs one exact BRep projection per face sample per axis (≈0.5 s on
-  these fixtures). It is not cached across the auto-h retry loop.
 - The advisor's v8 retrain is still outstanding, and every mesh-derived label moved
   again with this change.

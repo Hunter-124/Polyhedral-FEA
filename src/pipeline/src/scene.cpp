@@ -110,6 +110,13 @@ Model Model::load(const std::string& path, double sharp_angle_deg) {
                         path));
     }
     model.surface.validate();
+    // Reflection symmetry of the exact geometry, once per load. Detected from the
+    // BRep when there is one; the tessellation path is for OCC-disabled builds,
+    // where the tessellation IS the geometry.
+    model.mirror = model.cad && !model.cad->empty()
+                       ? mesh::detect_mirror_frame(*model.cad, model.bbox_min,
+                                                   model.bbox_max)
+                       : mesh::detect_mirror_frame(model.surface);
 
     // CAD-style face regions: grow across edges whose dihedral angle is
     // below the sharp threshold.
@@ -1363,7 +1370,7 @@ std::size_t project_quadratic_boundary_mids(
     fea::NodalMesh& nodal_mesh, const geom::CadModel& cad,
     mesh::BoundaryProjectionContext* projection, double h,
     std::vector<std::uint32_t>* reverted_nodes,
-    std::vector<std::uint32_t>* partial_nodes) {
+    std::vector<std::uint32_t>* partial_nodes, const mesh::MirrorFrame* mirror) {
     if (reverted_nodes != nullptr) {
         reverted_nodes->clear();
     }
@@ -1373,9 +1380,26 @@ std::size_t project_quadratic_boundary_mids(
     if (projection == nullptr || !projection->target || cad.empty() || !(h > 0.0)) {
         return 0;
     }
-    const auto boundary_mids = quadratic_boundary_mids(nodal_mesh);
+    auto boundary_mids = quadratic_boundary_mids(nodal_mesh);
     if (boundary_mids.empty()) {
         return 0;
+    }
+    // Mirror-canonical visit order. Each mid is projected and then line-searched
+    // back against its own incident cells, and those cells are shared, so the
+    // order decides which mids keep how much of their projection. Ascending id
+    // does not mirror (ADR-0036 Section 9).
+    {
+        const mesh::MirrorKeyFrame mkey = mesh::mirror_key_frame(nodal_mesh.nodes);
+        std::stable_sort(boundary_mids.begin(), boundary_mids.end(),
+                         [&](const auto& x, const auto& y) {
+                             if (x.mid >= nodal_mesh.nodes.size() ||
+                                 y.mid >= nodal_mesh.nodes.size()) {
+                                 return x.mid < y.mid;
+                             }
+                             const auto kx = mkey.key(nodal_mesh.nodes[x.mid]);
+                             const auto ky = mkey.key(nodal_mesh.nodes[y.mid]);
+                             return kx != ky ? kx < ky : x.mid < y.mid;
+                         });
     }
     std::unordered_map<std::uint32_t, Eigen::Vector3d> saved_positions;
     saved_positions.reserve(boundary_mids.size());
@@ -1435,14 +1459,21 @@ std::size_t project_quadratic_boundary_mids(
                       owner_a.kind == owner_b.kind && owner_a.id == owner_b.id;
         if (direct) {
             direct_owner = owner_a;
+            // Folded query, unfolded answer: the owner id these corners agree on
+            // is the canonical-octant entity (ADR-0036 Section 9.2).
+            const Eigen::Vector3d query = mesh::mirror_fold(mirror, saved);
             if (owner_a.kind == mesh::BoundarySupportKind::kCadEdge) {
-                exact = geom::project_point_on_edge(cad, owner_a.id, saved);
+                exact = geom::project_point_on_edge(cad, owner_a.id, query);
             } else if (owner_a.kind == mesh::BoundarySupportKind::kCadFace) {
-                exact = geom::project_point_on_face(cad, owner_a.id, saved);
+                exact = geom::project_point_on_face(cad, owner_a.id, query);
             } else if (owner_a.kind == mesh::BoundarySupportKind::kCadVertex) {
-                exact = geom::project_point_on_vertex(cad, owner_a.id, saved);
+                exact = geom::project_point_on_vertex(cad, owner_a.id, query);
             } else {
                 direct = false;
+            }
+            if (exact) {
+                exact->point = mesh::mirror_unfold(mirror, exact->point, saved);
+                exact->distance = (exact->point - saved).norm();
             }
         }
 
@@ -1453,7 +1484,8 @@ std::size_t project_quadratic_boundary_mids(
                 target = mesh::BoundaryTarget{exact->point, exact->distance};
             }
         } else {
-            target = mesh::owned_boundary_projection_target(saved, edge.mid, projection);
+            target =
+                mesh::owned_boundary_projection_target(saved, edge.mid, projection, mirror);
         }
         if (!target) {
             if (reverted_nodes != nullptr) {
@@ -1616,9 +1648,13 @@ CurvedGeometryResult curve_volume_geometry(const Model& model,
         if (model.cad && h > 0.0) {
             std::vector<mesh::BoundarySupport> provenance;
             mesh::BoundaryProjectionContext projection;
+            // The linear mesh handed here is exactly mirror-symmetric on a
+            // symmetric part (ADR-0036 §9); the curved promotion must not undo
+            // that, so the mid projection is folded like every other one.
+            const mesh::MirrorFrame* mirror = model.mirror.any() ? &model.mirror : nullptr;
             if (make_boundary_projection(*model.cad, h, &projection, &provenance)) {
                 result.n_projected = project_quadratic_boundary_mids(
-                    result.mesh, *model.cad, &projection, h, &reverted, &partial);
+                    result.mesh, *model.cad, &projection, h, &reverted, &partial, mirror);
             }
             const auto topology = geom::extract_topology(*model.cad);
             std::unordered_map<std::uint32_t, std::vector<std::size_t>>
@@ -1644,12 +1680,15 @@ CurvedGeometryResult curve_volume_geometry(const Model& model,
                         return cached->second;
                     }
                     std::optional<std::uint32_t> owner;
-                    if (const auto near = geom::closest_edge(
-                            topology, result.mesh.nodes[node], true)) {
+                    // Folded, so a corner and its mirror image latch the SAME
+                    // canonical sharp edge and the mid projection below reproduces
+                    // mirrored points from it (ADR-0036 Section 9).
+                    const Eigen::Vector3d query =
+                        mesh::mirror_fold(mirror, result.mesh.nodes[node]);
+                    if (const auto near = geom::closest_edge(topology, query, true)) {
                         if (near->distance <= h) {
                             if (const auto exact = geom::project_point_on_edge(
-                                    *model.cad, near->edge_id,
-                                    result.mesh.nodes[node])) {
+                                    *model.cad, near->edge_id, query)) {
                                 if (exact->distance <= 1e-6 * h) {
                                     owner = near->edge_id;
                                 }
@@ -1659,7 +1698,20 @@ CurvedGeometryResult curve_volume_geometry(const Model& model,
                     sharp_owner.emplace(node, owner);
                     return owner;
                 };
-            for (const auto& edge : quadratic_boundary_mids(result.mesh)) {
+            // Mirror-canonical visit order: each pin is accepted against the
+            // shared node array, so the order decides which ones survive.
+            auto sharp_mids = quadratic_boundary_mids(result.mesh);
+            {
+                const mesh::MirrorKeyFrame mkey =
+                    mesh::mirror_key_frame(result.mesh.nodes);
+                std::stable_sort(sharp_mids.begin(), sharp_mids.end(),
+                                 [&](const auto& x, const auto& y) {
+                                     const auto kx = mkey.key(result.mesh.nodes[x.mid]);
+                                     const auto ky = mkey.key(result.mesh.nodes[y.mid]);
+                                     return kx != ky ? kx < ky : x.mid < y.mid;
+                                 });
+            }
+            for (const auto& edge : sharp_mids) {
                 const auto owner_a = exact_sharp_owner(edge.a);
                 if (!owner_a) {
                     continue;
@@ -1668,13 +1720,16 @@ CurvedGeometryResult curve_volume_geometry(const Model& model,
                 if (!owner_b || *owner_a != *owner_b) {
                     continue;
                 }
-                const auto exact = geom::project_point_on_edge(
-                    *model.cad, *owner_a, result.mesh.nodes[edge.mid]);
+                const Eigen::Vector3d mid_query =
+                    mesh::mirror_fold(mirror, result.mesh.nodes[edge.mid]);
+                const auto exact =
+                    geom::project_point_on_edge(*model.cad, *owner_a, mid_query);
                 if (!exact) {
                     continue;
                 }
                 const Eigen::Vector3d saved_mid = result.mesh.nodes[edge.mid];
-                result.mesh.nodes[edge.mid] = exact->point;
+                result.mesh.nodes[edge.mid] =
+                    mesh::mirror_unfold(mirror, exact->point, saved_mid);
                 bool valid = true;
                 for (const auto ei : edge_mid_incidence[edge.mid]) {
                     const auto& element = result.mesh.elements[ei];
@@ -2173,7 +2228,10 @@ conform_true_exterior(fea::NodalMesh& mesh,
     // far off it at this deflection. A node with no owner is therefore
     // projected freely onto the BRep instead, which also latches an owner.
     const auto resolve = [&](std::uint32_t ni) -> std::optional<mesh::BoundaryTarget> {
-        auto target = mesh::owned_boundary_projection_target(mesh.nodes[ni], ni, projection);
+        // Folded: owners recorded by the pin are the CANONICAL entity, so an
+        // unfolded query against them answers in the wrong octant (ADR-0036 §9.2).
+        auto target =
+            mesh::owned_boundary_projection_target(mesh.nodes[ni], ni, projection, mirror);
         if (!target && fit != nullptr && fit->cad != nullptr) {
             if (const auto free_projection =
                     geom::project_point_on_surface(*fit->cad, mesh.nodes[ni])) {
@@ -3286,10 +3344,7 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
     // Detection is dense and tight — every exact face sample is reflected and
     // must land back on the solid — so an asymmetric part simply gets no frame
     // and no fold.
-    const mesh::MirrorFrame mirror_frame =
-        (model.cad && !model.cad->empty())
-            ? mesh::detect_mirror_frame(*model.cad, model.bbox_min, model.bbox_max)
-            : mesh::detect_mirror_frame(model.surface);
+    const mesh::MirrorFrame& mirror_frame = model.mirror;
     const mesh::MirrorFrame* mirror = mirror_frame.any() ? &mirror_frame : nullptr;
     const auto mirror_note = [&]() -> std::string {
         if (mirror == nullptr) {

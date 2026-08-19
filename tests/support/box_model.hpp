@@ -7,6 +7,7 @@
 // yields the same 6 CAD-style face regions that Model::load grows from a box.
 
 #include "geom/tri_surface.hpp"
+#include "mesh/mirror.hpp"
 #include "pipeline/scene.hpp"
 
 #include <Eigen/Core>
@@ -67,6 +68,9 @@ inline pipeline::Model model_from_surface(geom::TriSurface surface,
     m.triangle_region.assign(m.surface.triangles.size(), 0);
     m.region_count = 1;
     m.name = name;
+    // Same contract as `Model::load`: the frame is a property of the model, and
+    // with no BRep the tessellation is the geometry (mesh/mirror.hpp).
+    m.mirror = mesh::detect_mirror_frame(m.surface);
     return m;
 }
 

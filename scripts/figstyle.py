@@ -21,8 +21,6 @@ exist to prevent were real, and they are cheap to reintroduce by hand:
   ``share_y``         multi-panel grids share a y-axis unless the caller passes
                       an explicit reason for not doing so.
   ``annotate_n``      sample size and exclusion count, same corner every time.
-  ``ratio_bars``      "inside tolerance" as one normalised bar against a 1.0
-                      limit, instead of a value restated three ways.
   ``tolerance_band``  one visual treatment for a tolerance region.
   ``convergence``     fits and prints the measured slope instead of drawing a
                       two-point line that invites the eye to extrapolate.
@@ -61,7 +59,7 @@ __all__ = [
     "use", "theme", "figure", "finish", "panel_title", "axes_off",
     "series", "series_handles", "SERIES_ORDER", "register_series",
     "field_cmap", "field_lut", "colorbar",
-    "loglim", "share_y", "annotate_n", "ratio_bars", "tolerance_band",
+    "loglim", "share_y", "annotate_n", "tolerance_band",
     "convergence", "si", "unit_formatter", "footer_source",
     "provenance", "git_revision", "digest",
     "font_path", "assert_glyphs", "GLYPHS_REQUIRED",
@@ -1064,41 +1062,6 @@ def tolerance_band(ax: Any, limit: float, *, label: str = "tolerance",
                 ha="left", va="top", fontsize=FONT_PT["annot"] - 0.5,
                 color=t.band)
 
-
-def ratio_bars(ax: Any, labels: Sequence[str], measured: Sequence[float],
-               tolerance: Sequence[float], *, unit: str = "%",
-               digits: int = 3) -> list[float]:
-    """Measured-over-tolerance as one bar per case against a 1.0 limit.
-
-    Replaces the three-way restatement (bar length + absolute value + percent
-    of budget) and removes the flattering x-range that came from plotting five
-    different tolerances on one absolute axis.
-    """
-    t = theme()
-    ratios = [m / tol if tol else math.nan for m, tol in zip(measured, tolerance)]
-    ypos = np.arange(len(labels))[::-1]
-    colors = [t.ok if r <= 1.0 else t.bad for r in ratios]
-    ax.barh(ypos, ratios, height=0.62, color=colors, zorder=3,
-            edgecolor="none")
-    # Redundant encoding: pass/fail is also hatched, not colour alone.
-    for y, r in zip(ypos, ratios):
-        if r > 1.0:
-            # linewidth drives the hatch stroke width in matplotlib, and the
-            # stroke must contrast with the bar it overlays — a bad-on-bad
-            # hatch leaves a failing bar distinguished by colour alone.
-            ax.barh([y], [r], height=0.62, color="none", hatch="///",
-                    edgecolor=t.panel, linewidth=0.8, zorder=4)
-    ax.axvline(1.0, color=t.rule, linewidth=1.4, zorder=5)
-    ax.set_yticks(ypos)
-    ax.set_yticklabels(labels)
-    ax.set_xlim(0, max(1.15, max([r for r in ratios if math.isfinite(r)],
-                                 default=1.0) * 1.18))
-    ax.grid(axis="y", visible=False)
-    for y, r, m, tol in zip(ypos, ratios, measured, tolerance):
-        ax.text(r + 0.02, y, f"  {m:.{digits}g}{unit} of {tol:g}{unit}",
-                va="center", ha="left", fontsize=FONT_PT["annot"] - 0.5,
-                color=t.ink, zorder=6)
-    return ratios
 
 
 @dataclass

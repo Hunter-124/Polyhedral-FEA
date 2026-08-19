@@ -13,6 +13,7 @@
 
 #include "geom/tri_surface.hpp"
 #include "mesh/feature_pin.hpp"
+#include "mesh/mirror.hpp"
 #include "mesh/poly_mesh.hpp"
 
 #include <Eigen/Core>
@@ -43,10 +44,14 @@ struct TetFillOutput {
 ///        projects to the CAD oracle instead of the tessellation, sharp edges
 ///        and CAD vertices are hard-pinned, and the free surface is smoothed
 ///        with owner-aware re-projection. Null keeps the tessellated path.
+/// @param mirror Optional verified reflection symmetry (mesh/mirror.hpp): the
+///        classification is mirrored from one octant and every projection is
+///        answered there, so a symmetric part gets a symmetric element pattern.
 TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
                                const Eigen::Vector3d& bbox_min,
                                const Eigen::Vector3d& bbox_max, double h,
-                               bool snap_boundary = true, const BoundaryFit* fit = nullptr);
+                               bool snap_boundary = true, const BoundaryFit* fit = nullptr,
+                               const MirrorFrame* mirror = nullptr);
 
 /// Signed tet volume, m³ (positive for right-handed a,b,c,d).
 double tet_signed_volume(const Eigen::Vector3d& a, const Eigen::Vector3d& b,
@@ -89,8 +94,11 @@ buried_free_tet_face_owners(std::span<const Eigen::Vector3d> nodes,
 /// the foreign sheet), bisecting so no incident tet inverts. Deep or
 /// near-tangent overlap MUST be carved first — pulling cannot resolve it.
 /// Returns buried faces remaining (0 = clean).
+/// `mirror` applies each pull to the node's whole reflection orbit or to none of
+/// it, so this finisher cannot break a symmetry the rest of the mesher preserved.
 std::size_t pull_buried_free_faces(std::vector<Eigen::Vector3d>& nodes,
                                    std::span<const std::array<std::uint32_t, 4>> tets,
-                                   double h, int max_iters = 8);
+                                   double h, int max_iters = 8,
+                                   const MirrorFrame* mirror = nullptr);
 
 } // namespace polymesh::mesh

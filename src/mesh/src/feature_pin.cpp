@@ -103,21 +103,37 @@ FeaturePinReport pin_feature_nodes(
     std::vector<Eigen::Vector3d>& nodes,
     const std::vector<std::uint32_t>& boundary_nodes, double h,
     const NodeOffendsFn& node_offends,
-    std::vector<BoundarySupport>* provenance) {
+    std::vector<BoundarySupport>* provenance, const MirrorFrame* mirror) {
     FeaturePinReport report;
     if (boundary_nodes.empty() || topo.empty() || cad.empty() || !(h > 0.0) ||
         !std::isfinite(h)) {
         return report;
     }
 
-    // Ascending node order everywhere: the acceptance test reads the shared
-    // node array, so visit order is mesh-level mutation state (ADR-0032).
+    // Visit order is mesh-level mutation state, not tidiness: `try_pin` accepts
+    // or reverts against the shared node array, so an earlier pin decides
+    // whether a later one is legal (ADR-0032). Ascending node id made that
+    // platform-independent but not mirror-equivariant — node ids do not mirror —
+    // so the order runs on the mirror key, with the id only as the final
+    // tie-break (ADR-0036).
     std::vector<std::uint32_t> candidates(boundary_nodes.begin(), boundary_nodes.end());
     std::sort(candidates.begin(), candidates.end());
     candidates.erase(std::unique(candidates.begin(), candidates.end()), candidates.end());
     candidates.erase(std::remove_if(candidates.begin(), candidates.end(),
                                     [&](std::uint32_t n) { return n >= nodes.size(); }),
                      candidates.end());
+    sort_mirror_canonical(nodes, candidates);
+    // Orbit map over the node array as this pass finds it: every earlier stage is
+    // exactly symmetric by construction, so this is the symmetry the pins must
+    // preserve. Node indices never change here, only positions, so the map stays
+    // valid while pins are applied.
+    const MirrorNodeOrbit orbit_storage(
+        mirror != nullptr ? *mirror : MirrorFrame{}, nodes,
+        [&] {
+            const MirrorKeyFrame frame = mirror_key_frame(nodes);
+            return frame.inv_quantum > 0.0 ? 1.0 / frame.inv_quantum : 0.0;
+        }());
+    const MirrorNodeOrbit* orbit = orbit_storage.active() ? &orbit_storage : nullptr;
     if (candidates.empty()) {
         return report;
     }
@@ -150,13 +166,113 @@ FeaturePinReport pin_feature_nodes(
         if (!exact) {
             continue;
         }
-        if (!try_pin(nodes, best, exact->point, node_offends)) {
+        const Eigen::Vector3d vertex_target =
+            mirror != nullptr ? mirror->clamp_to_planes(exact->point, nodes[best])
+                              : exact->point;
+        // The whole orbit of the claimed node is pinned together. A CAD vertex and
+        // its mirror image are two separate topology entries visited in kernel
+        // order, so pinning each one when its own turn came let the validity gate
+        // accept one and refuse the other. Measured on plate_hole at h = 6 mm with
+        // every other stage exact: two box-corner/edge nodes lost their mirror
+        // image and took 8 tets with them.
+        std::vector<std::uint32_t> group{best};
+        if (orbit != nullptr) {
+            for (unsigned mask = 1; mask <= orbit->reflection_count(); ++mask) {
+                const std::uint32_t other = orbit->reflected(best, mask);
+                if (other == MirrorNodeOrbit::npos) {
+                    group.clear();
+                    break;
+                }
+                if (other != best && claimed.count(other) == 0 &&
+                    std::find(group.begin(), group.end(), other) == group.end()) {
+                    group.push_back(other);
+                }
+            }
+        }
+        if (group.empty()) {
+            continue; // incomplete orbit: leave the node where the snap put it
+        }
+        // Each copy is pinned onto ITS OWN nearest exact CAD vertex, which for a
+        // symmetric solid is the mirror image of this one.
+        std::vector<std::pair<Eigen::Vector3d, std::uint32_t>> group_target;
+        group_target.reserve(group.size());
+        bool have_targets = true;
+        for (const auto node : group) {
+            if (node == best) {
+                group_target.emplace_back(vertex_target, vertex.id);
+                continue;
+            }
+            const geom::CadVertex* nearest = nullptr;
+            double nearest_d = std::numeric_limits<double>::infinity();
+            for (const auto& other_vertex : topo.vertices) {
+                const double d = (nodes[node] - other_vertex.position).norm();
+                if (d < nearest_d) {
+                    nearest_d = d;
+                    nearest = &other_vertex;
+                }
+            }
+            if (nearest == nullptr || nearest_d > 0.75 * h) {
+                have_targets = false;
+                break;
+            }
+            const auto other_exact =
+                geom::project_point_on_vertex(cad, nearest->id, nodes[node]);
+            if (!other_exact) {
+                have_targets = false;
+                break;
+            }
+            group_target.emplace_back(
+                mirror != nullptr
+                    ? mirror->clamp_to_planes(other_exact->point, nodes[node])
+                    : other_exact->point,
+                nearest->id);
+        }
+        if (!have_targets) {
+            continue;
+        }
+        std::vector<Eigen::Vector3d> group_saved;
+        group_saved.reserve(group.size());
+        for (const auto node : group) {
+            group_saved.push_back(nodes[node]);
+        }
+        bool all_pinned = true;
+        for (std::size_t gi = 0; gi < group.size(); ++gi) {
+            if (!try_pin(nodes, group[gi], group_target[gi].first, node_offends)) {
+                all_pinned = false;
+                break;
+            }
+        }
+        if (!all_pinned) {
+            for (std::size_t gi = 0; gi < group.size(); ++gi) {
+                nodes[group[gi]] = group_saved[gi];
+            }
             ++report.rejected;
             continue;
         }
-        claimed.insert(best);
-        set_owner(provenance, best, BoundarySupportKind::kCadVertex, vertex.id);
-        ++report.vertex_pinned;
+        // Owner ids are canonical, not per-node: every later projection folds its
+        // query into the low octant (mesh/mirror.hpp), so an owner recorded as the
+        // node's OWN nearest CAD vertex would be projected from a folded query and
+        // answer with a point in the wrong octant. Measured on plate_hole at
+        // h = 6 mm: the very next snap round pulled such a node 2.4 mm — 0.4 h —
+        // off the corner it had just been pinned to, while its mirror image stayed,
+        // and those two nodes were the last 8 unmirrored tets in the part.
+        std::uint32_t canonical_owner = group_target.front().second;
+        if (orbit != nullptr) {
+            const auto [source, mask] = orbit->canonical(best);
+            (void)mask;
+            for (std::size_t gi = 0; gi < group.size(); ++gi) {
+                if (group[gi] == source) {
+                    canonical_owner = group_target[gi].second;
+                    break;
+                }
+            }
+        }
+        for (std::size_t gi = 0; gi < group.size(); ++gi) {
+            claimed.insert(group[gi]);
+            set_owner(provenance, group[gi], BoundarySupportKind::kCadVertex,
+                      canonical_owner);
+            ++report.vertex_pinned;
+        }
     }
 
     // ---- 2. Sharp edge chains -------------------------------------------
@@ -172,6 +288,38 @@ FeaturePinReport pin_feature_nodes(
     // crease node that drifted; it is a wall node, and its own face owns it.
     const double capture_r = 0.5 * h;
     const double travel_r = 0.35 * h;
+    // Targets for EVERY sharp edge are collected first, then symmetrised across
+    // reflection orbits, and only then applied.
+    //
+    // Collecting globally is what makes the symmetrisation possible at all: a
+    // node's reflection orbit routinely spans several CAD edges. The two rim
+    // circles of a cylinder are one orbit under the z mirror but two topological
+    // edges, and the four vertical edges of a plate are one orbit under x and y.
+    // Symmetrising inside a single edge's chain therefore refused almost every
+    // pin it should have made — measured on cylinder.step at h = 8 mm, rim chains
+    // pinned dropped to zero and the shipped facet-normal p99 rose from 0.35° to
+    // 1.28°.
+    //
+    // Two properties are wanted from the symmetrisation, and both come from using
+    // the canonical orbit member as the single source of truth:
+    //   * The Fourier re-spacing is a GLOBAL operation on a closed chain, and it
+    //     does not commute with reflecting that chain (reflection reverses the
+    //     parameterisation, and a low-pass of the reversed signal against the
+    //     uniform ramp is not the reverse of the low-passed signal). Re-spacing one
+    //     octant and reflecting the result keeps the regularity the pass exists for
+    //     and makes it exact.
+    //   * The recorded OWNER must be the canonical member's edge, because every
+    //     later projection folds its query into the low octant: an owner recorded
+    //     as the node's own edge would then be projected from a folded query and
+    //     answer in the wrong octant. Measured on plate_hole at h = 6 mm, that
+    //     inconsistency let the next snap round pull a freshly pinned box-corner
+    //     node 2.4 mm (0.4 h) off its corner while its mirror image stayed put.
+    struct ChainPin {
+        Eigen::Vector3d point = Eigen::Vector3d::Zero();
+        std::uint32_t edge_id = 0;
+    };
+    std::unordered_map<std::uint32_t, ChainPin> chain_target;
+    std::size_t n_chains = 0;
     for (const auto& edge : topo.edges) {
         if (edge.feature != geom::CadEdgeFeature::kSharp || edge.samples.size() < 2) {
             continue;
@@ -180,7 +328,6 @@ FeaturePinReport pin_feature_nodes(
         if (!(stations.back() > 0.0)) {
             continue;
         }
-        bool used = false;
 
         struct Pinned {
             std::uint32_t node;
@@ -235,7 +382,7 @@ FeaturePinReport pin_feature_nodes(
             }
         }
 
-
+        bool contributed = false;
         for (const auto& pin : chain) {
             const Eigen::Vector3d seed = polyline_point(edge.samples, stations, pin.t);
             const auto exact = geom::project_point_on_edge(cad, edge.id, seed);
@@ -257,24 +404,96 @@ FeaturePinReport pin_feature_nodes(
             if ((target - nodes[pin.node]).norm() > travel_r) {
                 continue; // a wall node, not a crease node that drifted
             }
-            if (!try_pin(nodes, pin.node, target, node_offends)) {
-                ++report.rejected;
+            // A node sitting on a mirror plane stays on it: the exact curve
+            // projection is free to leave the plane by a rounding error, and that
+            // error is a broken symmetry all by itself.
+            if (mirror != nullptr) {
+                target = mirror->clamp_to_planes(target, nodes[pin.node]);
+            }
+            chain_target.insert_or_assign(pin.node, ChainPin{target, edge.id});
+            contributed = true;
+        }
+        if (contributed) {
+            ++n_chains;
+        }
+    }
+    if (orbit != nullptr) {
+        std::unordered_map<std::uint32_t, ChainPin> mirrored;
+        mirrored.reserve(chain_target.size());
+        for (const auto& [node, pin] : chain_target) {
+            const auto [source, mask] = orbit->canonical(node);
+            if (source == MirrorNodeOrbit::npos) {
                 continue;
             }
-            claimed.insert(pin.node);
-            set_owner(provenance, pin.node, BoundarySupportKind::kCadEdge, edge.id);
+            const auto it = chain_target.find(source);
+            if (it == chain_target.end()) {
+                continue; // canonical member is not pinned: refuse the copy
+            }
+            mirrored.insert_or_assign(
+                node, ChainPin{orbit->reflect(it->second.point, mask), it->second.edge_id});
+        }
+        chain_target = std::move(mirrored);
+    }
+    // Apply in orbit groups so a validity refusal takes the whole group.
+    std::unordered_set<std::uint32_t> applied;
+    for (const auto ni : candidates) {
+        const auto target_it = chain_target.find(ni);
+        if (target_it == chain_target.end() || applied.count(ni) != 0) {
+            continue;
+        }
+        std::vector<std::uint32_t> group{ni};
+        if (orbit != nullptr) {
+            for (unsigned mask = 1; mask <= orbit->reflection_count(); ++mask) {
+                const std::uint32_t other = orbit->reflected(ni, mask);
+                if (other == MirrorNodeOrbit::npos || other == ni) {
+                    continue;
+                }
+                if (chain_target.find(other) == chain_target.end()) {
+                    group.clear();
+                    break;
+                }
+                if (std::find(group.begin(), group.end(), other) == group.end()) {
+                    group.push_back(other);
+                }
+            }
+        }
+        if (group.empty()) {
+            ++report.rejected;
+            continue;
+        }
+        std::vector<Eigen::Vector3d> saved;
+        saved.reserve(group.size());
+        for (const auto node : group) {
+            saved.push_back(nodes[node]);
+        }
+        bool all_pinned = true;
+        for (const auto node : group) {
+            if (!try_pin(nodes, node, chain_target.at(node).point, node_offends)) {
+                all_pinned = false;
+                break;
+            }
+        }
+        if (!all_pinned) {
+            for (std::size_t i = 0; i < group.size(); ++i) {
+                nodes[group[i]] = saved[i];
+            }
+            ++report.rejected;
+            continue;
+        }
+        for (const auto node : group) {
+            applied.insert(node);
+            claimed.insert(node);
+            const std::uint32_t owner_edge = chain_target.at(node).edge_id;
+            set_owner(provenance, node, BoundarySupportKind::kCadEdge, owner_edge);
             ++report.edge_pinned;
-            used = true;
-            const auto residual = geom::project_point_on_edge(cad, edge.id, nodes[pin.node]);
+            const auto residual = geom::project_point_on_edge(cad, owner_edge, nodes[node]);
             if (residual) {
                 report.max_edge_residual =
                     std::max(report.max_edge_residual, residual->distance);
             }
         }
-        if (used) {
-            ++report.chains;
-        }
     }
+    report.chains = n_chains;
 
     // Post-pin census: which boundary node is worst against the exact BRep,
     // and who owns it. This is the number the fidelity metric will report, so

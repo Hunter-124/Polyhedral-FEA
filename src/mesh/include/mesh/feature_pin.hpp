@@ -86,11 +86,17 @@ struct FeaturePinReport {
 ///                      (0.75/0.5/0.25) and abandoned if no fraction is legal.
 /// @param provenance    Optional per-node owner slots, grown as needed, so the
 ///                      later smoothing/wall passes see the pins as owned.
+/// @param mirror        Optional verified reflection symmetry (mesh/mirror.hpp).
+///                      Chain re-spacing is then computed in one octant and
+///                      reflected, and each orbit of nodes is pinned whole or not
+///                      at all — the re-spacing is a global operation on a closed
+///                      rim and does not commute with reflecting it.
 FeaturePinReport pin_feature_nodes(
     const geom::CadModel& cad, const geom::CadTopology& topo,
     std::vector<Eigen::Vector3d>& nodes,
     const std::vector<std::uint32_t>& boundary_nodes, double h,
     const NodeOffendsFn& node_offends,
-    std::vector<BoundarySupport>* provenance = nullptr);
+    std::vector<BoundarySupport>* provenance = nullptr,
+    const MirrorFrame* mirror = nullptr);
 
 } // namespace polymesh::mesh

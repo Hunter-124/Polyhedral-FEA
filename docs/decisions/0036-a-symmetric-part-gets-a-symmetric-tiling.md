@@ -266,12 +266,142 @@ survives a different survivor selection — but the margin above the 0.02 floor 
 now thin on curved parts and worth watching. The cylinder's surface p99 moved
 5.6e-6 → 1.8e-5 for the same reason, still well inside the 1e-4 bar.
 
-**Still open.** What remains asymmetric is what still reads `Model::surface`:
-`stamp_curvature_cells`'s per-cell turning angle (worth 12 points of plate
-symmetry when ablated), `classify_cells_inside`'s z-ray parity, and the
-jut/carve thresholds — all fed by a tessellation that is itself 0–6%
-mirror-symmetric on the sphere and plate. Closing those means either an exact
-BRep inside/outside classifier for boundary cells or a symmetry-exploiting
-tessellation; neither is small, and the renders are no longer visibly wrong, so
-they are left open here rather than half-done.
+**Still open after §8** — closed by §9 below. What remained asymmetric was what
+still read `Model::surface`: `stamp_curvature_cells`'s per-cell turning angle
+(worth 12 points of plate symmetry when ablated), `classify_cells_inside`'s z-ray
+parity, and the jut/carve thresholds — all fed by a tessellation that is itself
+0–6% mirror-symmetric on the sphere and plate.
 
+## 9. The fold: decide in one octant, mirror the decision
+
+§8 left the product path at 75–96% mirrored tets and called the tessellation a
+ceiling. It is not a ceiling, because the tessellation does not have to be the
+thing that answers the question. Two mechanisms took every fixture to **exactly
+1.0** on every mirror plane its exact solid actually has.
+
+### 9.1 Verified symmetry, then a folded query
+
+`mesh::MirrorFrame` (`src/mesh/include/mesh/mirror.hpp`) records which bbox
+mid-planes are mirror planes of the **exact BRep**. Detection is dense sampling of
+the trimmed faces (`geom::sample_brep_surface`, eight samples per face, so a boss
+present on one side only is sampled on the side it exists), each sample reflected
+and projected back onto the BRep; a plane is accepted only when every reflected
+sample lands within 1e-7 of the bbox diagonal. Measured residuals on the fixtures
+are 0 (cantilever), 1.8e-16 (sphere), 1.9e-17 (plate_hole), 4.2e-14 (cylinder) and
+5.2e-14·diag (cone, x and y only — the cone is apex-up and its z mid-plane is
+correctly rejected). STL-only inputs use a combinatorial test instead: every vertex
+must have a mirror partner and the reflected triangle set must be the triangle set.
+
+Sampling the faces rather than comparing topology is deliberate: a mirror-symmetric
+solid need not have mirror-symmetric topology. A sphere's seam edge lies wholly on
+one side of the x = 0 plane, so a topology match would reject the sphere's x
+symmetry, which is real.
+
+With a frame installed, every geometry query is answered in the low-side octant
+and reflected back — `fold(p) = c − |p − c|`, then `unfold`. A point and its mirror
+image fold to the same canonical point, so they receive the *same* answer no matter
+how lopsided the tessellation is, and because the reflected geometry was *measured*
+to lie on the exact solid, the folded answer is the same answer: fidelity is
+unchanged by construction. Cell-level decisions do better than that — the
+classification, the child mask and every refinement mark are mirrored through
+`canonical_cell_map`, an index-space orbit map, so a cell and its mirror image get
+bit-identical answers rather than nearly-equal ones.
+
+### 9.2 Orbit locks on the sequential passes
+
+Folding makes every *input* symmetric, which is necessary and not sufficient: a
+pass that mutates the mesh one decision at a time can still accept on one side and
+refuse on the other, because the first decision changed the state the second is
+judged against. On `cylinder.step` at h = 8 mm with every query folded, the mesher
+entered the sliver-collapse round at exactly 100/100/100% and left it at
+99.7/98.8/99.4%; 170 of 1880 collapses had no mirror image, all on the curved wall,
+none near a mid-plane. The mechanism is coupling along a ring of caps: a greedy
+sweep commits a matching, and a matching chosen one cap at a time need not be
+mirror-symmetric even when every individual choice is.
+
+So each such pass now decides for a whole reflection orbit or not at all, using
+`mesh::MirrorNodeOrbit` (position → node, per reflection subset):
+
+| pass | lock |
+|---|---|
+| sliver-cap collapse, jut merge (`hybrid_fill.cpp`) | all copies legal AND their incident stars pairwise disjoint, else refuse |
+| feature pin, vertex phase (`feature_pin.cpp`) | whole orbit pinned or reverted |
+| feature pin, sharp-edge chains | targets for **all** edges collected, then symmetrised from the canonical member, then applied per orbit |
+| buried-face pull (`tet_fill.cpp`) | one bisection fraction for the whole orbit |
+| interior relaxation (`tet_fill.cpp`) | whole orbit relaxed or reverted |
+| exterior conform: kink relief, sharp-edge recovery (`scene.cpp`) | one relax value / one repair per orbit, with undo |
+
+Four findings from that work are worth keeping:
+
+- **Ties must be quantised, not compared.** A cap and its mirror image have equal
+  aspects, equal edge lengths and equal collapse scores in exact arithmetic and
+  differ in the last ulp in floating point, so raw comparisons ordered them by
+  noise. `tie_key` quantises at 1e-9 of the quantity's own scale — nine orders
+  above the noise, nine below any real difference. Quantisation and not an epsilon
+  compare, because an epsilon compare is not transitive and `std::sort` requires a
+  strict weak ordering.
+- **An edge tie-break must identify the edge.** Breaking ties on the lower
+  endpoint's key leaves two edges sharing that endpoint tied, and the tie then fell
+  to the node id: that alone decided 164 of 2032 collapses differently across the y
+  plane. The sorted pair of endpoint keys is unique per edge here, because even
+  cell counts keep every cell — and so every tet and every edge — off the
+  mid-planes.
+- **A node on a plane is its own orbit, so the lock says nothing about it**, yet
+  any motion with a component normal to the plane breaks the symmetry by itself.
+  `MirrorFrame::clamp_to_planes` holds such nodes on their plane. Two such nodes on
+  plate_hole were the last 8 unmirrored tets in the part.
+- **An owner id is canonical, not per-node.** Every projection folds its query, so
+  a pin that recorded the node's *own* nearest CAD vertex was later projected from a
+  folded query and answered in the wrong octant: the next snap round pulled a
+  freshly pinned box-corner node 2.4 mm — 0.4 h — off its corner while its mirror
+  image stayed. Owners are the canonical member's entity.
+
+The pipeline needed the same treatment as the mesher: with the fill exact,
+`conform_true_exterior` alone still shipped 98.96/98.79/99.61% on the cylinder.
+
+### 9.3 Measured
+
+Mirrored-tet fraction, `--no-curved`, tolerance 1e-6·diag, product `graded` path
+through the whole pipeline (the shipped mesh, not the fill):
+
+| part | h | x | y | z |
+|---|---|---|---|---|
+| cantilever | 10 mm | **1.000000000** | **1.000000000** | **1.000000000** |
+| sphere | 8 mm | **1.000000000** | **1.000000000** | **1.000000000** |
+| cylinder | 8 mm | **1.000000000** | **1.000000000** | **1.000000000** |
+| plate_hole | 6 mm | **1.000000000** | **1.000000000** | **1.000000000** |
+| icecream_cone | 8 mm | **1.000000000** | **1.000000000** | n/a (no z symmetry) |
+
+Quality and fidelity moved in the right direction, not merely "not worse":
+
+| part | q_min §8 → now | surface p99/bbox §8 → now | normal p99° §8 → now |
+|---|---|---|---|
+| sphere | 0.0207 → **0.0545** | 6.9e-6 → 9.1e-6 | 0.253 → 0.238 |
+| icecream_cone | 0.0205 → 0.0206 | 1.42e-4 → 1.49e-4 | 5.12 → 5.34 |
+| cylinder | 0.0221 → **0.0527** | 1.8e-5 → **5.7e-6** | 0.347 → 0.377 |
+| plate_hole | 0.0210 → **0.0512** | 4.5e-6 → 4.5e-6 | 0.366 → 0.598 |
+
+Zero inverted and zero sub-floor cells throughout. §8's thin-margin warning is
+retired: the cylinder and plate q_min are back above 0.05, 2.5× the 0.02 floor. The
+cone stays the ADR-0035 §6 sharp-rim item — its surface p99 sits in the same
+5e-5–1.5e-4 band it has always occupied and is not a symmetry effect.
+
+`tests/test_graded_fill.cpp` asserts the contract end-to-end on cylinder,
+plate_hole, sphere and cone, with and without feature refinement, at **exactly
+1.0** rather than a floor: any fraction below 1.0 means some pass decided something
+in one octant it did not decide in the others, and the number to chase is which
+pass, not which threshold to accept.
+
+### 9.4 Still open
+
+- **The `tet` and `hybrid` meshers are not there yet.** Plain `tet` reaches
+  100/100/99.2% on the cylinder and 98.6% on plate_hole but only 27–36% on the
+  sphere: its stair boundary sends far more nodes through the snap's coupled
+  retreat and the exterior gate's stuck-node nudges, neither of which is
+  orbit-locked. `hybrid`'s mixed hex/pyramid fill is further out — it deliberately
+  keeps the odd-permitting lattice (§3), so its *cells* do not mirror to begin
+  with. Both show in `compare_meshers.png`; the product default `graded` is exact.
+- Detection costs one exact BRep projection per face sample per axis (≈0.5 s on
+  these fixtures). It is not cached across the auto-h retry loop.
+- The advisor's v8 retrain is still outstanding, and every mesh-derived label moved
+  again with this change.

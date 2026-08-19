@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 add_library(polymesh_mesh
     src/poly_mesh.cpp
+    src/mirror.cpp
     src/tet_fill.cpp
     src/hex_fill.cpp
     src/prism_fill.cpp

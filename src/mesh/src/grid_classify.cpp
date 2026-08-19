@@ -373,6 +373,113 @@ FeatureAwareClassification classify_cells_feature_aware(
     return out;
 }
 
+CanonicalCellMap canonical_cell_map(const CartesianGrid& grid, const MirrorFrame& frame) {
+    CanonicalCellMap map;
+    if (!frame.any() || grid.cell_count() < 1) {
+        return map;
+    }
+    const Eigen::Vector3d extent{grid.cell[0] * static_cast<double>(grid.nx),
+                                 grid.cell[1] * static_cast<double>(grid.ny),
+                                 grid.cell[2] * static_cast<double>(grid.nz)};
+    const double tol = 1e-9 * extent.norm();
+    const int n[3] = {grid.nx, grid.ny, grid.nz};
+    bool any_axis = false;
+    for (int a = 0; a < 3; ++a) {
+        const double mid = grid.origin[a] + 0.5 * extent[a];
+        map.axis[static_cast<std::size_t>(a)] =
+            frame.plane[static_cast<std::size_t>(a)] &&
+            std::abs(mid - frame.center[a]) <= tol;
+        any_axis = any_axis || map.axis[static_cast<std::size_t>(a)];
+    }
+    if (!any_axis) {
+        return map;
+    }
+    const auto count = static_cast<std::size_t>(grid.cell_count());
+    map.canonical.resize(count);
+    map.flipped.assign(count, std::uint8_t{0});
+    for (int k = 0; k < grid.nz; ++k) {
+        for (int j = 0; j < grid.ny; ++j) {
+            for (int i = 0; i < grid.nx; ++i) {
+                const int ijk[3] = {i, j, k};
+                int canonical[3] = {i, j, k};
+                std::uint8_t flipped = 0;
+                for (int a = 0; a < 3; ++a) {
+                    if (!map.axis[static_cast<std::size_t>(a)]) {
+                        continue;
+                    }
+                    const int mirror = n[a] - 1 - ijk[a];
+                    if (mirror < ijk[a]) {
+                        canonical[a] = mirror;
+                        flipped |= static_cast<std::uint8_t>(1U << a);
+                    }
+                }
+                const auto id = grid.index(i, j, k);
+                map.canonical[id] = static_cast<std::uint32_t>(
+                    grid.index(canonical[0], canonical[1], canonical[2]));
+                map.flipped[id] = flipped;
+            }
+        }
+    }
+    return map;
+}
+
+void symmetrise_classification(FeatureAwareClassification& classification,
+                               const CanonicalCellMap& map) {
+    if (!map.active() || map.canonical.size() != classification.inside.size()) {
+        return;
+    }
+    const auto count = classification.inside.size();
+    const auto inside_before = classification.inside;
+    for (std::size_t c = 0; c < count; ++c) {
+        classification.inside[c] = inside_before[map.canonical[c]];
+    }
+    if (classification.coarse_inside.size() == count) {
+        const auto coarse_before = classification.coarse_inside;
+        for (std::size_t c = 0; c < count; ++c) {
+            classification.coarse_inside[c] = coarse_before[map.canonical[c]];
+        }
+    }
+    if (classification.child_inside_mask.size() != count) {
+        return;
+    }
+    // Child bit b = a + 2b + 4d is the child's own octant inside the parent, so
+    // reflecting parent axis `a` swaps the two children along `a`: bit index XOR
+    // (1 << a). The flipped mask is already in that encoding.
+    const auto mask_before = classification.child_inside_mask;
+    std::size_t n_mixed = 0;
+    std::size_t n_inside_children = 0;
+    for (std::size_t c = 0; c < count; ++c) {
+        const std::uint8_t source = mask_before[map.canonical[c]];
+        const std::uint8_t flip = map.flipped[c];
+        std::uint8_t mask = 0;
+        for (int bit = 0; bit < 8; ++bit) {
+            if ((source & static_cast<std::uint8_t>(1U << (bit ^ flip))) != 0) {
+                mask |= static_cast<std::uint8_t>(1U << bit);
+            }
+        }
+        classification.child_inside_mask[c] = mask;
+        classification.inside[c] = mask != 0;
+        if (mask != 0 && mask != std::uint8_t{0xff}) {
+            ++n_mixed;
+        }
+        for (int bit = 0; bit < 8; ++bit) {
+            if ((mask & static_cast<std::uint8_t>(1U << bit)) != 0) {
+                ++n_inside_children;
+            }
+        }
+    }
+    classification.n_mixed_cells = n_mixed;
+    classification.refinement_levels = n_mixed > 0 ? 1 : 0;
+    const double child_volume = 0.125 * classification.grid.cell.prod();
+    classification.classified_volume =
+        static_cast<double>(n_inside_children) * child_volume;
+    classification.relative_volume_error =
+        classification.surface_volume > 0.0 && std::isfinite(classification.surface_volume)
+            ? std::abs(classification.classified_volume - classification.surface_volume) /
+                  classification.surface_volume
+            : 0.0;
+}
+
 std::vector<bool> classify_cells_inside_axis(const geom::TriSurface& surface,
                                              const CartesianGrid& grid, int ray_axis) {
     if (ray_axis < 0 || ray_axis > 2) {

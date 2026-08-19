@@ -248,7 +248,7 @@ struct FreeFaceHash {
 TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
                                 std::vector<std::array<std::uint32_t, 4>> tets,
                                 std::span<const std::size_t> marked, LocalRefineStats* stats,
-                                const geom::TriSurface* surface) {
+                                const geom::TriSurface* surface, const MirrorFrame* mirror) {
     LocalRefineStats local_stats;
     local_stats.n_input_tets = tets.size();
     local_stats.n_marked = marked.size();
@@ -374,7 +374,12 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
             if (on_free) {
                 // Chord of a convex free edge lies outside the solid (into holes);
                 // place the mid on the STL so post-snap unsnap is less likely.
-                mid = closest_on_surface(*surface, mid).point;
+                // Folded, so a mid-edge node and its mirror image land on
+                // mirrored surface points even though the tessellation they are
+                // landing on is not itself mirror-symmetric (ADR-0036 §7).
+                mid = mirror_unfold(mirror,
+                                    closest_on_surface(*surface, mirror_fold(mirror, mid)).point,
+                                    mid);
                 ++local_stats.n_surface_mids;
             }
             const std::uint32_t mid_id = it->second;
@@ -616,8 +621,9 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
 }
 
 TetFillOutput local_refine_tets(const TetFillOutput& mesh, std::span<const std::size_t> marked,
-                                LocalRefineStats* stats, const geom::TriSurface* surface) {
-    return local_refine_tets(mesh.nodes, mesh.tets, marked, stats, surface);
+                                LocalRefineStats* stats, const geom::TriSurface* surface,
+                                const MirrorFrame* mirror) {
+    return local_refine_tets(mesh.nodes, mesh.tets, marked, stats, surface, mirror);
 }
 
 } // namespace polymesh::mesh

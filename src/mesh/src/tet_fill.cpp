@@ -12,6 +12,7 @@
 #include <cmath>
 #include <format>
 #include <map>
+#include <optional>
 #include <set>
 #include <span>
 #include <unordered_map>
@@ -229,7 +230,7 @@ buried_free_tet_face_owners(std::span<const Eigen::Vector3d> nodes,
 
 std::size_t pull_buried_free_faces(std::vector<Eigen::Vector3d>& nodes,
                                    std::span<const std::array<std::uint32_t, 4>> tets,
-                                   double h, int max_iters) {
+                                   double h, int max_iters, const MirrorFrame* mirror) {
     if (tets.empty() || !(h > 0.0)) {
         return 0;
     }
@@ -250,6 +251,35 @@ std::size_t pull_buried_free_faces(std::vector<Eigen::Vector3d>& nodes,
         }
         return true;
     };
+    // This pass pulls nodes inward one at a time under a validity gate, so it is
+    // order-dependent like every other accept/reject pass. Measured on plate_hole
+    // at h = 6 mm with the mesher otherwise exactly symmetric, it pulled one
+    // box-corner node 2.4 mm off its pinned CAD vertex and left the mirror image
+    // where it was: 2 nodes and 8 tets lost their mirror. Each pull is therefore
+    // applied to the node's whole reflection orbit or to none of it.
+    const MirrorNodeOrbit orbit(mirror != nullptr ? *mirror : MirrorFrame{}, nodes, [&] {
+        const MirrorKeyFrame frame = mirror_key_frame(nodes);
+        return frame.inv_quantum > 0.0 ? 1.0 / frame.inv_quantum : 0.0;
+    }());
+    // Star centroid of `ni`, or nullopt when it has no star.
+    const auto pull_target = [&](std::uint32_t ni) -> std::optional<Eigen::Vector3d> {
+        Eigen::Vector3d target = Eigen::Vector3d::Zero();
+        std::size_t n_used = 0;
+        for (const auto ti : star[ni]) {
+            for (const auto o : tets[ti]) {
+                target += nodes[o];
+                ++n_used;
+            }
+        }
+        if (n_used == 0) {
+            return std::nullopt;
+        }
+        target /= static_cast<double>(n_used);
+        if (mirror != nullptr) {
+            target = mirror->clamp_to_planes(target, nodes[ni]);
+        }
+        return target;
+    };
     for (int iter = 0; iter < max_iters; ++iter) {
         const TetGrid grid(nodes, tets, h);
         const auto buried = buried_face_ids(nodes, free, grid);
@@ -259,34 +289,67 @@ std::size_t pull_buried_free_faces(std::vector<Eigen::Vector3d>& nodes,
         bool any_moved = false;
         for (const auto& [fi, buryer] : buried) {
             for (const auto ni : free[fi].nodes) {
-                Eigen::Vector3d target = Eigen::Vector3d::Zero();
-                std::size_t n_used = 0;
-                for (const auto ti : star[ni]) {
-                    for (const auto o : tets[ti]) {
-                        target += nodes[o];
-                        ++n_used;
+                std::vector<std::uint32_t> group{ni};
+                if (orbit.active()) {
+                    for (unsigned mask = 1; mask <= orbit.reflection_count(); ++mask) {
+                        const std::uint32_t other = orbit.reflected(ni, mask);
+                        if (other == MirrorNodeOrbit::npos) {
+                            group.clear();
+                            break;
+                        }
+                        if (std::find(group.begin(), group.end(), other) == group.end()) {
+                            group.push_back(other);
+                        }
                     }
                 }
-                if (n_used == 0) {
+                if (group.empty()) {
                     continue;
                 }
-                target /= static_cast<double>(n_used);
-                const Eigen::Vector3d saved = nodes[ni];
-                double frac = 0.5;
-                bool moved = false;
-                for (int cut = 0; cut < 4; ++cut) {
-                    nodes[ni] = saved + frac * (target - saved);
-                    if (star_ok(ni)) {
-                        moved = true;
+                std::vector<Eigen::Vector3d> saved;
+                std::vector<Eigen::Vector3d> target;
+                saved.reserve(group.size());
+                target.reserve(group.size());
+                bool have_targets = true;
+                for (const auto node : group) {
+                    saved.push_back(nodes[node]);
+                    const auto t = pull_target(node);
+                    if (!t) {
+                        have_targets = false;
                         break;
                     }
-                    frac *= 0.5;
+                    target.push_back(*t);
                 }
-                if (!moved) {
-                    nodes[ni] = saved;
-                } else {
-                    any_moved = true;
+                if (!have_targets) {
+                    continue;
                 }
+                // One bisection fraction for the whole orbit, tested on every
+                // member before any of them is kept: per-member ladders can stop
+                // at different rungs on validity tests that tie across a mirror
+                // pair, which is the asymmetry this lock exists to prevent.
+                bool all_moved = false;
+                double frac = 0.5;
+                for (int cut = 0; cut < 4 && !all_moved; ++cut) {
+                    for (std::size_t gi = 0; gi < group.size(); ++gi) {
+                        nodes[group[gi]] = saved[gi] + frac * (target[gi] - saved[gi]);
+                    }
+                    all_moved = true;
+                    for (const auto node : group) {
+                        if (!star_ok(node)) {
+                            all_moved = false;
+                            break;
+                        }
+                    }
+                    if (!all_moved) {
+                        for (std::size_t gi = 0; gi < group.size(); ++gi) {
+                            nodes[group[gi]] = saved[gi];
+                        }
+                        frac *= 0.5;
+                    }
+                }
+                if (!all_moved) {
+                    continue;
+                }
+                any_moved = true;
             }
         }
         if (!any_moved) {
@@ -300,11 +363,24 @@ std::size_t pull_buried_free_faces(std::vector<Eigen::Vector3d>& nodes,
 TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
                                const Eigen::Vector3d& bbox_min,
                                const Eigen::Vector3d& bbox_max, double h, bool snap_boundary,
-                               const BoundaryFit* fit) {
+                               const BoundaryFit* fit, const MirrorFrame* mirror) {
     // Even cell counts per axis: the alternating split below only mirrors about
     // a bbox mid-plane when the count crossed by that plane is even.
     const CartesianGrid grid = make_bbox_grid_even(bbox_min, bbox_max, h);
-    const auto inside = classify_cells_inside(surface, grid);
+    // Classify one octant and mirror the answer when the geometry is verified
+    // mirror-symmetric: ray parity is read off a tessellation that is not
+    // (mesh/mirror.hpp). The orbit is found in index arithmetic, so a cell and its
+    // mirror image are guaranteed the same answer.
+    auto inside = classify_cells_inside(surface, grid);
+    if (mirror != nullptr) {
+        const auto orbit = canonical_cell_map(grid, *mirror);
+        if (orbit.active() && orbit.canonical.size() == inside.size()) {
+            const auto before = inside;
+            for (std::size_t c = 0; c < inside.size(); ++c) {
+                inside[c] = before[orbit.canonical[c]];
+            }
+        }
+    }
     const int nx = grid.nx, ny = grid.ny, nz = grid.nz;
 
     TetFillOutput out;
@@ -477,9 +553,12 @@ TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
         // degree of freedom a fully-boundary stair cell has left.
         const auto reproject = [&](std::uint32_t ni, const Eigen::Vector3d& p) {
             if (fit == nullptr || fit->projection == nullptr) {
-                return closest_on_surface(surface, p).point;
+                return mirror_unfold(mirror,
+                                     closest_on_surface(surface, mirror_fold(mirror, p)).point,
+                                     p);
             }
-            const auto target = boundary_projection_target(surface, p, ni, fit->projection);
+            const auto target =
+                boundary_projection_target(surface, p, ni, fit->projection, mirror);
             return target ? target->point : p;
         };
         const auto relax_neighborhood = [&](std::uint32_t seed) {
@@ -497,9 +576,12 @@ TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
                     (on_boundary[ni] == 0 ? ring : wall).push_back(ni);
                 }
             }
-            auto dedup = [](std::vector<std::uint32_t>& v) {
+            auto dedup = [&](std::vector<std::uint32_t>& v) {
                 std::sort(v.begin(), v.end());
                 v.erase(std::unique(v.begin(), v.end()), v.end());
+                // Mirror-canonical: each nudge is accepted against the shared node
+                // array, so the sweep order decides the result (ADR-0036).
+                sort_mirror_canonical(out.nodes, v);
             };
             dedup(ring);
             dedup(wall);
@@ -554,18 +636,83 @@ TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
                 interior.push_back(ni);
             }
         }
+        // Mirror-canonical sweep order, and every accepted relaxation applied to
+        // the node's whole reflection orbit or to none of it. This is a
+        // Gauss-Seidel sweep with a validity gate, so in ascending node id it gave
+        // a node and its mirror image different predecessors: measured on
+        // sphere.step at h = 8 mm with `--mesher tet`, the shipped interior nodes
+        // had a MEDIAN mirror-partner distance of 1e-5 of the bbox diagonal, ten
+        // times the tolerance at which a pair counts as mirrored, and only 3% of
+        // tets had a mirror image.
+        sort_mirror_canonical(out.nodes, interior);
+        const MirrorNodeOrbit interior_orbit(
+            mirror != nullptr ? *mirror : MirrorFrame{}, out.nodes, [&] {
+                const MirrorKeyFrame frame = mirror_key_frame(out.nodes);
+                return frame.inv_quantum > 0.0 ? 1.0 / frame.inv_quantum : 0.0;
+            }());
         const auto relax_interior = [&](int relax_passes, double omega) {
+            const auto relax_one = [&](std::uint32_t ni) {
+                Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
+                for (const auto other : nbrs[ni]) {
+                    centroid += out.nodes[other];
+                }
+                centroid /= static_cast<double>(nbrs[ni].size());
+                const Eigen::Vector3d saved = out.nodes[ni];
+                Eigen::Vector3d moved = saved + omega * (centroid - saved);
+                if (mirror != nullptr) {
+                    moved = mirror->clamp_to_planes(moved, saved);
+                }
+                out.nodes[ni] = moved;
+                if (node_offends(ni)) {
+                    out.nodes[ni] = saved;
+                    return false;
+                }
+                return true;
+            };
             for (int pass = 0; pass < relax_passes; ++pass) {
+                std::vector<char> done(out.nodes.size(), 0);
                 for (const auto ni : interior) {
-                    Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
-                    for (const auto other : nbrs[ni]) {
-                        centroid += out.nodes[other];
+                    if (done[ni] != 0) {
+                        continue;
                     }
-                    centroid /= static_cast<double>(nbrs[ni].size());
-                    const Eigen::Vector3d saved = out.nodes[ni];
-                    out.nodes[ni] = saved + omega * (centroid - saved);
-                    if (node_offends(ni)) {
-                        out.nodes[ni] = saved;
+                    std::vector<std::uint32_t> group{ni};
+                    if (interior_orbit.active()) {
+                        for (unsigned mask = 1; mask <= interior_orbit.reflection_count();
+                             ++mask) {
+                            const std::uint32_t other = interior_orbit.reflected(ni, mask);
+                            if (other == MirrorNodeOrbit::npos) {
+                                group.clear();
+                                break;
+                            }
+                            if (std::find(group.begin(), group.end(), other) ==
+                                group.end()) {
+                                group.push_back(other);
+                            }
+                        }
+                    }
+                    if (group.empty()) {
+                        continue;
+                    }
+                    std::vector<Eigen::Vector3d> saved;
+                    saved.reserve(group.size());
+                    for (const auto node : group) {
+                        saved.push_back(out.nodes[node]);
+                    }
+                    bool all_moved = true;
+                    for (const auto node : group) {
+                        if (!relax_one(node)) {
+                            all_moved = false;
+                            break;
+                        }
+                    }
+                    if (!all_moved) {
+                        for (std::size_t gi = 0; gi < group.size(); ++gi) {
+                            out.nodes[group[gi]] = saved[gi];
+                        }
+                        continue;
+                    }
+                    for (const auto node : group) {
+                        done[node] = 1;
                     }
                 }
             }
@@ -583,7 +730,7 @@ TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
                 /*max_move_frac=*/exact ? 1.25 : 0.75, /*passes=*/exact ? 6 : 4,
                 /*feature_edges=*/{}, /*repair_interior=*/{}, node_offends,
                 /*defer_coupled=*/false, exact ? fit->projection : nullptr,
-                relax_neighborhood);
+                relax_neighborhood, mirror);
         };
         out.snap = run_snap();
         if (exact) {
@@ -599,12 +746,12 @@ TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
             std::vector<BoundarySupport>* provenance =
                 fit->projection != nullptr ? fit->projection->provenance : nullptr;
             out.pin = pin_feature_nodes(*fit->cad, *fit->topo, out.nodes, bnodes, h_snap,
-                                        node_offends, provenance);
+                                        node_offends, provenance, mirror);
             smooth_boundary_nodes(surface, out.nodes, out.boundary_quads, h_snap,
                                   collect_offenders, /*passes=*/3, /*relax=*/0.5,
-                                  /*feature_edges=*/{}, fit->projection);
+                                  /*feature_edges=*/{}, fit->projection, mirror);
             const auto second = pin_feature_nodes(*fit->cad, *fit->topo, out.nodes, bnodes,
-                                                  h_snap, node_offends, provenance);
+                                                  h_snap, node_offends, provenance, mirror);
             out.pin.edge_pinned = std::max(out.pin.edge_pinned, second.edge_pinned);
             out.pin.vertex_pinned = std::max(out.pin.vertex_pinned, second.vertex_pinned);
             out.pin.chains = std::max(out.pin.chains, second.chains);

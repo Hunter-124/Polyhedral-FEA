@@ -11,6 +11,7 @@
 // Units: node coordinates in metres.
 
 #include "geom/tri_surface.hpp"
+#include "mesh/mirror.hpp"
 #include "mesh/tet_fill.hpp"
 
 #include <Eigen/Core>
@@ -47,20 +48,27 @@ struct LocalRefineStats {
 /// @param surface Optional CAD/STL: free-surface edge midpoints are projected
 ///        onto the surface instead of Euclidean chords (reduces hole/void
 ///        residual after LEB). Nullptr = pure geometric mids (default).
+/// @param mirror Optional verified reflection symmetry: the free-surface
+///        midpoint projection is answered in the canonical octant and reflected
+///        back, so a mid-edge node and its mirror image land on mirrored points
+///        of the surface rather than on whatever the local facet row happens to
+///        offer (mesh/mirror.hpp).
 /// @return Refined mesh (`boundary_quads` left empty — topology of the lattice
-///         skin is no longer valid after interior splits).
-/// @throws ValidityError on empty mesh, out-of-range indices, or non-positive
+///         quads does not survive bisection).
+/// @throws ValidityError on bad indices, degenerate input tets, or non-positive
 ///         parent volumes that cannot be repaired.
 TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
                                 std::vector<std::array<std::uint32_t, 4>> tets,
                                 std::span<const std::size_t> marked,
                                 LocalRefineStats* stats = nullptr,
-                                const geom::TriSurface* surface = nullptr);
+                                const geom::TriSurface* surface = nullptr,
+                                const MirrorFrame* mirror = nullptr);
 
 /// Same as above, taking a `TetFillOutput` (nodes + tets). Boundary quads from
 /// the input are **not** preserved.
 TetFillOutput local_refine_tets(const TetFillOutput& mesh, std::span<const std::size_t> marked,
                                 LocalRefineStats* stats = nullptr,
-                                const geom::TriSurface* surface = nullptr);
+                                const geom::TriSurface* surface = nullptr,
+                                const MirrorFrame* mirror = nullptr);
 
 } // namespace polymesh::mesh

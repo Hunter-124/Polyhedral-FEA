@@ -249,7 +249,8 @@ ClosestPoint closest_on_surface(const geom::TriSurface& surface, const Eigen::Ve
 
 std::optional<BoundaryTarget>
 owned_boundary_projection_target(const Eigen::Vector3d& p, std::uint32_t node,
-                                 BoundaryProjectionContext* context) {
+                                 BoundaryProjectionContext* context,
+                                 const MirrorFrame* mirror) {
     if (context == nullptr || !context->target) {
         return std::nullopt;
     }
@@ -262,7 +263,13 @@ owned_boundary_projection_target(const Eigen::Vector3d& p, std::uint32_t node,
         support = &(*context->provenance)[node];
     }
     const BoundarySupport owner = *support;
-    auto target = context->target(p, *support);
+    // The oracle sees the folded query, so ownership is classified in the
+    // canonical octant: a node and its mirror image latch the SAME face/edge/
+    // vertex id and are then projected onto mirrored points of it. Classifying
+    // each in its own octant is what let a sphere's seam edge own one node and
+    // its mirror image own the face (ADR-0036 §7).
+    const Eigen::Vector3d query = mirror_fold(mirror, p);
+    auto target = context->target(query, *support);
     // A classified owner is immutable. In particular, vertex and protected
     // edge ownership can never silently fall back to a face.
     if (owner.kind != BoundarySupportKind::kUnknown &&
@@ -271,6 +278,7 @@ owned_boundary_projection_target(const Eigen::Vector3d& p, std::uint32_t node,
         return std::nullopt;
     }
     if (target && target->point.allFinite()) {
+        target->point = mirror_unfold(mirror, target->point, p);
         target->distance = (target->point - p).norm();
         if (std::isfinite(target->distance)) {
             return target;
@@ -282,15 +290,17 @@ owned_boundary_projection_target(const Eigen::Vector3d& p, std::uint32_t node,
 std::optional<BoundaryTarget> boundary_projection_target(const geom::TriSurface& surface,
                                                          const Eigen::Vector3d& p,
                                                          std::uint32_t node,
-                                                         BoundaryProjectionContext* context) {
+                                                         BoundaryProjectionContext* context,
+                                                         const MirrorFrame* mirror) {
     if (context != nullptr && context->target) {
-        return owned_boundary_projection_target(p, node, context);
+        return owned_boundary_projection_target(p, node, context, mirror);
     }
-    const ClosestPoint cp = closest_on_surface(surface, p);
+    const ClosestPoint cp = closest_on_surface(surface, mirror_fold(mirror, p));
     if (!std::isfinite(cp.distance)) {
         return std::nullopt;
     }
-    return BoundaryTarget{cp.point, cp.distance};
+    // Reflection is an isometry, so the folded distance is the real distance.
+    return BoundaryTarget{mirror_unfold(mirror, cp.point, p), cp.distance};
 }
 
 ConformityStats surface_conformity(const geom::TriSurface& surface,
@@ -363,7 +373,7 @@ snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d
                     int passes, std::span<const geom::SharpEdge> feature_edges,
                     const RepairInteriorFn& repair_interior, const NodeOffendsFn& node_offends,
                     bool defer_coupled, BoundaryProjectionContext* projection,
-                    const RelaxNeighborhoodFn& relax_neighborhood) {
+                    const RelaxNeighborhoodFn& relax_neighborhood, const MirrorFrame* mirror) {
     SnapStats stats;
     if (boundary_nodes.empty() || !(h > 0.0) || !std::isfinite(h) || !collect_offenders) {
         return stats;
@@ -404,7 +414,8 @@ snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d
             // across a trimmed face or sharp edge when its exact projection
             // temporarily fails.
             if (projection != nullptr && projection->target) {
-                const auto exact = boundary_projection_target(surface, p, ni, projection);
+                const auto exact =
+                    boundary_projection_target(surface, p, ni, projection, mirror);
                 if (exact && exact->distance > 1e-15 && exact->distance <= search_r) {
                     target = exact->point;
                     dist = exact->distance;
@@ -415,20 +426,24 @@ snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d
                 }
             } else {
                 // Legacy tessellation heuristic for contexts without a live
-                // CAD projection oracle.
-                const auto cp = closest_on_surface(surface, p);
+                // CAD projection oracle. Both queries run on the folded point:
+                // the tessellation is the one input that is measurably NOT
+                // mirror-symmetric even on a symmetric part, and the sampled
+                // feature set inherits that (ADR-0036 §7).
+                const Eigen::Vector3d q = mirror_fold(mirror, p);
+                const auto cp = closest_on_surface(surface, q);
                 if (!feature_edges.empty()) {
-                    const auto cf = geom::closest_on_features(p, surface, feature_edges);
+                    const auto cf = geom::closest_on_features(q, surface, feature_edges);
                     if (std::isfinite(cf.distance) && cf.distance > 1e-15 &&
                         cf.distance <= edge_prefer_r &&
                         cf.distance <= cp.distance + 0.08 * h) {
-                        target = cf.point;
+                        target = mirror_unfold(mirror, cf.point, p);
                         dist = cf.distance;
                         have = true;
                     }
                 }
                 if (!have && cp.distance > 1e-15 && cp.distance <= search_r) {
-                    target = cp.point;
+                    target = mirror_unfold(mirror, cp.point, p);
                     dist = cp.distance;
                     have = true;
                 }
@@ -686,7 +701,19 @@ snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d
 
         // Recover as much surface projection as each fully restored node can
         // keep in the now-clean coupled neighbourhood.
+        //
+        // Sequential and coupled: a node is re-pushed while its own star is
+        // valid, and that decides whether its neighbour can be. `recover` was
+        // filled by scanning an ascending-id offender set, which does not mirror,
+        // so a node and its mirror image were replayed in different company and
+        // kept different fractions. Replay on the mirror key instead (ADR-0036).
         if (offenders.empty()) {
+            std::stable_sort(recover.begin(), recover.end(),
+                             [&](const RestoredMove& a, const RestoredMove& b) {
+                                 const auto ka = mkey.key(a.original);
+                                 const auto kb = mkey.key(b.original);
+                                 return ka != kb ? ka < kb : a.node < b.node;
+                             });
             for (const auto& r : recover) {
                 if (node_offends(r.node)) {
                     nodes[r.node] = r.original;
@@ -830,7 +857,8 @@ SmoothStats smooth_boundary_nodes(const geom::TriSurface& surface,
                                   double h, const CollectOffendersFn& collect_offenders,
                                   int passes, double relax,
                                   std::span<const geom::SharpEdge> feature_edges,
-                                  BoundaryProjectionContext* projection) {
+                                  BoundaryProjectionContext* projection,
+                                  const MirrorFrame* mirror) {
     SmoothStats stats;
     if (boundary_faces.empty() || !(h > 0.0) || !std::isfinite(h) || !collect_offenders) {
         return stats;
@@ -884,6 +912,15 @@ SmoothStats smooth_boundary_nodes(const geom::TriSurface& surface,
     for (const auto& [ni, _] : nbr) {
         nbr_ids.push_back(ni);
     }
+    // Each adjacency list is sorted on the same key, so a node and its mirror
+    // image accumulate their neighbour centroid in mirrored order and the two
+    // sums round identically. Left in bucket order the two differ by an ulp,
+    // which is harmless for the centroid but not for the comparisons downstream
+    // of it.
+    for (auto& [ni, list] : nbr) {
+        (void)ni;
+        sort_mirror_canonical(nodes, list);
+    }
     sort_mirror_canonical(nodes, nbr_ids);
     const bool exact_owners = projection != nullptr && projection->target;
     for (const auto ni : nbr_ids) {
@@ -891,7 +928,7 @@ SmoothStats smooth_boundary_nodes(const geom::TriSurface& surface,
         if (exact_owners) {
             // Classification is a side effect of the first exact target query;
             // the point itself is not moved during this setup pass.
-            (void)boundary_projection_target(surface, nodes[ni], ni, projection);
+            (void)boundary_projection_target(surface, nodes[ni], ni, projection, mirror);
             if (projection->provenance != nullptr && ni < projection->provenance->size()) {
                 const BoundarySupport owner = (*projection->provenance)[ni];
                 if (owner.kind == BoundarySupportKind::kCadVertex) {
@@ -902,7 +939,9 @@ SmoothStats smooth_boundary_nodes(const geom::TriSurface& surface,
             }
         } else if (!feature_edges.empty()) {
             const double df =
-                geom::closest_on_features(nodes[ni], surface, feature_edges).distance;
+                geom::closest_on_features(mirror_fold(mirror, nodes[ni]), surface,
+                                          feature_edges)
+                    .distance;
             if (df <= on_crease_r) {
                 k = Kind::kCrease;
             } else if (df <= crease_guard_r) {
@@ -985,23 +1024,25 @@ SmoothStats smooth_boundary_nodes(const geom::TriSurface& surface,
             // Re-project so travel is tangential. Exact owners are always
             // resolved through the same constrained oracle used by snap.
             if (exact_owners) {
-                const auto target = boundary_projection_target(surface, p, ni, projection);
+                const auto target =
+                    boundary_projection_target(surface, p, ni, projection, mirror);
                 if (!target || target->distance > 0.75 * h) {
                     continue;
                 }
                 p = target->point;
             } else if (k == Kind::kCrease) {
-                const auto cf = geom::closest_on_features(p, surface, feature_edges);
+                const auto cf = geom::closest_on_features(mirror_fold(mirror, p), surface,
+                                                          feature_edges);
                 if (!std::isfinite(cf.distance)) {
                     continue;
                 }
-                p = cf.point;
+                p = mirror_unfold(mirror, cf.point, p);
             } else {
-                const auto cp = closest_on_surface(surface, p);
+                const auto cp = closest_on_surface(surface, mirror_fold(mirror, p));
                 if (cp.distance > 0.75 * h) {
                     continue; // projection ran away — keep the node
                 }
-                p = cp.point;
+                p = mirror_unfold(mirror, cp.point, p);
             }
             if ((p - nodes[ni]).squaredNorm() <= 1e-30) {
                 continue;

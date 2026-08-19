@@ -503,19 +503,23 @@ TEST_CASE("brep_fidelity: graded authoritative curvature stays stiffness-valid",
     polymesh::pipeline::SolveJob job;
     job.start(model, setup);
     std::optional<polymesh::pipeline::SolveResult> result;
-    for (int poll = 0; poll < 12'000; ++poll) {
-        result = job.take_result();
-        if (result) {
-            break;
-        }
-        if (job.state() == polymesh::pipeline::SolveJob::State::kFailed) {
-            FAIL(job.status_text());
-        }
-        if (job.state() == polymesh::pipeline::SolveJob::State::kCancelled) {
-            FAIL("graded authoritative curvature was cancelled");
-        }
+    // Wait on the job's own state, not on a wall-clock poll budget. This solve
+    // takes 66-69 s alone on a 6-core desktop; under `ctest -j10` it has been
+    // measured at 132 s, so a fixed 12'000 x 10 ms cap made the test fail for
+    // machine load rather than for anything it asserts. `kSolving`/`kMeshing` are
+    // the only non-terminal states, and a hung worker is caught by ctest's own
+    // per-test timeout, which is the right place for a clock.
+    while (job.state() == polymesh::pipeline::SolveJob::State::kSolving ||
+           job.state() == polymesh::pipeline::SolveJob::State::kMeshing) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
+    if (job.state() == polymesh::pipeline::SolveJob::State::kFailed) {
+        FAIL(job.status_text());
+    }
+    if (job.state() == polymesh::pipeline::SolveJob::State::kCancelled) {
+        FAIL("graded authoritative curvature was cancelled");
+    }
+    result = job.take_result();
     REQUIRE(result);
     const auto counts = polymesh::fea::count_element_types(result->volume_mesh);
     CHECK(counts.tet10 > 0);
@@ -550,17 +554,14 @@ TEST_CASE("brep_fidelity: mesh-only preview is authoritative curved geometry",
 
     polymesh::pipeline::SolveJob job;
     job.start_mesh(model, setup);
-    std::optional<polymesh::pipeline::VolumeMeshOutput> preview;
-    for (int poll = 0; poll < 12'000; ++poll) {
-        preview = job.take_mesh();
-        if (preview) {
-            break;
-        }
-        if (job.state() == polymesh::pipeline::SolveJob::State::kFailed) {
-            FAIL(job.status_text());
-        }
+    // State-driven wait, for the same reason as the solve above.
+    while (job.state() == polymesh::pipeline::SolveJob::State::kMeshing) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
+    if (job.state() == polymesh::pipeline::SolveJob::State::kFailed) {
+        FAIL(job.status_text());
+    }
+    const auto preview = job.take_mesh();
     REQUIRE(preview);
     const auto counts = polymesh::fea::count_element_types(preview->mesh);
     CHECK(counts.tet4 == 0);
@@ -592,17 +593,13 @@ TEST_CASE("brep_fidelity: auto h keeps curved geometry inside the DOF ceiling",
 
     polymesh::pipeline::SolveJob job;
     job.start_mesh(model, setup);
-    std::optional<polymesh::pipeline::VolumeMeshOutput> preview;
-    for (int poll = 0; poll < 24'000; ++poll) {
-        preview = job.take_mesh();
-        if (preview) {
-            break;
-        }
-        if (job.state() == polymesh::pipeline::SolveJob::State::kFailed) {
-            FAIL(job.status_text());
-        }
+    while (job.state() == polymesh::pipeline::SolveJob::State::kMeshing) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
+    if (job.state() == polymesh::pipeline::SolveJob::State::kFailed) {
+        FAIL(job.status_text());
+    }
+    const auto preview = job.take_mesh();
     REQUIRE(preview);
     const auto counts = polymesh::fea::count_element_types(preview->mesh);
     CHECK(counts.tet10 > 0);

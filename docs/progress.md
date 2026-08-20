@@ -332,6 +332,29 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-08-20: **Field-level verification of the shipped solves
+  ([`docs/validation/field-verification.md`](validation/field-verification.md),
+  `scripts/verify_fields.py`)** — `bench/reference/*.json` gates one scalar per
+  part; this adds 33 pointwise checks on the same solve VTUs the showcase
+  figures are drawn from, for stress **and** displacement. All 33 inside band.
+  Stress: cantilever von Mises against √(σ_xx²+3τ²) at 34,952 bending-dominated
+  nodes **−0.137%** mean (rms 3.20%), recovered `M(x)/P(L−x)` **−0.425%**,
+  shear force `−dM/dx` **994.85 N** vs 1000 (statics), neutral-plane shear
+  **+1.61%**; cylinder interior von Mises **−0.221%** of F/A and section force
+  **+0.04%** at mid-height; plate section force **−0.022%** and SCF **3.1399**
+  vs Howland 3.12. Deformation: cylinder interior `du_z/dz` **−0.123%** and
+  `du_r/dr` **+0.212%** on 46,161 nodes (the clean check — uniform tension has
+  no shear correction and no fitting); cantilever interior curvature
+  **−0.050%** of P/(2EI), tip rotation **−0.440%**, plane sections stay plane
+  (1−R² = 8.9e-7); sphere/cone hoop displacement **0.60% / 0.08%** of peak
+  (exactly 0 for an axisymmetric problem). The cantilever's **−0.690%** tip
+  deflection vs Timoshenko is h-converged (0.077% spread over a 14× element
+  range) and attributed by measurement, not assertion: root rotation deficit ×
+  L / deflection gap = **0.9486**, stable at 0.92–0.96 across four meshes, so
+  95% of it is the fully clamped end face — a BC beam theory does not model.
+  Two false positives are recorded in §5 (a collinear three-term deflection fit
+  "proving" the shear compliance missing; a one-term rotation fit reading the
+  curvature 0.58% low because it absorbed the shear-warping offset).
 - 2026-08-15: **Mesher-quality wave — a gate measures the cell that ships
   (ADR-0033)** — pyramid/hex/graded gates now measure the cell that ships:
   corner-folded pyramids ship as their two assembly split tets

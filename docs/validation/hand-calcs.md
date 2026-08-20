@@ -22,6 +22,14 @@ Legacy STL fixtures for older campaigns:
 python3 scripts/gen_part_library.py
 ```
 
+Every metric here is a *scalar* probe: one number per part at a 5–15% band. The
+field-level counterpart — von Mises and displacement checked pointwise against
+Saint-Venant flexure, uniform tension and Kirsch, plus the invariants that hold
+where no closed form does — is
+[field-verification.md](field-verification.md), run by
+`python3 scripts/verify_fields.py`. It reads the same solve VTUs the showcase
+figures are drawn from, so it verifies what ships.
+
 ---
 
 ## smoke-bar

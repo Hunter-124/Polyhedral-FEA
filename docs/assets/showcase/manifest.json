@@ -226,7 +226,7 @@
     {
       "file": "gui_studio.png",
       "kind": "gui",
-      "part": null,
+      "part": "plate_hole",
       "mesher": null,
       "h": null,
       "solve_command": null,
@@ -234,7 +234,8 @@
       "dofs": null,
       "wall_time_s": null,
       "max_von_mises_pa": null,
-      "caption": "PolyMesh Studio desktop application."
+      "caption": "PolyMesh Studio desktop application.",
+      "command": "polymesh-gui --auto \"load tests/fixtures/parts/plate_hole.step; h 6; fix 5; loadface 0 1000 0 0; solve; wire off; frame; shot <path>; quit\""
     },
     {
       "file": "hero.png",

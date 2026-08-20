@@ -562,6 +562,21 @@ def in_box(points: np.ndarray, box) -> np.ndarray:
     return np.all((points >= lo) & (points <= hi), axis=1)
 
 
+def fixed_boundary_nodes(nodes: np.ndarray, faces: np.ndarray, fix_box) -> np.ndarray:
+    """Fixture nodes: BOUNDARY nodes inside the fix box, which is what the engine
+    applies (fea::boundary_nodes_within, reached from apps/cli select_end). The
+    rule used to be "every node inside the box", and on these corpus slabs that
+    is a different problem, not a different discretisation of the same one: an
+    element whose nodes all fall inside a slab is strain-free, so the volume
+    rule embeds a rigid inclusion the engine no longer creates. Comparing a
+    CalculiX run under one rule against a PolyMesh run under the other would
+    report a mesh/solver discrepancy that is really a BC discrepancy."""
+    boundary_nodes = np.unique(faces.reshape(-1))
+    on_boundary = np.zeros(nodes.shape[0], dtype=bool)
+    on_boundary[boundary_nodes] = True
+    return np.flatnonzero(in_box(nodes, fix_box) & on_boundary)
+
+
 # --------------------------------------------------------------------------- #
 # CalculiX deck + output parsing
 # --------------------------------------------------------------------------- #
@@ -820,18 +835,7 @@ def solve_rung(
 
     load_faces = faces[chosen]
     loads = consistent_face_loads(nodes, load_faces, case.traction)
-    # Fixture nodes: BOUNDARY nodes inside the fix box, which is what the engine
-    # applies (fea::boundary_nodes_within, reached from apps/cli select_end). The
-    # rule used to be "every node inside the box", and on these corpus slabs that
-    # is a different problem, not a different discretisation of the same one: an
-    # element whose nodes all fall inside a slab is strain-free, so the volume
-    # rule embeds a rigid inclusion the engine no longer creates. Comparing a
-    # CalculiX run under one rule against a PolyMesh run under the other would
-    # report a mesh/solver discrepancy that is really a BC discrepancy.
-    boundary_nodes = np.unique(faces.reshape(-1))
-    on_boundary = np.zeros(nodes.shape[0], dtype=bool)
-    on_boundary[boundary_nodes] = True
-    fixed = np.flatnonzero(in_box(nodes, case.fix_box) & on_boundary)
+    fixed = fixed_boundary_nodes(nodes, faces, case.fix_box)
     if fixed.size < 3:
         row.update(status="empty-fix-selection")
         return row

@@ -75,6 +75,7 @@ add_executable(polymesh_tests
     test_probe_util.cpp
     test_advisor_dataset_rederive.cpp
     test_truth_guard.cpp
+    test_peer_harness.cpp
     test_load_area_gate.cpp
     test_run_artifacts.cpp
     test_surface_render.cpp

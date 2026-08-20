@@ -419,8 +419,30 @@ BcSelection select_end(const polymesh::fea::NodalMesh& mesh,
     sel.slab_nodes = sel.nodes.size();
     const auto need = sane_selection_minimum(n_boundary_nodes);
     if (sel.nodes.size() >= need) {
-        sel.faces = polymesh::fea::faces_within(all_faces, sel.nodes);
-        return sel;
+        // The slab's node set reaches 0.51·h up the side walls, so a plain
+        // faces_within() also returns side-wall rim facets. As a fixture that
+        // clamps an artificial patch boundary one slab deep into the wall —
+        // measured on plate_hole at h = 6 mm, the dominant hot band sat at
+        // the slab edge (2,510 nodes above 1.5 MPa at x = xmin + 0.51·h,
+        // where the exact-face solve carries ~1.0 MPa) — and as a load it
+        // integrates the end traction over those side facets as in-plane
+        // shear (the loaded face read 1.03…2.02 MPa where the exact-face
+        // solve delivers a uniform 1.00 MPa). Keep only end-facing facets
+        // (the fallback path's own |n·x̂| convention) and let the node set be
+        // their closure: the end face including its perimeter ring, nothing
+        // up the walls.
+        const auto slab_faces = polymesh::fea::faces_within(all_faces, sel.nodes);
+        for (const auto& f : slab_faces) {
+            const Eigen::Vector3d n = polymesh::fea::surface_face_normal(mesh, f);
+            if (n.squaredNorm() > 0.0 && std::abs(n.x()) >= kNormalMinDot) {
+                sel.faces.push_back(f);
+            }
+        }
+        if (!sel.faces.empty()) {
+            sel.nodes = polymesh::fea::boundary_face_nodes(sel.faces);
+            return sel;
+        }
+        sel.nodes.clear(); // nothing end-facing: widen via the band fallback
     }
     // Degenerate slab: take the ±x-facing boundary faces near this end instead.
     // |n·x̂| (not the signed dot) because mixed hex/pyramid skins do not

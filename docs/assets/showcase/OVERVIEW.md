@@ -24,9 +24,10 @@ wall time, peak von Mises, exact commands) is in
 | `manifest.json` | Provenance record for every image above (schema in [`../../SHOWCASE.md`](../../SHOWCASE.md)) | written by `render_showcase.py --all` |
 
 Every stress render states its displacement warp factor, the colour range, the
-percentile the range was clipped at, and the true unclipped peak nodal value —
-the peak sits at a boundary-condition singularity on all of these parts (a
-clamped face, or the rim where the applied traction starts), not at a physical
-stress. Speed and DOF comparisons are against
+percentile the range was clipped at, and the true unclipped peak nodal value
+**with its node coordinates** — on the plate the peak is the hole-rim
+concentration the part exists to show; on the box-selected parts it sits where
+the stated BC says it should (a clamped face, or the rim where the applied
+traction starts). Speed and DOF comparisons are against
 PolyMesh's own frozen uniform-tet10 baseline, never against another solver
 ([README § Limitations](../../../README.md#limitations)).

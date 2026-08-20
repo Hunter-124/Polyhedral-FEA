@@ -581,12 +581,18 @@ setup (material, element size, fixtures, loads), and the results panel with
 stress, deflection, and the ZZ indicator η. Captured in-app: **F12** (or *File →
 save screenshot*) writes the window framebuffer to a PNG, and
 `POLYMESH_GUI_SHOT=/abs/path.png` writes to a fixed path, which is how the
-headless capture is scripted.
+headless capture is scripted. The fully scripted run (load, size, fixtures,
+load, solve, frame, capture, quit) goes through `--auto`, which drives the
+same code paths as the buttons — this is what produced this image:
 
 ```sh
-POLYMESH_GUI_SHOT=$PWD/docs/assets/showcase/gui_studio.png \
-  ./build/apps/gui/polymesh-gui tests/fixtures/parts/plate_hole.step
+xvfb-run -a ./build/apps/gui/polymesh-gui --auto \
+  "load tests/fixtures/parts/plate_hole.step; h 6; fix 5; loadface 0 1000 0 0; \
+   solve; wire off; frame; shot $PWD/docs/assets/showcase/gui_studio.png; quit"
 ```
+(`wire off` because the results wireframe is baked in a near-black line colour
+and covers the shaded field at this zoom; interactively that is the *wireframe
+edges* checkbox. Face ids 5 and 0 are the plate's two end faces.)
 
 ---
 

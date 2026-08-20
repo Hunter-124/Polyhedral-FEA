@@ -7,6 +7,8 @@
 // of the frame, collapsed, or lost. Test Lab talks to the harness only via
 // docs/dag/interfaces.md file formats (no apps/testlab link).
 // F12 / File menu / POLYMESH_GUI_SHOT capture the window to a PNG.
+// --auto "load p.step; h 6; fix 5; solve; wire off; shot out.png; quit" scripts
+// the app end-to-end without pointer input (doc captures, agent operation).
 
 #include "colormap.hpp"
 #include "fea/boundary_faces.hpp"
@@ -40,9 +42,11 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <ctime>
 #include <filesystem>
 #include <format>
+#include <limits>
 #include <optional>
 #include <string>
 #include <vector>
@@ -271,6 +275,248 @@ void service_screenshot(App& app, GLFWwindow* window) {
             app.shot_env_last = now;
             capture_screenshot(window, app.shot_env_path);
         }
+    }
+}
+
+// ---- headless automation (--auto) -----------------------------------------
+// Scripted driving of the same code paths the buttons call, for documentation
+// captures and agent operation where there is no pointer to click with.
+//
+// Exactly one action is executed per frame. The render loop has to keep
+// turning between steps: `shot` reads the default framebuffer, so the new
+// state must have been drawn (and the viewport FBO resolved) at least one
+// full frame before the capture, and ImGui itself needs a frame to lay the
+// status strip out again.
+
+struct AutoAction {
+    std::string verb;
+    std::vector<std::string> args;
+};
+
+struct AutoRunner {
+    std::vector<AutoAction> actions;
+    std::size_t next = 0;
+    /// `solve` holds the queue until the job settles. take_result() runs
+    /// *later* in the frame that first observes kDone, so one extra frame is
+    /// burned before app.status is read back for the outcome line.
+    bool awaiting_solve = false;
+    int settle_frames = 0;
+    /// `shot` is deferred to the end of its frame: glReadPixels only sees the
+    /// finished image between the last draw call and glfwSwapBuffers.
+    std::string pending_shot;
+    bool failed = false;
+
+    bool enabled() const { return !actions.empty(); }
+};
+
+/// Splits "load p.step; h 6; solve" into one action per ';', whitespace-split
+/// into verb + args. Empty segments are dropped, so a trailing ';' and any
+/// amount of padding are harmless.
+std::vector<AutoAction> parse_auto_spec(const std::string& spec) {
+    std::vector<AutoAction> out;
+    std::size_t pos = 0;
+    for (;;) {
+        const std::size_t sep = spec.find(';', pos);
+        const std::string seg =
+            spec.substr(pos, sep == std::string::npos ? std::string::npos : sep - pos);
+        std::vector<std::string> tok;
+        for (std::size_t i = 0; i < seg.size();) {
+            while (i < seg.size() && std::isspace(static_cast<unsigned char>(seg[i]))) {
+                ++i;
+            }
+            const std::size_t start = i;
+            while (i < seg.size() && !std::isspace(static_cast<unsigned char>(seg[i]))) {
+                ++i;
+            }
+            if (i > start) {
+                tok.emplace_back(seg.substr(start, i - start));
+            }
+        }
+        if (!tok.empty()) {
+            AutoAction action;
+            action.verb = tok.front();
+            action.args.assign(tok.begin() + 1, tok.end());
+            out.push_back(std::move(action));
+        }
+        if (sep == std::string::npos) {
+            break;
+        }
+        pos = sep + 1;
+    }
+    return out;
+}
+
+/// strtod / strtol with the whole-token check they normally lack: a typo'd
+/// number in a script must fail the run, not silently mesh at h = 0.
+bool parse_auto_double(const std::string& text, double& out) {
+    char* end = nullptr;
+    const double v = std::strtod(text.c_str(), &end);
+    if (end == text.c_str() || *end != '\0' || !std::isfinite(v)) {
+        return false;
+    }
+    out = v;
+    return true;
+}
+
+bool parse_auto_int(const std::string& text, int& out) {
+    char* end = nullptr;
+    const long v = std::strtol(text.c_str(), &end, 10);
+    if (end == text.c_str() || *end != '\0' || v < std::numeric_limits<int>::min() ||
+        v > std::numeric_limits<int>::max()) {
+        return false;
+    }
+    out = static_cast<int>(v);
+    return true;
+}
+
+std::string auto_action_text(const AutoAction& action) {
+    std::string text = action.verb;
+    for (const auto& arg : action.args) {
+        text += ' ';
+        text += arg;
+    }
+    return text;
+}
+
+/// Executes at most one queued action. Every exit path other than a clean
+/// `quit` sets `failed`, which run() turns into a nonzero exit code.
+void tick_auto(AutoRunner& run, App& app, GLFWwindow* window) {
+    if (!run.enabled()) {
+        return;
+    }
+    auto fail = [&](const std::string& why) {
+        std::fprintf(stderr, "auto: %s\n", why.c_str());
+        run.failed = true;
+        run.next = run.actions.size();
+        glfwSetWindowShouldClose(window, 1);
+    };
+
+    if (run.awaiting_solve) {
+        const auto st = app.job.state();
+        if (st == SolveJob::State::kMeshing || st == SolveJob::State::kSolving) {
+            return;
+        }
+        if (run.settle_frames > 0) {
+            --run.settle_frames;
+            return;
+        }
+        run.awaiting_solve = false;
+        if (st == SolveJob::State::kFailed) {
+            fail(std::format("solve failed: {}", app.job.status_text()));
+            return;
+        }
+        if (st == SolveJob::State::kCancelled) {
+            fail(std::format("solve cancelled: {}", app.job.status_text()));
+            return;
+        }
+        std::fprintf(stderr, "auto: %s\n", app.status.c_str());
+    }
+    if (run.next >= run.actions.size()) {
+        return;
+    }
+
+    const AutoAction action = run.actions[run.next++];
+    const std::string& verb = action.verb;
+    const auto& args = action.args;
+    std::fprintf(stderr, "auto: %s\n", auto_action_text(action).c_str());
+
+    if (verb == "load") {
+        if (args.size() != 1) {
+            return fail("load wants one path");
+        }
+        // load_model swallows import errors into app.status, and a failed load
+        // leaves any previously opened model in place. Pre-checking existence
+        // catches the dominant scripting mistake (wrong path) exactly.
+        if (!std::filesystem::exists(args[0])) {
+            return fail(std::format("load: no such file: {}", args[0]));
+        }
+        load_model(app, args[0]);
+        if (!app.model) {
+            return fail(std::format("load failed: {}", app.status));
+        }
+    } else if (verb == "h") {
+        double mm = 0.0;
+        if (args.size() != 1 || !parse_auto_double(args[0], mm) || mm <= 0.0) {
+            return fail("h wants one positive element size in mm");
+        }
+        app.setup.mesh_size = mm / 1000.0; // SimSetup::mesh_size is metres
+    } else if (verb == "fix") {
+        int face = -1;
+        if (args.size() != 1 || !parse_auto_int(args[0], face) || face < 0) {
+            return fail("fix wants one face id");
+        }
+        app.setup.loads.erase(face); // a face is fixed or loaded, never both
+        app.setup.fixtures.insert(face);
+        app.overlays_dirty = true;
+    } else if (verb == "loadface") {
+        int face = -1;
+        double fx = 0.0, fy = 0.0, fz = 0.0;
+        if (args.size() != 4 || !parse_auto_int(args[0], face) || face < 0 ||
+            !parse_auto_double(args[1], fx) || !parse_auto_double(args[2], fy) ||
+            !parse_auto_double(args[3], fz)) {
+            return fail("loadface wants <face> <fx> <fy> <fz> (newtons)");
+        }
+        app.setup.fixtures.erase(face);
+        app.setup.loads[face].force = Eigen::Vector3d(fx, fy, fz);
+        app.overlays_dirty = true;
+    } else if (verb == "solve") {
+        if (!args.empty()) {
+            return fail("solve takes no arguments");
+        }
+        if (!app.model) {
+            return fail("solve with no model loaded");
+        }
+        fea::set_openmp_threads(app.testlab.settings.max_threads);
+        app.live_mesh_seen_gen = 0;
+        app.status = "solving…";
+        app.job.start(*app.model, app.setup);
+        run.awaiting_solve = true;
+        run.settle_frames = 1;
+    } else if (verb == "frame") {
+        if (!args.empty()) {
+            return fail("frame takes no arguments");
+        }
+        app.viewport.frame_content(app.mode);
+    } else if (verb == "wire") {
+        // The results wireframe is near-black (0.02, 0.02, 0.04) and is baked
+        // from the 8x-subdivided curved boundary, so at h=6 mm on a fitted
+        // camera it covers the shaded field entirely: a captured von Mises
+        // view measured (6, 6, 11) per pixel with it on. Interactively that
+        // is one checkbox away; a script has no checkbox, so it needs this.
+        if (args.size() != 1 || (args[0] != "on" && args[0] != "off")) {
+            return fail("wire wants on or off");
+        }
+        app.show_wireframe = args[0] == "on";
+    } else if (verb == "shot") {
+        if (args.size() != 1) {
+            return fail("shot wants one output path");
+        }
+        run.pending_shot = args[0];
+    } else if (verb == "quit") {
+        if (!args.empty()) {
+            return fail("quit takes no arguments");
+        }
+        glfwSetWindowShouldClose(window, 1);
+    } else {
+        return fail(std::format("unknown action: {}", auto_action_text(action)));
+    }
+}
+
+/// End-of-frame half of `shot`: the back buffer holds the finished image here
+/// (same window as service_screenshot, for the same reason).
+void service_auto_shot(AutoRunner& run, GLFWwindow* window) {
+    if (run.pending_shot.empty()) {
+        return;
+    }
+    const std::string path = std::move(run.pending_shot);
+    run.pending_shot.clear();
+    if (capture_screenshot(window, path)) {
+        std::fprintf(stderr, "auto: wrote %s\n", path.c_str());
+    } else {
+        std::fprintf(stderr, "auto: screenshot failed: %s\n", path.c_str());
+        run.failed = true;
+        run.next = run.actions.size();
+        glfwSetWindowShouldClose(window, 1);
     }
 }
 
@@ -1275,6 +1521,27 @@ void draw_frame(App& app) {
 }
 
 int run(int argc, char** argv) {
+    // argv: an optional positional part path, an optional --auto "<spec>", in
+    // either order. Parsed before any GL/ImGui state exists so a bad command
+    // line exits without a window to tear down.
+    std::string part_path;
+    std::string auto_spec;
+    for (int i = 1; i < argc; ++i) {
+        const char* arg = argv[i];
+        if (arg == nullptr || arg[0] == '\0') {
+            continue;
+        }
+        if (std::strcmp(arg, "--auto") == 0) {
+            if (i + 1 >= argc || argv[i + 1] == nullptr) {
+                std::fprintf(stderr, "polymesh-gui: --auto wants a spec argument\n");
+                return 1;
+            }
+            auto_spec = argv[++i];
+        } else if (part_path.empty()) {
+            part_path = arg;
+        }
+    }
+
     // OpenMP + Eigen multi-thread (double-only; no fast-math).
     fea::init_runtime_performance();
 
@@ -1327,12 +1594,24 @@ int run(int argc, char** argv) {
     app.testlab.sync_buffers_from_settings();
     app.testlab.force_refresh = true;
     app.testlab.tick(0.0f);
-    if (argc >= 2 && argv[1] != nullptr && argv[1][0] != '\0') {
-        load_model(app, argv[1]);
+    if (!part_path.empty()) {
+        load_model(app, part_path);
+    }
+    AutoRunner auto_run;
+    if (!auto_spec.empty()) {
+        auto_run.actions = parse_auto_spec(auto_spec);
+        if (auto_run.actions.empty()) {
+            std::fprintf(stderr, "polymesh-gui: --auto spec has no actions\n");
+            auto_run.failed = true;
+            glfwSetWindowShouldClose(window, 1);
+        }
     }
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
+
+        // Scripted step, one per frame (see AutoRunner). No-op unless --auto.
+        tick_auto(auto_run, app, window);
 
         // Process drag-and-drop on the main thread (paths queued by callback).
         if (!app.pending_drops.empty()) {
@@ -1484,6 +1763,7 @@ int run(int argc, char** argv) {
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         // Capture after every draw call, before the swap discards the back buffer.
         service_screenshot(app, window);
+        service_auto_shot(auto_run, window);
         glfwSwapBuffers(window);
     }
 
@@ -1492,7 +1772,7 @@ int run(int argc, char** argv) {
     ImGui::DestroyContext();
     glfwDestroyWindow(window);
     glfwTerminate();
-    return 0;
+    return auto_run.failed ? 1 : 0;
 }
 
 } // namespace

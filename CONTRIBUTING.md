@@ -176,6 +176,7 @@ bench_harness loads bench/reference/* — ONLY module allowed to
 | 3D view / picking | `apps/gui/viewport.*` |
 | Analytical reference numbers | `bench/reference/*.json` **only** |
 | Verification tests | `tests/test_*.cpp` |
+| Field-level verification of shipped solves | `scripts/verify_fields.py` + `docs/validation/field-verification.md` |
 | Physics/math decisions | `docs/decisions/NNNN-*.md` (ADR) |
 | Phase plan / progress | `docs/phases.md`, `docs/progress.md` |
 | Agent knowledge graph | `graphify-out/` + `/graphify` skill |

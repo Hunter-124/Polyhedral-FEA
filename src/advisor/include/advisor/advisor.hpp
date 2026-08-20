@@ -14,6 +14,7 @@
 
 #include "pipeline/scene.hpp"
 
+#include <cstddef>
 #include <filesystem>
 #include <map>
 #include <memory>
@@ -126,6 +127,88 @@ using FeatureColumns = std::map<std::string, double>;
 /// The columns a `CaseFeatures` can supply, by their dataset names.
 [[nodiscard]] FeatureColumns to_columns(const pipeline::CaseFeatures& features);
 
+// --- what the network did (ADR-0027 C8, deployed side) ----------------------
+//
+// The types below exist so a reader can be shown the network that actually ran,
+// and they are deliberately built out of the DEPLOYED graph's own tensors. The
+// activations are extra ONNX outputs of `model.onnx` -- taps on the trunk --
+// and not a C++ re-implementation of `scripts/advisor/model.py:trunk`. A second
+// forward-pass implementation is free to disagree with the first: a different
+// GELU approximation, a different embedding lookup rounding rule, or simply a
+// weight file that has moved on, and the drawing would then be a picture of a
+// network nobody deployed. Every value here is read off the same `Session::Run`
+// that produced the decision it explains.
+//
+// The static half (layer sizes, labels, weight blocks) comes from
+// `activation_layout.json`, written next to `model.onnx` by the same export
+// call. When that sidecar is absent or disagrees with the graph,
+// `Advisor::has_activations()` is false and there is nothing to draw. That is
+// the intended degradation: a layout guessed from the graph alone would still
+// render circles and lines, and every edge in it would be attributed to the
+// wrong pair of neurons -- a confident, wrong picture, which is worse than no
+// picture at all.
+
+/// One layer of the deployed graph, for drawing it.
+struct NetworkLayer {
+    std::string name;                    // "input" | "trunk.fc1" | "trunk.fc2" | "heads"
+    std::size_t size = 0;
+    std::vector<std::string> labels;     // empty for the hidden layers
+};
+
+/// One fully connected weight block, `weights[j * cols + i]` = source i -> dest j.
+struct NetworkEdges {
+    std::string from;
+    std::string to;
+    std::size_t rows = 0;                // destination units
+    std::size_t cols = 0;                // source units
+    std::vector<float> weights;          // rows * cols, row-major over destinations
+};
+
+/// Static picture of the deployed network, from `activation_layout.json`.
+struct NetworkLayout {
+    std::vector<NetworkLayer> layers;
+    std::vector<NetworkEdges> edges;
+    bool empty() const { return layers.empty(); }
+};
+
+/// One forward pass of the production graph, as it happened. `input`, `fc1` and
+/// `fc2` are the graph's own trunk taps -- not a re-implementation -- and
+/// `heads` is the seven regressors, the failure logit, then the policy vector,
+/// matching `NetworkLayout` layer "heads".
+struct ActivationFrame {
+    int candidate = -1;          // index into the enumerated candidate grid; -1 = final re-score pass
+    bool recommended = false;    // this pass scored the action actually recommended
+    bool gate_pass = false;      // sigmoid(failure_logit) <= gate_threshold
+    bool over_budget = false;    // dropped by the max_dof budget
+    bool ranked = false;         // score was finite, so the candidate could be ranked
+    double score = 0.0;          // rel_err_rel, the ranking key (lower is better)
+    AdvisorDecision action;      // the action this pass scored
+    AdvisorRawOutputs outputs;
+    std::vector<float> input;
+    std::vector<float> fc1;
+    std::vector<float> fc2;
+    std::vector<float> heads;
+};
+
+/// The trunk tensors alone, for one forward pass. Same three taps and the same
+/// head vector `ActivationFrame` carries; separate because a pass that scored
+/// no particular action has no `AdvisorDecision` to report, and a struct with a
+/// meaningless action field invites reading one.
+struct ActivationTaps {
+    std::vector<float> input;
+    std::vector<float> fc1;
+    std::vector<float> fc2;
+    std::vector<float> heads;
+};
+
+/// The decision plus every forward pass that produced it, in the order the
+/// chooser ran them: one per enumerated candidate, then the final re-score.
+struct AdvisorExplanation {
+    AdvisorDecision decision;
+    std::vector<ActivationFrame> frames;
+    double gate_threshold = 0.0;
+};
+
 /// A loaded advisor. Construction is the expensive part (ORT session + graph
 /// validation); `recommend` is a pair of single-row forward passes.
 ///
@@ -175,7 +258,51 @@ public:
     /// The clamp-box defaults, i.e. what a veto returns.
     [[nodiscard]] AdvisorDecision defaults() const;
 
+    /// True when `model.onnx` exports the trunk taps and `activation_layout.json`
+    /// loaded, so `explain` can report what the network did.
+    [[nodiscard]] bool has_activations() const;
+    /// The deployed network's shape and weights. Empty when `has_activations()`.
+    [[nodiscard]] const NetworkLayout& layout() const;
+    /// `recommend`, plus the internal state of every forward pass it ran.
+    /// Throws `AdvisorError` when `has_activations()` is false.
+    ///
+    /// Not the hot path, and deliberately a separate entry point: `recommend`
+    /// keeps requesting exactly the nine contract outputs, so a campaign run
+    /// pays nothing for a facility only the drawing uses. `explain` asks the
+    /// same session for the three extra tap tensors as well, which is a
+    /// different `Run` -- graph optimization may fuse the trunk differently
+    /// when an intermediate is also an output -- so the numbers reported here
+    /// are the numbers of the pass `explain` itself ran, and every frame is
+    /// consistent with the decision returned beside it.
+    [[nodiscard]] AdvisorExplanation explain(const FeatureColumns& columns,
+                                             double max_dof = 0.0) const;
+    [[nodiscard]] AdvisorExplanation explain(const pipeline::CaseFeatures& features,
+                                             double max_dof = 0.0) const;
+
+    /// The trunk taps for one unmodified forward pass on exactly these columns
+    /// — the tap-carrying analogue of `evaluate`, applying no policy of its
+    /// own. `explain` cannot serve this purpose: every pass it runs has had the
+    /// action columns overwritten by the candidate being scored, so none of its
+    /// frames is the row the caller passed in. That makes this the surface a
+    /// parity test replays against the exporter's own standardized row.
+    ///
+    /// A tensor whose width disagrees with `layout()` is returned EMPTY rather
+    /// than resized, for the same reason `explain` does it: a mislabelled layer
+    /// is worse than a missing one. Throws `AdvisorError` when
+    /// `has_activations()` is false.
+    [[nodiscard]] ActivationTaps taps(const FeatureColumns& columns) const;
+
 private:
+    /// The one chooser. `recommend` and `explain` are both this function; the
+    /// only difference is whether `trace` is non-null, in which case every
+    /// forward pass it runs also records its own internals. Duplicating the
+    /// ranking, the gate, the budget bookkeeping or the veto rules into a
+    /// second "explaining" copy would let the picture and the shipped decision
+    /// drift apart, which is the one failure this whole facility exists to
+    /// avoid.
+    [[nodiscard]] AdvisorDecision decide(const FeatureColumns& columns, double max_dof,
+                                         AdvisorExplanation* trace) const;
+
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };

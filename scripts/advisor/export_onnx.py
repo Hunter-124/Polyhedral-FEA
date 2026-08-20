@@ -2,21 +2,40 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Export the advisor network to ONNX and verify graph/torch parity (C4-C6).
 
-Default mode exports ``bench/advisor/runs/latest.pt`` to
-``bench/advisor/model.onnx`` and rewrites ``normalization.json`` and
-``clamps.json`` from the same dataset pass, so the three files a C++ model
-directory needs can never drift apart.
+Default mode exports ``bench/advisor/runs/best.pt`` to
+``bench/advisor/model.onnx``, rewrites ``normalization.json`` and
+``clamps.json`` from the same dataset pass and checks the ``ood.json`` beside
+them, so the four files a C++ model directory needs can never drift apart. The
+graph carries the nine C6 outputs first, then the three
+``ACTIVATION_OUTPUT_NAMES`` trunk taps, and a tapped export drops an
+``activation_layout.json`` sidecar beside the graph describing the same network
+statically, so a consumer can draw what it is about to run.
 
 ``--tiny-fixture`` builds a deterministic miniature network on synthetic rows
 and writes the C++ unit-test fixture directory ``tests/fixtures/advisor_tiny/``
-containing ``model.onnx``, ``normalization.json``, ``clamps.json`` and
-``parity.json``. The fixture is constructed — not hoped for — so that it
-exercises the nominal, hard-clamp and failure-veto paths.
+containing ``model.onnx``, ``normalization.json``, ``clamps.json``,
+``ood.json`` and ``parity.json``. The fixture is constructed — not hoped
+for — so that it exercises the nominal, hard-clamp and failure-veto paths. It
+is exported WITHOUT the taps on purpose: it is the fixture that proves a model
+directory predating this feature still loads and recommends.
+
+``--explain-fixture`` writes the same artifacts for the same network into
+``tests/fixtures/advisor_explain/``, exported WITH the taps, plus
+``activation_layout.json``; its ``parity.json`` cases additionally carry the
+float64 ``trunk_input`` / ``trunk_fc1`` / ``trunk_fc2`` tensors so the C++ can
+check its tap reads against PyTorch rather than against itself.
+
+``--schema-from-checkpoint`` takes the input-column schema from the checkpoint
+instead of the dataset CSV. It exists only to re-export a shipped checkpoint
+whose corpus predates the current ``dataset.py`` (see ``run_export``); the
+default path still refuses that case.
 
 Usage
 -----
     python scripts/advisor/export_onnx.py
+    python scripts/advisor/export_onnx.py --schema-from-checkpoint
     python scripts/advisor/export_onnx.py --tiny-fixture
+    python scripts/advisor/export_onnx.py --explain-fixture
 """
 
 from __future__ import annotations
@@ -24,6 +43,7 @@ from __future__ import annotations
 import argparse
 import copy
 import csv
+import dataclasses
 import json
 import math
 import sys
@@ -40,7 +60,7 @@ if __package__ in (None, ""):  # direct `python scripts/advisor/export_onnx.py`
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     __package__ = "advisor"
 
-from .calibration import OOD_FEATURE_COLUMNS, fit_ood, ood_scores
+from .calibration import OOD_FEATURE_COLUMNS, OOD_JSON, fit_ood, ood_scores
 from .dataset import (
     ADVISOR_DIR,
     CASE_COLUMNS,
@@ -61,7 +81,7 @@ from .dataset import (
     standardize_row,
     write_json,
 )
-from .model import AdvisorNet
+from .model import ACTIVATION_OUTPUT_NAMES, AdvisorNet
 
 MODEL_ONNX = ADVISOR_DIR / "model.onnx"
 #: The shipped graph must be the shipped model: ``best.pt`` (best validation
@@ -86,53 +106,126 @@ OPSET = 17
 # Relative bound on |onnx_f32 - torch_f64| / max(1, |torch_f64|).
 #
 # Justified by float32 numerics, not chosen to make the check pass. float32 eps
-# is 1.19e-07 and the widest reduction in the trunk is 64 wide, so a single
-# layer already admits ~sqrt(64)*eps ~ 9.5e-07 of accumulation error before the
-# heads add more. Measured on the trained model: float32 PyTorch is 2.148e-06
-# from its own float64 result and ONNX Runtime is 1.597e-06 from it. Anything
-# tighter than ~2e-06 would be demanding agreement below the noise floor of the
-# computation itself; 1e-05 sits an order of magnitude above the observed noise
-# and still catches every real export defect (a wrong op, a wrong weight, or a
-# permuted column order moves outputs by orders of magnitude, not by 1e-06).
+# is 1.19e-07 and the widest reduction on the head path is the 96-wide trunk,
+# so a single layer already admits ~sqrt(96)*eps ~ 1.17e-06 of accumulation
+# error before the heads add more. Re-measured on the shipped model over the
+# batch `sample_raw_batch` produces with no dataset (raw N(0,1), which reaches
+# |z| ~ 1.7e02 after standardization and is therefore the harsher of the two
+# batches this script uses): float32 PyTorch is 3.891e-06 (relative) from its
+# own float64 result while ONNX Runtime is 3.078e-06 from it -- ORT is the more
+# accurate of the two -- and the taps, one layer shallower, are 2.923e-06 and
+# 2.864e-06. Over 16 real dataset rows the same figures are 2.215e-06 /
+# 1.744e-06 and 8.56e-07 / 9.78e-07. Anything tighter than ~5e-06 would be
+# demanding agreement below the noise floor of the computation itself; 1e-05
+# clears the observed noise while still catching every real export defect (a
+# wrong op, a wrong weight, or a permuted column order moves outputs by orders
+# of magnitude, not by 1e-06).
 PARITY_TOLERANCE = 1e-5
 
 
 class ExportWrapper(nn.Module):
-    """Adapts ``AdvisorNet`` to the flat tuple signature ONNX needs."""
+    """Adapts ``AdvisorNet`` to the flat tuple signature ONNX needs.
 
-    def __init__(self, net: AdvisorNet) -> None:
+    ``taps`` selects the graph shape: ``forward_tuple_explain``, whose outputs
+    are the nine C6 names followed by the three trunk taps, or the bare
+    ``forward_tuple`` contract. Both shapes must remain exportable: the C++
+    reports ``has_activations() == false`` and still recommends against an
+    untapped model directory, and ``tests/fixtures/advisor_tiny/`` is the
+    fixture that pins that path.
+    """
+
+    def __init__(self, net: AdvisorNet, taps: bool) -> None:
         super().__init__()
         self.net = net
+        self.taps = taps
 
     def forward(self, features: Tensor) -> tuple[Tensor, ...]:
+        if self.taps:
+            return self.net.forward_tuple_explain(features)
         return self.net.forward_tuple(features)
+
+
+#: Sidecar schema id. Bump the version if a consumer could misread the payload.
+ACTIVATION_LAYOUT_SCHEMA = "polymesh.advisor.activation_layout/1"
+
+#: Sidecar file name. Lives beside ``model.onnx`` in the same model directory,
+#: because it describes that exact graph's weights and would be a lie next to
+#: any other one.
+ACTIVATION_LAYOUT_NAME = "activation_layout.json"
+
+
+def activation_layout_path(model_path: Path) -> Path:
+    return model_path.with_name(ACTIVATION_LAYOUT_NAME)
 
 
 # --------------------------------------------------------------------------- #
 # export + verification
 # --------------------------------------------------------------------------- #
 
-def export_graph(net: AdvisorNet, path: Path) -> None:
-    """Write the C6 graph: one ``features`` input, eight named outputs."""
+def graph_output_names(net: AdvisorNet, taps: bool = True) -> list[str]:
+    """Graph output order: the nine C6 names, then the activation taps.
+
+    The C6 names stay first and keep their indices because the C++ loader
+    validates output ``i`` by name for ``i < 9``; anything appended after that
+    is invisible to it.
+    """
+    return list(net.output_names) + (list(ACTIVATION_OUTPUT_NAMES) if taps else [])
+
+
+def export_graph(net: AdvisorNet, path: Path, taps: bool = True) -> Path | None:
+    """Write the C6 graph -- one ``features`` input, nine named outputs -- with
+    the three trunk taps appended, plus its ``activation_layout.json`` sidecar.
+
+    Naming the taps as graph outputs costs the production ``Advisor::Impl::run``
+    nothing. They are not new arithmetic: ``forward_tuple_explain`` shares one
+    trunk evaluation with the heads (see ``AdvisorNet.heads``), so the taps are
+    tensors the graph already had to materialise on the way to the nine
+    contract outputs. ORT computes and returns only the outputs the caller
+    names in ``Run``, and the C++ names exactly the nine; the extra graph
+    outputs merely stop those three intermediates from being fusible or
+    reusable buffers.
+
+    ``taps=False`` writes the pre-activation graph shape and no sidecar, which
+    is what a model directory looked like before this feature and what the C++
+    back-compat path must keep loading.
+
+    Returns the sidecar path, or ``None`` when untapped.
+    """
     net.eval()
     path.parent.mkdir(parents=True, exist_ok=True)
     dummy = torch.zeros(2, len(net.input_columns), dtype=torch.float32)
+    output_names = graph_output_names(net, taps)
     dynamic_axes: dict[str, dict[int, str]] = {"features": {0: "batch"}}
-    for name in net.output_names:
+    for name in output_names:
         dynamic_axes[name] = {0: "batch"}
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         torch.onnx.export(
-            ExportWrapper(net),
+            ExportWrapper(net, taps),
             (dummy,),
             str(path),
             input_names=["features"],
-            output_names=list(net.output_names),
+            output_names=output_names,
             dynamic_axes=dynamic_axes,
             opset_version=OPSET,
             do_constant_folding=True,
             dynamo=False,
         )
+    if not taps:
+        return None
+
+    layout_path = activation_layout_path(path)
+    # Written by the same call that writes the graph, never by a separate
+    # command: a layout describing a different set of weights than the .onnx
+    # beside it would draw a network nobody ran.
+    layout = {
+        "schema": ACTIVATION_LAYOUT_SCHEMA,
+        "hidden": int(net.hidden),
+        "activation_outputs": list(ACTIVATION_OUTPUT_NAMES),
+    }
+    layout.update(net.network_layout())
+    write_json(layout_path, layout)
+    return layout_path
 
 
 def _run_onnx(path: Path, batch: np.ndarray) -> tuple[dict[str, np.ndarray], str]:
@@ -161,8 +254,72 @@ def _run_onnx(path: Path, batch: np.ndarray) -> tuple[dict[str, np.ndarray], str
     return dict(zip(names, values)), f"onnx.reference {onnx.__version__}"
 
 
+@dataclasses.dataclass(frozen=True)
+class ParityResult:
+    """Worst deviation from the float64 reference, per output group.
+
+    The C6 outputs and the activation taps are reported apart because they are
+    two different claims. The contract numbers say the shipped predictions are
+    right; the tap numbers say the drawn network is the one that produced them.
+    A regression in either must be visible on its own, not averaged away by the
+    other.
+    """
+
+    contract_rel: float = 0.0
+    contract_abs: float = 0.0
+    tap_rel: float = 0.0
+    tap_abs: float = 0.0
+    taps: bool = True     # False for a deliberately untapped graph
+    runtime: str = ""
+
+    @property
+    def worst_rel(self) -> float:
+        return max(self.contract_rel, self.tap_rel)
+
+    @property
+    def worst_abs(self) -> float:
+        return max(self.contract_abs, self.tap_abs)
+
+    def worst_of(self, other: "ParityResult") -> "ParityResult":
+        """Element-wise worst of two runs of the same graph."""
+        return ParityResult(
+            contract_rel=max(self.contract_rel, other.contract_rel),
+            contract_abs=max(self.contract_abs, other.contract_abs),
+            tap_rel=max(self.tap_rel, other.tap_rel),
+            tap_abs=max(self.tap_abs, other.tap_abs),
+            taps=self.taps and other.taps,
+            runtime=self.runtime or other.runtime,
+        )
+
+    def report(self) -> list[str]:
+        """The parity summary lines, taps reported as their own claim."""
+        lines = [f"max parity error, contract = {self.contract_rel:.3e} relative "
+                 f"({self.contract_abs:.3e} absolute)"]
+        if self.taps:
+            lines.append(f"max parity error, taps     = {self.tap_rel:.3e} relative "
+                         f"({self.tap_abs:.3e} absolute)")
+        else:
+            lines.append("activation taps            = not exported (untapped graph)")
+        lines.append(f"tolerance {PARITY_TOLERANCE:.0e} relative, every group")
+        return lines
+
+
+def float64_reference(net: AdvisorNet, batch: np.ndarray) -> tuple[Tensor, ...]:
+    """The net's own float64 evaluation of a *standardized* batch: the nine C6
+    outputs, then the three trunk taps.
+
+    Every parity claim in this script is scored against this, and the explain
+    fixture records it verbatim, so the fixture and the check can never be
+    quoting different references.
+    """
+    net.eval()
+    with torch.no_grad():
+        return copy.deepcopy(net).double().forward_tuple_explain(
+            torch.from_numpy(batch.astype(np.float64)))
+
+
 def verify_parity(net: AdvisorNet, path: Path, raw_batch: np.ndarray,
-                  normalization: dict[str, Any]) -> tuple[float, float, str]:
+                  normalization: dict[str, Any], taps: bool = True) -> ParityResult:
     """Compare the exported graph against a float64 PyTorch reference.
 
     ``raw_batch`` is *un-standardized*; it is standardized here with
@@ -173,35 +330,58 @@ def verify_parity(net: AdvisorNet, path: Path, raw_batch: np.ndarray,
     The reference is the net evaluated in **float64**, not in float32. Scoring
     ONNX against float32 PyTorch asks two float32 implementations to agree more
     closely than either agrees with the exact answer, which is unsatisfiable:
-    measured on this model, float32 PyTorch sits 2.148e-06 (relative) from its
-    own float64 result while ONNX Runtime sits 1.597e-06 from it -- ORT is the
-    *more* accurate of the two. Comparing both to float64 keeps the check
-    sensitive to a real export defect (wrong op, wrong weights, wrong column
-    order, all of which move outputs by orders of magnitude) while tolerating
-    GEMM accumulation order, which is not a defect.
+    measured on this model, float32 PyTorch sits 2.215e-06 (relative) from its
+    own float64 result while ONNX Runtime sits 1.744e-06 from it -- ORT is the
+    *more* accurate of the two, and see ``PARITY_TOLERANCE`` for the same
+    measurement on the harsher synthetic batch. Comparing both to float64 keeps
+    the check sensitive to a real export defect (wrong op, wrong weights, wrong
+    column order, all of which move outputs by orders of magnitude) while
+    tolerating GEMM accumulation order, which is not a defect.
 
-    Returns ``(worst_relative, worst_absolute, runtime)``; raises if the graph
-    does not honour the C6 output contract.
+    The three activation taps are held to the same reference and the same
+    tolerance, against ``AdvisorNet.trunk``'s float64 tensors. An unchecked tap
+    would be worse than no tap: the cinema surface would draw confident
+    per-neuron values with nothing asserting they are the network's own.
+
+    ``taps`` must match how the graph was exported; a graph that should carry
+    the taps and does not is a hard failure, exactly as a missing C6 output is.
     """
     batch = standardize_matrix(raw_batch, normalization)
     outputs, runtime = _run_onnx(path, batch)
-    missing = [name for name in net.output_names if name not in outputs]
+    names = graph_output_names(net, taps)
+    contract = len(net.output_names)
+    missing = [name for name in names if name not in outputs]
     if missing:
-        raise SystemExit(f"exported graph is missing outputs {missing} (C6 violation)")
-    net.eval()
-    reference_net = copy.deepcopy(net).double()
-    with torch.no_grad():
-        reference = reference_net.forward_tuple(torch.from_numpy(batch.astype(np.float64)))
-    worst_rel = 0.0
-    worst_abs = 0.0
-    for name, tensor in zip(net.output_names, reference):
+        raise SystemExit(
+            f"exported graph is missing outputs {missing}; it must carry the "
+            f"{contract} C6 names"
+            + (f" and the taps {list(ACTIVATION_OUTPUT_NAMES)}" if taps else ""))
+    if not taps:
+        # An untapped export must be untapped on purpose, not by a stale
+        # wrapper: a tap that leaked in would silently change the graph shape
+        # the back-compat fixture exists to pin.
+        leaked = [name for name in ACTIVATION_OUTPUT_NAMES if name in outputs]
+        if leaked:
+            raise SystemExit(f"untapped export unexpectedly carries {leaked}")
+    reference = float64_reference(net, batch)
+    contract_rel = contract_abs = tap_rel = tap_abs = 0.0
+    # `names` is shorter than `reference` for an untapped graph, so the zip
+    # drops the tap tensors that were never exported.
+    for index, (name, tensor) in enumerate(zip(names, reference)):
         truth = tensor.numpy().astype(np.float64)
         delta = np.abs(np.asarray(outputs[name], dtype=np.float64) - truth)
         if delta.size == 0:
             continue
-        worst_abs = max(worst_abs, float(delta.max()))
-        worst_rel = max(worst_rel, float((delta / np.maximum(1.0, np.abs(truth))).max()))
-    return worst_rel, worst_abs, runtime
+        absolute = float(delta.max())
+        relative = float((delta / np.maximum(1.0, np.abs(truth))).max())
+        if index < contract:
+            contract_abs = max(contract_abs, absolute)
+            contract_rel = max(contract_rel, relative)
+        else:
+            tap_abs = max(tap_abs, absolute)
+            tap_rel = max(tap_rel, relative)
+    return ParityResult(contract_rel=contract_rel, contract_abs=contract_abs,
+                        tap_rel=tap_rel, tap_abs=tap_abs, taps=taps, runtime=runtime)
 
 
 SEED_BATCH = 9781
@@ -230,8 +410,15 @@ def sample_raw_batch(data: AdvisorData | None, n_inputs: int, rows: int = 16) ->
 # default export
 # --------------------------------------------------------------------------- #
 
-def load_trained(checkpoint: Path, data: AdvisorData) -> tuple[AdvisorNet, dict[str, Any]]:
-    """Load the checkpoint's net; returns it with the full saved payload."""
+def load_trained(checkpoint: Path,
+                 data: AdvisorData | None) -> tuple[AdvisorNet, dict[str, Any]]:
+    """Load the checkpoint's net; returns it with the full saved payload.
+
+    ``data`` is the table the graph will be checked against. ``None`` means
+    ``--schema-from-checkpoint``: take the schema from the checkpoint and skip
+    the comparison below, which is the only way to re-export a shipped model
+    whose corpus predates the current ``dataset.py``.
+    """
     if not checkpoint.is_file():
         raise SystemExit(
             f"no trained checkpoint at {checkpoint}\n"
@@ -241,14 +428,17 @@ def load_trained(checkpoint: Path, data: AdvisorData) -> tuple[AdvisorNet, dict[
     config = payload.get("config")
     if not config:
         raise SystemExit(f"checkpoint {checkpoint} has no model config")
-    expected = data.model_config()
-    if list(config["input_columns"]) != expected["input_columns"] or \
-       list(config["action_dims"]) != expected["action_dims"]:
-        raise SystemExit(
-            "checkpoint schema does not match the current dataset "
-            f"(D={len(config['input_columns'])}/{len(expected['input_columns'])}, "
-            f"A={len(config['action_dims'])}/{len(expected['action_dims'])}); retrain."
-        )
+    if data is not None:
+        expected = data.model_config()
+        if list(config["input_columns"]) != expected["input_columns"] or \
+           list(config["action_dims"]) != expected["action_dims"]:
+            raise SystemExit(
+                "checkpoint schema does not match the current dataset "
+                f"(D={len(config['input_columns'])}/{len(expected['input_columns'])}, "
+                f"A={len(config['action_dims'])}/{len(expected['action_dims'])}); "
+                f"retrain, or pass --schema-from-checkpoint to re-export the "
+                f"checkpoint under its own schema."
+            )
     net = AdvisorNet(config)
     net.load_state_dict(payload["model"])
     net.eval()
@@ -291,9 +481,66 @@ def normalization_drift(saved: dict[str, Any], fresh: dict[str, Any]) -> list[st
     return drift
 
 
+def verify_ood(path: Path, net: AdvisorNet) -> dict[str, Any]:
+    """Check the OOD block that ships beside the graph; never refit it.
+
+    ``ood.json`` is fitted on the *corpus*, not on the graph, and carries its
+    own standardizer over the geometry descriptors (see ``calibration.fit_ood``),
+    so a change to the network's input schema cannot invalidate it. Refitting it
+    here on today's table would silently move the veto boundary of a network
+    trained on a different one -- a retrain decision, not an export decision.
+    So this verifies instead: present, the right width, and the columns the C++
+    descriptor builder emits. The C++ loader refuses a model directory without a
+    usable OOD block, so an export that left one broken would ship a directory
+    that cannot be loaded at all.
+    """
+    if not path.is_file():
+        raise SystemExit(
+            f"no OOD block at {path}; the C++ loader requires one. "
+            f"Fit it: python scripts/advisor/calibration.py")
+    params = json.loads(path.read_text(encoding="utf-8"))
+    columns = params.get("feature_columns")
+    if columns != list(OOD_FEATURE_COLUMNS):
+        raise SystemExit(
+            f"{path} was fitted over {len(columns or [])} columns, but the C++ "
+            f"descriptor builder emits {len(OOD_FEATURE_COLUMNS)}; refit it: "
+            f"python scripts/advisor/calibration.py")
+    width = len(columns)
+    for key in ("center", "scale"):
+        if len(params.get(key, [])) != width:
+            raise SystemExit(f"{path}: '{key}' is not {width} wide")
+    if len(params.get("precision", [])) != width:
+        raise SystemExit(f"{path}: 'precision' is not {width}x{width}")
+    return params
+
+
 def run_export(args: argparse.Namespace) -> int:
     checkpoint = Path(args.checkpoint) if args.checkpoint else default_checkpoint()
-    data = load_from_args(args)
+
+    # `--schema-from-checkpoint` takes the input-column schema from the
+    # checkpoint and skips the dataset comparison entirely. It exists for one
+    # measured situation: re-exporting a SHIPPED checkpoint whose dataset
+    # generation predates the current `dataset.py`. HEAD's dataset.py declares
+    # 62 INPUT_COLUMNS, while `runs/best.pt` and the shipped
+    # bench/advisor/{model.onnx,normalization.json,clamps.json} are all the
+    # 47-column schema, so the default path (correctly) refuses to export any of
+    # them. That skew is a known, separate defect -- the shipped model needs a
+    # retrain on the 62-column table -- and this flag does not fix it and must
+    # not be used to paper over it.
+    #
+    # What makes the flag safe is that the re-export is provably the same
+    # network: all 24 of `best.pt`'s state_dict tensors are bit-equal to the
+    # shipped graph's initializers, and the nine contract outputs of the
+    # re-exported graph are bit-identical to the previous graph's on the same
+    # batch. Everything else is still verified below: parity against float64
+    # PyTorch, the nine-name C6 contract, the three taps, and the
+    # normalization/clamps/OOD triple, all taken from or checked against the
+    # checkpoint's own schema so the four files cannot drift apart.
+    #
+    # The dataset is not read at all on this path, which is deliberate:
+    # `bench/advisor/dataset.csv` is gitignored, so a command that needed it
+    # could not regenerate a shipped artifact from a fresh clone.
+    data = None if args.schema_from_checkpoint else load_from_args(args)
     net, payload = load_trained(checkpoint, data)
 
     # The graph was trained under the checkpoint's statistics, so those are the
@@ -308,32 +555,45 @@ def run_export(args: argparse.Namespace) -> int:
             f"it predates the export contract. Retrain: "
             f"python scripts/advisor/train.py --runs 1"
         )
-    drift = normalization_drift(normalization, data.normalization)
+    if list(normalization.get("input_columns", [])) != list(net.input_columns):
+        raise SystemExit(
+            f"checkpoint {checkpoint} stores {len(normalization.get('input_columns', []))} "
+            f"normalization columns for a {len(net.input_columns)}-input network; "
+            f"the payload is inconsistent with its own graph")
 
-    # `clamps.json` mixes two kinds of key. Vocabularies, boxes, defaults and the
-    # candidate grid describe what the graph was trained to encode and decode, so
-    # a change there really does invalidate the checkpoint. The two thresholds do
-    # not: they are read by the C++ chooser *after* inference and touch neither
-    # the graph nor the encoding, so retuning them must not force a retrain.
-    # Conflating the two would mean a one-line operating-point change could only
-    # ship behind hours of training, which is how the gate ended up left at an
-    # unconsidered value in the first place.
+    # `clamps.json` mixes two kinds of key. Vocabularies, boxes, defaults and
+    # the candidate grid describe what the graph was trained to encode and
+    # decode, so a change there really does invalidate the checkpoint. The two
+    # thresholds do not: they are read by the C++ chooser *after* inference and
+    # touch neither the graph nor the encoding, so retuning them must not force
+    # a retrain. Conflating the two would mean a one-line operating-point
+    # change could only ship behind hours of training, which is how the gate
+    # ended up left at an unconsidered value in the first place.
     graph_affecting = {k: v for k, v in clamps.items() if k not in DEPLOYMENT_CLAMP_KEYS}
-    current_graph_affecting = {
-        k: v for k, v in data.clamps.items() if k not in DEPLOYMENT_CLAMP_KEYS
-    }
-    if graph_affecting != current_graph_affecting:
-        drift.append("clamps.json graph-affecting payload differs from the checkpoint's")
 
-    # Ship the checkpoint's graph contract with the *current* operating point.
+    # The operating point comes from the current table when there is one, and
+    # from the checkpoint when there is not. Either way it is appended last, so
+    # the file's key order is a property of this exporter rather than of which
+    # path wrote it -- a re-export must not churn the artifact by reordering it.
+    operating_point = clamps if data is None else data.clamps
+    if data is None:
+        drift: list[str] = []
+    else:
+        drift = normalization_drift(normalization, data.normalization)
+        current_graph_affecting = {
+            k: v for k, v in data.clamps.items() if k not in DEPLOYMENT_CLAMP_KEYS
+        }
+        if graph_affecting != current_graph_affecting:
+            drift.append("clamps.json graph-affecting payload differs from the checkpoint's")
+
     clamps = dict(graph_affecting)
     for key in DEPLOYMENT_CLAMP_KEYS:
-        if key not in data.clamps:
+        if key not in operating_point:
             raise SystemExit(
-                f"dataset.py did not emit '{key}'; the C++ requires it and refuses a "
-                f"clamps.json that omits it"
+                f"no '{key}' in {'the checkpoint' if data is None else 'dataset.py output'}; "
+                f"the C++ requires it and refuses a clamps.json that omits it"
             )
-        clamps[key] = data.clamps[key]
+        clamps[key] = operating_point[key]
     if drift:
         detail = "\n".join(f"  {line}" for line in drift)
         raise SystemExit(
@@ -344,25 +604,35 @@ def run_export(args: argparse.Namespace) -> int:
         )
 
     output = Path(args.output) if args.output else MODEL_ONNX
-    export_graph(net, output)
+    layout_path = export_graph(net, output)
     write_json(NORMALIZATION_JSON, normalization)
     write_json(CLAMPS_JSON, clamps)
+    ood = verify_ood(OOD_JSON, net)
 
     batch = sample_raw_batch(data, len(net.input_columns))
-    worst_rel, worst_abs, runtime = verify_parity(net, output, batch, normalization)
+    parity = verify_parity(net, output, batch, normalization)
 
+    source = ("the checkpoint's own schema (--schema-from-checkpoint)" if data is None
+              else f"the current table {data.csv_path}")
     print(f"wrote {output}")
+    print(f"wrote {layout_path}")
     print(f"wrote {NORMALIZATION_JSON}")
     print(f"wrote {CLAMPS_JSON}")
+    print(f"checked {OOD_JSON} ({len(ood['feature_columns'])} columns, "
+          f"{ood.get('n_train_rows', '?')} rows; fitted separately, not rewritten)")
     print(f"opset={OPSET} D={len(net.input_columns)} A={len(net.action_dims)} "
-          f"params={net.n_parameters()}")
+          f"hidden={net.hidden} params={net.n_parameters()}")
+    print(f"outputs = {len(net.output_names)} contract + "
+          f"{len(ACTIVATION_OUTPUT_NAMES)} taps {ACTIVATION_OUTPUT_NAMES}")
+    print(f"schema from {source}")
     print(f"normalization from {checkpoint} (run {payload.get('run', '?')})")
-    print(f"verified with {runtime} on a {batch.shape[0]}x{batch.shape[1]} batch")
-    print(f"max parity error = {worst_rel:.3e} relative "
-          f"({worst_abs:.3e} absolute), tolerance {PARITY_TOLERANCE:.0e} relative")
-    if not (worst_rel <= PARITY_TOLERANCE):
+    print(f"verified with {parity.runtime} on a {batch.shape[0]}x{batch.shape[1]} batch")
+    for line in parity.report():
+        print(line)
+    if not (parity.worst_rel <= PARITY_TOLERANCE):
         raise SystemExit(
-            f"ONNX/torch parity failure: {worst_rel:.3e} > {PARITY_TOLERANCE:.0e} relative")
+            f"ONNX/torch parity failure: {parity.worst_rel:.3e} > "
+            f"{PARITY_TOLERANCE:.0e} relative")
     return 0
 
 
@@ -644,8 +914,23 @@ def tiny_ood(raw_matrix: np.ndarray, normalization: dict[str, Any]) -> dict[str,
     return params
 
 
-def run_tiny_fixture(args: argparse.Namespace) -> int:
-    directory = Path(args.fixture_dir) if args.fixture_dir else FIXTURE_DIR
+#: The activation fixture: the same tiny network, exported WITH the taps and
+#: carrying the float64 tap tensors per case. Kept separate from
+#: ``advisor_tiny`` on purpose. That directory is the evidence that a model
+#: without taps still loads and recommends (``has_activations() == false``), so
+#: tapping it in place would delete the back-compat fixture rather than add one.
+EXPLAIN_FIXTURE_DIR = ROOT / "tests" / "fixtures" / "advisor_explain"
+
+
+def build_fixture(args: argparse.Namespace, directory: Path, taps: bool,
+                  flag: str) -> int:
+    """Write one deterministic fixture directory.
+
+    ``taps`` selects the graph shape and, with it, whether the parity cases
+    carry the three float64 tap tensors. Everything else -- seed, synthetic
+    table, forced heads, OOD fit -- is shared, so the two fixtures differ in
+    exactly the thing under test and nothing else.
+    """
     directory.mkdir(parents=True, exist_ok=True)
 
     with tempfile.TemporaryDirectory(prefix="advisor-tiny-") as tmp:
@@ -673,6 +958,10 @@ def run_tiny_fixture(args: argparse.Namespace) -> int:
     with torch.no_grad():
         outputs = net.forward_tuple(torch.from_numpy(standardized.astype(np.float32)))
     tensors = dict(zip(net.output_names, outputs))
+    # The taps are recorded in float64, from the same reference the parity check
+    # scores the graph against, so the C++ has something better than the graph's
+    # own float32 answer to compare its tap reads to.
+    reference = float64_reference(net, standardized) if taps else ()
     for index, case in enumerate(cases):
         case["standardized_input"] = [float(value) for value in standardized[index]]
         case["outputs"] = {
@@ -680,10 +969,13 @@ def run_tiny_fixture(args: argparse.Namespace) -> int:
                    else [float(value) for value in tensors["policy"][index]])
             for name in net.output_names
         }
+        for offset, name in enumerate(ACTIVATION_OUTPUT_NAMES if taps else []):
+            tap = reference[len(net.output_names) + offset]
+            case[name] = [float(value) for value in tap[index]]
     check_fixture_guarantees(cases, clamps)
 
     model_path = directory / "model.onnx"
-    export_graph(net, model_path)
+    layout_path = export_graph(net, model_path, taps)
     write_json(directory / "normalization.json", normalization)
     write_json(directory / "clamps.json", clamps)
     # The OOD block is required by the C++ loader, so the fixture must carry one
@@ -692,7 +984,7 @@ def run_tiny_fixture(args: argparse.Namespace) -> int:
     # shipped parameters would stop being a self-contained unit.
     write_json(directory / "ood.json", tiny_ood(raw_matrix, normalization))
     parity = {
-        "generator": "scripts/advisor/export_onnx.py --tiny-fixture",
+        "generator": f"scripts/advisor/export_onnx.py {flag}",
         "seed": TINY_SEED,
         "opset": OPSET,
         "tolerance": {
@@ -705,34 +997,59 @@ def run_tiny_fixture(args: argparse.Namespace) -> int:
         "input_columns": list(normalization["input_columns"]),
         "action_dims": list(clamps["action_dims"]),
         "output_names": list(OUTPUT_NAMES),
-        "cases": cases,
     }
+    if taps:
+        parity["activation_outputs"] = list(ACTIVATION_OUTPUT_NAMES)
+        parity["activation_reference"] = (
+            "float64 torch AdvisorNet.trunk() on standardized_input; the graph is "
+            "float32, so compare under tolerance.relative")
+    parity["cases"] = cases
     write_json(directory / "parity.json", parity)
 
-    worst_rel, worst_abs, runtime = verify_parity(net, model_path, raw_matrix, normalization)
-    extra_rel, extra_abs, _ = verify_parity(
-        net, model_path, sample_raw_batch(data, len(net.input_columns)), normalization)
-    worst_rel = max(worst_rel, extra_rel)
-    worst_abs = max(worst_abs, extra_abs)
+    parity_run = verify_parity(net, model_path, raw_matrix, normalization, taps)
+    parity_run = parity_run.worst_of(verify_parity(
+        net, model_path, sample_raw_batch(data, len(net.input_columns)),
+        normalization, taps))
 
     print(f"wrote {model_path}")
+    if layout_path is not None:
+        print(f"wrote {layout_path}")
     print(f"wrote {directory / 'normalization.json'}")
     print(f"wrote {directory / 'clamps.json'}")
+    print(f"wrote {directory / 'ood.json'}")
     print(f"wrote {directory / 'parity.json'}")
     print(f"opset={OPSET} D={len(net.input_columns)} A={len(net.action_dims)} "
           f"hidden={config['hidden']} params={net.n_parameters()}")
+    print(f"outputs = {len(net.output_names)} contract"
+          + (f" + {len(ACTIVATION_OUTPUT_NAMES)} taps {ACTIVATION_OUTPUT_NAMES}"
+             if taps else " (no activation taps, by design)"))
     for case in cases:
         policy = case["outputs"]["policy"]
         print(f"  case {case['name']:<18} h_rel={policy[0]:+.6f} "
               f"failure_logit={case['outputs']['failure_logit']:+.4f} "
               f"rel_err={case['outputs']['rel_err']:+.4f}")
-    print(f"verified with {runtime}")
-    print(f"max parity error = {worst_rel:.3e} relative "
-          f"({worst_abs:.3e} absolute), tolerance {PARITY_TOLERANCE:.0e} relative")
-    if not (worst_rel <= PARITY_TOLERANCE):
+    print(f"verified with {parity_run.runtime}")
+    for line in parity_run.report():
+        print(line)
+    total = sum(path.stat().st_size for path in sorted(directory.iterdir())
+                if path.is_file())
+    print(f"{directory} total {total} bytes")
+    if not (parity_run.worst_rel <= PARITY_TOLERANCE):
         raise SystemExit(
-            f"ONNX/torch parity failure: {worst_rel:.3e} > {PARITY_TOLERANCE:.0e} relative")
+            f"ONNX/torch parity failure: {parity_run.worst_rel:.3e} > "
+            f"{PARITY_TOLERANCE:.0e} relative")
     return 0
+
+
+def run_tiny_fixture(args: argparse.Namespace) -> int:
+    return build_fixture(args, Path(args.fixture_dir) if args.fixture_dir else FIXTURE_DIR,
+                         taps=False, flag="--tiny-fixture")
+
+
+def run_explain_fixture(args: argparse.Namespace) -> int:
+    return build_fixture(args,
+                         Path(args.fixture_dir) if args.fixture_dir else EXPLAIN_FIXTURE_DIR,
+                         taps=True, flag="--explain-fixture")
 
 
 # --------------------------------------------------------------------------- #
@@ -746,8 +1063,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--output", default=None, help="output .onnx path (default bench/advisor/model.onnx)")
     parser.add_argument("--csv", default=None, help="dataset CSV override")
     add_split_args(parser)
+    parser.add_argument("--schema-from-checkpoint", action="store_true",
+                        help="take the input-column schema from the checkpoint instead of "
+                             "the dataset CSV, to re-export a shipped model whose corpus "
+                             "predates the current dataset.py")
     parser.add_argument("--tiny-fixture", action="store_true",
-                        help="build the deterministic tests/fixtures/advisor_tiny/ directory")
+                        help="build the deterministic tests/fixtures/advisor_tiny/ "
+                             "directory (no activation taps)")
+    parser.add_argument("--explain-fixture", action="store_true",
+                        help="build the deterministic tests/fixtures/advisor_explain/ "
+                             "directory (activation taps + layout sidecar)")
     parser.add_argument("--fixture-dir", default=None, help="fixture output directory override")
     return parser.parse_args(argv)
 
@@ -755,8 +1080,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     torch.set_num_threads(1)
     args = parse_args(argv)
+    if args.tiny_fixture and args.explain_fixture:
+        raise SystemExit("--tiny-fixture and --explain-fixture write different "
+                         "directories; run them one at a time")
     if args.tiny_fixture:
         return run_tiny_fixture(args)
+    if args.explain_fixture:
+        return run_explain_fixture(args)
     return run_export(args)
 
 

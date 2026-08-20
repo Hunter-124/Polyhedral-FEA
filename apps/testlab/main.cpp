@@ -459,69 +459,17 @@ PartCase load_case(const fs::path& path) {
     return c;
 }
 
+/// Campaign configs name meshers with the vocabulary in
+/// `pipeline::mesher_from_name`, which is the single table beside the enum.
+/// This used to be a local copy that accepted `hexvem` but *emitted*
+/// `hex_vem`, so a mesher name this binary printed into a results row could
+/// not be fed back into it.
 pipeline::VolumeMesher parse_mesher(const std::string& name) {
-    if (name == "hex") {
-        return pipeline::VolumeMesher::kHexFill;
+    const auto parsed = pipeline::mesher_from_name(name);
+    if (!parsed) {
+        throw std::runtime_error("unknown mesher '" + name + "'");
     }
-    if (name == "tet" || name == "tet_fill") {
-        return pipeline::VolumeMesher::kTetFill;
-    }
-    if (name == "graded_tet" || name == "graded") {
-        return pipeline::VolumeMesher::kGradedTet;
-    }
-    if (name == "hybrid_zoo" || name == "hybrid" || name == "zoo") {
-        return pipeline::VolumeMesher::kHybrid;
-    }
-    if (name == "hybrid_vem" || name == "hybridvem" || name == "hybrid-vem") {
-        return pipeline::VolumeMesher::kHybridVem;
-    }
-    if (name == "hexpyr" || name == "transition") {
-        return pipeline::VolumeMesher::kHexPyramid;
-    }
-    if (name == "prism" || name == "sweep") {
-        return pipeline::VolumeMesher::kPrismSweep;
-    }
-    if (name == "hexvem" || name == "vem") {
-        return pipeline::VolumeMesher::kHexVem;
-    }
-    if (name == "octa" || name == "octahedral") {
-        return pipeline::VolumeMesher::kOctahedral;
-    }
-    if (name == "varyhedron" || name == "vary") {
-        return pipeline::VolumeMesher::kVaryhedron;
-    }
-    if (name == "cvt_poly" || name == "cvt" || name == "restricted_cvt") {
-        return pipeline::VolumeMesher::kCvtPoly;
-    }
-    throw std::runtime_error("unknown mesher '" + name + "'");
-}
-
-std::string mesher_name(pipeline::VolumeMesher mesher) {
-    switch (mesher) {
-    case pipeline::VolumeMesher::kTetFill:
-        return "tet";
-    case pipeline::VolumeMesher::kHexFill:
-        return "hex";
-    case pipeline::VolumeMesher::kHexVem:
-        return "hex_vem";
-    case pipeline::VolumeMesher::kGradedTet:
-        return "graded_tet";
-    case pipeline::VolumeMesher::kHexPyramid:
-        return "hexpyr";
-    case pipeline::VolumeMesher::kPrismSweep:
-        return "prism";
-    case pipeline::VolumeMesher::kHybrid:
-        return "hybrid_zoo";
-    case pipeline::VolumeMesher::kOctahedral:
-        return "octa";
-    case pipeline::VolumeMesher::kHybridVem:
-        return "hybrid_vem";
-    case pipeline::VolumeMesher::kVaryhedron:
-        return "varyhedron";
-    case pipeline::VolumeMesher::kCvtPoly:
-        return "cvt_poly";
-    }
-    return "unknown";
+    return *parsed;
 }
 
 // Full-factorial expansion of campaign.grid → Config list.
@@ -1869,7 +1817,7 @@ json case_features_json(const pipeline::CaseFeatures& f) {
 json action_json(const Config& cfg, double h, double h_rel) {
     return {{"h", h},
             {"h_rel", h_rel},
-            {"mesher", mesher_name(cfg.mesher)},
+            {"mesher", pipeline::mesher_name(cfg.mesher)},
             {"element_tendency", cfg.element_tendency},
             {"skin_layers", cfg.skin_layers},
             {"feature_refine", cfg.feature_refine},

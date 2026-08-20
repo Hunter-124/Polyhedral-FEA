@@ -16,6 +16,7 @@
 
 #include <Eigen/Core>
 
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <functional>
@@ -28,6 +29,7 @@
 #include <stdexcept>
 
 #include <string>
+#include <string_view>
 #include <thread>
 #include <vector>
 #include <utility>
@@ -54,6 +56,25 @@ enum class VolumeMesher : int {
     kVaryhedron = 9, // variable poly packing (ADR-0021); v1 edge-seed scaffold
     kCvtPoly = 10,   // restricted CVT → clipped Voronoi poly VEM (G1–G4 / M5)
 };
+
+/// Canonical name for a mesher, and the inverse. The names are the CLI's
+/// `--mesher` vocabulary and the advisor's `mesher` string, so this table is
+/// also the advisor-decision-to-setup mapping.
+///
+/// One table, next to the enum, because the copies that grew in apps/ diverged:
+/// `apps/cli` spelled four enumerators differently from `apps/testlab`
+/// (`hexvem`/`hex_vem`, `graded`/`graded_tet`, `hybrid`/`hybrid_zoo`,
+/// `hybridvem`/`hybrid_vem`), and testlab could not even parse the `hex_vem` it
+/// emitted. `mesher_name` returns the advisor/testlab spelling, because that is
+/// what the trained model's `mesher_choices` vocabulary contains and what
+/// decision logs already record; `mesher_from_name` accepts every alias either
+/// copy ever accepted, so nothing that used to parse stops parsing.
+///
+/// An unknown name is `nullopt`. No fallback: the CLI's lenient
+/// `value_or(kGradedTet)` is what let a typo'd `--mesher` silently mesh with a
+/// mesher nobody asked for, and a caller that wants a default can say so.
+[[nodiscard]] std::string_view mesher_name(VolumeMesher mesher);
+[[nodiscard]] std::optional<VolumeMesher> mesher_from_name(std::string_view name);
 
 /// Continuous element-shape preference dial the campaign/tuner sweeps
 /// (`element_tendency` ∈ [-1, +1], clamped). See `resolve_element_tendency`.
@@ -494,6 +515,49 @@ struct VolumeMeshOutput {
     GeometryVolumeAssessment fill_geometry_volume;
     GeometryVolumeAssessment solved_geometry_volume;
 };
+
+/// One completed construction stage of a volume fill, exactly as the mesher
+/// built it: the mesh as it stood at that instant, in solver types.
+struct MeshStage {
+    std::string stage; // stable id, see kMeshStageNames
+    int index = 0;     // 0-based emission order within one fill
+    int pass = 0;      // adapt pass that ran the fill (0 = initial)
+    fea::NodalMesh mesh;
+};
+/// Set to observe a fill as it is built; empty (the default) costs nothing.
+using MeshStageSink = std::function<void(const MeshStage&)>;
+
+/// Every stage id `volume_mesh` can emit, in emission order.
+///
+/// The list is the vocabulary, not the schedule. Only the hybrid zoo — the
+/// mesher the advisor actually recommends — has construction boundaries the
+/// pipeline can see: it drives `mesh::mixed_fill_surface`, the ADR-0013
+/// hex->pyramid expansion, the snap and the repair rounds as separate calls on
+/// one mixed-cell container. Every other mesher is a single opaque call at this
+/// level, so it emits only "fill" and "ship"; instrumenting its interior would
+/// mean a parameter on the mesher itself, which this deliberately does not do.
+///
+/// A stage whose step did not run is never emitted: "expand" is absent on a
+/// pure-hex lattice and on the VEM variant, "snap" through "pin" are all absent
+/// when the lattice produced no boundary quads, and "pin" needs a pinnable
+/// BRep. A step that ran and happened to move nothing still emits, so two
+/// consecutive stages can be identical meshes — that is what the mesher did,
+/// and reporting it is preferred over hiding a round that ran.
+///
+/// What the mesher had finished at each instant:
+inline constexpr std::array<std::string_view, 10> kMeshStageNames{
+    "lattice",   // hex/pyramid/tet lattice emitted, unsnapped, at raw grid sites.
+    "expand",    // ADR-0013 hex->pyramid product expansion (skipped on pure hex / VEM).
+    "snap",      // free-surface boundary nodes projected onto the CAD surface.
+    "peel",      // snap-flattened transition fan tets deleted, boundary faces rebuilt.
+    "reproject", // per-node re-projection of the residual outliers the snap left.
+    "smooth",    // tangential relaxation of boundary-node spacing on curved walls.
+    "resnap",    // second snap, over the boundary set the peel and smoothing left.
+    "pin",       // CAD vertices and sharp-edge curves hard-pinned (ADR-0035).
+    "fill",      // the mesher's own output, converted to the solver element zoo.
+    "ship",      // exterior conform + ship gate + orphan compaction: the delivered mesh.
+};
+
 /// Volume fill of a closed model surface.
 /// @param h Coarse target edge length, metres (must be > 0; call resolve_mesh_size first).
 /// @param feature_refine When true and mesher is graded, also refine near sharp edges.
@@ -506,13 +570,20 @@ struct VolumeMeshOutput {
 /// Product callers pass the resolved nonzero SimSetup ceilings.
 /// @param cancel_check Optional cooperative poll; may throw to cancel meshing.
 /// @param auto_retry_budget Bounded coarsen-and-retry count for auto-h callers.
+/// @param on_stage Optional construction-stage observer (`kMeshStageNames`).
+/// Called synchronously on the calling thread with a copy of the mesh at each
+/// boundary; it cannot influence the fill, which never reads it back. Costs
+/// nothing when empty. `MeshStage::pass` is left at 0 here — this function
+/// knows nothing of adapt passes; `SolveJob` stamps it. A fill that hits the
+/// element/DOF ceiling and coarsens is a second fill, so its stage indices
+/// restart at 0 after the abandoned attempt's stages.
 VolumeMeshOutput volume_mesh(
     const Model& model, double h, VolumeMesher mesher = VolumeMesher::kHybrid,
     int skin_layers = 2, bool feature_refine = false,
     std::span<const Eigen::Vector3d> refine_seeds = {}, double seed_band = 0.0,
     double element_tendency = 0.0, std::size_t max_elems = 0, std::size_t max_dof = 0,
     int auto_retry_budget = 0, const std::function<void()>& cancel_check = {},
-    const mesh::SizeFieldFn& size_field = {});
+    const mesh::SizeFieldFn& size_field = {}, const MeshStageSink& on_stage = {});
 
 /// Refresh the solved-stage assessment after the final order elevation and CAD
 /// mid-node projection. Replaces its prior mesher-note token and enforces the
@@ -596,6 +667,15 @@ class SolveJob {
     /// Optional worker-thread callback after each recovered adaptive pass.
     /// Set before `start`; callbacks are serialized in deterministic pass order.
     std::function<void(const PassTrace&)> on_pass;
+
+    /// Optional worker-thread callback for each construction stage of every
+    /// fill this job runs. Set before `start`/`start_mesh`; fires on the worker
+    /// thread, so the consumer must synchronise. `MeshStage::pass` is the adapt
+    /// pass that ran the fill (0 = initial) and `index` is the stage's emission
+    /// order within that fill. Unlike `on_pass`, this one carries a whole mesh
+    /// per call, so leaving it unset is the cheap path and is what every
+    /// existing caller gets.
+    std::function<void(const MeshStage&)> on_mesh_stage;
 
     /// Poll intermediate volume mesh for viewport (updated after mesh / adapt
     /// remesh). Returns a copy when generation advanced past `seen_gen` (then

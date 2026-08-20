@@ -102,6 +102,43 @@ constexpr std::array<const char*, 9> kOutputNames{
     "rel_err", "rel_err_rel", "geo_chamfer",   "geo_p99", "dof",
     "mesh_ms", "solve_ms",    "failure_logit", "policy"};
 
+// The activation taps, in the order `scripts/advisor/export_onnx.py` appends
+// them AFTER the nine contract outputs. Appended, never interleaved: the
+// contract indices above are what `evaluate()` unpacks positionally, so a tap
+// inserted among them would silently re-label every head.
+//
+// `trunk_input` is the post-embedding concatenation (the trunk's real input
+// width, narrower than `input_columns` by the two categorical columns and wider
+// by the two embedding blocks); `trunk_fc1` and `trunk_fc2` are the POST-GELU
+// hidden tensors.
+constexpr std::array<const char*, 3> kActivationOutputNames{"trunk_input", "trunk_fc1",
+                                                            "trunk_fc2"};
+
+/// Sidecar schema tag. Refusing an unknown tag is the point: the layout decides
+/// which neuron a drawn edge connects, and a future revision that reorders
+/// `layers` or transposes `weights` would still parse.
+constexpr const char* kActivationLayoutSchema = "polymesh.advisor.activation_layout/1";
+
+/// The `layers` names, in the order `AdvisorNet.activations()` emits them.
+constexpr std::array<const char*, 4> kLayerNames{"input", "trunk.fc1", "trunk.fc2", "heads"};
+
+/// The nine contract tensors, unpacked positionally. Index i is
+/// `kOutputNames[i]`, and construction has already proven the graph agrees with
+/// that list name-by-name, so these are not a guess.
+AdvisorRawOutputs unpack(const std::vector<std::vector<float>>& raw) {
+    AdvisorRawOutputs out;
+    out.rel_err_log10 = static_cast<double>(raw[0][0]);
+    out.rel_err_rel = static_cast<double>(raw[1][0]);
+    out.geo_chamfer_log10 = static_cast<double>(raw[2][0]);
+    out.geo_p99_log10 = static_cast<double>(raw[3][0]);
+    out.dof_log10 = static_cast<double>(raw[4][0]);
+    out.mesh_ms_log10 = static_cast<double>(raw[5][0]);
+    out.solve_ms_log10 = static_cast<double>(raw[6][0]);
+    out.failure_logit = static_cast<double>(raw[7][0]);
+    out.policy.assign(raw[8].begin(), raw[8].end());
+    return out;
+}
+
 } // namespace
 
 struct Advisor::Impl {
@@ -168,9 +205,34 @@ struct Advisor::Impl {
     std::string input_name;
     std::vector<const char*> output_name_ptrs;
 
+    /// The same nine names followed by `kActivationOutputNames`. Non-empty only
+    /// when the graph exports the taps. Kept as a SECOND list so the production
+    /// path keeps asking for exactly nine tensors: the taps are materialised
+    /// intermediates, and a campaign that never draws anything should not pay
+    /// for them.
+    std::vector<const char*> tap_output_name_ptrs;
+
+    /// Set when `activation_layout.json` loaded AND agreed with the graph.
+    /// Everything the drawing needs is either fully consistent or absent; there
+    /// is no partial mode, because a layout that half-matches the graph draws
+    /// edges between neurons that are not connected.
+    bool activations_available = false;
+    /// Why not, when `activations_available` is false. Reported through the
+    /// `explain()` error rather than swallowed, so a stale model directory says
+    /// what to re-export instead of silently rendering nothing.
+    std::string activation_note = "advisor: this model directory was loaded without activation "
+                                  "taps";
+    NetworkLayout layout;
+
     void load_normalization(const std::filesystem::path& dir);
     void load_clamps(const std::filesystem::path& dir);
     void load_ood(const std::filesystem::path& dir);
+    /// Read and validate `activation_layout.json` against the graph. Never
+    /// throws: a missing or inconsistent sidecar leaves
+    /// `activations_available == false` with a note, because an older model
+    /// directory must still load and recommend exactly as it did before this
+    /// facility existed.
+    void load_activation_layout(const std::filesystem::path& dir, bool graph_has_taps);
     /// Mahalanobis distance of one query, in raw feature units. Accumulates in
     /// double regardless of storage width: the precision matrix is
     /// ill-conditioned by construction and a float32 accumulation here would be
@@ -178,7 +240,15 @@ struct Advisor::Impl {
     [[nodiscard]] double mahalanobis(const FeatureColumns& columns) const;
     [[nodiscard]] std::vector<float> encode(const FeatureColumns& columns) const;
     void apply_action(FeatureColumns& columns, const AdvisorDecision& action) const;
-    [[nodiscard]] std::vector<std::vector<float>> run(const std::vector<float>& row) const;
+    [[nodiscard]] std::vector<std::vector<float>> run(const std::vector<float>& row,
+                                                     const std::vector<const char*>& names) const;
+    /// One forward pass on these columns. With `frame == nullptr` this is the
+    /// production path, unchanged: nine requested outputs. With a frame, and
+    /// only when the taps are available, the SAME `Run` also returns the trunk
+    /// tensors, so the recorded activations belong to the recorded outputs
+    /// rather than to a second pass that might not agree with the first.
+    [[nodiscard]] AdvisorRawOutputs forward(const FeatureColumns& columns,
+                                            ActivationFrame* frame) const;
 };
 
 void Advisor::Impl::load_normalization(const std::filesystem::path& dir) {
@@ -444,6 +514,281 @@ void Advisor::Impl::load_ood(const std::filesystem::path& dir) {
     }
 }
 
+// Static picture of the deployed network (activation_layout.json), written by
+// scripts/advisor/export_onnx.py beside the graph it describes.
+//
+// Unlike every other artifact this file reads, an absent or unusable one is NOT
+// an error. The sidecar buys one thing -- the ability to DRAW the network -- and
+// nothing else in the advisor depends on it, so a model directory exported
+// before it existed must still load and recommend bit-for-bit as it did. The
+// alternative discipline (reconstruct the layout from the graph's own shapes)
+// was rejected: layer sizes are recoverable, but which weight row belongs to
+// which of the nine heads, and which input column feeds which trunk neuron
+// after the embedding concatenation, are not. A layout inferred that far would
+// render a plausible network with its edges attached to the wrong neurons --
+// a lie that looks exactly like the truth.
+//
+// Everything here is therefore validated against the graph, and any single
+// disagreement drops the whole facility rather than half of it.
+void Advisor::Impl::load_activation_layout(const std::filesystem::path& dir,
+                                           bool graph_has_taps) {
+    layout = NetworkLayout{};
+    activations_available = false;
+    const std::string remedy =
+        ". Activations are unavailable; the advisor recommends normally without them. Re-export "
+        "with python scripts/advisor/export_onnx.py to draw the network.";
+    const std::filesystem::path path = dir / "activation_layout.json";
+    if (!graph_has_taps) {
+        activation_note = "advisor: model.onnx exports no trunk activation taps" + remedy;
+        return;
+    }
+    if (!std::filesystem::exists(path)) {
+        activation_note = "advisor: no activation_layout.json in " + dir.string() + remedy;
+        return;
+    }
+
+    // Validation failures are thrown and caught here. They are genuine errors
+    // about the sidecar, so they are raised where they are detected with the
+    // detail attached, and converted to "no activations" at exactly one place.
+    NetworkLayout parsed;
+    try {
+        const json doc = read_json(path);
+        const std::string schema = doc.value("schema", std::string{});
+        if (schema != kActivationLayoutSchema) {
+            // A future revision is free to reorder `layers` or transpose
+            // `weights` and would still parse cleanly here, so the tag is
+            // checked rather than the shape alone.
+            throw AdvisorError("advisor: activation_layout.json schema is '" + schema +
+                               "', expected '" + kActivationLayoutSchema + "'");
+        }
+        const auto taps = doc.value("activation_outputs", std::vector<std::string>{});
+        if (taps.size() != kActivationOutputNames.size()) {
+            throw AdvisorError("advisor: activation_layout.json activation_outputs has " +
+                               std::to_string(taps.size()) + " entries, expected " +
+                               std::to_string(kActivationOutputNames.size()));
+        }
+        for (std::size_t i = 0; i < taps.size(); ++i) {
+            if (taps[i] != kActivationOutputNames[i]) {
+                throw AdvisorError("advisor: activation_layout.json activation_outputs[" +
+                                   std::to_string(i) + "] is '" + taps[i] + "', expected '" +
+                                   kActivationOutputNames[i] + "'");
+            }
+        }
+        if (!doc.contains("hidden") || !doc.at("hidden").is_number_unsigned()) {
+            throw AdvisorError("advisor: activation_layout.json has no unsigned 'hidden'");
+        }
+        const auto hidden = doc.at("hidden").get<std::size_t>();
+
+        if (!doc.contains("layers") || !doc.at("layers").is_array() ||
+            doc.at("layers").size() != kLayerNames.size()) {
+            throw AdvisorError("advisor: activation_layout.json needs exactly " +
+                               std::to_string(kLayerNames.size()) + " layers");
+        }
+        for (std::size_t i = 0; i < kLayerNames.size(); ++i) {
+            const json& entry = doc.at("layers")[i];
+            NetworkLayer layer;
+            layer.name = entry.value("name", std::string{});
+            if (layer.name != kLayerNames[i]) {
+                throw AdvisorError("advisor: activation_layout.json layer " + std::to_string(i) +
+                                   " is '" + layer.name + "', expected '" + kLayerNames[i] + "'");
+            }
+            if (!entry.contains("size") || !entry.at("size").is_number_unsigned() ||
+                entry.at("size").get<std::size_t>() == 0) {
+                throw AdvisorError("advisor: activation_layout.json layer '" + layer.name +
+                                   "' has no positive 'size'");
+            }
+            layer.size = entry.at("size").get<std::size_t>();
+            if (entry.contains("labels")) {
+                layer.labels = entry.at("labels").get<std::vector<std::string>>();
+                if (!layer.labels.empty() && layer.labels.size() != layer.size) {
+                    throw AdvisorError("advisor: activation_layout.json layer '" + layer.name +
+                                       "' has " + std::to_string(layer.labels.size()) +
+                                       " labels for " + std::to_string(layer.size) + " units");
+                }
+            }
+            parsed.layers.push_back(std::move(layer));
+        }
+
+        // The hidden layers are the trunk, both `hidden` wide by construction
+        // (model.py:fc1/fc2). Checking both against the declared width catches a
+        // sidecar copied from a model trained at a different capacity, which is
+        // the shape of mistake that survives a directory being reassembled by
+        // hand.
+        if (parsed.layers[1].size != hidden || parsed.layers[2].size != hidden) {
+            throw AdvisorError("advisor: activation_layout.json trunk layers are " +
+                               std::to_string(parsed.layers[1].size) + "/" +
+                               std::to_string(parsed.layers[2].size) + " wide, not the declared "
+                               "hidden width " + std::to_string(hidden));
+        }
+
+        // Seven regressors plus the failure logit plus one policy dimension per
+        // action dim -- the same accounting `evaluate()` unpacks, so a drawn
+        // "heads" layer cannot have more or fewer circles than the graph has
+        // outputs.
+        const std::size_t expected_heads = kOutputNames.size() - 1 + action_dims.size();
+        if (parsed.layers[3].size != expected_heads) {
+            throw AdvisorError("advisor: activation_layout.json 'heads' has " +
+                               std::to_string(parsed.layers[3].size) + " units, expected " +
+                               std::to_string(expected_heads) + " for " +
+                               std::to_string(kOutputNames.size() - 1) +
+                               " scalar heads plus " + std::to_string(action_dims.size()) +
+                               " policy dims");
+        }
+        // Head ORDER matters more than head count: the drawing labels the lit
+        // circle that produced the recommendation, and a permuted heads layer
+        // would attribute the decision to the wrong output.
+        if (!parsed.layers[3].labels.empty()) {
+            for (std::size_t i = 0; i + 1 < kOutputNames.size(); ++i) {
+                if (parsed.layers[3].labels[i] != kOutputNames[i]) {
+                    throw AdvisorError("advisor: activation_layout.json 'heads' label " +
+                                       std::to_string(i) + " is '" +
+                                       parsed.layers[3].labels[i] + "', expected '" +
+                                       kOutputNames[i] + "'");
+                }
+            }
+        }
+
+        // Tie the input layer to the graph's own input width. The trunk input is
+        // not the model input: model.py:trunk_input drops the two categorical
+        // columns and appends one embedding block for each, so the width is
+        // `input_columns - 2 + 2 * emb_dim`. `emb_dim` is not shipped to C++, so
+        // what is checked is the part that does not depend on it: every named
+        // input-layer label must be a real input column, exactly the two
+        // categorical columns may be missing, and the unnamed remainder (the two
+        // embedding blocks) must split evenly.
+        const NetworkLayer& input_layer = parsed.layers[0];
+        if (input_layer.labels.size() != input_layer.size) {
+            throw AdvisorError("advisor: activation_layout.json 'input' layer must label all " +
+                               std::to_string(input_layer.size) +
+                               " units; the labels are what attaches an edge to a column");
+        }
+        std::size_t named = 0;
+        for (const std::string& label : input_layer.labels) {
+            if (std::find(input_columns.begin(), input_columns.end(), label) !=
+                input_columns.end()) {
+                ++named;
+            }
+        }
+        if (input_columns.size() < 2 || named != input_columns.size() - 2) {
+            throw AdvisorError("advisor: activation_layout.json 'input' layer names " +
+                               std::to_string(named) + " of the graph's " +
+                               std::to_string(input_columns.size()) +
+                               " input columns, expected all but the two categorical ones");
+        }
+        if ((input_layer.size - named) % 2 != 0) {
+            throw AdvisorError("advisor: activation_layout.json 'input' layer has " +
+                               std::to_string(input_layer.size - named) +
+                               " embedding units, which is not two equal blocks");
+        }
+
+        // Widths as the GRAPH declares them, where it declares them statically.
+        // This is the authoritative check that `trunk_input` really is
+        // `layers[0]` wide: everything above is arithmetic on the sidecar's own
+        // numbers, this compares them against the tensors that will actually
+        // arrive. A dynamic dimension is left unchecked rather than assumed --
+        // `forward()` re-checks every tap width per pass anyway.
+        const std::array<std::size_t, 3> tap_expect{parsed.layers[0].size, hidden, hidden};
+        for (std::size_t i = 0; i < kActivationOutputNames.size(); ++i) {
+            const auto shape = session->GetOutputTypeInfo(kOutputNames.size() + i)
+                                   .GetTensorTypeAndShapeInfo()
+                                   .GetShape();
+            if (shape.size() != 2) {
+                throw AdvisorError("advisor: model.onnx tap '" +
+                                   std::string(kActivationOutputNames[i]) + "' is rank " +
+                                   std::to_string(shape.size()) + ", expected [batch, width]");
+            }
+            if (shape[1] > 0 && static_cast<std::size_t>(shape[1]) != tap_expect[i]) {
+                throw AdvisorError("advisor: model.onnx tap '" +
+                                   std::string(kActivationOutputNames[i]) + "' is " +
+                                   std::to_string(shape[1]) +
+                                   " wide, but activation_layout.json declares " +
+                                   std::to_string(tap_expect[i]));
+            }
+        }
+
+        // Weight blocks. `rows`/`cols` are validated against the layers they
+        // join AND against the nesting of `weights`, because those are two
+        // independent claims: the header pair is what a consumer indexes with,
+        // the nesting is what the numbers actually are, and a mismatch between
+        // them would transpose the drawn network.
+        if (!doc.contains("edges") || !doc.at("edges").is_array() ||
+            doc.at("edges").size() + 1 != kLayerNames.size()) {
+            throw AdvisorError("advisor: activation_layout.json needs exactly " +
+                               std::to_string(kLayerNames.size() - 1) + " edge blocks");
+        }
+        for (std::size_t i = 0; i + 1 < kLayerNames.size(); ++i) {
+            const json& entry = doc.at("edges")[i];
+            NetworkEdges edges;
+            edges.from = entry.value("from", std::string{});
+            edges.to = entry.value("to", std::string{});
+            if (edges.from != kLayerNames[i] || edges.to != kLayerNames[i + 1]) {
+                throw AdvisorError("advisor: activation_layout.json edge " + std::to_string(i) +
+                                   " joins '" + edges.from + "' to '" + edges.to +
+                                   "', expected '" + kLayerNames[i] + "' to '" +
+                                   kLayerNames[i + 1] + "'");
+            }
+            if (!entry.contains("rows") || !entry.at("rows").is_number_unsigned() ||
+                !entry.contains("cols") || !entry.at("cols").is_number_unsigned()) {
+                throw AdvisorError("advisor: activation_layout.json edge '" + edges.from +
+                                   "' -> '" + edges.to + "' has no unsigned rows/cols");
+            }
+            edges.rows = entry.at("rows").get<std::size_t>();
+            edges.cols = entry.at("cols").get<std::size_t>();
+            if (edges.rows != parsed.layers[i + 1].size || edges.cols != parsed.layers[i].size) {
+                throw AdvisorError("advisor: activation_layout.json edge '" + edges.from +
+                                   "' -> '" + edges.to + "' is " + std::to_string(edges.rows) +
+                                   "x" + std::to_string(edges.cols) + ", expected " +
+                                   std::to_string(parsed.layers[i + 1].size) + "x" +
+                                   std::to_string(parsed.layers[i].size) +
+                                   " for the layers it joins");
+            }
+            if (!entry.contains("weights") || !entry.at("weights").is_array() ||
+                entry.at("weights").size() != edges.rows) {
+                throw AdvisorError("advisor: activation_layout.json edge '" + edges.from +
+                                   "' -> '" + edges.to + "' has no " +
+                                   std::to_string(edges.rows) + "-row 'weights' matrix");
+            }
+            edges.weights.resize(edges.rows * edges.cols);
+            for (std::size_t r = 0; r < edges.rows; ++r) {
+                const json& row = entry.at("weights")[r];
+                if (!row.is_array() || row.size() != edges.cols) {
+                    throw AdvisorError("advisor: activation_layout.json edge '" + edges.from +
+                                       "' -> '" + edges.to + "' row " + std::to_string(r) +
+                                       " is not " + std::to_string(edges.cols) + " wide");
+                }
+                for (std::size_t c = 0; c < edges.cols; ++c) {
+                    const double value = row[c].get<double>();
+                    if (!std::isfinite(value)) {
+                        throw AdvisorError("advisor: activation_layout.json edge '" +
+                                           edges.from + "' -> '" + edges.to +
+                                           "' holds a non-finite weight at (" +
+                                           std::to_string(r) + ", " + std::to_string(c) + ")");
+                    }
+                    // float32 on purpose: these are the drawing's line widths,
+                    // the weights themselves are float32 in the graph, and the
+                    // largest block here is 96x68.
+                    edges.weights[r * edges.cols + c] = static_cast<float>(value);
+                }
+            }
+            parsed.edges.push_back(std::move(edges));
+        }
+    } catch (const AdvisorError& error) {
+        activation_note = std::string(error.what()) + remedy;
+        return;
+    } catch (const std::exception& error) {
+        // Anything nlohmann raises on a payload that parses but is not shaped
+        // like the schema. Prefixed, because those messages name a JSON type
+        // and nothing else, and a user needs to know which file to re-export.
+        activation_note = "advisor: activation_layout.json is malformed: " +
+                          std::string(error.what()) + remedy;
+        return;
+    }
+
+    layout = std::move(parsed);
+    activations_available = true;
+    activation_note.clear();
+}
+
 /// Mahalanobis distance of one query from the training centre, over the ood.json
 /// columns in the ood.json order. Mirrors
 /// `scripts/advisor/calibration.py:ood_scores` exactly, including the clamp at
@@ -620,13 +965,14 @@ FeatureColumns to_columns(const pipeline::CaseFeatures& f) {
     return columns;
 }
 
-std::vector<std::vector<float>> Advisor::Impl::run(const std::vector<float>& row) const {
+std::vector<std::vector<float>> Advisor::Impl::run(
+    const std::vector<float>& row, const std::vector<const char*>& names) const {
     const std::array<std::int64_t, 2> shape{1, static_cast<std::int64_t>(row.size())};
     Ort::Value input = Ort::Value::CreateTensor<float>(
         memory, const_cast<float*>(row.data()), row.size(), shape.data(), shape.size());
     const char* input_names[] = {input_name.c_str()};
-    auto outputs = session->Run(Ort::RunOptions{nullptr}, input_names, &input, 1,
-                                output_name_ptrs.data(), output_name_ptrs.size());
+    auto outputs = session->Run(Ort::RunOptions{nullptr}, input_names, &input, 1, names.data(),
+                                names.size());
 
     std::vector<std::vector<float>> result;
     result.reserve(outputs.size());
@@ -637,6 +983,52 @@ std::vector<std::vector<float>> Advisor::Impl::run(const std::vector<float>& row
         result.emplace_back(data, data + count);
     }
     return result;
+}
+
+AdvisorRawOutputs Advisor::Impl::forward(const FeatureColumns& columns,
+                                         ActivationFrame* frame) const {
+    const std::vector<float> row = encode(columns);
+    const bool with_taps = frame != nullptr && activations_available;
+    const std::vector<std::vector<float>> raw =
+        run(row, with_taps ? tap_output_name_ptrs : output_name_ptrs);
+    const AdvisorRawOutputs out = unpack(raw);
+    if (frame == nullptr) {
+        return out;
+    }
+
+    frame->outputs = out;
+    // The `heads` layer of the drawing is the graph's own head outputs, in
+    // `NetworkLayout` "heads" order: the seven regressors, the failure logit,
+    // then the policy vector. Copied from the SAME tensors the decision is made
+    // from, so a lit head circle and the recommendation it justifies cannot
+    // disagree. Reported pre-activation, exactly as the graph emits them: the
+    // regressors are log10 levels and `failure_logit` is a logit, and squashing
+    // it here would make the drawn value a different number from the one the
+    // gate compares.
+    frame->heads.clear();
+    frame->heads.reserve(kOutputNames.size() - 1 + out.policy.size());
+    for (std::size_t i = 0; i + 1 < kOutputNames.size(); ++i) {
+        frame->heads.push_back(raw[i][0]);
+    }
+    frame->heads.insert(frame->heads.end(), raw[kOutputNames.size() - 1].begin(),
+                        raw[kOutputNames.size() - 1].end());
+    if (!with_taps) {
+        return out;
+    }
+
+    // Widths re-checked per pass rather than trusted from load time: the tap
+    // dimensions may be dynamic in the graph, in which case construction could
+    // not check them, and a frame whose vector length disagrees with the layout
+    // would be drawn against the wrong circles. Left EMPTY on disagreement --
+    // the drawing must show a dark layer, never a resized guess.
+    std::vector<float>* const targets[] = {&frame->input, &frame->fc1, &frame->fc2};
+    for (std::size_t i = 0; i < kActivationOutputNames.size(); ++i) {
+        const std::vector<float>& tensor = raw[kOutputNames.size() + i];
+        if (tensor.size() == layout.layers[i].size) {
+            *targets[i] = tensor;
+        }
+    }
+    return out;
 }
 
 Advisor::Advisor(const std::filesystem::path& model_dir) : impl_(std::make_unique<Impl>()) {
@@ -670,12 +1062,22 @@ Advisor::Advisor(const std::filesystem::path& model_dir) : impl_(std::make_uniqu
     }
     impl_->input_name = impl_->session->GetInputNameAllocated(0, allocator).get();
 
+    // The nine contract outputs are still matched name-by-name and position-by
+    // position: `evaluate()` unpacks them positionally, so this list is load
+    // -time proof, not documentation. The three activation taps are the ONLY
+    // permitted extras and only in their contract order -- anything else is a
+    // graph this build cannot read positionally, which stays an error rather
+    // than a best-effort load.
     const std::size_t n_out = impl_->session->GetOutputCount();
-    if (n_out != kOutputNames.size()) {
+    const bool graph_has_taps = n_out == kOutputNames.size() + kActivationOutputNames.size();
+    if (n_out != kOutputNames.size() && !graph_has_taps) {
         throw AdvisorError("advisor: model.onnx has " + std::to_string(n_out) +
-                           " outputs, expected " + std::to_string(kOutputNames.size()));
+                           " outputs, expected " + std::to_string(kOutputNames.size()) +
+                           " or " +
+                           std::to_string(kOutputNames.size() + kActivationOutputNames.size()) +
+                           " with the trunk activation taps appended");
     }
-    for (std::size_t i = 0; i < n_out; ++i) {
+    for (std::size_t i = 0; i < kOutputNames.size(); ++i) {
         const std::string name = impl_->session->GetOutputNameAllocated(i, allocator).get();
         if (name != kOutputNames[i]) {
             throw AdvisorError("advisor: model.onnx output " + std::to_string(i) + " is '" +
@@ -683,6 +1085,22 @@ Advisor::Advisor(const std::filesystem::path& model_dir) : impl_(std::make_uniqu
         }
     }
     impl_->output_name_ptrs.assign(kOutputNames.begin(), kOutputNames.end());
+    if (graph_has_taps) {
+        for (std::size_t i = 0; i < kActivationOutputNames.size(); ++i) {
+            const std::string name =
+                impl_->session->GetOutputNameAllocated(kOutputNames.size() + i, allocator).get();
+            if (name != kActivationOutputNames[i]) {
+                throw AdvisorError("advisor: model.onnx output " +
+                                   std::to_string(kOutputNames.size() + i) + " is '" + name +
+                                   "', expected the activation tap '" +
+                                   kActivationOutputNames[i] + "'");
+            }
+        }
+        impl_->tap_output_name_ptrs = impl_->output_name_ptrs;
+        impl_->tap_output_name_ptrs.insert(impl_->tap_output_name_ptrs.end(),
+                                          kActivationOutputNames.begin(),
+                                          kActivationOutputNames.end());
+    }
 
     const auto in_shape =
         impl_->session->GetInputTypeInfo(0).GetTensorTypeAndShapeInfo().GetShape();
@@ -692,6 +1110,9 @@ Advisor::Advisor(const std::filesystem::path& model_dir) : impl_(std::make_uniqu
         throw AdvisorError("advisor: model.onnx input width does not match "
                            "normalization.json input_columns");
     }
+
+    // Last, because it validates the sidecar against the session above.
+    impl_->load_activation_layout(model_dir, graph_has_taps);
 }
 
 Advisor::~Advisor() = default;
@@ -707,20 +1128,15 @@ void Advisor::apply_action(FeatureColumns& columns, const AdvisorDecision& actio
 }
 
 AdvisorRawOutputs Advisor::evaluate(const FeatureColumns& columns) const {
-    const auto raw = impl_->run(impl_->encode(columns));
-    // Index i is `kOutputNames[i]`, and construction has already proven the
-    // graph agrees with that list name-by-name, so these are not a guess.
-    AdvisorRawOutputs out;
-    out.rel_err_log10 = static_cast<double>(raw[0][0]);
-    out.rel_err_rel = static_cast<double>(raw[1][0]);
-    out.geo_chamfer_log10 = static_cast<double>(raw[2][0]);
-    out.geo_p99_log10 = static_cast<double>(raw[3][0]);
-    out.dof_log10 = static_cast<double>(raw[4][0]);
-    out.mesh_ms_log10 = static_cast<double>(raw[5][0]);
-    out.solve_ms_log10 = static_cast<double>(raw[6][0]);
-    out.failure_logit = static_cast<double>(raw[7][0]);
-    out.policy.assign(raw[8].begin(), raw[8].end());
-    return out;
+    return impl_->forward(columns, nullptr);
+}
+
+bool Advisor::has_activations() const {
+    return impl_->activations_available;
+}
+
+const NetworkLayout& Advisor::layout() const {
+    return impl_->layout;
 }
 
 AdvisorDecision Advisor::recommend(const pipeline::CaseFeatures& features) const {
@@ -737,6 +1153,48 @@ AdvisorDecision Advisor::recommend(const FeatureColumns& columns) const {
 }
 
 AdvisorDecision Advisor::recommend(const FeatureColumns& columns, double max_dof) const {
+    // One chooser, two entry points. `recommend` is `decide` with nothing
+    // watching, so there is no second ranking rule for the drawing to disagree
+    // with -- and nothing in `decide` behaves differently when `trace` is null.
+    return decide(columns, max_dof, nullptr);
+}
+
+AdvisorExplanation Advisor::explain(const pipeline::CaseFeatures& features,
+                                    double max_dof) const {
+    return explain(to_columns(features), max_dof);
+}
+
+AdvisorExplanation Advisor::explain(const FeatureColumns& columns, double max_dof) const {
+    // Throws, unlike `recommend`, and deliberately: there is no honest reduced
+    // answer here. A caller asking what the network did cannot be handed a
+    // decision with empty activations and left to guess whether the network was
+    // idle or the model directory was stale, so the reason is reported instead.
+    if (!impl_->activations_available) {
+        throw AdvisorError(impl_->activation_note);
+    }
+    AdvisorExplanation explanation;
+    explanation.gate_threshold = impl_->gate_threshold;
+    explanation.decision = decide(columns, max_dof, &explanation);
+    return explanation;
+}
+
+ActivationTaps Advisor::taps(const FeatureColumns& columns) const {
+    // Same guard and same reason as `explain`: no honest reduced answer.
+    if (!impl_->activations_available) {
+        throw AdvisorError(impl_->activation_note);
+    }
+    // Routed through the one `forward`, so this cannot become a second way of
+    // reading the graph that disagrees with the one the decision uses.
+    ActivationFrame frame;
+    // The head outputs are already carried on the frame; the return value is
+    // the unpacked form the chooser wants and this caller does not.
+    static_cast<void>(impl_->forward(columns, &frame));
+    return {std::move(frame.input), std::move(frame.fc1), std::move(frame.fc2),
+            std::move(frame.heads)};
+}
+
+AdvisorDecision Advisor::decide(const FeatureColumns& columns, double max_dof,
+                                AdvisorExplanation* trace) const {
     const Impl& impl = *impl_;
     FeatureColumns query = columns;
 
@@ -750,7 +1208,25 @@ AdvisorDecision Advisor::recommend(const FeatureColumns& columns, double max_dof
         // families this rule is the worst deployable chooser tested, losing
         // significantly to a zero-parameter constant configuration.
         impl.apply_action(query, impl.default_decision);
-        const std::vector<double> policy = evaluate(query).policy;
+        ActivationFrame* frame = nullptr;
+        if (trace != nullptr) {
+            // There is no grid to index into on a legacy artifact, so this is
+            // recorded as the first pass that ran. `gate_pass`, `over_budget`
+            // and `ranked` stay false because this branch ranks nothing: it
+            // reads the policy head and takes its word. Back-filling the
+            // candidate bookkeeping here would draw a chooser that does not
+            // exist.
+            frame = &trace->frames.emplace_back();
+            frame->candidate = 0;
+            frame->action = impl.default_decision;
+        }
+        const AdvisorRawOutputs read = impl.forward(query, frame);
+        if (frame != nullptr) {
+            // The pass's own accuracy output, recorded because it is a real
+            // number this pass produced -- not because anything ranked on it.
+            frame->score = read.rel_err_rel;
+        }
+        const std::vector<double> policy = read.policy;
         if (policy.size() != impl.action_dims.size()) {
             AdvisorDecision vetoed = impl.default_decision;
             vetoed.vetoed = true;
@@ -785,42 +1261,57 @@ AdvisorDecision Advisor::recommend(const FeatureColumns& columns, double max_dof
         bool have_any = false;
         bool saw_over_budget = false;
 
-        for (const AdvisorDecision& candidate : impl.candidates) {
-                            impl.apply_action(query, candidate);
-                            const AdvisorRawOutputs out = evaluate(query);
-                            const double risk = sigmoid(out.failure_logit);
-                            const double score = out.rel_err_rel;
-                            if (!std::isfinite(score)) {
-                                continue;
-                            }
-                            // The max_dof budget is a hard feasibility filter,
-                            // applied after the feasibility head has scored the
-                            // candidate and before any ranking: an action the
-                            // caller cannot afford is dropped from BOTH pools,
-                            // so it is never returned -- not even by the
-                            // gate-binds fallback below, which exists to give
-                            // the veto the last word, not to spend budget the
-                            // caller does not have. The dof head is a learned
-                            // predictor (held-out MAE ~0.5 log10), so this is a
-                            // filter, not a guarantee.
-                            if (max_dof > 0.0 && from_log10(out.dof_log10) > max_dof) {
-                                saw_over_budget = true;
-                                continue;
-                            }
-                            // Tracked separately so a query where the gate
-                            // rejects everything still returns the best ranked
-                            // action rather than nothing: refusing to act is the
-                            // veto's job, not the gate's.
-                            if (score < best_risk_score) {
-                                best_risk_score = score;
-                                best_any = candidate;
-                                have_any = true;
-                            }
-                            if (risk <= impl.gate_threshold && score < best_score) {
-                                best_score = score;
-                                best_survivor = candidate;
-                                have_survivor = true;
-                            }
+        for (std::size_t index = 0; index < impl.candidates.size(); ++index) {
+            const AdvisorDecision& candidate = impl.candidates[index];
+            impl.apply_action(query, candidate);
+            ActivationFrame* frame = nullptr;
+            if (trace != nullptr) {
+                frame = &trace->frames.emplace_back();
+                frame->candidate = static_cast<int>(index);
+                frame->action = candidate;
+            }
+            const AdvisorRawOutputs out = impl.forward(query, frame);
+            const double risk = sigmoid(out.failure_logit);
+            const double score = out.rel_err_rel;
+            if (frame != nullptr) {
+                // The chooser's own values, not a second evaluation of the same
+                // rules: `risk`, `score` and the threshold below are the ones
+                // the branches underneath actually test.
+                frame->score = score;
+                frame->gate_pass = risk <= impl.gate_threshold;
+                frame->ranked = std::isfinite(score);
+            }
+            if (!std::isfinite(score)) {
+                continue;
+            }
+            // The max_dof budget is a hard feasibility filter, applied after
+            // the feasibility head has scored the candidate and before any
+            // ranking: an action the caller cannot afford is dropped from BOTH
+            // pools, so it is never returned -- not even by the gate-binds
+            // fallback below, which exists to give the veto the last word, not
+            // to spend budget the caller does not have. The dof head is a
+            // learned predictor (held-out MAE ~0.5 log10), so this is a filter,
+            // not a guarantee.
+            if (max_dof > 0.0 && from_log10(out.dof_log10) > max_dof) {
+                if (frame != nullptr) {
+                    frame->over_budget = true;
+                }
+                saw_over_budget = true;
+                continue;
+            }
+            // Tracked separately so a query where the gate rejects everything
+            // still returns the best ranked action rather than nothing:
+            // refusing to act is the veto's job, not the gate's.
+            if (score < best_risk_score) {
+                best_risk_score = score;
+                best_any = candidate;
+                have_any = true;
+            }
+            if (risk <= impl.gate_threshold && score < best_score) {
+                best_score = score;
+                best_survivor = candidate;
+                have_survivor = true;
+            }
         }
 
         if (have_survivor) {
@@ -843,7 +1334,28 @@ AdvisorDecision Advisor::recommend(const FeatureColumns& columns, double max_dof
     // the reported predictions and the feasibility veto both describe the
     // recommendation rather than the default or some other candidate.
     impl.apply_action(query, decision);
-    const AdvisorRawOutputs scored = evaluate(query);
+    ActivationFrame* final_frame = nullptr;
+    if (trace != nullptr) {
+        // `recommended` marks the pass that scored the action the chooser was
+        // about to recommend, which is what this pass is for. It stays true
+        // through a refusal -- the pass really ran on that action -- and
+        // `AdvisorExplanation::decision.vetoed` is what says the recommendation
+        // did not survive the vetoes below.
+        final_frame = &trace->frames.emplace_back();
+        final_frame->candidate = -1;
+        final_frame->recommended = true;
+        final_frame->action = decision;
+    }
+    const AdvisorRawOutputs scored = impl.forward(query, final_frame);
+    if (final_frame != nullptr) {
+        final_frame->score = scored.rel_err_rel;
+        // `gate_pass` is a predicate on this frame's own output against the same
+        // threshold, so it is meaningful here even though the gate itself only
+        // ran over the candidates. `ranked` and `over_budget` are candidate-loop
+        // bookkeeping and stay false: this pass was never a candidate and was
+        // never ranked or budgeted against one.
+        final_frame->gate_pass = sigmoid(scored.failure_logit) <= impl.gate_threshold;
+    }
     decision.predicted_rel_err = from_log10(scored.rel_err_log10);
     decision.predicted_chamfer_mean = from_log10(scored.geo_chamfer_log10);
     decision.predicted_dof = from_log10(scored.dof_log10);

@@ -172,87 +172,23 @@ bool parse_ceiling(std::span<char*> args, std::size_t& i, std::size_t& value) {
     return true;
 }
 
-/// Accepts both the CLI's historical short names and the canonical spellings
-/// `testlab`'s `mesher_name()` emits, because the advisor's `mesher_choices`
-/// vocabulary is the latter. `graded_tet`, `hex_vem` and `hybrid_zoo` used to
-/// miss every branch and fall through to the hybrid default, so an advisor
-/// recommending `graded_tet` silently got a hybrid mesh while the logged
-/// decision still said `graded_tet`.
-std::optional<polymesh::pipeline::VolumeMesher> try_parse_mesher(const std::string& m) {
-    if (m == "hybrid" || m == "zoo" || m == "mixed" || m == "hybrid_zoo") {
-        return polymesh::pipeline::VolumeMesher::kHybrid;
+/// `--mesher` accepts every spelling in `pipeline::mesher_from_name`, which is
+/// the union of the vocabularies the CLI and `testlab` grew separately. An
+/// unrecognised name is now an error rather than a silent fall-through: this
+/// flag used to be `.value_or(kGradedTet)`, so `--mesher hybird` meshed with
+/// graded tet while every log line and JSON field reported the mesher the user
+/// asked for. A typo that quietly changes the mesher poisons a benchmark row
+/// in the one way that cannot be detected downstream.
+bool parse_mesher_arg(const std::string& m, polymesh::pipeline::VolumeMesher& out) {
+    const auto parsed = polymesh::pipeline::mesher_from_name(m);
+    if (!parsed) {
+        return false;
     }
-    if (m == "hybridvem" || m == "hybrid-vem" || m == "hybrid_vem") {
-        return polymesh::pipeline::VolumeMesher::kHybridVem;
-    }
-    if (m == "tet" || m == "tet_fill") {
-        return polymesh::pipeline::VolumeMesher::kTetFill;
-    }
-    if (m == "hex") {
-        return polymesh::pipeline::VolumeMesher::kHexFill;
-    }
-    if (m == "hexvem" || m == "vem" || m == "hex_vem") {
-        return polymesh::pipeline::VolumeMesher::kHexVem;
-    }
-    if (m == "graded" || m == "graded_tet") {
-        return polymesh::pipeline::VolumeMesher::kGradedTet;
-    }
-    if (m == "varyhedron" || m == "vary") {
-        return polymesh::pipeline::VolumeMesher::kVaryhedron;
-    }
-    if (m == "cvt_poly" || m == "cvt" || m == "restricted_cvt") {
-        return polymesh::pipeline::VolumeMesher::kCvtPoly;
-    }
-    if (m == "hexpyr" || m == "transition") {
-        return polymesh::pipeline::VolumeMesher::kHexPyramid;
-    }
-    if (m == "prism" || m == "sweep") {
-        return polymesh::pipeline::VolumeMesher::kPrismSweep;
-    }
-    if (m == "octa" || m == "octahedral") {
-        return polymesh::pipeline::VolumeMesher::kOctahedral;
-    }
-    return std::nullopt;
+    out = *parsed;
+    return true;
 }
 
-/// Lenient form kept for the `--mesher` flag's historical behaviour.
-polymesh::pipeline::VolumeMesher parse_mesher(const std::string& m) {
-    return try_parse_mesher(m).value_or(polymesh::pipeline::VolumeMesher::kGradedTet);
-}
 
-/// Every enumerator, spelled exactly as `parse_mesher` accepts it, so a
-/// reported name round-trips through `--mesher`. An earlier `default: "other"`
-/// silently mislabelled five of the eleven meshers — `--mesher hex` (the
-/// hex-fill baseline every scorecard compares against) reported "other", so no
-/// campaign row could tell hex from hexvem, prism or octa. No `default` here: a
-/// new mesher must fail the -Wswitch build, not report "other".
-const char* mesher_name(polymesh::pipeline::VolumeMesher mesher) {
-    switch (mesher) {
-    case polymesh::pipeline::VolumeMesher::kTetFill:
-        return "tet";
-    case polymesh::pipeline::VolumeMesher::kHexFill:
-        return "hex";
-    case polymesh::pipeline::VolumeMesher::kHexVem:
-        return "hexvem";
-    case polymesh::pipeline::VolumeMesher::kGradedTet:
-        return "graded";
-    case polymesh::pipeline::VolumeMesher::kHexPyramid:
-        return "hexpyr";
-    case polymesh::pipeline::VolumeMesher::kPrismSweep:
-        return "prism";
-    case polymesh::pipeline::VolumeMesher::kHybrid:
-        return "hybrid";
-    case polymesh::pipeline::VolumeMesher::kOctahedral:
-        return "octa";
-    case polymesh::pipeline::VolumeMesher::kHybridVem:
-        return "hybridvem";
-    case polymesh::pipeline::VolumeMesher::kVaryhedron:
-        return "varyhedron";
-    case polymesh::pipeline::VolumeMesher::kCvtPoly:
-        return "cvt_poly";
-    }
-    return "unknown"; // only reachable from an out-of-range int cast
-}
 
 struct BoxSel {
     bool set = false;
@@ -693,7 +629,10 @@ int cmd_mesh(std::span<char*> args) {
         } else if (std::strcmp(args[i], "-o") == 0 && i + 1 < args.size()) {
             out_path = args[++i];
         } else if (std::strcmp(args[i], "--mesher") == 0 && i + 1 < args.size()) {
-            mesher = parse_mesher(args[++i]);
+            if (!parse_mesher_arg(args[++i], mesher)) {
+                std::fprintf(stderr, "unknown --mesher '%s'\n", args[i]);
+                return 2;
+            }
         } else if (std::strcmp(args[i], "--skin") == 0 && i + 1 < args.size()) {
             skin = std::atoi(args[++i]);
             if (skin < 1) {
@@ -818,7 +757,10 @@ int cmd_solve(std::span<char*> args) {
         } else if (std::strcmp(args[i], "-nu") == 0 && i + 1 < args.size()) {
             nu = std::atof(args[++i]);
         } else if (std::strcmp(args[i], "--mesher") == 0 && i + 1 < args.size()) {
-            mesher = parse_mesher(args[++i]);
+            if (!parse_mesher_arg(args[++i], mesher)) {
+                std::fprintf(stderr, "unknown --mesher '%s'\n", args[i]);
+                return 2;
+            }
         } else if (std::strcmp(args[i], "--skin") == 0 && i + 1 < args.size()) {
             skin = std::atoi(args[++i]);
             if (skin < 1) {
@@ -944,7 +886,7 @@ int cmd_solve(std::span<char*> args) {
             advisor.recommend(features, static_cast<double>(advisor_max_dof));
         std::printf("advisor: %s\n", polymesh::advisor::to_json(decision).c_str());
         const double diag = (model->bbox_max - model->bbox_min).norm();
-        const auto resolved_mesher = try_parse_mesher(decision.mesher);
+        const auto resolved_mesher = polymesh::pipeline::mesher_from_name(decision.mesher);
         if (!resolved_mesher) {
             std::fprintf(stderr,
                          "solve: advisor recommended mesher '%s', which this build cannot "
@@ -1403,7 +1345,10 @@ int cmd_diag(std::span<char*> args) {
         if (std::strcmp(args[i], "-h") == 0 && i + 1 < args.size()) {
             h = std::atof(args[++i]);
         } else if (std::strcmp(args[i], "--mesher") == 0 && i + 1 < args.size()) {
-            mesher = parse_mesher(args[++i]);
+            if (!parse_mesher_arg(args[++i], mesher)) {
+                std::fprintf(stderr, "unknown --mesher '%s'\n", args[i]);
+                return 2;
+            }
         } else if (std::strcmp(args[i], "--json") == 0 && i + 1 < args.size()) {
             json_path = args[++i];
         } else if (std::strcmp(args[i], "--no-solve") == 0) {
@@ -1740,7 +1685,7 @@ int cmd_diag(std::span<char*> args) {
         "  \"mesh_size_note\": \"{}\",\n"
         "  \"mesher_note\": \"{}\"\n"
         "}}\n",
-        model.name, mesher_name(mesher), model.surface.vertices.size(),
+        model.name, polymesh::pipeline::mesher_name(mesher), model.surface.vertices.size(),
         model.surface.triangles.size(),
         bbox_diag, model.cad ? "true" : "false", h, vol.mesh.nodes.size(),
         vol.mesh.elements.size(), q_min, q_min_type, n_inverted,
@@ -1803,7 +1748,10 @@ int cmd_render(std::span<char*> args) {
         } else if (std::strcmp(args[i], "-o") == 0 && i + 1 < args.size()) {
             out_path = args[++i];
         } else if (std::strcmp(args[i], "--mesher") == 0 && i + 1 < args.size()) {
-            mesher = parse_mesher(args[++i]);
+            if (!parse_mesher_arg(args[++i], mesher)) {
+                std::fprintf(stderr, "unknown --mesher '%s'\n", args[i]);
+                return 2;
+            }
         } else if (std::strcmp(args[i], "--no-curved") == 0) {
             curved = false;
         } else if (std::strcmp(args[i], "--no-feature") == 0) {
@@ -1927,7 +1875,8 @@ int cmd_render(std::span<char*> args) {
         "{}"
         "  \"png\": \"{}\"\n"
         "}}\n",
-        model.name, mesher_name(mesher), h, curved ? "true" : "false", subdiv,
+        model.name, polymesh::pipeline::mesher_name(mesher), h, curved ? "true" : "false",
+        subdiv,
         vol.mesh.nodes.size(), vol.mesh.elements.size(), census_json,
         surface.triangles.size(), render.image.width, render.image.height,
         render.coverage.pixels_covered, render.coverage.silhouette_area_px, normal_json,

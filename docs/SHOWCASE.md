@@ -645,6 +645,27 @@ fields, which is how the GUI's solve is cross-checked against the CLI's.)
   8-bit RGBA PNG), not by an external screen grabber.
 - **Diagram** (`architecture.png`) is drawn programmatically with matplotlib
   through `scripts/figstyle.py`, so it matches the rest of the generated figures.
+- **Advisor cinema** (`assets/cinema/advisor_cinema.mp4`, `.gif`, `poster.png`)
+  is the GUI's own framebuffer, one PNG per frame, captured by
+  `polymesh-gui --auto`'s `record` verb at a fixed 1/60 s virtual timestep and
+  encoded by `scripts/render_cinema.py`. The network it draws is the deployed
+  ONNX graph read through its own trunk taps — one forward pass per candidate the
+  chooser enumerated, not a re-implementation of the forward pass and not one
+  canonical input — and the mesh is built at the mesher's real construction-stage
+  granularity, in `mesh.elements` emission order, with the element counts the
+  viewport uploaded. Cosmetic, and only this: the virtual clock the acts are
+  paced on (so no frame is a wall-clock measurement, and the take's length is not
+  a performance claim), fades and opacity, the shrink that draws each element
+  toward its own centroid, the colour ramp, and the layout. Where data is
+  missing — no trunk taps in the export, or a part the novelty gate refuses — the
+  surface says so on screen, and the renderer exits nonzero rather than
+  publishing a capture with a frame missing or a panel silently empty
+  ([ADR-0042](decisions/0042-the-advisor-explains-itself-on-screen.md)). The case
+  is `box_hole_s0_c0`, chosen because the advisor admits it (out-of-distribution
+  distance 3.57 against the 6.30 operating point) and because it is the case the
+  retired `activation_map.png` was computed on. Per-act frame spans, the exact
+  GUI command, the encoder used and the sha256 of `model.onnx` and of the mp4 are
+  in [`assets/cinema/manifest.json`](assets/cinema/manifest.json).
 - **Honesty rules.** Speed and DOF wins are measured against PolyMesh's own
   frozen uniform-tet10 baseline (ADR-0005), never against a third-party solver.
   Product volume fills are Cartesian grid-fill, not constrained Delaunay
@@ -676,7 +697,7 @@ fields, which is how the GUI's solve is cross-checked against the CLI's.)
 
 ## Reproduce
 
-Three entry points, all pure Python 3 on top of the built CLI:
+Four entry points, all pure Python 3 on top of the built CLI and GUI:
 
 ```sh
 # 1. Everything: solves, renders, comparison grids, diagram, charts, manifest.
@@ -689,6 +710,12 @@ python scripts/plot_benchmarks.py
 # 3. Generic labeled tiler, reusable for any set of PNGs.
 python scripts/make_compare_grid.py --out OUT.png --title "..." \
   --labels tet,graded,hybrid img1.png img2.png img3.png
+
+# 4. The advisor cinema: drives polymesh-gui under xvfb-run itself (do not wrap
+#    it in another xvfb-run), verifies the frames, then encodes mp4/gif/poster.
+#    Frames land in build/cinema/frames; --only re-encodes without recapturing.
+python scripts/render_cinema.py --all
+python scripts/render_cinema.py --list
 ```
 
 Useful `render_showcase.py` flags:

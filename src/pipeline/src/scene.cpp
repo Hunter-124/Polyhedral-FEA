@@ -1012,6 +1012,82 @@ RefinementPlan build_refinement_plan(const Model& model, double h_coarse,
     return plan;
 }
 
+std::string_view mesher_name(VolumeMesher mesher) {
+    switch (mesher) {
+    case VolumeMesher::kTetFill:
+        return "tet";
+    case VolumeMesher::kHexFill:
+        return "hex";
+    case VolumeMesher::kHexVem:
+        return "hex_vem";
+    case VolumeMesher::kGradedTet:
+        return "graded_tet";
+    case VolumeMesher::kHexPyramid:
+        return "hexpyr";
+    case VolumeMesher::kPrismSweep:
+        return "prism";
+    case VolumeMesher::kHybrid:
+        return "hybrid_zoo";
+    case VolumeMesher::kOctahedral:
+        return "octa";
+    case VolumeMesher::kHybridVem:
+        return "hybrid_vem";
+    case VolumeMesher::kVaryhedron:
+        return "varyhedron";
+    case VolumeMesher::kCvtPoly:
+        return "cvt_poly";
+    }
+    // No `default:` above, so a new enumerator fails the -Wswitch build instead
+    // of silently reporting one label for several meshers -- which is exactly
+    // how `--mesher hex`, the hex-fill baseline every scorecard compares
+    // against, once reported "other" and made five of eleven meshers
+    // indistinguishable in the campaign rows.
+    return "unknown"; // only reachable from an out-of-range int cast
+}
+
+std::optional<VolumeMesher> mesher_from_name(std::string_view name) {
+    // Every alias either historical copy accepted, including each enumerator's
+    // canonical name above, so `mesher_from_name(mesher_name(m)) == m` holds for
+    // all eleven. The aliases are not decoration: `hybrid_zoo`, `graded_tet`,
+    // `hex_vem` and `hybrid_vem` are what the advisor emits, while `hybrid`,
+    // `graded`, `hexvem` and `hybridvem` are what a decade of scripts and
+    // scorecards type.
+    static constexpr std::array<std::pair<std::string_view, VolumeMesher>, 26> kAliases{{
+        {"tet", VolumeMesher::kTetFill},
+        {"tet_fill", VolumeMesher::kTetFill},
+        {"hex", VolumeMesher::kHexFill},
+        {"hex_vem", VolumeMesher::kHexVem},
+        {"hexvem", VolumeMesher::kHexVem},
+        {"vem", VolumeMesher::kHexVem},
+        {"graded_tet", VolumeMesher::kGradedTet},
+        {"graded", VolumeMesher::kGradedTet},
+        {"hexpyr", VolumeMesher::kHexPyramid},
+        {"transition", VolumeMesher::kHexPyramid},
+        {"prism", VolumeMesher::kPrismSweep},
+        {"sweep", VolumeMesher::kPrismSweep},
+        {"hybrid_zoo", VolumeMesher::kHybrid},
+        {"hybrid", VolumeMesher::kHybrid},
+        {"zoo", VolumeMesher::kHybrid},
+        {"mixed", VolumeMesher::kHybrid},
+        {"octa", VolumeMesher::kOctahedral},
+        {"octahedral", VolumeMesher::kOctahedral},
+        {"hybrid_vem", VolumeMesher::kHybridVem},
+        {"hybridvem", VolumeMesher::kHybridVem},
+        {"hybrid-vem", VolumeMesher::kHybridVem},
+        {"varyhedron", VolumeMesher::kVaryhedron},
+        {"vary", VolumeMesher::kVaryhedron},
+        {"cvt_poly", VolumeMesher::kCvtPoly},
+        {"cvt", VolumeMesher::kCvtPoly},
+        {"restricted_cvt", VolumeMesher::kCvtPoly},
+    }};
+    for (const auto& [alias, mesher] : kAliases) {
+        if (alias == name) {
+            return mesher;
+        }
+    }
+    return std::nullopt;
+}
+
 ElementTendencyPlan resolve_element_tendency(VolumeMesher base, double tendency,
                                              int skin_layers) {
     ElementTendencyPlan plan;
@@ -3406,6 +3482,190 @@ void update_solved_geometry_volume(const Model& model, VolumeMeshOutput& output)
     }
 }
 
+namespace {
+/// The mixed-cell zoo lifted into the solver's element types.
+struct MixedConversion {
+    fea::NodalMesh mesh;
+    /// Corner-folded pyramid5 cells shipped as their two assembly tets.
+    std::size_t n_pyramid_split_to_tets = 0;
+};
+
+/// `mesh::MixedCell` container -> `fea::NodalMesh`: the hybrid branch's one and
+/// only conversion. It lives out here so a construction-stage observer
+/// (`MeshStageSink`) sees every intermediate mesh through exactly the converter
+/// that ships the final one. A second, "equivalent" converter for the observed
+/// frames would be the one place a fabricated picture could enter: it would be
+/// free to disagree with the shipped mesh about what a cell is, and nobody
+/// would notice. `nodes` arrives by value so the shipping call moves its
+/// container in for free, while an observer's call pays for its own copy.
+MixedConversion convert_mixed_cells(std::vector<Eigen::Vector3d> nodes,
+                                    const std::vector<mesh::MixedCell>& cells,
+                                    const std::function<void()>& cancel_check) {
+    const auto poll_cancel = [&] {
+        if (cancel_check) {
+            cancel_check();
+        }
+    };
+    // Corner-fold decomposition floor: the same normalized cell-shape floor
+    // every mesher gate uses, so "folded" means one thing in this codebase.
+    constexpr double kMinShapeConvert = mesh::validity::kCellShapeFloor;
+    MixedConversion conv;
+    conv.mesh.nodes = std::move(nodes);
+    const std::vector<Eigen::Vector3d>& pts = conv.mesh.nodes;
+    auto& elems = conv.mesh.elements;
+    elems.reserve(cells.size());
+
+    // Which pyramid5 cells ship as their two assembly tets. A base quad is
+    // shared by the fans of the two lattice cells across it, so triangulating
+    // it on one side only leaves the shared face non-conforming (measured:
+    // the boundary-shell guard reports 2152 edges used by three or more
+    // faces). The split diagonal depends only on the base quad, so splitting
+    // BOTH sides is conforming; the mark therefore propagates from a folded
+    // cell to whoever shares its base. Side faces are triangles already, so
+    // this closes in one round — no cascade.
+    std::vector<char> split_pyramid(cells.size(), 0);
+    {
+        // Same winding normalization the emission below applies, so the fold
+        // is measured on the cell that actually ships (the corner Jacobian
+        // is sign-sensitive: an inverted stored winding would otherwise read
+        // as folded).
+        const auto oriented = [&](const mesh::MixedCell& cell) {
+            std::array<std::uint32_t, 5> p{{cell.nodes[0], cell.nodes[1], cell.nodes[2],
+                                            cell.nodes[3], cell.nodes[4]}};
+            const auto& xa = pts[p[4]];
+            const double vtk_volume =
+                0.5 * (mesh::validity::tet_signed_volume(pts[p[0]], pts[p[1]], pts[p[2]], xa) +
+                       mesh::validity::tet_signed_volume(pts[p[0]], pts[p[2]], pts[p[3]], xa) +
+                       mesh::validity::tet_signed_volume(pts[p[1]], pts[p[2]], pts[p[3]], xa) +
+                       mesh::validity::tet_signed_volume(pts[p[1]], pts[p[3]], pts[p[0]], xa));
+            if (vtk_volume < 0.0) {
+                std::swap(p[1], p[3]);
+            }
+            return p;
+        };
+        std::map<std::array<std::uint32_t, 4>, std::vector<std::size_t>> base_owners;
+        std::vector<char> folded(cells.size(), 0);
+        std::vector<char> splittable(cells.size(), 0);
+        for (std::size_t ci = 0; ci < cells.size(); ++ci) {
+            const auto& cell = cells[ci];
+            if (cell.kind != mesh::MixedCellKind::kPyramid5) {
+                continue;
+            }
+            const auto p = oriented(cell);
+            std::array<std::uint32_t, 4> key{{p[0], p[1], p[2], p[3]}};
+            std::sort(key.begin(), key.end());
+            base_owners[key].push_back(ci);
+            const auto& x0 = pts[p[0]];
+            const auto& x1 = pts[p[1]];
+            const auto& x2 = pts[p[2]];
+            const auto& x3 = pts[p[3]];
+            const auto& x4 = pts[p[4]];
+            // Splittable = both assembly tets have positive volume. The bar
+            // is validity, NOT the shape floor: two positive tets are
+            // strictly better than one folded pyramid whatever their aspect,
+            // and a floor here refused splits whose tets were no worse than
+            // cells the mesh already ships (measured on cylinder_prism.stl
+            // h=0.12·extent, where one -0.082 pyramid survived beside
+            // shipped 0.005 tets).
+            splittable[ci] = static_cast<char>(
+                mesh::validity::pyramid_min_split_volume(x0, x1, x2, x3, x4) > 0.0);
+            folded[ci] = static_cast<char>(
+                mesh::validity::pyramid_corner_folded(x0, x1, x2, x3, x4, kMinShapeConvert));
+        }
+        for (const auto& [key, owners] : base_owners) {
+            (void)key;
+            const bool any_folded = std::any_of(
+                owners.begin(), owners.end(), [&](std::size_t ci) { return folded[ci] != 0; });
+            const bool all_splittable =
+                std::all_of(owners.begin(), owners.end(),
+                            [&](std::size_t ci) { return splittable[ci] != 0; });
+            if (!any_folded || !all_splittable) {
+                continue; // nothing folded here, or a partner could not be split safely
+            }
+            for (const auto ci : owners) {
+                split_pyramid[ci] = 1;
+            }
+        }
+    }
+    std::size_t conversion_poll = 0;
+    for (std::size_t ci = 0; ci < cells.size(); ++ci) {
+        const auto& cell = cells[ci];
+        if ((conversion_poll++ & 255U) == 0U) {
+            poll_cancel();
+        }
+        if (cell.kind == mesh::MixedCellKind::kPolyVem) {
+            elems.emplace_back(fea::ElementType::kPolyVem, cell.poly_nodes, cell.poly_faces);
+        } else if (cell.kind == mesh::MixedCellKind::kPyramid5) {
+            std::array<std::uint32_t, 5> p{{cell.nodes[0], cell.nodes[1], cell.nodes[2],
+                                            cell.nodes[3], cell.nodes[4]}};
+            // Normalize winding at the final coordinates: snap rollback and
+            // smoothing happen after mixed-cell emission, so a pre-existing
+            // all-negative winding can otherwise survive as an offender
+            // with no moved node to restore. VTK's signed pyramid volume is
+            // the mean of the two base-diagonal tet-volume sums.
+            const auto& x0 = pts[p[0]];
+            const auto& x1 = pts[p[1]];
+            const auto& x2 = pts[p[2]];
+            const auto& x3 = pts[p[3]];
+            const auto& xa = pts[p[4]];
+            const double vtk_volume =
+                0.5 * (mesh::validity::tet_signed_volume(x0, x1, x2, xa) +
+                       mesh::validity::tet_signed_volume(x0, x2, x3, xa) +
+                       mesh::validity::tet_signed_volume(x1, x2, x3, xa) +
+                       mesh::validity::tet_signed_volume(x1, x3, x0, xa));
+            if (vtk_volume < 0.0) {
+                std::swap(p[1], p[3]);
+            }
+            // A base corner folded by the boundary snap makes the kPyramid5
+            // isoparametric map turn inside out there, even with both
+            // assembly split tets healthy — `fea::cell_quality` reports the
+            // cell inverted and every consumer that trusts the map is
+            // wrong. Ship it as the two tets the assembly would have built
+            // from it (`element_stiffness` splits kPyramid5 along exactly
+            // this diagonal): identical geometry, identical stiffness,
+            // conforming (the diagonal depends only on the shared base
+            // quad), and no folded cell leaves the mesher. Unsnapping the
+            // wall instead costs real fidelity — measured on icecream_cone
+            // h=0.008, exact-BRep p99/h 0.019 → 0.107.
+            const int diagonal = mesh::validity::pyramid_split_diagonal(
+                pts[p[0]], pts[p[1]], pts[p[2]], pts[p[3]]);
+            if (split_pyramid[ci] != 0) {
+                const auto emit = [&](std::size_t a, std::size_t b, std::size_t c) {
+                    elems.push_back(
+                        fea::NodalElement{fea::ElementType::kTet4, {p[a], p[b], p[c], p[4]}});
+                };
+                if (diagonal == 1) {
+                    emit(1, 2, 3);
+                    emit(1, 3, 0);
+                } else {
+                    emit(0, 1, 2);
+                    emit(0, 2, 3);
+                }
+                ++conv.n_pyramid_split_to_tets;
+                continue;
+            }
+            // VTK/PyVista triangulate pyramid5 along local 0-2. Rotate the
+            // cyclic base so it is the conformity-safe assembly diagonal.
+            if (diagonal == 1) {
+                std::rotate(p.begin(), p.begin() + 1, p.begin() + 4);
+            }
+            elems.push_back(fea::NodalElement{fea::ElementType::kPyramid5,
+                                              {p[0], p[1], p[2], p[3], p[4]}});
+        } else if (cell.kind == mesh::MixedCellKind::kHex8) {
+            elems.push_back(fea::NodalElement{
+                fea::ElementType::kHex8,
+                {cell.nodes[0], cell.nodes[1], cell.nodes[2], cell.nodes[3], cell.nodes[4],
+                 cell.nodes[5], cell.nodes[6], cell.nodes[7]}});
+        } else {
+            elems.push_back(fea::NodalElement{
+                fea::ElementType::kTet4,
+                {cell.nodes[0], cell.nodes[1], cell.nodes[2], cell.nodes[3]}});
+        }
+    }
+    return conv;
+}
+} // namespace
+
 
 // Internal: the public `volume_mesh` below wraps this to convert a zero-interior-cell
 // fill into a resolution refusal. Nothing else about its behaviour changes.
@@ -3416,11 +3676,31 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
                                          std::size_t max_elems, std::size_t max_dof,
                                          int auto_retry_budget,
                                          const std::function<void()>& cancel_check,
-                                         const mesh::SizeFieldFn& size_field) {
+                                         const mesh::SizeFieldFn& size_field,
+                                         const MeshStageSink& on_stage) {
     const auto poll_cancel = [&] {
         if (cancel_check) {
             cancel_check();
         }
+    };
+    // Construction-stage observation (`MeshStageSink`, `kMeshStageNames`). The
+    // sink is handed a MeshStage by const reference and nothing else: it cannot
+    // reach `fill`, `out`, or any container the fill is still building, and the
+    // fill never reads a result back from it. `stage_index` is the only state
+    // the feature adds, and it is only ever read into `MeshStage::index`, so a
+    // fill with the sink set and one with it unset take the same branches in the
+    // same order and produce the same mesh. Every emission is `if (on_stage)`
+    // guarded at the call site, so an unset sink costs one branch per boundary
+    // and no conversion.
+    int stage_index = 0;
+    const auto emit_stage = [&](std::string_view name, fea::NodalMesh stage_mesh) {
+        on_stage(MeshStage{std::string(name), stage_index++, /*pass=*/0,
+                           std::move(stage_mesh)});
+    };
+    const auto emit_mixed_stage = [&](std::string_view name,
+                                      const std::vector<Eigen::Vector3d>& nodes,
+                                      const std::vector<mesh::MixedCell>& cells) {
+        emit_stage(name, convert_mixed_cells(nodes, cells, cancel_check).mesh);
     };
     poll_cancel();
     const double predicted_elems = predict_mesh_elements(model, h);
@@ -3540,6 +3820,9 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
         const std::size_t n_hex_lattice = raw.n_hex;
         const std::size_t n_pyr_raw = raw.n_pyramid;
         const std::size_t n_poly_raw = raw.n_poly;
+        if (on_stage) {
+            emit_mixed_stage(kMeshStageNames[0], raw.nodes, raw.cells);
+        }
         // ADR-0013: the hex→pyramid product expansion exists so an
         // isoparametric hex8 never shares a face with a tet-split pyramid5 /
         // tet4 (the mixed-zoo patch test fails otherwise). A lattice that came
@@ -3547,10 +3830,15 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
         // expanding it only multiplies the element count by six while
         // downgrading hex8 to split-pyramid accuracy.
         const bool pure_hex_lattice = raw.n_pyramid == 0 && raw.n_tet == 0 && raw.n_poly == 0;
-        auto fill = (native_poly || pure_hex_lattice)
-                        ? std::move(raw)
-                        : mesh::expand_mixed_hex_to_pyramids(raw);
+        // Named so the stage emission can say whether the expansion RAN. A
+        // pure-hex or native-poly lattice skips it, and reporting a stage that
+        // did not happen would be a fabricated frame.
+        const bool expanded = !native_poly && !pure_hex_lattice;
+        auto fill = expanded ? mesh::expand_mixed_hex_to_pyramids(raw) : std::move(raw);
         poll_cancel();
+        if (on_stage && expanded) {
+            emit_mixed_stage(kMeshStageNames[1], fill.nodes, fill.cells);
+        }
         fill_h = fill.h;
         // Post-expand free-surface snap (boundary quads from lattice).
         if (!fill.boundary_quads.empty()) {
@@ -3829,6 +4117,9 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
                     relax_neighborhood)
                     .max_residual;
             poll_cancel();
+            if (on_stage) {
+                emit_mixed_stage(kMeshStageNames[2], fill.nodes, fill.cells);
+            }
             // Peel snap-flattened fan tets: a full wall snap can pull all three
             // free nodes of a transition fan tet into the apex plane (aspect →
             // 0). The apex is then coplanar with the wall, so deleting the tet
@@ -3931,6 +4222,14 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
                     }
                 }
             }
+            // The peel is a whole-mesh boundary: `fill.cells` is compacted and
+            // the tri-encoded boundary entries rebuilt inside the block above,
+            // so nothing here is mid-delete. Mid-block there IS a window where
+            // condemned cells are still present, which is why no stage is
+            // emitted inside the peel's three passes.
+            if (on_stage) {
+                emit_mixed_stage(kMeshStageNames[3], fill.nodes, fill.cells);
+            }
             // Per-node outlier re-projection (mirror of graded S3): residual
             // stragglers get a full/partial projection accepted only when every
             // incident cell stays valid. After expand all cells are pyramid/tet.
@@ -4030,6 +4329,9 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
             fill.n_boundary_no_target = n_no_target;
             fill.n_boundary_residual_tail = n_residual_tail;
             poll_cancel();
+            if (on_stage) {
+                emit_mixed_stage(kMeshStageNames[4], fill.nodes, fill.cells);
+            }
             // Tangential smoothing: even out lattice-stair spacing on curved
             // walls / hole rims (crease nodes relax along the crease). Moves
             // are re-projected so the residual cannot grow; any move that
@@ -4058,6 +4360,9 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
             poll_cancel();
             if (smooth_st.n_moved > 0) {
                 fill.boundary_max_distance = smooth_st.max_residual;
+            }
+            if (on_stage) {
+                emit_mixed_stage(kMeshStageNames[5], fill.nodes, fill.cells);
             }
             // The mixed-cell merge survey never collapsed a node on any STEP
             // fixture, so no topology-repair path remains. This post-smoothing
@@ -4107,6 +4412,9 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
                     final_node_offends, /*defer_coupled=*/true, projection, relax_neighborhood)
                     .max_residual;
             poll_cancel();
+            if (on_stage) {
+                emit_mixed_stage(kMeshStageNames[6], fill.nodes, fill.cells);
+            }
             // Hard-pin CAD vertices and sharp edge curves, exactly as the
             // tet/hex/graded fills do. Without this the mixed fill was the one
             // CAD-backed path with no pinning at all: it reached the exact
@@ -4130,173 +4438,17 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
                 fill.boundary_max_distance =
                     std::max(fill.boundary_max_distance, pin.worst_node_distance);
                 poll_cancel();
+                if (on_stage) {
+                    emit_mixed_stage(kMeshStageNames[7], fill.nodes, fill.cells);
+                }
             }
 
         }
-        // Corner-fold decomposition floor: the same normalized cell-shape floor
-        // every mesher gate uses, so "folded" means one thing in this codebase.
-        constexpr double kMinShapeConvert = mesh::validity::kCellShapeFloor;
-        std::size_t n_pyramid_split_to_tets = 0;
-        out.mesh.nodes = std::move(fill.nodes);
-        out.mesh.elements.reserve(fill.cells.size());
-
-        // Which pyramid5 cells ship as their two assembly tets. A base quad is
-        // shared by the fans of the two lattice cells across it, so triangulating
-        // it on one side only leaves the shared face non-conforming (measured:
-        // the boundary-shell guard reports 2152 edges used by three or more
-        // faces). The split diagonal depends only on the base quad, so splitting
-        // BOTH sides is conforming; the mark therefore propagates from a folded
-        // cell to whoever shares its base. Side faces are triangles already, so
-        // this closes in one round — no cascade.
-        std::vector<char> split_pyramid(fill.cells.size(), 0);
-        {
-            // Same winding normalization the emission below applies, so the fold
-            // is measured on the cell that actually ships (the corner Jacobian
-            // is sign-sensitive: an inverted stored winding would otherwise read
-            // as folded).
-            const auto oriented = [&](const mesh::MixedCell& cell) {
-                std::array<std::uint32_t, 5> p{{cell.nodes[0], cell.nodes[1], cell.nodes[2],
-                                                cell.nodes[3], cell.nodes[4]}};
-                const auto& xa = out.mesh.nodes[p[4]];
-                const double vtk_volume =
-                    0.5 * (mesh::validity::tet_signed_volume(out.mesh.nodes[p[0]],
-                                                             out.mesh.nodes[p[1]],
-                                                             out.mesh.nodes[p[2]], xa) +
-                           mesh::validity::tet_signed_volume(out.mesh.nodes[p[0]],
-                                                             out.mesh.nodes[p[2]],
-                                                             out.mesh.nodes[p[3]], xa) +
-                           mesh::validity::tet_signed_volume(out.mesh.nodes[p[1]],
-                                                             out.mesh.nodes[p[2]],
-                                                             out.mesh.nodes[p[3]], xa) +
-                           mesh::validity::tet_signed_volume(out.mesh.nodes[p[1]],
-                                                             out.mesh.nodes[p[3]],
-                                                             out.mesh.nodes[p[0]], xa));
-                if (vtk_volume < 0.0) {
-                    std::swap(p[1], p[3]);
-                }
-                return p;
-            };
-            std::map<std::array<std::uint32_t, 4>, std::vector<std::size_t>> base_owners;
-            std::vector<char> folded(fill.cells.size(), 0);
-            std::vector<char> splittable(fill.cells.size(), 0);
-            for (std::size_t ci = 0; ci < fill.cells.size(); ++ci) {
-                const auto& cell = fill.cells[ci];
-                if (cell.kind != mesh::MixedCellKind::kPyramid5) {
-                    continue;
-                }
-                const auto p = oriented(cell);
-                std::array<std::uint32_t, 4> key{{p[0], p[1], p[2], p[3]}};
-                std::sort(key.begin(), key.end());
-                base_owners[key].push_back(ci);
-                const auto& x0 = out.mesh.nodes[p[0]];
-                const auto& x1 = out.mesh.nodes[p[1]];
-                const auto& x2 = out.mesh.nodes[p[2]];
-                const auto& x3 = out.mesh.nodes[p[3]];
-                const auto& x4 = out.mesh.nodes[p[4]];
-                // Splittable = both assembly tets have positive volume. The bar
-                // is validity, NOT the shape floor: two positive tets are
-                // strictly better than one folded pyramid whatever their aspect,
-                // and a floor here refused splits whose tets were no worse than
-                // cells the mesh already ships (measured on cylinder_prism.stl
-                // h=0.12·extent, where one -0.082 pyramid survived beside
-                // shipped 0.005 tets).
-                splittable[ci] = static_cast<char>(
-                    mesh::validity::pyramid_min_split_volume(x0, x1, x2, x3, x4) > 0.0);
-                folded[ci] = static_cast<char>(
-                    mesh::validity::pyramid_corner_folded(x0, x1, x2, x3, x4, kMinShapeConvert));
-            }
-            for (const auto& [key, owners] : base_owners) {
-                (void)key;
-                const bool any_folded = std::any_of(
-                    owners.begin(), owners.end(), [&](std::size_t ci) { return folded[ci] != 0; });
-                const bool all_splittable =
-                    std::all_of(owners.begin(), owners.end(),
-                                [&](std::size_t ci) { return splittable[ci] != 0; });
-                if (!any_folded || !all_splittable) {
-                    continue; // nothing folded here, or a partner could not be split safely
-                }
-                for (const auto ci : owners) {
-                    split_pyramid[ci] = 1;
-                }
-            }
-        }
-        std::size_t conversion_poll = 0;
-        for (std::size_t ci = 0; ci < fill.cells.size(); ++ci) {
-            const auto& cell = fill.cells[ci];
-            if ((conversion_poll++ & 255U) == 0U) {
-                poll_cancel();
-            }
-            if (cell.kind == mesh::MixedCellKind::kPolyVem) {
-                out.mesh.elements.emplace_back(fea::ElementType::kPolyVem, cell.poly_nodes,
-                                               cell.poly_faces);
-            } else if (cell.kind == mesh::MixedCellKind::kPyramid5) {
-                std::array<std::uint32_t, 5> p{{cell.nodes[0], cell.nodes[1], cell.nodes[2],
-                                                cell.nodes[3], cell.nodes[4]}};
-                // Normalize winding at the final coordinates: snap rollback and
-                // smoothing happen after mixed-cell emission, so a pre-existing
-                // all-negative winding can otherwise survive as an offender
-                // with no moved node to restore. VTK's signed pyramid volume is
-                // the mean of the two base-diagonal tet-volume sums.
-                const auto& x0 = out.mesh.nodes[p[0]];
-                const auto& x1 = out.mesh.nodes[p[1]];
-                const auto& x2 = out.mesh.nodes[p[2]];
-                const auto& x3 = out.mesh.nodes[p[3]];
-                const auto& xa = out.mesh.nodes[p[4]];
-                const double vtk_volume =
-                    0.5 * (mesh::validity::tet_signed_volume(x0, x1, x2, xa) +
-                           mesh::validity::tet_signed_volume(x0, x2, x3, xa) +
-                           mesh::validity::tet_signed_volume(x1, x2, x3, xa) +
-                           mesh::validity::tet_signed_volume(x1, x3, x0, xa));
-                if (vtk_volume < 0.0) {
-                    std::swap(p[1], p[3]);
-                }
-                // A base corner folded by the boundary snap makes the kPyramid5
-                // isoparametric map turn inside out there, even with both
-                // assembly split tets healthy — `fea::cell_quality` reports the
-                // cell inverted and every consumer that trusts the map is
-                // wrong. Ship it as the two tets the assembly would have built
-                // from it (`element_stiffness` splits kPyramid5 along exactly
-                // this diagonal): identical geometry, identical stiffness,
-                // conforming (the diagonal depends only on the shared base
-                // quad), and no folded cell leaves the mesher. Unsnapping the
-                // wall instead costs real fidelity — measured on icecream_cone
-                // h=0.008, exact-BRep p99/h 0.019 → 0.107.
-                const int diagonal = mesh::validity::pyramid_split_diagonal(
-                    out.mesh.nodes[p[0]], out.mesh.nodes[p[1]], out.mesh.nodes[p[2]],
-                    out.mesh.nodes[p[3]]);
-                if (split_pyramid[ci] != 0) {
-                    const auto emit = [&](std::size_t a, std::size_t b, std::size_t c) {
-                        out.mesh.elements.push_back(fea::NodalElement{
-                            fea::ElementType::kTet4, {p[a], p[b], p[c], p[4]}});
-                    };
-                    if (diagonal == 1) {
-                        emit(1, 2, 3);
-                        emit(1, 3, 0);
-                    } else {
-                        emit(0, 1, 2);
-                        emit(0, 2, 3);
-                    }
-                    ++n_pyramid_split_to_tets;
-                    continue;
-                }
-                // VTK/PyVista triangulate pyramid5 along local 0-2. Rotate the
-                // cyclic base so it is the conformity-safe assembly diagonal.
-                if (diagonal == 1) {
-                    std::rotate(p.begin(), p.begin() + 1, p.begin() + 4);
-                }
-                out.mesh.elements.push_back(fea::NodalElement{fea::ElementType::kPyramid5,
-                                                              {p[0], p[1], p[2], p[3], p[4]}});
-            } else if (cell.kind == mesh::MixedCellKind::kHex8) {
-                out.mesh.elements.push_back(fea::NodalElement{
-                    fea::ElementType::kHex8,
-                    {cell.nodes[0], cell.nodes[1], cell.nodes[2], cell.nodes[3], cell.nodes[4],
-                     cell.nodes[5], cell.nodes[6], cell.nodes[7]}});
-            } else {
-                out.mesh.elements.push_back(fea::NodalElement{
-                    fea::ElementType::kTet4,
-                    {cell.nodes[0], cell.nodes[1], cell.nodes[2], cell.nodes[3]}});
-            }
-        }
+        // The mixed zoo becomes solver elements through the shared converter
+        // (`convert_mixed_cells`), which owns the corner-fold pyramid split.
+        auto converted = convert_mixed_cells(std::move(fill.nodes), fill.cells, cancel_check);
+        const std::size_t n_pyramid_split_to_tets = converted.n_pyramid_split_to_tets;
+        out.mesh = std::move(converted.mesh);
         out.boundary_quads = std::move(fill.boundary_quads);
         out.local_child_boundary_quads = std::move(fill.local_child_boundary_quads);
         if (native_poly) {
@@ -5319,6 +5471,15 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
         out.mesher_note += mirror_note();
     }
 
+    // The mesher's own output, in solver types, before any pipeline-level
+    // conformity/quality/compaction step touches it. Every branch above reaches
+    // here, so this is the one stage every mesher emits: for all of them except
+    // the hybrid zoo it is also the ONLY visible construction boundary, because
+    // at this level the fill is a single opaque call.
+    if (on_stage) {
+        emit_stage(kMeshStageNames[8], out.mesh);
+    }
+
     // Prefer true element exterior faces for display/region skin so tet/prism
     // previews show element triangles (incl. Kuhn diagonals), not only lattice quads.
     {
@@ -5530,10 +5691,14 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
         }
         const double retry_h =
             std::nextafter(h * scale * 1.05, std::numeric_limits<double>::infinity());
+        // The retry is a second, independent fill, so it gets the sink too and
+        // its stage indices restart at 0. The abandoned attempt's stages have
+        // already been reported; hiding them would be a nicer story than what
+        // happened.
         auto retry = volume_mesh(model, retry_h, requested_mesher, requested_skin_layers,
                                  feature_refine, refine_seeds, seed_band, element_tendency,
                                  max_elems, max_dof, auto_retry_budget - 1, cancel_check,
-                                 size_field);
+                                 size_field, on_stage);
         const std::string ceiling_note =
             elem_over ? std::format("element ceiling {}, actual {}", max_elems, actual_elems)
                       : std::format("DOF ceiling {}, actual {}", max_dof, actual_dof);
@@ -5560,6 +5725,13 @@ static VolumeMeshOutput volume_mesh_impl(const Model& model, double h, VolumeMes
     }
     out.geometry_h = fill_h > 0.0 ? fill_h : h;
     out.mesh.check_validity();
+    // The delivered mesh, after the exterior conform, the ship gate's cell
+    // relaxation and the orphan-node compaction -- and after
+    // `check_validity()`, so this stage is the only one guaranteed to be a mesh
+    // the solver will accept. Emitted last, once, on the success path only.
+    if (on_stage) {
+        emit_stage(kMeshStageNames[9], out.mesh);
+    }
     return out;
 }
 
@@ -5610,11 +5782,12 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                              double element_tendency, std::size_t max_elems,
                              std::size_t max_dof, int auto_retry_budget,
                              const std::function<void()>& cancel_check,
-                             const mesh::SizeFieldFn& size_field) {
+                             const mesh::SizeFieldFn& size_field,
+                             const MeshStageSink& on_stage) {
     try {
         return volume_mesh_impl(model, h, mesher, skin_layers, feature_refine, refine_seeds,
                                 seed_band, element_tendency, max_elems, max_dof,
-                                auto_retry_budget, cancel_check, size_field);
+                                auto_retry_budget, cancel_check, size_field, on_stage);
     } catch (const mesh::ValidityError& e) {
         // ONLY this cause is reclassified. Every other validity failure propagates
         // unchanged, so no existing campaign row status shifts.
@@ -5633,6 +5806,25 @@ namespace {
 struct JobCancelled : std::runtime_error {
     JobCancelled() : std::runtime_error("cancelled") {}
 };
+
+/// Forwarder from a fill's `MeshStageSink` to `SolveJob::on_mesh_stage`, adding
+/// the adapt pass that ran the fill -- the one field `volume_mesh` cannot fill
+/// in, because it knows nothing about adapt passes and should not.
+///
+/// An unset callback yields an EMPTY sink rather than a no-op lambda, so the
+/// fill's `if (on_stage)` guards stay false and it never converts or copies a
+/// mesh. When the callback IS set, stamping costs one mesh copy per stage:
+/// `MeshStage` is handed over by const reference and `pass` has to change.
+/// Recording is not a hot path, and the alternative -- teaching `volume_mesh`
+/// about adapt passes -- buys a copy with a worse interface.
+MeshStageSink stage_sink(std::function<void(const MeshStage&)> callback, int pass) {
+    if (!callback) {
+        return {};
+    }
+    return [callback = std::move(callback), pass](const MeshStage& stage) {
+        callback(MeshStage{stage.stage, stage.index, pass, stage.mesh});
+    };
+}
 } // namespace
 
 void SolveJob::set_status(const std::string& s) {
@@ -5839,7 +6031,10 @@ void SolveJob::start_mesh(const Model& model, const SimSetup& setup) {
     reset_control_flags();
     state_ = State::kMeshing;
     report("mesh", 0.0, "meshing…");
-    worker_ = std::thread([this, model, setup] {
+    // Copied before the worker starts, exactly like `on_pass`: the member may be
+    // reassigned from the UI thread while the worker runs.
+    const auto stage_callback = on_mesh_stage;
+    worker_ = std::thread([this, model, setup, stage_callback] {
         try {
             // Global scalar h from D5 only. Do NOT min-sample geometry sizing at
             // sharp corners for uniform meshers — that forced h→h_min on every
@@ -5868,7 +6063,9 @@ void SolveJob::start_mesh(const Model& model, const SimSetup& setup) {
                 model, h, setup.mesher, setup.skin_layers, setup.use_feature_grading,
                 refinement.refine_seeds, refinement.seed_band, setup.element_tendency,
                 resolved.element_ceiling, resolved.dof_ceiling, resolved.auto_chosen ? 3 : 0,
-                mesh_cancel_check, refinement.size_field);
+                mesh_cancel_check, refinement.size_field,
+                // Mesh-only preview is never an adapt pass.
+                stage_sink(stage_callback, /*pass=*/0));
             if (setup.p_elevate) {
                 auto curved = curve_volume_geometry(model, mesh_only_.mesh, h);
                 mesh_only_.mesh = std::move(curved.mesh);
@@ -5984,7 +6181,9 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
     report("mesh", 0.0, "meshing…", 0, pass_count);
     // Copy inputs by value into the worker.
     const auto pass_callback = on_pass;
-    worker_ = std::thread([this, model, setup, pass_count, pass_callback] {
+    const auto stage_callback = on_mesh_stage;
+    worker_ = std::thread(
+        [this, model, setup, pass_count, pass_callback, stage_callback] {
         try {
             // Global h from D5 only (same as start_mesh). Feature grading is
             // feature_refine on graded fills — not global h→h_min at corners.
@@ -6092,7 +6291,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 model, h_use, setup.mesher, setup.skin_layers, setup.use_feature_grading,
                 adapt_seeds, adapt_seed_band, setup.element_tendency, resolved.element_ceiling,
                 resolved.dof_ceiling, resolved.auto_chosen ? 3 : 0, mesh_cancel_check,
-                adapt_size_field);
+                adapt_size_field, stage_sink(stage_callback, /*pass=*/0));
             double pass_mesh_ms = std::chrono::duration<double, std::milli>(
                                       std::chrono::steady_clock::now() - initial_mesh_t0)
                                       .count();
@@ -6918,7 +7117,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                                           adapt_seed_band, setup.element_tendency,
                                           resolved.element_ceiling, resolved.dof_ceiling,
                                           resolved.auto_chosen ? 3 : 0, mesh_cancel_check,
-                                          adapt_size_field);
+                                          adapt_size_field,
+                                          stage_sink(stage_callback, pass));
                         p_constraints = {};
                         publish_live_mesh(vol);
                         h_use = std::max(h_use, h_remesh);

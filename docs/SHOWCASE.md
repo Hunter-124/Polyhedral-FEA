@@ -26,9 +26,9 @@ A one-line index of the same assets lives in
 low oblique angle across the whole plate (h = 6 mm, 77,940 nodes / 52,080 curved
 cells, 233,820 DOF; min-x face fixed, conserved +x resultant on max-x).
 von Mises is shown on the surface with displacement warped ×5000. The colour
-range is 0 – 2.62 MPa, clipped at the 99th percentile of the visible surface
-field; the true peak nodal value is 3.13 MPa, at a boundary-condition
-singularity.
+range is 0 – 2.61 MPa, clipped at the 99th percentile of the visible surface
+field; the true peak nodal value is 3.14 MPa at the hole rim — the Kirsch
+concentration the part exists to show, not a boundary-condition artifact.
 Exact values per image live in
 [`manifest.json`](assets/showcase/manifest.json).
 
@@ -44,11 +44,11 @@ with the displacement field warped for visibility. Every caption in
 [`manifest.json`](assets/showcase/manifest.json) states the element size, node /
 element / DOF counts, the boundary conditions, the warp factor, the colour range
 **and the percentile it was clipped at**, plus the true unclipped peak nodal
-value — a boundary-condition singularity, not a physical stress, whose node
-coordinates the caption now prints rather than assuming it sits at a clamped
-face: on the cylinder the load box reaches 5 mm down the wall, so the peak sits
-on the loaded top rim instead. The exact `polymesh solve` invocation per part is
-in the manifest too.
+value **with its node coordinates**, so the peak can be matched against the
+stated BCs rather than assumed: on the plate it is the hole-rim concentration
+(a free surface — no BC acts there), on the cylinder the load box reaches 5 mm
+down the wall so the peak sits on the loaded top rim. The exact `polymesh
+solve` invocation per part is in the manifest too.
 
 ### `gallery_plate_hole.png`
 
@@ -56,7 +56,7 @@ in the manifest too.
 
 Flat plate with a central hole — the canonical stress-riser benchmark geometry.
 Feature-aware grading concentrates elements around the hole where the gradient
-lives. h = 6 mm, 52,080 curved cells, **233,820 solved DOF**, 121 s wall. h was
+lives. h = 6 mm, 52,080 curved cells, **233,820 solved DOF**, 95 s wall. h was
 3 mm while the shipped mesh was straight-edged; the exact curved boundary now
 renders a smoother hole at ~1/8 the cells.
 
@@ -69,7 +69,7 @@ python scripts/render_showcase.py --only plate_hole
 ![cantilever](assets/showcase/gallery_cantilever.png)
 
 End-loaded cantilever: linear bending stress distribution, maximum at the
-clamped root. h = 30 mm, 44,832 curved cells, **193,971 solved DOF**, 58 s wall.
+clamped root. h = 30 mm, 44,832 curved cells, **193,971 solved DOF**, 53 s wall.
 This is the geometry behind the Timoshenko tip-deflection verification (1.50%
 error,
 [bench/reports/p1-gate1-convergence.md](../bench/reports/p1-gate1-convergence.md)).
@@ -587,12 +587,15 @@ same code paths as the buttons — this is what produced this image:
 
 ```sh
 xvfb-run -a ./build/apps/gui/polymesh-gui --auto \
-  "load tests/fixtures/parts/plate_hole.step; h 6; fix 5; loadface 0 1000 0 0; \
+  "load tests/fixtures/parts/plate_hole.step; h 6; fix 0; loadface 5 1000 0 0; \
    solve; wire off; frame; shot $PWD/docs/assets/showcase/gui_studio.png; quit"
 ```
 (`wire off` because the results wireframe is baked in a near-black line colour
 and covers the shaded field at this zoom; interactively that is the *wireframe
-edges* checkbox. Face ids 5 and 0 are the plate's two end faces.)
+edges* checkbox. Face ids 0 and 5 are the plate's two end faces — 0 the min-x
+end, 5 the max-x end — so this is the gallery's tension case: min-x fixed,
++x resultant on max-x. `savevtu out.vtu` additionally exports the solved nodal
+fields, which is how the GUI's solve is cross-checked against the CLI's.)
 
 ---
 

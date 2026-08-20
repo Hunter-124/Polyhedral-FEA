@@ -9,6 +9,8 @@
 // F12 / File menu / POLYMESH_GUI_SHOT capture the window to a PNG.
 // --auto "load p.step; h 6; fix 5; solve; wire off; shot out.png; quit" scripts
 // the app end-to-end without pointer input (doc captures, agent operation).
+// `savevtu out.vtu` additionally exports the solved nodal fields exactly as
+// the viewport sees them, for headless GUI-vs-CLI cross-checks.
 
 #include "colormap.hpp"
 #include "fea/boundary_faces.hpp"
@@ -378,6 +380,35 @@ std::string auto_action_text(const AutoAction& action) {
     return text;
 }
 
+/// Writes the current solve result as VTU. Shared by the Results-panel
+/// "export VTU" button and the --auto `savevtu` verb, so a headless run can
+/// capture exactly the nodal field the viewport is showing.
+bool export_result_vtu(const App& app, const std::string& path, std::string& err) {
+    if (!app.result) {
+        err = "no solve result";
+        return false;
+    }
+    try {
+        std::vector<fea::VtuPointData> pdata;
+        pdata.push_back(
+            {.name = "von_Mises", .scalars = app.result->von_mises, .vectors = {}});
+        pdata.push_back(
+            {.name = "displacement", .scalars = {}, .vectors = app.result->displacement});
+        if (!app.result->nodal_eta.empty()) {
+            pdata.push_back(
+                {.name = "ZZ_eta", .scalars = app.result->nodal_eta, .vectors = {}});
+        }
+        std::vector<fea::VtuCellData> cdata;
+        cdata.push_back({.name = "quality",
+                         .scalars = fea::tet4_cell_quality(app.result->volume_mesh)});
+        fea::write_vtu(path, app.result->volume_mesh, pdata, cdata);
+        return true;
+    } catch (const std::exception& e) {
+        err = e.what();
+        return false;
+    }
+}
+
 /// Executes at most one queued action. Every exit path other than a clean
 /// `quit` sets `failed`, which run() turns into a nonzero exit code.
 void tick_auto(AutoRunner& run, App& app, GLFWwindow* window) {
@@ -487,6 +518,14 @@ void tick_auto(AutoRunner& run, App& app, GLFWwindow* window) {
             return fail("wire wants on or off");
         }
         app.show_wireframe = args[0] == "on";
+    } else if (verb == "savevtu") {
+        if (args.size() != 1) {
+            return fail("savevtu wants one output path");
+        }
+        std::string err;
+        if (!export_result_vtu(app, args[0], err)) {
+            return fail(std::format("savevtu failed: {}", err));
+        }
     } else if (verb == "shot") {
         if (args.size() != 1) {
             return fail("shot wants one output path");
@@ -1135,30 +1174,12 @@ void draw_study_panel(App& app) {
                         3 * app.result->volume_mesh.nodes.size());
             ImGui::TextWrapped("%s", app.result->mesh_note.c_str());
             if (iw::button("export VTU", ImVec2(-1, 0))) {
-                try {
-                    std::vector<fea::VtuPointData> pdata;
-                    pdata.push_back({.name = "von_Mises",
-                                     .scalars = app.result->von_mises,
-                                     .vectors = {}});
-                    pdata.push_back({.name = "displacement",
-                                     .scalars = {},
-                                     .vectors = app.result->displacement});
-                    if (!app.result->nodal_eta.empty()) {
-                        pdata.push_back({.name = "ZZ_eta",
-                                         .scalars = app.result->nodal_eta,
-                                         .vectors = {}});
-                    }
-                    std::vector<fea::VtuCellData> cdata;
-                    cdata.push_back(
-                        {.name = "quality",
-                         .scalars = fea::tet4_cell_quality(app.result->volume_mesh)});
-                    const std::string out =
-                        app.model ? (app.model->name + "_result.vtu") : "result.vtu";
-                    fea::write_vtu(out, app.result->volume_mesh, pdata, cdata);
-                    app.status = std::format("wrote {}", out);
-                } catch (const std::exception& e) {
-                    app.status = std::format("export failed: {}", e.what());
-                }
+                const std::string out =
+                    app.model ? (app.model->name + "_result.vtu") : "result.vtu";
+                std::string err;
+                app.status = export_result_vtu(app, out, err)
+                                 ? std::format("wrote {}", out)
+                                 : std::format("export failed: {}", err);
             }
         } else if (app.mesh_preview) {
             ImGui::Text("nodes %zu  elems %zu  DOF %zu", app.mesh_preview->mesh.nodes.size(),

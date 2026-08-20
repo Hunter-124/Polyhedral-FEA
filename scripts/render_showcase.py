@@ -892,19 +892,17 @@ def render_stress(
     p.close()
 
     if clipped:
-        # Do not assert WHICH boundary condition the peak sits on. This caption
-        # used to say "at the clamped-face stress singularity", and on the
-        # cylinder that is simply false: the load box reaches 5 mm down the wall,
-        # so a +z shear traction runs up to the sharp top rim and the peak node
-        # (16.2 MPa) sits there at r = 50 mm, z = 200 mm, while the clamped base
-        # peaks at 1.54 MPa. Print where the peak actually is and let the reader
-        # match it against the stated BCs.
+        # Do not assert WHAT the peak sits on. This caption used to say "at
+        # the clamped-face stress singularity", and that is false on the
+        # cylinder (the peak sits at the load rim) and on the plate (the peak
+        # is the Kirsch concentration at the hole rim, a free surface — no BC
+        # acts there at all). Print where the peak actually is and let the
+        # reader match it against the stated BCs.
         peak_at = np.asarray(grid.points)[int(np.argmax(vm))] * 1e3
         clip_note = (
             f"colour range 0 \u2013 {fs.si(hi, 'Pa')} ({clip_rule_text()}); "
-            f"peak nodal value {fs.si(true_max, 'Pa')} at a boundary-condition "
-            f"singularity, node at ({peak_at[0]:.0f}, {peak_at[1]:.0f}, "
-            f"{peak_at[2]:.0f}) mm"
+            f"peak nodal value {fs.si(true_max, 'Pa')}, node at "
+            f"({peak_at[0]:.0f}, {peak_at[1]:.0f}, {peak_at[2]:.0f}) mm"
         )
     else:
         clip_note = (
@@ -1516,7 +1514,7 @@ def main(argv: list[str] | None = None) -> int:
         if part.name == FLAGSHIP and want("hero"):
             info = render_stress(
                 vtu, outdir / "hero.png",
-                title=f"{part.title} \u2014 bending stress field",
+                title=f"{part.title} \u2014 tension stress field",
                 meta_extra=base_meta,
                 footer_extra=f"{part.bc_note} \u00b7 low-oblique view",
                 view=HERO_VIEW, up=HERO_UP, margin=1.02,

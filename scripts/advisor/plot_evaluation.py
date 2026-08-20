@@ -1246,7 +1246,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    fs.use("light")
+    fs.use("dark")
     written = int(advisor_evaluation(args.crossval or default_crossval(),
                                      args.out_dir, args.primary_level))
     print(f"\n{written}/1 figures written to {args.out_dir}")

@@ -150,6 +150,11 @@ def main() -> int:
     print("plotted classes:")
     for c in CLASSES:
         r = ratios[c]
+        if not r:
+            # A class can be empty against a regenerated corpus (e.g. no
+            # 'resolution refused' rows) — print that, don't crash.
+            print(f"  {c:<28} n=0     (none in this dataset)")
+            continue
         print(f"  {c:<28} n={len(r):<5} h/feature min {min(r):.3f} "
               f"median {statistics.median(r):.3f} max {max(r):.3f}   "
               f"at or below the h<=feature/{CELLS_ACROSS:g} rule: {below[c]}")
@@ -168,7 +173,7 @@ def main() -> int:
     for slot, name in enumerate(("succeeded", "refused-with-recommendation",
                                  "fill-guard failure", "over budget")):
         fs.register_series(name, slot, label=name)
-    fs.use("light")
+    fs.use("dark")
     t = fs.theme()
 
     title = "The mesher now refuses a size it cannot represent -- and says which size to use"
@@ -303,7 +308,8 @@ def main() -> int:
                           for f in fams], fontsize=7.2)
     ax_c.set_ylim(-0.65, len(fams) - 0.35)
     ax_c.invert_yaxis()
-    ax_c.set_xlim(0, max(max(fam_ref.values()), max(fam_guard.values())) * 1.45)
+    ax_c.set_xlim(0, max(max(fam_ref.values(), default=0),
+                         max(fam_guard.values(), default=0), 1) * 1.45)
     ax_c.set_xlabel("runs the engine declined")
     ax_c.grid(True, axis="x", color=t.grid, lw=0.5, alpha=0.8)
     ax_c.set_axisbelow(True)

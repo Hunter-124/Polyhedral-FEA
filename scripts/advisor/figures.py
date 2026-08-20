@@ -358,7 +358,7 @@ def activation_map(runs_dir: Path, out_dir: Path) -> bool:
 
 def main() -> int:
     args = parse_args()
-    fs.use("light")
+    fs.use("dark")
     runs_dir = args.runs_dir or args.advisor_dir / "runs"
     args.out_dir.mkdir(parents=True, exist_ok=True)
     wrote = [training_curves(runs_dir, args.out_dir),

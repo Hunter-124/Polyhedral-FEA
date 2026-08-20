@@ -1743,6 +1743,7 @@ def external_comparison(result_path: Path, out_dir: Path) -> bool:
 
 def main() -> int:
     args = parse_args()
+    fs.use("dark")  # house style (was the implicit light default)
     advisor_dir = args.advisor_dir
     out_dir = args.out_dir
     if args.external_only:

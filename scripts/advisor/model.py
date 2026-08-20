@@ -11,13 +11,24 @@ that are rounded, clamped and gathered against small embedding tables. The
 remaining ``D - 2`` continuous columns are concatenated with the two 4-dim
 embeddings to form the trunk input of width ``D_eff = (D - 2) + 8``.
 
-    trunk : Linear(D_eff -> 64) -> GELU -> Linear(64 -> 64) -> GELU
-    heads : 6 x Linear(64 -> 1) regressors (log10 targets)
-            1 x Linear(64 -> 1) failure logit
-            1 x Linear(64 -> A) policy (continuous dims in physical units)
+    trunk : Linear(D_eff -> H) -> GELU -> Linear(H -> H) -> GELU
+    heads : 7 x Linear(H -> 1) regressors (log10 targets)
+            1 x Linear(H -> 1) failure logit
+            1 x Linear(H -> A) policy (continuous dims in physical units)
 
-With the production schema (D = 44, A = 14) this is 8 837 parameters, small
+which is the nine named C6 graph outputs, in ``OUTPUT_NAMES`` order. With the
+production schema (D = 47, A = 9, H = 96) this is 16 177 parameters, small
 enough that the dashboard's per-neuron activation view stays legible.
+
+Activation taps
+---------------
+``forward_tuple_explain`` appends the trunk's own three tensors -- the
+post-embedding concat and the two post-GELU hidden layers -- to the nine
+contract outputs, and that is the signature the shipped graph is exported
+with. They are intermediates the heads already consume rather than a second
+evaluation, so a consumer that never names them pays nothing for their
+existence. ``network_layout`` describes the same graph statically (widths,
+labels, weight blocks) for a caller that wants to draw it.
 """
 
 from __future__ import annotations
@@ -36,6 +47,11 @@ if __package__ in (None, ""):  # direct `python scripts/advisor/model.py`
 from .dataset import OUTPUT_NAMES, REGRESSION_HEADS
 
 TRUNK_LAYER_NAMES = ["trunk.fc1", "trunk.fc2"]
+
+#: The trunk tensors appended to the C6 outputs by ``forward_tuple_explain``,
+#: in that order. Named here rather than in the exporter because the network
+#: decides what it can expose.
+ACTIVATION_OUTPUT_NAMES = ["trunk_input", "trunk_fc1", "trunk_fc2"]
 
 
 class AdvisorNet(nn.Module):
@@ -124,9 +140,14 @@ class AdvisorNet(nn.Module):
         h2 = self.act(self.fc2(h1))
         return z, h1, h2
 
-    def forward(self, x: Tensor) -> dict[str, Tensor]:
-        """Dict of C6 outputs; regressors are ``[B, 1]``, policy is ``[B, A]``."""
-        _, _, h2 = self.trunk(x)
+    def heads(self, h2: Tensor) -> dict[str, Tensor]:
+        """Every C6 output, read off the trunk's final hidden activation.
+
+        Split out of ``forward`` so a caller that already holds the trunk taps
+        -- ``forward_tuple_explain``, ``activations`` -- never evaluates the
+        trunk a second time. The exported graph therefore contains exactly one
+        copy of the trunk no matter how many of its tensors are named outputs.
+        """
         outputs: dict[str, Tensor] = {
             name: head(h2) for name, head in self.regression_heads.items()
         }
@@ -134,10 +155,79 @@ class AdvisorNet(nn.Module):
         outputs["policy"] = self.policy_head(h2)
         return outputs
 
+    def forward(self, x: Tensor) -> dict[str, Tensor]:
+        """Dict of C6 outputs; regressors are ``[B, 1]``, policy is ``[B, A]``."""
+        return self.heads(self.trunk(x)[2])
+
     def forward_tuple(self, x: Tensor) -> tuple[Tensor, ...]:
         """Outputs in the exact C6 order, for ``torch.onnx.export``."""
         outputs = self.forward(x)
         return tuple(outputs[name] for name in self.output_names)
+
+    def forward_tuple_explain(self, x: Tensor) -> tuple[Tensor, ...]:
+        """``forward_tuple``, then the three taps of ACTIVATION_OUTPUT_NAMES.
+
+        This is the signature the shipped graph is exported with. The C6
+        outputs keep their names, their order and their positions, so a caller
+        that asks only for those cannot tell the taps are there. The taps are
+        the tensors the heads are *already* computed from, shared through
+        ``heads``, so naming them adds no arithmetic -- only the option of
+        fetching them.
+        """
+        z, h1, h2 = self.trunk(x)
+        outputs = self.heads(h2)
+        return tuple(outputs[name] for name in self.output_names) + (z, h1, h2)
+
+    # -- drawable structure (C8 dump and ONNX sidecar) -----------------------
+
+    def _structure(self) -> tuple[list[tuple[str, int, list[str]]],
+                                  list[tuple[str, str, Tensor]]]:
+        """The drawable graph: ``(name, size, labels)`` per layer, and one
+        fully connected weight block per gap between layers.
+
+        The single source of truth behind both views of this network -- the C8
+        ``activations()`` dump the dashboard draws and the
+        ``activation_layout.json`` sidecar the GUI draws -- so the two cannot
+        drift apart on a layer width, a label or a weight orientation. The two
+        views differ only in what they attach to this skeleton: one row of
+        values, or nothing.
+        """
+        # The heads are separate Linear modules, so the block that draws them
+        # as one layer stacks their weight rows in head_labels order.
+        head_rows = [self.regression_heads[name].weight for name in REGRESSION_HEADS]
+        head_rows.append(self.failure_head.weight)
+        head_rows.append(self.policy_head.weight)
+        head_weight = torch.cat(head_rows, dim=0)
+        layers = [
+            ("input", self.n_trunk_inputs, list(self.trunk_input_labels)),
+            (TRUNK_LAYER_NAMES[0], self.hidden, []),
+            (TRUNK_LAYER_NAMES[1], self.hidden, []),
+            ("heads", len(self.head_labels), list(self.head_labels)),
+        ]
+        edges = [
+            ("input", TRUNK_LAYER_NAMES[0], self.fc1.weight),
+            (TRUNK_LAYER_NAMES[0], TRUNK_LAYER_NAMES[1], self.fc2.weight),
+            (TRUNK_LAYER_NAMES[1], "heads", head_weight),
+        ]
+        return layers, edges
+
+    def network_layout(self) -> dict[str, Any]:
+        """The static half of ``activation_layout.json``: shape and weights.
+
+        Hidden layers carry an explicit empty ``labels`` list rather than
+        omitting the key: a drawing consumer wants to iterate labels
+        unconditionally, whereas the C8 dump below is an established on-disk
+        shape that omits it.
+        """
+        layers, edges = self._structure()
+        return {
+            "layers": [{"name": name, "size": size, "labels": labels}
+                       for name, size, labels in layers],
+            "edges": [{"from": source, "to": destination,
+                       "rows": int(weight.shape[0]), "cols": int(weight.shape[1]),
+                       "weights": _matrix(weight)}
+                      for source, destination, weight in edges],
+        }
 
     # -- C8 activation dump --------------------------------------------------
 
@@ -154,46 +244,29 @@ class AdvisorNet(nn.Module):
         if x.shape[0] != 1:
             raise ValueError(f"activations() expects a single row, got {tuple(x.shape)}")
         z, h1, h2 = self.trunk(x)
-        outputs = self.forward(x)
+        outputs = self.heads(h2)
         head_values = [float(outputs[name][0, 0]) for name in REGRESSION_HEADS]
         head_values.append(float(outputs["failure_logit"][0, 0]))
         head_values.extend(float(value) for value in outputs["policy"][0])
+        values = {
+            "input": [float(value) for value in z[0]],
+            TRUNK_LAYER_NAMES[0]: [float(value) for value in h1[0]],
+            TRUNK_LAYER_NAMES[1]: [float(value) for value in h2[0]],
+            "heads": head_values,
+        }
 
-        # heads matrix stacks each head's weight rows in head_labels order.
-        head_rows = [self.regression_heads[name].weight for name in REGRESSION_HEADS]
-        head_rows.append(self.failure_head.weight)
-        head_rows.append(self.policy_head.weight)
-        head_weight = torch.cat(head_rows, dim=0)
-
-        layers = [
-            {
-                "name": "input",
-                "size": int(z.shape[1]),
-                "values": [float(value) for value in z[0]],
-                "labels": list(self.trunk_input_labels),
-            },
-            {
-                "name": "trunk.fc1",
-                "size": int(h1.shape[1]),
-                "values": [float(value) for value in h1[0]],
-            },
-            {
-                "name": "trunk.fc2",
-                "size": int(h2.shape[1]),
-                "values": [float(value) for value in h2[0]],
-            },
-            {
-                "name": "heads",
-                "size": len(head_values),
-                "values": head_values,
-                "labels": list(self.head_labels),
-            },
-        ]
-        edges = [
-            {"from": "input", "to": "trunk.fc1", "weights": _matrix(self.fc1.weight)},
-            {"from": "trunk.fc1", "to": "trunk.fc2", "weights": _matrix(self.fc2.weight)},
-            {"from": "trunk.fc2", "to": "heads", "weights": _matrix(head_weight)},
-        ]
+        structure, blocks = self._structure()
+        layers: list[dict[str, Any]] = []
+        for name, size, labels in structure:
+            # Key order, and the absence of `labels` on the hidden layers, are
+            # part of the shape bench/advisor/runs/*/activations.json consumers
+            # already parse; do not "tidy" either one.
+            layer: dict[str, Any] = {"name": name, "size": size, "values": values[name]}
+            if labels:
+                layer["labels"] = labels
+            layers.append(layer)
+        edges = [{"from": source, "to": destination, "weights": _matrix(weight)}
+                 for source, destination, weight in blocks]
         return {"layers": layers, "edges": edges}
 
 

@@ -67,6 +67,7 @@ add_executable(polymesh-gui
     theme.cpp
     widgets.cpp
     viewport.cpp
+    cinema.cpp
     gui_settings.cpp
     process_runner.cpp
     testlab_panel.cpp
@@ -81,3 +82,14 @@ target_link_libraries(polymesh-gui
         polymesh_warnings
         polymesh_perf
 )
+
+# Advisor activation cinema: the network drawing and `cinema advisor` need the
+# inference module. Optional exactly as in apps/cli — a GUI configured with
+# POLYMESH_WITH_ADVISOR=OFF still builds, and the cinema panel then says on
+# screen that this build carries no inference module rather than drawing an
+# empty graph that looks like a loaded one.
+if(TARGET polymesh::advisor)
+    target_link_libraries(polymesh-gui PRIVATE polymesh::advisor)
+    target_compile_definitions(polymesh-gui PRIVATE POLYMESH_WITH_ADVISOR)
+    polymesh_stage_onnxruntime(polymesh-gui)
+endif()

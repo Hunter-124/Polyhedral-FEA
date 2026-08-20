@@ -7,8 +7,14 @@ Committed README assets, regenerated from the real training artifacts:
   training_curves.png  per-epoch train and validation MAE of log10(rel_err),
                        first vs latest training run overlaid
                        (runs/<NNN>/metrics.json)
-  activation_map.png   per-layer activation heatmap of the latest run for
-                       its canonical input case (runs/<NNN>/activations.json)
+
+What the network does with a case is no longer a still: the activation heatmap
+this script used to write was replaced by `docs/assets/cinema/`, a recording of
+the deployed graph's own trunk taps firing over the real candidate enumeration
+beside the mesher building the mesh it chose (`scripts/render_cinema.py`,
+ADR-0042). A per-row-normalised heatmap of one canonical input could show which
+units were warm; it could not show which candidate a unit was warm *for*, or
+that the action it argued for is the one the mesher then executed.
 
 Missing inputs skip the affected figure with a printed "no data yet" note —
 the script still exits 0 so it is safe to run before any training exists.
@@ -33,9 +39,6 @@ import figstyle as fs  # noqa: E402
 ROOT = Path(__file__).resolve().parents[2]
 ADVISOR_DIR = ROOT / "bench" / "advisor"
 FIGURES_DIR = ROOT / "docs" / "advisor" / "figures"
-
-import numpy as np  # noqa: E402
-from matplotlib.colors import TwoSlopeNorm  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -239,131 +242,12 @@ def training_curves(runs_dir: Path, out_dir: Path) -> bool:
     return True
 
 
-def _tick_step(n: int) -> int:
-    for step in (1, 2, 5, 10, 20, 25, 50, 100):
-        if n / step <= 14:
-            return step
-    return max(1, n // 14)
-
-
-def activation_map(runs_dir: Path, out_dir: Path) -> bool:
-    dirs = [d for d in run_dirs(runs_dir) if (d / "activations.json").is_file()]
-    if not dirs:
-        print(f"no data yet — expected {runs_dir}/<NNN>/activations.json; "
-              "skipping activation_map.png")
-        return False
-    act = load_json(dirs[-1] / "activations.json")
-    assert act is not None
-    layers = act.get("layers", [])
-    if not layers:
-        print(f"{dirs[-1] / 'activations.json'} has no layers; "
-              "skipping activation_map.png")
-        return False
-
-    case = act.get("input_case") or {}
-    run_id = str(act.get("run"))
-    part = str(case.get("part", "?"))
-    cfg_id = str(case.get("cfg_id", "?"))
-    amax = max((abs(float(v)) for layer in layers
-                for v in layer.get("values", [])), default=0.0)
-    if amax <= 0.0:
-        amax = 1.0
-
-    title = f"Advisor activations — run {run_id}"
-    if case:
-        title += f" on {part} · {cfg_id}"
-    subtitle = ("all units, no subsampling; each row scaled to its own "
-                "max |a|, given in the row label")
-    # The input row is WIDER than the documented input contract and saying
-    # "unit index (0-48)" beside a 43-column contract invites the reader to
-    # think one of the two is wrong. Name the composition from the data:
-    # the two categorical columns are replaced by their embeddings.
-    encoder = next((l for l in layers if str(l.get("name")) == "input"), None)
-    if encoder:
-        labels = [str(x) for x in (encoder.get("labels") or [])]
-        embedded = [x for x in labels if "_emb_" in x]
-        if embedded:
-            groups = sorted({x.split("_emb_")[0] for x in embedded})
-            subtitle += (f"\nthe encoder row is {len(labels)} units, not the "
-                         f"{len(labels) - len(embedded) + len(groups)}-column "
-                         f"input contract: {', '.join(groups)} enter as "
-                         f"{len(embedded)} embedding units rather than as "
-                         f"{len(groups)} index columns")
-    footer = fs.footer_source(
-        dirs[-1] / "activations.json",
-        n=sum(len(l.get("values", [])) for l in layers),
-        note="per-row scaling: trunk and head magnitudes differ ~10×")
-    fs.assert_glyphs(title, subtitle, footer, run_id, part, cfg_id)
-
-    n_layers = len(layers)
-    # The bottom row draws its unit names rotated, and those names are long
-    # (`policy_mesher_logit_graded_tet`). A fixed spacer let them run into the
-    # colourbar, so the gutter is sized from the longest label actually drawn.
-    longest = max((len(str(x)) for layer in layers
-                   for x in (layer.get("labels") or [])
-                   if len(layer.get("labels") or []) <= 24), default=0)
-    spacer_ratio = max(0.6, 0.075 * longest)
-    fig, axes = fs.figure(title, subtitle=subtitle, footer=footer,
-                          size="tall", nrows=n_layers + 2, ncols=1,
-                          gridspec_kw={"height_ratios":
-                                       [1.0] * n_layers + [spacer_ratio, 0.16],
-                                       "hspace": 1.0})
-    spacer = axes[-2][0]   # keeps the long head labels clear of the colourbar
-    spacer.set_axis_off()
-    cax = axes[-1][0]
-    norm = TwoSlopeNorm(vmin=-1.0, vcenter=0.0, vmax=1.0)
-    cmap = fs.field_cmap("signed")
-    im = None
-    for ax, layer in zip([a[0] for a in axes[:-2]], layers):
-        values = [float(v) for v in layer.get("values", [])]
-        labels = [str(x) for x in (layer.get("labels") or [])]
-        name = str(layer.get("name"))
-        fs.assert_glyphs(name, *labels)
-        row_max = max((abs(v) for v in values), default=0.0) or 1.0
-        row = np.asarray(values, dtype=float).reshape(1, -1) / row_max
-        im = ax.imshow(row, cmap=cmap, norm=norm, aspect="auto",
-                       interpolation="nearest",
-                       extent=(-0.5, len(values) - 0.5, -0.5, 0.5))
-        ax.set_yticks([])
-        ax.set_ylabel(f"{name}\n±{row_max:.2f}", fontsize=fs.FONT_PT["label"],
-                      rotation=0, ha="right", va="center", labelpad=8)
-        for side in ax.spines.values():
-            side.set_visible(False)
-        if labels and len(labels) == len(values) and len(values) <= 24:
-            ax.set_xticks(range(len(values)))
-            ax.set_xticklabels(labels, rotation=90, ha="center",
-                               va="top",
-                               fontsize=fs.FONT_PT["tick"] - 1.5)
-        else:
-            step = _tick_step(len(values))
-            ticks = list(range(0, len(values), step))
-            ax.set_xticks(ticks)
-            ax.set_xticklabels([str(t) for t in ticks],
-                               fontsize=fs.FONT_PT["tick"] - 1)
-            ax.set_xlabel(f"unit index (0–{len(values) - 1})",
-                          fontsize=fs.FONT_PT["tick"])
-        print(f"  layer {name}: {len(values)} units, "
-              f"row scale ±{row_max:.3f}")
-
-    print(f"  max |a| over all layers = {amax:.2f}")
-    if im is not None:
-        fs.colorbar(fig, im, label="activation, normalised", unit="row max",
-                    cax=cax, orientation="horizontal")
-    else:
-        cax.set_visible(False)
-    path = out_dir / "activation_map.png"
-    fs.finish(fig, path)
-    return True
-
-
 def main() -> int:
     args = parse_args()
     fs.use("dark")
     runs_dir = args.runs_dir or args.advisor_dir / "runs"
     args.out_dir.mkdir(parents=True, exist_ok=True)
-    wrote = [training_curves(runs_dir, args.out_dir),
-             activation_map(runs_dir, args.out_dir)]
-    if not any(wrote):
+    if not training_curves(runs_dir, args.out_dir):
         print("no figures written — run scripts/advisor/train.py first "
               "(artifacts appear under bench/advisor/runs/)")
     return 0

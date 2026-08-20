@@ -288,12 +288,40 @@ action that then fails from 36.4% to 27.5% at the shipped threshold.
 
 ![Advisor network layout](docs/advisor/figures/network_layout.png)
 
-The deployed width-96, depth-2 model has 15,591 parameters, 43 inputs and 7
-action outputs. `p_elevate` was deleted as redundant (`order >= 2` is the same
+The deployed width-96, depth-2 model has 16,177 parameters, 47 inputs and 9
+action outputs (3 continuous, plus a 2-wide order logit and a 4-wide mesher
+logit). `p_elevate` was deleted as redundant (`order >= 2` is the same
 actuator) and the order vocabulary trimmed to the reachable `[1,2]`. It exports
 at ONNX opset 17 with 2.158e-06 relative C++ parity. A recommendation costs
 about 1.0 ms (p50, single-threaded, 20 candidates; p99 2.62 ms measured at 32),
 roughly 0.1% of a solve, and a test fails the build above 100 ms p99.
+
+[![The advisor deciding, and the mesher building what it decided](docs/assets/cinema/advisor_cinema.gif)](docs/assets/cinema/advisor_cinema.mp4)
+
+The advisor deciding, and the mesher building what it decided —
+`box_hole_s0_c0` under axial tension. Inline loop: 11.4 s across the advisor →
+mesh cut of a 30 s take. Full video:
+[advisor_cinema.mp4](docs/assets/cinema/advisor_cinema.mp4) (h264 1920x1080;
+[poster frame](docs/assets/cinema/poster.png) if your renderer shows neither).
+
+Everything with a number on it is measured. The lit nodes and connection lines
+are the deployed ONNX graph's own trunk taps and weights, read back out of the
+forward pass onnxruntime ran — not a re-implementation of it — one pass per
+candidate for all 38 candidates the chooser actually enumerated plus the final
+re-score, with the ranking score, the feasibility gate and the DOF budget shown
+as they fell. The mesh is built at the granularity the mesher has: 18 real
+construction stages — named boundaries like the lattice, the ADR-0013 pyramid
+expansion, the CAD snap and the fan peel — across the two fills the advisor's
+single adapt pass asked for, ending at the 568 elements the solve ran on, in the
+mesher's own emission order, and the action
+being built is the one the network picked in the act before. Cosmetic, and only
+this: the virtual clock the acts are paced on (no frame is a wall-clock
+measurement), fades and opacity, the shrink that draws each element toward its
+own centroid so the interior is legible, the colour ramp, and the layout. If the
+model has no taps or the part is refused as out of distribution, the surface
+says so on screen instead of drawing something plausible
+([ADR-0042](docs/decisions/0042-the-advisor-explains-itself-on-screen.md)).
+This replaces the retired `activation_map.png`, on that figure's own case.
 
 The advisor refuses parts it does not recognise. A Mahalanobis distance over 31
 part-geometry columns — 16 mesh-derived features plus 15 exact-B-rep descriptors

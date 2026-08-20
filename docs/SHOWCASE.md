@@ -56,7 +56,7 @@ in the manifest too.
 
 Flat plate with a central hole — the canonical stress-riser benchmark geometry.
 Feature-aware grading concentrates elements around the hole where the gradient
-lives. h = 6 mm, 52,016 curved cells, **233,388 solved DOF**, 156 s wall. h was
+lives. h = 6 mm, 52,080 curved cells, **233,820 solved DOF**, 121 s wall. h was
 3 mm while the shipped mesh was straight-edged; the exact curved boundary now
 renders a smoother hole at ~1/8 the cells.
 
@@ -69,7 +69,7 @@ python scripts/render_showcase.py --only plate_hole
 ![cantilever](assets/showcase/gallery_cantilever.png)
 
 End-loaded cantilever: linear bending stress distribution, maximum at the
-clamped root. h = 30 mm, 44,832 curved cells, **193,971 solved DOF**, 74 s wall.
+clamped root. h = 30 mm, 44,832 curved cells, **193,971 solved DOF**, 58 s wall.
 This is the geometry behind the Timoshenko tip-deflection verification (1.50%
 error,
 [bench/reports/p1-gate1-convergence.md](../bench/reports/p1-gate1-convergence.md)).
@@ -86,11 +86,11 @@ Curved-wall solid imported from STEP. Curvature-dominant sizing uses a 0.5×
 accuracy lattice, then the **authoritative solve mesh** is promoted to
 tet10/hex20 and its boundary mids are projected onto the exact BRep. The same
 curved volume elements are assembled, exported, and rendered. h = 12 mm,
-**703,599 solved DOF**, 780 s wall. Its load box selects the cap plus the top
+**688,047 solved DOF**, 780 s wall. Its load box selects the cap plus the top
 5 mm of wall, and since [ADR-0037](decisions/0037-a-box-selection-is-a-region.md)
 the traction is integrated over exactly that region instead of over whole faces,
-so a +z shear runs up to the sharp top rim: the peak nodal value is 16.24 MPa
-there, against 3.49 MPa just above the clamped base face and a nominal 0.998 MPa
+so a +z shear runs up to the sharp top rim: the peak nodal value is 3.13 MPa
+there, against 2.31 MPa just above the clamped base face and a nominal 0.998 MPa
 in the mid-wall (F/A = 1.000 MPa exactly). The fixture is the z = 0 face alone
 since [ADR-0038](decisions/0038-a-fixture-is-applied-to-the-boundary.md); it used
 to be every node below z = 15 mm, which froze 30.7% of the elements solid.
@@ -106,7 +106,7 @@ python scripts/render_showcase.py --only cylinder
 Closed curved B-rep — the hardest case for a Cartesian grid fill. The shipped
 mesh is no longer a linear solve hidden behind a smoothed render: graded
 boundary topology, projected tet10 geometry, stiffness assembly, VTU export and
-Studio all consume the same authoritative node set. h = 8 mm, **521,271 solved
+Studio all consume the same authoritative node set. h = 8 mm, **521,175 solved
 DOF**, 112 s wall.
 
 ```sh
@@ -119,8 +119,8 @@ python scripts/render_showcase.py --only sphere
 One watertight 3D Boolean solid: a round truncated cone fused into an
 overlapping spherical scoop. Sharp CAD-edge paths are recovered through the
 boundary graph under the same cell-quality/Jacobian gate, and the projected
-quadratic volume mesh is solved directly. h = 10 mm, **379,815 solved DOF**,
-115 s wall.
+quadratic volume mesh is solved directly. h = 10 mm, **383,295 solved DOF**,
+88 s wall.
 
 ```sh
 python scripts/render_showcase.py --only icecream_cone

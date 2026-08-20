@@ -342,17 +342,16 @@ solve the curved mesh itself:
   faithful sampling of the solved tet10/hex20 geometry, not a substitute mesh.
 
 At requested h = 8 mm, the product graded path measures p99 surface-to-BRep
-error over bbox diagonal of **8.23e-6 sphere**, **1.23e-4 cone**,
-**2.39e-5 cylinder** and **1.02e-5 plate-with-hole**. Three of the four are
-inside the 1e-4 (99.99%) target and the cone is not: its sharp rim is the
-pre-existing residual recorded in
-[ADR-0035](decisions/0035-boundary-conformity.md) §6, and the area-weighted wall
-relaxation of
-[ADR-0037](decisions/0037-a-box-selection-is-a-region.md) moved it from 1.43e-4
-toward the bar rather than through it. Their curved-cell `quality_min` values are
-0.06338, 0.02012, 0.05276 and 0.02072, with zero inverted and zero sub-floor
-cells, and relative volume errors of 3.9e-5, 6.7e-5, 1.2e-5 and 6.8e-6.
-Facet-normal p99 is 0.320° / 4.46° / 4.16° / 0.664°; the ~90° maxima on the cone,
+error over bbox diagonal of **8.23e-6 sphere**, **8.21e-5 cone**,
+**1.42e-5 cylinder** and **9.91e-6 plate-with-hole** — all four inside the
+1e-4 (99.99%) target. The cone was the holdout at 1.23e-4 until
+[ADR-0039](decisions/0039-a-stranded-boundary-node-is-rescued.md): its
+residual was one orbit of boundary nodes stranded at their raw lattice sites
+behind floor-pinned cap cells, plus two crease-classification defects at the
+foot rim, not chordal error. Their curved-cell `quality_min` values are
+0.06338, 0.02085, 0.02550 and 0.03188, with zero inverted and zero sub-floor
+cells, and relative volume errors of 3.9e-5, 6.7e-5, 1.2e-5 and 5.3e-6.
+Facet-normal p99 is 0.320° / 2.82° / 1.28° / 0.684°; the ~90° maxima on the cone,
 cylinder and plate are declared BRep sharp edges and the cone's apex vertex, not
 smooth-wall defects.
 

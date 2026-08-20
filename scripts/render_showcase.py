@@ -215,10 +215,21 @@ PARTS: list[Part] = [
         E=2.0e11,
         nu=0.3,
         view=(-0.42, -1.00, 0.46),
-        up=(0.0, 0.0, 1.0),
+        # Same rule as the plate: up=(0, vz, -vy) is perpendicular to the view
+        # AND has no world-x component, so the beam axis lands exactly
+        # horizontal on screen. up=(0,0,1) does not, and on a cantilever that
+        # is not cosmetic: it gave world x-hat a +0.1512 screen-vertical
+        # component, so a *straight* 1 m beam climbed 151 mm up the frame from
+        # root to tip — 4.1x the 37 mm of warped droop, and in the opposite
+        # sense. The deflection became a small correction to a large fake tilt,
+        # so the figure read as a beam rising to the right and the clamped
+        # (yellow, 5.89 MPa) end looked like the free end. With this up,
+        # x-hat.up = 0 exactly: every pixel of vertical deviation is deflection.
+        up=(0.0, 0.46, 1.00),
         margin=1.06,
         # A cantilever's story is its tip deflection, so it gets a larger warp
-        # target than the plate; x200 on a 1 m beam is ~36 mm of droop.
+        # target than the plate; x200 on a 1 m beam is 40 mm of droop, 37 mm of
+        # it screen-vertical once the axis is horizontal.
         warp_frac=0.05,
         bc_note="root face fixed, -z resultant on tip face",
         load_dir=(0.0, 0.0, -1.0),
@@ -287,9 +298,22 @@ PARTS: list[Part] = [
         view=(1.00, -1.00, 0.55),
         up=(0.0, 0.0, 1.0),
         margin=1.05,
-        fix_box=(-1, -1, -1, 1, 1, 0.012),
+        # The flat foot FACE, not a 12 mm band of the cone wall — the same
+        # correction the cylinder above got, for the same reason and with the
+        # same measurement. z <= 12 mm clamped the 6.0 mm-radius foot plus the
+        # wall out to r = 9.5 mm, and the top of that band is an artificial
+        # clamped-patch boundary in the middle of a conical face. It carried the
+        # figure's headline number: at h = 10 mm every one of the 200 hottest
+        # nodes sat in z = 11.1..13.9 mm, a one-element ring straddling the box
+        # plane, peaking at 8.67 MPa where z = 16 mm reads 3.65 MPa and z = 8 mm
+        # (inside the clamp) reads 2.75 MPa. So the part's reported peak was a
+        # property of the box. 0.1 mm still contains the whole z = 0 face (its
+        # 341 nodes snap to z = 0 exactly, and the first wall layer above it
+        # sits at z = 0.273 mm), and the remaining rim singularity is the foot's
+        # own CAD corner, which a cone standing on its point really has.
+        fix_box=(-1, -1, -1, 1, 1, 0.0001),
         load_box=(-1, -1, 0.120, 1, 1, 1),
-        bc_note="foot z <= 0.012 m fixed, -z resultant on scoop",
+        bc_note="foot face (z = 0) fixed, -z resultant on scoop",
         load_dir=(0.0, 0.0, -1.0),
     ),
 ]
@@ -763,6 +787,77 @@ def _shot(p) -> np.ndarray:
 
 
 # ---------------------------------------------------------------------------
+# The undeformed reference
+# ---------------------------------------------------------------------------
+# A warped surface on its own does not show deformation, because the reader has
+# nothing to compare it against. Measured on the gallery set: the plate, hero,
+# cylinder, sphere and cone all move along their own long axis (tension /
+# compression), so the warp changes the silhouette by 2-5% of the bbox diagonal
+# and reads as *nothing*; on the cantilever, 4% of droop read as camera tilt.
+# Every stress render now draws the rest shape as a reference, which is the
+# same thing the Studio viewport's "undeformed outline" toggle draws.
+#
+# It is the view SILHOUETTE of the rest surface, not its wireframe: the GUI can
+# afford a full boundary-edge overlay interactively, but at 44,832 cells in a
+# still figure that is mush. And it is composited over the body rather than
+# depth-tested against it, because the case worth seeing is exactly the one
+# where the body has moved in front of where it used to be.
+GHOST_LINE_PX = 1.7
+GHOST_ALPHA = 0.62
+
+
+def _camera_state(p) -> dict:
+    """The projection of `p`, verbatim, so a second pass can reproduce it."""
+    c = p.camera
+    return {
+        "position": tuple(c.position),
+        "focal_point": tuple(c.focal_point),
+        "up": tuple(c.up),
+        "view_angle": float(c.view_angle),
+    }
+
+
+def rest_outline(rest, cam: dict, width: int, height: int,
+                 line_width: float) -> np.ndarray:
+    """RGBA of the undeformed silhouette as `cam` sees it (transparent bg)."""
+    import pyvista as pv
+    from vtkmodules.vtkFiltersHybrid import vtkPolyDataSilhouette
+
+    p = _plotter(width, height, "none")
+    p.camera.view_angle = cam["view_angle"]
+    p.camera.position = cam["position"]
+    p.camera.focal_point = cam["focal_point"]
+    p.camera.up = cam["up"]
+    sil = vtkPolyDataSilhouette()
+    sil.SetInputData(rest)
+    sil.SetCamera(p.camera)
+    # Silhouette only. Crease edges (EnableFeatureAngle) would also emit the
+    # part's hidden back edges, which turns a reference curve into a box
+    # wireframe over the field.
+    sil.SetEnableFeatureAngle(0)
+    sil.BorderEdgesOn()
+    sil.Update()
+    edges = pv.wrap(sil.GetOutput())
+    if edges.n_cells == 0:
+        p.close()
+        return np.zeros((height, width, 4), dtype=np.uint8)
+    p.add_mesh(edges, color=theme().ink, line_width=line_width, lighting=False)
+    p.renderer.ResetCameraClippingRange()
+    img = _shot(p)
+    p.close()
+    return img
+
+
+def over(base: np.ndarray, top: np.ndarray, alpha: float) -> np.ndarray:
+    """Straight-alpha composite of `top` (scaled by `alpha`) onto `base`."""
+    a = top[..., 3:4].astype(np.float32) * (alpha / 255.0)
+    rgb = (top[..., :3].astype(np.float32) * a
+           + base[..., :3].astype(np.float32) * (1.0 - a))
+    out_a = np.maximum(base[..., 3:4].astype(np.float32), a * 255.0)
+    return np.concatenate([rgb, out_a], axis=2).round().clip(0, 255).astype(np.uint8)
+
+
+# ---------------------------------------------------------------------------
 # The one colour-range rule
 # ---------------------------------------------------------------------------
 # Every stress render clips its colour range at this percentile of the *visible
@@ -847,6 +942,7 @@ def render_stress(
     grid.point_data.active_vectors_name = "displacement"
     warped = grid.warp_by_vector("displacement", factor=factor)
     surf = warped.extract_surface(algorithm="dataset_surface")
+    rest = grid.extract_surface(algorithm="dataset_surface")
 
     # Range comes from the surface field: that is what the render shows.
     lo, hi, clipped = color_range(
@@ -879,7 +975,10 @@ def render_stress(
         # the lit far wall shows through and the hole looks like a hole.
         culling="back",
     )
-    pts = np.asarray(surf.points)
+    # Frame the union: the rest outline is part of the picture now, and on a
+    # cantilever it is the half that sits *above* the warped body, so fitting
+    # the warped points alone would crop the reference the caption points at.
+    pts = np.vstack([np.asarray(surf.points), np.asarray(rest.points)])
     sel = pts
     if focus is not None and focus_radius is not None:
         f = np.asarray(focus, dtype=float)
@@ -889,7 +988,14 @@ def render_stress(
     fit_camera(p, sel, view, up, w3 * s, h3 * s, margin=margin,
                focus=np.asarray(focus, dtype=float) if focus is not None else None)
     img = _shot(p)
+    cam = _camera_state(p)
     p.close()
+    # The reference the warp is measured against. Skipped when there is no warp
+    # to reference: an unwarped body and its own outline coincide, and drawing
+    # the second over the first would just dim the field.
+    if factor > 0.0:
+        img = over(img, rest_outline(rest, cam, w3 * s, h3 * s, GHOST_LINE_PX * s),
+                   GHOST_ALPHA)
 
     if clipped:
         # Do not assert WHAT the peak sits on. This caption used to say "at
@@ -910,7 +1016,8 @@ def render_stress(
             f"the {ordinal(CLIP_PERCENTILE)} percentile of the visible surface "
             f"field equals the peak)"
         )
-    footer = f"Deformation warped \u00d7{factor:g} for visibility \u00b7 {clip_note}"
+    footer = (f"Deformation warped \u00d7{factor:g}, against the undeformed "
+              f"outline \u00b7 {clip_note}")
     if footer_extra:
         footer += f" \u00b7 {footer_extra}"
     # Same stamp the matplotlib figures carry, for the same reason: these
@@ -1500,7 +1607,8 @@ def main(argv: list[str] | None = None) -> int:
                     f"{part.title}: von Mises stress on the {part.mesher} mesh "
                     f"(h = {fmt_h(part.h)}, {info['nodes']:,} nodes / "
                     f"{info['elems']:,} elements, {3 * info['nodes']:,} DOF); "
-                    f"{part.bc_note}; displacement warped \u00d7{info['warp_factor']:g}; "
+                    f"{part.bc_note}; displacement warped "
+                    f"\u00d7{info['warp_factor']:g} against the undeformed outline; "
                     f"{info['caption_clip']}."
                 ),
             })
@@ -1538,7 +1646,8 @@ def main(argv: list[str] | None = None) -> int:
                     f"low oblique angle (h = {fmt_h(part.h)}, "
                     f"{info['nodes']:,} nodes / {info['elems']:,} elements, "
                     f"{3 * info['nodes']:,} DOF); {part.bc_note}; displacement "
-                    f"warped \u00d7{info['warp_factor']:g}; {info['caption_clip']}."
+                    f"warped \u00d7{info['warp_factor']:g} against the undeformed "
+                    f"outline; {info['caption_clip']}."
                 ),
             })
             fs.assert_glyphs(images[-1]["caption"])

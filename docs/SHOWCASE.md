@@ -23,11 +23,11 @@ A one-line index of the same assets lives in
 ![Hero stress render](assets/showcase/hero.png)
 
 **`hero.png`** — `plate_hole` solved on the feature-graded mesher, shot from a
-low oblique angle across the whole plate (h = 6 mm, 77,796 nodes / 52,016 curved
-cells, 233,388 DOF; min-x face fixed, conserved +x resultant on max-x).
+low oblique angle across the whole plate (h = 6 mm, 77,940 nodes / 52,080 curved
+cells, 233,820 DOF; min-x face fixed, conserved +x resultant on max-x).
 von Mises is shown on the surface with displacement warped ×5000. The colour
-range is 0 – 2.51 MPa, clipped at the 99th percentile of the visible surface
-field; the true peak nodal value is 3.08 MPa, at a boundary-condition
+range is 0 – 2.62 MPa, clipped at the 99th percentile of the visible surface
+field; the true peak nodal value is 3.13 MPa, at a boundary-condition
 singularity.
 Exact values per image live in
 [`manifest.json`](assets/showcase/manifest.json).
@@ -131,7 +131,7 @@ python scripts/render_showcase.py --only icecream_cone
 ![Mesher comparison](assets/showcase/compare_meshers.png)
 
 **`compare_meshers.png`** — the same plate at h = 6 mm through three meshers,
-all three now on curved CAD geometry: `tet` (37,800 DOF), `graded` (233,388) and
+all three now on curved CAD geometry: `tet` (37,800 DOF), `graded` (233,820) and
 `hybrid` (134,748), whose transition zoo carries conforming mixed cells.
 All four panels share one camera on a 60 mm window across the hole (6 hole
 radii): at whole-plate scale the three topologies read as identical grey
@@ -223,8 +223,8 @@ python scripts/render_showcase.py --only compare_meshers
 
 **`compare_grading.png`** — uniform (`--no-feature`, h = 4.2 mm) versus
 feature-graded sizing (h = 5.6 mm) on the same part and mesher, with `h` tuned
-so the two legs land on a **matched element budget**: 42,960 vs 45,096 cells,
-5.0% apart (190,032 vs 204,888 DOF on the curved geometry — the grid quantizes
+so the two legs land on a **matched element budget**: 42,960 vs 45,128 cells,
+5.0% apart (190,032 vs 205,128 DOF on the curved geometry — the grid quantizes
 too hard to hit equal DOF exactly, so the honest control is element count; both
 figures are printed in the tile footers and the manifest).
 The comparison is therefore about *where*

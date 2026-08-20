@@ -86,7 +86,9 @@ unpromoted benchmark gates
 | ![Mesher comparison](docs/assets/showcase/compare_meshers.png) <br> **compare_meshers** — h = 6 mm: `tet`, `graded`, and `hybrid` (hex bulk + transition cells). | ![DOF/time benchmark](docs/assets/showcase/bench_dof_time.png) <br> **bench_dof_time** — the D6 L-domain result: 6384 → 1248 DOF, 2.762 s → 0.227 s. |
 
 Stress renders come from real solver VTU output. Displacement is warped for
-visibility and the colour range is clipped at a stated percentile, because a
+visibility and drawn against a grey outline of the undeformed shape — without
+that reference the warp is unreadable, since most of these cases deform along
+their own long axis. The colour range is clipped at a stated percentile, because a
 clamped face is a boundary-condition singularity whose peak nodal value is not a
 physical stress. Every image records its element size, DOF count, warp factor,
 colour range, clipping percentile and true peak in

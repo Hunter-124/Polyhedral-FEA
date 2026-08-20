@@ -25,7 +25,8 @@ A one-line index of the same assets lives in
 **`hero.png`** — `plate_hole` solved on the feature-graded mesher, shot from a
 low oblique angle across the whole plate (h = 6 mm, 77,940 nodes / 52,080 curved
 cells, 233,820 DOF; min-x face fixed, conserved +x resultant on max-x).
-von Mises is shown on the surface with displacement warped ×5000. The colour
+von Mises is shown on the surface with displacement warped ×5000 against the
+undeformed outline. The colour
 range is 0 – 2.61 MPa, clipped at the 99th percentile of the visible surface
 field; the true peak nodal value is 3.14 MPa at the hole rim — the Kirsch
 concentration the part exists to show, not a boundary-condition artifact.
@@ -40,7 +41,11 @@ python scripts/render_showcase.py --only hero
 
 Each render is a full import → mesh → solve → export pass on a STEP part from
 [`tests/fixtures/parts/`](../tests/fixtures/parts), coloured by von Mises stress
-with the displacement field warped for visibility. Every caption in
+with the displacement field warped for visibility **against a grey outline of
+the undeformed shape** — without that reference an axial 2–5% warp reads as
+nothing at all, and a transverse one reads as camera tilt
+([ADR-0041](decisions/0041-a-deformed-render-carries-its-undeformed-outline.md)).
+Every caption in
 [`manifest.json`](assets/showcase/manifest.json) states the element size, node /
 element / DOF counts, the boundary conditions, the warp factor, the colour range
 **and the percentile it was clipped at**, plus the true unclipped peak nodal
@@ -69,7 +74,8 @@ python scripts/render_showcase.py --only plate_hole
 ![cantilever](assets/showcase/gallery_cantilever.png)
 
 End-loaded cantilever: linear bending stress distribution, maximum at the
-clamped root. h = 30 mm, 44,832 curved cells, **193,971 solved DOF**, 53 s wall.
+clamped root, drooping visibly out of its undeformed outline toward the loaded
+tip. h = 30 mm, 44,832 curved cells, **193,971 solved DOF**, 53 s wall.
 This is the geometry behind the Timoshenko tip-deflection verification (1.50%
 error,
 [bench/reports/p1-gate1-convergence.md](../bench/reports/p1-gate1-convergence.md)).
@@ -120,7 +126,14 @@ One watertight 3D Boolean solid: a round truncated cone fused into an
 overlapping spherical scoop. Sharp CAD-edge paths are recovered through the
 boundary graph under the same cell-quality/Jacobian gate, and the projected
 quadratic volume mesh is solved directly. h = 10 mm, **383,295 solved DOF**,
-88 s wall.
+118 s wall. Its fixture is the flat 6 mm-radius foot face, not the 12 mm band of
+cone wall it used to be: that band's upper edge was an artificial clamped-patch
+boundary in the middle of a conical face, and it carried the figure's peak
+(8.67 MPa on a one-element ring at the box plane, against 3.65 MPa one element
+above it). The peak is now the foot's own CAD rim at 12.2 MPa, a 1.38×
+concentration on the 8.84 MPa mean bearing stress, with the field decaying
+monotonically from the fixture into the part
+([ADR-0041](decisions/0041-a-deformed-render-carries-its-undeformed-outline.md)).
 
 ```sh
 python scripts/render_showcase.py --only icecream_cone
@@ -609,8 +622,11 @@ fields, which is how the GUI's solve is cross-checked against the CLI's.)
   is viridis (`figstyle.field_cmap("magnitude")`): perceptually uniform, monotone
   in lightness and colour-blind safe. The GUI's own blue → cyan → green → yellow
   → red ramp is not, so it appears only in `gui_studio.png`, which documents the
-  GUI itself. Displacement is warped by a stated factor (×200 to ×5000) so
-  deflection is visible, and the colour range is clipped by one rule applied to
+  GUI itself. Displacement is warped by a stated factor (×200 to ×10000) and
+  drawn against the view silhouette of the *undeformed* shape, without which the
+  warp is unreadable — five of the six stress cases deform along their own long
+  axis, so the silhouette moves by a few percent of a shape the reader has never
+  seen at rest. The colour range is clipped by one rule applied to
   every render — the 99th percentile of the visible surface field — stated
   identically in every footer alongside the true unclipped peak nodal value:
   clamped faces are stress singularities under point-fixed boundary conditions,

@@ -174,9 +174,18 @@ outer wall up to 15 mm as well, and the upper edge of that strip is an artificia
 clamped-patch boundary with a real stress singularity on it: at h = 12 mm it drew
 a ring of one-element hot spots a fifteenth of the way up the wall, which no
 physical fixture produces. The base face is the standard model, it is what the
-caption always claimed, and as measured above it does not move the mesh. The cone
-keeps its patch fixture because its foot has no flat face to clamp; its
-clamped-edge ring is azimuthally smooth and is the honest answer to that model.
+caption always claimed, and as measured above it does not move the mesh.
+
+> **Superseded by [ADR-0041](0041-a-deformed-render-carries-its-undeformed-outline.md) §5.**
+> This paragraph originally continued: "The cone keeps its patch fixture because
+> its foot has no flat face to clamp; its clamped-edge ring is azimuthally smooth
+> and is the honest answer to that model." The premise is wrong, and §5 above
+> says so — `icecream_cone.step` is a *truncated* cone whose foot is a flat disc
+> of radius 6 mm, and at h = 10 mm 341 boundary nodes sit on it at exactly z = 0.
+> The `z <= 12 mm` patch was therefore doing to the cone exactly what the 15 mm
+> box did to the cylinder, and it owned the figure's peak (8.67 MPa on a
+> one-element ring at the box plane against 3.65 MPa one element above it). The
+> cone's fixture is now the foot face too.
 
 ## 7. What this does *not* fix
 

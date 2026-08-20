@@ -237,6 +237,14 @@ reasons unrelated to boundary placement.
 
 ## 6. What is still open, and why it is not hidden
 
+> Update, 2026-08-19: the cone's sharp-rim residual discussed below is closed
+> by [ADR-0039](0039-a-stranded-boundary-node-is-rescued.md) — the tail was
+> one orbit of boundary nodes stranded at raw lattice sites behind
+> floor-pinned cap cells, plus two crease-classification defects; cone
+> p99/bbox is now 8.21e-5, inside the 1e-4 bar. The uniform `tet` fill's
+> floor-bounded residual in the first paragraph of this section is a
+> different regime and remains as recorded.
+
 **The uniform Cartesian tet fill is bounded by the shape floor, not by the
 projector.** `tet` still leaves p99 = 0.10 h on the sphere and 0.18 h on the
 cone at h = 8 mm. This was measured, not assumed: placing one straggler on its

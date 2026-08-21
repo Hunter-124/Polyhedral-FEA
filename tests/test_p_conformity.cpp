@@ -28,8 +28,7 @@ const fea::Material kMaterial{.youngs_modulus = 70e9, .poissons_ratio = 0.27};
 
 Eigen::Vector3d affine_displacement(const Eigen::Vector3d& x) {
     Eigen::Matrix3d a;
-    a << 1.1e-3, -2.7e-4, 3.2e-4, 4.3e-4, -7.0e-4, 1.9e-4, -3.6e-4,
-        2.4e-4, 8.5e-4;
+    a << 1.1e-3, -2.7e-4, 3.2e-4, 4.3e-4, -7.0e-4, 1.9e-4, -3.6e-4, 2.4e-4, 8.5e-4;
     const Eigen::Vector3d b{2.0e-5, -3.0e-5, 1.0e-5};
     return a * x + b;
 }
@@ -39,8 +38,7 @@ bool is_boundary(const Eigen::Vector3d& x, const Eigen::Vector3d& extents) {
     return x.minCoeff() <= kTol || (extents - x).minCoeff() <= kTol;
 }
 
-fea::Dirichlet affine_boundary(const fea::NodalMesh& mesh,
-                               const Eigen::Vector3d& extents,
+fea::Dirichlet affine_boundary(const fea::NodalMesh& mesh, const Eigen::Vector3d& extents,
                                const fea::LinearConstraints* constraints = nullptr) {
     fea::Dirichlet bc;
     for (std::size_t node = 0; node < mesh.nodes.size(); ++node) {
@@ -122,8 +120,8 @@ CantileverSolution solve_body_loaded(const fea::NodalMesh& mesh,
         mesh, [](const Eigen::Vector3d&) { return Eigen::Vector3d{0.0, 0.0, -2.5e5}; });
     fea::SolveOptions options;
     options.method = fea::SolveMethod::kDirect;
-    const auto u = fea::solve_elastostatics(mesh, kMaterial, fixed_min_x(mesh), loads,
-                                            options, constraints);
+    const auto u = fea::solve_elastostatics(mesh, kMaterial, fixed_min_x(mesh), loads, options,
+                                            constraints);
     return {.u = u, .energy = fea::strain_energy(mesh, kMaterial, u)};
 }
 
@@ -179,8 +177,8 @@ TEST_CASE("selective p interface passes affine patch only when constrained",
     const double constrained_error = affine_max_error(elevated.mesh, u_constrained);
 
     const auto discontinuous_bc = affine_boundary(elevated.mesh, extents);
-    const auto u_discontinuous = fea::solve_elastostatics(
-        elevated.mesh, kMaterial, discontinuous_bc, loads, options);
+    const auto u_discontinuous =
+        fea::solve_elastostatics(elevated.mesh, kMaterial, discontinuous_bc, loads, options);
     const double unconstrained_error = affine_max_error(elevated.mesh, u_discontinuous);
 
     std::cout << "pconform patch max error: constrained=" << constrained_error
@@ -203,8 +201,7 @@ TEST_CASE("selective constrained stiffness has exactly six rigid-body modes",
     Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eig(constrained);
     REQUIRE(eig.info() == Eigen::Success);
     const double cutoff = 1e-9 * eig.eigenvalues().cwiseAbs().maxCoeff();
-    const Eigen::Index zero_modes =
-        (eig.eigenvalues().cwiseAbs().array() <= cutoff).count();
+    const Eigen::Index zero_modes = (eig.eigenvalues().cwiseAbs().array() <= cutoff).count();
     CHECK(zero_modes == 6);
 }
 
@@ -232,8 +229,7 @@ TEST_CASE("all and no promotion are exact no-op endpoints", "[pconform][hp]") {
     CHECK((none_a.u.array() == none_b.u.array()).all());
 }
 
-TEST_CASE("selective conforming enrichment has intermediate load energy",
-          "[pconform][hp]") {
+TEST_CASE("selective conforming enrichment has intermediate load energy", "[pconform][hp]") {
     const auto linear = box_hex_mesh(3, 2, 2, {1.0, 0.3, 0.3});
     const auto selected = elements_left_of(linear, 0.34);
     const auto selective = fea::p_elevate_with_constraints(linear, selected);

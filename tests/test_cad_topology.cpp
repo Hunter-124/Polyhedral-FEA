@@ -156,8 +156,7 @@ TEST_CASE("extract_topology cylinder classifies seams/smooth and sharp rims") {
         const Eigen::Vector3d& p1 = e.samples[e.samples.size() / 4];
         const Eigen::Vector3d& p2 = e.samples[e.samples.size() / 2];
         // Closed circle: endpoints coincide; sagitta of quarter-arc vs diameter.
-        const bool closed =
-            (e.samples.back() - p0).norm() < 1e-9 * std::max(1.0, e.length);
+        const bool closed = (e.samples.back() - p0).norm() < 1e-9 * std::max(1.0, e.length);
         if (!closed) {
             continue;
         }
@@ -213,8 +212,8 @@ TEST_CASE("chordal_edge_metrics_segments e~=1 on synthetic circle chord") {
     // so e = d / (ℓ²κ/8) ≈ 1.
     using polymesh::geom::CadEdge;
     using polymesh::geom::CadTopology;
-    using polymesh::geom::MeshEdgeSegment;
     using polymesh::geom::chordal_edge_metrics_segments;
+    using polymesh::geom::MeshEdgeSegment;
 
     constexpr double kR = 1.0;
     constexpr double kKappa = 1.0 / kR;

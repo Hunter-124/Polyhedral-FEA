@@ -78,7 +78,6 @@ void transform_axis(std::vector<std::complex<double>>& f, const std::array<int, 
 
 } // namespace
 
-
 std::size_t Grid3d::index(int i, int j, int k) const {
     return static_cast<std::size_t>(i) +
            static_cast<std::size_t>(dims[0]) *

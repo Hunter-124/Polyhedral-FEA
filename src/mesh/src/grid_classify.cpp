@@ -136,7 +136,8 @@ double min_h_for_cell_budget(const Eigen::Vector3d& bbox_min, const Eigen::Vecto
     const int sub = std::max(1, subdivision);
     // Isotropic: (sub * L_i / h) product ≤ max_cells ⇒ h ≥ sub * cbrt(∏ L / max).
     const double vol = std::max(extent[0] * extent[1] * extent[2], 1e-300);
-    const double h_iso = static_cast<double>(sub) * std::cbrt(vol / static_cast<double>(max_cells));
+    const double h_iso =
+        static_cast<double>(sub) * std::cbrt(vol / static_cast<double>(max_cells));
     // Axis-wise lower bound: each n_i ≥ 1, but also n_i ≈ sub*L_i/h; if one axis
     // is very short, isotropic still works; pad 5% for ceil/even rounding.
     return h_iso * 1.05;
@@ -151,8 +152,8 @@ void set_cell_from_n(CartesianGrid& g, const Eigen::Vector3d& extent) {
 }
 
 /// Shrink n so nx*ny*nz ≤ max_cells while keeping n ≥ min_n and optional even.
-void fit_cell_budget(CartesianGrid& g, const Eigen::Vector3d& extent, long max_cells, int min_n,
-                     bool even) {
+void fit_cell_budget(CartesianGrid& g, const Eigen::Vector3d& extent, long max_cells,
+                     int min_n, bool even) {
     if (max_cells < 1) {
         max_cells = 1;
     }
@@ -275,17 +276,17 @@ std::vector<bool> classify_cells_inside(const geom::TriSurface& surface,
     return classify_impl(surface, grid, /*ray_axis=*/2);
 }
 
-FeatureAwareClassification classify_cells_feature_aware(
-    const geom::TriSurface& surface, const Eigen::Vector3d& bbox_min,
-    const Eigen::Vector3d& bbox_max, double h, long max_cells,
-    double relative_volume_tolerance, int max_refinement_levels,
-    const std::function<double(const Eigen::Vector3d&)>& size_field, bool even_cells) {
+FeatureAwareClassification
+classify_cells_feature_aware(const geom::TriSurface& surface, const Eigen::Vector3d& bbox_min,
+                             const Eigen::Vector3d& bbox_max, double h, long max_cells,
+                             double relative_volume_tolerance, int max_refinement_levels,
+                             const std::function<double(const Eigen::Vector3d&)>& size_field,
+                             bool even_cells) {
     validate_h_bbox(bbox_min, bbox_max, h, "classify_cells_feature_aware");
     if (max_cells < 1) {
         throw ValidityError("classify_cells_feature_aware: max_cells must be positive");
     }
-    if (!(relative_volume_tolerance > 0.0) ||
-        !std::isfinite(relative_volume_tolerance)) {
+    if (!(relative_volume_tolerance > 0.0) || !std::isfinite(relative_volume_tolerance)) {
         throw ValidityError(
             "classify_cells_feature_aware: relative volume tolerance must be positive");
     }
@@ -348,8 +349,7 @@ FeatureAwareClassification classify_cells_feature_aware(
                 for (int d = 0; d < 2; ++d) {
                     for (int b = 0; b < 2; ++b) {
                         for (int a = 0; a < 2; ++a) {
-                            if (!fine_inside[fine.index(2 * i + a, 2 * j + b,
-                                                       2 * k + d)]) {
+                            if (!fine_inside[fine.index(2 * i + a, 2 * j + b, 2 * k + d)]) {
                                 continue;
                             }
                             const int bit = a + 2 * b + 4 * d;
@@ -387,8 +387,7 @@ CanonicalCellMap canonical_cell_map(const CartesianGrid& grid, const MirrorFrame
     for (int a = 0; a < 3; ++a) {
         const double mid = grid.origin[a] + 0.5 * extent[a];
         map.axis[static_cast<std::size_t>(a)] =
-            frame.plane[static_cast<std::size_t>(a)] &&
-            std::abs(mid - frame.center[a]) <= tol;
+            frame.plane[static_cast<std::size_t>(a)] && std::abs(mid - frame.center[a]) <= tol;
         any_axis = any_axis || map.axis[static_cast<std::size_t>(a)];
     }
     if (!any_axis) {
@@ -471,8 +470,7 @@ void symmetrise_classification(FeatureAwareClassification& classification,
     classification.n_mixed_cells = n_mixed;
     classification.refinement_levels = n_mixed > 0 ? 1 : 0;
     const double child_volume = 0.125 * classification.grid.cell.prod();
-    classification.classified_volume =
-        static_cast<double>(n_inside_children) * child_volume;
+    classification.classified_volume = static_cast<double>(n_inside_children) * child_volume;
     classification.relative_volume_error =
         classification.surface_volume > 0.0 && std::isfinite(classification.surface_volume)
             ? std::abs(classification.classified_volume - classification.surface_volume) /

@@ -31,8 +31,8 @@
 #include <string>
 #include <string_view>
 #include <thread>
-#include <vector>
 #include <utility>
+#include <vector>
 
 namespace polymesh::pipeline {
 /// Product defaults derive from the hybrid fill's established 48k work budget.
@@ -41,7 +41,6 @@ namespace polymesh::pipeline {
 /// element is the conservative DOF proxy. CLI/config value 0 selects these.
 inline constexpr std::size_t kDefaultMaxMeshElems = 12 * mesh::kHybridMaxElems;
 inline constexpr std::size_t kDefaultMaxMeshDof = 3 * kDefaultMaxMeshElems;
-
 
 enum class VolumeMesher : int {
     kTetFill = 0,
@@ -249,9 +248,8 @@ struct ResolvedMeshSize {
 /// lattice and promoted to tet10/hex20, so auto sizing must reserve ~8× cells
 /// and ~4.4 DOF per cell instead of 3.
 ResolvedMeshSize resolve_mesh_size(const Model& model, double requested_h,
-                                   double sharp_angle_deg = 30.0,
-                                   std::size_t max_elems = 0, std::size_t max_dof = 0,
-                                   bool curved_geometry = false,
+                                   double sharp_angle_deg = 30.0, std::size_t max_elems = 0,
+                                   std::size_t max_dof = 0, bool curved_geometry = false,
                                    const geom::CadTopology* cad_topology = nullptr);
 
 /// A boundary-condition / load selection region (world AABB) used to grade the
@@ -329,21 +327,21 @@ struct CaseFeatures {
 
 /// Extract cheap, deterministic advisor context without meshing or solving.
 CaseFeatures extract_case_features(const Model& model,
-                                  std::span<const RefineRegion> fix_regions,
-                                  std::span<const RefineRegion> load_regions,
-                                  const Eigen::Vector3d& load_dir, double poisson);
+                                   std::span<const RefineRegion> fix_regions,
+                                   std::span<const RefineRegion> load_regions,
+                                   const Eigen::Vector3d& load_dir, double poisson);
 
 /// What the spectral sizing pass did (ADR-0034). Zeroed when spectral sizing
 /// was not requested or no size field existed to filter.
 struct SpectralSizingReport {
     bool applied = false;
-    std::size_t modes_total = 0; // FFT modes considered (DC excluded)
-    std::size_t modes_kept = 0;  // modes surviving the energy truncation
-    double energy_kept = 0.0;    // retained spectral energy fraction [0,1]
-    double predicted_before = 0.0; // Σ vol/h³ before filtering
-    double predicted_after = 0.0;  // Σ vol/h³ after filtering (+ budget scale)
-    double h_scale = 1.0;          // uniform budget multiplier applied to h
-    bool budget_met = true;        // predicted_after ≤ budget (or no budget)
+    std::size_t modes_total = 0;        // FFT modes considered (DC excluded)
+    std::size_t modes_kept = 0;         // modes surviving the energy truncation
+    double energy_kept = 0.0;           // retained spectral energy fraction [0,1]
+    double predicted_before = 0.0;      // Σ vol/h³ before filtering
+    double predicted_after = 0.0;       // Σ vol/h³ after filtering (+ budget scale)
+    double h_scale = 1.0;               // uniform budget multiplier applied to h
+    bool budget_met = true;             // predicted_after ≤ budget (or no budget)
     std::size_t n_edge_curve_seeds = 0; // denoised CAD-edge curvature sources
 };
 
@@ -426,7 +424,6 @@ class GeometryVolumeLimitError : public std::runtime_error {
 GeometryVolumeAssessment measure_geometry_volume(const Model& model,
                                                  const fea::NodalMesh& mesh);
 
-
 /// Solve products, ready for rendering / VTU.
 struct SolveResult {
     fea::NodalMesh volume_mesh;
@@ -445,7 +442,6 @@ struct SolveResult {
     std::string mesh_note; // e.g. element/node counts, mesher version
     GeometryVolumeAssessment fill_geometry_volume;
     GeometryVolumeAssessment solved_geometry_volume;
-
 };
 
 /// Build the exact, owner-stable BRep projection oracle used by volume meshing
@@ -455,10 +451,10 @@ struct SolveResult {
 /// `topology_out`, when given, receives the extracted CAD topology the oracle
 /// built for itself, so a caller can hard-pin sharp edges (ADR-0035) without
 /// paying for a second `geom::extract_topology`.
-bool make_boundary_projection(const geom::CadModel& cad, double h,
-                              mesh::BoundaryProjectionContext* ctx,
-                              std::vector<mesh::BoundarySupport>* provenance,
-                              std::shared_ptr<const geom::CadTopology>* topology_out = nullptr);
+bool make_boundary_projection(
+    const geom::CadModel& cad, double h, mesh::BoundaryProjectionContext* ctx,
+    std::vector<mesh::BoundarySupport>* provenance,
+    std::shared_ptr<const geom::CadTopology>* topology_out = nullptr);
 
 /// Project quadratic free-surface mid-edge nodes onto their exact BRep support.
 /// A full move that would invalidate an incident tet10/hex20 is backed off by
@@ -471,12 +467,12 @@ bool make_boundary_projection(const geom::CadModel& cad, double h,
 /// owner. Without it the curved boundary loses the symmetry the linear one has:
 /// measured on cylinder.step at h = 8 mm, 99.89% of tet10 elements mirrored
 /// against 100% of the tet4 elements they came from.
-std::size_t project_quadratic_boundary_mids(
-    fea::NodalMesh& mesh, const geom::CadModel& cad,
-    mesh::BoundaryProjectionContext* projection, double h,
-    std::vector<std::uint32_t>* reverted_nodes = nullptr,
-    std::vector<std::uint32_t>* partial_nodes = nullptr,
-    const mesh::MirrorFrame* mirror = nullptr);
+std::size_t
+project_quadratic_boundary_mids(fea::NodalMesh& mesh, const geom::CadModel& cad,
+                                mesh::BoundaryProjectionContext* projection, double h,
+                                std::vector<std::uint32_t>* reverted_nodes = nullptr,
+                                std::vector<std::uint32_t>* partial_nodes = nullptr,
+                                const mesh::MirrorFrame* mirror = nullptr);
 /// The authoritative curved volume discretisation used for solve and export.
 /// Pyramid5 cells are first replaced by the same conformity-safe tet split the
 /// assembler integrates, then every tet4/hex8 is promoted and its free boundary
@@ -493,8 +489,8 @@ struct CurvedGeometryResult {
     std::size_t n_reverted = 0;
 };
 
-CurvedGeometryResult curve_volume_geometry(const Model& model,
-                                           const fea::NodalMesh& mesh, double h);
+CurvedGeometryResult curve_volume_geometry(const Model& model, const fea::NodalMesh& mesh,
+                                           double h);
 
 /// Volume mesh from closed surface: tet4 grid fill (P2 v1) with stair-cased
 /// boundary quads for region mapping / rendering.
@@ -577,13 +573,13 @@ inline constexpr std::array<std::string_view, 10> kMeshStageNames{
 /// knows nothing of adapt passes; `SolveJob` stamps it. A fill that hits the
 /// element/DOF ceiling and coarsens is a second fill, so its stage indices
 /// restart at 0 after the abandoned attempt's stages.
-VolumeMeshOutput volume_mesh(
-    const Model& model, double h, VolumeMesher mesher = VolumeMesher::kHybrid,
-    int skin_layers = 2, bool feature_refine = false,
-    std::span<const Eigen::Vector3d> refine_seeds = {}, double seed_band = 0.0,
-    double element_tendency = 0.0, std::size_t max_elems = 0, std::size_t max_dof = 0,
-    int auto_retry_budget = 0, const std::function<void()>& cancel_check = {},
-    const mesh::SizeFieldFn& size_field = {}, const MeshStageSink& on_stage = {});
+VolumeMeshOutput
+volume_mesh(const Model& model, double h, VolumeMesher mesher = VolumeMesher::kHybrid,
+            int skin_layers = 2, bool feature_refine = false,
+            std::span<const Eigen::Vector3d> refine_seeds = {}, double seed_band = 0.0,
+            double element_tendency = 0.0, std::size_t max_elems = 0, std::size_t max_dof = 0,
+            int auto_retry_budget = 0, const std::function<void()>& cancel_check = {},
+            const mesh::SizeFieldFn& size_field = {}, const MeshStageSink& on_stage = {});
 
 /// Refresh the solved-stage assessment after the final order elevation and CAD
 /// mid-node projection. Replaces its prior mesher-note token and enforces the
@@ -637,15 +633,14 @@ struct PassTrace {
 /// is the order in which the answer is actually computed: a solve, the error
 /// field recovered from it, then the refinement that field asked for.
 struct SolveStage {
-    int pass = 0;             // adapt pass index (0 = initial)
-    bool final_pass = false;  // no further pass ran after this one
-    PassTrace trace;          // the pass's own scalar telemetry
-    SolveResult result;       // mesh, displacement, von Mises and ZZ fields at that pass
-    std::string solver_note;  // the linear solver's own account of what it did
+    int pass = 0;            // adapt pass index (0 = initial)
+    bool final_pass = false; // no further pass ran after this one
+    PassTrace trace;         // the pass's own scalar telemetry
+    SolveResult result;      // mesh, displacement, von Mises and ZZ fields at that pass
+    std::string solver_note; // the linear solver's own account of what it did
 };
 /// Set to observe each pass as it completes; empty (the default) costs nothing.
 using SolveStageSink = std::function<void(const SolveStage&)>;
-
 
 /// Background mesh / solve pipeline. Poll `state` from the UI thread.
 class SolveJob {

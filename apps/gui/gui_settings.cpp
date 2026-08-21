@@ -6,8 +6,9 @@
 namespace polymesh::gui {
 
 std::filesystem::path GuiSettings::resolved_testlab_binary() const {
-    const auto found = find_testlab_binary(
-        testlab_binary.empty() ? std::filesystem::path{} : std::filesystem::path{testlab_binary});
+    const auto found =
+        find_testlab_binary(testlab_binary.empty() ? std::filesystem::path{}
+                                                   : std::filesystem::path{testlab_binary});
     if (!found.empty()) {
         return found;
     }

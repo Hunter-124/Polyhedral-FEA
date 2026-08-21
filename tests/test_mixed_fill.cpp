@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
-#include "fea/solve.hpp"
 #include "fea/boundary_faces.hpp"
+#include "fea/solve.hpp"
 #include "geom/cad_model.hpp"
 #include "geom/step.hpp"
 #include "geom/stl.hpp"
@@ -9,17 +9,17 @@
 #include "mesh/surface_project.hpp"
 #include "pipeline/scene.hpp"
 
-#include <Eigen/Geometry>
 #include "support/box_model.hpp"
+#include <Eigen/Geometry>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
-#include <filesystem>
-#include <algorithm>
 #include <cstdint>
+#include <filesystem>
 #include <limits>
 #include <map>
 #include <set>
@@ -124,7 +124,8 @@ TEST_CASE("hybrid zoo expanded product path patch test: constant strain") {
 }
 
 TEST_CASE("hybrid zoo cylinder_prism smoke: conforming FE + snap") {
-    auto model = polymesh::testsupport::model_from_surface(polymesh::geom::load_stl("bench/geometries/public/cylinder_prism.stl"));
+    auto model = polymesh::testsupport::model_from_surface(
+        polymesh::geom::load_stl("bench/geometries/public/cylinder_prism.stl"));
     const double h = 0.12 * (model.bbox_max - model.bbox_min).maxCoeff();
     auto vol = pipeline::volume_mesh(model, h, pipeline::VolumeMesher::kHybrid, 2, true);
     REQUIRE_FALSE(vol.mesh.elements.empty());
@@ -135,15 +136,15 @@ TEST_CASE("hybrid zoo cylinder_prism smoke: conforming FE + snap") {
     bool has_fe = false;
     for (const auto& el : vol.mesh.elements) {
         has_fe = has_fe || el.type == fea::ElementType::kHex8 ||
-                 el.type == fea::ElementType::kPyramid5 ||
-                 el.type == fea::ElementType::kTet4;
+                 el.type == fea::ElementType::kPyramid5 || el.type == fea::ElementType::kTet4;
     }
     REQUIRE(has_fe);
 }
 
 TEST_CASE("hybrid zoo 2:1 size adaptivity on feature band") {
     // Open box with a sharp crease band: feature grading must refine to h/2.
-    auto model = polymesh::testsupport::model_from_surface(polymesh::geom::load_stl("bench/geometries/public/cylinder_prism.stl"));
+    auto model = polymesh::testsupport::model_from_surface(
+        polymesh::geom::load_stl("bench/geometries/public/cylinder_prism.stl"));
     const double h = 0.15 * (model.bbox_max - model.bbox_min).maxCoeff();
     auto plain = mixed_fill_surface(model.surface, model.bbox_min, model.bbox_max, h,
                                     /*skin=*/1, {}, 0.0, {}, 0.0, /*snap=*/false);
@@ -168,7 +169,7 @@ std::vector<std::vector<std::uint32_t>> cell_faces(const fea::NodalElement& el) 
         {0, 1, 2, 3}, {0, 1, 4}, {1, 2, 4}, {2, 3, 4}, {3, 0, 4}};
     static const std::vector<std::vector<std::uint32_t>> kTet{
         {0, 1, 2}, {0, 1, 3}, {1, 2, 3}, {0, 2, 3}};
-    const auto& local = el.type == fea::ElementType::kHex8    ? kHex
+    const auto& local = el.type == fea::ElementType::kHex8       ? kHex
                         : el.type == fea::ElementType::kPyramid5 ? kPyr
                                                                  : kTet;
     std::vector<std::vector<std::uint32_t>> out;
@@ -196,8 +197,8 @@ TEST_CASE("hybrid zoo meshes are conforming across the budget-fallback ladder") 
         polymesh::geom::load_stl("bench/geometries/public/cylinder_prism.stl"));
     const double extent = (model.bbox_max - model.bbox_min).maxCoeff();
     for (const double frac : {0.16, 0.20}) {
-        auto vol =
-            pipeline::volume_mesh(model, frac * extent, pipeline::VolumeMesher::kHybrid, 2, true);
+        auto vol = pipeline::volume_mesh(model, frac * extent, pipeline::VolumeMesher::kHybrid,
+                                         2, true);
         REQUIRE_FALSE(vol.mesh.elements.empty());
 
         std::map<std::vector<std::uint32_t>, int> face_use;
@@ -213,11 +214,10 @@ TEST_CASE("hybrid zoo meshes are conforming across the budget-fallback ladder") 
             max_face_use = std::max(max_face_use, uses);
         }
         INFO("h/extent = " << frac << ", " << vol.mesh.elements.size()
-                            << " elements, max face use " << max_face_use);
+                           << " elements, max face use " << max_face_use);
         REQUIRE(max_face_use <= 2);
     }
 }
-
 
 namespace {
 
@@ -249,8 +249,7 @@ std::pair<std::size_t, double> bore_wall(const fea::NodalMesh& mesh, double radi
             z_max = std::max(z_max, p.z());
         }
         centroid /= static_cast<double>(n);
-        if (z_max - z_min <= 0.05 * thickness ||
-            centroid.head<2>().norm() >= 3.0 * radius) {
+        if (z_max - z_min <= 0.05 * thickness || centroid.head<2>().norm() >= 3.0 * radius) {
             continue;
         }
         ++count;
@@ -273,8 +272,7 @@ TEST_CASE("box-hole bore survives the coarse-grid parity ladder",
 
     constexpr double radius = 0.002834263448;
     constexpr double thickness = 0.003054365478;
-    constexpr double expected_wall_area =
-        2.0 * 3.14159265358979323846 * radius * thickness;
+    constexpr double expected_wall_area = 2.0 * 3.14159265358979323846 * radius * thickness;
     const auto model = pipeline::Model::load(kBoxHole);
     const double diagonal = (model.bbox_max - model.bbox_min).norm();
 
@@ -298,31 +296,27 @@ TEST_CASE("box-hole bore survives the coarse-grid parity ladder",
                                                       /*feature_refine=*/true);
             const auto [n_wall_faces, wall_area] = bore_wall(coarse.mesh, radius, thickness);
             INFO("coarse mesher=" << static_cast<int>(mesher) << " wall_faces=" << n_wall_faces
-                                  << " wall_area=" << wall_area
-                                  << " expected=" << expected_wall_area
-                                  << " note=" << coarse.mesher_note);
+                                  << " wall_area=" << wall_area << " expected="
+                                  << expected_wall_area << " note=" << coarse.mesher_note);
             CHECK(n_wall_faces > 0);
             CHECK(wall_area > 0.25 * expected_wall_area);
         } catch (const pipeline::GeometryVolumeLimitError& error) {
             CHECK_FALSE(error.solved_stage);
-            CHECK(std::string(error.what()).find("feature unresolved") !=
-                  std::string::npos);
+            CHECK(std::string(error.what()).find("feature unresolved") != std::string::npos);
             CHECK(std::string(error.what()).find("reduce -h") != std::string::npos);
             CHECK(std::string(error.what()).find("raise --max-elems/--max-dof") !=
                   std::string::npos);
         }
 
         for (const double h_rel : {0.12, 0.08}) {
-            const auto volume = pipeline::volume_mesh(
-                model, h_rel * diagonal, mesher, /*skin_layers=*/2,
-                /*feature_refine=*/true);
-            const auto [n_wall_faces, wall_area] =
-                bore_wall(volume.mesh, radius, thickness);
+            const auto volume =
+                pipeline::volume_mesh(model, h_rel * diagonal, mesher, /*skin_layers=*/2,
+                                      /*feature_refine=*/true);
+            const auto [n_wall_faces, wall_area] = bore_wall(volume.mesh, radius, thickness);
             INFO("mesher=" << static_cast<int>(mesher) << " h_rel=" << h_rel
-                            << " wall_faces=" << n_wall_faces
-                            << " wall_area=" << wall_area
-                            << " expected=" << expected_wall_area
-                            << " note=" << volume.mesher_note);
+                           << " wall_faces=" << n_wall_faces << " wall_area=" << wall_area
+                           << " expected=" << expected_wall_area
+                           << " note=" << volume.mesher_note);
             CHECK(n_wall_faces > 0);
             // Known h_rel=0.12 faceting limit: measured wall area is 1.93x
             // exact for hybrid and 2.27x for graded tet. This guard checks

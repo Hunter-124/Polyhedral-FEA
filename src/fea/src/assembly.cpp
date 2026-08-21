@@ -104,8 +104,8 @@ Eigen::MatrixXd element_stiffness(const NodalMesh& mesh, const NodalElement& ele
             }
         };
         // TEMP-DIAG removed; choose the shared-face-consistent diagonal.
-        if (mesh::validity::pyramid_split_diagonal(
-                mesh.nodes[n[0]], mesh.nodes[n[1]], mesh.nodes[n[2]], mesh.nodes[n[3]]) == 1) {
+        if (mesh::validity::pyramid_split_diagonal(mesh.nodes[n[0]], mesh.nodes[n[1]],
+                                                   mesh.nodes[n[2]], mesh.nodes[n[3]]) == 1) {
             add_tet({{1, 2, 3, 4}});
             add_tet({{1, 3, 0, 4}});
         } else {
@@ -192,8 +192,7 @@ Eigen::SparseMatrix<double> assemble_stiffness(const NodalMesh& mesh,
     {
         const int tid = omp_get_thread_num();
         // Clamp if runtime thread count exceeds pre-size (should not happen).
-        auto& local =
-            per_thread[static_cast<std::size_t>(std::min(tid, nthreads - 1))];
+        auto& local = per_thread[static_cast<std::size_t>(std::min(tid, nthreads - 1))];
 #pragma omp for schedule(static)
         for (std::ptrdiff_t e = 0; e < ne; ++e) {
             if (had_error.load(std::memory_order_relaxed)) {

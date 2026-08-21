@@ -114,8 +114,7 @@ struct CadTopology {
 /// keeping only the points BRepTopAdaptor_FClass2d puts inside the trimmed
 /// face at the face tolerance. `samples_per_edge` is reused deliberately —
 /// one knob sets curve and surface sampling density together.
-[[nodiscard]] CadTopology extract_topology(const CadModel& model,
-                                           int samples_per_edge = 8);
+[[nodiscard]] CadTopology extract_topology(const CadModel& model, int samples_per_edge = 8);
 
 struct ClosestEdgeQuery {
     std::uint32_t edge_id = 0;
@@ -126,8 +125,8 @@ struct ClosestEdgeQuery {
 };
 
 /// Closest CAD edge (by sampled polyline distance) to point `p`.
-[[nodiscard]] std::optional<ClosestEdgeQuery>
-closest_edge(const CadTopology& topo, const Eigen::Vector3d& p);
+[[nodiscard]] std::optional<ClosestEdgeQuery> closest_edge(const CadTopology& topo,
+                                                           const Eigen::Vector3d& p);
 
 /// Closest CAD edge matching the filter. When `sharp_only` is true, only
 /// CadEdgeFeature::kSharp edges are considered (protected features).
@@ -141,9 +140,10 @@ closest_edge(const CadTopology& topo, const Eigen::Vector3d& p, bool sharp_only)
 
 /// One-sided Hausdorff polyline → CAD curves. When `sharp_only` is true, only
 /// sharp (protected) edges contribute — use for residual of protected features.
-[[nodiscard]] double edge_profile_hausdorff_filtered(
-    const CadTopology& topo, const std::vector<Eigen::Vector3d>& polyline,
-    bool sharp_only = true);
+[[nodiscard]] double
+edge_profile_hausdorff_filtered(const CadTopology& topo,
+                                const std::vector<Eigen::Vector3d>& polyline,
+                                bool sharp_only = true);
 
 /// Undirected mesh edge segment used for chordal residual / efficiency metrics.
 struct MeshEdgeSegment {
@@ -175,8 +175,8 @@ chordal_edge_metrics_segments(const CadTopology& topo,
 /// Prefer chordal_edge_metrics_segments with real mesh edges when available.
 [[nodiscard]] ChordalEdgeMetrics
 chordal_edge_metrics(const CadTopology& topo,
-                     const std::vector<Eigen::Vector3d>& mesh_feature_polyline,
-                     double h, bool sharp_edges_only = true);
+                     const std::vector<Eigen::Vector3d>& mesh_feature_polyline, double h,
+                     bool sharp_edges_only = true);
 
 /// Count edges by feature class (tests / logging).
 struct CadEdgeClassCounts {

@@ -26,11 +26,11 @@ struct TetQuality {
 /// faces are free-surface boundary (count once) or hanging-node interfaces
 /// (count once but centroid deep inside the solid).
 struct FaceConformityStats {
-    std::size_t n_tet_faces = 0;       // 4 × n_tets
-    std::size_t n_unique_faces = 0;    // distinct oriented-agnostic faces
-    std::size_t n_boundary_faces = 0;  // appear once
-    std::size_t n_interior_faces = 0;  // appear exactly twice
-    std::size_t n_nonconforming = 0;   // appear 3+ times (should be 0)
+    std::size_t n_tet_faces = 0;      // 4 × n_tets
+    std::size_t n_unique_faces = 0;   // distinct oriented-agnostic faces
+    std::size_t n_boundary_faces = 0; // appear once
+    std::size_t n_interior_faces = 0; // appear exactly twice
+    std::size_t n_nonconforming = 0;  // appear 3+ times (should be 0)
     /// count==1 faces whose centroid is farther than margin from the AABB —
     /// classic 2:1 hanging-node signature (G0).
     std::size_t n_hanging_faces = 0;
@@ -62,7 +62,8 @@ TetQuality summarize_tet4_quality(const std::vector<Eigen::Vector3d>& nodes,
                                   double sliver_threshold = 0.05);
 
 /// Count tet faces by sorted 3-node key. Topology only (no hanging detection).
-FaceConformityStats tet4_face_conformity(const std::vector<std::array<std::uint32_t, 4>>& tets);
+FaceConformityStats
+tet4_face_conformity(const std::vector<std::array<std::uint32_t, 4>>& tets);
 
 /// Topology + geometry: flags count==1 faces whose centroid is more than
 /// `surface_margin` inside the axis-aligned box [bbox_min, bbox_max] as hanging.

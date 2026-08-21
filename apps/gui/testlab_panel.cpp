@@ -52,8 +52,8 @@ std::string query_git_short_head() {
         return "unknown";
     }
     for (char c : s) {
-        const bool hex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
-                         (c >= 'A' && c <= 'F');
+        const bool hex =
+            (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
         if (!hex) {
             return "unknown";
         }
@@ -86,9 +86,7 @@ ImVec4 result_status_color(const std::string& status) {
     return palette.status_err;
 }
 
-bool is_finite_num(double v) {
-    return std::isfinite(v);
-}
+bool is_finite_num(double v) { return std::isfinite(v); }
 
 const char* fmt_opt_num(double v, char* buf, std::size_t n, const char* fmt = "%.3g") {
     if (!is_finite_num(v)) {
@@ -170,9 +168,7 @@ void TestLabState::apply_buffers_to_settings() {
     settings.testlab_binary = testlab_bin_buf;
 }
 
-void TestLabState::cache_git_head() {
-    git_head = query_git_short_head();
-}
+void TestLabState::cache_git_head() { git_head = query_git_short_head(); }
 
 void TestLabState::refresh_campaign_list() {
     apply_buffers_to_settings();
@@ -228,8 +224,8 @@ void TestLabState::refresh_selected() {
         status = std::format("harness exited ({})", runner.exit_code());
     } else if (checkpoint) {
         status = std::format("{} — tier {} — {} runs",
-                             testlab::checkpoint_state_cstr(checkpoint->state), checkpoint->tier,
-                             checkpoint->completed_runs);
+                             testlab::checkpoint_state_cstr(checkpoint->state),
+                             checkpoint->tier, checkpoint->completed_runs);
     } else {
         status = std::format("{} campaign", sum->name);
     }
@@ -247,8 +243,8 @@ void TestLabState::tick(float /*dt_s*/) {
     // Faster refresh while harness is live so progress.json heartbeats show up promptly.
     const float interval =
         runner.is_running() ? 0.25f : std::max(0.15f, settings.refresh_interval_s);
-    const bool due = force_refresh ||
-                     std::chrono::duration<float>(now - last_refresh).count() >= interval;
+    const bool due =
+        force_refresh || std::chrono::duration<float>(now - last_refresh).count() >= interval;
     if (!due) {
         return;
     }
@@ -348,10 +344,10 @@ bool TestLabState::start_run(bool resume) {
         return false;
     }
     if (thr_cap > 0 || mem_cap > 0.0) {
-        last_action = std::format(
-            "{} {} (threads {}, mem {})", resume ? "resume" : "run", dir.filename().string(),
-            thr_cap > 0 ? std::to_string(thr_cap) : "all",
-            mem_cap > 0.0 ? std::format("{:.1f} GB soft", mem_cap) : "off");
+        last_action =
+            std::format("{} {} (threads {}, mem {})", resume ? "resume" : "run",
+                        dir.filename().string(), thr_cap > 0 ? std::to_string(thr_cap) : "all",
+                        mem_cap > 0.0 ? std::format("{:.1f} GB soft", mem_cap) : "off");
     } else {
         last_action = std::format("{} {}", resume ? "resume" : "run", dir.filename().string());
     }
@@ -437,12 +433,12 @@ void draw_testlab_panel(TestLabState& tl) {
         ImGui::TextColored(palette.text_dim, "no campaigns found");
         ImGui::TextWrapped("Place campaign.json under %s/<name>/", tl.campaigns_root_buf);
     } else {
-        const float list_h =
-            std::clamp(20.0f * static_cast<float>(std::min(static_cast<int>(tl.campaigns.size()), 10)) +
-                           8.0f,
-                       64.0f, 200.0f);
-        if (ImGui::BeginChild("##campaign_list", ImVec2(-FLT_MIN, list_h), ImGuiChildFlags_Borders,
-                              ImGuiWindowFlags_HorizontalScrollbar)) {
+        const float list_h = std::clamp(
+            20.0f * static_cast<float>(std::min(static_cast<int>(tl.campaigns.size()), 10)) +
+                8.0f,
+            64.0f, 200.0f);
+        if (ImGui::BeginChild("##campaign_list", ImVec2(-FLT_MIN, list_h),
+                              ImGuiChildFlags_Borders, ImGuiWindowFlags_HorizontalScrollbar)) {
             for (int i = 0; i < static_cast<int>(tl.campaigns.size()); ++i) {
                 const auto& c = tl.campaigns[static_cast<std::size_t>(i)];
                 const bool sel = (tl.selected == i);
@@ -455,13 +451,14 @@ void draw_testlab_panel(TestLabState& tl) {
                 }
                 if (ImGui::IsItemHovered()) {
                     if (m9) {
-                        ImGui::SetTooltip(
-                            "%s\n%d results · %s\nmeasure-first M9 freeze baseline (ADR-0023/24)",
-                            c.dir.string().c_str(), c.result_count,
-                            testlab::checkpoint_state_cstr(c.state));
+                        ImGui::SetTooltip("%s\n%d results · %s\nmeasure-first M9 freeze "
+                                          "baseline (ADR-0023/24)",
+                                          c.dir.string().c_str(), c.result_count,
+                                          testlab::checkpoint_state_cstr(c.state));
                     } else {
                         ImGui::SetTooltip("%s\n%d results · %s", c.dir.string().c_str(),
-                                          c.result_count, testlab::checkpoint_state_cstr(c.state));
+                                          c.result_count,
+                                          testlab::checkpoint_state_cstr(c.state));
                     }
                 }
                 ImGui::SameLine();
@@ -481,10 +478,9 @@ void draw_testlab_panel(TestLabState& tl) {
     iw::begin_group_box("run control");
     const bool busy = tl.runner.is_running();
     const bool has_sel = tl.selected_summary() != nullptr;
-    const bool can_resume =
-        has_sel && tl.checkpoint &&
-        (tl.checkpoint->state == testlab::CheckpointState::kPaused ||
-         tl.checkpoint->state == testlab::CheckpointState::kRunning);
+    const bool can_resume = has_sel && tl.checkpoint &&
+                            (tl.checkpoint->state == testlab::CheckpointState::kPaused ||
+                             tl.checkpoint->state == testlab::CheckpointState::kRunning);
 
     ImGui::BeginDisabled(!has_sel || busy);
     if (iw::button("play / run", ImVec2(-1, 0), /*primary=*/true)) {
@@ -528,8 +524,7 @@ void draw_testlab_panel(TestLabState& tl) {
         }
         if (thr > 0 || mem > 0.0) {
             const std::string thr_s = thr > 0 ? std::to_string(thr) : "all";
-            const std::string mem_s =
-                mem > 0.0 ? std::format("{:.1f} GB (soft)", mem) : "off";
+            const std::string mem_s = mem > 0.0 ? std::format("{:.1f} GB (soft)", mem) : "off";
             ImGui::TextColored(palette.text_dim, "caps: threads %s  mem %s", thr_s.c_str(),
                                mem_s.c_str());
         }
@@ -550,8 +545,10 @@ void draw_testlab_panel(TestLabState& tl) {
         ImGui::Text("completed runs: %d", cp.completed_runs);
         ImGui::Text("survivors: %zu", cp.survivors.size());
         if (!cp.survivors.empty()) {
-            const float sh = std::min(80.0f, 16.0f * static_cast<float>(cp.survivors.size()) + 4.0f);
-            if (ImGui::BeginChild("##survivors", ImVec2(-FLT_MIN, sh), ImGuiChildFlags_Borders)) {
+            const float sh =
+                std::min(80.0f, 16.0f * static_cast<float>(cp.survivors.size()) + 4.0f);
+            if (ImGui::BeginChild("##survivors", ImVec2(-FLT_MIN, sh),
+                                  ImGuiChildFlags_Borders)) {
                 for (const auto& id : cp.survivors) {
                     ImGui::TextUnformatted(id.c_str());
                 }
@@ -610,13 +607,13 @@ void draw_testlab_panel(TestLabState& tl) {
         const auto& sp = *tl.active_spec;
         ImGui::TextWrapped("%s", sp.name.c_str());
         if (testlab::is_measure_first_baseline(sp.name)) {
-            ImGui::TextColored(palette.accent,
-                               "measure-first baseline (M9 · ADR-0023/24)");
+            ImGui::TextColored(palette.accent, "measure-first baseline (M9 · ADR-0023/24)");
         }
         ImGui::Text("parts: %zu  tiers: %zu", sp.parts.size(), sp.tiers.size());
         ImGui::Text("grid axes: %zu", sp.grid.size());
         for (const auto& ax : sp.grid) {
-            ImGui::TextColored(palette.text_dim, "  %s ×%zu", ax.key.c_str(), ax.values.size());
+            ImGui::TextColored(palette.text_dim, "  %s ×%zu", ax.key.c_str(),
+                               ax.values.size());
         }
         ImGui::Text("score w: acc %.2f  solve %.2f  mesh %.2f", sp.score.accuracy,
                     sp.score.solve_ms, sp.score.mesh_ms);
@@ -639,9 +636,8 @@ void draw_testlab_panel(TestLabState& tl) {
                                tl.handoff->finished_utc.c_str());
         }
         const auto& nodes = tl.handoff->open_program_nodes;
-        const float oh =
-            std::min(100.0f, 16.0f * static_cast<float>(std::min(nodes.size(), std::size_t{8})) +
-                                 4.0f);
+        const float oh = std::min(
+            100.0f, 16.0f * static_cast<float>(std::min(nodes.size(), std::size_t{8})) + 4.0f);
         if (ImGui::BeginChild("##open_nodes", ImVec2(-FLT_MIN, oh), ImGuiChildFlags_Borders)) {
             for (const auto& id : nodes) {
                 ImGui::TextUnformatted(id.c_str());
@@ -703,10 +699,11 @@ void draw_results_panel(TestLabState& tl) {
         }
         ImGui::TextColored(palette.status_ok, "ok %d", n_ok);
         ImGui::SameLine(0, 10);
-        ImGui::TextColored(n_suspect > 0 ? palette.status_warn : palette.text_dim, "suspect %d",
-                           n_suspect);
+        ImGui::TextColored(n_suspect > 0 ? palette.status_warn : palette.text_dim,
+                           "suspect %d", n_suspect);
         ImGui::SameLine(0, 10);
-        ImGui::TextColored(n_fail > 0 ? palette.status_err : palette.text_dim, "fail %d", n_fail);
+        ImGui::TextColored(n_fail > 0 ? palette.status_err : palette.text_dim, "fail %d",
+                           n_fail);
         ImGui::SameLine(0, 10);
         ImGui::TextColored(n_budget > 0 ? palette.status_warn : palette.text_dim, "budget %d",
                            n_budget);
@@ -737,7 +734,8 @@ void draw_results_panel(TestLabState& tl) {
     iw::begin_group_box_fill("runs", runs_h);
     // Table fills the fixed content region (scroll inside).
     const float table_h = std::max(80.0f, ImGui::GetContentRegionAvail().y);
-    if (ImGui::BeginChild("##results_table", ImVec2(-FLT_MIN, table_h), ImGuiChildFlags_Borders)) {
+    if (ImGui::BeginChild("##results_table", ImVec2(-FLT_MIN, table_h),
+                          ImGuiChildFlags_Borders)) {
         if (tl.results.empty()) {
             ImGui::TextColored(palette.text_dim, "no runs yet");
         } else if (ImGui::BeginTable("##res", 9,
@@ -775,8 +773,8 @@ void draw_results_panel(TestLabState& tl) {
                 ImGui::TextColored(result_status_color(r.status), "%s", r.status.c_str());
                 ImGui::TableSetColumnIndex(3);
                 if (r.health.present) {
-                    ImGui::TextColored(r.health.ok ? palette.status_ok : palette.status_warn, "%s",
-                                       r.health.ok ? "ok" : "no");
+                    ImGui::TextColored(r.health.ok ? palette.status_ok : palette.status_warn,
+                                       "%s", r.health.ok ? "ok" : "no");
                 } else if (r.scorecard.has_health_ok) {
                     ImGui::TextColored(r.scorecard.health_ok ? palette.status_ok
                                                              : palette.status_warn,
@@ -791,9 +789,11 @@ void draw_results_panel(TestLabState& tl) {
                     ImGui::Text("%.3g", r.accuracy.rel_err);
                 }
                 ImGui::TableSetColumnIndex(5);
-                ImGui::TextUnformatted(fmt_opt_num(r.answers.tip_deflection, num_buf, sizeof(num_buf)));
+                ImGui::TextUnformatted(
+                    fmt_opt_num(r.answers.tip_deflection, num_buf, sizeof(num_buf)));
                 ImGui::TableSetColumnIndex(6);
-                ImGui::TextUnformatted(fmt_opt_num(r.answers.strain_energy, num_buf, sizeof(num_buf)));
+                ImGui::TextUnformatted(
+                    fmt_opt_num(r.answers.strain_energy, num_buf, sizeof(num_buf)));
                 ImGui::TableSetColumnIndex(7);
                 ImGui::Text("%.0f", r.mesh_ms);
                 ImGui::TableSetColumnIndex(8);

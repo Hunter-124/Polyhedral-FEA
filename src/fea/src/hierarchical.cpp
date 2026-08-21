@@ -87,14 +87,8 @@ namespace {
 
 // Canonical hex vertex sign-indices (0 -> the -1 side, 1 -> the +1 side),
 // matching nodal_mesh.hpp v0..v7.
-constexpr std::array<std::array<int, 3>, 8> kHexV{{{0, 0, 0},
-                                                   {1, 0, 0},
-                                                   {1, 1, 0},
-                                                   {0, 1, 0},
-                                                   {0, 0, 1},
-                                                   {1, 0, 1},
-                                                   {1, 1, 1},
-                                                   {0, 1, 1}}};
+constexpr std::array<std::array<int, 3>, 8> kHexV{
+    {{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}, {0, 0, 1}, {1, 0, 1}, {1, 1, 1}, {0, 1, 1}}};
 
 // Hex edges in hex20 order (nodal_mesh.hpp).
 constexpr std::array<std::array<int, 2>, 12> kHexE{{{0, 1},
@@ -117,12 +111,8 @@ struct HexFace {
     int vary0;
     int vary1;
 };
-constexpr std::array<HexFace, 6> kHexF{{{2, 0, 0, 1},
-                                        {2, 1, 0, 1},
-                                        {1, 0, 0, 2},
-                                        {1, 1, 0, 2},
-                                        {0, 0, 1, 2},
-                                        {0, 1, 1, 2}}};
+constexpr std::array<HexFace, 6> kHexF{
+    {{2, 0, 0, 1}, {2, 1, 0, 1}, {1, 0, 0, 2}, {1, 1, 0, 2}, {0, 0, 1, 2}, {0, 1, 1, 2}}};
 
 // Tet edges in tet10 order (nodal_mesh.hpp).
 constexpr std::array<std::array<int, 2>, 6> kTetE{
@@ -153,14 +143,17 @@ std::vector<HexRecipe> build_hex(std::uint8_t order) {
         m.entity = HpMode::Entity::kVertex;
         m.entity_index = static_cast<std::uint8_t>(v);
         m.order = 1;
-        out.push_back({kHexV[static_cast<std::size_t>(v)][0], kHexV[static_cast<std::size_t>(v)][1],
+        out.push_back({kHexV[static_cast<std::size_t>(v)][0],
+                       kHexV[static_cast<std::size_t>(v)][1],
                        kHexV[static_cast<std::size_t>(v)][2], m});
     }
     // Edges: one axis varies (order 2..p), the other two fixed at the shared
     // vertex sign.
     for (int e = 0; e < 12; ++e) {
-        const auto& va = kHexV[static_cast<std::size_t>(kHexE[static_cast<std::size_t>(e)][0])];
-        const auto& vb = kHexV[static_cast<std::size_t>(kHexE[static_cast<std::size_t>(e)][1])];
+        const auto& va =
+            kHexV[static_cast<std::size_t>(kHexE[static_cast<std::size_t>(e)][0])];
+        const auto& vb =
+            kHexV[static_cast<std::size_t>(kHexE[static_cast<std::size_t>(e)][1])];
         int axis = 0;
         for (int d = 0; d < 3; ++d) {
             if (va[static_cast<std::size_t>(d)] != vb[static_cast<std::size_t>(d)]) {
@@ -222,10 +215,10 @@ enum class TetKind : std::uint8_t { kVertex, kEdge, kFace, kInterior };
 
 struct TetRecipe {
     TetKind kind = TetKind::kVertex;
-    int a = 0; // vertex, or edge endpoint a / face vertex a
-    int b = 0; // edge endpoint b / face vertex b
-    int c = 0; // face vertex c
-    int d = 0; // unused, or interior unused
+    int a = 0;  // vertex, or edge endpoint a / face vertex a
+    int b = 0;  // edge endpoint b / face vertex b
+    int c = 0;  // face vertex c
+    int d = 0;  // unused, or interior unused
     int n1 = 0; // edge order (>=2), or face multi-index n1>=0, or interior n1
     int n2 = 0; // face multi-index n2, or interior n2
     int n3 = 0; // interior n3
@@ -239,8 +232,7 @@ struct TetRecipe {
 
 std::vector<TetRecipe> build_tet(std::uint8_t order) {
     if (order < 1 || order > 4) {
-        throw FeaError(std::format(
-            "hierarchical tet: order {} unsupported (1..4)", order));
+        throw FeaError(std::format("hierarchical tet: order {} unsupported (1..4)", order));
     }
     const int p = order;
     std::vector<TetRecipe> out;
@@ -280,7 +272,8 @@ std::vector<TetRecipe> build_tet(std::uint8_t order) {
                 m.index2 = static_cast<std::uint8_t>(face_slot); // slot within face
                 out.push_back({TetKind::kFace, kTetF[static_cast<std::size_t>(f)][0],
                                kTetF[static_cast<std::size_t>(f)][1],
-                               kTetF[static_cast<std::size_t>(f)][2], 0, n1, n2, face_slot, m});
+                               kTetF[static_cast<std::size_t>(f)][2], 0, n1, n2, face_slot,
+                               m});
                 ++face_slot;
             }
         }
@@ -329,8 +322,8 @@ void eval_tet_mode(const TetRecipe& rec, const std::array<double, 4>& lam,
         // N = 4 la lb L(lb-la)
         val = 4.0 * la * lb * L;
         // dN = 4[(dla) lb L + la (dlb) L + la lb dL (dlb - dla)]
-        grad = 4.0 * (lb * L * glam[ia] + la * L * glam[ib] +
-                      la * lb * dL * (glam[ib] - glam[ia]));
+        grad = 4.0 *
+               (lb * L * glam[ia] + la * L * glam[ib] + la * lb * dL * (glam[ib] - glam[ia]));
         return;
     }
     if (rec.kind == TetKind::kFace) {
@@ -438,11 +431,11 @@ HpShape hp_eval(ElementType type, std::uint8_t order, const Eigen::Vector3d& xi)
     }
     if (type == ElementType::kTet4 || type == ElementType::kTet10) {
         const auto recipes = build_tet(order);
-        const std::array<double, 4> lam{1.0 - xi.x() - xi.y() - xi.z(), xi.x(), xi.y(), xi.z()};
-        const std::array<Eigen::Vector3d, 4> glam{Eigen::Vector3d(-1, -1, -1),
-                                                   Eigen::Vector3d(1, 0, 0),
-                                                   Eigen::Vector3d(0, 1, 0),
-                                                   Eigen::Vector3d(0, 0, 1)};
+        const std::array<double, 4> lam{1.0 - xi.x() - xi.y() - xi.z(), xi.x(), xi.y(),
+                                        xi.z()};
+        const std::array<Eigen::Vector3d, 4> glam{
+            Eigen::Vector3d(-1, -1, -1), Eigen::Vector3d(1, 0, 0), Eigen::Vector3d(0, 1, 0),
+            Eigen::Vector3d(0, 0, 1)};
         const auto n = static_cast<Eigen::Index>(recipes.size());
         out.n.resize(n);
         out.dn.resize(n, 3);
@@ -458,9 +451,9 @@ HpShape hp_eval(ElementType type, std::uint8_t order, const Eigen::Vector3d& xi)
     throw FeaError("hierarchical basis: only tet and hex are supported");
 }
 
-Eigen::MatrixXd hp_element_stiffness(const Eigen::Matrix<double, Eigen::Dynamic, 3>& vertex_coords,
-                                     ElementType type, std::uint8_t order,
-                                     const Material& material) {
+Eigen::MatrixXd
+hp_element_stiffness(const Eigen::Matrix<double, Eigen::Dynamic, 3>& vertex_coords,
+                     ElementType type, std::uint8_t order, const Material& material) {
     const bool is_hex = (type == ElementType::kHex8 || type == ElementType::kHex20);
     const bool is_tet = (type == ElementType::kTet4 || type == ElementType::kTet10);
     if (!is_hex && !is_tet) {
@@ -469,7 +462,8 @@ Eigen::MatrixXd hp_element_stiffness(const Eigen::Matrix<double, Eigen::Dynamic,
     const ElementType geo_type = is_hex ? ElementType::kHex8 : ElementType::kTet4;
     const Eigen::Index expected_v = is_hex ? 8 : 4;
     if (vertex_coords.rows() != expected_v) {
-        throw FeaError("hp_element_stiffness: vertex_coords row count does not match element type");
+        throw FeaError(
+            "hp_element_stiffness: vertex_coords row count does not match element type");
     }
 
     // Subparametric geometry: straight-sided map from the p=1 vertex functions.
@@ -490,8 +484,8 @@ Eigen::MatrixXd hp_element_stiffness(const Eigen::Matrix<double, Eigen::Dynamic,
         const Eigen::Matrix3d jac = geo.dn.transpose() * vertex_coords;
         const double det = jac.determinant();
         if (det <= 0.0) {
-            throw FeaError(std::format(
-                "hp_element_stiffness: non-positive Jacobian ({:.3e})", det));
+            throw FeaError(
+                std::format("hp_element_stiffness: non-positive Jacobian ({:.3e})", det));
         }
         const Eigen::Matrix3d jac_inv = jac.inverse();
         const auto field = hp_eval(type, order, qp.xi);

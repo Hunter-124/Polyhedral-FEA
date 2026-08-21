@@ -113,17 +113,17 @@ TetQuality summarize_tet4_quality(const std::vector<Eigen::Vector3d>& nodes,
     return q;
 }
 
-FaceConformityStats tet4_face_conformity(const std::vector<std::array<std::uint32_t, 4>>& tets) {
+FaceConformityStats
+tet4_face_conformity(const std::vector<std::array<std::uint32_t, 4>>& tets) {
     FaceConformityStats s;
     s.n_tet_faces = tets.size() * 4;
     std::map<FaceKey, int> counts;
     static constexpr int kFaceVerts[4][3] = {{0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}};
     for (const auto& t : tets) {
         for (const auto& fv : kFaceVerts) {
-            const FaceKey key =
-                make_face_key(t[static_cast<std::size_t>(fv[0])],
-                              t[static_cast<std::size_t>(fv[1])],
-                              t[static_cast<std::size_t>(fv[2])]);
+            const FaceKey key = make_face_key(t[static_cast<std::size_t>(fv[0])],
+                                              t[static_cast<std::size_t>(fv[1])],
+                                              t[static_cast<std::size_t>(fv[2])]);
             ++counts[key];
         }
     }

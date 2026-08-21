@@ -324,8 +324,8 @@ Viewport::CinemaView cinema_view(const CinemaState& state, const CinemaCue& cue)
     view.edges = true;
     switch (cue.act) {
     case CinemaAct::kSkeleton:
-        view.skeleton_alpha =
-            static_cast<float>(smoothstep(state.t / std::max(cinema_opening_fade(state), 1.0e-9)));
+        view.skeleton_alpha = static_cast<float>(
+            smoothstep(state.t / std::max(cinema_opening_fade(state), 1.0e-9)));
         view.reveal = 0.0f;
         view.mesh_alpha = 0.0f;
         view.shrink = 1.0f;
@@ -347,8 +347,8 @@ Viewport::CinemaView cinema_view(const CinemaState& state, const CinemaCue& cue)
         // Elements land shrunk toward their own centroid so each reads as a
         // separate cell as it appears, and close up to touching by the middle
         // of the stage. Geometry, not data: the element is the element.
-        view.shrink =
-            static_cast<float>(0.35 * (1.0 - smoothstep(std::min(1.0, cue.stage_reveal * 2.0))));
+        view.shrink = static_cast<float>(
+            0.35 * (1.0 - smoothstep(std::min(1.0, cue.stage_reveal * 2.0))));
         break;
     case CinemaAct::kResult:
         view.skeleton_alpha = 0.25f;
@@ -379,7 +379,8 @@ void sync_cinema_viewport(CinemaState& state, const CinemaCue& cue, Viewport& vi
 
 // ---- act 1: the part's own skeleton --------------------------------------
 
-void build_cinema_skeleton(CinemaState& state, const pipeline::Model& model, Viewport& viewport) {
+void build_cinema_skeleton(CinemaState& state, const pipeline::Model& model,
+                           Viewport& viewport) {
     std::vector<std::vector<Eigen::Vector3d>> polylines;
     state.skeleton_note.clear();
     state.skeleton_source = SkeletonSource::kNone;
@@ -414,8 +415,8 @@ void build_cinema_skeleton(CinemaState& state, const pipeline::Model& model, Vie
             for (const auto& edge : sharp) {
                 if (edge.v0 < model.surface.vertices.size() &&
                     edge.v1 < model.surface.vertices.size()) {
-                    polylines.push_back({model.surface.vertices[edge.v0],
-                                         model.surface.vertices[edge.v1]});
+                    polylines.push_back(
+                        {model.surface.vertices[edge.v0], model.surface.vertices[edge.v1]});
                 }
             }
             state.skeleton_source = SkeletonSource::kSharpEdges;
@@ -455,15 +456,17 @@ bool load_cinema_advisor(CinemaState& state, const pipeline::Model& model,
 #ifndef POLYMESH_WITH_ADVISOR
     (void)model;
     (void)setup;
-    return unavailable("this polymesh-gui was configured with POLYMESH_WITH_ADVISOR=OFF, so it "
-                       "carries no inference module at all — reconfigure with "
-                       "-DPOLYMESH_WITH_ADVISOR=ON");
+    return unavailable(
+        "this polymesh-gui was configured with POLYMESH_WITH_ADVISOR=OFF, so it "
+        "carries no inference module at all — reconfigure with "
+        "-DPOLYMESH_WITH_ADVISOR=ON");
 #else
     state.explanation.reset();
     state.layout = advisor::NetworkLayout{};
 
     if (model.surface.triangles.empty()) {
-        return unavailable("no part is loaded, so there is no feature row to run the network on");
+        return unavailable(
+            "no part is loaded, so there is no feature row to run the network on");
     }
     std::error_code ec;
     if (!std::filesystem::is_directory(std::filesystem::path{dir}, ec)) {
@@ -502,8 +505,7 @@ bool load_cinema_advisor(CinemaState& state, const pipeline::Model& model,
                                "scripts/advisor/export_onnx.py");
         }
         state.layout = advisor.layout();
-        state.explanation =
-            advisor.explain(features, static_cast<double>(setup.max_dof));
+        state.explanation = advisor.explain(features, static_cast<double>(setup.max_dof));
     } catch (const std::exception& e) {
         return unavailable(e.what());
     }
@@ -521,8 +523,7 @@ bool load_cinema_advisor(CinemaState& state, const pipeline::Model& model,
             "mesh act runs on the studio's own setup",
             decision.budget_refusal ? "no candidate fit the max_dof budget" : "vetoed",
             decision.ood_distance, decision.failure_prob,
-            decision.note.empty() ? std::string{}
-                                  : std::format(", note: {}", decision.note));
+            decision.note.empty() ? std::string{} : std::format(", note: {}", decision.note));
     } else if (const auto mesher = pipeline::mesher_from_name(decision.mesher)) {
         const double diag = (model.bbox_max - model.bbox_min).norm();
         setup.mesher = *mesher;
@@ -539,8 +540,9 @@ bool load_cinema_advisor(CinemaState& state, const pipeline::Model& model,
             "adapt {} · η target {:.4g} · order {}{}",
             decision.mesher, setup.mesh_size * 1e3, decision.h_rel, diag * 1e3,
             setup.adapt_passes, setup.eta_target, setup.p_elevate ? 2 : 1,
-            decision.order > 2 ? std::format(" (order {} executed as quadratic)", decision.order)
-                               : std::string{});
+            decision.order > 2
+                ? std::format(" (order {} executed as quadratic)", decision.order)
+                : std::string{});
     } else {
         // Same refusal the CLI makes: meshing something other than what was
         // recommended, while reporting the recommendation, is the failure mode
@@ -594,11 +596,12 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue) {
     const advisor::NetworkLayout& layout = state.layout;
     const auto& frames = state.explanation->frames;
     if (layout.layers.size() != 4 || layout.edges.size() != 3) {
-        ImGui::TextColored(palette.status_err,
-                           "activation_layout.json describes %zu layers and %zu weight blocks; "
-                           "this surface draws the four-column trunk (input / trunk.fc1 / "
-                           "trunk.fc2 / heads) and its three blocks, so it will not guess",
-                           layout.layers.size(), layout.edges.size());
+        ImGui::TextColored(
+            palette.status_err,
+            "activation_layout.json describes %zu layers and %zu weight blocks; "
+            "this surface draws the four-column trunk (input / trunk.fc1 / "
+            "trunk.fc2 / heads) and its three blocks, so it will not guess",
+            layout.layers.size(), layout.edges.size());
         return;
     }
 
@@ -611,12 +614,12 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue) {
         values = {&frame->input, &frame->fc1, &frame->fc2, &frame->heads};
         for (std::size_t l = 0; l < 4; ++l) {
             if (values[l]->size() != layout.layers[l].size) {
-                ImGui::TextColored(palette.status_err,
-                                   "layer '%s' is %zu units in activation_layout.json but the "
-                                   "graph tap returned %zu — the artifacts disagree, so nothing "
-                                   "is drawn",
-                                   layout.layers[l].name.c_str(), layout.layers[l].size,
-                                   values[l]->size());
+                ImGui::TextColored(
+                    palette.status_err,
+                    "layer '%s' is %zu units in activation_layout.json but the "
+                    "graph tap returned %zu — the artifacts disagree, so nothing "
+                    "is drawn",
+                    layout.layers[l].name.c_str(), layout.layers[l].size, values[l]->size());
                 return;
             }
         }
@@ -668,18 +671,18 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue) {
                 for (std::size_t i = 0; i < block.cols; ++i) {
                     const float v = row[i] * src[i];
                     value_max = std::max(value_max, std::fabs(v));
-                    picks.push_back({std::fabs(v), v, static_cast<int>(b),
-                                     static_cast<int>(i), static_cast<int>(j)});
+                    picks.push_back({std::fabs(v), v, static_cast<int>(b), static_cast<int>(i),
+                                     static_cast<int>(j)});
                 }
             }
         }
         drawn = std::min(kDrawnConnections, picks.size());
         if (drawn > 0) {
-            std::nth_element(picks.begin(), picks.begin() + static_cast<std::ptrdiff_t>(drawn) - 1,
-                             picks.end(), [](const CinemaState::EdgePick& a,
-                                             const CinemaState::EdgePick& b) {
-                                 return a.rank > b.rank;
-                             });
+            std::nth_element(picks.begin(),
+                             picks.begin() + static_cast<std::ptrdiff_t>(drawn) - 1,
+                             picks.end(),
+                             [](const CinemaState::EdgePick& a,
+                                const CinemaState::EdgePick& b) { return a.rank > b.rank; });
             // Weakest of the kept set first, so the strongest connections end
             // up on top instead of buried under near-silent ones.
             std::sort(picks.begin(), picks.begin() + static_cast<std::ptrdiff_t>(drawn),
@@ -699,9 +702,10 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue) {
 
     std::vector<CinemaLine> disclosure;
     if (frame == nullptr) {
-        disclosure.push_back({palette.status_warn,
-                              "structure only: no forward pass is being shown on this beat, so "
-                              "every node is drawn at its minimum radius"});
+        disclosure.push_back(
+            {palette.status_warn,
+             "structure only: no forward pass is being shown on this beat, so "
+             "every node is drawn at its minimum radius"});
     } else {
         // `drawn` is the real size of the subset that was just selected, so this
         // sentence tracks kDrawnConnections instead of restating it.
@@ -734,9 +738,8 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue) {
     std::vector<std::string> head_text(heads.size);
     for (std::size_t i = 0; i < heads.size; ++i) {
         const char* name = i < heads.labels.size() ? heads.labels[i].c_str() : "(unlabelled)";
-        head_text[i] = values[3] != nullptr
-                           ? std::format("{} {:+.4g}", name, (*values[3])[i])
-                           : std::format("{} —", name);
+        head_text[i] = values[3] != nullptr ? std::format("{} {:+.4g}", name, (*values[3])[i])
+                                            : std::format("{} —", name);
     }
 
     // ---- geometry, derived from the measured text ------------------------
@@ -830,12 +833,10 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue) {
             // opacity AND width are the normalised magnitude, so the paths that
             // actually carry this pass are the ones that read, and the rest are
             // hairlines instead of a uniform grey haze.
-            dl->AddLine(ImVec2(column_x(b),
-                               node_y(static_cast<std::size_t>(pick.src),
-                                      layout.layers[b].size)),
-                        ImVec2(column_x(b + 1),
-                               node_y(static_cast<std::size_t>(pick.dst),
-                                      layout.layers[b + 1].size)),
+            dl->AddLine(ImVec2(column_x(b), node_y(static_cast<std::size_t>(pick.src),
+                                                   layout.layers[b].size)),
+                        ImVec2(column_x(b + 1), node_y(static_cast<std::size_t>(pick.dst),
+                                                       layout.layers[b + 1].size)),
                         rgba(signed_colormap(t), (0.05f + 0.85f * weight) * fade),
                         0.55f + 1.35f * weight);
         }
@@ -886,9 +887,8 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue) {
         const float x = column_x(3) + head_r + kLabelGap;
         const ImU32 col = faded(palette.text);
         for (std::size_t i = 0; i < heads.size; ++i) {
-            dl->AddText(font, label_size,
-                        ImVec2(x, node_y(i, heads.size) - 0.5f * label_size), col,
-                        head_text[i].c_str());
+            dl->AddText(font, label_size, ImVec2(x, node_y(i, heads.size) - 0.5f * label_size),
+                        col, head_text[i].c_str());
         }
     }
 
@@ -989,9 +989,9 @@ void advisor_ticker(const CinemaState& state, const CinemaCue& cue,
                       f.gate_pass ? "PASS" : "DROPPED", bookkeeping.c_str(),
                       f.recommended ? " · THIS IS THE RECOMMENDED ACTION" : ""));
     } else {
-        push_line(out, palette.text_dim,
-                  fmt("%zu forward passes recorded; the first beat has not started",
-                      frames.size()));
+        push_line(
+            out, palette.text_dim,
+            fmt("%zu forward passes recorded; the first beat has not started", frames.size()));
     }
     // The decision itself, once the last pass has been reached. Before that the
     // ticker must not pre-announce an outcome the beats have not shown.
@@ -1143,19 +1143,20 @@ std::vector<CinemaLine> cinema_ticker_body(const CinemaState& state, const Cinem
               fmt("part %s · mesher %s · %s · order %d · adapt %d · η target %.4g · "
                   "elements %zu · nodes %zu · DOF %zu",
                   hud.part.empty() ? "(none loaded)" : hud.part.c_str(), hud.mesher.c_str(),
-                  h_text(hud).c_str(), hud.order, hud.adapt_passes, hud.eta_target, hud.elements,
-                  hud.nodes, hud.dof));
+                  h_text(hud).c_str(), hud.order, hud.adapt_passes, hud.eta_target,
+                  hud.elements, hud.nodes, hud.dof));
     if (hud.stamp.empty()) {
-        push_line(body, palette.text_dim,
-                  "POLYMESH_CINEMA_STAMP not set — no provenance line was supplied to this run");
+        push_line(
+            body, palette.text_dim,
+            "POLYMESH_CINEMA_STAMP not set — no provenance line was supplied to this run");
     } else {
         push_line(body, palette.text_dim, hud.stamp);
     }
     return body;
 }
 
-float cinema_ticker_height(const CinemaState& state, const CinemaCue& cue, const CinemaHud& hud,
-                           float wrap_width) {
+float cinema_ticker_height(const CinemaState& state, const CinemaCue& cue,
+                           const CinemaHud& hud, float wrap_width) {
     const float wrap = std::max(80.0f, wrap_width);
     const float spacing = ImGui::GetStyle().ItemSpacing.y;
     const auto chips = cinema_ticker_chips(state, cue);

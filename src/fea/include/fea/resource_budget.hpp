@@ -74,7 +74,7 @@ struct EffectiveMemoryBudget {
 
 /// Estimate the complete peak footprint before stiffness assembly allocates.
 [[nodiscard]] SolveResourceEstimate estimate_solve_resources(const NodalMesh& mesh,
-                                                              Eigen::Index nfree);
+                                                             Eigen::Index nfree);
 
 /// Largest named component for a method-specific estimate.
 [[nodiscard]] std::string_view limiting_resource_term(const SolveResourceEstimate& estimate,

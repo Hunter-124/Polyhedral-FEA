@@ -734,7 +734,8 @@ std::vector<Loop> resolve_boundary_loops(const NodalMesh& mesh) {
             }
             bool touches = false;
             for (std::size_t c = 0; c < loops[i].size() && !touches; ++c) {
-                touches = torn.count(edge(loops[i][c], loops[i][(c + 1) % loops[i].size()])) > 0;
+                touches =
+                    torn.count(edge(loops[i][c], loops[i][(c + 1) % loops[i].size()])) > 0;
             }
             if (touches) {
                 active[i] = true;
@@ -870,9 +871,18 @@ bool triangulate_loop(const NodalMesh& mesh, const Loop& loop,
 std::map<Edge, std::uint32_t> quadratic_edge_mids(const NodalMesh& mesh) {
     static constexpr std::array<std::array<std::size_t, 2>, 6> kTet10Edges{
         {{0, 1}, {1, 2}, {0, 2}, {0, 3}, {1, 3}, {2, 3}}};
-    static constexpr std::array<std::array<std::size_t, 2>, 12> kHex20Edges{
-        {{0, 1}, {1, 2}, {2, 3}, {3, 0}, {4, 5}, {5, 6}, {6, 7}, {7, 4}, {0, 4}, {1, 5},
-         {2, 6}, {3, 7}}};
+    static constexpr std::array<std::array<std::size_t, 2>, 12> kHex20Edges{{{0, 1},
+                                                                             {1, 2},
+                                                                             {2, 3},
+                                                                             {3, 0},
+                                                                             {4, 5},
+                                                                             {5, 6},
+                                                                             {6, 7},
+                                                                             {7, 4},
+                                                                             {0, 4},
+                                                                             {1, 5},
+                                                                             {2, 6},
+                                                                             {3, 7}}};
     std::map<Edge, std::uint32_t> mids;
     for (const auto& el : mesh.elements) {
         if (el.type == ElementType::kTet10 && el.nodes.size() >= 10) {

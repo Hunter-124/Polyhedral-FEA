@@ -14,11 +14,11 @@
 #include <fstream>
 #include <string>
 
+using polymesh::gui::testlab::CheckpointState;
 using polymesh::gui::testlab::parse_campaign;
 using polymesh::gui::testlab::parse_checkpoint;
 using polymesh::gui::testlab::parse_progress;
 using polymesh::gui::testlab::parse_result_line;
-using polymesh::gui::testlab::CheckpointState;
 using polymesh::gui::testlab::scan_campaigns;
 
 namespace {

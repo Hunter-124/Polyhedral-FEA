@@ -56,8 +56,7 @@ struct SurfaceTessellation {
 /// Tessellate the actual isoparametric free surface, not its corner chords.
 /// Samples retain nodal interpolation weights so result fields and deformation
 /// use the same quadratic geometry solved by the volume elements.
-SurfaceTessellation tessellate_boundary_surface(const NodalMesh& mesh,
-                                                int subdivisions = 6);
+SurfaceTessellation tessellate_boundary_surface(const NodalMesh& mesh, int subdivisions = 6);
 
 /// Traction field t(x), N/m^2, evaluated at a physical surface point.
 using Traction = std::function<Eigen::Vector3d(const Eigen::Vector3d&)>;
@@ -96,10 +95,10 @@ std::vector<std::uint32_t> boundary_face_nodes(const std::vector<SurfaceFace>& f
 
 /// Result of energy-conjugate load application over a face set.
 struct ConsistentLoad {
-    Eigen::VectorXd loads;                     ///< 3N nodal load vector, N
-    Eigen::Vector3d resultant{0.0, 0.0, 0.0};  ///< sum of nodal loads, N
-    double area = 0.0;                         ///< integrated load area, m^2
-    double conservation_error = 0.0;            ///< |resultant - requested|, N
+    Eigen::VectorXd loads;                    ///< 3N nodal load vector, N
+    Eigen::Vector3d resultant{0.0, 0.0, 0.0}; ///< sum of nodal loads, N
+    double area = 0.0;                        ///< integrated load area, m^2
+    double conservation_error = 0.0;          ///< |resultant - requested|, N
 };
 
 /// Consistent (energy-conjugate) nodal loads for a uniform traction over

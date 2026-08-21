@@ -141,8 +141,7 @@ void stamp_curvature_cells(std::vector<char>& is_l1, std::vector<char>* is_l2,
             continue;
         }
         // Barycentric sampling at ~half-cell spacing (min 1 interior sample).
-        const double emax =
-            std::max({(a - b).norm(), (a - c).norm(), (b - c).norm(), 1e-30});
+        const double emax = std::max({(a - b).norm(), (a - c).norm(), (b - c).norm(), 1e-30});
         const int n = std::clamp(static_cast<int>(std::ceil(emax / (0.5 * h_ref))), 1, 64);
         for (int u = 0; u <= n; ++u) {
             for (int v = 0; v <= n - u; ++v) {

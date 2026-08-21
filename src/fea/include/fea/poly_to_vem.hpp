@@ -14,4 +14,4 @@ namespace polymesh::fea {
 /// shared globally. Empty mesh if `pm` has no cells.
 [[nodiscard]] NodalMesh poly_mesh_to_vem(const mesh::PolyMesh& pm);
 
-}  // namespace polymesh::fea
+} // namespace polymesh::fea

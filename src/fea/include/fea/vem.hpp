@@ -102,9 +102,9 @@ double vem_energy_error_sq(
 /// `u_elem` (size 3n). order 1 → constant B-bar strain; order 2 → [P₂]³ strain
 /// sampled at the cell centroid. Same projector as the stiffness — used for
 /// polyhedral stress recovery (σ = D·ε).
-Eigen::Matrix<double, 6, 1> vem_projected_strain(
-    const std::vector<Eigen::Vector3d>& coords,
-    const std::vector<std::vector<std::uint32_t>>& faces, const Eigen::VectorXd& u_elem,
-    int order);
+Eigen::Matrix<double, 6, 1>
+vem_projected_strain(const std::vector<Eigen::Vector3d>& coords,
+                     const std::vector<std::vector<std::uint32_t>>& faces,
+                     const Eigen::VectorXd& u_elem, int order);
 
 } // namespace polymesh::fea

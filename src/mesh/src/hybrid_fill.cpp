@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "mesh/hybrid_fill.hpp"
 
-#include "mesh/cell_validity.hpp"
 #include "mesh/cell_stamp.hpp"
+#include "mesh/cell_validity.hpp"
 #include "mesh/grid_classify.hpp"
 #include "mesh/lattice_split.hpp"
 #include "mesh/local_refine.hpp"
@@ -15,14 +15,14 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <format>
 #include <cstdint>
+#include <format>
+#include <limits>
 #include <map>
 #include <queue>
 #include <set>
-#include <limits>
-#include <tuple>
 #include <span>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -408,9 +408,9 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     // first and most consequential of them: which cells hold material decides the
     // whole element pattern, and it is read off a tessellation that is measurably
     // not mirror-symmetric (ADR-0036 §7).
-    const CanonicalCellMap cell_orbit =
-        mirror != nullptr ? canonical_cell_map(classification.grid, *mirror)
-                          : CanonicalCellMap{};
+    const CanonicalCellMap cell_orbit = mirror != nullptr
+                                            ? canonical_cell_map(classification.grid, *mirror)
+                                            : CanonicalCellMap{};
     symmetrise_classification(classification, cell_orbit);
     const CartesianGrid& grid = classification.grid;
     const auto& inside = classification.inside;
@@ -422,7 +422,6 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         return i >= 0 && i < nx && j >= 0 && j < ny && k >= 0 && k < nz &&
                inside[idx(i, j, k)];
     };
-
 
     // Face-only boundary distance (coarse hops).
     std::vector<int> dist(inside.size(), -1);
@@ -473,8 +472,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     // graded (no geo drivers) still skins so unit boxes get an L1 shell.
     const int skin_cap = std::max(1, (max_dist + 1) / 2);
     const bool have_geo_drivers = (feature_band > 0.0) || (seed_band > 0.0) ||
-                                  (curvature_turn_deg > 0.0) ||
-                                  static_cast<bool>(size_field);
+                                  (curvature_turn_deg > 0.0) || static_cast<bool>(size_field);
     const int skin_thresh = have_geo_drivers ? 0 : std::min(skin_layers, skin_cap);
 
     // refine_level: 0=bulk, 1=L1, 2=L2, 3=deep protected-feature core.
@@ -778,7 +776,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     // Pre-LEB snap of lattice corners so LEB mid-edges start closer to the CAD
     // (cleaner hole rims; midpoints of two on-surface nodes ≈ on surface).
     {
-        std::vector<std::uint32_t> pre_snap = tet_boundary_nodes(out.mesh.tets, out.mesh.nodes);
+        std::vector<std::uint32_t> pre_snap =
+            tet_boundary_nodes(out.mesh.tets, out.mesh.nodes);
         if (!pre_snap.empty()) {
             std::unordered_set<std::uint32_t> bset(pre_snap.begin(), pre_snap.end());
             std::vector<std::size_t> skin_tets;
@@ -848,8 +847,9 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             return false;
         }
         const auto& tri = surface.triangles[cp.triangle];
-        const Eigen::Vector3d n = (surface.vertices[tri[1]] - surface.vertices[tri[0]])
-                                      .cross(surface.vertices[tri[2]] - surface.vertices[tri[0]]);
+        const Eigen::Vector3d n =
+            (surface.vertices[tri[1]] - surface.vertices[tri[0]])
+                .cross(surface.vertices[tri[2]] - surface.vertices[tri[0]]);
         return (p - cp.point).dot(n) > 0.0;
     };
 
@@ -858,7 +858,6 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     const auto surface_distance = [&surface, mirror](const Eigen::Vector3d& p) {
         return closest_on_surface(surface, mirror_fold(mirror, p)).distance;
     };
-
 
     // The feature-aware classifier's h/2 samples are authoritative inside a
     // mixed coarse parent. LEB has already made those parents conforming; now
@@ -939,7 +938,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     // corners after refine). Run as a reusable round: the S5 void carve below
     // exposes fresh (never-snapped) lattice faces that need a second round.
     const auto snap_round = [&]() {
-        std::vector<std::uint32_t> snap_nodes = tet_boundary_nodes(out.mesh.tets, out.mesh.nodes);
+        std::vector<std::uint32_t> snap_nodes =
+            tet_boundary_nodes(out.mesh.tets, out.mesh.nodes);
         if (snap_nodes.empty()) {
             return;
         }
@@ -1013,14 +1013,11 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         // a symmetry plane changes what the other side's gate reads (measured
         // on cylinder/feature at h = 12 mm: the per-node variant shipped a
         // 0.930 mirrored-tet fraction; the gate is == 1.0).
-        const mesh::MirrorNodeOrbit orbit(mirror != nullptr ? *mirror : mesh::MirrorFrame{},
-                                          out.mesh.nodes, [&] {
-                                              const mesh::MirrorKeyFrame frame =
-                                                  mesh::mirror_key_frame(out.mesh.nodes);
-                                              return frame.inv_quantum > 0.0
-                                                         ? 1.0 / frame.inv_quantum
-                                                         : 0.0;
-                                          }());
+        const mesh::MirrorNodeOrbit orbit(
+            mirror != nullptr ? *mirror : mesh::MirrorFrame{}, out.mesh.nodes, [&] {
+                const mesh::MirrorKeyFrame frame = mesh::mirror_key_frame(out.mesh.nodes);
+                return frame.inv_quantum > 0.0 ? 1.0 / frame.inv_quantum : 0.0;
+            }());
         const auto orbit_of = [&](std::uint32_t node) {
             std::vector<std::uint32_t> group{node};
             if (!orbit.active()) {
@@ -1044,12 +1041,10 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         // placement never changes — only their spacing).
         const auto reproject = [&](std::uint32_t ni, const Eigen::Vector3d& p) {
             if (projection == nullptr) {
-                return mirror_unfold(mirror,
-                                     closest_on_surface(surface, mirror_fold(mirror, p)).point,
-                                     p);
+                return mirror_unfold(
+                    mirror, closest_on_surface(surface, mirror_fold(mirror, p)).point, p);
             }
-            const auto target =
-                boundary_projection_target(surface, p, ni, projection, mirror);
+            const auto target = boundary_projection_target(surface, p, ni, projection, mirror);
             return target ? target->point : p;
         };
         const auto relax_neighborhood = [&](std::uint32_t seed) {
@@ -1190,10 +1185,9 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 if (ni >= out.mesh.nodes.size()) {
                     continue;
                 }
-                const auto target = boundary_projection_target(
-                    surface, out.mesh.nodes[ni], ni, projection, mirror);
-                if (target && target->distance > 0.01 * hc &&
-                    target->distance <= 2.5 * hc) {
+                const auto target = boundary_projection_target(surface, out.mesh.nodes[ni], ni,
+                                                               projection, mirror);
+                if (target && target->distance > 0.01 * hc && target->distance <= 2.5 * hc) {
                     stragglers.push_back(ni);
                 }
             }
@@ -1264,9 +1258,9 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                     for (const auto node : group) {
                         for (const auto ti : incident[node]) {
                             const auto& n = out.mesh.tets[ti];
-                            const double v = tet_signed_volume(
-                                out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
-                                out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
+                            const double v =
+                                tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
+                                                  out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
                             if (!(v > vol_eps)) {
                                 invert_free = false;
                                 break;
@@ -1334,8 +1328,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                     }
                 }
                 for (std::size_t gi = 0; gi < group.size(); ++gi) {
-                    out.mesh.nodes[group[gi]] =
-                        saved[gi] + good * (target_pt[gi] - saved[gi]);
+                    out.mesh.nodes[group[gi]] = saved[gi] + good * (target_pt[gi] - saved[gi]);
                 }
             }
         }
@@ -1347,8 +1340,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 if (ni >= out.mesh.nodes.size()) {
                     continue;
                 }
-                const auto target = boundary_projection_target(
-                    surface, out.mesh.nodes[ni], ni, projection, mirror);
+                const auto target = boundary_projection_target(surface, out.mesh.nodes[ni], ni,
+                                                               projection, mirror);
                 if (!target || !(target->distance > thr) || target->distance > 2.5 * hc) {
                     continue;
                 }
@@ -1413,8 +1406,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     std::unordered_set<std::uint32_t> initial_juts;
     for (const auto ni : tet_boundary_nodes(out.mesh.tets, out.mesh.nodes)) {
         const Eigen::Vector3d& p = out.mesh.nodes[ni];
-        if (surface_distance(p) > initial_jut_threshold &&
-            outside_solid(p)) {
+        if (surface_distance(p) > initial_jut_threshold && outside_solid(p)) {
             initial_juts.insert(ni);
         }
     }
@@ -1470,7 +1462,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 double v = 0.0;
                 for (const auto& t : out.mesh.tets) {
                     v += std::abs(tet_signed_volume(out.mesh.nodes[t[0]], out.mesh.nodes[t[1]],
-                                                    out.mesh.nodes[t[2]], out.mesh.nodes[t[3]]));
+                                                    out.mesh.nodes[t[2]],
+                                                    out.mesh.nodes[t[3]]));
                 }
                 return v;
             };
@@ -1696,17 +1689,16 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 // length itself is compared through `tie_key`: mirrored lengths
                 // agree only to the last ulp, and ordering on that noise is what
                 // sent mirrored juts to unmirrored survivors (ADR-0036).
-                std::sort(cand.begin(), cand.end(),
-                          [&](const auto& x, const auto& y) {
-                              const auto lx = tie_key(x.first, hc);
-                              const auto ly = tie_key(y.first, hc);
-                              if (lx != ly) {
-                                  return lx < ly;
-                              }
-                              const auto kx = mkey.key(out.mesh.nodes[x.second]);
-                              const auto ky = mkey.key(out.mesh.nodes[y.second]);
-                              return kx != ky ? kx < ky : x.second < y.second;
-                          });
+                std::sort(cand.begin(), cand.end(), [&](const auto& x, const auto& y) {
+                    const auto lx = tie_key(x.first, hc);
+                    const auto ly = tie_key(y.first, hc);
+                    if (lx != ly) {
+                        return lx < ly;
+                    }
+                    const auto kx = mkey.key(out.mesh.nodes[x.second]);
+                    const auto ky = mkey.key(out.mesh.nodes[y.second]);
+                    return kx != ky ? kx < ky : x.second < y.second;
+                });
                 cand.erase(std::unique(cand.begin(), cand.end(),
                                        [](const auto& x, const auto& y) {
                                            return x.second == y.second;
@@ -2169,8 +2161,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                     // owner so the guard judges the band, not a pinch.
                     std::unordered_set<std::uint32_t> owner_nodes;
                     for (const auto ti : owners) {
-                        owner_nodes.insert(out.mesh.tets[ti].begin(),
-                                           out.mesh.tets[ti].end());
+                        owner_nodes.insert(out.mesh.tets[ti].begin(), out.mesh.tets[ti].end());
                     }
                     std::fill(kill.begin(), kill.end(), static_cast<char>(0));
                     for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
@@ -2209,13 +2200,11 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         constexpr int kAlternations = 3;
         for (int round = 0; round < kAlternations; ++round) {
             carve_to_clean();
-            if (count_buried_free_tet_faces(out.mesh.nodes, out.mesh.tets, hc).n_buried !=
-                0) {
+            if (count_buried_free_tet_faces(out.mesh.nodes, out.mesh.tets, hc).n_buried != 0) {
                 break; // carve stranded: do not snap on top of a tangle
             }
             snap_round();
-            if (count_buried_free_tet_faces(out.mesh.nodes, out.mesh.tets, hc).n_buried ==
-                0) {
+            if (count_buried_free_tet_faces(out.mesh.nodes, out.mesh.tets, hc).n_buried == 0) {
                 break; // snapped AND clean
             }
         }
@@ -2225,15 +2214,13 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         // BEFORE the final carve + pull and the census gate stays last.
         repair_round();
         carve_to_clean();
-        pull_buried_free_faces(out.mesh.nodes, out.mesh.tets, hc, /*max_iters=*/8,
-                               mirror);
-        if (const auto st =
-                count_buried_free_tet_faces(out.mesh.nodes, out.mesh.tets, hc);
+        pull_buried_free_faces(out.mesh.nodes, out.mesh.tets, hc, /*max_iters=*/8, mirror);
+        if (const auto st = count_buried_free_tet_faces(out.mesh.nodes, out.mesh.tets, hc);
             st.n_buried != 0) {
-            throw ValidityError(std::format(
-                "graded_tet_fill_surface: {} boundary faces remain buried inside "
-                "other cells after the overlap carve — self-intersecting boundary",
-                st.n_buried));
+            throw ValidityError(
+                std::format("graded_tet_fill_surface: {} boundary faces remain buried inside "
+                            "other cells after the overlap carve — self-intersecting boundary",
+                            st.n_buried));
         }
     }
 
@@ -2278,9 +2265,9 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             std::map<std::array<std::uint32_t, 3>, int> face_use;
             for (const auto& t : out.mesh.tets) {
                 for (const auto& f : kTris) {
-                    std::array<std::uint32_t, 3> key{
-                        {t[static_cast<std::size_t>(f[0])], t[static_cast<std::size_t>(f[1])],
-                         t[static_cast<std::size_t>(f[2])]}};
+                    std::array<std::uint32_t, 3> key{{t[static_cast<std::size_t>(f[0])],
+                                                      t[static_cast<std::size_t>(f[1])],
+                                                      t[static_cast<std::size_t>(f[2])]}};
                     std::sort(key.begin(), key.end());
                     ++face_use[key];
                 }

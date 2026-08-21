@@ -7,8 +7,8 @@
 
 #include "fea/solve.hpp"
 #include "fea/stress.hpp"
-#include "pipeline/scene.hpp"
 #include "geom/stl.hpp"
+#include "pipeline/scene.hpp"
 #include "support/box_model.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -149,7 +149,8 @@ TEST_CASE("E4 product mesh: public cylinder_prism smoke (mesh+solve, not Lame to
     if (!std::filesystem::exists(geom)) {
         SKIP("cylinder_prism.stl not found (run from repo root)");
     }
-    const auto model = polymesh::testsupport::model_from_surface(polymesh::geom::load_stl(geom.string()));
+    const auto model =
+        polymesh::testsupport::model_from_surface(polymesh::geom::load_stl(geom.string()));
     REQUIRE(model.surface.triangles.size() >= 8);
 
     // Coarse h from bbox so runtime stays small.

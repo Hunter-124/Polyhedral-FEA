@@ -8,8 +8,8 @@
 #include <string>
 #else
 #include <cerrno>
-#include <cstdio>
 #include <csignal>
+#include <cstdio>
 #include <cstring>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -82,9 +82,9 @@ bool ProcessRunner::start(const std::filesystem::path& binary,
     std::vector<char> cmdline(cmd.begin(), cmd.end());
     cmdline.push_back('\0');
 
-    const BOOL ok = CreateProcessA(
-        nullptr, cmdline.data(), nullptr, nullptr, FALSE, CREATE_NEW_PROCESS_GROUP, nullptr,
-        cwd_str.empty() ? nullptr : cwd_str.c_str(), &si, &pi);
+    const BOOL ok = CreateProcessA(nullptr, cmdline.data(), nullptr, nullptr, FALSE,
+                                   CREATE_NEW_PROCESS_GROUP, nullptr,
+                                   cwd_str.empty() ? nullptr : cwd_str.c_str(), &si, &pi);
     if (!ok) {
         last_error_ = std::format("CreateProcess failed (err {})", GetLastError());
         state_ = State::kIdle;

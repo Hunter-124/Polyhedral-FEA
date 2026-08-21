@@ -12,10 +12,10 @@
 #include "geom/features.hpp"
 #include "geom/tri_surface.hpp"
 #include "mesh/cvt_lloyd.hpp"
-#include "mesh/mirror.hpp"
-#include "mesh/tet_fill.hpp"
 #include "mesh/feature_pin.hpp"
+#include "mesh/mirror.hpp"
 #include "mesh/surface_project.hpp"
+#include "mesh/tet_fill.hpp"
 
 #include <Eigen/Core>
 

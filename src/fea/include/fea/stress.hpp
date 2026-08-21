@@ -43,9 +43,9 @@ struct ElementCentroidStress {
     std::uint32_t element_index = 0;
 };
 
-std::vector<ElementCentroidStress>
-recover_element_centroid_stress(const NodalMesh& mesh, const Material& material,
-                                const Eigen::VectorXd& u);
+std::vector<ElementCentroidStress> recover_element_centroid_stress(const NodalMesh& mesh,
+                                                                   const Material& material,
+                                                                   const Eigen::VectorXd& u);
 
 /// Von Mises equivalent stress, Pa.
 double von_mises(const Stress& s);

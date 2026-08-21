@@ -79,7 +79,6 @@ BuriedFaceStats count_buried_free_tet_faces(std::span<const Eigen::Vector3d> nod
                                             std::span<const std::array<std::uint32_t, 4>> tets,
                                             double h);
 
-
 /// Owner tets of buried free faces, deduplicated. The owners are overlapping
 /// volume — the same material is inside another cell too — so the remedy is
 /// deletion (shell-guarded, then re-snap), not node motion: pulling nodes at a

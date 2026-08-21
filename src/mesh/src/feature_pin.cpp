@@ -98,12 +98,12 @@ Eigen::Vector3d polyline_point(const std::vector<Eigen::Vector3d>& samples,
 }
 
 } // namespace
-FeaturePinReport pin_feature_nodes(
-    const geom::CadModel& cad, const geom::CadTopology& topo,
-    std::vector<Eigen::Vector3d>& nodes,
-    const std::vector<std::uint32_t>& boundary_nodes, double h,
-    const NodeOffendsFn& node_offends,
-    std::vector<BoundarySupport>* provenance, const MirrorFrame* mirror) {
+FeaturePinReport pin_feature_nodes(const geom::CadModel& cad, const geom::CadTopology& topo,
+                                   std::vector<Eigen::Vector3d>& nodes,
+                                   const std::vector<std::uint32_t>& boundary_nodes, double h,
+                                   const NodeOffendsFn& node_offends,
+                                   std::vector<BoundarySupport>* provenance,
+                                   const MirrorFrame* mirror) {
     FeaturePinReport report;
     if (boundary_nodes.empty() || topo.empty() || cad.empty() || !(h > 0.0) ||
         !std::isfinite(h)) {
@@ -128,8 +128,7 @@ FeaturePinReport pin_feature_nodes(
     // preserve. Node indices never change here, only positions, so the map stays
     // valid while pins are applied.
     const MirrorNodeOrbit orbit_storage(
-        mirror != nullptr ? *mirror : MirrorFrame{}, nodes,
-        [&] {
+        mirror != nullptr ? *mirror : MirrorFrame{}, nodes, [&] {
             const MirrorKeyFrame frame = mirror_key_frame(nodes);
             return frame.inv_quantum > 0.0 ? 1.0 / frame.inv_quantum : 0.0;
         }());
@@ -222,9 +221,8 @@ FeaturePinReport pin_feature_nodes(
                 break;
             }
             group_target.emplace_back(
-                mirror != nullptr
-                    ? mirror->clamp_to_planes(other_exact->point, nodes[node])
-                    : other_exact->point,
+                mirror != nullptr ? mirror->clamp_to_planes(other_exact->point, nodes[node])
+                                  : other_exact->point,
                 nearest->id);
         }
         if (!have_targets) {
@@ -269,8 +267,7 @@ FeaturePinReport pin_feature_nodes(
         }
         for (std::size_t gi = 0; gi < group.size(); ++gi) {
             claimed.insert(group[gi]);
-            set_owner(provenance, group[gi], BoundarySupportKind::kCadVertex,
-                      canonical_owner);
+            set_owner(provenance, group[gi], BoundarySupportKind::kCadVertex, canonical_owner);
             ++report.vertex_pinned;
         }
     }
@@ -358,9 +355,9 @@ FeaturePinReport pin_feature_nodes(
         // ramp removes the lattice's own frequency content while leaving the
         // curve untouched — the pin target below is still the exact OCC
         // projection, only its parameter has been regularized.
-        const bool closed = edge.v0 == edge.v1 &&
-                            (edge.samples.front() - edge.samples.back()).norm() <=
-                                1e-9 * std::max(1.0, edge.length);
+        const bool closed =
+            edge.v0 == edge.v1 && (edge.samples.front() - edge.samples.back()).norm() <=
+                                      1e-9 * std::max(1.0, edge.length);
         if (closed && chain.size() >= 8) {
             std::vector<double> idx(chain.size());
             std::vector<double> param(chain.size());
@@ -369,15 +366,15 @@ FeaturePinReport pin_feature_nodes(
                 // Deviation of the measured parameter from a perfectly
                 // uniform chain: a zero-mean periodic signal whose content is
                 // lattice noise plus any genuine crowding the geometry needs.
-                param[i] = chain[i].t - static_cast<double>(i) / static_cast<double>(
-                                                                    chain.size());
+                param[i] =
+                    chain[i].t - static_cast<double>(i) / static_cast<double>(chain.size());
             }
             geom::FilterReport filter;
-            const auto smoothed = geom::lowpass_signal_periodic(idx, param,
-                                                                kChainEnergyFraction, &filter);
+            const auto smoothed =
+                geom::lowpass_signal_periodic(idx, param, kChainEnergyFraction, &filter);
             for (std::size_t i = 0; i < chain.size(); ++i) {
-                double t = smoothed[i] + static_cast<double>(i) /
-                                             static_cast<double>(chain.size());
+                double t =
+                    smoothed[i] + static_cast<double>(i) / static_cast<double>(chain.size());
                 chain[i].t = std::clamp(t, 0.0, 1.0);
             }
         }

@@ -76,7 +76,8 @@ OctaFillOutput octa_fill_surface(const geom::TriSurface& surface,
     const int nx = grid.nx, ny = grid.ny, nz = grid.nz;
     const auto idx = [&](int i, int j, int k) { return grid.index(i, j, k); };
     const auto inb = [&](int i, int j, int k) {
-        return i >= 0 && i < nx && j >= 0 && j < ny && k >= 0 && k < nz && inside[idx(i, j, k)];
+        return i >= 0 && i < nx && j >= 0 && j < ny && k >= 0 && k < nz &&
+               inside[idx(i, j, k)];
     };
 
     OctaFillOutput out;

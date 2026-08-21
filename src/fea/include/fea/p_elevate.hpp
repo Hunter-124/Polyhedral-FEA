@@ -37,15 +37,15 @@ NodalMesh p_elevate(const NodalMesh& mesh, std::span<const std::size_t> elevate_
 
 /// Selective p-elevation with the p=1/p=2 interface constraints required by
 /// `solve_elastostatics`. Incidence is computed on the input connectivity.
-PElevateResult p_elevate_with_constraints(
-    const NodalMesh& mesh, std::span<const std::size_t> elevate_indices);
+PElevateResult p_elevate_with_constraints(const NodalMesh& mesh,
+                                          std::span<const std::size_t> elevate_indices);
 
 /// Convenience: promote where `elevate_mask[e]` is true (size = mesh.elements).
 NodalMesh p_elevate(const NodalMesh& mesh, std::span<const bool> elevate_mask);
 
 /// Mask overload of `p_elevate_with_constraints`.
 PElevateResult p_elevate_with_constraints(const NodalMesh& mesh,
-                                           std::span<const bool> elevate_mask);
+                                          std::span<const bool> elevate_mask);
 
 /// Count elements of each promotable / quadratic type (for notes / tests).
 struct ElementTypeCounts {

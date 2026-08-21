@@ -47,18 +47,18 @@ Palette make_slate_palette() {
 /// is captured in — keep it in sync with docs/gui/theme-layout.md.
 Palette make_studio_palette() {
     Palette p;
-    p.window_bg = {0.055f, 0.067f, 0.086f, 1};   // #0E1116 chrome
-    p.panel_bg = {0.086f, 0.106f, 0.133f, 1};    // #161B22
-    p.header_bg = {0.110f, 0.137f, 0.188f, 1};   // #1C2330
-    p.popup_bg = {0.102f, 0.125f, 0.165f, 1};    // #1A2029
-    p.border = {0.165f, 0.196f, 0.251f, 1};      // #2A3240
-    p.status_bg = {0.039f, 0.051f, 0.071f, 1};   // #0A0D12
-    p.text = {0.902f, 0.918f, 0.941f, 1};        // #E6EAF0
-    p.text_dim = {0.541f, 0.576f, 0.639f, 1};    // #8A93A3
-    p.text_disabled = {0.353f, 0.384f, 0.447f, 1}; // #5A6272
-    p.accent = {0.298f, 0.761f, 1.000f, 1};      // #4CC2FF
+    p.window_bg = {0.055f, 0.067f, 0.086f, 1};       // #0E1116 chrome
+    p.panel_bg = {0.086f, 0.106f, 0.133f, 1};        // #161B22
+    p.header_bg = {0.110f, 0.137f, 0.188f, 1};       // #1C2330
+    p.popup_bg = {0.102f, 0.125f, 0.165f, 1};        // #1A2029
+    p.border = {0.165f, 0.196f, 0.251f, 1};          // #2A3240
+    p.status_bg = {0.039f, 0.051f, 0.071f, 1};       // #0A0D12
+    p.text = {0.902f, 0.918f, 0.941f, 1};            // #E6EAF0
+    p.text_dim = {0.541f, 0.576f, 0.639f, 1};        // #8A93A3
+    p.text_disabled = {0.353f, 0.384f, 0.447f, 1};   // #5A6272
+    p.accent = {0.298f, 0.761f, 1.000f, 1};          // #4CC2FF
     p.accent_soft_top = {0.498f, 0.831f, 1.000f, 1}; // #7FD4FF (gradient top)
-    p.accent_dim = {0.165f, 0.431f, 0.588f, 1};  // #2A6E96
+    p.accent_dim = {0.165f, 0.431f, 0.588f, 1};      // #2A6E96
     p.accent_soft = {0.298f, 0.761f, 1.000f, 0.20f};
     p.accent_mid = {0.298f, 0.761f, 1.000f, 0.38f};
     p.button = {0.102f, 0.129f, 0.169f, 1};
@@ -78,7 +78,7 @@ Palette make_studio_palette() {
     p.axis_x = {0.961f, 0.427f, 0.404f, 1};
     p.axis_y = {0.400f, 0.855f, 0.478f, 1};
     p.axis_z = {0.298f, 0.761f, 1.000f, 1};
-    p.status_ok = {0.176f, 0.831f, 0.749f, 1};  // #2DD4BF
+    p.status_ok = {0.176f, 0.831f, 0.749f, 1};   // #2DD4BF
     p.status_warn = {0.961f, 0.773f, 0.259f, 1}; // #F5C542
     p.status_err = {0.961f, 0.529f, 0.416f, 1};  // #F5876C
     return p;

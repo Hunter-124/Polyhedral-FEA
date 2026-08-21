@@ -297,8 +297,8 @@ BRepGeometryFidelity evaluate_brep_geometry_fidelity(
             const std::size_t limit = std::min<std::size_t>(worst_samples.size(), 64);
             for (std::size_t i = 0; i < limit; ++i) {
                 const WorstSample& s = worst_samples[i];
-                std::fprintf(file, "%c %.9g %.9g %.9g %.9g\n", s.kind, s.distance,
-                             s.point.x(), s.point.y(), s.point.z());
+                std::fprintf(file, "%c %.9g %.9g %.9g %.9g\n", s.kind, s.distance, s.point.x(),
+                             s.point.y(), s.point.z());
             }
             std::fclose(file);
         }
@@ -341,8 +341,7 @@ BRepGeometryFidelity evaluate_brep_geometry_fidelity(
                 if (edge.feature != geom::CadEdgeFeature::kSharp) {
                     continue;
                 }
-                if (const auto exact =
-                        geom::project_point_on_edge(model, edge.id, p)) {
+                if (const auto exact = geom::project_point_on_edge(model, edge.id, p)) {
                     nearest = std::min(nearest, exact->distance);
                 }
             }
@@ -400,16 +399,16 @@ BRepGeometryFidelity evaluate_brep_geometry_fidelity(
     return out;
 }
 
-GeometryCompleteness evaluate_geometry_completeness(
-    const geom::CadModel& model, double mesh_volume, double relative_volume_tolerance) {
+GeometryCompleteness evaluate_geometry_completeness(const geom::CadModel& model,
+                                                    double mesh_volume,
+                                                    double relative_volume_tolerance) {
     GeometryCompleteness out;
     out.mesh_volume = mesh_volume;
     out.relative_volume_tolerance = relative_volume_tolerance;
     const auto brep = geom::inspect_brep(model);
     if (!brep.available || !brep.valid || !brep.closed || brep.solid_count == 0 ||
         !(brep.volume > 0.0) || !std::isfinite(brep.volume) ||
-        !(relative_volume_tolerance > 0.0) ||
-        !std::isfinite(relative_volume_tolerance)) {
+        !(relative_volume_tolerance > 0.0) || !std::isfinite(relative_volume_tolerance)) {
         return out;
     }
     out.available = true;

@@ -127,10 +127,7 @@ TEST_CASE("D3: selective p_elevate leaves unlisted tet4 linear") {
 
 TEST_CASE("D3: selective p_elevate rejects a tet invalidated by an inherited curved mid") {
     fea::NodalMesh mesh;
-    mesh.nodes = {{0.0, 0.0, 0.0},
-                  {1.0, 0.0, 0.0},
-                  {0.0, 1.0, 0.0},
-                  {0.0, 0.0, 1.0}};
+    mesh.nodes = {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};
     mesh.elements.emplace_back(fea::ElementType::kTet4,
                                std::vector<std::uint32_t>{0, 1, 2, 3});
     mesh = fea::promote_to_quadratic(mesh);

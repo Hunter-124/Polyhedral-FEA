@@ -82,15 +82,15 @@ TEST_CASE("headless render: draws, repeats byte-for-byte, and tracks the exact B
         // A sphere fitted with a 6% margin covers ~pi/4 of the shorter frame
         // dimension squared; anything near 0 or near the whole frame means the
         // camera fit or the z-buffer collapsed.
-        const std::size_t frame = static_cast<std::size_t>(view.width) *
-                                  static_cast<std::size_t>(view.height);
+        const std::size_t frame =
+            static_cast<std::size_t>(view.width) * static_cast<std::size_t>(view.height);
         REQUIRE(render.coverage.silhouette_area_px > frame / 4);
         REQUIRE(render.coverage.silhouette_area_px < (frame * 7) / 10);
 
         // Every pixel claimed as covered really differs from the same view drawn
         // with nothing in it, and no other pixel does.
-        const auto empty = pipeline::render_surface(curved.mesh, fea::SurfaceTessellation{},
-                                                   view);
+        const auto empty =
+            pipeline::render_surface(curved.mesh, fea::SurfaceTessellation{}, view);
         REQUIRE(empty.coverage.pixels_covered == 0);
         std::size_t differing = 0;
         for (std::size_t p = 0; p < frame; ++p) {
@@ -125,8 +125,7 @@ TEST_CASE("headless render: draws, repeats byte-for-byte, and tracks the exact B
 
         // Valid PNG framing: signature, IHDR dimensions, IEND terminator. The
         // pixel payload is exercised by the coverage section above.
-        constexpr std::uint8_t signature[] = {0x89, 0x50, 0x4E, 0x47,
-                                             0x0D, 0x0A, 0x1A, 0x0A};
+        constexpr std::uint8_t signature[] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
         REQUIRE(std::equal(std::begin(signature), std::end(signature), a.begin()));
         REQUIRE(std::string(a.begin() + 12, a.begin() + 16) == "IHDR");
         const auto be32 = [&a](std::size_t at) {

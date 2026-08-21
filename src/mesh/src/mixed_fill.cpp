@@ -63,8 +63,8 @@ double tet_vol(const Eigen::Vector3d& a, const Eigen::Vector3d& b, const Eigen::
 // (normalized shape below `shape_floor`; vol_eps alone is ~1e-14·h³, thirteen
 // orders below a healthy cell, so it never caught one).
 // `shape_floor <= 0` disables the shape test.
-bool hex_bad(const std::array<std::uint32_t, 8>& hx,
-             const std::vector<Eigen::Vector3d>& nodes, double shape_floor) {
+bool hex_bad(const std::array<std::uint32_t, 8>& hx, const std::vector<Eigen::Vector3d>& nodes,
+             double shape_floor) {
     std::array<Eigen::Vector3d, 8> x{};
     for (int i = 0; i < 8; ++i) {
         x[static_cast<std::size_t>(i)] = nodes[hx[static_cast<std::size_t>(i)]];
@@ -132,10 +132,8 @@ void orient_pyramid_winding(MixedCell& pyr, const std::vector<Eigen::Vector3d>& 
         return validity::pyramid_min_split_volume(nodes[n0], nodes[n1], nodes[n2], nodes[n3],
                                                   nodes[pyr.nodes[4]]);
     };
-    const double forward =
-        split_min(pyr.nodes[0], pyr.nodes[1], pyr.nodes[2], pyr.nodes[3]);
-    const double reversed =
-        split_min(pyr.nodes[0], pyr.nodes[3], pyr.nodes[2], pyr.nodes[1]);
+    const double forward = split_min(pyr.nodes[0], pyr.nodes[1], pyr.nodes[2], pyr.nodes[3]);
+    const double reversed = split_min(pyr.nodes[0], pyr.nodes[3], pyr.nodes[2], pyr.nodes[1]);
     if (reversed > forward) {
         std::swap(pyr.nodes[1], pyr.nodes[3]);
     }
@@ -160,9 +158,9 @@ void normalize_pyramid_diagonal(MixedCell& pyr, const std::vector<Eigen::Vector3
 /// apex that clears the requested cell-quality floor. If the floor cannot be
 /// reached, retain the best improving candidate.
 template <typename WorstQualityFn>
-bool search_fan_apex(const std::array<Eigen::Vector3d, 8>& lattice,
-                     const Eigen::Vector3d& ctr, WorstQualityFn&& worst,
-                     double q_reference, double shape_floor, Eigen::Vector3d& best) {
+bool search_fan_apex(const std::array<Eigen::Vector3d, 8>& lattice, const Eigen::Vector3d& ctr,
+                     WorstQualityFn&& worst, double q_reference, double shape_floor,
+                     Eigen::Vector3d& best) {
     best = ctr;
     double best_q = q_reference;
     double best_d2 = std::numeric_limits<double>::max();
@@ -173,8 +171,8 @@ bool search_fan_apex(const std::array<Eigen::Vector3d, 8>& lattice,
                 Eigen::Vector3d a = Eigen::Vector3d::Zero();
                 for (std::size_t t = 0; t < 8; ++t) {
                     const auto& s = validity::kHexCornerSigns[t];
-                    a += 0.125 * (1.0 + s[0] * xi) * (1.0 + s[1] * eta) *
-                         (1.0 + s[2] * zeta) * lattice[t];
+                    a += 0.125 * (1.0 + s[0] * xi) * (1.0 + s[1] * eta) * (1.0 + s[2] * zeta) *
+                         lattice[t];
                 }
                 const double q = worst(a);
                 const double d2 = (a - ctr).squaredNorm();
@@ -346,7 +344,8 @@ void emit_transition_poly(MixedFillOutput& out, FineNodeFn&& fn, EdgeSplitFn&& e
                 const auto& A = fcoord[static_cast<std::size_t>(q)];
                 const auto& B = fcoord[static_cast<std::size_t>((q + 1) % 4)];
                 const auto& P = fcoord[static_cast<std::size_t>((q + 3) % 4)];
-                const int mx = (A[0] + B[0]) / 2, my = (A[1] + B[1]) / 2, mz = (A[2] + B[2]) / 2;
+                const int mx = (A[0] + B[0]) / 2, my = (A[1] + B[1]) / 2,
+                          mz = (A[2] + B[2]) / 2;
                 const int pmx = (A[0] + P[0]) / 2, pmy = (A[1] + P[1]) / 2,
                           pmz = (A[2] + P[2]) / 2;
                 const auto na = fn(A[0], A[1], A[2]);
@@ -446,17 +445,14 @@ void emit_transition_poly(MixedFillOutput& out, FineNodeFn&& fn, EdgeSplitFn&& e
 
 } // namespace
 
-MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
-                                   const Eigen::Vector3d& bbox_min,
-                                   const Eigen::Vector3d& bbox_max, double h, int skin_layers,
-                                   std::span<const geom::SharpEdge> features,
-                                   double feature_band,
-                                   std::span<const Eigen::Vector3d> curvature_seeds,
-                                   double seed_band, bool snap_boundary,
-                                   double curvature_turn_deg, bool native_poly_transitions,
-                                   const std::function<void()>& cancel_check,
-                                   const SizeFieldFn& size_field,
-                                   bool local_surface_classification) {
+MixedFillOutput
+mixed_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& bbox_min,
+                   const Eigen::Vector3d& bbox_max, double h, int skin_layers,
+                   std::span<const geom::SharpEdge> features, double feature_band,
+                   std::span<const Eigen::Vector3d> curvature_seeds, double seed_band,
+                   bool snap_boundary, double curvature_turn_deg, bool native_poly_transitions,
+                   const std::function<void()>& cancel_check, const SizeFieldFn& size_field,
+                   bool local_surface_classification) {
     if (!(h > 0.0) || !std::isfinite(h)) {
         throw ValidityError("mixed_fill_surface: h must be positive");
     }
@@ -489,8 +485,7 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
     // itself never advances globally.
     auto classification = classify_cells_feature_aware(
         surface, bbox_min, bbox_max, h_use, kHybridMaxCoarse,
-        /*relative_volume_tolerance=*/0.01,
-        local_surface_classification ? 1 : 0, size_field);
+        /*relative_volume_tolerance=*/0.01, local_surface_classification ? 1 : 0, size_field);
     const CartesianGrid& grid = classification.grid;
     const auto& inside = classification.inside;
     poll_cancel();
@@ -855,7 +850,8 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
             n_fine_cells += (is_fine[c] != 0);
             n_trans_cells += (is_transition[c] != 0);
         }
-        const long n_lattice_hex = 8 * n_fine_cells + (n_interior - n_fine_cells - n_trans_cells);
+        const long n_lattice_hex =
+            8 * n_fine_cells + (n_interior - n_fine_cells - n_trans_cells);
         const long est_graded =
             native_poly_transitions
                 ? n_lattice_hex + n_trans_cells
@@ -881,7 +877,6 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
             ++out.n_level0_cells;
         }
     }
-
 
     // Fine-index node map: I∈[0,2nx], J∈[0,2ny], K∈[0,2nz].
     std::map<std::array<int, 3>, std::uint32_t> node_ids;
@@ -976,10 +971,9 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                     // never entered boundary snapping and caused the apparent
                     // curved-fidelity regression on spheres and cones.
                     ++out.n_fine_cells;
-                    const auto child_mask =
-                        classification.child_inside_mask.empty()
-                            ? std::uint8_t{0xff}
-                            : classification.child_inside_mask[id];
+                    const auto child_mask = classification.child_inside_mask.empty()
+                                                ? std::uint8_t{0xff}
+                                                : classification.child_inside_mask[id];
                     for (int c = 0; c < 2; ++c) {
                         for (int b = 0; b < 2; ++b) {
                             for (int a = 0; a < 2; ++a) {
@@ -1230,9 +1224,8 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
     // Gated on the lattice already being mixed: a pure-hex lattice is kept as
     // hex8 by the caller (ADR-0013), and introducing the first pyramid here
     // would expand the whole mesh 6× for one cell.
-    const bool product_expand_follows =
-        !native_poly_transitions && out.n_hex > 0 &&
-        (out.n_pyramid > 0 || out.n_tet > 0 || out.n_poly > 0);
+    const bool product_expand_follows = !native_poly_transitions && out.n_hex > 0 &&
+                                        (out.n_pyramid > 0 || out.n_tet > 0 || out.n_poly > 0);
     if (product_expand_follows && !out.boundary_quads.empty()) {
         std::set<std::uint32_t> bnode_set;
         for (const auto& q : out.boundary_quads) {
@@ -1510,15 +1503,16 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                     double q = std::numeric_limits<double>::max();
                     for (const auto* cell : fit->second) {
                         if (cell->kind == MixedCellKind::kPyramid5) {
-                            q = std::min(
-                                q, validity::pyramid_split_shape_quality(
-                                       out.nodes[cell->nodes[0]], out.nodes[cell->nodes[1]],
-                                       out.nodes[cell->nodes[2]], out.nodes[cell->nodes[3]], a));
-                        } else {
-                            q = std::min(q, validity::tet_shape_quality(
+                            q = std::min(q, validity::pyramid_split_shape_quality(
                                                 out.nodes[cell->nodes[0]],
                                                 out.nodes[cell->nodes[1]],
-                                                out.nodes[cell->nodes[2]], a));
+                                                out.nodes[cell->nodes[2]],
+                                                out.nodes[cell->nodes[3]], a));
+                        } else {
+                            q = std::min(
+                                q, validity::tet_shape_quality(out.nodes[cell->nodes[0]],
+                                                               out.nodes[cell->nodes[1]],
+                                                               out.nodes[cell->nodes[2]], a));
                         }
                     }
                     return q;
@@ -1528,7 +1522,8 @@ MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
                     continue;
                 }
                 Eigen::Vector3d best;
-                if (search_fan_apex(lattice, ctr, worst_actual, q_current, shape_floor, best)) {
+                if (search_fan_apex(lattice, ctr, worst_actual, q_current, shape_floor,
+                                    best)) {
                     out.nodes[fan.apex] = best;
                 }
             }
@@ -1579,10 +1574,10 @@ std::size_t repair_mixed_fan_apices(MixedFillOutput& fill, double shape_floor) {
             double q = std::numeric_limits<double>::max();
             for (const auto* cell : fit->second) {
                 if (cell->kind == MixedCellKind::kPyramid5) {
-                    q = std::min(
-                        q, validity::pyramid_split_shape_quality(
-                               fill.nodes[cell->nodes[0]], fill.nodes[cell->nodes[1]],
-                               fill.nodes[cell->nodes[2]], fill.nodes[cell->nodes[3]], a));
+                    q = std::min(q, validity::pyramid_split_shape_quality(
+                                        fill.nodes[cell->nodes[0]], fill.nodes[cell->nodes[1]],
+                                        fill.nodes[cell->nodes[2]], fill.nodes[cell->nodes[3]],
+                                        a));
                 } else {
                     q = std::min(q, validity::tet_shape_quality(
                                         fill.nodes[cell->nodes[0]], fill.nodes[cell->nodes[1]],

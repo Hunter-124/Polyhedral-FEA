@@ -49,8 +49,8 @@ constexpr float kBtnPadX = 12.0f;
 constexpr float kBtnPadY = 6.0f;
 
 /// Draw label text centered in [min,max], clipped so it never spills the box.
-void draw_centered_label(ImDrawList* dl, const ImVec2& min, const ImVec2& max, const char* text,
-                         ImU32 col) {
+void draw_centered_label(ImDrawList* dl, const ImVec2& min, const ImVec2& max,
+                         const char* text, ImU32 col) {
     const ImVec2 tsize = ImGui::CalcTextSize(text);
     const float box_w = max.x - min.x;
     const float box_h = max.y - min.y;
@@ -64,7 +64,8 @@ void draw_centered_label(ImDrawList* dl, const ImVec2& min, const ImVec2& max, c
 int fit_selector_columns(const char* const* options, int count, float avail, float gap,
                          float pad_x) {
     for (int cols = count; cols >= 1; --cols) {
-        const float cell = (avail - gap * static_cast<float>(cols - 1)) / static_cast<float>(cols);
+        const float cell =
+            (avail - gap * static_cast<float>(cols - 1)) / static_cast<float>(cols);
         bool ok = true;
         for (int i = 0; i < count; ++i) {
             if (ImGui::CalcTextSize(options[i]).x + 2.0f * pad_x > cell + 0.5f) {
@@ -146,9 +147,9 @@ void end_group_box() {
     if (frame.fixed_content_h > 0.0f) {
         // Fixed-fill: outer Dummy already reserved full height; place cursor
         // after the box for the trailing gap.
-        ImGui::SetCursorScreenPos(ImVec2(
-            frame.start.x,
-            frame.start.y + kGroupHeader + 2.0f * kGroupPad + frame.fixed_content_h));
+        ImGui::SetCursorScreenPos(
+            ImVec2(frame.start.x,
+                   frame.start.y + kGroupHeader + 2.0f * kGroupPad + frame.fixed_content_h));
         ImGui::Dummy(ImVec2(frame.width, 0.0f));
     } else {
         // Auto-height: bottom padding inside the border.
@@ -165,8 +166,8 @@ void end_group_box() {
     // Draw chrome on the parent draw list (child is nested; outer group is parent).
     ImDrawList* dl = ImGui::GetWindowDrawList();
     // Header strip (covers the reserved Dummy only — content sits below it).
-    dl->AddRectFilled(box_min, ImVec2(box_max.x, box_min.y + kGroupHeader), u32(palette.header_bg),
-                      3.0f, ImDrawFlags_RoundCornersTop);
+    dl->AddRectFilled(box_min, ImVec2(box_max.x, box_min.y + kGroupHeader),
+                      u32(palette.header_bg), 3.0f, ImDrawFlags_RoundCornersTop);
     dl->AddRect(box_min, box_max, u32(palette.border), 3.0f);
     // 2px accent rule down the left of the header strip. Inset by 1px so the
     // border stays visible around it, and palette-driven so it reads correctly
@@ -242,7 +243,8 @@ bool slider_double(const char* label, double* value, double min, double max,
     const ImVec2 vsize = ImGui::CalcTextSize(value_text);
     const ImVec2 lsize = ImGui::CalcTextSize(label);
     // Clip label so it never runs into the value on the right.
-    dl->PushClipRect(pos, ImVec2(pos.x + width - vsize.x - 6.0f, pos.y + lsize.y + 2.0f), true);
+    dl->PushClipRect(pos, ImVec2(pos.x + width - vsize.x - 6.0f, pos.y + lsize.y + 2.0f),
+                     true);
     dl->AddText(pos, u32(palette.text_dim), label);
     dl->PopClipRect();
     dl->AddText(ImVec2(pos.x + width - vsize.x, pos.y), u32(palette.text_dim), value_text);
@@ -274,12 +276,10 @@ bool button(const char* label, const ImVec2& size, bool primary) {
     // size.x < 0 → fill item width (respects group-box PushItemWidth);
     // size.x == 0 → hug label; size.x > 0 → explicit.
     const float avail = fill_width();
-    const float width = size.x < 0.0f ? avail
-                        : size.x > 0.0f
-                            ? size.x
-                            : std::min(avail, label_size.x + 2.0f * kBtnPadX);
-    const float height =
-        size.y > 0.0f ? size.y : label_size.y + 2.0f * kBtnPadY;
+    const float width = size.x < 0.0f   ? avail
+                        : size.x > 0.0f ? size.x
+                                        : std::min(avail, label_size.x + 2.0f * kBtnPadX);
+    const float height = size.y > 0.0f ? size.y : label_size.y + 2.0f * kBtnPadY;
     const ImVec2 pos = ImGui::GetCursorScreenPos();
     const bool pressed = ImGui::InvisibleButton("##btn", ImVec2(width, height));
     const bool hovered = ImGui::IsItemHovered();
@@ -317,8 +317,7 @@ void begin_field(const char* label) {
     // Side-by-side relative to this row's start (not window origin — group boxes
     // indent via SetCursorScreenPos, so SameLine(offset) would misalign).
     const float row_start = ImGui::GetCursorPosX();
-    const float label_col =
-        std::clamp(text_w + kGap, avail * 0.38f, avail - kMinField);
+    const float label_col = std::clamp(text_w + kGap, avail * 0.38f, avail - kMinField);
     ImGui::AlignTextToFramePadding();
     ImGui::TextColored(palette.text_dim, "%s", label);
     ImGui::SameLine(0.0f, 0.0f);

@@ -109,8 +109,8 @@ HpShape hp_eval(ElementType type, std::uint8_t order, const Eigen::Vector3d& xi)
 /// canonical nodal order (4 rows tet, 8 rows hex). DOF layout matches the
 /// nodal convention: mode i owns local DOFs (3i, 3i+1, 3i+2). Throws FeaError
 /// on non-positive geometry Jacobian.
-Eigen::MatrixXd hp_element_stiffness(const Eigen::Matrix<double, Eigen::Dynamic, 3>& vertex_coords,
-                                     ElementType type, std::uint8_t order,
-                                     const Material& material);
+Eigen::MatrixXd
+hp_element_stiffness(const Eigen::Matrix<double, Eigen::Dynamic, 3>& vertex_coords,
+                     ElementType type, std::uint8_t order, const Material& material);
 
 } // namespace polymesh::fea

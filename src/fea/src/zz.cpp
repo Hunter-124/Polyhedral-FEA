@@ -239,8 +239,7 @@ ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
             const double scaled = basis_weights[i] / svd.singularValues()[i];
             extrapolation_gain2 += scaled * scaled;
         }
-        if (!(extrapolation_gain2 <=
-              kMaxExtrapolationGain * kMaxExtrapolationGain)) {
+        if (!(extrapolation_gain2 <= kMaxExtrapolationGain * kMaxExtrapolationGain)) {
             out.nodal_stress[nu] = mean_stress;
             continue;
         }

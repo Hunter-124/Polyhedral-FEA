@@ -638,7 +638,8 @@ void Viewport::set_model(const Model& model) {
     std::vector<Eigen::Vector3d> face_unit_n(tris.size());
     for (std::size_t t = 0; t < tris.size(); ++t) {
         const auto& tri = tris[t];
-        const Eigen::Vector3d an = (verts[tri[1]] - verts[tri[0]]).cross(verts[tri[2]] - verts[tri[0]]);
+        const Eigen::Vector3d an =
+            (verts[tri[1]] - verts[tri[0]]).cross(verts[tri[2]] - verts[tri[0]]);
         face_area_n[t] = an;
         const double nn = an.norm();
         face_unit_n[t] = nn > 1e-30 ? (an / nn).eval() : Eigen::Vector3d(0, 0, 1);
@@ -746,7 +747,7 @@ void Viewport::set_mesh(const VolumeMeshOutput& mesh_out) {
     }
 
     const auto surface = fea::tessellate_boundary_surface(mesh_out.mesh, 8);
-    std::vector<float> data;  // fill: pos3 + normal3 + rgba4
+    std::vector<float> data; // fill: pos3 + normal3 + rgba4
     data.reserve(surface.triangles.size() * 3 * 10);
     std::vector<float> edata; // edges: pos3 + rgba4
     edata.reserve(surface.triangles.size() * 6 * 7);
@@ -763,8 +764,7 @@ void Viewport::set_mesh(const VolumeMeshOutput& mesh_out) {
         mesh_bounds_.add(c);
         Eigen::Vector3d nrm = (b - a).cross(c - a);
         const double nn = nrm.norm();
-        nrm = nn > 1e-30 ? Eigen::Vector3d(nrm / nn)
-                         : Eigen::Vector3d::UnitZ();
+        nrm = nn > 1e-30 ? Eigen::Vector3d(nrm / nn) : Eigen::Vector3d::UnitZ();
 
         fea::ElementType type = fea::ElementType::kTet4;
         const auto source = surface.samples[tri[0]].source_nodes[0];
@@ -779,22 +779,19 @@ void Viewport::set_mesh(const VolumeMeshOutput& mesh_out) {
         rgb[1] *= shade;
         rgb[2] *= shade;
         const auto emit_fill = [&](const Eigen::Vector3d& p) {
-            data.insert(data.end(),
-                        {static_cast<float>(p.x()), static_cast<float>(p.y()),
-                         static_cast<float>(p.z()), static_cast<float>(nrm.x()),
-                         static_cast<float>(nrm.y()), static_cast<float>(nrm.z()),
-                         rgb[0], rgb[1], rgb[2], 1.0f});
+            data.insert(data.end(), {static_cast<float>(p.x()), static_cast<float>(p.y()),
+                                     static_cast<float>(p.z()), static_cast<float>(nrm.x()),
+                                     static_cast<float>(nrm.y()), static_cast<float>(nrm.z()),
+                                     rgb[0], rgb[1], rgb[2], 1.0f});
         };
         const auto emit_edge = [&](const Eigen::Vector3d& p) {
-            edata.insert(edata.end(),
-                         {static_cast<float>(p.x()), static_cast<float>(p.y()),
-                          static_cast<float>(p.z()), er, eg, eb, ea});
+            edata.insert(edata.end(), {static_cast<float>(p.x()), static_cast<float>(p.y()),
+                                       static_cast<float>(p.z()), er, eg, eb, ea});
         };
         emit_fill(a);
         emit_fill(b);
         emit_fill(c);
-        for (const auto& edge :
-             {std::pair{&a, &b}, std::pair{&b, &c}, std::pair{&c, &a}}) {
+        for (const auto& edge : {std::pair{&a, &b}, std::pair{&b, &c}, std::pair{&c, &a}}) {
             emit_edge(*edge.first);
             emit_edge(*edge.second);
         }
@@ -912,8 +909,7 @@ void Viewport::set_cinema_mesh(const fea::NodalMesh& mesh) {
             Eigen::Vector3d nrm = Eigen::Vector3d::Zero();
             for (std::size_t k = 0; k < n_face; ++k) {
                 const Eigen::Vector3d& p = mesh.nodes[loops.nodes[begin + k]];
-                const Eigen::Vector3d& q =
-                    mesh.nodes[loops.nodes[begin + (k + 1) % n_face]];
+                const Eigen::Vector3d& q = mesh.nodes[loops.nodes[begin + (k + 1) % n_face]];
                 nrm += p.cross(q);
             }
             const double nn = nrm.norm();
@@ -966,8 +962,7 @@ void Viewport::set_cinema_mesh(const fea::NodalMesh& mesh) {
             edata.insert(edata.end(),
                          {static_cast<float>(p.x()), static_cast<float>(p.y()),
                           static_cast<float>(p.z()), 0.02f, 0.02f, 0.04f, 1.0f,
-                          static_cast<float>(centroid.x()),
-                          static_cast<float>(centroid.y()),
+                          static_cast<float>(centroid.x()), static_cast<float>(centroid.y()),
                           static_cast<float>(centroid.z()), index_t});
         };
         for (const auto& [a, b] : edges) {
@@ -1004,26 +999,24 @@ void Viewport::set_result(const SolveResult& result) {
     result_scalar_u_.clear();
     result_scalar_eta_.clear();
     result_quads_.clear();
-    const auto surface =
-        polymesh::fea::tessellate_boundary_surface(result.volume_mesh, 8);
+    const auto surface = polymesh::fea::tessellate_boundary_surface(result.volume_mesh, 8);
     result_rest_.reserve(surface.samples.size());
     result_scalar_vm_.reserve(surface.samples.size());
     result_scalar_u_.reserve(surface.samples.size());
     result_scalar_eta_.reserve(surface.samples.size());
-    result_disp_ = Eigen::VectorXd::Zero(
-        3 * static_cast<Eigen::Index>(surface.samples.size()));
-    const auto interpolate_scalar =
-        [](const polymesh::fea::SurfaceSample& sample,
-           const std::vector<double>& values) {
-            double value = 0.0;
-            for (std::size_t i = 0; i < sample.count; ++i) {
-                const auto node = sample.source_nodes[i];
-                if (node < values.size()) {
-                    value += sample.weights[i] * values[node];
-                }
+    result_disp_ =
+        Eigen::VectorXd::Zero(3 * static_cast<Eigen::Index>(surface.samples.size()));
+    const auto interpolate_scalar = [](const polymesh::fea::SurfaceSample& sample,
+                                       const std::vector<double>& values) {
+        double value = 0.0;
+        for (std::size_t i = 0; i < sample.count; ++i) {
+            const auto node = sample.source_nodes[i];
+            if (node < values.size()) {
+                value += sample.weights[i] * values[node];
             }
-            return value;
-        };
+        }
+        return value;
+    };
     for (std::size_t si = 0; si < surface.samples.size(); ++si) {
         const auto& sample = surface.samples[si];
         result_rest_.push_back(sample.position);
@@ -1031,8 +1024,7 @@ void Viewport::set_result(const SolveResult& result) {
         result_scalar_u_.push_back(interpolate_scalar(sample, result.u_magnitude));
         result_scalar_eta_.push_back(interpolate_scalar(sample, result.nodal_eta));
         for (std::size_t i = 0; i < sample.count; ++i) {
-            const Eigen::Index base =
-                3 * static_cast<Eigen::Index>(sample.source_nodes[i]);
+            const Eigen::Index base = 3 * static_cast<Eigen::Index>(sample.source_nodes[i]);
             if (base + 2 < result.displacement.size()) {
                 result_disp_.segment<3>(3 * static_cast<Eigen::Index>(si)) +=
                     sample.weights[i] * result.displacement.segment<3>(base);
@@ -1187,8 +1179,8 @@ void Viewport::bake_result(DisplayMode mode, float deform_scale, float result_ma
     // Deformed wireframe edges (same scale as shaded surface).
     std::vector<Eigen::Vector3d> deformed(result_rest_.size());
     for (std::size_t i = 0; i < result_rest_.size(); ++i) {
-        deformed[i] =
-            result_rest_[i] + static_cast<double>(deform_scale) * disp_at(static_cast<std::uint32_t>(i));
+        deformed[i] = result_rest_[i] + static_cast<double>(deform_scale) *
+                                            disp_at(static_cast<std::uint32_t>(i));
     }
     upload_boundary_edges(deformed, result_quads_, 0.02f, 0.02f, 0.04f, 0.95f,
                           result_edge_vbo_, result_edge_vertex_count_);
@@ -1392,8 +1384,7 @@ void Viewport::draw_cinema(const Eigen::Matrix4f& view, const Eigen::Matrix4f& p
                            view.data());
         glUniformMatrix4fv(glGetUniformLocation(cinema_program_, "u_proj"), 1, GL_FALSE,
                            proj.data());
-        glUniform3f(glGetUniformLocation(cinema_program_, "u_eye"), eye.x(), eye.y(),
-                    eye.z());
+        glUniform3f(glGetUniformLocation(cinema_program_, "u_eye"), eye.x(), eye.y(), eye.z());
         glUniform1f(glGetUniformLocation(cinema_program_, "u_reveal"), reveal);
         glUniform1f(glGetUniformLocation(cinema_program_, "u_shrink"), shrink);
         glUniform1f(glGetUniformLocation(cinema_program_, "u_alpha"), mesh_alpha);

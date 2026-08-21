@@ -68,8 +68,7 @@ std::uint64_t ldlt_factor_nnz(std::uint64_t csr_nnz, Eigen::Index nfree) {
     // ratios and keeps growing instead of assuming constant fill.
     const double scale = std::max(4.0, 1.8 * std::cbrt(static_cast<double>(nfree) / 1000.0));
     const long double predicted = static_cast<long double>(csr_nnz) * scale;
-    const auto dense_lower =
-        sat_mul(index_as_u64(nfree), sat_add(index_as_u64(nfree), 1)) / 2;
+    const auto dense_lower = sat_mul(index_as_u64(nfree), sat_add(index_as_u64(nfree), 1)) / 2;
     if (predicted >= static_cast<long double>(dense_lower)) {
         return dense_lower;
     }
@@ -155,10 +154,10 @@ SolveResourceEstimate estimate_solve_resources(const NodalMesh& mesh, Eigen::Ind
                             sizeof(std::uint32_t)));
         const auto local_dof = sat_mul(3, nnode);
         connectivity_nnz = sat_add(connectivity_nnz, sat_mul(local_dof, local_dof));
-        out.cell_storage_bytes = sat_add(
-            out.cell_storage_bytes,
-            sat_mul(static_cast<std::uint64_t>(element.faces.capacity()),
-                    sizeof(std::vector<std::uint32_t>)));
+        out.cell_storage_bytes =
+            sat_add(out.cell_storage_bytes,
+                    sat_mul(static_cast<std::uint64_t>(element.faces.capacity()),
+                            sizeof(std::vector<std::uint32_t>)));
         for (const auto& face : element.faces) {
             out.cell_storage_bytes = sat_add(
                 out.cell_storage_bytes,
@@ -175,10 +174,8 @@ SolveResourceEstimate estimate_solve_resources(const NodalMesh& mesh, Eigen::Ind
     // At reduced-system construction the assembled global CSR, reduced
     // Triplet vector, and compressed K_ff coexist.  Eigen::Triplet<double>
     // stores one value and two default int indices (16 bytes on this ABI).
-    const auto reduced_triplets =
-        sat_mul(free_nnz, sizeof(double) + 2 * sizeof(int));
-    out.assembly_workspace_bytes =
-        sat_add(sat_add(global_csr, reduced_triplets), reduced_csr);
+    const auto reduced_triplets = sat_mul(free_nnz, sizeof(double) + 2 * sizeof(int));
+    out.assembly_workspace_bytes = sat_add(sat_add(global_csr, reduced_triplets), reduced_csr);
 
     const auto ndof_u = index_as_u64(out.ndof);
     const auto nfree_u = index_as_u64(out.nfree);
@@ -188,9 +185,8 @@ SolveResourceEstimate estimate_solve_resources(const NodalMesh& mesh, Eigen::Ind
                 sat_mul(nfree_u, 2 * sizeof(double)));
 
     const auto factor_nnz = ldlt_factor_nnz(free_nnz, out.nfree);
-    out.ldlt_factor_bytes =
-        sat_add(csr_bytes(factor_nnz, out.nfree),
-                sat_mul(nfree_u, sizeof(double) + 5 * sizeof(int)));
+    out.ldlt_factor_bytes = sat_add(csr_bytes(factor_nnz, out.nfree),
+                                    sat_mul(nfree_u, sizeof(double) + 5 * sizeof(int)));
 
     // IncompleteCholesky keeps approximately one triangular copy of the input;
     // uninterrupted PCG adds x, r, z, p, Ap, and one temporary solve vector.
@@ -229,13 +225,16 @@ std::string_view limiting_resource_term(const SolveResourceEstimate& estimate, b
 
 std::string format_memory_bytes(std::uint64_t bytes) {
     if (bytes >= kGiB) {
-        return std::format("{:.2f} GiB", static_cast<double>(bytes) / static_cast<double>(kGiB));
+        return std::format("{:.2f} GiB",
+                           static_cast<double>(bytes) / static_cast<double>(kGiB));
     }
     if (bytes >= (1ULL << 20)) {
-        return std::format("{:.1f} MiB", static_cast<double>(bytes) / static_cast<double>(1ULL << 20));
+        return std::format("{:.1f} MiB",
+                           static_cast<double>(bytes) / static_cast<double>(1ULL << 20));
     }
     if (bytes >= kKiB) {
-        return std::format("{:.1f} KiB", static_cast<double>(bytes) / static_cast<double>(kKiB));
+        return std::format("{:.1f} KiB",
+                           static_cast<double>(bytes) / static_cast<double>(kKiB));
     }
     return std::format("{} B", bytes);
 }

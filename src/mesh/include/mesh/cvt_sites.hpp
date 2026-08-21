@@ -40,9 +40,9 @@ struct ConstrainedSiteSeedResult {
 
 /// Seed CVT sites: **sharp** CAD edge samples as `fixed`, plus free interior
 /// lattice. Smooth and seam edges never become fixed protectors (ADR-0024).
-[[nodiscard]] ConstrainedSiteSeedResult seed_constrained_cvt_sites(
-    const ClipBox& domain, const geom::CadTopology* topo,
-    const ConstrainedSiteSeedParams& params = {});
+[[nodiscard]] ConstrainedSiteSeedResult
+seed_constrained_cvt_sites(const ClipBox& domain, const geom::CadTopology* topo,
+                           const ConstrainedSiteSeedParams& params = {});
 
 struct OccSiteProjectStats {
     std::size_t n_candidates = 0;
@@ -57,10 +57,10 @@ struct OccSiteProjectStats {
 /// the live BRep (M10). Sites closer than `sharp_guard` to a **sharp** CAD
 /// edge are left alone so fixed features stay authoritative.
 /// No-op without OCC / empty cad.
-[[nodiscard]] OccSiteProjectStats project_free_wall_sites(
-    const geom::CadModel& cad, const geom::CadTopology* topo,
-    const ClipBox& domain, std::vector<CvtSite>& sites, double wall_band,
-    double sharp_guard);
+[[nodiscard]] OccSiteProjectStats
+project_free_wall_sites(const geom::CadModel& cad, const geom::CadTopology* topo,
+                        const ClipBox& domain, std::vector<CvtSite>& sites, double wall_band,
+                        double sharp_guard);
 
 struct ConstrainedLloydParams {
     CvtLloydParams lloyd;
@@ -68,8 +68,8 @@ struct ConstrainedLloydParams {
     /// After each Lloyd iter (and once at end): project free wall sites.
     bool project_each_iter = false;
     bool project_final = true;
-    double wall_band_frac = 0.15;    // of domain diagonal
-    double sharp_guard_frac = 0.05;  // of domain diagonal
+    double wall_band_frac = 0.15;   // of domain diagonal
+    double sharp_guard_frac = 0.05; // of domain diagonal
 };
 
 struct ConstrainedLloydResult {
@@ -81,8 +81,9 @@ struct ConstrainedLloydResult {
 
 /// Full G3 pipeline: seed (sharp fixed + interior free) → Lloyd with ρ=1/h³ →
 /// optional OCC wall project of free sites.
-[[nodiscard]] ConstrainedLloydResult constrained_lloyd_cvt(
-    const ClipBox& domain, const geom::CadModel* cad,
-    const geom::CadTopology* topo, const ConstrainedLloydParams& params = {});
+[[nodiscard]] ConstrainedLloydResult
+constrained_lloyd_cvt(const ClipBox& domain, const geom::CadModel* cad,
+                      const geom::CadTopology* topo,
+                      const ConstrainedLloydParams& params = {});
 
-}  // namespace polymesh::mesh
+} // namespace polymesh::mesh

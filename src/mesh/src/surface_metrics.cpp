@@ -38,8 +38,7 @@ Eigen::Vector3d unit_or_z(const Eigen::Vector3d& d) {
 }
 
 /// Radial distance from axis and angle in plane orthogonal to axis.
-void cyl_coords(const Eigen::Vector3d& p, const CircularFeature& c, double& r,
-                double& theta) {
+void cyl_coords(const Eigen::Vector3d& p, const CircularFeature& c, double& r, double& theta) {
     const Eigen::Vector3d ax = unit_or_z(c.axis_dir);
     const Eigen::Vector3d d = p - c.axis_point;
     const Eigen::Vector3d radial = d - ax * d.dot(ax);
@@ -70,9 +69,8 @@ std::vector<std::uint32_t> free_face_nodes(const std::vector<FreeFace>& free_fac
 
 CurvedMeshMetrics evaluate_curved_mesh_quality(
     const geom::TriSurface& surface, const std::vector<Eigen::Vector3d>& nodes,
-    const std::vector<FreeFace>& free_faces, double h, double mesh_volume,
-    double ref_volume, const CircularFeature* circular,
-    const std::vector<std::array<std::uint32_t, 4>>* tets) {
+    const std::vector<FreeFace>& free_faces, double h, double mesh_volume, double ref_volume,
+    const CircularFeature* circular, const std::vector<std::array<std::uint32_t, 4>>* tets) {
     CurvedMeshMetrics m;
     if (nodes.empty() || !(h > 0.0) || !std::isfinite(h)) {
         return m;
@@ -134,8 +132,7 @@ CurvedMeshMetrics evaluate_curved_mesh_quality(
 
     if (circular != nullptr && circular->radius > 0.0 && std::isfinite(circular->radius)) {
         m.has_circular = true;
-        const double band =
-            (circular->select_band > 0.0) ? circular->select_band : 0.75 * h;
+        const double band = (circular->select_band > 0.0) ? circular->select_band : 0.75 * h;
         std::vector<double> thetas;
         thetas.reserve(bnodes.size());
         double max_rad_err = 0.0;
@@ -225,17 +222,16 @@ CurvedMeshMetrics evaluate_curved_mesh_quality(
                 continue;
             }
             for (std::size_t k = 0; k < nv; ++k) {
-                const double q = polygon_corner_quality(nodes[f[(k + nv - 1) % nv]], nodes[f[k]],
-                                                        nodes[f[(k + 1) % nv]], nv);
+                const double q = polygon_corner_quality(
+                    nodes[f[(k + nv - 1) % nv]], nodes[f[k]], nodes[f[(k + 1) % nv]], nv);
                 if (std::isfinite(q)) {
                     worst = std::min(worst, q);
                     ++n_corners_measured;
                 }
             }
         }
-        m.m6_min_boundary_aspect = (n_corners_measured > 0)
-                                       ? worst
-                                       : std::numeric_limits<double>::quiet_NaN();
+        m.m6_min_boundary_aspect =
+            (n_corners_measured > 0) ? worst : std::numeric_limits<double>::quiet_NaN();
         m.m6_from_free_faces = n_corners_measured > 0;
     }
 
@@ -246,8 +242,7 @@ CurvedMeshMetrics evaluate_curved_mesh_quality(
     const double s2 = 1.0 - clamp01(m.m2_max * inv_h);
     const double s3 = m.has_volume ? (1.0 - clamp01(m.m3_rel_volume_err)) : 1.0;
     const double s4 = m.has_circular ? (1.0 - clamp01(m.m4_radial_rel)) : 1.0;
-    const double s5 =
-        m.has_circular ? (1.0 - clamp01(m.m5_max_azimuth_gap / kPi)) : 1.0;
+    const double s5 = m.has_circular ? (1.0 - clamp01(m.m5_max_azimuth_gap / kPi)) : 1.0;
     const double s6 = m.has_tet_aspect ? clamp01(m.m6_min_boundary_aspect) : 1.0;
 
     double w1 = 0.12, w2 = 0.30, w3 = 0.12, w4 = 0.28, w5 = 0.10, w6 = 0.08;
@@ -264,8 +259,7 @@ CurvedMeshMetrics evaluate_curved_mesh_quality(
     }
     const double wsum = w1 + w2 + w3 + w4 + w5 + w6;
     if (wsum > 0.0) {
-        m.composite_score =
-            (w1 * s1 + w2 * s2 + w3 * s3 + w4 * s4 + w5 * s5 + w6 * s6) / wsum;
+        m.composite_score = (w1 * s1 + w2 * s2 + w3 * s3 + w4 * s4 + w5 * s5 + w6 * s6) / wsum;
     }
     return m;
 }

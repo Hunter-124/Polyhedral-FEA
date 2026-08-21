@@ -60,9 +60,8 @@ std::vector<Stress> recover_nodal_stress(const NodalMesh& mesh, const Material& 
     // Thread-local buffers then ordered merge — same averages as serial (double).
     // Pre-size outside the parallel region (no concurrent resize).
     const int nthreads = std::max(1, omp_get_max_threads());
-    std::vector<std::vector<Stress>> thr_stress(
-        static_cast<std::size_t>(nthreads),
-        std::vector<Stress>(n_nodes, Stress::Zero()));
+    std::vector<std::vector<Stress>> thr_stress(static_cast<std::size_t>(nthreads),
+                                                std::vector<Stress>(n_nodes, Stress::Zero()));
     std::vector<std::vector<int>> thr_hits(static_cast<std::size_t>(nthreads),
                                            std::vector<int>(n_nodes, 0));
 #pragma omp parallel
@@ -90,8 +89,7 @@ std::vector<Stress> recover_nodal_stress(const NodalMesh& mesh, const Material& 
             const auto ref = reference_nodes(element.type);
             Eigen::Matrix<double, Eigen::Dynamic, 3> x(element.nodes.size(), 3);
             for (std::size_t a = 0; a < element.nodes.size(); ++a) {
-                x.row(static_cast<Eigen::Index>(a)) =
-                    mesh.nodes[element.nodes[a]].transpose();
+                x.row(static_cast<Eigen::Index>(a)) = mesh.nodes[element.nodes[a]].transpose();
             }
             for (std::size_t a = 0; a < element.nodes.size(); ++a) {
                 const auto shape = eval_shape(element.type, ref[a]);
@@ -238,7 +236,8 @@ bool poly_vem_constant_strain(const NodalMesh& mesh, const NodalElement& element
         const Eigen::Vector3d ui =
             u.segment<3>(3 * static_cast<Eigen::Index>(element.nodes[i]));
         for (int c = 0; c < 3; ++c) {
-            const Eigen::Index row = static_cast<Eigen::Index>(3 * i + static_cast<std::size_t>(c));
+            const Eigen::Index row =
+                static_cast<Eigen::Index>(3 * i + static_cast<std::size_t>(c));
             A(row, 4 * c + 0) = 1.0;
             A(row, 4 * c + 1) = dx.x();
             A(row, 4 * c + 2) = dx.y();
@@ -257,17 +256,17 @@ bool poly_vem_constant_strain(const NodalMesh& mesh, const NodalElement& element
     eps[0] = gxx;
     eps[1] = gyy;
     eps[2] = gzz;
-    eps[3] = gyz + gzy;  // engineering shear γ_yz
-    eps[4] = gxz + gzx;  // γ_xz
-    eps[5] = gxy + gyx;  // γ_xy
+    eps[3] = gyz + gzy; // engineering shear γ_yz
+    eps[4] = gxz + gzx; // γ_xz
+    eps[5] = gxy + gyx; // γ_xy
     return true;
 }
 
-}  // namespace
+} // namespace
 
-std::vector<ElementCentroidStress>
-recover_element_centroid_stress(const NodalMesh& mesh, const Material& material,
-                                const Eigen::VectorXd& u) {
+std::vector<ElementCentroidStress> recover_element_centroid_stress(const NodalMesh& mesh,
+                                                                   const Material& material,
+                                                                   const Eigen::VectorXd& u) {
     const auto dmat = material.d_matrix();
     std::vector<ElementCentroidStress> out;
     out.reserve(mesh.elements.size());

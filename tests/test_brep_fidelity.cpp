@@ -50,10 +50,10 @@ constexpr char kCylinder[] = "tests/fixtures/parts/cylinder.step";
 std::vector<std::uint32_t> boundary_quadratic_mids(const polymesh::fea::NodalMesh& mesh) {
     std::set<std::uint32_t> mids;
     for (const auto& face : polymesh::fea::boundary_surface_faces(mesh)) {
-        const std::size_t n_corners =
-            (face.type == polymesh::fea::FaceType::kTri6)   ? 3
-            : (face.type == polymesh::fea::FaceType::kQuad8) ? 4
-                                                              : face.nodes.size();
+        const std::size_t n_corners = (face.type == polymesh::fea::FaceType::kTri6) ? 3
+                                      : (face.type == polymesh::fea::FaceType::kQuad8)
+                                          ? 4
+                                          : face.nodes.size();
         mids.insert(face.nodes.begin() + static_cast<std::ptrdiff_t>(n_corners),
                     face.nodes.end());
     }
@@ -74,8 +74,7 @@ std::array<std::uint32_t, 4> face_key(BoundaryQuad face) {
     return face;
 }
 
-std::vector<std::uint32_t>
-nodes_on_faces(std::span<const BoundaryQuad> faces) {
+std::vector<std::uint32_t> nodes_on_faces(std::span<const BoundaryQuad> faces) {
     std::set<std::uint32_t> nodes;
     for (const auto& face : faces) {
         nodes.insert(face.begin(), face.end());
@@ -183,8 +182,7 @@ TEST_CASE("geometry completeness guard rejects a synthetic aliased solid",
     REQUIRE(inspection.available);
     REQUIRE(inspection.volume > 0.0);
 
-    const auto exact =
-        polymesh::mesh::evaluate_geometry_completeness(cad, inspection.volume);
+    const auto exact = polymesh::mesh::evaluate_geometry_completeness(cad, inspection.volume);
     REQUIRE(exact.available);
     CHECK(exact.complete);
     CHECK(exact.relative_volume_error == Catch::Approx(0.0));
@@ -192,12 +190,10 @@ TEST_CASE("geometry completeness guard rejects a synthetic aliased solid",
     const double aliased_volume =
         inspection.volume *
         (1.0 + 2.0 * polymesh::mesh::kGeometryCompletenessRelVolumeTolerance);
-    const auto aliased =
-        polymesh::mesh::evaluate_geometry_completeness(cad, aliased_volume);
+    const auto aliased = polymesh::mesh::evaluate_geometry_completeness(cad, aliased_volume);
     REQUIRE(aliased.available);
     CHECK_FALSE(aliased.complete);
-    CHECK(aliased.relative_volume_error >
-          aliased.relative_volume_tolerance);
+    CHECK(aliased.relative_volume_error > aliased.relative_volume_tolerance);
 }
 
 TEST_CASE("solved geometry volume integrates quadratic boundary mids",
@@ -211,12 +207,11 @@ TEST_CASE("solved geometry volume integrates quadratic boundary mids",
     const auto model = polymesh::pipeline::Model::load(kUnitBox);
     polymesh::fea::NodalMesh mesh;
     mesh.nodes = {
-        {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0},
-        {0.5, 0.0, 0.0}, {0.5, 0.5, 0.0}, {0.0, 0.5, 0.0}, {0.0, 0.0, 0.5},
-        {0.5, 0.0, 0.5}, {0.0, 0.5, 0.5},
+        {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}, {0.5, 0.0, 0.0},
+        {0.5, 0.5, 0.0}, {0.0, 0.5, 0.0}, {0.0, 0.0, 0.5}, {0.5, 0.0, 0.5}, {0.0, 0.5, 0.5},
     };
-    mesh.elements.push_back({polymesh::fea::ElementType::kTet10,
-                             {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}});
+    mesh.elements.push_back(
+        {polymesh::fea::ElementType::kTet10, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}});
 
     const auto straight = polymesh::pipeline::measure_geometry_volume(model, mesh);
     REQUIRE(straight.available);
@@ -250,8 +245,7 @@ TEST_CASE("geometry volume policy retains degraded meshes and rejects egregious 
                              {1.0, 0.0, 0.0},
                              {0.0, 1.0, 0.0},
                              {0.0, 0.0, 6.0 * fraction * cad_volume}};
-        output.mesh.elements.push_back(
-            {polymesh::fea::ElementType::kTet4, {0, 1, 2, 3}});
+        output.mesh.elements.push_back({polymesh::fea::ElementType::kTet4, {0, 1, 2, 3}});
         return output;
     };
 
@@ -342,10 +336,8 @@ TEST_CASE("fidelity sample budget is honoured and still tracks the metric",
     const auto generous = summary_for(kSphere, 0.08, 16 * kTightBudget);
     REQUIRE(generous.available);
     CHECK(generous.n_samples > budgeted.n_samples);
-    CHECK(budgeted.chamfer_mean ==
-          Catch::Approx(generous.chamfer_mean).epsilon(0.35));
+    CHECK(budgeted.chamfer_mean == Catch::Approx(generous.chamfer_mean).epsilon(0.35));
 }
-
 
 TEST_CASE("brep_fidelity: quadratic plate-hole boundary mids lie on the exact BRep",
           "[cad][fidelity]") {
@@ -361,10 +353,9 @@ TEST_CASE("brep_fidelity: quadratic plate-hole boundary mids lie on the exact BR
     std::size_t total_pre_outliers = 0;
     for (const double h_rel : {0.12, 0.10}) {
         const double h = h_rel * (model.bbox_max - model.bbox_min).norm();
-        const auto vol =
-            polymesh::pipeline::volume_mesh(model, h,
-                                            polymesh::pipeline::VolumeMesher::kHybrid,
-                                            /*skin_layers=*/2, /*feature_refine=*/true);
+        const auto vol = polymesh::pipeline::volume_mesh(
+            model, h, polymesh::pipeline::VolumeMesher::kHybrid,
+            /*skin_layers=*/2, /*feature_refine=*/true);
         auto quadratic = polymesh::fea::promote_to_quadratic(vol.mesh);
         const auto mids = boundary_quadratic_mids(quadratic);
         REQUIRE_FALSE(mids.empty());
@@ -401,9 +392,8 @@ TEST_CASE("brep_fidelity: quadratic plate-hole boundary mids lie on the exact BR
                                                              &provenance));
         std::vector<std::uint32_t> reverted;
         std::vector<std::uint32_t> partial;
-        const std::size_t projected =
-            polymesh::pipeline::project_quadratic_boundary_mids(
-                quadratic, *model.cad, &projection, h, &reverted, &partial);
+        const std::size_t projected = polymesh::pipeline::project_quadratic_boundary_mids(
+            quadratic, *model.cad, &projection, h, &reverted, &partial);
         const std::set<std::uint32_t> reverted_set(reverted.begin(), reverted.end());
         const std::set<std::uint32_t> partial_set(partial.begin(), partial.end());
         REQUIRE(reverted_set.size() == reverted.size());
@@ -446,8 +436,7 @@ TEST_CASE("brep_fidelity: quadratic plate-hole boundary mids lie on the exact BR
         }
 
         const std::size_t limited_count = partial.size() + reverted.size();
-        const std::size_t limited_limit =
-            std::max<std::size_t>(8, (mids.size() + 99) / 100);
+        const std::size_t limited_limit = std::max<std::size_t>(8, (mids.size() + 99) / 100);
         CAPTURE(h_rel, mids.size(), pre_outliers, post_outliers.size(), projected,
                 partial.size(), reverted.size(), limited_limit, post_max, full_max,
                 partial_max, reverted_max);
@@ -622,8 +611,7 @@ TEST_CASE("brep_fidelity: auto h keeps curved geometry inside the DOF ceiling",
 // same snap/projection path, the worst local p99/max is .0273/.0273 (icecream)
 // and the worst original p99/max remains 1.6e-15/2.0e-15. Keep those surfaces
 // on their old 0.10/0.25 rails and independently cap the harder local subset.
-TEST_CASE("brep_fidelity: hybrid curved boundary survey stays bounded",
-          "[cad][fidelity]") {
+TEST_CASE("brep_fidelity: hybrid curved boundary survey stays bounded", "[cad][fidelity]") {
     if (!polymesh::geom::occ_enabled()) {
         SKIP("OpenCASCADE disabled");
     }
@@ -663,10 +651,8 @@ TEST_CASE("brep_fidelity: hybrid curved boundary survey stays bounded",
                 CHECK_FALSE(e.solved_stage);
                 CHECK(e.assessment.available);
                 const bool expected_guard =
-                    std::string(e.what()).find("feature unresolved") !=
-                        std::string::npos ||
-                    e.assessment.relative_error >
-                        polymesh::pipeline::kGeometryVolumeHardLimit;
+                    std::string(e.what()).find("feature unresolved") != std::string::npos ||
+                    e.assessment.relative_error > polymesh::pipeline::kGeometryVolumeHardLimit;
                 CHECK(expected_guard);
                 continue;
             }
@@ -676,8 +662,7 @@ TEST_CASE("brep_fidelity: hybrid curved boundary survey stays bounded",
             const auto local_nodes = nodes_on_faces(vol.local_child_boundary_quads);
             REQUIRE_FALSE(nodes.empty());
             REQUIRE_FALSE(original_nodes.empty());
-            const auto residual =
-                exact_residuals_over_h(*model.cad, vol.mesh.nodes, nodes, h);
+            const auto residual = exact_residuals_over_h(*model.cad, vol.mesh.nodes, nodes, h);
             const auto original_residual =
                 exact_residuals_over_h(*model.cad, vol.mesh.nodes, original_nodes, h);
             const auto local_residual =
@@ -687,9 +672,9 @@ TEST_CASE("brep_fidelity: hybrid curved boundary survey stays bounded",
             REQUIRE(local_residual.count == local_nodes.size());
             CHECK(local_residual.max <= 0.06);
             CHECK(local_residual.p99 <= 0.06);
-            CAPTURE(part.name, h_rel, residual.max, residual.p99,
-                    original_residual.max, original_residual.p99,
-                    local_residual.max, local_residual.p99, vol.mesher_note);
+            CAPTURE(part.name, h_rel, residual.max, residual.p99, original_residual.max,
+                    original_residual.p99, local_residual.max, local_residual.p99,
+                    vol.mesher_note);
             CHECK(original_residual.max <= 0.25);
             CHECK(original_residual.p99 <= 0.10);
             CHECK(residual.max <= 0.25);
@@ -796,7 +781,8 @@ TEST_CASE("sharp BRep edges are reproduced by mesh feature segments",
             /*feature_refine=*/true);
         const auto quads = polymesh::fea::extract_boundary_faces(vol.mesh);
         const std::vector<polymesh::mesh::FreeFace> faces(quads.begin(), quads.end());
-        const auto segments = polymesh::mesh::mesh_dihedral_feature_segments(vol.mesh.nodes, faces);
+        const auto segments =
+            polymesh::mesh::mesh_dihedral_feature_segments(vol.mesh.nodes, faces);
         const auto fidelity = polymesh::mesh::evaluate_brep_geometry_fidelity(
             *model.cad, vol.mesh.nodes, faces, segments, kH, 0.0);
         REQUIRE(fidelity.available);

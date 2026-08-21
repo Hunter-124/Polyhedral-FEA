@@ -43,9 +43,9 @@ TEST_CASE("hp-driver: curved boundary (high h*kappa) prefers h over p") {
 
     // Turning angle: h·κ = 0.1 * 5.0 = 0.5 rad ≈ 28.6° > 15° → geometry gate.
     auto s = base_signal();
-    s.kappa = 5.0;     // 1/m
+    s.kappa = 5.0; // 1/m
     s.eta = 0.8;
-    s.surplus = 0.9;   // would look "smooth" if geometry did not gate
+    s.surplus = 0.9; // would look "smooth" if geometry did not gate
     s.p = 1;
 
     const auto d = adapt::decide_element(s, policy, /*max_eta=*/1.0);
@@ -138,9 +138,9 @@ TEST_CASE("hp-driver: shape fitness flips mesher tendency (poly over hex)") {
 
     // For nonsmooth-h: surplus ratio 0.05/0.3 ≈ 0.17, nonsmooth high → might pick h.
     // Lower eta-driven nonsmooth by reducing eta and raising awkwardness via fits.
-    // Actually cost_h=8, benefit_h = eta * nonsmooth^2; cost_shape=3.5, benefit_shape = awkward*eta
-    // nonsmooth ≈ 1, benefit_h ≈ 0.3, u_h ≈ 0.0375
-    // awkward ≈ 0.9-0.15=0.75, benefit_s ≈ 0.225, u_s ≈ 0.064 → shape wins
+    // Actually cost_h=8, benefit_h = eta * nonsmooth^2; cost_shape=3.5, benefit_shape =
+    // awkward*eta nonsmooth ≈ 1, benefit_h ≈ 0.3, u_h ≈ 0.0375 awkward ≈ 0.9-0.15=0.75,
+    // benefit_s ≈ 0.225, u_s ≈ 0.064 → shape wins
 
     const auto d = adapt::decide_element(s, policy, 1.0);
     // If h still wins on this signal, use a mesh vote that clearly prefers poly.
@@ -269,8 +269,7 @@ TEST_CASE("hp-driver: make_hp_signals broadcasts scalar h and estimates surplus"
     const std::vector<double> eta{0.1, 1.0};
     const std::vector<int> p{1};
 
-    const auto sigs =
-        adapt::make_hp_signals(h, kappa, thick, eta, /*surplus=*/{}, p);
+    const auto sigs = adapt::make_hp_signals(h, kappa, thick, eta, /*surplus=*/{}, p);
     REQUIRE(sigs.size() == 2);
     CHECK(sigs[0].h == Catch::Approx(0.2));
     CHECK(sigs[1].h == Catch::Approx(0.2));

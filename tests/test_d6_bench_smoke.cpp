@@ -48,8 +48,8 @@ std::string temp_out_path(const char* name) {
 TEST_CASE("D6 run_tier3.py --help exits 0") {
     // Working directory is repo root (catch_discover_tests WORKING_DIRECTORY).
     const std::string out_path = temp_out_path("polymesh_d6_help.txt");
-    const std::string cmd =
-        std::string(python_exe()) + " bench/d6/run_tier3.py --help > \"" + out_path + "\" 2>&1";
+    const std::string cmd = std::string(python_exe()) + " bench/d6/run_tier3.py --help > \"" +
+                            out_path + "\" 2>&1";
     const int rc = run_cmd(cmd);
     REQUIRE(rc == 0);
     const auto out = slurp(out_path);
@@ -60,9 +60,8 @@ TEST_CASE("D6 run_tier3.py --help exits 0") {
 
 TEST_CASE("D6 run_tier3.py --dry-run prints artifact paths") {
     const std::string out_path = temp_out_path("polymesh_d6_dry.txt");
-    const std::string cmd =
-        std::string(python_exe()) + " bench/d6/run_tier3.py --dry-run > \"" + out_path +
-        "\" 2>&1";
+    const std::string cmd = std::string(python_exe()) +
+                            " bench/d6/run_tier3.py --dry-run > \"" + out_path + "\" 2>&1";
     const int rc = run_cmd(cmd);
     REQUIRE(rc == 0);
     const auto out = slurp(out_path);

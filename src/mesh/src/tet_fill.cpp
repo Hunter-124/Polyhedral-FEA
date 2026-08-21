@@ -87,7 +87,7 @@ std::vector<FreeTetFace> free_tet_faces(std::span<const std::array<std::uint32_t
 
 // Spatial hash of tet bounding boxes on a cubic grid of pitch `cell`.
 class TetGrid {
-public:
+  public:
     TetGrid(std::span<const Eigen::Vector3d> nodes,
             std::span<const std::array<std::uint32_t, 4>> tets, double cell)
         : nodes_(nodes), tets_(tets), cell_(cell) {
@@ -136,7 +136,7 @@ public:
         return SIZE_MAX;
     }
 
-private:
+  private:
     std::array<long long, 3> key_of(const Eigen::Vector3d& p) const {
         return {static_cast<long long>(std::floor(p.x() / cell_)),
                 static_cast<long long>(std::floor(p.y() / cell_)),
@@ -148,7 +148,8 @@ private:
         };
         return (u(i) << 42) | (u(j) << 21) | u(k);
     }
-    bool strictly_inside(const Eigen::Vector3d& p, const std::array<std::uint32_t, 4>& t) const {
+    bool strictly_inside(const Eigen::Vector3d& p,
+                         const std::array<std::uint32_t, 4>& t) const {
         const Eigen::Vector3d& a = nodes_[t[0]];
         const double v = tet_signed_volume_impl(a, nodes_[t[1]], nodes_[t[2]], nodes_[t[3]]);
         if (!(v > 0.0)) {
@@ -553,9 +554,8 @@ TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
         // degree of freedom a fully-boundary stair cell has left.
         const auto reproject = [&](std::uint32_t ni, const Eigen::Vector3d& p) {
             if (fit == nullptr || fit->projection == nullptr) {
-                return mirror_unfold(mirror,
-                                     closest_on_surface(surface, mirror_fold(mirror, p)).point,
-                                     p);
+                return mirror_unfold(
+                    mirror, closest_on_surface(surface, mirror_fold(mirror, p)).point, p);
             }
             const auto target =
                 boundary_projection_target(surface, p, ni, fit->projection, mirror);
@@ -684,8 +684,7 @@ TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
                                 group.clear();
                                 break;
                             }
-                            if (std::find(group.begin(), group.end(), other) ==
-                                group.end()) {
+                            if (std::find(group.begin(), group.end(), other) == group.end()) {
                                 group.push_back(other);
                             }
                         }
@@ -729,8 +728,8 @@ TetFillOutput tet_fill_surface(const geom::TriSurface& surface,
                 surface, out.nodes, bnodes, h_snap, collect_offenders,
                 /*max_move_frac=*/exact ? 1.25 : 0.75, /*passes=*/exact ? 6 : 4,
                 /*feature_edges=*/{}, /*repair_interior=*/{}, node_offends,
-                /*defer_coupled=*/false, exact ? fit->projection : nullptr,
-                relax_neighborhood, mirror);
+                /*defer_coupled=*/false, exact ? fit->projection : nullptr, relax_neighborhood,
+                mirror);
         };
         out.snap = run_snap();
         if (exact) {

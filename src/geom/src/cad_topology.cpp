@@ -139,8 +139,7 @@ double kappa_at_t(const CadEdge& ce, double t) {
 }
 
 std::optional<ClosestEdgeQuery> closest_edge_impl(const CadTopology& topo,
-                                                  const Eigen::Vector3d& p,
-                                                  bool sharp_only) {
+                                                  const Eigen::Vector3d& p, bool sharp_only) {
     if (topo.edges.empty()) {
         return std::nullopt;
     }
@@ -217,10 +216,8 @@ double dihedral_from_normals(const gp_Vec& n1, const gp_Vec& n2) {
     return kPi - std::acos(c);
 }
 
-void classify_edges(const TopoDS_Shape& shape,
-                    const TopTools_IndexedMapOfShape& emap,
-                    const std::map<int, std::uint32_t>& emap_to_id,
-                    CadTopology& topo) {
+void classify_edges(const TopoDS_Shape& shape, const TopTools_IndexedMapOfShape& emap,
+                    const std::map<int, std::uint32_t>& emap_to_id, CadTopology& topo) {
     TopTools_IndexedDataMapOfShapeListOfShape edge_faces;
     TopExp::MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, edge_faces);
 
@@ -287,8 +284,7 @@ void classify_edges(const TopoDS_Shape& shape,
 
         gp_Vec n0;
         gp_Vec n1;
-        if (!face_normal_at_edge_mid(f0, e, n0) ||
-            !face_normal_at_edge_mid(f1, e, n1)) {
+        if (!face_normal_at_edge_mid(f0, e, n0) || !face_normal_at_edge_mid(f1, e, n1)) {
             // Fallback: treat as sharp if normals unavailable.
             ce.feature = CadEdgeFeature::kSharp;
             ce.dihedral_rad = 0.0;
@@ -582,8 +578,7 @@ std::optional<ClosestEdgeQuery> closest_edge(const CadTopology& topo,
     return closest_edge_impl(topo, p, /*sharp_only=*/false);
 }
 
-std::optional<ClosestEdgeQuery> closest_edge(const CadTopology& topo,
-                                             const Eigen::Vector3d& p,
+std::optional<ClosestEdgeQuery> closest_edge(const CadTopology& topo, const Eigen::Vector3d& p,
                                              bool sharp_only) {
     return closest_edge_impl(topo, p, sharp_only);
 }
@@ -611,9 +606,9 @@ double edge_profile_hausdorff_filtered(const CadTopology& topo,
     return any ? max_d : 0.0;
 }
 
-ChordalEdgeMetrics chordal_edge_metrics_segments(
-    const CadTopology& topo, const std::vector<MeshEdgeSegment>& segs,
-    bool sharp_edges_only) {
+ChordalEdgeMetrics chordal_edge_metrics_segments(const CadTopology& topo,
+                                                 const std::vector<MeshEdgeSegment>& segs,
+                                                 bool sharp_edges_only) {
     ChordalEdgeMetrics out;
     if (segs.empty() || topo.edges.empty()) {
         return out;
@@ -649,10 +644,10 @@ ChordalEdgeMetrics chordal_edge_metrics_segments(
     return out;
 }
 
-ChordalEdgeMetrics chordal_edge_metrics(
-    const CadTopology& topo,
-    const std::vector<Eigen::Vector3d>& mesh_feature_polyline, double h,
-    bool sharp_edges_only) {
+ChordalEdgeMetrics
+chordal_edge_metrics(const CadTopology& topo,
+                     const std::vector<Eigen::Vector3d>& mesh_feature_polyline, double h,
+                     bool sharp_edges_only) {
     ChordalEdgeMetrics out;
     if (mesh_feature_polyline.size() < 2 || topo.edges.empty()) {
         return out;
@@ -660,7 +655,8 @@ ChordalEdgeMetrics chordal_edge_metrics(
     std::vector<MeshEdgeSegment> segs;
     segs.reserve(mesh_feature_polyline.size() - 1);
     for (std::size_t i = 1; i < mesh_feature_polyline.size(); ++i) {
-        segs.push_back(MeshEdgeSegment{mesh_feature_polyline[i - 1], mesh_feature_polyline[i]});
+        segs.push_back(
+            MeshEdgeSegment{mesh_feature_polyline[i - 1], mesh_feature_polyline[i]});
     }
     out = chordal_edge_metrics_segments(topo, segs, sharp_edges_only);
     // Scorecard compatibility: normalize residual by mesh size h.

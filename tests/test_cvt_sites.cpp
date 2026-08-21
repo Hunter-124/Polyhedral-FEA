@@ -15,9 +15,9 @@
 
 using Catch::Approx;
 using polymesh::mesh::ClipBox;
+using polymesh::mesh::constrained_lloyd_cvt;
 using polymesh::mesh::ConstrainedLloydParams;
 using polymesh::mesh::ConstrainedSiteSeedParams;
-using polymesh::mesh::constrained_lloyd_cvt;
 using polymesh::mesh::geogram_available;
 using polymesh::mesh::seed_constrained_cvt_sites;
 
@@ -52,7 +52,7 @@ polymesh::geom::CadTopology make_synthetic_topo() {
     return topo;
 }
 
-}  // namespace
+} // namespace
 
 TEST_CASE("seed_constrained_cvt_sites fixes sharp only", "[cvt][g3]") {
     ClipBox box;
@@ -90,7 +90,7 @@ TEST_CASE("constrained_lloyd keeps sharp sites fixed", "[cvt][g3]") {
     ConstrainedLloydParams p;
     p.seed.interior_n_side = 2;
     p.lloyd.max_iters = 8;
-    p.project_final = false;  // no CAD
+    p.project_final = false; // no CAD
 
     const auto result = constrained_lloyd_cvt(box, nullptr, &topo, p);
     REQUIRE(result.lloyd_stats.geogram_ok);
@@ -110,8 +110,7 @@ TEST_CASE("constrained_lloyd keeps sharp sites fixed", "[cvt][g3]") {
     REQUIRE(checked == 3);
 }
 
-TEST_CASE("OCC project free wall sites on cube STEP when available",
-          "[cvt][g3][occ]") {
+TEST_CASE("OCC project free wall sites on cube STEP when available", "[cvt][g3][occ]") {
     if (!geogram_available()) {
         SKIP("POLYMESH_WITH_GEOGRAM is OFF");
     }
@@ -149,7 +148,7 @@ TEST_CASE("OCC project free wall sites on cube STEP when available",
     p.seed.interior_n_side = 2;
     p.lloyd.max_iters = 4;
     p.project_final = true;
-    p.wall_band_frac = 0.5;  // generous so some free sites hit the wall band
+    p.wall_band_frac = 0.5; // generous so some free sites hit the wall band
 
     const auto result = constrained_lloyd_cvt(box, &cad, &topo, p);
     REQUIRE(result.lloyd_stats.geogram_ok);

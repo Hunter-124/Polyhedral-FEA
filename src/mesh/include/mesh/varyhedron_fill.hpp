@@ -11,8 +11,8 @@
 #include "geom/cad_topology.hpp"
 #include "geom/features.hpp"
 #include "geom/tri_surface.hpp"
-#include "mesh/tet_fill.hpp"
 #include "mesh/surface_project.hpp"
+#include "mesh/tet_fill.hpp"
 
 #include <Eigen/Core>
 

@@ -22,17 +22,16 @@ namespace {
 // bounded greedy LZ77 match search. Deterministic by construction — the same
 // pixels always produce the same bytes.
 
-constexpr std::uint16_t kLenBase[29] = {3,  4,  5,  6,   7,   8,   9,   10,  11,  13,
-                                        15, 17, 19, 23,  27,  31,  35,  43,  51,  59,
+constexpr std::uint16_t kLenBase[29] = {3,  4,  5,  6,   7,   8,   9,   10,  11, 13,
+                                        15, 17, 19, 23,  27,  31,  35,  43,  51, 59,
                                         67, 83, 99, 115, 131, 163, 195, 227, 258};
 constexpr std::uint8_t kLenExtra[29] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2,
-                                       2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0};
-constexpr std::uint16_t kDistBase[30] = {1,    2,    3,    4,    5,    7,     9,    13,
-                                         17,   25,   33,   49,   65,   97,    129,  193,
-                                         257,  385,  513,  769,  1025, 1537,  2049, 3073,
-                                         4097, 6145, 8193, 12289, 16385, 24577};
-constexpr std::uint8_t kDistExtra[30] = {0, 0, 0, 0, 1, 1, 2,  2,  3,  3,  4,  4,  5,  5,  6,
-                                        6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13};
+                                        2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0};
+constexpr std::uint16_t kDistBase[30] = {
+    1,   2,   3,   4,   5,   7,    9,    13,   17,   25,   33,   49,   65,    97,    129,
+    193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577};
+constexpr std::uint8_t kDistExtra[30] = {0, 0, 0, 0, 1, 1, 2, 2,  3,  3,  4,  4,  5,  5,  6,
+                                         6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13};
 
 class BitWriter {
   public:
@@ -164,8 +163,8 @@ std::vector<std::uint8_t> zlib_deflate(const std::vector<std::uint8_t>& data) {
             }
             // Insert this position (and, for a match, the positions it covers)
             // so later matches can still find them.
-            const std::size_t insert_end = std::min(i + std::max<std::size_t>(best_len, 1),
-                                                    data.size() - kMinMatch + 1);
+            const std::size_t insert_end =
+                std::min(i + std::max<std::size_t>(best_len, 1), data.size() - kMinMatch + 1);
             for (std::size_t k = i; k < insert_end; ++k) {
                 const std::int32_t kh = hash_at(k);
                 prev[k] = head[static_cast<std::size_t>(kh)];
@@ -242,10 +241,9 @@ Basis make_basis(double azimuth_deg, double elevation_deg) {
     const double yaw = azimuth_deg * kDegToRad;
     const double pitch = std::clamp(elevation_deg * kDegToRad, -1.55, 1.55);
     Basis basis;
-    basis.eye_dir =
-        Eigen::Vector3d(std::cos(pitch) * std::cos(yaw), std::cos(pitch) * std::sin(yaw),
-                        std::sin(pitch))
-            .normalized();
+    basis.eye_dir = Eigen::Vector3d(std::cos(pitch) * std::cos(yaw),
+                                    std::cos(pitch) * std::sin(yaw), std::sin(pitch))
+                        .normalized();
     const Eigen::Vector3d forward = -basis.eye_dir;
     const Eigen::Vector3d world_up(0.0, 0.0, 1.0);
     Eigen::Vector3d right = forward.cross(world_up);
@@ -289,10 +287,9 @@ void fill_background(Image& image) {
     constexpr std::array<double, 3> kTop{0.106, 0.125, 0.157};
     for (int y = 0; y < image.height; ++y) {
         // t = 0 at the bottom row, matching the GUI background shader.
-        const double t = image.height > 1
-                             ? 1.0 - static_cast<double>(y) /
-                                         static_cast<double>(image.height - 1)
-                             : 0.5;
+        const double t = image.height > 1 ? 1.0 - static_cast<double>(y) /
+                                                      static_cast<double>(image.height - 1)
+                                          : 0.5;
         std::array<double, 3> rgb{};
         for (int c = 0; c < 3; ++c) {
             const double s = t > 0.5 ? (t - 0.5) * 2.0 : t * 2.0;
@@ -303,10 +300,10 @@ void fill_background(Image& image) {
                               kMid[static_cast<std::size_t>(c)] * s;
         }
         for (int x = 0; x < image.width; ++x) {
-            const std::size_t o = (static_cast<std::size_t>(y) *
-                                       static_cast<std::size_t>(image.width) +
-                                   static_cast<std::size_t>(x)) *
-                                  3;
+            const std::size_t o =
+                (static_cast<std::size_t>(y) * static_cast<std::size_t>(image.width) +
+                 static_cast<std::size_t>(x)) *
+                3;
             image.rgb[o + 0] = to_byte(rgb[0]);
             image.rgb[o + 1] = to_byte(rgb[1]);
             image.rgb[o + 2] = to_byte(rgb[2]);
@@ -336,8 +333,8 @@ NormalDeviation summarize(std::vector<double>& degrees) {
         sum += d;
     }
     out.mean = sum / static_cast<double>(degrees.size());
-    const std::size_t p99_index = static_cast<std::size_t>(
-        std::llround(0.99 * static_cast<double>(degrees.size() - 1)));
+    const std::size_t p99_index =
+        static_cast<std::size_t>(std::llround(0.99 * static_cast<double>(degrees.size() - 1)));
     out.p99 = degrees[p99_index];
     out.max = degrees.back();
     return out;
@@ -362,13 +359,12 @@ double angle_between_deg(const Eigen::Vector3d& a, const Eigen::Vector3d& b) {
 } // namespace
 
 SurfaceRender render_surface(const fea::NodalMesh& mesh,
-                            const fea::SurfaceTessellation& surface,
-                            const RenderView& view) {
+                             const fea::SurfaceTessellation& surface, const RenderView& view) {
     SurfaceRender out;
     out.image.width = std::max(view.width, 1);
     out.image.height = std::max(view.height, 1);
-    const std::size_t pixels = static_cast<std::size_t>(out.image.width) *
-                               static_cast<std::size_t>(out.image.height);
+    const std::size_t pixels =
+        static_cast<std::size_t>(out.image.width) * static_cast<std::size_t>(out.image.height);
     out.image.rgb.assign(pixels * 3, 0);
     fill_background(out.image);
     if (surface.triangles.empty() || surface.samples.empty()) {
@@ -438,7 +434,8 @@ SurfaceRender render_surface(const fea::NodalMesh& mesh,
         const Eigen::Vector3d& s0 = screen[tri[0]];
         const Eigen::Vector3d& s1 = screen[tri[1]];
         const Eigen::Vector3d& s2 = screen[tri[2]];
-        const double area = (s1[0] - s0[0]) * (s2[1] - s0[1]) - (s2[0] - s0[0]) * (s1[1] - s0[1]);
+        const double area =
+            (s1[0] - s0[0]) * (s2[1] - s0[1]) - (s2[0] - s0[0]) * (s1[1] - s0[1]);
         if (std::abs(area) < 1e-12) {
             continue;
         }
@@ -476,20 +473,20 @@ SurfaceRender render_surface(const fea::NodalMesh& mesh,
             const double py = static_cast<double>(y) + 0.5;
             for (int x = x0; x <= x1; ++x) {
                 const double px = static_cast<double>(x) + 0.5;
-                const double w1 = ((px - s0[0]) * (s2[1] - s0[1]) -
-                                   (s2[0] - s0[0]) * (py - s0[1])) *
-                                  inv_area;
-                const double w2 = ((s1[0] - s0[0]) * (py - s0[1]) -
-                                   (px - s0[0]) * (s1[1] - s0[1])) *
-                                  inv_area;
+                const double w1 =
+                    ((px - s0[0]) * (s2[1] - s0[1]) - (s2[0] - s0[0]) * (py - s0[1])) *
+                    inv_area;
+                const double w2 =
+                    ((s1[0] - s0[0]) * (py - s0[1]) - (px - s0[0]) * (s1[1] - s0[1])) *
+                    inv_area;
                 const double w0 = 1.0 - w1 - w2;
                 if (w0 < 0.0 || w1 < 0.0 || w2 < 0.0) {
                     continue;
                 }
                 const double z = w0 * s0[2] + w1 * s1[2] + w2 * s2[2];
-                const std::size_t index = static_cast<std::size_t>(y) *
-                                              static_cast<std::size_t>(out.image.width) +
-                                          static_cast<std::size_t>(x);
+                const std::size_t index =
+                    static_cast<std::size_t>(y) * static_cast<std::size_t>(out.image.width) +
+                    static_cast<std::size_t>(x);
                 if (z <= zbuffer[index]) {
                     continue;
                 }
@@ -523,14 +520,13 @@ SurfaceRender render_surface(const fea::NodalMesh& mesh,
             int error = dx + dy;
             for (int step = 0;; ++step) {
                 if (ax >= 0 && ay >= 0 && ax < out.image.width && ay < out.image.height) {
-                    const double t = steps > 0 ? static_cast<double>(step) /
-                                                     static_cast<double>(steps)
-                                               : 0.0;
+                    const double t =
+                        steps > 0 ? static_cast<double>(step) / static_cast<double>(steps)
+                                  : 0.0;
                     const double z = a[2] + (b[2] - a[2]) * t;
-                    const std::size_t index =
-                        static_cast<std::size_t>(ay) *
-                            static_cast<std::size_t>(out.image.width) +
-                        static_cast<std::size_t>(ax);
+                    const std::size_t index = static_cast<std::size_t>(ay) *
+                                                  static_cast<std::size_t>(out.image.width) +
+                                              static_cast<std::size_t>(ax);
                     if (z + bias >= zbuffer[index]) {
                         put(index, kEdge);
                     }
@@ -565,8 +561,8 @@ SurfaceRender render_surface(const fea::NodalMesh& mesh,
 }
 
 NormalDeviation exact_facet_normal_deviation(const geom::CadModel& cad,
-                                            const fea::SurfaceTessellation& surface,
-                                            std::size_t max_samples) {
+                                             const fea::SurfaceTessellation& surface,
+                                             std::size_t max_samples) {
     if (cad.empty() || surface.triangles.empty()) {
         return {};
     }
@@ -579,10 +575,10 @@ NormalDeviation exact_facet_normal_deviation(const geom::CadModel& cad,
         if (normal.squaredNorm() < 0.5) {
             continue; // degenerate facet: no orientation to compare
         }
-        const Eigen::Vector3d centroid = (surface.samples[tri[0]].position +
-                                          surface.samples[tri[1]].position +
-                                          surface.samples[tri[2]].position) /
-                                         3.0;
+        const Eigen::Vector3d centroid =
+            (surface.samples[tri[0]].position + surface.samples[tri[1]].position +
+             surface.samples[tri[2]].position) /
+            3.0;
         const auto projected = geom::project_point_on_surface(cad, centroid);
         if (!projected || projected->normal.squaredNorm() < 0.5) {
             continue;
@@ -607,10 +603,10 @@ NormalDeviation tessellated_facet_normal_deviation(const geom::TriSurface& refer
         if (normal.squaredNorm() < 0.5) {
             continue;
         }
-        const Eigen::Vector3d centroid = (surface.samples[tri[0]].position +
-                                          surface.samples[tri[1]].position +
-                                          surface.samples[tri[2]].position) /
-                                         3.0;
+        const Eigen::Vector3d centroid =
+            (surface.samples[tri[0]].position + surface.samples[tri[1]].position +
+             surface.samples[tri[2]].position) /
+            3.0;
         const auto closest = mesh::closest_on_surface(reference, centroid);
         const auto& ref_tri = reference.triangles[closest.triangle];
         const Eigen::Vector3d ref_normal =

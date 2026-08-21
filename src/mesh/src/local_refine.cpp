@@ -377,9 +377,8 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
                 // Folded, so a mid-edge node and its mirror image land on
                 // mirrored surface points even though the tessellation they are
                 // landing on is not itself mirror-symmetric (ADR-0036 §7).
-                mid = mirror_unfold(mirror,
-                                    closest_on_surface(*surface, mirror_fold(mirror, mid)).point,
-                                    mid);
+                mid = mirror_unfold(
+                    mirror, closest_on_surface(*surface, mirror_fold(mirror, mid)).point, mid);
                 ++local_stats.n_surface_mids;
             }
             const std::uint32_t mid_id = it->second;
@@ -391,7 +390,8 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
                 free_edges.insert(make_edge(e.second, mid_id));
                 std::vector<FreeFaceKey> hit;
                 for (const auto& fk : free_faces) {
-                    const bool has_a = (fk[0] == e.first || fk[1] == e.first || fk[2] == e.first);
+                    const bool has_a =
+                        (fk[0] == e.first || fk[1] == e.first || fk[2] == e.first);
                     const bool has_b =
                         (fk[0] == e.second || fk[1] == e.second || fk[2] == e.second);
                     if (has_a && has_b) {
@@ -426,7 +426,8 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
         // Prefer lowest remaining index among still-live tets.
         std::size_t seed = static_cast<std::size_t>(-1);
         for (const auto m : remaining) {
-            if (m < alive.size() && alive[m] && (seed == static_cast<std::size_t>(-1) || m < seed)) {
+            if (m < alive.size() && alive[m] &&
+                (seed == static_cast<std::size_t>(-1) || m < seed)) {
                 seed = m;
             }
         }

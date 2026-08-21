@@ -103,7 +103,7 @@ struct SnapStats {
     std::size_t n_moved = 0;
     std::size_t n_unsnapped = 0;
     std::size_t n_relax_rescued = 0; // projections saved by interior relaxation
-    double max_residual = 0.0; // metres, after snap/unsnap
+    double max_residual = 0.0;       // metres, after snap/unsnap
 };
 
 /// Collect every node that participates in an invalid element. Used for the
@@ -162,7 +162,6 @@ MirrorKeyFrame mirror_key_frame(const std::vector<Eigen::Vector3d>& nodes);
 void sort_mirror_canonical(const std::vector<Eigen::Vector3d>& nodes,
                            std::vector<std::uint32_t>& ids);
 
-
 /// Pull boundary lattice nodes toward the STL in multi-pass steps, then unsnap
 /// any node that participates in an inverted element (B3 / ADR-0015).
 ///
@@ -180,16 +179,14 @@ void sort_mirror_canonical(const std::vector<Eigen::Vector3d>& nodes,
 /// @param mirror Optional verified reflection symmetry: every projection,
 ///        closest-point and feature-capture query is answered in the canonical
 ///        octant and reflected back, so mirrored nodes snap to mirrored targets.
-SnapStats
-snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d>& nodes,
-                    const std::vector<std::uint32_t>& boundary_nodes, double h,
-                    const CollectOffendersFn& collect_offenders, double max_move_frac = 0.75,
-                    int passes = 4, std::span<const geom::SharpEdge> feature_edges = {},
-                    const RepairInteriorFn& repair_interior = {},
-                    const NodeOffendsFn& node_offends = {}, bool defer_coupled = false,
-                    BoundaryProjectionContext* projection = nullptr,
-                    const RelaxNeighborhoodFn& relax_neighborhood = {},
-                    const MirrorFrame* mirror = nullptr);
+SnapStats snap_boundary_nodes(
+    const geom::TriSurface& surface, std::vector<Eigen::Vector3d>& nodes,
+    const std::vector<std::uint32_t>& boundary_nodes, double h,
+    const CollectOffendersFn& collect_offenders, double max_move_frac = 0.75, int passes = 4,
+    std::span<const geom::SharpEdge> feature_edges = {},
+    const RepairInteriorFn& repair_interior = {}, const NodeOffendsFn& node_offends = {},
+    bool defer_coupled = false, BoundaryProjectionContext* projection = nullptr,
+    const RelaxNeighborhoodFn& relax_neighborhood = {}, const MirrorFrame* mirror = nullptr);
 
 /// Result of a tangential boundary smoothing pass.
 struct SmoothStats {

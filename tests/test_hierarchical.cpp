@@ -24,8 +24,9 @@ double legendre(int n, double x) {
     }
     double a = 1.0, b = x;
     for (int k = 1; k < n; ++k) {
-        const double c = (static_cast<double>(2 * k + 1) * x * b - static_cast<double>(k) * a) /
-                         static_cast<double>(k + 1);
+        const double c =
+            (static_cast<double>(2 * k + 1) * x * b - static_cast<double>(k) * a) /
+            static_cast<double>(k + 1);
         a = b;
         b = c;
     }

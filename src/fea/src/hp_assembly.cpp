@@ -35,23 +35,15 @@ constexpr std::array<std::array<int, 2>, 12> kHexE{{{0, 1},
                                                     {3, 7}}};
 // Hex face corners in local (s,t) order: origin (s,t)=(-1,-1), +s, +s+t, +t.
 // Matches hierarchical kHexF vary0/vary1 convention.
-constexpr std::array<std::array<int, 4>, 6> kHexFaceV{{{0, 1, 2, 3},
-                                                       {4, 5, 6, 7},
-                                                       {0, 1, 5, 4},
-                                                       {3, 2, 6, 7},
-                                                       {0, 3, 7, 4},
-                                                       {1, 2, 6, 5}}};
+constexpr std::array<std::array<int, 4>, 6> kHexFaceV{
+    {{0, 1, 2, 3}, {4, 5, 6, 7}, {0, 1, 5, 4}, {3, 2, 6, 7}, {0, 3, 7, 4}, {1, 2, 6, 5}}};
 constexpr std::array<std::array<int, 2>, 6> kTetE{
     {{0, 1}, {1, 2}, {0, 2}, {0, 3}, {1, 3}, {2, 3}}};
 constexpr std::array<std::array<int, 3>, 4> kTetF{
     {{0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}}};
 
-bool is_hex(ElementType t) {
-    return t == ElementType::kHex8 || t == ElementType::kHex20;
-}
-bool is_tet(ElementType t) {
-    return t == ElementType::kTet4 || t == ElementType::kTet10;
-}
+bool is_hex(ElementType t) { return t == ElementType::kHex8 || t == ElementType::kHex20; }
+bool is_tet(ElementType t) { return t == ElementType::kTet4 || t == ElementType::kTet10; }
 
 using EdgeKey = std::pair<std::uint32_t, std::uint32_t>;
 EdgeKey edge_key(std::uint32_t a, std::uint32_t b) {
@@ -72,7 +64,8 @@ TriKey tri_key(std::uint32_t a, std::uint32_t b, std::uint32_t c) {
 
 Eigen::Matrix<double, Eigen::Dynamic, 3> vertex_coords(const HpModel& model,
                                                        const HpElementDef& e) {
-    Eigen::Matrix<double, Eigen::Dynamic, 3> x(static_cast<Eigen::Index>(e.vertices.size()), 3);
+    Eigen::Matrix<double, Eigen::Dynamic, 3> x(static_cast<Eigen::Index>(e.vertices.size()),
+                                               3);
     for (std::size_t v = 0; v < e.vertices.size(); ++v) {
         x.row(static_cast<Eigen::Index>(v)) = model.nodes[e.vertices[v]].transpose();
     }
@@ -80,18 +73,17 @@ Eigen::Matrix<double, Eigen::Dynamic, 3> vertex_coords(const HpModel& model,
 }
 
 EdgeKey elem_edge(const HpElementDef& e, int local_edge) {
-    const auto& tab =
-        is_hex(e.type) ? kHexE[static_cast<std::size_t>(local_edge)]
-                       : kTetE[static_cast<std::size_t>(local_edge)];
+    const auto& tab = is_hex(e.type) ? kHexE[static_cast<std::size_t>(local_edge)]
+                                     : kTetE[static_cast<std::size_t>(local_edge)];
     return edge_key(e.vertices[static_cast<std::size_t>(tab[0])],
                     e.vertices[static_cast<std::size_t>(tab[1])]);
 }
 
 // Local edge endpoints as (start, end) in the element's edge table order.
-std::pair<std::uint32_t, std::uint32_t> elem_edge_oriented(const HpElementDef& e, int local_edge) {
-    const auto& tab =
-        is_hex(e.type) ? kHexE[static_cast<std::size_t>(local_edge)]
-                       : kTetE[static_cast<std::size_t>(local_edge)];
+std::pair<std::uint32_t, std::uint32_t> elem_edge_oriented(const HpElementDef& e,
+                                                           int local_edge) {
+    const auto& tab = is_hex(e.type) ? kHexE[static_cast<std::size_t>(local_edge)]
+                                     : kTetE[static_cast<std::size_t>(local_edge)];
     return {e.vertices[static_cast<std::size_t>(tab[0])],
             e.vertices[static_cast<std::size_t>(tab[1])]};
 }
@@ -136,34 +128,20 @@ struct TriKeyHash {
 };
 
 // Number of edge modes at entity order pe (>=0; 0 if pe < 2).
-int n_edge_modes(int pe) {
-    return pe >= 2 ? pe - 1 : 0;
-}
+int n_edge_modes(int pe) { return pe >= 2 ? pe - 1 : 0; }
 // Hex face modes at entity order pf: (pf-1)^2 tensor bubbles (indices 2..pf).
-int n_hex_face_modes(int pf) {
-    return pf >= 2 ? (pf - 1) * (pf - 1) : 0;
-}
+int n_hex_face_modes(int pf) { return pf >= 2 ? (pf - 1) * (pf - 1) : 0; }
 // Tet face modes at entity order pf: (pf-1)(pf-2)/2.
-int n_tet_face_modes(int pf) {
-    return pf >= 3 ? (pf - 1) * (pf - 2) / 2 : 0;
-}
+int n_tet_face_modes(int pf) { return pf >= 3 ? (pf - 1) * (pf - 2) / 2 : 0; }
 // Hex interior modes at element order p: (p-1)^3.
-int n_hex_interior(int p) {
-    return p >= 2 ? (p - 1) * (p - 1) * (p - 1) : 0;
-}
+int n_hex_interior(int p) { return p >= 2 ? (p - 1) * (p - 1) * (p - 1) : 0; }
 // Tet interior modes at element order p: (p-1)(p-2)(p-3)/6.
-int n_tet_interior(int p) {
-    return p >= 4 ? (p - 1) * (p - 2) * (p - 3) / 6 : 0;
-}
+int n_tet_interior(int p) { return p >= 4 ? (p - 1) * (p - 2) * (p - 3) / 6 : 0; }
 
 // Slot of edge mode of polynomial order k (k=2..pe) within the edge block.
-int edge_slot(int k) {
-    return k - 2;
-}
+int edge_slot(int k) { return k - 2; }
 // Slot of hex face mode (i,j) with i,j in 2..pf within the face block.
-int hex_face_slot(int i, int j, int pf) {
-    return (i - 2) * (pf - 1) + (j - 2);
-}
+int hex_face_slot(int i, int j, int pf) { return (i - 2) * (pf - 1) + (j - 2); }
 
 // Dihedral orientation of a hex face: local (s,t) vs global (S,T).
 // Global frame: origin = min-id vertex; +S toward the adjacent corner with
@@ -178,9 +156,10 @@ struct FaceOrient {
 FaceOrient hex_face_orient(const HpElementDef& e, int local_face) {
     const auto& q = kHexFaceV[static_cast<std::size_t>(local_face)];
     // Local corners: 0=(-1,-1), 1=(+1,-1), 2=(+1,+1), 3=(-1,+1)
-    const std::array<std::uint32_t, 4> id{
-        e.vertices[static_cast<std::size_t>(q[0])], e.vertices[static_cast<std::size_t>(q[1])],
-        e.vertices[static_cast<std::size_t>(q[2])], e.vertices[static_cast<std::size_t>(q[3])]};
+    const std::array<std::uint32_t, 4> id{e.vertices[static_cast<std::size_t>(q[0])],
+                                          e.vertices[static_cast<std::size_t>(q[1])],
+                                          e.vertices[static_cast<std::size_t>(q[2])],
+                                          e.vertices[static_cast<std::size_t>(q[3])]};
     const std::array<double, 4> s{-1, 1, 1, -1};
     const std::array<double, 4> t{-1, -1, 1, 1};
     // Neighbour pairs on the face cycle: 0-1, 1-2, 2-3, 3-0.
@@ -235,7 +214,8 @@ FaceOrient hex_face_orient(const HpElementDef& e, int local_face) {
 
 // Map local hex face mode (i,j) through FaceOrient to global (i',j') and sign.
 // phi_i(s) phi_j(t) with s = e0 * U, t = e1 * V where {U,V} is {S,T} possibly swapped.
-void map_hex_face_mode(int i, int j, const FaceOrient& o, int& i_out, int& j_out, double& sign) {
+void map_hex_face_mode(int i, int j, const FaceOrient& o, int& i_out, int& j_out,
+                       double& sign) {
     // s = sign0 * (swap ? T : S), t = sign1 * (swap ? S : T)
     // phi_i(s) = phi_i(sign0 * X) = (sign0 < 0 ? (-1)^i : 1) phi_i(X)
     const double si = (o.sign0 < 0 && (i % 2 == 1)) ? -1.0 : 1.0;
@@ -320,7 +300,7 @@ void map_tet_face_mode(int n1, int n2, const std::array<std::uint32_t, 3>& local
     // lB-lA at A: -1; at B: +1; at C: 0  (same pattern relative to A,B,C)
     //
     // If local a maps to global A (ord[0]==0), b->B (ord[1]==1), c->C: identity.
-    // Generally: vertex local i has global role r where ord[r]==i... 
+    // Generally: vertex local i has global role r where ord[r]==i...
     // role_of_local[i] = position of i in ord.
     int role[3];
     for (int r = 0; r < 3; ++r) {
@@ -421,9 +401,7 @@ void map_tet_face_mode(int n1, int n2, const std::array<std::uint32_t, 3>& local
     sign = 1.0;
 }
 
-int max_order_for_type(ElementType t) {
-    return is_hex(t) ? 6 : 4;
-}
+int max_order_for_type(ElementType t) { return is_hex(t) ? 6 : 4; }
 
 } // namespace
 
@@ -671,8 +649,7 @@ HpSystem assemble_hp(const HpModel& model, const Material& material) {
                     // Interior ordered i,j,k each in 2..p (same as build_hex).
                     const int p = e.order;
                     const int i = mode.index0, j = mode.index1, k = mode.index2;
-                    const int slot =
-                        ((i - 2) * (p - 1) + (j - 2)) * (p - 1) + (k - 2);
+                    const int slot = ((i - 2) * (p - 1) + (j - 2)) * (p - 1) + (k - 2);
                     g[m] = interior_base[ei] + slot;
                 } else {
                     // Tet interior slot: same enumeration as build_tet.
@@ -714,7 +691,8 @@ HpSystem assemble_hp(const HpModel& model, const Material& material) {
                 }
                 const Eigen::Index ga = g[static_cast<std::size_t>(a)];
                 const Eigen::Index gb = g[static_cast<std::size_t>(b)];
-                const double sab = sg[static_cast<std::size_t>(a)] * sg[static_cast<std::size_t>(b)];
+                const double sab =
+                    sg[static_cast<std::size_t>(a)] * sg[static_cast<std::size_t>(b)];
                 for (int i = 0; i < 3; ++i) {
                     for (int j = 0; j < 3; ++j) {
                         triplets.emplace_back(3 * ga + i, 3 * gb + j,
@@ -849,7 +827,8 @@ double hp_energy_error(const HpModel& model, const HpSystem& system, const Eigen
             const double det = jac.determinant();
             const Eigen::Matrix3d jac_inv = jac.inverse();
             const auto field = hp_eval(e.type, e.order, qp.xi);
-            const Eigen::Matrix<double, Eigen::Dynamic, 3> dndx = field.dn * jac_inv.transpose();
+            const Eigen::Matrix<double, Eigen::Dynamic, 3> dndx =
+                field.dn * jac_inv.transpose();
             Eigen::Matrix<double, 6, 1> eps_h = Eigen::Matrix<double, 6, 1>::Zero();
             for (Eigen::Index m = 0; m < nm; ++m) {
                 const double dx = dndx(m, 0), dy = dndx(m, 1), dz = dndx(m, 2);

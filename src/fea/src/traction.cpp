@@ -130,8 +130,7 @@ const std::vector<FaceQp>& face_rule(FaceType type) {
     }();
     // 3x3 Gauss on [-1,1]^2; weights sum to 4, that domain's area.
     static const std::vector<FaceQp> quad = [] {
-        static constexpr std::array<double, 3> x{-0.7745966692414834, 0.0,
-                                                 0.7745966692414834};
+        static constexpr std::array<double, 3> x{-0.7745966692414834, 0.0, 0.7745966692414834};
         static constexpr std::array<double, 3> w{5.0 / 9.0, 8.0 / 9.0, 5.0 / 9.0};
         std::vector<FaceQp> rule;
         rule.reserve(9);
@@ -167,8 +166,7 @@ struct RefTriangle {
 std::span<const RefTriangle> reference_triangles(FaceType type) {
     static constexpr std::array<RefTriangle, 1> kTri{{{{0.0, 0.0}, {1.0, 0.0}, {0.0, 1.0}}}};
     static constexpr std::array<RefTriangle, 2> kQuad{
-        {{{-1.0, -1.0}, {1.0, -1.0}, {1.0, 1.0}},
-         {{-1.0, -1.0}, {1.0, 1.0}, {-1.0, 1.0}}}};
+        {{{-1.0, -1.0}, {1.0, -1.0}, {1.0, 1.0}}, {{-1.0, -1.0}, {1.0, 1.0}, {-1.0, 1.0}}}};
     if (type == FaceType::kTri3 || type == FaceType::kTri6) {
         return kTri;
     }
@@ -250,8 +248,7 @@ void emit_polygon_rule(const ClipPoly& poly, std::vector<FaceQp>& out) {
         const ClipVertex& p0 = poly.v[0];
         const ClipVertex& p1 = poly.v[static_cast<std::size_t>(i)];
         const ClipVertex& p2 = poly.v[static_cast<std::size_t>(i + 1)];
-        const double cross =
-            (p1.u - p0.u) * (p2.v - p0.v) - (p2.u - p0.u) * (p1.v - p0.v);
+        const double cross = (p1.u - p0.u) * (p2.v - p0.v) - (p2.u - p0.u) * (p1.v - p0.v);
         const double scale = std::abs(cross);
         if (!(scale > 0.0)) {
             continue;
@@ -396,9 +393,18 @@ std::map<std::pair<std::uint32_t, std::uint32_t>, std::uint32_t>
 quadratic_edge_mids(const NodalMesh& mesh) {
     static constexpr std::array<std::array<int, 2>, 6> kTetEdges{
         {{0, 1}, {1, 2}, {0, 2}, {0, 3}, {1, 3}, {2, 3}}};
-    static constexpr std::array<std::array<int, 2>, 12> kHexEdges{
-        {{0, 1}, {1, 2}, {2, 3}, {3, 0}, {4, 5}, {5, 6}, {6, 7}, {7, 4}, {0, 4}, {1, 5},
-         {2, 6}, {3, 7}}};
+    static constexpr std::array<std::array<int, 2>, 12> kHexEdges{{{0, 1},
+                                                                   {1, 2},
+                                                                   {2, 3},
+                                                                   {3, 0},
+                                                                   {4, 5},
+                                                                   {5, 6},
+                                                                   {6, 7},
+                                                                   {7, 4},
+                                                                   {0, 4},
+                                                                   {1, 5},
+                                                                   {2, 6},
+                                                                   {3, 7}}};
     std::map<std::pair<std::uint32_t, std::uint32_t>, std::uint32_t> mids;
     for (const auto& el : mesh.elements) {
         const bool tet10 = el.type == ElementType::kTet10;
@@ -518,8 +524,9 @@ std::vector<SurfaceFace> boundary_surface_faces(const NodalMesh& mesh) {
             mid_nodes.reserve(n_edges);
             for (std::size_t e = 0; e < n_edges; ++e) {
                 const auto& ep = tri ? kTriFaceEdges[e] : kQuadFaceEdges[e];
-                const auto it = mids.find(std::minmax(f.nodes[static_cast<std::size_t>(ep[0])],
-                                                      f.nodes[static_cast<std::size_t>(ep[1])]));
+                const auto it =
+                    mids.find(std::minmax(f.nodes[static_cast<std::size_t>(ep[0])],
+                                          f.nodes[static_cast<std::size_t>(ep[1])]));
                 if (it == mids.end()) {
                     mid_nodes.clear();
                     break;
@@ -536,8 +543,7 @@ std::vector<SurfaceFace> boundary_surface_faces(const NodalMesh& mesh) {
     return out;
 }
 
-SurfaceTessellation tessellate_boundary_surface(const NodalMesh& mesh,
-                                                int subdivisions) {
+SurfaceTessellation tessellate_boundary_surface(const NodalMesh& mesh, int subdivisions) {
     subdivisions = std::clamp(subdivisions, 1, 16);
     SurfaceTessellation out;
     const auto faces = boundary_surface_faces(mesh);
@@ -555,32 +561,30 @@ SurfaceTessellation tessellate_boundary_surface(const NodalMesh& mesh,
     };
 
     for (const auto& face : faces) {
-        const bool quadratic =
-            face.type == FaceType::kTri6 || face.type == FaceType::kQuad8;
+        const bool quadratic = face.type == FaceType::kTri6 || face.type == FaceType::kQuad8;
         const int n = quadratic ? subdivisions : 1;
         if (face.type == FaceType::kTri3 || face.type == FaceType::kTri6) {
-            std::vector<std::vector<std::uint32_t>> grid(
-                static_cast<std::size_t>(n + 1));
+            std::vector<std::vector<std::uint32_t>> grid(static_cast<std::size_t>(n + 1));
             for (int i = 0; i <= n; ++i) {
                 auto& row = grid[static_cast<std::size_t>(i)];
                 row.reserve(static_cast<std::size_t>(n - i + 1));
                 for (int j = 0; j <= n - i; ++j) {
-                    row.push_back(sample(face, static_cast<double>(i) / n,
-                                         static_cast<double>(j) / n));
+                    row.push_back(
+                        sample(face, static_cast<double>(i) / n, static_cast<double>(j) / n));
                 }
             }
             for (int i = 0; i < n; ++i) {
                 for (int j = 0; j < n - i; ++j) {
-                    const auto a = grid[static_cast<std::size_t>(i)]
-                                      [static_cast<std::size_t>(j)];
-                    const auto b = grid[static_cast<std::size_t>(i + 1)]
-                                      [static_cast<std::size_t>(j)];
-                    const auto c = grid[static_cast<std::size_t>(i)]
-                                      [static_cast<std::size_t>(j + 1)];
+                    const auto a =
+                        grid[static_cast<std::size_t>(i)][static_cast<std::size_t>(j)];
+                    const auto b =
+                        grid[static_cast<std::size_t>(i + 1)][static_cast<std::size_t>(j)];
+                    const auto c =
+                        grid[static_cast<std::size_t>(i)][static_cast<std::size_t>(j + 1)];
                     out.triangles.push_back({a, b, c});
                     if (j + 1 < n - i) {
                         const auto d = grid[static_cast<std::size_t>(i + 1)]
-                                          [static_cast<std::size_t>(j + 1)];
+                                           [static_cast<std::size_t>(j + 1)];
                         out.triangles.push_back({b, d, c});
                     }
                 }
@@ -618,9 +622,8 @@ Eigen::Vector3d surface_face_normal(const NodalMesh& mesh, const SurfaceFace& fa
     if (face.nodes.size() < 3) {
         return Eigen::Vector3d::Zero();
     }
-    const std::size_t n_corner = (face.type == FaceType::kQuad4 || face.type == FaceType::kQuad8)
-                                     ? 4u
-                                     : 3u;
+    const std::size_t n_corner =
+        (face.type == FaceType::kQuad4 || face.type == FaceType::kQuad8) ? 4u : 3u;
     // Newell's method over the corner loop: robust for non-planar quads.
     Eigen::Vector3d n = Eigen::Vector3d::Zero();
     for (std::size_t a = 0; a < n_corner; ++a) {
@@ -690,8 +693,8 @@ std::vector<SurfaceFace> faces_touching(const NodalMesh& mesh,
                                         const LoadRegion& region) {
     std::vector<SurfaceFace> out;
     for (const auto& f : faces) {
-        Eigen::Vector3d lo = Eigen::Vector3d::Constant(
-            std::numeric_limits<double>::infinity());
+        Eigen::Vector3d lo =
+            Eigen::Vector3d::Constant(std::numeric_limits<double>::infinity());
         Eigen::Vector3d hi = -lo;
         for (const auto n : f.nodes) {
             const Eigen::Vector3d& p = mesh.nodes[n];

@@ -12,12 +12,12 @@
 #include <BRepGProp.hxx>
 #include <Bnd_Box.hxx>
 #include <GProp_GProps.hxx>
+#include <Standard_Failure.hxx>
 #include <TopAbs_ShapeEnum.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Face.hxx>
 #include <TopoDS_Shape.hxx>
-#include <Standard_Failure.hxx>
 
 namespace polymesh::geom {
 
@@ -212,9 +212,7 @@ GeometryDescriptors compute_geometry_descriptors(const CadModel& model) {
 
 namespace polymesh::geom {
 
-GeometryDescriptors compute_geometry_descriptors(const CadModel&) {
-    return {};
-}
+GeometryDescriptors compute_geometry_descriptors(const CadModel&) { return {}; }
 
 } // namespace polymesh::geom
 

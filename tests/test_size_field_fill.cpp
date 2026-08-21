@@ -26,7 +26,8 @@ using polymesh::mesh::SizeFieldFn;
 bool same_node_bytes(const std::vector<Eigen::Vector3d>& a,
                      const std::vector<Eigen::Vector3d>& b) {
     return a.size() == b.size() &&
-           (a.empty() || std::memcmp(a.data(), b.data(), a.size() * sizeof(Eigen::Vector3d)) == 0);
+           (a.empty() ||
+            std::memcmp(a.data(), b.data(), a.size() * sizeof(Eigen::Vector3d)) == 0);
 }
 
 double tet_mean_edge(const GradedTetFillOutput& fill, std::size_t ti) {
@@ -77,7 +78,6 @@ std::array<std::size_t, 2> half_tet_counts(const GradedTetFillOutput& fill) {
 
 } // namespace
 
-
 TEST_CASE("empty size fields preserve graded and hybrid fill bytes", "[sizefield][mesher]") {
     const auto model = polymesh::testsupport::box_model(1.0, 1.0, 1.0);
     const SizeFieldFn empty;
@@ -85,17 +85,17 @@ TEST_CASE("empty size fields preserve graded and hybrid fill bytes", "[sizefield
     const auto graded_default = polymesh::mesh::graded_tet_fill_surface(
         model.surface, model.bbox_min, model.bbox_max, 0.34, 1);
     const auto graded_empty = polymesh::mesh::graded_tet_fill_surface(
-        model.surface, model.bbox_min, model.bbox_max, 0.34, 1, {}, 0.0, {}, 0.0, 0.0,
-        nullptr, empty);
+        model.surface, model.bbox_min, model.bbox_max, 0.34, 1, {}, 0.0, {}, 0.0, 0.0, nullptr,
+        empty);
     REQUIRE(graded_empty.mesh.nodes.size() == graded_default.mesh.nodes.size());
     REQUIRE(graded_empty.mesh.tets.size() == graded_default.mesh.tets.size());
     REQUIRE(same_node_bytes(graded_empty.mesh.nodes, graded_default.mesh.nodes));
 
     const auto hybrid_default = polymesh::mesh::mixed_fill_surface(
         model.surface, model.bbox_min, model.bbox_max, 0.25, 1);
-    const auto hybrid_empty = polymesh::mesh::mixed_fill_surface(
-        model.surface, model.bbox_min, model.bbox_max, 0.25, 1, {}, 0.0, {}, 0.0,
-        true, 0.0, false, {}, empty);
+    const auto hybrid_empty =
+        polymesh::mesh::mixed_fill_surface(model.surface, model.bbox_min, model.bbox_max, 0.25,
+                                           1, {}, 0.0, {}, 0.0, true, 0.0, false, {}, empty);
     REQUIRE(hybrid_empty.nodes.size() == hybrid_default.nodes.size());
     REQUIRE(hybrid_empty.cells.size() == hybrid_default.cells.size());
     REQUIRE(same_node_bytes(hybrid_empty.nodes, hybrid_default.nodes));
@@ -140,9 +140,9 @@ TEST_CASE("linear field selects spatially fine hybrid hexes", "[sizefield][meshe
     const SizeFieldFn field = [](const Eigen::Vector3d& x) {
         return 0.175 * (0.25 + 0.75 * x.x());
     };
-    const auto fill = polymesh::mesh::mixed_fill_surface(
-        model.surface, model.bbox_min, model.bbox_max, 0.125, 1, {}, 0.0, {}, 0.0, false,
-        0.0, false, {}, field);
+    const auto fill = polymesh::mesh::mixed_fill_surface(model.surface, model.bbox_min,
+                                                         model.bbox_max, 0.125, 1, {}, 0.0, {},
+                                                         0.0, false, 0.0, false, {}, field);
     std::array<std::size_t, 2> fine_hexes{};
     for (const auto& cell : fill.cells) {
         if (cell.kind != polymesh::mesh::MixedCellKind::kHex8) {
@@ -177,8 +177,8 @@ TEST_CASE("continuous field transition is no sharper than seed ball", "[sizefiel
     const std::vector<polymesh::adapt::SizeSource> sources{{source, 0.0625}};
     const auto field = polymesh::adapt::size_field_from_sources(sources, 0.0625, 0.25, 0.5);
     const auto graded = polymesh::mesh::graded_tet_fill_surface(
-        model.surface, model.bbox_min, model.bbox_max, 0.25, 1, {}, 0.0, {}, 0.0, 0.0,
-        nullptr, field);
+        model.surface, model.bbox_min, model.bbox_max, 0.25, 1, {}, 0.0, {}, 0.0, 0.0, nullptr,
+        field);
 
     REQUIRE(graded.n_level2_cells > 0);
     REQUIRE(seeded.n_level2_cells > 0);
@@ -191,13 +191,12 @@ TEST_CASE("field-driven graded tet stays conforming and positive", "[sizefield][
     const SizeFieldFn field = [](const Eigen::Vector3d& x) {
         return 0.30 * (0.25 + 0.75 * x.x());
     };
-    const auto fill = polymesh::mesh::graded_tet_fill_surface(
-        model.surface, model.bbox_min, model.bbox_max, 0.30, 1, {}, 0.0, {}, 0.0, 0.0,
-        nullptr, field);
+    const auto fill = polymesh::mesh::graded_tet_fill_surface(model.surface, model.bbox_min,
+                                                              model.bbox_max, 0.30, 1, {}, 0.0,
+                                                              {}, 0.0, 0.0, nullptr, field);
 
     const auto conformity = polymesh::mesh::tet4_face_conformity(
-        fill.mesh.nodes, fill.mesh.tets, model.bbox_min, model.bbox_max,
-        0.2 * fill.h_coarse);
+        fill.mesh.nodes, fill.mesh.tets, model.bbox_min, model.bbox_max, 0.2 * fill.h_coarse);
     REQUIRE(conformity.n_hanging_faces == 0);
     REQUIRE(conformity.n_nonconforming == 0);
     REQUIRE(conformity.is_conforming);
@@ -212,9 +211,9 @@ TEST_CASE("size field budget floor clamps without throwing", "[sizefield][mesher
     const auto model = polymesh::testsupport::box_model(1.0, 1.0, 1.0);
     const double tiny = (model.bbox_max - model.bbox_min).norm() / 10000.0;
     const SizeFieldFn field = [tiny](const Eigen::Vector3d&) { return tiny; };
-    const auto out = polymesh::pipeline::volume_mesh(
-        model, 0.20, polymesh::pipeline::VolumeMesher::kHybrid, 1, false, {}, 0.0, 0.0,
-        0, 0, 0, {}, field);
+    const auto out =
+        polymesh::pipeline::volume_mesh(model, 0.20, polymesh::pipeline::VolumeMesher::kHybrid,
+                                        1, false, {}, 0.0, 0.0, 0, 0, 0, {}, field);
 
     REQUIRE_FALSE(out.mesh.elements.empty());
     REQUIRE(out.mesh.elements.size() <= polymesh::mesh::kHybridMaxElems);
@@ -226,12 +225,12 @@ TEST_CASE("field-driven fill is byte deterministic", "[sizefield][mesher]") {
     const SizeFieldFn field = [](const Eigen::Vector3d& x) {
         return 0.30 * (0.25 + 0.75 * x.x());
     };
-    const auto a = polymesh::mesh::graded_tet_fill_surface(
-        model.surface, model.bbox_min, model.bbox_max, 0.30, 1, {}, 0.0, {}, 0.0, 0.0,
-        nullptr, field);
-    const auto b = polymesh::mesh::graded_tet_fill_surface(
-        model.surface, model.bbox_min, model.bbox_max, 0.30, 1, {}, 0.0, {}, 0.0, 0.0,
-        nullptr, field);
+    const auto a = polymesh::mesh::graded_tet_fill_surface(model.surface, model.bbox_min,
+                                                           model.bbox_max, 0.30, 1, {}, 0.0,
+                                                           {}, 0.0, 0.0, nullptr, field);
+    const auto b = polymesh::mesh::graded_tet_fill_surface(model.surface, model.bbox_min,
+                                                           model.bbox_max, 0.30, 1, {}, 0.0,
+                                                           {}, 0.0, 0.0, nullptr, field);
 
     REQUIRE(a.mesh.tets == b.mesh.tets);
     REQUIRE(same_node_bytes(a.mesh.nodes, b.mesh.nodes));

@@ -73,8 +73,7 @@ inline constexpr double kLoadAreaTol = 0.05;
 /// Set-level behaviour is NOT part of this predicate: a filter that selects nothing
 /// falls back to the whole in-box set, which each caller applies to its own
 /// collection.
-inline bool load_rule_keeps_normal(double normal_min_dot,
-                                   const Eigen::Vector3d& traction,
+inline bool load_rule_keeps_normal(double normal_min_dot, const Eigen::Vector3d& traction,
                                    const Eigen::Vector3d& normal) {
     const double traction_norm = traction.norm();
     if (!(normal_min_dot > -1.0) || !(traction_norm > 1e-30)) {
@@ -121,7 +120,7 @@ struct AuthoredAreaCheck {
 };
 
 inline AuthoredAreaCheck check_authored_area(std::optional<double> expected_area,
-                                            std::optional<double> cad_rule_area) {
+                                             std::optional<double> cad_rule_area) {
     AuthoredAreaCheck out;
     if (!expected_area || !(*expected_area > 0.0) || !cad_rule_area ||
         !(*cad_rule_area > 0.0)) {

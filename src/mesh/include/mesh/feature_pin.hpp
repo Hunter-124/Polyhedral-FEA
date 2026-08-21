@@ -91,12 +91,11 @@ struct FeaturePinReport {
 ///                      reflected, and each orbit of nodes is pinned whole or not
 ///                      at all — the re-spacing is a global operation on a closed
 ///                      rim and does not commute with reflecting it.
-FeaturePinReport pin_feature_nodes(
-    const geom::CadModel& cad, const geom::CadTopology& topo,
-    std::vector<Eigen::Vector3d>& nodes,
-    const std::vector<std::uint32_t>& boundary_nodes, double h,
-    const NodeOffendsFn& node_offends,
-    std::vector<BoundarySupport>* provenance = nullptr,
-    const MirrorFrame* mirror = nullptr);
+FeaturePinReport pin_feature_nodes(const geom::CadModel& cad, const geom::CadTopology& topo,
+                                   std::vector<Eigen::Vector3d>& nodes,
+                                   const std::vector<std::uint32_t>& boundary_nodes, double h,
+                                   const NodeOffendsFn& node_offends,
+                                   std::vector<BoundarySupport>* provenance = nullptr,
+                                   const MirrorFrame* mirror = nullptr);
 
 } // namespace polymesh::mesh

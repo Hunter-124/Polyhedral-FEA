@@ -21,8 +21,9 @@ Design notes
   progress fraction or an element count. Where a number reaches
   ``manifest.json`` it was either measured off the files on disk (frame count,
   byte sizes, digests) or printed by the GUI itself (acts, candidates, stages,
-  elements). When the GUI prints nothing, the manifest says so rather than
-  carrying a plausible value.
+  elements, and the ``solver`` token naming the linear solver the take's solves
+  actually ran through). When the GUI prints nothing, the manifest says so
+  rather than carrying a plausible value.
 * **Provenance comes from figstyle**, the same ``git_revision`` and ``digest``
   every generated figure in the repo is stamped with, so the footer burned into
   the video and the JSON beside it agree with the still figures by construction.
@@ -36,14 +37,15 @@ Design notes
   did not honour the request is visible in the manifest rather than assumed away.
 * **Face ids are GUI face ids, discovered per part at load time.** They are not
   the case JSON's selection boxes, so they are CLI parameters rather than
-  constants derived from the case. The defaults for ``box_hole_s0`` were
-  verified by solving with them and reading the VTU back: max-|u| node at
-  (0.03, 0, 0) -- the loaded end -- with the top displacement decile 99.92%
-  aligned with x, i.e. axial tension on x_hi with x_lo clamped. A face id that
+  constants derived from the case. The defaults for ``sphere_box_s0`` were
+  verified by solving with them and reading the VTU back: the part's x extent is
+  [0, 0.0729] m and the max-|u| node sits at the max-x end -- the loaded one --
+  with the top displacement decile 99.73% aligned with x, i.e. axial tension on
+  x_hi with x_lo clamped, which is what the case specifies. A face id that
   selects nothing fails the run rather than recording a video of an unloaded
   part.
 * **The GIF is budgeted and reports what it cost.** GitHub inlines a GIF and not
-  a repo-relative ``<video>``, so the README needs one; a 30 s 60 fps take at
+  a repo-relative ``<video>``, so the README needs one; a 20 s 60 fps take at
   full width is tens of megabytes, so the GIF is a stated subset of the take at
   a stated width and frame rate, and the ladder stops at the first setting under
   ``--gif-max-bytes``. The setting it landed on is printed and recorded.
@@ -54,6 +56,7 @@ Usage
     python3 scripts/render_cinema.py --only mp4 --only gif # re-encode on disk
     python3 scripts/render_cinema.py --list
     python3 scripts/render_cinema.py --frames 900 --size 1920x1080
+    python3 scripts/render_cinema.py --all --part box_hole_s0_c0
 """
 
 from __future__ import annotations
@@ -84,16 +87,24 @@ FRAMES_DIR = REPO / "build/cinema/frames"
 #: rate and the playback rate: one recorded frame is one displayed frame and the
 #: video's duration is the take's own virtual duration.
 FPS = 60
-#: 1800 frames = 30.0 s of virtual time. Long enough for the skeleton opening,
-#: the candidate sweep and the fill stages to each get real screen time.
-DEFAULT_FRAMES = 1800
+#: 1200 frames = 20.0 s of virtual time. A length, not a schedule: the GUI paces
+#: its own acts inside however many frames it is given, so a shorter take speeds
+#: every beat up rather than truncating the end. 20 s is the length the
+#: composition is tuned for -- at it, one forward pass gets 0.159 s and one pass-0
+#: construction stage 0.340 s, against 0.238 s and 0.540 s at the 30 s this used
+#: to be, and 0.292 s per pass in the old sequential take. Faster per iteration,
+#: and with the pass and fill lanes now overlapping there is no longer a second
+#: act's worth of screen time to pay for.
+DEFAULT_FRAMES = 1200
 #: The Xvfb screen AND, via ``POLYMESH_GUI_SIZE``, the GUI window itself: the
-#: window otherwise opens at its interactive 1600x1000 whatever the screen is,
-#: which shows up as a 1600x1000 film rather than an error. 1080p without
-#: paying for a 4K framebuffer.
+#: window otherwise opens at the interactive default it has always had
+#: (``kDefaultWindowW``/``H`` = 1600x1000 in ``apps/gui/main.cpp``) whatever the
+#: screen is, which shows up as a 1600x1000 film rather than an error. 1080p
+#: without paying for a 4K framebuffer.
 DEFAULT_SCREEN = (1920, 1080)
-#: Solve plus capture on the default case, with headroom for the order-2
-#: elevation the advisor asks for.
+#: Solve plus capture on the default case, with headroom for the fact that the
+#: advisor asks for one adapt pass there, i.e. two real solves of a 13,146-DOF
+#: system, before a single frame is recorded.
 DEFAULT_TIMEOUT = 1800
 
 # h264 at CRF 18 is visually lossless on flat UI panels and thin lines, which is
@@ -120,16 +131,17 @@ H264_LADDER: tuple[tuple[str, tuple[str, ...]], ...] = (
 GIF_LADDER = ((960, 15), (960, 12), (800, 12), (720, 10), (640, 10))
 GIF_MAX_BYTES = 8 * 1024 * 1024
 #: The inline loop cannot be the whole take at a size a README will tolerate, so
-#: it shows the causal moment: the tail of the advisor act, the cut, and the
-#: start of the mesh act -- the network choosing an action and the mesher
-#: building that action. When the GUI reported its act table the window is
-#: computed from it (advisor midpoint to mesh midpoint), so it follows the real
-#: schedule instead of a guess. These fractions of the take are the fallback for
-#: a `--only gif` run that has no act table to read: the acts run
-#: 0.12/0.38/0.38/0.12 of the take, so 0.30 lands inside the advisor act and
-#: 0.30 more crosses the cut into the mesh act.
-GIF_START_FRACTION = 0.30
-GIF_DURATION_FRACTION = 0.30
+#: it shows the moment where both halves are live at once: the pass lane still
+#: sweeping while the mesher builds the action it picked. That is the act the GUI
+#: names `build`, so the window is cut from the act table the GUI printed rather
+#: than from a guess -- `build` when it is there, else the longest act reported,
+#: else these fractions. The GUI schedules skeleton 0.06, deliberate 0.11, build
+#: 0.20 and solve 0.63 of the take, so the fallback is `build`'s own span, 0.17 to
+#: 0.37, for a `--only gif` run with no act table to read. Note that `solve` is
+#: the longest act, which is why the longest-act rule is a fallback and not the
+#: first choice: it would show the answer without the decision that produced it.
+GIF_START_FRACTION = 0.17
+GIF_DURATION_FRACTION = 0.20
 
 
 def rel(path: Path) -> str:
@@ -166,20 +178,63 @@ class Case:
 
 
 CASES: dict[str, Case] = {
-    # The only class of part the advisor will actually advise on, which is the
-    # whole point of the film. Measured with `polymesh solve <part> --advisor
-    # bench/advisor`: box_hole_s0 scores an out-of-distribution distance of 3.57
-    # against the 6.30 operating point and is advised (hybrid_zoo, h_rel 0.2,
-    # order 2, 0 adapt passes, failure_prob 5.3e-06), while sphere, icecream_cone,
-    # cantilever, smoke_bar and pipe all score 12.6 to 90.9 and are vetoed as
-    # out of distribution -- an advisor panel on any of those would be a refusal
-    # notice, not an explanation. tests/fixtures/parts/plate_hole.step is also
-    # admitted (3.73) but sits closer to the gate.
+    # The default, and where the film's definition comes from. Of the 44
+    # primitives in the corpus only 23 are advised at all: `ellipsoid_boss`,
+    # `lobed_shaft`, `perforated_plate`, `tube` and `twisted_loft` are refused as
+    # out of distribution in every regime -- perforated_plate_s0 scores 11.36
+    # against the shipped 5.034 operating point -- and on any of those the
+    # advisor panel would be a refusal notice rather than an explanation. Of the
+    # 23 that are advised, sphere_box_s0 gives by far the most elements, because
+    # its curved wall is what drives real curvature and feature grading: 11,692
+    # elements and 13,146 DOF, against 568 elements on box_hole_s0_c0, with a max
+    # von Mises of 2.489 MPa.
     #
-    # It is also the case the retired `activation_map.png` was computed on (its
-    # title read "run 30 on box_hole_s0_c0 - cfg-116b3958"), so the video
-    # supersedes that figure on the figure's own input rather than on a case
-    # chosen to flatter the replacement.
+    # That definition is the advisor's own action and not an override. On this
+    # case it advises hybrid_zoo at h_rel 0.08, order 1, one adapt pass and an
+    # eta target of 0.02, at a Mahalanobis distance of 3.34 against the 5.034
+    # operating point, and does not veto: 38 candidates enumerated, 39 forward
+    # passes counting the final re-score. A denser film was bought by picking a
+    # part the model itself asks for a fine mesh on, which is the only way to buy
+    # it without contradicting what the film is about.
+    "sphere_box_s0_c0": Case(
+        name="sphere_box_s0_c0",
+        step="bench/geometries/corpus/primitives/sphere_box_s0.step",
+        case_json="bench/geometries/corpus/primitives/sphere_box_s0_c0.case.json",
+        # FALLBACK ONLY, and not the mesh size the video shows: when the advisor
+        # advises it sets h itself from h_rel. 6.888 mm is 0.08 of this part's
+        # 86.10 mm bbox diagonal (x [0, 0.0729] m, y and z [-0.0162, 0.0162] m),
+        # i.e. the same size the advisor's own h_rel resolves to here, so a
+        # refusal falls back to a comparable mesh rather than to a different film.
+        h_mm=6.888,
+        fix_face=0,
+        load_face=5,
+        # 1e6 Pa along +x over the x_hi face, and that face's area is a
+        # measurement rather than an authored number: this case's loaded face is
+        # curved (`"load_face_boundary": "curved_surface"`) and
+        # scripts/gen_primitive_corpus.py emits `select.expected_area` only for
+        # planar ends, so there is none in the case JSON to read. The CLI
+        # reported the exact CAD area of that face as 0.000528197958 m2, which at
+        # 1e6 Pa is a resultant of 528.197958 N; the `loadface` verb takes
+        # newtons, so that is the faithful translation of the case.
+        load=(528.197958, 0.0, 0.0),
+        why="the advisor advises it (ood 3.34, not vetoed) and of the 23 advised "
+            "primitives it gives the most elements: 11,692 elements, 13,146 DOF",
+        load_note="1e6 Pa over the exact CAD area 0.000528197958 m2 of the "
+                  "curved x_hi face = 528.197958 N",
+    ),
+    # Retained, and still selectable with `--part box_hole_s0_c0`. It was the
+    # film's original case for one reason that has not expired: it is the exact
+    # input the retired `activation_map.png` was computed on (its title read
+    # "run 30 on box_hole_s0_c0 - cfg-116b3958"), so the video supersedes that
+    # figure on the figure's own input rather than on a case chosen to flatter
+    # the replacement. Measured with `polymesh solve <part> --advisor
+    # bench/advisor`, box_hole_s0 scores an out-of-distribution distance of 3.57
+    # against the shipped 5.034 operating point and is advised (hybrid_zoo,
+    # h_rel 0.2, order 2, 0 adapt passes, failure_prob 5.3e-06).
+    #
+    # It is 568 elements, which is why it is no longer the default: the fill lane
+    # runs out of geometry to build long before the pass lane runs out of
+    # candidates to score.
     "box_hole_s0_c0": Case(
         name="box_hole_s0_c0",
         step="bench/geometries/corpus/primitives/box_hole_s0.step",
@@ -201,7 +256,7 @@ CASES: dict[str, Case] = {
         load_note="1e6 Pa over 8.925720996e-05 m2 of the x_hi face = 89.257 N",
     ),
 }
-DEFAULT_CASE = "box_hole_s0_c0"
+DEFAULT_CASE = "sphere_box_s0_c0"
 
 
 # ---------------------------------------------------------------------------
@@ -242,7 +297,10 @@ def auto_spec(case: Case, part: Path, model_dir: Path, frames_dir: Path,
         f"load {rel(part)}",
         f"h {case.h_mm:g}",
         f"fix {case.fix_face}",
-        f"loadface {case.load_face} {fx:g} {fy:g} {fz:g}",
+        # `.9g`, not `g`: the resultant is a measurement of the CAD area times
+        # the case's traction, and six significant digits would hand the GUI
+        # 528.198 N for a face whose measured resultant is 528.197958 N.
+        f"loadface {case.load_face} {fx:.9g} {fy:.9g} {fz:.9g}",
         "cinema on",
         f"cinema advisor {rel(model_dir)}",
         "solve",
@@ -318,8 +376,14 @@ _TAKE_RE = re.compile(r"^cinema:\s+take\b(?P<rest>.*)$")
 _ACT_RE = re.compile(
     r"^cinema:\s+act\s+(?P<name>\S+)\s+frames\s+(?P<f0>\d+)\.\.(?P<f1>\d+)"
     r"\s+t\s+(?P<t0>[\d.]+)\.\.(?P<t1>[\d.]+)")
-#: The record summary, parsed as loose ``key value`` pairs.
+#: The record summary, parsed as loose ``key value`` pairs plus one word-valued
+#: field, ``solver``.
 _SUMMARY_RE = re.compile(r"^cinema:\s+record\b(?P<rest>.*)$")
+#: Which linear solver the take's solves actually ran through. Word-valued, so
+#: ``_PAIR_RE`` cannot see it: the method is a choice `fea::SolveMethod::kAuto`
+#: makes from the free DOF count, and the film states it rather than letting a
+#: reader assume iterations were animated on a case that was factorised.
+_SOLVER_RE = re.compile(r"\bsolver\s+(?P<solver>\S+)")
 #: The advisor line, same pair grammar plus one word-valued field.
 _ADVISOR_RE = re.compile(r"^cinema:\s+advisor\s+(?!unavailable\b)(?P<rest>.*)$")
 _DECISION_RE = re.compile(r"\bdecision\s+(?P<decision>\S+)")
@@ -333,9 +397,14 @@ _PROGRESS_RE = re.compile(r"^cinema:\s+frame\s+\d+/\d+\b")
 
 _PAIR_RE = re.compile(r"(?P<key>[a-z_]+)\s+(?P<value>-?[\d.eE+-]*[\d.])")
 
-#: Keys lifted out of the record summary into the manifest.
-_SUMMARY_KEYS = ("frames", "fps", "candidates", "stages", "elements", "poster",
-                 "width", "height")
+#: Keys lifted out of the record summary into the manifest. ``stages`` counts the
+#: mesher's construction stages and ``solve_stages`` the completed adaptive
+#: passes: two different real sequences, so two different keys. ``skipped`` is the
+#: elements the viewport could not triangulate, kept because an element the film
+#: did not draw is exactly the kind of number a reader should not have to take on
+#: trust.
+_SUMMARY_KEYS = ("frames", "fps", "candidates", "stages", "solve_stages",
+                 "elements", "skipped", "poster", "width", "height")
 #: Keys lifted out of the advisor line. ``candidates`` is the enumerated grid
 #: without the final re-score pass; ``frames`` counts every forward pass
 #: including it, so both are kept and named apart.
@@ -355,6 +424,7 @@ class GuiReport:
     advisor: dict[str, float]
     take: dict[str, float]
     decision: str | None
+    solver: str | None
     unavailable: str | None
     raw: list[str]
 
@@ -391,6 +461,7 @@ def parse_report(stdout: str) -> GuiReport:
     advisor: dict[str, float] = {}
     take: dict[str, float] = {}
     decision: str | None = None
+    solver: str | None = None
     unavailable: str | None = None
     raw: list[str] = []
     for line in stdout.splitlines():
@@ -421,6 +492,9 @@ def parse_report(stdout: str) -> GuiReport:
         summary = _SUMMARY_RE.match(line)
         if summary:
             counts.update(_pairs(summary["rest"], _SUMMARY_KEYS))
+            named = _SOLVER_RE.search(summary["rest"])
+            if named:
+                solver = named["solver"]
             continue
         advised = _ADVISOR_RE.match(line)
         if advised:
@@ -429,7 +503,8 @@ def parse_report(stdout: str) -> GuiReport:
             if found:
                 decision = found["decision"]
     return GuiReport(acts=acts, counts=counts, advisor=advisor, take=take,
-                     decision=decision, unavailable=unavailable, raw=raw)
+                     decision=decision, solver=solver, unavailable=unavailable,
+                     raw=raw)
 
 
 # ---------------------------------------------------------------------------
@@ -588,17 +663,39 @@ def gif_window(report: GuiReport, total_s: float, start_arg: float | None,
                duration_arg: float | None) -> tuple[float, float, str]:
     """Which slice of the take the inline loop shows, and where that came from.
 
-    Preference order: an explicit CLI value, then the GUI's own act table
-    (advisor midpoint to mesh midpoint, so the loop always straddles the cut
-    between the network choosing and the mesher building), then the documented
-    fractions of the take. The source is returned so the manifest can say which
-    rule produced the window rather than leaving two numbers unexplained.
+    Preference order: an explicit CLI value, then the GUI's own act table, then
+    the documented fractions of the take. The source is returned so the manifest
+    can say which rule produced the window rather than leaving two numbers
+    unexplained.
+
+    Three act-table rules, in the order they mean something. ``build`` is the act
+    in which the candidate sweep and the fill overlap, so when the GUI reports it
+    the loop is that act. A take that instead reports separate ``advisor`` and
+    ``mesh`` acts is cut between the network choosing and the mesher building, and
+    the interesting window straddles that cut: advisor midpoint to mesh midpoint.
+    Failing both, the loop is centred on the longest act reported, which is at
+    least a real span the GUI printed. No rule invents an act name: each is
+    skipped unless the names it needs are present.
     """
+    build_act = report.act("build")
     advisor_act, mesh_act = report.act("advisor"), report.act("mesh")
-    if advisor_act and mesh_act:
+    longest = (max(report.acts, key=lambda a: a["duration_s"])
+               if report.acts else None)
+    if build_act:
+        start, end = build_act["start_s"], build_act["end_s"]
+        source = (f"the build act the GUI reported, where the candidate sweep "
+                  f"and the fill overlap ({build_act['duration_s']:g} s)")
+    elif advisor_act and mesh_act:
         start = (advisor_act["start_s"] + advisor_act["end_s"]) / 2.0
         end = (mesh_act["start_s"] + mesh_act["end_s"]) / 2.0
         source = "midpoint of the advisor act to the midpoint of the mesh act"
+    elif longest is not None:
+        want = min(GIF_DURATION_FRACTION * total_s, longest["duration_s"])
+        middle = (longest["start_s"] + longest["end_s"]) / 2.0
+        start = max(longest["start_s"], middle - want / 2.0)
+        end = start + want
+        source = (f"centred on the longest act the GUI reported "
+                  f"({longest['act']}, {longest['duration_s']:g} s)")
     else:
         start = GIF_START_FRACTION * total_s
         end = start + GIF_DURATION_FRACTION * total_s
@@ -747,12 +844,14 @@ def main(argv: list[str] | None = None) -> int:
                     help="frame index for poster.png; default is the index the "
                          "GUI reports as the first fully-composed frame, or 0")
     ap.add_argument("--gif-start", type=float, default=None,
-                    help="GIF subset start in seconds; default is the midpoint "
-                         "of the advisor act the GUI reported, so the loop "
-                         "straddles the cut into the mesh act")
+                    help="GIF subset start in seconds; default is derived from "
+                         "the act table the GUI reported -- centred on its "
+                         "longest act, or straddling the advisor/mesh cut when "
+                         "the take still has one")
     ap.add_argument("--gif-duration", type=float, default=None,
-                    help="GIF subset length in seconds; default runs to the "
-                         "midpoint of the mesh act")
+                    help=f"GIF subset length in seconds; default is "
+                         f"{GIF_DURATION_FRACTION:g} of the take, clamped to the "
+                         f"act it is centred on")
     ap.add_argument("--gif-max-bytes", type=int, default=GIF_MAX_BYTES,
                     help=f"inline GIF byte budget (default: {GIF_MAX_BYTES})")
     ap.add_argument("--encoder", default=None,
@@ -773,11 +872,12 @@ def main(argv: list[str] | None = None) -> int:
         print("\ncases (--part NAME):")
         for case in CASES.values():
             fx, fy, fz = case.load
-            print(f"  {case.name}")
+            mark = "  (default)" if case.name == DEFAULT_CASE else ""
+            print(f"  {case.name}{mark}")
             print(f"    part      {case.step}")
             print(f"    case      {case.case_json}")
             print(f"    verbs     h {case.h_mm:g}; fix {case.fix_face}; "
-                  f"loadface {case.load_face} {fx:g} {fy:g} {fz:g}")
+                  f"loadface {case.load_face} {fx:.9g} {fy:.9g} {fz:.9g}")
             print(f"    load      {case.load_note}")
             print(f"    h         fallback only -- the advisor sets h from "
                   f"h_rel when it advises")
@@ -827,7 +927,7 @@ def main(argv: list[str] | None = None) -> int:
     spec = auto_spec(case, part, args.model_dir, frames_dir.resolve(), args.frames)
     argv_gui = gui_argv(args.gui, spec, screen)
     report = GuiReport(acts=[], counts={}, advisor={}, take={}, decision=None,
-                       unavailable=None, raw=[])
+                       solver=None, unavailable=None, raw=[])
     wall = None
 
     # ---- capture ------------------------------------------------------------
@@ -868,6 +968,13 @@ def main(argv: list[str] | None = None) -> int:
             print("    note: the advisor vetoed this part as out of "
                   "distribution, so the panel draws a refusal rather than an "
                   "explanation")
+        if report.solver is not None:
+            print(f"    solver {report.solver} (as the GUI reported it; the "
+                  "method is chosen from the free DOF count, not requested "
+                  "here)")
+        elif report.raw:
+            print("    note: the GUI printed no solver token, so the manifest "
+                  "records which linear solver ran as unknown")
         if not report.acts:
             print("    note: the GUI printed no act table, so per-act durations "
                   "are unknown and the manifest will say so")
@@ -980,7 +1087,14 @@ def main(argv: list[str] | None = None) -> int:
             "candidates": _as_int(report.counts.get("candidates")),
             "forward_passes": _as_int(report.advisor.get("frames")),
             "mesh_stages": _as_int(report.counts.get("stages")),
+            "solve_stages": _as_int(report.counts.get("solve_stages")),
             "elements": _as_int(report.counts.get("elements")),
+            "elements_skipped": _as_int(report.counts.get("skipped")),
+            "solver": report.solver,
+            "solver_note": (None if report.solver else
+                            "the GUI printed no solver token on its record "
+                            "line, so which linear solver ran is unknown from "
+                            "this run"),
             "poster_frame": report.poster_frame,
             "framebuffer": (f"{report.reported_size[0]}x"
                             f"{report.reported_size[1]}"

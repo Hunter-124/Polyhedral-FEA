@@ -2,20 +2,34 @@
 #pragma once
 
 // Advisor activation cinema: the deployed advisor network lighting up with the
-// activations of its own forward passes, beside the mesh being built out of the
-// mesher's own construction stages, on a virtual clock so a headless recording
-// is identical whatever the real frame rate was.
+// activations of its own forward passes, CONCURRENTLY with the mesh being built
+// out of the mesher's own construction stages, closing on the real
+// solve/estimate/refine loop the answer is actually computed by -- all on a
+// virtual clock, so a headless recording is identical whatever the real frame
+// rate was.
 //
 // HONESTY IS THE POINT OF THIS FILE. Every node fill is a value from the
 // production ONNX graph's trunk taps (`advisor::ActivationFrame::input/fc1/
 // fc2/heads`), every connection strength is |w_ji * a_i| from the exported
 // weight blocks (`advisor::NetworkEdges::weights`), every element in the reveal
-// is an element the mesher emitted (`pipeline::MeshStage::mesh`), and every
-// number on screen is the struct field named beside it. Only TIME, opacity and
-// the shrink-toward-centroid reveal are interpolated -- no displayed number
-// ever is, and no activation, element count or progress value is ever
-// synthesised. When a source is missing the surface says WHICH one and skips
-// that act; it never substitutes a plausible value.
+// is an element the mesher emitted (`pipeline::MeshStage::mesh`), every field is
+// one that pass really produced (`pipeline::SolveStage::result`), and every
+// number on screen is the struct field named beside it. Only TIME, opacity, the
+// shrink-toward-centroid reveal and the load factor are interpolated -- and the
+// load factor is interpolated because linear elastostatics makes u(λ) = λ·u
+// exact, so every frame of that ramp is a real solution rather than a blend of
+// two. No displayed number is ever interpolated, and no activation, element
+// count, error indicator or progress value is ever synthesised. When a source is
+// missing the surface says WHICH one and skips that beat; it never substitutes a
+// plausible value.
+//
+// CONCURRENCY IS A COMPOSITION, NOT A CHRONOLOGY CLAIM. `Advisor::explain()`
+// runs to completion at `cinema advisor`, long before `solve` is issued, so the
+// passes and the fill stages are two recorded sequences. The take shows them on
+// one clock because the fill is the execution of what the passes chose, states
+// that on screen, and keeps the causal order readable by locking the DECISION in
+// before the first element appears. It never implies the mesh preceded the
+// decision, and it never implies the two ran at the same instant.
 //
 // This module owns no studio state: the app hands it a `CinemaHud` snapshot of
 // what the app already measured, so the HUD cannot drift from what the panels
@@ -50,10 +64,59 @@ enum class SkeletonSource {
     kUnavailable, // extraction ran and threw; the reason is in `skeleton_note`
 };
 
-/// The acts, in take order. The clock may run past `kResult` (a recording is an
+/// The acts, in take order. The clock may run past `kSolve` (a recording is an
 /// exact frame count, not an exact act sum); past the end the composition holds
 /// the final frame rather than looping.
-enum class CinemaAct { kSkeleton = 0, kAdvisor, kMesh, kResult };
+///
+/// `kBuild` is the CONCURRENT act and the reason the take has this shape: the
+/// advisor's pass lane is ONE continuous sweep over every forward pass that
+/// spans `kDeliberate` and `kBuild` together, while the mesher's stage lane
+/// runs inside `kBuild` alone. Through `kBuild` both counters advance on the
+/// same virtual clock, so the network is firing while the fill is being built.
+///
+/// The causal order survives that overlap because the DECISION is locked and on
+/// screen from the first frame of `kBuild`, a lead-in before the first element
+/// appears (`CinemaState::kDecisionLead`). It is honest to state it there and
+/// keep showing passes afterwards: `Advisor::explain()` ran to completion in
+/// `load_cinema_advisor`, before `solve` was ever issued, so every pass on
+/// screen — including the ones still to come — had already happened when the
+/// mesher emitted its first stage. The cinema replays two recorded sequences;
+/// it does not claim they were simultaneous, and it says so in the ticker.
+enum class CinemaAct { kSkeleton = 0, kDeliberate, kBuild, kSolve };
+
+/// Where the closing act is inside the real solve/estimate/refine loop.
+///
+/// This is the order in which the answer is actually computed, one
+/// `pipeline::SolveStage` at a time: solve, recover the ZZ error field from
+/// that solve, refine where the field asked, solve again. Nothing here is a
+/// per-element solve order or an iteration counter, because a direct sparse
+/// factorisation has neither.
+enum class SolvePhase {
+    kNone = 0,  // no SolveStage was delivered; nothing solved is drawn
+    kField,     // that pass's own von Mises field on its own mesh, undeformed
+    kError,     // the ZZ error field recovered from that same solve
+    kRefine,    // the mesh the NEXT pass solved on, revealing element by element
+    kLoadRamp,  // u(λ) = λ·u on the final field, λ from 0 to 1
+    kHold,      // λ = 1, the finished answer
+};
+
+/// Phase id, for the ticker and the disclosures. Stable text.
+[[nodiscard]] const char* cinema_solve_phase_name(SolvePhase phase);
+
+/// Which real mesh the viewport's per-element cinema buffer should be holding.
+///
+/// Two different meshes are revealed element by element in this take and they
+/// come from different places: the fill under construction
+/// (`pipeline::MeshStage::mesh`, one snapshot per construction stage) and the
+/// mesh a later adaptive pass actually solved on
+/// (`pipeline::SolveStage::result.volume_mesh`). Naming the source is what stops
+/// the refine beat from silently redrawing the pass-0 fill and calling it
+/// refined.
+enum class CinemaMeshSource {
+    kNone = 0,   // nothing should be uploaded
+    kFillStage,  // CinemaState::stages[index].mesh
+    kSolvedPass, // CinemaState::solve_stages[index].result.volume_mesh
+};
 
 /// Act id, also the token printed on stdout for the render script's manifest.
 /// Stable: `scripts/render_cinema.py` parses these.
@@ -82,6 +145,11 @@ struct CinemaHud {
     int order = 1;                 // SimSetup::p_elevate ? 2 : 1
     int adapt_passes = 0;          // SimSetup::adapt_passes
     double eta_target = 0.0;       // SimSetup::eta_target
+    /// Resultant of every `SimSetup::LoadSpec::force` this take is solving, in
+    /// newtons. Stated beside the load factor λ so "λ = 0.500" reads as a real
+    /// load case (264.099 N of 528.198 N on the film's part) rather than as a
+    /// fraction of an unnamed quantity.
+    double load_newtons = 0.0;
     std::size_t nodes = 0;         // node count as the studio's own DOF line uses it
     std::size_t elements = 0;      // element count from the same mesh
     std::size_t dof = 0;           // App::dof_count (3 * nodes)
@@ -106,27 +174,74 @@ struct CinemaHud {
 };
 
 /// Where the take is at one instant of the virtual clock, with every index
-/// resolved against the real data (candidate count, stage count) rather than a
-/// guess. Produced by `cinema_cue`; consumed by the drawing and the recorder.
+/// resolved against the real data (pass count, stage count, solve-stage count)
+/// rather than a guess. Produced by `cinema_cue`; consumed by the drawing and
+/// the recorder.
 struct CinemaCue {
     CinemaAct act = CinemaAct::kSkeleton;
     double act_t = 0.0;    // seconds into the act
     double act_span = 1.0; // act length, seconds
+
+    // ---- the advisor pass lane (spans kDeliberate and kBuild) -------------
+
     /// Index into `CinemaState::explanation->frames`. -1 when there are none.
     int frame_index = -1;
-    /// Index into `CinemaState::stages`. -1 when none were collected.
+    /// One forward pass, in seconds. Reported on screen so the beat rate is
+    /// auditable against the recorded frame count.
+    double pass_beat_seconds = 0.0;
+    /// True once the ranking's outcome may be stated: from the first frame of
+    /// `kBuild`, which is also before the first element of the fill appears.
+    bool decision_locked = false;
+
+    // ---- the mesher's stage lane (inside kBuild) --------------------------
+
+    /// Index into `CinemaState::stages`. -1 when none apply on this beat.
     int stage_index = -1;
-    /// 0..1 through the current stage's element reveal (eased; time only).
+    /// 0..1 through the current stage's element reveal (time only).
     double stage_reveal = 0.0;
-    /// One candidate, or one construction stage, in seconds. Reported on screen
-    /// so the beat rate is auditable against the recorded frame count.
-    double beat_seconds = 0.0;
+    /// One construction stage, in seconds.
+    double stage_beat_seconds = 0.0;
+
+    /// Which mesh the per-element reveal is drawing, and its index in that
+    /// source. The reveal fraction is `stage_reveal` for `kFillStage` and
+    /// `refine_reveal` for `kSolvedPass`.
+    CinemaMeshSource mesh_source = CinemaMeshSource::kNone;
+    int mesh_source_index = -1;
+
+    /// True while BOTH lanes are advancing on this frame — the fact the ticker
+    /// states, so the claim on screen and the schedule cannot disagree.
+    bool concurrent = false;
+
+    // ---- the solve/estimate/refine loop (kSolve) --------------------------
+
+    /// Index into `CinemaState::solve_stages`. -1 when none were delivered.
+    int solve_stage_index = -1;
+    SolvePhase solve_phase = SolvePhase::kNone;
+    double solve_phase_t = 0.0;    // seconds into the phase
+    double solve_phase_span = 1.0; // phase length, seconds
+    /// 0..1 through the refined mesh's element reveal, in `kRefine`.
+    double refine_reveal = 0.0;
+    /// The load factor λ the frame is drawn at. Exactly 1 outside `kLoadRamp`,
+    /// and drawn on screen wherever it is not: linear elastostatics gives
+    /// u(λ) = λ·u for the same λ·f, so every intermediate frame of the ramp is
+    /// the exact solution of a real load case and not an interpolation.
+    double load_factor = 1.0;
+
+    // ---- opacity and layout ----------------------------------------------
+
     /// Opacity of the whole network panel, 0..1. The opening act belongs to the
     /// part, so the network is held back and faded up across the back half of
     /// it rather than sitting there as a wall of lines from frame zero. This is
     /// opacity and nothing else: every node, every edge and every number is
     /// exactly what it would be at alpha 1.
     float network_alpha = 1.0f;
+    /// How far the network panel is slid into its share of the width, 0..1.
+    /// Separate from `network_alpha` because the panel is DIMMED in `kSolve`
+    /// once its last pass is only being held, and a width that followed the
+    /// opacity would grow the viewport pane mid-take. The pane's height sets
+    /// the part's rendered size, so that would resize the subject inside one
+    /// continuous shot. Rises once, during the opening, and then stays at 1.
+    float network_open = 1.0f;
 };
 
 /// The take. Owns the advisor explanation, the collected construction stages,
@@ -149,6 +264,16 @@ class CinemaState {
     /// `cinema_opening_fade()`, which also caps it at half the opening act so a
     /// short take does not spend its whole first act fading up.
     static constexpr double kOpeningFade = 0.5;
+    /// How long the DECISION is on screen at the head of the concurrent act
+    /// before the first element of the fill appears, seconds. Capped at a fifth
+    /// of that act by `cinema_decision_lead()` so a short take does not spend
+    /// the whole concurrent stretch holding a caption.
+    ///
+    /// This lead is what keeps the overlap honest. The fill is the execution of
+    /// the advised action, so the action has to be readable BEFORE the thing it
+    /// produced starts appearing; without the lead the two would arrive on the
+    /// same frame and a viewer could not tell which followed which.
+    static constexpr double kDecisionLead = 0.6;
 
     // ---- take state ------------------------------------------------------
 
@@ -168,7 +293,7 @@ class CinemaState {
     /// Verbatim failure text when `skeleton_source == kUnavailable`.
     std::string skeleton_note;
 
-    // ---- act 2: the network ---------------------------------------------
+    // ---- the network: act 2 (kDeliberate) and act 3 (kBuild) -------------
 
 #ifdef POLYMESH_WITH_ADVISOR
     /// The forward passes that produced the decision, in chooser order.
@@ -187,17 +312,17 @@ class CinemaState {
     /// What was applied, or why it was not. Drawn verbatim beside the decision.
     std::string decision_note;
 
-    // ---- act 3: the mesher's own stages ---------------------------------
+    // ---- the mesher's own stages: act 3 (kBuild) -------------------------
 
     /// Every construction stage of every fill this take ran, in emission order.
     ///
     /// Each entry keeps its whole `fea::NodalMesh`, which is what makes the
     /// reveal honest -- the elements drawn are the elements that stage actually
-    /// contained -- and is also this feature's memory cost. On the cinema case
-    /// (box_hole_s0 at the advisor's own h_rel = 0.2) a stage is a few hundred
-    /// elements, so the whole list is kilobytes; on a 100k-element fill it
-    /// would be tens of megabytes per stage, which is why the sink is installed
-    /// only while `active`.
+    /// contained -- and is also this feature's memory cost. On the film's case
+    /// (sphere_box_s0 at the advisor's own h_rel = 0.08) a pass-0 stage is
+    /// 11,692 tet4 cells over 4,382 nodes, so the whole pass-0 list is a few
+    /// megabytes; on a 100k-element fill it would be tens of megabytes per
+    /// stage, which is why the sink is installed only while `active`.
     std::vector<pipeline::MeshStage> stages;
 
     /// Worker-thread sink for `pipeline::SolveJob::on_mesh_stage`. Copies the
@@ -209,6 +334,26 @@ class CinemaState {
     /// Drops collected stages and the uploaded-stage bookkeeping, so one take
     /// never shows another run's mesh.
     void clear_stages();
+
+    // ---- the solve/estimate/refine loop: act 4 (kSolve) ------------------
+
+    /// Every completed adaptive pass of this take's solve, in the order the
+    /// pipeline finished them, from `pipeline::SolveJob::on_solve_stage`.
+    ///
+    /// This is the ONLY source the closing act draws a field from. Each entry
+    /// carries that pass's own `SolveResult` -- its mesh, its displacement, its
+    /// von Mises and its ZZ error -- so the field shown beside "pass 0" is the
+    /// field pass 0 produced and not the final answer relabelled. Measured cost
+    /// on the film's case: 1,314,253 B per stage, two stages.
+    std::vector<pipeline::SolveStage> solve_stages;
+
+    /// Worker-thread sink for `pipeline::SolveJob::on_solve_stage`. Copies the
+    /// stage for the same reason `push_stage` does.
+    void push_solve_stage(const pipeline::SolveStage& stage);
+    /// Main-thread hand-off, the counterpart of `drain_stages`.
+    void drain_solve_stages();
+    /// Drops collected solve stages and the uploaded bookkeeping.
+    void clear_solve_stages();
 
     // ---- recorder --------------------------------------------------------
 
@@ -227,9 +372,20 @@ class CinemaState {
     /// Puts the clock on the exact instant of recorded frame `index`.
     void seek_frame(int index) { t = static_cast<double>(index) * kRecordStep; }
 
-    /// Index of the stage currently uploaded to the viewport, -1 when none.
-    /// Public so `sync_cinema_viewport` can keep the upload to stage changes.
-    int uploaded_stage = -1;
+    /// Which mesh the viewport's per-element cinema buffer currently holds.
+    /// Public so `sync_cinema_viewport` can keep the upload to actual changes:
+    /// `Viewport::set_cinema_mesh` rebuilds every element's own faces (1200 B
+    /// per tet4 cell, so 14 MB for this film's 11,692-element fill), which is
+    /// not a per-frame cost.
+    CinemaMeshSource uploaded_mesh_source = CinemaMeshSource::kNone;
+    int uploaded_mesh_index = -1;
+    /// Index of the solve stage whose `SolveResult` is currently uploaded to
+    /// the viewport, -1 when none. Same role: the upload is a whole boundary
+    /// re-bake, so it happens on pass changes and not per frame.
+    int uploaded_solve_stage = -1;
+    /// Forgets every upload, so a fresh take never draws the previous run's
+    /// geometry on its first frame.
+    void invalidate_uploads();
 
     /// Height the ticker strip is reserved at for the whole take, pixels; 0
     /// until the first frame measures it. Maintained by
@@ -241,16 +397,19 @@ class CinemaState {
     /// fixes the vertical field). A strip that grew from four rows in the
     /// opening act to eight when the DECISION lines arrive would therefore
     /// resize the part at every act boundary — measured at 701x529 px in the
-    /// skeleton act against 668x505 in the advisor act before this existed.
+    /// skeleton act against 668x505 in the deliberation act before this existed.
     /// A subject that changes size mid-shot reads as a cut, so the composition
     /// reserves the tallest strip the take can need and holds it.
     float ticker_reserve = 0.0f;
 
   private:
-    /// Worker-thread staging buffer. `push_stage` appends here under the mutex;
-    /// `drain_stages` moves it out on the main thread.
+    /// Worker-thread staging buffers. `push_stage` / `push_solve_stage` append
+    /// here under the one mutex; the two `drain_*` calls move them out on the
+    /// main thread. One mutex for both because the worker never holds it across
+    /// anything and the two sinks fire from the same thread anyway.
     std::mutex stage_mutex_;
     std::vector<pipeline::MeshStage> pending_stages_;
+    std::vector<pipeline::SolveStage> pending_solve_stages_;
 
     /// Per-frame connection ranking scratch, kept across frames so the top-K
     /// selection allocates once for the whole take rather than 60 times a
@@ -280,25 +439,57 @@ void cinema_act_window(const CinemaState& state, CinemaAct act, double& t0, doub
 /// fully composed one, which is what the recorder reports.
 [[nodiscard]] double cinema_opening_fade(const CinemaState& state);
 
-/// Act schedule at the current clock, resolved against the real candidate and
-/// stage counts. Act spans are fixed fractions of `state.duration`: the two
-/// data acts (advisor, mesh) take 0.38 each because neither is subordinate to
-/// the other, and the opening skeleton and closing result take 0.12 each.
+/// Length of the DECISION lead-in at the head of the concurrent act, seconds:
+/// `CinemaState::kDecisionLead`, but never more than a fifth of that act.
+[[nodiscard]] double cinema_decision_lead(const CinemaState& state);
+
+/// Act schedule at the current clock, resolved against the real pass, stage and
+/// solve-stage counts. Act spans are fixed fractions of `state.duration`:
+/// skeleton 0.075, deliberate 0.120, build 0.235, solve 0.570. The two data
+/// lanes are NOT one act each -- the pass lane spans deliberate+build and the
+/// stage lane sits inside build -- which is what makes them concurrent, and the
+/// closing 0.570 is the solve/estimate/refine loop plus the load ramp, which is
+/// the longest single thing this take shows.
 [[nodiscard]] CinemaCue cinema_cue(const CinemaState& state);
 
 /// Draw parameters for this instant. Time, opacity and the shrink-toward-
 /// centroid fraction are the only interpolated quantities in the whole module.
 [[nodiscard]] Viewport::CinemaView cinema_view(const CinemaState& state, const CinemaCue& cue);
 
-/// What the viewport should display now: `kCinema` for the skeleton, advisor
-/// and mesh acts, and the real von Mises field for the result act when a
-/// `SolveResult` exists. Without a result the result act holds the final fill
-/// stage and the ticker says so.
-[[nodiscard]] DisplayMode cinema_display_mode(const CinemaState& state, const CinemaCue& cue,
-                                              bool has_result);
+/// Everything the viewport render call needs for this instant, in one struct so
+/// the mode, the exaggeration and the colour-scale maximum cannot be chosen by
+/// three different rules.
+struct CinemaRender {
+    DisplayMode mode = DisplayMode::kCinema;
+    /// Displacement exaggeration to draw at. Zero through the mesh acts and the
+    /// per-pass field beats -- those show the field on the geometry the solver
+    /// actually used -- and `load_factor * base` through the load ramp, which is
+    /// what makes the ramp the exact linear response and not an easing curve.
+    float deform_scale = 0.0f;
+    /// Denominator the field is normalised by. The scalar buffer is the pass's
+    /// own field, so scaling the field by λ is done by DIVIDING this maximum by
+    /// λ: the drawn colour is then λ·s / s_max, i.e. the λ-scaled field against
+    /// a fixed full-load legend, with no second copy of the field anywhere.
+    float result_max = 1.0f;
+};
 
-/// Uploads the stage the cue selected (only when it changed) and pushes the
-/// draw parameters. Main thread only.
+/// What the viewport should display now. `kCinema` for the skeleton, the
+/// deliberation, the concurrent fill and the refine beats; the pass's own von
+/// Mises or ZZ error field for the solve beats. Without a `pipeline::SolveStage`
+/// the closing act holds the final fill stage and the ticker says so.
+[[nodiscard]] CinemaRender cinema_render(const CinemaState& state, const CinemaCue& cue,
+                                         double base_deform_scale);
+
+/// The `solver <token>` word the recorder prints: which linear solver this
+/// take's solves actually ran through. `direct_ldlt` / `cg` when that is
+/// established, `note_absent` when solve stages arrived but neither the solver's
+/// own note nor a DOF count could establish it, `no_solve_stage` when
+/// `pipeline::SolveJob::on_solve_stage` delivered nothing at all. Never a
+/// method this module inferred from anything but those two sources.
+[[nodiscard]] const char* cinema_solver_token(const CinemaState& state);
+
+/// Uploads the stage or the solve-pass result the cue selected (only when it
+/// changed) and pushes the draw parameters. Main thread only.
 void sync_cinema_viewport(CinemaState& state, const CinemaCue& cue, Viewport& viewport);
 
 /// Extracts the part's real outline and pushes it to the viewport skeleton:
@@ -346,11 +537,13 @@ cinema_ticker_body(const CinemaState& state, const CinemaCue& cue, const CinemaH
                                          const CinemaHud& hud, float wrap_width);
 
 /// Height the composition should give the ticker strip: the tallest
-/// `cinema_ticker_height` of any of the four acts at this instant — with the
-/// advisor act probed on its LAST pass, where the DECISION rows join the
-/// per-pass rows and it is at its tallest — raised into
-/// `CinemaState::ticker_reserve` and returned from there. Constant for the
-/// take, so the viewport pane keeps one height and the part keeps one size.
+/// `cinema_ticker_height` of any act at this instant — with the two acts that
+/// carry the pass lane probed on their LAST pass, where the DECISION rows join
+/// the per-pass rows, and the solve act probed in every one of its phases,
+/// because the load-ramp rows and the refine rows are different heights —
+/// raised into `CinemaState::ticker_reserve` and returned from there. Constant
+/// for the take, so the viewport pane keeps one height and the part keeps one
+/// size.
 [[nodiscard]] float cinema_ticker_reserve(CinemaState& state, const CinemaCue& cue,
                                           const CinemaHud& hud, float wrap_width);
 

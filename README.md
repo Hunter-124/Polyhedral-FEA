@@ -3,7 +3,31 @@
 A C++20 adaptive hybrid polyhedral mesher and the linear-elastostatics solver it
 was co-designed with.
 
-![PolyMesh stress render](docs/assets/showcase/hero.png)
+[![The advisor deciding, the mesher building it, and the solve appearing in the order it is computed](docs/assets/cinema/advisor_cinema.gif)](docs/assets/cinema/advisor_cinema.mp4)
+
+**The whole loop in one take.** The advisor's forward passes, the mesher building
+the action they chose, and the answer appearing in the order the solver computes
+it — `sphere_box_s0_c0` under axial tension, 11,692 elements, 13,146 DOF, max von
+Mises 2.489 MPa. Inline loop: the 4 s where the candidate sweep and the fill
+overlap. Full 20 s take:
+[advisor_cinema.mp4](docs/assets/cinema/advisor_cinema.mp4) (h264 1920×1080,
+[poster](docs/assets/cinema/poster.png)).
+
+None of it is a mock-up. The lit nodes and edges are the deployed ONNX graph's
+own trunk tensors and weights, read out of the 39 forward passes onnxruntime ran
+— 38 enumerated candidates plus the final re-score — not a re-implementation of
+them. The mesh arrives at the mesher's own 20 construction stages, in its own
+element emission order, growing from the 2,056-element lattice to 11,692. The
+fields are the real solve in the order the answer is computed: solve, the error
+field recovered from it, the refinement that field asked for, then the refined
+solve, with the load ramped as the exact linear response u(λ) = λ·u — and no
+iteration counter, because at 13,146 free DOF this system is factorised rather
+than iterated. Cosmetic, and only this: the virtual clock the beats are paced on,
+the fades, the shrink that draws each element toward its own centroid, the colour
+ramp and the panel layout. Where a number does not exist the film says so instead
+of inventing one — including that the adapt pass here re-fills to the same
+element count rather than a finer mesh
+([ADR-0042](docs/decisions/0042-the-advisor-explains-itself-on-screen.md)).
 
 Most FEA toolchains split meshing from solving. The mesher emits elements, the
 solver takes what it gets, and neither one gets to tell the other what it needs.
@@ -78,6 +102,11 @@ unpromoted benchmark gates
 [implementation study](docs/research/geogram-cvt-vendoring.md)).
 
 ## Gallery
+
+![PolyMesh stress render](docs/assets/showcase/hero.png)
+
+**hero** — `plate_hole` on the feature-graded mesher at h = 6 mm: 52,080 curved
+cells, 233,820 DOF, min-x face fixed and a conserved +x resultant on max-x.
 
 | | |
 |---|---|
@@ -296,40 +325,40 @@ at ONNX opset 17 with 2.158e-06 relative C++ parity. A recommendation costs
 about 1.0 ms (p50, single-threaded, 20 candidates; p99 2.62 ms measured at 32),
 roughly 0.1% of a solve, and a test fails the build above 100 ms p99.
 
-[![The advisor deciding, and the mesher building what it decided](docs/assets/cinema/advisor_cinema.gif)](docs/assets/cinema/advisor_cinema.mp4)
-
-The advisor deciding, and the mesher building what it decided —
-`box_hole_s0_c0` under axial tension. Inline loop: 11.4 s across the advisor →
-mesh cut of a 30 s take. Full video:
-[advisor_cinema.mp4](docs/assets/cinema/advisor_cinema.mp4) (h264 1920x1080;
-[poster frame](docs/assets/cinema/poster.png) if your renderer shows neither).
-
-Everything with a number on it is measured. The lit nodes and connection lines
-are the deployed ONNX graph's own trunk taps and weights, read back out of the
-forward pass onnxruntime ran — not a re-implementation of it — one pass per
-candidate for all 38 candidates the chooser actually enumerated plus the final
-re-score, with the ranking score, the feasibility gate and the DOF budget shown
-as they fell. The mesh is built at the granularity the mesher has: 18 real
-construction stages — named boundaries like the lattice, the ADR-0013 pyramid
-expansion, the CAD snap and the fan peel — across the two fills the advisor's
-single adapt pass asked for, ending at the 568 elements the solve ran on, in the
-mesher's own emission order, and the action
-being built is the one the network picked in the act before. Cosmetic, and only
-this: the virtual clock the acts are paced on (no frame is a wall-clock
-measurement), fades and opacity, the shrink that draws each element toward its
-own centroid so the interior is legible, the colour ramp, and the layout. If the
-model has no taps or the part is refused as out of distribution, the surface
-says so on screen instead of drawing something plausible
-([ADR-0042](docs/decisions/0042-the-advisor-explains-itself-on-screen.md)).
-This replaces the retired `activation_map.png`, on that figure's own case.
+The film at the top of this README is one of those decisions happening: all 38
+candidates the chooser enumerated plus the final re-score, one real forward pass
+each, with the ranking score, the feasibility gate and the DOF budget shown as
+they fell, beside the mesher building the action it chose and the solver solving
+it. It draws the deployed graph's own trunk taps rather than a re-implementation
+of the forward pass, and where the data is missing — no taps in the export, or a
+part the novelty gate refuses — it says so on screen instead of drawing
+something plausible. It replaces the retired `activation_map.png`, whose own
+case, `box_hole_s0_c0`, is still recordable with
+`scripts/render_cinema.py --part box_hole_s0_c0`. What is measured and what is
+cosmetic, item by item:
+[ADR-0042](docs/decisions/0042-the-advisor-explains-itself-on-screen.md).
 
 The advisor refuses parts it does not recognise. A Mahalanobis distance over 31
 part-geometry columns — 16 mesh-derived features plus 15 exact-B-rep descriptors
-read from the CAD — flags 100% of held-out-family rows in all 8 folds at a 0.86%
-in-sample false-alarm rate, with the threshold at the training 99th percentile.
-It is enforced in C++, not merely measured: on the public unit box the advisor
-reports distance 61.83 against the 6.30 operating point, refuses, and falls back
-to defaults, while an in-corpus part scores 2.29 and is advised normally.
+read from the CAD — is tested against the operating point the shipped
+`bench/advisor/ood.json` actually enforces, 5.034, which is that fit's training
+99th percentile. The artifact records its own leave-one-family-out
+cross-validation beside it: 83.3% held-out-family detection over 12 folds at a
+1% in-sample false-alarm rate.
+
+That is the fit. The shipped artifact was also swept live over all 44 corpus
+primitives (`polymesh solve <part> --advisor bench/advisor`) — a different
+measurement, kept apart from the cross-validated one. Training covers 12 of
+those geometries: regimes s0 and s2 of six families, plus six legacy parts. The
+other 32 split into 12 unseen regimes of trained families and 20 parts of five
+families that appear nowhere in training. All 20 unseen-family parts are
+refused, at distances of 11.36 to 80.19 — 2.3x to 16x the threshold, not
+marginal. All 12 trained geometries are advised, so no false alarm on trained
+geometry, though `channel_s2` sits at 5.03 against the 5.034 threshold. Of the
+12 unseen regimes, 11 are advised and one is refused: `stepped_shaft_s1` at
+5.12, 1.7% over, while its three siblings score 3.74 to 4.17 and are advised.
+The gate is enforced in C++, not merely measured: a refusal falls back to
+defaults rather than reporting a recommendation.
 
 The gate tests the part, not the load case. A user may clamp and load a familiar
 geometry any way they like, and that is a legal question rather than an unknown

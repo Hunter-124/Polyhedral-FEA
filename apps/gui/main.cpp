@@ -17,6 +17,12 @@
 // into <dir>/frame_%05d.png, so the take is independent of the real frame rate
 // and reproducible headlessly. POLYMESH_CINEMA_STAMP is drawn verbatim in the
 // cinema footer as the provenance line.
+// The take is one concurrent composition, not four sequential acts: the advisor
+// pass lane and the mesher's stage lane both advance through the `build` act,
+// and the closing `solve` act walks the real solve/estimate/refine loop out of
+// `pipeline::SolveJob::on_solve_stage` before ramping the load factor. Both
+// worker-thread sinks are installed by `cinema on` and removed by `cinema off`,
+// so a studio session that never enters the cinema pays nothing for either.
 // POLYMESH_GUI_SIZE=<w>x<h> sets the window (and therefore the recorded frame)
 // size at startup; unset, it is the default 1600x1000.
 
@@ -470,6 +476,13 @@ CinemaHud make_cinema_hud(const App& app) {
     hud.order = app.setup.p_elevate ? 2 : 1;
     hud.adapt_passes = app.setup.adapt_passes;
     hud.eta_target = app.setup.eta_target;
+    // Vector sum, not a sum of magnitudes: two opposed face loads resultant to
+    // zero and the load factor has to say so.
+    Eigen::Vector3d total_force = Eigen::Vector3d::Zero();
+    for (const auto& [face, load] : app.setup.loads) {
+        total_force += load.force;
+    }
+    hud.load_newtons = total_force.norm();
     if (app.result) {
         hud.has_result = true;
         hud.nodes = app.result->volume_mesh.nodes.size();
@@ -630,24 +643,30 @@ void tick_auto(AutoRunner& run, App& app, GLFWwindow* window) {
         const bool worker_busy =
             st == SolveJob::State::kMeshing || st == SolveJob::State::kSolving;
         if (args.size() == 1 && args[0] == "on") {
-            // The stage sink has to be installed before the worker starts, so
-            // toggling it under a live job would be a data race on
-            // SolveJob::on_mesh_stage. Refuse rather than race.
+            // The sinks have to be installed before the worker starts, so
+            // toggling them under a live job would be a data race on
+            // SolveJob::on_mesh_stage / on_solve_stage. Refuse rather than race.
             if (worker_busy) {
-                return fail("cinema on while a mesh/solve is running — the stage sink must be "
+                return fail("cinema on while a mesh/solve is running — the stage sinks must be "
                             "installed before the worker starts");
             }
             app.cinema.active = true;
             app.cinema.t = 0.0;
             app.cinema.duration = CinemaState::kDefaultDuration;
             app.cinema.clear_stages();
+            app.cinema.clear_solve_stages();
             // Re-measured from this take's first frame, so a take never
             // inherits a strip height another window size reserved.
             app.cinema.ticker_reserve = 0.0f;
-            // Installed only for the take: the sink copies a whole NodalMesh
-            // per construction stage, which no ordinary solve should pay for.
+            // Installed only for the take: one copies a whole NodalMesh per
+            // construction stage and the other a whole SolveResult per adaptive
+            // pass (1.3 MB each on this film's case), which no ordinary solve
+            // should pay for.
             app.job.on_mesh_stage = [cine = &app.cinema](const pipeline::MeshStage& stage) {
                 cine->push_stage(stage);
+            };
+            app.job.on_solve_stage = [cine = &app.cinema](const pipeline::SolveStage& stage) {
+                cine->push_solve_stage(stage);
             };
             // One continuous shot: nothing re-frames the camera until the take
             // is over, so the result act cannot cut to the deformed shape's own
@@ -659,12 +678,19 @@ void tick_auto(AutoRunner& run, App& app, GLFWwindow* window) {
             }
         } else if (args.size() == 1 && args[0] == "off") {
             if (worker_busy) {
-                return fail("cinema off while a mesh/solve is running — the stage sink cannot "
+                return fail("cinema off while a mesh/solve is running — the stage sinks cannot "
                             "be removed from under the worker");
             }
             app.cinema.active = false;
             app.viewport.set_camera_locked(false);
             app.job.on_mesh_stage = {};
+            app.job.on_solve_stage = {};
+            // The take's own per-pass fields were uploaded over the studio's
+            // result buffers, so hand those back before the studio draws again.
+            if (app.result) {
+                app.viewport.set_result(*app.result);
+            }
+            app.cinema.invalidate_uploads();
             // Hand the viewport back to whatever the studio actually holds:
             // DisplayMode::kCinema means nothing outside the cinema layout.
             app.mode = app.result
@@ -705,7 +731,7 @@ void tick_auto(AutoRunner& run, App& app, GLFWwindow* window) {
         // scaled to exactly that and to nothing else.
         app.cinema.duration = static_cast<double>(frames) * CinemaState::kRecordStep;
         app.cinema.t = 0.0;
-        app.cinema.uploaded_stage = -1;
+        app.cinema.invalidate_uploads();
         // Frames are captured, not watched: waiting for the display would make
         // a 1200-frame take cost 20 s of wall clock for nothing. Restored when
         // the take ends, and on the failure path too.
@@ -815,10 +841,20 @@ void service_cinema_record(AutoRunner& run, App& app, GLFWwindow* window) {
     const int poster = std::min(
         cine.record_frames - 1,
         static_cast<int>(std::ceil(cinema_opening_fade(cine) / CinemaState::kRecordStep)));
+    // Every token that was on this line before keeps its spelling and its
+    // place; `skipped`, `solve_stages` and `solver` are appended, because
+    // scripts/render_cinema.py matches this line token for token.
+    //
+    // `solver` is a word rather than a number and it is the film's answer to a
+    // question a reader would otherwise answer wrongly: at 13,146 DOF against
+    // fea::SolveOptions::cg_threshold = 50,000 this case is factorised, so there
+    // are no iterations in it and nothing in the video may suggest otherwise.
     std::printf("cinema: record %s frames %d fps 60 candidates %zu stages %zu elements %zu "
-                "poster %d width %d height %d\n",
+                "poster %d width %d height %d skipped %zu solve_stages %zu solver %s\n",
                 cine.record_dir.c_str(), cine.record_frames, candidates, cine.stages.size(),
-                app.viewport.cinema_element_count(), poster, fb_w, fb_h);
+                app.viewport.cinema_element_count(), poster, fb_w, fb_h,
+                app.viewport.cinema_skipped_element_count(), cine.solve_stages.size(),
+                cinema_solver_token(cine));
     std::fflush(stdout);
     cine.record_dir.clear();
     glfwSwapInterval(1);
@@ -1617,18 +1653,18 @@ void draw_viewport_content(App& app) {
 /// cropped out of a recorded frame. Camera drag still works so a take can be
 /// composed interactively; a recording never touches the mouse, so a recorded
 /// frame is unaffected either way.
-void draw_cinema_viewport(App& app) {
+///
+/// The mode, the exaggeration and the colour-scale maximum all come from
+/// `cinema_render`, not from the studio's own sliders: the closing act shows one
+/// adaptive pass's field at a time and ramps the load factor, and neither is
+/// something the studio state knows about.
+void draw_cinema_viewport(App& app, const CinemaRender& render) {
     const ImVec2 size = ImGui::GetContentRegionAvail();
     if (size.x < 1 || size.y < 1) {
         return;
     }
-    // Only the result act renders a scalar field, and it is always von Mises.
-    const float result_max = (app.result && app.mode == DisplayMode::kResultsVonMises)
-                                 ? static_cast<float>(app.result->max_von_mises)
-                                 : 1.0f;
-    app.viewport.render(static_cast<int>(size.x), static_cast<int>(size.y), app.mode,
-                        static_cast<float>(app.deform_scale), result_max, app.show_wireframe,
-                        false);
+    app.viewport.render(static_cast<int>(size.x), static_cast<int>(size.y), render.mode,
+                        render.deform_scale, render.result_max, app.show_wireframe, false);
     ImGui::Image(static_cast<ImTextureID>(app.viewport.texture()), size, ImVec2(0, 1),
                  ImVec2(1, 0));
 
@@ -1658,7 +1694,8 @@ void draw_cinema_frame(App& app) {
     const CinemaCue cue = cinema_cue(app.cinema);
 
     // The cue owns what is shown; the app only carries it into the viewport.
-    app.mode = cinema_display_mode(app.cinema, cue, app.result.has_value());
+    const CinemaRender render = cinema_render(app.cinema, cue, app.deform_scale);
+    app.mode = render.mode;
     sync_cinema_viewport(app.cinema, cue, app.viewport);
     const CinemaHud hud = make_cinema_hud(app);
 
@@ -1667,10 +1704,10 @@ void draw_cinema_frame(App& app) {
     // width they will wrap at: a fixed line count clipped the longest act's
     // disclosure off the bottom of the recorded frame, and a disclosure that
     // does not survive into the recording was not made. It is reserved at the
-    // tallest of the FOUR acts rather than at this act's own need, because the
-    // leftover is the viewport pane and the pane's height is what sets the
-    // part's rendered size — a per-act strip resized the part at every act
-    // boundary.
+    // tallest of ALL FOUR acts and of every beat of the closing one, rather than
+    // at this act's own need, because the leftover is the viewport pane and the
+    // pane's height is what sets the part's rendered size — a per-act strip
+    // resized the part at every act boundary.
     const float ticker_h =
         std::max(ImGui::GetTextLineHeightWithSpacing() + 2.0f * kTickerPadY,
                  cinema_ticker_reserve(app.cinema, cue, hud, content_w - 2.0f * kTickerPadX));
@@ -1683,8 +1720,12 @@ void draw_cinema_frame(App& app) {
     // The opening act belongs to the part, so the split OPENS with the network
     // rather than standing empty beside it: the viewport has the whole window
     // while the panel is dark, and the panel slides in from the left as it
-    // fades up. `CinemaCue::network_alpha` drives the width and the opacity
-    // together, so the two can never disagree about when the act arrives.
+    // fades up. `CinemaCue::network_open` drives the width and rises exactly
+    // once, during the opening; `network_alpha` starts as the same curve and
+    // then parts company in the closing act, where the panel is dimmed because
+    // it is HOLDING its last pass. Dimming may not move the split: the pane's
+    // height sets the part's rendered size and a pane that changed mid-take
+    // would resize the subject inside one continuous shot.
     //
     // The panel is always laid out at its FINAL width and translated, never
     // laid out narrow. Its wrapping, label gutter and column spacing are then
@@ -1696,7 +1737,7 @@ void draw_cinema_frame(App& app) {
     // aspect) and the pane height never changes, so the world-to-pixel scale is
     // invariant to the pane WIDTH in both axes. Only the pane's centre
     // translates, continuously, on the same smoothstep — a pan, not a cut.
-    const float open = std::clamp(cue.network_alpha, 0.0f, 1.0f);
+    const float open = std::clamp(cue.network_open, 0.0f, 1.0f);
     const float net_slide = std::floor(net_w * (1.0f - open));
 
     ImGui::SetNextWindowPos(ImVec2(std::floor(vp->Pos.x), std::floor(vp->Pos.y)));
@@ -1726,7 +1767,7 @@ void draw_cinema_frame(App& app) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
     ImGui::BeginChild("cinema_view", ImVec2(0.0f, row_h), ImGuiChildFlags_None,
                       ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-    draw_cinema_viewport(app);
+    draw_cinema_viewport(app, render);
     ImGui::EndChild();
     ImGui::PopStyleVar();
 
@@ -2235,10 +2276,11 @@ int run(int argc, char** argv) {
         app.observed_job_state = current_job_state;
 
         if (app.cinema.active) {
-            // Stages arrive on the SolveJob worker thread; this is the single
-            // main-thread hand-off, so the GL uploads and the draw never race
-            // the mesher.
+            // Construction stages and completed solve passes both arrive on the
+            // SolveJob worker thread; these are the single main-thread hand-off,
+            // so the GL uploads and the draw never race the mesher or the solver.
             app.cinema.drain_stages();
+            app.cinema.drain_solve_stages();
             if (app.cinema.recording()) {
                 // A recording is defined by its frame COUNT, so the clock is a
                 // pure function of the frame index. ImGui::GetIO().DeltaTime is

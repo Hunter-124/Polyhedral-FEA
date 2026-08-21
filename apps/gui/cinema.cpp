@@ -6,6 +6,7 @@
 
 #include "geom/cad_topology.hpp"
 #include "geom/features.hpp"
+#include "fea/solve.hpp"
 
 #include "imgui.h"
 
@@ -24,13 +25,97 @@
 namespace polymesh::gui {
 namespace {
 
-/// Act spans as fractions of the take. The two data acts are equal because
-/// neither is subordinate: the network's deliberation and the mesher's
-/// construction are the two halves of the claim this video makes. The opening
-/// outline and the closing field are cards, so they get a sixth each.
-/// They sum to 1 by construction; `cinema_cue` asserts nothing and simply
-/// clamps, because a recording is an exact frame count, not an exact act sum.
-constexpr std::array<double, 4> kActFraction = {0.12, 0.38, 0.38, 0.12};
+/// Act spans as fractions of the take.
+///
+/// They are NOT one act per data source any more, because the two data sources
+/// no longer take turns. The advisor's pass lane runs continuously across
+/// `kDeliberate` AND `kBuild` (0.31 of the take), while the mesher's stage lane
+/// runs inside `kBuild` alone (0.20): through `kBuild` both counters advance on
+/// the same clock, which is the whole point of this shape. `kSolve` gets the
+/// largest share because it is the only act that shows work with a real
+/// ordering of its own -- solve, estimate, refine, solve, then the load ramp --
+/// rather than a fixed-length sweep over a recorded list.
+///
+/// Measured pacing on the film's case (39 forward passes, 20 construction
+/// stages of which 10 are the initial fill) at the render script's 1800-frame
+/// default, 30.0 s:
+///
+///   forward pass       0.292 s before  ->  0.238 s   (0.31 x 30 / 39)
+///   construction stage 0.570 s before  ->  0.540 s   ((0.20 x 30 - 0.6) / 10)
+///
+/// The "before" pass figure is the old 0.38-of-the-take advisor act over the
+/// same 39 passes. The "before" stage figure is the old 0.38 mesh act over all
+/// 20 stages on THIS case; the 0.633 s quoted when the schedule was designed was
+/// the same fraction over box_hole_s0's 18. The 10 stages of the adaptive
+/// remesh are no longer replayed as ten more stage names -- the closing act
+/// shows the mesh that pass actually SOLVED instead, which is the thing the
+/// error field asked for.
+///
+/// At 1200 frames (20.0 s), the length this composition is tuned for, those
+/// become 0.159 s and 0.340 s; at 900 frames (15.0 s) they are 0.119 s and
+/// 0.240 s. The fractions sum to 1 by construction; `cinema_cue` asserts nothing
+/// and simply clamps, because a recording is an exact frame count, not an exact
+/// act sum.
+constexpr std::array<double, 4> kActFraction = {0.06, 0.11, 0.20, 0.63};
+
+/// Relative lengths of the closing act's beats. Weights, not seconds: the act's
+/// own span is divided among however many beats the real solve produced, so a
+/// case with three adaptive passes gets nine beats out of the same act and a
+/// non-adaptive one gets four.
+///
+/// The refine beat is the long one because it is the only beat that reveals a
+/// whole mesh element by element; the field and error beats are stills of a
+/// field that is already complete and only need long enough to be read. The
+/// ramp is second-longest because it is the one continuous motion in the act.
+constexpr double kFieldWeight = 1.0;
+constexpr double kErrorWeight = 1.0;
+constexpr double kRefineWeight = 2.4;
+constexpr double kRampWeight = 2.2;
+constexpr double kHoldWeight = 0.6;
+
+/// Per-element reveal geometry, retuned for the film's mesh density.
+///
+/// This reveal was first built on box_hole_s0 at the advisor's h_rel = 0.2: 568
+/// cells, each tens of pixels across in the cinema pane. The film's case is
+/// sphere_box_s0 at h_rel = 0.08 — 11,692 cells, 20.6x as many, in the same
+/// pane — and the settings that described 568 cells bury 11,692.
+///
+/// Measured, two binaries differing only in these four numbers, same take, same
+/// frame indices, and the fraction of the part's own painted pixels that are
+/// near-black (luminance < 60, i.e. edge rather than surface) inside the
+/// concurrent act:
+///
+///   frame   0.35 / 0.50 / 1.00 / 1.5 px      0.22 / 0.33 / 0.30 / 1.0 px
+///      72   36.2% dark, mean lum 69.9        6.6% dark, mean lum 98.1
+///      78   50.3% dark, mean lum 65.0        6.3% dark, mean lum 112.9
+///      90   24.9% dark, mean lum 93.1        3.9% dark, mean lum 118.4
+///     125   21.9% dark, mean lum 85.4        3.6% dark, mean lum 105.3
+///
+/// At half the part's pixels being cell outline the fill is a black grid with
+/// orange in the gaps: the shading that distinguishes one face of a cell from
+/// another is gone, and so is the reveal front, because a front made of dark
+/// outlines does not read against a dark background. Luminance spread over the
+/// part drops from 42-60 to 18-27 with the thinner pass, which is the same fact
+/// stated as contrast. The smaller shrink, collapsing over the first third of
+/// each beat rather than the first half, is what keeps the front a surface of
+/// distinct cells instead of detached specks at this cell size.
+constexpr double kRevealShrink = 0.22;
+constexpr double kRevealShrinkFraction = 0.33;
+constexpr float kMeshEdgeAlpha = 0.30f;
+constexpr float kMeshEdgeWidth = 1.0f;
+
+/// Opacity the network panel is held at through the closing act, where its pass
+/// lane has run out and it is showing the final re-score pass rather than
+/// advancing. Opacity only: the panel's width share, its content and every
+/// number in it are exactly what they were at full strength.
+constexpr double kHeldNetworkAlpha = 0.55;
+
+/// Floor on λ when it is used as a DIVISOR for the colour scale. λ itself is
+/// never floored — the number on screen and the displacement are the real λ,
+/// including exactly 0 — but s_max / λ has to stay finite, and at λ = 1e-3 every
+/// drawn colour is already within one part in a thousand of the bottom of the
+/// colormap, which is the correct picture of a part carrying no load.
+constexpr double kMinLoadFactor = 1.0e-3;
 
 /// Connections drawn per frame. The deployed graph has 15,936 of them for this
 /// layout; drawing thousands fills the column band with a solid grey haze that
@@ -164,18 +249,95 @@ std::string h_text(const CinemaHud& hud) {
     return "h auto (SimSetup::mesh_size = 0; nothing meshed yet, so no resolved h to report)";
 }
 
+/// Virtual-time window the advisor's pass lane sweeps: from the end of the
+/// opening to the end of the concurrent act, i.e. across BOTH data acts. One
+/// definition, so the pass beat the ticker prints and the pass the network draws
+/// can never come from two different schedules.
+struct PassLane {
+    double t0 = 0.0;
+    double t1 = 0.0;
+};
+PassLane pass_lane(double total) {
+    return {kActFraction[0] * total,
+            (kActFraction[0] + kActFraction[1] + kActFraction[2]) * total};
+}
+
+/// Construction stages belonging to the initial fill, which is the fill the
+/// concurrent act shows. Later passes' stages exist in the same list (a fill per
+/// adaptive remesh) but they are not the fill the decision produced, and the
+/// closing act shows the mesh a later pass SOLVED rather than re-running the
+/// same ten stage names a second time.
+std::size_t initial_fill_stage_count(const std::vector<pipeline::MeshStage>& stages) {
+    std::size_t n = 0;
+    for (const auto& stage : stages) {
+        if (stage.pass == 0) {
+            ++n;
+        }
+    }
+    return n;
+}
+
+/// Generates the closing act's beat sequence for `n` completed solve passes, in
+/// the order the pipeline computed them, and hands each to `fn(stage, phase,
+/// weight)`.
+///
+/// Per pass: the field that solve produced, the ZZ error field recovered from
+/// the same solve, then -- when another pass followed -- the mesh that next pass
+/// actually solved on. After the last pass, the load ramp and the hold. That is
+/// `pipeline::SolveJob`'s own loop order and nothing else; there is no beat for
+/// a per-element solve order or an iteration count, because a direct sparse
+/// factorisation has neither.
+///
+/// Generated rather than materialised so the per-frame cue costs no allocation:
+/// it is walked twice, once to total the weights and once to locate the beat,
+/// and `n` is `SimSetup::adapt_passes + 1`.
+template <class Fn> void for_each_solve_beat(std::size_t n, Fn&& fn) {
+    if (n == 0) {
+        return;
+    }
+    for (std::size_t i = 0; i < n; ++i) {
+        const auto stage = static_cast<int>(i);
+        fn(stage, SolvePhase::kField, kFieldWeight);
+        fn(stage, SolvePhase::kError, kErrorWeight);
+        if (i + 1 < n) {
+            fn(stage, SolvePhase::kRefine, kRefineWeight);
+        }
+    }
+    const auto last = static_cast<int>(n) - 1;
+    fn(last, SolvePhase::kLoadRamp, kRampWeight);
+    fn(last, SolvePhase::kHold, kHoldWeight);
+}
+
 } // namespace
 
 const char* cinema_act_name(CinemaAct act) {
     switch (act) {
     case CinemaAct::kSkeleton:
         return "skeleton";
-    case CinemaAct::kAdvisor:
-        return "advisor";
-    case CinemaAct::kMesh:
-        return "mesh";
-    case CinemaAct::kResult:
-        return "result";
+    case CinemaAct::kDeliberate:
+        return "deliberate";
+    case CinemaAct::kBuild:
+        return "build";
+    case CinemaAct::kSolve:
+        return "solve";
+    }
+    return "unknown"; // only reachable from an out-of-range int cast
+}
+
+const char* cinema_solve_phase_name(SolvePhase phase) {
+    switch (phase) {
+    case SolvePhase::kNone:
+        return "none";
+    case SolvePhase::kField:
+        return "field";
+    case SolvePhase::kError:
+        return "error";
+    case SolvePhase::kRefine:
+        return "refine";
+    case SolvePhase::kLoadRamp:
+        return "load ramp";
+    case SolvePhase::kHold:
+        return "hold";
     }
     return "unknown"; // only reachable from an out-of-range int cast
 }
@@ -208,7 +370,42 @@ void CinemaState::clear_stages() {
         pending_stages_.clear();
     }
     stages.clear();
-    uploaded_stage = -1;
+    invalidate_uploads();
+}
+
+void CinemaState::push_solve_stage(const pipeline::SolveStage& stage) {
+    // Worker thread, same contract as push_stage: the callback's SolveResult is
+    // the worker's own, so the copy is mandatory.
+    const std::lock_guard<std::mutex> lock(stage_mutex_);
+    pending_solve_stages_.push_back(stage);
+}
+
+void CinemaState::drain_solve_stages() {
+    std::vector<pipeline::SolveStage> pending;
+    {
+        const std::lock_guard<std::mutex> lock(stage_mutex_);
+        if (pending_solve_stages_.empty()) {
+            return;
+        }
+        pending.swap(pending_solve_stages_);
+    }
+    solve_stages.insert(solve_stages.end(), std::make_move_iterator(pending.begin()),
+                        std::make_move_iterator(pending.end()));
+}
+
+void CinemaState::clear_solve_stages() {
+    {
+        const std::lock_guard<std::mutex> lock(stage_mutex_);
+        pending_solve_stages_.clear();
+    }
+    solve_stages.clear();
+    invalidate_uploads();
+}
+
+void CinemaState::invalidate_uploads() {
+    uploaded_mesh_source = CinemaMeshSource::kNone;
+    uploaded_mesh_index = -1;
+    uploaded_solve_stage = -1;
 }
 
 void CinemaState::advance(double dt) {
@@ -241,6 +438,11 @@ double cinema_opening_fade(const CinemaState& state) {
     return std::min(CinemaState::kOpeningFade, 0.5 * skeleton_span);
 }
 
+double cinema_decision_lead(const CinemaState& state) {
+    const double build_span = kActFraction[2] * std::max(state.duration, 1.0e-6);
+    return std::min(CinemaState::kDecisionLead, 0.2 * build_span);
+}
+
 CinemaCue cinema_cue(const CinemaState& state) {
     CinemaCue cue;
     const double total = std::max(state.duration, 1.0e-6);
@@ -266,54 +468,126 @@ CinemaCue cinema_cue(const CinemaState& state) {
     // the panel's content at alpha 0.4 is the same content it has at alpha 1.
     if (cue.act == CinemaAct::kSkeleton) {
         const double half = 0.5 * cue.act_span;
-        cue.network_alpha =
+        cue.network_open =
             static_cast<float>(smoothstep((cue.act_t - half) / std::max(half, 1.0e-9)));
+        cue.network_alpha = cue.network_open;
+    } else if (cue.act == CinemaAct::kSolve) {
+        // The pass lane has run out by here, so the panel is HOLDING its final
+        // re-score pass rather than advancing, and it is dimmed to say so.
+        // Opacity only: `network_open` stays at 1, because the width share sets
+        // the viewport pane's width, the pane's height sets the part's rendered
+        // size, and a pane that changed mid-take would resize the subject inside
+        // what is meant to be one continuous shot.
+        const double fade = std::min(0.5, 0.15 * cue.act_span);
+        cue.network_alpha = static_cast<float>(
+            1.0 - (1.0 - kHeldNetworkAlpha) * smoothstep(cue.act_t / std::max(fade, 1.0e-9)));
     }
 
-    // Advisor beats: one per forward pass, in the order the chooser ran them.
-    // After the advisor act the index sticks at the last pass, so the network
-    // stays lit with the decision while the mesh it chose is built -- that is
-    // the causal link the video is about, and it is the same real data.
+    // ---- lane 1: the advisor's forward passes ----------------------------
+    // One beat per real forward pass, in the order the chooser ran them, across
+    // kDeliberate AND kBuild as a single uninterrupted sweep. Past the lane the
+    // index sticks at the last pass, so the network stays lit with the decision
+    // while the answer it chose is computed.
     std::size_t n_frames = 0;
 #ifdef POLYMESH_WITH_ADVISOR
     if (state.explanation) {
         n_frames = state.explanation->frames.size();
     }
 #endif
+    bool pass_lane_live = false;
     if (n_frames > 0) {
-        const double advisor_span = kActFraction[1] * total;
-        const double beat = advisor_span / static_cast<double>(n_frames);
-        if (cue.act == CinemaAct::kSkeleton) {
-            cue.frame_index = -1;
-        } else if (cue.act == CinemaAct::kAdvisor) {
-            const auto i = static_cast<std::size_t>(cue.act_t / std::max(beat, 1.0e-9));
+        const PassLane lane = pass_lane(total);
+        const double beat = (lane.t1 - lane.t0) / static_cast<double>(n_frames);
+        cue.pass_beat_seconds = beat;
+        if (state.t >= lane.t0) {
+            const auto i =
+                static_cast<std::size_t>((state.t - lane.t0) / std::max(beat, 1.0e-9));
             cue.frame_index = static_cast<int>(std::min(i, n_frames - 1));
-            cue.beat_seconds = beat;
-        } else {
-            cue.frame_index = static_cast<int>(n_frames - 1);
+            pass_lane_live = state.t < lane.t1;
         }
     }
 
-    // Mesh beats: one per collected construction stage, in emission order.
-    if (!state.stages.empty()) {
-        const std::size_t n = state.stages.size();
-        const double mesh_span = kActFraction[2] * total;
-        const double beat = mesh_span / static_cast<double>(n);
-        if (cue.act == CinemaAct::kSkeleton || cue.act == CinemaAct::kAdvisor) {
-            cue.stage_index = -1;
-        } else if (cue.act == CinemaAct::kMesh) {
-            const auto i = static_cast<std::size_t>(cue.act_t / std::max(beat, 1.0e-9));
-            const std::size_t clamped = std::min(i, n - 1);
-            cue.stage_index = static_cast<int>(clamped);
-            // Linear in time on purpose: the on-screen spawn rate is then
-            // proportional to the stage's own element count, so a stage that
-            // added twice as many elements visibly takes twice the work.
-            const double within = cue.act_t - static_cast<double>(clamped) * beat;
-            cue.stage_reveal = std::clamp(within / std::max(beat, 1.0e-9), 0.0, 1.0);
-            cue.beat_seconds = beat;
-        } else {
-            cue.stage_index = static_cast<int>(n - 1);
+    // The ranking's outcome may be stated from the first frame of the concurrent
+    // act, which `cinema_decision_lead` guarantees is before the first element
+    // of the fill appears.
+    cue.decision_locked = cue.act == CinemaAct::kBuild || cue.act == CinemaAct::kSolve;
+
+    // ---- lane 2: the mesher's own construction stages -------------------
+    const std::size_t n_fill = initial_fill_stage_count(state.stages);
+    bool stage_lane_live = false;
+    if (n_fill > 0) {
+        const double lead = cinema_decision_lead(state);
+        const double span = std::max(kActFraction[2] * total - lead, 1.0e-6);
+        const double beat = span / static_cast<double>(n_fill);
+        cue.stage_beat_seconds = beat;
+        if (cue.act == CinemaAct::kBuild) {
+            const double x = cue.act_t - lead;
+            if (x >= 0.0) {
+                const auto i = static_cast<std::size_t>(x / beat);
+                const std::size_t clamped = std::min(i, n_fill - 1);
+                cue.stage_index = static_cast<int>(clamped);
+                // Linear in time on purpose: the on-screen spawn rate is then
+                // proportional to the stage's own element count, so a stage that
+                // added twice as many elements visibly takes twice the work.
+                const double within = x - static_cast<double>(clamped) * beat;
+                cue.stage_reveal = std::clamp(within / beat, 0.0, 1.0);
+                cue.mesh_source = CinemaMeshSource::kFillStage;
+                cue.mesh_source_index = cue.stage_index;
+                stage_lane_live = true;
+            }
+        } else if (cue.act == CinemaAct::kSolve) {
+            // The finished fill is where the closing act starts, and it stays
+            // named in the ticker. No mesh source: the closing act draws fields
+            // out of `solve_stages`, and the one beat that uses the per-element
+            // buffer is kRefine, which points it at the refined mesh itself.
+            cue.stage_index = static_cast<int>(n_fill - 1);
             cue.stage_reveal = 1.0;
+        }
+    }
+    // The claim the ticker makes, taken from the schedule rather than restated
+    // beside it: both lanes are advancing on this frame.
+    cue.concurrent = pass_lane_live && stage_lane_live;
+
+    // ---- the closing act: the real solve / estimate / refine loop --------
+    if (cue.act == CinemaAct::kSolve && !state.solve_stages.empty()) {
+        const std::size_t n_solve = state.solve_stages.size();
+        double weight_total = 0.0;
+        for_each_solve_beat(n_solve,
+                            [&](int, SolvePhase, double w) { weight_total += w; });
+        const double unit = cue.act_span / std::max(weight_total, 1.0e-9);
+        double at = 0.0;
+        int beat_stage = 0;
+        SolvePhase beat_phase = SolvePhase::kField;
+        double beat_t0 = 0.0;
+        double beat_span = 1.0;
+        for_each_solve_beat(n_solve, [&](int stage, SolvePhase phase, double w) {
+            const double span = w * unit;
+            // The beats are contiguous, so the last one whose start is at or
+            // before the clock is the one the clock is inside — and a clock that
+            // overran the act holds the final beat rather than wrapping.
+            if (cue.act_t >= at) {
+                beat_stage = stage;
+                beat_phase = phase;
+                beat_t0 = at;
+                beat_span = span;
+            }
+            at += span;
+        });
+        cue.solve_stage_index = beat_stage;
+        cue.solve_phase = beat_phase;
+        cue.solve_phase_span = beat_span;
+        cue.solve_phase_t = std::clamp(cue.act_t - beat_t0, 0.0, beat_span);
+        const double x = cue.solve_phase_t / std::max(beat_span, 1.0e-9);
+        if (beat_phase == SolvePhase::kRefine) {
+            cue.refine_reveal = std::clamp(x, 0.0, 1.0);
+            cue.mesh_source = CinemaMeshSource::kSolvedPass;
+            cue.mesh_source_index = beat_stage + 1;
+        } else if (beat_phase == SolvePhase::kLoadRamp) {
+            // Linear, never eased. λ is a number on screen and u(λ) = λ·u is
+            // exact, so easing λ would give the deforming shape a rate of change
+            // the linear solve does not have — which is the one thing a ramp
+            // labelled "exact linear response" may not do.
+            cue.load_factor = std::clamp(x, 0.0, 1.0);
         }
     }
     return cue;
@@ -322,6 +596,16 @@ CinemaCue cinema_cue(const CinemaState& state) {
 Viewport::CinemaView cinema_view(const CinemaState& state, const CinemaCue& cue) {
     Viewport::CinemaView view;
     view.edges = true;
+    view.edge_alpha = kMeshEdgeAlpha;
+    view.edge_width = kMeshEdgeWidth;
+    // Elements land shrunk toward their own centroid so each reads as a separate
+    // cell as it appears, and close up to touching partway through the beat.
+    // Geometry, not data: the element is the element.
+    const auto shrink_for = [](double reveal) {
+        return static_cast<float>(
+            kRevealShrink *
+            (1.0 - smoothstep(std::min(1.0, reveal / kRevealShrinkFraction))));
+    };
     switch (cue.act) {
     case CinemaAct::kSkeleton:
         view.skeleton_alpha = static_cast<float>(
@@ -330,49 +614,156 @@ Viewport::CinemaView cinema_view(const CinemaState& state, const CinemaCue& cue)
         view.mesh_alpha = 0.0f;
         view.shrink = 1.0f;
         break;
-    case CinemaAct::kAdvisor:
-        // Nothing has been meshed while the network deliberates, so nothing may
-        // be drawn as mesh. The outline is the whole picture here.
+    case CinemaAct::kDeliberate:
+        // Nothing has been meshed while the network deliberates alone, so nothing
+        // may be drawn as mesh. The outline is the whole picture here.
         view.skeleton_alpha = 1.0f;
         view.reveal = 0.0f;
         view.mesh_alpha = 0.0f;
         view.shrink = 1.0f;
         break;
-    case CinemaAct::kMesh:
+    case CinemaAct::kBuild:
         // The outline stays as a dim reference frame so the growing fill can be
-        // read against the part it is filling.
+        // read against the part it is filling. Through the DECISION lead-in the
+        // cue has selected no stage yet, and a reveal of 0 draws no element:
+        // the fill may not start before the action it executes is readable.
         view.skeleton_alpha = 0.45f;
-        view.reveal = static_cast<float>(cue.stage_reveal);
+        view.reveal = cue.stage_index >= 0 ? static_cast<float>(cue.stage_reveal) : 0.0f;
         view.mesh_alpha = 1.0f;
-        // Elements land shrunk toward their own centroid so each reads as a
-        // separate cell as it appears, and close up to touching by the middle
-        // of the stage. Geometry, not data: the element is the element.
-        view.shrink = static_cast<float>(
-            0.35 * (1.0 - smoothstep(std::min(1.0, cue.stage_reveal * 2.0))));
+        view.shrink = cue.stage_index >= 0 ? shrink_for(cue.stage_reveal) : 1.0f;
         break;
-    case CinemaAct::kResult:
-        view.skeleton_alpha = 0.25f;
-        view.reveal = 1.0f;
-        view.mesh_alpha = 1.0f;
-        view.shrink = 0.0f;
+    case CinemaAct::kSolve:
+        if (cue.solve_phase == SolvePhase::kRefine) {
+            // The refined mesh appearing, element by element, in the order it is
+            // stored in the mesh the next pass actually solved.
+            view.skeleton_alpha = 0.35f;
+            view.reveal = static_cast<float>(cue.refine_reveal);
+            view.mesh_alpha = 1.0f;
+            view.shrink = shrink_for(cue.refine_reveal);
+        } else {
+            // Every other beat of this act renders a field, so these values are
+            // only reached when no `pipeline::SolveStage` arrived at all and the
+            // act holds the finished fill instead. The ticker says which.
+            view.skeleton_alpha = 0.25f;
+            view.reveal = 1.0f;
+            view.mesh_alpha = 1.0f;
+            view.shrink = 0.0f;
+        }
         break;
     }
     return view;
 }
 
-DisplayMode cinema_display_mode(const CinemaState& /*state*/, const CinemaCue& cue,
-                                bool has_result) {
-    if (cue.act == CinemaAct::kResult && has_result) {
-        return DisplayMode::kResultsVonMises;
+CinemaRender cinema_render(const CinemaState& state, const CinemaCue& cue,
+                           double base_deform_scale) {
+    CinemaRender out;
+    if (cue.act != CinemaAct::kSolve || cue.solve_stage_index < 0 ||
+        static_cast<std::size_t>(cue.solve_stage_index) >= state.solve_stages.size()) {
+        return out; // kCinema, undeformed; `result_max` is unused there
     }
-    return DisplayMode::kCinema;
+    const pipeline::SolveResult& result =
+        state.solve_stages[static_cast<std::size_t>(cue.solve_stage_index)].result;
+    switch (cue.solve_phase) {
+    case SolvePhase::kField:
+        // That pass's own von Mises, on the geometry that pass solved. Zero
+        // exaggeration: this beat is about the field, and the shape's real
+        // response is what the load ramp below is for.
+        out.mode = DisplayMode::kResultsVonMises;
+        out.result_max = static_cast<float>(result.max_von_mises);
+        break;
+    case SolvePhase::kError:
+        // The ZZ error field recovered from that same solve — the field that
+        // decided where the next pass refined.
+        out.mode = DisplayMode::kResultsError;
+        out.result_max = static_cast<float>(result.max_nodal_eta);
+        break;
+    case SolvePhase::kRefine:
+        break; // kCinema: this beat draws the refined MESH, not a field
+    case SolvePhase::kLoadRamp:
+    case SolvePhase::kHold: {
+        out.mode = DisplayMode::kResultsVonMises;
+        const double lambda = std::clamp(cue.load_factor, 0.0, 1.0);
+        out.deform_scale = static_cast<float>(lambda * base_deform_scale);
+        // The stress scales with the load exactly as the displacement does, so
+        // the colour has to ramp with the shape or the frame would show a fully
+        // stressed part that has barely moved. The scalar buffer stays the
+        // pass's own field and the MAXIMUM is divided by λ instead, which makes
+        // the drawn colour λ·s / s_max: the λ-scaled field against a fixed
+        // full-load legend, with no second copy of the field anywhere.
+        out.result_max =
+            static_cast<float>(result.max_von_mises / std::max(lambda, kMinLoadFactor));
+        break;
+    }
+    case SolvePhase::kNone:
+        break;
+    }
+    // A field whose maximum is zero would divide the colormap by zero. One is
+    // the neutral denominator and leaves every value where it is.
+    if (!(out.result_max > 0.0f)) {
+        out.result_max = 1.0f;
+    }
+    return out;
+}
+
+const char* cinema_solver_token(const CinemaState& state) {
+    if (state.solve_stages.empty()) {
+        return "no_solve_stage";
+    }
+    // The solver's own words first. `fea::SolveOptions::on_note` is the only
+    // channel the linear solver has, and it speaks on the CG path and on a
+    // memory-budget downgrade; below `cg_threshold` with the budget satisfied it
+    // says nothing at all, which is the normal outcome at this project's DOF
+    // counts and is exactly the case on the film's part.
+    for (const auto& stage : state.solve_stages) {
+        if (stage.solver_note.find("CG") != std::string::npos ||
+            stage.solver_note.find("cg") != std::string::npos) {
+            return "cg";
+        }
+    }
+    // No note. That is not a licence to guess: it is a fact with a consequence.
+    // `fea::select_solve_method` sends `kAuto` to CG only when the FREE DOF count
+    // exceeds `SolveOptions::cg_threshold`, the free set is a subset of the
+    // mesh's DOF, and the one override that could have changed the choice is the
+    // memory-budget downgrade — which emits a note. So a silent solve whose total
+    // DOF is below the threshold was factorised, and nothing was inferred beyond
+    // arithmetic on two real numbers.
+    const fea::SolveOptions defaults;
+    for (const auto& stage : state.solve_stages) {
+        if (stage.trace.n_dof == 0 ||
+            static_cast<Eigen::Index>(stage.trace.n_dof) > defaults.cg_threshold) {
+            return "note_absent";
+        }
+    }
+    return "direct_ldlt";
 }
 
 void sync_cinema_viewport(CinemaState& state, const CinemaCue& cue, Viewport& viewport) {
-    if (cue.stage_index >= 0 && cue.stage_index != state.uploaded_stage &&
-        static_cast<std::size_t>(cue.stage_index) < state.stages.size()) {
-        viewport.set_cinema_mesh(state.stages[static_cast<std::size_t>(cue.stage_index)].mesh);
-        state.uploaded_stage = cue.stage_index;
+    // Per-element buffer: re-uploaded only when the cue names a different mesh,
+    // because `set_cinema_mesh` rebuilds every element's own faces.
+    if (cue.mesh_source != CinemaMeshSource::kNone && cue.mesh_source_index >= 0 &&
+        (cue.mesh_source != state.uploaded_mesh_source ||
+         cue.mesh_source_index != state.uploaded_mesh_index)) {
+        const auto i = static_cast<std::size_t>(cue.mesh_source_index);
+        const fea::NodalMesh* mesh = nullptr;
+        if (cue.mesh_source == CinemaMeshSource::kFillStage && i < state.stages.size()) {
+            mesh = &state.stages[i].mesh;
+        } else if (cue.mesh_source == CinemaMeshSource::kSolvedPass &&
+                   i < state.solve_stages.size()) {
+            mesh = &state.solve_stages[i].result.volume_mesh;
+        }
+        if (mesh != nullptr) {
+            viewport.set_cinema_mesh(*mesh);
+            state.uploaded_mesh_source = cue.mesh_source;
+            state.uploaded_mesh_index = cue.mesh_source_index;
+        }
+    }
+    // Result buffers: one re-bake per adaptive pass, so the field drawn beside
+    // "pass 0" is the field pass 0 produced and not the final answer relabelled.
+    if (cue.solve_stage_index >= 0 && cue.solve_stage_index != state.uploaded_solve_stage &&
+        static_cast<std::size_t>(cue.solve_stage_index) < state.solve_stages.size()) {
+        viewport.set_result(
+            state.solve_stages[static_cast<std::size_t>(cue.solve_stage_index)].result);
+        state.uploaded_solve_stage = cue.solve_stage_index;
     }
     viewport.set_cinema_view(cinema_view(state, cue));
 }
@@ -993,12 +1384,12 @@ void advisor_ticker(const CinemaState& state, const CinemaCue& cue,
             out, palette.text_dim,
             fmt("%zu forward passes recorded; the first beat has not started", frames.size()));
     }
-    // The decision itself, once the last pass has been reached. Before that the
-    // ticker must not pre-announce an outcome the beats have not shown.
-    const bool locked =
-        cue.act != CinemaAct::kAdvisor ||
-        (!frames.empty() && cue.frame_index == static_cast<int>(frames.size()) - 1);
-    if (locked) {
+    // The decision itself, from the first frame of the concurrent act onward —
+    // which `cinema_decision_lead` puts strictly before the first element of the
+    // fill. Before that the ticker must not pre-announce an outcome the beats
+    // have not shown, and after it the fill on screen has to be readable as the
+    // execution of THIS action rather than something that arrived first.
+    if (cue.decision_locked) {
         const auto& d = explanation.decision;
         push_line(out, d.vetoed ? palette.status_err : palette.status_ok,
                   fmt("DECISION mesher %s · h_rel %.4g · order %d · adapt %d · η %.4g · "
@@ -1008,11 +1399,26 @@ void advisor_ticker(const CinemaState& state, const CinemaCue& cue,
                       d.vetoed ? " · REFUSED" : "", d.clamped ? " · clamped" : ""));
         push_line(out, state.decision_applied ? palette.status_ok : palette.status_warn,
                   state.decision_note);
+        // Stated because the composition would otherwise invite the wrong
+        // reading: passes keep arriving on screen after the outcome is shown, and
+        // the fill grows beside them. Both sequences are recordings. The ranking
+        // ran to completion inside Advisor::explain() before `solve` was issued,
+        // so the decision really was final before the mesher emitted anything —
+        // and the remaining passes on screen are the rest of that same finished
+        // deliberation, not new evidence arriving late.
+        if (cue.frame_index >= 0 && cue.frame_index + 1 < static_cast<int>(frames.size())) {
+            push_line(out, palette.text_dim,
+                      fmt("all %zu forward passes completed inside Advisor::explain() before "
+                          "`solve` was issued; the pass lane is still replaying them (%d of "
+                          "%zu shown) beside the fill they chose. The decision above was "
+                          "already final when the mesher emitted its first stage",
+                          frames.size(), cue.frame_index + 1, frames.size()));
+        }
     }
 #endif
 }
 
-void mesh_ticker(const CinemaState& state, const CinemaCue& cue, const CinemaHud& hud,
+void fill_ticker(const CinemaState& state, const CinemaCue& cue, const CinemaHud& hud,
                  std::vector<CinemaLine>& out) {
     if (state.stages.empty()) {
         push_line(out, palette.status_err,
@@ -1024,23 +1430,40 @@ void mesh_ticker(const CinemaState& state, const CinemaCue& cue, const CinemaHud
                   "Nothing is drawn in place of stages that were never emitted");
         return;
     }
-    const auto idx = static_cast<std::size_t>(std::max(cue.stage_index, 0));
+    if (cue.stage_index < 0) {
+        push_line(out, palette.text_dim,
+                  fmt("the fill has not started: the advised action above is held on screen "
+                      "for %.3f s (CinemaState::kDecisionLead) before the first element "
+                      "appears, so nothing on this frame can be read as preceding it",
+                      cinema_decision_lead(state)));
+        return;
+    }
+    const auto idx = static_cast<std::size_t>(cue.stage_index);
     const auto& stage = state.stages[idx];
+    const std::size_t n_fill = initial_fill_stage_count(state.stages);
     push_line(out, palette.text,
               fmt("stage %zu/%zu '%s' — emission index %d, adapt pass %d, %zu elements / "
-                  "%zu nodes in this stage",
-                  idx + 1, state.stages.size(), stage.stage.c_str(), stage.index, stage.pass,
-                  stage.mesh.elements.size(), stage.mesh.nodes.size()));
+                  "%zu nodes in this stage%s",
+                  idx + 1, n_fill, stage.stage.c_str(), stage.index, stage.pass,
+                  stage.mesh.elements.size(), stage.mesh.nodes.size(),
+                  cue.concurrent ? " — CONCURRENT with the pass lane above: both counters "
+                                   "are advancing on this frame"
+                                 : ""));
     // The viewport draws every element whose index is below reveal * count, so
     // the drawn count is that product -- exact arithmetic on two real numbers,
     // not an estimate of progress.
     const auto drawn =
         static_cast<std::size_t>(cue.stage_reveal * static_cast<double>(hud.cinema_elements));
     push_line(out, palette.text_dim,
-              fmt("reveal %.0f%% — %zu of %zu drawable elements, appearing in the mesher's "
-                  "own emission order (their index in mesh.elements): nothing is sorted, "
-                  "and no element is drawn before the stage that built it",
-                  100.0 * cue.stage_reveal, drawn, hud.cinema_elements));
+              fmt("reveal %.0f%% — %zu of %zu drawable elements at %.0f elements per "
+                  "recorded frame, appearing in the mesher's own emission order (their "
+                  "index in mesh.elements): nothing is sorted, and no element is drawn "
+                  "before the stage that built it",
+                  100.0 * cue.stage_reveal, drawn, hud.cinema_elements,
+                  cue.stage_beat_seconds > 0.0
+                      ? static_cast<double>(hud.cinema_elements) * CinemaState::kRecordStep /
+                            cue.stage_beat_seconds
+                      : 0.0));
     if (hud.cinema_skipped_elements > 0) {
         push_line(out, palette.status_warn,
                   fmt("%zu of this stage's %zu elements could not be triangulated for "
@@ -1050,23 +1473,141 @@ void mesh_ticker(const CinemaState& state, const CinemaCue& cue, const CinemaHud
     }
 }
 
-void result_ticker(const CinemaHud& hud, std::vector<CinemaLine>& out) {
-    if (!hud.has_result) {
-        push_line(out, palette.status_warn,
-                  "no solve result in this take — holding the final fill stage. "
-                  "Nothing is drawn in place of a field that was not computed");
+/// The linear solver's own account of itself, or the fact that it gave none.
+///
+/// `fea::SolveOptions::on_note` is the only channel the solver has and it speaks
+/// on the CG path and on a memory-budget downgrade. Below `cg_threshold` with
+/// the budget satisfied it says nothing, which is what happens on this film's
+/// case — so the surface reports the silence AND the arithmetic that makes the
+/// silence conclusive, and never a method name dressed up as something the
+/// solver said.
+void solver_lines(const pipeline::SolveStage& stage, std::vector<CinemaLine>& out) {
+    const fea::SolveOptions defaults;
+    if (!stage.solver_note.empty()) {
+        push_line(out, palette.text,
+                  fmt("linear solver, verbatim from fea::SolveOptions::on_note: %s",
+                      stage.solver_note.c_str()));
         return;
     }
-    push_line(out, palette.status_ok,
-              fmt("real von Mises field — max %.4g MPa · max |u| %.4g mm · ZZ η global "
-                  "%.4g · %zu elements / %zu nodes / %zu DOF",
-                  hud.max_von_mises / 1e6, hud.max_displacement * 1e3, hud.global_eta,
-                  hud.elements, hud.nodes, hud.dof));
-    push_line(out, palette.text_dim,
-              fmt("nodal values are SolveResult::von_mises; the deformed shape is the "
-                  "solved displacement drawn at %.4g× (App::deform_scale — true scale on "
-                  "this part is invisible at %.4g mm peak)",
-                  hud.deform_scale, hud.max_displacement * 1e3));
+    if (stage.trace.n_dof == 0) {
+        push_line(out, palette.status_warn,
+                  "this pass emitted no solver note (fea::SolveOptions::on_note was never "
+                  "called) and PassTrace::n_dof is 0, so which linear solver ran is not "
+                  "established here and is not guessed");
+        return;
+    }
+    const bool below = static_cast<Eigen::Index>(stage.trace.n_dof) <= defaults.cg_threshold;
+    push_line(out, below ? palette.status_ok : palette.status_warn,
+              fmt("this pass emitted NO solver note — fea::SolveOptions::on_note was never "
+                  "called, which fea does only when it neither iterates nor overrides its "
+                  "own method choice. fea::select_solve_method sends SolveMethod::kAuto to "
+                  "CG only when the FREE DOF count exceeds SolveOptions::cg_threshold = "
+                  "%lld; the free set is a subset of this pass's PassTrace::n_dof = %zu, so "
+                  "nfree ≤ %zu %s %lld and the system was %s",
+                  static_cast<long long>(defaults.cg_threshold), stage.trace.n_dof,
+                  stage.trace.n_dof, below ? "<" : ">",
+                  static_cast<long long>(defaults.cg_threshold),
+                  below ? "factorised directly (sparse LDLT). NO conjugate-gradient "
+                          "iterations exist on this case, so none are animated"
+                        : "not established by this bound alone, and no method is claimed"));
+}
+
+void solve_ticker(const CinemaState& state, const CinemaCue& cue, const CinemaHud& hud,
+                  std::vector<CinemaLine>& out) {
+    if (state.solve_stages.empty()) {
+        push_line(out, palette.status_err,
+                  "no solve passes were collected: pipeline::SolveJob::on_solve_stage "
+                  "received none, so this act holds the finished fill instead of a field");
+        push_line(out, palette.text_dim,
+                  "the solve-stage sink is installed only while `cinema on`, and it fires "
+                  "from the adaptive loop — run `cinema on` before `solve`. Nothing is "
+                  "drawn in place of a field that was never delivered here");
+        return;
+    }
+    const auto i = static_cast<std::size_t>(std::max(cue.solve_stage_index, 0));
+    const auto& stage = state.solve_stages[std::min(i, state.solve_stages.size() - 1)];
+    const auto& r = stage.result;
+    const auto& tr = stage.trace;
+    push_line(out, palette.accent,
+              fmt("solve pass %d of %zu completed passes · beat '%s' %.2f/%.2f s · %zu "
+                  "elements / %zu nodes / %zu DOF (PassTrace) · %s",
+                  stage.pass, state.solve_stages.size(), cinema_solve_phase_name(cue.solve_phase),
+                  cue.solve_phase_t, cue.solve_phase_span, tr.n_elems, tr.n_nodes, tr.n_dof,
+                  stage.final_pass ? "no further pass ran after this one (SolveStage::"
+                                     "final_pass)"
+                                   : "another pass followed"));
+    switch (cue.solve_phase) {
+    case SolvePhase::kField:
+        push_line(out, palette.status_ok,
+                  fmt("THIS PASS'S OWN von Mises field — max %.4g MPa · max |u| %.4g mm · "
+                      "nodal values are SolveStage::result.von_mises, drawn on the geometry "
+                      "this pass solved (0× exaggeration: the real shape)",
+                      r.max_von_mises / 1e6, r.max_displacement * 1e3));
+        solver_lines(stage, out);
+        break;
+    case SolvePhase::kError:
+        push_line(out, palette.status_ok,
+                  fmt("the ZZ error field recovered FROM that same solve — global η %.4g · "
+                      "η p50 %.4g · p90 %.4g · max %.4g · nodal values are "
+                      "SolveStage::result.nodal_eta, colour scale is max_nodal_eta %.4g",
+                      tr.global_eta, tr.eta_p50, tr.eta_p90, tr.eta_max, r.max_nodal_eta));
+        push_line(out, palette.text_dim,
+                  fmt("this is what decided the next refinement: %zu elements marked for h, "
+                      "%zu for p, %zu on shape, predicted DOF factor %.4g. η target %.4g",
+                      tr.n_h_mark, tr.n_p_mark, tr.n_shape_mark, tr.predicted_dof_factor,
+                      hud.eta_target));
+        break;
+    case SolvePhase::kRefine: {
+        const std::size_t next = i + 1;
+        if (next < state.solve_stages.size()) {
+            const auto& nx = state.solve_stages[next];
+            push_line(out, palette.status_ok,
+                      fmt("the refined mesh pass %d actually solved, appearing element by "
+                          "element — %zu elements / %zu nodes / %zu DOF, from %zu / %zu / %zu "
+                          "at pass %d (PassTrace::n_elems, n_nodes, n_dof)",
+                          nx.pass, nx.trace.n_elems, nx.trace.n_nodes, nx.trace.n_dof,
+                          tr.n_elems, tr.n_nodes, tr.n_dof, stage.pass));
+            const auto drawn = static_cast<std::size_t>(
+                cue.refine_reveal * static_cast<double>(hud.cinema_elements));
+            push_line(out, palette.text_dim,
+                      fmt("reveal %.0f%% — %zu of %zu drawable elements of "
+                          "SolveStage::result.volume_mesh, in that mesh's own storage order. "
+                          "%zu elements were marked for h refinement by the field above",
+                          100.0 * cue.refine_reveal, drawn, hud.cinema_elements, tr.n_h_mark));
+            if (nx.trace.n_elems == tr.n_elems) {
+                push_line(out, palette.status_warn,
+                          fmt("the delivered element count is UNCHANGED at %zu: the marks "
+                              "above drove a remesh whose ship gate returned the same "
+                              "count, so this beat is showing a re-fill and not a finer "
+                              "mesh",
+                              nx.trace.n_elems));
+            }
+        }
+        break;
+    }
+    case SolvePhase::kLoadRamp:
+    case SolvePhase::kHold:
+        push_line(out, palette.status_ok,
+                  fmt("load factor λ = %.3f — u(λ) = λ·u EXACTLY, because the solve is "
+                      "linear elastostatics: λ·f produces λ·u and λ·σ, so this frame is the "
+                      "real solution of a %.4g N load case and not an interpolation between "
+                      "two pictures",
+                      cue.load_factor, cue.load_factor * hud.load_newtons));
+        push_line(out, palette.text_dim,
+                  fmt("|u| %.4g mm and von Mises %.4g MPa at this λ, from the full-load "
+                      "%.4g mm / %.4g MPa in SolveStage::result. Shape drawn at %.4g× the "
+                      "λ-scaled displacement (λ × App::deform_scale %.4g — true scale is "
+                      "invisible at this peak); colour scale is the FULL-load maximum, so "
+                      "the field darkens with λ instead of renormalising",
+                      cue.load_factor * r.max_displacement * 1e3,
+                      cue.load_factor * r.max_von_mises / 1e6, r.max_displacement * 1e3,
+                      r.max_von_mises / 1e6, cue.load_factor * hud.deform_scale,
+                      hud.deform_scale));
+        solver_lines(stage, out);
+        break;
+    case SolvePhase::kNone:
+        break;
+    }
 }
 
 /// Flows the header chips across rows `wrap_width` wide with `gap` between
@@ -1107,10 +1648,29 @@ std::vector<CinemaLine> cinema_ticker_chips(const CinemaState& state, const Cine
               fmt("act %d/4 %s", static_cast<int>(cue.act) + 1, cinema_act_name(cue.act)));
     push_line(chips, palette.text_dim,
               fmt("t %.3f / %.3f s (virtual clock)", state.t, state.duration));
-    if (cue.beat_seconds > 0.0) {
+    // Both beats, whenever both lanes are live, because "beat" is no longer one
+    // number: the pass lane and the stage lane run at different rates on the
+    // same clock and the concurrency claim is only auditable if both are stated.
+    if (cue.frame_index >= 0 && cue.pass_beat_seconds > 0.0) {
         push_line(chips, palette.text_dim,
-                  fmt("beat %.3f s = %.1f frames at 60 fps", cue.beat_seconds,
-                      cue.beat_seconds * 60.0));
+                  fmt("pass beat %.3f s = %.1f frames at 60 fps", cue.pass_beat_seconds,
+                      cue.pass_beat_seconds * 60.0));
+    }
+    // The stage beat only means something while the stage lane is running, so it
+    // is not restated in the closing act where the finished fill is merely held.
+    if (cue.act == CinemaAct::kBuild && cue.stage_index >= 0 &&
+        cue.stage_beat_seconds > 0.0) {
+        push_line(chips, palette.text_dim,
+                  fmt("stage beat %.3f s = %.1f frames", cue.stage_beat_seconds,
+                      cue.stage_beat_seconds * 60.0));
+    }
+    if (cue.concurrent) {
+        push_line(chips, palette.status_ok, "CONCURRENT: both lanes advancing");
+    }
+    if (cue.act == CinemaAct::kSolve && cue.solve_phase != SolvePhase::kNone) {
+        push_line(chips, palette.accent,
+                  fmt("solve beat %s %.2f s", cinema_solve_phase_name(cue.solve_phase),
+                      cue.solve_phase_span));
     }
     if (state.recording()) {
         push_line(chips, palette.status_warn,
@@ -1126,14 +1686,17 @@ std::vector<CinemaLine> cinema_ticker_body(const CinemaState& state, const Cinem
     case CinemaAct::kSkeleton:
         skeleton_ticker(state, body);
         break;
-    case CinemaAct::kAdvisor:
+    case CinemaAct::kDeliberate:
         advisor_ticker(state, cue, body);
         break;
-    case CinemaAct::kMesh:
-        mesh_ticker(state, cue, hud, body);
+    case CinemaAct::kBuild:
+        // Both lanes, in the order the causality runs: what the network is
+        // scoring and what it decided, then the fill that decision produced.
+        advisor_ticker(state, cue, body);
+        fill_ticker(state, cue, hud, body);
         break;
-    case CinemaAct::kResult:
-        result_ticker(hud, body);
+    case CinemaAct::kSolve:
+        solve_ticker(state, cue, hud, body);
         break;
     }
     // The HUD reports the setup that is actually meshing, sourced from
@@ -1172,18 +1735,52 @@ float cinema_ticker_height(const CinemaState& state, const CinemaCue& cue,
 float cinema_ticker_reserve(CinemaState& state, const CinemaCue& cue, const CinemaHud& hud,
                             float wrap_width) {
     float want = 0.0f;
+    // Every act, and inside the concurrent act every combination that changes
+    // the row count: the strip has to be reserved at the tallest thing the take
+    // can ever put in it, or a later act clips its own disclosures.
+    const auto probe_height = [&](const CinemaCue& probe) {
+        want = std::max(want, cinema_ticker_height(state, probe, hud, wrap_width));
+    };
     for (int a = 0; a < 4; ++a) {
         CinemaCue probe = cue;
         probe.act = static_cast<CinemaAct>(a);
+        probe.concurrent = probe.act == CinemaAct::kBuild;
+        probe.decision_locked =
+            probe.act == CinemaAct::kBuild || probe.act == CinemaAct::kSolve;
+        // The concurrent act is at its tallest once a stage is selected, not
+        // during the decision lead-in where the fill rows are one sentence.
+        if (probe.act == CinemaAct::kBuild && !state.stages.empty()) {
+            probe.stage_index = 0;
+        }
 #ifdef POLYMESH_WITH_ADVISOR
-        if (probe.act == CinemaAct::kAdvisor && state.explanation &&
-            !state.explanation->frames.empty()) {
+        if (state.explanation && !state.explanation->frames.empty()) {
             // Tallest advisor beat: on the last pass the DECISION row and the
-            // applied/refused note join the three per-pass rows.
-            probe.frame_index = static_cast<int>(state.explanation->frames.size()) - 1;
+            // applied/refused note join the three per-pass rows. In the
+            // concurrent act the mid-lane case is taller still, because the
+            // replay disclosure only exists while passes remain — so both are
+            // probed rather than assumed.
+            const auto n = static_cast<int>(state.explanation->frames.size());
+            probe.frame_index = n - 1;
+            probe_height(probe);
+            if (n > 1) {
+                probe.frame_index = n - 2;
+            }
         }
 #endif
-        want = std::max(want, cinema_ticker_height(state, probe, hud, wrap_width));
+        if (probe.act != CinemaAct::kSolve) {
+            probe_height(probe);
+            continue;
+        }
+        // The closing act's beats carry different rows — the refine beat names
+        // two meshes, the ramp beat names λ and the solver — so every phase is
+        // measured instead of the act being probed in whichever one it is in.
+        for (const SolvePhase phase :
+             {SolvePhase::kField, SolvePhase::kError, SolvePhase::kRefine,
+              SolvePhase::kLoadRamp, SolvePhase::kHold}) {
+            probe.solve_phase = phase;
+            probe.solve_stage_index = state.solve_stages.empty() ? -1 : 0;
+            probe_height(probe);
+        }
     }
     // High-water mark, never lowered inside a take: a strip that shrank would
     // grow the viewport pane and resize the part, which is the same cut as a

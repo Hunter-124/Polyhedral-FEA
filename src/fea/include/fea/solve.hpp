@@ -4,8 +4,8 @@
 // Linear elastostatics solve: assemble, apply optional homogeneous multi-point
 // constraints, partition Dirichlet DOFs, then sparse direct LDLT or iterative CG.
 
-#include "fea/constraints.hpp"
 #include "fea/assembly.hpp"
+#include "fea/constraints.hpp"
 #include "fea/resource_budget.hpp"
 
 #include <functional>
@@ -143,10 +143,10 @@ symmetric_diagonal_scaling(const Eigen::SparseMatrix<double>& spd);
 /// bounded CG above that; the choice never depends on element type.
 /// Force `SolveMethod::kDirect` for exact patch-test path; force `kCG` to
 /// exercise the iterative solver on small systems.
-Eigen::VectorXd solve_elastostatics(
-    const NodalMesh& mesh, const Material& material, const Dirichlet& dirichlet,
-    const Eigen::VectorXd& loads, const SolveOptions& options = {},
-    const LinearConstraints* constraints = nullptr);
+Eigen::VectorXd solve_elastostatics(const NodalMesh& mesh, const Material& material,
+                                    const Dirichlet& dirichlet, const Eigen::VectorXd& loads,
+                                    const SolveOptions& options = {},
+                                    const LinearConstraints* constraints = nullptr);
 
 /// Strain energy 1/2 u^T K u, joules.
 double strain_energy(const NodalMesh& mesh, const Material& material,

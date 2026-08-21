@@ -243,7 +243,8 @@ ResultRow parse_result_line(const std::string& line) {
             const auto& sc = j["scorecard"];
             out.scorecard.present = true;
             out.scorecard.edge_hausdorff_over_h = opt_double_nan(sc, "edge_hausdorff_over_h");
-            out.scorecard.chordal_efficiency_max = opt_double_nan(sc, "chordal_efficiency_max");
+            out.scorecard.chordal_efficiency_max =
+                opt_double_nan(sc, "chordal_efficiency_max");
             out.scorecard.normal_dev_deg_max = opt_double_nan(sc, "normal_dev_deg_max");
             out.scorecard.accuracy_rel_err = opt_double_nan(sc, "accuracy_rel_err");
             out.scorecard.min_element_quality = opt_double_nan(sc, "min_element_quality");
@@ -368,7 +369,8 @@ std::vector<ResultRow> load_results(const std::filesystem::path& dir) {
     std::string line;
     while (std::getline(in, line)) {
         // Trim trailing CR (Windows) and skip blank / comment lines.
-        while (!line.empty() && (line.back() == '\r' || line.back() == ' ' || line.back() == '\t')) {
+        while (!line.empty() &&
+               (line.back() == '\r' || line.back() == ' ' || line.back() == '\t')) {
             line.pop_back();
         }
         if (line.empty() || line[0] == '#') {
@@ -449,7 +451,8 @@ int count_result_lines(const std::filesystem::path& results_path) {
     int n = 0;
     std::string line;
     while (std::getline(in, line)) {
-        while (!line.empty() && (line.back() == '\r' || std::isspace(static_cast<unsigned char>(line.back())))) {
+        while (!line.empty() && (line.back() == '\r' ||
+                                 std::isspace(static_cast<unsigned char>(line.back())))) {
             line.pop_back();
         }
         if (!line.empty() && line[0] != '#') {
@@ -502,8 +505,9 @@ std::vector<CampaignSummary> scan_campaigns(const std::filesystem::path& root) {
         }
         out.push_back(std::move(s));
     }
-    std::sort(out.begin(), out.end(),
-              [](const CampaignSummary& a, const CampaignSummary& b) { return a.name < b.name; });
+    std::sort(out.begin(), out.end(), [](const CampaignSummary& a, const CampaignSummary& b) {
+        return a.name < b.name;
+    });
     return out;
 }
 

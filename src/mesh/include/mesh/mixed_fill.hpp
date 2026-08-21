@@ -26,17 +26,16 @@
 #include <Eigen/Core>
 
 #include <array>
-#include <cstdint>
-#include <span>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
+#include <span>
 #include <vector>
 
 namespace polymesh::mesh {
 /// Established hybrid-work budget. Public so pipeline pre-flight guards and
 /// the fill's internal graded-lattice fallback use one ceiling convention.
 inline constexpr std::size_t kHybridMaxElems = 48 * 1024;
-
 
 enum class MixedCellKind : std::uint8_t {
     kHex8 = 0,
@@ -113,19 +112,14 @@ struct MixedFillOutput {
 /// transition closure, and emission loops and may throw to cancel the fill.
 /// `local_surface_classification` enables one h/2 sampling level whose mixed
 /// parents alone are subdivided; it is intended for authoritative CAD topology.
-MixedFillOutput mixed_fill_surface(const geom::TriSurface& surface,
-                                   const Eigen::Vector3d& bbox_min,
-                                   const Eigen::Vector3d& bbox_max, double h,
-                                   int skin_layers = 2,
-                                   std::span<const geom::SharpEdge> features = {},
-                                   double feature_band = 0.0,
-                                   std::span<const Eigen::Vector3d> curvature_seeds = {},
-                                   double seed_band = 0.0, bool snap_boundary = true,
-                                   double curvature_turn_deg = 0.0,
-                                   bool native_poly_transitions = false,
-                                   const std::function<void()>& cancel_check = {},
-                                   const SizeFieldFn& size_field = {},
-                                   bool local_surface_classification = false);
+MixedFillOutput mixed_fill_surface(
+    const geom::TriSurface& surface, const Eigen::Vector3d& bbox_min,
+    const Eigen::Vector3d& bbox_max, double h, int skin_layers = 2,
+    std::span<const geom::SharpEdge> features = {}, double feature_band = 0.0,
+    std::span<const Eigen::Vector3d> curvature_seeds = {}, double seed_band = 0.0,
+    bool snap_boundary = true, double curvature_turn_deg = 0.0,
+    bool native_poly_transitions = false, const std::function<void()>& cancel_check = {},
+    const SizeFieldFn& size_field = {}, bool local_surface_classification = false);
 
 /// Expand every hex8 → 6 pyramid5 (centroid apex). Pyramids/tets/polys pass
 /// through. Product FE path for hybrid / hexpyr (constant-strain exact).

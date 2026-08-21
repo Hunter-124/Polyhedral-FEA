@@ -28,7 +28,7 @@ namespace polymesh::advisor {
 /// graph whose I/O does not match `normalization.json`). Inference on a loaded
 /// advisor never throws: an unusable prediction becomes a veto instead.
 class AdvisorError : public std::runtime_error {
-public:
+  public:
     using std::runtime_error::runtime_error;
 };
 
@@ -150,18 +150,18 @@ using FeatureColumns = std::map<std::string, double>;
 
 /// One layer of the deployed graph, for drawing it.
 struct NetworkLayer {
-    std::string name;                    // "input" | "trunk.fc1" | "trunk.fc2" | "heads"
+    std::string name; // "input" | "trunk.fc1" | "trunk.fc2" | "heads"
     std::size_t size = 0;
-    std::vector<std::string> labels;     // empty for the hidden layers
+    std::vector<std::string> labels; // empty for the hidden layers
 };
 
 /// One fully connected weight block, `weights[j * cols + i]` = source i -> dest j.
 struct NetworkEdges {
     std::string from;
     std::string to;
-    std::size_t rows = 0;                // destination units
-    std::size_t cols = 0;                // source units
-    std::vector<float> weights;          // rows * cols, row-major over destinations
+    std::size_t rows = 0;       // destination units
+    std::size_t cols = 0;       // source units
+    std::vector<float> weights; // rows * cols, row-major over destinations
 };
 
 /// Static picture of the deployed network, from `activation_layout.json`.
@@ -176,13 +176,13 @@ struct NetworkLayout {
 /// `heads` is the seven regressors, the failure logit, then the policy vector,
 /// matching `NetworkLayout` layer "heads".
 struct ActivationFrame {
-    int candidate = -1;          // index into the enumerated candidate grid; -1 = final re-score pass
-    bool recommended = false;    // this pass scored the action actually recommended
-    bool gate_pass = false;      // sigmoid(failure_logit) <= gate_threshold
-    bool over_budget = false;    // dropped by the max_dof budget
-    bool ranked = false;         // score was finite, so the candidate could be ranked
-    double score = 0.0;          // rel_err_rel, the ranking key (lower is better)
-    AdvisorDecision action;      // the action this pass scored
+    int candidate = -1; // index into the enumerated candidate grid; -1 = final re-score pass
+    bool recommended = false; // this pass scored the action actually recommended
+    bool gate_pass = false;   // sigmoid(failure_logit) <= gate_threshold
+    bool over_budget = false; // dropped by the max_dof budget
+    bool ranked = false;      // score was finite, so the candidate could be ranked
+    double score = 0.0;       // rel_err_rel, the ranking key (lower is better)
+    AdvisorDecision action;   // the action this pass scored
     AdvisorRawOutputs outputs;
     std::vector<float> input;
     std::vector<float> fc1;
@@ -215,7 +215,7 @@ struct AdvisorExplanation {
 /// Deterministic by construction: CPU execution provider only, one intra-op
 /// thread, no parallel execution mode.
 class Advisor {
-public:
+  public:
     explicit Advisor(const std::filesystem::path& model_dir);
     ~Advisor();
     Advisor(Advisor&&) noexcept;
@@ -292,7 +292,7 @@ public:
     /// `has_activations()` is false.
     [[nodiscard]] ActivationTaps taps(const FeatureColumns& columns) const;
 
-private:
+  private:
     /// The one chooser. `recommend` and `explain` are both this function; the
     /// only difference is whether `trace` is non-null, in which case every
     /// forward pass it runs also records its own internals. Duplicating the

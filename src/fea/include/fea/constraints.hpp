@@ -49,7 +49,6 @@ class LinearConstraints {
     [[nodiscard]] Eigen::VectorXd recover(const Eigen::VectorXd& u_reduced,
                                           Eigen::Index n_dof) const;
 
-
   private:
     std::vector<LinearConstraint> constraints_;
     std::map<std::uint32_t, std::size_t> slave_indices_;

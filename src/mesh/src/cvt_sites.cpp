@@ -8,8 +8,7 @@
 namespace polymesh::mesh {
 namespace {
 
-bool far_enough(const Eigen::Vector3d& p, double min_sep2,
-                const std::vector<CvtSite>& sites) {
+bool far_enough(const Eigen::Vector3d& p, double min_sep2, const std::vector<CvtSite>& sites) {
     for (const CvtSite& s : sites) {
         if ((s.pos - p).squaredNorm() < min_sep2) {
             return false;
@@ -25,11 +24,11 @@ double dist_to_domain_boundary(const Eigen::Vector3d& p, const ClipBox& box) {
     return std::min({dx, dy, dz});
 }
 
-}  // namespace
+} // namespace
 
-ConstrainedSiteSeedResult seed_constrained_cvt_sites(
-    const ClipBox& domain, const geom::CadTopology* topo,
-    const ConstrainedSiteSeedParams& params) {
+ConstrainedSiteSeedResult seed_constrained_cvt_sites(const ClipBox& domain,
+                                                     const geom::CadTopology* topo,
+                                                     const ConstrainedSiteSeedParams& params) {
     ConstrainedSiteSeedResult out;
     const double diag = std::max((domain.max - domain.min).norm(), 1e-30);
     const double min_sep = params.sharp_min_sep_frac * diag;
@@ -48,7 +47,8 @@ ConstrainedSiteSeedResult seed_constrained_cvt_sites(
             }
             // kSharp only.
             bool used = false;
-            for (std::size_t i = 0; i < e.samples.size(); i += static_cast<std::size_t>(stride)) {
+            for (std::size_t i = 0; i < e.samples.size();
+                 i += static_cast<std::size_t>(stride)) {
                 const Eigen::Vector3d& p = e.samples[i];
                 // Keep samples inside / near domain.
                 if ((p.array() < domain.min.array() - diag).any() ||
@@ -90,10 +90,8 @@ ConstrainedSiteSeedResult seed_constrained_cvt_sites(
 
 OccSiteProjectStats project_free_wall_sites(const geom::CadModel& cad,
                                             const geom::CadTopology* topo,
-                                            const ClipBox& domain,
-                                            std::vector<CvtSite>& sites,
-                                            double wall_band,
-                                            double sharp_guard) {
+                                            const ClipBox& domain, std::vector<CvtSite>& sites,
+                                            double wall_band, double sharp_guard) {
     OccSiteProjectStats st;
     if (cad.empty() || wall_band <= 0.0) {
         return st;
@@ -134,8 +132,7 @@ OccSiteProjectStats project_free_wall_sites(const geom::CadModel& cad,
     return st;
 }
 
-ConstrainedLloydResult constrained_lloyd_cvt(const ClipBox& domain,
-                                             const geom::CadModel* cad,
+ConstrainedLloydResult constrained_lloyd_cvt(const ClipBox& domain, const geom::CadModel* cad,
                                              const geom::CadTopology* topo,
                                              const ConstrainedLloydParams& params) {
     ConstrainedLloydResult out;
@@ -171,8 +168,8 @@ ConstrainedLloydResult constrained_lloyd_cvt(const ClipBox& domain,
             }
         }
         if (params.project_each_iter && cad && !cad->empty()) {
-            out.project_stats = project_free_wall_sites(
-                *cad, topo, domain, out.sites, wall_band, sharp_guard);
+            out.project_stats =
+                project_free_wall_sites(*cad, topo, domain, out.sites, wall_band, sharp_guard);
         }
         if (lr.stats.converged) {
             last_stats.converged = true;
@@ -182,10 +179,10 @@ ConstrainedLloydResult constrained_lloyd_cvt(const ClipBox& domain,
     out.lloyd_stats = last_stats;
 
     if (params.project_final && cad && !cad->empty()) {
-        out.project_stats = project_free_wall_sites(*cad, topo, domain, out.sites,
-                                                    wall_band, sharp_guard);
+        out.project_stats =
+            project_free_wall_sites(*cad, topo, domain, out.sites, wall_band, sharp_guard);
     }
     return out;
 }
 
-}  // namespace polymesh::mesh
+} // namespace polymesh::mesh

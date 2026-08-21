@@ -952,10 +952,10 @@ double vem_energy_error_sq(
     return err;
 }
 
-Eigen::Matrix<double, 6, 1> vem_projected_strain(
-    const std::vector<Eigen::Vector3d>& coords,
-    const std::vector<std::vector<std::uint32_t>>& faces, const Eigen::VectorXd& u_elem,
-    int order) {
+Eigen::Matrix<double, 6, 1>
+vem_projected_strain(const std::vector<Eigen::Vector3d>& coords,
+                     const std::vector<std::vector<std::uint32_t>>& faces,
+                     const Eigen::VectorXd& u_elem, int order) {
     if (order == 1) {
         const auto n = coords.size();
         const double vol = poly_volume(coords, faces);

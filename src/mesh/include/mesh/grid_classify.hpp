@@ -11,8 +11,8 @@
 
 #include <Eigen/Core>
 
-#include <cstdint>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <vector>
 
@@ -112,9 +112,8 @@ std::vector<bool> classify_cells_inside(const geom::TriSurface& surface,
 /// tuned on the odd-permitting lattice.
 FeatureAwareClassification classify_cells_feature_aware(
     const geom::TriSurface& surface, const Eigen::Vector3d& bbox_min,
-    const Eigen::Vector3d& bbox_max, double h,
-    long max_cells = kDefaultMaxGridCells, double relative_volume_tolerance = 0.01,
-    int max_refinement_levels = 4,
+    const Eigen::Vector3d& bbox_max, double h, long max_cells = kDefaultMaxGridCells,
+    double relative_volume_tolerance = 0.01, int max_refinement_levels = 4,
     const std::function<double(const Eigen::Vector3d&)>& size_field = {},
     bool even_cells = false);
 

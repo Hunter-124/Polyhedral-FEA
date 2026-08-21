@@ -49,8 +49,7 @@ void GradedSizing::build_grid() {
     // Also ≥ mean spacing so the grid stays O(#sources) cells, not huge.
     const double rmax = (h_max_ - h_min_) / beta_;
     const double vol = std::max(ext.x() * ext.y() * ext.z(), 1e-300);
-    const double mean_spacing =
-        std::cbrt(vol / static_cast<double>(sources_.size()));
+    const double mean_spacing = std::cbrt(vol / static_cast<double>(sources_.size()));
     grid_cell_ = std::max({rmax, mean_spacing, 1e-12});
     const double inv = 1.0 / grid_cell_;
     grid_nx_ = std::max(1, static_cast<std::int32_t>(std::floor(ext.x() * inv)) + 1);
@@ -232,9 +231,8 @@ std::vector<SizeSource> point_size_sources(std::span<const Eigen::Vector3d> poin
 
 mesh::SizeFieldFn size_field_from_sources(std::span<const SizeSource> sources, double h_min,
                                           double h_max, double beta) {
-    auto field =
-        std::make_shared<GradedSizing>(std::vector<SizeSource>(sources.begin(), sources.end()),
-                                       h_min, h_max, beta);
+    auto field = std::make_shared<GradedSizing>(
+        std::vector<SizeSource>(sources.begin(), sources.end()), h_min, h_max, beta);
     return [field = std::move(field)](const Eigen::Vector3d& point) {
         return field->size_at(point);
     };

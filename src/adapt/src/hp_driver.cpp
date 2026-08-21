@@ -13,9 +13,7 @@ namespace {
 
 constexpr double kPi = 3.14159265358979323846;
 
-double turn_threshold_rad(const HpDriverPolicy& p) {
-    return p.turn_angle_deg * kPi / 180.0;
-}
+double turn_threshold_rad(const HpDriverPolicy& p) { return p.turn_angle_deg * kPi / 180.0; }
 
 bool is_thin_wall(double thickness) {
     return std::isfinite(thickness) && thickness > 0.0 &&
@@ -47,7 +45,8 @@ ShapeTendency best_shape_vote(const ElementHpSignal& s) {
     const double tt = s.tet_fit;
     const double py = s.poly_fit;
     const double m = std::max({hx, tt, py});
-    const double second = (m == hx) ? std::max(tt, py) : (m == tt ? std::max(hx, py) : std::max(hx, tt));
+    const double second =
+        (m == hx) ? std::max(tt, py) : (m == tt ? std::max(hx, py) : std::max(hx, tt));
     if (m - second < 0.08) {
         return ShapeTendency::kKeep; // ambiguous
     }
@@ -130,12 +129,12 @@ ElementHpDecision decide_element(const ElementHpSignal& s, const HpDriverPolicy&
 
     // --- Benefit estimates (dimensionless error-reduction proxies) ---
     // Geometry-driven h: severity above gate, scaled by residual (or pure geo).
-    const double benefit_h_geo =
-        (geo >= policy.geometry_force_h)
-            ? geo * std::max(eta, 0.1 * std::max(max_e, 1e-6))
-            : 0.0;
+    const double benefit_h_geo = (geo >= policy.geometry_force_h)
+                                     ? geo * std::max(eta, 0.1 * std::max(max_e, 1e-6))
+                                     : 0.0;
     // Non-smooth residual: large η, small surplus ratio → h refinement pays.
-    const double nonsmooth = clamp01(1.0 - surplus_ratio / std::max(policy.smooth_surplus_ratio, 1e-6));
+    const double nonsmooth =
+        clamp01(1.0 - surplus_ratio / std::max(policy.smooth_surplus_ratio, 1e-6));
     const double benefit_h_nonsmooth =
         (geo < policy.geometry_force_h) ? eta * nonsmooth * nonsmooth : 0.0;
     const double benefit_h = std::max(benefit_h_geo, benefit_h_nonsmooth);
@@ -235,17 +234,13 @@ std::vector<double> estimate_surplus_from_zz(const std::vector<double>& element_
     return surplus;
 }
 
-std::vector<ElementHpSignal> make_hp_signals(std::span<const double> h,
-                                             std::span<const double> kappa,
-                                             std::span<const double> thickness,
-                                             std::span<const double> eta_zz,
-                                             std::span<const double> surplus,
-                                             std::span<const int> p_orders,
-                                             std::span<const double> hex_fit,
-                                             std::span<const double> tet_fit,
-                                             std::span<const double> poly_fit,
-                                             const HpDriverPolicy& policy,
-                                             std::span<const double> h_geometry) {
+std::vector<ElementHpSignal>
+make_hp_signals(std::span<const double> h, std::span<const double> kappa,
+                std::span<const double> thickness, std::span<const double> eta_zz,
+                std::span<const double> surplus, std::span<const int> p_orders,
+                std::span<const double> hex_fit, std::span<const double> tet_fit,
+                std::span<const double> poly_fit, const HpDriverPolicy& policy,
+                std::span<const double> h_geometry) {
     const std::size_t n = eta_zz.size();
     if (n == 0) {
         return {};
@@ -467,9 +462,9 @@ HpDriverPlan drive_hp(std::span<const ElementHpSignal> signals, const HpDriverPo
         n > 0 ? static_cast<double>(plan.p_mark.size()) / static_cast<double>(n) : 0.0;
     const double frac_s =
         n > 0 ? static_cast<double>(plan.shape_mark.size()) / static_cast<double>(n) : 0.0;
-    plan.predicted_dof_factor =
-        1.0 + frac_h * (policy.cost_h - 1.0) + frac_p * (policy.cost_p - 1.0) +
-        frac_s * 0.25 * (policy.cost_shape - 1.0);
+    plan.predicted_dof_factor = 1.0 + frac_h * (policy.cost_h - 1.0) +
+                                frac_p * (policy.cost_p - 1.0) +
+                                frac_s * 0.25 * (policy.cost_shape - 1.0);
     // Coarsening shrinks DOF ≈ (h_e / h_next_e)³ per coarsened element (3-D),
     // applied multiplicatively to the refine-side estimate.
     double coarsen_dof = 1.0;

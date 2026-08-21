@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
+#include "geom/stl.hpp"
 #include "geom/tri_surface.hpp"
 #include "mesh/poly_mesh.hpp"
 #include "mesh/tet_fill.hpp"
 #include "pipeline/scene.hpp"
-#include "geom/stl.hpp"
 #include "support/box_model.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -71,7 +71,8 @@ TEST_CASE("L-domain public STL grid-fills with validity only (ADR-0015)") {
     // Documents expected product-mesh behaviour on the L fixture: load + mesh
     // + structural validity. Does NOT claim analytical L-domain energy accuracy
     // (GATE 1 Tier-1 uses structured imported meshes — ADR-0009).
-    auto model = polymesh::testsupport::model_from_surface(polymesh::geom::load_stl("bench/geometries/public/l_domain.stl"));
+    auto model = polymesh::testsupport::model_from_surface(
+        polymesh::geom::load_stl("bench/geometries/public/l_domain.stl"));
     REQUIRE(model.surface.triangles.size() >= 4);
     auto vol = pipeline::volume_mesh(model, 0.25, pipeline::VolumeMesher::kTetFill);
     REQUIRE_FALSE(vol.mesh.elements.empty());
@@ -170,7 +171,8 @@ TEST_CASE("tet_fill edge-case STLs: exact volume on AABB solids") {
         {"bench/geometries/edge/slender_beam.stl", 0.16}, // 4×0.2×0.2
     };
     for (const auto& c : cases) {
-        auto model = polymesh::testsupport::model_from_surface(polymesh::geom::load_stl(c.path));
+        auto model =
+            polymesh::testsupport::model_from_surface(polymesh::geom::load_stl(c.path));
         auto vol = pipeline::volume_mesh(model, 0.1, pipeline::VolumeMesher::kTetFill);
         REQUIRE_NOTHROW(vol.mesh.check_validity());
         double mesh_vol = 0.0;
@@ -193,7 +195,8 @@ TEST_CASE("tet_fill edge-case STLs: exact volume on AABB solids") {
 }
 
 TEST_CASE("tet_fill sphere edge STL is solid (no crash, positive volume)") {
-    auto model = polymesh::testsupport::model_from_surface(polymesh::geom::load_stl("bench/geometries/edge/sphere.stl"));
+    auto model = polymesh::testsupport::model_from_surface(
+        polymesh::geom::load_stl("bench/geometries/edge/sphere.stl"));
     auto vol = pipeline::volume_mesh(model, 0.1, pipeline::VolumeMesher::kTetFill);
     REQUIRE(vol.mesh.elements.size() > 100);
     REQUIRE_NOTHROW(vol.mesh.check_validity());

@@ -28,12 +28,10 @@ namespace {
 #if defined(POLYMESH_WITH_GEOGRAM) && POLYMESH_WITH_GEOGRAM
 std::once_flag g_geo_once;
 
-void init_geogram_once() {
-    GEO::initialize(GEO::GEOGRAM_INSTALL_ALL);
-}
+void init_geogram_once() { GEO::initialize(GEO::GEOGRAM_INSTALL_ALL); }
 #endif
 
-}  // namespace
+} // namespace
 
 bool geogram_available() noexcept {
 #if defined(POLYMESH_WITH_GEOGRAM) && POLYMESH_WITH_GEOGRAM
@@ -59,8 +57,8 @@ std::optional<ClippedCell> clip_convex_cell(const ClipBox& box,
     }
 
     VBW::ConvexCell cell;
-    cell.init_with_box(box.min.x(), box.min.y(), box.min.z(), box.max.x(),
-                       box.max.y(), box.max.z());
+    cell.init_with_box(box.min.x(), box.min.y(), box.min.z(), box.max.x(), box.max.y(),
+                       box.max.z());
 
     for (const ClipPlane& pl : planes) {
         cell.clip_by_plane(VBW::make_vec4(pl.a, pl.b, pl.c, pl.d));
@@ -91,9 +89,7 @@ std::optional<ClippedCell> clip_convex_cell(const ClipBox& box,
 #endif
 }
 
-std::optional<ClippedCell> unit_cube_cell() {
-    return clip_convex_cell(ClipBox{}, {});
-}
+std::optional<ClippedCell> unit_cube_cell() { return clip_convex_cell(ClipBox{}, {}); }
 
 // ---- SiteGrid (neighbour-restricted Voronoi clipping) -----------------------
 
@@ -122,8 +118,7 @@ void SiteGrid::build(std::span<const Eigen::Vector3d> pts, double cell_edge) {
     nz_ = std::max(1, static_cast<int>(std::floor(ext.z() * inv_cell_)) + 1);
     max_ring_ = std::max({nx_, ny_, nz_});
 
-    const std::size_t ncells = static_cast<std::size_t>(nx_) *
-                               static_cast<std::size_t>(ny_) *
+    const std::size_t ncells = static_cast<std::size_t>(nx_) * static_cast<std::size_t>(ny_) *
                                static_cast<std::size_t>(nz_);
     // Counting sort into CSR: cell_start_ holds per-bucket counts, then offsets.
     cell_start_.assign(ncells + 1, 0);
@@ -191,4 +186,4 @@ void SiteGrid::ring(const Eigen::Vector3d& p, int r, std::vector<std::uint32_t>&
     }
 }
 
-}  // namespace polymesh::mesh
+} // namespace polymesh::mesh

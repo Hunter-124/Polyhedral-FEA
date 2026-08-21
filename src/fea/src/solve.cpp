@@ -27,8 +27,7 @@ concept HasShiftAccessor = requires(const T& ic) {
     { ic.shift() } -> std::convertible_to<double>;
 };
 
-template <class T>
-std::string ichol_shift_text(const T& ic, double requested_initial_shift) {
+template <class T> std::string ichol_shift_text(const T& ic, double requested_initial_shift) {
     if constexpr (HasShiftAccessor<T>) {
         return std::format("{}", ic.shift());
     } else {
@@ -386,10 +385,10 @@ Eigen::VectorXd solve_reduced(const Eigen::SparseMatrix<double>& kff,
             attempts.push_back(
                 std::format("{}incomplete Cholesky: factorization failed after shift {}", eq,
                             failed_shift));
-            emit_note(std::format(
-                "CG incomplete Cholesky factorization failed after shift {}; "
-                "retrying with initial shift {}",
-                failed_shift, kIcRetryInitialShift));
+            emit_note(
+                std::format("CG incomplete Cholesky factorization failed after shift {}; "
+                            "retrying with initial shift {}",
+                            failed_shift, kIcRetryInitialShift));
 
             ichol.setInitialShift(kIcRetryInitialShift);
             ichol.factorize(a); // reuse the already-computed AMD ordering
@@ -419,9 +418,8 @@ Eigen::VectorXd solve_reduced(const Eigen::SparseMatrix<double>& kff,
         }
 
         const std::string provenance = join_attempts(attempts);
-        if (!target_met &&
-            (!have_attempt ||
-             selected_attempt.true_relative_residual > options.cg_accept_tol)) {
+        if (!target_met && (!have_attempt ||
+                            selected_attempt.true_relative_residual > options.cg_accept_tol)) {
             throw FeaError(std::format(
                 "solve_elastostatics: CG failed (target tol={}, acceptance tol={}, "
                 "max iterations per attempt={}, total iterations={}, best preconditioner={}, "
@@ -434,20 +432,19 @@ Eigen::VectorXd solve_reduced(const Eigen::SparseMatrix<double>& kff,
                                 selected_attempt.true_relative_residual);
         }
         if (target_met) {
-            emit_note(std::format(
-                "CG converged with {} after {} iterations ({} total; "
-                "true relative residual={}; reliable restarts={}); attempts=[{}]",
-                selected_preconditioner, selected_attempt.iterations, total_iterations,
-                selected_attempt.true_relative_residual,
-                selected_attempt.reliable_restarts, provenance));
+            emit_note(
+                std::format("CG converged with {} after {} iterations ({} total; "
+                            "true relative residual={}; reliable restarts={}); attempts=[{}]",
+                            selected_preconditioner, selected_attempt.iterations,
+                            total_iterations, selected_attempt.true_relative_residual,
+                            selected_attempt.reliable_restarts, provenance));
         } else {
             emit_note(std::format(
                 "CG TARGET NOT MET: accepted {} after {} iterations ({} total; "
                 "target tol={}; acceptance tol={}; achieved true relative residual={}; "
                 "reliable restarts={}); attempts=[{}]",
                 selected_preconditioner, selected_attempt.iterations, total_iterations,
-                options.cg_tol, options.cg_accept_tol,
-                selected_attempt.true_relative_residual,
+                options.cg_tol, options.cg_accept_tol, selected_attempt.true_relative_residual,
                 selected_attempt.reliable_restarts, provenance));
         }
         return std::move(selected_attempt.x);
@@ -467,10 +464,10 @@ Eigen::VectorXd solve_reduced(const Eigen::SparseMatrix<double>& kff,
 
 } // namespace
 
-Eigen::VectorXd solve_elastostatics(
-    const NodalMesh& mesh, const Material& material, const Dirichlet& dirichlet,
-    const Eigen::VectorXd& loads, const SolveOptions& options,
-    const LinearConstraints* constraints) {
+Eigen::VectorXd solve_elastostatics(const NodalMesh& mesh, const Material& material,
+                                    const Dirichlet& dirichlet, const Eigen::VectorXd& loads,
+                                    const SolveOptions& options,
+                                    const LinearConstraints* constraints) {
     const Eigen::Index ndof = 3 * static_cast<Eigen::Index>(mesh.nodes.size());
     if (loads.size() != ndof) {
         throw FeaError(std::format("solve_elastostatics: load vector size {} != 3N = {}",

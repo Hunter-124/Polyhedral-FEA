@@ -22,8 +22,8 @@ namespace polymesh::testsupport {
 inline geom::TriSurface box_surface(double lx, double ly, double lz) {
     geom::TriSurface s;
     s.vertices = {
-        {0, 0, 0},   {lx, 0, 0},   {lx, ly, 0},  {0, ly, 0},
-        {0, 0, lz},  {lx, 0, lz},  {lx, ly, lz}, {0, ly, lz},
+        {0, 0, 0},  {lx, 0, 0},  {lx, ly, 0},  {0, ly, 0},
+        {0, 0, lz}, {lx, 0, lz}, {lx, ly, lz}, {0, ly, lz},
     };
     s.triangles = {
         {0, 1, 2}, {0, 2, 3}, {4, 6, 5}, {4, 7, 6}, {0, 4, 5}, {0, 5, 1},

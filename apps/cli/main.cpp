@@ -11,8 +11,8 @@
 #include "fea/backend.hpp"
 #include "fea/boundary_faces.hpp"
 #include "fea/cell_quality.hpp"
-#include "fea/msh.hpp"
 #include "fea/material.hpp"
+#include "fea/msh.hpp"
 #include "fea/p_elevate.hpp"
 #include "fea/solve.hpp"
 #include "fea/traction.hpp"
@@ -48,98 +48,99 @@
 namespace {
 
 int usage() {
-    std::fputs("usage: polymesh <command> [args]\n"
-               "\n"
-               "commands:\n"
-               "  check <part.step|.brep>    validate CAD geometry\n"
-               "  mesh  <part> [-h m] [-o out.vtu] [--mesher name] [--skin n]\n"
-               "              [--no-feature] [--element-tendency t] [--no-spectral]\n"
-               "              [--max-elems N] [--max-dof N]\n"
-               "              [--fix-box x0 y0 z0 x1 y1 z1] [--load-box x0 y0 z0 x1 y1 z1]\n"
-               "                             geometry+BC-aware volume mesh; optional VTU\n"
-               "  solve <part.step|.brep|.msh> -o out.vtu [-h m] [-E Pa] [-nu r]\n"
-               "              [--mesher name] [--skin n] [--no-feature] [--adapt n]\n"
-               "              [--eta-target η] [--no-curved] [--p-elevate-uniform]\n"
-               "              [--element-tendency t] [--no-spectral]\n"
-               "              [--max-elems N] [--max-dof N] [--max-mem GB]\n"
-               "              [--fix-box ...6] [--load-box ...6] [--bc-grade]\n"
-               "              [--load-dir x y z] [--force N] [--traction Pa]\n"
-               "              [--advisor <model_dir>] [--advisor-max-dof N] (CAD inputs only)\n"
-               "                             CAD: mesh + BCs + VTU; Gmsh: solve the imported\n"
-               "                             volume mesh directly. Default BCs fix min-x and\n"
-               "                             load max-x; boxes override selection.\n"
-               "  diag  <part> [-h m] [--mesher name] [--json out.json] [--no-solve]\n"
-               "              [--max-elems N] [--max-dof N] [--max-mem GB]\n"
-               "              [--fix-box ...6] [--load-box ...6]\n"
-               "              [--load-dir x y z] [--force N] [--traction Pa]\n"
-               "                             JSON diagnostics: fidelity, quality, timings\n"
-               "  render <part> -o out.png [-h m] [--mesher name] [--no-curved]\n"
-               "              [--subdiv N] [--size WxH] [--azimuth DEG] [--elevation DEG]\n"
-               "              [--wireframe] [--stats out.json]\n"
-               "                             headless PNG of the same boundary surface the\n"
-               "                             Studio viewport paints — no GL, no window\n"
-               "  backend                    print compute backend + OpenMP/opt summary\n"
-               "\n"
-               "inputs: CAD (.step .stp .brep .brp); solve also accepts Gmsh 2.x ASCII .msh.\n"
-               "mesh size: omit -h (or -h 0) for auto h0 from bbox + feature density\n"
-               "mesher names: hybrid|zoo (default), varyhedron|vary (CAD packing),\n"
-               "              hybridvem, cvt_poly|cvt (experimental packed-poly VEM),\n"
-               "              tet, hex, hexvem|vem, graded, hexpyr|transition,\n"
-               "              prism|sweep, octa|octahedral (experimental)\n"
-               "--skin n: graded fine skin layers (default 2)\n"
-               "--no-feature: disable geometry (curvature/thin-wall) grading (default on)\n"
-               "--element-tendency t: shape dial in [-1,+1] (hex↔fan hybrid↔poly VEM↔tet)\n"
-               "--fix-box / --load-box: BC/load selection AABBs. They select the *boundary*\n"
-               "              nodes and faces inside the box, never interior nodes, and the\n"
-               "              mesh grades finer toward them (loads finest)\n"
-               "--load-dir x y z: load direction (normalized; default 0 1 0)\n"
-               "--force N: total resultant force in newtons over the loaded faces\n"
-               "              (default 1000); applied as a consistent traction ∫Nᵗt dS\n"
-               "--traction Pa: pressure magnitude instead of a total force; faces in the\n"
-               "              load selection are filtered by normal alignment with\n"
-               "              --load-dir, and resultant is Pa × their area. Last of\n"
-               "              --force/--traction wins\n"
-               "--max-mem GB: enforced preflight solve cap; 0=auto (70% of currently\n"
-               "              available system memory)\n"
-               "--adapt n: ZZ→Dörfler remesh passes (local seeds on graded path)\n"
-               "--eta-target η: stop adapt when global ZZ η ≤ η (0=off; needs --adapt)\n"
-               "--no-curved: ship the straight-edged linear mesh instead of the exact\n"
-               "             curved CAD geometry. Default for a CAD part is curved: the\n"
-               "             solve/export mesh is tet10/hex20 with boundary mids on the\n"
-               "             BRep (ADR-0035), so this flag is the opt-out, not the opt-in\n"
-               "--p-elevate-uniform: promote every tet4/hex8 on a non-CAD (STL) mesh too,\n"
-               "             for order-2 parity with Gmsh peers on tessellated input\n"
-               "--bc-grade: force a-priori BC grading from the default cantilever faces\n"
-               "--advisor DIR: pick mesher/h/adapt/p-order with the learned mesh advisor\n"
-               "               (DIR holds model.onnx, normalization.json, clamps.json);\n"
-               "               every value is clamped and the decision is logged as JSON\n"
-               "--max-elems N: pre-flight element ceiling (0=589824 default); auto-h\n"
-               "               clamps to fit and over-ceiling meshes coarsen-and-retry;\n"
-               "               with spectral sizing on (default) the size field is\n"
-               "               FFT-trimmed first (insignificant fine bands merge, ADR-0034)\n"
-               "--no-spectral: disable FFT sizing-field trimming and CAD-edge curvature\n"
-               "               denoise (campaign-baseline behavior)\n"
-               "--advisor-max-dof N: with --advisor, drop candidate actions whose\n"
-               "               predicted DOF exceeds N; refusal (defaults) if none fit\n"
-               "--max-dof N: pre-flight/adapt DOF ceiling (0=1769472 default)\n"
-               "--subdiv N: render/tessellation subdivisions per quadratic boundary face\n"
-               "               (default 8, the value the Studio viewport uses); linear\n"
-               "               faces have no interior to subdivide and ignore it\n"
-               "--size WxH: render pixel size (default 1200x900)\n"
-               "--azimuth DEG / --elevation DEG: orbit camera angles for `render`,\n"
-               "               degrees (defaults 35 / 25); the projection is orthographic\n"
-               "               so a view is reproducible from these two numbers\n"
-               "--wireframe: overlay the tessellation triangle edges on the render\n"
-               "--stats out.json: numeric render report — node/element counts, element-type\n"
-               "               census, triangle count, covered/silhouette pixels, and the\n"
-               "               facet-normal deviation against the exact BRep normal\n"
-               "               (omitted for non-CAD input, which has no exact normal)\n"
-               "\n"
-               "default BC selection: nodes in a 0.51·h slab at min-x (fixed) / max-x\n"
-               "              (loaded). If a slab captures too few nodes to act as a\n"
-               "              face (curved parts), selection falls back to boundary\n"
-               "              faces whose outward normal aligns with ∓x/±x.\n",
-               stderr);
+    std::fputs(
+        "usage: polymesh <command> [args]\n"
+        "\n"
+        "commands:\n"
+        "  check <part.step|.brep>    validate CAD geometry\n"
+        "  mesh  <part> [-h m] [-o out.vtu] [--mesher name] [--skin n]\n"
+        "              [--no-feature] [--element-tendency t] [--no-spectral]\n"
+        "              [--max-elems N] [--max-dof N]\n"
+        "              [--fix-box x0 y0 z0 x1 y1 z1] [--load-box x0 y0 z0 x1 y1 z1]\n"
+        "                             geometry+BC-aware volume mesh; optional VTU\n"
+        "  solve <part.step|.brep|.msh> -o out.vtu [-h m] [-E Pa] [-nu r]\n"
+        "              [--mesher name] [--skin n] [--no-feature] [--adapt n]\n"
+        "              [--eta-target η] [--no-curved] [--p-elevate-uniform]\n"
+        "              [--element-tendency t] [--no-spectral]\n"
+        "              [--max-elems N] [--max-dof N] [--max-mem GB]\n"
+        "              [--fix-box ...6] [--load-box ...6] [--bc-grade]\n"
+        "              [--load-dir x y z] [--force N] [--traction Pa]\n"
+        "              [--advisor <model_dir>] [--advisor-max-dof N] (CAD inputs only)\n"
+        "                             CAD: mesh + BCs + VTU; Gmsh: solve the imported\n"
+        "                             volume mesh directly. Default BCs fix min-x and\n"
+        "                             load max-x; boxes override selection.\n"
+        "  diag  <part> [-h m] [--mesher name] [--json out.json] [--no-solve]\n"
+        "              [--max-elems N] [--max-dof N] [--max-mem GB]\n"
+        "              [--fix-box ...6] [--load-box ...6]\n"
+        "              [--load-dir x y z] [--force N] [--traction Pa]\n"
+        "                             JSON diagnostics: fidelity, quality, timings\n"
+        "  render <part> -o out.png [-h m] [--mesher name] [--no-curved]\n"
+        "              [--subdiv N] [--size WxH] [--azimuth DEG] [--elevation DEG]\n"
+        "              [--wireframe] [--stats out.json]\n"
+        "                             headless PNG of the same boundary surface the\n"
+        "                             Studio viewport paints — no GL, no window\n"
+        "  backend                    print compute backend + OpenMP/opt summary\n"
+        "\n"
+        "inputs: CAD (.step .stp .brep .brp); solve also accepts Gmsh 2.x ASCII .msh.\n"
+        "mesh size: omit -h (or -h 0) for auto h0 from bbox + feature density\n"
+        "mesher names: hybrid|zoo (default), varyhedron|vary (CAD packing),\n"
+        "              hybridvem, cvt_poly|cvt (experimental packed-poly VEM),\n"
+        "              tet, hex, hexvem|vem, graded, hexpyr|transition,\n"
+        "              prism|sweep, octa|octahedral (experimental)\n"
+        "--skin n: graded fine skin layers (default 2)\n"
+        "--no-feature: disable geometry (curvature/thin-wall) grading (default on)\n"
+        "--element-tendency t: shape dial in [-1,+1] (hex↔fan hybrid↔poly VEM↔tet)\n"
+        "--fix-box / --load-box: BC/load selection AABBs. They select the *boundary*\n"
+        "              nodes and faces inside the box, never interior nodes, and the\n"
+        "              mesh grades finer toward them (loads finest)\n"
+        "--load-dir x y z: load direction (normalized; default 0 1 0)\n"
+        "--force N: total resultant force in newtons over the loaded faces\n"
+        "              (default 1000); applied as a consistent traction ∫Nᵗt dS\n"
+        "--traction Pa: pressure magnitude instead of a total force; faces in the\n"
+        "              load selection are filtered by normal alignment with\n"
+        "              --load-dir, and resultant is Pa × their area. Last of\n"
+        "              --force/--traction wins\n"
+        "--max-mem GB: enforced preflight solve cap; 0=auto (70% of currently\n"
+        "              available system memory)\n"
+        "--adapt n: ZZ→Dörfler remesh passes (local seeds on graded path)\n"
+        "--eta-target η: stop adapt when global ZZ η ≤ η (0=off; needs --adapt)\n"
+        "--no-curved: ship the straight-edged linear mesh instead of the exact\n"
+        "             curved CAD geometry. Default for a CAD part is curved: the\n"
+        "             solve/export mesh is tet10/hex20 with boundary mids on the\n"
+        "             BRep (ADR-0035), so this flag is the opt-out, not the opt-in\n"
+        "--p-elevate-uniform: promote every tet4/hex8 on a non-CAD (STL) mesh too,\n"
+        "             for order-2 parity with Gmsh peers on tessellated input\n"
+        "--bc-grade: force a-priori BC grading from the default cantilever faces\n"
+        "--advisor DIR: pick mesher/h/adapt/p-order with the learned mesh advisor\n"
+        "               (DIR holds model.onnx, normalization.json, clamps.json);\n"
+        "               every value is clamped and the decision is logged as JSON\n"
+        "--max-elems N: pre-flight element ceiling (0=589824 default); auto-h\n"
+        "               clamps to fit and over-ceiling meshes coarsen-and-retry;\n"
+        "               with spectral sizing on (default) the size field is\n"
+        "               FFT-trimmed first (insignificant fine bands merge, ADR-0034)\n"
+        "--no-spectral: disable FFT sizing-field trimming and CAD-edge curvature\n"
+        "               denoise (campaign-baseline behavior)\n"
+        "--advisor-max-dof N: with --advisor, drop candidate actions whose\n"
+        "               predicted DOF exceeds N; refusal (defaults) if none fit\n"
+        "--max-dof N: pre-flight/adapt DOF ceiling (0=1769472 default)\n"
+        "--subdiv N: render/tessellation subdivisions per quadratic boundary face\n"
+        "               (default 8, the value the Studio viewport uses); linear\n"
+        "               faces have no interior to subdivide and ignore it\n"
+        "--size WxH: render pixel size (default 1200x900)\n"
+        "--azimuth DEG / --elevation DEG: orbit camera angles for `render`,\n"
+        "               degrees (defaults 35 / 25); the projection is orthographic\n"
+        "               so a view is reproducible from these two numbers\n"
+        "--wireframe: overlay the tessellation triangle edges on the render\n"
+        "--stats out.json: numeric render report — node/element counts, element-type\n"
+        "               census, triangle count, covered/silhouette pixels, and the\n"
+        "               facet-normal deviation against the exact BRep normal\n"
+        "               (omitted for non-CAD input, which has no exact normal)\n"
+        "\n"
+        "default BC selection: nodes in a 0.51·h slab at min-x (fixed) / max-x\n"
+        "              (loaded). If a slab captures too few nodes to act as a\n"
+        "              face (curved parts), selection falls back to boundary\n"
+        "              faces whose outward normal aligns with ∓x/±x.\n",
+        stderr);
     return 2;
 }
 
@@ -187,8 +188,6 @@ bool parse_mesher_arg(const std::string& m, polymesh::pipeline::VolumeMesher& ou
     out = *parsed;
     return true;
 }
-
-
 
 struct BoxSel {
     bool set = false;
@@ -535,9 +534,9 @@ Eigen::VectorXd build_loads(const polymesh::fea::NodalMesh& mesh,
                             const LoadSpec& spec, const char* what, std::FILE* report,
                             const std::optional<polymesh::fea::LoadRegion>& region,
                             std::optional<double> exact_pressure_area = std::nullopt) {
-    const double mesh_area =
-        region.has_value() ? polymesh::fea::integrated_region_area(mesh, faces, *region)
-                           : polymesh::fea::integrated_face_area(mesh, faces);
+    const double mesh_area = region.has_value()
+                                 ? polymesh::fea::integrated_region_area(mesh, faces, *region)
+                                 : polymesh::fea::integrated_face_area(mesh, faces);
     if (fallback_nodes.empty() && !(mesh_area > 0.0)) {
         throw std::runtime_error(std::format(
             "{}: the load selection is empty — widen --load-box or refine with -h.", what));
@@ -616,7 +615,7 @@ int cmd_mesh(std::span<char*> args) {
     std::string out_path;
     auto mesher = polymesh::pipeline::VolumeMesher::kGradedTet;
     int skin = 2;
-    bool feature = true; // geometry (curvature/thin-wall) grading on by default
+    bool feature = true;  // geometry (curvature/thin-wall) grading on by default
     bool spectral = true; // spectral sizing on by default (ADR-0034)
     double element_tendency = 0.0;
     bool curved = true; // exact curved CAD solve/export geometry (ADR-0035)
@@ -677,8 +676,8 @@ int cmd_mesh(std::span<char*> args) {
 
     // Geometry + simulation-setup (BC/load box) aware refinement plan → seeds.
     const auto regions = make_regions(fix_box, load_box);
-    const auto plan = polymesh::pipeline::build_refinement_plan(model, h, regions, feature,
-                                                                spectral, 0);
+    const auto plan =
+        polymesh::pipeline::build_refinement_plan(model, h, regions, feature, spectral, 0);
     auto vol = polymesh::pipeline::volume_mesh(
         model, h, mesher, skin, feature, plan.refine_seeds, plan.seed_band, element_tendency,
         resolved.element_ceiling, resolved.dof_ceiling, resolved.auto_chosen ? 3 : 0, {},
@@ -690,8 +689,8 @@ int cmd_mesh(std::span<char*> args) {
         vol.mesher_note += std::format(
             " | curved_volume promoted={} pyramid_split={} projected={} partial={} "
             "reverted={} h_refined={}",
-            shaped.n_promoted, shaped.n_pyramids_split, shaped.n_projected,
-            shaped.n_partial, shaped.n_reverted, shaped.n_h_refined);
+            shaped.n_promoted, shaped.n_pyramids_split, shaped.n_projected, shaped.n_partial,
+            shaped.n_reverted, shaped.n_h_refined);
     }
     vol.mesh.check_validity();
     std::printf("mesh: %zu nodes, %zu elems, h=%.6g m\n"
@@ -731,8 +730,8 @@ int cmd_solve(std::span<char*> args) {
     std::string out_path;
     auto mesher = polymesh::pipeline::VolumeMesher::kGradedTet;
     int skin = 2;
-    bool feature = true; // geometry grading on by default (CAD)
-    bool curved = true; // exact curved CAD solve/export geometry (ADR-0035)
+    bool feature = true;  // geometry grading on by default (CAD)
+    bool curved = true;   // exact curved CAD solve/export geometry (ADR-0035)
     bool spectral = true; // spectral sizing on by default (ADR-0034)
     int adapt_passes = 0;
     double eta_target = 0.0;
@@ -842,7 +841,8 @@ int cmd_solve(std::span<char*> args) {
 
     const bool msh_input = is_msh_path(path);
     if (msh_input && !advisor_dir.empty()) {
-        std::fputs("solve: --advisor requires CAD input and cannot be used with .msh\n", stderr);
+        std::fputs("solve: --advisor requires CAD input and cannot be used with .msh\n",
+                   stderr);
         return 2;
     }
 
@@ -920,8 +920,9 @@ int cmd_solve(std::span<char*> args) {
         std::string feature_clamp_reason;
         for (int probe = 0; probe < 3; ++probe) {
             try {
-                (void)polymesh::pipeline::volume_mesh(*model, h, mesher, skin, feature, {}, 0.0,
-                                                      element_tendency, max_elems, max_dof, 0);
+                (void)polymesh::pipeline::volume_mesh(*model, h, mesher, skin, feature, {},
+                                                      0.0, element_tendency, max_elems,
+                                                      max_dof, 0);
                 break;
             } catch (const polymesh::pipeline::GeometryVolumeLimitError& e) {
                 if (feature_clamped_from == 0.0) {
@@ -976,10 +977,9 @@ int cmd_solve(std::span<char*> args) {
 #endif
     }
 
-    const auto exact_pressure_area =
-        !msh_input && load_spec.traction_mode
-            ? cad_pressure_area(*model, load_box, load_spec.dir)
-            : std::nullopt;
+    const auto exact_pressure_area = !msh_input && load_spec.traction_mode
+                                         ? cad_pressure_area(*model, load_box, load_spec.dir)
+                                         : std::nullopt;
     polymesh::pipeline::ResolvedMeshSize resolved;
     if (msh_input) {
         const bool auto_h = !(h > 0.0);
@@ -1002,12 +1002,10 @@ int cmd_solve(std::span<char*> args) {
         if (max_dof > 0) {
             resolved.dof_ceiling = max_dof;
         }
-        resolved.note =
-            std::format("imported .msh (CAD fidelity unavailable, h{}={:.6g} m)",
-                        auto_h ? "_estimate" : "", h);
+        resolved.note = std::format("imported .msh (CAD fidelity unavailable, h{}={:.6g} m)",
+                                    auto_h ? "_estimate" : "", h);
     } else {
-        resolved =
-            polymesh::pipeline::resolve_mesh_size(*model, h, 30.0, max_elems, max_dof);
+        resolved = polymesh::pipeline::resolve_mesh_size(*model, h, 30.0, max_elems, max_dof);
         h = resolved.h;
     }
 
@@ -1038,9 +1036,8 @@ int cmd_solve(std::span<char*> args) {
             hi[0] = xmin + slab;
             regions.push_back({lo, hi, 0.5});
         }
-        const auto plan =
-            polymesh::pipeline::build_refinement_plan(*model, h_use, regions, feature,
-                                                      spectral, 0);
+        const auto plan = polymesh::pipeline::build_refinement_plan(*model, h_use, regions,
+                                                                    feature, spectral, 0);
         seeds = plan.refine_seeds;
         seed_band = plan.seed_band;
         size_field = plan.size_field;
@@ -1061,13 +1058,13 @@ int cmd_solve(std::span<char*> args) {
     }
     auto mesh_now = [&](polymesh::pipeline::VolumeMesher m) {
         if (msh_input) {
-            throw std::runtime_error(
-                "solve: --adapt requires CAD geometry for remeshing and is unavailable for .msh");
+            throw std::runtime_error("solve: --adapt requires CAD geometry for remeshing and "
+                                     "is unavailable for .msh");
         }
-        return polymesh::pipeline::volume_mesh(
-            *model, h_use, m, skin, feature, seeds, seed_band, element_tendency,
-            resolved.element_ceiling, resolved.dof_ceiling, resolved.auto_chosen ? 3 : 0, {},
-            size_field);
+        return polymesh::pipeline::volume_mesh(*model, h_use, m, skin, feature, seeds,
+                                               seed_band, element_tendency,
+                                               resolved.element_ceiling, resolved.dof_ceiling,
+                                               resolved.auto_chosen ? 3 : 0, {}, size_field);
     };
     polymesh::pipeline::VolumeMeshOutput vol;
     if (msh_input) {
@@ -1096,9 +1093,8 @@ int cmd_solve(std::span<char*> args) {
         std::vector<std::uint32_t> partial;
         const std::size_t projected = polymesh::pipeline::project_quadratic_boundary_mids(
             vol.mesh, *model->cad, solve_projection, h_use, &reverted, &partial);
-        vol.mesher_note +=
-            std::format(" | mids projected={} partial={} reverted={}", projected,
-                        partial.size(), reverted.size());
+        vol.mesher_note += std::format(" | mids projected={} partial={} reverted={}",
+                                       projected, partial.size(), reverted.size());
     };
 
     const polymesh::fea::Material mat{.youngs_modulus = E, .poissons_ratio = nu};
@@ -1172,28 +1168,26 @@ int cmd_solve(std::span<char*> args) {
     const auto report_p_elevate = [&](std::size_t n_promoted, std::size_t n0) {
         const auto counts = polymesh::fea::count_element_types(vol.mesh);
         // Wording pinned: the peer matrix parses this line for per-row counts.
-        std::printf("p-elevate: %zu smooth, nodes %zu→%zu (tet10=%zu hex20=%zu)\n",
-                    n_promoted, n0, vol.mesh.nodes.size(), counts.tet10, counts.hex20);
+        std::printf("p-elevate: %zu smooth, nodes %zu→%zu (tet10=%zu hex20=%zu)\n", n_promoted,
+                    n0, vol.mesh.nodes.size(), counts.tet10, counts.hex20);
         std::printf("p-elevate-mode: %s\n", p_elevate_mode);
         vol.mesher_note += std::format(" | p-elevate={} promoted={} tet10={} hex20={}",
-                                       p_elevate_mode, n_promoted, counts.tet10,
-                                       counts.hex20);
+                                       p_elevate_mode, n_promoted, counts.tet10, counts.hex20);
     };
     const auto curve_final_geometry = [&]() {
         if (!curved || !model || !model->cad) {
             return false;
         }
         const std::size_t n0 = vol.mesh.nodes.size();
-        auto shaped =
-            polymesh::pipeline::curve_volume_geometry(*model, vol.mesh, h_use);
+        auto shaped = polymesh::pipeline::curve_volume_geometry(*model, vol.mesh, h_use);
         curved_constraints = std::move(shaped.constraints);
         vol.mesh = std::move(shaped.mesh);
         vol.boundary_quads = polymesh::fea::extract_boundary_faces(vol.mesh);
         vol.mesher_note += std::format(
             " | curved_volume promoted={} pyramid_split={} projected={} partial={} "
             "reverted={} h_refined={}",
-            shaped.n_promoted, shaped.n_pyramids_split, shaped.n_projected,
-            shaped.n_partial, shaped.n_reverted, shaped.n_h_refined);
+            shaped.n_promoted, shaped.n_pyramids_split, shaped.n_projected, shaped.n_partial,
+            shaped.n_reverted, shaped.n_h_refined);
         report_p_elevate(shaped.n_promoted, n0);
         return true;
     };
@@ -1334,7 +1328,7 @@ int cmd_diag(std::span<char*> args) {
     auto mesher = polymesh::pipeline::VolumeMesher::kVaryhedron;
     bool do_solve = true;
     bool spectral = true; // spectral sizing on by default (ADR-0034)
-    bool curved = true; // exact curved CAD solve/export geometry (ADR-0035)
+    bool curved = true;   // exact curved CAD solve/export geometry (ADR-0035)
     std::size_t max_elems = 0;
     std::size_t max_dof = 0;
     double max_mem_gb = 0.0;
@@ -1433,8 +1427,8 @@ int cmd_diag(std::span<char*> args) {
         vol.mesher_note += std::format(
             " | curved_volume promoted={} pyramid_split={} projected={} partial={} "
             "reverted={} h_refined={}",
-            shaped.n_promoted, shaped.n_pyramids_split, shaped.n_projected,
-            shaped.n_partial, shaped.n_reverted, shaped.n_h_refined);
+            shaped.n_promoted, shaped.n_pyramids_split, shaped.n_projected, shaped.n_partial,
+            shaped.n_reverted, shaped.n_h_refined);
     }
     vol.mesh.check_validity();
 
@@ -1467,8 +1461,7 @@ int cmd_diag(std::span<char*> args) {
         }
     }
 
-    const auto fidelity_surface =
-        polymesh::fea::tessellate_boundary_surface(vol.mesh, 8);
+    const auto fidelity_surface = polymesh::fea::tessellate_boundary_surface(vol.mesh, 8);
     std::vector<Eigen::Vector3d> fidelity_nodes;
     fidelity_nodes.reserve(fidelity_surface.samples.size());
     for (const auto& sample : fidelity_surface.samples) {
@@ -1486,43 +1479,36 @@ int cmd_diag(std::span<char*> args) {
         std::vector<polymesh::geom::MeshEdgeSegment> feature_segments;
         std::set<std::array<std::uint32_t, 2>> visited_edges;
         for (const auto& face : polymesh::fea::boundary_surface_faces(vol.mesh)) {
-            const int corners =
-                (face.type == polymesh::fea::FaceType::kTri3 ||
-                 face.type == polymesh::fea::FaceType::kTri6)
-                    ? 3
-                    : 4;
-            const bool quadratic =
-                face.type == polymesh::fea::FaceType::kTri6 ||
-                face.type == polymesh::fea::FaceType::kQuad8;
+            const int corners = (face.type == polymesh::fea::FaceType::kTri3 ||
+                                 face.type == polymesh::fea::FaceType::kTri6)
+                                    ? 3
+                                    : 4;
+            const bool quadratic = face.type == polymesh::fea::FaceType::kTri6 ||
+                                   face.type == polymesh::fea::FaceType::kQuad8;
             for (int edge_index = 0; edge_index < corners; ++edge_index) {
-                const std::uint32_t a =
-                    face.nodes[static_cast<std::size_t>(edge_index)];
-                const std::uint32_t b = face.nodes[
-                    static_cast<std::size_t>((edge_index + 1) % corners)];
+                const std::uint32_t a = face.nodes[static_cast<std::size_t>(edge_index)];
+                const std::uint32_t b =
+                    face.nodes[static_cast<std::size_t>((edge_index + 1) % corners)];
                 auto key = std::array{a, b};
                 std::sort(key.begin(), key.end());
                 if (!visited_edges.insert(key).second) {
                     continue;
                 }
                 const std::uint32_t mid =
-                    quadratic
-                        ? face.nodes[static_cast<std::size_t>(corners + edge_index)]
-                        : a;
+                    quadratic ? face.nodes[static_cast<std::size_t>(corners + edge_index)] : a;
                 const auto point = [&](double t) -> Eigen::Vector3d {
                     if (!quadratic) {
-                        return ((1.0 - t) * vol.mesh.nodes[a] +
-                                t * vol.mesh.nodes[b]).eval();
+                        return ((1.0 - t) * vol.mesh.nodes[a] + t * vol.mesh.nodes[b]).eval();
                     }
                     const double wa = (1.0 - t) * (1.0 - 2.0 * t);
                     const double wb = t * (2.0 * t - 1.0);
                     const double wm = 4.0 * t * (1.0 - t);
                     return (wa * vol.mesh.nodes[a] + wb * vol.mesh.nodes[b] +
-                            wm * vol.mesh.nodes[mid]).eval();
+                            wm * vol.mesh.nodes[mid])
+                        .eval();
                 };
-                const auto edge_a =
-                    polymesh::geom::closest_edge(topology, point(0.0), true);
-                const auto edge_b =
-                    polymesh::geom::closest_edge(topology, point(1.0), true);
+                const auto edge_a = polymesh::geom::closest_edge(topology, point(0.0), true);
+                const auto edge_b = polymesh::geom::closest_edge(topology, point(1.0), true);
                 if (!edge_a || !edge_b || edge_a->edge_id != edge_b->edge_id) {
                     continue;
                 }
@@ -1537,8 +1523,7 @@ int cmd_diag(std::span<char*> args) {
                 }
                 Eigen::Vector3d previous = point(0.0);
                 for (int sample = 1; sample <= 8; ++sample) {
-                    const Eigen::Vector3d current =
-                        point(static_cast<double>(sample) / 8.0);
+                    const Eigen::Vector3d current = point(static_cast<double>(sample) / 8.0);
                     feature_segments.push_back({previous, current});
                     previous = current;
                 }
@@ -1662,9 +1647,8 @@ int cmd_diag(std::span<char*> args) {
         "\"energy_kept\": {:.6g}, \"edge_curve_seeds\": {}, "
         "\"n_pred_before\": {:.6g}, \"n_pred_after\": {:.6g} }}",
         plan.spectral.applied ? "true" : "false", plan.spectral.modes_kept,
-        plan.spectral.modes_total, plan.spectral.energy_kept,
-        plan.spectral.n_edge_curve_seeds, plan.spectral.predicted_before,
-        plan.spectral.predicted_after);
+        plan.spectral.modes_total, plan.spectral.energy_kept, plan.spectral.n_edge_curve_seeds,
+        plan.spectral.predicted_before, plan.spectral.predicted_after);
 
     const std::string json = std::format(
         "{{\n"
@@ -1686,15 +1670,12 @@ int cmd_diag(std::span<char*> args) {
         "  \"mesher_note\": \"{}\"\n"
         "}}\n",
         model.name, polymesh::pipeline::mesher_name(mesher), model.surface.vertices.size(),
-        model.surface.triangles.size(),
-        bbox_diag, model.cad ? "true" : "false", h, vol.mesh.nodes.size(),
-        vol.mesh.elements.size(), q_min, q_min_type, n_inverted,
-        vol.n_cells_below_shape_floor, q_mean,
-        plan.n_geometry_seeds, plan.n_bc_seeds,
-        plan.geometry_curvature_from_brep ? "brep" : "tessellation", spectral_json,
-        import_ms, mesh_ms, solve_ms, mesh_throughput, fidelity_json,
-        solved ? "true" : "false", dof, max_vm, max_u, global_eta, mesh_size_note,
-        vol.mesher_note);
+        model.surface.triangles.size(), bbox_diag, model.cad ? "true" : "false", h,
+        vol.mesh.nodes.size(), vol.mesh.elements.size(), q_min, q_min_type, n_inverted,
+        vol.n_cells_below_shape_floor, q_mean, plan.n_geometry_seeds, plan.n_bc_seeds,
+        plan.geometry_curvature_from_brep ? "brep" : "tessellation", spectral_json, import_ms,
+        mesh_ms, solve_ms, mesh_throughput, fidelity_json, solved ? "true" : "false", dof,
+        max_vm, max_u, global_eta, mesh_size_note, vol.mesher_note);
 
     if (!json_path.empty()) {
         std::FILE* f = std::fopen(json_path.c_str(), "w");
@@ -1841,12 +1822,11 @@ int cmd_render(std::span<char*> args) {
     // normal at all: the field is then omitted rather than reported as zero.
     std::string normal_json;
     if (model.cad && !model.cad->empty()) {
-        auto deviation =
-            polymesh::pipeline::exact_facet_normal_deviation(*model.cad, surface);
+        auto deviation = polymesh::pipeline::exact_facet_normal_deviation(*model.cad, surface);
         const char* reference = "exact_brep";
         if (deviation.samples == 0) {
-            deviation = polymesh::pipeline::tessellated_facet_normal_deviation(
-                model.surface, surface);
+            deviation =
+                polymesh::pipeline::tessellated_facet_normal_deviation(model.surface, surface);
             reference = "tessellated_surface";
         }
         if (deviation.samples > 0) {
@@ -1857,30 +1837,29 @@ int cmd_render(std::span<char*> args) {
                 reference, deviation.samples, deviation.mean, deviation.p99, deviation.max);
         }
     }
-    const std::string json = std::format(
-        "{{\n"
-        "  \"part\": \"{}\",\n"
-        "  \"mesher\": \"{}\",\n"
-        "  \"h\": {:.6g},\n"
-        "  \"curved\": {},\n"
-        "  \"subdiv\": {},\n"
-        "  \"nodes\": {},\n"
-        "  \"elements\": {},\n"
-        "  \"element_types\": {{{}}},\n"
-        "  \"triangles\": {},\n"
-        "  \"width\": {},\n"
-        "  \"height\": {},\n"
-        "  \"pixels_covered\": {},\n"
-        "  \"silhouette_area_px\": {},\n"
-        "{}"
-        "  \"png\": \"{}\"\n"
-        "}}\n",
-        model.name, polymesh::pipeline::mesher_name(mesher), h, curved ? "true" : "false",
-        subdiv,
-        vol.mesh.nodes.size(), vol.mesh.elements.size(), census_json,
-        surface.triangles.size(), render.image.width, render.image.height,
-        render.coverage.pixels_covered, render.coverage.silhouette_area_px, normal_json,
-        out_path);
+    const std::string json =
+        std::format("{{\n"
+                    "  \"part\": \"{}\",\n"
+                    "  \"mesher\": \"{}\",\n"
+                    "  \"h\": {:.6g},\n"
+                    "  \"curved\": {},\n"
+                    "  \"subdiv\": {},\n"
+                    "  \"nodes\": {},\n"
+                    "  \"elements\": {},\n"
+                    "  \"element_types\": {{{}}},\n"
+                    "  \"triangles\": {},\n"
+                    "  \"width\": {},\n"
+                    "  \"height\": {},\n"
+                    "  \"pixels_covered\": {},\n"
+                    "  \"silhouette_area_px\": {},\n"
+                    "{}"
+                    "  \"png\": \"{}\"\n"
+                    "}}\n",
+                    model.name, polymesh::pipeline::mesher_name(mesher), h,
+                    curved ? "true" : "false", subdiv, vol.mesh.nodes.size(),
+                    vol.mesh.elements.size(), census_json, surface.triangles.size(),
+                    render.image.width, render.image.height, render.coverage.pixels_covered,
+                    render.coverage.silhouette_area_px, normal_json, out_path);
     std::FILE* file = std::fopen(stats_path.c_str(), "w");
     if (file == nullptr) {
         std::fprintf(stderr, "render: cannot write %s\n", stats_path.c_str());

@@ -49,8 +49,8 @@ struct CvtLloydParams {
 
 struct CvtLloydStats {
     int n_iters = 0;
-    double max_move = 0.0;       // metres, last iteration
-    double domain_diag = 0.0;    // metres
+    double max_move = 0.0;    // metres, last iteration
+    double domain_diag = 0.0; // metres
     std::size_t n_sites = 0;
     std::size_t n_fixed = 0;
     std::size_t n_free = 0;
@@ -67,25 +67,23 @@ struct CvtLloydResult {
 
 /// Voronoi cell of `site` inside `box`, clipped by bisectors to `others`.
 /// Empty optional if geogram off or the cell is empty.
-[[nodiscard]] std::optional<ClippedCell> restricted_voronoi_cell(
-    const ClipBox& box, const Eigen::Vector3d& site,
-    std::span<const Eigen::Vector3d> others);
+[[nodiscard]] std::optional<ClippedCell>
+restricted_voronoi_cell(const ClipBox& box, const Eigen::Vector3d& site,
+                        std::span<const Eigen::Vector3d> others);
 
 /// Density-weighted centroid of the restricted Voronoi cell of `site`.
 /// If `size_at` is empty, returns geometric barycenter. Nullopt if empty cell.
-[[nodiscard]] std::optional<Eigen::Vector3d> restricted_voronoi_centroid(
-    const ClipBox& box, const Eigen::Vector3d& site,
-    std::span<const Eigen::Vector3d> others, const SizeFieldFn& size_at,
-    double h_floor = 1e-12);
+[[nodiscard]] std::optional<Eigen::Vector3d>
+restricted_voronoi_centroid(const ClipBox& box, const Eigen::Vector3d& site,
+                            std::span<const Eigen::Vector3d> others,
+                            const SizeFieldFn& size_at, double h_floor = 1e-12);
 
 /// Lloyd iteration: free sites ← density-weighted restricted Voronoi centroids.
 /// Fixed sites are copied through unchanged. Requires POLYMESH_WITH_GEOGRAM.
-[[nodiscard]] CvtLloydResult lloyd_cvt(const ClipBox& domain,
-                                       std::span<const CvtSite> sites,
+[[nodiscard]] CvtLloydResult lloyd_cvt(const ClipBox& domain, std::span<const CvtSite> sites,
                                        const CvtLloydParams& params = {});
 
 /// Seed a regular-ish lattice of free sites inside the box (diagnostic / tests).
-[[nodiscard]] std::vector<CvtSite> seed_lattice_sites(const ClipBox& box,
-                                                      int n_side);
+[[nodiscard]] std::vector<CvtSite> seed_lattice_sites(const ClipBox& box, int n_side);
 
-}  // namespace polymesh::mesh
+} // namespace polymesh::mesh

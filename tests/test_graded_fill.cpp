@@ -101,7 +101,8 @@ TEST_CASE("feature/seed bands refine more blocks at multi-level lattice") {
 
     // Seed balls alone mark L2 blocks (no sharp edges needed).
     std::vector<Eigen::Vector3d> seeds{{0.5, 0.5, 0.0}, {0.5, 0.5, 1.0}};
-    auto seeded = graded_tet_fill_surface(s, {0, 0, 0}, {1, 1, 1}, 0.4, 1, {}, 0.0, seeds, 0.5);
+    auto seeded =
+        graded_tet_fill_surface(s, {0, 0, 0}, {1, 1, 1}, 0.4, 1, {}, 0.0, seeds, 0.5);
     REQUIRE(seeded.subdivision == 2);
     REQUIRE(seeded.n_seed_cells > 0);
     // L2 active → h_fine ~ h/4.
@@ -136,9 +137,8 @@ TEST_CASE("graded multi-level has finer edges near seeds than bulk") {
     std::vector<double> far_edges;
     const Eigen::Vector3d seed = seeds[0];
     for (const auto& t : graded.mesh.tets) {
-        const Eigen::Vector3d c =
-            0.25 * (graded.mesh.nodes[t[0]] + graded.mesh.nodes[t[1]] +
-                    graded.mesh.nodes[t[2]] + graded.mesh.nodes[t[3]]);
+        const Eigen::Vector3d c = 0.25 * (graded.mesh.nodes[t[0]] + graded.mesh.nodes[t[1]] +
+                                          graded.mesh.nodes[t[2]] + graded.mesh.nodes[t[3]]);
         double elen = 0.0;
         int ne = 0;
         for (int a = 0; a < 4; ++a) {
@@ -205,8 +205,8 @@ TEST_CASE("graded tet tiny h auto-coarsens instead of throwing grid too fine") {
 }
 
 TEST_CASE("make_bbox_grid_even respects max_cells budget") {
-    using polymesh::mesh::make_bbox_grid_even;
     using polymesh::mesh::kDefaultMaxGridCells;
+    using polymesh::mesh::make_bbox_grid_even;
     // Request absurdly fine even lattice on unit cube.
     auto g = make_bbox_grid_even({0, 0, 0}, {1, 1, 1}, 1e-6, 2, kDefaultMaxGridCells);
     REQUIRE(g.nx % 2 == 0);
@@ -359,7 +359,7 @@ TEST_CASE("lattice tilings mirror about every bbox mid-plane", "[mesher][symmetr
             return 0.08 + 0.30 * r;
         };
         const auto fill = graded_tet_fill_surface(s, {0, 0, 0}, {1, 1, 1}, 0.2, 1, {}, 0.0, {},
-                                                 0.0, 0.0, nullptr, field);
+                                                  0.0, 0.0, nullptr, field);
         REQUIRE_FALSE(fill.mesh.tets.empty());
         for (int axis = 0; axis < 3; ++axis) {
             INFO("graded axis=" << axis << " tets=" << fill.mesh.tets.size());
@@ -398,19 +398,36 @@ TEST_CASE("a mirror-symmetric CAD part ships a mirror-symmetric mesh",
     const Case cases[] = {
         // Both grading paths: `feature_refine` off exercises the plain skin/LEB
         // fill, on exercises the feature band, the curvature stamp and the pin.
-        {"cylinder", "tests/fixtures/parts/cylinder.step", 0.012, false,
+        {"cylinder", "tests/fixtures/parts/cylinder.step", 0.012, false, {{true, true, true}}},
+        {"cylinder/feature",
+         "tests/fixtures/parts/cylinder.step",
+         0.012,
+         true,
          {{true, true, true}}},
-        {"cylinder/feature", "tests/fixtures/parts/cylinder.step", 0.012, true,
+        {"plate_hole",
+         "tests/fixtures/parts/plate_hole.step",
+         0.008,
+         false,
          {{true, true, true}}},
-        {"plate_hole", "tests/fixtures/parts/plate_hole.step", 0.008, false,
+        {"plate_hole/feature",
+         "tests/fixtures/parts/plate_hole.step",
+         0.008,
+         true,
          {{true, true, true}}},
-        {"plate_hole/feature", "tests/fixtures/parts/plate_hole.step", 0.008, true,
+        {"sphere/feature",
+         "tests/fixtures/parts/sphere.step",
+         0.012,
+         true,
          {{true, true, true}}},
-        {"sphere/feature", "tests/fixtures/parts/sphere.step", 0.012, true,
-         {{true, true, true}}},
-        {"icecream_cone", "tests/fixtures/parts/icecream_cone.step", 0.012, false,
+        {"icecream_cone",
+         "tests/fixtures/parts/icecream_cone.step",
+         0.012,
+         false,
          {{true, true, false}}},
-        {"icecream_cone/feature", "tests/fixtures/parts/icecream_cone.step", 0.012, true,
+        {"icecream_cone/feature",
+         "tests/fixtures/parts/icecream_cone.step",
+         0.012,
+         true,
          {{true, true, false}}},
     };
     for (const auto& c : cases) {
@@ -419,8 +436,7 @@ TEST_CASE("a mirror-symmetric CAD part ships a mirror-symmetric mesh",
         }
         const auto model = polymesh::pipeline::Model::load(c.path);
         REQUIRE(model.cad);
-        const auto frame =
-            detect_mirror_frame(*model.cad, model.bbox_min, model.bbox_max);
+        const auto frame = detect_mirror_frame(*model.cad, model.bbox_min, model.bbox_max);
         for (int axis = 0; axis < 3; ++axis) {
             INFO(c.name << " detected plane axis=" << axis);
             REQUIRE(frame.plane[static_cast<std::size_t>(axis)] ==
@@ -434,8 +450,8 @@ TEST_CASE("a mirror-symmetric CAD part ships a mirror-symmetric mesh",
         tets.reserve(vol.mesh.elements.size());
         for (const auto& element : vol.mesh.elements) {
             REQUIRE(element.type == polymesh::fea::ElementType::kTet4);
-            tets.push_back({element.nodes[0], element.nodes[1], element.nodes[2],
-                            element.nodes[3]});
+            tets.push_back(
+                {element.nodes[0], element.nodes[1], element.nodes[2], element.nodes[3]});
         }
         for (int axis = 0; axis < 3; ++axis) {
             if (!c.plane[static_cast<std::size_t>(axis)]) {

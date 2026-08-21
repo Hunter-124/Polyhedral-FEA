@@ -92,9 +92,9 @@ bool dominates(const Eigen::Matrix3d& finer, const Eigen::Matrix3d& coarser) {
     const Eigen::Matrix3d delta = 0.5 * ((finer - coarser) + (finer - coarser).transpose());
     const Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eig(delta);
     const double scale = std::max({1.0, finer.norm(), coarser.norm()});
-    return eig.info() == Eigen::Success && eig.eigenvalues().minCoeff() >=
-                                               -64.0 * std::numeric_limits<double>::epsilon() *
-                                                   scale;
+    return eig.info() == Eigen::Success &&
+           eig.eigenvalues().minCoeff() >=
+               -64.0 * std::numeric_limits<double>::epsilon() * scale;
 }
 
 Eigen::Matrix3d repaired_spd(Eigen::Matrix3d matrix) {
@@ -108,8 +108,8 @@ Eigen::Matrix3d repaired_spd(Eigen::Matrix3d matrix) {
     }
     Eigen::Vector3d values = eig.eigenvalues();
     if (!(values.minCoeff() > 0.0)) {
-        const double floor = std::max(std::numeric_limits<double>::min(),
-                                      values.cwiseAbs().maxCoeff() * 1e-14);
+        const double floor =
+            std::max(std::numeric_limits<double>::min(), values.cwiseAbs().maxCoeff() * 1e-14);
         values = values.cwiseMax(floor);
         matrix = eig.eigenvectors() * values.asDiagonal() * eig.eigenvectors().transpose();
         matrix = 0.5 * (matrix + matrix.transpose());
@@ -120,8 +120,8 @@ Eigen::Matrix3d repaired_spd(Eigen::Matrix3d matrix) {
 }
 
 std::size_t node_count(const Eigen::Vector3i& resolution) {
-    return static_cast<std::size_t>(resolution.x()) * static_cast<std::size_t>(resolution.y()) *
-           static_cast<std::size_t>(resolution.z());
+    return static_cast<std::size_t>(resolution.x()) *
+           static_cast<std::size_t>(resolution.y()) * static_cast<std::size_t>(resolution.z());
 }
 
 Eigen::Vector3i capped_resolution(const Eigen::Vector3i& requested) {
@@ -187,14 +187,16 @@ Metric3d Metric3d::isotropic(double h) {
     const double inv_h = 1.0 / h;
     const double lambda = inv_h * inv_h;
     if (!(lambda > 0.0) || !std::isfinite(lambda)) {
-        throw std::invalid_argument("Metric3d::isotropic: h is outside the representable range");
+        throw std::invalid_argument(
+            "Metric3d::isotropic: h is outside the representable range");
     }
     return Metric3d(lambda * Eigen::Matrix3d::Identity());
 }
 
 Metric3d Metric3d::from_axes(const Eigen::Vector3d& h, const Eigen::Matrix3d& axes) {
     if (!h.allFinite() || !(h.minCoeff() > 0.0) || !axes.allFinite()) {
-        throw std::invalid_argument("Metric3d::from_axes: finite positive sizes and axes required");
+        throw std::invalid_argument(
+            "Metric3d::from_axes: finite positive sizes and axes required");
     }
 
     const double frame_scale = axes.colwise().norm().maxCoeff();
@@ -222,7 +224,8 @@ Metric3d Metric3d::from_axes(const Eigen::Vector3d& h, const Eigen::Matrix3d& ax
     const Eigen::Vector3d inv_h = h.cwiseInverse();
     const Eigen::Vector3d lambda = inv_h.array().square().matrix();
     if (!lambda.allFinite() || !(lambda.minCoeff() > 0.0)) {
-        throw std::invalid_argument("Metric3d::from_axes: sizes are outside representable range");
+        throw std::invalid_argument(
+            "Metric3d::from_axes: sizes are outside representable range");
     }
     const Eigen::Matrix3d metric = q * lambda.asDiagonal() * q.transpose();
     return Metric3d(metric);
@@ -279,10 +282,9 @@ Metric3d Metric3d::intersect(const Metric3d& other) const {
     // the standard simultaneous-reduction intersection.
     Eigen::GeneralizedSelfAdjointEigenSolver<Eigen::Matrix3d> generalized(b, a);
     Eigen::Matrix3d candidate = Eigen::Matrix3d::Zero();
-    bool primary_ok = generalized.info() == Eigen::Success &&
-                      generalized.eigenvalues().allFinite() &&
-                      generalized.eigenvectors().allFinite() &&
-                      generalized.eigenvalues().minCoeff() > 0.0;
+    bool primary_ok =
+        generalized.info() == Eigen::Success && generalized.eigenvalues().allFinite() &&
+        generalized.eigenvectors().allFinite() && generalized.eigenvalues().minCoeff() > 0.0;
     if (primary_ok) {
         const Eigen::FullPivLU<Eigen::Matrix3d> lu(generalized.eigenvectors());
         primary_ok = lu.isInvertible() && lu.rcond() > 1e-12;
@@ -315,8 +317,8 @@ Metric3d Metric3d::intersect(const Metric3d& other) const {
         if (!ratios.allFinite() || !(ratios.minCoeff() > 0.0) || !lu.isInvertible()) {
             throw std::runtime_error("Metric3d::intersect: fallback basis is singular");
         }
-        candidate = a * basis * ratios.cwiseMax(Eigen::Vector3d::Ones()).asDiagonal() *
-                    lu.inverse();
+        candidate =
+            a * basis * ratios.cwiseMax(Eigen::Vector3d::Ones()).asDiagonal() * lu.inverse();
     }
 
     return Metric3d(repaired_spd(candidate));
@@ -338,9 +340,7 @@ Metric3d Metric3d::log_interp(const Metric3d& a, const Metric3d& b, double t) {
     return Metric3d(matrix_exp(log_metric));
 }
 
-double Metric3d::isotropic_size() const {
-    return sizes().minCoeff();
-}
+double Metric3d::isotropic_size() const { return sizes().minCoeff(); }
 
 MetricGrid::MetricGrid(const Eigen::Vector3d& bbox_min, const Eigen::Vector3d& bbox_max,
                        const Eigen::Vector3i& resolution)
@@ -350,11 +350,12 @@ MetricGrid::MetricGrid(const Eigen::Vector3d& bbox_min, const Eigen::Vector3d& b
         throw std::invalid_argument("MetricGrid: bbox must be finite with positive extent");
     }
     if ((resolution.array() < 2).any()) {
-        throw std::invalid_argument("MetricGrid: resolution must have at least two nodes per axis");
+        throw std::invalid_argument(
+            "MetricGrid: resolution must have at least two nodes per axis");
     }
     resolution_ = capped_resolution(resolution);
-    spacing_ = (bbox_max_ - bbox_min_).cwiseQuotient(
-        (resolution_.cast<double>() - Eigen::Vector3d::Ones()));
+    spacing_ = (bbox_max_ - bbox_min_)
+                   .cwiseQuotient((resolution_.cast<double>() - Eigen::Vector3d::Ones()));
     metrics_.assign(node_count(resolution_), Metric3d{});
 }
 
@@ -378,17 +379,17 @@ Metric3d MetricGrid::at_node(std::size_t i, std::size_t j, std::size_t k) const 
 
 Eigen::Vector3d MetricGrid::node_position(std::size_t i, std::size_t j, std::size_t k) const {
     static_cast<void>(index(i, j, k));
-    return bbox_min_ +
-           spacing_.cwiseProduct(Eigen::Vector3d{static_cast<double>(i), static_cast<double>(j),
-                                                static_cast<double>(k)});
+    return bbox_min_ + spacing_.cwiseProduct(Eigen::Vector3d{static_cast<double>(i),
+                                                             static_cast<double>(j),
+                                                             static_cast<double>(k)});
 }
 
 Metric3d MetricGrid::sample(const Eigen::Vector3d& x) const {
     if (!x.allFinite()) {
         throw std::invalid_argument("MetricGrid::sample: point must be finite");
     }
-    Eigen::Vector3d local = (x.cwiseMax(bbox_min_).cwiseMin(bbox_max_) - bbox_min_)
-                                .cwiseQuotient(spacing_);
+    Eigen::Vector3d local =
+        (x.cwiseMax(bbox_min_).cwiseMin(bbox_max_) - bbox_min_).cwiseQuotient(spacing_);
     Eigen::Vector3i base;
     Eigen::Vector3d fraction;
     for (int axis = 0; axis < 3; ++axis) {
@@ -408,11 +409,12 @@ Metric3d MetricGrid::sample(const Eigen::Vector3d& x) const {
                 if (weight == 0.0) {
                     continue;
                 }
-                log_metric += weight * matrix_log(metrics_[index(
-                                                  static_cast<std::size_t>(base.x() + di),
-                                                  static_cast<std::size_t>(base.y() + dj),
-                                                  static_cast<std::size_t>(base.z() + dk))]
-                                                      .M);
+                log_metric +=
+                    weight *
+                    matrix_log(metrics_[index(static_cast<std::size_t>(base.x() + di),
+                                              static_cast<std::size_t>(base.y() + dj),
+                                              static_cast<std::size_t>(base.z() + dk))]
+                                   .M);
             }
         }
     }
@@ -442,7 +444,8 @@ mesh::SizeFieldFn MetricGrid::as_size_field() const {
 Metric3d metric_from_hessian(const Eigen::Matrix3d& H, double eps_target, double h_min,
                              double h_max, double max_aspect) {
     if (!H.allFinite() || !(eps_target > 0.0) || !std::isfinite(eps_target)) {
-        throw std::invalid_argument("metric_from_hessian: finite H and eps_target > 0 required");
+        throw std::invalid_argument(
+            "metric_from_hessian: finite H and eps_target > 0 required");
     }
     if (!(h_min > 0.0) || !(h_max >= h_min) || !std::isfinite(h_min) ||
         !std::isfinite(h_max) || !(max_aspect >= 1.0) || !std::isfinite(max_aspect)) {
@@ -456,8 +459,8 @@ Metric3d metric_from_hessian(const Eigen::Matrix3d& H, double eps_target, double
     }
 
     const Eigen::Vector3d magnitude = eig.eigenvalues().cwiseAbs();
-    const double near_zero = 64.0 * std::numeric_limits<double>::epsilon() *
-                             std::max(1.0, magnitude.maxCoeff());
+    const double near_zero =
+        64.0 * std::numeric_limits<double>::epsilon() * std::max(1.0, magnitude.maxCoeff());
     Eigen::Vector3d h = Eigen::Vector3d::Constant(h_max);
     for (int axis = 0; axis < 3; ++axis) {
         if (magnitude[axis] > near_zero) {
@@ -563,10 +566,10 @@ double complexity(const MetricGrid& grid) {
         for (int j = 0; j + 1 < grid.resolution_.y(); ++j) {
             for (int i = 0; i + 1 < grid.resolution_.x(); ++i) {
                 const Eigen::Vector3d centre =
-                    grid.bbox_min_ + grid.spacing_.cwiseProduct(
-                                         Eigen::Vector3d{static_cast<double>(i) + 0.5,
-                                                         static_cast<double>(j) + 0.5,
-                                                         static_cast<double>(k) + 0.5});
+                    grid.bbox_min_ +
+                    grid.spacing_.cwiseProduct(Eigen::Vector3d{static_cast<double>(i) + 0.5,
+                                                               static_cast<double>(j) + 0.5,
+                                                               static_cast<double>(k) + 0.5});
                 integral += grid.sample(centre).volume_density() * cell_volume;
             }
         }
@@ -582,10 +585,11 @@ void normalize_complexity(MetricGrid& grid, double target_complexity, double h_m
     }
     const double current = complexity(grid);
     if (!(current > 0.0) || !std::isfinite(current)) {
-        throw std::runtime_error("normalize_complexity: current complexity is not positive finite");
+        throw std::runtime_error(
+            "normalize_complexity: current complexity is not positive finite");
     }
-    const double scale = std::exp((2.0 / 3.0) *
-                                  (std::log(target_complexity) - std::log(current)));
+    const double scale =
+        std::exp((2.0 / 3.0) * (std::log(target_complexity) - std::log(current)));
     if (!(scale > 0.0) || !std::isfinite(scale)) {
         throw std::overflow_error("normalize_complexity: metric scale is not representable");
     }

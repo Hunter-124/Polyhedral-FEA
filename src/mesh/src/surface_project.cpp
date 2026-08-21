@@ -339,7 +339,7 @@ MirrorKeyFrame mirror_key_frame(const std::vector<Eigen::Vector3d>& nodes) {
 }
 
 void sort_mirror_canonical(const std::vector<Eigen::Vector3d>& nodes,
-                          std::vector<std::uint32_t>& ids) {
+                           std::vector<std::uint32_t>& ids) {
     if (ids.size() < 2) {
         return;
     }
@@ -851,14 +851,12 @@ snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d
     return stats;
 }
 
-SmoothStats smooth_boundary_nodes(const geom::TriSurface& surface,
-                                  std::vector<Eigen::Vector3d>& nodes,
-                                  std::span<const std::array<std::uint32_t, 4>> boundary_faces,
-                                  double h, const CollectOffendersFn& collect_offenders,
-                                  int passes, double relax,
-                                  std::span<const geom::SharpEdge> feature_edges,
-                                  BoundaryProjectionContext* projection,
-                                  const MirrorFrame* mirror) {
+SmoothStats
+smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d>& nodes,
+                      std::span<const std::array<std::uint32_t, 4>> boundary_faces, double h,
+                      const CollectOffendersFn& collect_offenders, int passes, double relax,
+                      std::span<const geom::SharpEdge> feature_edges,
+                      BoundaryProjectionContext* projection, const MirrorFrame* mirror) {
     SmoothStats stats;
     if (boundary_faces.empty() || !(h > 0.0) || !std::isfinite(h) || !collect_offenders) {
         return stats;
@@ -1028,10 +1026,9 @@ SmoothStats smooth_boundary_nodes(const geom::TriSurface& surface,
                 }
             }
         } else if (!feature_edges.empty()) {
-            const double df =
-                geom::closest_on_features(mirror_fold(mirror, nodes[ni]), surface,
-                                          feature_edges)
-                    .distance;
+            const double df = geom::closest_on_features(mirror_fold(mirror, nodes[ni]),
+                                                        surface, feature_edges)
+                                  .distance;
             if (df <= on_crease_r) {
                 k = Kind::kCrease;
             } else if (df <= crease_guard_r) {
@@ -1170,8 +1167,8 @@ SmoothStats smooth_boundary_nodes(const geom::TriSurface& surface,
                 }
                 p = target->point;
             } else if (k == Kind::kCrease) {
-                const auto cf = geom::closest_on_features(mirror_fold(mirror, p), surface,
-                                                          feature_edges);
+                const auto cf =
+                    geom::closest_on_features(mirror_fold(mirror, p), surface, feature_edges);
                 if (!std::isfinite(cf.distance)) {
                     continue;
                 }

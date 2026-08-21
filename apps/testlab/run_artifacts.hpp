@@ -46,8 +46,7 @@ inline constexpr int kRenameBackoffMs = 5;
 /// full backoff before being reported -- which is the right trade: a real
 /// failure still surfaces, it just surfaces ~155 ms later.
 inline bool is_transient_rename_error(const std::error_code& ec) {
-    return ec == std::errc::permission_denied ||
-           ec == std::errc::device_or_resource_busy ||
+    return ec == std::errc::permission_denied || ec == std::errc::device_or_resource_busy ||
            ec == std::errc::no_lock_available ||
            ec == std::errc::resource_unavailable_try_again;
 }
@@ -84,8 +83,8 @@ inline void atomic_write(const fs::path& path, const std::string& text) {
     // exception message carries the reason.
     std::error_code cleanup;
     fs::remove(tmp, cleanup);
-    throw std::runtime_error("cannot rename " + tmp.string() + " -> " + path.string() +
-                             ": " + ec.message());
+    throw std::runtime_error("cannot rename " + tmp.string() + " -> " + path.string() + ": " +
+                             ec.message());
 }
 
 /// Write the per-run result.json (and quality.json when present) under
@@ -99,8 +98,8 @@ inline bool write_run_json(const fs::path& run_dir, const nlohmann::json& line) 
         // An ignored failure here guarantees the writes below fail for a reason
         // nobody can see, so report it and stop rather than compounding it.
         if (ec && !fs::is_directory(run_dir)) {
-            std::fprintf(stderr, "warehouse: cannot create %s: %s\n",
-                         run_dir.string().c_str(), ec.message().c_str());
+            std::fprintf(stderr, "warehouse: cannot create %s: %s\n", run_dir.string().c_str(),
+                         ec.message().c_str());
             return false;
         }
         atomic_write(run_dir / "result.json", line.dump(2) + "\n");

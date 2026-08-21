@@ -27,9 +27,9 @@ void LinearConstraints::add(LinearConstraint constraint) {
     std::set<std::uint32_t> seen_masters;
     for (const auto& [master, weight] : constraint.masters) {
         if (master == constraint.slave_dof) {
-            throw FeaError(std::format(
-                "LinearConstraints: slave DOF {} directly depends on itself",
-                constraint.slave_dof));
+            throw FeaError(
+                std::format("LinearConstraints: slave DOF {} directly depends on itself",
+                            constraint.slave_dof));
         }
         if (slave_indices_.contains(master)) {
             throw FeaError(std::format(
@@ -37,14 +37,14 @@ void LinearConstraints::add(LinearConstraint constraint) {
                 master));
         }
         if (!seen_masters.insert(master).second) {
-            throw FeaError(std::format(
-                "LinearConstraints: master DOF {} is repeated for slave DOF {}", master,
-                constraint.slave_dof));
+            throw FeaError(
+                std::format("LinearConstraints: master DOF {} is repeated for slave DOF {}",
+                            master, constraint.slave_dof));
         }
         if (!std::isfinite(weight)) {
-            throw FeaError(std::format(
-                "LinearConstraints: slave DOF {} has a non-finite weight",
-                constraint.slave_dof));
+            throw FeaError(
+                std::format("LinearConstraints: slave DOF {} has a non-finite weight",
+                            constraint.slave_dof));
         }
     }
     slave_indices_.emplace(constraint.slave_dof, constraints_.size());
@@ -56,9 +56,9 @@ bool LinearConstraints::is_slave(std::uint32_t dof) const noexcept {
 }
 
 void LinearConstraints::validate(Eigen::Index n_dof) const {
-    if (n_dof < 0 || static_cast<std::uint64_t>(n_dof) >
-                           static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()) +
-                               1ull) {
+    if (n_dof < 0 ||
+        static_cast<std::uint64_t>(n_dof) >
+            static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()) + 1ull) {
         throw FeaError(std::format("LinearConstraints: invalid DOF count {}", n_dof));
     }
     if (static_cast<Eigen::Index>(constraints_.size()) > n_dof) {
@@ -66,16 +66,16 @@ void LinearConstraints::validate(Eigen::Index n_dof) const {
     }
     for (const auto& constraint : constraints_) {
         if (static_cast<Eigen::Index>(constraint.slave_dof) >= n_dof) {
-            throw FeaError(std::format(
-                "LinearConstraints: slave DOF {} out of range for {} DOFs",
-                constraint.slave_dof, n_dof));
+            throw FeaError(
+                std::format("LinearConstraints: slave DOF {} out of range for {} DOFs",
+                            constraint.slave_dof, n_dof));
         }
         for (const auto& [master, weight] : constraint.masters) {
             (void)weight;
             if (static_cast<Eigen::Index>(master) >= n_dof) {
-                throw FeaError(std::format(
-                    "LinearConstraints: master DOF {} out of range for {} DOFs", master,
-                    n_dof));
+                throw FeaError(
+                    std::format("LinearConstraints: master DOF {} out of range for {} DOFs",
+                                master, n_dof));
             }
             if (slave_indices_.contains(master)) {
                 throw FeaError(std::format(
@@ -126,9 +126,9 @@ Eigen::VectorXd LinearConstraints::recover(const Eigen::VectorXd& u_reduced,
     validate(n_dof);
     const Eigen::Index expected = n_dof - static_cast<Eigen::Index>(constraints_.size());
     if (u_reduced.size() != expected) {
-        throw FeaError(std::format(
-            "LinearConstraints: reduced vector size {} does not match expected {}",
-            u_reduced.size(), expected));
+        throw FeaError(
+            std::format("LinearConstraints: reduced vector size {} does not match expected {}",
+                        u_reduced.size(), expected));
     }
     Eigen::VectorXd result(n_dof);
     Eigen::Index column = 0;

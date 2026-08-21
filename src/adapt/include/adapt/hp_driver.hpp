@@ -70,13 +70,13 @@ enum class ShapeTendency : std::uint8_t {
 
 /// Per-element inputs. Lengths in metres, κ in 1/m, indicators dimensionless.
 struct ElementHpSignal {
-    double h = 0.0;          // local edge length, m
-    double kappa = 0.0;      // mean |curvature|, 1/m (0 = flat)
-    double thickness = 0.0;  // local wall thickness, m; ≤0 or +inf ⇒ not thin-wall
-    double eta = 0.0;        // ZZ (or energy) indicator ≥ 0
-    double surplus = 0.0;    // hierarchical p→p+1 surplus ≥ 0 (or estimate)
-    int p = 1;               // current polynomial order
-    int p_max = 4;           // order cap for this element shape
+    double h = 0.0;         // local edge length, m
+    double kappa = 0.0;     // mean |curvature|, 1/m (0 = flat)
+    double thickness = 0.0; // local wall thickness, m; ≤0 or +inf ⇒ not thin-wall
+    double eta = 0.0;       // ZZ (or energy) indicator ≥ 0
+    double surplus = 0.0;   // hierarchical p→p+1 surplus ≥ 0 (or estimate)
+    int p = 1;              // current polynomial order
+    int p_max = 4;          // order cap for this element shape
     /// A-priori geometry size demand at the centroid, m (from feature / curvature
     /// sizing). 0 = unknown → the coarsen gate stays closed for this element.
     double h_geometry = 0.0;
@@ -101,7 +101,7 @@ struct HpDriverPolicy {
     /// Absolute utility floor; below this → kNone.
     double min_utility = 1e-12;
     double h_refine_factor = 0.75; // next local / uniform h multiplier
-    double h_min = 0.0;           // metres; 0 = no floor
+    double h_min = 0.0;            // metres; 0 = no floor
     int p_max_default = 4;
     /// Relative DOF / solve-time costs (dimensionless). Lower cost ⇒ higher utility.
     double cost_h = 8.0;     // 3-D local octree-ish refinement
@@ -140,9 +140,9 @@ struct ElementHpDecision {
 /// Aggregate plan for one adapt pass.
 struct HpDriverPlan {
     std::vector<ElementHpDecision> decisions;
-    std::vector<std::size_t> h_mark;     // elements marked for h-refine
-    std::vector<std::size_t> p_mark;     // elements marked for p-raise
-    std::vector<std::size_t> shape_mark; // elements voting shape change
+    std::vector<std::size_t> h_mark;       // elements marked for h-refine
+    std::vector<std::size_t> p_mark;       // elements marked for p-raise
+    std::vector<std::size_t> shape_mark;   // elements voting shape change
     std::vector<std::size_t> coarsen_mark; // elements marked for coarsening
     ShapeTendency global_shape = ShapeTendency::kKeep;
     /// Uniform / seeded h suggestion built from h-mark centroids (may be empty seeds).
@@ -165,8 +165,8 @@ ElementHpDecision decide_element(const ElementHpSignal& s, const HpDriverPolicy&
 /// `h_ceiling` > 0 caps the suggested global h rise of a pure-coarsen pass;
 /// 0 = h_next may not exceed h_uniform.
 HpDriverPlan drive_hp(std::span<const ElementHpSignal> signals, const HpDriverPolicy& policy,
-                      std::span<const Eigen::Vector3d> centroids = {},
-                      double h_uniform = 0.0, double h_ceiling = 0.0);
+                      std::span<const Eigen::Vector3d> centroids = {}, double h_uniform = 0.0,
+                      double h_ceiling = 0.0);
 
 /// Estimate hierarchical surplus from ZZ η ranking when modal surpluses are absent.
 /// High-η Dörfler elements get a small surplus (non-smooth); complement gets
@@ -178,17 +178,13 @@ std::vector<double> estimate_surplus_from_zz(const std::vector<double>& element_
 /// for scalar broadcast of h / p). `thickness[i] <= 0` means “not a thin wall”.
 /// Missing fit arrays (empty) default to 0.5. Missing surplus → estimate from η.
 /// Missing h_geometry (empty) → 0.0 = unknown, coarsen gate closed.
-std::vector<ElementHpSignal> make_hp_signals(std::span<const double> h,
-                                             std::span<const double> kappa,
-                                             std::span<const double> thickness,
-                                             std::span<const double> eta_zz,
-                                             std::span<const double> surplus,
-                                             std::span<const int> p_orders,
-                                             std::span<const double> hex_fit = {},
-                                             std::span<const double> tet_fit = {},
-                                             std::span<const double> poly_fit = {},
-                                             const HpDriverPolicy& policy = {},
-                                             std::span<const double> h_geometry = {});
+std::vector<ElementHpSignal>
+make_hp_signals(std::span<const double> h, std::span<const double> kappa,
+                std::span<const double> thickness, std::span<const double> eta_zz,
+                std::span<const double> surplus, std::span<const int> p_orders,
+                std::span<const double> hex_fit = {}, std::span<const double> tet_fit = {},
+                std::span<const double> poly_fit = {}, const HpDriverPolicy& policy = {},
+                std::span<const double> h_geometry = {});
 
 /// Human-readable one-line summary for mesh notes / CLI.
 std::string summarize_hp_plan(const HpDriverPlan& plan);

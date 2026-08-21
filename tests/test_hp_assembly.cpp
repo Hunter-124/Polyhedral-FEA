@@ -52,18 +52,18 @@ bool modes_on_boundary(const std::vector<std::uint32_t>& nodes,
     return false;
 }
 
-std::map<Eigen::Index, double> homogeneous_boundary(const HpModel& model, const HpSystem& sys) {
+std::map<Eigen::Index, double> homogeneous_boundary(const HpModel& model,
+                                                    const HpSystem& sys) {
     std::map<Eigen::Index, double> fixed;
     for (Eigen::Index m = 0; m < sys.n_modes; ++m) {
         const auto& nodes = sys.mode_nodes[static_cast<std::size_t>(m)];
         const bool bdry =
-            (nodes.size() == 1)
-                ? [&] {
-                      const Eigen::Vector3d& p = model.nodes[nodes[0]];
-                      return p.x() < 1e-9 || p.x() > 1 - 1e-9 || p.y() < 1e-9 ||
-                             p.y() > 1 - 1e-9 || p.z() < 1e-9 || p.z() > 1 - 1e-9;
-                  }()
-                : modes_on_boundary(nodes, model.nodes, 0.0, 1.0);
+            (nodes.size() == 1) ? [&] {
+                const Eigen::Vector3d& p = model.nodes[nodes[0]];
+                return p.x() < 1e-9 || p.x() > 1 - 1e-9 || p.y() < 1e-9 || p.y() > 1 - 1e-9 ||
+                       p.z() < 1e-9 || p.z() > 1 - 1e-9;
+            }()
+                                : modes_on_boundary(nodes, model.nodes, 0.0, 1.0);
         if (bdry) {
             for (int a = 0; a < 3; ++a) {
                 fixed[3 * m + a] = 0.0;

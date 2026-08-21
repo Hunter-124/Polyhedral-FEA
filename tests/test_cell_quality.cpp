@@ -329,14 +329,14 @@ TEST_CASE("element volumes are the real thing, per element type") {
 
     SECTION("six pyramids fanned from a hex centre sum to the hex") {
         NodalMesh mesh;
-        mesh.nodes = {{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}, {0, 0, 1},
+        mesh.nodes = {{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0},      {0, 0, 1},
                       {1, 0, 1}, {1, 1, 1}, {0, 1, 1}, {0.5, 0.5, 0.5}};
-        const std::vector<std::vector<std::uint32_t>> faces{
-            {0, 1, 2, 3}, {4, 7, 6, 5}, {0, 4, 5, 1},
-            {1, 5, 6, 2}, {2, 6, 7, 3}, {3, 7, 4, 0}};
+        const std::vector<std::vector<std::uint32_t>> faces{{0, 1, 2, 3}, {4, 7, 6, 5},
+                                                            {0, 4, 5, 1}, {1, 5, 6, 2},
+                                                            {2, 6, 7, 3}, {3, 7, 4, 0}};
         for (const auto& face : faces) {
-            mesh.elements.push_back(NodalElement{
-                ElementType::kPyramid5, {face[0], face[1], face[2], face[3], 8}});
+            mesh.elements.push_back(
+                NodalElement{ElementType::kPyramid5, {face[0], face[1], face[2], face[3], 8}});
         }
         for (const auto& element : mesh.elements) {
             CHECK(polymesh::fea::element_volume(mesh, element) ==

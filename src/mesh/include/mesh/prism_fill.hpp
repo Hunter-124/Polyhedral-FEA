@@ -26,8 +26,8 @@ struct PrismFillOutput {
     std::vector<std::array<std::uint32_t, 6>> prisms;
     /// Outer quads of the voxel lattice (region mapping / rendering).
     std::vector<std::array<std::uint32_t, 4>> boundary_quads;
-    double h = 0.0;     // grid spacing used, metres
-    int sweep_axis = 2; // 0=x, 1=y, 2=z — extrusion direction
+    double h = 0.0;                     // grid spacing used, metres
+    int sweep_axis = 2;                 // 0=x, 1=y, 2=z — extrusion direction
     double boundary_max_distance = 0.0; // metres; set when snap runs
 };
 

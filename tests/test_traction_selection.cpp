@@ -54,8 +54,8 @@ TEST_CASE("traction: boundary_surface_faces covers the exact box surface", "[tra
         REQUIRE(f.type == fea::FaceType::kQuad4);
         REQUIRE(f.nodes.size() == 4);
     }
-    const double expected = 2.0 * (size.x() * size.y() + size.y() * size.z() +
-                                   size.z() * size.x());
+    const double expected =
+        2.0 * (size.x() * size.y() + size.y() * size.z() + size.z() * size.x());
     CHECK(fea::integrated_face_area(mesh, faces) == Approx(expected).epsilon(1e-12));
 }
 
@@ -78,8 +78,7 @@ TEST_CASE("traction: boundary_surface_faces upgrades quadratic meshes", "[tracti
 
 TEST_CASE("traction: tessellation evaluates authoritative quadratic faces",
           "[traction][curved]") {
-    auto mesh = promote_to_quadratic(
-        box_tet_mesh(1, 1, 1, Eigen::Vector3d(1.0, 1.0, 1.0)));
+    auto mesh = promote_to_quadratic(box_tet_mesh(1, 1, 1, Eigen::Vector3d(1.0, 1.0, 1.0)));
     const auto faces = fea::boundary_surface_faces(mesh);
     const auto curved =
         std::find_if(faces.begin(), faces.end(), [](const fea::SurfaceFace& face) {
@@ -98,16 +97,14 @@ TEST_CASE("traction: tessellation evaluates authoritative quadratic faces",
         Eigen::Vector3d reconstructed = Eigen::Vector3d::Zero();
         for (std::size_t i = 0; i < sample.count; ++i) {
             weight_sum += sample.weights[i];
-            reconstructed +=
-                sample.weights[i] * mesh.nodes[sample.source_nodes[i]];
+            reconstructed += sample.weights[i] * mesh.nodes[sample.source_nodes[i]];
         }
         CHECK(weight_sum == Approx(1.0).margin(1e-12));
         CHECK((sample.position - reconstructed).norm() < 1e-12);
-        const bool is_mesh_node =
-            std::any_of(mesh.nodes.begin(), mesh.nodes.end(),
-                        [&](const Eigen::Vector3d& node) {
-                            return (node - sample.position).norm() < 1e-12;
-                        });
+        const bool is_mesh_node = std::any_of(
+            mesh.nodes.begin(), mesh.nodes.end(), [&](const Eigen::Vector3d& node) {
+                return (node - sample.position).norm() < 1e-12;
+            });
         saw_interpolated_position = saw_interpolated_position || !is_mesh_node;
     }
     CHECK(saw_interpolated_position);
@@ -204,8 +201,7 @@ TEST_CASE("traction: consistent load is tributary-area weighted, not evenly spli
     CHECK(corner != Approx(total.z() / 25.0).epsilon(1e-3));
 }
 
-TEST_CASE("traction: quadratic faces load the mid-side nodes, not the corners",
-          "[traction]") {
+TEST_CASE("traction: quadratic faces load the mid-side nodes, not the corners", "[traction]") {
     const Eigen::Vector3d size(1.0, 1.0, 1.0);
     const auto linear = box_tet_mesh(2, 2, 1, size);
     const auto n_corner_nodes = linear.nodes.size();
@@ -226,8 +222,7 @@ TEST_CASE("traction: quadratic faces load the mid-side nodes, not the corners",
     double corner_load = 0.0, mid_load = 0.0;
     for (const auto& f : top_faces) {
         for (std::size_t a = 0; a < 3; ++a) {
-            corner_load +=
-                std::abs(load.loads[3 * static_cast<Eigen::Index>(f.nodes[a]) + 2]);
+            corner_load += std::abs(load.loads[3 * static_cast<Eigen::Index>(f.nodes[a]) + 2]);
         }
         for (std::size_t a = 3; a < 6; ++a) {
             REQUIRE(f.nodes[a] >= n_corner_nodes);
@@ -292,9 +287,9 @@ TEST_CASE("traction: a load region is integrated at the box plane, not at a face
     for (const int n : {3, 5, 7}) {
         const auto other = box_hex_mesh(n, n, 2, size);
         const auto other_faces = fea::boundary_surface_faces(other);
-        CHECK(fea::integrated_region_area(
-                  other, fea::faces_touching(other, other_faces, region), region) ==
-              Approx(exact).epsilon(1e-12));
+        CHECK(fea::integrated_region_area(other,
+                                          fea::faces_touching(other, other_faces, region),
+                                          region) == Approx(exact).epsilon(1e-12));
         CHECK(fea::integrated_face_area(
                   other, fea::faces_within(other_faces, nodes_in_region(other, region))) !=
               Approx(exact).epsilon(1e-6));
@@ -351,8 +346,7 @@ TEST_CASE("traction: a region that contains a face integrates it exactly as befo
 // volume of material to freeze. These pin the difference, because the volume
 // rule is silently wrong rather than loudly wrong: it solves, and the answer is
 // a rigid inclusion with a mesh-shaped boundary.
-TEST_CASE("traction: a boundary selection never reaches an interior node",
-          "[traction]") {
+TEST_CASE("traction: a boundary selection never reaches an interior node", "[traction]") {
     const Eigen::Vector3d size(1.0, 1.0, 1.0);
     const auto mesh = promote_to_quadratic(box_tet_mesh(4, 4, 4, size));
     const auto faces = fea::boundary_surface_faces(mesh);
@@ -381,8 +375,7 @@ TEST_CASE("traction: a boundary selection never reaches an interior node",
     }
 }
 
-TEST_CASE("traction: a boundary selection leaves no element fully constrained",
-          "[traction]") {
+TEST_CASE("traction: a boundary selection leaves no element fully constrained", "[traction]") {
     // The property that decides whether a solve has a rigid inclusion in it: an
     // element whose every node is prescribed has identically zero strain, so its
     // stress is identically zero however the rest of the part is loaded, and the

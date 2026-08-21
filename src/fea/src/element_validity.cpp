@@ -13,8 +13,8 @@ namespace {
 
 Eigen::Matrix<double, Eigen::Dynamic, 3> coords_of(const NodalMesh& mesh,
                                                    const NodalElement& element) {
-    Eigen::Matrix<double, Eigen::Dynamic, 3> x(
-        static_cast<Eigen::Index>(element.nodes.size()), 3);
+    Eigen::Matrix<double, Eigen::Dynamic, 3> x(static_cast<Eigen::Index>(element.nodes.size()),
+                                               3);
     for (std::size_t a = 0; a < element.nodes.size(); ++a) {
         x.row(static_cast<Eigen::Index>(a)) = mesh.nodes[element.nodes[a]].transpose();
     }

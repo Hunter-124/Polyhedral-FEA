@@ -88,8 +88,7 @@ namespace {
 /// only quantity that couples `default_rule` to `eval_shape`; a rule written for
 /// a different parametric domain than its shape functions fails here and
 /// nowhere else.
-double isoparametric_volume(ElementType type,
-                            const std::vector<Eigen::Vector3d>& nodes) {
+double isoparametric_volume(ElementType type, const std::vector<Eigen::Vector3d>& nodes) {
     Eigen::MatrixXd x(static_cast<Eigen::Index>(nodes.size()), 3);
     for (std::size_t a = 0; a < nodes.size(); ++a) {
         x.row(static_cast<Eigen::Index>(a)) = nodes[a].transpose();
@@ -102,8 +101,7 @@ double isoparametric_volume(ElementType type,
     return total;
 }
 
-std::vector<Eigen::Vector3d> affine_image(const Eigen::Matrix3d& a,
-                                          const Eigen::Vector3d& b,
+std::vector<Eigen::Vector3d> affine_image(const Eigen::Matrix3d& a, const Eigen::Vector3d& b,
                                           const std::vector<Eigen::Vector3d>& reference) {
     std::vector<Eigen::Vector3d> out;
     out.reserve(reference.size());
@@ -132,7 +130,8 @@ TEST_CASE("the pyramid rule measures the volume its shape functions describe") {
     for (const auto& face : faces) {
         const std::vector<Eigen::Vector3d> nodes{face[0], face[1], face[2], face[3], apex};
         // Each pyramid is base area 1 × height 1/2 ÷ 3.
-        CHECK(std::abs(isoparametric_volume(ElementType::kPyramid5, nodes) - 1.0 / 6.0) < 1e-14);
+        CHECK(std::abs(isoparametric_volume(ElementType::kPyramid5, nodes) - 1.0 / 6.0) <
+              1e-14);
         fan += isoparametric_volume(ElementType::kPyramid5, nodes);
     }
     CHECK(std::abs(fan - 1.0) < 1e-14);
@@ -150,9 +149,9 @@ TEST_CASE("pyramid and prism rules are exact on affine images of their reference
     const std::vector<Eigen::Vector3d> pyramid_ref{
         {-1, -1, -1}, {1, -1, -1}, {1, 1, -1}, {-1, 1, -1}, {0, 0, 1}};
     // Base 2×2 at zeta=-1, apex at zeta=+1: (1/3)·4·2 = 8/3.
-    CHECK(std::abs(isoparametric_volume(ElementType::kPyramid5,
-                                        affine_image(a, b, pyramid_ref)) -
-                   scale * 8.0 / 3.0) < 1e-13);
+    CHECK(std::abs(
+              isoparametric_volume(ElementType::kPyramid5, affine_image(a, b, pyramid_ref)) -
+              scale * 8.0 / 3.0) < 1e-13);
 
     const std::vector<Eigen::Vector3d> prism_ref{{0, 0, -1}, {1, 0, -1}, {0, 1, -1},
                                                  {0, 0, 1},  {1, 0, 1},  {0, 1, 1}};

@@ -10,10 +10,10 @@
 #include <vector>
 
 using Catch::Approx;
-using polymesh::mesh::ClipBox;
-using polymesh::mesh::ClipPlane;
-using polymesh::mesh::ClippedCell;
 using polymesh::mesh::clip_convex_cell;
+using polymesh::mesh::ClipBox;
+using polymesh::mesh::ClippedCell;
+using polymesh::mesh::ClipPlane;
 using polymesh::mesh::geogram_available;
 using polymesh::mesh::unit_cube_cell;
 
@@ -69,12 +69,12 @@ TEST_CASE("clip oversized box down to unit cube via six planes", "[geogram][g1]"
 
     // Keep halfspaces that define [0,1]³ (same convention as midplane test).
     const std::vector<ClipPlane> planes = {
-        ClipPlane{1.0, 0.0, 0.0, 0.0},   // x ≥ 0
-        ClipPlane{-1.0, 0.0, 0.0, 1.0},  // x ≤ 1
-        ClipPlane{0.0, 1.0, 0.0, 0.0},   // y ≥ 0
-        ClipPlane{0.0, -1.0, 0.0, 1.0},  // y ≤ 1
-        ClipPlane{0.0, 0.0, 1.0, 0.0},   // z ≥ 0
-        ClipPlane{0.0, 0.0, -1.0, 1.0},  // z ≤ 1
+        ClipPlane{1.0, 0.0, 0.0, 0.0},  // x ≥ 0
+        ClipPlane{-1.0, 0.0, 0.0, 1.0}, // x ≤ 1
+        ClipPlane{0.0, 1.0, 0.0, 0.0},  // y ≥ 0
+        ClipPlane{0.0, -1.0, 0.0, 1.0}, // y ≤ 1
+        ClipPlane{0.0, 0.0, 1.0, 0.0},  // z ≥ 0
+        ClipPlane{0.0, 0.0, -1.0, 1.0}, // z ≤ 1
     };
 
     const auto cell = clip_convex_cell(box, planes);
@@ -86,8 +86,7 @@ TEST_CASE("clip oversized box down to unit cube via six planes", "[geogram][g1]"
     REQUIRE(cell->barycenter.z() == Approx(0.5).margin(1e-9));
 }
 
-TEST_CASE("ClipPlane::from_point_normal matches explicit coefficients",
-          "[geogram][g1]") {
+TEST_CASE("ClipPlane::from_point_normal matches explicit coefficients", "[geogram][g1]") {
     if (!geogram_available()) {
         SKIP("POLYMESH_WITH_GEOGRAM is OFF");
     }

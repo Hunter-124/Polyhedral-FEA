@@ -73,8 +73,8 @@ TEST_CASE("mesh budget: auto h is clamped and reports the element ceiling") {
 TEST_CASE("mesh budget: explicit tiny ceiling refuses before fill with prediction") {
     const auto model = polymesh::testsupport::box_model(1.0, 1.0, 1.0);
     try {
-        (void)volume_mesh(model, 0.05, VolumeMesher::kHybrid, 2, false, {}, 0.0, 0.0,
-                          5000, 1000000);
+        (void)volume_mesh(model, 0.05, VolumeMesher::kHybrid, 2, false, {}, 0.0, 0.0, 5000,
+                          1000000);
         FAIL("expected explicit mesh ceiling refusal");
     } catch (const std::runtime_error& e) {
         const std::string message = e.what();
@@ -86,8 +86,8 @@ TEST_CASE("mesh budget: explicit tiny ceiling refuses before fill with predictio
 TEST_CASE("mesh budget: generous explicit ceiling preserves exact mesh") {
     const auto model = polymesh::testsupport::box_model(1.0, 1.0, 1.0);
     const auto baseline = volume_mesh(model, 0.2, VolumeMesher::kHybrid, 2, false);
-    const auto guarded = volume_mesh(model, 0.2, VolumeMesher::kHybrid, 2, false, {}, 0.0,
-                                     0.0, 1000000, 3000000);
+    const auto guarded = volume_mesh(model, 0.2, VolumeMesher::kHybrid, 2, false, {}, 0.0, 0.0,
+                                     1000000, 3000000);
 
     REQUIRE(guarded.mesh.elements.size() == baseline.mesh.elements.size());
     REQUIRE(guarded.mesh.nodes.size() == baseline.mesh.nodes.size());

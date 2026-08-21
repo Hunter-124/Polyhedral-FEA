@@ -15,8 +15,8 @@ using polymesh::geom::extract_topology;
 using polymesh::geom::occ_enabled;
 using polymesh::mesh::varyhedron_fill_surface;
 using polymesh::pipeline::Model;
-using polymesh::pipeline::VolumeMesher;
 using polymesh::pipeline::volume_mesh;
+using polymesh::pipeline::VolumeMesher;
 
 TEST_CASE("varyhedron_fill_surface unit cube with topology") {
     if (!occ_enabled()) {
@@ -26,9 +26,8 @@ TEST_CASE("varyhedron_fill_surface unit cube with topology") {
     const auto topo = extract_topology(cad, 6);
     const auto surface = cad.tessellate();
     const double h = 0.25;
-    auto fill =
-        varyhedron_fill_surface(surface, cad.bbox_min(), cad.bbox_max(), h, 1, {}, 0.0, {}, 0.0,
-                                15.0, &topo);
+    auto fill = varyhedron_fill_surface(surface, cad.bbox_min(), cad.bbox_max(), h, 1, {}, 0.0,
+                                        {}, 0.0, 15.0, &topo);
     REQUIRE(fill.n_tets > 0);
     REQUIRE(fill.n_edge_seeds > 0);
     // CDS protect radii: r ≤ α h (α=0.45), plus corner shrink can go lower.
@@ -61,8 +60,7 @@ TEST_CASE("Model::load STEP retains CadModel (V1c)") {
 }
 
 TEST_CASE("Model::load rejects STL inputs (CAD-only)") {
-    REQUIRE_THROWS_AS(Model::load("bench/geometries/public/unit_box.stl"),
-                      std::runtime_error);
+    REQUIRE_THROWS_AS(Model::load("bench/geometries/public/unit_box.stl"), std::runtime_error);
     REQUIRE_THROWS_AS(Model::load("/tmp/nope.stl"), std::runtime_error);
 }
 

@@ -22,10 +22,10 @@
 #include "geom/cad_topology.hpp"
 #include "geom/indicators.hpp"
 #include "geom/step.hpp"
+#include "load_area.hpp"
 #include "mesh/brep_fidelity.hpp"
 #include "mesh/surface_metrics.hpp"
 #include "pipeline/scene.hpp"
-#include "load_area.hpp"
 #include "probe_util.hpp"
 #include "run_artifacts.hpp"
 
@@ -42,9 +42,9 @@
 #include <chrono>
 #include <cmath>
 #include <csignal>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
-#include <cstdint>
 #include <ctime>
 #include <filesystem>
 #include <fstream>
@@ -53,9 +53,9 @@
 #include <mutex>
 #include <optional>
 #include <set>
+#include <span>
 #include <sstream>
 #include <stdexcept>
-#include <span>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -307,10 +307,11 @@ Campaign load_campaign(const fs::path& path) {
         throw std::runtime_error("grid must be an object");
     }
     static const std::set<std::string> kGridKeys{
-        "mesher",          "feature_refine", "order",          "element_tendency",
-        "bc_grading",      "curvature_turn_deg", "snap_boundary", "skin_layers",
-        "adapt_passes",    "eta_target",      "p_elevate",     "adapt_leb_waves",
-        "spectral_smooth", "h_rel"};
+        "mesher",           "feature_refine", "order",
+        "element_tendency", "bc_grading",     "curvature_turn_deg",
+        "snap_boundary",    "skin_layers",    "adapt_passes",
+        "eta_target",       "p_elevate",      "adapt_leb_waves",
+        "spectral_smooth",  "h_rel"};
     for (auto it = c.grid.begin(); it != c.grid.end(); ++it) {
         if (!kGridKeys.contains(it.key())) {
             throw std::runtime_error("unknown grid key '" + it.key() + "'");
@@ -781,7 +782,6 @@ std::vector<fea::SurfaceFace>
 select_exact_cad_load_faces(const fea::NodalMesh& mesh, const geom::CadModel& cad, double h,
                             std::span<const std::uint32_t> cad_face_ids);
 
-
 fea::Dirichlet make_dirichlet(const fea::NodalMesh& mesh, const std::vector<BcSpec>& bcs,
                               const geom::CadModel* cad, double h) {
     // Node-in-box plus free-face centroid-in-box (surface snap can pull end-face
@@ -1075,9 +1075,9 @@ select_exact_cad_load_faces(const fea::NodalMesh& mesh, const geom::CadModel& ca
     return selected;
 }
 
-std::vector<ResolvedLoadFaces>
-resolve_load_faces(const fea::NodalMesh& mesh, const geom::CadModel* cad, double h,
-                   const std::vector<LoadSpec>& loads) {
+std::vector<ResolvedLoadFaces> resolve_load_faces(const fea::NodalMesh& mesh,
+                                                  const geom::CadModel* cad, double h,
+                                                  const std::vector<LoadSpec>& loads) {
     std::vector<ResolvedLoadFaces> out;
     out.reserve(loads.size());
     for (const auto& load : loads) {
@@ -1096,12 +1096,10 @@ resolve_load_faces(const fea::NodalMesh& mesh, const geom::CadModel* cad, double
                 0.05;
         }
         if ((resolved.faces.empty() || legacy_failed_area_gate) && cad != nullptr &&
-            load.cad_face_area && *load.cad_face_area > 0.0 &&
-            !load.cad_face_ids.empty()) {
+            load.cad_face_area && *load.cad_face_area > 0.0 && !load.cad_face_ids.empty()) {
             // Face REPLACEMENT: the box selection found nothing usable, so take the
             // faces the exact CAD ids resolve to instead.
-            auto exact_faces =
-                select_exact_cad_load_faces(mesh, *cad, h, load.cad_face_ids);
+            auto exact_faces = select_exact_cad_load_faces(mesh, *cad, h, load.cad_face_ids);
             double mesh_area = 0.0;
             for (const auto& face : exact_faces) {
                 mesh_area += surface_face_area(mesh, face);
@@ -1160,8 +1158,7 @@ Eigen::VectorXd make_loads(const fea::NodalMesh& mesh, const std::vector<LoadSpe
             const Eigen::Vector3d ext = (hi - lo).cwiseMax(1e-30);
             const double area =
                 ext[0] * ext[1] * ext[2] / std::max({ext[0], ext[1], ext[2], 1e-30});
-            const Eigen::Vector3d per =
-                L.traction * area / static_cast<double>(nodes.size());
+            const Eigen::Vector3d per = L.traction * area / static_cast<double>(nodes.size());
             for (auto n : nodes) {
                 f.segment<3>(3 * static_cast<Eigen::Index>(n)) += per;
             }
@@ -1173,7 +1170,6 @@ Eigen::VectorXd make_loads(const fea::NodalMesh& mesh, const std::vector<LoadSpe
     }
     return f;
 }
-
 
 void hash_mix(std::uint64_t& hash, std::uint64_t value) {
     constexpr std::uint64_t kPrime = 1099511628211ull;
@@ -1503,8 +1499,8 @@ ProbeAnswers compute_probes(const fea::NodalMesh& mesh, const fea::Material& mat
         // consulted neither on a CAD-backed run whose case omitted expected_area,
         // and left rel_err at its 0.0 default, which reads as a perfect match.
         // Policy and reasoning live in load_area.hpp so they can be unit-tested.
-        const tlab::LoadAreaAssessment area = tlab::assess_load_area(
-            L0.expected_area, L0.cad_rule_area, a.mesh_selected_area);
+        const tlab::LoadAreaAssessment area =
+            tlab::assess_load_area(L0.expected_area, L0.cad_rule_area, a.mesh_selected_area);
         a.load_area_status = area.status;
         a.load_area_rel_err = area.rel_err;
         a.load_area_ok = area.ok;
@@ -1938,10 +1934,9 @@ PartCase with_exact_cad_selections(const pipeline::Model& model, const PartCase&
         const auto& selected = use_aligned ? aligned_faces : box_faces;
         double exact_area = 0.0;
         for (const auto face_id : selected) {
-            const auto it = std::find_if(topology.faces.begin(), topology.faces.end(),
-                                         [&](const geom::CadFace& face) {
-                                             return face.id == face_id;
-                                         });
+            const auto it =
+                std::find_if(topology.faces.begin(), topology.faces.end(),
+                             [&](const geom::CadFace& face) { return face.id == face_id; });
             if (it != topology.faces.end()) {
                 load.cad_face_ids.push_back(face_id);
                 exact_area += it->area;
@@ -1968,8 +1963,8 @@ PartCase with_exact_cad_selections(const pipeline::Model& model, const PartCase&
         // Loud once per part: an authored expected_area that no longer matches the
         // CAD is a case-definition or geometry bug, and every row it produces is
         // scored against a load the reference did not assume.
-        const auto authored = tlab::check_authored_area(load.expected_area,
-                                                       load.cad_rule_area);
+        const auto authored =
+            tlab::check_authored_area(load.expected_area, load.cad_rule_area);
         if (authored.checked && !authored.consistent) {
             std::fprintf(stderr,
                          "WARNING %s: authored select.expected_area %.9g disagrees with the "
@@ -2145,19 +2140,19 @@ json geo_fidelity_of(const pipeline::Model& model, const fea::NodalMesh& nodal, 
 /// self-confirming and destroy the comparison the campaign exists to produce.
 #ifdef POLYMESH_WITH_ADVISOR
 class AdvisorScorer {
-public:
+  public:
     explicit AdvisorScorer(const fs::path& model_dir) : advisor_(model_dir) {}
 
     [[nodiscard]] json decision_json(const pipeline::CaseFeatures& features) const {
         return json::parse(polymesh::advisor::to_json(advisor_.recommend(features)));
     }
 
-private:
+  private:
     polymesh::advisor::Advisor advisor_;
 };
 #else
 class AdvisorScorer {
-public:
+  public:
     explicit AdvisorScorer(const fs::path&) {
         throw std::runtime_error("--advisor needs a build with POLYMESH_WITH_ADVISOR=ON");
     }
@@ -2170,7 +2165,7 @@ public:
 // ── single run ──────────────────────────────────────────────────────────────
 
 struct RunOutcome {
-    json line;                   // results.jsonl object
+    json line; // results.jsonl object
     // The mesh travels out so the CALLER can write artifacts AFTER the summary
     // row is appended. Present only when a mesh was actually built: five of the
     // eight former write sites had none, and std::optional makes handing over a
@@ -2216,7 +2211,8 @@ void write_adapt_trace(const fs::path& run_dir,
     static constexpr std::array<const char*, 4> kShapeNames{"keep", "hex", "tet", "poly"};
     std::ostringstream text;
     for (const auto& trace : traces) {
-        const std::size_t shape = static_cast<std::size_t>(std::clamp(trace.global_shape, 0, 3));
+        const std::size_t shape =
+            static_cast<std::size_t>(std::clamp(trace.global_shape, 0, 3));
         const json row{{"pass", trace.pass},
                        {"n_elems", trace.n_elems},
                        {"n_nodes", trace.n_nodes},
@@ -2279,9 +2275,8 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         const PartCase selection_part = with_exact_cad_selections(model, part);
         const auto auto_resolved = pipeline::resolve_mesh_size(model, 0.0);
         const double bbox_diag = (model.bbox_max - model.bbox_min).norm();
-        const double h = cfg.h_rel
-                             ? std::max(*cfg.h_rel * bbox_diag, 1e-9)
-                             : std::max(auto_resolved.h * h_scale, 1e-9);
+        const double h = cfg.h_rel ? std::max(*cfg.h_rel * bbox_diag, 1e-9)
+                                   : std::max(auto_resolved.h * h_scale, 1e-9);
         const auto resolved =
             cfg.h_rel ? pipeline::resolve_mesh_size(model, h) : auto_resolved;
         json gc = geom_class_of(model, auto_resolved.h);
@@ -2411,9 +2406,9 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
             }
             write_adapt_trace(warehouse_run_dir, adapt_traces);
         } else {
-            vol = pipeline::volume_mesh(
-                model, h, cfg.mesher, cfg.skin_layers, cfg.feature_refine, refine_seeds,
-                refine_band, cfg.element_tendency, 0, 0, 0, {}, size_field);
+            vol = pipeline::volume_mesh(model, h, cfg.mesher, cfg.skin_layers,
+                                        cfg.feature_refine, refine_seeds, refine_band,
+                                        cfg.element_tendency, 0, 0, 0, {}, size_field);
             const std::string combined_mesher_note =
                 tlab::combine_mesher_notes(resolved.note, vol.mesher_note);
             if (!combined_mesher_note.empty()) {
@@ -2429,18 +2424,17 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
                 auto shaped = pipeline::curve_volume_geometry(model, vol.mesh, h);
                 vol.mesh = std::move(shaped.mesh);
                 vol.boundary_quads = fea::extract_boundary_faces(vol.mesh);
-                vol.mesher_note += std::format(
-                    " | curved_volume promoted={} pyramid_split={} projected={}"
-                    " partial={} reverted={} h_refined={}",
-                    shaped.n_promoted, shaped.n_pyramids_split, shaped.n_projected,
-                    shaped.n_partial, shaped.n_reverted, shaped.n_h_refined);
+                vol.mesher_note +=
+                    std::format(" | curved_volume promoted={} pyramid_split={} projected={}"
+                                " partial={} reverted={} h_refined={}",
+                                shaped.n_promoted, shaped.n_pyramids_split, shaped.n_projected,
+                                shaped.n_partial, shaped.n_reverted, shaped.n_h_refined);
                 vol.mesh.check_validity();
             }
             pipeline::update_solved_geometry_volume(model, vol);
 
             const auto t_mesh1 = clock::now();
-            out.mesh_ms =
-                std::chrono::duration<double, std::milli>(t_mesh1 - t_mesh0).count();
+            out.mesh_ms = std::chrono::duration<double, std::milli>(t_mesh1 - t_mesh0).count();
         }
         if (!vol.mesher_note.empty()) {
             out.line["mesher_note"] = vol.mesher_note;
@@ -2455,8 +2449,7 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         out.line["quality"] = quality_of(model, vol.mesh, h);
         out.line["geo_fidelity"] = geo_fidelity_of(model, vol.mesh, h);
         if (vol.fill_geometry_volume.available) {
-            out.line["geometry_fill_volume_err"] =
-                vol.fill_geometry_volume.relative_error;
+            out.line["geometry_fill_volume_err"] = vol.fill_geometry_volume.relative_error;
         }
         if (vol.solved_geometry_volume.available) {
             out.line["geometry_volume_err"] = vol.solved_geometry_volume.relative_error;
@@ -2511,26 +2504,23 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         beat.set_phase("assemble", 0.0);
 
         const fea::Material mat{.youngs_modulus = part.E, .poissons_ratio = part.nu};
-        const auto bc = make_dirichlet(vol.mesh, selection_part.bcs,
-                                       model.cad ? &*model.cad : nullptr, h);
+        const auto bc =
+            make_dirichlet(vol.mesh, selection_part.bcs, model.cad ? &*model.cad : nullptr, h);
         if (bc.dof_values.empty()) {
             throw std::runtime_error("no Dirichlet DOFs matched BC boxes for part " +
                                      part.part);
         }
-        const auto resolved_loads =
-            resolve_load_faces(vol.mesh, model.cad ? &*model.cad : nullptr, h,
-                               selection_part.loads);
+        const auto resolved_loads = resolve_load_faces(
+            vol.mesh, model.cad ? &*model.cad : nullptr, h, selection_part.loads);
         const auto loads = make_loads(vol.mesh, selection_part.loads, resolved_loads);
         if (loads.norm() == 0.0) {
             throw std::runtime_error("zero load vector for part " + part.part);
         }
         if (std::getenv("POLYMESH_SELECTION_AUDIT") != nullptr) {
-            const auto legacy_bc =
-                make_dirichlet(vol.mesh, part.bcs, nullptr, h);
+            const auto legacy_bc = make_dirichlet(vol.mesh, part.bcs, nullptr, h);
             const auto legacy_selections =
                 resolve_load_faces(vol.mesh, nullptr, h, part.loads);
-            const auto legacy_loads =
-                make_loads(vol.mesh, part.loads, legacy_selections);
+            const auto legacy_loads = make_loads(vol.mesh, part.loads, legacy_selections);
             const bool used_fixture_fallback =
                 legacy_bc.dof_values.empty() && !bc.dof_values.empty();
             const bool used_load_fallback =
@@ -2538,27 +2528,18 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
                             [](const ResolvedLoadFaces& selection) {
                                 return selection.used_exact_fallback;
                             });
-            const std::uint64_t legacy_fixture_hash =
-                dirichlet_node_set_hash(legacy_bc);
-            const std::uint64_t selected_fixture_hash =
-                dirichlet_node_set_hash(bc);
-            const std::uint64_t legacy_face_hash =
-                selected_face_set_hash(legacy_selections);
-            const std::uint64_t selected_face_hash =
-                selected_face_set_hash(resolved_loads);
-            const std::uint64_t legacy_node_hash =
-                selected_node_set_hash(legacy_selections);
-            const std::uint64_t selected_node_hash =
-                selected_node_set_hash(resolved_loads);
-            const std::uint64_t legacy_vector_hash =
-                load_vector_hash(legacy_loads);
-            const std::uint64_t selected_vector_hash =
-                load_vector_hash(loads);
-            const bool unchanged =
-                legacy_fixture_hash == selected_fixture_hash &&
-                legacy_face_hash == selected_face_hash &&
-                legacy_node_hash == selected_node_hash &&
-                legacy_vector_hash == selected_vector_hash;
+            const std::uint64_t legacy_fixture_hash = dirichlet_node_set_hash(legacy_bc);
+            const std::uint64_t selected_fixture_hash = dirichlet_node_set_hash(bc);
+            const std::uint64_t legacy_face_hash = selected_face_set_hash(legacy_selections);
+            const std::uint64_t selected_face_hash = selected_face_set_hash(resolved_loads);
+            const std::uint64_t legacy_node_hash = selected_node_set_hash(legacy_selections);
+            const std::uint64_t selected_node_hash = selected_node_set_hash(resolved_loads);
+            const std::uint64_t legacy_vector_hash = load_vector_hash(legacy_loads);
+            const std::uint64_t selected_vector_hash = load_vector_hash(loads);
+            const bool unchanged = legacy_fixture_hash == selected_fixture_hash &&
+                                   legacy_face_hash == selected_face_hash &&
+                                   legacy_node_hash == selected_node_hash &&
+                                   legacy_vector_hash == selected_vector_hash;
             if (!used_fixture_fallback && !used_load_fallback && !unchanged) {
                 throw std::logic_error(
                     "selection audit: a non-fallback row changed its BC/load selection");
@@ -2608,9 +2589,8 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
 
         beat.set_phase("recover", 0.5);
 
-        const ProbeAnswers ans =
-            compute_probes(vol.mesh, mat, u, selection_part.loads, resolved_loads,
-                           part.metrics, bc, loads);
+        const ProbeAnswers ans = compute_probes(vol.mesh, mat, u, selection_part.loads,
+                                                resolved_loads, part.metrics, bc, loads);
         // INVARIANT: this block must carry every ProbeAnswers field that
         // evaluate_probe() can read. scripts/build_advisor_dataset.py re-derives
         // each row's accuracy from `answers` against the CURRENT references, so a
@@ -2619,38 +2599,35 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         // dataset rebuild. sigma_box_max (the box-windowed peak VM behind the SCF
         // probe) was missing for exactly that reason; mean_ux/mean_uz and
         // dominant_load_axis back the axis-conditional displacement probes.
-        out.line["answers"] = {{"sigma_max", ans.sigma_max},
-                               {"sigma_face_mean", ans.sigma_face_mean},
-                               {"sigma_box_max", ans.sigma_box_max},
-                               {"sigma_p99", ans.sigma_p99},
-                               {"strain_energy", ans.strain_energy},
-                               {"tip_deflection", ans.tip_deflection},
-                               {"tip_deflection_max", ans.tip_deflection_max},
-                               {"mean_u_component", ans.mean_u_component},
-                               {"mean_ux", ans.mean_ux},
-                               {"mean_uz", ans.mean_uz},
-                               {"dominant_load_axis", ans.dominant_load_axis},
-                               {"n_probe_nodes", ans.n_probe_nodes},
-                               {"n_load_faces", ans.n_load_faces},
-                               {"n_quality_excluded", ans.n_quality_excluded},
-                               {"load_face_area", ans.load_face_area},
-                               {"mesh_selected_area", ans.mesh_selected_area},
-                               {"load_area_status",
-                                std::string(tlab::load_area_status_name(
-                                    ans.load_area_status))},
-                               // Explicit null, never 0.0, when nothing could be
-                               // verified. A number here reads as a pass.
-                               {"load_area_rel_err",
-                                ans.load_area_rel_err ? json(*ans.load_area_rel_err)
-                                                      : json(nullptr)},
-                               // Case-definition cross-check, deliberately a
-                               // separate field from the mesh deficit above.
-                               {"authored_area_checked", ans.authored_area_checked},
-                               {"authored_area_consistent", ans.authored_area_consistent},
-                               {"authored_area_rel_diff",
-                                ans.authored_area_rel_diff
-                                    ? json(*ans.authored_area_rel_diff)
-                                    : json(nullptr)}};
+        out.line["answers"] = {
+            {"sigma_max", ans.sigma_max},
+            {"sigma_face_mean", ans.sigma_face_mean},
+            {"sigma_box_max", ans.sigma_box_max},
+            {"sigma_p99", ans.sigma_p99},
+            {"strain_energy", ans.strain_energy},
+            {"tip_deflection", ans.tip_deflection},
+            {"tip_deflection_max", ans.tip_deflection_max},
+            {"mean_u_component", ans.mean_u_component},
+            {"mean_ux", ans.mean_ux},
+            {"mean_uz", ans.mean_uz},
+            {"dominant_load_axis", ans.dominant_load_axis},
+            {"n_probe_nodes", ans.n_probe_nodes},
+            {"n_load_faces", ans.n_load_faces},
+            {"n_quality_excluded", ans.n_quality_excluded},
+            {"load_face_area", ans.load_face_area},
+            {"mesh_selected_area", ans.mesh_selected_area},
+            {"load_area_status",
+             std::string(tlab::load_area_status_name(ans.load_area_status))},
+            // Explicit null, never 0.0, when nothing could be
+            // verified. A number here reads as a pass.
+            {"load_area_rel_err",
+             ans.load_area_rel_err ? json(*ans.load_area_rel_err) : json(nullptr)},
+            // Case-definition cross-check, deliberately a
+            // separate field from the mesh deficit above.
+            {"authored_area_checked", ans.authored_area_checked},
+            {"authored_area_consistent", ans.authored_area_consistent},
+            {"authored_area_rel_diff",
+             ans.authored_area_rel_diff ? json(*ans.authored_area_rel_diff) : json(nullptr)}};
 
         // Health gates: residual / reaction / orphans / load-area guard.
         // load_area_ok is false only when the area was genuinely verified and is
@@ -2662,21 +2639,19 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
         const bool health_ok = (ans.n_orphan_nodes == 0) &&
                                (ans.free_residual_rel <= kFreeResidTolDirect) &&
                                (ans.reaction_sum_err <= kReactionSumTol) && ans.load_area_ok;
-        out.line["health"] = {{"free_residual_rel", ans.free_residual_rel},
-                              {"reaction_sum_err", ans.reaction_sum_err},
-                              {"n_orphans", ans.n_orphan_nodes},
-                              {"n_bc_dofs", ans.n_bc_dofs},
-                              {"load_area_ok", ans.load_area_ok},
-                              {"load_area_status",
-                               std::string(tlab::load_area_status_name(
-                                   ans.load_area_status))},
-                              {"load_area_verified",
-                               ans.load_area_status == tlab::LoadAreaStatus::kVerified},
-                              {"authored_area_consistent", ans.authored_area_consistent},
-                              {"load_area_rel_err",
-                               ans.load_area_rel_err ? json(*ans.load_area_rel_err)
-                                                     : json(nullptr)},
-                              {"ok", health_ok}};
+        out.line["health"] = {
+            {"free_residual_rel", ans.free_residual_rel},
+            {"reaction_sum_err", ans.reaction_sum_err},
+            {"n_orphans", ans.n_orphan_nodes},
+            {"n_bc_dofs", ans.n_bc_dofs},
+            {"load_area_ok", ans.load_area_ok},
+            {"load_area_status",
+             std::string(tlab::load_area_status_name(ans.load_area_status))},
+            {"load_area_verified", ans.load_area_status == tlab::LoadAreaStatus::kVerified},
+            {"authored_area_consistent", ans.authored_area_consistent},
+            {"load_area_rel_err",
+             ans.load_area_rel_err ? json(*ans.load_area_rel_err) : json(nullptr)},
+            {"ok", health_ok}};
 
         // Accuracy vs hand-calc truths (loaded from bench/reference via the case).
         // When health fails, still record measured answers/rel_err but zero scores
@@ -3145,8 +3120,7 @@ int run_campaign(const fs::path& camp_dir, bool resume, const AdvisorScorer* adv
                 // second makes an artifact failure unable to cost a row by
                 // construction, not merely by the guard inside the writer.
                 if (!wh_dir.empty()) {
-                    write_warehouse_run(wh_dir, ro.line,
-                                        ro.mesh ? &*ro.mesh : nullptr);
+                    write_warehouse_run(wh_dir, ro.line, ro.mesh ? &*ro.mesh : nullptr);
                 }
                 done.insert(key);
                 ++cp.completed_runs;

@@ -48,14 +48,13 @@ TEST_CASE("two-site restricted Voronoi bisects the unit cube", "[cvt][g2]") {
     REQUIRE(ca->volume + cb->volume == Approx(1.0).margin(1e-9));
 }
 
-TEST_CASE("uniform Lloyd on lattice stays near lattice (low energy move)",
-          "[cvt][g2]") {
+TEST_CASE("uniform Lloyd on lattice stays near lattice (low energy move)", "[cvt][g2]") {
     if (!geogram_available()) {
         SKIP("POLYMESH_WITH_GEOGRAM is OFF");
     }
 
     ClipBox box;
-    auto sites = seed_lattice_sites(box, 3);  // 27 sites
+    auto sites = seed_lattice_sites(box, 3); // 27 sites
     CvtLloydParams p;
     p.max_iters = 20;
     p.move_tol_rel = 1e-5;
@@ -93,8 +92,7 @@ TEST_CASE("fixed sites do not move under Lloyd", "[cvt][g2]") {
     REQUIRE(result.positions[0].isApprox(fixed.pos, 1e-15));
 }
 
-TEST_CASE("graded 1/h^3 density pulls free sites toward fine region",
-          "[cvt][g2]") {
+TEST_CASE("graded 1/h^3 density pulls free sites toward fine region", "[cvt][g2]") {
     if (!geogram_available()) {
         SKIP("POLYMESH_WITH_GEOGRAM is OFF");
     }
@@ -104,7 +102,7 @@ TEST_CASE("graded 1/h^3 density pulls free sites toward fine region",
     box.min = Eigen::Vector3d(0, 0, 0);
     box.max = Eigen::Vector3d(1, 1, 1);
 
-    std::vector<CvtSite> sites = seed_lattice_sites(box, 2);  // 8 free sites
+    std::vector<CvtSite> sites = seed_lattice_sites(box, 2); // 8 free sites
     CvtLloydParams p;
     p.max_iters = 40;
     p.move_tol_rel = 1e-4;
@@ -133,8 +131,7 @@ TEST_CASE("graded 1/h^3 density pulls free sites toward fine region",
     REQUIRE(mean_x1 < mean_x0 - 0.02);
 }
 
-TEST_CASE("restricted_voronoi_centroid matches barycenter when h constant",
-          "[cvt][g2]") {
+TEST_CASE("restricted_voronoi_centroid matches barycenter when h constant", "[cvt][g2]") {
     if (!geogram_available()) {
         SKIP("POLYMESH_WITH_GEOGRAM is OFF");
     }

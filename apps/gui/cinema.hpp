@@ -266,7 +266,6 @@ class CinemaState {
     std::vector<EdgePick> edge_scratch_;
 };
 
-
 /// Virtual-time window `[t0, t1)` of one act at the current take length.
 /// Exposed so the recorder can report exact frame spans for the render
 /// script's manifest without duplicating the schedule.
@@ -336,9 +335,8 @@ inline constexpr float kTickerPadY = 8.0f;
 
 /// The ticker's body rows for this instant: the act's own real numbers, the HUD
 /// line and the provenance stamp, in draw order.
-[[nodiscard]] std::vector<CinemaLine> cinema_ticker_body(const CinemaState& state,
-                                                         const CinemaCue& cue,
-                                                         const CinemaHud& hud);
+[[nodiscard]] std::vector<CinemaLine>
+cinema_ticker_body(const CinemaState& state, const CinemaCue& cue, const CinemaHud& hud);
 
 /// Exact height in pixels the ticker strip needs at `wrap_width` for the rows
 /// `cinema_ticker_chips` and `cinema_ticker_body` return, including the window

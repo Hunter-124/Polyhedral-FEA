@@ -2,15 +2,15 @@
 #include "adapt/graded_sizing.hpp"
 #include "geom/tri_surface.hpp"
 
+#include <array>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
-#include <array>
 #include <cmath>
 #include <vector>
 
+using Eigen::Vector3d;
 using polymesh::adapt::GradedSizing;
 using polymesh::adapt::SizeSource;
-using Eigen::Vector3d;
 
 namespace {
 polymesh::geom::TriSurface unit_cube() {
@@ -45,8 +45,8 @@ TEST_CASE("source target below h_min is clamped up") {
 TEST_CASE("field is the lower envelope of its sources (min-plus)") {
     // Two sources at x=0 and x=1, both h=0.02, beta=1.0, h_max large enough not
     // to clamp: at x=0.5 both give 0.02 + 0.5 = 0.52.
-    const GradedSizing f(
-        {SizeSource{{0, 0, 0}, 0.02}, SizeSource{{1, 0, 0}, 0.02}}, 0.02, 2.0, 1.0);
+    const GradedSizing f({SizeSource{{0, 0, 0}, 0.02}, SizeSource{{1, 0, 0}, 0.02}}, 0.02, 2.0,
+                         1.0);
     CHECK(f.size_at({0, 0, 0}) == Catch::Approx(0.02));
     CHECK(f.size_at({1, 0, 0}) == Catch::Approx(0.02));
     CHECK(f.size_at({0.5, 0, 0}) == Catch::Approx(0.52));
@@ -56,8 +56,8 @@ TEST_CASE("field is the lower envelope of its sources (min-plus)") {
 
 TEST_CASE("field is Lipschitz with constant beta") {
     const double beta = 0.8;
-    const GradedSizing f(
-        {SizeSource{{0, 0, 0}, 0.01}, SizeSource{{2, 1, 0}, 0.03}}, 0.01, 100.0, beta);
+    const GradedSizing f({SizeSource{{0, 0, 0}, 0.01}, SizeSource{{2, 1, 0}, 0.03}}, 0.01,
+                         100.0, beta);
     const std::array<Vector3d, 5> pts = {Vector3d{0, 0, 0}, Vector3d{0.3, 0.2, 0.1},
                                          Vector3d{1, 0.5, 0}, Vector3d{1.7, 0.9, 0.4},
                                          Vector3d{2, 1, 0}};

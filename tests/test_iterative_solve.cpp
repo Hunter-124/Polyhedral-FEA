@@ -102,8 +102,7 @@ TEST_CASE("CG honours its iteration cap instead of grinding") {
     opt.cg_accept_tol = 1e-14;
     opt.cg_max_iters = 2;
     try {
-        static_cast<void>(
-            solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, opt));
+        static_cast<void>(solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, opt));
         FAIL("two CG iterations unexpectedly converged");
     } catch (const polymesh::fea::FeaError& e) {
         const std::string message = e.what();

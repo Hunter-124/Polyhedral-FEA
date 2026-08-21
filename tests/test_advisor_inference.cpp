@@ -10,10 +10,10 @@
 // number, so the test fails if either side drifts.
 
 #include "advisor/advisor.hpp"
-#include "pipeline/scene.hpp"
+#include "geom/cad_geometry_features.hpp"
 #include "geom/cad_model.hpp"
 #include "geom/step.hpp"
-#include "geom/cad_geometry_features.hpp"
+#include "pipeline/scene.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -22,10 +22,10 @@
 
 #include <algorithm>
 #include <chrono>
-#include <limits>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -267,8 +267,7 @@ bool explain_fixture_present() {
            std::filesystem::exists(kExplainFixtureDir / "activation_layout.json");
 }
 
-TEST_CASE("advisor trunk taps match PyTorch, and the layout matches the graph",
-          "[advisor]") {
+TEST_CASE("advisor trunk taps match PyTorch, and the layout matches the graph", "[advisor]") {
     if (!explain_fixture_present()) {
         SKIP("advisor_explain fixture missing (python scripts/advisor/export_onnx.py "
              "--explain-fixture)");
@@ -291,8 +290,7 @@ TEST_CASE("advisor trunk taps match PyTorch, and the layout matches the graph",
         INFO("edge block " << e);
         CHECK(layout.edges[e].cols == layout.layers[e].size);
         CHECK(layout.edges[e].rows == layout.layers[e + 1].size);
-        CHECK(layout.edges[e].weights.size() ==
-              layout.edges[e].rows * layout.edges[e].cols);
+        CHECK(layout.edges[e].weights.size() == layout.edges[e].rows * layout.edges[e].cols);
     }
 
     const double tolerance = parity.at("tolerance").at("relative").get<double>();
@@ -300,7 +298,7 @@ TEST_CASE("advisor trunk taps match PyTorch, and the layout matches the graph",
         return std::abs(actual - expected) / std::max(1.0, std::abs(expected)) <= tolerance;
     };
     const auto same_vector = [&](const std::vector<float>& actual, const json& expected,
-                                const char* what) {
+                                 const char* what) {
         const auto reference = expected.get<std::vector<double>>();
         INFO(what << ": " << actual.size() << " values against " << reference.size());
         REQUIRE(actual.size() == reference.size());
@@ -351,11 +349,10 @@ TEST_CASE("advisor explain reports the same decision recommend does", "[advisor]
     const json clamps = load(kExplainFixtureDir / "clamps.json");
     const polymesh::advisor::Advisor advisor(kExplainFixtureDir);
 
-    const std::size_t n_candidates =
-        clamps.at("candidate_grid").at("actions").size();
-    CHECK(advisor.explain(columns_of(parity.at("cases").at(0).at("features")))
-              .gate_threshold ==
-          Catch::Approx(clamps.at("gate_threshold").get<double>()));
+    const std::size_t n_candidates = clamps.at("candidate_grid").at("actions").size();
+    CHECK(
+        advisor.explain(columns_of(parity.at("cases").at(0).at("features"))).gate_threshold ==
+        Catch::Approx(clamps.at("gate_threshold").get<double>()));
 
     for (const auto& fixture_case : parity.at("cases")) {
         INFO("case " << fixture_case.at("name").get<std::string>());
@@ -389,15 +386,14 @@ TEST_CASE("advisor explain reports the same decision recommend does", "[advisor]
         // The gate flag is not a separate opinion: it is the threshold applied
         // to the failure logit of that very pass.
         for (const auto& frame : explanation.frames) {
-            const bool gate = sigmoid(frame.outputs.failure_logit) <=
-                              explanation.gate_threshold;
+            const bool gate =
+                sigmoid(frame.outputs.failure_logit) <= explanation.gate_threshold;
             CHECK(frame.gate_pass == gate);
         }
     }
 }
 
-TEST_CASE("an advisor without trunk taps recommends but declines to explain",
-          "[advisor]") {
+TEST_CASE("an advisor without trunk taps recommends but declines to explain", "[advisor]") {
     if (!fixture_present()) {
         SKIP("advisor_tiny fixture missing (python scripts/advisor/export_onnx.py "
              "--tiny-fixture)");
@@ -632,28 +628,26 @@ TEST_CASE("advisor max_dof budget filter: gated enumeration respects the budget"
     };
     // Independently score every candidate, exactly as the gated-enumeration
     // test above does: apply the action, read the heads, keep the finite rows.
-    const auto score_candidates =
-        [&](const polymesh::advisor::FeatureColumns& columns) {
-            std::vector<Scored> table;
-            for (const auto& action : actions) {
-                auto candidate = defaults;
-                candidate.mesher = action.value("mesher", defaults.mesher);
-                candidate.order = action.value("order", defaults.order);
-                candidate.h_rel = action.value("h_rel", defaults.h_rel);
-                candidate.eta_target = action.value("eta_target", defaults.eta_target);
-                candidate.adapt_passes =
-                    action.value("adapt_passes", defaults.adapt_passes);
-                auto query = columns;
-                advisor.apply_action(query, candidate);
-                const auto raw = advisor.evaluate(query);
-                if (!std::isfinite(raw.rel_err_rel)) {
-                    continue;
-                }
-                table.push_back({candidate, raw.rel_err_rel,
-                                 sigmoid(raw.failure_logit), dof_of(raw.dof_log10)});
+    const auto score_candidates = [&](const polymesh::advisor::FeatureColumns& columns) {
+        std::vector<Scored> table;
+        for (const auto& action : actions) {
+            auto candidate = defaults;
+            candidate.mesher = action.value("mesher", defaults.mesher);
+            candidate.order = action.value("order", defaults.order);
+            candidate.h_rel = action.value("h_rel", defaults.h_rel);
+            candidate.eta_target = action.value("eta_target", defaults.eta_target);
+            candidate.adapt_passes = action.value("adapt_passes", defaults.adapt_passes);
+            auto query = columns;
+            advisor.apply_action(query, candidate);
+            const auto raw = advisor.evaluate(query);
+            if (!std::isfinite(raw.rel_err_rel)) {
+                continue;
             }
-            return table;
-        };
+            table.push_back({candidate, raw.rel_err_rel, sigmoid(raw.failure_logit),
+                             dof_of(raw.dof_log10)});
+        }
+        return table;
+    };
     const auto same_action = [](const polymesh::advisor::AdvisorDecision& a,
                                 const polymesh::advisor::AdvisorDecision& b) {
         return a.mesher == b.mesher && a.order == b.order && a.h_rel == b.h_rel &&
@@ -678,10 +672,9 @@ TEST_CASE("advisor max_dof budget filter: gated enumeration respects the budget"
         CHECK(unfiltered.clamped == budget_off.clamped);
         CHECK(unfiltered.note == budget_off.note);
         CHECK(same_number(unfiltered.predicted_rel_err, budget_off.predicted_rel_err));
-        CHECK(same_number(unfiltered.predicted_rel_err_rel,
-                          budget_off.predicted_rel_err_rel));
-        CHECK(same_number(unfiltered.predicted_chamfer_mean,
-                          budget_off.predicted_chamfer_mean));
+        CHECK(same_number(unfiltered.predicted_rel_err_rel, budget_off.predicted_rel_err_rel));
+        CHECK(
+            same_number(unfiltered.predicted_chamfer_mean, budget_off.predicted_chamfer_mean));
         CHECK(same_number(unfiltered.predicted_dof, budget_off.predicted_dof));
         CHECK(same_number(unfiltered.predicted_mesh_ms, budget_off.predicted_mesh_ms));
         CHECK(same_number(unfiltered.predicted_solve_ms, budget_off.predicted_solve_ms));
@@ -824,8 +817,7 @@ TEST_CASE("advisor recommend() latency", "[advisor][!benchmark]") {
         const auto decision = advisor.recommend(columns);
         const auto end = std::chrono::steady_clock::now();
         (void)decision;
-        micros.push_back(
-            std::chrono::duration<double, std::micro>(end - start).count());
+        micros.push_back(std::chrono::duration<double, std::micro>(end - start).count());
     }
     std::sort(micros.begin(), micros.end());
     const auto pct = [&](double q) {
@@ -835,14 +827,14 @@ TEST_CASE("advisor recommend() latency", "[advisor][!benchmark]") {
     };
 
     const auto model_bytes = std::filesystem::file_size(kFixtureDir / "model.onnx");
-    WARN("advisor recommend() over " << kRuns << " calls, " << candidates
-         << " candidate actions, single-threaded:"
+    WARN("advisor recommend() over "
+         << kRuns << " calls, " << candidates << " candidate actions, single-threaded:"
          << "\n  p50 " << pct(0.50) << " us"
          << "\n  p90 " << pct(0.90) << " us"
          << "\n  p99 " << pct(0.99) << " us"
          << "\n  max " << micros.back() << " us"
-         << "\n  per candidate (p50) " << (candidates ? pct(0.50) / static_cast<double>(candidates) : 0.0)
-         << " us"
+         << "\n  per candidate (p50) "
+         << (candidates ? pct(0.50) / static_cast<double>(candidates) : 0.0) << " us"
          << "\n  fixture model.onnx " << model_bytes << " bytes");
 
     // A guard, not a benchmark target: if a recommendation ever costs more than
@@ -933,5 +925,5 @@ TEST_CASE("advisor descriptor dump", "[advisor][!benchmark]") {
     stream << out.dump(2) << "\n";
     stream.close();
     WARN("wrote C++ OOD vectors and distances for " << steps.size() << " parts to "
-         << path.string());
+                                                    << path.string());
 }

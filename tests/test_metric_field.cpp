@@ -30,8 +30,8 @@ void check_matrix_near(const Eigen::Matrix3d& actual, const Eigen::Matrix3d& exp
 std::vector<double> make_limited_field() {
     MetricGrid grid({-0.2, 0.1, -0.3}, {0.8, 0.9, 0.5}, {5, 4, 3});
     grid.fill([](const Eigen::Vector3d& x) {
-        const double h = 0.018 + 0.013 * (x.x() + 0.2) + 0.007 * (x.y() - 0.1) +
-                         0.003 * (x.z() + 0.3);
+        const double h =
+            0.018 + 0.013 * (x.x() + 0.2) + 0.007 * (x.y() - 0.1) + 0.003 * (x.z() + 0.3);
         const Eigen::Matrix3d axes =
             Eigen::AngleAxisd(0.31 * x.x() - 0.17 * x.y(), Eigen::Vector3d::UnitZ())
                 .toRotationMatrix();
@@ -46,9 +46,10 @@ std::vector<double> make_limited_field() {
     for (int k = 0; k < n.z(); ++k) {
         for (int j = 0; j < n.y(); ++j) {
             for (int i = 0; i < n.x(); ++i) {
-                const Eigen::Matrix3d metric = grid.at_node(
-                    static_cast<std::size_t>(i), static_cast<std::size_t>(j),
-                    static_cast<std::size_t>(k)).M;
+                const Eigen::Matrix3d metric =
+                    grid.at_node(static_cast<std::size_t>(i), static_cast<std::size_t>(j),
+                                 static_cast<std::size_t>(k))
+                        .M;
                 serialized.insert(serialized.end(), metric.data(), metric.data() + 9);
             }
         }
@@ -87,7 +88,8 @@ TEST_CASE("metric field axes round-trip reconstructs the tensor", "[metric]") {
     for (int i = 0; i < 3; ++i) {
         CHECK_THAT(recovered_h[i], WithinRel(sorted_original[i], 1e-13));
     }
-    const Eigen::Vector3d recovered_lambda = recovered_h.cwiseInverse().array().square().matrix();
+    const Eigen::Vector3d recovered_lambda =
+        recovered_h.cwiseInverse().array().square().matrix();
     const Eigen::Matrix3d reconstructed =
         original.axes() * recovered_lambda.asDiagonal() * original.axes().transpose();
     check_matrix_near(reconstructed, original.M, 1e-12);
@@ -129,10 +131,8 @@ TEST_CASE("metric field intersection selects restrictive principal sizes", "[met
     check_matrix_near(coarse.intersect(fine).M, fine.M, 0.0);
     check_matrix_near(fine.intersect(coarse).M, fine.M, 0.0);
 
-    const Metric3d a =
-        Metric3d::from_axes({0.1, 0.02, 0.05}, Eigen::Matrix3d::Identity());
-    const Metric3d b =
-        Metric3d::from_axes({0.04, 0.03, 0.01}, Eigen::Matrix3d::Identity());
+    const Metric3d a = Metric3d::from_axes({0.1, 0.02, 0.05}, Eigen::Matrix3d::Identity());
+    const Metric3d b = Metric3d::from_axes({0.04, 0.03, 0.01}, Eigen::Matrix3d::Identity());
     const Metric3d ab = a.intersect(b);
     const Metric3d ba = b.intersect(a);
     const Metric3d expected =
@@ -144,7 +144,8 @@ TEST_CASE("metric field intersection selects restrictive principal sizes", "[met
     CHECK(eig.eigenvalues().minCoeff() > 0.0);
 }
 
-TEST_CASE("metric field log interpolation has exact endpoints and geometric midpoint", "[metric]") {
+TEST_CASE("metric field log interpolation has exact endpoints and geometric midpoint",
+          "[metric]") {
     const Metric3d a = Metric3d::isotropic(0.02);
     const Metric3d b = Metric3d::isotropic(0.18);
     check_matrix_near(Metric3d::log_interp(a, b, 0.0).M, a.M, 1e-12);
@@ -159,8 +160,7 @@ TEST_CASE("metric field log interpolation has exact endpoints and geometric midp
 TEST_CASE("metric field grid interpolates nodes and preserves uniform metrics", "[metric]") {
     MetricGrid varied({-1.0, 2.0, 0.5}, {2.0, 5.0, 2.5}, {4, 3, 5});
     varied.fill([](const Eigen::Vector3d& x) {
-        return Metric3d::from_axes({0.03 + 0.002 * (x.x() + 1.0),
-                                    0.05 + 0.001 * (x.y() - 2.0),
+        return Metric3d::from_axes({0.03 + 0.002 * (x.x() + 1.0), 0.05 + 0.001 * (x.y() - 2.0),
                                     0.08 + 0.003 * (x.z() - 0.5)},
                                    Eigen::Matrix3d::Identity());
     });
@@ -191,7 +191,8 @@ TEST_CASE("metric field grid interpolates nodes and preserves uniform metrics", 
                WithinRel(0.02, 1e-12));
 }
 
-TEST_CASE("metric field gradation limits every adjacent node without coarsening seed", "[metric]") {
+TEST_CASE("metric field gradation limits every adjacent node without coarsening seed",
+          "[metric]") {
     MetricGrid grid({0.0, 0.0, 0.0}, {0.4, 0.4, 0.4}, {5, 5, 5});
     grid.fill([](const Eigen::Vector3d&) { return Metric3d::isotropic(0.1); });
     grid.set(0, 0, 0, Metric3d::isotropic(1e-3));
@@ -202,12 +203,12 @@ TEST_CASE("metric field gradation limits every adjacent node without coarsening 
 
     const Eigen::Vector3i n = grid.resolution();
     auto check_direction = [&](int i0, int j0, int k0, int i1, int j1, int k1) {
-        const Metric3d m0 = grid.at_node(static_cast<std::size_t>(i0),
-                                        static_cast<std::size_t>(j0),
-                                        static_cast<std::size_t>(k0));
-        const Metric3d m1 = grid.at_node(static_cast<std::size_t>(i1),
-                                        static_cast<std::size_t>(j1),
-                                        static_cast<std::size_t>(k1));
+        const Metric3d m0 =
+            grid.at_node(static_cast<std::size_t>(i0), static_cast<std::size_t>(j0),
+                         static_cast<std::size_t>(k0));
+        const Metric3d m1 =
+            grid.at_node(static_cast<std::size_t>(i1), static_cast<std::size_t>(j1),
+                         static_cast<std::size_t>(k1));
         const Eigen::Vector3d edge =
             grid.node_position(static_cast<std::size_t>(i1), static_cast<std::size_t>(j1),
                                static_cast<std::size_t>(k1)) -
@@ -261,8 +262,7 @@ TEST_CASE("metric field gradation is bit deterministic", "[metric]") {
 
 TEST_CASE("metric field Hessian conversion maps flat directions to coarse size", "[metric]") {
     const Eigen::Matrix3d H = (Eigen::Vector3d{0.0, -4.0, 100.0}).asDiagonal();
-    const Metric3d metric =
-        polymesh::adapt::metric_from_hessian(H, 0.01, 0.005, 0.2, 20.0);
+    const Metric3d metric = polymesh::adapt::metric_from_hessian(H, 0.01, 0.005, 0.2, 20.0);
     const Eigen::Vector3d sizes = metric.sizes();
     CHECK(sizes.maxCoeff() <= 0.2 + 1e-14);
     CHECK(sizes.minCoeff() >= 0.005 - 1e-14);
@@ -274,8 +274,7 @@ TEST_CASE("metric field invalid inputs throw", "[metric]") {
     CHECK_THROWS_AS(Metric3d::isotropic(-0.1), std::invalid_argument);
     CHECK_THROWS_AS(Metric3d::isotropic(std::numeric_limits<double>::quiet_NaN()),
                     std::invalid_argument);
-    CHECK_THROWS_AS(Metric3d::isotropic(0.1).clamped(0.01, 1.0, 0.99),
-                    std::invalid_argument);
+    CHECK_THROWS_AS(Metric3d::isotropic(0.1).clamped(0.01, 1.0, 0.99), std::invalid_argument);
 
     MetricGrid grid({0.0, 0.0, 0.0}, {1.0, 1.0, 1.0}, {2, 2, 2});
     CHECK_THROWS_AS(polymesh::adapt::normalize_complexity(grid, 0.0, 0.01, 1.0, 10.0),

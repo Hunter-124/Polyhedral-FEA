@@ -23,8 +23,7 @@ namespace {
 polymesh::geom::TriSurface unit_box_surface() {
     polymesh::geom::TriSurface s;
     s.vertices = {
-        {0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0},
-        {0, 0, 1}, {1, 0, 1}, {1, 1, 1}, {0, 1, 1},
+        {0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}, {0, 0, 1}, {1, 0, 1}, {1, 1, 1}, {0, 1, 1},
     };
     s.triangles = {
         {0, 1, 2}, {0, 2, 3}, {4, 6, 5}, {4, 7, 6}, {0, 4, 5}, {0, 5, 1},
@@ -157,8 +156,8 @@ TEST_CASE("resolve_element_tendency: clamps and preserves specialty meshers", "[
     REQUIRE(hi.mesher == VolumeMesher::kGradedTet);
 
     // Prism / octa / hexpyr: tendency ignored
-    for (auto base : {VolumeMesher::kPrismSweep, VolumeMesher::kOctahedral,
-                      VolumeMesher::kHexPyramid}) {
+    for (auto base :
+         {VolumeMesher::kPrismSweep, VolumeMesher::kOctahedral, VolumeMesher::kHexPyramid}) {
         const auto p = resolve_element_tendency(base, 1.0, 2);
         REQUIRE(p.mesher == base);
         REQUIRE_FALSE(p.remapped);

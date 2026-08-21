@@ -86,8 +86,8 @@ TEST_CASE("auto solve records LDLT to CG downgrade when only CG fits") {
     const auto nfree = ndof - static_cast<Eigen::Index>(bc.dof_values.size());
     const auto estimate = estimate_solve_resources(mesh, nfree);
     REQUIRE(estimate.direct_peak_bytes > estimate.cg_peak_bytes);
-    const auto cap = estimate.cg_peak_bytes +
-                     (estimate.direct_peak_bytes - estimate.cg_peak_bytes) / 2;
+    const auto cap =
+        estimate.cg_peak_bytes + (estimate.direct_peak_bytes - estimate.cg_peak_bytes) / 2;
 
     SolveOptions options;
     options.method = SolveMethod::kAuto;

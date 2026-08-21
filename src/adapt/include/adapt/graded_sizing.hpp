@@ -26,8 +26,8 @@
 // a-posteriori refinement marks.
 
 #include "adapt/sizing_field.hpp"
-#include "mesh/cvt_lloyd.hpp"
 #include "geom/tri_surface.hpp"
+#include "mesh/cvt_lloyd.hpp"
 
 #include <Eigen/Core>
 
@@ -50,7 +50,8 @@ class GradedSizing final : public SizingField {
     /// @param sources Size requests; each h is clamped into [h_min, h_max].
     /// @param h_min,h_max Edge-length bounds, metres (0 < h_min ≤ h_max).
     /// @param beta Max gradation (dimensionless size growth per unit length), > 0.
-    GradedSizing(std::vector<SizeSource> sources, double h_min, double h_max, double beta = 1.0);
+    GradedSizing(std::vector<SizeSource> sources, double h_min, double h_max,
+                 double beta = 1.0);
 
     double size_at(const Eigen::Vector3d& point) const override;
     /// Non-owning field view. The GradedSizing object must outlive the callable.
@@ -73,8 +74,8 @@ class GradedSizing final : public SizingField {
     Eigen::Vector3d grid_origin_{0, 0, 0};
     double grid_cell_ = 1.0;
     std::int32_t grid_nx_ = 0, grid_ny_ = 0, grid_nz_ = 0;
-    std::vector<std::uint32_t> cell_start_;  // CSR offsets
-    std::vector<std::uint32_t> items_;       // source indices bucketed
+    std::vector<std::uint32_t> cell_start_; // CSR offsets
+    std::vector<std::uint32_t> items_;      // source indices bucketed
 };
 
 /// Curvature-driven size sources from the *tessellation*: one per surface
@@ -87,8 +88,7 @@ class GradedSizing final : public SizingField {
 /// exact per-face samples on `geom::CadFace::kappa_samples`; this function is
 /// the STL / no-CAD path.
 std::vector<SizeSource> curvature_size_sources(const geom::TriSurface& surface, double h_min,
-                                               double h_max,
-                                               double curvature_fraction = 0.25);
+                                               double h_max, double curvature_fraction = 0.25);
 
 /// Thin-wall size sources: one per surface vertex whose local thickness asks
 /// for `thickness_fraction * thickness` finer than `h_max`, clamped to
@@ -96,8 +96,7 @@ std::vector<SizeSource> curvature_size_sources(const geom::TriSurface& surface, 
 /// no exact-BRep analogue in this codebase, so this stays the tessellation
 /// reading on every path.
 std::vector<SizeSource> thickness_size_sources(const geom::TriSurface& surface, double h_min,
-                                               double h_max,
-                                               double thickness_fraction = 0.35);
+                                               double h_max, double thickness_fraction = 0.35);
 
 /// Geometry-driven size sources: one per surface vertex whose curvature or
 /// thin-wall target is finer than `h_max`. h = min(curvature_fraction / kappa,
@@ -128,7 +127,6 @@ std::vector<SizeSource> point_size_sources(std::span<const Eigen::Vector3d> poin
 mesh::SizeFieldFn size_field_from_sources(std::span<const SizeSource> sources, double h_min,
                                           double h_max, double beta = 1.0);
 
-
 /// Refine-seed plan for the ball-grading meshers (pipeline::volume_mesh):
 /// seeds = source points that ask for a size finer than `h_coarse`;
 /// band = band_frac * h_coarse (single influence radius, ball semantics).
@@ -137,6 +135,7 @@ struct SeedPlan {
     double seed_band = 0.0;
     double h_fine = 0.0; // finest requested target among the fine sources (m)
 };
-SeedPlan seed_plan(std::span<const SizeSource> sources, double h_coarse, double band_frac = 2.0);
+SeedPlan seed_plan(std::span<const SizeSource> sources, double h_coarse,
+                   double band_frac = 2.0);
 
 } // namespace polymesh::adapt

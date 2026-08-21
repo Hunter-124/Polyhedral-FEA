@@ -26,7 +26,8 @@ Eigen::Vector3d tri_normal(const TriSurface& s, std::size_t t) {
     return Eigen::Vector3d(0.0, 0.0, 1.0);
 }
 
-[[maybe_unused]] double point_segment_distance(const Eigen::Vector3d& p, const Eigen::Vector3d& a,
+[[maybe_unused]] double point_segment_distance(const Eigen::Vector3d& p,
+                                               const Eigen::Vector3d& a,
                                                const Eigen::Vector3d& b) {
     const Eigen::Vector3d ab = b - a;
     const double denom = ab.squaredNorm();
@@ -67,7 +68,8 @@ struct EdgeGrid {
         if (!any) {
             return;
         }
-        const Eigen::Vector3d extent = (bmax - bmin).cwiseMax(Eigen::Vector3d::Constant(1e-12));
+        const Eigen::Vector3d extent =
+            (bmax - bmin).cwiseMax(Eigen::Vector3d::Constant(1e-12));
         const double pad = 1e-6 * extent.norm() + 1e-12;
         bmin.array() -= pad;
         bmax.array() += pad;
@@ -141,8 +143,8 @@ struct EdgeGrid {
                 for (int j = j0; j <= j1; ++j) {
                     for (int i = i0; i <= i1; ++i) {
                         if (r > 0) {
-                            const bool on_shell = (i == i0 || i == i1 || j == j0 ||
-                                                   j == j1 || k == k0 || k == k1);
+                            const bool on_shell = (i == i0 || i == i1 || j == j0 || j == j1 ||
+                                                   k == k0 || k == k1);
                             if (!on_shell) {
                                 continue;
                             }

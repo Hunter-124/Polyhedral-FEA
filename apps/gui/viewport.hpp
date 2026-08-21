@@ -109,9 +109,9 @@ class Viewport {
     std::size_t cinema_skipped_element_count() const;
     /// Cinema draw parameters, applied only in `DisplayMode::kCinema`.
     struct CinemaView {
-        float skeleton_alpha = 1.0f;  // 0..1
-        float reveal = 0.0f;          // elements with index < reveal * count are drawn
-        float shrink = 0.0f;          // 0 = touching, 1 = collapsed to centroids
+        float skeleton_alpha = 1.0f; // 0..1
+        float reveal = 0.0f;         // elements with index < reveal * count are drawn
+        float shrink = 0.0f;         // 0 = touching, 1 = collapsed to centroids
         float mesh_alpha = 1.0f;
         bool edges = true;
     };

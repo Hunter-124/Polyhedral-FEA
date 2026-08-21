@@ -15,8 +15,8 @@
 #include "geom/cad_topology.hpp"
 #include "geom/step.hpp"
 #include "mesh/brep_fidelity.hpp"
-#include "mesh/local_refine.hpp"
 #include "mesh/hybrid_fill.hpp"
+#include "mesh/local_refine.hpp"
 #include "mesh/tet_fill.hpp"
 #include "pipeline/scene.hpp"
 
@@ -364,12 +364,12 @@ TEST_CASE("graded fills ship no free face buried inside another cell") {
             std::vector<polymesh::mesh::BoundarySupport> provenance;
             polymesh::mesh::BoundaryProjectionContext projection;
             std::shared_ptr<const polymesh::geom::CadTopology> topology;
-            REQUIRE(polymesh::pipeline::make_boundary_projection(
-                *model.cad, c.h, &projection, &provenance, &topology));
+            REQUIRE(polymesh::pipeline::make_boundary_projection(*model.cad, c.h, &projection,
+                                                                 &provenance, &topology));
             const polymesh::mesh::BoundaryFit fit{&*model.cad, topology.get(), &projection};
             const auto fill = polymesh::mesh::graded_tet_fill_surface(
-                model.surface, model.bbox_min, model.bbox_max, c.h, 2, {}, 0.0, {}, 0.0,
-                0.0, &fit);
+                model.surface, model.bbox_min, model.bbox_max, c.h, 2, {}, 0.0, {}, 0.0, 0.0,
+                &fit);
             const auto stats = polymesh::mesh::count_buried_free_tet_faces(
                 fill.mesh.nodes, fill.mesh.tets, fill.h_coarse > 0.0 ? fill.h_coarse : c.h);
             INFO("free faces " << stats.n_free_faces << ", buried " << stats.n_buried);
@@ -575,8 +575,8 @@ TEST_CASE("diagnostic: independently sum coarse graded volumes") {
         std::vector<polymesh::mesh::BoundarySupport> provenance;
         polymesh::mesh::BoundaryProjectionContext projection;
         std::shared_ptr<const polymesh::geom::CadTopology> topology;
-        REQUIRE(polymesh::pipeline::make_boundary_projection(
-            *model.cad, c.h, &projection, &provenance, &topology));
+        REQUIRE(polymesh::pipeline::make_boundary_projection(*model.cad, c.h, &projection,
+                                                             &provenance, &topology));
         const polymesh::mesh::BoundaryFit fit{&*model.cad, topology.get(), &projection};
         const auto fill = polymesh::mesh::graded_tet_fill_surface(
             model.surface, model.bbox_min, model.bbox_max, c.h, 2, {}, 0.0, {}, 0.0, 0.0,
@@ -609,9 +609,18 @@ polymesh::fea::NodalMesh curved_hex20_sector(double r, double R, double sweep, d
     polymesh::fea::NodalMesh mesh;
     mesh.nodes = {at(r, a0, 0.0),    at(r, a1, 0.0),    at(R, a1, 0.0),    at(R, a0, 0.0),
                   at(r, a0, height), at(r, a1, height), at(R, a1, height), at(R, a0, height)};
-    static constexpr std::array<std::array<std::size_t, 2>, 12> kEdges{
-        {{0, 1}, {1, 2}, {2, 3}, {3, 0}, {4, 5}, {5, 6}, {6, 7}, {7, 4}, {0, 4}, {1, 5},
-         {2, 6}, {3, 7}}};
+    static constexpr std::array<std::array<std::size_t, 2>, 12> kEdges{{{0, 1},
+                                                                        {1, 2},
+                                                                        {2, 3},
+                                                                        {3, 0},
+                                                                        {4, 5},
+                                                                        {5, 6},
+                                                                        {6, 7},
+                                                                        {7, 4},
+                                                                        {0, 4},
+                                                                        {1, 5},
+                                                                        {2, 6},
+                                                                        {3, 7}}};
     for (const auto& e : kEdges) {
         const Eigen::Vector3d chord = 0.5 * (mesh.nodes[e[0]] + mesh.nodes[e[1]]);
         const bool on_outer_wall = std::abs(mesh.nodes[e[0]].head<2>().norm() - R) < 1e-12 &&

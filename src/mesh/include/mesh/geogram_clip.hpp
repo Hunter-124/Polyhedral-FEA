@@ -60,8 +60,8 @@ struct ClippedCell {
 
 /// Build a ConvexCell from `box`, clip by each plane in order, compute volume
 /// and barycenter. Returns nullopt if geogram is unavailable or the cell dies.
-[[nodiscard]] std::optional<ClippedCell> clip_convex_cell(
-    const ClipBox& box, std::span<const ClipPlane> planes);
+[[nodiscard]] std::optional<ClippedCell> clip_convex_cell(const ClipBox& box,
+                                                          std::span<const ClipPlane> planes);
 
 /// Convenience: unit cube [0,1]³ with no extra planes.
 [[nodiscard]] std::optional<ClippedCell> unit_cube_cell();
@@ -94,8 +94,8 @@ class SiteGrid {
     int nx_ = 0, ny_ = 0, nz_ = 0;
     int max_ring_ = 0;
     std::size_t n_pts_ = 0;
-    std::vector<std::uint32_t> cell_start_;  // CSR offsets, size nx*ny*nz+1
-    std::vector<std::uint32_t> items_;       // site indices bucketed
+    std::vector<std::uint32_t> cell_start_; // CSR offsets, size nx*ny*nz+1
+    std::vector<std::uint32_t> items_;      // site indices bucketed
 };
 
-}  // namespace polymesh::mesh
+} // namespace polymesh::mesh

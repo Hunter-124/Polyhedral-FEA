@@ -42,8 +42,8 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <utility>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace polymesh::mesh {
@@ -177,7 +177,6 @@ struct MirrorFrame {
                                               const Eigen::Vector3d& bbox_max,
                                               double tol_frac = 1e-7);
 
-
 /// Reflection-orbit lookup over a mesh node array.
 ///
 /// Folding the geometry queries makes every *input* symmetric, which is
@@ -252,6 +251,6 @@ class MirrorNodeOrbit {
 /// a fold justified by "close enough" tessellation would mirror away real
 /// asymmetric detail.
 [[nodiscard]] MirrorFrame detect_mirror_frame(const geom::TriSurface& surface,
-                                             double tol_frac = 1e-9);
+                                              double tol_frac = 1e-9);
 
 } // namespace polymesh::mesh

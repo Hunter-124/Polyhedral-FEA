@@ -712,9 +712,9 @@ varyhedron_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     fit.cad = cad;
     fit.topo = topo;
     fit.projection = projection;
-    auto graded = graded_tet_fill_surface(surface, bbox_min, bbox_max, h, skin_layers,
-                                          features, feature_band, seeds, seed_band,
-                                          curvature_turn_deg, &fit);
+    auto graded =
+        graded_tet_fill_surface(surface, bbox_min, bbox_max, h, skin_layers, features,
+                                feature_band, seeds, seed_band, curvature_turn_deg, &fit);
     out.mesh = std::move(graded.mesh);
     out.h_coarse = graded.h_coarse;
     out.h_fine = graded.h_fine;

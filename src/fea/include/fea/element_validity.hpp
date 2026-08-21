@@ -32,7 +32,8 @@ namespace polymesh::fea {
 /// `default_rule(element.type)`. Polyhedral VEM cells carry no isoparametric
 /// map; they are reported valid here and are gated by their own positive-volume
 /// test (`fea::poly_volume`).
-[[nodiscard]] bool element_jacobians_positive(const NodalMesh& mesh, const NodalElement& element);
+[[nodiscard]] bool element_jacobians_positive(const NodalMesh& mesh,
+                                              const NodalElement& element);
 
 /// `element_jacobians_positive` for every element incident to `node`, given a
 /// precomputed incidence list.

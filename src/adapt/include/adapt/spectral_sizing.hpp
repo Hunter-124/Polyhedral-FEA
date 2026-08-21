@@ -42,8 +42,8 @@ namespace polymesh::adapt::spectral {
 // Fourier primitives live in geom (`adapt` links `mesh`, so mesh passes that
 // need the transform cannot include an adapt header). Re-exported here so the
 // sizing pipeline keeps one spelling.
-using geom::FilterReport;
 using geom::fft_inplace;
+using geom::FilterReport;
 using geom::lowpass_signal;
 using geom::lowpass_signal_periodic;
 using geom::truncate_modes;

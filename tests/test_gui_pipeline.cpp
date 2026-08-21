@@ -10,20 +10,19 @@
 #include "support/box_model.hpp"
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <format>
 #include <fstream>
-#include <thread>
-#include <algorithm>
-#include <cstdint>
 #include <string>
+#include <thread>
 #include <vector>
 
 using namespace polymesh::pipeline;
 namespace fea = polymesh::fea;
-
 
 TEST_CASE("GUI pipeline: box STL segments into six faces and solves end-to-end") {
     const auto model = polymesh::testsupport::box_model(0.1, 0.02, 0.02);
@@ -668,8 +667,7 @@ TEST_CASE("a solution from a different discretization fails an independent resid
     REQUIRE(broad_result.has_value());
     REQUIRE(narrow_result.has_value());
     // Same mesher, same h, no adaptation: both solves share one mesh.
-    REQUIRE(broad_result->volume_mesh.nodes.size() ==
-            narrow_result->volume_mesh.nodes.size());
+    REQUIRE(broad_result->volume_mesh.nodes.size() == narrow_result->volume_mesh.nodes.size());
 
     const fea::Material mat{.youngs_modulus = base.youngs_modulus,
                             .poissons_ratio = base.poissons_ratio};

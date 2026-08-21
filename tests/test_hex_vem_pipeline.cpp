@@ -13,7 +13,6 @@
 using namespace polymesh::pipeline;
 namespace fea = polymesh::fea;
 
-
 TEST_CASE("hex-VEM volume mesh solves cantilever-style BCs") {
     const auto model = polymesh::testsupport::box_model(1.0, 1.0, 1.0);
     auto vol = volume_mesh(model, 0.25, VolumeMesher::kHexVem);

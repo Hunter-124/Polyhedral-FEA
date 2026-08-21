@@ -12,8 +12,8 @@
 // residuals. Thresholds from measured product fills at fixed equal h (not
 // auto-h). ADR-0015: scores measure lattice+snap fidelity, not CAD Delaunay.
 
-#include "fea/cell_quality.hpp"
 #include "fea/boundary_faces.hpp"
+#include "fea/cell_quality.hpp"
 #include "fea/nodal_mesh.hpp"
 #include "geom/stl.hpp"
 #include "geom/tri_surface.hpp"
@@ -29,8 +29,8 @@
 #include <filesystem>
 #include <format>
 #include <map>
-#include <utility>
 #include <string>
+#include <utility>
 #include <vector>
 
 using namespace polymesh;
@@ -198,12 +198,24 @@ Scorecard score_volume(const pipeline::Model& model, double h, pipeline::VolumeM
             if (std::isfinite(q[i]) && q[i] < lo) {
                 lo = q[i];
                 switch (vol.mesh.elements[i].type) {
-                case fea::ElementType::kTet4: sc.worst_cell_type = "tet4"; break;
-                case fea::ElementType::kHex8: sc.worst_cell_type = "hex8"; break;
-                case fea::ElementType::kPyramid5: sc.worst_cell_type = "pyr5"; break;
-                case fea::ElementType::kPrism6: sc.worst_cell_type = "prism6"; break;
-                case fea::ElementType::kPolyVem: sc.worst_cell_type = "polyvem"; break;
-                default: sc.worst_cell_type = "other"; break;
+                case fea::ElementType::kTet4:
+                    sc.worst_cell_type = "tet4";
+                    break;
+                case fea::ElementType::kHex8:
+                    sc.worst_cell_type = "hex8";
+                    break;
+                case fea::ElementType::kPyramid5:
+                    sc.worst_cell_type = "pyr5";
+                    break;
+                case fea::ElementType::kPrism6:
+                    sc.worst_cell_type = "prism6";
+                    break;
+                case fea::ElementType::kPolyVem:
+                    sc.worst_cell_type = "polyvem";
+                    break;
+                default:
+                    sc.worst_cell_type = "other";
+                    break;
                 }
             }
         }
@@ -218,22 +230,22 @@ Scorecard score_volume(const pipeline::Model& model, double h, pipeline::VolumeM
 // floors get re-baselined from measured output must not do. WARN prints on pass
 // and on fail (2026-08-08).
 void dump_score(const Scorecard& sc) {
-    WARN(
-        std::format("{}: score={:.4f} M1max={:.4g} M2max={:.4g} M3={:.4g} M4={:.4g} M5={:.4g} "
-                    "M6={:.4g}{} qmin_all={:.4g}({}) elems={} nodes={} h={:.4g}",
-                    sc.mesher, sc.m.composite_score, sc.m.m1_max, sc.m.m2_max,
-                    sc.m.m3_rel_volume_err, sc.m.m4_radial_rel, sc.m.m5_max_azimuth_gap,
-                    sc.m.m6_min_boundary_aspect,
-                    sc.m.has_tet_aspect ? "(tet)" : (sc.m.m6_from_free_faces ? "(face)" : "(n/a)"),
-                    sc.worst_cell_quality, sc.worst_cell_type, sc.n_elems, sc.n_nodes, sc.h));
+    WARN(std::format(
+        "{}: score={:.4f} M1max={:.4g} M2max={:.4g} M3={:.4g} M4={:.4g} M5={:.4g} "
+        "M6={:.4g}{} qmin_all={:.4g}({}) elems={} nodes={} h={:.4g}",
+        sc.mesher, sc.m.composite_score, sc.m.m1_max, sc.m.m2_max, sc.m.m3_rel_volume_err,
+        sc.m.m4_radial_rel, sc.m.m5_max_azimuth_gap, sc.m.m6_min_boundary_aspect,
+        sc.m.has_tet_aspect ? "(tet)" : (sc.m.m6_from_free_faces ? "(face)" : "(n/a)"),
+        sc.worst_cell_quality, sc.worst_cell_type, sc.n_elems, sc.n_nodes, sc.h));
 }
 
 // --- Frozen thresholds (hybrid re-baselined 2026-08-08; see below) ---
 // Measured composites (equal h, product fills, one run each, /tmp/b-QualityHole):
 //                             2026-07-10                 2026-08-08
-//   sphere   h=0.15*ext: hex 0.849 graded 0.799 hybrid 0.896 | hex 0.8494 graded 0.8035 hybrid 0.8434
-//   cylinder h=0.12*ext: hex 0.860 graded 0.780 hybrid 0.860 | hex 0.8604 graded 0.7915 hybrid 0.8222
-//   hole     h=0.10*ext: hex 0.568 graded 0.530 hybrid 0.577 | hex 0.5678 graded 0.5299 hybrid 0.5344
+//   sphere   h=0.15*ext: hex 0.849 graded 0.799 hybrid 0.896 | hex 0.8494 graded 0.8035 hybrid
+//   0.8434 cylinder h=0.12*ext: hex 0.860 graded 0.780 hybrid 0.860 | hex 0.8604 graded 0.7915
+//   hybrid 0.8222 hole     h=0.10*ext: hex 0.568 graded 0.530 hybrid 0.577 | hex 0.5678 graded
+//   0.5299 hybrid 0.5344
 // hex and graded are unmoved; only hybrid's profile changed, and NOT because the
 // metrics got more honest — `composite_score` is pure geometry
 // (mesh::evaluate_curved_mesh_quality) and never reads fea::cell_quality, while
@@ -283,9 +295,9 @@ constexpr double kHexFloorHole = 0.40;
 constexpr double kGradedFloorSphere = 0.75;
 constexpr double kGradedFloorCylinder = 0.74;
 constexpr double kGradedFloorHole = 0.48;
-constexpr double kHybridFloorSphere = 0.80;    // measured 0.8200 (2026-08-15)
-constexpr double kHybridFloorCylinder = 0.78;  // measured 0.7938 (2026-08-15)
-constexpr double kHybridFloorHole = 0.50;      // measured 0.5344 (2026-08-08)
+constexpr double kHybridFloorSphere = 0.80;   // measured 0.8200 (2026-08-15)
+constexpr double kHybridFloorCylinder = 0.78; // measured 0.7938 (2026-08-15)
+constexpr double kHybridFloorHole = 0.50;     // measured 0.5344 (2026-08-08)
 
 // Relative competitiveness: graded (all-tet, pays the M6 tet-aspect term hex
 // never does) must stay within 0.88×hex; hybrid no longer *matches* hex — the
@@ -304,7 +316,7 @@ constexpr double kHybridKeepFraction = 0.90; // measured ≥0.941×hex (2026-08-
 // nodes. Measured 2026-08-08 after that fix, hybrid m1_max is 1.7e-16 @ h=0.15,
 // 0.0066 @ h=0.12 (0.055 h) and 9.6e-12 @ h=5.08, from 0.0313 (0.21 h) /
 // 0.0075 (0.063 h) / 9.6e-12 before it; graded and hex measure ≤1e-11.
-constexpr double kResidualFrac = 0.08;      // ×h, M1max bound
+constexpr double kResidualFrac = 0.08; // ×h, M1max bound
 // Minimum boundary-tet aspect, graded only (hex and hybrid never read it).
 //
 // Was 0.01, "measured >=0.01052 after local-child carve" -- and the local-child
@@ -351,7 +363,8 @@ TEST_CASE("curved scorecard: sphere hex passes, graded/hybrid lag or fail bar",
     if (!std::filesystem::exists(geom)) {
         SKIP("sphere.stl missing");
     }
-    const auto model = polymesh::testsupport::model_from_surface(polymesh::geom::load_stl(geom.string()));
+    const auto model =
+        polymesh::testsupport::model_from_surface(polymesh::geom::load_stl(geom.string()));
     const double extent = (model.bbox_max - model.bbox_min).maxCoeff();
     const double h = 0.15 * extent; // coarse CI-friendly; equal for all meshers
     // Low-res unit sphere inscribed in [0,1]^3, R≈0.5 at centre 0.5^3.
@@ -403,7 +416,8 @@ TEST_CASE("curved scorecard: cylinder_prism hex ranks above graded/hybrid",
     if (!std::filesystem::exists(geom)) {
         SKIP("cylinder_prism.stl missing");
     }
-    const auto model = polymesh::testsupport::model_from_surface(polymesh::geom::load_stl(geom.string()));
+    const auto model =
+        polymesh::testsupport::model_from_surface(polymesh::geom::load_stl(geom.string()));
     const double extent = (model.bbox_max - model.bbox_min).maxCoeff();
     const double h = 0.12 * extent;
     // Regular octagonal prism ≈ cylinder R=0.5, H=1 about z; solid volume of
@@ -456,7 +470,8 @@ TEST_CASE("curved scorecard: hole plate test.stl graded residual / ranking",
     if (!std::filesystem::exists(geom)) {
         SKIP("test.stl missing");
     }
-    const auto model = polymesh::testsupport::model_from_surface(polymesh::geom::load_stl(geom.string()));
+    const auto model =
+        polymesh::testsupport::model_from_surface(polymesh::geom::load_stl(geom.string()));
     const double extent = (model.bbox_max - model.bbox_min).maxCoeff();
     // Slightly coarser than GUI auto for CI; equal h for all three.
     const double h = 0.10 * extent;

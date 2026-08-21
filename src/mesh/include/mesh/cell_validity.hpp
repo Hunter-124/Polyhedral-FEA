@@ -174,11 +174,19 @@ inline double pyramid_volume_collapse(const Eigen::Vector3d& p0, const Eigen::Ve
                                       const Eigen::Vector3d& p4) {
     const std::array<Eigen::Vector3d, 5> p{{p0, p1, p2, p3, p4}};
     static constexpr std::array<std::array<int, 2>, 8> kEdges{{
-        {{0, 1}}, {{1, 2}}, {{2, 3}}, {{3, 0}}, {{0, 4}}, {{1, 4}}, {{2, 4}}, {{3, 4}},
+        {{0, 1}},
+        {{1, 2}},
+        {{2, 3}},
+        {{3, 0}},
+        {{0, 4}},
+        {{1, 4}},
+        {{2, 4}},
+        {{3, 4}},
     }};
     double edge_sum = 0.0;
     for (const auto& e : kEdges) {
-        edge_sum += (p[static_cast<std::size_t>(e[1])] - p[static_cast<std::size_t>(e[0])]).norm();
+        edge_sum +=
+            (p[static_cast<std::size_t>(e[1])] - p[static_cast<std::size_t>(e[0])]).norm();
     }
     const double mean_edge = edge_sum / static_cast<double>(kEdges.size());
     if (!(mean_edge > 0.0)) {
@@ -207,7 +215,8 @@ inline double pyramid_volume_collapse(const Eigen::Vector3d& p0, const Eigen::Ve
             const Eigen::Vector3d a =
                 p[static_cast<std::size_t>(f.v[static_cast<std::size_t>(k)])] - origin;
             const Eigen::Vector3d b =
-                p[static_cast<std::size_t>(f.v[static_cast<std::size_t>((k + 1) % f.n)])] - origin;
+                p[static_cast<std::size_t>(f.v[static_cast<std::size_t>((k + 1) % f.n)])] -
+                origin;
             volume += a.dot(b.cross(centroid)) / 6.0;
         }
     }
@@ -368,12 +377,26 @@ inline double hex8_shape_quality(const std::array<Eigen::Vector3d, 8>& x) {
     // Same topological edges and outward face-centroid fan used by
     // fea::cell_quality's volume_collapse_term.
     static constexpr std::array<std::array<int, 2>, 12> kEdges{{
-        {{0, 1}}, {{1, 2}}, {{2, 3}}, {{3, 0}}, {{4, 5}}, {{5, 6}},
-        {{6, 7}}, {{7, 4}}, {{0, 4}}, {{1, 5}}, {{2, 6}}, {{3, 7}},
+        {{0, 1}},
+        {{1, 2}},
+        {{2, 3}},
+        {{3, 0}},
+        {{4, 5}},
+        {{5, 6}},
+        {{6, 7}},
+        {{7, 4}},
+        {{0, 4}},
+        {{1, 5}},
+        {{2, 6}},
+        {{3, 7}},
     }};
     static constexpr std::array<std::array<int, 4>, 6> kFaces{{
-        {{0, 3, 2, 1}}, {{4, 5, 6, 7}}, {{0, 1, 5, 4}},
-        {{1, 2, 6, 5}}, {{2, 3, 7, 6}}, {{3, 0, 4, 7}},
+        {{0, 3, 2, 1}},
+        {{4, 5, 6, 7}},
+        {{0, 1, 5, 4}},
+        {{1, 2, 6, 5}},
+        {{2, 3, 7, 6}},
+        {{3, 0, 4, 7}},
     }};
     double edge_sum = 0.0;
     for (const auto& e : kEdges) {

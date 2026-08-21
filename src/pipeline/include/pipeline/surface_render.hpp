@@ -69,8 +69,7 @@ struct SurfaceRender {
 /// `mesh` supplies the per-node element type the palette keys on; it must be
 /// the mesh `surface` was tessellated from.
 SurfaceRender render_surface(const fea::NodalMesh& mesh,
-                             const fea::SurfaceTessellation& surface,
-                             const RenderView& view);
+                             const fea::SurfaceTessellation& surface, const RenderView& view);
 
 /// Angle between rendered facet normals and a reference surface normal, in
 /// degrees. Orientation-agnostic (|cos| is used), so a facet whose winding is
@@ -90,8 +89,8 @@ struct NormalDeviation {
 /// succeeded — the caller must then report a different reference rather than a
 /// zero deviation.
 NormalDeviation exact_facet_normal_deviation(const geom::CadModel& cad,
-                                            const fea::SurfaceTessellation& surface,
-                                            std::size_t max_samples = 2000);
+                                             const fea::SurfaceTessellation& surface,
+                                             std::size_t max_samples = 2000);
 
 /// Same measure against the tessellated `TriSurface` normal at the closest
 /// point: the honest fallback reference when no exact BRep normal exists.

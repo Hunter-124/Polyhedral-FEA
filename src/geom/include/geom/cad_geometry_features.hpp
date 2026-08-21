@@ -41,11 +41,11 @@ struct GeometryDescriptors {
     /// the OOD distance meaningless rather than merely inaccurate.
     bool available = false;
 
-    double curved_area_frac = 0.0;    ///< (cylinder + other) / total area
-    double cyl_area_frac = 0.0;       ///< cylindrical / total area
-    double plane_area_frac = 0.0;     ///< planar / total area
-    double other_area_frac = 0.0;     ///< sphere + cone + torus + freeform
-    double min_curv_radius_rel = 0.0; ///< smallest analytic radius / diagonal
+    double curved_area_frac = 0.0;     ///< (cylinder + other) / total area
+    double cyl_area_frac = 0.0;        ///< cylindrical / total area
+    double plane_area_frac = 0.0;      ///< planar / total area
+    double other_area_frac = 0.0;      ///< sphere + cone + torus + freeform
+    double min_curv_radius_rel = 0.0;  ///< smallest analytic radius / diagonal
     double log_curv_radius_mean = 0.0; ///< area-weighted mean of log10(r/diag)
     double log_curv_radius_std = 0.0;  ///< area-weighted sd of log10(r/diag)
     double n_faces = 0.0;

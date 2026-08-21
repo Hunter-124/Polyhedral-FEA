@@ -98,9 +98,9 @@ double from_log10(double value) {
 // order. `rel_err_rel` is `rel_err` centred on its per-case median and is
 // deliberately adjacent to it, so a future head insertion cannot separate the
 // pair without this list failing the load-time check.
-constexpr std::array<const char*, 9> kOutputNames{
-    "rel_err", "rel_err_rel", "geo_chamfer",   "geo_p99", "dof",
-    "mesh_ms", "solve_ms",    "failure_logit", "policy"};
+constexpr std::array<const char*, 9> kOutputNames{"rel_err",  "rel_err_rel",   "geo_chamfer",
+                                                  "geo_p99",  "dof",           "mesh_ms",
+                                                  "solve_ms", "failure_logit", "policy"};
 
 // The activation taps, in the order `scripts/advisor/export_onnx.py` appends
 // them AFTER the nine contract outputs. Appended, never interleaved: the
@@ -145,8 +145,7 @@ struct Advisor::Impl {
     Ort::Env env{ORT_LOGGING_LEVEL_WARNING, "polymesh_advisor"};
     Ort::SessionOptions options;
     std::unique_ptr<Ort::Session> session;
-    Ort::MemoryInfo memory =
-        Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeCPU);
+    Ort::MemoryInfo memory = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeCPU);
 
     std::vector<std::string> input_columns;
     std::vector<double> mean;
@@ -220,8 +219,9 @@ struct Advisor::Impl {
     /// Why not, when `activations_available` is false. Reported through the
     /// `explain()` error rather than swallowed, so a stale model directory says
     /// what to re-export instead of silently rendering nothing.
-    std::string activation_note = "advisor: this model directory was loaded without activation "
-                                  "taps";
+    std::string activation_note =
+        "advisor: this model directory was loaded without activation "
+        "taps";
     NetworkLayout layout;
 
     void load_normalization(const std::filesystem::path& dir);
@@ -240,8 +240,8 @@ struct Advisor::Impl {
     [[nodiscard]] double mahalanobis(const FeatureColumns& columns) const;
     [[nodiscard]] std::vector<float> encode(const FeatureColumns& columns) const;
     void apply_action(FeatureColumns& columns, const AdvisorDecision& action) const;
-    [[nodiscard]] std::vector<std::vector<float>> run(const std::vector<float>& row,
-                                                     const std::vector<const char*>& names) const;
+    [[nodiscard]] std::vector<std::vector<float>>
+    run(const std::vector<float>& row, const std::vector<const char*>& names) const;
     /// One forward pass on these columns. With `frame == nullptr` this is the
     /// production path, unchanged: nine requested outputs. With a frame, and
     /// only when the taps are available, the SAME `Run` also returns the trunk
@@ -330,9 +330,8 @@ void Advisor::Impl::load_clamps(const std::filesystem::path& dir) {
     default_decision.h_rel = h_rel.clamp(defaults.value("h_rel", h_rel.lo), default_clamped);
     default_decision.eta_target =
         eta_target.clamp(defaults.value("eta_target", eta_target.lo), default_clamped);
-    default_decision.adapt_passes = static_cast<int>(std::lround(
-        adapt_passes.clamp(static_cast<double>(defaults.value("adapt_passes", 0)),
-                           default_clamped)));
+    default_decision.adapt_passes = static_cast<int>(std::lround(adapt_passes.clamp(
+        static_cast<double>(defaults.value("adapt_passes", 0)), default_clamped)));
     if (default_clamped) {
         throw AdvisorError("advisor: clamps.json defaults fall outside the clamp box the same "
                            "file declares; re-export the model");
@@ -354,21 +353,21 @@ void Advisor::Impl::load_clamps(const std::filesystem::path& dir) {
                 candidate.mesher = entry.value("mesher", default_decision.mesher);
                 candidate.order = entry.value("order", default_decision.order);
                 bool clamped = false;
-                candidate.h_rel = h_rel.clamp(entry.value("h_rel", default_decision.h_rel),
-                                              clamped);
-                candidate.eta_target =
-                    eta_target.clamp(entry.value("eta_target", default_decision.eta_target),
-                                     clamped);
-                candidate.adapt_passes = static_cast<int>(std::lround(adapt_passes.clamp(
-                    static_cast<double>(entry.value("adapt_passes",
-                                                    default_decision.adapt_passes)),
-                    clamped)));
+                candidate.h_rel =
+                    h_rel.clamp(entry.value("h_rel", default_decision.h_rel), clamped);
+                candidate.eta_target = eta_target.clamp(
+                    entry.value("eta_target", default_decision.eta_target), clamped);
+                candidate.adapt_passes = static_cast<int>(std::lround(
+                    adapt_passes.clamp(static_cast<double>(entry.value(
+                                           "adapt_passes", default_decision.adapt_passes)),
+                                       clamped)));
                 if (clamped) {
-                    throw AdvisorError("advisor: clamps.json candidate_grid action leaves the "
-                                       "clamp box the same file declares; re-export the model");
+                    throw AdvisorError(
+                        "advisor: clamps.json candidate_grid action leaves the "
+                        "clamp box the same file declares; re-export the model");
                 }
-                if (std::find(mesher_choices.begin(), mesher_choices.end(), candidate.mesher) ==
-                    mesher_choices.end()) {
+                if (std::find(mesher_choices.begin(), mesher_choices.end(),
+                              candidate.mesher) == mesher_choices.end()) {
                     throw AdvisorError("advisor: clamps.json candidate_grid names mesher '" +
                                        candidate.mesher + "', absent from mesher_choices");
                 }
@@ -389,10 +388,11 @@ void Advisor::Impl::load_clamps(const std::filesystem::path& dir) {
     // member of its own sweep. An absent key is a misconfiguration, not a
     // default, and it fails here rather than degrading a recommendation.
     if (!clamps.contains("gate_threshold") || !clamps.at("gate_threshold").is_number()) {
-        throw AdvisorError("advisor: clamps.json is missing a numeric 'gate_threshold'. It is "
-                           "required and must not be inherited from 'veto_threshold': the gate "
-                           "filters candidates before ranking, the veto refuses the whole "
-                           "recommendation. Re-export with python scripts/advisor/export_onnx.py");
+        throw AdvisorError(
+            "advisor: clamps.json is missing a numeric 'gate_threshold'. It is "
+            "required and must not be inherited from 'veto_threshold': the gate "
+            "filters candidates before ranking, the veto refuses the whole "
+            "recommendation. Re-export with python scripts/advisor/export_onnx.py");
     }
     gate_threshold = clamps.at("gate_threshold").get<double>();
     if (!(gate_threshold > 0.0) || !(gate_threshold < 1.0)) {
@@ -466,13 +466,14 @@ void Advisor::Impl::load_ood(const std::filesystem::path& dir) {
         // fire on a corrupt or hand-edited artifact.
         if (!(value > 0.0) || !std::isfinite(value)) {
             throw AdvisorError("advisor: ood.json 'scale' holds a non-positive entry; the "
-                               "distance would be infinite." + std::string(remedy));
+                               "distance would be infinite." +
+                               std::string(remedy));
         }
     }
     if (!ood.contains("precision") || !ood.at("precision").is_array() ||
         ood.at("precision").size() != k) {
-        throw AdvisorError("advisor: ood.json 'precision' is not a " + std::to_string(k) + "x" +
-                           std::to_string(k) + " matrix." + remedy);
+        throw AdvisorError("advisor: ood.json 'precision' is not a " + std::to_string(k) +
+                           "x" + std::to_string(k) + " matrix." + remedy);
     }
     ood_precision.assign(k * k, 0.0);
     for (std::size_t i = 0; i < k; ++i) {
@@ -484,8 +485,9 @@ void Advisor::Impl::load_ood(const std::filesystem::path& dir) {
         for (std::size_t j = 0; j < k; ++j) {
             const double value = row[j].get<double>();
             if (!std::isfinite(value)) {
-                throw AdvisorError("advisor: ood.json 'precision' holds a non-finite entry at (" +
-                                   std::to_string(i) + ", " + std::to_string(j) + ")." + remedy);
+                throw AdvisorError(
+                    "advisor: ood.json 'precision' holds a non-finite entry at (" +
+                    std::to_string(i) + ", " + std::to_string(j) + ")." + remedy);
             }
             ood_precision[i * k + j] = value;
         }
@@ -509,8 +511,8 @@ void Advisor::Impl::load_ood(const std::filesystem::path& dir) {
     ood_threshold = ood.at("operating_point").at("threshold").get<double>();
     if (!(ood_threshold > 0.0) || !std::isfinite(ood_threshold)) {
         throw AdvisorError("advisor: ood.json operating_point.threshold " +
-                           std::to_string(ood_threshold) +
-                           " is not a positive distance." + remedy);
+                           std::to_string(ood_threshold) + " is not a positive distance." +
+                           remedy);
     }
 }
 
@@ -535,7 +537,8 @@ void Advisor::Impl::load_activation_layout(const std::filesystem::path& dir,
     layout = NetworkLayout{};
     activations_available = false;
     const std::string remedy =
-        ". Activations are unavailable; the advisor recommends normally without them. Re-export "
+        ". Activations are unavailable; the advisor recommends normally without them. "
+        "Re-export "
         "with python scripts/advisor/export_onnx.py to draw the network.";
     const std::filesystem::path path = dir / "activation_layout.json";
     if (!graph_has_taps) {
@@ -589,8 +592,9 @@ void Advisor::Impl::load_activation_layout(const std::filesystem::path& dir,
             NetworkLayer layer;
             layer.name = entry.value("name", std::string{});
             if (layer.name != kLayerNames[i]) {
-                throw AdvisorError("advisor: activation_layout.json layer " + std::to_string(i) +
-                                   " is '" + layer.name + "', expected '" + kLayerNames[i] + "'");
+                throw AdvisorError("advisor: activation_layout.json layer " +
+                                   std::to_string(i) + " is '" + layer.name + "', expected '" +
+                                   kLayerNames[i] + "'");
             }
             if (!entry.contains("size") || !entry.at("size").is_number_unsigned() ||
                 entry.at("size").get<std::size_t>() == 0) {
@@ -617,8 +621,10 @@ void Advisor::Impl::load_activation_layout(const std::filesystem::path& dir,
         if (parsed.layers[1].size != hidden || parsed.layers[2].size != hidden) {
             throw AdvisorError("advisor: activation_layout.json trunk layers are " +
                                std::to_string(parsed.layers[1].size) + "/" +
-                               std::to_string(parsed.layers[2].size) + " wide, not the declared "
-                               "hidden width " + std::to_string(hidden));
+                               std::to_string(parsed.layers[2].size) +
+                               " wide, not the declared "
+                               "hidden width " +
+                               std::to_string(hidden));
         }
 
         // Seven regressors plus the failure logit plus one policy dimension per
@@ -658,9 +664,10 @@ void Advisor::Impl::load_activation_layout(const std::filesystem::path& dir,
         // embedding blocks) must split evenly.
         const NetworkLayer& input_layer = parsed.layers[0];
         if (input_layer.labels.size() != input_layer.size) {
-            throw AdvisorError("advisor: activation_layout.json 'input' layer must label all " +
-                               std::to_string(input_layer.size) +
-                               " units; the labels are what attaches an edge to a column");
+            throw AdvisorError(
+                "advisor: activation_layout.json 'input' layer must label all " +
+                std::to_string(input_layer.size) +
+                " units; the labels are what attaches an edge to a column");
         }
         std::size_t named = 0;
         for (const std::string& label : input_layer.labels) {
@@ -722,9 +729,9 @@ void Advisor::Impl::load_activation_layout(const std::filesystem::path& dir,
             edges.from = entry.value("from", std::string{});
             edges.to = entry.value("to", std::string{});
             if (edges.from != kLayerNames[i] || edges.to != kLayerNames[i + 1]) {
-                throw AdvisorError("advisor: activation_layout.json edge " + std::to_string(i) +
-                                   " joins '" + edges.from + "' to '" + edges.to +
-                                   "', expected '" + kLayerNames[i] + "' to '" +
+                throw AdvisorError("advisor: activation_layout.json edge " +
+                                   std::to_string(i) + " joins '" + edges.from + "' to '" +
+                                   edges.to + "', expected '" + kLayerNames[i] + "' to '" +
                                    kLayerNames[i + 1] + "'");
             }
             if (!entry.contains("rows") || !entry.at("rows").is_number_unsigned() ||
@@ -734,7 +741,8 @@ void Advisor::Impl::load_activation_layout(const std::filesystem::path& dir,
             }
             edges.rows = entry.at("rows").get<std::size_t>();
             edges.cols = entry.at("cols").get<std::size_t>();
-            if (edges.rows != parsed.layers[i + 1].size || edges.cols != parsed.layers[i].size) {
+            if (edges.rows != parsed.layers[i + 1].size ||
+                edges.cols != parsed.layers[i].size) {
                 throw AdvisorError("advisor: activation_layout.json edge '" + edges.from +
                                    "' -> '" + edges.to + "' is " + std::to_string(edges.rows) +
                                    "x" + std::to_string(edges.cols) + ", expected " +
@@ -779,8 +787,9 @@ void Advisor::Impl::load_activation_layout(const std::filesystem::path& dir,
         // Anything nlohmann raises on a payload that parses but is not shaped
         // like the schema. Prefixed, because those messages name a JSON type
         // and nothing else, and a user needs to know which file to re-export.
-        activation_note = "advisor: activation_layout.json is malformed: " +
-                          std::string(error.what()) + remedy;
+        activation_note =
+            "advisor: activation_layout.json is malformed: " + std::string(error.what()) +
+            remedy;
         return;
     }
 
@@ -809,7 +818,8 @@ double Advisor::Impl::mahalanobis(const FeatureColumns& columns) const {
         const auto it = columns.find(ood_columns[i]);
         if (it == columns.end()) {
             throw AdvisorError("advisor: the out-of-distribution test needs feature column '" +
-                               ood_columns[i] + "', which the caller did not supply. Imputing it "
+                               ood_columns[i] +
+                               "', which the caller did not supply. Imputing it "
                                "would place an unknown part at the centre of the training "
                                "distribution and report it as familiar.");
         }
@@ -853,16 +863,16 @@ std::vector<float> Advisor::Impl::encode(const FeatureColumns& columns) const {
     return row;
 }
 
-void Advisor::Impl::apply_action(FeatureColumns& columns, const AdvisorDecision& action) const {
+void Advisor::Impl::apply_action(FeatureColumns& columns,
+                                 const AdvisorDecision& action) const {
     // An out-of-vocabulary category is encoded as `size()`, the reserved
     // unknown-embedding slot the trainer allocates (`n_order_slots =
     // len(order_choices) + 1`). Returning 0 would silently score the row as if
     // it had asked for the FIRST category, which is a valid, wrong answer.
     const auto index_of = [](const auto& choices, const auto& value) -> double {
         const auto it = std::find(choices.begin(), choices.end(), value);
-        return it == choices.end()
-                   ? static_cast<double>(choices.size())
-                   : static_cast<double>(std::distance(choices.begin(), it));
+        return it == choices.end() ? static_cast<double>(choices.size())
+                                   : static_cast<double>(std::distance(choices.begin(), it));
     };
     columns["h_rel"] = action.h_rel;
     columns["eta_target"] = action.eta_target;
@@ -965,11 +975,12 @@ FeatureColumns to_columns(const pipeline::CaseFeatures& f) {
     return columns;
 }
 
-std::vector<std::vector<float>> Advisor::Impl::run(
-    const std::vector<float>& row, const std::vector<const char*>& names) const {
+std::vector<std::vector<float>>
+Advisor::Impl::run(const std::vector<float>& row,
+                   const std::vector<const char*>& names) const {
     const std::array<std::int64_t, 2> shape{1, static_cast<std::int64_t>(row.size())};
-    Ort::Value input = Ort::Value::CreateTensor<float>(
-        memory, const_cast<float*>(row.data()), row.size(), shape.data(), shape.size());
+    Ort::Value input = Ort::Value::CreateTensor<float>(memory, const_cast<float*>(row.data()),
+                                                       row.size(), shape.data(), shape.size());
     const char* input_names[] = {input_name.c_str()};
     auto outputs = session->Run(Ort::RunOptions{nullptr}, input_names, &input, 1, names.data(),
                                 names.size());
@@ -1071,11 +1082,11 @@ Advisor::Advisor(const std::filesystem::path& model_dir) : impl_(std::make_uniqu
     const std::size_t n_out = impl_->session->GetOutputCount();
     const bool graph_has_taps = n_out == kOutputNames.size() + kActivationOutputNames.size();
     if (n_out != kOutputNames.size() && !graph_has_taps) {
-        throw AdvisorError("advisor: model.onnx has " + std::to_string(n_out) +
-                           " outputs, expected " + std::to_string(kOutputNames.size()) +
-                           " or " +
-                           std::to_string(kOutputNames.size() + kActivationOutputNames.size()) +
-                           " with the trunk activation taps appended");
+        throw AdvisorError(
+            "advisor: model.onnx has " + std::to_string(n_out) + " outputs, expected " +
+            std::to_string(kOutputNames.size()) + " or " +
+            std::to_string(kOutputNames.size() + kActivationOutputNames.size()) +
+            " with the trunk activation taps appended");
     }
     for (std::size_t i = 0; i < kOutputNames.size(); ++i) {
         const std::string name = impl_->session->GetOutputNameAllocated(i, allocator).get();
@@ -1088,7 +1099,8 @@ Advisor::Advisor(const std::filesystem::path& model_dir) : impl_(std::make_uniqu
     if (graph_has_taps) {
         for (std::size_t i = 0; i < kActivationOutputNames.size(); ++i) {
             const std::string name =
-                impl_->session->GetOutputNameAllocated(kOutputNames.size() + i, allocator).get();
+                impl_->session->GetOutputNameAllocated(kOutputNames.size() + i, allocator)
+                    .get();
             if (name != kActivationOutputNames[i]) {
                 throw AdvisorError("advisor: model.onnx output " +
                                    std::to_string(kOutputNames.size() + i) + " is '" + name +
@@ -1098,15 +1110,14 @@ Advisor::Advisor(const std::filesystem::path& model_dir) : impl_(std::make_uniqu
         }
         impl_->tap_output_name_ptrs = impl_->output_name_ptrs;
         impl_->tap_output_name_ptrs.insert(impl_->tap_output_name_ptrs.end(),
-                                          kActivationOutputNames.begin(),
-                                          kActivationOutputNames.end());
+                                           kActivationOutputNames.begin(),
+                                           kActivationOutputNames.end());
     }
 
     const auto in_shape =
         impl_->session->GetInputTypeInfo(0).GetTensorTypeAndShapeInfo().GetShape();
-    if (in_shape.size() != 2 ||
-        (in_shape[1] > 0 &&
-         static_cast<std::size_t>(in_shape[1]) != impl_->input_columns.size())) {
+    if (in_shape.size() != 2 || (in_shape[1] > 0 && static_cast<std::size_t>(in_shape[1]) !=
+                                                        impl_->input_columns.size())) {
         throw AdvisorError("advisor: model.onnx input width does not match "
                            "normalization.json input_columns");
     }
@@ -1119,9 +1130,7 @@ Advisor::~Advisor() = default;
 Advisor::Advisor(Advisor&&) noexcept = default;
 Advisor& Advisor::operator=(Advisor&&) noexcept = default;
 
-AdvisorDecision Advisor::defaults() const {
-    return impl_->default_decision;
-}
+AdvisorDecision Advisor::defaults() const { return impl_->default_decision; }
 
 void Advisor::apply_action(FeatureColumns& columns, const AdvisorDecision& action) const {
     impl_->apply_action(columns, action);
@@ -1131,13 +1140,9 @@ AdvisorRawOutputs Advisor::evaluate(const FeatureColumns& columns) const {
     return impl_->forward(columns, nullptr);
 }
 
-bool Advisor::has_activations() const {
-    return impl_->activations_available;
-}
+bool Advisor::has_activations() const { return impl_->activations_available; }
 
-const NetworkLayout& Advisor::layout() const {
-    return impl_->layout;
-}
+const NetworkLayout& Advisor::layout() const { return impl_->layout; }
 
 AdvisorDecision Advisor::recommend(const pipeline::CaseFeatures& features) const {
     return recommend(features, 0.0);
@@ -1439,7 +1444,8 @@ AdvisorDecision Advisor::decide(const FeatureColumns& columns, double max_dof,
     // OOD veto.
     if (!ood_assessable) {
         return refuse("out-of-distribution test unavailable, so no recommendation can be "
-                      "assessed; defaults used (" + ood_failure + ")");
+                      "assessed; defaults used (" +
+                      ood_failure + ")");
     }
 
     // Out of distribution refuses the QUESTION, not the answer: beyond the

@@ -35,9 +35,8 @@ namespace {
 /// fixed name would let one case observe another's leftovers.
 fs::path scratch_dir(const std::string& tag) {
     static std::atomic<int> counter{0};
-    const fs::path dir = fs::temp_directory_path() /
-                         ("polymesh_run_artifacts_" + tag + "_" +
-                          std::to_string(counter.fetch_add(1)));
+    const fs::path dir = fs::temp_directory_path() / ("polymesh_run_artifacts_" + tag + "_" +
+                                                      std::to_string(counter.fetch_add(1)));
     std::error_code ec;
     fs::remove_all(dir, ec);
     fs::create_directories(dir);
@@ -154,7 +153,10 @@ TEST_CASE("run_artifacts: write_run_json never throws and reports failure") {
         // fails, and the old code ignored its error_code and then threw from
         // the write that could not possibly succeed.
         const fs::path blocker = dir / "not_a_dir";
-        { std::ofstream out(blocker); out << "x"; }
+        {
+            std::ofstream out(blocker);
+            out << "x";
+        }
         bool ok = true;
         CHECK_NOTHROW(ok = write_run_json(blocker / "t0", row));
         CHECK_FALSE(ok);
@@ -176,13 +178,13 @@ TEST_CASE("run_artifacts: sharing violations are transient, real faults are not"
     // permission_denied is what Windows reports for ERROR_SHARING_VIOLATION (32)
     // and ERROR_ACCESS_DENIED (5), the codes a concurrent reader produces.
     CHECK(is_transient_rename_error(std::make_error_code(std::errc::permission_denied)));
-    CHECK(is_transient_rename_error(
-        std::make_error_code(std::errc::device_or_resource_busy)));
+    CHECK(is_transient_rename_error(std::make_error_code(std::errc::device_or_resource_busy)));
     CHECK(is_transient_rename_error(std::make_error_code(std::errc::no_lock_available)));
     // A missing path or a full disk is not going to fix itself; do not spend the
     // backoff on it.
     CHECK_FALSE(
         is_transient_rename_error(std::make_error_code(std::errc::no_such_file_or_directory)));
-    CHECK_FALSE(is_transient_rename_error(std::make_error_code(std::errc::no_space_on_device)));
+    CHECK_FALSE(
+        is_transient_rename_error(std::make_error_code(std::errc::no_space_on_device)));
     CHECK_FALSE(is_transient_rename_error(std::error_code{}));
 }

@@ -22,8 +22,8 @@
 
 #include "cinema.hpp"
 #include "colormap.hpp"
-#include "fea/boundary_faces.hpp"
 #include "fea/backend.hpp"
+#include "fea/boundary_faces.hpp"
 #include "fea/vtu.hpp"
 #include "pipeline/scene.hpp"
 #include "png_writer.hpp"
@@ -47,12 +47,11 @@
 
 #include <algorithm>
 #include <atomic>
-#include <cstdlib>
-#include <thread>
 #include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <ctime>
 #include <filesystem>
@@ -61,6 +60,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 namespace polymesh::gui {
@@ -88,7 +88,8 @@ struct App {
     SimSetup setup = [] {
         // Product defaults: graded tet + light adaptive loop (η-target stop).
         // Graded multi-level LEB: L0 bulk / L1 features / L2 high-κ. Thin parts
-        // skip free-surface flood when feature grading is on; curved solve geometry is default.
+        // skip free-surface flood when feature grading is on; curved solve geometry is
+        // default.
         SimSetup s;
         s.mesher = VolumeMesher::kGradedTet;
         s.adapt_passes = 2;
@@ -417,8 +418,8 @@ bool export_result_vtu(const App& app, const std::string& path, std::string& err
                 {.name = "ZZ_eta", .scalars = app.result->nodal_eta, .vectors = {}});
         }
         std::vector<fea::VtuCellData> cdata;
-        cdata.push_back({.name = "quality",
-                         .scalars = fea::tet4_cell_quality(app.result->volume_mesh)});
+        cdata.push_back(
+            {.name = "quality", .scalars = fea::tet4_cell_quality(app.result->volume_mesh)});
         fea::write_vtu(path, app.result->volume_mesh, pdata, cdata);
         return true;
     } catch (const std::exception& e) {
@@ -666,9 +667,10 @@ void tick_auto(AutoRunner& run, App& app, GLFWwindow* window) {
             app.job.on_mesh_stage = {};
             // Hand the viewport back to whatever the studio actually holds:
             // DisplayMode::kCinema means nothing outside the cinema layout.
-            app.mode = app.result ? DisplayMode::kResultsVonMises
-                                  : (app.viewport.has_mesh_preview() ? DisplayMode::kMeshPreview
-                                                                     : DisplayMode::kSetup);
+            app.mode = app.result
+                           ? DisplayMode::kResultsVonMises
+                           : (app.viewport.has_mesh_preview() ? DisplayMode::kMeshPreview
+                                                              : DisplayMode::kSetup);
         } else if (args.size() == 2 && args[0] == "advisor") {
             if (!app.model) {
                 return fail("cinema advisor with no model loaded");
@@ -792,8 +794,9 @@ void service_cinema_record(AutoRunner& run, App& app, GLFWwindow* window) {
         cinema_act_window(cine, act, t0, t1);
         const int f0 = std::min(cine.record_frames - 1,
                                 static_cast<int>(std::ceil(t0 / CinemaState::kRecordStep)));
-        const int f1 = std::min(cine.record_frames - 1,
-                                static_cast<int>(std::ceil(t1 / CinemaState::kRecordStep)) - 1);
+        const int f1 =
+            std::min(cine.record_frames - 1,
+                     static_cast<int>(std::ceil(t1 / CinemaState::kRecordStep)) - 1);
         std::printf("cinema: act %s frames %d..%d t %.4f..%.4f s\n", cinema_act_name(act), f0,
                     std::max(f0, f1), t0, t1);
     }
@@ -809,9 +812,9 @@ void service_cinema_record(AutoRunner& run, App& app, GLFWwindow* window) {
     glfwGetFramebufferSize(window, &fb_w, &fb_h);
     // The first frame at or after the opening fade is the first fully composed
     // one, which is the frame the render script publishes as the poster.
-    const int poster =
-        std::min(cine.record_frames - 1,
-                 static_cast<int>(std::ceil(cinema_opening_fade(cine) / CinemaState::kRecordStep)));
+    const int poster = std::min(
+        cine.record_frames - 1,
+        static_cast<int>(std::ceil(cinema_opening_fade(cine) / CinemaState::kRecordStep)));
     std::printf("cinema: record %s frames %d fps 60 candidates %zu stages %zu elements %zu "
                 "poster %d width %d height %d\n",
                 cine.record_dir.c_str(), cine.record_frames, candidates, cine.stages.size(),
@@ -835,12 +838,12 @@ bool load_ui_font() {
     ImGuiIO& io = ImGui::GetIO();
     // Static: ImGui keeps the pointer until the atlas is built.
     static const ImWchar kRanges[] = {
-        0x0020, 0x00FF,  // Latin + Latin-1 supplement (°, µ, ±)
-        0x0370, 0x03FF,  // Greek (σ, ν, Ω, θ)
-        0x2010, 0x203A,  // dashes, quotes, ·, —
-        0x2190, 0x21FF,  // arrows
-        0x2200, 0x22FF,  // maths operators (≈, ≤, ≥, ×, ∞)
-        0x2300, 0x2300,  // ⌀ diameter sign
+        0x0020, 0x00FF, // Latin + Latin-1 supplement (°, µ, ±)
+        0x0370, 0x03FF, // Greek (σ, ν, Ω, θ)
+        0x2010, 0x203A, // dashes, quotes, ·, —
+        0x2190, 0x21FF, // arrows
+        0x2200, 0x22FF, // maths operators (≈, ≤, ≥, ×, ∞)
+        0x2300, 0x2300, // ⌀ diameter sign
         0,
     };
     auto try_load = [&io](const char* path) {
@@ -849,8 +852,7 @@ bool load_ui_font() {
             !std::filesystem::is_regular_file(std::filesystem::path{path}, ec)) {
             return false;
         }
-        return io.Fonts->AddFontFromFileTTF(path, 16.0f, nullptr, kRanges) !=
-               nullptr;
+        return io.Fonts->AddFontFromFileTTF(path, 16.0f, nullptr, kRanges) != nullptr;
     };
     if (try_load(std::getenv("POLYMESH_GUI_FONT"))) {
         return true;
@@ -950,9 +952,9 @@ void set_window_icon(GLFWwindow* window) {
             const float d_out = hexagon_sdf(px, py, kOuter);
             const float d_in = hexagon_sdf(px, py, kInner);
             const float body = coverage(d_out);
-            const float ring = coverage(std::fabs(d_out) - 1.3f);        // accent stroke
+            const float ring = coverage(std::fabs(d_out) - 1.3f);          // accent stroke
             const float ring_in = coverage(std::fabs(d_in) - 0.9f) * body; // dim stroke
-            float r = 0.086f, g = 0.106f, b = 0.133f; // #161B22 cell body
+            float r = 0.086f, g = 0.106f, b = 0.133f;                      // #161B22 cell body
             float a = body * 0.92f;
             r = r * (1.0f - ring_in) + 0.165f * ring_in; // #2A6E96
             g = g * (1.0f - ring_in) + 0.431f * ring_in;
@@ -962,9 +964,10 @@ void set_window_icon(GLFWwindow* window) {
             g = g * (1.0f - ring) + 0.761f * ring;
             b = b * (1.0f - ring) + 1.000f * ring;
             a = std::max(a, ring);
-            const std::size_t i = (static_cast<std::size_t>(y) * static_cast<std::size_t>(kSize) +
-                                   static_cast<std::size_t>(x)) *
-                                  4u;
+            const std::size_t i =
+                (static_cast<std::size_t>(y) * static_cast<std::size_t>(kSize) +
+                 static_cast<std::size_t>(x)) *
+                4u;
             pixels[i + 0] = static_cast<unsigned char>(std::lround(r * 255.0f));
             pixels[i + 1] = static_cast<unsigned char>(std::lround(g * 255.0f));
             pixels[i + 2] = static_cast<unsigned char>(std::lround(b * 255.0f));
@@ -1028,9 +1031,9 @@ void draw_study_panel(App& app) {
         int m = static_cast<int>(app.setup.mesher);
         // Order matches VolumeMesher enum. Graded tet is the product default.
         static const char* kMeshers[] = {
-            "tet (grid)",   "hex (grid)",    "hex VEM (grid)", "graded tet (default)",
-            "hex+pyramid",  "prism (grid)",  "hybrid zoo",     "octa (exp)",
-            "hybrid VEM",   "Varyhedron",    "CVT poly (G4)",
+            "tet (grid)",  "hex (grid)",   "hex VEM (grid)", "graded tet (default)",
+            "hex+pyramid", "prism (grid)", "hybrid zoo",     "octa (exp)",
+            "hybrid VEM",  "Varyhedron",   "CVT poly (G4)",
         };
         if (iw::selector("mesher", &m, kMeshers, 11)) {
             app.setup.mesher = static_cast<VolumeMesher>(m);
@@ -1119,8 +1122,8 @@ void draw_study_panel(App& app) {
         const float list_h =
             std::clamp(18.0f * static_cast<float>(std::min(app.model->region_count, 8)) + 8.0f,
                        56.0f, 160.0f);
-        if (ImGui::BeginChild("##face_list", ImVec2(-FLT_MIN, list_h),
-                              ImGuiChildFlags_Borders, ImGuiWindowFlags_HorizontalScrollbar)) {
+        if (ImGui::BeginChild("##face_list", ImVec2(-FLT_MIN, list_h), ImGuiChildFlags_Borders,
+                              ImGuiWindowFlags_HorizontalScrollbar)) {
             for (int r = 0; r < app.model->region_count; ++r) {
                 const bool is_fix = app.setup.fixtures.contains(r);
                 const bool is_load = app.setup.loads.contains(r);
@@ -1181,7 +1184,8 @@ void draw_study_panel(App& app) {
     ImGui::TextColored(palette.sim_fixture, "fixtures: %zu", app.setup.fixtures.size());
     {
         const std::string loads_txt = std::format("loads: {}", app.setup.loads.size());
-        if (ImGui::GetContentRegionAvail().x > ImGui::CalcTextSize(loads_txt.c_str()).x + 18.0f) {
+        if (ImGui::GetContentRegionAvail().x >
+            ImGui::CalcTextSize(loads_txt.c_str()).x + 18.0f) {
             ImGui::SameLine(0, 18);
         }
     }
@@ -1206,9 +1210,8 @@ void draw_study_panel(App& app) {
             app.testlab.settings.max_threads = thr;
         }
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip(
-                "OpenMP thread cap for mesh/assemble/solve hot paths.\n"
-                "0 keeps the process default (OMP_NUM_THREADS / hardware).");
+            ImGui::SetTooltip("OpenMP thread cap for mesh/assemble/solve hot paths.\n"
+                              "0 keeps the process default (OMP_NUM_THREADS / hardware).");
         }
         double mem = app.testlab.settings.max_mem_gb;
         if (iw::input_double("max mem (GB, 0=auto)", &mem, "%.2f")) {
@@ -1216,17 +1219,15 @@ void draw_study_panel(App& app) {
         }
         app.setup.max_mem_gb = app.testlab.settings.max_mem_gb;
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip(
-                "Enforced before stiffness assembly/factorization.\n"
-                "0 uses 70%% of currently available system memory.");
+            ImGui::SetTooltip("Enforced before stiffness assembly/factorization.\n"
+                              "0 uses 70%% of currently available system memory.");
         }
 
         static fea::EffectiveMemoryBudget shown_budget;
         static double budget_refresh_time = -1.0e9;
         static double shown_user_cap = -1.0;
         const double now = ImGui::GetTime();
-        if (now - budget_refresh_time >= 1.0 ||
-            shown_user_cap != app.setup.max_mem_gb) {
+        if (now - budget_refresh_time >= 1.0 || shown_user_cap != app.setup.max_mem_gb) {
             shown_budget = fea::effective_memory_budget(app.setup.max_mem_gb);
             shown_user_cap = app.setup.max_mem_gb;
             budget_refresh_time = now;
@@ -1247,7 +1248,8 @@ void draw_study_panel(App& app) {
             static std::size_t cached_nodes = 0;
             static std::size_t cached_elements = 0;
             static fea::SolveResourceEstimate projected;
-            if (cached_mesh != projected_mesh || cached_nodes != projected_mesh->nodes.size() ||
+            if (cached_mesh != projected_mesh ||
+                cached_nodes != projected_mesh->nodes.size() ||
                 cached_elements != projected_mesh->elements.size()) {
                 const auto projected_free =
                     3 * static_cast<Eigen::Index>(projected_mesh->nodes.size());
@@ -1265,7 +1267,8 @@ void draw_study_panel(App& app) {
                 projected_decision.estimated_bytes > shown_budget.effective_cap_bytes;
             const char* method =
                 projected_decision.method == fea::SolveMethod::kDirect ? "LDLT" : "CG";
-            const auto footprint = fea::format_memory_bytes(projected_decision.estimated_bytes);
+            const auto footprint =
+                fea::format_memory_bytes(projected_decision.estimated_bytes);
             ImGui::TextColored(projected_over ? palette.status_warn : palette.text_dim,
                                "projected solve: %s (%s, conservative)", footprint.c_str(),
                                method);
@@ -1285,9 +1288,9 @@ void draw_study_panel(App& app) {
     // report() boundaries (mesh/solve can sit on one fraction for a long time).
     if (busy) {
         const auto prog = app.job.progress();
-        const char* phase =
-            prog.phase.empty() ? (state == SolveJob::State::kMeshing ? "mesh" : "solve")
-                               : prog.phase.c_str();
+        const char* phase = prog.phase.empty()
+                                ? (state == SolveJob::State::kMeshing ? "mesh" : "solve")
+                                : prog.phase.c_str();
         ImGui::TextColored(paused ? palette.accent : palette.status_warn, "phase: %s%s", phase,
                            paused ? " (paused)" : "");
         const float frac = static_cast<float>(std::clamp(prog.phase_frac, 0.0, 1.0));
@@ -1295,7 +1298,8 @@ void draw_study_panel(App& app) {
         float overall = frac;
         if (prog.pass_count > 0) {
             const float span = 1.0f / static_cast<float>(prog.pass_count + 1);
-            overall = std::clamp(static_cast<float>(prog.pass) * span + frac * span, 0.0f, 1.0f);
+            overall =
+                std::clamp(static_cast<float>(prog.pass) * span + frac * span, 0.0f, 1.0f);
         }
         // Soft pulse while a long phase holds a fixed fraction so the bar still
         // reads as "alive" (mesh/CG do not emit mid-phase progress yet).
@@ -1424,7 +1428,8 @@ void draw_study_panel(App& app) {
             launch_improve("grok");
         }
         ImGui::EndDisabled();
-        ImGui::TextColored(palette.text_dim, "runs a CAD diagnostics battery → LLM edits meshers");
+        ImGui::TextColored(palette.text_dim,
+                           "runs a CAD diagnostics battery → LLM edits meshers");
     }
     iw::end_group_box();
 
@@ -1460,8 +1465,7 @@ void draw_study_panel(App& app) {
                 std::max({100.0, app.deform_auto * 20.0, app.deform_scale * 2.0, 10.0});
             iw::slider_double("deformation scale", &app.deform_scale, 0.0, scale_max, "%.3gx");
             if (app.result->max_displacement > 0.0 && app.model) {
-                const double diag =
-                    (app.model->bbox_max - app.model->bbox_min).norm();
+                const double diag = (app.model->bbox_max - app.model->bbox_min).norm();
                 const double tip_frac =
                     (app.deform_scale * app.result->max_displacement) / std::max(diag, 1e-30);
                 ImGui::TextColored(palette.text_dim, "auto %.3gx → tip ~%.1f%% of model",
@@ -1619,10 +1623,9 @@ void draw_cinema_viewport(App& app) {
         return;
     }
     // Only the result act renders a scalar field, and it is always von Mises.
-    const float result_max =
-        (app.result && app.mode == DisplayMode::kResultsVonMises)
-            ? static_cast<float>(app.result->max_von_mises)
-            : 1.0f;
+    const float result_max = (app.result && app.mode == DisplayMode::kResultsVonMises)
+                                 ? static_cast<float>(app.result->max_von_mises)
+                                 : 1.0f;
     app.viewport.render(static_cast<int>(size.x), static_cast<int>(size.y), app.mode,
                         static_cast<float>(app.deform_scale), result_max, app.show_wireframe,
                         false);
@@ -1668,9 +1671,9 @@ void draw_cinema_frame(App& app) {
     // leftover is the viewport pane and the pane's height is what sets the
     // part's rendered size — a per-act strip resized the part at every act
     // boundary.
-    const float ticker_h = std::max(
-        ImGui::GetTextLineHeightWithSpacing() + 2.0f * kTickerPadY,
-        cinema_ticker_reserve(app.cinema, cue, hud, content_w - 2.0f * kTickerPadX));
+    const float ticker_h =
+        std::max(ImGui::GetTextLineHeightWithSpacing() + 2.0f * kTickerPadY,
+                 cinema_ticker_reserve(app.cinema, cue, hud, content_w - 2.0f * kTickerPadX));
     const float content_h = std::max(1.0f, std::floor(vp->Size.y) - ticker_h);
     // The network needs the taller share of the width once it is on screen: 96
     // nodes per trunk column, real head-unit names in the right gutter, and
@@ -1730,8 +1733,7 @@ void draw_cinema_frame(App& app) {
     ImGui::End();
     ImGui::PopStyleVar(2);
 
-    ImGui::SetNextWindowPos(
-        ImVec2(std::floor(vp->Pos.x), std::floor(vp->Pos.y) + content_h));
+    ImGui::SetNextWindowPos(ImVec2(std::floor(vp->Pos.x), std::floor(vp->Pos.y) + content_h));
     ImGui::SetNextWindowSize(ImVec2(content_w, ticker_h));
     ImGui::PushStyleColor(ImGuiCol_WindowBg, palette.status_bg);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(kTickerPadX, kTickerPadY));
@@ -1754,7 +1756,8 @@ void draw_column_splitter(const char* id, float row_h, float* width, float sign 
     }
     if (ImGui::IsItemHovered() || ImGui::IsItemActive()) {
         ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-        ImGui::GetWindowDrawList()->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(),
+        ImGui::GetWindowDrawList()->AddRectFilled(ImGui::GetItemRectMin(),
+                                                  ImGui::GetItemRectMax(),
                                                   ImGui::GetColorU32(palette.accent_mid));
     }
 }
@@ -1839,8 +1842,7 @@ void draw_frame(App& app) {
     constexpr float kSplitter = 6.0f;
     // Floor positions so subpixel seams never expose glClear window_bg.
     const float content_y = std::floor(vp->Pos.y + menu_height);
-    const float content_h =
-        std::floor(vp->Pos.y + vp->Size.y - status_h) - content_y;
+    const float content_h = std::floor(vp->Pos.y + vp->Size.y - status_h) - content_y;
     const float content_w = std::floor(vp->Size.x);
 
     // Clamp panel widths so the viewport keeps a usable center band.
@@ -1867,7 +1869,8 @@ void draw_frame(App& app) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
     ImGui::Begin("##workspace", nullptr,
-                 kPanelFlags | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+                 kPanelFlags | ImGuiWindowFlags_NoScrollbar |
+                     ImGuiWindowFlags_NoScrollWithMouse);
 
     const float row_h = ImGui::GetContentRegionAvail().y;
 
@@ -1885,8 +1888,8 @@ void draw_frame(App& app) {
 
     // Col 2: Sim Setup (existing study tools)
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 12.0f));
-    ImGui::BeginChild("study", ImVec2(gs.sim_width, row_h), ImGuiChildFlags_AlwaysUseWindowPadding,
-                      ImGuiWindowFlags_None);
+    ImGui::BeginChild("study", ImVec2(gs.sim_width, row_h),
+                      ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_None);
     draw_study_panel(app);
     ImGui::EndChild();
     ImGui::PopStyleVar();
@@ -1928,7 +1931,8 @@ void draw_frame(App& app) {
     ImGui::PushStyleColor(ImGuiCol_WindowBg, palette.status_bg);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10, 5));
     ImGui::Begin("##status", nullptr,
-                 kPanelFlags | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+                 kPanelFlags | ImGuiWindowFlags_NoScrollbar |
+                     ImGuiWindowFlags_NoScrollWithMouse);
     {
         // One shared table (pipeline::mesher_name) so the strip, the cinema
         // HUD, the CLI and testlab cannot drift into four spellings of the
@@ -1959,9 +1963,9 @@ void draw_frame(App& app) {
         info += std::format(" · testlab: {}", tl);
         info += app.dof_count > 0 ? std::format(" · DOF {}", app.dof_count)
                                   : std::string(" · drop .step/.brep");
-        const char* hint = app.dof_count > 0
-                               ? "lmb orbit · shift+lmb pan · wheel zoom · F12 screenshot"
-                               : "lmb pick/orbit · shift+lmb pan · wheel zoom · F12 screenshot";
+        const char* hint =
+            app.dof_count > 0 ? "lmb orbit · shift+lmb pan · wheel zoom · F12 screenshot"
+                              : "lmb pick/orbit · shift+lmb pan · wheel zoom · F12 screenshot";
 
         // Transient capture toast leads the line while it lives.
         if (app.shot_msg_ttl > 0.0f && !app.shot_msg.empty()) {
@@ -2029,9 +2033,8 @@ int run(int argc, char** argv) {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    GLFWwindow* window = glfwCreateWindow(window_w, window_h,
-                                          "PolyMesh Studio — Adaptive Polyhedral FEA", nullptr,
-                                          nullptr);
+    GLFWwindow* window = glfwCreateWindow(
+        window_w, window_h, "PolyMesh Studio — Adaptive Polyhedral FEA", nullptr, nullptr);
     if (!window) {
         glfwTerminate();
         return 1;
@@ -2129,8 +2132,8 @@ int run(int argc, char** argv) {
             // this run is cancelled.
             const auto live_state = app.job.state();
             if (live_state == SolveJob::State::kMeshing ||
-                live_state == SolveJob::State::kSolving ||
-                app.mode == DisplayMode::kSetup || app.mode == DisplayMode::kMeshPreview) {
+                live_state == SolveJob::State::kSolving || app.mode == DisplayMode::kSetup ||
+                app.mode == DisplayMode::kMeshPreview) {
                 app.mode = DisplayMode::kMeshPreview;
             }
             // Frame the first mesh of a run only: later adapt passes remesh the
@@ -2203,8 +2206,7 @@ int run(int argc, char** argv) {
             // Auto-exaggeration: map max |u| to ~12% of model diagonal so the
             // deformed shape is visible without cranking a tiny true-scale slider.
             if (app.model && app.result->max_displacement > 1e-30) {
-                const double diag =
-                    (app.model->bbox_max - app.model->bbox_min).norm();
+                const double diag = (app.model->bbox_max - app.model->bbox_min).norm();
                 app.deform_auto = (0.12 * diag) / app.result->max_displacement;
                 app.deform_auto = std::clamp(app.deform_auto, 1.0, 1e9);
             } else {

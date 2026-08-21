@@ -40,12 +40,16 @@ inline std::array<float, 3> signed_colormap(float t) {
     // ColorBrewer RdBu, 11 classes, reversed so negative = blue. Written as the
     // original 8-bit values over 255 to keep them checkable against the source.
     static constexpr std::array<std::array<float, 3>, 11> kRdBuReversed = {{
-        {5.0f / 255, 48.0f / 255, 97.0f / 255},    {33.0f / 255, 102.0f / 255, 172.0f / 255},
-        {67.0f / 255, 147.0f / 255, 195.0f / 255}, {146.0f / 255, 197.0f / 255, 222.0f / 255},
+        {5.0f / 255, 48.0f / 255, 97.0f / 255},
+        {33.0f / 255, 102.0f / 255, 172.0f / 255},
+        {67.0f / 255, 147.0f / 255, 195.0f / 255},
+        {146.0f / 255, 197.0f / 255, 222.0f / 255},
         {209.0f / 255, 229.0f / 255, 240.0f / 255},
         {247.0f / 255, 247.0f / 255, 247.0f / 255},
-        {253.0f / 255, 219.0f / 255, 199.0f / 255}, {244.0f / 255, 165.0f / 255, 130.0f / 255},
-        {214.0f / 255, 96.0f / 255, 77.0f / 255},  {178.0f / 255, 24.0f / 255, 43.0f / 255},
+        {253.0f / 255, 219.0f / 255, 199.0f / 255},
+        {244.0f / 255, 165.0f / 255, 130.0f / 255},
+        {214.0f / 255, 96.0f / 255, 77.0f / 255},
+        {178.0f / 255, 24.0f / 255, 43.0f / 255},
         {103.0f / 255, 0.0f / 255, 31.0f / 255},
     }};
     constexpr int last = static_cast<int>(kRdBuReversed.size()) - 1;

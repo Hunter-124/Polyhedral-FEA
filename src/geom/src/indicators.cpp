@@ -5,12 +5,12 @@
 
 #include <algorithm>
 #include <array>
-#include <cstdint>
-#include <vector>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <map>
 #include <utility>
+#include <vector>
 
 namespace polymesh::geom {
 namespace {
@@ -288,7 +288,8 @@ VertexThickness estimate_local_thickness(const TriSurface& surface, double eps_s
 
             double best_t = std::numeric_limits<double>::infinity();
             for (;;) {
-                for (const std::uint32_t t : grid.cells[grid.flat(cell[0], cell[1], cell[2])]) {
+                for (const std::uint32_t t :
+                     grid.cells[grid.flat(cell[0], cell[1], cell[2])]) {
                     if (seen[t] == stamp) {
                         continue;
                     }
@@ -303,9 +304,8 @@ VertexThickness estimate_local_thickness(const TriSurface& surface, double eps_s
                         best_t = std::min(best_t, hit_t);
                     }
                 }
-                const int axis = (t_next[0] < t_next[1])
-                                     ? (t_next[0] < t_next[2] ? 0 : 2)
-                                     : (t_next[1] < t_next[2] ? 1 : 2);
+                const int axis = (t_next[0] < t_next[1]) ? (t_next[0] < t_next[2] ? 0 : 2)
+                                                         : (t_next[1] < t_next[2] ? 1 : 2);
                 const double exit_t = t_next[axis];
                 if (best_t <= exit_t) {
                     break; // nearest hit lies within visited cells

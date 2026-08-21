@@ -19,8 +19,8 @@ polymesh::pipeline::Model make_box(double scale) {
     const double ly = 2.0 * scale;
     const double lz = 0.5 * scale;
     model.surface.vertices = {
-        {0, 0, 0},   {lx, 0, 0},   {lx, ly, 0},   {0, ly, 0},
-        {0, 0, lz},  {lx, 0, lz},  {lx, ly, lz},  {0, ly, lz},
+        {0, 0, 0},  {lx, 0, 0},  {lx, ly, 0},  {0, ly, 0},
+        {0, 0, lz}, {lx, 0, lz}, {lx, ly, lz}, {0, ly, lz},
     };
     model.surface.triangles = {
         {0, 2, 1}, {0, 3, 2}, {4, 5, 6}, {4, 6, 7}, {0, 1, 5}, {0, 5, 4},
@@ -59,12 +59,14 @@ std::array<double, 22> doubles(const polymesh::pipeline::CaseFeatures& f) {
 
 std::vector<polymesh::pipeline::RefineRegion> fix_regions(double scale) {
     return {{{-0.01 * scale, -0.01 * scale, -0.01 * scale},
-             {0.01 * scale, 2.01 * scale, 0.51 * scale}, 0.5}};
+             {0.01 * scale, 2.01 * scale, 0.51 * scale},
+             0.5}};
 }
 
 std::vector<polymesh::pipeline::RefineRegion> load_regions(double scale) {
     return {{{0.99 * scale, -0.01 * scale, -0.01 * scale},
-             {1.01 * scale, 2.01 * scale, 0.51 * scale}, 0.25}};
+             {1.01 * scale, 2.01 * scale, 0.51 * scale},
+             0.25}};
 }
 
 } // namespace
@@ -108,8 +110,8 @@ TEST_CASE("case features keep invalid and empty regions finite", "[features]") {
         {{nan, 0, 0}, {nan, 1, 1}, 0.5},
     };
     const std::vector<polymesh::pipeline::RefineRegion> empty;
-    const auto f = polymesh::pipeline::extract_case_features(
-        model, invalid, empty, {nan, nan, nan}, nan);
+    const auto f =
+        polymesh::pipeline::extract_case_features(model, invalid, empty, {nan, nan, nan}, nan);
 
     for (const double value : doubles(f)) {
         REQUIRE(std::isfinite(value));

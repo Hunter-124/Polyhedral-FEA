@@ -34,19 +34,23 @@ constexpr std::array<std::array<int, 2>, 12> kHexEdges{{{{0, 1}},
                                                         {{1, 5}},
                                                         {{2, 6}},
                                                         {{3, 7}}}};
-constexpr std::array<std::array<int, 2>, 9> kPrismEdges{
-    {{{0, 1}}, {{1, 2}}, {{2, 0}}, {{3, 4}}, {{4, 5}}, {{5, 3}}, {{0, 3}}, {{1, 4}}, {{2, 5}}}};
+constexpr std::array<std::array<int, 2>, 9> kPrismEdges{{{{0, 1}},
+                                                         {{1, 2}},
+                                                         {{2, 0}},
+                                                         {{3, 4}},
+                                                         {{4, 5}},
+                                                         {{5, 3}},
+                                                         {{0, 3}},
+                                                         {{1, 4}},
+                                                         {{2, 5}}}};
 constexpr std::array<std::array<int, 2>, 8> kPyramidEdges{
     {{{0, 1}}, {{1, 2}}, {{2, 3}}, {{3, 0}}, {{0, 4}}, {{1, 4}}, {{2, 4}}, {{3, 4}}}};
 
-Edge canonical_edge(std::uint32_t a, std::uint32_t b) {
-    return std::minmax(a, b);
-}
+Edge canonical_edge(std::uint32_t a, std::uint32_t b) { return std::minmax(a, b); }
 
 template <std::size_t N, typename Fn>
 void visit_fixed_edges(const NodalElement& element,
-                       const std::array<std::array<int, 2>, N>& edges, int n_corner,
-                       Fn&& fn) {
+                       const std::array<std::array<int, 2>, N>& edges, int n_corner, Fn&& fn) {
     if (element.nodes.size() < static_cast<std::size_t>(n_corner)) {
         throw FeaError("p_elevate: element node count invalid");
     }
@@ -56,8 +60,7 @@ void visit_fixed_edges(const NodalElement& element,
     }
 }
 
-template <typename Fn>
-void visit_corner_edges(const NodalElement& element, Fn&& fn) {
+template <typename Fn> void visit_corner_edges(const NodalElement& element, Fn&& fn) {
     switch (element.type) {
     case ElementType::kTet4:
     case ElementType::kTet10:
@@ -96,19 +99,19 @@ bool quadratic(ElementType type) {
     return type == ElementType::kTet10 || type == ElementType::kHex20;
 }
 
-void seed_existing_midpoints(const NodalElement& element, std::map<Edge, std::uint32_t>& mids) {
+void seed_existing_midpoints(const NodalElement& element,
+                             std::map<Edge, std::uint32_t>& mids) {
     const auto seed = [&](const auto& edges, std::size_t n_corner) {
         for (std::size_t i = 0; i < edges.size(); ++i) {
             const auto& edge = edges[i];
-            const auto key = canonical_edge(
-                element.nodes[static_cast<std::size_t>(edge[0])],
-                element.nodes[static_cast<std::size_t>(edge[1])]);
+            const auto key = canonical_edge(element.nodes[static_cast<std::size_t>(edge[0])],
+                                            element.nodes[static_cast<std::size_t>(edge[1])]);
             const auto mid = element.nodes[n_corner + i];
             const auto [it, inserted] = mids.try_emplace(key, mid);
             if (!inserted && it->second != mid) {
                 throw FeaError(std::format(
-                    "p_elevate: quadratic edge ({},{}) has inconsistent midside nodes", key.first,
-                    key.second));
+                    "p_elevate: quadratic edge ({},{}) has inconsistent midside nodes",
+                    key.first, key.second));
             }
         }
     };
@@ -165,10 +168,9 @@ bool promotion_stays_valid(const NodalMesh& mesh, const NodalElement& element,
         const auto a = element.nodes[static_cast<std::size_t>(edge[0])];
         const auto b = element.nodes[static_cast<std::size_t>(edge[1])];
         const auto existing = midpoints.find(canonical_edge(a, b));
-        const Eigen::Vector3d position =
-            existing == midpoints.end()
-                ? 0.5 * (mesh.nodes[a] + mesh.nodes[b])
-                : mesh.nodes.at(existing->second);
+        const Eigen::Vector3d position = existing == midpoints.end()
+                                             ? 0.5 * (mesh.nodes[a] + mesh.nodes[b])
+                                             : mesh.nodes.at(existing->second);
         coordinates.row(static_cast<Eigen::Index>(n_corner + edge_index)) =
             position.transpose();
     }
@@ -188,12 +190,12 @@ bool promotion_stays_valid(const NodalMesh& mesh, const NodalElement& element,
 bool promotion_stays_valid(const NodalMesh& mesh, const NodalElement& element,
                            const std::map<Edge, std::uint32_t>& midpoints) {
     if (element.type == ElementType::kTet4) {
-        return promotion_stays_valid(mesh, element, kTetEdges, 4,
-                                     ElementType::kTet10, midpoints);
+        return promotion_stays_valid(mesh, element, kTetEdges, 4, ElementType::kTet10,
+                                     midpoints);
     }
     if (element.type == ElementType::kHex8) {
-        return promotion_stays_valid(mesh, element, kHexEdges, 8,
-                                     ElementType::kHex20, midpoints);
+        return promotion_stays_valid(mesh, element, kHexEdges, 8, ElementType::kHex20,
+                                     midpoints);
     }
     return false;
 }
@@ -231,8 +233,7 @@ PElevateResult p_elevate_impl(const NodalMesh& mesh, const std::vector<bool>& el
         const bool final_quadratic =
             quadratic(element.type) || (accepted[e] && promotable(element.type));
         visit_corner_edges(element, [&](const Edge& edge) {
-            incidence[edge].has_linear =
-                incidence[edge].has_linear || !final_quadratic;
+            incidence[edge].has_linear = incidence[edge].has_linear || !final_quadratic;
         });
     }
 
@@ -286,8 +287,7 @@ PElevateResult p_elevate_impl(const NodalMesh& mesh, const std::vector<bool>& el
         for (std::uint32_t axis = 0; axis < 3; ++axis) {
             result.constraints.add(LinearConstraint{
                 .slave_dof = 3u * mid + axis,
-                .masters = {{3u * edge.first + axis, 0.5},
-                            {3u * edge.second + axis, 0.5}}});
+                .masters = {{3u * edge.first + axis, 0.5}, {3u * edge.second + axis, 0.5}}});
         }
         ++result.n_constrained_midside;
     }
@@ -301,8 +301,8 @@ NodalMesh promote_to_quadratic(const NodalMesh& mesh) {
     return p_elevate_impl(mesh, all).mesh;
 }
 
-PElevateResult p_elevate_with_constraints(
-    const NodalMesh& mesh, std::span<const std::size_t> elevate_indices) {
+PElevateResult p_elevate_with_constraints(const NodalMesh& mesh,
+                                          std::span<const std::size_t> elevate_indices) {
     std::vector<bool> mask(mesh.elements.size(), false);
     for (const auto idx : elevate_indices) {
         if (idx >= mesh.elements.size()) {
@@ -318,7 +318,7 @@ NodalMesh p_elevate(const NodalMesh& mesh, std::span<const std::size_t> elevate_
 }
 
 PElevateResult p_elevate_with_constraints(const NodalMesh& mesh,
-                                           std::span<const bool> elevate_mask) {
+                                          std::span<const bool> elevate_mask) {
     if (elevate_mask.size() != mesh.elements.size()) {
         throw FeaError("p_elevate: elevate mask size mismatch");
     }

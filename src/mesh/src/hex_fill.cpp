@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
-#include "mesh/cell_validity.hpp"
 #include "mesh/hex_fill.hpp"
+#include "mesh/cell_validity.hpp"
 
 #include "mesh/grid_classify.hpp"
 #include "mesh/poly_mesh.hpp"
@@ -138,8 +138,18 @@ HexFillOutput hex_fill_surface(const geom::TriSurface& surface,
         std::vector<std::vector<std::uint32_t>> nbrs(out.nodes.size());
         {
             static constexpr std::array<std::array<int, 2>, 12> kHexEdges{{
-                {{0, 1}}, {{1, 2}}, {{2, 3}}, {{3, 0}}, {{4, 5}}, {{5, 6}},
-                {{6, 7}}, {{7, 4}}, {{0, 4}}, {{1, 5}}, {{2, 6}}, {{3, 7}},
+                {{0, 1}},
+                {{1, 2}},
+                {{2, 3}},
+                {{3, 0}},
+                {{4, 5}},
+                {{5, 6}},
+                {{6, 7}},
+                {{7, 4}},
+                {{0, 4}},
+                {{1, 5}},
+                {{2, 6}},
+                {{3, 7}},
             }};
             std::set<std::pair<std::uint32_t, std::uint32_t>> seen;
             for (const auto& hx : out.hexes) {
@@ -273,8 +283,9 @@ HexFillOutput hex_fill_surface(const geom::TriSurface& surface,
                                     node_offends, provenance);
             out.boundary_max_distance = 0.0;
             for (const auto ni : bnodes) {
-                out.boundary_max_distance = std::max(
-                    out.boundary_max_distance, closest_on_surface(surface, out.nodes[ni]).distance);
+                out.boundary_max_distance =
+                    std::max(out.boundary_max_distance,
+                             closest_on_surface(surface, out.nodes[ni]).distance);
             }
         }
     }

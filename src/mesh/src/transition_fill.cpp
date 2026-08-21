@@ -214,8 +214,7 @@ TransitionFillOutput transition_fill_surface(const geom::TriSurface& surface,
             surface, out.nodes, bnodes, h_cell,
             [&](std::set<std::uint32_t>& offenders) {
                 for (const auto& cell : out.cells) {
-                    if (!cell_inverted(cell, out.nodes, vol_eps,
-                                       validity::kCellShapeFloor)) {
+                    if (!cell_inverted(cell, out.nodes, vol_eps, validity::kCellShapeFloor)) {
                         continue;
                     }
                     for (std::uint8_t i = 0; i < cell.n_nodes; ++i) {

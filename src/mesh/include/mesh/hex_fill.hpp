@@ -20,7 +20,7 @@ struct HexFillOutput {
     std::vector<Eigen::Vector3d> nodes; // metres
     std::vector<std::array<std::uint32_t, 8>> hexes;
     std::vector<std::array<std::uint32_t, 4>> boundary_quads;
-    double h = 0.0; // grid spacing used, metres
+    double h = 0.0;                     // grid spacing used, metres
     double boundary_max_distance = 0.0; // metres; set when snap runs
 };
 

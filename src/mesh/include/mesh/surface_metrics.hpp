@@ -21,7 +21,7 @@ namespace polymesh::mesh {
 struct CircularFeature {
     Eigen::Vector3d axis_point = Eigen::Vector3d::Zero();
     Eigen::Vector3d axis_dir = Eigen::Vector3d::UnitZ(); // unit preferred
-    double radius = 0.0;                                // metres
+    double radius = 0.0;                                 // metres
     /// Nodes within this radial band of the feature are scored (metres).
     double select_band = 0.0;
 };

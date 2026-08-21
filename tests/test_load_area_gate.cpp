@@ -36,7 +36,7 @@ TEST_CASE("load area: an unverifiable area is never reported as zero error") {
     // be established, so there must be no number at all.
     const auto none = assess_load_area(std::nullopt, std::nullopt, 1.0e-4);
     CHECK(none.status == LoadAreaStatus::kUnverified);
-    CHECK_FALSE(none.rel_err.has_value());          // NOT 0.0
+    CHECK_FALSE(none.rel_err.has_value()); // NOT 0.0
     CHECK(load_area_status_name(none.status) == "unverified");
 
     // Degenerate areas are equally unverifiable, not perfect matches.
@@ -79,8 +79,8 @@ TEST_CASE("load area: a rescaled run reports its deficit and stays healthy") {
     CHECK(deficient.status == LoadAreaStatus::kRescaledToExactCad);
     REQUIRE(deficient.rel_err.has_value());
     CHECK_THAT(*deficient.rel_err, Catch::Matchers::WithinAbs(0.4493, 1e-3));
-    CHECK(*deficient.rel_err > kLoadAreaTol);   // a real 45% gap, reported
-    CHECK(deficient.ok);                        // and NOT a health failure
+    CHECK(*deficient.rel_err > kLoadAreaTol); // a real 45% gap, reported
+    CHECK(deficient.ok);                      // and NOT a health failure
     CHECK(load_area_status_name(deficient.status) == "rescaled_to_exact_cad");
 
     // The worst measured case (66% on a spherical boss) is still not a failure.
@@ -129,7 +129,7 @@ TEST_CASE("load area: an authored area with nothing to rescale onto still gates"
     CHECK(bad.status == LoadAreaStatus::kVerified);
     REQUIRE(bad.rel_err.has_value());
     CHECK_THAT(*bad.rel_err, Catch::Matchers::WithinAbs(0.28, 1e-12));
-    CHECK_FALSE(bad.ok);                        // the gate still fails here
+    CHECK_FALSE(bad.ok); // the gate still fails here
     CHECK(*bad.rel_err > kLoadAreaTol);
 
     // Boundary: at the tolerance it passes, just beyond it fails.
@@ -167,11 +167,10 @@ TEST_CASE("load area: authored expected_area drift from the CAD cannot pass sile
 
     // Not run is NOT agreement: `checked` false and rel_diff EMPTY, so a missing
     // authored value can never be counted as a passing cross-check.
-    for (const auto& out : {check_authored_area(std::nullopt, cad),
-                            check_authored_area(cad, std::nullopt),
-                            check_authored_area(std::nullopt, std::nullopt),
-                            check_authored_area(0.0, cad),
-                            check_authored_area(cad, 0.0)}) {
+    for (const auto& out :
+         {check_authored_area(std::nullopt, cad), check_authored_area(cad, std::nullopt),
+          check_authored_area(std::nullopt, std::nullopt), check_authored_area(0.0, cad),
+          check_authored_area(cad, 0.0)}) {
         CHECK_FALSE(out.checked);
         CHECK_FALSE(out.rel_diff.has_value());
     }
@@ -188,8 +187,8 @@ TEST_CASE("load area: both sides agree on the region for a normal_min_dot = -1 c
     // traction 2.3x onto a region the case never asked for. One predicate now
     // serves both sides, so a wall-like normal MUST be kept for a -1 case.
     const Eigen::Vector3d traction(1.0e6, 0.0, 0.0);
-    const Eigen::Vector3d cap_normal(1.0, 0.0, 0.0);       // end cap, aligned
-    const Eigen::Vector3d wall_normal(0.0, 1.0, 0.0);      // lateral wall, perpendicular
+    const Eigen::Vector3d cap_normal(1.0, 0.0, 0.0);  // end cap, aligned
+    const Eigen::Vector3d wall_normal(0.0, 1.0, 0.0); // lateral wall, perpendicular
     const Eigen::Vector3d oblique = Eigen::Vector3d(1.0, 1.0, 0.0).normalized();
 
     CHECK_FALSE(load_rule_filters(-1.0, traction));

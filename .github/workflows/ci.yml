@@ -49,9 +49,25 @@ jobs:
             libocct-visualization-dev
 
       - name: Configure
+        # RelWithDebInfo, not Debug. This suite is dominated by the mesher and
+        # solver, and unoptimised they are not slow but impractical: measured in
+        # a local Debug build at --parallel 4, `brep_fidelity: graded
+        # authoritative curvature stays stiffness-valid` takes 1609 s, `sharp
+        # BRep edges are reproduced by mesh feature segments` 1377 s, `boundary
+        # nodes land on the exact BRep for every CAD mesher` 1298 s and the
+        # graded plate-hole BRep test 761 s -- on a box faster than a runner.
+        # The whole 451-test suite is 272 s optimised. A Debug run of it reached
+        # GitHub's 6 h ceiling on 2026-08-19 and was killed with no result, which
+        # is a gate that reports nothing rather than a strict one.
+        #
+        # Nothing is given up by optimising: the product path carries no
+        # `assert()`, so -DNDEBUG removes no check, the validity gates are real
+        # code that throws either way, and -O2 raises strictly more -W warnings
+        # than -O0 for the -Werror build below. Debug info is kept so a failing
+        # test still symbolises.
         run: |
           cmake -S . -B build -G Ninja \
-            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
             -DPOLYMESH_WITH_GUI=ON \
             -DPOLYMESH_WITH_OCC=ON \
             -DPOLYMESH_WITH_CUDA=OFF
@@ -62,23 +78,16 @@ jobs:
       - name: Test
         # Working directory for discovered tests is the repo root (bench/reference).
         #
-        # A Debug build runs this suite unoptimised, and a handful of tests
-        # dominate it. Measured in a local Debug build on a 7600X3D at
-        # --parallel 4: `graded plate-hole mesh resolves exact BRep surfaces and
-        # protected rims` passes in 761 s, and the hierarchical MMS convergence
-        # test takes 506 s. `--parallel 2` on a 4-vCPU runner left half the
-        # machine idle and put the job past 40 minutes; an earlier run reached
-        # GitHub's 6 h ceiling and was killed with no result at all.
-        #
-        # So: use the cores the runner has, and bound each test well above the
-        # measured worst case rather than near it. A runner core is slower than
-        # the box those numbers came from, and a timeout tuned to 900 s would
-        # fail the 761 s test for being slow rather than wrong -- the exact
-        # mistake the poll budgets in test_gui_pipeline made. 2700 s still turns
-        # a genuine hang into a failure inside the hour instead of burning six.
+        # `--parallel 2` on a 4-vCPU runner left half the machine idle. Use the
+        # cores the runner has, and bound each test well above its measured cost
+        # rather than near it: the whole optimised suite is 272 s locally and the
+        # slowest single test well under a minute, so 900 s is a hang, not a slow
+        # test. Tuning a limit down to just above a measurement is how the poll
+        # budgets in test_gui_pipeline came to fail a working mesher for being
+        # slow rather than wrong.
         run: |
           ctest --test-dir build --output-on-failure \
-            --parallel "$(nproc)" --timeout 2700
+            --parallel "$(nproc)" --timeout 900
 
   # Cross-standard-library determinism. The mesher once produced a different mesh
   # under MSVC than under gcc (5 of 24 corpus pairs, 2026-08-14) because several

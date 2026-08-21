@@ -332,6 +332,33 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-08-21: **GLM evaluated as a math library and rejected
+  ([ADR-0044](decisions/0044-glm-cannot-be-the-math-library.md),
+  [`bench/mathlib/`](../bench/mathlib/README.md))** — the question was whether
+  GLM could replace Eigen, or sit beside it as a second implementation to
+  compare against. It can do neither, on two independent grounds. **Scope:** GLM
+  is declared only for sizes 1–4, so it has no type for a runtime-sized element
+  matrix, no sparse matrix, no solver, and no SVD/QR/LU or general eigensolver;
+  timing `element_stiffness`'s quadrature body with and without its `B^T D B`
+  product puts 91.5% of the hot loop outside anything GLM can express (574.430
+  of 627.904 ns/op). Eigen is also in 355 public-header signatures across five
+  PUBLIC-linked libraries, so a geometry-only port would add a conversion
+  boundary at every mesh/FEA interface. **Numerics:** GLM's one non-trivial
+  offer, `findEigenvaluesSymReal`, hardcodes a 1e-7 convergence epsilon for
+  every scalar type including `double`; scored against a known spectrum it
+  returns eigenvalues ~100% wrong (9.97e-01 relative, 6000/6000) **while
+  reporting success** on tensors below that magnitude — the exact class
+  `metric_field.cpp:92` builds when it eigensolves the difference of two nearly
+  equal metrics. **Where GLM can compete it is a wash** (0.61×–1.39×, no
+  consistent winner). **Spin-off finding, open:** the one large margin (K4 face
+  normal, 0.23×) is not GLM being fast but Eigen 3.5.0's vectorized
+  `Vector3d::cross` being 5.5× a hand-written scalar control — 12.9 ns/op as
+  written, 1.59 with `EIGEN_DONT_VECTORIZE`, 15.1 with `-march=x86-64-v3`. It
+  affects materialized 3-vector crosses in real per-face loops
+  (`traction.cpp:632`, `boundary_faces.cpp:170`, `poly_mesh.cpp:97`,
+  `cell_validity.hpp:103-106`), not the `a.dot(b.cross(c))` triple products.
+  No dependency added; `src/` and `apps/` unchanged. Committed run:
+  [`docs/bench/mathlib-probe.txt`](bench/mathlib-probe.txt).
 - 2026-08-21: **The showcase film, rebuilt so it can be read
   ([ADR-0043](decisions/0043-a-film-someone-can-read.md),
   [`docs/assets/cinema/NOTES.md`](assets/cinema/NOTES.md))** — the README take

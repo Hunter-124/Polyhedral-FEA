@@ -1,10 +1,14 @@
 # ADR-0042: The advisor explains itself on screen
 
 - Status: accepted (2026-08-20)
+- Revised (2026-08-20, round two): the acts run concurrently (§6), the solved
+  fields animate in the order they are computed (§7), and the recorded case moved
+  to `sphere_box_s0_c0` (§5)
 - Supersedes: `docs/advisor/figures/activation_map.png` and the
   `activation_map()` generator in `scripts/advisor/figures.py`, both deleted
 - Touches: `scripts/advisor/export_onnx.py`, `src/advisor/*`, `src/mesh/*`,
-  `apps/gui/*`, `scripts/render_cinema.py`, `docs/assets/cinema/*`
+  `src/pipeline/*`, `apps/gui/*`, `scripts/render_cinema.py`,
+  `docs/assets/cinema/*`
 
 ## 1. What the heatmap could not show
 
@@ -31,7 +35,8 @@ reader has about the advisor.
   consequence anybody cares about: the mesh that action produces.
 
 So it was replaced by a recording of the deployed graph running the real
-decision, beside the mesher building the mesh that decision asked for:
+decision, beside the mesher building the mesh that decision asked for and the
+solver's own answer appearing in the order it is computed:
 `docs/assets/cinema/`, produced by `scripts/render_cinema.py`.
 
 ## 2. The activations come from the graph, not from a second implementation
@@ -105,9 +110,10 @@ number against `polymesh mesh` on the same part.
 
 Everything in this list changes when a pixel is drawn, never what it says:
 
-- **Time.** The take runs on a virtual clock at a fixed 1/60 s per frame, and the
-  acts get fixed fractions of it. Nothing on screen is a wall-clock measurement,
-  so nothing on screen is a performance claim; the solve's real cost is in the
+- **Time, including which things share it.** The take runs on a virtual clock at
+  a fixed 1/60 s per frame; the acts get fractions of it and, since round two,
+  those fractions overlap (§6). Nothing on screen is a wall-clock measurement, so
+  nothing on screen is a performance claim; the solve's real cost is in the
   showcase manifest, where it is measured.
 - **Opacity and easing.** Fades between acts, the skeleton's alpha, the mesh's
   alpha.
@@ -123,7 +129,9 @@ Everything in this list changes when a pixel is drawn, never what it says:
 Everything else is measured: which candidate a pass scored, its score, whether
 the feasibility gate passed it, whether the DOF budget dropped it, which action
 was recommended, the activations themselves, the weights on the edges, the stage
-sequence, the element geometry and the element counts.
+sequence, the element geometry, the element counts, the per-pass displacement and
+von Mises fields, the error field each pass recovered, the refinement it asked
+for, and the load factor each deformed frame is drawn at (§7).
 
 Two rules follow, and both are enforced rather than documented:
 
@@ -138,58 +146,190 @@ Two rules follow, and both are enforced rather than documented:
 
 ## 5. The case is chosen by the gate, not by what looks good
 
-The film records `box_hole_s0_c0`: `bench/geometries/corpus/primitives/box_hole_s0.step`
-under axial tension, the x_lo face clamped and the x_hi face loaded.
+The film records `sphere_box_s0_c0`:
+`bench/geometries/corpus/primitives/sphere_box_s0.step` under axial tension, the
+x_lo face clamped and the curved x_hi face loaded. 11,692 elements, 13,146 DOF,
+max von Mises 2.489 MPa, 38 candidates enumerated and 39 forward passes counting
+the final re-score.
 
 That case is not a stylistic choice. The advisor refuses parts it does not
-recognise, and the refusal is not rare — measured with
-`polymesh solve <part> --advisor bench/advisor` against the 6.30 operating point,
-`box_hole_s0` scores an out-of-distribution distance of 3.57 and is advised,
-`tests/fixtures/parts/plate_hole.step` scores 3.73 and is advised, and
-`sphere`, `icecream_cone`, `cantilever`, `smoke_bar` and `pipe` score 12.6 to
-90.9 and are vetoed. On any of those the advisor panel would be a refusal notice.
-Recording the showcase flagship instead would have put the film closer to the
-gate for no gain.
+recognise, so the gate picks the shortlist and only then does the film pick from
+it. Swept over all 44 corpus primitives with
+`polymesh solve <part> --advisor bench/advisor` against the operating point the
+shipped `bench/advisor/ood.json` enforces — 5.034, that fit's training 99th
+percentile — 23 are advised and 21 refused, and the refusals are whole families:
+`perforated_plate` 11.36–17.65, `tube` 13.55–19.02, `ellipsoid_boss`
+19.95–32.16, `twisted_loft` 74.51–76.56 and `lobed_shaft` 77.66–80.19 are in no
+training row and are refused in every regime. On any of those the advisor panel
+would be a refusal notice rather than an explanation.
 
-`box_hole_s0_c0` is also the exact input the retired heatmap was computed on: its
-title read "run 30 on box_hole_s0_c0 · cfg-116b3958". The replacement therefore
-supersedes the figure on the figure's own case, rather than on a case chosen to
-flatter the replacement.
+Of the 23 that are advised, `sphere_box_s0` gives by far the most elements,
+because a curved wall is what actually drives curvature and feature grading. It
+scores 3.34 against the 5.034 operating point and is not vetoed.
+
+**The definition came from case selection, not from overriding the model.** Round
+two asked for a higher-definition mesh, and there were two ways to get one:
+override the advisor's `h_rel` and mesh finer than it asked for, or record a part
+the advisor itself asks for a fine mesh on. The first would have made the film a
+picture of a mesh the product does not build — §2's failure, one layer out — so
+the case moved instead. On `sphere_box_s0_c0` the advisor advises `hybrid_zoo` at
+`h_rel` 0.08, order 1, one adapt pass and an η target of 0.02, and the film
+records that action unmodified: 20x the 568 elements of the previous case, at the
+advisor's own recommendation.
+
+`box_hole_s0_c0` is retained and stays reproducible with
+`scripts/render_cinema.py --part box_hole_s0_c0`, because it has one property the
+new case cannot have: it is the exact input the retired heatmap was computed on,
+its title reading "run 30 on box_hole_s0_c0 · cfg-116b3958". The replacement
+therefore still supersedes that figure on the figure's own case, and the recorder
+keeps the case that proves it. It is advised as well, at 3.57 against 5.034 —
+`hybrid_zoo`, `h_rel` 0.08, order 1 and one adapt pass on the axial tension of
+`box_hole_s0_c0`, versus `h_rel` 0.2, order 2 and no adapt passes from
+`polymesh solve box_hole_s0.step --advisor bench/advisor`, whose default
+boundary conditions are a transverse load. Same part, same model, different case
+columns, identical distance: the gate tests the part, not the load case. Its 568
+elements are simply why it is no longer the default — the mesh runs out of
+geometry to build long before the network runs out of candidates to score.
 
 Two details of the translation into GUI verbs are worth recording, because both
 are places where a plausible guess would have been wrong:
 
-- **The load is 89.257 N, not a round number.** The case JSON specifies a 1e6 Pa
-  traction over an `expected_area` of 8.925720996e-05 m² on the x_hi face, and
-  the `loadface` verb takes newtons, so the faithful translation is that
-  resultant.
+- **The load is 528.197958 N, and the area behind it is a measurement rather
+  than an authored number.** The case JSON specifies a 1e6 Pa traction on x_hi
+  and, unlike the old case, carries no `select.expected_area` to read: this
+  loaded face is curved (`"load_face_boundary": "curved_surface"`) and
+  `scripts/gen_primitive_corpus.py` emits an authored area only for planar ends.
+  The CLI measured the exact CAD area of that face as 0.000528197958 m², which at
+  1e6 Pa is a resultant of 528.197958 N, and the `loadface` verb takes newtons.
+  `render_cinema.py` formats that verb with `.9g` for the same reason the number
+  is not rounded here: `%g`'s six significant digits would have handed the GUI
+  528.198 N.
 - **Face ids are GUI face ids and were verified, not assumed.** They are assigned
   when the viewport loads the part and have nothing to do with the case JSON's
   selection boxes. `fix 0` / `loadface 5` was confirmed by solving with them and
-  reading the VTU back: the part's x extent is [−0.03, 0.03] m, the max-|u| node
-  sits at (0.03, 0, 0) — the loaded end — with u = (3.113e-07, −4.0e-19,
-  2.37e-09) m, and the top displacement decile is 99.92% aligned with x. That is
-  axial tension on x_hi with x_lo clamped, which is what the case specifies. The
-  ids stay CLI parameters (`--fix-face`, `--load-face`) because a change to face
-  discovery would renumber them.
+  reading the VTU back: the part's x extent is [0, 0.0729] m, the max-|u| node
+  sits at the max-x end — the loaded one — and the top displacement decile is
+  99.73% aligned with x. That is axial tension on x_hi with x_lo clamped, which
+  is what the case specifies. The ids stay CLI parameters (`--fix-face`,
+  `--load-face`) because a change to face discovery would renumber them.
 
-The `h` verb in the recorded command is a fallback only. When the advisor
-advises it sets `h` itself, so the mesh in the film is the advisor's own action
-rather than an element size the script chose. On this case it advises
-`hybrid_zoo` at `h_rel` 0.08 — 5.345 mm on this part — order 1, one adapt pass
-and an η target of 0.02, inside the distribution at a Mahalanobis distance of
-3.57 against the 6.30 operating point.
+The `h` verb in the recorded command is a fallback only. When the advisor advises
+it sets `h` itself from `h_rel`, so the mesh in the film is the advisor's own
+action rather than an element size the script chose. The recorded fallback is
+6.888 mm, which is 0.08 of this part's 86.10 mm bounding-box diagonal (x
+[0, 0.0729] m, y and z [−0.0162, 0.0162] m) — the same size the advisor's own
+`h_rel` resolves to here, so a refusal would fall back to a comparable mesh
+rather than to a different film.
 
-That is a different action from the one the same part gets from
-`polymesh solve box_hole_s0.step --advisor bench/advisor`, which reports
-`h_rel` 0.2, order 2 and no adapt passes. Both are real forward passes; they
-differ because they are different *cases*, not different models. The CLI
-invocation above takes its default boundary conditions (a transverse load), the
-film applies `box_hole_s0_c0`'s axial tension, and the case columns are model
-inputs. The out-of-distribution distance is identical at 3.57 in both, which is
-the gate behaving as documented: it tests the part, not the load case.
+## 6. The two halves share the clock, because the causal link is the point
 
-## 6. Packaging and provenance
+Round one ran the film as a sequence: the network scored candidates, the act
+ended, and then the mesher built the winner. That ordering is true of the code —
+the recommendation is complete before the fill starts, because the fill needs the
+`h` it sets — and it is exactly the wrong way to *show* it. A reader watching two
+separate acts sees two demos. The claim worth making is that these are one
+decision, and the only way to make it visible is to have the activations still
+firing while the elements the chosen action produces come into being.
+
+So the acts overlap. The take is `skeleton`, `deliberate`, `build`, `solve` —
+0.06, 0.11, 0.20 and 0.63 of it — and the candidate sweep is one continuous 1..39
+pass lane running across `deliberate` *and* `build`, while the fill's stage lane
+runs inside `build`. For the whole of `build` both counters advance: the network
+is still firing while the fill is being built. The beats are shorter too, because
+they no longer have to fill two acts: at the recorder's 20 s default a forward
+pass gets 0.159 s and a pass-0 construction stage 0.340 s, against 0.238 s and
+0.540 s in a 30 s take and 0.292 s per pass in the old sequential one.
+
+**The overlap is a replay, and the film says so.** It would be easy to read two
+advancing counters as a claim that the network was still deciding while the
+mesher built, and that is not what happened: `Advisor::explain()` runs to
+completion in `load_cinema_advisor`, before `solve` is issued, so every pass on
+screen — including the ones still to come — had already happened when the mesher
+emitted its first stage. What preserves the causal order under the overlap is
+that the decision is locked and on screen from the first frame of `build`, with a
+lead-in before the first element appears: `CinemaState::kDecisionLead` is 0.6 s,
+capped at a fifth of the `build` act, so at the recorder's 1200-frame default it
+is the full 0.6 s — 36 frames of decided action with zero elements drawn — and it
+only shortens below roughly 450 frames. The cinema replays two recorded sequences
+on one clock; the ticker states that, and the ADR states it here.
+
+Nothing about the data changed. Each activation frame still belongs to the
+candidate pass that produced it, each mesh stage still belongs to the stage that
+emitted it, and both still carry their own index on screen. What changed is which
+pixels share a frame, which §4 already lists as cosmetic: time and layout.
+
+One consequence for the recorder. `render_cinema.py` used to cut the inline GIF
+from the midpoint of the `advisor` act to the midpoint of the `mesh` act, a rule
+that presumes a cut to straddle and that no longer matches any act name the GUI
+prints. It now cuts the loop to the `build` act, which is exactly the overlap the
+inline loop exists to show; failing that name it falls back to the longest act
+reported, and failing an act table to `build`'s own scheduled fractions,
+0.17..0.37 of the take. The longest-act rule is deliberately the *fallback*: the
+longest act is `solve` at 0.63, so a rule that preferred it would inline the
+answer without the decision that produced it. Either way the window is computed
+from what the GUI printed and the rule that produced it is named in
+`manifest.json` as `window_source`, so the inline loop is never a hand-picked
+range that quietly stopped matching the film.
+
+## 7. The fields animate in the order the answer is computed
+
+Round two asked for the stress and deformation to animate "in the way and order
+it is actually solved". There are exactly three real orderings available on this
+case, and the film is restricted to them.
+
+**The adaptive loop, which is the order the answer is computed.** A solve, the
+error field recovered from that solve, the refinement that field asked for, then
+the next solve. `adapt_passes` is 1 on this case, so that is two real solves, and
+the loop is observable rather than reconstructed: `pipeline::SolveStage` carries
+the pass index, the pass's own `PassTrace`, its `SolveResult` — mesh,
+displacement, von Mises, nodal and element η — and the linear solver's note, and
+`pipeline::SolveJob::on_solve_stage` delivers one per completed pass. It is the
+same shape as the mesh-stage sink of §3 and for the same reason: the film shows
+boundaries the code actually has, and unset the callback costs a null check.
+
+On screen that becomes the `SolvePhase` sequence — `kField`, the pass's own von
+Mises field on its own mesh; `kError`, the ZZ field recovered from that same
+solve; `kRefine`, the mesh the *next* pass solved on, revealed element by
+element; then `kLoadRamp` and `kHold` — one phase per real step, named in the
+ticker so a viewer can tell which step they are looking at.
+
+**The load factor, which is exact rather than interpolated.** In linear
+elastostatics u(λ) = λ·u identically, so ramping λ from 0 to 1 draws the true
+solution of the problem at every intermediate load — not a tween between a
+start and an end state. That is why the ramp is allowed at all, and why λ is on
+screen and labelled as the linear response: a viewer who reads it as a
+load-stepped nonlinear solve would be reading a claim the solver never made.
+
+**CG iterates, which this case does not have.** The obvious animation for "as it
+is solved" is a residual falling over iterations, and it is unavailable here, for
+a measured reason. `fea::SolveMethod::kAuto` chooses from the free DOF count
+against `SolveOptions::cg_threshold`, which is 50,000; this case has 13,146 free
+DOF, so it is factorised by direct sparse LDLT and there is no iteration sequence
+to draw. The threshold is not arbitrary — the solver header records CG losing to
+LDLT by two orders of magnitude below it, measured at 11,040 DOF on a plate hex
+mesh: 179 s against 0.9 s.
+
+Forcing CG to obtain a prettier animation was considered and rejected. It would
+have made the film a recording of a solver path the product does not take on this
+part, which is the same defect as drawing a re-implemented forward pass (§2) or a
+mesh the advisor did not ask for (§5), and it would have cost a 200x slowdown to
+do it. Iterate animation is supported if a case ever selects CG —
+`SolveOptions::on_progress` already reports `(iter, max_iter, rel_resid)` — and
+until one does, the surface names the method that actually ran and why. The GUI
+prints it as a `solver` token on its `cinema: record` line, out of a closed
+vocabulary of four: `direct_ldlt`, `cg`, `note_absent` when the passes arrived
+without a note to read, and `no_solve_stage` when no pass was observed at all, so
+the absence of a solver claim is itself a value rather than a blank.
+`render_cinema.py` records it, and `solve_stages`, in `manifest.json`; the film
+cannot imply iterations it never performed.
+
+Three things are therefore prohibited, and their absence is the point of this
+section: a per-element "solve order" reveal, which does not exist — the
+factorisation does not produce the answer element by element; an iteration
+counter on a case that was factorised; and a ramp shaped to look nonlinear, which
+would misrepresent an exactly linear response.
+
+## 8. Packaging and provenance
 
 - **Three artifacts, because one format cannot do the job.** GitHub does not
   render a repo-relative `<video>` reliably, so the README embeds a
@@ -208,10 +348,10 @@ the gate behaving as documented: it tests the part, not the load case.
   verbatim in the footer. A frame grabbed out of the video can be matched to a
   still figure and to `manifest.json`, which additionally records the exact GUI
   command, the part, the model directory, the sha256 of `model.onnx` and of the
-  mp4, the frame count, the frame rate, and the per-act frame spans the GUI
-  reported.
+  mp4, the frame count, the frame rate, the per-act frame spans the GUI reported,
+  and the `solver` token naming the linear solver the take's solves ran through.
 
-## 7. Consequences
+## 9. Consequences
 
 - The advisor's static activation figure is gone, and nothing in the docs
   regenerates it. `scripts/advisor/figures.py` writes `training_curves.png` and
@@ -226,3 +366,17 @@ the gate behaving as documented: it tests the part, not the load case.
   and the determinism tests are bit-identical.
 - Frames are build output, not documentation. They land in `build/cinema/frames`,
   which the repo-root `/build*/` rule already ignores.
+- An adaptive pass is now observable too, on the same terms.
+  `pipeline::SolveJob::on_solve_stage` defaults to empty and costs one
+  `SolveResult` copy per pass only when a consumer sets it, so the CLI, the
+  benchmarks and the determinism tests are unaffected.
+- The recorded case is `sphere_box_s0_c0` and `box_hole_s0_c0` is now a
+  `--part` option rather than the default. Any figure or table quoting the film's
+  element count quotes 11,692 rather than 568, and the retired heatmap's own case
+  remains recordable for the comparison that justified the replacement.
+- The GUI's stdout contract gained three tokens on the `cinema: record` line,
+  appended after the existing ones so every prior spelling and position is
+  unchanged: `skipped` (elements the viewport could not triangulate),
+  `solve_stages` and `solver`. `render_cinema.py` parses all three and records a
+  null with a stated reason where one is absent, so an older GUI still renders
+  rather than failing a match it cannot satisfy.

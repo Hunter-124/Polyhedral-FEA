@@ -114,6 +114,23 @@ class Viewport {
         float shrink = 0.0f;         // 0 = touching, 1 = collapsed to centroids
         float mesh_alpha = 1.0f;
         bool edges = true;
+        /// Per-element edge opacity, multiplied into `mesh_alpha` for the edge
+        /// pass only, and the GL line width that pass draws at.
+        ///
+        /// Both exist because element COUNT decides whether cell edges are
+        /// information or noise. On the 568-element case this reveal was first
+        /// tuned for, 1.5 px at full opacity drew a readable cell diagram. The
+        /// film's case is sphere_box_s0 at 11,692 cells in the same pane, and
+        /// the same settings there were measured (two binaries differing only in
+        /// these numbers, same take, same frame indices) to put 22-50% of the
+        /// part's own painted pixels into near-black cell outline, against
+        /// 3.4-8.9% at 1.0 px and 0.30 opacity. At half the part being outline
+        /// the fill's shading is gone and so is the reveal front, because a
+        /// front made of dark lines does not read against a dark background.
+        /// The defaults here stay the old values, so a caller that does not set
+        /// them gets exactly the previous behaviour.
+        float edge_alpha = 1.0f;
+        float edge_width = 1.5f;
     };
     void set_cinema_view(const CinemaView& view);
 

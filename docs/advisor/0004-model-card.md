@@ -285,10 +285,22 @@ same cause.
 - **The OOD gate is distance-based, validated, and now actually wired.**
   Mahalanobis over **31 part-geometry columns** — the 16 mesh-derived geometry
   features plus the 15 exact-BRep descriptors — with shrunk covariance and the
-  threshold at the training 99th percentile (**6.3037**): **100 % of
-  held-out-family rows flagged in all 8 folds** at a **0.86 %** in-sample
-  false-alarm rate. Parameters in `bench/advisor/ood.json`, consumed by
-  `Advisor::Impl::load_ood`.
+  threshold at the training 99th percentile (**5.0341**): the fit's own
+  leave-one-family-out cross-validation records **83.3 % of held-out-family rows
+  flagged over 12 folds** at a **1.0 %** in-sample false-alarm rate. Parameters
+  in `bench/advisor/ood.json`, consumed by `Advisor::Impl::load_ood`.
+
+  Measured on the shipped artifact over all 44 corpus primitives, the gate is
+  cleaner than that cross-validated rate suggests, because the rate is per
+  *row* while a refusal is per *part*. Training covers 12 corpus geometries —
+  regimes s0 and s2 only, of six families — and `polymesh solve <part>
+  --advisor bench/advisor` over the whole corpus refuses **20 of 20** parts from
+  the five families absent from training (distances 11.36 to 80.19, between
+  2.3x and 16x the threshold) while advising **12 of 12** geometries that are
+  actually in the training set. The narrowest margin on trained geometry is
+  `channel_s2` at 5.03 against the 5.0341 threshold. Of the twelve unseen
+  *regimes* of trained families, eleven are advised and `stepped_shaft_s1` is
+  refused at 5.12, 1.7 % over — the single marginal call in the sweep.
 
   **It tests the part, not the load case.** Boundary-condition columns are
   deliberately excluded. `fit_ood`'s rule is that only an unfamiliar *part* is out
@@ -304,10 +316,10 @@ same cause.
 
   The parameters are held in **raw feature units with their own `center`/`scale`**,
   independent of `normalization.json`. Fifteen of the columns are outside the
-  43-column ONNX contract, so they never appear in `encode()`'s output and the
+  47-column ONNX contract, so they never appear in `encode()`'s output and the
   distance cannot be computed there. Fitting on raw columns directly gave a
   precision matrix at condition number **2.97e20**, past float64's 1/eps; the
-  artifact's own standardizer brings it to **9.15e10**, which is recorded in the
+  artifact's own standardizer brings it to **7.68e10**, which is recorded in the
   file as `precision_condition_number` so a later refit that degrades it is
   visible. The C++ accumulates the quadratic form in double.
 
@@ -325,14 +337,17 @@ same cause.
   the C++-computed `ood_distance` for every part, so the comparison is one command
   rather than an argument.
 
-  **In-sample false alarms are real and visible.** Of the 32 corpus parts,
-  `tube_s1` trips the gate at 6.684 against the 6.304 operating point — 6.0 % over,
-  on *training* geometry. One in 32, consistent with a q0.99 fit having a ~1 %
-  in-sample alarm rate by construction, but a false alarm nonetheless. Separately
-  `tube_s2` is refused by the *feasibility* gate at a distance of 5.704, inside the
-  OOD boundary — the two mechanisms firing on adjacent parts for different stated
-  reasons is the clearest evidence they are genuinely separate gates rather than
-  one wearing two labels.
+  **The marginal calls are real and visible.** Over the 44 corpus primitives the
+  one part the gate refuses from a trained family is `stepped_shaft_s1`, at 5.12
+  against the 5.0341 operating point — 1.7 % over, on an unseen *regime* of a
+  family whose s0 and s2 regimes are in training. In the other direction
+  `channel_s2`, which *is* training geometry, is advised at 5.03, inside the
+  threshold by 0.1 %. Two parts within 2 % of the boundary on opposite sides is
+  what a q0.99 fit looks like from the inside, and neither is hidden here.
+
+  `tube` sits nowhere near the boundary: absent from training entirely, its four
+  regimes score 13.55 to 19.02, so it is refused by the OOD gate on its own
+  merits rather than by the *feasibility* gate.
 
   This is not an isolated result. `tube` is also the family contributing no
   scorable folds and the one Gmsh fails outright on, and those findings share a
@@ -345,7 +360,7 @@ The 15 offline CAD descriptors *hurt* held-out regret — a 1-NN classifier
 recovers the family from them alone at 32/32, so on a corpus this narrow they are
 family identifiers rather than transferable physics. That same property makes
 them close to ideal for OOD detection, which is what they are now used for, and
-why they are **not** among the 43 shipped inputs.
+why they are **not** among the 47 shipped inputs.
 
 ## Known failure modes
 

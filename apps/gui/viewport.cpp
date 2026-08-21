@@ -1372,7 +1372,8 @@ void Viewport::draw_cinema(const Eigen::Matrix4f& view, const Eigen::Matrix4f& p
     // reveal == 0 would discard every fragment anyway; skipping the draw keeps
     // the pre-mesh act from paying for a full pass over the element buffer.
     if (cinema_vertex_count_ > 0 && reveal > 0.0f && mesh_alpha > 0.0f) {
-        const bool draw_edges = cinema_view_.edges && cinema_edge_vertex_count_ > 0;
+        const bool draw_edges = cinema_view_.edges && cinema_edge_vertex_count_ > 0 &&
+                                cinema_view_.edge_alpha > 0.0f;
         if (draw_edges) {
             // Push the fill back so the cell edges win the depth test against
             // their own faces, same as the wireframe pass above.
@@ -1406,8 +1407,9 @@ void Viewport::draw_cinema(const Eigen::Matrix4f& view, const Eigen::Matrix4f& p
             // fill, so the same reveal/shrink keep the two exactly in step.
             glUniform1f(glGetUniformLocation(cinema_line_program_, "u_reveal"), reveal);
             glUniform1f(glGetUniformLocation(cinema_line_program_, "u_shrink"), shrink);
-            glUniform1f(glGetUniformLocation(cinema_line_program_, "u_alpha"), mesh_alpha);
-            glLineWidth(1.5f);
+            glUniform1f(glGetUniformLocation(cinema_line_program_, "u_alpha"),
+                        mesh_alpha * std::clamp(cinema_view_.edge_alpha, 0.0f, 1.0f));
+            glLineWidth(std::clamp(cinema_view_.edge_width, 0.5f, 8.0f));
             glBindVertexArray(cinema_edge_vao_);
             glDrawArrays(GL_LINES, 0, cinema_edge_vertex_count_);
             glLineWidth(1.0f);

@@ -441,6 +441,8 @@ std::array<float, 3> sweep_sample_color(std::array<float, 3> rgb, float x, float
 
 } // namespace
 
+std::array<float, 3> element_type_color(fea::ElementType type) { return type_color(type); }
+
 // ---- Camera ---------------------------------------------------------------
 
 void Camera::fit(const Eigen::Vector3d& bbox_min, const Eigen::Vector3d& bbox_max) {

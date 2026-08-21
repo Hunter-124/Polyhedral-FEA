@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "cinema.hpp"
 
+#include "adapt/spectral_sizing.hpp"
 #include "colormap.hpp"
 #include "theme.hpp"
 
+#include "fea/cell_quality.hpp"
 #include "fea/solve.hpp"
 #include "fea/stress.hpp"
 #include "geom/cad_topology.hpp"
@@ -20,6 +22,7 @@
 #include <filesystem>
 #include <format>
 #include <iterator>
+#include <numeric>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -27,94 +30,69 @@
 namespace polymesh::gui {
 namespace {
 
-/// Act spans as fractions of the take, tuned at the render script's 1800-frame
-/// default (30.0 s).
+/// Act spans as fractions of the take, tuned at the render script's 3600-frame
+/// default (60.0 s).
 ///
-/// The closing act gets more than half of it because it is the only act that
-/// shows work with a real ordering of its own -- solve, look at the answer, look
-/// at where the answer changes fastest, estimate the error, refine, solve again,
-/// ramp the load -- and because every one of those steps is now followed by a
-/// still hold. The holds are the point: the previous cut of this film moved off
-/// each result on the frame it completed, which is exactly long enough to see
-/// that something happened and not long enough to see what.
+/// The opening now has enough room for a real curvature/FFT story, the build
+/// has enough room to inspect individual cells rather than flash stage names,
+/// and the completed mesh gets 6.6 s of its own. The closing act keeps 26.4 s:
+/// on a single-pass showcase every moving result and every still hold below is
+/// therefore paid at its literal `beat_seconds` value.
 ///
-/// Measured pacing on the film's case (39 forward passes, 10 pass-0
-/// construction stages, 2 solve passes) at 30.0 s:
+/// Measured pacing on the film's default take:
 ///
-///   forward pass         0.108 s   (0.14 x 30 / 39)
-///   construction stage   0.530 s   ((0.20 x 30 - 0.7) / 10)
-///   finished-mesh hold   2.100 s   (0.07 x 30)
-///   closing-act beat     0.8-1.9 s (kBeatSeconds below, scaled to the act)
+///   exact-CAD / spectral opening  5.400 s
+///   forward pass                 0.185 s (stable strip; activations animate)
+///   two-stage graded fill        6.750 s/stage after the decision lead
+///   exploded + closed mesh hold  6.600 s
+///   solve / recovery sequence   26.400 s
 ///
-/// The pass lane is fast because it is a sweep over a list and its content is
-/// one candidate per beat; the fill and the closing act are slow because every
-/// beat of them is a thing to look at.
-constexpr std::array<double, kCinemaActCount> kActFraction = {0.05, 0.14, 0.20, 0.07, 0.54};
+/// Candidate-specific prose is deliberately absent from the fast pass lane.
+/// The network is the motion there; the strip carries one stable explanation.
+constexpr std::array<double, kCinemaActCount> kActFraction = {0.09, 0.12, 0.24, 0.11, 0.44};
 
-/// Length of each closing-act beat, in seconds at the 30 s take the composition
-/// is tuned for. They are scaled by the act's own span divided by their sum, so
-/// a shorter take compresses every beat in proportion rather than truncating the
-/// end, and at 30 s these numbers are literal.
-///
-/// The sweeps are the longest moving beats because a front that crosses the part
-/// in half a second reads as a flicker. The holds are just over a second each
-/// because that is about the shortest still that survives being watched at 10
-/// frames a second in a README GIF.
+/// Readable beat lengths for the 60 s default. A single solve pass uses exactly
+/// 26.4 s; extra adaptive passes scale the sequence proportionally, never clip
+/// it. Moving reveals take 2.4-4.4 s and still results take 2.8-5.4 s.
 double beat_seconds(SolvePhase phase) {
     switch (phase) {
     case SolvePhase::kStressSweep:
-        return 1.6;
+        return 2.6;
     case SolvePhase::kStressHold:
-        return 1.1;
+        return 3.2;
     case SolvePhase::kGradientSweep:
-        return 1.5;
+        return 2.6;
     case SolvePhase::kGradientHold:
-        return 1.1;
+        return 3.0;
     case SolvePhase::kError:
-        return 1.2;
+        return 2.4;
     case SolvePhase::kErrorHold:
-        return 0.8;
+        return 2.8;
     case SolvePhase::kRefine:
-        return 1.7;
+        return 3.2;
     case SolvePhase::kRefineHold:
-        return 1.0;
+        return 3.4;
     case SolvePhase::kLoadRamp:
-        return 1.9;
+        return 4.4;
     case SolvePhase::kHold:
-        return 1.8;
+        return 5.4;
     case SolvePhase::kNone:
         break;
     }
     return 0.0;
 }
 
-/// Per-element reveal geometry, retuned for the film's mesh density.
+/// Per-element reveal geometry, retuned for the denser complex-CAD take.
 ///
-/// This reveal was first built on box_hole_s0 at the advisor's h_rel = 0.2: 568
-/// cells, each tens of pixels across in the cinema pane. The film's case is
-/// sphere_box_s0 at h_rel = 0.08 — 11,692 cells, 20.6x as many, in the same
-/// pane — and the settings that described 568 cells bury 11,692.
-///
-/// Measured, two binaries differing only in these four numbers, same take, same
-/// frame indices, and the fraction of the part's own painted pixels that are
-/// near-black (luminance < 60, i.e. edge rather than surface) inside the fill:
-///
-///   frame   0.35 / 0.50 / 1.00 / 1.5 px      0.22 / 0.33 / 0.30 / 1.0 px
-///      72   36.2% dark, mean lum 69.9        6.6% dark, mean lum 98.1
-///      78   50.3% dark, mean lum 65.0        6.3% dark, mean lum 112.9
-///      90   24.9% dark, mean lum 93.1        3.9% dark, mean lum 118.4
-///     125   21.9% dark, mean lum 85.4        3.6% dark, mean lum 105.3
-///
-/// At half the part's pixels being cell outline the fill is a black grid with
-/// orange in the gaps: the shading that distinguishes one face of a cell from
-/// another is gone, and so is the reveal front, because a front made of dark
-/// outlines does not read against a dark background. Luminance spread over the
-/// part drops from 42-60 to 18-27 with the thinner pass, which is the same fact
-/// stated as contrast.
+/// The old full-opacity 1.5 px edge pass was measured on a 568-cell fixture.
+/// At 11,692 cells it already put up to half the subject into near-black
+/// outline; the complex showcase carries tens of thousands of cells. Keep the
+/// centroid shrink that lets a new cell read as a separate object, but make the
+/// edge pass a restrained annotation over shaded faces rather than the image.
 constexpr double kRevealShrink = 0.22;
 constexpr double kRevealShrinkFraction = 0.33;
-constexpr float kMeshEdgeAlpha = 0.30f;
-constexpr float kMeshEdgeWidth = 1.0f;
+constexpr float kMeshEdgeAlpha = 0.18f;
+constexpr float kMeshEdgeWidth = 0.8f;
 
 /// Width of the field sweep's leading band, as a fraction of the part's extent
 /// along the sweep axis. Wide enough that the highlight reads as a moving front
@@ -302,16 +280,6 @@ double smoothstep(double x) {
     return x * x * (3.0 - 2.0 * x);
 }
 
-/// Overflow-safe logistic, the same branch-on-sign form as
-/// `src/advisor/src/advisor.cpp`: exp of a large positive logit overflows to
-/// inf and would turn the probability into NaN.
-double sigmoid(double x) {
-    if (x >= 0.0) {
-        return 1.0 / (1.0 + std::exp(-x));
-    }
-    const double e = std::exp(x);
-    return e / (1.0 + e);
-}
 
 ImU32 rgba(const std::array<float, 3>& rgb, float alpha) {
     return ImGui::ColorConvertFloat4ToU32(ImVec4(rgb[0], rgb[1], rgb[2], alpha));
@@ -376,18 +344,17 @@ std::size_t initial_fill_stage_count(const std::vector<pipeline::MeshStage>& sta
 /// Generates the closing act's beat sequence for `n` completed solve passes, in
 /// the order the pipeline computed them, and hands each to `fn(stage, phase)`.
 ///
-/// Per pass: the field that solve produced and a hold on it; then, on the FIRST
-/// pass only, the recovered gradient of that field and a hold on it; then, when
-/// another pass followed, the error field that decided the refinement, the mesh
-/// that next pass actually solved on, and a hold on each. After the last pass,
-/// the load ramp and the final hold. That is `pipeline::SolveJob`'s own loop
-/// order plus the pauses; there is no beat for a per-element solve order or an
-/// iteration count, because a direct sparse factorisation has neither.
+/// Per pass: stress plus its still hold. On the first pass, the recovered
+/// gradient plus its hold. Every pass then shows the ZZ error field it actually
+/// computed, even when that field met policy and no remesh followed; hiding a
+/// final-pass estimator made a high-quality single-pass take look as if error
+/// recovery did not exist. When another pass followed, the next solved mesh is
+/// revealed and held. The last pass ends with the exact linear load ramp and
+/// the longest final hold.
 ///
-/// The gradient appears once, on the first answer, because it is an aside about
-/// what a stress field looks like rather than a step of the loop — showing it
-/// again on the refined pass would cost three seconds to repeat a point already
-/// made, on an act that has a load ramp still to pay for.
+/// The gradient appears once because it explains a stress field rather than
+/// advancing the adaptive loop. The error field appears on every pass because
+/// it is the loop's decision input, including the decision to stop.
 ///
 /// Generated rather than materialised so the per-frame cue costs no allocation:
 /// it is walked twice, once to total the seconds and once to locate the beat.
@@ -403,9 +370,9 @@ template <class Fn> void for_each_solve_beat(std::size_t n, Fn&& fn) {
             fn(stage, SolvePhase::kGradientSweep);
             fn(stage, SolvePhase::kGradientHold);
         }
+        fn(stage, SolvePhase::kError);
+        fn(stage, SolvePhase::kErrorHold);
         if (i + 1 < n) {
-            fn(stage, SolvePhase::kError);
-            fn(stage, SolvePhase::kErrorHold);
             fn(stage, SolvePhase::kRefine);
             fn(stage, SolvePhase::kRefineHold);
         }
@@ -492,6 +459,26 @@ CinemaType cinema_type(ImFont* font, float height) {
     return type;
 }
 
+namespace {
+
+CinemaMeshInsight inspect_mesh(const fea::NodalMesh& mesh) {
+    CinemaMeshInsight out;
+    for (const auto& element : mesh.elements) {
+        const auto index = static_cast<std::size_t>(element.type);
+        if (index < out.type_counts.size()) {
+            ++out.type_counts[index];
+        }
+    }
+    const fea::CellQualityStats quality = fea::summarize_cell_quality(mesh);
+    out.quality_min = quality.min;
+    out.quality_mean = quality.mean;
+    out.quality_measured = quality.n_measured;
+    out.quality_unmeasured = quality.n_unmeasured;
+    return out;
+}
+
+} // namespace
+
 // ---- take state -----------------------------------------------------------
 
 void CinemaState::push_stage(const pipeline::MeshStage& stage) {
@@ -510,6 +497,9 @@ void CinemaState::drain_stages() {
         }
         pending.swap(pending_stages_);
     }
+    for (const auto& stage : pending) {
+        stage_insights.push_back(inspect_mesh(stage.mesh));
+    }
     stages.insert(stages.end(), std::make_move_iterator(pending.begin()),
                   std::make_move_iterator(pending.end()));
 }
@@ -520,6 +510,7 @@ void CinemaState::clear_stages() {
         pending_stages_.clear();
     }
     stages.clear();
+    stage_insights.clear();
     invalidate_uploads();
 }
 
@@ -539,8 +530,55 @@ void CinemaState::drain_solve_stages() {
         }
         pending.swap(pending_solve_stages_);
     }
+    for (const auto& stage : pending) {
+        solve_insights.push_back(inspect_mesh(stage.result.volume_mesh));
+    }
     solve_stages.insert(solve_stages.end(), std::make_move_iterator(pending.begin()),
                         std::make_move_iterator(pending.end()));
+}
+
+void CinemaState::adopt_final_result(const pipeline::SolveResult& result) {
+    if (solve_stages.empty()) {
+        return;
+    }
+    pipeline::SolveStage& stage = solve_stages.back();
+    const bool finalisation_changed =
+        stage.result.volume_mesh.nodes.size() != result.volume_mesh.nodes.size() ||
+        stage.result.volume_mesh.elements.size() != result.volume_mesh.elements.size() ||
+        stage.result.max_von_mises != result.max_von_mises;
+
+    stage.final_pass = true;
+    stage.trace.n_elems = result.volume_mesh.elements.size();
+    stage.trace.n_nodes = result.volume_mesh.nodes.size();
+    stage.trace.n_dof = static_cast<std::size_t>(result.displacement.size());
+    stage.trace.global_eta = result.global_eta;
+    if (!result.element_eta.empty()) {
+        std::vector<double> eta = result.element_eta;
+        std::sort(eta.begin(), eta.end());
+        const auto at = [&](double q) {
+            const std::size_t index = static_cast<std::size_t>(
+                std::floor(q * static_cast<double>(eta.size() - 1)));
+            return eta[index];
+        };
+        stage.trace.eta_p50 = at(0.50);
+        stage.trace.eta_p90 = at(0.90);
+        stage.trace.eta_max = eta.back();
+    }
+    if (finalisation_changed) {
+        // The old marks were computed on the pre-promotion field. The final
+        // result has been re-solved and recovered; no second marking pass ran,
+        // so carrying the old mesh's counts onto it would be a false claim.
+        stage.trace.n_h_mark = 0;
+        stage.trace.n_p_mark = 0;
+        stage.trace.n_shape_mark = 0;
+    }
+    stage.result = result;
+    if (solve_insights.size() < solve_stages.size()) {
+        solve_insights.resize(solve_stages.size());
+    }
+    solve_insights.back() = inspect_mesh(result.volume_mesh);
+    gradients_.clear();
+    invalidate_uploads();
 }
 
 void CinemaState::clear_solve_stages() {
@@ -549,6 +587,7 @@ void CinemaState::clear_solve_stages() {
         pending_solve_stages_.clear();
     }
     solve_stages.clear();
+    solve_insights.clear();
     gradients_.clear();
     invalidate_uploads();
 }
@@ -679,17 +718,15 @@ CinemaCue cinema_cue(const CinemaState& state) {
         start += span;
     }
 
-    // The opening act belongs to the part: the panel is held dark through the
-    // first half of it and slides in across the second, so the take opens on the
-    // outline rather than on a full-strength wall of connections. It then keeps
-    // that width for the whole take — the pane's height sets the part's rendered
-    // size, and a pane that changed would resize the subject inside one
-    // continuous shot.
+    // Open on the exact CAD alone, then slide the spectral analysis in early
+    // enough to leave more than three readable seconds at full size. The pane
+    // reaches its final width once and never moves again.
     if (cue.act == CinemaAct::kSkeleton) {
-        const double half = 0.5 * cue.act_span;
-        cue.panel_open =
-            static_cast<float>(smoothstep((cue.act_t - half) / std::max(half, 1.0e-9)));
-        cue.network_alpha = cue.panel_open;
+        const double wait = 0.18 * cue.act_span;
+        const double slide = 0.22 * cue.act_span;
+        cue.panel_open = static_cast<float>(
+            smoothstep((cue.act_t - wait) / std::max(slide, 1.0e-9)));
+        cue.network_alpha = 0.0f;
         cue.equations_alpha = 0.0f;
     } else if (cue.act == CinemaAct::kSolve) {
         // The panel's content swaps: the network has said everything it has to
@@ -760,12 +797,18 @@ CinemaCue cinema_cue(const CinemaState& state) {
                 cue.mesh_source_index = cue.stage_index;
             }
         } else if (cue.act == CinemaAct::kMeshHold) {
-            // The whole finished fill, complete, still. This is the beat the
-            // film exists to show and it used to not exist at all.
+            // Hold the authoritative mesh the first solve consumed. On a
+            // quadratic CAD run this is the promoted tet10/hex20 node set, not
+            // the linear construction scaffold wearing final counts.
             cue.stage_index = static_cast<int>(n_fill - 1);
             cue.stage_reveal = 1.0;
-            cue.mesh_source = CinemaMeshSource::kFillStage;
-            cue.mesh_source_index = cue.stage_index;
+            if (!state.solve_stages.empty()) {
+                cue.mesh_source = CinemaMeshSource::kSolvedPass;
+                cue.mesh_source_index = 0;
+            } else {
+                cue.mesh_source = CinemaMeshSource::kFillStage;
+                cue.mesh_source_index = cue.stage_index;
+            }
         } else if (cue.act == CinemaAct::kSolve) {
             // The finished fill stays named in the caption. No mesh source: the
             // closing act draws fields out of `solve_stages`, and the one beat
@@ -877,12 +920,27 @@ Viewport::CinemaView cinema_view(const CinemaState& state, const CinemaCue& cue)
         view.mesh_alpha = 1.0f;
         view.shrink = cue.stage_index >= 0 ? shrink_for(cue.stage_reveal) : 1.0f;
         break;
-    case CinemaAct::kMeshHold:
+    case CinemaAct::kMeshHold: {
+        // A six-second result beat can do more than freeze: open the finished
+        // cells just enough to expose their topology, hold that microscope
+        // view, then close them and leave the exact delivered mesh still for
+        // the final fifth. The subject never rotates or changes data.
+        const double x = cue.act_t / std::max(cue.act_span, 1.0e-9);
+        double exploded = 0.0;
+        if (x < 0.18) {
+            exploded = smoothstep(x / 0.18);
+        } else if (x < 0.55) {
+            exploded = 1.0;
+        } else if (x < 0.78) {
+            exploded = 1.0 - smoothstep((x - 0.55) / 0.23);
+        }
         view.skeleton_alpha = 0.30f;
         view.reveal = 1.0f;
         view.mesh_alpha = 1.0f;
-        view.shrink = 0.0f;
+        view.shrink = static_cast<float>(0.10 * exploded);
+        view.edge_alpha = kMeshEdgeAlpha + static_cast<float>(0.24 * exploded);
         break;
+    }
     case CinemaAct::kSolve:
         if (cue.solve_phase == SolvePhase::kRefine ||
             cue.solve_phase == SolvePhase::kRefineHold) {
@@ -1098,6 +1156,8 @@ std::pair<Eigen::Vector3f, std::string> resolve_sweep_axis(const pipeline::Model
         Eigen::Vector3f axis = Eigen::Vector3f::Zero();
         axis[longest] = 1.0f;
         return {axis, "this take has no load case, so the reveal runs along the part's "
+
+
                       "longest axis — a camera move, not a direction of anything physical"};
     }
     Eigen::Vector3d axis = force.normalized();
@@ -1113,6 +1173,64 @@ std::pair<Eigen::Vector3f, std::string> resolve_sweep_axis(const pipeline::Model
             "resultant of every SimSetup::LoadSpec::force in this take"};
 }
 
+void capture_curve_story(CinemaState& state, const geom::CadTopology& topology) {
+    state.sizing.edge_id = 0;
+    state.sizing.edge_length = 0.0;
+    state.sizing.curve_modes_total = 0;
+    state.sizing.curve_modes_kept = 0;
+    state.sizing.curve_energy_fraction = 0.0;
+    state.sizing.stations.clear();
+    state.sizing.curvature_raw.clear();
+    state.sizing.curvature_filtered.clear();
+
+    double best_score = -1.0;
+    for (const auto& edge : topology.edges) {
+        if (edge.samples.size() < 3 || edge.kappa_samples.size() != edge.samples.size()) {
+            continue;
+        }
+        std::vector<double> stations(edge.samples.size(), 0.0);
+        for (std::size_t i = 1; i < edge.samples.size(); ++i) {
+            stations[i] = stations[i - 1] + (edge.samples[i] - edge.samples[i - 1]).norm();
+        }
+        if (!(stations.back() > 0.0)) {
+            continue;
+        }
+        for (double& station : stations) {
+            station /= stations.back();
+        }
+        geom::FilterReport report;
+        std::vector<double> filtered =
+            geom::lowpass_signal(stations, edge.kappa_samples, 0.995, &report);
+        if (filtered.size() != edge.kappa_samples.size()) {
+            continue;
+        }
+        const auto [lo, hi] =
+            std::minmax_element(edge.kappa_samples.begin(), edge.kappa_samples.end());
+        double mean = 0.0;
+        for (const double kappa : edge.kappa_samples) {
+            mean += std::fabs(kappa);
+        }
+        mean /= static_cast<double>(edge.kappa_samples.size());
+        // Prefer a genuinely varying curvature trace; when every curved edge is
+        // analytic-constant, still choose the strongest real curve rather than
+        // drawing an invented spectrum.
+        const double score =
+            edge.length * (std::fabs(*hi - *lo) + 0.05 * mean);
+        if (score <= best_score) {
+            continue;
+        }
+        best_score = score;
+        state.sizing.edge_id = edge.id;
+        state.sizing.edge_length = edge.length;
+        state.sizing.curve_modes_total = report.modes_total;
+        state.sizing.curve_modes_kept = report.modes_kept;
+        state.sizing.curve_energy_fraction =
+            report.energy_total > 0.0 ? report.energy_kept / report.energy_total : 1.0;
+        state.sizing.stations = std::move(stations);
+        state.sizing.curvature_raw = edge.kappa_samples;
+        state.sizing.curvature_filtered = std::move(filtered);
+    }
+}
 } // namespace
 
 void build_cinema_skeleton(CinemaState& state, const pipeline::Model& model,
@@ -1120,13 +1238,15 @@ void build_cinema_skeleton(CinemaState& state, const pipeline::Model& model,
     std::vector<std::vector<Eigen::Vector3d>> polylines;
     state.skeleton_note.clear();
     state.skeleton_source = SkeletonSource::kNone;
+    state.sizing = CinemaSizingStory{};
 
     if (model.cad && !model.cad->empty()) {
         try {
-            // 16 samples per edge: enough that a fillet or a bore rim reads as
-            // a curve rather than a chord chain at the 1600 px the recorder
-            // captures, and the same density the CLI's BRep wire export uses.
-            const geom::CadTopology topology = geom::extract_topology(*model.cad, 16);
+            // 32 samples are the product sizing pass's own density. They keep
+            // the outline smooth at 1080p and give the opening feature panel
+            // the exact curvature trace the FFT denoiser receives.
+            const geom::CadTopology topology = geom::extract_topology(*model.cad, 32);
+            capture_curve_story(state, topology);
             polylines.reserve(topology.edges.size());
             for (const auto& edge : topology.edges) {
                 if (edge.samples.size() >= 2) {
@@ -1172,6 +1292,57 @@ void build_cinema_skeleton(CinemaState& state, const pipeline::Model& model,
     auto [axis, note] = resolve_sweep_axis(model, setup);
     state.sweep_axis = axis;
     state.sweep_note = std::move(note);
+}
+
+void prepare_cinema_features(CinemaState& state, const pipeline::Model& model,
+                             const pipeline::SimSetup& setup) {
+    std::vector<pipeline::RefineRegion> regions;
+    regions.reserve(setup.fixtures.size() + setup.loads.size());
+    for (const int face : setup.fixtures) {
+        if (const auto box = region_box(model, face)) {
+            regions.push_back({box->first, box->second, 0.5});
+        }
+    }
+    for (const auto& [face, load] : setup.loads) {
+        (void)load;
+        if (const auto box = region_box(model, face)) {
+            regions.push_back({box->first, box->second, 0.25});
+        }
+    }
+
+    try {
+        double h = setup.mesh_size;
+        if (!(h > 0.0)) {
+            h = pipeline::resolve_mesh_size(model, h, 30.0, setup.max_elems, setup.max_dof,
+                                            setup.p_elevate)
+                    .h;
+        }
+        const pipeline::RefinementPlan plan =
+            pipeline::build_refinement_plan(model, h, regions, setup.use_feature_grading,
+                                            setup.spectral_smooth, 0);
+        state.sizing.prepared = true;
+        state.sizing.brep_curvature = plan.geometry_curvature_from_brep;
+        state.sizing.geometry_seeds = plan.n_geometry_seeds;
+        state.sizing.bc_seeds = plan.n_bc_seeds;
+        state.sizing.h_min = plan.h_min;
+        state.sizing.spectral = plan.spectral;
+    } catch (const std::exception&) {
+        // The worker remains authoritative and will report the actual failure.
+        // The feature panel simply declines to draw a report it could not
+        // compute; it never blocks the solve or substitutes plausible values.
+        state.sizing.prepared = false;
+        state.sizing.spectral = {};
+    }
+
+    const auto& spectral = state.sizing.spectral;
+    std::printf("cinema: spectral applied %d modes_total %zu modes_kept %zu "
+                "energy_kept %.9g edge_seeds %zu predicted_before %.9g "
+                "predicted_after %.9g geometry_seeds %zu bc_seeds %zu brep_curvature %d\n",
+                spectral.applied ? 1 : 0, spectral.modes_total, spectral.modes_kept,
+                spectral.energy_kept, spectral.n_edge_curve_seeds, spectral.predicted_before,
+                spectral.predicted_after, state.sizing.geometry_seeds, state.sizing.bc_seeds,
+                state.sizing.brep_curvature ? 1 : 0);
+    std::fflush(stdout);
 }
 
 // ---- act 2: the network ---------------------------------------------------
@@ -1258,11 +1429,13 @@ bool load_cinema_advisor(CinemaState& state, const pipeline::Model& model,
     // two unrelated things side by side. A refusal is NOT applied -- it is a
     // real outcome and is shown as one.
     if (decision.vetoed) {
+        const std::string why =
+            decision.note.empty()
+                ? (decision.budget_refusal ? "no candidate fit the degrees-of-freedom budget"
+                                           : "the feasibility gate declined the prediction")
+                : decision.note;
         state.decision_note = std::format(
-            "the network REFUSED this case and nothing was applied ({}); the mesh below is "
-            "the studio's own setup",
-            decision.budget_refusal ? "no candidate fit the degrees-of-freedom budget"
-                                    : "vetoed on predicted failure risk");
+            "advisor abstained: {}; the verified fallback below stays unchanged", why);
     } else if (const auto mesher = pipeline::mesher_from_name(decision.mesher)) {
         const double diag = (model.bbox_max - model.bbox_min).norm();
         setup.mesher = *mesher;
@@ -1394,14 +1567,19 @@ void draw_cinema_equations(const CinemaState& state, const CinemaCue& cue,
     //    fea/solve.hpp:136 plus solve.cpp:574-595 for the eliminated system the
     //    factorisation actually receives.
     {
-        EquationGroup g{"the system we solve", {}, {}, on_stress || on_ramp};
+        EquationGroup g{"linear system", {}, {}, on_stress || on_ramp};
         g.lines.push_back({plain("K u = f", g.lit ? hot : lit)});
         Runs ke{plain("K", dim), sub("e", dim), plain(" = ∫ B", dim), sup("T", dim),
                 plain(" D B dV", dim)};
         g.lines.push_back(std::move(ke));
         if (g.lit && stage != nullptr) {
-            g.live = {plain(fmt("%s unknowns, held supports eliminated, factorised once",
-                                grouped(stage->trace.n_dof).c_str()),
+            const std::string_view token = cinema_solver_token(state);
+            const char* method = token == "direct_ldlt"
+                                     ? "factorised once"
+                                     : (token == "cg" ? "conjugate gradient"
+                                                      : "solver method not reported");
+            g.live = {plain(fmt("%s unknowns, held supports eliminated, %s",
+                                grouped(stage->trace.n_dof).c_str(), method),
                             hot)};
         }
         groups.push_back(std::move(g));
@@ -1411,7 +1589,7 @@ void draw_cinema_equations(const CinemaState& state, const CinemaCue& cue,
     //    D's shear block carries mu and not 2 mu — fea/src/assembly.cpp:39-60,
     //    fea/src/material.cpp:6-18.
     {
-        EquationGroup g{"stretch, then stress", {}, {}, on_stress || on_ramp};
+        EquationGroup g{"strain + stress", {}, {}, on_stress || on_ramp};
         g.lines.push_back({plain("ε = B u", g.lit ? lit : dim),
                            plain("        σ = D ε", g.lit ? lit : dim)});
         g.lines.push_back({plain("λ = Eν / (1+ν)(1−2ν),   μ = E / 2(1+ν)", dim)});
@@ -1420,7 +1598,7 @@ void draw_cinema_equations(const CinemaState& state, const CinemaCue& cue,
 
     // 3. Von Mises, exactly as fea/src/stress.cpp:177-183 computes it.
     {
-        EquationGroup g{"one number per point", {}, {}, on_stress || on_ramp};
+        EquationGroup g{"von Mises stress", {}, {}, on_stress || on_ramp};
         Runs first{plain("σ", g.lit ? hot : lit),          sub("vm", g.lit ? hot : lit),
                    plain(" = √( ½[(σ", g.lit ? hot : lit), sub("11", g.lit ? hot : lit),
                    plain("−σ", g.lit ? hot : lit),         sub("22", g.lit ? hot : lit),
@@ -1443,7 +1621,7 @@ void draw_cinema_equations(const CinemaState& state, const CinemaCue& cue,
     // 4. The recovered gradient — the definition of what
     //    fea::nodal_scalar_gradient_magnitude actually fits.
     {
-        EquationGroup g{"where stress changes fastest", {}, {}, on_gradient};
+        EquationGroup g{"stress gradient", {}, {}, on_gradient};
         g.lines.push_back({plain("|∇σ", g.lit ? hot : dim), sub("vm", g.lit ? hot : dim),
                            plain("|,  g = argmin Σ (σ", g.lit ? hot : dim),
                            sub("j", g.lit ? hot : dim), plain("−σ", g.lit ? hot : dim),
@@ -1464,7 +1642,7 @@ void draw_cinema_equations(const CinemaState& state, const CinemaCue& cue,
     // 5. Zienkiewicz-Zhu, as fea/include/fea/zz.hpp:27-35 defines it and
     //    fea/src/zz.cpp:270-286 computes it.
     {
-        EquationGroup g{"how wrong is this answer", {}, {}, on_error};
+        EquationGroup g{"ZZ error estimate", {}, {}, on_error};
         g.lines.push_back({plain("η", g.lit ? hot : dim), sub("e", g.lit ? hot : dim),
                            plain(" = ‖σ* − σ", g.lit ? hot : dim), sub("h", g.lit ? hot : dim),
                            plain("‖", g.lit ? hot : dim), sub("E,e", g.lit ? hot : dim),
@@ -1484,7 +1662,7 @@ void draw_cinema_equations(const CinemaState& state, const CinemaCue& cue,
     // 6. Dörfler set selection — adapt/src/error.cpp:11-38, applied to the
     //    h-marked set at adapt/src/hp_driver.cpp:377-394.
     {
-        EquationGroup g{"where to put the next cells", {}, {}, on_refine};
+        EquationGroup g{"adaptive marking", {}, {}, on_refine};
         g.lines.push_back({plain("mark the largest η", g.lit ? hot : dim),
                            sub("e", g.lit ? hot : dim), plain(" until Σ η", g.lit ? hot : dim),
                            sub("e", g.lit ? hot : dim), sup("2", g.lit ? hot : dim),
@@ -1502,7 +1680,7 @@ void draw_cinema_equations(const CinemaState& state, const CinemaCue& cue,
     //    the right-hand side, and von Mises is homogeneous of degree one in
     //    stress — so scaling f scales u and sigma by exactly the same factor.
     {
-        EquationGroup g{"turning the load up", {}, {}, on_ramp};
+        EquationGroup g{"linear load response", {}, {}, on_ramp};
         // Written with an English connective rather than ⇒: the double arrow is
         // missing from Liberation Sans, and "gives" reads better than either a
         // merged glyph or a second → in a line that already has three.
@@ -1881,47 +2059,315 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
 #endif
 }
 
-void draw_cinema_panel(CinemaState& state, const CinemaCue& cue, const CinemaType& type,
-                       const CinemaHud& hud) {
-    // Both drawings start at the same cursor, so the cross fade happens in place
-    // and neither one can move the pane. Order matters only for what ends up on
-    // top during the half second they overlap; the network goes down first
-    // because it is the thing being left behind.
-    const ImVec2 origin = ImGui::GetCursorPos();
-    draw_cinema_network(state, cue, type, cue.network_alpha);
-    ImGui::SetCursorPos(origin);
-    draw_cinema_equations(state, cue, type, hud, cue.equations_alpha);
+namespace {
+
+std::string mesh_mix_text(const CinemaMeshInsight& insight) {
+    std::string out;
+    for (std::size_t i = 0; i < insight.type_counts.size(); ++i) {
+        const std::size_t count = insight.type_counts[i];
+        if (count == 0) {
+            continue;
+        }
+        if (!out.empty()) {
+            out += " · ";
+        }
+        const auto type = static_cast<fea::ElementType>(i);
+        out += std::format("{} {}", grouped(count), fea::element_type_name(type));
+    }
+    return out.empty() ? std::string("no cells measured") : out;
 }
 
-// ---- the bottom strip -----------------------------------------------------
+void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
+                          const CinemaType& type, float alpha) {
+    if (alpha <= 0.0f) {
+        return;
+    }
+    ImFont* font = type.font != nullptr ? type.font : ImGui::GetFont();
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    const ImVec2 origin = ImGui::GetCursorScreenPos();
+    const ImVec2 region = ImGui::GetContentRegionAvail();
+    const float wrap = std::max(120.0f, region.x);
+
+    dl->AddText(font, type.caption, origin, faded(palette.text, alpha),
+                "Exact CAD curvature → spectral sizing");
+    const std::string summary =
+        state.sizing.spectral.applied
+            ? fmt("%s / %s field modes kept · %.2f%% energy · %s curve seeds",
+                  grouped(state.sizing.spectral.modes_kept).c_str(),
+                  grouped(state.sizing.spectral.modes_total).c_str(),
+                  100.0 * state.sizing.spectral.energy_kept,
+                  grouped(state.sizing.spectral.n_edge_curve_seeds).c_str())
+            : std::string("spectral sizing report arrives with the verified mesh setup");
+    dl->AddText(font, type.label, ImVec2(origin.x, origin.y + type.caption * 1.55f),
+                faded(state.sizing.spectral.applied ? palette.accent : palette.text_dim, alpha),
+                summary.c_str(), nullptr, wrap);
+
+    const float chart_top = origin.y + type.caption * 3.0f;
+    const float chart_h = std::max(150.0f, std::min(region.y * 0.43f, 330.0f));
+    const float chart_w = std::max(120.0f, region.x);
+    dl->AddRectFilled(ImVec2(origin.x, chart_top),
+                      ImVec2(origin.x + chart_w, chart_top + chart_h),
+                      faded(palette.panel_bg, 0.52f * alpha), 6.0f);
+    dl->AddRect(ImVec2(origin.x, chart_top),
+                ImVec2(origin.x + chart_w, chart_top + chart_h),
+                faded(palette.border, 0.8f * alpha), 6.0f);
+
+    const auto& raw = state.sizing.curvature_raw;
+    const auto& filtered = state.sizing.curvature_filtered;
+    const auto& stations = state.sizing.stations;
+    if (raw.size() >= 2 && filtered.size() == raw.size() && stations.size() == raw.size()) {
+        double lo = raw.front();
+        double hi = raw.front();
+        for (std::size_t i = 0; i < raw.size(); ++i) {
+            lo = std::min({lo, raw[i], filtered[i]});
+            hi = std::max({hi, raw[i], filtered[i]});
+        }
+        const double span = std::max(hi - lo, 1.0e-12);
+        const double blend = smoothstep(
+            (cue.act_t - 0.9) / std::max(0.42 * cue.act_span, 1.0e-9));
+        const auto point = [&](std::size_t i, double value) {
+            const float x = origin.x + 14.0f +
+                            (chart_w - 28.0f) * static_cast<float>(stations[i]);
+            const float y = chart_top + chart_h - 18.0f -
+                            (chart_h - 38.0f) * static_cast<float>((value - lo) / span);
+            return ImVec2(x, y);
+        };
+        for (std::size_t i = 1; i < raw.size(); ++i) {
+            dl->AddLine(point(i - 1, raw[i - 1]), point(i, raw[i]),
+                        faded(palette.text_dim, 0.42f * alpha), 1.0f);
+            const double y0 = raw[i - 1] + blend * (filtered[i - 1] - raw[i - 1]);
+            const double y1 = raw[i] + blend * (filtered[i] - raw[i]);
+            dl->AddLine(point(i - 1, y0), point(i, y1),
+                        faded(palette.accent, alpha), 2.4f);
+        }
+        dl->AddText(font, type.legend, ImVec2(origin.x + 12.0f, chart_top + 9.0f),
+                    faded(palette.text_dim, alpha), "sampled curvature");
+        const std::string edge =
+            fmt("CAD edge %u · %.3g mm", state.sizing.edge_id, state.sizing.edge_length * 1e3);
+        const float ew = font->CalcTextSizeA(type.legend, FLT_MAX, 0.0f, edge.c_str()).x;
+        dl->AddText(font, type.legend,
+                    ImVec2(origin.x + chart_w - ew - 12.0f, chart_top + 9.0f),
+                    faded(palette.accent, alpha), edge.c_str());
+    } else {
+        dl->AddText(font, type.label, ImVec2(origin.x + 14.0f, chart_top + 20.0f),
+                    faded(palette.status_warn, alpha),
+                    "No curved CAD edge supplied a resolvable curvature trace.");
+    }
+
+    const std::array<const char*, 4> steps{
+        "sample exact curve", "FFT curvature", "keep 99.5% energy", "size the cells"};
+    const float gap = 8.0f;
+    const float box_w = (chart_w - gap * 3.0f) / 4.0f;
+    const float box_y = chart_top + chart_h + type.label * 1.1f;
+    for (std::size_t i = 0; i < steps.size(); ++i) {
+        const float x = origin.x + static_cast<float>(i) * (box_w + gap);
+        const bool active =
+            cue.act_t / std::max(cue.act_span, 1.0e-9) >= 0.16 * static_cast<double>(i);
+        dl->AddRectFilled(ImVec2(x, box_y), ImVec2(x + box_w, box_y + type.label * 2.4f),
+                          faded(active ? palette.accent_mid : palette.panel_bg,
+                                alpha * (active ? 0.62f : 0.45f)),
+                          5.0f);
+        dl->AddText(font, type.legend, ImVec2(x + 8.0f, box_y + 8.0f),
+                    faded(active ? palette.text : palette.text_dim, alpha), steps[i], nullptr,
+                    std::max(20.0f, box_w - 16.0f));
+    }
+    const std::string floor =
+        state.sizing.brep_curvature
+            ? "Exact BRep curvature is re-imposed after filtering — real features cannot blur."
+            : "No exact-BRep curvature report is available for this input.";
+    dl->AddText(font, type.legend,
+                ImVec2(origin.x, box_y + type.label * 3.0f),
+                faded(state.sizing.brep_curvature ? palette.status_ok : palette.status_warn,
+                      alpha),
+                floor.c_str(), nullptr, wrap);
+    ImGui::Dummy(ImVec2(region.x, std::max(1.0f, region.y - 2.0f)));
+}
+
+void draw_cinema_cells(const CinemaState& state, const CinemaCue& cue,
+                       const CinemaType& type, const CinemaHud& hud, float alpha) {
+    if (alpha <= 0.0f) {
+        return;
+    }
+    const std::size_t n_fill = initial_fill_stage_count(state.stages);
+    std::size_t index = cue.stage_index >= 0 ? static_cast<std::size_t>(cue.stage_index)
+                                            : (n_fill > 0 ? n_fill - 1 : 0);
+    if (n_fill > 0) {
+        index = std::min(index, n_fill - 1);
+    }
+    const CinemaMeshInsight* emitted =
+        index < state.stage_insights.size() ? &state.stage_insights[index] : nullptr;
+    const CinemaMeshInsight* solved =
+        !state.solve_insights.empty() ? &state.solve_insights.front() : emitted;
+
+    ImFont* font = type.font != nullptr ? type.font : ImGui::GetFont();
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    const ImVec2 origin = ImGui::GetCursorScreenPos();
+    const ImVec2 region = ImGui::GetContentRegionAvail();
+    const float wrap = std::max(120.0f, region.x);
+
+    dl->AddText(font, type.caption, origin, faded(palette.text, alpha),
+                "Cell microscope — actual emitted topology");
+    std::string stage = "waiting for the first emitted cell";
+    if (index < state.stages.size() && emitted != nullptr) {
+        stage = std::format("{} · {}", stage_name(state.stages[index].stage),
+                            mesh_mix_text(*emitted));
+    }
+    dl->AddText(font, type.label, ImVec2(origin.x, origin.y + type.caption * 1.55f),
+                faded(palette.accent, alpha), stage.c_str(), nullptr, wrap);
+
+    const float bar_y = origin.y + type.caption * 3.2f;
+    const float bar_h = 18.0f;
+    if (emitted != nullptr) {
+        const std::size_t total =
+            std::max<std::size_t>(1, std::accumulate(emitted->type_counts.begin(),
+                                                     emitted->type_counts.end(),
+                                                     std::size_t{0}));
+        float x = origin.x;
+        for (std::size_t i = 0; i < emitted->type_counts.size(); ++i) {
+            if (emitted->type_counts[i] == 0) {
+                continue;
+            }
+            const float w = region.x * static_cast<float>(emitted->type_counts[i]) /
+                            static_cast<float>(total);
+            const auto rgb = element_type_color(static_cast<fea::ElementType>(i));
+            dl->AddRectFilled(ImVec2(x, bar_y), ImVec2(x + w, bar_y + bar_h),
+                              rgba(rgb, alpha), 2.0f);
+            x += w;
+        }
+    }
+
+    const float card_top = bar_y + bar_h + type.label * 1.4f;
+    const float card_h = std::min(300.0f, region.y * 0.42f);
+    const float card_gap = 12.0f;
+    const float card_w = (region.x - card_gap) * 0.5f;
+    const auto draw_tet = [&](float x, bool quadratic) {
+        dl->AddRectFilled(ImVec2(x, card_top), ImVec2(x + card_w, card_top + card_h),
+                          faded(palette.panel_bg, 0.58f * alpha), 7.0f);
+        dl->AddRect(ImVec2(x, card_top), ImVec2(x + card_w, card_top + card_h),
+                    faded(palette.border, alpha), 7.0f);
+        const std::array<ImVec2, 4> p{{
+            {x + card_w * 0.50f, card_top + card_h * 0.19f},
+            {x + card_w * 0.18f, card_top + card_h * 0.78f},
+            {x + card_w * 0.82f, card_top + card_h * 0.78f},
+            {x + card_w * 0.63f, card_top + card_h * 0.53f},
+        }};
+        constexpr std::array<std::array<int, 2>, 6> edges{{
+            {{0, 1}}, {{0, 2}}, {{0, 3}}, {{1, 2}}, {{1, 3}}, {{2, 3}},
+        }};
+        for (const auto& edge : edges) {
+            dl->AddLine(p[edge[0]], p[edge[1]], faded(palette.text, 0.72f * alpha), 2.0f);
+            if (quadratic) {
+                const ImVec2 mid{0.5f * (p[edge[0]].x + p[edge[1]].x),
+                                 0.5f * (p[edge[0]].y + p[edge[1]].y)};
+                dl->AddCircleFilled(mid, 4.2f, faded(palette.accent, alpha));
+            }
+        }
+        for (const ImVec2 point : p) {
+            dl->AddCircleFilled(point, 6.0f, faded(palette.text, alpha));
+        }
+        const char* title = quadratic ? "order 2 · tet10" : "order 1 · tet4";
+        const char* subline =
+            quadratic ? "six midside nodes bend with the exact CAD"
+                      : "four corners define the linear fill";
+        dl->AddText(font, type.label, ImVec2(x + 12.0f, card_top + 10.0f),
+                    faded(quadratic ? palette.accent : palette.text, alpha), title);
+        dl->AddText(font, type.legend,
+                    ImVec2(x + 12.0f, card_top + card_h - type.legend * 2.2f),
+                    faded(palette.text_dim, alpha), subline, nullptr, card_w - 24.0f);
+    };
+    draw_tet(origin.x, false);
+    draw_tet(origin.x + card_w + card_gap, hud.order >= 2);
+
+    const float facts_y = card_top + card_h + type.label * 1.1f;
+    std::string quality = "quality summary arrives with the emitted mesh";
+    if (solved != nullptr && solved->quality_measured > 0) {
+        quality = fmt("shape quality  min %.4g · mean %.4g · %s cells measured",
+                      solved->quality_min, solved->quality_mean,
+                      grouped(solved->quality_measured).c_str());
+    }
+    dl->AddText(font, type.label, ImVec2(origin.x, facts_y),
+                faded(palette.status_ok, alpha), quality.c_str(), nullptr, wrap);
+    const std::string facts = fmt(
+        "spectral sizing %s · exact BRep curvature %s · polynomial order %d · "
+        "ZZ recovery %s",
+        state.sizing.spectral.applied ? "on" : "off",
+        state.sizing.brep_curvature ? "on" : "off", hud.order,
+        state.solve_stages.empty() ? "waiting" : "measured");
+    dl->AddText(font, type.legend, ImVec2(origin.x, facts_y + type.label * 1.7f),
+                faded(palette.text_dim, alpha), facts.c_str(), nullptr, wrap);
+    dl->AddText(font, type.legend, ImVec2(origin.x, facts_y + type.label * 3.1f),
+                faded(palette.status_warn, 0.78f * alpha),
+                "experimental alternatives: varyhedron · CVT poly-VEM · octahedral — "
+                "not used in this verified solve",
+                nullptr, wrap);
+    ImGui::Dummy(ImVec2(region.x, std::max(1.0f, region.y - 2.0f)));
+}
+
+} // namespace
+
+void draw_cinema_panel(CinemaState& state, const CinemaCue& cue, const CinemaType& type,
+                       const CinemaHud& hud) {
+    // Four real views share one fixed pane: CAD spectrum, deployed network,
+    // emitted-cell microscope, solver equations. Transitions are opacity-only,
+    // so neither the part nor the panel geometry jumps between chapters.
+    float feature_alpha = 0.0f;
+    float network_alpha = 0.0f;
+    float cell_alpha = 0.0f;
+    float equation_alpha = 0.0f;
+    if (cue.act == CinemaAct::kSkeleton) {
+        feature_alpha = cue.panel_open;
+    } else if (cue.act == CinemaAct::kDeliberate) {
+        network_alpha = 1.0f;
+    } else if (cue.act == CinemaAct::kBuild) {
+        const double lead = cinema_decision_lead(state);
+        const float blend = static_cast<float>(
+            smoothstep((cue.act_t - lead) / std::max(0.7, 0.08 * cue.act_span)));
+        network_alpha = 1.0f - blend;
+        cell_alpha = blend;
+    } else if (cue.act == CinemaAct::kMeshHold) {
+        cell_alpha = 1.0f;
+    } else {
+        network_alpha = cue.network_alpha;
+        equation_alpha = cue.equations_alpha;
+    }
+
+    const ImVec2 origin = ImGui::GetCursorPos();
+    draw_cinema_features(state, cue, type, feature_alpha);
+    ImGui::SetCursorPos(origin);
+    draw_cinema_network(state, cue, type, network_alpha);
+    ImGui::SetCursorPos(origin);
+    draw_cinema_cells(state, cue, type, hud, cell_alpha);
+    ImGui::SetCursorPos(origin);
+    draw_cinema_equations(state, cue, type, hud, equation_alpha);
+}
 
 namespace {
 
-/// The one sentence, the numbers and the one disclosure for the opening act.
 void skeleton_caption(const CinemaState& state, CinemaCaption& out) {
-    out.headline = "The part, as the CAD file has it";
+    out.headline = "Exact CAD + spectral size field";
     switch (state.skeleton_source) {
     case SkeletonSource::kBrepEdges:
-        out.numbers = fmt("%s CAD edges, sampled 16 times each",
-                          grouped(state.skeleton_polylines).c_str());
-        out.note = "outline from the STEP file's own edge curves, not from a triangle mesh";
+        out.numbers = fmt("%s exact edges · 32 samples per edge · %s / %s field modes kept",
+                          grouped(state.skeleton_polylines).c_str(),
+                          grouped(state.sizing.spectral.modes_kept).c_str(),
+                          grouped(state.sizing.spectral.modes_total).c_str());
+        out.note = "CAD curvature → FFT denoise → geometry floor → target cell sizes";
         out.note_color = palette.text_dim;
         break;
     case SkeletonSource::kSharpEdges:
         out.numbers =
-            fmt("%s creases in the triangle mesh", grouped(state.skeleton_polylines).c_str());
-        out.note = "this part carries no CAD geometry (mesh input), so this outline is the "
-                   "tessellation's own creases — not a CAD skeleton";
+            fmt("%s tessellation creases", grouped(state.skeleton_polylines).c_str());
+        out.note = "mesh input · no BRep curvature or CAD-edge spectrum is claimed";
         out.note_color = palette.status_warn;
         break;
     case SkeletonSource::kUnavailable:
-        out.headline = "The part could not be outlined";
+        out.headline = "CAD feature extraction unavailable";
         out.note = state.skeleton_note;
         out.note_color = palette.status_err;
         break;
     case SkeletonSource::kNone:
-        out.headline = "No part is loaded";
-        out.note = "nothing is drawn in place of a part that was never loaded";
+        out.headline = "No part loaded";
+        out.note = "no substitute geometry is drawn";
         out.note_color = palette.status_err;
         break;
     }
@@ -1931,100 +2377,100 @@ void deliberate_caption(const CinemaState& state, const CinemaCue& cue, CinemaCa
 #ifndef POLYMESH_WITH_ADVISOR
     (void)state;
     (void)cue;
-    out.headline = "No advisor in this build";
-    out.note = "built with POLYMESH_WITH_ADVISOR=OFF";
+    out.headline = "Advisor unavailable";
+    out.note = "POLYMESH_WITH_ADVISOR=OFF";
     out.note_color = palette.status_err;
 #else
     if (!state.explanation) {
-        out.headline = "No network ran for this take";
-        out.note = state.advisor_note.empty()
-                       ? std::string("no `cinema advisor <dir>` was run, so no decision is "
-                                     "shown and none was applied")
-                       : state.advisor_note;
+        out.headline = "Advisor unavailable";
+        out.note = state.advisor_note.empty() ? std::string("no measured forward pass")
+                                               : state.advisor_note;
         out.note_color = palette.status_err;
         return;
     }
     const auto& explanation = *state.explanation;
     const auto& frames = explanation.frames;
+    const std::size_t candidates = frames.empty() ? 0 : frames.size() - 1;
+    out.headline = "Mesh search — deployed advisor network";
     if (cue.frame_index < 0 || static_cast<std::size_t>(cue.frame_index) >= frames.size()) {
-        out.headline = "Choosing how to mesh it";
-        out.numbers = fmt("%s options to score", grouped(frames.size()).c_str());
+        out.numbers = fmt("%s candidate meshes · measured forward passes only",
+                          grouped(candidates).c_str());
         return;
     }
-    const auto& f = frames[static_cast<std::size_t>(cue.frame_index)];
-    const std::size_t candidates = frames.size() > 0 ? frames.size() - 1 : 0;
-    if (f.candidate < 0) {
-        out.headline = "Re-scoring the option it picked";
-    } else {
-        out.headline =
-            fmt("Trying option %d of %s: %s at %.3g%% cell size", f.candidate + 1,
-                grouped(candidates).c_str(),
-                std::string(mesher_plain(f.action.mesher)).c_str(), f.action.h_rel * 100.0);
-    }
-    out.headline_color = f.recommended ? palette.status_ok : palette.text;
-    out.numbers = fmt(
-        "predicted error %+.3g · %s unknowns · failure risk %.2g%%", f.score,
-        grouped(static_cast<std::size_t>(std::llround(std::pow(10.0, f.outputs.dof_log10))))
-            .c_str(),
-        sigmoid(f.outputs.failure_logit) * 100.0);
-    out.note = f.gate_pass ? fmt("passes the failure gate at %.3g%% and is in the running",
-                                 explanation.gate_threshold * 100.0)
-                           : fmt("dropped: failure risk is over the %.3g%% gate",
-                                 explanation.gate_threshold * 100.0);
-    out.note_color = f.gate_pass ? palette.status_ok : palette.status_warn;
+    out.numbers = fmt("forward pass %d / %s · %s candidates compared", cue.frame_index + 1,
+                      grouped(frames.size()).c_str(), grouped(candidates).c_str());
+    out.note = fmt("circle = activation · line = |weight × activation| · %.3g%% failure gate",
+                   explanation.gate_threshold * 100.0);
+    out.note_color = palette.text_dim;
 #endif
 }
 
 void build_caption(const CinemaState& state, const CinemaCue& cue, const CinemaHud& hud,
                    CinemaCaption& out) {
     if (state.stages.empty()) {
-        out.headline = "The mesher emitted no construction stages";
-        out.note = "the stage sink is installed only while `cinema on`, and only the hybrid "
-                   "and graded fills report their interior — run `cinema on` before `solve`";
+        out.headline = "No construction stages emitted";
+        out.note = "nothing is substituted for missing mesher snapshots";
         out.note_color = palette.status_err;
         return;
     }
     if (cue.stage_index < 0) {
-        // The DECISION lead-in: the action is on screen before the thing it
-        // produced starts appearing.
-        out.headline = "Decided — now building it";
+        out.headline = state.decision_applied ? "Advisor selection locked"
+                                              : "Advisor abstained — verified fallback";
         out.headline_color = state.decision_applied ? palette.status_ok : palette.status_warn;
-        out.numbers = state.decision_note;
-        out.note = fmt("held for %.2f s before the first cell appears, so nothing on screen "
-                       "can be read as coming before the decision",
-                       cinema_decision_lead(state));
+        out.numbers = fmt("%s · %.3g mm target · order %d · %d refinement pass%s",
+                          std::string(mesher_plain(hud.mesher)).c_str(),
+                          hud.mesh_size * 1e3, hud.order, hud.adapt_passes,
+                          hud.adapt_passes == 1 ? "" : "es");
+        out.note = state.decision_note;
+        out.note_color = state.decision_applied ? palette.text_dim : palette.status_warn;
         return;
     }
     const auto idx = static_cast<std::size_t>(cue.stage_index);
-    const auto& stage = state.stages[idx];
     const std::size_t n_fill = initial_fill_stage_count(state.stages);
-    out.headline = fmt("Step %zu of %zu: %s", idx + 1, n_fill,
+    if (idx >= state.stages.size()) {
+        return;
+    }
+    const auto& stage = state.stages[idx];
+    out.headline = fmt("Stage %zu / %zu — %s", idx + 1, n_fill,
                        std::string(stage_name(stage.stage)).c_str());
+    const std::size_t total = stage.mesh.elements.size();
     const auto drawn =
-        static_cast<std::size_t>(cue.stage_reveal * static_cast<double>(hud.cinema_elements));
-    out.numbers = fmt("%s of %s cells placed", grouped(drawn).c_str(),
-                      grouped(hud.cinema_elements).c_str());
-    out.note = "cells appear in the mesher's own emission order — nothing is sorted, and no "
-               "cell is drawn before the step that built it";
+        static_cast<std::size_t>(cue.stage_reveal * static_cast<double>(total));
+    out.numbers = fmt("%s / %s cells · %s nodes · order-%d target",
+                      grouped(drawn).c_str(), grouped(total).c_str(),
+                      grouped(stage.mesh.nodes.size()).c_str(), hud.order);
+    out.note = "exact stage snapshot · mesher emission order · cell microscope at left";
     out.note_color = palette.text_dim;
     if (hud.cinema_skipped_elements > 0) {
-        out.note = fmt("%s of this step's cells could not be drawn (degenerate connectivity "
-                       "or faceless polyhedra) and are absent from the reveal",
+        out.note = fmt("%s cells could not be triangulated and are excluded from this view",
                        grouped(hud.cinema_skipped_elements).c_str());
         out.note_color = palette.status_warn;
     }
 }
 
-void mesh_hold_caption(const CinemaState& state, const CinemaHud& hud, CinemaCaption& out) {
-    out.headline = "The finished mesh";
+void mesh_hold_caption(const CinemaState& state, const CinemaCue& cue, const CinemaHud& hud,
+                       CinemaCaption& out) {
+    const double x = cue.act_t / std::max(cue.act_span, 1.0e-9);
+    out.headline = x < 0.78 ? "Cell topology — exploded view"
+                            : "Authoritative mesh — ready to solve";
     out.headline_color = palette.status_ok;
-    out.numbers = fmt("%s cells · %s nodes · %s unknowns · %s", grouped(hud.elements).c_str(),
-                      grouped(hud.nodes).c_str(), grouped(hud.dof).c_str(),
-                      std::string(mesher_plain(hud.mesher)).c_str());
-    out.note = state.decision_applied ? fmt("this is the mesh the network asked for: %s",
-                                            state.decision_note.c_str())
-                                      : state.decision_note;
-    out.note_color = state.decision_applied ? palette.text_dim : palette.status_warn;
+    if (!state.solve_stages.empty()) {
+        const auto& stage = state.solve_stages.front();
+        out.numbers = fmt("%s cells · %s nodes · %s unknowns · order %d",
+                          grouped(stage.trace.n_elems).c_str(),
+                          grouped(stage.trace.n_nodes).c_str(),
+                          grouped(stage.trace.n_dof).c_str(), hud.order);
+        if (!state.solve_insights.empty()) {
+            const auto& insight = state.solve_insights.front();
+            out.note = fmt("%s · shape quality min %.4g / mean %.4g",
+                           mesh_mix_text(insight).c_str(), insight.quality_min,
+                           insight.quality_mean);
+        }
+    }
+    if (out.note.empty()) {
+        out.note = state.decision_note;
+    }
+    out.note_color = palette.text_dim;
 }
 
 void solve_caption(CinemaState& state, const CinemaCue& cue, const CinemaHud& hud,
@@ -2048,27 +2494,23 @@ void solve_caption(CinemaState& state, const CinemaCue& cue, const CinemaHud& hu
     out.note_color = palette.text_dim;
     switch (cue.solve_phase) {
     case SolvePhase::kStressSweep:
-        out.headline = "Stress, spreading in from the load";
+        out.headline = "Stress field — spatial reveal";
         out.numbers =
             fmt("%s cells · %s unknowns · solved once%s", grouped(tr.n_elems).c_str(),
                 grouped(tr.n_dof).c_str(), pass_tag.c_str());
-        out.note = state.sweep_note + " — the field is already complete; what moves is how "
-                                      "much of it has been uncovered";
+        out.note = "completed von Mises field · reveal starts at the loaded surface";
         break;
     case SolvePhase::kStressHold:
         out.headline = fmt("Peak stress %.4g MPa", r.max_von_mises / 1e6);
         out.headline_color = palette.status_ok;
         out.numbers = fmt("largest movement %.4g mm · undeformed shape%s",
                           r.max_displacement * 1e3, pass_tag.c_str());
-        out.note = "von Mises equivalent stress at every node, drawn on the geometry the "
-                   "solver actually used";
+        out.note = "von Mises stress on the exact geometry this pass solved";
         break;
     case SolvePhase::kGradientSweep:
-        out.headline = "Where does stress change fastest?";
-        out.numbers = "the slope of the field above, recovered per node";
-        out.note = "least-squares fit of the stress field over each node's own cells "
-                   "(fea::nodal_scalar_gradient_magnitude) — a recovery, so it is first-order "
-                   "accurate and not an exact derivative";
+        out.headline = "Stress gradient — spatial reveal";
+        out.numbers = "|∇σvm| recovered at every resolvable node";
+        out.note = "least-squares recovery over each node's own neighboring cells";
         break;
     case SolvePhase::kGradientHold: {
         const double gmax = state.gradient_max(i);
@@ -2076,13 +2518,12 @@ void solve_caption(CinemaState& state, const CinemaCue& cue, const CinemaHud& hu
         if (gmax > 0.0) {
             out.headline = fmt("Steepest change %.4g MPa per mm", gmax / 1e9);
             out.headline_color = palette.status_ok;
-            out.numbers = "red is where a small step moves you a long way up the stress curve";
+            out.numbers = "red = the steepest local stress change";
             out.note =
                 unresolved > 0
-                    ? fmt("%s nodes had no resolvable gradient (their surrounding cells "
-                          "are coplanar) and read as zero",
+                    ? fmt("%s nodes had coplanar neighborhoods and report zero gradient",
                           grouped(unresolved).c_str())
-                    : std::string("this is what a stress riser looks like as a number");
+                    : std::string("stress-riser intensity, measured per unit distance");
             out.note_color = unresolved > 0 ? palette.status_warn : palette.text_dim;
         } else {
             out.headline = "No gradient could be recovered here";
@@ -2094,17 +2535,23 @@ void solve_caption(CinemaState& state, const CinemaCue& cue, const CinemaHud& hu
         break;
     }
     case SolvePhase::kError:
-        out.headline = "How wrong is this answer?";
-        out.numbers = fmt("estimated error %.3g%% against a %.3g%% target",
-                          tr.global_eta * 100.0, hud.eta_target * 100.0);
-        out.note = "the Zienkiewicz-Zhu estimate: how far this answer's stress is from a "
-                   "smoother one recovered from it, in energy";
+        out.headline = "Estimated solution error";
+        if (hud.eta_target > 0.0) {
+            out.numbers = fmt("ZZ indicator %.3g%% · target %.3g%%",
+                              tr.global_eta * 100.0, hud.eta_target * 100.0);
+        } else {
+            out.numbers = fmt("ZZ global indicator %.3g%% · verification pass",
+                              tr.global_eta * 100.0);
+        }
+        out.note = "recovered stress vs solved stress · energy-norm indicator";
         break;
     case SolvePhase::kErrorHold:
-        out.headline = "Red is where the answer is weakest";
-        out.numbers = fmt("%s cells want smaller cells · %s want a higher polynomial order",
+        out.headline = "Local error map";
+        out.numbers = fmt("%s h-refinement marks · %s p-refinement marks",
                           grouped(tr.n_h_mark).c_str(), grouped(tr.n_p_mark).c_str());
-        out.note = "this field, and nothing else, is what decides the next mesh";
+        out.note = i + 1 < state.solve_stages.size()
+                       ? "this measured field drives the next solved mesh"
+                       : "reported in full · no unrecorded refinement is implied";
         break;
     case SolvePhase::kRefine: {
         const std::size_t next = i + 1;
@@ -2143,30 +2590,29 @@ void solve_caption(CinemaState& state, const CinemaCue& cue, const CinemaHud& hu
         break;
     }
     case SolvePhase::kLoadRamp:
-        out.headline = fmt("Loading it up: %.4g N of %.4g N",
+        out.headline = fmt("Load response — %.4g / %.4g N",
                            cue.load_factor * hud.load_newtons, hud.load_newtons);
         out.numbers =
             fmt("%.4g MPa · %.4g mm at this load", cue.load_factor * r.max_von_mises / 1e6,
                 cue.load_factor * r.max_displacement * 1e3);
-        out.note =
-            fmt("every frame of this ramp is a real solution, not a blend: doubling the "
-                "force doubles the answer exactly · shape drawn at %.3g× the real "
-                "movement, which is invisible at this scale",
-                cue.load_factor * hud.deform_scale);
+        out.note = fmt("exact linear response u(λ)=λu · visible deformation %.3g×",
+                       cue.load_factor * hud.deform_scale);
         break;
-    case SolvePhase::kHold:
+    case SolvePhase::kHold: {
         out.headline = fmt("Full load — %.4g MPa peak", r.max_von_mises / 1e6);
         out.headline_color = palette.status_ok;
+        const std::string_view token = cinema_solver_token(state);
+        const char* method = token == "direct_ldlt"
+                                 ? "factorised, not iterated"
+                                 : (token == "cg" ? "conjugate gradient"
+                                                  : "solver method not reported");
         out.numbers = fmt("%.4g mm largest movement · %s cells · %s unknowns · %s",
                           r.max_displacement * 1e3, grouped(tr.n_elems).c_str(),
-                          grouped(tr.n_dof).c_str(),
-                          std::string(cinema_solver_token(state)) == "direct_ldlt"
-                              ? "factorised, not iterated"
-                              : cinema_solver_token(state));
-        out.note = fmt("shape drawn at %.3g× the real movement so it can be seen at all; the "
-                       "colour scale is the full-load maximum",
+                          grouped(tr.n_dof).c_str(), method);
+        out.note = fmt("final field held still · visible deformation %.3g× · full-load scale",
                        hud.deform_scale);
         break;
+    }
     case SolvePhase::kNone:
         break;
     }
@@ -2189,10 +2635,10 @@ void draw_fitted(ImDrawList* dl, ImFont* font, float size, ImVec2 at, float widt
 
 std::vector<CinemaChapter> cinema_chapters() {
     return {
-        {"the part", CinemaAct::kSkeleton},
-        {"choose a mesh", CinemaAct::kDeliberate},
-        {"build it", CinemaAct::kBuild},
-        {"solve it", CinemaAct::kSolve},
+        {"exact CAD", CinemaAct::kSkeleton},
+        {"advisor", CinemaAct::kDeliberate},
+        {"mesher", CinemaAct::kBuild},
+        {"analysis", CinemaAct::kSolve},
     };
 }
 
@@ -2212,7 +2658,7 @@ CinemaCaption cinema_caption(const CinemaState& state, const CinemaCue& cue,
         build_caption(state, cue, hud, out);
         break;
     case CinemaAct::kMeshHold:
-        mesh_hold_caption(state, hud, out);
+        mesh_hold_caption(state, cue, hud, out);
         break;
     case CinemaAct::kSolve:
         // The gradient captions read a cached recovery, which is why this one

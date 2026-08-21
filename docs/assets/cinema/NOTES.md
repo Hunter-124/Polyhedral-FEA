@@ -19,11 +19,11 @@ stdout.
 
 | | |
 |---|---|
-| Take | 1800 frames at a fixed 1/60 s virtual timestep = 30.000 s. The clock is set from the frame **index**, never accumulated from a real frame time, so the same take renders identically on a 400 fps box and inside a 6 fps software-GL Xvfb. |
-| Frame | 1920×1080. `--size` sets both the Xvfb screen and, through `POLYMESH_GUI_SIZE`, the GUI window; the recorded resolution is measured off the PNG rather than assumed. |
-| Acts | `skeleton` 0.05, `deliberate` 0.14, `build` 0.20, `mesh_hold` 0.07, `solve` 0.54 of the take. The GUI prints the frame span of each; the manifest records what it printed. |
-| Left panel | 0.42 of the width, from the end of the opening act to the last frame. It never moves again: the pane's height sets the part's rendered size, so a pane that changed width mid-take would resize the subject inside one continuous shot. Its **content** cross-fades from the network to the equation board over 0.5 s at the `solve` boundary. |
-| Bottom strip | A constant height, computed from the four row sizes. A row too wide for the strip is set smaller until it fits — never wrapped (that would change the strip's height, and therefore the part's size) and never clipped (that would drop the end of a sentence the film is making). |
+| Take | 3600 frames at a fixed 1/60 s virtual timestep = 60.000 s. The clock is set from the frame **index**, never accumulated from real frame time. |
+| Frame | 1920×1080. `--size` sets Xvfb and `POLYMESH_GUI_SIZE`; the recorded resolution is measured from the PNG rather than assumed. |
+| Acts | `skeleton` 0.09, `deliberate` 0.12, `build` 0.24, `mesh_hold` 0.11, `solve` 0.44. The GUI prints exact frame spans into the manifest. |
+| Left panel | 0.42 of the width. It opens once, then changes in place: exact-CAD spectrum → deployed network → actual-cell microscope → equation board. Build and solve transitions are opacity-only; pane geometry never moves after opening. |
+| Bottom strip | Constant height. Over-wide rows shrink to fit; they never wrap or clip. Labels remain stable while fast computation animates above them. |
 | Camera | Set once, at `cinema on`, to the union of the skeleton and the mesh bounds (`Viewport::frame_content(kCinema)`, yaw 0.70, pitch 0.72, 0.90 fill) and then locked. There is no cut anywhere in the film. |
 
 ### What is interpolated
@@ -42,8 +42,8 @@ because interpolating it is exact rather than approximate — see
 ## Act 1 — `skeleton`: the part
 
 - **Outline source** is stated on screen and is one of:
-  - `geom::extract_topology(*model.cad, 16)` — the STEP file's own edge curves, 16
-    samples per edge. The film's part takes this path.
+  - `geom::extract_topology(*model.cad, 32)` — the STEP file's exact edge
+    curves and the same 32-sample curvature traces used by product sizing.
   - `geom::detect_sharp_edges(model.surface, 30°)` — the tessellation's crease
     network, for mesh input that carries no BRep. The film calls this out as **not**
     a CAD skeleton when it happens.
@@ -51,13 +51,20 @@ because interpolating it is exact rather than approximate — see
 - `skeleton_polylines` / `skeleton_points` are the counts of what was extracted
   and pushed to the viewport, not an estimate of the part's complexity.
 - Nothing is drawn as mesh in this act or the next. Nothing has been meshed yet.
+- `prepare_cinema_features` calls the production
+  `pipeline::build_refinement_plan` with the final `SimSetup`. Its
+  `SpectralSizingReport` supplies modes kept/total, retained energy, denoised
+  curve seeds, predicted density before/after, and exact-BRep provenance.
+- The left chart is one real `CadEdge::kappa_samples` trace and the output of
+  `geom::lowpass_signal(..., 0.995)`. The line morph is cosmetic opacity/geometry;
+  the reported modes and samples are not interpolated.
 
 ## Act 2 — `deliberate`: choosing a mesh
 
-One beat per real forward pass of the deployed graph, in the order
-`Advisor::explain()` ran them: one per enumerated candidate action, then a final
-re-score of the recommended one. On the film's case that is 38 + 1 = 39 passes at
-0.108 s each.
+One beat per real forward pass of the deployed graph, in chooser order: one per
+candidate and one final re-score. The default take records 38 + 1 = 39 passes at
+0.185 s each. Candidate-specific prose does not flash at that rate: the strip
+keeps one stable explanation while the network itself carries the motion.
 
 - **The node fills are the graph's own tensors**, read out of the ONNX session:
   `advisor::ActivationFrame::input` / `fc1` / `fc2` (post-GELU) / `heads`. Not a
@@ -104,48 +111,28 @@ re-score of the recommended one. On the film's case that is 38 + 1 = 39 passes a
   | mesher: hybrid VEM | `policy_mesher_logit_hybrid_vem` |
   | mesher: hybrid, hex + pyramids | `policy_mesher_logit_hybrid_zoo` |
 
-- **The number in the headline** is `ActivationFrame::candidate + 1` of
-  `frames.size() - 1` — the candidate grid is one shorter than the pass count,
-  because the last pass is the re-score and not a candidate.
-- **"predicted error"** in the numbers row is `ActivationFrame::score`, i.e.
-  `rel_err_rel`: `log10(rel_err)` minus that case's median over the actions
-  actually run. It is the ranking key, lower is better, and it is meaningless
-  compared across cases
-  ([docs/advisor/0001-architecture.md](../../advisor/0001-architecture.md)).
-- **"failure risk"** is `σ(failure_logit)`, computed with the same
-  branch-on-sign logistic `src/advisor/src/advisor.cpp` uses, because `exp` of a
-  large positive logit overflows to `inf` and would turn the probability into NaN.
-- **The gate** compares that probability against `AdvisorExplanation::gate_threshold`.
-  A dropped candidate is shown as dropped. The candidate-loop bookkeeping
-  (`ranked`, `over_budget`) applies only to candidates, never to the re-score pass.
+- The strip reports only the measured forward-pass index, total pass count,
+  candidate count and failure-gate threshold. Candidate scores remain visible
+  on their real head units, but no paragraph tries to change every 0.185 s.
+- The default complex part is outside the advisor's validated operating
+  envelope. The OOD refusal is the deployed result, not an error in the film:
+  `AdvisorDecision::vetoed` is shown and its action is not applied.
 
 ## Act 3 — `build`: the mesher executing the decision
 
-The decision is on screen for `CinemaState::kDecisionLead` (0.7 s, capped at a
-fifth of the act) **before the first cell appears**. Without that lead the action
-and the thing it produced would arrive on the same frame and a viewer could not
-tell which followed which.
+The advisor outcome is held for `CinemaState::kDecisionLead` (1.6 s) before the
+first cell appears. The default part is refused as out of distribution, so the
+configured fallback remains authoritative: graded tet, h = 12 mm, spectral
+sizing on, quadratic CAD geometry. The strip labels this **Advisor abstained —
+verified fallback**; it never presents the vetoed hybrid action as executed.
 
-- **The pass lane stops.** From the first frame of this act to the last frame of
-  the film, the network holds the pass that scored the recommended action
-  (`ActivationFrame::recommended`, falling back to the final re-score, which is a
-  pass over exactly the action being built). The activations beside the growing
-  mesh are the activations of the forward pass that chose that mesh. This is a
-  change from the earlier cut of the film, which kept sweeping candidates during
-  the fill: two lanes advancing on one clock was honest about being a composition,
-  but a viewer reasonably read the lit graph as being about the mesh on the right,
-  and it was not.
-- **The head unit the decision came out of is highlighted** — the
-  `policy_mesher_logit_*` unit matching `ActivationFrame::action.mesher`.
-- **The decision was applied.** `load_cinema_advisor` writes the advised mesher,
-  `h = h_rel × bbox diagonal`, adapt passes, η target and order into the app's
-  `SimSetup` before `solve` is issued, and the strip states what was applied. A
-  refusal (`AdvisorDecision::vetoed`) is **not** applied and is shown as a
-  refusal. An advised mesher name this build does not recognise is **not**
-  substituted for something else: `pipeline::mesher_from_name` refuses it, and
-  the strip says the mesh below is the studio's own setup.
-- **Order above 2** is executed as quadratic: the solve path has one p-elevation
-  step (tet4/hex8 → tet10/hex20). The HUD reports the executed order.
+- During the lead, the network holds its final measured pass. It then
+  cross-fades to the cell microscope as construction begins.
+- An accepted decision still writes mesher, `h = h_rel × bbox diagonal`, adapt
+  passes, η target and order into `SimSetup`. A refusal or unrecognised mesher is
+  never substituted silently.
+- Order above 2 maps to the one supported quadratic promotion
+  (tet4/hex8 → tet10/hex20), and the executed order is displayed.
 - **Stages are the mesher's own.** One beat per `pipeline::MeshStage` of the
   initial fill (`pass == 0`), in emission order, each carrying that stage's whole
   `fea::NodalMesh`. The stage ids are `pipeline::kMeshStageNames`; the film draws
@@ -175,44 +162,53 @@ tell which followed which.
   poly-VEM cells) are counted by `Viewport::cinema_skipped_element_count()` and
   called out on screen when nonzero, rather than the reveal being quietly
   narrowed.
-- **The shrink** that draws each cell toward its own centroid as it lands is
-  cosmetic and is geometry only: the cell is the cell. It collapses over the
-  first third of each beat (`kRevealShrink` 0.22, `kRevealShrinkFraction` 0.33)
-  and the cell edges are drawn at 1.0 px / 0.30 opacity. Both were measured, not
-  chosen: at the previous 1.5 px / full opacity, 22–50% of the part's own painted
-  pixels were near-black cell outline on this 11,692-cell case, against 3.4–8.9%
-  at these settings, and at half the part being outline the reveal front stops
-  reading at all.
+- **The reveal shrink** pulls each cell toward its own centroid as it lands,
+  then closes over the first third of the stage beat. Cell edges are 0.8 px at
+  0.18 opacity so the dense 30k-cell take remains shaded geometry rather than a
+  black wire mass.
+- **The cell microscope** reads the captured `NodalMesh`, not a second model. It
+  reports the actual type histogram, displays order-1 corners beside order-2
+  midside nodes, and shows `fea::summarize_cell_quality` once per snapshot.
+  `CinemaMeshInsight` is computed when worker snapshots are drained, never per
+  frame.
+
+- The panel names varyhedron, restricted-CVT poly-VEM and octahedral as
+  **experimental alternatives — not used in this verified solve**. Presence in
+  the codebase is not presented as evidence that this take exercised them.
 
 ## Act 4 — `mesh_hold`: the finished mesh
 
-2.1 s of the completed fill, complete and still, with its own counts. This act
-did not exist in the earlier cut, which moved off the mesh on the frame the last
-cell landed.
+6.6 s on the authoritative mesh consumed by the first solve. It opens every
+cell by 0.10 toward its own centroid, holds the exploded topology, closes it,
+then leaves the delivered mesh still for the final fifth of the act.
 
-Counts are the app's own HUD line, sourced from `SimSetup` and the delivered
-mesh, never from the advisor decision struct — the two agree only when the
-decision was applied, and when they disagree the setup is the truth.
+Counts come from `SolveStage::trace`; type mix and min/mean shape quality come
+from the aligned `CinemaMeshInsight`. On quadratic CAD runs the viewport source
+is `SolveStage::result.volume_mesh`, not the linear construction scaffold.
 
 ## Act 5 — `solve`: the answer, in the order it is computed
 
-Every field is one a real `pipeline::SolveStage` produced. Beat order per pass is
-`pipeline::SolveJob`'s own loop order plus a still hold after every moving beat:
+Intermediate passes are the real `pipeline::SolveStage` callbacks. After worker
+finalisation, `CinemaState::adopt_final_result` replaces only the last snapshot
+with `SolveJob::take_result()` and refreshes its trace/quality. That makes final
+quadratic promotion, re-solve, VTU result and film byte-for-byte the same field.
+Beat order follows the adaptive loop with a hold after every moving result:
 
 ```
 pass i:  stress sweep, stress hold
          [i == 0 only] gradient sweep, gradient hold
-         [another pass follows] error, error hold, refine, refine hold
+         error, error hold
+         [another pass follows] refine, refine hold
 after the last pass:  load ramp, hold
 ```
 
-Beat lengths at the 30 s take (`beat_seconds` in `apps/gui/cinema.cpp`, scaled to
-the act's own span): stress sweep 1.6 s, stress hold 1.1 s, gradient sweep 1.5 s,
-gradient hold 1.1 s, error 1.2 s, error hold 0.8 s, refine 1.7 s, refine hold
-1.0 s, load ramp 1.9 s, final hold 1.8 s.
+At the 60 s default, a single-pass take uses literal beat lengths: stress reveal
+2.6 s, stress hold 3.2 s, gradient reveal 2.6 s, gradient hold 3.0 s, error
+reveal 2.4 s, error hold 2.8 s, load ramp 4.4 s, final hold 5.4 s. Multi-pass
+takes scale proportionally and never truncate the ending.
 
-There is no beat for a per-element solve order and no iteration counter, because
-a direct sparse factorisation has neither. See [the solver](#which-solver-ran).
+There is no per-element solve order. The take replays completed fields, not a
+fabricated iteration timeline; the recorded solver token is described below.
 
 ### The sweeps are reveals, not animations
 
@@ -265,11 +261,10 @@ least squares and reports `|g|`.
 
 ### The error field
 
-`SolveStage::result.nodal_eta` — the Zienkiewicz-Zhu error field recovered from
-that same solve, colour-scaled by `max_nodal_eta`. The numbers row carries
-`PassTrace::global_eta` against the run's own `SimSetup::eta_target`, and the
-element counts `n_h_mark` / `n_p_mark`: this field, and nothing else, is what
-decides the next mesh.
+`SolveStage::result.nodal_eta` — the Zienkiewicz-Zhu error field from that solve,
+colour-scaled by `max_nodal_eta`. The strip reports `PassTrace::global_eta` and
+the real `n_h_mark` / `n_p_mark` counts. With no configured adapt target it says
+**verification pass** rather than printing a fictitious 0% target.
 
 ### Refine
 
@@ -278,11 +273,9 @@ actually solved — revealed element by element in that mesh's own storage order
 Naming the source is what stops this beat from silently redrawing the pass-0 fill
 and calling it refined.
 
-When the delivered element count comes back **unchanged**, the film says so in the
-headline and stops calling it a finer mesh: the marks drove a remesh whose ship
-gate returned the same count, so what is on screen is a re-fill. On the film's
-case this is exactly what happens (11,692 → 11,692), and it is the kind of number
-a reader should not have to take on trust.
+When a later pass exists, an unchanged delivered count is labelled a re-fill,
+not a finer mesh. The default complex take is deliberately single-pass; its
+error field is still shown and no unrecorded refinement is implied.
 
 ### Load ramp
 
@@ -322,28 +315,19 @@ drawn colour is already within one part in a thousand of the bottom of the
 colormap.
 
 **The shape is exaggerated.** The film states the factor
-(`λ × App::deform_scale`) on screen at every frame of the ramp and the final hold.
-The true displacement on this case peaks at 1.78e-4 mm and is invisible at any
-honest scale.
+(`λ × App::deform_scale`) on screen throughout the ramp and final hold. The
+manifest and strip carry the take's measured displacement; the film does not
+transcribe an older case's value.
 
 ### Which solver ran
 
 The recorder prints a `solver` token and the manifest records it.
 
-`fea::SolveOptions::on_note` is the only channel the linear solver has, and it
-speaks on the CG path and on a memory-budget downgrade. Below `cg_threshold` with
-the budget satisfied it says nothing at all — which is the normal outcome at this
-project's DOF counts and is exactly what happens on the film's case.
-
-Silence is not a licence to guess. `fea::select_solve_method` sends
-`SolveMethod::kAuto` to CG only when the **free** DOF count exceeds
-`SolveOptions::cg_threshold` (50,000); the free set is a subset of the pass's
-`PassTrace::n_dof`; and the one override that could have changed the choice emits
-a note. So `n_dof = 13,146 ≤ 50,000` with no note means the system was factorised
-directly (sparse LDLT), and no conjugate-gradient iterations exist on this case —
-which is why none are animated. The token is `direct_ldlt` when that argument
-closes, `cg` when the solver said so, `note_absent` when neither establishes it,
-and `no_solve_stage` when nothing was delivered.
+`fea::SolveOptions::on_note` is the solver's authoritative channel. A CG run
+names itself there. With no note, `cinema_solver_token` may prove direct LDLT
+only when total DOF is already below the free-DOF threshold; otherwise it records
+`note_absent` rather than guessing. The default final quadratic result takes that
+honest `note_absent` path, rendered as **solver method not reported** on screen.
 
 ## The equation board
 

@@ -646,51 +646,37 @@ fields, which is how the GUI's solve is cross-checked against the CLI's.)
 - **Diagram** (`architecture.png`) is drawn programmatically with matplotlib
   through `scripts/figstyle.py`, so it matches the rest of the generated figures.
 - **Advisor cinema** (`assets/cinema/advisor_cinema.mp4`, `.gif`, `poster.png`)
-  is the GUI's own framebuffer, one PNG per frame, captured by
-  `polymesh-gui --auto`'s `record` verb at a fixed 1/60 s virtual timestep and
-  encoded by `scripts/render_cinema.py`. Four chapters, in sequence, with a
-  still hold on every result: the part's own CAD outline, the network scoring
-  38 candidate meshes, the mesher building the one it chose, the finished mesh
-  held for 2.1 s, then the solve. The network it draws is the deployed ONNX
-  graph read through its own trunk taps — one forward pass per candidate the
-  chooser enumerated, not a re-implementation of the forward pass and not one
-  canonical input — and from the first frame of the build it HOLDS the pass that
-  scored the recommended action, so the lit graph is the pass that chose the mesh
-  growing beside it. The mesh is built at the mesher's real construction-stage
-  granularity, in `mesh.elements` emission order, with the element counts the
-  viewport uploaded. The fields are the solve in the order the answer is
-  computed, one snapshot per completed adaptive pass (`pipeline::SolveStage`):
-  the von Mises field and the stress gradient recovered from it by
-  `fea::nodal_scalar_gradient_magnitude`, each uncovered by a plane travelling
-  from the loaded end and then held still; the ZZ error field that pass
-  recovered; the mesh the next pass actually solved; and the load drawn as the
-  exact linear response u(λ) = λ·u with λ labelled on screen. Through the solve
-  the left panel is not the network but the relations being evaluated, each
-  cited to `path:line`. No iteration counter appears, because at 13,146 free DOF
-  against a `cg_threshold` of 50,000 this case is factorised by direct sparse
-  LDLT and has no iterates; the GUI prints the method it used as a `solver`
-  token — this take reported `direct_ldlt` — and the manifest records it
-  alongside `solve_stages`. Cosmetic, and only this: the virtual clock the acts
-  are paced on (so no frame is a wall-clock measurement, and the take's length
-  is not a performance claim), fades and opacity, the shrink that draws each
-  element toward its own centroid, the plane that uncovers a finished field, the
-  colour ramp, and the layout. Where data is missing — no trunk taps in the
-  export, a part the novelty gate refuses, a gradient no patch could resolve —
-  the surface says so on screen, and the renderer exits nonzero rather than
-  publishing a capture with a frame missing or a panel silently empty
+  is the GUI's own framebuffer at a fixed 1/60 s virtual timestep, encoded by
+  `scripts/render_cinema.py`. The 60 s default has four readable chapters:
+  exact-CAD curvature plus production FFT sizing; 39 deployed-network forward
+  passes; real mesher snapshots plus a cell/order/quality microscope; and the
+  authoritative final solve with stress, recovered gradient, ZZ error and exact
+  linear load ramp.
+
+  The default part is `icecream_cone.step`, a watertight cone+sphere Boolean.
+  Its OOD distance is 90.94 against the validated 5.034 threshold, so the
+  advisor abstains and no recommendation is applied. The labelled fallback is
+  graded tet at h = 12 mm with spectral sizing and quadratic CAD geometry:
+  30,496 tet10 cells, 44,907 nodes, 134,721 total unknowns, shape quality
+  min/mean 0.04675/0.2926, and zero skipped cells. The spectral report keeps
+  4,155 / 262,143 field modes at 99.5% energy with 36 denoised edge seeds.
+
+  Every panel consumes production data: ONNX trunk taps and exported weights;
+  `pipeline::build_refinement_plan`; captured `MeshStage`/`NodalMesh`
+  snapshots; `fea::summarize_cell_quality`; and `SolveJob::take_result()` after
+  final quadratic promotion and re-solve. That last adoption is load-bearing:
+  the 8.509 MPa field in the film is the same authoritative result Studio and
+  VTU export receive, not the earlier linear callback snapshot.
+
+  Cosmetic work is limited to virtual pacing, opacity, centroid separation,
+  spatial field reveals, colour and layout. Experimental varyhedron,
+  restricted-CVT poly-VEM and octahedral paths are named as **not used in this
+  verified solve**, rather than implied. Full citations and per-beat
+  disclosures are in [`assets/cinema/NOTES.md`](assets/cinema/NOTES.md);
+  commands, act spans, spectral fields, model digest, encoder and output hashes
+  are in [`assets/cinema/manifest.json`](assets/cinema/manifest.json)
   ([ADR-0042](decisions/0042-the-advisor-explains-itself-on-screen.md),
-  [ADR-0043](decisions/0043-a-film-someone-can-read.md); every per-beat
-  disclosure and every equation citation is in
-  [`assets/cinema/NOTES.md`](assets/cinema/NOTES.md)). The case is
-  `sphere_box_s0_c0` (11,692 elements, 13,146 DOF): the advisor admits it at an
-  out-of-distribution distance of 3.34 against the shipped 5.034 operating
-  point, and of the 23 corpus primitives it admits at all this is the one it asks
-  for the most elements on, so the definition is its own recommendation and not
-  an override. `box_hole_s0_c0` — the case the retired `activation_map.png` was
-  computed on — stays recordable with `--part box_hole_s0_c0`. Per-act frame
-  spans, the exact GUI command, the encoder used, the solver token and the sha256
-  of `model.onnx` and of the mp4 are in
-  [`assets/cinema/manifest.json`](assets/cinema/manifest.json).
+  [ADR-0043](decisions/0043-a-film-someone-can-read.md)).
 - **Honesty rules.** Speed and DOF wins are measured against PolyMesh's own
   frozen uniform-tet10 baseline (ADR-0005), never against a third-party solver.
   Product volume fills are Cartesian grid-fill, not constrained Delaunay
@@ -739,7 +725,7 @@ python scripts/make_compare_grid.py --out OUT.png --title "..." \
 # 4. The advisor cinema: drives polymesh-gui under xvfb-run itself (do not wrap
 #    it in another xvfb-run), verifies the frames, then encodes mp4/gif/poster.
 #    Frames land in build/cinema/frames; --only re-encodes without recapturing.
-#    The default case is sphere_box_s0_c0; --part selects the retired heatmap's.
+#    The default is icecream_cone; --part selects retained advisor-corpus cases.
 python scripts/render_cinema.py --all
 python scripts/render_cinema.py --all --part box_hole_s0_c0
 python scripts/render_cinema.py --list

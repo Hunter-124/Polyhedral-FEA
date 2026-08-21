@@ -13,6 +13,7 @@
 
 #include <Eigen/Core>
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -27,6 +28,11 @@ using pipeline::SimSetup;
 using pipeline::SolveJob;
 using pipeline::SolveResult;
 using pipeline::VolumeMeshOutput;
+
+/// Canonical element-type colour shared by mesh preview, cinema geometry and
+/// the cinema legend. Keeping one function prevents a "green hex" label from
+/// disagreeing with the cell beside it.
+[[nodiscard]] std::array<float, 3> element_type_color(fea::ElementType type);
 
 class Camera {
   public:

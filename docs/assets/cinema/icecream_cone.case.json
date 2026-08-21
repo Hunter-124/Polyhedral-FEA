@@ -1,0 +1,32 @@
+{
+  "schema": "polymesh.cinema.case/1",
+  "part": "icecream_cone",
+  "geometry": "tests/fixtures/parts/icecream_cone.step",
+  "material": {
+    "E": 200000000000.0,
+    "nu": 0.3
+  },
+  "mesh": {
+    "mesher": "graded_tet",
+    "h_m": 0.012,
+    "spectral_sizing": true,
+    "quadratic_cad_geometry": true
+  },
+  "fixture": {
+    "gui_region": 1,
+    "description": "planar foot"
+  },
+  "load": {
+    "gui_region": 0,
+    "resultant_n": [
+      0.0,
+      0.0,
+      -1000.0
+    ],
+    "description": "conserved resultant on the connected curved cone+scoop exterior"
+  },
+  "advisor": {
+    "policy": "run the deployed explanation and keep this configured mesh unchanged on refusal",
+    "expected_outcome": "out-of-distribution refusal"
+  }
+}

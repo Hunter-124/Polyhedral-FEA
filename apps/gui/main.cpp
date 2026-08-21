@@ -11,17 +11,16 @@
 // the app end-to-end without pointer input (doc captures, agent operation).
 // `savevtu out.vtu` additionally exports the solved nodal fields exactly as
 // the viewport sees them, for headless GUI-vs-CLI cross-checks.
-// The advisor activation cinema (cinema.hpp) is driven by four more verbs:
-//   cinema on | cinema off | cinema advisor <model dir> | record <dir> <frames>
+// The advisor cinema adds `spectral on|off`, `cinema on|off`,
+// `cinema advisor <model dir>`, and `record <dir> <frames>`.
 // `record` renders exactly <frames> frames at a fixed 1/60 s virtual timestep
 // into <dir>/frame_%05d.png, so the take is independent of the real frame rate
 // and reproducible headlessly. POLYMESH_CINEMA_STAMP is drawn verbatim in the
 // cinema footer as the provenance line.
-// The take is one concurrent composition, not four sequential acts: the advisor
-// pass lane and the mesher's stage lane both advance through the `build` act,
-// and the closing `solve` act walks the real solve/estimate/refine loop out of
-// `pipeline::SolveJob::on_solve_stage` before ramping the load factor. Both
-// worker-thread sinks are installed by `cinema on` and removed by `cinema off`,
+// The take is a fixed sequence: exact-CAD/spectral analysis, measured advisor
+// passes, the mesher's stage snapshots and cell microscope, then the real
+// solve/estimate/refine loop from `pipeline::SolveJob::on_solve_stage`.
+// Both worker-thread sinks are installed by `cinema on` and removed by `cinema off`,
 // so a studio session that never enters the cinema pays nothing for either.
 // POLYMESH_GUI_SIZE=<w>x<h> sets the window (and therefore the recorded frame)
 // size at startup; unset, it is the default 1600x1000.
@@ -606,6 +605,11 @@ void tick_auto(AutoRunner& run, App& app, GLFWwindow* window) {
             return fail("h wants one positive element size in mm");
         }
         app.setup.mesh_size = mm / 1000.0; // SimSetup::mesh_size is metres
+    } else if (verb == "spectral") {
+        if (args.size() != 1 || (args[0] != "on" && args[0] != "off")) {
+            return fail("spectral wants on or off");
+        }
+        app.setup.spectral_smooth = args[0] == "on";
     } else if (verb == "fix") {
         int face = -1;
         if (args.size() != 1 || !parse_auto_int(args[0], face)) {
@@ -641,6 +645,9 @@ void tick_auto(AutoRunner& run, App& app, GLFWwindow* window) {
         fea::set_openmp_threads(app.testlab.settings.max_threads);
         app.live_mesh_seen_gen = 0;
         app.status = "solving…";
+        if (app.cinema.active) {
+            prepare_cinema_features(app.cinema, *app.model, app.setup);
+        }
         app.job.start(*app.model, app.setup);
         run.awaiting_solve = true;
         run.settle_frames = 1;
@@ -874,20 +881,28 @@ void service_cinema_record(AutoRunner& run, App& app, GLFWwindow* window) {
     const int poster = std::min(
         cine.record_frames - 1,
         static_cast<int>(std::ceil(cinema_opening_fade(cine) / CinemaState::kRecordStep)));
-    // Every token that was on this line before keeps its spelling and its
-    // place; `skipped`, `solve_stages` and `solver` are appended, because
-    // scripts/render_cinema.py matches this line token for token.
-    //
-    // `solver` is a word rather than a number and it is the film's answer to a
-    // question a reader would otherwise answer wrongly: at 13,146 DOF against
-    // fea::SolveOptions::cg_threshold = 50,000 this case is factorised, so there
-    // are no iterations in it and nothing in the video may suggest otherwise.
+    // The numeric tail is the manifest's compact verification record. Nodes,
+    // total DOF and quality all come from the final authoritative solve stage;
+    // absent data stays zero rather than being reconstructed by the script.
+    std::size_t nodes = 0;
+    std::size_t dof = 0;
+    double quality_min = 0.0;
+    double quality_mean = 0.0;
+    if (!cine.solve_stages.empty()) {
+        nodes = cine.solve_stages.back().trace.n_nodes;
+        dof = cine.solve_stages.back().trace.n_dof;
+    }
+    if (!cine.solve_insights.empty()) {
+        quality_min = cine.solve_insights.back().quality_min;
+        quality_mean = cine.solve_insights.back().quality_mean;
+    }
     std::printf("cinema: record %s frames %d fps 60 candidates %zu stages %zu elements %zu "
-                "poster %d width %d height %d skipped %zu solve_stages %zu solver %s\n",
+                "nodes %zu dof %zu quality_min %.9g quality_mean %.9g poster %d width %d "
+                "height %d skipped %zu solve_stages %zu solver %s\n",
                 cine.record_dir.c_str(), cine.record_frames, candidates, cine.stages.size(),
-                app.viewport.cinema_element_count(), poster, fb_w, fb_h,
-                app.viewport.cinema_skipped_element_count(), cine.solve_stages.size(),
-                cinema_solver_token(cine));
+                app.viewport.cinema_element_count(), nodes, dof, quality_min, quality_mean,
+                poster, fb_w, fb_h, app.viewport.cinema_skipped_element_count(),
+                cine.solve_stages.size(), cinema_solver_token(cine));
     std::fflush(stdout);
     cine.record_dir.clear();
     glfwSwapInterval(1);
@@ -1490,6 +1505,9 @@ void draw_study_panel(App& app) {
         apply_resource_caps();
         app.live_mesh_seen_gen = 0;
         app.status = "solving…";
+        if (app.cinema.active) {
+            prepare_cinema_features(app.cinema, *app.model, app.setup);
+        }
         app.job.start(*app.model, app.setup);
     }
     ImGui::EndDisabled();
@@ -2367,6 +2385,11 @@ int run(int argc, char** argv) {
             }
         }
         if (auto result = app.job.take_result()) {
+            if (app.cinema.active) {
+                app.cinema.drain_stages();
+                app.cinema.drain_solve_stages();
+                app.cinema.adopt_final_result(*result);
+            }
             app.result = std::move(result);
             app.viewport.set_result(*app.result);
             set_mesh_info(app, app.result->mesh_note, app.result->volume_mesh.nodes.size(),

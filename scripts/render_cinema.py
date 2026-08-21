@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """PolyMesh advisor cinema renderer -- records the GUI's cinema surface to video.
 
-Produces every file in ``docs/assets/cinema/``: the full take as h264, a short
-palette-optimised GIF for inline README use, a poster still, and a
+Produces every file in ``docs/assets/cinema/``: the full take as h264, a
+palette-optimised full-take GIF for inline README use, a poster still, and a
 ``manifest.json`` recording the exact command that made them.
 
 The frames are not drawn here. They are the GUI's own framebuffer, captured by
@@ -14,16 +14,13 @@ drive that, refuse to publish a partial capture, and encode what came out.
 
 Design notes
 ------------
-* **Nothing in the pixels is synthesized.** The advisor panel draws
-  ``Advisor::explain()`` -- the production ONNX graph's own trunk taps, one
-  forward pass per candidate the chooser enumerated -- and the mesh panel draws
-  the fill stages the mesher emitted. This script never computes an activation, a
-  progress fraction or an element count. Where a number reaches
-  ``manifest.json`` it was either measured off the files on disk (frame count,
-  byte sizes, digests) or printed by the GUI itself (acts, candidates, stages,
-  elements, and the ``solver`` token naming the linear solver the take's solves
-  actually ran through). When the GUI prints nothing, the manifest says so
-  rather than carrying a plausible value.
+* **Nothing in the pixels is fabricated.** The advisor panel draws
+  ``Advisor::explain()`` -- the deployed ONNX graph's own trunk taps. The
+  spectral panel calls the production refinement-plan/FFT path, the cell
+  microscope measures captured ``NodalMesh`` snapshots, and the result acts draw
+  completed solve fields. This script never computes an activation, spectrum,
+  quality value, progress fraction or element count. Manifest numbers are either
+  file measurements or tokens printed by the GUI; missing data stays missing.
 * **Provenance comes from figstyle**, the same ``git_revision`` and ``digest``
   every generated figure in the repo is stamped with, so the footer burned into
   the video and the JSON beside it agree with the still figures by construction.
@@ -35,24 +32,16 @@ Design notes
   screen and, through ``POLYMESH_GUI_SIZE``, the GUI window; the encoded
   resolution is read out of the first PNG's IHDR and recorded, so a window that
   did not honour the request is visible in the manifest rather than assumed away.
-* **Face ids are GUI face ids, discovered per part at load time.** They are not
-  the case JSON's selection boxes, so they are CLI parameters rather than
-  constants derived from the case. The defaults for ``sphere_box_s0`` were
-  verified by solving with them and reading the VTU back: the part's x extent is
-  [0, 0.0729] m and the max-|u| node sits at the max-x end -- the loaded one --
-  with the top displacement decile 99.73% aligned with x, i.e. axial tension on
-  x_hi with x_lo clamped, which is what the case specifies. A face id that
-  selects nothing fails the run rather than recording a video of an unloaded
-  part.
-* **The GIF is the whole take, budgeted, and it reports what it cost.** GitHub
-  inlines a GIF and not a repo-relative ``<video>``, so the README needs one --
-  and the film's payload is spread across the whole 30 s: the finished mesh held
-  still, stress arriving, the stress gradient, the refinement, the load ramp.
-  A four-second slice of that shows one of them. So the GIF covers the take end
-  to end and pays for it in frame rate and width instead of in content: the
-  ladder steps down through width and fps until one rung lands under
-  ``--gif-max-bytes``, and the setting it landed on is printed and recorded.
-  ``--gif-start``/``--gif-duration`` still cut a slice for anyone who wants one.
+* **Face ids are GUI smooth-region ids, discovered per part at load time.** The
+  complex default uses the ice-cream cone's planar foot (region 1) and connected
+  curved exterior (region 0), recorded in ``icecream_cone.case.json``. The run
+  clamps the foot and applies a conserved -z 1000 N resultant to the curved
+  body. An invalid id fails the take instead of silently recording no load.
+* **The GIF is the whole 60 s take, budgeted, and it reports what it cost.**
+  GitHub inlines a GIF rather than a repo-relative ``<video>``. The film pays
+  for readable holds in duration, then the encoder ladder trades frame rate
+  before width until the result fits ``--gif-max-bytes``; content is never
+  silently cut. ``--gif-start``/``--gif-duration`` remain explicit overrides.
 
 Usage
 -----
@@ -91,25 +80,21 @@ FRAMES_DIR = REPO / "build/cinema/frames"
 #: rate and the playback rate: one recorded frame is one displayed frame and the
 #: video's duration is the take's own virtual duration.
 FPS = 60
-#: 1800 frames = 30.0 s of virtual time. A length, not a schedule: the GUI paces
-#: its own acts inside however many frames it is given, so a shorter take speeds
-#: every beat up rather than truncating the end. 30 s is the length the
-#: composition is tuned for, and it is longer than the 20 s it used to be because
-#: the film now holds still on each result instead of cutting off it: the
-#: finished mesh gets 2.1 s of its own, and each of the closing act's ten beats
-#: gets 0.8-1.9 s. At 30 s one forward pass gets 0.108 s, one pass-0 construction
-#: stage 0.530 s, and the closing act 16.2 s, which is where the holds are paid
-#: for.
-DEFAULT_FRAMES = 1800
+#: 3600 frames = 60.0 s of virtual time. The take is paced as a professional
+#: presentation rather than a loop: 5.4 s for exact-CAD/spectral sizing, 7.2 s
+#: for the advisor, 14.4 s for construction and the cell microscope, 6.6 s for
+#: an exploded-then-closed mesh hold, and 26.4 s for solved fields. Shorter
+#: recordings scale every beat rather than truncating the end.
+DEFAULT_FRAMES = 3600
 #: The Xvfb screen AND, via ``POLYMESH_GUI_SIZE``, the GUI window itself: the
 #: window otherwise opens at the interactive default it has always had
 #: (``kDefaultWindowW``/``H`` = 1600x1000 in ``apps/gui/main.cpp``) whatever the
 #: screen is, which shows up as a 1600x1000 film rather than an error. 1080p
 #: without paying for a 4K framebuffer.
 DEFAULT_SCREEN = (1920, 1080)
-#: Solve plus capture on the default case, with headroom for the fact that the
-#: advisor asks for one adapt pass there, i.e. two real solves of a 13,146-DOF
-#: system, before a single frame is recorded.
+#: Complex quadratic solve plus 3600-frame capture. The published h=10 mm
+#: graded ice-cream-cone solve has historically completed in about two minutes;
+#: 30 minutes leaves headroom for software rendering and encoding.
 DEFAULT_TIMEOUT = 1800
 
 # h264 at CRF 18 is visually lossless on flat UI panels and thin lines, which is
@@ -195,24 +180,38 @@ class Case:
 
 
 CASES: dict[str, Case] = {
-    # The default, and where the film's definition comes from. Of the 44
-    # primitives in the corpus only 23 are advised at all: `ellipsoid_boss`,
-    # `lobed_shaft`, `perforated_plate`, `tube` and `twisted_loft` are refused as
-    # out of distribution in every regime -- perforated_plate_s0 scores 11.36
-    # against the shipped 5.034 operating point -- and on any of those the
-    # advisor panel would be a refusal notice rather than an explanation. Of the
-    # 23 that are advised, sphere_box_s0 gives by far the most elements, because
-    # its curved wall is what drives real curvature and feature grading: 11,692
-    # elements and 13,146 DOF, against 568 elements on box_hole_s0_c0, with a max
-    # von Mises of 2.489 MPa.
+    # The hero case is deliberately more demanding than the advisor corpus:
+    # a watertight Boolean union of a truncated cone and an intersecting sphere,
+    # with a sharp circular join, a curved scoop and a small planar foot. The
+    # shipped OOD gate refuses it instead of extrapolating; that refusal is part
+    # of the film, then the configured product fallback runs unchanged.
     #
-    # That definition is the advisor's own action and not an override. On this
-    # case it advises hybrid_zoo at h_rel 0.08, order 1, one adapt pass and an
-    # eta target of 0.02, at a Mahalanobis distance of 3.34 against the 5.034
-    # operating point, and does not veto: 38 candidates enumerated, 39 forward
-    # passes counting the final re-score. A denser film was bought by picking a
-    # part the model itself asks for a fine mesh on, which is the only way to buy
-    # it without contradicting what the film is about.
+    # h=12 mm / graded / quadratic keeps the measured cell-quality minimum
+    # above the 0.02 ship floor on this part (0.02194, no inverted cells) while
+    # still carrying 37,804 curved cells before face-native BC grading. Spectral
+    # sizing is explicitly enabled and its real report is printed into the
+    # cinema manifest.
+    "icecream_cone": Case(
+        name="icecream_cone",
+        step="tests/fixtures/parts/icecream_cone.step",
+        case_json="docs/assets/cinema/icecream_cone.case.json",
+        h_mm=12.0,
+        fix_face=1,
+        load_face=0,
+        load=(0.0, 0.0, -1000.0),
+        why="complex cone+sphere Boolean with exact curved CAD, FFT sizing, "
+            "quadratic geometry, positive quality margin and a measured OOD "
+            "refusal before the verified fallback",
+        load_note="GUI region 1 (planar foot) fixed; conserved -z 1000 N "
+                  "resultant on GUI region 0 (connected cone+scoop exterior)",
+    ),
+    # Earlier advised take, retained as `--part sphere_box_s0_c0`. Of the 44
+    # primitives in the corpus only 23 are advised at all. Of those, sphere_box_s0
+    # gives by far the most elements because its curved wall drives curvature and
+    # feature grading: 11,692 elements and 13,146 DOF.
+    #
+    # It advises hybrid_zoo at h_rel 0.08, order 1, one adapt pass and eta 0.02,
+    # at Mahalanobis distance 3.34 against the 5.034 operating point.
     "sphere_box_s0_c0": Case(
         name="sphere_box_s0_c0",
         step="bench/geometries/corpus/primitives/sphere_box_s0.step",
@@ -273,7 +272,7 @@ CASES: dict[str, Case] = {
         load_note="1e6 Pa over 8.925720996e-05 m2 of the x_hi face = 89.257 N",
     ),
 }
-DEFAULT_CASE = "sphere_box_s0_c0"
+DEFAULT_CASE = "icecream_cone"
 
 
 # ---------------------------------------------------------------------------
@@ -313,13 +312,14 @@ def auto_spec(case: Case, part: Path, model_dir: Path, frames_dir: Path,
     return "; ".join([
         f"load {rel(part)}",
         f"h {case.h_mm:g}",
+        "spectral on",
         f"fix {case.fix_face}",
-        # `.9g`, not `g`: the resultant is a measurement of the CAD area times
-        # the case's traction, and six significant digits would hand the GUI
-        # 528.198 N for a face whose measured resultant is 528.197958 N.
+        # `.9g`, not `g`: preserve measured resultants instead of rounding the
+        # physical case for display.
         f"loadface {case.load_face} {fx:.9g} {fy:.9g} {fz:.9g}",
         "cinema on",
         f"cinema advisor {rel(model_dir)}",
+        "wire off",
         "solve",
         f"record {frames_dir} {frames}",
         "quit",
@@ -404,12 +404,15 @@ _SOLVER_RE = re.compile(r"\bsolver\s+(?P<solver>\S+)")
 #: The advisor line, same pair grammar plus one word-valued field.
 _ADVISOR_RE = re.compile(r"^cinema:\s+advisor\s+(?!unavailable\b)(?P<rest>.*)$")
 _DECISION_RE = re.compile(r"\bdecision\s+(?P<decision>\S+)")
+#: Spectral refinement-plan report, computed by the same pipeline function the
+#: solve uses and printed before the worker starts.
+_SPECTRAL_RE = re.compile(r"^cinema:\s+spectral\b(?P<rest>.*)$")
 #: No trunk taps, no model, or the advisor would not construct: there are no
 #: activations to draw and the panel says so on screen.
 _UNAVAILABLE_RE = re.compile(
     r"^cinema:\s+advisor\s+unavailable\s+(?P<rest>.*)$")
 #: Per-frame progress. Streamed to the console as it arrives, but kept out of
-#: the manifest -- sixty lines of "frame 900/1800" is not provenance.
+#: the manifest -- progress chatter is not provenance.
 _PROGRESS_RE = re.compile(r"^cinema:\s+frame\s+\d+/\d+\b")
 
 _PAIR_RE = re.compile(r"(?P<key>[a-z_]+)\s+(?P<value>-?[\d.eE+-]*[\d.])")
@@ -421,13 +424,17 @@ _PAIR_RE = re.compile(r"(?P<key>[a-z_]+)\s+(?P<value>-?[\d.eE+-]*[\d.])")
 #: did not draw is exactly the kind of number a reader should not have to take on
 #: trust.
 _SUMMARY_KEYS = ("frames", "fps", "candidates", "stages", "solve_stages",
-                 "elements", "skipped", "poster", "width", "height")
+                 "elements", "nodes", "dof", "quality_min", "quality_mean",
+                 "skipped", "poster", "width", "height")
 #: Keys lifted out of the advisor line. ``candidates`` is the enumerated grid
 #: without the final re-score pass; ``frames`` counts every forward pass
 #: including it, so both are kept and named apart.
 _ADVISOR_KEYS = ("candidates", "frames", "gate_threshold", "h_rel", "order",
                  "adapt_passes", "eta_target", "vetoed", "ood_distance",
                  "applied")
+_SPECTRAL_KEYS = ("applied", "modes_total", "modes_kept", "energy_kept",
+                  "edge_seeds", "predicted_before", "predicted_after",
+                  "geometry_seeds", "bc_seeds", "brep_curvature")
 #: Keys lifted out of the take announcement.
 _TAKE_KEYS = ("frames", "fps", "duration")
 
@@ -435,10 +442,10 @@ _TAKE_KEYS = ("frames", "fps", "duration")
 @dataclass
 class GuiReport:
     """What the GUI said about the take. Absent fields stay None, never 0."""
-
     acts: list[dict]
     counts: dict[str, float]
     advisor: dict[str, float]
+    spectral: dict[str, float]
     take: dict[str, float]
     decision: str | None
     solver: str | None
@@ -476,6 +483,7 @@ def parse_report(stdout: str) -> GuiReport:
     acts: list[dict] = []
     counts: dict[str, float] = {}
     advisor: dict[str, float] = {}
+    spectral: dict[str, float] = {}
     take: dict[str, float] = {}
     decision: str | None = None
     solver: str | None = None
@@ -513,15 +521,19 @@ def parse_report(stdout: str) -> GuiReport:
             if named:
                 solver = named["solver"]
             continue
+        sized = _SPECTRAL_RE.match(line)
+        if sized:
+            spectral.update(_pairs(sized["rest"], _SPECTRAL_KEYS))
+            continue
         advised = _ADVISOR_RE.match(line)
         if advised:
             advisor.update(_pairs(advised["rest"], _ADVISOR_KEYS))
             found = _DECISION_RE.search(advised["rest"])
             if found:
                 decision = found["decision"]
-    return GuiReport(acts=acts, counts=counts, advisor=advisor, take=take,
-                     decision=decision, solver=solver, unavailable=unavailable,
-                     raw=raw)
+    return GuiReport(acts=acts, counts=counts, advisor=advisor, spectral=spectral,
+                     take=take, decision=decision, solver=solver,
+                     unavailable=unavailable, raw=raw)
 
 
 # ---------------------------------------------------------------------------
@@ -876,8 +888,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"    verbs     h {case.h_mm:g}; fix {case.fix_face}; "
                   f"loadface {case.load_face} {fx:.9g} {fy:.9g} {fz:.9g}")
             print(f"    load      {case.load_note}")
-            print(f"    h         fallback only -- the advisor sets h from "
-                  f"h_rel when it advises")
+            print(f"    h         configured before inference; accepted advice "
+                  f"overrides it, refusal keeps it")
             print(f"    why       {case.why}")
         print(f"\noutputs land in {rel(OUT_DIR)}; frames in "
               f"{rel(FRAMES_DIR)} (gitignored by the repo-root /build*/ rule)")
@@ -923,8 +935,8 @@ def main(argv: list[str] | None = None) -> int:
 
     spec = auto_spec(case, part, args.model_dir, frames_dir.resolve(), args.frames)
     argv_gui = gui_argv(args.gui, spec, screen)
-    report = GuiReport(acts=[], counts={}, advisor={}, take={}, decision=None,
-                       solver=None, unavailable=None, raw=[])
+    report = GuiReport(acts=[], counts={}, advisor={}, spectral={}, take={},
+                       decision=None, solver=None, unavailable=None, raw=[])
     wall = None
 
     # ---- capture ------------------------------------------------------------
@@ -1069,9 +1081,9 @@ def main(argv: list[str] | None = None) -> int:
             "load_face": case.load_face,
             "load_n": list(case.load),
             "load_note": case.load_note,
-            "h_mm_fallback": case.h_mm,
-            "h_note": "the h verb is a fallback; when the advisor advises it "
-                      "sets h itself from h_rel",
+            "h_mm_configured": case.h_mm,
+            "h_note": "configured before inference; an accepted advisor action "
+                      "overrides it, while a refusal leaves it unchanged",
             "why": case.why,
         },
         "model": {
@@ -1107,6 +1119,10 @@ def main(argv: list[str] | None = None) -> int:
             "mesh_stages": _as_int(report.counts.get("stages")),
             "solve_stages": _as_int(report.counts.get("solve_stages")),
             "elements": _as_int(report.counts.get("elements")),
+            "nodes": _as_int(report.counts.get("nodes")),
+            "dof": _as_int(report.counts.get("dof")),
+            "quality_min": report.counts.get("quality_min"),
+            "quality_mean": report.counts.get("quality_mean"),
             "elements_skipped": _as_int(report.counts.get("skipped")),
             "solver": report.solver,
             "solver_note": (None if report.solver else
@@ -1123,6 +1139,8 @@ def main(argv: list[str] | None = None) -> int:
             "decision": report.decision,
             "advisor_fields": {key: report.advisor[key]
                                for key in sorted(report.advisor)},
+            "spectral_fields": {key: report.spectral[key]
+                                for key in sorted(report.spectral)},
             "lines": report.raw,
         },
         "outputs": outputs,

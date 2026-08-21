@@ -24,7 +24,7 @@ Nothing is hardcoded about the level set, the chooser set, the pair set or the
 fold count: it is all discovered from the file, because the sweep is still
 getting finer and new choosers (``advisor_gated_*``) are still arriving.
 Regret is in log10 units, 0 = picked the best feasible action; the right-hand
-axis of the sweep restates it as "x worse than oracle".
+axis of the sweep restates it as "times worse than the best choice".
 
 Missing inputs print a "no data yet" note and exit 0, so this is safe to run
 mid-campaign. Every number that lands in the figure is also printed.
@@ -77,15 +77,18 @@ GROUPS: dict[str, list[str]] = {
 CHOOSERS: list[str] = [c for names in GROUPS.values() for c in names]
 
 LABELS = {
-    "oracle": "oracle (best feasible action)",
-    "advisor_policy": "advisor_policy (policy head, previously shipped)",
-    "advisor_argmin": "advisor_argmin (ranking only, no gate — ablation)",
+    "oracle": "oracle (the best choice in hindsight)",
+    "advisor_policy": "advisor_policy (the advisor's own pick, previously "
+                      "shipped)",
+    "advisor_argmin": "advisor_argmin (ranking only — the same rule with the "
+                      "gate removed)",
     "advisor_efficiency": "advisor_efficiency",
     "default": "default (shipped default action)",
     "constant_config": "constant_config",
     "family_lookup": "family_lookup",
-    "finest_action": "finest_action (smallest h_rel, can pick failures)",
-    "spend_budget": "spend_budget (priciest feasible, measured dof)",
+    "finest_action": "finest_action (smallest cell size, can pick failures)",
+    "spend_budget": "spend_budget (priciest feasible, by measured "
+                    "degrees of freedom)",
     "random": "random",
 }
 #: Palette slots. Learned rules get the three strong slots plus yellow, and a
@@ -95,10 +98,11 @@ LABELS = {
 LEARNED_SLOTS = [0, 1, 2, 6]
 TRIVIAL_SLOTS = [3, 4, 5, 7, 6]
 ALPHA = 0.05
-HINDSIGHT_TAG = "oracle-flavoured (has hindsight)"
+HINDSIGHT_TAG = "it had hindsight"
 #: What the SHIPPED chooser is called on the figure. The threshold is filled in
 #: from clamps.json, never typed here.
-SHIPPED_TAG = "SHIPPED in C++: gated enumeration over measured candidates"
+SHIPPED_TAG = ("SHIPPED in C++: checks every measured candidate and blocks "
+               "the risky ones")
 
 
 def gate_threshold() -> tuple[float | None, str | None]:
@@ -447,18 +451,23 @@ def collapse_families(choosers: list[str], tab: dict[str, Any], level: str,
 # drawing
 # --------------------------------------------------------------------------- #
 def _fit(bits: list[str], font_pt: float, width_in: float,
-         per_char: float = 0.505) -> str:
+         max_lines: int = 1) -> str:
     """Join caption fragments, dropping trailing ones that will not fit.
 
-    figstyle lays titles and subtitles out as a single unwrapped line, so an
-    over-long caption is silently clipped at the figure edge. Budget characters
-    from the figure width instead of guessing.
+    figstyle wraps a title or subtitle to the figure width -- ``fs.figure``
+    fills each paragraph at ``width_in * 72 / (0.55 * font_pt)`` columns -- so
+    the real limit is a line count, not a character count. Measure with the
+    same wrapper at the same width over ``max_lines`` of them, rather than a
+    second hand-tuned constant: budgeting one unwrapped line silently threw
+    away findings that had room to wrap, and dropping an honest result to a
+    stale character count is itself a claim the figure did not earn. The cap
+    stays, though, because an unbounded caption grows down into the axes.
     """
-    budget = int((width_in * 72.0 * 0.976) / (per_char * font_pt))
+    columns = max(24, int(width_in * 72.0 / (0.55 * font_pt)))
     text = ""
     for bit in bits:
         candidate = bit if not text else f"{text}; {bit}"
-        if len(candidate) > budget and text:
+        if len(textwrap.wrap(candidate, columns)) > max_lines and text:
             break
         text = candidate
     return text
@@ -471,6 +480,22 @@ def level_label(level: str, q: dict[str, float], bands: set[str]) -> str:
         return level[4:] if level.startswith("band") else level
     value = q.get(level, math.inf)
     return f"p{value * 100:g}" if math.isfinite(value) else level
+
+
+def budget_phrase(level: str, q: dict[str, float]) -> str:
+    """The words for one budget level: ``q0.5`` -> ``the median budget``.
+
+    The level ids stay spelled as the record spells them in the console
+    tables; prose gets the percentile a reader can picture instead.
+    """
+    if level == "unconstrained":
+        return "no budget cap at all"
+    value = q.get(level, math.inf)
+    if not math.isfinite(value):
+        return f"the {level} budget"
+    if math.isclose(value, 0.5, abs_tol=1e-9):
+        return "the median budget"
+    return f"the {value * 100:g}th-percentile budget"
 
 
 def style_of(chooser: str, hindsight: set[str]) -> tuple[Any, str]:
@@ -488,7 +513,8 @@ def draw_sweep(ax: Any, tab: dict[str, Any], levels: list[str],
                note: str = "") -> None:
     t = fs.theme()
     x = np.arange(len(levels), dtype=float)
-    fs.panel_title(ax, "regret against budget — lower is better")
+    fs.panel_title(ax, "how much worse than the best choice, by budget — "
+                       "lower is better")
 
     values = {c: np.array([tab[c].get(lv, {}).get("macro_mean_regret", np.nan)
                            for lv in levels], dtype=float) for c in choosers}
@@ -498,7 +524,8 @@ def draw_sweep(ax: Any, tab: dict[str, Any], levels: list[str],
     # oracle is the definition of zero, not a competitor: draw it as the floor
     ax.axhline(0.0, color=t.rule, linewidth=1.4, zorder=1)
     ax.text(x[-1] - 0.1, 0.01 * float(np.nanmax(list(values.values()))),
-            "oracle floor = 0", ha="right", va="bottom", fontsize=8.0,
+            "best choice in hindsight = 0", ha="right", va="bottom",
+            fontsize=8.0,
             color=t.muted, zorder=3)
 
     drawn = [c for c in choosers if c != "oracle"
@@ -533,10 +560,11 @@ def draw_sweep(ax: Any, tab: dict[str, Any], levels: list[str],
     # curves at the widest budget so the legend reads top-down like the panel
     #
     # Labels are NAMES plus a tag, not sentences. The full explanations
-    # ("priciest feasible, measured dof", "smallest h_rel, can pick failures")
-    # are what each chooser IS, and they belong in the panel note and the
-    # cards; wrapped into nine legend rows they covered the curves they were
-    # supposed to identify, whichever corner the key was put in.
+    # ("priciest feasible, by measured degrees of freedom", "smallest cell
+    # size, can pick failures") are what each chooser IS, and they belong in
+    # the panel note and the cards; wrapped into nine legend rows they covered
+    # the curves they were supposed to identify, whichever corner the key was
+    # put in.
     for chooser in sorted(drawn, key=lambda c: (c != shipped, -float(
             np.nan_to_num(values[c][-1], nan=-1.0)))):
         st, color = style_of(chooser, hindsight)
@@ -563,8 +591,10 @@ def draw_sweep(ax: Any, tab: dict[str, Any], levels: list[str],
     ax.set_xticklabels([level_label(lv, q, bands) for lv in levels],
                        fontsize=7.4, rotation=45, ha="right",
                        rotation_mode="anchor")
-    ax.set_xlabel(f"budget level (quantile of measured {budget_head})")
-    ax.set_ylabel("macro-mean regret (log10 decades)")
+    ax.set_xlabel("budget cap, as a percentile of measured "
+                  f"{fs.quantity_label(budget_head)}")
+    ax.set_ylabel(f"{fs.quantity_label('macro_mean_regret')}\n"
+                  f"({fs.DECADES_NOTE})")
     ax.set_xlim(x[0] - 0.4, x[-1] + 0.4)
     hi = max(float(np.nanmax(v)) for v in values.values())
     n_note = note.count("\n") + 1 if note else 0
@@ -584,7 +614,7 @@ def draw_sweep(ax: Any, tab: dict[str, Any], levels: list[str],
     right = ax.secondary_yaxis(
         "right", functions=(lambda d: np.power(10.0, d),
                             lambda f: np.log10(np.maximum(f, 1e-12))))
-    right.set_ylabel("x worse than oracle")
+    right.set_ylabel("times worse than the best choice")
 
 
 def draw_bands(ax: Any, tab: dict[str, Any], bands: list[str],
@@ -592,7 +622,7 @@ def draw_bands(ax: Any, tab: dict[str, Any], bands: list[str],
                hindsight: set[str], note: str,
                shipped: str | None = None) -> None:
     t = fs.theme()
-    fs.panel_title(ax, "matched cost — spend allocation removed")
+    fs.panel_title(ax, "same spending — just the per-case choice")
     shown = [c for c in choosers if c != "oracle" and not (twin and c == twin[1])]
     mean_of = {c: float(np.nanmean([tab[c].get(b, {}).get("macro_mean_regret", np.nan)
                                     for b in bands])) for c in shown}
@@ -623,7 +653,8 @@ def draw_bands(ax: Any, tab: dict[str, Any], bands: list[str],
     ax.set_yticklabels(labels, fontsize=7.8)
     # headroom for the wrapped note, which is drawn inside the panel
     ax.set_ylim(-1.9, len(shown) - 0.3 + 0.95 * (note.count("\n") + 1))
-    ax.set_xlabel("matched-cost regret (log10 decades)")
+    ax.set_xlabel(f"{fs.quantity_label('macro_mean_regret')}\n"
+                  f"({fs.DECADES_NOTE})")
     handles = [ax.barh(0, 0, color=t.panel, edgecolor=t.ink, linewidth=0.5,
                        hatch=hatches[j % len(hatches)],
                        label=f"band {b[4:] if b.startswith('band') else b}")
@@ -638,9 +669,10 @@ def draw_bands(ax: Any, tab: dict[str, Any], bands: list[str],
 
 def draw_paired(ax: Any, rows: list[dict[str, Any]], note: str) -> None:
     t = fs.theme()
-    fs.panel_title(ax, "pooled paired tests — precomputed in the record")
+    fs.panel_title(ax, "head to head on the same cases — counted in the record")
     if not rows:
-        ax.text(0.5, 0.5, "no paired tests in file", ha="center", va="center",
+        ax.text(0.5, 0.5, "no head-to-head comparisons in this file",
+                ha="center", va="center",
                 color=t.muted, fontsize=9)
         fs.axes_off(ax)
         return
@@ -664,7 +696,7 @@ def draw_paired(ax: Any, rows: list[dict[str, Any]], note: str) -> None:
         p = row["p_value"]
         sig = math.isfinite(p) and p < ALPHA
         ax.text(1.03, yy, ("*  " if sig else "=  ")
-                + (f"p={p:.2g}" if sig else f"p={p:.2g} n.s."),
+                + (f"p={p:.2g}" if sig else f"p={p:.2g}, too close to call"),
                 ha="left", va="center", fontsize=7.4, zorder=4,
                 color=t.ink if sig else t.muted,
                 weight="bold" if sig else "normal")
@@ -676,7 +708,8 @@ def draw_paired(ax: Any, rows: list[dict[str, Any]], note: str) -> None:
     ax.set_ylim(-(0.5 + 1.15 * (note.count("\n") + 1)), len(rows) - 0.3)
     ax.set_xticks([0.0, 0.5, 1.0])
     ax.set_xticklabels(["0%", "50%", "100%"])
-    ax.set_xlabel("share of paired cases — wins (solid) / ties (dotted) / losses (hatched)")
+    ax.set_xlabel("share of cases both rules scored — wins (solid), "
+                  "ties (dotted), losses (hatched)")
     ax.text(0.0, -0.62, note, fontsize=7.2, color=t.muted, ha="left",
             va="top", linespacing=1.6)
     for spine in ("top", "right"):
@@ -711,7 +744,8 @@ def draw_failures(ax: Any, rates: dict[str, dict[str, float]],
     top = max((rates[c]["mean"] for c in shown), default=0.1)
     ax.set_xlim(0.0, max(0.05, top) * 1.9)
     ax.xaxis.set_major_formatter(lambda v, _pos: f"{v * 100:g}%")
-    ax.set_xlabel("mean pick_failure_rate over every scored fold x level")
+    ax.set_xlabel(f"{fs.quantity_label('pick_failure_rate')}\n"
+                  "(every cross-validation group and budget)")
     ax.grid(True, axis="x", color=t.grid, linewidth=0.7, zorder=0)
     ax.text(0.0, -1.0, note, transform=ax.get_yaxis_transform(),
             fontsize=7.0, color=t.muted, ha="left", va="top", linespacing=1.6)
@@ -862,7 +896,7 @@ def advisor_evaluation(crossval: Path, out_dir: Path,
         print(f"  family_lookup hit rate: mean {np.mean(hits):.3f} over "
               f"{len(hits)} runs with a finite rate")
         if max(hits) == 0.0:
-            hit_note = "family_lookup_hit_rate = 0.0 everywhere"
+            hit_note = "it never once found the held-out family"
     if twin:
         print(f"  {twin[1]} is IDENTICAL to {twin[0]} at every level"
               + (f" ({hit_note})" if hit_note else "")
@@ -949,8 +983,9 @@ def advisor_evaluation(crossval: Path, out_dir: Path,
         title_bits.append(
             f"{headline['challenger']} {'beats' if won else 'loses to'}"
             f" {headline['reference']}"
-            f" {headline['wins']}W-{headline['losses']}L"
-            f" p={headline['p_value']:.2g}{'' if sig else ' n.s.'}")
+            f" {headline['wins']} to {headline['losses']},"
+            f" p={headline['p_value']:.2g}"
+            + ("" if sig else ", too close to call"))
     # what the gate itself buys over the same predictions ranked without it:
     # state it either way, from the paired test, never from expectation
     if gate_row is not None:
@@ -958,22 +993,24 @@ def advisor_evaluation(crossval: Path, out_dir: Path,
                  and gate_row["p_value"] < ALPHA)
         g_won = gate_row["wins"] > gate_row["losses"]
         title_bits.append(
-            f"gate vs {ungated} "
-            + ("significant" if g_sig and g_won else "not significant")
-            + f" ({gate_row['wins']}W-{gate_row['losses']}L p="
+            f"gate vs {ungated}: "
+            + ("a real difference" if g_sig and g_won else "too close to call")
+            + f" ({gate_row['wins']} to {gate_row['losses']}, p="
               f"{gate_row['p_value']:.2g})")
     title = _fit(["Advisor evaluation: " + (title_bits[0] if title_bits
                                             else "budget sweep and paired tests")]
-                 + title_bits[1:], fs.FONT_PT["title"], 14.5,
-                 per_char=0.595)
+                 + title_bits[1:], fs.FONT_PT["title"], 14.5)
 
-    shipped_word = "shipped" if focus == shipped else "best deployable"
-    bits = [f"{head} at {primary}: {shipped_word} {focus} {focus_r:.3f}"
-            + (f" ({focus_rank}/{n_distinct})" if focus_rank else "")
-            + (", ranking-only "
+    shipped_word = "shipped" if focus == shipped else "best that can ship"
+    primary_words = budget_phrase(primary, q)
+    bits = [f"{fs.quantity_label(head)} at {primary_words}: {shipped_word} "
+            f"{focus} {focus_r:.3f} ({fs.times_off(focus_r)} off the best "
+            "choice)"
+            + (f", {focus_rank} of {n_distinct}" if focus_rank else "")
+            + (", ranking only "
                f"{tab[ungated].get(primary, {}).get('macro_mean_regret', float('nan')):.3f}"
                if ungated else "")
-            + (", policy head "
+            + (", its own pick "
                f"{tab[policy].get(primary, {}).get('macro_mean_regret', float('nan')):.3f}"
                if policy else "")]
     if oracleish and math.isfinite(oracleish_r) and math.isfinite(focus_r):
@@ -990,9 +1027,9 @@ def advisor_evaluation(crossval: Path, out_dir: Path,
             verdict = "is level with"
         bits.append(
             f"{verdict} hindsight {oracleish} {oracleish_r:.3f}"
-            + (f" ({hs_row['wins']}W-{hs_row['losses']}L p="
+            + (f" ({hs_row['wins']} to {hs_row['losses']}, p="
                f"{hs_row['p_value']:.2g}"
-               + ("" if decided else " n.s., not distinguishable") + ")"
+               + ("" if decided else ", too close to call") + ")"
                if hs_row else ""))
     lost_pairs = [r for r in rows if r["challenger"] == focus
                   and not is_learned(r["reference"])
@@ -1007,18 +1044,19 @@ def advisor_evaluation(crossval: Path, out_dir: Path,
         return f"{label} {named}{extra}"
 
     if lost_pairs:
-        bits.append(_pairs("significantly worse than", lost_pairs, show=1))
+        bits.append(_pairs("clearly worse than", lost_pairs, show=1))
     if focus_band_rank:
-        bits.append(f"at matched cost {focus_band_rank}/{len(band_rank)}"
+        bits.append(f"with spending matched, {focus_band_rank} of "
+                    f"{len(band_rank)}"
                     + (", the worst chooser" if focus_band_worst
                        else f", behind {band_best}"))
     if ns_pairs:
-        bits.append(_pairs("n.s. vs", ns_pairs))
-    subtitle = _fit(bits, fs.FONT_PT["subtitle"], 14.5)
+        bits.append(_pairs("too close to call against", ns_pairs))
+    subtitle = _fit(bits, fs.FONT_PT["subtitle"], 14.5, max_lines=3)
 
     zero_note = "; ".join(
-        f"fold {f} ({', '.join(g) or 'unnamed'}) scored 0 cases and is excluded "
-        "from every macro mean" for f, g in zeros)
+        f"cross-validation group {f} ({', '.join(g) or 'unnamed'}) scored 0 "
+        "cases and is excluded from every average" for f, g in zeros)
     prov = data.get("provenance") or {}
     stamp = ""
     stale = ""
@@ -1037,67 +1075,70 @@ def advisor_evaluation(crossval: Path, out_dir: Path,
             print(f"  {stale}")
     footer = fs.footer_source(
         crossval, n=len(data.get("runs") or []),
-        note=f"leave-one-{split_mode}-out, {n_folds_used} scorable folds x "
-             f"{n_seeds} seeds, objective '{head}'"
+        note=f"leave-one-{split_mode}-out, {n_folds_used} scorable "
+             f"cross-validation groups x {n_seeds} random starts, scored on "
+             f"{fs.quantity_label(head)} ('{head}')"
              + (f" | {zero_note}" if zero_note else "") + stamp
              + (f"\n{stale}" if stale else ""))
 
     seed_max = max((tab[c][lv]["mean_seed_std"] for c in choosers for lv in tab[c]),
                    default=0.0)
     sweep_notes = [
-        f"error bars = fold_std over {n_folds_used} folds; "
-        + (f"largest mean_seed_std {seed_max:.3f} over {n_seeds} seeds"
-           if seed_max > 0 else "mean_seed_std = 0 everywhere")]
+        f"bars = spread over the {n_folds_used} groups"
+        + (f"; random starts move a point {seed_max:.3f} "
+           f"({fs.times_off(seed_max)})" if seed_max > 0
+           else "; every random start gives the same numbers")]
     twin_note = ""
     if twin:
         twin_note = (f"{twin[1]} coincides exactly with {twin[0]}"
-                     + (f" — {hit_note}, so the held-out family always falls "
-                        "back" if hit_note else ""))
+                     + (f" — {hit_note}, so it always falls back"
+                        if hit_note else ""))
     hindsight_note = ""
     if hindsight:
-        hindsight_note = (", ".join(sorted(hindsight)) + " is greyed out: "
-                          f"{HINDSIGHT_TAG} — it ranks candidates by measured "
-                          "cost, so it can never pick a failing action")
+        hindsight_note = (", ".join(sorted(hindsight)) + " is grayed out: "
+                          f"{HINDSIGHT_TAG} — it ranked on cost measured "
+                          "afterwards, so it can never pick a failure")
     for rep, members in groups.items():
         spread = [tab[m].get(primary, {}).get("macro_mean_regret", float("nan"))
                   for m in members]
         others = [m for m in members if m != rep]
-        lead = (f"{rep} drawn heavy: shipped gate, read from "
-                f"clamps.json:{gate_key}"
+        lead = (f"{rep} drawn thick: shipped gate "
+                f"(clamps.json:{gate_key})"
                 if rep == shipped else
-                f"{rep} is the best of the sweep at {primary}; the shipped "
-                "threshold is not in this record")
+                f"{rep} is the best of the sweep at {primary_words}; the "
+                "shipped threshold is not in this record")
         sweep_notes.append(
-            f"{lead}. Shaded envelope = the other {len(others)} thresholds; "
-            f"the sweep spans {min(spread):.3f}-{max(spread):.3f} decades at "
-            f"{primary}, so the threshold is worth "
-            f"{max(spread) - min(spread):.3f} decades and is not the result")
+            f"{lead}. The band = the other {len(others)}, all within "
+            f"{max(spread) - min(spread):.3f} "
+            f"({fs.times_off(max(spread) - min(spread))}) at {primary_words}, "
+            "so the threshold is not the result")
     if missing:
         sweep_notes.append("absent from this file: " + ", ".join(missing))
-    # 44 columns, not 52: the key occupies the right of the same empty band,
-    # and a wider note ran underneath it.
-    sweep_note = "\n".join(textwrap.fill(line, 44, subsequent_indent="   ")
+    # 39 columns, not 44: the key occupies the right of the same empty band,
+    # and at 44 the widest lines ran under its handles once the record grew to
+    # nine choosers. Measured off the rendered PNG, not guessed.
+    sweep_note = "\n".join(textwrap.fill(line, 39, subsequent_indent="   ")
                            for line in sweep_notes)
-    paired_note = (f"n = paired cases with a decided comparison; "
-                   f"* = p < {ALPHA:g}, = : not significant")
+    paired_note = ("n = cases where one rule beat the other; a star marks a "
+                   f"real difference (p below {ALPHA:g})")
     if rank_row is not None:
         r_sig = (math.isfinite(rank_row["p_value"])
                  and rank_row["p_value"] < ALPHA
                  and rank_row["wins"] > rank_row["losses"])
         paired_note += "\n" + textwrap.fill(
-            f"ranking alone ({ungated}, no gate) "
-            + ("also clears" if r_sig else "does not clear")
+            f"ranking alone ({ungated}) "
+            + ("also beats" if r_sig else "does not beat")
             + f" {rank_row['reference']} "
-              f"({rank_row['wins']}W-{rank_row['losses']}L "
+              f"({rank_row['wins']} to {rank_row['losses']}, "
               f"p={rank_row['p_value']:.2g})"
             + (f", and {focus} vs {ungated} is "
-               f"{gate_row['wins']}W-{gate_row['losses']}L-"
-               f"{gate_row['ties']}T p={gate_row['p_value']:.2g}"
-               + (": the gate no longer separates from ranking alone"
+               f"{gate_row['wins']} to {gate_row['losses']} with "
+               f"{gate_row['ties']} ties (p={gate_row['p_value']:.2g})"
+               + (": the gate adds nothing over ranking alone"
                   if not (math.isfinite(gate_row["p_value"])
                           and gate_row["p_value"] < ALPHA
                           and gate_row["wins"] > gate_row["losses"])
-                  else ": the gate still separates from ranking alone")
+                  else ": the gate still adds something over ranking alone")
                if gate_row is not None else ""), 96)
 
     band_note = ""
@@ -1107,31 +1148,33 @@ def advisor_evaluation(crossval: Path, out_dir: Path,
         ahead_of = (band_rank[focus_band_rank - 2]
                     if focus_band_rank >= 2 else None)
         band_note = textwrap.fill(
-            f"budget matched, {focus} ranks {focus_band_rank}/{len(band_rank)}"
+            f"with spending matched, {focus} ranks {focus_band_rank} of "
+            f"{len(band_rank)}"
             + (" — worst of all" if focus_band_worst else "")
-            + (f" ({dep_rank}/{len(band_deployable)} deployable)"
+            + (f" ({dep_rank} of {len(band_deployable)} that can ship)"
                if dep_rank else "")
             + (f", behind {ahead_of}" if ahead_of else "")
-            + ": most of the win is spend allocation, not per-case judgement",
+            + ": most of the win is choosing how much to spend, not the "
+              "per-case choice",
             58)
     gate_notes = []
     for rep in groups:
         base = ungated or "advisor_argmin"
         if rep in rates and base in rates:
+            base_r = tab[base].get(primary, {}).get("macro_mean_regret",
+                                                    float("nan"))
+            rep_r = tab[rep].get(primary, {}).get("macro_mean_regret",
+                                                  float("nan"))
             gate_notes.append(
-                f"{rep} cuts the pick-failure rate from "
+                f"{rep} cuts failing picks from "
                 f"{rates[base]['mean'] * 100:.1f}% ({base}) to "
-                f"{rates[rep]['mean'] * 100:.1f}% (mean over all budget "
-                f"levels; tight budgets leave fewer feasible actions, so a "
-                f"single level reads 2-3 points lower), and regret at "
-                f"{primary} from "
-                f"{tab[base].get(primary, {}).get('macro_mean_regret', float('nan')):.3f}"
-                f" to {tab[rep].get(primary, {}).get('macro_mean_regret', float('nan')):.3f}"
-                " decades")
+                f"{rates[rep]['mean'] * 100:.1f}%, averaged over budgets "
+                "— a tight budget leaves fewer choices, so one alone "
+                f"reads 2-3 points lower — and at {primary_words} from "
+                f"{base_r:.3f} to {rep_r:.3f} ({fs.times_off(rep_r)})")
     failure_note = "\n".join(textwrap.fill(line, 62) for line in [
-        "a deployable rule must sometimes pick an action that turns out to "
-        "fail; a 0% rate means the rule ranked candidates on measured "
-        "outcomes it could not have known"]
+        "a rule you could ship must sometimes pick an action that fails; "
+        "0% means it ranked on results it could not have known"]
         + gate_notes
         + ([hindsight_note] if hindsight_note else [])
         + ([twin_note] if twin_note else []))
@@ -1153,7 +1196,7 @@ def advisor_evaluation(crossval: Path, out_dir: Path,
         draw_bands(axes[0][1], tab, band_list, shown, twin, hindsight,
                    band_note, shipped)
     else:
-        axes[0][1].text(0.5, 0.5, "no matched-cost bands in this file",
+        axes[0][1].text(0.5, 0.5, "no matched-spending bands in this file",
                         ha="center", va="center", color=fs.theme().muted,
                         fontsize=9)
         fs.axes_off(axes[0][1])
@@ -1174,7 +1217,9 @@ def advisor_evaluation(crossval: Path, out_dir: Path,
     if rates:
         draw_failures(axes[1][1], rates, shown, twin, hindsight, failure_note)
     else:
-        axes[1][1].text(0.5, 0.5, "no pick_failure_rate in this file",
+        axes[1][1].text(0.5, 0.5,
+                        f"no {fs.quantity_label('pick_failure_rate')} "
+                        "in this file",
                         ha="center", va="center", color=fs.theme().muted,
                         fontsize=9)
         fs.axes_off(axes[1][1])

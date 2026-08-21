@@ -4,8 +4,9 @@
 
 Committed README assets, regenerated from the real training artifacts:
 
-  training_curves.png  per-epoch train and validation MAE of log10(rel_err),
-                       first vs latest training run overlaid
+  training_curves.png  how far off the error prediction lands after each pass
+                       through the training data — on parts the net trained on
+                       and on parts it has never seen — first vs latest run
                        (runs/<NNN>/metrics.json)
 
 What the network does with a case is no longer a still: the activation heatmap
@@ -93,13 +94,14 @@ def regime_start(dirs: list[Path]) -> tuple[int, str]:
         previous = sizes[index - 1]
         if warm is not None and warm != "warm":
             start = index
-            reason = (f"training restarted from scratch at run "
-                      f"{index + 1} (warm_start={warm!r})")
+            reason = f"training restarted from scratch at run {index + 1}"
         elif (train_rows, val_rows) != (previous[2], previous[3]):
             start = index
-            reason = (f"the corpus changed at run {index + 1}: "
-                      f"{previous[2]}/{previous[3]} -> {train_rows}/{val_rows} "
-                      f"train/val rows")
+            changes = [f"{previous[2]:,} to {train_rows:,} training examples"]
+            if val_rows != previous[3]:
+                changes.append(f"{previous[3]:,} to {val_rows:,} held back")
+            reason = (f"the data changed at run {index + 1} "
+                      f"({' and '.join(changes)})")
     return start, reason
 
 
@@ -125,45 +127,54 @@ def _finding(first: dict[str, Any], latest: dict[str, Any]) -> str:
     """One honest line about the latest run, computed from the metrics.
 
     Never hardcoded: a rerun on corrected data flips the wording with the
-    numbers.
+    numbers. Written for someone who has not read the training code, so the
+    two splits are named for what they hold — parts the net trained on, and
+    parts it has never seen — rather than as "train" and "val".
     """
+    first_id = str(first.get("run"))
+    latest_id = str(latest.get("run"))
     _, first_val = epoch_series(first, "val")
     _, latest_val = epoch_series(latest, "val")
     _, latest_train = epoch_series(latest, "train")
     if not first_val or not latest_val:
-        return "not enough validation epochs to compare the two runs"
+        return "Not enough scores on unseen parts to compare the two runs."
 
     best_first = min(first_val)
     best_latest = min(latest_val)
-    # Epoch-to-epoch swing on the same run is the scale below which a
-    # difference between two runs says nothing. Without it a 1% move reads as
-    # a regression in the same voice as a 55% one.
+    # Pass-to-pass swing on the same run is the scale below which a difference
+    # between two runs says nothing. Without it a 1% move reads as a
+    # regression in the same voice as a 55% one.
     swings = [abs(b - a) for a, b in zip(latest_val, latest_val[1:])]
     noise = (sum(swings) / len(swings)) if swings else 0.0
     delta = best_latest - best_first
+    scores = (f"best miss {best_latest:.3f} vs {best_first:.3f}, which is "
+              f"{fs.times_off(best_latest)} vs {fs.times_off(best_first)} off")
     if abs(delta) <= noise:
-        verdict = (f"latest run is level with the first on val: best MAE of "
-                   f"log10(rel_err) {best_latest:.3f} vs {best_first:.3f}, a "
-                   f"{abs(delta):.3f} difference inside the {noise:.3f} "
-                   f"epoch-to-epoch swing of the run itself")
+        verdict = (f"Run {latest_id} ties run {first_id} on parts it never "
+                   f"trained on: {scores}. The {abs(delta):.3f} between them "
+                   f"is smaller than the {noise:.3f} the score already drifts "
+                   f"from one pass to the next.")
     elif delta < 0:
-        verdict = (f"latest run improved on val: best MAE of log10(rel_err) "
-                   f"{best_latest:.3f} vs {best_first:.3f} "
-                   f"(−{_pct(best_latest, best_first)})")
+        verdict = (f"Run {latest_id} beats run {first_id} on parts it never "
+                   f"trained on: {scores} — {_pct(best_latest, best_first)} "
+                   f"better.")
     else:
-        verdict = (f"latest run REGRESSED on val: best MAE of log10(rel_err) "
-                   f"{best_latest:.3f} vs {best_first:.3f} "
-                   f"(+{_pct(best_latest, best_first)})")
+        verdict = (f"Run {latest_id} LOST ground against run {first_id} on "
+                   f"parts it never trained on: {scores} — "
+                   f"{_pct(best_latest, best_first)} worse.")
 
     if latest_train:
         gap = latest_val[-1] - latest_train[-1]
         share = (gap / latest_val[-1] * 100.0) if latest_val[-1] else 0.0
         if gap > 0:
-            verdict += (f"; final train/val {latest_train[-1]:.3f}/"
-                        f"{latest_val[-1]:.3f} — {share:.0f}% gap, overfits")
+            verdict += (f" It ends at {latest_train[-1]:.3f} on the parts it "
+                        f"trained on against {latest_val[-1]:.3f} on new ones, "
+                        f"a {share:.0f}% gap: much of what it learned is those "
+                        f"specific parts rather than the pattern behind them.")
         else:
-            verdict += (f"; final train/val {latest_train[-1]:.3f}/"
-                        f"{latest_val[-1]:.3f} — no train/val gap")
+            verdict += (f" It ends at {latest_train[-1]:.3f} on the parts it "
+                        f"trained on and {latest_val[-1]:.3f} on new ones, so "
+                        f"it is not just memorizing them.")
     return verdict
 
 
@@ -183,16 +194,21 @@ def training_curves(runs_dir: Path, out_dir: Path) -> bool:
     latest_id = str(latest.get("run"))
     subtitle = _finding(first, latest)
     if start:
-        subtitle += (f"\nRuns before {first_id} are excluded: {reason}. They "
-                     f"were fitted against different labels, so overlaying "
-                     f"them would compare two questions, not two runs.")
+        subtitle += (f"\nRuns before {first_id} are left out because {reason}. "
+                     f"They were trained against different reference answers, "
+                     f"so putting them on the same axes would compare two "
+                     f"different questions rather than two runs.")
     title = (f"Advisor training curves — first run ({first_id}) vs latest "
              f"run ({latest_id}) of the current campaign")
     footer = fs.footer_source(campaign[0] / "metrics.json",
                               campaign[-1] / "metrics.json",
                               n=len(campaign),
                               note=f"runs in this campaign, of {len(dirs)} on disk")
-    fs.assert_glyphs(title, subtitle, footer, first_id, latest_id)
+    xlabel = "pass through the training data (epoch)"
+    ylabel = f"typical miss predicting a mesh's error\n({fs.DECADES_NOTE})"
+    legend_note = "runs (solid = unseen parts, dashed = training parts)"
+    fs.assert_glyphs(title, subtitle, footer, first_id, latest_id,
+                     xlabel, ylabel, legend_note)
     print(f"training_curves campaign: runs {first_id}-{latest_id} "
           f"({len(campaign)} of {len(dirs)}) — {reason}")
     print(f"training_curves finding: {subtitle}")
@@ -201,7 +217,7 @@ def training_curves(runs_dir: Path, out_dir: Path) -> bool:
     ax = axes[0][0]
     n_series = 0
     # End-of-run value labels collide when two runs finish at nearly the same
-    # MAE, which is exactly what happens when a campaign converges. Collect
+    # score, which is exactly what happens when a campaign converges. Collect
     # them and offset the second one instead of overprinting.
     end_labels: list[tuple[float, float, str, str]] = []
     for metrics, name in ((first, "before"), (latest, "after")):
@@ -212,7 +228,7 @@ def training_curves(runs_dir: Path, out_dir: Path) -> bool:
             n_series += 1
             ax.plot(xs, ys, **st.line(linestyle="-", linewidth=2.0,
                                       markersize=4, markevery=max(1, len(xs) // 12),
-                                      label=f"run {run} (val)"))
+                                      label=f"run {run} (unseen parts)"))
             end_labels.append((float(xs[-1]), float(ys[-1]),
                                f"{ys[-1]:.3f}", st.color))
         xs_t, ys_t = epoch_series(metrics, "train")
@@ -221,7 +237,7 @@ def training_curves(runs_dir: Path, out_dir: Path) -> bool:
                                           markersize=4, alpha=0.85,
                                           markerfacecolor="none",
                                           markevery=max(1, len(xs_t) // 12),
-                                          label=f"run {run} (train)"))
+                                          label=f"run {run} (training parts)"))
         print(f"  run {run}: {len(xs)} val epochs, {len(xs_t)} train epochs, "
               f"final val {ys[-1]:.4f}" if xs else f"  run {run}: no val epochs")
 
@@ -233,10 +249,10 @@ def training_curves(runs_dir: Path, out_dir: Path) -> bool:
         dy = (10 if index == 0 else -12) if crowded else -2
         ax.annotate(text, (x, y), textcoords="offset points",
                     xytext=(8, dy), fontsize=fs.FONT_PT["annot"], color=colour)
-    ax.set_xlabel("epoch")
-    ax.set_ylabel("MAE of log10(rel_err)  (unitless)")
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
     ax.legend(frameon=False, fontsize=fs.FONT_PT["legend"], ncol=2)
-    fs.annotate_n(ax, n_series, what="runs (solid = val, dashed = train)")
+    fs.annotate_n(ax, n_series, what=legend_note)
     path = out_dir / "training_curves.png"
     fs.finish(fig, path)
     return True

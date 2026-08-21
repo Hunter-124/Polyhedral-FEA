@@ -113,6 +113,40 @@ def parse_tier1_table() -> list[dict]:
     return rows
 
 
+#: Tier-1 metric names and mesh kinds reach this module as phrase fragments
+#: parsed out of markdown columns -- "SCF at hole equator", "u_r at inner
+#: wall", "hex20 annulus, exact field BC" -- and not as dataset column or
+#: model head names, so a ``figstyle.QUANTITY_LABELS`` lookup can never match
+#: one; the keys there are identifiers. The report itself stays untouched: it
+#: is a committed artifact and its column headings are provenance. So the
+#: abbreviations those fragments carry are spelled out here, at the places
+#: they are drawn, and nothing else in the fragment is rewritten. Do not
+#: "simplify" these into QUANTITY_LABELS -- they would silently stop matching.
+METRIC_WORDS = {
+    # radial displacement at the inner wall of the Lamé cylinder
+    "u_r": "radial displacement",
+    # stress concentration factor at the hole / cavity equator
+    "SCF": "peak stress factor",
+}
+
+#: Element names, as they are spelled in both the Tier-1 mesh-kind column and
+#: the Tier-2 element rows. The node count is the part a reader can act on: it
+#: says how much the element can bend between its corners.
+ELEMENT_WORDS = {
+    "tet4": "4-node tets",
+    "tet10": "10-node tets",
+    "hex8": "8-node hex bricks",
+    "hex20": "20-node hex bricks",
+}
+
+
+def spell_out(name: str, table: dict[str, str]) -> str:
+    """Replace whole tokens from ``table`` in a parsed phrase fragment."""
+    for token, words in table.items():
+        name = re.sub(rf"\b{re.escape(token)}\b", words, name)
+    return name
+
+
 def parse_mms_elements() -> list[dict]:
     """Tier-2 MMS table: element, theory order, observed order."""
     known = {"tet4", "hex8", "tet10", "hex20"}
@@ -216,36 +250,39 @@ def plot_dof_time(outdir: Path) -> Path:
     # values stay on the face as the per-bar labels.
     rows = [
         {
-            "name": "Degrees of freedom",
+            "name": "Unknowns the solver has to solve for "
+                    f"({fs.quantity_label('n_dof')})",
             "vals": (base["dofs"], grad["dofs"]),
-            "fmt": lambda v: f"{int(v):,} DOF",
+            "fmt": lambda v: f"{int(v):,} unknowns",
             "stat": f"{dof_ratio:.2f}\u00d7 fewer",
         },
         {
-            "name": "Wall time (mesh + solve)",
+            "name": "Time to build the mesh and solve it",
             "vals": (base["wall_time_s"]["total"], grad["wall_time_s"]["total"]),
             "fmt": lambda v: f"{v:.3f} s",
             "stat": f"{time_ratio:.1f}\u00d7 faster",
         },
         {
-            "name": "Energy deficit (lower is better)",
+            "name": "Energy shortfall against the reference answer "
+                    "(lower is better)",
             "vals": (base["accuracy"]["value"], grad["accuracy"]["value"]),
             "fmt": lambda v: f"{v:.4f} %",
-            "stat": f"{energy_ratio:.2f}\u00d7 deficit, graded higher",
+            "stat": f"{energy_ratio:.2f}\u00d7 the shortfall, graded higher",
         },
     ]
 
     t = fs.theme()
-    base_st = fs.series("baseline", "uniform tet10 (frozen baseline)")
-    grad_st = fs.series("graded_tet", "feature-graded tet10")
+    base_st = fs.series("baseline", "same cell size everywhere (frozen baseline)")
+    grad_st = fs.series("graded_tet", "smaller cells toward the sharp inside corner")
     note = repeat_note(raw)
     # The ratios are now the headline stat on each row, so the prose carries
     # what the marks cannot: what is held fixed, whose baseline this is, and
     # how the timings were sampled.
     subtitle = (
-        "Same solver, same element type, same problem \u2014 only the sizing "
-        "field differs. Internal self-comparison against PolyMesh's own frozen "
-        "baseline, never an external solver. "
+        "Same solver, same 10-node tetrahedron elements, same part \u2014 the "
+        "only difference is where the mesh puts its small cells. Every bar is "
+        "PolyMesh measured against its own frozen baseline, never against "
+        "another program. "
         + note.split(" \u2014 ")[0].capitalize() + "."
     )
     footer = fs.footer_source(
@@ -255,7 +292,7 @@ def plot_dof_time(outdir: Path) -> Path:
     fs.assert_glyphs(subtitle, footer, base_st.label, grad_st.label)
 
     fig, axes = fs.figure(
-        "D6 \u00b7 L-domain: feature-graded vs PolyMesh's own frozen uniform tet10 baseline",
+        "D6 \u00b7 L-domain: a mesh graded to the features vs PolyMesh's own frozen baseline",
         subtitle=subtitle, footer=footer, size="full",
     )
     ax = axes[0][0]
@@ -312,7 +349,7 @@ def plot_dof_time(outdir: Path) -> Path:
     # Drawn under the bars so the 100% mark reads in the row gaps without
     # putting an outline on the baseline bars that end on it.
     ax.axvline(1.0, color=t.rule, lw=0.8, zorder=1)
-    ax.set_xlabel("share of the frozen uniform tet10 baseline (baseline = 100%)")
+    ax.set_xlabel("share of the frozen baseline mesh (baseline = 100%)")
 
     handles = [fs.plt.Rectangle((0, 0), 1, 1, color=st.color, label=st.label)
                for st in (base_st, grad_st)]
@@ -356,8 +393,8 @@ def plot_tier1(outdir: Path) -> Path:
     meshes: list[str] = []
     for r in rows:
         head, _, mesh = r["case"].partition(" (")
-        heads.append(f"{head} \u00b7 {r['metric']}")
-        meshes.append(mesh.rstrip(")"))
+        heads.append(f"{head} \u00b7 {spell_out(r['metric'], METRIC_WORDS)}")
+        meshes.append(spell_out(mesh.rstrip(")"), ELEMENT_WORDS))
     values = [f"{r['err_pct']:.3g}% of {r['tol_pct']:g}%" for r in rows]
 
     # The verdict is computed from the parsed data, never asserted in a string.
@@ -366,15 +403,17 @@ def plot_tier1(outdir: Path) -> Path:
     if outside:
         # The failing cases are named over their own bars; the title states the
         # count so it stays readable however many cases fail.
-        verdict = f"{len(outside)} of {n} cases OUTSIDE tolerance"
+        verdict = f"{len(outside)} of {n} cases OUTSIDE the error allowed"
     else:
-        verdict = f"all {n} cases inside tolerance"
-    title = f"Tier-1 analytical verification \u2014 {verdict}"
+        verdict = f"all {n} cases inside the error allowed"
+    title = f"Tier-1 checks against exact textbook answers \u2014 {verdict}"
     # The mesh kind of every case is now drawn on its own row, so the prose
     # keeps the fact without re-listing them.
     subtitle = (
-        "Measured on structured parametric verification meshes \u2014 not on "
-        "product Cartesian grid-fill meshes."
+        "Each bar is one case: the filled part is the error PolyMesh made and "
+        "the whole track is the error allowed for that case. Measured on "
+        "regular, purpose-built test meshes \u2014 not on the grid-fill meshes "
+        "the product ships."
     )
     footer = fs.footer_source(
         GATE1_JSON, GATE1_MD, n=n,
@@ -386,17 +425,17 @@ def plot_tier1(outdir: Path) -> Path:
     # the budget separates the three cases with an order of margin from the two
     # that spend most of theirs; the third band only appears if a case fails.
     # The Timoshenko case is exactly 1.5/3 = 0.500, so the safe band is spelled
-    # "≤ half", not "under half": at the boundary the looser wording would
-    # state a bound the data does not support.
+    # "half ... or less", not "under half": at the boundary the looser wording
+    # would state a bound the data does not support.
     band_color_of = ("ok", "warn", "bad")
     band_label = (
-        "\u2264 half of tolerance used",
-        "> half of tolerance used",
-        "outside tolerance",
+        "used half the error allowed, or less",
+        "used more than half the error allowed",
+        "outside the error allowed",
     )
     bands = [2 if r > 1.0 else (1 if r > 0.5 else 0) for r in ratios]
-    limit_label = "tolerance limit"
-    xlabel = "measured error / tolerance"
+    limit_label = "the limit"
+    xlabel = "measured error as a share of the error allowed for that case"
     fs.assert_glyphs(title, subtitle, footer, limit_label, xlabel,
                      *heads, *meshes, *values, *band_label)
 
@@ -487,14 +526,17 @@ def plot_mms(outdir: Path) -> Path:
     """
     groups = [
         {
-            "title": "Frozen P1 isoparametric elements",
-            "sub": "uniform h-halving n=4\u21928, cubic manufactured field",
+            "title": "Frozen baseline elements (tets and bricks)",
+            "sub": "4- and 8-node elements are linear,\n"
+                   "10- and 20-node are quadratic\n"
+                   "cell size halved: 4 \u2192 8 cells per side",
             "rows": parse_mms_elements(),
             "src": GATE1_MD,
         },
         {
-            "title": "Hierarchical p-basis (integrated Legendre)",
-            "sub": "integrated-Legendre hierarchical basis, orders p=1..4",
+            "title": "Higher-order elements (hierarchical p-basis)",
+            "sub": "element order raised from 1 to 4\n"
+                   "integrated-Legendre hierarchical basis",
             "rows": parse_mms_hierarchical(),
             "src": PROGRESS_MD,
         },
@@ -511,20 +553,24 @@ def plot_mms(outdir: Path) -> Path:
     shortfall = max(0.0, -min(devs))
     excess = max(0.0, max(devs))
     if shortfall <= 5.0:
-        verdict = (f"no measured order falls more than {shortfall:.1f}% below "
+        verdict = (f"no measured order is more than {shortfall:.1f}% below "
                    f"theory ({len(all_rows)} cases)")
     else:
         verdict = (f"worst measured order {shortfall:.0f}% below theory "
                    f"({len(all_rows)} cases)")
-    title = f"MMS convergence \u2014 {verdict}"
+    title = f"Convergence check \u2014 {verdict}"
     footer = fs.footer_source(
         *[g["src"] for g in groups], n=len(all_rows),
         note="theory order and measured order both read from the committed reports",
     )
     subtitle = (
-        "Top row: measured energy-norm order (dot) against the theoretical "
-        "order (grey tick), both printed. Bottom row: the same pair as a signed "
-        "deviation from theory, on one shared scale across both groups."
+        "Order is how fast the error shrinks as the cells get smaller: at "
+        "order 2, halving the cell size cuts the error about fourfold, so "
+        "higher is better. Every case here is solved against an answer known "
+        "exactly up front (the method of manufactured solutions, MMS). Top "
+        "row: the measured order (dot) against the order theory predicts "
+        "(grey tick), both printed. Bottom row: the same pair as a signed gap "
+        "from theory, on one shared scale across both groups."
     )
 
     def dev_label(value: float) -> str:
@@ -533,11 +579,12 @@ def plot_mms(outdir: Path) -> Path:
         # cut is half the printed resolution, so nothing else rounds into it.
         return "0.0%" if abs(value) < 0.05 else f"{value:+.1f}%"
 
-    order_label = "energy-norm convergence order"
-    dev_axis_label = "deviation from theory (%)"
+    order_label = "convergence order\n(energy-norm error)"
+    dev_axis_label = "gap from theory (%)"
     theory_labels = [f"theory {r['theory']:g}" for r in all_rows]
     fs.assert_glyphs(title, subtitle, footer, order_label, dev_axis_label,
-                     *[r["label"] for r in all_rows],
+                     *[spell_out(r["label"], ELEMENT_WORDS)
+                       for r in all_rows],
                      *[r["observed_text"] for r in all_rows], *theory_labels,
                      *[dev_label(r["dev_pct"]) for r in all_rows])
 
@@ -626,7 +673,11 @@ def plot_mms(outdir: Path) -> Path:
         # Half a slot of margin: the outer ticks are 34 pt wide and the outer
         # value labels are centred on them, so both clear the spines.
         ax_dev.set_xlim(-0.62, len(rows) - 1 + 0.62)
-        ax_dev.set_xticks(x, [r["label"] for r in rows])
+        # One x slot is ~190 px here and "20-node hex bricks" needs ~210, so
+        # the tick breaks after the node count. The p-basis labels carry no
+        # element token and pass through both steps unchanged.
+        ax_dev.set_xticks(x, [spell_out(r["label"], ELEMENT_WORDS)
+                              .replace(" ", "\n", 1) for r in rows])
         ax_dev.set_xlabel(g["sub"])
 
         if col == 0:
@@ -653,9 +704,10 @@ def plot_mms(outdir: Path) -> Path:
 
     # The element deviations are all at or just below zero, so the top half of
     # that panel is free: the pooled extremes go there rather than into prose.
-    fs.annotate_n(axes[1][0], len(all_rows), what="MMS cases", loc="upper left",
-                  extra=f"largest excess +{excess:.1f}%\n"
-                        f"worst shortfall -{shortfall:.1f}%")
+    fs.annotate_n(axes[1][0], len(all_rows), what="convergence cases",
+                  loc="upper left",
+                  extra=f"furthest above theory +{excess:.1f}%\n"
+                        f"furthest below theory -{shortfall:.1f}%")
 
     out = outdir / "bench_mms.png"
     return fs.finish(fig, out)
@@ -718,19 +770,21 @@ def plot_advisor_budget(outdir: Path) -> Path:
     verdict = (f"{len(over)} of {len(checkable)} capped picks over budget "
                f"({n_runs} runs, {n_refusals} honest refusal"
                f"{'s' if n_refusals != 1 else ''})")
-    title = f"Learned mesh advisor under a DOF budget — {verdict}"
+    title = f"Learned mesh advisor under a budget — {verdict}"
     subtitle = (
-        "Predicted per-case relative-error score (rel_err_rel, lower is "
-        "better) of the action the advisor picks at each cap; all three cases "
-        "on one shared score axis. Each coloured step holds one action until "
-        "a looser cap buys a better one; a refusal means no candidate action "
-        "fit the budget."
+        f"The advisor is handed a {fs.quantity_label('max_dof')} — a cap on "
+        "the unknowns the solver has to solve for — and picks a mesh under it. "
+        "Each coloured step is one pick, held until a looser cap buys a better "
+        "one; the colour says which mesher, and cell size is a fraction of the "
+        "part. All three parts share one score axis: the height is the model's "
+        f"predicted {fs.quantity_label('rel_err_rel')}, so lower is better. A "
+        "refusal means no candidate mesh fit the budget."
     )
     footer = fs.footer_source(
         ADVISOR_SWEEP_JSON, n=n_runs,
         note=f"one CLI solve invoked per point (polymesh solve --advisor "
              f"--advisor-max-dof N), of which {len(failed)} of {n_runs} "
-             f"exited nonzero — the picked action failed to mesh or solve; "
+             f"failed to mesh or solve — the picked action never came back; "
              f"every plotted score is the shipped ONNX model's prediction, "
              f"not a measured outcome",
     )
@@ -821,9 +875,13 @@ def plot_advisor_budget(outdir: Path) -> Path:
     ax.grid(axis="y", color=t.grid, linewidth=0.6, zorder=0)
     ax.set_axisbelow(True)
     ax.set_xticks(range(x_uncapped + 1), cap_labels)
-    ax.set_xlabel("DOF budget cap (--advisor-max-dof)")
-    ax.set_ylabel("predicted error score of the chosen action\n"
-                  "(lower is better)")
+    ax.set_xlabel(f"{fs.quantity_label('max_dof')} the advisor was given "
+                  "(--advisor-max-dof)")
+    # The score is a log10 distance from the case's own median action, so the
+    # axis says what a step of 0.30 on it actually means.
+    ax.set_ylabel("predicted error of the pick (lower is better)\n"
+                  "measured against this part's middle pick\n"
+                  f"({fs.DECADES_NOTE})")
 
     # Past the last action change nothing moves; shading that stretch says so
     # without asserting anything the records do not carry.
@@ -833,7 +891,7 @@ def plot_advisor_budget(outdir: Path) -> Path:
     if 0 < last_change < x_uncapped:
         ax.axvspan(last_change - 0.5, right, color=t.grid, alpha=0.45,
                    zorder=0, linewidth=0)
-        settled_note = (f"no pick changes from {cap_labels[last_change]} "
+        settled_note = (f"nothing changes from {cap_labels[last_change]} "
                         f"up to no cap")
 
     # Placed label boxes: a label goes to the side that has room instead of
@@ -928,8 +986,8 @@ def plot_advisor_budget(outdir: Path) -> Path:
                           default=(y_range, bottom))
         x_key = (last_change - 0.25) if settled_note else 0.6
         y_mid = gap_lo + 0.5 * gap
-        head = (f"ringed: {len(failed)} of {n_runs} invoked solves "
-                f"exited nonzero")
+        head = (f"ringed: {len(failed)} of {n_runs} picks failed to mesh "
+                f"or solve")
         fs.assert_glyphs(head)
         ax.scatter([x_key - 0.22], [y_mid], marker="o", s=120,
                    facecolors="none", edgecolors=t.bad, linewidths=1.4,
@@ -938,6 +996,35 @@ def plot_advisor_budget(outdir: Path) -> Path:
                     fontsize=fs.FONT_PT["annot"], color=t.ink, zorder=6)
         placed.append((x_key - 0.35, x_key + char_x * len(head),
                        y_mid - 0.5 * line_y, y_mid + 0.5 * line_y))
+    # The mesher is named once, in the legend, instead of on every step. The
+    # plain names run to 26 characters, and repeating one on each of the seven
+    # step labels put three of them on top of each other; the colour already
+    # carries the identity, so the legend is the cheaper place to spell it.
+    mesher_names: list[str] = []
+    for case in cases:
+        for s in case["steps"]:
+            if s["key"][0] not in mesher_names:
+                mesher_names.append(s["key"][0])
+    mesher_styles = [fs.series(name) for name in mesher_names]
+    fs.assert_glyphs(*[st.label for st in mesher_styles])
+    # Solid, like the steps themselves: the shared dash cycle would show a
+    # dashed key beside a solid line and read as a different series.
+    mesher_handles = [
+        fs.plt.Line2D([0], [0], color=st.color, linestyle="-", linewidth=3.0,
+                      marker=st.marker, markersize=6, markeredgecolor=t.bg,
+                      markeredgewidth=0.8, label=st.label)
+        for st in mesher_styles
+    ]
+    legend_cols = 2 if len(mesher_handles) > 2 else 1
+    ax.legend(handles=mesher_handles, loc="lower right", ncol=legend_cols,
+              frameon=False, fontsize=fs.FONT_PT["legend"], handlelength=1.6,
+              columnspacing=1.6, borderaxespad=0.6, labelspacing=0.35)
+    # Reserved before any step label is placed, so the placement search treats
+    # the legend as occupied space rather than drawing a label under it.
+    legend_rows = -(-len(mesher_handles) // legend_cols)
+    widest = max(len(st.label) for st in mesher_styles)
+    placed.append((right - char_x * (widest + 10) * legend_cols, right,
+                   bottom, bottom + line_y * (legend_rows + 0.6)))
 
     label_texts: list[str] = []
     for ci, case in enumerate(cases):
@@ -966,17 +1053,33 @@ def plot_advisor_budget(outdir: Path) -> Path:
                 ax.scatter(s["bad"], [s["y"]] * len(s["bad"]), marker="o",
                            s=120, facecolors="none", edgecolors=t.bad,
                            linewidths=1.4, zorder=5)
-            mesher, order, h_rel, passes = s["key"]
-            bits = [f"h {h_rel:g}"]
+            _, order, h_rel, passes = s["key"]  # mesher is already `st` above
+            # Plain words for the pick, and only what the colour cannot say:
+            # the mesher is named once in the legend. One fact per line keeps
+            # every label under a column wide, which is what the placement
+            # search needs here -- the bottom three levels sit 0.11 apart on a
+            # 2.2 span, so a two-column-wide label has nowhere to go and lands
+            # on its neighbour.
+            order_words = fs.quantity_label(f"policy_order_logit_{order}")
+            lines = [order_words, f"cells {h_rel:g}"]
             if passes:
-                bits.append(f"+{passes} adapt")
-            text = f"{mesher} p{order}\n{s['y']:+.2f} · " + " ".join(bits)
+                lines.append(f"{passes} pass{'' if passes == 1 else 'es'} "
+                             f"of refinement")
+            # The score is a log10 distance from this part's median pick, so
+            # the label prints the plain factor beside it: a bare -2.02 reads
+            # as a small number when it stands for a hundredfold difference.
+            factor = fs.times_off(abs(s["y"]))
+            way = "lower" if s["y"] < 0.0 else "higher"
+            lines.append(f"{s['y']:+.2f} \u2014 {factor} {way}")
+            text = "\n".join(lines)
             label_texts.append(text)
             put(text, s["x0"] - 0.42, s["y"])
             prev = s
         for k, x in enumerate(case["refused"]):
             # No action was chosen, so there is no score to draw: the refusal
-            # gets its own lane at the foot of the panel.
+            # gets its own lane at the foot of the panel. The mark stays short
+            # -- this lane is not routed around the step labels, and the
+            # subtitle already says what a refusal is.
             y_frac = 0.03 + 0.06 * ci
             ax.scatter([x], [y_frac], marker="x", s=70, color=t.bad,
                        linewidth=2.0, zorder=6,

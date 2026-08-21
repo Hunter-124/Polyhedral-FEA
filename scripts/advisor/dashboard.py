@@ -34,6 +34,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+# The legend entries and the table's row names come from the one label table
+# in figstyle, so a dashboard axis cannot disagree with the report figure or
+# the doc that quotes it. This is the module's only matplotlib-backed import.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import figstyle as fs  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
 ADVISOR_DIR = ROOT / "bench" / "advisor"
 # The cache location is fixed by contract, independent of --advisor-dir.
@@ -74,9 +80,16 @@ BASE_LAYOUT = {
     "font": {"family": "system-ui, Segoe UI, Helvetica, Arial, sans-serif",
              "size": 12, "color": "#20242a"},
     "margin": {"l": 56, "r": 24, "t": 30, "b": 44},
-    "legend": {"orientation": "h", "y": -0.22},
-    "xaxis": {"title": "training run", "gridcolor": "#e4e1da",
-              "zerolinecolor": "#e4e1da"},
+    # Pinned to the bottom of the chart box, not to the plot area: now that
+    # the x-axis title actually renders, a plot-area-relative legend lands on
+    # top of it and on the tick labels when a chart is tall.
+    "legend": {"orientation": "h", "yref": "container", "y": 0.0,
+               "yanchor": "bottom"},
+    # plotly.js 3.x dropped the bare-string form of an axis title: a string
+    # here renders as nothing at all, which is how every axis on this page
+    # ended up unlabelled. Titles are objects.
+    "xaxis": {"title": {"text": "training run"}, "automargin": True,
+              "gridcolor": "#e4e1da", "zerolinecolor": "#e4e1da"},
     "yaxis": {"gridcolor": "#e4e1da", "zerolinecolor": "#e4e1da"},
 }
 
@@ -201,7 +214,7 @@ def series(history: list[dict[str, Any]], section: str,
 def trace(history: list[dict[str, Any]], section: str, key: str,
           mode: str = "lines+markers", **extra: Any) -> dict[str, Any]:
     xs, ys = series(history, section, key)
-    out = {"x": xs, "y": ys, "name": key, "mode": mode,
+    out = {"x": xs, "y": ys, "name": fs.metric_label(key), "mode": mode,
            "line": {"color": METRIC_COLORS.get(key, "#555555"), "width": 2},
            "marker": {"size": 5}}
     out.update(extra)
@@ -227,9 +240,12 @@ def stage_marker_layout(history: list[dict[str, Any]]) -> dict[str, Any]:
                        "yref": "paper", "y0": 0, "y1": 1,
                        "line": {"color": "#8a6d1c", "width": 1.5,
                                 "dash": "dot"}})
+        # Inside the plot area, not above it: at y = 1.0 the label sits in the
+        # title band and prints on top of the chart title whenever the
+        # transition lands near the middle of the run history.
         annotations.append({"x": run, "yref": "paper", "y": 1.0,
-                            "text": "Stage A→B", "showarrow": False,
-                            "yanchor": "bottom", "xanchor": "left",
+                            "text": "Stage A to B", "showarrow": False,
+                            "yanchor": "top", "xanchor": "left",
                             "font": {"color": "#8a6d1c", "size": 11}})
     return {"shapes": shapes, "annotations": annotations}
 
@@ -240,7 +256,8 @@ def begin_end_annotations(history: list[dict[str, Any]]) -> list[dict[str, Any]]
         return []
     out = []
     for label, x, y in (("begin", xs[0], ys[0]), ("end", xs[-1], ys[-1])):
-        out.append({"x": x, "y": y, "text": f"{label} {y:.3f}",
+        out.append({"x": x, "y": y,
+                    "text": f"{label} {y:.3f} ({fs.times_off(y)} off)",
                     "showarrow": True, "arrowhead": 2, "ax": 34, "ay": -30,
                     "font": {"size": 11, "color": "#2166ac"}})
     return out
@@ -254,11 +271,15 @@ def panel_val_metrics(history: list[dict[str, Any]]) -> str:
     traces = [trace(history, "val", key) for key in keys]
     marker = stage_marker_layout(history)
     annotations = marker["annotations"] + begin_end_annotations(history)
-    layout = {"title": {"text": "validation metric per head vs training run"},
-              "yaxis": {"title": "validation metric",
+    layout = {"title": {"text": "How each prediction did on parts it never "
+                                "trained on"},
+              "yaxis": {"title": {"text": "score, lower is better<br>"
+                                          f"misses are in {fs.DECADES_NOTE}",
+                                  "font": {"size": 11}},
+                        "automargin": True,
                         "gridcolor": "#e4e1da", "zerolinecolor": "#e4e1da"},
               "shapes": marker["shapes"], "annotations": annotations}
-    return chart("val-metrics", traces, layout, height=380)
+    return chart("val-metrics", traces, layout, height=440)
 
 
 def panel_benchmark(history: list[dict[str, Any]]) -> str:
@@ -269,15 +290,20 @@ def panel_benchmark(history: list[dict[str, Any]]) -> str:
         trace(history, "val", "geo_chamfer_mae"),
         trace(history, "val", "geo_p99_mae"),
         trace(history, "val", "failure_bce"),
-        trace(history, "val", "failure_acc", dash_y2("failure_acc")),
-        trace(history, "val", "failure_auc", dash_y2("failure_auc")),
+        trace(history, "val", "failure_acc", **dash_y2("failure_acc")),
+        trace(history, "val", "failure_auc", **dash_y2("failure_auc")),
     ]
     acc_layout = {
-        "title": {"text": "accuracy heads (validation split)"},
-        "yaxis": {"title": "MAE / BCE", "gridcolor": "#e4e1da",
-                  "zerolinecolor": "#e4e1da"},
-        "yaxis2": {"title": "acc / AUC", "overlaying": "y", "side": "right",
-                   "range": [0, 1], "showgrid": False},
+        "title": {"text": "Accuracy, on parts it never trained on"},
+        "yaxis": {"title": {"text": "average miss, or cross-entropy<br>"
+                                    f"{fs.DECADES_NOTE}",
+                            "font": {"size": 11}},
+                  "automargin": True,
+                  "gridcolor": "#e4e1da", "zerolinecolor": "#e4e1da"},
+        "yaxis2": {"title": {"text": "accuracy and ranking quality (0 to 1)",
+                             "font": {"size": 11}},
+                   "automargin": True, "overlaying": "y",
+                   "side": "right", "range": [0, 1], "showgrid": False},
         **stage_marker_layout(history),
     }
     cost = [
@@ -285,14 +311,17 @@ def panel_benchmark(history: list[dict[str, Any]]) -> str:
         trace(history, "val", "mesh_ms_mae"),
         trace(history, "val", "solve_ms_mae"),
     ]
-    cost_layout = {"title": {"text": "cost heads (validation split)"},
-                   "yaxis": {"title": "MAE (log10 space)",
+    cost_layout = {"title": {"text": "Cost, on parts it never trained on"},
+                   "yaxis": {"title": {"text": "average miss<br>"
+                                               f"{fs.DECADES_NOTE}",
+                                       "font": {"size": 11}},
+                             "automargin": True,
                              "gridcolor": "#e4e1da",
                              "zerolinecolor": "#e4e1da"},
                    **stage_marker_layout(history)}
     return ('<div class="grid-2">'
-            + chart("bench-accuracy", accuracy, acc_layout, height=340)
-            + chart("bench-cost", cost, cost_layout, height=340)
+            + chart("bench-accuracy", accuracy, acc_layout, height=430)
+            + chart("bench-cost", cost, cost_layout, height=430)
             + "</div>")
 
 
@@ -308,17 +337,21 @@ def panel_pruning_throughput(history: list[dict[str, Any]],
         xs, dropped = series(history, "", "pruned_rows")
         _, cumulative = series(history, "", "pruned_total")
         traces = [
-            {"x": xs, "y": dropped, "name": "rows dropped", "type": "bar",
-             "marker": {"color": "#c51b7d"}},
-            {"x": xs, "y": cumulative, "name": "cumulative dropped",
+            {"x": xs, "y": dropped, "name": fs.quantity_label("pruned_rows"),
+             "type": "bar", "marker": {"color": "#c51b7d"}},
+            {"x": xs, "y": cumulative,
+             "name": fs.quantity_label("pruned_total"),
              "mode": "lines+markers", "yaxis": "y2",
              "line": {"color": "#4d4d4d", "width": 2}},
         ]
-        layout = {"title": {"text": "outlier pruning per run"},
+        layout = {"title": {"text": "Rows dropped for poor fit, per training "
+                                    "run"},
                   "barmode": "overlay",
-                  "yaxis": {"title": "rows dropped",
+                  "yaxis": {"title": {"text": "rows dropped this run"},
+                            "automargin": True,
                             "gridcolor": "#e4e1da", "zerolinecolor": "#e4e1da"},
-                  "yaxis2": {"title": "cumulative", "overlaying": "y",
+                  "yaxis2": {"title": {"text": "rows dropped so far"},
+                             "automargin": True, "overlaying": "y",
                              "side": "right", "showgrid": False}}
         cells.append(chart("pruning", traces, layout, height=320))
     else:
@@ -330,18 +363,22 @@ def panel_pruning_throughput(history: list[dict[str, Any]],
         rate = [b.get("rows_per_s") for b in batches]
         dedup = [b.get("dedup_hits") for b in batches]
         rate_traces = [
-            {"x": labels, "y": rate, "name": "rows/s", "type": "bar",
+            {"x": labels, "y": rate, "name": "rows per second", "type": "bar",
              "marker": {"color": "#2166ac"}},
-            {"x": labels, "y": dedup, "name": "dedup hits", "type": "bar",
+            {"x": labels, "y": dedup, "name": "duplicates skipped",
+             "type": "bar",
              "marker": {"color": "#1b7837"}, "yaxis": "y2"},
         ]
-        rate_layout = {"title": {"text": "campaign throughput per batch"},
+        rate_layout = {"title": {"text": "How fast the data was generated, "
+                                         "per batch"},
                        "barmode": "group",
-                       "xaxis": {"title": "", "gridcolor": "#e4e1da",
+                       "xaxis": {"title": {"text": ""}, "gridcolor": "#e4e1da",
                                  "zerolinecolor": "#e4e1da"},
-                       "yaxis": {"title": "rows/s", "gridcolor": "#e4e1da",
+                       "yaxis": {"title": {"text": "rows per second"},
+                                 "automargin": True, "gridcolor": "#e4e1da",
                                  "zerolinecolor": "#e4e1da"},
-                       "yaxis2": {"title": "dedup hits", "overlaying": "y",
+                       "yaxis2": {"title": {"text": "duplicates skipped"},
+                                  "automargin": True, "overlaying": "y",
                                   "side": "right", "showgrid": False}}
         shard_traces: list[dict[str, Any]] = []
         shard_ids = sorted({s.get("shard") for b in batches
@@ -355,12 +392,13 @@ def panel_pruning_throughput(history: list[dict[str, Any]],
                 ys.append(match.get("wall_s") if match else None)
                 texts.append(f"{match.get('rows')} rows" if match else "")
             shard_traces.append({"x": labels, "y": ys, "type": "bar",
-                                 "name": f"shard {shard}", "text": texts})
-        shard_layout = {"title": {"text": "per-shard wall time (s)"},
+                                 "name": f"chunk {shard}", "text": texts})
+        shard_layout = {"title": {"text": "Time each chunk of the batch took"},
                         "barmode": "group",
-                        "xaxis": {"title": "", "gridcolor": "#e4e1da",
+                        "xaxis": {"title": {"text": ""}, "gridcolor": "#e4e1da",
                                   "zerolinecolor": "#e4e1da"},
-                        "yaxis": {"title": "wall_s", "gridcolor": "#e4e1da",
+                        "yaxis": {"title": {"text": "time taken (seconds)"},
+                                  "automargin": True, "gridcolor": "#e4e1da",
                                   "zerolinecolor": "#e4e1da"}}
         cells.append(chart("throughput-rate", rate_traces, rate_layout,
                            height=320))
@@ -394,32 +432,41 @@ def panel_baseline(history: list[dict[str, Any]],
             and isinstance(base_mae, (int, float)) else None
         winner = ""
         if delta is not None:
-            winner = ('<span class="win">MLP</span>' if delta < 0
+            winner = ('<span class="win">our model</span>' if delta < 0
                       else '<span class="lose">LightGBM</span>')
+        # Plain name for the reader, the JSON key beside it: this table is read
+        # against baseline_metrics.json, so dropping the key would cost a grep.
+        quantity = fs.quantity_label(str(name))
+        cell = html.escape(quantity)
+        if quantity != str(name):
+            cell += f" <code>{html.escape(str(name))}</code>"
         rows.append(
             "<tr>"
-            f"<td>{html.escape(str(name))}</td>"
+            f"<td>{cell}</td>"
             f"<td>{fmt(base_mae)}</td><td>{fmt(base_rmse)}</td>"
             f"<td>{fmt(mlp_mae)}</td><td>{fmt(delta, signed=True)}</td>"
             f"<td>{winner}</td></tr>"
         )
     note_bits = []
     if baseline:
-        note_bits.append(f"LightGBM: n_train={baseline.get('n_train')}, "
-                         f"n_val={baseline.get('n_val')}")
+        note_bits.append(f"LightGBM trained on {baseline.get('n_train')} rows "
+                         f"and scored on {baseline.get('n_val')} it never saw")
     if latest_run is not None:
-        note_bits.append(f"MLP: latest run {latest_run} (log10-space MAE)")
+        note_bits.append(f"our model: latest run {latest_run}, misses in "
+                         f"{fs.DECADES_NOTE}")
     if not baseline:
-        note_bits.append("baseline_metrics.json not present yet — "
-                         "LightGBM columns will fill in after "
+        note_bits.append("baseline_metrics.json not present yet — the "
+                         "LightGBM columns fill in after "
                          "train.py --baseline")
     if not names:
-        return no_data("baseline targets or MLP validation metrics")
+        return no_data("baseline scores or our model's scores on unseen parts")
     return (
         f'<p class="note">{" · ".join(html.escape(b) for b in note_bits)}</p>'
-        '<table class="compare"><thead><tr><th>target</th>'
-        "<th>LightGBM val MAE</th><th>LightGBM val RMSE</th>"
-        "<th>MLP val MAE</th><th>Δ (MLP − LGBM)</th><th>lower MAE</th>"
+        '<table class="compare"><thead><tr><th>what it predicts</th>'
+        "<th>LightGBM: average miss</th>"
+        "<th>LightGBM: average miss, RMS</th>"
+        "<th>our model: average miss</th>"
+        "<th>difference (ours − LightGBM)</th><th>smaller miss</th>"
         "</tr></thead><tbody>" + "".join(rows) + "</tbody></table>"
     )
 
@@ -470,7 +517,10 @@ def render_activation_svg(act: dict[str, Any]) -> tuple[str, list[str]]:
     top = 46.0
     max_nodes = max((len(idx) for idx in kept), default=1)
     height = top + max_nodes * spacing + 26
-    width = col_x[-1] + 170 if col_x else 400
+    # Right-hand room for the head labels, which are spelled out rather than
+    # printed as head identifiers: "relative error, against the case's own
+    # median" needs about twice what "rel_err_rel" did.
+    width = col_x[-1] + 330 if col_x else 400
 
     def node_pos(col: int, row: int, count: int) -> tuple[float, float]:
         col_height = count * spacing
@@ -494,8 +544,8 @@ def render_activation_svg(act: dict[str, Any]) -> tuple[str, list[str]]:
         ordered = sorted(flat)
         threshold = ordered[min(len(ordered) - 1,
                                 int(EDGE_QUANTILE * (len(ordered) - 1)))]
-        edge_notes.append(f"{edge.get('from')}→{edge.get('to')} "
-                          f"|w| ≥ {threshold:.3f}")
+        edge_notes.append(f"{edge.get('from')}→{edge.get('to')}: "
+                          f"strength {threshold:.3f} and up")
         if wmax <= 0:
             continue
         drawn = 0
@@ -521,13 +571,13 @@ def render_activation_svg(act: dict[str, Any]) -> tuple[str, list[str]]:
                 )
                 drawn += 1
         if drawn == 0:
-            edge_notes[-1] += " (no edges above threshold)"
+            edge_notes[-1] += " (nothing that strong)"
 
     last_col = len(layers) - 1
     for col, (layer, idx) in enumerate(zip(layers, kept)):
         name = html.escape(str(layer.get("name")))
         size = int(layer.get("size", 0))
-        caption = f"{name} · {size}" + (" (subsampled)" if len(idx) < size
+        caption = f"{name} · {size}" + (" (sample shown)" if len(idx) < size
                                         else "")
         parts.append(f'<text x="{col_x[col]}" y="{top - 26:.0f}" '
                      f'text-anchor="middle" class="layer-name">{caption}'
@@ -550,22 +600,28 @@ def render_activation_svg(act: dict[str, Any]) -> tuple[str, list[str]]:
                 f"<title>{name}[{i}]{html.escape(label_txt)} = "
                 f"{a:.4f}</title></circle>"
             )
-            if row < len(side_labels):
+            # Index by i, the neuron this circle actually is, not by row, its
+            # slot in the drawn column. They agree only while the layer fits
+            # under the subsample cap; past it the side label named a
+            # different output than the tooltip on the same circle.
+            if i < len(side_labels):
                 parts.append(
                     f'<text x="{x + 13:.1f}" y="{y + 3.5:.1f}" '
-                    f'class="head-label">{html.escape(str(labels[row]))}'
+                    "class=\"head-label\">"
+                    f"{html.escape(fs.quantity_label(str(labels[i])))}"
                     "</text>"
                 )
     parts.append(
         f'<text x="{width - 8}" y="{height - 8:.0f}" text-anchor="end" '
         f'class="scale-note">'
-        f"max |activation| = {amax:.3f} this run</text>"
+        f"strongest signal this run = {amax:.3f}</text>"
     )
     svg = (f'<svg viewBox="0 0 {width:.0f} {height:.0f}" role="img" '
-           f'aria-label="network activations run {act.get("run")}" '
+           f'aria-label="network signals for run {act.get("run")}" '
            'xmlns="http://www.w3.org/2000/svg">' + "".join(parts) + "</svg>")
-    notes.append("edges drawn where |weight| is above the "
-                 f"{int(EDGE_QUANTILE * 100)}th percentile per layer pair: "
+    notes.append("a line is drawn only where a connection is stronger than "
+                 f"{int(EDGE_QUANTILE * 100)} percent of the connections "
+                 "between those two layers: "
                  + "; ".join(edge_notes))
     return svg, notes
 
@@ -582,23 +638,25 @@ def panel_activations(acts: list[dict[str, Any]]) -> str:
         case = act.get("input_case") or {}
         caption = ""
         if case:
-            caption = (f'<span class="case">input case: '
+            caption = (f'<span class="case">example part fed in: '
                        f"{html.escape(str(case.get('part', '?')))} · "
                        f"{html.escape(str(case.get('cfg_id', '?')))}</span>")
         panes.append(f'<div class="act-run" data-run="{act.get("run")}" '
                      f'style="display:none">{caption}{svg}</div>')
     legend = (
-        '<p class="legend">node = neuron — radius ∝ √|activation|, '
-        "blue = positive, orange = negative, saturation ∝ |activation| "
-        "(normalised per run; max printed top-right). "
-        + " ".join(html.escape(n) for n in all_notes)
-        + " Edges: blue = positive weight, orange = negative.</p>"
+        '<p class="legend">Each circle is one neuron — the bigger the circle '
+        "and the stronger the color, the bigger the signal; blue is positive, "
+        "orange is negative, measured against the strongest signal in that "
+        "run (printed at the bottom right). "
+        + " \u00b7 ".join(html.escape(n) for n in all_notes)
+        + ". Lines are connections: blue adds to the next neuron, orange "
+          "subtracts from it.</p>"
     )
     slider = (
         '<div class="act-controls">'
         f'<input type="range" id="act-slider" min="0" max="{len(runs) - 1}" '
         f'step="1" value="{len(runs) - 1}" '
-        'aria-label="scrub training runs">'
+        'aria-label="move through the training runs">'
         f'<span id="act-label">run {runs[-1]}</span></div>'
     )
     script = (
@@ -703,7 +761,7 @@ def main() -> int:
     summary = (f"{len(history)} training run(s) on record"
                + (f" · latest stage {html.escape(str(latest_stage))}"
                   if latest_stage else "")
-               + f" · {len(acts)} activation snapshot(s)"
+               + f" · {len(acts)} network snapshot(s)"
                + f" · plotly.js {PLOTLY_VERSION} inlined")
 
     document = f"""<!DOCTYPE html>
@@ -719,23 +777,26 @@ def main() -> int:
 <code>{html.escape(str(advisor_dir))}</code> · {summary} · regenerable via
 <code>python scripts/advisor/dashboard.py</code></p>
 {warnings}
-<section class="panel"><h2>Guardrails — stage head weights</h2>
+<section class="panel"><h2>Guardrails — how much each prediction counts</h2>
 {guardrails_block(weights)}</section>
-<section class="panel"><h2>1 · Per-head validation metrics</h2>
-<p class="note">Huber losses are staged: Stage A trains accuracy, geometry and
-failure heads; Stage B blends in cost heads. Begin/end markers track the
-primary rel_err_mae.</p>
+<section class="panel"><h2>1 · How each prediction is doing</h2>
+<p class="note">Every prediction is scored with a penalty that goes easy on the
+biggest misses (a Huber loss), and training runs in two stages: Stage A teaches
+the accuracy, shape and failure predictions, and Stage B adds the cost ones.
+The begin and end markers follow the main one, predicted relative error
+(<code>rel_err</code>).</p>
 {panel_val_metrics(history)}</section>
-<section class="panel"><h2>2 · Benchmark — validation accuracy and cost</h2>
+<section class="panel"><h2>2 · Scorecard — accuracy and cost on unseen parts</h2>
 {panel_benchmark(history)}</section>
-<section class="panel"><h2>3 · Pruning log and campaign throughput</h2>
-<p class="note">Worst-5% residual rows are pruned per run (failure rows are
-never dropped). Throughput shows dedup hits, rows/s and per-shard wall times
-from the sharded campaign runner.</p>
+<section class="panel"><h2>3 · Rows dropped, and how fast the data was made</h2>
+<p class="note">Each run drops the worst 5% of rows by how badly the model fits
+them; rows that record a failure are never dropped. The speed charts show
+duplicates skipped, rows per second, and how long each chunk of the batch took,
+as reported by the campaign runner.</p>
 {panel_pruning_throughput(history, throughput)}</section>
-<section class="panel"><h2>4 · MLP vs LightGBM baseline</h2>
+<section class="panel"><h2>4 · Our model against the LightGBM baseline</h2>
 {panel_baseline(history, baseline)}</section>
-<section class="panel"><h2>5 · Network activations</h2>
+<section class="panel"><h2>5 · Inside the network</h2>
 {panel_activations(acts)}</section>
 </main></body></html>
 """

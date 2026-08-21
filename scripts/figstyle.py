@@ -38,7 +38,6 @@ import math
 import os
 import re
 import subprocess
-import textwrap
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Sequence
@@ -52,6 +51,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
 from matplotlib.ticker import FuncFormatter  # noqa: E402
+from matplotlib.font_manager import FontProperties  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -63,6 +63,8 @@ __all__ = [
     "convergence", "si", "unit_formatter", "footer_source",
     "provenance", "git_revision", "digest",
     "font_path", "assert_glyphs", "GLYPHS_REQUIRED",
+    "QUANTITY_LABELS", "quantity_label", "metric_label",
+    "times_off", "DECADES_NOTE",
 ]
 
 
@@ -230,10 +232,19 @@ def register_series(name: str, slot: int | None = None, *,
 
 
 def _preregister() -> None:
-    # meshers -- the most widely shared vocabulary in the repo
-    for slot, name in enumerate(["hybrid_zoo", "graded_tet", "hex",
-                                 "hybrid_vem", "varyhedron", "cvt_poly"]):
-        register_series(name, slot)
+    # meshers -- the most widely shared vocabulary in the repo. These labels are
+    # the compact form, for an in-plot legend or a step label; QUANTITY_LABELS
+    # carries the longer wording for axes and colourbars, where there is room
+    # for it. The two differ deliberately and are not a drift to be "fixed".
+    for slot, (name, label) in enumerate([
+        ("hybrid_zoo", "hybrid, hex + pyramid skin"),
+        ("graded_tet", "graded tets"),
+        ("hex", "hex bricks"),
+        ("hybrid_vem", "hybrid VEM"),
+        ("varyhedron", "varyhedron"),
+        ("cvt_poly", "Voronoi polyhedra"),
+    ]):
+        register_series(name, slot, label=label)
     # external comparison sources
     register_series("gmsh-mesh+polymesh-solver", 4, label="Gmsh mesh")
     register_series("calculix", 5, label="CalculiX")
@@ -280,6 +291,144 @@ def series_handles(names: Sequence[str], **kwargs: Any) -> list[Line2D]:
                           marker=st.marker, markersize=6, linewidth=2.0,
                           label=st.label, **kwargs))
     return out
+
+
+# ---------------------------------------------------------------------------
+# Quantity names
+# ---------------------------------------------------------------------------
+#: Dataset column / model head -> the words a reader sees on an axis, in a
+#: legend, on a colourbar or in a generated table cell.
+#:
+#: It lives here once because the same six quantities are drawn by six
+#: generators (``advisor/report.py``, ``advisor/plot_evaluation.py``,
+#: ``advisor/figures.py``, ``advisor/dashboard.py``, ``plot_benchmarks.py``
+#: and the showcase composites). Six hand-typed copies of "cell size, as a
+#: fraction of the part" drift, and a figure whose axis disagrees with the doc
+#: beside it is worse than either one being wrong on its own: the reader
+#: cannot tell which of the two is the mistake, so both stop being evidence.
+#:
+#: The keys stay verbatim. They are provenance -- CSV column names, ONNX
+#: output names, ``history.jsonl`` metric keys -- and every footer, manifest
+#: and record still spells them exactly. Only the value is prose.
+QUANTITY_LABELS: dict[str, str] = {
+    # accuracy heads
+    "rel_err": "predicted relative error",
+    "rel_err_rel": "relative error, against the case's own median",
+    # the campaign CSV's *measured* column, which is not a prediction: keeping
+    # the two labels distinct is the difference between an honest axis and a
+    # claim the figure cannot support.
+    "accuracy_rel_err": "measured relative error",
+    "geo_chamfer": "mesh-to-CAD distance",
+    "geo_fidelity_chamfer_mean": "mesh-to-CAD distance",
+    "geo_p99": "mesh-to-CAD worst 1%",
+    "geo_fidelity_dist_p99": "mesh-to-CAD worst 1%",
+    # cost heads
+    "dof": "degrees of freedom",
+    "n_dof": "degrees of freedom",
+    "max_dof": "degrees-of-freedom budget",
+    "mesh_ms": "meshing time",
+    "solve_ms": "solve time",
+    "efficiency": "relative error x degrees of freedom",
+    # feasibility. The head emits a logit; a figure that plots the squashed
+    # probability must say "probability" itself -- this label is the quantity,
+    # not the scale.
+    "failure": "failure risk",
+    "failure_logit": "failure risk",
+    "ood_distance": "distance from the training distribution",
+    # action dimensions
+    "h_rel": "cell size, as a fraction of the part",
+    "eta_target": "error target",
+    "adapt_passes": "refinement passes",
+    "p_elevate": "quadratic elements",
+    "global_eta": "global error estimate",
+    "policy": "recommended action",
+    # The policy head's own regression twins of the three action dimensions
+    # above. They need their own entries rather than a prefix-stripping rule:
+    # `h_rel` is the size a run actually used, `policy_h_rel` is the size the
+    # network would advise, and a figure that lets those two share one label
+    # cannot say which of them it drew.
+    "policy_h_rel": "recommended cell size, as a fraction of the part",
+    "policy_adapt_passes": "recommended refinement passes",
+    "policy_eta_target": "recommended error target",
+    "policy_order_logit_1": "order 1 (linear)",
+    "policy_order_logit_2": "order 2 (quadratic)",
+    "policy_mesher_logit_graded_tet": "mesher: graded tets",
+    "policy_mesher_logit_hex": "mesher: hex bricks",
+    "policy_mesher_logit_hybrid_vem": "mesher: hybrid VEM",
+    "policy_mesher_logit_hybrid_zoo": "mesher: hybrid, hex bulk + pyramid skin",
+    "total_loss": "total loss",
+    # Run bookkeeping the dashboard plots. `prune.py` drops the worst-fitting
+    # rows per head into a persistent ledger and every later run trains without
+    # them, so these count dropped *training rows* -- not anything wrong with a
+    # part, which is what "pruned" reads as to someone meeting it cold.
+    "pruned_rows": "worst-fitting rows dropped this run",
+    "pruned_total": "worst-fitting rows dropped so far",
+    # Summary-JSON keys rather than heads, but they reach an axis in
+    # `plot_evaluation.py` and a table in `report.py`, so they belong to the
+    # same vocabulary. "regret" is the gap to the best action that case could
+    # have had, in powers of 10 -- pair either of these with `DECADES_NOTE`.
+    "macro_mean_regret": "how much worse than the best choice",
+    "pick_failure_rate": "share of picks that fail",
+}
+
+#: ``history.jsonl`` keys are ``<head>_<statistic>``. One table over heads and
+#: one over statistics covers every legend entry the dashboard draws, so a new
+#: head needs no new legend string.
+#:
+#: The statistics are spelled out rather than abbreviated. The abbreviations
+#: used to stand here on the grounds that "MAE and AUC are the words a reader
+#: of an error plot expects" -- true of a reader who already trains models, and
+#: the people these figures get shown to are not that reader. "MAE" on an axis
+#: explains nothing to them, while "average miss" costs the trained reader
+#: nothing: the identifier is still in the footer, the manifest and every
+#: record, so nothing became less traceable by the axis becoming readable.
+_METRIC_STATS: dict[str, str] = {
+    "mae": "average miss",
+    "rmse": "average miss, RMS",
+    "mse": "mean squared miss",
+    "bce": "cross-entropy",
+    "acc": "accuracy",
+    "auc": "ranking quality, ROC AUC",
+}
+
+
+def quantity_label(name: str) -> str:
+    """Reader-facing words for a column/head name.
+
+    Unmapped names come back verbatim rather than de-snaked mechanically: an
+    identifier showing through on an axis is a visible prompt to add a real
+    label here, whereas ``"geo p99"`` reads like prose and hides.
+    """
+    return QUANTITY_LABELS.get(name, name)
+
+
+def metric_label(name: str) -> str:
+    """``rel_err_mae`` -> ``predicted relative error (average miss)``."""
+    head, _, stat = name.rpartition("_")
+    if head and stat in _METRIC_STATS:
+        return f"{quantity_label(head)} ({_METRIC_STATS[stat]})"
+    return quantity_label(name)
+
+
+#: Every accuracy and cost head is trained on a log10 target, so a miss on one
+#: of those axes is a distance in powers of ten and not a percentage: 0.30 is
+#: not "30% off", it is "off by a factor of two". An axis carrying one of those
+#: distances says so, because the bare number reads as a fraction and misleads
+#: in the direction of sounding better than it is.
+DECADES_NOTE = "powers of 10 — 0.30 means off by about 2x"
+
+
+def times_off(decades: float) -> str:
+    """A log10 distance as the plain factor it stands for: ``0.30`` -> ``2.0x``.
+
+    The display half of :func:`scripts.advisor.regret.decades_to_factor`, which
+    stays numeric because JSON records and console tables consume the float.
+    Both are kept on purpose: a record wants the number, an axis wants the four
+    characters a reader can picture. Do not collapse either into the other.
+    """
+    if not math.isfinite(decades):
+        return "n/a"
+    return f"{10.0 ** decades:.1f}x"
 
 
 # ---------------------------------------------------------------------------
@@ -348,6 +497,20 @@ SIZES = {
 #: Rendered so the long edge lands near this many pixels; dpi follows.
 TARGET_PX = 1800
 MAX_ASPECT = 2.2
+
+#: Share of the canvas width a title, subtitle or footer may occupy before it
+#: wraps. Captions are drawn from x=0.012, so this leaves a right margin to
+#: match the left inset rather than letting text run to the very edge.
+CAPTION_WIDTH = 0.976
+
+
+def save_dpi(width_in: float) -> int:
+    """The dpi a figure of this width will be written at.
+
+    Shared by `figure` and `finish` so a caption is measured at exactly the
+    resolution it is rasterised at. They must not derive this separately.
+    """
+    return max(120, round(TARGET_PX / width_in))
 
 
 def use(name: str = "light") -> Theme:
@@ -811,21 +974,69 @@ def figure(title: str, *, subtitle: str = "", footer: str = "",
 
     fig, axes = plt.subplots(nrows, ncols, figsize=dims, squeeze=False,
                              sharey=sharey, **subplot_kw)
+    # Pin the figure to the dpi it will be *saved* at, before a single caption
+    # is measured. Glyph advances are hinted, so they snap to whole pixels and
+    # a line's width is not exactly proportional to dpi: measuring at one dpi
+    # and rasterising at another drifts by around 1% over a long caption, which
+    # is enough to push the widest subtitle past an edge it was measured to
+    # clear. Measuring and drawing at one dpi makes the wrap exact.
+    fig.set_dpi(save_dpi(dims[0]))
 
     t = theme()
     # Wrap to the canvas: a subtitle or footer running off the right edge was
     # a recurring defect, and every caption here is composed from data whose
     # length is not known when the figure is laid out.
-    def fit(text: str, role: str) -> tuple[str, int]:
+    def fit(text: str, role: str, *, bold: bool = False) -> tuple[str, int]:
+        """Wrap to the canvas by measuring the text, not by counting characters.
+
+        A mean advance width cannot bound a proportional string. The previous
+        budget divided the canvas by an average character, which a Title Case
+        line full of capitals and digits comfortably exceeds -- so a caption
+        that fitted the character budget could still run past the right edge
+        and be clipped mid-word, which is how it presented (`textwrap` never
+        breaks inside a word, so a mid-word cut means no wrap happened at all).
+
+        Measured through the renderer that will draw the text, not from glyph
+        outlines: `TextPath` extents describe the inked path and come out about
+        1% under matplotlib's advance-and-kern layout, which is inside the
+        margin this leaves and so still clipped the widest captions. The
+        backend is Agg from module import, so a renderer always exists here.
+        """
         if not text:
             return "", 0
-        columns = max(24, int(dims[0] * 72.0 / (0.55 * FONT_PT[role])))
+        # Renderer widths are in pixels at the figure's dpi, so the budget has
+        # to be too. Both scale together, which keeps this dpi-independent.
+        limit = dims[0] * fig.dpi * CAPTION_WIDTH
+        properties = FontProperties(fname=str(font_path("regular", bold=bold)),
+                                    size=FONT_PT[role])
+        renderer = fig.canvas.get_renderer()
+        measured: dict[str, float] = {}
+
+        def width(fragment: str) -> float:
+            if not fragment:
+                return 0.0
+            if fragment not in measured:
+                measured[fragment] = float(
+                    renderer.get_text_width_height_descent(
+                        fragment, properties, False)[0])
+            return measured[fragment]
+
         lines: list[str] = []
         for paragraph in text.split("\n"):
-            lines.extend(textwrap.wrap(paragraph, columns) or [""])
+            current = ""
+            for word in paragraph.split(" "):
+                candidate = word if not current else f"{current} {word}"
+                # A single word wider than the canvas still gets its own line:
+                # breaking inside it is what we are trying to avoid.
+                if current and width(candidate) > limit:
+                    lines.append(current)
+                    current = word
+                else:
+                    current = candidate
+            lines.append(current)
         return "\n".join(lines), len(lines)
 
-    title_text, title_lines = fit(title, "title")
+    title_text, title_lines = fit(title, "title", bold=True)
     subtitle_text, subtitle_lines = fit(subtitle, "subtitle")
     footer_text, footer_lines = fit(footer, "footer")
 
@@ -875,7 +1086,7 @@ def finish(fig: Any, out: Path, *, manifest: dict[str, Any] | None = None,
         pass
 
     width_in = fig.get_size_inches()[0]
-    dpi = max(120, round(TARGET_PX / width_in))
+    dpi = save_dpi(width_in)
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, dpi=dpi, facecolor=theme().bg,

@@ -98,7 +98,8 @@ EXTERNAL_SOURCES = ["gmsh-mesh+polymesh-solver", "polymesh-native",
                     "polymesh-native-graded", "polymesh-native-uniform-p2"]
 #: slot 2 (bluish green) is free in the mesher palette; pinning it here keeps
 #: the new variant the same colour+marker+dash wherever it is drawn next.
-fs.register_series("polymesh-native-uniform-p2", 2, label="native uniform p2")
+fs.register_series("polymesh-native-uniform-p2", 2,
+                   label="native, uniformly quadratic")
 EXTERNAL_LABELS = {name: fs.series(name).label for name in EXTERNAL_SOURCES}
 
 #: input-column groups drawn in network_layout.png, in trunk-input order. The
@@ -109,6 +110,18 @@ GROUP_SERIES = {
     "case context": "graded_tet",
     "continuous action": "hex",
     "categorical action": "hybrid_vem",
+}
+
+#: The same groups in the words a reader sees on the diagram. The keys above
+#: are the schema names dataset.py uses and stay exactly as they are; only
+#: these strings are drawn.
+GROUP_TITLES = {
+    "part features": "shape of the part",
+    "case context": "what is being solved",
+    "continuous action": "mesh settings (numbers)",
+    "categorical action": "mesh settings (choices)",
+    "other": "everything else",
+    "input columns": "what the network is given",
 }
 
 
@@ -371,9 +384,11 @@ def network_layout(advisor_dir: Path, out_dir: Path) -> bool:
               f"the dataset.py contract {contract}")
 
     fig, axes = fs.figure(
-        "AdvisorNet — architecture as saved in the checkpoint",
-        subtitle=(f"training run {shape['run']} · {shape['n_parameters']:,} "
-                  f"parameters · trunk width {hidden} · {len(heads)} heads"),
+        "AdvisorNet — the network exactly as it was saved after training",
+        subtitle=(f"Training run {shape['run']}. It holds "
+                  f"{shape['n_parameters']:,} numbers it learned, a shared "
+                  f"middle section {hidden} values wide, and {len(heads)} "
+                  f"separate predictions."),
         footer=fs.footer_source(advisor_dir / "runs" / "latest.pt",
                                 advisor_dir / "normalization.json"),
         size=(13.2, 7.2))
@@ -408,16 +423,17 @@ def network_layout(advisor_dir: Path, out_dir: Path) -> bool:
             sample += ", ..."
         right, mid = _box(
             ax, 0.02, y, 0.185, h,
-            f"{label}\n{len(members)} columns\n{sample}",
+            f"{GROUP_TITLES.get(label, label)}\n{len(members)} numbers\n{sample}",
             colors.get(label, tint(fs.series("hybrid_zoo").color)), fontsize=8.2)
         group_ports.append((label, (right, mid), members))
         y -= gap
 
-    ax.text(0.1125, top + 0.045, f"input features  x[{len(shape['input_columns'])}]",
+    ax.text(0.1125, top + 0.045,
+            f"the {len(shape['input_columns'])} numbers it is given",
             ha="center", va="center", fontsize=fs.FONT_PT["panel"],
             weight="bold")
     ax.text(0.1125, top + 0.016,
-            "standardized in C++ by normalization.json (mean/std/impute)",
+            "rescaled to a common range in C++ (normalization.json)",
             ha="center", va="center", fontsize=fs.FONT_PT["footer"],
             color=fs.theme().muted, style="italic")
 
@@ -428,11 +444,12 @@ def network_layout(advisor_dir: Path, out_dir: Path) -> bool:
                         ("order_idx", shape["order_slots"])):
         right, mid = _box(
             ax, 0.265, emb_y, 0.135, 0.075,
-            f"Embedding({slots}, {emb_dim})\n{name}",
+            f"{slots} choices → {emb_dim} numbers\n{name}",
             tint(fs.series("hybrid_vem").color), fontsize=8.2)
         emb_ports.append((right, mid))
         emb_y += 0.095
-    ax.text(0.3325, emb_y + 0.012, "round + clamp, then gather\n(inside the ONNX graph)",
+    ax.text(0.3325, emb_y + 0.012,
+            "the choice is rounded to a valid slot\nthen looked up inside the model",
             ha="center", va="bottom", fontsize=fs.FONT_PT["footer"],
             color=fs.theme().muted, style="italic")
 
@@ -440,8 +457,9 @@ def network_layout(advisor_dir: Path, out_dir: Path) -> bool:
     concat_x, concat_w = 0.455, 0.10
     concat_y, concat_h = bottom + 0.06, span - 0.12
     _box(ax, concat_x, concat_y, concat_w, concat_h,
-         f"concat\n\nD_eff = {shape['trunk_inputs']}\n\n"
-         f"{n_continuous} continuous\n+ {emb_dim} order\n+ {emb_dim} mesher",
+         f"joined together\n\n{shape['trunk_inputs']} numbers in all\n\n"
+         f"{n_continuous} plain numbers\n+ {emb_dim} for the order\n"
+         f"+ {emb_dim} for the mesher",
          tint(fs.theme().muted, 0.90), fontsize=8.6)
     concat_left = (concat_x, concat_y + concat_h / 2)
     concat_right = (concat_x + concat_w, concat_y + concat_h / 2)
@@ -462,24 +480,25 @@ def network_layout(advisor_dir: Path, out_dir: Path) -> bool:
     fc1_y = 0.545
     fc2_y = 0.305
     _box(ax, trunk_x, fc1_y, trunk_w, trunk_h,
-         f"Linear({shape['trunk_inputs']} -> {hidden})\nGELU\n\n"
-         f"{shape['fc1_parameters']:,} params",
+         f"mix to {hidden} values\n(Linear + GELU)\n\n"
+         f"{shape['fc1_parameters']:,} learned\nnumbers",
          tint(fs.series("hybrid_zoo").color, 0.62), fontsize=9,
          weight="bold")
     _box(ax, trunk_x, fc2_y, trunk_w, trunk_h,
-         f"Linear({hidden} -> {hidden})\nGELU\n\n"
-         f"{shape['fc2_parameters']:,} params",
+         f"mix to {hidden} values\n(Linear + GELU)\n\n"
+         f"{shape['fc2_parameters']:,} learned\nnumbers",
          tint(fs.series("hybrid_zoo").color, 0.62), fontsize=9,
          weight="bold")
     _arrow(ax, concat_right, (trunk_x, fc1_y + trunk_h / 2), width=1.4)
     _arrow(ax, (trunk_x + trunk_w / 2, fc1_y),
            (trunk_x + trunk_w / 2, fc2_y + trunk_h), width=1.4)
     ax.text(trunk_x + trunk_w / 2, top + 0.02,
-            f"shared trunk\nwidth {hidden}", ha="center", va="center",
-            fontsize=fs.FONT_PT["label"], weight="bold")
+            f"shared middle section\n{hidden} values wide", ha="center",
+            va="center", fontsize=fs.FONT_PT["label"], weight="bold")
 
-    # column 4 -- heads
-    head_x, head_w = 0.795, 0.185
+    # column 4 -- heads. The column is wide enough, and the label wrapped, so
+    # that the longest plain-English head name still lands inside its box.
+    head_x, head_w = 0.775, 0.205
     head_gap = 0.012
     head_h = (span - head_gap * (len(heads) - 1)) / max(len(heads), 1)
     trunk_out = (trunk_x + trunk_w, fc2_y + trunk_h / 2)
@@ -490,22 +509,24 @@ def network_layout(advisor_dir: Path, out_dir: Path) -> bool:
             tint(fs.theme().bad, 0.80) if name == "failure_logit"
             else tint(fs.series("graded_tet").color, 0.86))
         _box(ax, head_x, y, head_w, head_h,
-             f"{name}   [{width}]   {params} params",
-             face, fontsize=8.6)
+             "\n".join(textwrap.wrap(fs.quantity_label(name), 36))
+             + f"\n{width} output{'' if width == 1 else 's'} · "
+               f"{params:,} learned numbers",
+             face, fontsize=8.0)
         _arrow(ax, trunk_out, (head_x, y + head_h / 2), width=0.8)
         y -= head_gap
     ax.text(head_x + head_w / 2, top + 0.045,
-            f"output heads  ({len(heads)})", ha="center", va="center",
+            "what it predicts", ha="center", va="center",
             fontsize=fs.FONT_PT["panel"], weight="bold")
     ax.text(head_x + head_w / 2, top + 0.016,
-            "ONNX output order, top to bottom",
+            "in the order the model returns them",
             ha="center", va="center", fontsize=fs.FONT_PT["footer"],
             color=fs.theme().muted, style="italic")
 
     if drift:
         fig.text(0.5, 0.028,
-                 "checkpoint predates the current dataset.py head contract "
-                 f"({', '.join(contract or [])})",
+                 "the saved network is older than the list of predictions "
+                 f"dataset.py now asks for ({', '.join(contract or [])})",
                  ha="center", fontsize=fs.FONT_PT["annot"],
                  color=fs.theme().bad, style="italic")
     save(fig, out_dir, "network_layout.png")
@@ -549,11 +570,15 @@ def mesh_progress(rows: list[dict[str, str]], out_dir: Path) -> bool:
         by_case.setdefault(row["part"], []).append(row)
 
     metrics = [
-        ("accuracy_rel_err", "best-so-far accuracy  (rel_err)",
-         "best-so-far rel_err", "hybrid_zoo"),
+        ("accuracy_rel_err",
+         f"Best {fs.quantity_label('accuracy_rel_err')} found so far",
+         f"best {fs.quantity_label('accuracy_rel_err')} so far\n"
+         "(lower is better)", "hybrid_zoo"),
         ("geo_fidelity_dist_p99",
-         "best-so-far geometric fidelity  (surface distance p99)",
-         "best-so-far dist p99  (model units)", "graded_tet"),
+         f"Best {fs.quantity_label('geo_p99')} found so far",
+         f"best {fs.quantity_label('geo_p99')} so far\n"
+         "(model units, lower is better)",
+         "graded_tet"),
     ]
     curves: dict[str, list[tuple[np.ndarray, np.ndarray]]] = {
         k: [] for k, _, _, _ in metrics}
@@ -614,39 +639,41 @@ def mesh_progress(rows: list[dict[str, str]], out_dir: Path) -> bool:
         }
 
     gains = " · ".join(
-        f"{key.split('_')[0]} median improves {reduced[key]['gain']:.2f}×"
+        f"{fs.quantity_label(key)} improves {reduced[key]['gain']:.2f}×"
         for key, _, _, _ in metrics if key in reduced
         and math.isfinite(reduced[key]["gain"]))
     fig, axes = fs.figure(
         "Mesh search over the campaign — best result found so far against "
         "solver time spent",
-        subtitle=(f"{gains} over the search window; band is the inter-quartile "
-                  f"range across cases"),
+        subtitle=(f"Over the search window the typical case improves: {gains}. "
+                  f"The shaded band covers the middle half of the cases."),
         footer=fs.footer_source(ADVISOR_DIR / "dataset.csv", n=len(corpus),
                                 note=f"{len(by_case)} cases"),
         size="wide", ncols=2,
-        share_y_axis="the two panels measure different quantities "
-                     "(relative error vs distance in model units)")
+        share_y_axis="the two panels measure different things (a relative "
+                     "error against a distance in model units)")
 
     for ax, (key, label, short, name) in zip(axes[0], metrics):
         stats = reduced.get(key)
         st = fs.series(name)
         if stats is None:
-            ax.text(0.5, 0.5, f"no {key} data", ha="center", va="center",
+            ax.text(0.5, 0.5, f"no {fs.quantity_label(key)} data yet",
+                    ha="center", va="center",
                     transform=ax.transAxes, color=fs.theme().muted)
             fs.axes_off(ax)
             continue
         grid, median = stats["grid"], stats["median"]
         ax.fill_between(grid, stats["lo"], stats["hi"], color=st.color,
-                        alpha=0.16, linewidth=0, label="inter-quartile band")
+                        alpha=0.16, linewidth=0,
+                        label="middle half of the cases")
         ax.plot(grid, median, color=st.color, linestyle=st.dash, linewidth=2.2,
                 label=f"median over {stats['kept']} cases")
         ax.axvline(horizon, color=fs.theme().rule, linewidth=1.1,
                    linestyle=(0, (1, 2)),
-                   label=f"median case budget ({horizon:.0f} s)")
+                   label=f"time the median case got ({horizon:.0f} s)")
         ax.set_xscale("log")
         info = fs.loglim(ax, np.concatenate([stats["lo"], stats["hi"]]))
-        ax.set_xlabel("cumulative solver wall time per case  [s]")
+        ax.set_xlabel("total solver time spent on this case  (seconds)")
         ax.set_ylabel(short)
         fs.panel_title(ax, label)
         ax.legend(loc="lower left")
@@ -690,17 +717,18 @@ def accuracy_vs_cost(rows: list[dict[str, str]], out_dir: Path) -> bool:
 
     accuracy = np.array([to_float(r["accuracy_rel_err"]) for r in usable])
     meshers = [r["mesher"] for r in usable]
-    panels = [("n_dof", "degrees of freedom  n_dof"),
-              ("solve_ms", "solve time  [ms]")]
+    panels = [("n_dof", f"{fs.quantity_label('n_dof')}  (the unknowns the "
+                        "solver has to solve for)"),
+              ("solve_ms", f"{fs.quantity_label('solve_ms')}  (milliseconds)")]
 
     print(f"\naccuracy_vs_cost.png — {len(usable)} successful corpus rows "
           f"({failed} failed meshes and {no_metric} rows without a metric "
           f"excluded from {len(every)})")
     fig, axes = fs.figure(
-        "Accuracy against cost for every corpus mesh",
-        subtitle="point cloud is the whole campaign; the heavy line is each "
-                 "mesher's binned median, so density is readable instead of "
-                 "overplotted",
+        "Accuracy against cost for every mesh in the data set",
+        subtitle="Every dot is one mesh from the campaign. The heavy line is "
+                 "each mesher's median within a band of cost, so the crowd of "
+                 "dots cannot hide which mesher owns which region.",
         footer=fs.footer_source(ADVISOR_DIR / "dataset.csv", n=len(every)),
         size="wide", ncols=2)
 
@@ -740,8 +768,8 @@ def accuracy_vs_cost(rows: list[dict[str, str]], out_dir: Path) -> bool:
         owners = [kept_rows[index]["part"] for index in front]
         ax.plot(px, py, color=fs.theme().ink, linewidth=1.5,
                 drawstyle="steps-post", zorder=5,
-                label=f"Pareto front  ({len(px)} "
-                      f"point{'' if len(px) == 1 else 's'})")
+                label=f"best trade-offs available  ({len(px)} "
+                      f"mesh{'' if len(px) == 1 else 'es'})")
         ax.scatter(px, py, s=26, facecolors="none", edgecolors=fs.theme().ink,
                    linewidths=1.1, zorder=6)
         ax.set_xscale("log")
@@ -753,6 +781,10 @@ def accuracy_vs_cost(rows: list[dict[str, str]], out_dir: Path) -> bool:
         legend = ax.legend(loc="lower left", frameon=True, framealpha=0.94)
         legend.get_frame().set_facecolor(fs.theme().panel)
         legend.get_frame().set_edgecolor(fs.theme().rule)
+        # The key now carries the spelled-out mesher names, so the card is
+        # wider than the identifiers made it and reaches the front's markers.
+        # Lift it over them, which is what "passing behind it" already claimed.
+        legend.set_zorder(7)
         fs.annotate_n(ax, int(keep.sum()), excluded=failed + no_metric,
                       what="meshes")
 
@@ -769,14 +801,18 @@ def accuracy_vs_cost(rows: list[dict[str, str]], out_dir: Path) -> bool:
         # case can dominate the pooled cloud outright. Say so on the figure
         # rather than letting a one-point front read as a plotting bug.
         if len(set(owners)) <= 2:
-            note = (f"front owned by {', '.join(sorted(set(owners)))} — rel_err "
-                    "is not\ncomparable across cases (hence the rel_err_rel head)")
+            note = (f"every point on this line comes from "
+                    f"{', '.join(sorted(set(owners)))} —\n"
+                    f"{fs.quantity_label('accuracy_rel_err')} cannot be "
+                    "compared between cases,\nwhich is why the network also "
+                    f"learns {fs.quantity_label('rel_err_rel')}")
             fs.assert_glyphs(note)
             ax.text(0.02, 0.02, note, transform=ax.transAxes, va="bottom",
                     ha="left", fontsize=fs.FONT_PT["annot"] - 0.5,
                     color=fs.theme().muted, style="italic")
 
-    axes[0][0].set_ylabel("accuracy_rel_err  (lower is better)")
+    axes[0][0].set_ylabel(
+        f"{fs.quantity_label('accuracy_rel_err')}  (lower is better)")
     save(fig, out_dir, "accuracy_vs_cost.png")
     return True
 
@@ -794,8 +830,10 @@ def fidelity_vs_h(rows: list[dict[str, str]], out_dir: Path) -> bool:
               "skipping fidelity_vs_h.png")
         return False
 
-    metrics = [("geo_fidelity_chamfer_mean", "chamfer mean distance"),
-               ("geo_fidelity_dist_p99", "surface distance p99")]
+    metrics = [("geo_fidelity_chamfer_mean",
+                fs.quantity_label("geo_fidelity_chamfer_mean")),
+               ("geo_fidelity_dist_p99",
+                fs.quantity_label("geo_fidelity_dist_p99"))]
     orders = sorted({int(to_float(r["order"])) for r in usable
                      if math.isfinite(to_float(r["order"]))})
 
@@ -804,14 +842,16 @@ def fidelity_vs_h(rows: list[dict[str, str]], out_dir: Path) -> bool:
           "surfaces the boundary residual is at machine precision, and a raw "
           "log axis over those values shows nothing")
     fig, axes = fs.figure(
-        "Geometric fidelity against mesh resolution, split by element order",
-        subtitle="markers are per-resolution medians with the inter-quartile "
-                 "range; values at the floor line are at machine precision, "
-                 "not zero error",
+        "How closely the mesh follows the CAD surface, against cell size, "
+        "split by element order",
+        subtitle="Each marker is the median at one cell size, and the bars "
+                 "span the middle half of the runs. Values sitting on the "
+                 "floor line are at the limit of what the arithmetic can "
+                 "measure, not zero error.",
         footer=fs.footer_source(ADVISOR_DIR / "dataset.csv", n=len(usable)),
         size="wide", ncols=2,
-        share_y_axis="chamfer mean and p99 surface distance are different "
-                     "statistics of the same residual")
+        share_y_axis="the average distance and the worst 1% are two different "
+                     "summaries of the same set of distances")
 
     for ax, (key, label) in zip(axes[0], metrics):
         all_levels = sorted({round(to_float(r["h_rel"]), 4) for r in usable
@@ -855,8 +895,8 @@ def fidelity_vs_h(rows: list[dict[str, str]], out_dir: Path) -> bool:
                 # The rate belongs with the other measured text, not in the
                 # legend: as a legend suffix it doubled the key's width and
                 # left no corner free for the precision note.
-                rates.append(f"order {order}: measured rate h^{fit.slope:.2f} "
-                             f"(r² {fit.residual:.2f})")
+                rates.append(f"order {order}: rate cell size^{fit.slope:.2f} "
+                             f"(fit quality {fit.residual:.2f})")
             ax.errorbar(np.array(levels) * nudge, med,
                         yerr=[np.array(med) - np.array(q25),
                               np.array(q75) - np.array(med)],
@@ -879,9 +919,10 @@ def fidelity_vs_h(rows: list[dict[str, str]], out_dir: Path) -> bool:
         ax.set_xmargin(0.25)
         # Ascending h_rel, left to right. The old panel put decreasing numbers
         # under a "finer →" arrow, which reads as a reversed axis.
-        ax.set_xlabel("h_rel  (element size / diagonal)  —  finer on the left")
+        ax.set_xlabel(f"{fs.quantity_label('h_rel')}"
+                      "  —  finer on the left")
         ax.set_ylabel(f"{label}  (model units)")
-        fs.panel_title(ax, f"{label} vs resolution")
+        fs.panel_title(ax, f"{label} against cell size")
         ax.legend(loc="upper left")
         corner = rates + ([info.note("at machine precision")]
                           if info.clamped else [])
@@ -983,10 +1024,12 @@ def matched_pair(paths: Sequence[Path], pad: int = 12,
 
 
 def _caption(row: dict[str, str]) -> str:
-    text = (f"h_rel {to_float(row['h_rel']):.3g}  ·  order {row['order']}  ·  "
-            f"{fs.series(row['mesher']).label}\n"
-            f"{int(to_float(row['n_dof'])):,} DOF  ·  "
-            f"rel_err {to_float(row['accuracy_rel_err']):.3g}")
+    text = (f"{fs.quantity_label('h_rel')} {to_float(row['h_rel']):.3g}"
+            f"  ·  order {row['order']}\n"
+            f"{fs.series(row['mesher']).label}  ·  "
+            f"{int(to_float(row['n_dof'])):,} {fs.quantity_label('n_dof')}\n"
+            f"{fs.quantity_label('accuracy_rel_err')} "
+            f"{to_float(row['accuracy_rel_err']):.3g}")
     fs.assert_glyphs(text)
     return text
 
@@ -1050,9 +1093,9 @@ def mesh_before_after(rows: list[dict[str, str]], campaigns_dir: Path,
     # calling that "feature-framed" on the face of the figure would assert a
     # framing nothing verified. Say which camera produced it and let the
     # panels speak.
-    framing = ("hole-zoom ROI render" if cameras == {"wire_feature.png"}
-               else "whole-part render" if cameras == {"wire.png"}
-               else "mixed cameras: " + ", ".join(sorted(cameras)))
+    framing = ("close-up on the hole" if cameras == {"wire_feature.png"}
+               else "the whole part" if cameras == {"wire.png"}
+               else "mixed views: " + ", ".join(sorted(cameras)))
     print(f"  camera: {framing} ({', '.join(sorted(cameras))})")
 
     # Which parts appear is decided ONLY by the coarse->best gain, so say so,
@@ -1061,19 +1104,21 @@ def mesh_before_after(rows: list[dict[str, str]], campaigns_dir: Path,
     shown = [family_of(part) for part, _, _ in picks]
     bores = sorted({family_of(path.parts[-3])
                     for path in campaigns_dir.rglob("wire_feature.png")})
-    selection = (f"rows are the {len(picks)} families with the largest "
-                 f"coarse->best accuracy gain ({', '.join(shown)}), chosen on "
-                 "the gain alone")
+    selection = (f"The rows are the {len(picks)} part families where going "
+                 f"from the coarsest mesh to the best one helped most "
+                 f"({', '.join(shown)}), chosen on that alone.")
     if bores and not any(family in bores for family in shown):
-        selection += (f"; the bore-framed camera exists only for "
+        selection += (f" The close-up view exists only for "
                       f"{', '.join(bores)}, which no row here belongs to, so "
-                      "every panel is the whole-part camera")
+                      "every panel shows the whole part.")
 
     fig, axes = fs.figure(
         "Meshes before and after — the coarsest run beside the best-accuracy "
         "run for the same part",
-        subtitle=("each row is one part; both panels in a row are cropped to "
-                  f"the same scale and the same canvas · {framing}\n"
+        subtitle=("Each row is one part, and both pictures in a row are "
+                  "cropped to the same scale and the same canvas, so a size "
+                  "difference on the page is a size difference in the mesh. "
+                  f"Each panel shows {framing}.\n"
                   f"{selection}"),
         # Stamp the renders actually drawn, not the warehouse root: a digest
         # folded over 20,000 unrelated campaign files identifies nothing.
@@ -1101,8 +1146,8 @@ def mesh_before_after(rows: list[dict[str, str]], campaigns_dir: Path,
 
         paths = [wire_path(campaigns_dir, coarse), wire_path(campaigns_dir, best)]
         images = matched_pair([p for p in paths if p is not None])
-        panels = [("baseline — coarsest run", coarse),
-                  (f"best accuracy — {gain:.0f}× lower rel_err", best)]
+        panels = [("baseline — the coarsest mesh run", coarse),
+                  (f"best accuracy — error {gain:.0f}× lower", best)]
         for col_index, (title, row) in enumerate(panels):
             ax = axes[row_index][col_index]
             ax.set_xticks([])
@@ -1110,14 +1155,22 @@ def mesh_before_after(rows: list[dict[str, str]], campaigns_dir: Path,
             for side in ax.spines.values():
                 side.set_color(fs.theme().rule)
             if paths[col_index] is None or col_index >= len(images):
-                ax.text(0.5, 0.5, "render missing", ha="center", va="center",
+                ax.text(0.5, 0.5, "picture missing", ha="center", va="center",
                         transform=ax.transAxes, color=fs.theme().muted)
                 continue
             # source and axes are near 1:1, so nearest keeps the wire lines
             # crisp instead of smearing them into grey.
             ax.imshow(np.asarray(images[col_index]), interpolation="nearest")
-            fs.panel_title(ax, f"{title}\n{_caption(row)}")
-            ax.title.set_linespacing(1.45)
+            caption = f"{title}\n{_caption(row)}"
+            fs.panel_title(ax, caption)
+            # A loc="left" title is a different Text object than ``ax.title``,
+            # which is the centred one, so the linespacing that used to be set
+            # on ax.title here never reached the drawn title at all. Set it on
+            # the left title itself, and take it down a size while we are
+            # here: the caption now spells the quantities out, and those words
+            # ran off the right edge of the page at panel size.
+            ax.set_title(caption, loc="left", pad=6, linespacing=1.45,
+                         color=fs.theme().ink, fontsize=fs.FONT_PT["annot"])
         axes[row_index][0].set_ylabel(part, fontsize=fs.FONT_PT["label"],
                                       weight="bold", labelpad=8)
 
@@ -1150,9 +1203,9 @@ def _external_tolerance(case_id: str, metric_name: str) -> float | None:
 OUTCOME_ORDER = ["measured", "refused", "failed", "timeout"]
 OUTCOME_LABELS = {
     "measured": "measured",
-    "refused": "refused — mesher declined this h",
+    "refused": "refused — cell size declined",
     "failed": "failed — real error",
-    "timeout": "over the time budget",
+    "timeout": "ran out of time",
 }
 
 
@@ -1241,18 +1294,18 @@ def _rung_note(cells: list[dict[str, Any]]) -> list[str]:
     recommended = [row["recommended_h"] for row in refused
                    if math.isfinite(row["recommended_h"]) and row["recommended_h"] > 0]
     silent = len(refused) - len(recommended)
-    head = f"{len(refused)} declined" + (f" ({silent} no h)" if silent else "")
+    head = f"{len(refused)} declined" + (f" ({silent} no size)" if silent else "")
     if not recommended:
         # the fill-stage guard refuses without naming a size; saying so beats
         # inventing one.
-        return [head, "no h stated"]
-    return [head, f"h ≤ {min(recommended):.3g} m"]
+        return [head, "no size stated"]
+    return [head, f"cell size ≤ {min(recommended):.3g} m"]
 
 
 def _outcome_strip(ax: Any, panel: list[dict[str, Any]], variants: list[str],
                    cases: list[str], rungs: list[float],
                    label_variants: bool) -> list[str]:
-    """One cell per (variant, case, h_rel): measured / refused / failed.
+    """One cell per (mesh source, case, cell size): measured / refused / failed.
 
     Drawn as its own thin axes under the convergence panel rather than as
     markers inside it: the convergence panel's x-axis is DOF, and a refusal
@@ -1288,7 +1341,7 @@ def _outcome_strip(ax: Any, panel: list[dict[str, Any]], variants: list[str],
         note = _rung_note(cells)
         notes.append(f"h_rel {rung:g}: "
                      + ", ".join(line for line in note if line))
-        labels.append("\n".join([f"h_rel {rung:g}", *note]))
+        labels.append("\n".join([f"cell size {rung:g} of the part", *note]))
     ax.set_xticklabels(labels, fontsize=fs.FONT_PT["annot"] - 2.5,
                        color=fs.theme().muted, linespacing=1.4)
     ax.tick_params(axis="x", length=0)
@@ -1308,13 +1361,14 @@ def _outcome_strip(ax: Any, panel: list[dict[str, Any]], variants: list[str],
 
 def _place_rung_labels(fig: Any, panels: Sequence[tuple[Any, Sequence[
         tuple[float, float, str, str]]]], fontsize: float) -> int:
-    """Label each point with its h_rel, choosing offsets that do not collide.
+    """Label each point with its cell size, choosing offsets that do not collide.
 
-    Several mesh variants land on nearly the same (dof, error/tol) in these
-    panels, so a fixed offset rule always buried one label under another. Each
-    label is instead tried against the ones already placed, in axes-fraction
-    space, and takes the first free slot. Returns the number of labels that
-    found no free slot, so the figure never claims a placement it did not get.
+    Several mesh variants land on nearly the same (unknowns, error as a
+    multiple of the allowance) in these panels, so a fixed offset rule always
+    buried one label under another. Each label is instead tried against the
+    ones already placed, in axes-fraction space, and takes the first free
+    spot. Returns how many labels found no free spot, so the figure never
+    claims a placement it did not get.
     """
     # tight_layout here only to read the near-final axes geometry; figstyle's
     # finish() lays the figure out again with its own rect before saving.
@@ -1369,7 +1423,8 @@ def _place_rung_labels(fig: Any, panels: Sequence[tuple[Any, Sequence[
 
 def _order_tally(measured: list[dict[str, Any]], families: list[str],
                  order: int) -> list[tuple[str, str, float, float]]:
-    """(family, best native variant, its median rel_err, Gmsh median) per family."""
+    """(family, best native variant, its median relative error, Gmsh's median)
+    per family."""
     out = []
     for family in families:
         panel = [row for row in measured
@@ -1394,7 +1449,8 @@ def _order_tally(measured: list[dict[str, Any]], families: list[str],
 
 def _cost_tally(measured: list[dict[str, Any]], families: list[str],
                 order: int) -> list[tuple[str, float, float]]:
-    """(family, best native median rel_err x DOF, Gmsh median) per family.
+    """(family, best native median relative error x degrees of freedom, Gmsh's
+    median) per family.
 
     The accuracy tally answers "whose mesh is more accurate". It does not
     answer "at what cost", and on this matrix the two answers differ: the
@@ -1470,8 +1526,8 @@ def external_comparison(result_path: Path, out_dir: Path) -> bool:
         for family, solver, native, peer in tallies[order]:
             verdict = "ours lower" if native < peer else "Gmsh lower"
             print(f"  order {order} {family}: best native "
-                  f"{fs.series(solver).label} median rel_err {native:.4f} vs "
-                  f"Gmsh mesh {peer:.4f} — {verdict}")
+                  f"{fs.series(solver).label} median relative error "
+                  f"{native:.4f} vs Gmsh mesh {peer:.4f} — {verdict}")
         print(f"  order {order} tally: ours lower in {wins[order]}/"
               f"{len(tallies[order])} families")
 
@@ -1482,21 +1538,21 @@ def external_comparison(result_path: Path, out_dir: Path) -> bool:
     cost = _cost_tally(measured, families, order1)
     cost_wins = sum(1 for _, native, peer in cost if native < peer)
     for family, native, peer in cost:
-        print(f"  order {order1} {family} rel_err x DOF: ours "
-              f"{native:.0f} vs Gmsh {peer:.0f} — "
+        print(f"  order {order1} {family} relative error x degrees of "
+              f"freedom: ours {native:.0f} vs Gmsh {peer:.0f} — "
               + ("ours lower" if native < peer else "Gmsh lower"))
     print(f"  order {order1} cost tally: ours lower in {cost_wins}/"
-          f"{len(cost)} families on rel_err x DOF")
+          f"{len(cost)} families on relative error x degrees of freedom")
     cost_sentence = ""
     if cost:
         losers = ", ".join(family for family, native, peer in cost
                            if native >= peer)
         cost_sentence = (
-            " \u00b7 those wins are bought with degrees of freedom: on median "
-            f"rel_err x DOF ours is lower in only {cost_wins}/{len(cost)} "
-            "families"
+            " Those wins are bought with extra unknowns to solve for: on the "
+            f"median {fs.quantity_label('efficiency')} ours is lower in only "
+            f"{cost_wins}/{len(cost)} families"
             + (f", with Gmsh more economical on {losers}" if losers else "")
-            + " \u2014 more accurate per case is not the same as cheaper per case")
+            + " — more accurate per case is not the same as cheaper per case.")
     findings = ROOT / "bench" / "reference" / "external" / \
         "external-truth-findings.json"
     # the parity vocabulary is read off promotion.order_pairing, so no caveat
@@ -1508,12 +1564,14 @@ def external_comparison(result_path: Path, out_dir: Path) -> bool:
     parity_sentence = ""
     if true_parity_labels:
         parity_sentence = (
-            " · promotion.order_pairing per row: "
-            f"{', '.join(true_parity_labels)} = TRUE PARITY against Gmsh's "
-            "uniformly quadratic tet10 (every element promoted)")
+            " Each row states its own order pairing "
+            f"(promotion.order_pairing): {', '.join(true_parity_labels)} is a "
+            "TRUE PARITY match against Gmsh's uniformly quadratic 10-node "
+            "tetrahedra (tet10), where every element is promoted.")
         if approx_labels:
-            parity_sentence += (f"; {', '.join(approx_labels)} = APPROXIMATE, "
-                                "selective p-elevate promotes a marked subset")
+            parity_sentence += (f" {', '.join(approx_labels)} is only "
+                                "APPROXIMATE — promotion lifts a marked "
+                                "subset of the elements, not all of them.")
 
     # error/tolerance, not raw rel_err: tolerances are now 0.02–0.087 while
     # errors run 0.004–0.8, so a shaded band on a linear axis is a hairline at
@@ -1531,28 +1589,30 @@ def external_comparison(result_path: Path, out_dir: Path) -> bool:
     if ratios:
         best = min(ratios)
         pass_sentence = (
-            f" · {inside} of {len(ratios)} measured configurations are inside "
-            f"tolerance; the closest is {best:.2f}x the tolerance, so at these "
-            "resolutions neither mesh source reaches reference accuracy on "
-            "most cases — the comparison is which source is closer, not which "
-            "one passes")
+            f" {inside} of the {len(ratios)} measured runs are inside the "
+            f"allowed error, and the closest is {best:.2f}× the allowance, so "
+            "at these cell sizes neither mesh source reaches reference "
+            "accuracy on most cases — the comparison is which source is "
+            "closer, not which one passes.")
     subtitle = (
-        "y is rel_err ÷ that case's own reference tolerance, so 1.0 is the "
-        "pass line in every panel and panels with different tolerances "
-        f"(now {min(tolerances):g}–{max(tolerances):g}, was a hand-picked "
-        "0.15) are comparable · the strip under each panel is one cell per "
-        "(variant, case, h_rel): a refusal is the mesher declining an h it "
-        f"cannot represent ({states['refused']} of {len(rows)} rows, the "
-        "plurality) and is shown as an outcome, not as a gap; a failure is a "
-        f"real error ({states['failed']}) and stays separate"
-        + parity_sentence + pass_sentence + " · order "
-        f"{order1}: our best native variant now has the lower median rel_err "
-        f"in {wins[order1]}/{len(tallies[order1])} families ({reversal}), "
-        "REVERSING the previous regeneration — those earlier numbers were "
-        "measured on an engine that silently deleted the bore, so this is a "
-        "corrected measurement and not a method improvement (see "
-        "external-truth-findings.json and "
-        "docs/validation/figures/hole_aliasing.png)"
+        "The height of each point is how far that mesh is from the reference "
+        "answer, as a multiple of the error that case is allowed, so 1.0 is "
+        "the pass line in every panel and cases with different allowances "
+        f"(now {min(tolerances):g}–{max(tolerances):g}, once a hand-picked "
+        "0.15) can be read side by side. The strip under each panel has one "
+        "cell per mesh source, case and cell size: a refusal is the mesher "
+        f"declining a cell size it cannot build ({states['refused']} of "
+        f"{len(rows)} rows, the most common outcome), and it is shown as an "
+        "outcome rather than as a gap; a failure is a real error "
+        f"({states['failed']}) and stays separate."
+        + parity_sentence + pass_sentence
+        + f" At order {order1} our best native variant now has the lower "
+        f"median relative error in {wins[order1]}/{len(tallies[order1])} "
+        f"families ({reversal}), REVERSING the previous regeneration — those "
+        "earlier numbers were measured on an engine that silently deleted the "
+        "bore, so this is a corrected measurement and not a method "
+        "improvement (see external-truth-findings.json and "
+        "docs/validation/figures/hole_aliasing.png)."
         + cost_sentence)
 
     # two axes rows per element order: the convergence panel and its outcome
@@ -1562,16 +1622,16 @@ def external_comparison(result_path: Path, out_dir: Path) -> bool:
     width = 4.7 * len(families)
     height = max(5.6 * len(orders), width / fs.MAX_ASPECT)
     fig, axes = fs.figure(
-        "Mesh source against third-party reference truth — error in units of "
-        "the reference tolerance",
+        "Mesh source against third-party reference answers — error as a "
+        "multiple of the error each case is allowed",
         subtitle=subtitle,
         footer=fs.footer_source(result_path, CORPUS_REFERENCE_DIR, findings,
                                 n=len(rows)),
         size=(width, height),
         nrows=2 * len(orders), ncols=len(families),
-        share_y_axis="the outcome strips are categorical and share nothing "
-                     "with the convergence panels; the convergence panels are "
-                     "put on one common ratio axis explicitly below",
+        share_y_axis="the outcome strips are pictures of categories and share "
+                     "nothing with the panels above them; those panels are "
+                     "put on one common axis explicitly below",
         gridspec_kw={"height_ratios": [3.0, 1.5] * len(orders)})
 
     shown_solvers: list[str] = []
@@ -1589,7 +1649,7 @@ def external_comparison(result_path: Path, out_dir: Path) -> bool:
                 continue
             chart_axes.append(ax)
 
-            fs.tolerance_band(ax, 1.0, label="tolerance = 1.0")
+            fs.tolerance_band(ax, 1.0, label="pass line = 1.0")
 
             rung_labels: list[tuple[float, float, str, str]] = []
             variants = [solver for solver in EXTERNAL_SOURCES
@@ -1632,7 +1692,8 @@ def external_comparison(result_path: Path, out_dir: Path) -> bool:
                                         st.color))
                 if solver not in shown_solvers:
                     shown_solvers.append(solver)
-                rate = (f"; rate dof^{fit.slope:.2f}" if fit.reportable
+                rate = (f"; rate degrees of freedom^{fit.slope:.2f}"
+                        if fit.reportable
                         else f"; {len(points)} resolution(s) — no rate stated")
                 print(f"  {family} order {order} {st.label}: "
                       + ", ".join(
@@ -1658,7 +1719,7 @@ def external_comparison(result_path: Path, out_dir: Path) -> bool:
             deferred_labels.append((ax, rung_labels))
 
             family_label = {
-                "box_hole": "Box-hole SCF",
+                "box_hole": "Box with a hole (stress concentration)",
                 "stepped_shaft": "Stepped-shaft tip deflection",
             }.get(family, family.replace("_", " ").title())
             # the order-2 parity claim is read off promotion.order_pairing, so
@@ -1673,9 +1734,9 @@ def external_comparison(result_path: Path, out_dir: Path) -> bool:
                                   if "APPROXIMATE" in row["order_pairing"]})
             if true_parity:
                 parity.append(f"true parity: {', '.join(true_parity)} "
-                              "vs Gmsh tet10")
+                              "vs Gmsh's quadratic tetrahedra")
             if approximate:
-                parity.append(f"approx. parity: {', '.join(approximate)}")
+                parity.append(f"approximate parity: {', '.join(approximate)}")
             # one title line in every panel: a multi-line left-aligned title
             # forces tight_layout to open the same gap between every axes row,
             # which pushed each outcome strip away from the panel it belongs
@@ -1687,10 +1748,12 @@ def external_comparison(result_path: Path, out_dir: Path) -> bool:
                     transform=ax.transAxes, ha="right", va="top",
                     fontsize=fs.FONT_PT["annot"] - 0.5, color=fs.theme().ink,
                     linespacing=1.35, zorder=6)
-            ax.set_xlabel("active degrees of freedom  (log scale)")
+            ax.set_xlabel(f"active {fs.quantity_label('n_dof')}  (log scale)\n"
+                          "the unknowns the solver has to solve for")
             if family_index == 0:
-                ax.set_ylabel("rel_err ÷ reference tolerance\n"
-                              "(≤ 1 passes; log scale)")
+                ax.set_ylabel(
+                    f"{fs.quantity_label('accuracy_rel_err')}, as a multiple "
+                    "of\nthe error allowed (1 or less passes; log scale)")
             # lower right: inside the shaded pass region, which no series
             # reaches on its right-hand side in any panel.
             fs.annotate_n(ax, sum(row["state"] == "measured" for row in panel),
@@ -1715,12 +1778,12 @@ def external_comparison(result_path: Path, out_dir: Path) -> bool:
     crowded = _place_rung_labels(fig, deferred_labels,
                                  fs.FONT_PT["annot"] - 1.5)
     if crowded:
-        print(f"  {crowded} h_rel label(s) had no free slot and were left "
-              "off; the printed medians above carry those rungs")
+        print(f"  {crowded} cell-size label(s) had no free spot and were left "
+              "off the figure; the printed medians above carry those sizes")
 
     handles = fs.series_handles(shown_solvers)
     handles.append(Line2D([0], [0], color=fs.theme().band, linewidth=1.2,
-                          linestyle=(0, (4, 2)), label="tolerance = 1.0"))
+                          linestyle=(0, (4, 2)), label="pass line = 1.0"))
     for state in OUTCOME_ORDER:
         if not states[state]:
             continue

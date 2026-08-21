@@ -25,6 +25,8 @@ jobs:
             nlohmann-json3-dev \
             libomp-dev \
             libtbb-dev \
+            libfontconfig1-dev \
+            libfreetype-dev \
             libgl1-mesa-dev \
             libx11-dev \
             libxrandr-dev \
@@ -72,6 +74,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             ninja-build cmake g++ clang libc++-dev libc++abi-dev \
             libeigen3-dev nlohmann-json3-dev libomp-dev libtbb-dev \
+            libfontconfig1-dev libfreetype-dev \
             libocct-data-exchange-dev libocct-foundation-dev \
             libocct-modeling-algorithms-dev libocct-modeling-data-dev \
             libocct-ocaf-dev libocct-visualization-dev

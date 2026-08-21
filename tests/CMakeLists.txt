@@ -38,6 +38,7 @@ add_executable(polymesh_tests
     test_case_features.cpp
     test_indicators.cpp
     test_zz.cpp
+    test_stress_gradient.cpp
     test_vtu.cpp
     test_vem.cpp
     test_fe_vem_assembly.cpp

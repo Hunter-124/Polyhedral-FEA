@@ -14,6 +14,7 @@
 
 #include <Eigen/Core>
 
+#include <cstddef>
 #include <vector>
 
 namespace polymesh::fea {
@@ -49,5 +50,40 @@ std::vector<ElementCentroidStress> recover_element_centroid_stress(const NodalMe
 
 /// Von Mises equivalent stress, Pa.
 double von_mises(const Stress& s);
+
+/// Magnitude of the spatial gradient of a per-node scalar field, per node, in
+/// [field units] per metre (node coordinates are metres — see nodal_mesh.hpp).
+///
+/// Definition. For node i with position xᵢ and value sᵢ, the patch is every
+/// node j ≠ i that shares at least one element with i, counted once however
+/// many elements it shares. With dⱼ = xⱼ - xᵢ the gradient g is the unweighted
+/// linear least-squares fit of s(x) ≈ sᵢ + g·(x - xᵢ) over that patch, i.e. the
+/// solution of the 3×3 normal equations (Σ dⱼ dⱼᵀ) g = Σ dⱼ (sⱼ - sᵢ). The
+/// returned entry is |g|.
+///
+/// The fit reproduces a field that is linear in x exactly (this is the property
+/// `tests/test_stress_gradient.cpp` pins), and a constant field gives exactly
+/// 0.0. On a curved field it is a *recovery*, not a derivative, and it is
+/// first-order accurate: a patch of diameter h cannot see the curvature it is
+/// averaging over. Measured on exp(x)·sin(3y)·(1+z²) over a unit-cube hex
+/// lattice, max interior error, h = 1/8 → 1/64: on the symmetric lattice the
+/// odd patch moments cancel and it converges at rate 1.80 / 1.90 / 1.95, but
+/// perturb the interior nodes by h/4 and the rate drops to 0.82 / 0.69 / 0.78.
+/// O(h) is the rate to budget for on any real mesh.
+///
+/// A 0.0 entry means one of two things, and the two are distinguishable only by
+/// `n_unresolved`: either the field really is flat there, or the node's normal
+/// matrix is rank deficient (fewer than 3 patch nodes, or patch nodes collinear
+/// / coplanar) so no gradient exists to report. Rank deficiency yields exactly
+/// 0.0 — never an extrapolated slope out of a near-null direction — and
+/// increments `*n_unresolved` when that pointer is non-null. `*n_unresolved` is
+/// reset to 0 on entry, so it counts this call only.
+///
+/// Returns an empty vector when `nodal.size() != mesh.nodes.size()`. A
+/// mismatched field is a caller bug; padding it would put a number on screen
+/// that was never computed from the solution.
+std::vector<double> nodal_scalar_gradient_magnitude(const NodalMesh& mesh,
+                                                    const std::vector<double>& nodal,
+                                                    std::size_t* n_unresolved = nullptr);
 
 } // namespace polymesh::fea

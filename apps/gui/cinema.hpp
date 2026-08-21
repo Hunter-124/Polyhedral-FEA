@@ -1,35 +1,46 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-// Advisor activation cinema: the deployed advisor network lighting up with the
-// activations of its own forward passes, CONCURRENTLY with the mesh being built
-// out of the mesher's own construction stages, closing on the real
-// solve/estimate/refine loop the answer is actually computed by -- all on a
-// virtual clock, so a headless recording is identical whatever the real frame
-// rate was.
+// The showcase film: the deployed advisor network choosing a mesh, the mesher
+// building the one it chose, and the solver's own answer appearing in the order
+// it is computed -- all on a virtual clock, so a headless recording is identical
+// whatever the real frame rate was.
 //
 // HONESTY IS THE POINT OF THIS FILE. Every node fill is a value from the
 // production ONNX graph's trunk taps (`advisor::ActivationFrame::input/fc1/
 // fc2/heads`), every connection strength is |w_ji * a_i| from the exported
 // weight blocks (`advisor::NetworkEdges::weights`), every element in the reveal
 // is an element the mesher emitted (`pipeline::MeshStage::mesh`), every field is
-// one that pass really produced (`pipeline::SolveStage::result`), and every
-// number on screen is the struct field named beside it. Only TIME, opacity, the
-// shrink-toward-centroid reveal and the load factor are interpolated -- and the
-// load factor is interpolated because linear elastostatics makes u(λ) = λ·u
+// one that pass really produced (`pipeline::SolveStage::result`) or is computed
+// from it by a named function, and every number on screen is the struct field or
+// the function named beside it. Only TIME, opacity, the shrink-toward-centroid
+// reveal, the spatial sweep front and the load factor are interpolated -- and
+// the load factor is interpolated because linear elastostatics makes u(λ) = λ·u
 // exact, so every frame of that ramp is a real solution rather than a blend of
 // two. No displayed number is ever interpolated, and no activation, element
 // count, error indicator or progress value is ever synthesised. When a source is
 // missing the surface says WHICH one and skips that beat; it never substitutes a
 // plausible value.
 //
-// CONCURRENCY IS A COMPOSITION, NOT A CHRONOLOGY CLAIM. `Advisor::explain()`
-// runs to completion at `cinema advisor`, long before `solve` is issued, so the
-// passes and the fill stages are two recorded sequences. The take shows them on
-// one clock because the fill is the execution of what the passes chose, states
-// that on screen, and keeps the causal order readable by locking the DECISION in
-// before the first element appears. It never implies the mesh preceded the
-// decision, and it never implies the two ran at the same instant.
+// IT IS ALSO MEANT TO BE READ BY SOMEONE WHO DID NOT WRITE IT. The film is
+// aimed at a README, so the composition carries exactly four rows of text: a
+// plain-English headline, the two-to-four numbers that matter on this beat, the
+// one disclosure that applies to it, and the provenance stamp. That budget is
+// the whole reason `docs/assets/cinema/NOTES.md` exists: the exhaustive
+// per-beat disclosures the surface used to stack six deep in 13 px grey live
+// there, beat by beat, and the film names that file on screen. A disclosure
+// nobody can read at the size a README embeds is not a disclosure, and the
+// honest fix is to make it legible somewhere rather than illegible here
+// (ADR-0043).
+//
+// SEQUENCE, NOT SIMULTANEITY. `Advisor::explain()` runs to completion at
+// `cinema advisor`, long before `solve` is issued, so the passes and the fill
+// stages are two recorded sequences and the film shows them in that order: the
+// pass lane sweeps the candidate grid inside `kDeliberate` and then HOLDS the
+// pass that scored the recommended action for the whole of `kBuild`. Holding is
+// what makes the two panes agree -- the activations on screen while the mesh
+// grows are the activations of the forward pass that chose that mesh, not an
+// unrelated later candidate. Nothing claims the two ran at the same instant.
 //
 // This module owns no studio state: the app hands it a `CinemaHud` snapshot of
 // what the app already measured, so the HUD cannot drift from what the panels
@@ -68,40 +79,48 @@ enum class SkeletonSource {
 /// exact frame count, not an exact act sum); past the end the composition holds
 /// the final frame rather than looping.
 ///
-/// `kBuild` is the CONCURRENT act and the reason the take has this shape: the
-/// advisor's pass lane is ONE continuous sweep over every forward pass that
-/// spans `kDeliberate` and `kBuild` together, while the mesher's stage lane
-/// runs inside `kBuild` alone. Through `kBuild` both counters advance on the
-/// same virtual clock, so the network is firing while the fill is being built.
-///
-/// The causal order survives that overlap because the DECISION is locked and on
-/// screen from the first frame of `kBuild`, a lead-in before the first element
-/// appears (`CinemaState::kDecisionLead`). It is honest to state it there and
-/// keep showing passes afterwards: `Advisor::explain()` ran to completion in
-/// `load_cinema_advisor`, before `solve` was ever issued, so every pass on
-/// screen — including the ones still to come — had already happened when the
-/// mesher emitted its first stage. The cinema replays two recorded sequences;
-/// it does not claim they were simultaneous, and it says so in the ticker.
-enum class CinemaAct { kSkeleton = 0, kDeliberate, kBuild, kSolve };
+/// `kMeshHold` exists because the mesh is the thing this project builds and the
+/// film used to cut away from it on the same frame the last element landed. It
+/// is the finished fill, complete, held still, with its own counts on screen --
+/// the beat a reader needs in order to see what was made before being shown
+/// what it is for.
+enum class CinemaAct { kSkeleton = 0, kDeliberate, kBuild, kMeshHold, kSolve };
 
-/// Where the closing act is inside the real solve/estimate/refine loop.
+/// Where the closing act is inside the real solve / estimate / refine loop.
 ///
 /// This is the order in which the answer is actually computed, one
-/// `pipeline::SolveStage` at a time: solve, recover the ZZ error field from
-/// that solve, refine where the field asked, solve again. Nothing here is a
-/// per-element solve order or an iteration counter, because a direct sparse
+/// `pipeline::SolveStage` at a time, with a still hold after every moving beat
+/// so the result of each step is on screen long enough to read. Nothing here is
+/// a per-element solve order or an iteration counter, because a direct sparse
 /// factorisation has neither.
+///
+/// The two `*Sweep` beats are SPATIAL REVEALS of a field that is already
+/// complete: a plane travels across the part and the field's own colours are
+/// uncovered behind it (`Viewport::FieldSweep`). The field is not animated and
+/// no value on screen changes as the front passes -- what changes is how much of
+/// it has been uncovered. That is the honest way to show a static solution
+/// arriving, and it is stated on screen in those terms.
 enum class SolvePhase {
-    kNone = 0, // no SolveStage was delivered; nothing solved is drawn
-    kField,    // that pass's own von Mises field on its own mesh, undeformed
-    kError,    // the ZZ error field recovered from that same solve
-    kRefine,   // the mesh the NEXT pass solved on, revealing element by element
-    kLoadRamp, // u(λ) = λ·u on the final field, λ from 0 to 1
-    kHold,     // λ = 1, the finished answer
+    kNone = 0,      // no SolveStage was delivered; nothing solved is drawn
+    kStressSweep,   // that pass's von Mises field, uncovered along the load axis
+    kStressHold,    // the whole field, still
+    kGradientSweep, // |∇σ| from `fea::nodal_scalar_gradient_magnitude`, uncovered
+    kGradientHold,  // the whole gradient field, still
+    kError,         // the ZZ error field recovered from that same solve
+    kErrorHold,     // the whole error field, still
+    kRefine,        // the mesh the NEXT pass solved, element by element
+    kRefineHold,    // that mesh, complete, still
+    kLoadRamp,      // u(λ) = λ·u on the final field, λ from 0 to 1
+    kHold,          // λ = 1, the finished answer
 };
 
-/// Phase id, for the ticker and the disclosures. Stable text.
+/// Phase id, for the manifest and the notes. Stable text.
 [[nodiscard]] const char* cinema_solve_phase_name(SolvePhase phase);
+
+/// True for the beats that are a still hold of whatever the beat before them
+/// finished. One predicate, so the pause the schedule pays for and the pause the
+/// caption claims cannot disagree.
+[[nodiscard]] bool cinema_phase_is_hold(SolvePhase phase);
 
 /// Which real mesh the viewport's per-element cinema buffer should be holding.
 ///
@@ -122,17 +141,47 @@ enum class CinemaMeshSource {
 /// Stable: `scripts/render_cinema.py` parses these.
 [[nodiscard]] const char* cinema_act_name(CinemaAct act);
 
-/// One composed row of the bottom ticker: the exact string that will be drawn
-/// and the palette colour it is drawn in.
-///
-/// The rows exist as strings BEFORE anything is drawn because the composition
-/// sizes the ticker strip from them. A disclosure clipped off the bottom or the
-/// right of a recorded frame is a disclosure that was not made, and the only
-/// way to be sure it fits is to measure the text that is actually going in.
+/// Number of acts. Exposed because the recorder prints one act window per act
+/// and the render script reads the table it prints.
+inline constexpr int kCinemaActCount = 5;
+
+/// One composed row of text and the palette colour it is drawn in.
 struct CinemaLine {
     ImVec4 color{1, 1, 1, 1};
     std::string text;
 };
+
+/// The type the film is set in.
+///
+/// Sizes are in pixels at a 1080-line frame and scale with the frame height, so
+/// the same composition is legible at 720p and does not become a wall of giant
+/// text at 4K. They are this large for one measured reason: the README embeds a
+/// GIF that is downscaled to roughly half the recorded width, so a 15 px row --
+/// what this surface used to set its prose at -- arrives at the reader as 7 px
+/// and cannot be read at all. The headline survives that halving; so do the
+/// numbers.
+struct CinemaType {
+    /// The face to draw with. Null falls back to the UI font, which is correct
+    /// but soft at these sizes: ImGui rasterises one size per face and scales
+    /// the rest. `main.cpp` loads a second face at `kAtlasSize` for this.
+    ImFont* font = nullptr;
+    float headline = 40.0f; // the plain-English sentence
+    float numbers = 27.0f;  // the numbers that matter on this beat
+    float note = 20.0f;     // the one disclosure that applies to it
+    float footer = 17.0f;   // provenance
+    float chapter = 21.0f;  // the chapter bar
+    float caption = 22.0f;  // panel captions and equations
+    float label = 19.0f;    // panel unit labels
+    float legend = 17.0f;   // panel legend
+};
+
+/// Size the second font face is rasterised at, and the frame height the sizes
+/// in `CinemaType` are quoted for.
+inline constexpr float kCinemaAtlasSize = 40.0f;
+inline constexpr float kCinemaRefHeight = 1080.0f;
+
+/// `CinemaType` for a frame `height` pixels tall.
+[[nodiscard]] CinemaType cinema_type(ImFont* font, float height);
 
 /// What the app measured about the run, lifted out of the app's own state by
 /// the caller. Every field is a value the app already holds; the cinema derives
@@ -182,15 +231,22 @@ struct CinemaCue {
     double act_t = 0.0;    // seconds into the act
     double act_span = 1.0; // act length, seconds
 
-    // ---- the advisor pass lane (spans kDeliberate and kBuild) -------------
+    // ---- the advisor pass lane (inside kDeliberate) -----------------------
 
     /// Index into `CinemaState::explanation->frames`. -1 when there are none.
     int frame_index = -1;
-    /// One forward pass, in seconds. Reported on screen so the beat rate is
-    /// auditable against the recorded frame count.
+    /// One forward pass, in seconds. Reported in the manifest so the beat rate
+    /// is auditable against the recorded frame count.
     double pass_beat_seconds = 0.0;
-    /// True once the ranking's outcome may be stated: from the first frame of
-    /// `kBuild`, which is also before the first element of the fill appears.
+    /// True while the lane is still advancing through the candidate grid.
+    bool pass_lane_live = false;
+    /// True once the pass lane has stopped on the pass that scored the
+    /// recommended action and is holding it: from the first frame of `kBuild`
+    /// onward. `frame_index` then points at that pass and nothing else, which
+    /// is what makes the lit graph and the growing mesh the same event.
+    bool chosen_pass_held = false;
+    /// True once the ranking's outcome may be stated: the same instant, which
+    /// `cinema_decision_lead` guarantees is before the first element appears.
     bool decision_locked = false;
 
     // ---- the mesher's stage lane (inside kBuild) --------------------------
@@ -208,10 +264,6 @@ struct CinemaCue {
     CinemaMeshSource mesh_source = CinemaMeshSource::kNone;
     int mesh_source_index = -1;
 
-    /// True while BOTH lanes are advancing on this frame — the fact the ticker
-    /// states, so the claim on screen and the schedule cannot disagree.
-    bool concurrent = false;
-
     // ---- the solve/estimate/refine loop (kSolve) --------------------------
 
     /// Index into `CinemaState::solve_stages`. -1 when none were delivered.
@@ -221,6 +273,10 @@ struct CinemaCue {
     double solve_phase_span = 1.0; // phase length, seconds
     /// 0..1 through the refined mesh's element reveal, in `kRefine`.
     double refine_reveal = 0.0;
+    /// How far the spatial reveal front has travelled, 0..1 along
+    /// `CinemaState::sweep_axis`. Exactly 1 (everything uncovered) outside the
+    /// two sweep beats.
+    double field_front = 1.0;
     /// The load factor λ the frame is drawn at. Exactly 1 outside `kLoadRamp`,
     /// and drawn on screen wherever it is not: linear elastostatics gives
     /// u(λ) = λ·u for the same λ·f, so every intermediate frame of the ramp is
@@ -229,19 +285,17 @@ struct CinemaCue {
 
     // ---- opacity and layout ----------------------------------------------
 
-    /// Opacity of the whole network panel, 0..1. The opening act belongs to the
-    /// part, so the network is held back and faded up across the back half of
-    /// it rather than sitting there as a wall of lines from frame zero. This is
-    /// opacity and nothing else: every node, every edge and every number is
+    /// How far the left panel is slid into its share of the width, 0..1. Rises
+    /// once, during the opening, and then stays at 1 for the rest of the take:
+    /// the pane's height sets the part's rendered size, so a width that moved
+    /// mid-take would resize the subject inside one continuous shot.
+    float panel_open = 1.0f;
+    /// Opacity of the network drawing and of the equation drawing. They cross
+    /// fade at the `kSolve` boundary — the same panel, a different thing in it —
+    /// and both are pure opacity: every node, every term and every number is
     /// exactly what it would be at alpha 1.
     float network_alpha = 1.0f;
-    /// How far the network panel is slid into its share of the width, 0..1.
-    /// Separate from `network_alpha` because the panel is DIMMED in `kSolve`
-    /// once its last pass is only being held, and a width that followed the
-    /// opacity would grow the viewport pane mid-take. The pane's height sets
-    /// the part's rendered size, so that would resize the subject inside one
-    /// continuous shot. Rises once, during the opening, and then stays at 1.
-    float network_open = 1.0f;
+    float equations_alpha = 0.0f;
 };
 
 /// The take. Owns the advisor explanation, the collected construction stages,
@@ -255,7 +309,7 @@ class CinemaState {
   public:
     /// Take length when nothing asked for a specific one. `record` overrides it
     /// from the requested frame count, which is the authoritative case.
-    static constexpr double kDefaultDuration = 20.0;
+    static constexpr double kDefaultDuration = 30.0;
     /// The recorder's fixed timestep. A recording is defined by its frame
     /// count, so the clock is derived from the frame index and never
     /// accumulated -- there is no drift to reason about.
@@ -264,16 +318,19 @@ class CinemaState {
     /// `cinema_opening_fade()`, which also caps it at half the opening act so a
     /// short take does not spend its whole first act fading up.
     static constexpr double kOpeningFade = 0.5;
-    /// How long the DECISION is on screen at the head of the concurrent act
-    /// before the first element of the fill appears, seconds. Capped at a fifth
-    /// of that act by `cinema_decision_lead()` so a short take does not spend
-    /// the whole concurrent stretch holding a caption.
+    /// How long the DECISION is on screen at the head of the build act before
+    /// the first element of the fill appears, seconds. Capped at a fifth of that
+    /// act by `cinema_decision_lead()` so a short take does not spend the whole
+    /// build stretch holding a caption.
     ///
-    /// This lead is what keeps the overlap honest. The fill is the execution of
-    /// the advised action, so the action has to be readable BEFORE the thing it
-    /// produced starts appearing; without the lead the two would arrive on the
-    /// same frame and a viewer could not tell which followed which.
-    static constexpr double kDecisionLead = 0.6;
+    /// The fill is the execution of the advised action, so the action has to be
+    /// readable BEFORE the thing it produced starts appearing; without the lead
+    /// the two would arrive on the same frame and a viewer could not tell which
+    /// followed which.
+    static constexpr double kDecisionLead = 0.7;
+    /// How long the network/equation cross fade takes, seconds. Capped at a
+    /// tenth of the closing act by `cinema_panel_fade()`.
+    static constexpr double kPanelFade = 0.5;
 
     // ---- take state ------------------------------------------------------
 
@@ -293,7 +350,16 @@ class CinemaState {
     /// Verbatim failure text when `skeleton_source == kUnavailable`.
     std::string skeleton_note;
 
-    // ---- the network: act 2 (kDeliberate) and act 3 (kBuild) -------------
+    /// Direction the closing act's field reveals travel in, unit length, and
+    /// how it was chosen. Both are set by `build_cinema_skeleton` from the real
+    /// load case: the axis is the resultant force direction and the sign is
+    /// flipped, when the load faces sit at the far end of it, so that the front
+    /// always STARTS at the loaded end and travels away from it. A part with no
+    /// load gets its longest bounding-box axis and says so.
+    Eigen::Vector3f sweep_axis{1.0f, 0.0f, 0.0f};
+    std::string sweep_note;
+
+    // ---- the network: kDeliberate, held through kBuild / kMeshHold --------
 
 #ifdef POLYMESH_WITH_ADVISOR
     /// The forward passes that produced the decision, in chooser order.
@@ -309,10 +375,14 @@ class CinemaState {
     /// act really is executing what the network chose. False on a refusal, on
     /// an unparseable mesher name, and when no advisor ran at all.
     bool decision_applied = false;
-    /// What was applied, or why it was not. Drawn verbatim beside the decision.
+    /// What was applied, or why it was not, in one plain sentence.
     std::string decision_note;
 
-    // ---- the mesher's own stages: act 3 (kBuild) -------------------------
+    /// Index into `explanation->frames` of the pass that scored the recommended
+    /// action, or -1 when there is no explanation. The build act holds this one.
+    [[nodiscard]] int chosen_frame() const;
+
+    // ---- the mesher's own stages: kBuild ---------------------------------
 
     /// Every construction stage of every fill this take ran, in emission order.
     ///
@@ -335,7 +405,7 @@ class CinemaState {
     /// never shows another run's mesh.
     void clear_stages();
 
-    // ---- the solve/estimate/refine loop: act 4 (kSolve) ------------------
+    // ---- the solve/estimate/refine loop: kSolve ---------------------------
 
     /// Every completed adaptive pass of this take's solve, in the order the
     /// pipeline finished them, from `pipeline::SolveJob::on_solve_stage`.
@@ -354,6 +424,25 @@ class CinemaState {
     void drain_solve_stages();
     /// Drops collected solve stages and the uploaded bookkeeping.
     void clear_solve_stages();
+
+    /// |∇σ_vm| at every node of solve stage `index`, from
+    /// `fea::nodal_scalar_gradient_magnitude` on that pass's own von Mises
+    /// field and its own mesh, in Pa/m. Computed on first use and cached: the
+    /// recovery is a least-squares fit per node over that node's element patch,
+    /// which is milliseconds on this film's 4,382-node mesh but is not a
+    /// per-frame cost, and the virtual clock means a first-use stall cannot
+    /// change a recorded frame.
+    ///
+    /// Empty when the stage does not exist or the recovery could not run. The
+    /// gradient beat then says so and draws no gradient field, because a
+    /// gradient this module made up would be exactly the invention this whole
+    /// surface exists to rule out.
+    [[nodiscard]] const std::vector<double>& gradient_field(std::size_t index);
+    /// Nodes whose patch could not determine a gradient, from the same call.
+    /// Disclosed on screen when nonzero.
+    [[nodiscard]] std::size_t gradient_unresolved(std::size_t index);
+    /// Largest value in `gradient_field(index)`, Pa/m; 0 when there is none.
+    [[nodiscard]] double gradient_max(std::size_t index);
 
     // ---- recorder --------------------------------------------------------
 
@@ -387,21 +476,6 @@ class CinemaState {
     /// geometry on its first frame.
     void invalidate_uploads();
 
-    /// Height the ticker strip is reserved at for the whole take, pixels; 0
-    /// until the first frame measures it. Maintained by
-    /// `cinema_ticker_reserve` as a high-water mark over ALL FOUR acts, never
-    /// as the current act's own need.
-    ///
-    /// The strip's height is what is left over for the viewport, and the
-    /// viewport's HEIGHT is what sets the part's rendered size (the projection
-    /// fixes the vertical field). A strip that grew from four rows in the
-    /// opening act to eight when the DECISION lines arrive would therefore
-    /// resize the part at every act boundary — measured at 701x529 px in the
-    /// skeleton act against 668x505 in the deliberation act before this existed.
-    /// A subject that changes size mid-shot reads as a cut, so the composition
-    /// reserves the tallest strip the take can need and holds it.
-    float ticker_reserve = 0.0f;
-
   private:
     /// Worker-thread staging buffers. `push_stage` / `push_solve_stage` append
     /// here under the one mutex; the two `drain_*` calls move them out on the
@@ -411,10 +485,23 @@ class CinemaState {
     std::vector<pipeline::MeshStage> pending_stages_;
     std::vector<pipeline::SolveStage> pending_solve_stages_;
 
+    /// Lazily computed gradient recovery, one entry per solve stage. `computed`
+    /// distinguishes "not tried yet" from "tried and there is none", so a
+    /// recovery that legitimately returned nothing is not retried every frame.
+    struct GradientCache {
+        bool computed = false;
+        std::size_t unresolved = 0;
+        double max = 0.0;
+        std::vector<double> values;
+    };
+    std::vector<GradientCache> gradients_;
+    GradientCache& gradient_slot(std::size_t index);
+
     /// Per-frame connection ranking scratch, kept across frames so the top-K
     /// selection allocates once for the whole take rather than 60 times a
     /// second. Only `draw_cinema_network` touches it.
-    friend void draw_cinema_network(CinemaState& state, const CinemaCue& cue);
+    friend void draw_cinema_network(CinemaState& state, const CinemaCue& cue,
+                                    const CinemaType& type, float alpha);
     struct EdgePick {
         float rank = 0.0f;  // |w_ji * a_i|, the selection key
         float value = 0.0f; // w_ji * a_i, signed, for the colour
@@ -439,21 +526,21 @@ void cinema_act_window(const CinemaState& state, CinemaAct act, double& t0, doub
 /// fully composed one, which is what the recorder reports.
 [[nodiscard]] double cinema_opening_fade(const CinemaState& state);
 
-/// Length of the DECISION lead-in at the head of the concurrent act, seconds:
+/// Length of the DECISION lead-in at the head of the build act, seconds:
 /// `CinemaState::kDecisionLead`, but never more than a fifth of that act.
 [[nodiscard]] double cinema_decision_lead(const CinemaState& state);
 
+/// Length of the panel cross fade, seconds: `CinemaState::kPanelFade`, but
+/// never more than a tenth of the closing act.
+[[nodiscard]] double cinema_panel_fade(const CinemaState& state);
+
 /// Act schedule at the current clock, resolved against the real pass, stage and
-/// solve-stage counts. Act spans are fixed fractions of `state.duration`:
-/// skeleton 0.075, deliberate 0.120, build 0.235, solve 0.570. The two data
-/// lanes are NOT one act each -- the pass lane spans deliberate+build and the
-/// stage lane sits inside build -- which is what makes them concurrent, and the
-/// closing 0.570 is the solve/estimate/refine loop plus the load ramp, which is
-/// the longest single thing this take shows.
+/// solve-stage counts.
 [[nodiscard]] CinemaCue cinema_cue(const CinemaState& state);
 
-/// Draw parameters for this instant. Time, opacity and the shrink-toward-
-/// centroid fraction are the only interpolated quantities in the whole module.
+/// Draw parameters for this instant. Time, opacity, the shrink-toward-centroid
+/// fraction and the sweep front are the only interpolated quantities in the
+/// whole module.
 [[nodiscard]] Viewport::CinemaView cinema_view(const CinemaState& state, const CinemaCue& cue);
 
 /// Everything the viewport render call needs for this instant, in one struct so
@@ -471,13 +558,17 @@ struct CinemaRender {
     /// λ: the drawn colour is then λ·s / s_max, i.e. the λ-scaled field against
     /// a fixed full-load legend, with no second copy of the field anywhere.
     float result_max = 1.0f;
+    /// The spatial reveal for this instant. Inactive on every beat that is not
+    /// a sweep, which is what leaves the held beats showing the whole field.
+    Viewport::FieldSweep sweep;
 };
 
 /// What the viewport should display now. `kCinema` for the skeleton, the
-/// deliberation, the concurrent fill and the refine beats; the pass's own von
-/// Mises or ZZ error field for the solve beats. Without a `pipeline::SolveStage`
-/// the closing act holds the final fill stage and the ticker says so.
-[[nodiscard]] CinemaRender cinema_render(const CinemaState& state, const CinemaCue& cue,
+/// deliberation, the fill and the refine beats; the pass's own von Mises,
+/// recovered gradient or ZZ error field for the solve beats. Without a
+/// `pipeline::SolveStage` the closing act holds the final fill stage and the
+/// caption says so.
+[[nodiscard]] CinemaRender cinema_render(CinemaState& state, const CinemaCue& cue,
                                          double base_deform_scale);
 
 /// The `solver <token>` word the recorder prints: which linear solver this
@@ -489,14 +580,17 @@ struct CinemaRender {
 [[nodiscard]] const char* cinema_solver_token(const CinemaState& state);
 
 /// Uploads the stage or the solve-pass result the cue selected (only when it
-/// changed) and pushes the draw parameters. Main thread only.
-void sync_cinema_viewport(CinemaState& state, const CinemaCue& cue, Viewport& viewport);
+/// changed), pushes the draw parameters and the spatial reveal. Main thread
+/// only; may compute a pass's gradient recovery on first use.
+void sync_cinema_viewport(CinemaState& state, const CinemaCue& cue, const CinemaRender& render,
+                          Viewport& viewport);
 
 /// Extracts the part's real outline and pushes it to the viewport skeleton:
 /// BRep edge polylines when the model carries a `geom::CadModel`, otherwise the
-/// tessellation's sharp-edge network. Records which, for the on-screen label.
+/// tessellation's sharp-edge network. Records which, for the on-screen label,
+/// and resolves the closing act's sweep axis from `setup`'s real load case.
 void build_cinema_skeleton(CinemaState& state, const pipeline::Model& model,
-                           Viewport& viewport);
+                           const pipeline::SimSetup& setup, Viewport& viewport);
 
 /// Loads `dir` as an advisor model, runs `explain()` on the loaded part plus
 /// the current setup, and -- when the decision is not a refusal -- applies it
@@ -507,49 +601,72 @@ void build_cinema_skeleton(CinemaState& state, const pipeline::Model& model,
 bool load_cinema_advisor(CinemaState& state, const pipeline::Model& model,
                          pipeline::SimSetup& setup, const std::string& dir);
 
+/// The left panel: the network column stack cross fading with the equation
+/// board. Both are drawn from the same origin at the alphas the cue resolved,
+/// so the swap is a dissolve inside one pane rather than a layout change --
+/// the pane's width sets the viewport's width and must not move mid-take.
+void draw_cinema_panel(CinemaState& state, const CinemaCue& cue, const CinemaType& type,
+                       const CinemaHud& hud);
+
 /// The network column stack: input / trunk.fc1 / trunk.fc2 / heads as circular
 /// nodes, sized and coloured by this frame's real activations, with the
 /// strongest connections drawn as lines. Takes `state` by reference only to
 /// reuse the connection-ranking scratch buffer across frames.
-void draw_cinema_network(CinemaState& state, const CinemaCue& cue);
+void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaType& type,
+                         float alpha);
 
-/// Window padding the ticker strip is drawn with. Shared with the composition
-/// so the strip cannot be padded differently from the way it was measured.
-inline constexpr float kTickerPadX = 12.0f;
-inline constexpr float kTickerPadY = 8.0f;
+/// The equation board the closing act runs on: the relations the solver
+/// actually evaluates, with the one this beat is computing lit and its own
+/// numbers beside it. Every equation is the expression the cited code
+/// implements; see `docs/assets/cinema/NOTES.md` for the citation table.
+void draw_cinema_equations(const CinemaState& state, const CinemaCue& cue,
+                           const CinemaType& type, const CinemaHud& hud, float alpha);
 
-/// The ticker's header chips (act, virtual clock, beat rate, recording state),
-/// each an independently coloured run of text. Drawn flowed across as many
-/// rows as they need.
-[[nodiscard]] std::vector<CinemaLine> cinema_ticker_chips(const CinemaState& state,
-                                                          const CinemaCue& cue);
+/// Padding the bottom strip is drawn with. Shared with the composition so the
+/// strip cannot be padded differently from the way it was measured.
+inline constexpr float kStripPadX = 22.0f;
+inline constexpr float kStripPadY = 12.0f;
 
-/// The ticker's body rows for this instant: the act's own real numbers, the HUD
-/// line and the provenance stamp, in draw order.
-[[nodiscard]] std::vector<CinemaLine>
-cinema_ticker_body(const CinemaState& state, const CinemaCue& cue, const CinemaHud& hud);
+/// The four rows of the bottom strip, in draw order. Fixed shape, every act:
+/// one plain-English headline, one row of the numbers that matter, one
+/// disclosure, one provenance stamp. A row may be empty; the strip's height
+/// never changes, because the leftover is the viewport pane and the pane's
+/// height is what sets the part's rendered size.
+struct CinemaCaption {
+    ImVec4 headline_color{1, 1, 1, 1};
+    std::string headline;
+    std::string numbers;
+    ImVec4 note_color{1, 1, 1, 1};
+    std::string note;
+    std::string footer;
+};
 
-/// Exact height in pixels the ticker strip needs at `wrap_width` for the rows
-/// `cinema_ticker_chips` and `cinema_ticker_body` return, including the window
-/// padding `draw_cinema_ticker` is drawn with. Measured with the live ImGui
-/// font, so a different UI face resizes the strip instead of clipping it.
-[[nodiscard]] float cinema_ticker_height(const CinemaState& state, const CinemaCue& cue,
-                                         const CinemaHud& hud, float wrap_width);
+[[nodiscard]] CinemaCaption cinema_caption(const CinemaState& state, const CinemaCue& cue,
+                                           const CinemaHud& hud);
 
-/// Height the composition should give the ticker strip: the tallest
-/// `cinema_ticker_height` of any act at this instant — with the two acts that
-/// carry the pass lane probed on their LAST pass, where the DECISION rows join
-/// the per-pass rows, and the solve act probed in every one of its phases,
-/// because the load-ramp rows and the refine rows are different heights —
-/// raised into `CinemaState::ticker_reserve` and returned from there. Constant
-/// for the take, so the viewport pane keeps one height and the part keeps one
-/// size.
-[[nodiscard]] float cinema_ticker_reserve(CinemaState& state, const CinemaCue& cue,
-                                          const CinemaHud& hud, float wrap_width);
+/// The chapter bar: the four things the film does, with the current one lit and
+/// a progress fill under it. The one piece of pure orientation in the
+/// composition -- it tells a first-time viewer where they are in a 30 s take
+/// without their having to read a number.
+struct CinemaChapter {
+    const char* label;
+    /// Act this chapter is lit for; `kMeshHold` belongs to the build chapter.
+    CinemaAct act;
+};
+[[nodiscard]] std::vector<CinemaChapter> cinema_chapters();
+/// 0..1 through the whole take, for the chapter bar's fill. Time only.
+[[nodiscard]] double cinema_progress(const CinemaState& state);
 
-/// The bottom ticker: act, beat, the real numbers of whatever the beat is
-/// showing, the HUD line, and the provenance stamp. Every row wraps rather
-/// than clipping, which is what `cinema_ticker_height` reserved room for.
-void draw_cinema_ticker(const CinemaState& state, const CinemaCue& cue, const CinemaHud& hud);
+/// Exact height of the bottom strip, pixels: the chapter bar plus the four rows
+/// at `type`'s sizes plus the padding. A constant for the take, which is what
+/// keeps the part one size from the first frame to the last.
+[[nodiscard]] float cinema_strip_height(const CinemaType& type);
+
+/// The bottom strip: chapter bar, headline, numbers, disclosure, stamp. A row
+/// too wide for the strip is SET SMALLER until it fits, never wrapped and never
+/// clipped: wrapping would change the strip's height mid-take and clipping
+/// would drop the end of a sentence the film is making.
+void draw_cinema_strip(const CinemaState& state, const CinemaCue& cue, const CinemaHud& hud,
+                       const CinemaType& type);
 
 } // namespace polymesh::gui

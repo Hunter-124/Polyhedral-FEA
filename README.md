@@ -6,33 +6,48 @@ was co-designed with.
 <p align="center">
   <a href="docs/assets/cinema/advisor_cinema.mp4"><img
     src="docs/assets/cinema/advisor_cinema.gif"
-    alt="The deployed advisor graph scoring its candidates, then the mesher building the action it chose"
+    alt="A mesh advisor scoring 38 candidate meshes, the mesher building the one it chose, and the solver's stress answer arriving on it"
     width="100%"></a>
 </p>
 
-**The whole loop in one take.** The advisor's forward passes, the mesher building
-the action they chose, and the answer appearing in the order the solver computes
-it — `sphere_box_s0_c0` under axial tension, 11,692 elements, 13,146 DOF, max von
-Mises 2.489 MPa. Inline loop: the 4 s in which the network scores its 38
-candidates and the mesher starts building the one it chose. Full 20 s take:
-[advisor_cinema.mp4](docs/assets/cinema/advisor_cinema.mp4) (h264 1920×1080,
-[poster](docs/assets/cinema/poster.png)).
+**The whole loop in one take, in four chapters.** A neural net picks how to mesh
+the part, the mesher builds exactly that, and the solver's answer arrives in the
+order it is computed — `sphere_box_s0` under axial tension, 11,692 cells,
+13,146 unknowns, peak stress 2.489 MPa. The inline GIF is the whole 30 s film;
+[advisor_cinema.mp4](docs/assets/cinema/advisor_cinema.mp4) is the same take at
+1920×1080 and 60 fps ([poster](docs/assets/cinema/poster.png)).
+
+It holds still on each result rather than cutting off it: the finished mesh for
+2.1 s, then stress spreading in from the loaded end and holding, then the
+*gradient* of that stress — where a small step moves you furthest up the stress
+curve — then the error estimate, the refinement it asks for, and the load ramped
+from zero to 528 N. When the film switches from meshing to solving, the network
+panel dissolves into the equations being evaluated, with the one this beat is
+computing lit and its own live numbers beside it.
 
 None of it is a mock-up. The lit nodes and edges are the deployed ONNX graph's
 own trunk tensors and weights, read out of the 39 forward passes onnxruntime ran
-— 38 enumerated candidates plus the final re-score — not a re-implementation of
-them. The mesh arrives at the mesher's own 20 construction stages, in its own
-element emission order, growing from the 2,056-element lattice to 11,692. The
-fields are the real solve in the order the answer is computed: solve, the error
-field recovered from it, the refinement that field asked for, then the refined
-solve, with the load ramped as the exact linear response u(λ) = λ·u — and no
-iteration counter, because at 13,146 free DOF this system is factorised rather
-than iterated. Cosmetic, and only this: the virtual clock the beats are paced on,
-the fades, the shrink that draws each element toward its own centroid, the colour
-ramp and the panel layout. Where a number does not exist the film says so instead
-of inventing one — including that the adapt pass here re-fills to the same
-element count rather than a finer mesh
-([ADR-0042](docs/decisions/0042-the-advisor-explains-itself-on-screen.md)).
+— 38 enumerated candidates plus the final re-score. From the moment the mesh
+starts building, the panel holds the one forward pass that chose it, so what is
+lit on the left is what produced what is growing on the right. The mesh arrives
+at the mesher's own construction stages, in its own element emission order,
+growing to 11,692 cells. The fields are the real solve: the von Mises field, the
+stress gradient recovered from it by
+[`fea::nodal_scalar_gradient_magnitude`](src/fea/include/fea/stress.hpp), the ZZ
+error field, the mesh the next pass actually solved, and the load ramped as the
+exact linear response u(λ) = λ·u — with no iteration counter, because at 13,146
+free unknowns this system is factorised rather than iterated. Cosmetic, and only
+this: the virtual clock the beats are paced on, the fades, the shrink that draws
+each cell toward its own centroid, the plane that uncovers a finished field, the
+colour ramp and the panel layout. Where a number does not exist the film says so
+instead of inventing one — including that the adapt pass here re-fills to the
+same cell count rather than a finer mesh.
+
+Every disclosure the film makes, the struct field or function behind each of
+them, and the code citation for every equation on screen:
+[docs/assets/cinema/NOTES.md](docs/assets/cinema/NOTES.md)
+([ADR-0042](docs/decisions/0042-the-advisor-explains-itself-on-screen.md),
+[ADR-0043](docs/decisions/0043-a-film-someone-can-read.md)).
 
 Most FEA toolchains split meshing from solving. The mesher emits elements, the
 solver takes what it gets, and neither one gets to tell the other what it needs.

@@ -11,6 +11,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <vector>
 
 #if defined(POLYMESH_WITH_OPENMP)
@@ -340,6 +342,129 @@ std::vector<ElementCentroidStress> recover_element_centroid_stress(const NodalMe
         out.push_back(sample);
     }
     return out;
+}
+
+std::vector<double> nodal_scalar_gradient_magnitude(const NodalMesh& mesh,
+                                                    const std::vector<double>& nodal,
+                                                    std::size_t* n_unresolved) {
+    if (n_unresolved != nullptr) {
+        *n_unresolved = 0;
+    }
+    const std::size_t n_nodes = mesh.nodes.size();
+    if (nodal.size() != n_nodes) {
+        return {};
+    }
+    std::vector<double> magnitude(n_nodes, 0.0);
+    if (n_nodes == 0) {
+        return magnitude;
+    }
+
+    // Node -> incident element adjacency, CSR (counts, prefix sum, fill). The
+    // per-node patch is otherwise a scan of every element, which is O(N·E).
+    // Measured on a uniform hex lattice: 20³ (9261 nodes, 8000 elements) takes
+    // 2.3 ms through this table against 232 ms for a per-node element scan
+    // doing the same patch assembly and 3×3 eigensolve, and 50³ (132651 nodes)
+    // takes 34 ms, where the scan's work is another 220× larger.
+    std::vector<std::size_t> offset(n_nodes + 1, 0);
+    for (const auto& element : mesh.elements) {
+        for (const std::uint32_t node : element.nodes) {
+            if (node < n_nodes) {
+                ++offset[node + 1];
+            }
+        }
+    }
+    for (std::size_t i = 0; i < n_nodes; ++i) {
+        offset[i + 1] += offset[i];
+    }
+    std::vector<std::uint32_t> incident(offset[n_nodes], 0);
+    {
+        std::vector<std::size_t> cursor(offset.begin(), offset.end() - 1);
+        for (std::size_t e = 0; e < mesh.elements.size(); ++e) {
+            for (const std::uint32_t node : mesh.elements[e].nodes) {
+                if (node < n_nodes) {
+                    incident[cursor[node]++] = static_cast<std::uint32_t>(e);
+                }
+            }
+        }
+    }
+
+    // Rank floor on λ_min/λ_max of the 3×3 normal matrix. Measured on patches
+    // rotated off the axes, so a null direction is a cancellation of three
+    // nonzero rows rather than an exactly zero row — the hard case:
+    //   - rank-deficient (collinear tet, coplanar tet, one-cell-thick lattice
+    //     from 2×2 to 16×16): |ratio| ≤ 2.4e-16, and it comes out *negative*
+    //     as often as positive, so the test is written as a strict `>`;
+    //   - thin but genuinely three-dimensional: a 1000:1 flattened hex lattice
+    //     sits at 4.4e-7 and recovers a linear field to 7.5e-12 relative, a
+    //     10000:1 one at 4.4e-9 and 5.5e-9 relative;
+    //   - well shaped: structured hex 0.12…0.25, Kuhn tet 0.10.
+    // 1e-10 sits in the gap: six decades above the round-off a rank-deficient
+    // patch produces, one decade below the flattest patch measured that still
+    // recovers a real slope.
+    constexpr double kRankFloor = 1e-10;
+
+    // `stamp[j] == i` marks node j as already in node i's patch, so a neighbour
+    // shared by k elements enters the sum once — the fit is unweighted, and
+    // counting multiplicity would silently weight it by valence. One array
+    // reused across all nodes: no allocation inside the loop.
+    constexpr std::size_t kUnstamped = static_cast<std::size_t>(-1);
+    std::vector<std::size_t> stamp(n_nodes, kUnstamped);
+    Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> solver;
+    std::size_t unresolved = 0;
+
+    for (std::size_t i = 0; i < n_nodes; ++i) {
+        const Eigen::Vector3d& xi = mesh.nodes[i];
+        const double si = nodal[i];
+        // Offsets are taken from x_i, not from the global origin: posing the fit
+        // in absolute coordinates is what made the ZZ patch fit rank deficient
+        // for a mesh sitting far from the origin (see zz.cpp).
+        Eigen::Matrix3d normal_matrix = Eigen::Matrix3d::Zero();
+        Eigen::Vector3d rhs = Eigen::Vector3d::Zero();
+        std::size_t patch_size = 0;
+        stamp[i] = i;
+        for (std::size_t k = offset[i]; k < offset[i + 1]; ++k) {
+            for (const std::uint32_t j : mesh.elements[incident[k]].nodes) {
+                if (j >= n_nodes || stamp[j] == i) {
+                    continue;
+                }
+                stamp[j] = i;
+                const Eigen::Vector3d d = mesh.nodes[j] - xi;
+                normal_matrix += d * d.transpose();
+                rhs += d * (nodal[j] - si);
+                ++patch_size;
+            }
+        }
+        if (patch_size < 3) {
+            ++unresolved;
+            continue;
+        }
+        solver.compute(normal_matrix);
+        if (solver.info() != Eigen::Success) {
+            ++unresolved;
+            continue;
+        }
+        // Ascending, and PSD by construction, so [2] is the largest.
+        const Eigen::Vector3d& lambda = solver.eigenvalues();
+        if (!(lambda[0] > kRankFloor * lambda[2])) {
+            ++unresolved;
+            continue;
+        }
+        // Spectral solve reusing the decomposition the rank test already paid
+        // for: g = V Λ⁻¹ Vᵀ rhs, exact for an SPD normal matrix.
+        const Eigen::Matrix3d& v = solver.eigenvectors();
+        const Eigen::Vector3d g = v * (v.transpose() * rhs).cwiseQuotient(lambda);
+        const double norm = g.norm();
+        if (!std::isfinite(norm)) {
+            ++unresolved;
+            continue;
+        }
+        magnitude[i] = norm;
+    }
+
+    if (n_unresolved != nullptr) {
+        *n_unresolved = unresolved;
+    }
+    return magnitude;
 }
 
 } // namespace polymesh::fea

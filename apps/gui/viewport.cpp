@@ -395,6 +395,50 @@ bool element_face_loops(const fea::NodalElement& el, std::size_t node_count, Fac
     return out.count() > 0;
 }
 
+/// Unswept grey for the part of the surface the reveal front has not reached.
+/// Deliberately outside the `fea_colormap` range: the nearest colour that map
+/// can produce sits 0.67 away in unit RGB, and even at its least saturated
+/// point (t = 0.288) it still holds one channel at 0.85, so grey this flat and
+/// this dark is unreachable and an unswept region can never be misread as a
+/// field value.
+constexpr std::array<float, 3> kUnsweptGrey = {0.24f, 0.25f, 0.28f};
+/// How far the front itself pulls the blended colour toward white. A straight
+/// fade to grey has no visible edge; this band is the only thing that makes the
+/// wavefront read as a moving front rather than a shrinking colour patch.
+constexpr float kFrontHighlight = 0.65f;
+
+/// Colour of one surface sample under the spatial reveal, where `x` is the
+/// sample's position along the sweep axis as a fraction of the result's own
+/// extent and `rgb` is the colour the un-swept bake would have given it.
+///
+/// This is a REVEAL: behind `front - feather` the sample's own colour is
+/// returned bit for bit, so nothing about the field is animated, only how much
+/// of it has been uncovered.
+///   x <= front - feather : `rgb`, untouched.
+///   x >= front           : kUnsweptGrey.
+///   between              : `rgb` blended linearly to kUnsweptGrey by
+///                          w = (x - (front - feather)) / feather, then lifted
+///                          toward white by kFrontHighlight * w.
+/// The lift peaks at the front and is zero at the band's trailing edge, so the
+/// only discontinuity is the front line itself -- which is the wavefront.
+std::array<float, 3> sweep_sample_color(std::array<float, 3> rgb, float x, float front,
+                                        float feather) {
+    if (x >= front) {
+        return kUnsweptGrey;
+    }
+    const float band = std::max(feather, 0.0f);
+    const float lead = front - band;
+    if (x <= lead) {
+        return rgb;
+    }
+    const float w = band > 0.0f ? (x - lead) / band : 1.0f;
+    for (int i = 0; i < 3; ++i) {
+        const float faded = rgb[i] + w * (kUnsweptGrey[i] - rgb[i]);
+        rgb[i] = faded + kFrontHighlight * w * (1.0f - faded);
+    }
+    return rgb;
+}
+
 } // namespace
 
 // ---- Camera ---------------------------------------------------------------
@@ -992,18 +1036,28 @@ std::size_t Viewport::cinema_skipped_element_count() const {
 
 void Viewport::set_cinema_view(const CinemaView& view) { cinema_view_ = view; }
 
-void Viewport::set_result(const SolveResult& result) {
+void Viewport::set_result(const SolveResult& result, const std::vector<double>* nodal_extra) {
     // Store rest positions + scalars; bake when mode/scale/range changes.
     result_rest_.clear();
     result_scalar_vm_.clear();
     result_scalar_u_.clear();
     result_scalar_eta_.clear();
+    result_scalar_extra_.clear();
     result_quads_.clear();
     const auto surface = polymesh::fea::tessellate_boundary_surface(result.volume_mesh, 8);
     result_rest_.reserve(surface.samples.size());
     result_scalar_vm_.reserve(surface.samples.size());
     result_scalar_u_.reserve(surface.samples.size());
     result_scalar_eta_.reserve(surface.samples.size());
+    // A wrong-sized extra field is a caller bug, and the honest response is to
+    // show nothing rather than a field that is not the one the legend names:
+    // an off-by-one node count would otherwise paint a plausible-looking
+    // picture of the wrong quantity. Zeros are unmistakable.
+    const bool has_extra =
+        nodal_extra != nullptr && nodal_extra->size() == result.volume_mesh.nodes.size();
+    if (has_extra) {
+        result_scalar_extra_.reserve(surface.samples.size());
+    }
     result_disp_ =
         Eigen::VectorXd::Zero(3 * static_cast<Eigen::Index>(surface.samples.size()));
     const auto interpolate_scalar = [](const polymesh::fea::SurfaceSample& sample,
@@ -1023,6 +1077,9 @@ void Viewport::set_result(const SolveResult& result) {
         result_scalar_vm_.push_back(interpolate_scalar(sample, result.von_mises));
         result_scalar_u_.push_back(interpolate_scalar(sample, result.u_magnitude));
         result_scalar_eta_.push_back(interpolate_scalar(sample, result.nodal_eta));
+        if (has_extra) {
+            result_scalar_extra_.push_back(interpolate_scalar(sample, *nodal_extra));
+        }
         for (std::size_t i = 0; i < sample.count; ++i) {
             const Eigen::Index base = 3 * static_cast<Eigen::Index>(sample.source_nodes[i]);
             if (base + 2 < result.displacement.size()) {
@@ -1048,6 +1105,8 @@ void Viewport::set_result(const SolveResult& result) {
     frame_on_bake_ = true;
 }
 
+void Viewport::set_field_sweep(const FieldSweep& sweep) { field_sweep_ = sweep; }
+
 bool Viewport::frame_content(DisplayMode mode) {
     // The cinema spans two uploads whose union has to be framed ONCE: the
     // opening shot has only the skeleton and the closing one only the mesh, and
@@ -1064,6 +1123,7 @@ bool Viewport::frame_content(DisplayMode mode) {
     case DisplayMode::kResultsVonMises:
     case DisplayMode::kResultsDisplacement:
     case DisplayMode::kResultsError:
+    case DisplayMode::kResultsGradient:
         // Results are only bounded after the first bake; the undeformed mesh
         // uploaded alongside them is the right stand-in until then.
         bounds = result_bounds_.valid ? &result_bounds_ : &mesh_bounds_;
@@ -1123,6 +1183,47 @@ void Viewport::bake_result(DisplayMode mode, float deform_scale, float result_ma
         scalars = &result_scalar_vm_;
     } else if (mode == DisplayMode::kResultsError) {
         scalars = &result_scalar_eta_;
+    } else if (mode == DisplayMode::kResultsGradient) {
+        // Empty when the caller passed no extra field, and `emit` reads out of
+        // range as zero, so the mode bakes a flat floor instead of borrowing
+        // whichever field happens to be loaded.
+        //
+        // A zero INSIDE a field the caller did supply is a different thing and
+        // is drawn as what it is: fea::nodal_scalar_gradient_magnitude returns
+        // an exact 0.0 for a rank-deficient node patch as well as for a
+        // genuinely flat field, and only its n_unresolved counter separates
+        // them. So an isolated dark spot here can be legitimate -- measured
+        // none on any structured hex or Kuhn-tet lattice, all 132,651 nodes of
+        // a 50^3 lattice resolved -- and this viewport cannot tell the two
+        // apart. Anything that needs to must read n_unresolved at the source.
+        scalars = &result_scalar_extra_;
+    }
+
+    // Spatial reveal, per surface sample (see sweep_sample_color). The colours
+    // behind the front are this pass's own values at this pass's own scale, so
+    // the reveal never changes what the picture says, only how much of it is
+    // uncovered yet.
+    const float sweep_axis_norm = field_sweep_.axis.norm();
+    Eigen::Vector3d sweep_dir = Eigen::Vector3d::Zero();
+    double sweep_u_min = 0.0;
+    double sweep_span = 0.0;
+    bool sweep_on = field_sweep_.active && sweep_axis_norm > 0.0f && !result_rest_.empty();
+    if (sweep_on) {
+        // One pass over the rest positions per bake: `x` below is a fraction of
+        // the result's OWN extent along the axis, so a caller animating `front`
+        // from 0 to 1 always crosses the whole part exactly once, whatever the
+        // part's size or where it sits in world space.
+        sweep_dir = (field_sweep_.axis / sweep_axis_norm).cast<double>();
+        double lo = std::numeric_limits<double>::infinity();
+        double hi = -std::numeric_limits<double>::infinity();
+        for (const Eigen::Vector3d& p : result_rest_) {
+            const double u = sweep_dir.dot(p);
+            lo = std::min(lo, u);
+            hi = std::max(hi, u);
+        }
+        sweep_u_min = lo;
+        sweep_span = hi - lo;
+        sweep_on = sweep_span > 0.0;
     }
     const float denom = result_max > 0.0f ? result_max : 1.0f;
     const Eigen::Index n_disp = result_disp_.size();
@@ -1146,7 +1247,15 @@ void Viewport::bake_result(DisplayMode mode, float deform_scale, float result_ma
             data.push_back(static_cast<float>(normal[i]));
         }
         const double s = node < scalars->size() ? (*scalars)[node] : 0.0;
-        const auto rgb = fea_colormap(static_cast<float>(s) / denom);
+        auto rgb = fea_colormap(static_cast<float>(s) / denom);
+        if (sweep_on) {
+            // Rest position, not the deformed one: the reveal is a fixed plane
+            // through the part, and letting the exaggerated warp move it would
+            // make the front wobble as the load ramps.
+            const float x = static_cast<float>(
+                (sweep_dir.dot(result_rest_[node]) - sweep_u_min) / sweep_span);
+            rgb = sweep_sample_color(rgb, x, field_sweep_.front, field_sweep_.feather);
+        }
         data.insert(data.end(), {rgb[0], rgb[1], rgb[2], 1.0f});
     };
     for (const auto& quad : result_quads_) {
@@ -1188,6 +1297,7 @@ void Viewport::bake_result(DisplayMode mode, float deform_scale, float result_ma
     baked_mode_ = mode;
     baked_scale_ = deform_scale;
     baked_max_ = result_max;
+    baked_sweep_ = field_sweep_;
     result_dirty_ = false;
 
     // First bake of a fresh result: frame the deformed shape once, then leave
@@ -1251,9 +1361,9 @@ void Viewport::render(int width, int height, DisplayMode mode, float deform_scal
                        proj.data());
     glUniform3f(glGetUniformLocation(model_program_, "u_eye"), eye.x(), eye.y(), eye.z());
 
-    const bool results_mode = mode == DisplayMode::kResultsVonMises ||
-                              mode == DisplayMode::kResultsDisplacement ||
-                              mode == DisplayMode::kResultsError;
+    const bool results_mode =
+        mode == DisplayMode::kResultsVonMises || mode == DisplayMode::kResultsDisplacement ||
+        mode == DisplayMode::kResultsError || mode == DisplayMode::kResultsGradient;
 
     // Push filled surfaces slightly back so edge lines win the depth test.
     const bool draw_edges = show_wireframe || (show_undeformed && results_mode);
@@ -1273,8 +1383,15 @@ void Viewport::render(int width, int height, DisplayMode mode, float deform_scal
             glDrawArrays(GL_TRIANGLES, 0, mesh_vertex_count_);
         }
     } else {
+        // The sweep is part of the bake key because the front lives in the
+        // vertex colours: an animated front changes nothing else about the
+        // result, so without this a moving wavefront would never re-upload.
+        const FieldSweep& baked = baked_sweep_;
+        const bool sweep_changed =
+            baked.active != field_sweep_.active || baked.axis != field_sweep_.axis ||
+            baked.front != field_sweep_.front || baked.feather != field_sweep_.feather;
         if (result_dirty_ || baked_mode_ != mode || baked_scale_ != deform_scale ||
-            baked_max_ != result_max) {
+            baked_max_ != result_max || sweep_changed) {
             bake_result(mode, deform_scale, result_max);
         }
         if (result_vertex_count_ > 0) {

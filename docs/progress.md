@@ -332,6 +332,36 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-08-21: **The showcase film, rebuilt so it can be read
+  ([ADR-0043](decisions/0043-a-film-someone-can-read.md),
+  [`docs/assets/cinema/NOTES.md`](assets/cinema/NOTES.md))** — the README take
+  was legible only at full resolution and cut away from every result it
+  produced. Now: four rows of text at 40/27/20/17 px against the old 13–16 px
+  (measured ink height 27 px vs 9 px in the recorded frames), a constant 203 px
+  strip instead of a 270 px one re-measured per act, and a four-word chapter
+  bar. The exhaustive per-beat disclosures moved to `NOTES.md`, which the film
+  names on screen — a disclosure nobody can read is not a disclosure. **Holds:**
+  a 2.1 s `mesh_hold` act on the finished fill, plus stress, gradient, error,
+  refine and final holds, all verified bit-exact frozen in the recorded frames
+  (0 pixels changed between consecutive frames; every moving beat moves).
+  **New beats:** von Mises and |∇σ| revealed by a plane sweeping from the loaded
+  end — resolved from the resultant of `SimSetup::LoadSpec::force` and the load
+  faces' own position, not assumed — measured uncovering the part over 1.4 s of
+  a 1.58 s beat, with the unswept region in a grey 0.67 unit-RGB from anything
+  `fea_colormap` can produce. **Alignment:** the pass lane now stops on the
+  forward pass that scored the recommended action and holds it through the build
+  (panel ink takes 7 distinct values across the deliberation and exactly 1
+  across the 7.8 s of build + hold), so the lit graph is the pass that chose the
+  mesh beside it. **Equations:** the closing act cross-fades the network into
+  the seven relations the solver evaluates, each cited to `path:line` in
+  `NOTES.md`, with the lit group's rule tracking the beat. New:
+  `fea::nodal_scalar_gradient_magnitude` (exact for a linear field, first order
+  measured at 0.82/0.69/0.78 on a perturbed lattice, rank-deficient patches
+  counted not invented — `tests/test_stress_gradient.cpp`, 112 assertions),
+  `DisplayMode::kResultsGradient`, `Viewport::FieldSweep`. The GIF is now the
+  whole 30 s take at 1100 px / 12 fps / 7.43 MB instead of a 4 s slice, and
+  `scripts/figstyle.py::QUANTITY_LABELS` is the single table every figure
+  generator and advisor doc draws its plain-English quantity names from.
 - 2026-08-20: **Field-level verification of the shipped solves
   ([`docs/validation/field-verification.md`](validation/field-verification.md),
   `scripts/verify_fields.py`)** — `bench/reference/*.json` gates one scalar per
@@ -425,7 +455,7 @@ GATE 0 was approved by owner on 2026-07-09.
   cylinder sector worst gap **4.019 → 1.022 mm**). One `fea::element_volume`
   definition. Graded torn shells fixed — geometry deletion now proposes and the
   shell disposes: **14/14 watertight** across both meshers and 7 parts;
-  `tube_s0` h=0.00125 graded rel_err 0.2446 → 0.09097; boundary-shell census in
+  `tube_s0` h=0.00125 graded relative error 0.2446 → 0.09097; boundary-shell census in
   every mesher note; `score_volume` requires closure before measuring.
 - 2026-08-13: **ADR-0031 "a jut has a side"** — the graded S5 void carve peeled
   juts that were far from the surface but *inside* the solid (sphere craters);
@@ -599,7 +629,7 @@ GATE 0 was approved by owner on 2026-07-09.
 - 2026-07-11: **Test lab harness + GUI Test Lab (DAG `testlab-harness`, `gui-testlab`)** —
   `apps/testlab/polymesh_testlab` campaign runner (successive-halving, SIGINT
   checkpoint, results.jsonl, progress.json; anti-cheat reference load). Smoke
-  campaign green on smoke_bar (hex rel_err≈3.7%, hybrid_zoo ≈14.8%). GUI:
+  campaign green on smoke_bar (hex relative error ≈3.7%, hybrid_zoo ≈14.8%). GUI:
   Test Lab | Sim Setup | viewport | Results; ImGui-free parsers + ProcessRunner.
 - 2026-07-11: **Joint (h,p,shape) adaptive driver (DAG `hp-driver`, ADR-0019
   §4)** — `adapt/hp_driver.{hpp,cpp}`: per-element utilities from geometry
@@ -912,7 +942,7 @@ GATE 0 was approved by owner on 2026-07-09.
   metrics, ADR-0012 (hybrid = graded all-tet until pyramids). 58 tests.
 - 2026-07-10: Prism6 wedges; hex-VEM hybrid; quality metrics; CalculiX smoke.
 - 2026-07-10: Hex grid fill option + GUI mesher selector; tet quality notes.
-- 2026-07-10: VEM k=1 polyhedra (patch test + 6 RBM), adapt_passes in pipeline,
+- 2026-07-10: VEM k=1 polyhedra (patch test + 6 RBM), refinement passes in pipeline,
   feature grading, CalculiX smoke peer, GUI adapt/feature controls. 50/50 tests.
 - 2026-07-10: Product batch — VTU export, ZZ recovery + Dörfler marking,
   sharp-edge features + graded sizing, limited surface snap on tet fill,

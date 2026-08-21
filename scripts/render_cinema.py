@@ -44,11 +44,15 @@ Design notes
   x_hi with x_lo clamped, which is what the case specifies. A face id that
   selects nothing fails the run rather than recording a video of an unloaded
   part.
-* **The GIF is budgeted and reports what it cost.** GitHub inlines a GIF and not
-  a repo-relative ``<video>``, so the README needs one; a 20 s 60 fps take at
-  full width is tens of megabytes, so the GIF is a stated subset of the take at
-  a stated width and frame rate, and the ladder stops at the first setting under
-  ``--gif-max-bytes``. The setting it landed on is printed and recorded.
+* **The GIF is the whole take, budgeted, and it reports what it cost.** GitHub
+  inlines a GIF and not a repo-relative ``<video>``, so the README needs one --
+  and the film's payload is spread across the whole 30 s: the finished mesh held
+  still, stress arriving, the stress gradient, the refinement, the load ramp.
+  A four-second slice of that shows one of them. So the GIF covers the take end
+  to end and pays for it in frame rate and width instead of in content: the
+  ladder steps down through width and fps until one rung lands under
+  ``--gif-max-bytes``, and the setting it landed on is printed and recorded.
+  ``--gif-start``/``--gif-duration`` still cut a slice for anyone who wants one.
 
 Usage
 -----
@@ -87,15 +91,16 @@ FRAMES_DIR = REPO / "build/cinema/frames"
 #: rate and the playback rate: one recorded frame is one displayed frame and the
 #: video's duration is the take's own virtual duration.
 FPS = 60
-#: 1200 frames = 20.0 s of virtual time. A length, not a schedule: the GUI paces
+#: 1800 frames = 30.0 s of virtual time. A length, not a schedule: the GUI paces
 #: its own acts inside however many frames it is given, so a shorter take speeds
-#: every beat up rather than truncating the end. 20 s is the length the
-#: composition is tuned for -- at it, one forward pass gets 0.159 s and one pass-0
-#: construction stage 0.340 s, against 0.238 s and 0.540 s at the 30 s this used
-#: to be, and 0.292 s per pass in the old sequential take. Faster per iteration,
-#: and with the pass and fill lanes now overlapping there is no longer a second
-#: act's worth of screen time to pay for.
-DEFAULT_FRAMES = 1200
+#: every beat up rather than truncating the end. 30 s is the length the
+#: composition is tuned for, and it is longer than the 20 s it used to be because
+#: the film now holds still on each result instead of cutting off it: the
+#: finished mesh gets 2.1 s of its own, and each of the closing act's ten beats
+#: gets 0.8-1.9 s. At 30 s one forward pass gets 0.108 s, one pass-0 construction
+#: stage 0.530 s, and the closing act 16.2 s, which is where the holds are paid
+#: for.
+DEFAULT_FRAMES = 1800
 #: The Xvfb screen AND, via ``POLYMESH_GUI_SIZE``, the GUI window itself: the
 #: window otherwise opens at the interactive default it has always had
 #: (``kDefaultWindowW``/``H`` = 1600x1000 in ``apps/gui/main.cpp``) whatever the
@@ -126,27 +131,34 @@ H264_LADDER: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("libopenh264", ("-rc_mode", "quality", "-b:v", "8M",
                      "-maxrate", "12M", "-bufsize", "24M")),
 )
-#: GIF ladder, tried in order until one lands under the byte budget. Width and
-#: frame rate only; which slice of the take it shows is decided below.
-GIF_LADDER = ((960, 15), (960, 12), (800, 12), (720, 10), (640, 10))
+#: GIF ladder, tried in order until one lands under the byte budget: width and
+#: frame rate only, never content.
+#:
+#: It starts wider than the 960 px this used to open at, because the film's text
+#: is what the ladder is really trading against. The composition sets its
+#: headline at 40 px and its numbers at 27 px in a 1080-line frame, so a 1100 px
+#: GIF delivers them at 23 and 15 px -- readable at the ~870 CSS px GitHub gives
+#: a full-width README image, and readable again on a 2x display. At the old
+#: 960/15 the same rows arrived at 20 and 13 px, which was the top of the range
+#: where they were still legible; below 720 px the numbers stop being readable at
+#: all, which is why the ladder ends there rather than continuing down.
+#:
+#: Frame rate is spent before width for the same reason: the take is mostly
+#: still holds and slow sweeps, so 10 fps costs almost nothing visually while
+#: halving the frame count, and a hold compresses to nearly nothing in a GIF
+#: whatever the rate.
+GIF_LADDER = ((1100, 12), (1100, 10), (960, 10), (860, 10), (720, 10), (720, 8))
 GIF_MAX_BYTES = 8 * 1024 * 1024
-#: The inline loop cannot be the whole take at a size a README will tolerate, so
-#: it shows the decision and its consequence: the pass lane scoring candidates
-#: inside `deliberate`, running on into `build` where the mesher lays down the
-#: action it picked. The window therefore opens at the start of the act the GUI
-#: names `deliberate` and runs GIF_DURATION_FRACTION of the take forward -- cut
-#: from the act table the GUI printed, not from a guess. Failing that name it is
-#: the `build` act alone, else the longest act reported, else these fractions.
-#: The GUI schedules skeleton 0.06, deliberate 0.11, build 0.20 and solve 0.63 of
-#: the take, so the fallback is deliberate's own start, 0.06, for a `--only gif`
-#: run with no act table to read. `build` alone was the earlier rule and is kept
-#: only beneath this one: it shows the mesher building an action whose decision
-#: already happened off screen, and the deployed network deciding is the half of
-#: this film a static mesh figure cannot show. `solve` is the longest act, which
-#: is why the longest-act rule sits below both: it would show the answer without
-#: the decision that produced it.
-GIF_START_FRACTION = 0.06
-GIF_DURATION_FRACTION = 0.20
+#: The whole take, unless asked otherwise. The film's payload is spread across
+#: all of it -- the mesh completing and being held, stress arriving, the stress
+#: gradient, the refinement, the load ramp, the final freeze -- and any slice
+#: short enough to be a "loop" drops most of them. This is a change of policy
+#: from the act-derived window that used to live here: that window existed
+#: because a 20 s take could not be shown whole inside 8 MB, and it showed the
+#: deliberation and the start of the fill. It cannot show a result the film did
+#: not used to have.
+GIF_START_FRACTION = 0.0
+GIF_DURATION_FRACTION = 1.0
 
 
 def rel(path: Path) -> str:
@@ -666,58 +678,27 @@ def encode_mp4(frames_dir: Path, out: Path, fps: int,
 
 def gif_window(report: GuiReport, total_s: float, start_arg: float | None,
                duration_arg: float | None) -> tuple[float, float, str]:
-    """Which slice of the take the inline loop shows, and where that came from.
+    """Which slice of the take the inline GIF shows, and where that came from.
 
-    Preference order: an explicit CLI value, then the GUI's own act table, then
-    the documented fractions of the take. The source is returned so the manifest
-    can say which rule produced the window rather than leaving two numbers
-    unexplained.
+    The default is all of it. The act-table rules that used to live here picked
+    a four-second window around the deliberation, and they were the right answer
+    to a different film: one where the payload was the network deciding and the
+    fill starting, and where showing the whole 20 s inside 8 MB was not
+    affordable. This film's payload is the sequence -- the mesh finishing and
+    being held, the stress arriving, the gradient of it, the refinement, the
+    ramp, the final freeze -- and no window narrow enough to be a loop contains
+    more than one of those. The byte budget is met by the ladder instead, in
+    width and frame rate, which costs sharpness rather than content.
 
-    Four act-table rules, in the order they mean something. ``deliberate`` is the
-    act in which the deployed network scores its candidates, so when the GUI
-    reports it the loop opens there and runs forward into ``build``, showing the
-    decision and the fill it produced in one pass. ``build`` alone is the next
-    rule: the candidate sweep and the fill overlap there, but the decision has
-    already been made off screen. A take that instead reports separate ``advisor``
-    and ``mesh`` acts is cut between the network choosing and the mesher building,
-    and the interesting window straddles that cut: advisor midpoint to mesh
-    midpoint. Failing all three, the loop is centred on the longest act reported,
-    which is at least a real span the GUI printed. No rule invents an act name:
-    each is skipped unless the names it needs are present.
+    ``--gif-start`` / ``--gif-duration`` still cut a slice, and the source string
+    records which rule produced the window so the manifest never carries two
+    unexplained numbers.
     """
-    deliberate_act = report.act("deliberate")
-    build_act = report.act("build")
-    advisor_act, mesh_act = report.act("advisor"), report.act("mesh")
-    longest = (max(report.acts, key=lambda a: a["duration_s"])
-               if report.acts else None)
-    if deliberate_act:
-        start = deliberate_act["start_s"]
-        end = start + GIF_DURATION_FRACTION * total_s
-        source = (f"opens on the deliberate act the GUI reported "
-                  f"({deliberate_act['duration_s']:g} s) and runs "
-                  f"{GIF_DURATION_FRACTION:g} of the take on into the fill it "
-                  f"chose")
-    elif build_act:
-        start, end = build_act["start_s"], build_act["end_s"]
-        source = (f"the build act the GUI reported, where the candidate sweep "
-                  f"and the fill overlap ({build_act['duration_s']:g} s)")
-    elif advisor_act and mesh_act:
-        start = (advisor_act["start_s"] + advisor_act["end_s"]) / 2.0
-        end = (mesh_act["start_s"] + mesh_act["end_s"]) / 2.0
-        source = "midpoint of the advisor act to the midpoint of the mesh act"
-    elif longest is not None:
-        want = min(GIF_DURATION_FRACTION * total_s, longest["duration_s"])
-        middle = (longest["start_s"] + longest["end_s"]) / 2.0
-        start = max(longest["start_s"], middle - want / 2.0)
-        end = start + want
-        source = (f"centred on the longest act the GUI reported "
-                  f"({longest['act']}, {longest['duration_s']:g} s)")
-    else:
-        start = GIF_START_FRACTION * total_s
-        end = start + GIF_DURATION_FRACTION * total_s
-        source = (f"{GIF_START_FRACTION:g} to "
-                  f"{GIF_START_FRACTION + GIF_DURATION_FRACTION:g} of the take; "
-                  "the GUI reported no act table")
+    start = GIF_START_FRACTION * total_s
+    end = start + GIF_DURATION_FRACTION * total_s
+    acts = ", ".join(a["act"] for a in report.acts) if report.acts else "none reported"
+    source = (f"the whole {total_s:g} s take (acts: {acts}); the GIF shows every "
+              f"beat and pays for it in the ladder rather than in content")
     if start_arg is not None:
         start, source = start_arg, "--gif-start"
         end = start + (duration_arg if duration_arg is not None

@@ -648,34 +648,42 @@ fields, which is how the GUI's solve is cross-checked against the CLI's.)
 - **Advisor cinema** (`assets/cinema/advisor_cinema.mp4`, `.gif`, `poster.png`)
   is the GUI's own framebuffer, one PNG per frame, captured by
   `polymesh-gui --auto`'s `record` verb at a fixed 1/60 s virtual timestep and
-  encoded by `scripts/render_cinema.py`. Three real things share the take, and
-  the network and the mesh share it *concurrently* — two recorded sequences
-  replayed on one clock, with the decision locked on screen before the first
-  element appears, not a claim that the advisor was still deciding while the
-  mesher built. The network it draws is the
-  deployed ONNX graph read through its own trunk taps — one forward pass per
-  candidate the chooser enumerated, not a re-implementation of the forward pass
-  and not one canonical input. The mesh is built at the mesher's real
-  construction-stage granularity, in `mesh.elements` emission order, with the
-  element counts the viewport uploaded. The fields are the solve in the order the
-  answer is computed: one snapshot per completed adaptive pass
-  (`pipeline::SolveStage` — displacement, von Mises and the ZZ error field that
-  pass recovered, then the refinement it asked for, then the refined solve), with
-  the load drawn as the exact linear response u(λ) = λ·u and λ labelled on
-  screen. No iteration counter appears, because at 13,146 free DOF against a
-  `cg_threshold` of 50,000 this case is factorised by direct sparse LDLT and has
-  no iterates; the GUI prints the method it used as a `solver` token — this take
-  reported `direct_ldlt` — and the manifest records it alongside
-  `solve_stages`. Cosmetic, and only this: the virtual clock the acts are
-  paced on and share (so no frame is a wall-clock measurement, and the take's
-  length is not a performance claim), fades and opacity, the shrink that draws
-  each element toward its own centroid, the colour ramp, and the layout. Where
-  data is missing — no trunk taps in the export, or a part the novelty gate
-  refuses — the surface says so on screen, and the renderer exits nonzero rather
-  than publishing a capture with a frame missing or a panel silently empty
-  ([ADR-0042](decisions/0042-the-advisor-explains-itself-on-screen.md)). The case
-  is `sphere_box_s0_c0` (11,692 elements, 13,146 DOF): the advisor admits it at
-  an out-of-distribution distance of 3.34 against the shipped 5.034 operating
+  encoded by `scripts/render_cinema.py`. Four chapters, in sequence, with a
+  still hold on every result: the part's own CAD outline, the network scoring
+  38 candidate meshes, the mesher building the one it chose, the finished mesh
+  held for 2.1 s, then the solve. The network it draws is the deployed ONNX
+  graph read through its own trunk taps — one forward pass per candidate the
+  chooser enumerated, not a re-implementation of the forward pass and not one
+  canonical input — and from the first frame of the build it HOLDS the pass that
+  scored the recommended action, so the lit graph is the pass that chose the mesh
+  growing beside it. The mesh is built at the mesher's real construction-stage
+  granularity, in `mesh.elements` emission order, with the element counts the
+  viewport uploaded. The fields are the solve in the order the answer is
+  computed, one snapshot per completed adaptive pass (`pipeline::SolveStage`):
+  the von Mises field and the stress gradient recovered from it by
+  `fea::nodal_scalar_gradient_magnitude`, each uncovered by a plane travelling
+  from the loaded end and then held still; the ZZ error field that pass
+  recovered; the mesh the next pass actually solved; and the load drawn as the
+  exact linear response u(λ) = λ·u with λ labelled on screen. Through the solve
+  the left panel is not the network but the relations being evaluated, each
+  cited to `path:line`. No iteration counter appears, because at 13,146 free DOF
+  against a `cg_threshold` of 50,000 this case is factorised by direct sparse
+  LDLT and has no iterates; the GUI prints the method it used as a `solver`
+  token — this take reported `direct_ldlt` — and the manifest records it
+  alongside `solve_stages`. Cosmetic, and only this: the virtual clock the acts
+  are paced on (so no frame is a wall-clock measurement, and the take's length
+  is not a performance claim), fades and opacity, the shrink that draws each
+  element toward its own centroid, the plane that uncovers a finished field, the
+  colour ramp, and the layout. Where data is missing — no trunk taps in the
+  export, a part the novelty gate refuses, a gradient no patch could resolve —
+  the surface says so on screen, and the renderer exits nonzero rather than
+  publishing a capture with a frame missing or a panel silently empty
+  ([ADR-0042](decisions/0042-the-advisor-explains-itself-on-screen.md),
+  [ADR-0043](decisions/0043-a-film-someone-can-read.md); every per-beat
+  disclosure and every equation citation is in
+  [`assets/cinema/NOTES.md`](assets/cinema/NOTES.md)). The case is
+  `sphere_box_s0_c0` (11,692 elements, 13,146 DOF): the advisor admits it at an
+  out-of-distribution distance of 3.34 against the shipped 5.034 operating
   point, and of the 23 corpus primitives it admits at all this is the one it asks
   for the most elements on, so the definition is its own recommendation and not
   an override. `box_hole_s0_c0` — the case the retired `activation_map.png` was

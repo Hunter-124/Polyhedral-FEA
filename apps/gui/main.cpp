@@ -182,6 +182,13 @@ struct App {
     bool shot_msg_ok = true;
     /// True when a TTF UI face loaded (else ImGui's stock bitmap font).
     bool custom_font = false;
+    /// The same face again at `kCinemaAtlasSize`, for the film. ImGui
+    /// rasterises one size per `ImFont` and scales the rest, so drawing a 40 px
+    /// headline from the 16 px UI atlas is a 2.5x upscale of a bitmap — soft
+    /// enough to read as blur in a recorded frame. Null when no TTF loaded at
+    /// all, in which case the film falls back to the UI face and is legible
+    /// rather than crisp.
+    ImFont* cinema_font = nullptr;
     /// The activation cinema (cinema.hpp). Inert until an `--auto cinema on`:
     /// the stage sink is not installed, the clock does not run, and the studio
     /// draws exactly what it drew before this feature existed.
@@ -223,7 +230,8 @@ void sanitize_display_mode(App& app) {
     const bool has_mesh = app.viewport.has_mesh_preview();
     const bool results_mode = app.mode == DisplayMode::kResultsVonMises ||
                               app.mode == DisplayMode::kResultsDisplacement ||
-                              app.mode == DisplayMode::kResultsError;
+                              app.mode == DisplayMode::kResultsError ||
+                              app.mode == DisplayMode::kResultsGradient;
     if (results_mode && !has_result) {
         app.mode = has_mesh ? DisplayMode::kMeshPreview : DisplayMode::kSetup;
     } else if (app.mode == DisplayMode::kMeshPreview && !has_mesh) {
@@ -682,9 +690,6 @@ void tick_auto(AutoRunner& run, App& app, GLFWwindow* window) {
             app.cinema.duration = CinemaState::kDefaultDuration;
             app.cinema.clear_stages();
             app.cinema.clear_solve_stages();
-            // Re-measured from this take's first frame, so a take never
-            // inherits a strip height another window size reserved.
-            app.cinema.ticker_reserve = 0.0f;
             // Installed only for the take: one copies a whole NodalMesh per
             // construction stage and the other a whole SolveResult per adaptive
             // pass (1.3 MB each on this film's case), which no ordinary solve
@@ -700,7 +705,7 @@ void tick_auto(AutoRunner& run, App& app, GLFWwindow* window) {
             // framing halfway through.
             app.viewport.set_camera_locked(true);
             if (app.model) {
-                build_cinema_skeleton(app.cinema, *app.model, app.viewport);
+                build_cinema_skeleton(app.cinema, *app.model, app.setup, app.viewport);
                 app.viewport.frame_content(DisplayMode::kCinema);
             }
         } else if (args.size() == 1 && args[0] == "off") {
@@ -841,7 +846,7 @@ void service_cinema_record(AutoRunner& run, App& app, GLFWwindow* window) {
     // Take complete. The act windows and the summary are what
     // scripts/render_cinema.py records in its manifest, so they are printed
     // from the same schedule the frames were drawn with.
-    for (int a = 0; a < 4; ++a) {
+    for (int a = 0; a < kCinemaActCount; ++a) {
         const auto act = static_cast<CinemaAct>(a);
         double t0 = 0.0;
         double t1 = 0.0;
@@ -890,33 +895,114 @@ void service_cinema_record(AutoRunner& run, App& app, GLFWwindow* window) {
 
 // ---- chrome bootstrap -----------------------------------------------------
 
-/// Loads a proportional UI face at 16 px: $POLYMESH_GUI_FONT first, then the
-/// usual per-platform locations. Returns false when none exist — ImGui's stock
-/// bitmap font stays in place and everything still works. Existence is checked
-/// first because AddFontFromFileTTF asserts on a missing file in debug builds.
+/// Fills the maths gaps in whatever face the film ended up with.
+///
+/// Merged rather than substituted: ImGui keeps the FIRST glyph added for a
+/// codepoint, so this supplies U+2190..U+22FF only where the primary face had
+/// nothing and never overrides a glyph it did have. Restricted to those two
+/// blocks so the merge cannot quietly restyle Latin or Greek text either.
+///
+/// A box with none of these installed keeps whatever the primary face has, which
+/// is the same outcome as before this existed. Either way the choice is PRINTED:
+/// a glyph that silently fell back is the kind of defect that reaches a
+/// committed asset and is then argued about, so the recorder's log says which
+/// file supplied the maths.
+void merge_maths_glyphs(ImGuiIO& io, float size) {
+    static const ImWchar kMathsRanges[] = {
+        0x2190, 0x21FF, // arrows (→, ⇒)
+        0x2200, 0x22FF, // maths operators (∇, √, ∫, ‖-adjacent, −, ≥)
+        0,
+    };
+    static constexpr const char* kMathsFaces[] = {
+        "/usr/share/fonts/google-noto/NotoSansMath-Regular.ttf",
+        "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/gdouros-symbola/Symbola.ttf",
+        "C:/Windows/Fonts/seguisym.ttf",
+        "C:/Windows/Fonts/cambria.ttc",
+        "/System/Library/Fonts/Supplemental/Symbola.ttf",
+        "/System/Library/Fonts/Apple Symbols.ttf",
+    };
+    ImFontConfig cfg;
+    cfg.MergeMode = true;
+    for (const char* path : kMathsFaces) {
+        std::error_code ec;
+        if (!std::filesystem::is_regular_file(std::filesystem::path{path}, ec)) {
+            continue;
+        }
+        if (io.Fonts->AddFontFromFileTTF(path, size, &cfg, kMathsRanges) != nullptr) {
+            std::printf("cinema: maths glyphs merged from %s\n", path);
+            std::fflush(stdout);
+            return;
+        }
+    }
+    std::printf("cinema: no maths fallback face found; the equation board draws ∇ and the "
+                "rest of U+2190..U+22FF from the UI face alone\n");
+    std::fflush(stdout);
+}
+
+/// Loads a proportional UI face at 16 px, and the SAME file again at
+/// `kCinemaAtlasSize` for the film: $POLYMESH_GUI_FONT first, then the usual
+/// per-platform locations. Returns false when none exist — ImGui's stock bitmap
+/// font stays in place and everything still works. Existence is checked first
+/// because AddFontFromFileTTF asserts on a missing file in debug builds.
+///
+/// The second face is not a luxury. ImGui rasterises one pixel size per
+/// `ImFont` and scales every other size from it, so the film's 40 px headline
+/// drawn from the 16 px atlas is a 2.5x bitmap upscale: legible on a monitor,
+/// mush once the README's GIF halves it again. `cinema_out` receives it, or
+/// stays null when no TTF loaded at all, in which case the film draws from
+/// whatever face is there.
 ///
 /// The glyph range is explicit. ImGui's default range is Latin only, so the
 /// labels that carry σ, ≥, ×, ⌀ or · rendered as "?" boxes — which then landed
-/// in committed screenshots. Anything drawn in the UI has to be in the atlas.
-bool load_ui_font() {
+/// in committed screenshots. Anything drawn in the UI has to be in the atlas,
+/// and the equation board draws ∇, √, ‖, ∫, → and Ω out of the two blocks
+/// below. Sub- and superscripts are NOT in the atlas on purpose: the board
+/// composes them from scaled, raised runs of ordinary digits, because
+/// Liberation Sans — the first Linux fallback here — has no U+2081 and an
+/// equation full of tofu boxes is worse than no equation.
+///
+/// Which is also why the film's face MERGES a maths fallback over the UI face.
+/// Measured on this box: Liberation Sans, Fedora's UI default and the first
+/// entry below, has no U+2207 ∇ and no U+21D2 ⇒ — so the gradient equation drew
+/// two tofu boxes, in a panel whose whole job is to be readable. Swapping the
+/// studio's UI face for a maths font to fix a film is the wrong trade; merging
+/// the missing block into the film's own face is not. ImGui keeps the FIRST
+/// glyph added for a codepoint, so the merge fills gaps and never overrides a
+/// glyph the UI face already has.
+bool load_ui_font(ImFont** cinema_out) {
     ImGuiIO& io = ImGui::GetIO();
     // Static: ImGui keeps the pointer until the atlas is built.
     static const ImWchar kRanges[] = {
-        0x0020, 0x00FF, // Latin + Latin-1 supplement (°, µ, ±)
-        0x0370, 0x03FF, // Greek (σ, ν, Ω, θ)
-        0x2010, 0x203A, // dashes, quotes, ·, —
-        0x2190, 0x21FF, // arrows
-        0x2200, 0x22FF, // maths operators (≈, ≤, ≥, ×, ∞)
+        0x0020, 0x00FF, // Latin + Latin-1 supplement (°, µ, ±, ½, ²)
+        0x0370, 0x03FF, // Greek (σ, ν, Ω, θ, η, λ, ε)
+        0x2010, 0x203A, // dashes, quotes, ·, —, ‖
+        0x2190, 0x21FF, // arrows (→, ⇒)
+        0x2200, 0x22FF, // maths operators (∇, √, ∫, −, ≈, ≤, ≥, ×, ∞)
         0x2300, 0x2300, // ⌀ diameter sign
         0,
     };
-    auto try_load = [&io](const char* path) {
+    auto try_load = [&io, cinema_out](const char* path) {
         std::error_code ec;
         if (path == nullptr || path[0] == '\0' ||
             !std::filesystem::is_regular_file(std::filesystem::path{path}, ec)) {
             return false;
         }
-        return io.Fonts->AddFontFromFileTTF(path, 16.0f, nullptr, kRanges) != nullptr;
+        if (io.Fonts->AddFontFromFileTTF(path, 16.0f, nullptr, kRanges) == nullptr) {
+            return false;
+        }
+        // A film face that fails to load is not a reason to lose the UI face
+        // that just did: the film degrades to soft text, the studio does not
+        // degrade at all.
+        if (cinema_out != nullptr) {
+            *cinema_out =
+                io.Fonts->AddFontFromFileTTF(path, kCinemaAtlasSize, nullptr, kRanges);
+            if (*cinema_out != nullptr) {
+                merge_maths_glyphs(io, kCinemaAtlasSize);
+            }
+        }
+        return true;
     };
     if (try_load(std::getenv("POLYMESH_GUI_FONT"))) {
         return true;
@@ -1723,11 +1809,11 @@ void draw_cinema_viewport(App& app, const CinemaRender& render) {
     }
 }
 
-/// Fullscreen cinema layout: network left, viewport right, ticker along the
-/// bottom. No menu bar and no status strip, so a recorded frame is the finished
-/// composition and `scripts/render_cinema.py` never has to crop. The split is
-/// not fixed: the viewport holds the whole window through the opening act and
-/// the network panel slides into its share as it fades up.
+/// Fullscreen cinema layout: the panel left, the viewport right, the caption
+/// strip along the bottom. No menu bar and no status strip, so a recorded frame
+/// is the finished composition and `scripts/render_cinema.py` never has to crop.
+/// The split is not fixed: the viewport holds the whole window through the
+/// opening act and the panel slides into its share as it fades up.
 void draw_cinema_frame(App& app) {
     const ImGuiViewport* vp = ImGui::GetMainViewport();
     const CinemaCue cue = cinema_cue(app.cinema);
@@ -1735,36 +1821,36 @@ void draw_cinema_frame(App& app) {
     // The cue owns what is shown; the app only carries it into the viewport.
     const CinemaRender render = cinema_render(app.cinema, cue, app.deform_scale);
     app.mode = render.mode;
-    sync_cinema_viewport(app.cinema, cue, app.viewport);
+    sync_cinema_viewport(app.cinema, cue, render, app.viewport);
     const CinemaHud hud = make_cinema_hud(app);
 
     const float content_w = std::floor(vp->Size.x);
-    // The strip is sized from the rows that are actually going into it, at the
-    // width they will wrap at: a fixed line count clipped the longest act's
-    // disclosure off the bottom of the recorded frame, and a disclosure that
-    // does not survive into the recording was not made. It is reserved at the
-    // tallest of ALL FOUR acts and of every beat of the closing one, rather than
-    // at this act's own need, because the leftover is the viewport pane and the
-    // pane's height is what sets the part's rendered size — a per-act strip
-    // resized the part at every act boundary.
-    const float ticker_h =
-        std::max(ImGui::GetTextLineHeightWithSpacing() + 2.0f * kTickerPadY,
-                 cinema_ticker_reserve(app.cinema, cue, hud, content_w - 2.0f * kTickerPadX));
-    const float content_h = std::max(1.0f, std::floor(vp->Size.y) - ticker_h);
-    // The network needs the taller share of the width once it is on screen: 96
-    // nodes per trunk column, real head-unit names in the right gutter, and
-    // enough horizontal separation between the columns for one connection to be
-    // followable.
-    const float net_w = std::floor(content_w * 0.44f);
-    // The opening act belongs to the part, so the split OPENS with the network
+    // The film's type scales with the frame, so the strip is measured from the
+    // frame it is going into and not from a constant.
+    const CinemaType type = cinema_type(app.cinema_font, std::floor(vp->Size.y));
+    // A CONSTANT height, computed from the four row sizes and nothing else. The
+    // strip used to be measured from whichever rows the current act happened to
+    // produce, reserved at the tallest act, and re-measured every frame — a
+    // 270 px block of grey that also had to be prevented from resizing the part
+    // at every act boundary. Four rows at a fixed size cannot do either: the
+    // leftover is the viewport pane, the pane's height sets the part's rendered
+    // size, and both are now the same on frame 1 and frame 1800.
+    const float strip_h =
+        std::max(4.0f * ImGui::GetTextLineHeightWithSpacing(), cinema_strip_height(type));
+    const float content_h = std::max(1.0f, std::floor(vp->Size.y) - strip_h);
+    // The panel needs a real share of the width once it is on screen: 96 nodes
+    // per trunk column with plain-language names in the right gutter, or seven
+    // equations with their live numbers. 0.42 rather than the old 0.44 because
+    // the part is the subject and the strip below it is now half the height it
+    // was, so the pane it lives in has room to give some back.
+    const float panel_w = std::floor(content_w * 0.42f);
+    // The opening act belongs to the part, so the split OPENS with the panel
     // rather than standing empty beside it: the viewport has the whole window
-    // while the panel is dark, and the panel slides in from the left as it
-    // fades up. `CinemaCue::network_open` drives the width and rises exactly
-    // once, during the opening; `network_alpha` starts as the same curve and
-    // then parts company in the closing act, where the panel is dimmed because
-    // it is HOLDING its last pass. Dimming may not move the split: the pane's
-    // height sets the part's rendered size and a pane that changed mid-take
-    // would resize the subject inside one continuous shot.
+    // while the panel is dark, and the panel slides in from the left as it fades
+    // up. `CinemaCue::panel_open` drives the width and rises exactly once,
+    // during the opening. Nothing later in the take may move it: the panel's
+    // CONTENT swaps from the network to the equation board in the closing act,
+    // and that is a dissolve inside a pane whose geometry never changes.
     //
     // The panel is always laid out at its FINAL width and translated, never
     // laid out narrow. Its wrapping, label gutter and column spacing are then
@@ -1776,8 +1862,8 @@ void draw_cinema_frame(App& app) {
     // aspect) and the pane height never changes, so the world-to-pixel scale is
     // invariant to the pane WIDTH in both axes. Only the pane's centre
     // translates, continuously, on the same smoothstep — a pan, not a cut.
-    const float open = std::clamp(cue.network_open, 0.0f, 1.0f);
-    const float net_slide = std::floor(net_w * (1.0f - open));
+    const float open = std::clamp(cue.panel_open, 0.0f, 1.0f);
+    const float panel_slide = std::floor(panel_w * (1.0f - open));
 
     ImGui::SetNextWindowPos(ImVec2(std::floor(vp->Pos.x), std::floor(vp->Pos.y)));
     ImGui::SetNextWindowSize(ImVec2(content_w, content_h));
@@ -1790,15 +1876,15 @@ void draw_cinema_frame(App& app) {
 
     if (open > 0.0f) {
         // Translated left by the un-opened remainder, so the panel's right edge
-        // sits at `net_w * open` and the viewport starts exactly there. The
+        // sits at `panel_w * open` and the viewport starts exactly there. The
         // part of the child that hangs off the left is clipped by the host
         // window; nothing else in the composition knows the difference.
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() - net_slide);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 10.0f));
-        ImGui::BeginChild("cinema_net", ImVec2(net_w, row_h),
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() - panel_slide);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18.0f, 14.0f));
+        ImGui::BeginChild("cinema_panel", ImVec2(panel_w, row_h),
                           ImGuiChildFlags_AlwaysUseWindowPadding,
                           ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-        draw_cinema_network(app.cinema, cue);
+        draw_cinema_panel(app.cinema, cue, type, hud);
         ImGui::EndChild();
         ImGui::PopStyleVar();
         ImGui::SameLine(0.0f, 0.0f);
@@ -1814,13 +1900,13 @@ void draw_cinema_frame(App& app) {
     ImGui::PopStyleVar(2);
 
     ImGui::SetNextWindowPos(ImVec2(std::floor(vp->Pos.x), std::floor(vp->Pos.y) + content_h));
-    ImGui::SetNextWindowSize(ImVec2(content_w, ticker_h));
+    ImGui::SetNextWindowSize(ImVec2(content_w, strip_h));
     ImGui::PushStyleColor(ImGuiCol_WindowBg, palette.status_bg);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(kTickerPadX, kTickerPadY));
-    ImGui::Begin("##cinema_ticker", nullptr,
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(kStripPadX, kStripPadY));
+    ImGui::Begin("##cinema_strip", nullptr,
                  kPanelFlags | ImGuiWindowFlags_NoScrollbar |
                      ImGuiWindowFlags_NoScrollWithMouse);
-    draw_cinema_ticker(app.cinema, cue, hud);
+    draw_cinema_strip(app.cinema, cue, hud, type);
     ImGui::End();
     ImGui::PopStyleVar();
     ImGui::PopStyleColor();
@@ -2134,7 +2220,8 @@ int run(int argc, char** argv) {
     ImGui::CreateContext();
     ImGui::GetIO().IniFilename = nullptr; // fixed layout — nothing to persist
     apply_theme();
-    const bool ttf_loaded = load_ui_font();
+    ImFont* cinema_font = nullptr;
+    const bool ttf_loaded = load_ui_font(&cinema_font);
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
 
@@ -2142,6 +2229,7 @@ int run(int argc, char** argv) {
     glfwSetWindowUserPointer(window, &app);
     glfwSetDropCallback(window, drop_callback);
     app.custom_font = ttf_loaded;
+    app.cinema_font = cinema_font;
     if (const char* shot_env = std::getenv("POLYMESH_GUI_SHOT");
         shot_env != nullptr && shot_env[0] != '\0') {
         app.shot_env_path = shot_env;

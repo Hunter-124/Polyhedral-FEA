@@ -67,7 +67,9 @@ class Camera {
     float fov_y_ = 40.0f * 3.14159265f / 180.0f;
 };
 
-/// What the viewport is currently displaying.
+/// What the viewport is currently displaying. `kResultsGradient` shows the
+/// extra per-node field handed to `set_result`, on the same deformed geometry
+/// and through the same colormap as the other results modes.
 enum class DisplayMode {
     kSetup = 0,
     kMeshPreview = 1,
@@ -75,6 +77,7 @@ enum class DisplayMode {
     kResultsDisplacement = 3,
     kResultsError = 4,
     kCinema = 5,
+    kResultsGradient = 6,
 };
 
 class Viewport {
@@ -89,7 +92,16 @@ class Viewport {
     /// Uploads volume mesh boundary for mesh-preview mode (element-type colors).
     void set_mesh(const VolumeMeshOutput& mesh);
     /// Uploads solve results (deformed boundary mesh + nodal scalars).
-    void set_result(const SolveResult& result);
+    ///
+    /// `nodal_extra` is an OPTIONAL fourth scalar field, one value per node of
+    /// `result.volume_mesh`, shown by `DisplayMode::kResultsGradient`. It is
+    /// interpolated onto the boundary surface samples by the same weights as
+    /// the von Mises field, so it is displayed on exactly the same footing.
+    /// A null pointer, or a size that does not match the mesh's node count,
+    /// clears it: `kResultsGradient` then bakes zeros rather than quietly
+    /// showing some other field under the gradient's legend.
+    void set_result(const SolveResult& result,
+                    const std::vector<double>* nodal_extra = nullptr);
 
     /// BRep/feature-edge polylines of the part, drawn as the pre-mesh skeleton.
     void set_skeleton(const std::vector<std::vector<Eigen::Vector3d>>& polylines);
@@ -133,6 +145,24 @@ class Viewport {
         float edge_width = 1.5f;
     };
     void set_cinema_view(const CinemaView& view);
+
+    /// Spatial reveal of the scalar field in the results modes.
+    ///
+    /// This is a REVEAL, not a field modification. The colours behind the front
+    /// are the pass's own values at the pass's own scale, byte for byte what
+    /// the un-swept bake would have produced; ahead of the front the sample is
+    /// painted an unstressed grey that no colormap entry can produce. Nothing
+    /// about the field is animated -- only how much of it has been uncovered --
+    /// so a frame grabbed mid-sweep can still be read straight off the legend.
+    struct FieldSweep {
+        bool active = false;
+        Eigen::Vector3f axis{1, 0, 0}; // need not be unit
+        float front = 1.0f;            // fraction of the result's own extent along axis
+        float feather = 0.06f;         // width of the leading band, same fraction units
+    };
+    /// Inactive, a zero-length `axis`, or a result with zero extent along the
+    /// axis all leave every colour exactly as the un-swept bake produced it.
+    void set_field_sweep(const FieldSweep& sweep);
 
     /// Rebuilds per-triangle overlay colors from the setup + selection.
     void update_overlays(const Model& model, const SimSetup& setup, int selected_region,
@@ -239,12 +269,21 @@ class Viewport {
     std::vector<double> result_scalar_vm_;
     std::vector<double> result_scalar_u_;
     std::vector<double> result_scalar_eta_;
+    /// The optional field from `set_result`'s `nodal_extra`, interpolated to the
+    /// same surface samples. Empty means "the caller supplied none, or supplied
+    /// one that did not fit the mesh"; kResultsGradient bakes zeros then.
+    std::vector<double> result_scalar_extra_;
     std::vector<std::array<std::uint32_t, 4>> result_quads_;
     Eigen::VectorXd result_disp_;
     bool result_dirty_ = false;
     DisplayMode baked_mode_ = DisplayMode::kSetup;
     float baked_scale_ = -1.0f;
     float baked_max_ = -1.0f;
+    /// Sweep requested by the caller, and the sweep the current VBO was baked
+    /// with. A moving front changes only these, so render() has to compare them
+    /// field by field to know the vertex colours are stale.
+    FieldSweep field_sweep_;
+    FieldSweep baked_sweep_;
     // World AABBs of the uploaded geometry, refreshed on every upload/bake and
     // consumed by frame_content().
     Bounds model_bounds_;

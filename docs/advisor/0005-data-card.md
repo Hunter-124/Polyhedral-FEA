@@ -126,11 +126,11 @@ reproduce the leakage it causes and must never ship a number.
 
 | head | source | notes |
 |---|---|---|
-| `rel_err` | `accuracy_rel_err` vs the case reference | now an independent Gmsh + CalculiX value for 64 cases; 8 remain closed-form |
-| `rel_err_rel` | per-case-centred `rel_err` | what the choosers rank on |
-| `geo_chamfer`, `geo_p99` | mesh-vs-BRep distance | `p95` collapses to ~0 on conforming meshes and carries no signal |
-| `dof`, `mesh_ms`, `solve_ms` | measured | independent of the reference |
-| `failure` | `status` / `error` | see below |
+| predicted relative error (`rel_err`) | `accuracy_rel_err` vs the case reference | now an independent Gmsh + CalculiX value for 64 cases; 8 remain closed-form |
+| relative error, centred per part (`rel_err_rel`) | per-case-centred `rel_err` | what the choosers rank on |
+| mesh-to-CAD distance and worst 1% (`geo_chamfer`, `geo_p99`) | mesh-vs-BRep distance | `p95` collapses to ~0 on conforming meshes and carries no signal |
+| degrees of freedom, meshing time, solve time (`dof`, `mesh_ms`, `solve_ms`) | measured | independent of the reference |
+| failure risk (`failure`) | `status` / `error` | see below |
 
 **Feasibility and trust are separate, and conflating them was a real defect.**
 `accuracy_trusted` is the solve *health gate* — `apps/testlab/main.cpp:2525` sets
@@ -172,7 +172,7 @@ Two code paths:
 Measured on the final `bench/advisor/dataset.csv` — 2,412 rows, SHA-256
 `3c0d6bd7a7d3…`:
 
-| `order` | `adapt_passes` | rows | share |
+| element order (`order`) | refinement passes (`adapt_passes`) | rows | share |
 |---|---|---:|---:|
 | 1 | 0 | 306 | 12.7 % |
 | 1 | 1 | 1,080 | 44.8 % |
@@ -188,7 +188,7 @@ discretisations.
 Worse than ambiguity — matching `order = 1` against `order = 2` rows identical in
 every other column:
 
-| `adapt_passes` | matched pairs | identical `n_dof`, `n_nodes` **and** `rel_err` | median `n_dof` ratio (o2/o1) |
+| refinement passes | matched pairs | identical `n_dof`, `n_nodes` **and** `rel_err` | median degrees-of-freedom ratio (o2/o1) |
 |---|---:|---:|---:|
 | 0 | 290 | 6 / 290 | 5.52 |
 | 1 | 264 | **264 / 264** | 1.000 |
@@ -316,7 +316,7 @@ suggests". **That claim is withdrawn. The trend runs the other way.**
 
 Measured on the final corpus:
 
-| `h_rel` | rows | usable |
+| cell size, as a fraction of the part (`h_rel`) | rows | usable |
 |---|---:|---:|
 | 0.08 | 72 | 79 % |
 | 0.09 | 306 | 74 % |

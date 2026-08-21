@@ -65,7 +65,7 @@ Two deviations from the plan, both forced by measurement:
 | `solve_fail` | 366 (mostly `no interior cells` — coarse `h_rel` on thin walls) |
 | `solve_suspect` | 78 |
 | `over_budget` | 8 |
-| `mesh_ms / (mesh_ms + solve_ms)` | **0.467** |
+| meshing share of wall time (`mesh_ms / (mesh_ms + solve_ms)`) | **0.467** |
 
 The 25 % failure rate is signal, not breakage: it is what the feasibility head
 learns, and it is concentrated where you would expect (`h_rel = 0.20` against
@@ -96,13 +96,13 @@ Validation MAE in log10 units. LightGBM is trained on the identical split.
 
 | Head | run 1 | run 30 | LightGBM |
 | --- | --- | --- | --- |
-| `dof` | 4.837 | **0.108** | 0.018 |
-| `mesh_ms` | 2.952 | **0.138** | 0.093 |
-| `solve_ms` | 3.929 | **0.153** | 0.085 |
-| `geo_chamfer` | 0.102 | 0.155 | 0.025 |
-| `geo_p99` | 0.132 | 0.182 | 0.063 |
-| `rel_err` | 0.983 | **1.070** | 0.970 |
-| `failure_auc` | 0.992 | 0.981 | — |
+| degrees of freedom (`dof`) | 4.837 | **0.108** | 0.018 |
+| meshing time (`mesh_ms`) | 2.952 | **0.138** | 0.093 |
+| solve time (`solve_ms`) | 3.929 | **0.153** | 0.085 |
+| mesh-to-CAD distance (`geo_chamfer`) | 0.102 | 0.155 | 0.025 |
+| mesh-to-CAD worst 1% (`geo_p99`) | 0.132 | 0.182 | 0.063 |
+| predicted relative error (`rel_err`) | 0.983 | **1.070** | 0.970 |
+| failure risk, ROC AUC (`failure_auc`) | 0.992 | 0.981 | — |
 
 Stage A -> B fired automatically at **run 21** on the <2 %-over-10-runs rule.
 Pruning removed 328 rows and then stopped at its 25 % ceiling, as designed.
@@ -235,13 +235,13 @@ policy head had no signal on the shape and adaptivity dials at all.
 
 | head | run 1 | run 30 | LightGBM |
 | --- | --- | --- | --- |
-| `rel_err` | 0.815 | 0.809 | 0.768 |
-| `rel_err_rel` | 0.301 | 0.312 | 0.255 |
-| `geo_chamfer` | 0.118 | 0.099 | 0.023 |
-| `geo_p99` | 0.125 | 0.097 | 0.033 |
-| `dof` | 3.707 | 0.150 | 0.017 |
-| `mesh_ms` | 2.695 | 0.132 | 0.071 |
-| `solve_ms` | 1.713 | 0.171 | 0.080 |
+| predicted relative error | 0.815 | 0.809 | 0.768 |
+| relative error, centred per part | 0.301 | 0.312 | 0.255 |
+| mesh-to-CAD distance | 0.118 | 0.099 | 0.023 |
+| mesh-to-CAD worst 1% | 0.125 | 0.097 | 0.033 |
+| degrees of freedom | 3.707 | 0.150 | 0.017 |
+| meshing time | 2.695 | 0.132 | 0.071 |
+| solve time | 1.713 | 0.171 | 0.080 |
 
 ### Does it choose a better mesh than the default?
 
@@ -252,9 +252,9 @@ regret is how much worse the chosen action is, in log10 units.
 
 | outcome | advisor | default | oracle | gain |
 | --- | --- | --- | --- | --- |
-| `rel_err` | **0.3313** | 0.7609 | 0.0000 | **+0.4296** |
-| `geo_p99` | **0.1306** | 0.2254 | 0.0637 | **+0.0948** |
-| `solve_ms` | 1.8703 | 0.3475 | 1.2598 | -1.5229 |
+| relative error | **0.3313** | 0.7609 | 0.0000 | **+0.4296** |
+| mesh-to-CAD worst 1% | **0.1306** | 0.2254 | 0.0637 | **+0.0948** |
+| solve time | 1.8703 | 0.3475 | 1.2598 | -1.5229 |
 
 Split by how good the case's ground truth is — the finding that matters:
 
@@ -302,9 +302,9 @@ computed rather than in a sequence chosen for looks
 
 Measured mesh improvement, coarsest run -> best-accuracy run for the same part:
 
-- `sphere_box_s2_c2`: rel_err 1.0 -> 7.2e-4 (**1389x**), 675 -> 62,472 DOF
-- `stepped_shaft_s0_c1`: rel_err 0.512 -> 2.47e-3 (**207x**), 297 -> 1,683 DOF
-- `plate_notch_s2_c1`: rel_err 0.458 -> 5.84e-3 (**78x**), 693 -> 7,041 DOF
+- `sphere_box_s2_c2`: relative error 1.0 -> 7.2e-4 (**1389x**), 675 -> 62,472 DOF
+- `stepped_shaft_s0_c1`: relative error 0.512 -> 2.47e-3 (**207x**), 297 -> 1,683 DOF
+- `plate_notch_s2_c1`: relative error 0.458 -> 5.84e-3 (**78x**), 693 -> 7,041 DOF
 
 Across the corpus the anytime curve improves median accuracy 1.50x and median
 geometric fidelity 2.02x as solver time is spent.
@@ -386,13 +386,13 @@ them.
 
 | head | M-A3 | archived M-A2 | direction |
 | --- | ---: | ---: | --- |
-| `rel_err` | **0.4235** | 0.8086 | better |
-| `rel_err_rel` | **0.2837** | 0.3121 | better |
-| `geo_chamfer` | 0.1649 | **0.0989** | worse |
-| `geo_p99` | 0.1428 | **0.0970** | worse |
-| `dof` | 0.2025 | **0.1500** | worse |
-| `mesh_ms` | 0.1732 | **0.1324** | worse |
-| `solve_ms` | 0.1900 | **0.1708** | worse |
+| predicted relative error | **0.4235** | 0.8086 | better |
+| relative error, centred per part | **0.2837** | 0.3121 | better |
+| mesh-to-CAD distance | 0.1649 | **0.0989** | worse |
+| mesh-to-CAD worst 1% | 0.1428 | **0.0970** | worse |
+| degrees of freedom | 0.2025 | **0.1500** | worse |
+| meshing time | 0.1732 | **0.1324** | worse |
+| solve time | 0.1900 | **0.1708** | worse |
 
 Accuracy improved; every geometry/cost head regressed. The same corrected data
 also made LightGBM worse on `geo_chamfer` (0.0227 -> 0.0611), `geo_p99`
@@ -407,9 +407,9 @@ from the best available action for that outcome:
 
 | outcome | advisor | default | oracle |
 | --- | ---: | ---: | ---: |
-| `rel_err` | **0.6322** | 1.2822 | 0 |
-| `geo_p99` | **0.2307** | 0.2334 | 0.1758 |
-| `solve_ms` | 1.7198 | **0.3629** | 1.6251 |
+| relative error | **0.6322** | 1.2822 | 0 |
+| mesh-to-CAD worst 1% | **0.2307** | 0.2334 | 0.1758 |
+| solve time | 1.7198 | **0.3629** | 1.6251 |
 
 In linear terms the advisor's accuracy pick is approximately **4.3x** off the
 oracle versus the default's approximately **19x**: about **4.5x better than the

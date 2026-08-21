@@ -90,15 +90,15 @@ to stay legible, and 5k rows do not support anything larger.
 
 | Output | Meaning | Units |
 | --- | --- | --- |
-| `rel_err` | relative error vs the case's truth metric | log10 |
-| `rel_err_rel` | `rel_err` minus that case's median over the actions run | log10 difference |
-| `geo_chamfer` | symmetric mean mesh<->B-rep distance / bbox diag | log10 |
-| `geo_p99` | worse of the two directions' p99 distance / bbox diag | log10 |
-| `dof` | solve degrees of freedom | log10 |
-| `mesh_ms` | meshing wall time | log10 |
-| `solve_ms` | solve wall time | log10 |
-| `failure_logit` | feasibility (mesh/solve failed, over budget, or untrusted) | logit |
-| `policy` | proposed action, `A` dims | mixed, see below |
+| predicted relative error (`rel_err`) | relative error vs the case's truth metric | log10 |
+| relative error, centred per part (`rel_err_rel`) | `rel_err` minus that case's median over the actions run | log10 difference |
+| mesh-to-CAD distance (`geo_chamfer`) | symmetric mean mesh<->B-rep distance / bbox diag | log10 |
+| mesh-to-CAD worst 1% (`geo_p99`) | worse of the two directions' p99 distance / bbox diag | log10 |
+| degrees of freedom (`dof`) | solve degrees of freedom | log10 |
+| meshing time (`mesh_ms`) | meshing wall time | log10 |
+| solve time (`solve_ms`) | solve wall time | log10 |
+| failure risk (`failure_logit`) | feasibility (mesh/solve failed, over budget, or untrusted) | logit |
+| recommended action (`policy`) | proposed action, `A` dims | mixed, see below |
 
 ### Why `rel_err_rel` exists
 

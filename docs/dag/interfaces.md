@@ -296,7 +296,8 @@ Written by `scripts/analyze_campaign.py` (feedback-loop tooling). Safe on
 `checkpoint.state` becomes `finished`.
 
 - **PARETO.md** — human report: weighted ranking, global/per-part/per-geom
-  Pareto (maximize accuracy, minimize mesh_ms+solve_ms), knob suggestions.
+  Pareto (maximize accuracy, minimize meshing time + solve time), knob
+  suggestions.
 - **PARETO.json** — same content structured for automation (`ranking`,
   `pareto_global`, `pareto_by_part`, `pareto_by_geom_class`,
   `recommendations.apply_code_defaults`).

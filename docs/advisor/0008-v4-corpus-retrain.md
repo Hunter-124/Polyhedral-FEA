@@ -49,7 +49,7 @@ because a regeneration retires the optimisation trajectory with the labels.
 | --- | --- | --- |
 | best validation `rel_err_mae` | 0.6893 (run 70) | **0.5201** (run 49) |
 | shipped `best.pt` | run 102 | run 143 |
-| `plate_hole` through `--advisor` | hybrid_zoo | **graded_tet**, h_rel 0.1, order 2 |
+| `plate_hole` through `--advisor` | hybrid_zoo | **graded_tet**, cell size 0.1 of the part, order 2 |
 
 ONNX re-exported at 62 columns, parity 2.2e-06 relative against onnxruntime;
 calibration and the OOD gate rebuilt on the corrected rows.
@@ -151,7 +151,7 @@ corner. Measured over the part's 288 rows:
 
 | | scored `max_von_mises` | scored `strain_energy` |
 | --- | --- | --- |
-| Spearman(DOF, rel_err) | **+0.70** (more DOF, "worse") | +0.18 |
+| Spearman(degrees of freedom, relative error) | **+0.70** (more DOF, "worse") | +0.18 |
 | order-1 median / max | 0.011 / 0.070 | 0.009 / 0.021 |
 | order-2 median / max | **2.72 / 12.05** | 0.070 / 0.205 |
 | worst measured value | σ = 1.3e7 Pa vs 1e6 reference | — |

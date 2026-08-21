@@ -1838,9 +1838,10 @@ def main(argv: list[str] | None = None) -> int:
          "measured order falls more than 0.7% below theory; p=1 sits 2.0% above "
          "it, so the bound is one-sided."),
         ("bench_advisor_budget.png", "advisor_budget",
-         "The learned mesh advisor under a DOF budget (ADR-0034): the action it "
-         "picks at each --advisor-max-dof cap, against that action's predicted "
-         "per-case relative-error score. 0 of the 18 capped picks is over budget "
+         f"The learned mesh advisor under a {fs.quantity_label('max_dof')} "
+         "(ADR-0034): the action it picks at each --advisor-max-dof cap, "
+         f"against that action's predicted {fs.quantity_label('rel_err_rel')}. "
+         "0 of the 18 capped picks is over budget "
          "and this sweep contains no refusal. 13 of the 21 invoked CLI solves "
          "exited nonzero — the picked action failed to mesh or solve — and those "
          "points are ringed; every plotted score is the shipped ONNX model's "

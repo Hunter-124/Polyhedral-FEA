@@ -24,7 +24,11 @@ jobs:
         run: |
           sudo apt-get update
           # OCCT's imported targets link TBB; ubuntu-24.04 omits libtbb.so without -dev.
+          # python3-numpy: six ctest cases re-derive advisor dataset rows by
+          # importing scripts/build_advisor_dataset.py, which imports numpy. They
+          # only started running once the build stopped failing ahead of them.
           sudo apt-get install -y --no-install-recommends \
+            python3-numpy \
             ninja-build \
             cmake \
             g++ \

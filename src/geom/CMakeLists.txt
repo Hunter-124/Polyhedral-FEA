@@ -43,12 +43,10 @@ if(POLYMESH_WITH_OCC)
     target_compile_definitions(polymesh_geom PUBLIC POLYMESH_WITH_OCC)
     target_include_directories(polymesh_geom SYSTEM PRIVATE ${OpenCASCADE_INCLUDE_DIR})
     # Imported TK* targets carry INTERFACE_INCLUDE_DIRECTORIES and transitive
-    # link deps. TKDESTEP = STEP read; TKMesh = BRepMesh_IncrementalMesh.
-    target_link_libraries(polymesh_geom PRIVATE
-        TKDESTEP
+    # link deps. TKDESTEP is OCCT 7.7+; Ubuntu 24.04 still ships 7.6 TKSTEP*.
+    set(_occ_libs
         TKMesh
         TKXSBase
-        TKDE
         TKBRep
         TKTopAlgo
         TKMath
@@ -59,5 +57,24 @@ if(POLYMESH_WITH_OCC)
         TKGeomAlgo
         TKShHealing
     )
+    set(_tkdestep_loc "")
+    if(TARGET TKDESTEP)
+        get_target_property(_tkdestep_loc TKDESTEP IMPORTED_LOCATION)
+        if(NOT _tkdestep_loc)
+            get_target_property(_tkdestep_loc TKDESTEP IMPORTED_LOCATION_RELEASE)
+        endif()
+    endif()
+    if(_tkdestep_loc)
+        list(APPEND _occ_libs TKDESTEP)
+        if(TARGET TKDE)
+            list(APPEND _occ_libs TKDE)
+        endif()
+    else()
+        list(APPEND _occ_libs TKSTEP TKSTEP209 TKSTEPAttr TKSTEPBase)
+        if(TARGET TKXDESTEP)
+            list(APPEND _occ_libs TKXDESTEP)
+        endif()
+    endif()
+    target_link_libraries(polymesh_geom PRIVATE ${_occ_libs})
     message(STATUS "OpenCASCADE STEP support enabled (POLYMESH_WITH_OCC)")
 endif()

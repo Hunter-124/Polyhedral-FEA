@@ -5,6 +5,13 @@ on:
     branches: [master]
   pull_request:
 
+# One live run per ref. Pushing four commits in a row otherwise queues four
+# 13-minute cross-stdlib jobs that starve each other for runners, and only the
+# last one's answer is about the tree anyone still has.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # Core libraries + Catch2 suite. GUI is built too (X11-only GLFW) so
   # presentation code stays compiling, but tests only need libs.

@@ -63,15 +63,22 @@ jobs:
         # Working directory for discovered tests is the repo root (bench/reference).
         #
         # A Debug build runs this suite unoptimised, and a handful of tests
-        # dominate it: `hierarchical MMS converges at the theoretical energy-norm
-        # rate` alone measured 506 s at -O0. `--parallel 2` on a 4-vCPU runner
-        # left half the machine idle and put the job over 40 minutes; an earlier
-        # run reached GitHub's 6 h ceiling and was killed. Use the cores the
-        # runner actually has, and bound each test so a genuine hang fails in
-        # minutes instead of burning the whole allowance.
+        # dominate it. Measured in a local Debug build on a 7600X3D at
+        # --parallel 4: `graded plate-hole mesh resolves exact BRep surfaces and
+        # protected rims` passes in 761 s, and the hierarchical MMS convergence
+        # test takes 506 s. `--parallel 2` on a 4-vCPU runner left half the
+        # machine idle and put the job past 40 minutes; an earlier run reached
+        # GitHub's 6 h ceiling and was killed with no result at all.
+        #
+        # So: use the cores the runner has, and bound each test well above the
+        # measured worst case rather than near it. A runner core is slower than
+        # the box those numbers came from, and a timeout tuned to 900 s would
+        # fail the 761 s test for being slow rather than wrong -- the exact
+        # mistake the poll budgets in test_gui_pipeline made. 2700 s still turns
+        # a genuine hang into a failure inside the hour instead of burning six.
         run: |
           ctest --test-dir build --output-on-failure \
-            --parallel "$(nproc)" --timeout 900
+            --parallel "$(nproc)" --timeout 2700
 
   # Cross-standard-library determinism. The mesher once produced a different mesh
   # under MSVC than under gcc (5 of 24 corpus pairs, 2026-08-14) because several

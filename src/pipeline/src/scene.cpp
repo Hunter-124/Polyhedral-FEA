@@ -5876,14 +5876,31 @@ void SolveJob::note_mesh_stats(const VolumeMeshOutput& vol) {
     progress_.n_nodes = vol.mesh.nodes.size();
 }
 
-fea::SolveOptions SolveJob::solve_options_with_progress(int pass, int pass_count) {
+fea::SolveOptions SolveJob::solve_options_with_progress(int pass, int pass_count,
+                                                        std::string* note_sink) {
     // Keep the shared default method/tolerance policy. The per-run memory cap
     // is enforced during solve preflight; four-iteration callbacks make the
     // same hook a low-latency cooperative pause/cancel point without restarting
     // the PCG recurrence.
     fea::SolveOptions opt;
     opt.max_mem_gb = active_max_mem_gb_;
-    opt.on_note = [this](std::string_view note) { set_status(std::string(note)); };
+    // The notes are the linear solver's own words (method choice, any CG
+    // attempt and its iteration count). They are appended verbatim and joined
+    // with newlines -- nothing here summarises or renames a method, because the
+    // consumer displays this as the solver's account of itself. A solve that
+    // emits no note leaves the sink untouched, which at this project's DOF
+    // counts is the normal outcome: `fea::SolveMethod::kAuto` picks direct
+    // sparse LDLT below `SolveOptions::cg_threshold` (50,000 free DOF) and the
+    // CG-flavoured notes never appear.
+    opt.on_note = [this, note_sink](std::string_view note) {
+        if (note_sink != nullptr) {
+            if (!note_sink->empty()) {
+                note_sink->push_back('\n');
+            }
+            note_sink->append(note);
+        }
+        set_status(std::string(note));
+    };
     opt.on_progress = [this, pass, pass_count](int iter, int max_iters, double resid) {
         checkpoint();
         const double frac =
@@ -6182,8 +6199,10 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
     // Copy inputs by value into the worker.
     const auto pass_callback = on_pass;
     const auto stage_callback = on_mesh_stage;
+    const auto solve_stage_callback = on_solve_stage;
     worker_ = std::thread(
-        [this, model, setup, pass_count, pass_callback, stage_callback] {
+        [this, model, setup, pass_count, pass_callback, stage_callback,
+         solve_stage_callback] {
         try {
             // Global h from D5 only (same as start_mesh). Feature grading is
             // feature_refine on graded fills — not global h→h_min at corners.
@@ -7141,7 +7160,14 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                            pass, pass_count);
                 }
                 checkpoint();
-                const auto solve_opt = solve_options_with_progress(pass, pass_count);
+                // Notes for this pass only. Default-constructed it owns no
+                // heap, and the sink pointer stays null unless someone is
+                // listening, so the unobserved path is byte-for-byte the old
+                // one.
+                std::string pass_solver_note;
+                const auto solve_opt = solve_options_with_progress(
+                    pass, pass_count,
+                    solve_stage_callback ? &pass_solver_note : nullptr);
                 const auto solve_t0 = std::chrono::steady_clock::now();
                 update_solved_geometry_volume(model, vol);
 
@@ -7161,13 +7187,72 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     adapt::drive_hp(signals, hp_policy, cents, h_use, h_adapt_ceiling);
                 last_shape_vote = hp_plan.global_shape;
                 const std::string hp_note = adapt::summarize_hp_plan(hp_plan);
-                if (setup.adapt_passes > 0 && pass_callback) {
-                    pass_callback(make_pass_trace(pass, vol.mesh, zz_try, hp_plan,
-                                                  pass_mesh_ms, pass_solve_ms));
+                // Whether a further pass runs is decided by three predicates
+                // the loop tests below. All three are pure functions of state
+                // that is already final here, so evaluating them at the
+                // emission point lets the observers state `final_pass`
+                // truthfully; the loop then re-uses these exact values rather
+                // than testing the same conditions twice.
+                const bool eta_target_stop =
+                    setup.eta_target > 0.0 && zz_try.global_eta <= setup.eta_target;
+                const double growth = std::max(1.0, hp_plan.predicted_dof_factor);
+                const double next_elems =
+                    std::ceil(growth * static_cast<double>(vol.mesh.elements.size()));
+                const double next_dof =
+                    std::ceil(growth * 3.0 * static_cast<double>(vol.mesh.nodes.size()));
+                const bool elem_cap =
+                    next_elems > static_cast<double>(resolved.element_ceiling);
+                const bool dof_cap = next_dof > static_cast<double>(resolved.dof_ceiling);
+                const auto& sug = hp_plan.h_suggestion;
+                // Early stop only when neither h nor p wants work — and no
+                // coarsen pass is pending (a coarsen remesh must run, or
+                // over-resolved regions would stay fine forever).
+                const bool nothing_left_to_refine =
+                    sug.n_marked == 0 && sug.h_next >= h_use * 0.98 &&
+                    hp_plan.p_mark.empty() && hp_plan.coarsen_mark.empty();
+                const bool another_pass_follows = !eta_target_stop &&
+                                                  pass < setup.adapt_passes && !elem_cap &&
+                                                  !dof_cap && !nothing_left_to_refine;
+
+                // Firing order, fixed: `on_pass` first, then `on_solve_stage`,
+                // from this one point, so the two observers can never be
+                // handed different passes and the order never varies between
+                // runs. `make_pass_trace` sorts a copy of the per-element η
+                // vector, so it is built once and shared rather than twice.
+                if ((setup.adapt_passes > 0 && pass_callback) || solve_stage_callback) {
+                    const PassTrace trace = make_pass_trace(
+                        pass, vol.mesh, zz_try, hp_plan, pass_mesh_ms, pass_solve_ms);
+                    if (setup.adapt_passes > 0 && pass_callback) {
+                        pass_callback(trace);
+                    }
+                    if (solve_stage_callback) {
+                        SolveStage stage;
+                        stage.pass = pass;
+                        stage.final_pass = !another_pass_follows;
+                        stage.trace = trace;
+                        // This pass's own fields, taken from this pass's own
+                        // `vol`, `u_try` and `zz_try` — copied, not moved,
+                        // because the loop still needs all three. The
+                        // p-elevation re-solves further down belong to
+                        // finalisation, not to the pass being reported, which
+                        // is also why `on_pass` reports its trace here.
+                        stage.result.volume_mesh = vol.mesh;
+                        stage.result.boundary_quads = vol.boundary_quads;
+                        fill_result_fields(stage.result, zz_try, u_try);
+                        stage.result.fill_geometry_volume = vol.fill_geometry_volume;
+                        stage.result.solved_geometry_volume = vol.solved_geometry_volume;
+                        // Only the two notes that exist at this instant. The
+                        // stop-reason suffix the final result carries is not
+                        // known yet and is not invented here.
+                        stage.result.mesh_note =
+                            std::format("{} | {}", vol.mesher_note, hp_note);
+                        stage.solver_note = pass_solver_note;
+                        solve_stage_callback(stage);
+                    }
                 }
 
                 // D2: global η target — stop when η is small enough (0 = disabled).
-                if (setup.eta_target > 0.0 && zz_try.global_eta <= setup.eta_target) {
+                if (eta_target_stop) {
                     std::string pnote;
                     if (maybe_p_elevate(hp_plan.p_mark, pnote)) {
                         publish_live_mesh(vol);
@@ -7194,15 +7279,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     break;
                 }
                 if (pass < setup.adapt_passes) {
-                    const double growth = std::max(1.0, hp_plan.predicted_dof_factor);
-                    const double next_elems =
-                        std::ceil(growth * static_cast<double>(vol.mesh.elements.size()));
-                    const double next_dof =
-                        std::ceil(growth * 3.0 * static_cast<double>(vol.mesh.nodes.size()));
-
-                    const bool elem_cap =
-                        next_elems > static_cast<double>(resolved.element_ceiling);
-                    const bool dof_cap = next_dof > static_cast<double>(resolved.dof_ceiling);
+                    // growth/next_elems/next_dof/elem_cap/dof_cap: computed
+                    // once above, where `final_pass` needed them.
                     if (elem_cap || dof_cap) {
                         const std::string reason =
                             elem_cap && dof_cap
@@ -7243,12 +7321,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         result_ = std::move(r);
                         break;
                     }
-                    const auto& sug = hp_plan.h_suggestion;
-                    // Early stop only when neither h nor p wants work — and no
-                    // coarsen pass is pending (a coarsen remesh must run, or
-                    // over-resolved regions would stay fine forever).
-                    if (sug.n_marked == 0 && sug.h_next >= h_use * 0.98 &&
-                        hp_plan.p_mark.empty() && hp_plan.coarsen_mark.empty()) {
+                    if (nothing_left_to_refine) {
                         std::string pnote;
 
                         // Still try mark_smooth fallback if driver was silent on p

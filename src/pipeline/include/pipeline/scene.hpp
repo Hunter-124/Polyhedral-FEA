@@ -629,6 +629,23 @@ struct PassTrace {
     double solve_ms = 0.0;
 };
 
+/// Declared here rather than beside `MeshStage`: it holds a `PassTrace` and a
+/// `SolveResult` by value, and `PassTrace` is only a complete type from this
+/// line down.
+///
+/// One completed solve of the adaptive loop, with the fields it produced. This
+/// is the order in which the answer is actually computed: a solve, the error
+/// field recovered from it, then the refinement that field asked for.
+struct SolveStage {
+    int pass = 0;             // adapt pass index (0 = initial)
+    bool final_pass = false;  // no further pass ran after this one
+    PassTrace trace;          // the pass's own scalar telemetry
+    SolveResult result;       // mesh, displacement, von Mises and ZZ fields at that pass
+    std::string solver_note;  // the linear solver's own account of what it did
+};
+/// Set to observe each pass as it completes; empty (the default) costs nothing.
+using SolveStageSink = std::function<void(const SolveStage&)>;
+
 
 /// Background mesh / solve pipeline. Poll `state` from the UI thread.
 class SolveJob {
@@ -677,6 +694,25 @@ class SolveJob {
     /// existing caller gets.
     std::function<void(const MeshStage&)> on_mesh_stage;
 
+    /// Optional worker-thread callback for each completed adaptive pass,
+    /// carrying that pass's fields. Set before `start`; fires on the worker
+    /// thread, so the consumer must synchronise. Costs one SolveResult copy per
+    /// pass when set, nothing when unset.
+    ///
+    /// Fires immediately AFTER `on_pass` for the same pass, from the same
+    /// point in the loop, so the two can never describe different passes and
+    /// the order is the same on every run. Unlike `on_pass`, it fires even when
+    /// `SimSetup::adapt_passes` is 0 — one non-adaptive solve is still one
+    /// completed pass.
+    ///
+    /// The copy is 72 B per node (coordinates, 3 displacements, von Mises,
+    /// |u|, nodal η) plus 84 B per element (56 B NodalElement, ~20 B of node
+    /// indices for a mixed hex/pyramid/tet zoo, 8 B element η) plus 16 B per
+    /// boundary quad. Measured on the sphere_box_s0_c0 hybrid-zoo mesh
+    /// (11,692 elements, 4,382 nodes, 13,146 DOF, 1,048 boundary quads):
+    /// 1,314,253 B = 1.25 MiB per pass, twice for its two passes.
+    std::function<void(const SolveStage&)> on_solve_stage;
+
     /// Poll intermediate volume mesh for viewport (updated after mesh / adapt
     /// remesh). Returns a copy when generation advanced past `seen_gen` (then
     /// updates `seen_gen`). Cheap no-op when nothing new. Phase-boundary only —
@@ -719,7 +755,12 @@ class SolveJob {
     void join_worker();
     void reset_control_flags();
     /// Solve options with CG progress wired into JobProgress (when applicable).
-    fea::SolveOptions solve_options_with_progress(int pass, int pass_count);
+    /// `note_sink`, when non-null, also accumulates every `fea::SolveOptions`
+    /// note verbatim (newline-separated) for `SolveStage::solver_note`; the
+    /// status line is written exactly as before either way. Null (the default)
+    /// leaves the pre-existing behaviour bit for bit.
+    fea::SolveOptions solve_options_with_progress(int pass, int pass_count,
+                                                  std::string* note_sink = nullptr);
 };
 
 } // namespace polymesh::pipeline

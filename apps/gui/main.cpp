@@ -647,8 +647,9 @@ void tick_auto(AutoRunner& run, App& app, GLFWwindow* window) {
             // toggling them under a live job would be a data race on
             // SolveJob::on_mesh_stage / on_solve_stage. Refuse rather than race.
             if (worker_busy) {
-                return fail("cinema on while a mesh/solve is running — the stage sinks must be "
-                            "installed before the worker starts");
+                return fail(
+                    "cinema on while a mesh/solve is running — the stage sinks must be "
+                    "installed before the worker starts");
             }
             app.cinema.active = true;
             app.cinema.t = 0.0;
@@ -678,8 +679,9 @@ void tick_auto(AutoRunner& run, App& app, GLFWwindow* window) {
             }
         } else if (args.size() == 1 && args[0] == "off") {
             if (worker_busy) {
-                return fail("cinema off while a mesh/solve is running — the stage sinks cannot "
-                            "be removed from under the worker");
+                return fail(
+                    "cinema off while a mesh/solve is running — the stage sinks cannot "
+                    "be removed from under the worker");
             }
             app.cinema.active = false;
             app.viewport.set_camera_locked(false);

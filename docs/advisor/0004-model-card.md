@@ -253,21 +253,21 @@ folds blow up — **quote the medians**.
 
 | head | median | mean | sd |
 |---|---:|---:|---:|
-| `rel_err` | 0.8045 | 1.1693 | 1.2526 |
-| `rel_err_rel` | 0.6357 | 0.7539 | 0.4866 |
-| `geo_chamfer` | 0.6921 | 3.8252 | 7.8202 |
-| `geo_p99` | 0.7390 | 3.6906 | 7.4704 |
-| `dof` | 0.5185 | 1.3036 | 2.5764 |
-| `mesh_ms` | 0.5701 | 0.9846 | 1.5953 |
-| `solve_ms` | 0.6684 | 1.0308 | 1.8415 |
-| `failure_auc` | 0.8657 | 0.8062 | 0.2160 |
+| predicted relative error (`rel_err`) | 0.8045 | 1.1693 | 1.2526 |
+| relative error, centred per part (`rel_err_rel`) | 0.6357 | 0.7539 | 0.4866 |
+| mesh-to-CAD distance (`geo_chamfer`) | 0.6921 | 3.8252 | 7.8202 |
+| mesh-to-CAD worst 1% (`geo_p99`) | 0.7390 | 3.6906 | 7.4704 |
+| degrees of freedom (`dof`) | 0.5185 | 1.3036 | 2.5764 |
+| meshing time (`mesh_ms`) | 0.5701 | 0.9846 | 1.5953 |
+| solve time (`solve_ms`) | 0.6684 | 1.0308 | 1.8415 |
+| failure risk, ROC AUC (`failure_auc`) | 0.8657 | 0.8062 | 0.2160 |
 
-Every head is **worse** than the previously published figures (`rel_err` 0.809,
-`dof` 0.150, `mesh_ms` 0.132, `solve_ms` 0.171). That is expected and correct,
-not a regression: those came from a **leaky** part-hash split with warm-started
-training, these from leave-one-family-out with independent labels. Prediction
-accuracy got worse and decision quality got better, at the same time, from the
-same cause.
+Every head is **worse** than the previously published figures (relative error
+0.809, degrees of freedom 0.150, meshing time 0.132, solve time 0.171). That is
+expected and correct, not a regression: those came from a **leaky** part-hash
+split with warm-started training, these from leave-one-family-out with
+independent labels. Prediction accuracy got worse and decision quality got
+better, at the same time, from the same cause.
 
 ## Uncertainty, calibration and abstention
 

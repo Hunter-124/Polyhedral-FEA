@@ -102,12 +102,12 @@ and C++. Nothing in the clamp table is duplicated as a C++ constant.
 
 | Dimension | Box |
 | --- | --- |
-| `h_rel` | [0.005, 0.2] |
-| `eta_target` | [0.0, 0.3] |
-| `adapt_passes` | [0, 6] |
-| `order` | one of `order_choices` (argmax over logits) |
-| `p_elevate` | {false, true} (logit sign) |
-| `mesher` | one of `mesher_choices` (argmax over logits) |
+| cell size, as a fraction of the part (`h_rel`) | [0.005, 0.2] |
+| error target (`eta_target`) | [0.0, 0.3] |
+| refinement passes (`adapt_passes`) | [0, 6] |
+| element order (`order`) | one of `order_choices` (argmax over logits) |
+| quadratic elements (`p_elevate`) | {false, true} (logit sign) |
+| mesher | one of `mesher_choices` (argmax over logits) |
 
 Two corrections to the planned table, both forced by the codebase:
 
@@ -162,10 +162,10 @@ the veto are still reported so the operator can see why.
   `sigmoid(failure_logit) > threshold` at the reconstructed pre-veto action; a
   veto returns exactly the defaults; a non-veto returns exactly the clamped
   policy. The four fixture cases are forced by least-squares-fitting the head
-  layer — `nominal`, `clamped_low_h_rel` (h_rel = 5e-4, below the floor),
-  `vetoed_failure` (logit +6.5), and `imputed_defaults` (five columns omitted so
-  the C++ impute path is what is under test) — so the guardrail branches are
-  reached by construction, not by luck.
+  layer — `nominal`, `clamped_low_h_rel` (cell size 5e-4 of the part, below the
+  floor), `vetoed_failure` (logit +6.5), and `imputed_defaults` (five columns
+  omitted so the C++ impute path is what is under test) — so the guardrail
+  branches are reached by construction, not by luck.
 
 The fixture's rows carry the clamp-box default action in their action columns.
 That is load-bearing: `recommend` queries the policy head at the default action,

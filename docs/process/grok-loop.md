@@ -39,7 +39,7 @@ Flags:
 
 - Sync protocol (`git pull --rebase`, no force-push, Hunter-124 identity)
 - Campaign name, git HEAD, paths to `PARETO.md`, `results.jsonl`, warehouse runs
-- Per-shape trend summary (mesh_ms / solve_ms / quality / accuracy vs tier)
+- Per-shape trend summary (meshing time / solve time / quality / accuracy vs tier)
 - Paths to mesh wire PNGs for visual review (`read_file` on images)
 - Open `PROGRAM.yaml` nodes relevant to packing/meshing
 - Instruction: propose one packing/sizing improvement, implement + test,

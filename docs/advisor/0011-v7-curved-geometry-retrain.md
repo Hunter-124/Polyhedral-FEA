@@ -41,23 +41,24 @@ dimension, not an accident.
 
 | band | objective | policy | v6 | v7 |
 |---|---|---|---|---|
-| 0.4–0.6 | rel_err | advisor_gated_0.5 | 0.4910 | **0.4272** |
-| 0.4–0.6 | rel_err | advisor_argmin | 0.5374 | **0.4117** |
-| 0.4–0.6 | solve_ms | advisor_gated_0.5 | 0.4518 | **0.4278** |
-| 0.4–0.6 | efficiency | advisor_gated_0.5 | 0.5194 | **0.4189** |
-| 0.7–0.9 | geo_p99 | advisor_gated_0.5 | 1.2641 | **0.8761** |
-| 0.4–0.6 | geo_p99 | advisor_gated_0.5 | **0.3495** | 0.9650 |
+| 0.4–0.6 | relative error | advisor_gated_0.5 | 0.4910 | **0.4272** |
+| 0.4–0.6 | relative error | advisor_argmin | 0.5374 | **0.4117** |
+| 0.4–0.6 | solve time | advisor_gated_0.5 | 0.4518 | **0.4278** |
+| 0.4–0.6 | relative error x degrees of freedom | advisor_gated_0.5 | 0.5194 | **0.4189** |
+| 0.7–0.9 | mesh-to-CAD worst 1% | advisor_gated_0.5 | 1.2641 | **0.8761** |
+| 0.4–0.6 | mesh-to-CAD worst 1% | advisor_gated_0.5 | **0.3495** | 0.9650 |
 
 Accuracy, speed and efficiency regret all improved, and high-band geometry
 regret improved by a third. **Mid-band geometry regret got roughly 2.8× worse,
 and that is a real finding, not noise.** Regret is measured against the best
 action available in each row, and curved geometry makes the order-2 action
-dominate on geometry error: `finest_action` reaches 0.0572 geo_p99 regret in
-that band (v6: 0.0373). The learned policy still under-selects order 2 when the
-objective is geometry fidelity, so the spread between its choice and the row
-optimum widened even though the meshes themselves got much more accurate. Anyone
-optimising for geometry fidelity alone should use `finest_action`; the advisor is
-the better policy for accuracy-per-cost, not for geometry alone.
+dominate on geometry error: `finest_action` reaches 0.0572 mesh-to-CAD worst-1%
+regret in that band (v6: 0.0373). The learned policy still under-selects order 2
+when the objective is geometry fidelity, so the spread between its choice and
+the row optimum widened even though the meshes themselves got much more
+accurate. Anyone optimising for geometry fidelity alone should use
+`finest_action`; the advisor is the better policy for accuracy-per-cost, not for
+geometry alone.
 
 ## Calibration, tolerance and OOD
 

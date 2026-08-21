@@ -113,7 +113,7 @@ generation split exists to prevent.
   10/10).
 
 ### 2b. Learned error estimator / h-selector (second)
-- Label: (part features, mesher, h) → measured rel_err and DOF from the fresh
+- Label: (part features, mesher, h) → measured relative error and DOF from the fresh
   campaign; regression, not classification.
 - Deliverable: "cheapest mesh meeting tolerance X" — directly demoable.
 - **MEASURED AND NOT DELIVERABLE, 2026-08-14** —
@@ -133,7 +133,7 @@ generation split exists to prevent.
   target h per patch.
 - 1–3 days on the 3080 Ti with checkpoints every 2 h and auto-resume;
   validate on the 9-part matrix by meshing with the predicted size field and
-  comparing rel_err/DOF against uniform-h at equal budget.
+  comparing relative error and DOF against uniform-h at equal budget.
 
 ### 2d. Learned repair policy (research-grade, LAST)
 - Do not start until 2a–2c are delivered. The S4/S6/S7 failure modes this

@@ -56,13 +56,13 @@ Validation MAE in log10, family-held-out fold 0:
 
 | head | LightGBM | net, no scale | net, with scale |
 |---|---|---|---|
-| rel_err | 0.6553 | 0.6048 | **0.5587** |
-| rel_err_rel | 0.3848 | **0.3463** | 0.3541 |
-| geo_chamfer | **0.3740** | 0.9059 | 0.4316 |
-| geo_p99 | **0.3573** | 0.8159 | 0.3814 |
-| dof | **0.0661** | 0.6574 | 0.1567 |
-| mesh_ms | **0.1001** | 0.8312 | 0.2405 |
-| solve_ms | **0.1161** | 0.3184 | 0.1774 |
+| predicted relative error (`rel_err`) | 0.6553 | 0.6048 | **0.5587** |
+| relative error, centred per part (`rel_err_rel`) | 0.3848 | **0.3463** | 0.3541 |
+| mesh-to-CAD distance (`geo_chamfer`) | **0.3740** | 0.9059 | 0.4316 |
+| mesh-to-CAD worst 1% (`geo_p99`) | **0.3573** | 0.8159 | 0.3814 |
+| degrees of freedom (`dof`) | **0.0661** | 0.6574 | 0.1567 |
+| meshing time (`mesh_ms`) | **0.1001** | 0.8312 | 0.2405 |
+| solve time (`solve_ms`) | **0.1161** | 0.3184 | 0.1774 |
 
 The net leads on accuracy and is the only model that also emits a policy and a
 failure head, so it ships — but **LightGBM still predicts DOF 2.4× better and
@@ -100,12 +100,12 @@ bad model and not a harder corpus.** The one-case `smoke_bar` fold carried ~3.0
 decades of regret and shifted the advisor-minus-random macro gap by +0.19 when
 the whole observed gap was +0.12. Its reference scored raw nodal max von Mises
 on a fully clamped bar — a quantity that *diverges* under refinement
-(Spearman(DOF, rel_err) = +0.70), so the advisor was charged three decades for
-correctly choosing a finer discretisation, and every model trained on those rows
-learned that order 2 is catastrophic. ADR-0023 already prohibited that probe as
-a score; nothing enforced it. With the metric corrected to strain energy the
-fold drops to 1.114 against random's 0.497 and the advisor leads random on the
-raw macro mean (0.601 vs 0.687).
+(Spearman(degrees of freedom, relative error) = +0.70), so the advisor was
+charged three decades for correctly choosing a finer discretisation, and every
+model trained on those rows learned that order 2 is catastrophic. ADR-0023
+already prohibited that probe as a score; nothing enforced it. With the metric
+corrected to strain energy the fold drops to 1.114 against random's 0.497 and
+the advisor leads random on the raw macro mean (0.601 vs 0.687).
 
 The failure head remains near chance (validation AUC 0.51–0.75 across runs,
 0.64 on the shipped checkpoint). It was near chance before the regeneration
@@ -124,10 +124,10 @@ failure share 8 % → 28 %:
 
 | head | refusals excluded | refusals kept |
 |---|---|---|
-| rel_err | **0.559** | 0.711 |
-| rel_err_rel | **0.354** | 0.477 |
-| dof | **0.157** | 0.299 |
-| mesh_ms | **0.241** | 0.475 |
+| predicted relative error | **0.559** | 0.711 |
+| relative error, centred per part | **0.354** | 0.477 |
+| degrees of freedom | **0.157** | 0.299 |
+| meshing time | **0.241** | 0.475 |
 | failure AUC | **0.72** | 0.53 |
 
 The failure head got *worse* with 3.5× more failure examples, which rules out

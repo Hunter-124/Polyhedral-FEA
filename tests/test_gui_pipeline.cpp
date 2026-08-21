@@ -24,6 +24,41 @@
 using namespace polymesh::pipeline;
 namespace fea = polymesh::fea;
 
+namespace {
+
+/// Wait for a mesh-only job's mesh, or fail with the job's own message.
+///
+/// The poll budgets these tests used to carry were iteration counts tuned to an
+/// optimised build: 300 * 10 ms is three seconds, which is ample at -O2 and not
+/// ample at -O0. The Debug CI job runs the same mesher unoptimised, so the
+/// budget expired before the worker finished and the test then asserted on an
+/// empty mesh -- reporting "no elements" for what was really "not yet". A wall
+/// clock deadline generous enough for an unoptimised mesher, with the job's own
+/// terminal states ending the wait early, tests the mesher instead of the
+/// machine. `kFailed` still fails immediately and still reports `status_text`,
+/// so a real defect is not hidden behind the longer deadline.
+VolumeMeshOutput await_mesh(SolveJob& job,
+                            std::chrono::seconds deadline = std::chrono::seconds(300)) {
+    const auto start = std::chrono::steady_clock::now();
+    while (std::chrono::steady_clock::now() - start < deadline) {
+        if (auto m = job.take_mesh()) {
+            return std::move(*m);
+        }
+        if (job.state() == SolveJob::State::kFailed) {
+            FAIL(job.status_text());
+        }
+        if (job.state() == SolveJob::State::kCancelled) {
+            FAIL("the mesh job was cancelled");
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    FAIL(std::format("no mesh within {} s; job state {}, status: {}", deadline.count(),
+                     static_cast<int>(job.state()), job.status_text()));
+    return {};
+}
+
+} // namespace
+
 TEST_CASE("GUI pipeline: box STL segments into six faces and solves end-to-end") {
     const auto model = polymesh::testsupport::box_model(0.1, 0.02, 0.02);
     CHECK(model.surface.triangles.size() == 12);
@@ -92,18 +127,7 @@ TEST_CASE("mesh-only job produces volume mesh for GUI preview") {
     setup.mesher = VolumeMesher::kTetFill;
     SolveJob job;
     job.start_mesh(model, setup);
-    // Poll until done (mesh is small).
-    VolumeMeshOutput mesh;
-    for (int i = 0; i < 200; ++i) {
-        if (auto m = job.take_mesh()) {
-            mesh = std::move(*m);
-            break;
-        }
-        if (job.state() == SolveJob::State::kFailed) {
-            FAIL(job.status_text());
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
+    const VolumeMeshOutput mesh = await_mesh(job);
     REQUIRE_FALSE(mesh.mesh.elements.empty());
     REQUIRE_FALSE(mesh.boundary_quads.empty());
     REQUIRE_FALSE(mesh.mesher_note.empty());
@@ -260,17 +284,7 @@ TEST_CASE("D5: mesh_size=0 auto h yields finite mesh and note with auto h") {
     setup.use_feature_grading = false;
     SolveJob job;
     job.start_mesh(model, setup);
-    VolumeMeshOutput mesh;
-    for (int i = 0; i < 300; ++i) {
-        if (auto m = job.take_mesh()) {
-            mesh = std::move(*m);
-            break;
-        }
-        if (job.state() == SolveJob::State::kFailed) {
-            FAIL(job.status_text());
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
+    const VolumeMeshOutput mesh = await_mesh(job);
     REQUIRE_FALSE(mesh.mesh.elements.empty());
     REQUIRE_FALSE(mesh.mesh.nodes.empty());
     REQUIRE_NOTHROW(mesh.mesh.check_validity());

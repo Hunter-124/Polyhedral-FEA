@@ -4,9 +4,9 @@
 #include "colormap.hpp"
 #include "theme.hpp"
 
+#include "fea/solve.hpp"
 #include "geom/cad_topology.hpp"
 #include "geom/features.hpp"
-#include "fea/solve.hpp"
 
 #include "imgui.h"
 
@@ -552,8 +552,7 @@ CinemaCue cinema_cue(const CinemaState& state) {
     if (cue.act == CinemaAct::kSolve && !state.solve_stages.empty()) {
         const std::size_t n_solve = state.solve_stages.size();
         double weight_total = 0.0;
-        for_each_solve_beat(n_solve,
-                            [&](int, SolvePhase, double w) { weight_total += w; });
+        for_each_solve_beat(n_solve, [&](int, SolvePhase, double w) { weight_total += w; });
         const double unit = cue.act_span / std::max(weight_total, 1.0e-9);
         double at = 0.0;
         int beat_stage = 0;
@@ -603,8 +602,7 @@ Viewport::CinemaView cinema_view(const CinemaState& state, const CinemaCue& cue)
     // Geometry, not data: the element is the element.
     const auto shrink_for = [](double reveal) {
         return static_cast<float>(
-            kRevealShrink *
-            (1.0 - smoothstep(std::min(1.0, reveal / kRevealShrinkFraction))));
+            kRevealShrink * (1.0 - smoothstep(std::min(1.0, reveal / kRevealShrinkFraction))));
     };
     switch (cue.act) {
     case CinemaAct::kSkeleton:
@@ -1531,8 +1529,9 @@ void solve_ticker(const CinemaState& state, const CinemaCue& cue, const CinemaHu
     push_line(out, palette.accent,
               fmt("solve pass %d of %zu completed passes · beat '%s' %.2f/%.2f s · %zu "
                   "elements / %zu nodes / %zu DOF (PassTrace) · %s",
-                  stage.pass, state.solve_stages.size(), cinema_solve_phase_name(cue.solve_phase),
-                  cue.solve_phase_t, cue.solve_phase_span, tr.n_elems, tr.n_nodes, tr.n_dof,
+                  stage.pass, state.solve_stages.size(),
+                  cinema_solve_phase_name(cue.solve_phase), cue.solve_phase_t,
+                  cue.solve_phase_span, tr.n_elems, tr.n_nodes, tr.n_dof,
                   stage.final_pass ? "no further pass ran after this one (SolveStage::"
                                      "final_pass)"
                                    : "another pass followed"));
@@ -1658,8 +1657,7 @@ std::vector<CinemaLine> cinema_ticker_chips(const CinemaState& state, const Cine
     }
     // The stage beat only means something while the stage lane is running, so it
     // is not restated in the closing act where the finished fill is merely held.
-    if (cue.act == CinemaAct::kBuild && cue.stage_index >= 0 &&
-        cue.stage_beat_seconds > 0.0) {
+    if (cue.act == CinemaAct::kBuild && cue.stage_index >= 0 && cue.stage_beat_seconds > 0.0) {
         push_line(chips, palette.text_dim,
                   fmt("stage beat %.3f s = %.1f frames", cue.stage_beat_seconds,
                       cue.stage_beat_seconds * 60.0));

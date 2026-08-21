@@ -92,12 +92,12 @@ enum class CinemaAct { kSkeleton = 0, kDeliberate, kBuild, kSolve };
 /// per-element solve order or an iteration counter, because a direct sparse
 /// factorisation has neither.
 enum class SolvePhase {
-    kNone = 0,  // no SolveStage was delivered; nothing solved is drawn
-    kField,     // that pass's own von Mises field on its own mesh, undeformed
-    kError,     // the ZZ error field recovered from that same solve
-    kRefine,    // the mesh the NEXT pass solved on, revealing element by element
-    kLoadRamp,  // u(λ) = λ·u on the final field, λ from 0 to 1
-    kHold,      // λ = 1, the finished answer
+    kNone = 0, // no SolveStage was delivered; nothing solved is drawn
+    kField,    // that pass's own von Mises field on its own mesh, undeformed
+    kError,    // the ZZ error field recovered from that same solve
+    kRefine,   // the mesh the NEXT pass solved on, revealing element by element
+    kLoadRamp, // u(λ) = λ·u on the final field, λ from 0 to 1
+    kHold,     // λ = 1, the finished answer
 };
 
 /// Phase id, for the ticker and the disclosures. Stable text.
@@ -138,13 +138,13 @@ struct CinemaLine {
 /// the caller. Every field is a value the app already holds; the cinema derives
 /// none of them.
 struct CinemaHud {
-    std::string part;              // pipeline::Model::name
-    std::string mesher;            // pipeline::mesher_name(SimSetup::mesher)
-    double mesh_size = 0.0;        // SimSetup::mesh_size, metres (0 = auto)
-    double geometry_h = 0.0;       // VolumeMeshOutput::geometry_h, metres (0 = none yet)
-    int order = 1;                 // SimSetup::p_elevate ? 2 : 1
-    int adapt_passes = 0;          // SimSetup::adapt_passes
-    double eta_target = 0.0;       // SimSetup::eta_target
+    std::string part;        // pipeline::Model::name
+    std::string mesher;      // pipeline::mesher_name(SimSetup::mesher)
+    double mesh_size = 0.0;  // SimSetup::mesh_size, metres (0 = auto)
+    double geometry_h = 0.0; // VolumeMeshOutput::geometry_h, metres (0 = none yet)
+    int order = 1;           // SimSetup::p_elevate ? 2 : 1
+    int adapt_passes = 0;    // SimSetup::adapt_passes
+    double eta_target = 0.0; // SimSetup::eta_target
     /// Resultant of every `SimSetup::LoadSpec::force` this take is solving, in
     /// newtons. Stated beside the load factor λ so "λ = 0.500" reads as a real
     /// load case (264.099 N of 528.198 N on the film's part) rather than as a

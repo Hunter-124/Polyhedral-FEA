@@ -4,6 +4,11 @@
 - Revised (2026-08-20, round two): the acts run concurrently (§6), the solved
   fields animate in the order they are computed (§7), and the recorded case moved
   to `sphere_box_s0_c0` (§5)
+- Revised (2026-08-21, presentation cut): ADR-0043 now owns pacing and the
+  current default. It uses complex `icecream_cone`, shows the deployed OOD
+  abstention, then a labelled graded/spectral/quadratic fallback with a cell
+  microscope and authoritative post-promotion result. Sections 5–7 below retain
+  the prior `sphere_box_s0_c0` cut as decision history.
 - Supersedes: `docs/advisor/figures/activation_map.png` and the
   `activation_map()` generator in `scripts/advisor/figures.py`, both deleted
 - Touches: `scripts/advisor/export_onnx.py`, `src/advisor/*`, `src/mesh/*`,

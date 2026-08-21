@@ -283,18 +283,17 @@ than chance, but it does not rank the whole action set.
 ### Figures
 
 All regenerated from the final model by `report.py` / `figures.py`, except the
-cinema, which is recorded out of the GUI by `render_cinema.py`. That take is
-concurrent — the pass lane is still sweeping while the mesher builds the chosen
-action, two recorded sequences replayed on one clock rather than a claim that
-they overlapped in time — and its fields animate in the order the answer is
-computed rather than in a sequence chosen for looks
-([ADR-0042](../decisions/0042-the-advisor-explains-itself-on-screen.md) §6, §7):
+cinema, which is the GUI framebuffer driven by `render_cinema.py`. It sequences
+real advisor passes, a measured OOD refusal, production spectral sizing, mesher
+snapshots, cell/order/quality inspection and the authoritative final solve
+([ADR-0042](../decisions/0042-the-advisor-explains-itself-on-screen.md),
+[ADR-0043](../decisions/0043-a-film-someone-can-read.md)):
 
 | figure | what it shows |
 | --- | --- |
 | `network_layout.png` | the trained architecture, read live from the checkpoint |
 | `training_curves.png` | per-head convergence, first vs latest run |
-| `../assets/cinema/advisor_cinema.mp4` | the deployed graph's trunk taps firing over the real candidate enumeration on `sphere_box_s0_c0` (38 candidates, 39 forward passes) while the mesher builds the action it chose, then that mesh's two real adaptive solves with their own error fields — replaces the retired `activation_map.png` ([ADR-0042](../decisions/0042-the-advisor-explains-itself-on-screen.md)) |
+| `../assets/cinema/advisor_cinema.mp4` | 39 deployed-network passes on complex `icecream_cone`; honest OOD abstention; graded/spectral/quadratic fallback; real cell-quality, stress-gradient and ZZ fields; 60 s with readable holds — replaces the retired `activation_map.png` |
 | `mesh_progress.png` | best-so-far accuracy and fidelity vs cumulative solver time |
 | `accuracy_vs_cost.png` | accuracy vs DOF and vs solve time, Pareto front, by mesher |
 | `fidelity_vs_h.png` | mesh-vs-BRep fidelity improving with resolution |

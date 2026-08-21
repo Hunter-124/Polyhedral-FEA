@@ -44,8 +44,8 @@ of work and none of its outcomes.
 
 The strip now carries exactly four rows, at a constant height, every act:
 
-1. a plain-English headline — "Peak stress 2.489 MPa", "Where does stress change
-   fastest?", "Rebuilding where the error was";
+1. a concise label — "Peak stress 8.509 MPa", "Stress gradient",
+   "Estimated solution error";
 2. the two-to-four numbers that matter on this beat;
 3. the one disclosure that applies to it;
 4. the provenance stamp, and the path to the rest of the disclosures.
@@ -58,15 +58,12 @@ height and the leftover is the viewport pane whose height sets the part's
 rendered size; and never clipped, because a clipped sentence is a different claim
 from the one the film made.
 
-The strip is 203 px instead of 270, and it is 203 px on frame 1 and frame 1800,
-so the machinery that used to probe every act and every beat for a high-water
-mark is gone.
+The strip is 203 px instead of 270, and it is 203 px on frame 1 and frame 3600,
+so per-act high-water probing is gone.
 
-Above the rows is a four-word chapter bar — *the part · choose a mesh · build it
-· solve it* — with the current chapter lit and a progress fill. It is the one
-piece of pure orientation in the composition, and it is there because a
-first-time viewer of a 30 s take should not have to read a clock to know where
-they are.
+Above it is a four-label chapter bar — *exact CAD · advisor · mesher · analysis*
+— with a progress fill. A first-time viewer of a 60 s presentation should not
+have to read a clock to know where they are.
 
 ### The disclosures did not disappear
 
@@ -84,43 +81,37 @@ One legible sentence plus a path to the full account informs the reader who want
 it and stops lying to the one who does not. Nothing was deleted; it moved to
 where it can be read.
 
-## 3. Sequence, not simultaneity
+## 3. One subject per chapter
 
-The pass lane now runs inside the deliberation act alone. From the first frame of
-the build act to the last frame of the film it **holds** the forward pass that
-scored the recommended action (`ActivationFrame::recommended`, falling back to
-the final re-score, which is a pass over exactly the action being built), and the
-`policy_mesher_logit_*` unit the decision came out of is highlighted.
+The fast advisor lane runs only inside deliberation. Its strip stays stable —
+pass index, total passes, candidate count, gate threshold — while the measured
+activations animate.
 
-Measured in the recorded frames: the panel's ink count takes seven distinct
-values across the deliberation act and exactly one value across the 7.8 s of
-build plus mesh-hold. The activations beside the growing mesh are the activations
-of the pass that chose that mesh.
+The build act holds the advisor outcome for 1.6 s, then dissolves the network
+into a cell microscope as the first cells appear. The microscope reads the
+captured `NodalMesh`: actual type counts, tet4→tet10 node placement and cached
+min/mean cell quality. The complex default is OOD-refused, so the strip says
+**Advisor abstained — verified fallback** and the configured graded/spectral/
+quadratic setup remains unchanged. No vetoed action is pictured as executed.
 
-ADR-0042 §6 argued for the overlap on the grounds that it was honest — the film
-said the two lanes were separate recordings — and that it bought screen time. It
-did buy screen time. It also asked the viewer to hold a disclaimer in mind while
-looking at a picture that contradicted it, which is a cost the film was paying in
-the one currency it cannot afford.
+The solve boundary dissolves that microscope into the equation board. Pane
+geometry never changes; only opacity does.
 
 ## 4. Holding on results
 
-Four new beats and one new act, all of them stills:
+The 60 s default spends time on outcomes, not transient prose:
 
 | Beat | Length | What is held |
-|---|---|---|
-| `mesh_hold` (a whole act) | 2.1 s | the finished fill, complete, with its counts |
-| `stress_hold` | 1.1 s | that pass's von Mises field |
-| `gradient_hold` | 1.1 s | the recovered stress gradient |
-| `error_hold` | 0.8 s | the ZZ error field |
-| `refine_hold` | 1.0 s | the mesh the next pass solved |
-| `hold` | 1.8 s | the finished answer at full load |
+|---|---:|---|
+| `mesh_hold` | 6.6 s | exploded topology, then the closed authoritative mesh |
+| `stress_hold` | 3.2 s | solved von Mises field |
+| `gradient_hold` | 3.0 s | recovered stress gradient |
+| `error_hold` | 2.8 s | ZZ error field |
+| `refine_hold` | 3.4 s | next solved mesh, when another pass exists |
+| `hold` | 5.4 s | finished full-load answer |
 
-Verified frame by frame on the recorded take: every one of those windows is a
-**bit-exact** freeze of the viewport (zero pixels changed between consecutive
-frames), and every moving beat between them moves. The take is 30 s rather than
-20 s, and the closing act takes 0.54 of it rather than 0.63, because the holds
-are what the extra ten seconds buy.
+Moving beats are also slower: 2.4–4.4 s. A single-pass closing act uses its
+literal 26.4 s beat budget; multi-pass takes scale proportionally.
 
 ## 5. Stress arriving, and its gradient
 
@@ -245,9 +236,11 @@ fix.
 - `Viewport::FieldSweep` participates in the result bake key, so a moving front
   re-bakes. The load ramp already re-baked every frame, so per-frame baking is
   established cost, not new.
-- The default take is 1800 frames. A shorter `--frames` still works: the GUI
-  paces its own acts inside whatever it is given, so every beat compresses in
-  proportion rather than the end being truncated.
+- The left pane adds a production spectral-sizing trace and a cached
+  `CinemaMeshInsight`; neither computes per frame.
+- The default take is 3600 frames (60 s). A shorter `--frames` still works:
+  every act and beat scales in proportion rather than truncating the ending.
+  Candidate-specific prose is intentionally absent from the fast pass lane.
 - `cinema_ticker_chips` / `cinema_ticker_body` / `cinema_ticker_height` /
   `cinema_ticker_reserve` / `draw_cinema_ticker` are gone, replaced by
   `cinema_caption` and `draw_cinema_strip`. `CinemaState::ticker_reserve` is gone

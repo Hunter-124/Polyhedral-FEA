@@ -6,45 +6,46 @@ was co-designed with.
 <p align="center">
   <a href="docs/assets/cinema/advisor_cinema.mp4"><img
     src="docs/assets/cinema/advisor_cinema.gif"
-    alt="A mesh advisor scoring 38 candidate meshes, the mesher building the one it chose, and the solver's stress answer arriving on it"
+    alt="Exact CAD curvature and Fourier sizing, an advisor safety refusal, a quadratic cell microscope, and the final stress analysis"
     width="100%"></a>
 </p>
 
-**The whole loop in one take, in four chapters.** A neural net picks how to mesh
-the part, the mesher builds exactly that, and the solver's answer arrives in the
-order it is computed — `sphere_box_s0` under axial tension, 11,692 cells,
-13,146 unknowns, peak stress 2.489 MPa. The inline GIF is the whole 30 s film;
-[advisor_cinema.mp4](docs/assets/cinema/advisor_cinema.mp4) is the same take at
-1920×1080 and 60 fps ([poster](docs/assets/cinema/poster.png)).
+**A complete mesh-to-answer presentation, paced for reading.** The 60 s take
+uses a deliberately complex Boolean CAD part — a truncated cone fused to a
+spherical scoop — and holds every finished result before moving on.
+[The 1080p/60 fps MP4](docs/assets/cinema/advisor_cinema.mp4) carries the same
+frames as the inline GIF ([poster](docs/assets/cinema/poster.png)).
 
-It holds still on each result rather than cutting off it: the finished mesh for
-2.1 s, then stress spreading in from the loaded end and holding, then the
-*gradient* of that stress — where a small step moves you furthest up the stress
-curve — then the error estimate, the refinement it asks for, and the load ramped
-from zero to 528 N. When the film switches from meshing to solving, the network
-panel dissolves into the equations being evaluated, with the one this beat is
-computing lit and its own live numbers beside it.
+The four chapters are concise and visual:
 
-None of it is a mock-up. The lit nodes and edges are the deployed ONNX graph's
-own trunk tensors and weights, read out of the 39 forward passes onnxruntime ran
-— 38 enumerated candidates plus the final re-score. From the moment the mesh
-starts building, the panel holds the one forward pass that chose it, so what is
-lit on the left is what produced what is growing on the right. The mesh arrives
-at the mesher's own construction stages, in its own element emission order,
-growing to 11,692 cells. The fields are the real solve: the von Mises field, the
-stress gradient recovered from it by
-[`fea::nodal_scalar_gradient_magnitude`](src/fea/include/fea/stress.hpp), the ZZ
-error field, the mesh the next pass actually solved, and the load ramped as the
-exact linear response u(λ) = λ·u — with no iteration counter, because at 13,146
-free unknowns this system is factorised rather than iterated. Cosmetic, and only
-this: the virtual clock the beats are paced on, the fades, the shrink that draws
-each cell toward its own centroid, the plane that uncovers a finished field, the
-colour ramp and the panel layout. Where a number does not exist the film says so
-instead of inventing one — including that the adapt pass here re-fills to the
-same cell count rather than a finer mesh.
+- **Exact CAD.** A real edge-curvature trace is sampled, FFT-denoised and turned
+  into the size field. This run keeps 4,155 of 262,143 field modes at 99.5%
+  energy, with 36 denoised curve seeds; the exact BRep demand is re-imposed
+  afterward so filtering cannot erase a real feature.
+- **Advisor.** The deployed ONNX graph runs all 39 measured forward passes.
+  This part lands outside its validated envelope (Mahalanobis 90.94), so the
+  model abstains instead of extrapolating. The film says so and leaves the
+  configured fallback unchanged.
+- **Mesher.** The verified graded/spectral/quadratic fallback builds 30,496
+  tet10 cells over 44,907 nodes (134,721 total unknowns). A cell microscope
+  opens the finished mesh, shows tet4 → tet10 midside promotion, and reports the
+  measured shape-quality range: minimum 0.04675, mean 0.2926, zero skipped
+  cells.
+- **Analysis.** The authoritative final solve — not the pre-promotion scaffold —
+  supplies every pixel: 8.509 MPa peak von Mises, recovered stress gradient,
+  complete ZZ error map, exact linear load ramp, and a 5.4 s final hold.
 
-Every disclosure the film makes, the struct field or function behind each of
-them, and the code citation for every equation on screen:
+Nothing in the take is a mock-up. Network nodes are the graph's own trunk
+tensors; connection strength is $|w_{ji}a_i|$; mesh frames are captured
+`pipeline::MeshStage` snapshots; spectral numbers come from
+`pipeline::build_refinement_plan`; cell quality comes from
+`fea::summarize_cell_quality`; and the last cinema stage is replaced with
+`SolveJob::take_result()` after quadratic promotion and re-solve so the film,
+Studio and exported result agree. Cosmetic work is limited to virtual pacing,
+opacity, cell-centroid separation, spatial field reveals and the exact linear
+load factor.
+
+Source citations and the disclosure behind every on-screen label:
 [docs/assets/cinema/NOTES.md](docs/assets/cinema/NOTES.md)
 ([ADR-0042](docs/decisions/0042-the-advisor-explains-itself-on-screen.md),
 [ADR-0043](docs/decisions/0043-a-film-someone-can-read.md)).
@@ -345,18 +346,17 @@ at ONNX opset 17 with 2.158e-06 relative C++ parity. A recommendation costs
 about 1.0 ms (p50, single-threaded, 20 candidates; p99 2.62 ms measured at 32),
 roughly 0.1% of a solve, and a test fails the build above 100 ms p99.
 
-The film at the top of this README is one of those decisions happening: all 38
-candidates the chooser enumerated plus the final re-score, one real forward pass
-each, with the ranking score, the feasibility gate and the DOF budget shown as
-they fell, beside the mesher building the action it chose and the solver solving
-it. It draws the deployed graph's own trunk taps rather than a re-implementation
-of the forward pass, and where the data is missing — no taps in the export, or a
-part the novelty gate refuses — it says so on screen instead of drawing
-something plausible. It replaces the retired `activation_map.png`, whose own
-case, `box_hole_s0_c0`, is still recordable with
-`scripts/render_cinema.py --part box_hole_s0_c0`. What is measured and what is
-cosmetic, item by item:
-[ADR-0042](docs/decisions/0042-the-advisor-explains-itself-on-screen.md).
+The film at the top runs all 38 candidates plus the final re-score, then shows
+the safety behavior that matters on genuinely complex CAD: the OOD gate refuses
+the cone+scoop instead of letting extrapolated scores change the setup. The
+configured graded/spectral/quadratic mesh then runs as a clearly labelled
+fallback. The graph drawing still uses the deployed trunk taps, and the
+construction, FFT, quality and final-solve panels all consume production data.
+The retired `activation_map.png` case remains recordable with
+`scripts/render_cinema.py --part box_hole_s0_c0`. Measurement and cosmetic
+pacing are separated item by item in
+[ADR-0042](docs/decisions/0042-the-advisor-explains-itself-on-screen.md) and
+[the cinema notes](docs/assets/cinema/NOTES.md).
 
 The advisor refuses parts it does not recognise. A Mahalanobis distance over 31
 part-geometry columns — 16 mesh-derived features plus 15 exact-B-rep descriptors

@@ -57,6 +57,8 @@
 
 #include <Eigen/Core>
 
+#include <array>
+#include <cstdint>
 #include <cstddef>
 #include <mutex>
 #include <optional>
@@ -179,6 +181,39 @@ struct CinemaType {
 /// in `CinemaType` are quoted for.
 inline constexpr float kCinemaAtlasSize = 40.0f;
 inline constexpr float kCinemaRefHeight = 1080.0f;
+
+/// Real, once-per-mesh measurements used by the cell microscope. Entries are
+/// aligned with `CinemaState::stages` / `solve_stages`; no frame recomputes
+/// quality over a mesh that can contain hundreds of thousands of cells.
+struct CinemaMeshInsight {
+    std::array<std::size_t, 7> type_counts{};
+    double quality_min = 0.0;
+    double quality_mean = 0.0;
+    std::size_t quality_measured = 0;
+    std::size_t quality_unmeasured = 0;
+};
+
+/// The exact spectral-sizing evidence and one real CAD-edge curvature trace
+/// shown in the opening chapter. `prepare_cinema_features` fills the plan
+/// report from `pipeline::build_refinement_plan`; `build_cinema_skeleton`
+/// fills the curve samples from `geom::extract_topology`.
+struct CinemaSizingStory {
+    bool prepared = false;
+    bool brep_curvature = false;
+    std::size_t geometry_seeds = 0;
+    std::size_t bc_seeds = 0;
+    double h_min = 0.0;
+    pipeline::SpectralSizingReport spectral;
+
+    std::uint32_t edge_id = 0;
+    double edge_length = 0.0;
+    std::size_t curve_modes_total = 0;
+    std::size_t curve_modes_kept = 0;
+    double curve_energy_fraction = 0.0;
+    std::vector<double> stations;
+    std::vector<double> curvature_raw;
+    std::vector<double> curvature_filtered;
+};
 
 /// `CinemaType` for a frame `height` pixels tall.
 [[nodiscard]] CinemaType cinema_type(ImFont* font, float height);
@@ -309,7 +344,7 @@ class CinemaState {
   public:
     /// Take length when nothing asked for a specific one. `record` overrides it
     /// from the requested frame count, which is the authoritative case.
-    static constexpr double kDefaultDuration = 30.0;
+    static constexpr double kDefaultDuration = 60.0;
     /// The recorder's fixed timestep. A recording is defined by its frame
     /// count, so the clock is derived from the frame index and never
     /// accumulated -- there is no drift to reason about.
@@ -317,7 +352,7 @@ class CinemaState {
     /// Longest the opening fade may be, seconds. The fade actually used is
     /// `cinema_opening_fade()`, which also caps it at half the opening act so a
     /// short take does not spend its whole first act fading up.
-    static constexpr double kOpeningFade = 0.5;
+    static constexpr double kOpeningFade = 0.8;
     /// How long the DECISION is on screen at the head of the build act before
     /// the first element of the fill appears, seconds. Capped at a fifth of that
     /// act by `cinema_decision_lead()` so a short take does not spend the whole
@@ -327,10 +362,10 @@ class CinemaState {
     /// readable BEFORE the thing it produced starts appearing; without the lead
     /// the two would arrive on the same frame and a viewer could not tell which
     /// followed which.
-    static constexpr double kDecisionLead = 0.7;
+    static constexpr double kDecisionLead = 1.6;
     /// How long the network/equation cross fade takes, seconds. Capped at a
     /// tenth of the closing act by `cinema_panel_fade()`.
-    static constexpr double kPanelFade = 0.5;
+    static constexpr double kPanelFade = 0.8;
 
     // ---- take state ------------------------------------------------------
 
@@ -404,6 +439,9 @@ class CinemaState {
     /// Drops collected stages and the uploaded-stage bookkeeping, so one take
     /// never shows another run's mesh.
     void clear_stages();
+    /// Once-per-stage element mix and shape-quality measurements. Populated
+    /// when the worker snapshots are drained, so panel drawing is O(1).
+    std::vector<CinemaMeshInsight> stage_insights;
 
     // ---- the solve/estimate/refine loop: kSolve ---------------------------
 
@@ -416,12 +454,21 @@ class CinemaState {
     /// field pass 0 produced and not the final answer relabelled. Measured cost
     /// on the film's case: 1,314,253 B per stage, two stages.
     std::vector<pipeline::SolveStage> solve_stages;
+    std::vector<CinemaMeshInsight> solve_insights;
+
+    /// Spectral sizing and exact-edge evidence for this take.
+    CinemaSizingStory sizing;
 
     /// Worker-thread sink for `pipeline::SolveJob::on_solve_stage`. Copies the
     /// stage for the same reason `push_stage` does.
     void push_solve_stage(const pipeline::SolveStage& stage);
     /// Main-thread hand-off, the counterpart of `drain_stages`.
     void drain_solve_stages();
+    /// Replaces the final callback snapshot with `SolveJob::take_result()` after
+    /// final quadratic promotion/re-solve. Intermediate pass snapshots stay
+    /// untouched; the film's last pass must match the app's authoritative VTU
+    /// result rather than the pre-finalisation callback.
+    void adopt_final_result(const pipeline::SolveResult& result);
     /// Drops collected solve stages and the uploaded bookkeeping.
     void clear_solve_stages();
 
@@ -592,6 +639,12 @@ void sync_cinema_viewport(CinemaState& state, const CinemaCue& cue, const Cinema
 void build_cinema_skeleton(CinemaState& state, const pipeline::Model& model,
                            const pipeline::SimSetup& setup, Viewport& viewport);
 
+/// Builds the refinement plan the imminent solve will use and records its real
+/// spectral report for the feature chapter. Cinema-only duplicate evaluation:
+/// the worker remains authoritative and receives the same immutable setup.
+void prepare_cinema_features(CinemaState& state, const pipeline::Model& model,
+                             const pipeline::SimSetup& setup);
+
 /// Loads `dir` as an advisor model, runs `explain()` on the loaded part plus
 /// the current setup, and -- when the decision is not a refusal -- applies it
 /// to `setup` so the mesh act executes what the network chose. Returns false
@@ -646,8 +699,8 @@ struct CinemaCaption {
 
 /// The chapter bar: the four things the film does, with the current one lit and
 /// a progress fill under it. The one piece of pure orientation in the
-/// composition -- it tells a first-time viewer where they are in a 30 s take
-/// without their having to read a number.
+/// composition -- it tells a first-time viewer where they are in a 60 s take
+/// without their having to read a clock.
 struct CinemaChapter {
     const char* label;
     /// Act this chapter is lit for; `kMeshHold` belongs to the build chapter.

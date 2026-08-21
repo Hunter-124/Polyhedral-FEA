@@ -57,11 +57,29 @@ if(POLYMESH_WITH_OCC)
         TKGeomAlgo
         TKShHealing
     )
+    # Which STEP libraries exist depends on the OCCT generation, so the choice
+    # is made from the imported target's own file location rather than from a
+    # version number. IMPORTED_LOCATION and IMPORTED_LOCATION_RELEASE are not
+    # enough: a distribution that builds OCCT RelWithDebInfo exports only
+    # IMPORTED_LOCATION_RELWITHDEBINFO, and Fedora 44's opencascade-devel
+    # 7.9.3 does exactly that. Reading those two properties alone therefore
+    # concluded "no TKDESTEP" on a 7.9 install and fell through to the 7.6
+    # TKSTEP* names, which do not exist there — the link failed with four
+    # `cannot find -lTKSTEP*` errors on a system with a perfectly good OCCT.
+    # Every configuration the target actually declares is consulted instead.
     set(_tkdestep_loc "")
     if(TARGET TKDESTEP)
         get_target_property(_tkdestep_loc TKDESTEP IMPORTED_LOCATION)
         if(NOT _tkdestep_loc)
-            get_target_property(_tkdestep_loc TKDESTEP IMPORTED_LOCATION_RELEASE)
+            get_target_property(_tkdestep_cfgs TKDESTEP IMPORTED_CONFIGURATIONS)
+            if(_tkdestep_cfgs)
+                foreach(_cfg IN LISTS _tkdestep_cfgs)
+                    get_target_property(_tkdestep_loc TKDESTEP IMPORTED_LOCATION_${_cfg})
+                    if(_tkdestep_loc)
+                        break()
+                    endif()
+                endforeach()
+            endif()
         endif()
     endif()
     if(_tkdestep_loc)

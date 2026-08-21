@@ -46,9 +46,9 @@ EXTERNAL_TRUTH_PY = REPO / "bench/reference/external_truth.py"
 fs.register_series("old_reference_3p0", 1, label="old reference: 3.0 (infinite plate)")
 fs.register_series("external_3d", 5, label="independent 3D: Gmsh + CalculiX")
 fs.register_series("tip_deflection", 0, label="tip deflection")
-fs.register_series("strain_energy", 2, label="strain energy")
-fs.register_series("self_consistency", 3, label="U vs P\u00b7\u03b4/2 residual")
-fs.register_series("peak_von_mises", 1, label="peak von Mises (nodal peak)")
+fs.register_series("strain_energy", 2, label="stored energy")
+fs.register_series("self_consistency", 3, label="energy vs work check")
+fs.register_series("peak_von_mises", 1, label="peak stress (von Mises)")
 
 
 def load(path: Path):
@@ -97,7 +97,7 @@ def panel_box_hole(ax, cases: list[dict]) -> dict:
         ktg = float(c["Ktg"])
         old = (float(c["old_reference"]) / ktg - 1.0) * 100.0
         ext = (float(c["external_converged_3d"]) / ktg - 1.0) * 100.0
-        labels.append(f"{short(c['case'])}\nd/W {float(c['d_over_W']):.3f}")
+        labels.append(f"{short(c['case'])}\nhole/width\n{float(c['d_over_W']):.3f}")
         old_dev.append(old)
         ext_dev.append(ext)
         print(f"  {c['case']:<16} d/W={float(c['d_over_W']):.4f} "
@@ -109,7 +109,7 @@ def panel_box_hole(ax, cases: list[dict]) -> dict:
     x = np.arange(len(labels), dtype=float)
     t = fs.theme()
     ax.axhline(0.0, color=t.ink, linewidth=1.4, zorder=4)
-    ax.text(0.01, 0.0, " handbook Ktg = 0%",
+    ax.text(0.01, 0.0, " handbook value = 0%",
             transform=ax.get_yaxis_transform(), ha="left", va="bottom",
             fontsize=fs.FONT_PT["annot"] - 0.5, color=t.ink, zorder=5)
     for xi, v in zip(x - 0.13, old_dev):
@@ -130,14 +130,15 @@ def panel_box_hole(ax, cases: list[dict]) -> dict:
     ax.set_xticklabels(labels)
     ax.set_xlim(-0.55, len(labels) - 0.45)
     ax.set_ylim(min(old_dev) - 1.2, max(ext_dev) + 2.6)
-    ax.set_ylabel("deviation from finite-width Ktg (%)")
+    ax.set_ylabel("difference from the handbook stress concentration (%)")
     ax.legend(handles=fs.series_handles(["old_reference_3p0", "external_3d"]),
               loc="lower right", frameon=False,
               fontsize=fs.FONT_PT["legend"] - 0.5)
-    fs.annotate_n(ax, len(labels), what="box_hole cases", loc="upper left",
-                  extra="4/4 old refs low, 4/4 3D solves high\n"
-                        "uniform sign = finite-thickness physics")
-    fs.panel_title(ax, "A \u00b7 the old 3.0 reference was 3\u20134% low")
+    fs.annotate_n(ax, len(labels), what="plate-with-hole cases", loc="upper left",
+                  extra="all 4 old references sit low, all 4 independent solves sit high\n"
+                        "same direction every time — that is real thickness, not scatter")
+    fs.panel_title(ax, "A \u00b7 the old 3.0 reference came from an infinitely "
+                       "wide plate \u2014 3\u20134% too low")
     return {"old": old_dev, "ext": ext_dev}
 
 
@@ -149,7 +150,7 @@ def panel_stepped(ax, cases: list[dict]) -> dict:
             "self_consistency_pct"]
     labels, vals = [], {n: [] for n in names}
     for c in cases:
-        labels.append(f"{short(c['case'])}\n{int(c['n_dof']):,} DOF")
+        labels.append(f"{short(c['case'])}\n{int(c['n_dof']):,}\nunknowns")
         for n, k in zip(names, keys):
             vals[n].append(float(c[k]))
         print(f"  {c['case']:<20} tip {float(c['tip_deflection_err_pct']):+.2f}%  "
@@ -161,7 +162,7 @@ def panel_stepped(ax, cases: list[dict]) -> dict:
     x = np.arange(len(labels), dtype=float)
     t = fs.theme()
     ax.axhline(0.0, color=t.ink, linewidth=1.4, zorder=4)
-    ax.text(0.01, 0.0, " closed form = 0%",
+    ax.text(0.01, 0.0, " textbook formula = 0%",
             transform=ax.get_yaxis_transform(), ha="left", va="top",
             fontsize=fs.FONT_PT["annot"] - 0.5, color=t.ink, zorder=5)
     for i, n in enumerate(names):
@@ -177,14 +178,16 @@ def panel_stepped(ax, cases: list[dict]) -> dict:
     ax.set_xticklabels(labels)
     ax.set_xlim(-0.55, len(labels) - 0.45)
     ax.set_ylim(-0.35, max(vals["tip_deflection"]) * 2.2)
-    ax.set_ylabel("deviation from closed form (%)")
+    ax.set_ylabel("difference from the textbook beam formula (%)")
     ax.legend(handles=fs.series_handles(names), loc="upper right",
               frameon=False, fontsize=fs.FONT_PT["legend"] - 0.5)
     worst_self = max(vals["self_consistency"])
-    fs.annotate_n(ax, len(labels), what="stepped_shaft cases", loc="upper left",
-                  extra=f"8/8 gaps positive: 3D is softer than the beam\n"
-                        f"self-consistent to \u2264 {worst_self:.2f}%")
-    fs.panel_title(ax, "B \u00b7 +1 to +2.4% over the beam, same sign")
+    fs.annotate_n(ax, len(labels), what="stepped-shaft cases", loc="upper left",
+                  extra=f"all 8 gaps positive — the real\n"
+                        f"3D part bends more than the\n"
+                        f"beam formula predicts\n"
+                        f"energy check agrees to {worst_self:.2f}% or better")
+    fs.panel_title(ax, "B \u00b7 every case sits +1 to +2.4% above the beam")
     return vals
 
 
@@ -213,15 +216,15 @@ def panel_convergence(ax, val_cases: list[dict], sizing: dict) -> dict:
         print(f"  sizing policy  {k:<16} {v:.5f}%")
     print(f"  sizing-policy sensitivity ratio: peak / global = {ratio:.0f}\u00d7")
 
-    columns = [("peak \u03c3\nrung\u2192rung", "peak_von_mises",
+    columns = [("peak\nstress\nrefining\nthe mesh", "peak_von_mises",
                 [v for _, v in groups["peak_von_mises"]]),
-               ("tip defl.\nrung\u2192rung", "tip_deflection",
+               ("tip\ndeflection\nrefining\nthe mesh", "tip_deflection",
                 [v for _, v in groups["tip_deflection"]]),
-               ("energy\nrung\u2192rung", "strain_energy",
+               ("stored\nenergy\nrefining\nthe mesh", "strain_energy",
                 [v for _, v in groups["strain_energy"]]),
-               ("peak \u03c3\nsizing policy", "peak_von_mises",
+               ("peak\nstress\nnew sizing\nrule", "peak_von_mises",
                 [policy["peak_von_mises"]]),
-               ("global\nsizing policy", "tip_deflection",
+               ("whole\npart\nnew sizing\nrule", "tip_deflection",
                 [policy["tip_deflection"], policy["strain_energy"]])]
 
     every = [v for _, _, vs in columns for v in vs]
@@ -238,10 +241,10 @@ def panel_convergence(ax, val_cases: list[dict], sizing: dict) -> dict:
     ax.set_xticks(range(len(columns)))
     ax.set_xticklabels([c[0] for c in columns])
     ax.set_xlim(-0.6, len(columns) - 0.4)
-    ax.set_ylabel("relative change (%)")
+    ax.set_ylabel("change in the answer (%)")
     ax.annotate(
-        f"under an independent sizing policy the nodal peak\n"
-        f"moves {ratio:.0f}\u00d7 more than the global quantities",
+        f"change the mesh sizing rule and the peak stress\n"
+        f"moves {ratio:.0f}\u00d7 more than the whole-part numbers do",
         xy=(3.0, policy["peak_von_mises"]), xytext=(0.03, 0.10),
         textcoords="axes fraction", ha="left", va="bottom",
         fontsize=fs.FONT_PT["annot"] - 0.5, color=t.ink,
@@ -249,8 +252,8 @@ def panel_convergence(ax, val_cases: list[dict], sizing: dict) -> dict:
     fs.annotate_n(ax, len(every), what="measurements", loc="upper right",
                   extra=info.note("numerical noise"))
     ax.set_ylim(top=ax.get_ylim()[1] * 3.0)
-    fs.panel_title(ax, "C \u00b7 the honest one: the nodal peak is the slow, "
-                       "policy-sensitive quantity")
+    fs.panel_title(ax, "C \u00b7 the honest one: peak stress settles slowest "
+                       "and shifts with the sizing rule")
     return {"ratio": ratio, "policy": policy, "groups": groups}
 
 
@@ -259,15 +262,15 @@ def panel_identities(ax, sup: dict, cross: list[dict], tol: float) -> dict:
     print("\npanel D \u2014 identity checks and the solver control")
     area = sup["loaded_area_vs_exact_CAD_area_rel_err"]
     rows = [
-        ("Clapeyron: CalculiX internal energy vs \u00bdF\u00b7u  (all 72)",
+        ("CalculiX energy vs work done (Clapeyron)  (all 72)",
          float(sup["calculix_internal_energy_vs_half_f_dot_u_max_rel_gap"])),
-        ("equilibrium: reaction vs applied resultant  (all 72)",
+        ("reactions balance the applied load  (all 72)",
          float(sup["reaction_vs_applied_resultant_max_rel_err"])),
         ("loaded area vs exact CAD area \u2014 rectangular end",
          float(area["box_hole_rectangular_end"])),
         ("loaded area vs exact CAD area \u2014 circular end",
          float(area["stepped_shaft_circular_end"])),
-        ("FRD reader vs CalculiX .dat print",
+        ("our results reader vs CalculiX's own printout",
          float(sup["frd_reader_validated_against_dat_print_rel_err"])),
     ]
     for c in cross:
@@ -294,19 +297,19 @@ def panel_identities(ax, sup: dict, cross: list[dict], tol: float) -> dict:
         ax.text(xi * 1.35, yi, f"{xi:.1e}", va="center", ha="left",
                 fontsize=fs.FONT_PT["annot"] - 0.5, color=t.ink, zorder=6)
     ax.axvline(tol, color=t.band, linewidth=1.4, linestyle=(0, (4, 2)), zorder=3)
-    ax.text(tol, 1.0, f" tightest reference tolerance {tol:.0%}",
+    ax.text(tol, 1.0, f" strictest tolerance we allow: {tol:.0%}",
             transform=ax.get_xaxis_transform(), rotation=90, va="top",
             ha="right", fontsize=fs.FONT_PT["annot"] - 0.5, color=t.band)
     ax.set_yticks(y)
     ax.set_yticklabels(labels, fontsize=fs.FONT_PT["tick"] - 0.5)
     ax.set_ylim(-0.8, len(rows) - 0.2)
-    ax.set_xlabel("relative residual (log scale)")
+    ax.set_xlabel("size of the gap, as a fraction of the value (log scale)")
     ax.grid(axis="y", visible=False)
     worst = max(vals)
-    fs.annotate_n(ax, len(rows), what="identity checks", loc="lower left",
-                  extra=f"worst residual {worst:.1e} \u2014 "
-                        f"{tol / worst:,.0f}\u00d7 inside the tolerance floor")
-    fs.panel_title(ax, "D \u00b7 identities close; solvers agree on one mesh")
+    fs.annotate_n(ax, len(rows), what="checks", loc="lower left",
+                  extra=f"worst gap {worst:.1e} \u2014 "
+                        f"{tol / worst:,.0f}\u00d7 tighter than the strictest tolerance")
+    fs.panel_title(ax, "D \u00b7 the checks close; the two solvers agree")
     return {"rows": rows, "worst": worst}
 
 
@@ -358,17 +361,18 @@ def build(out_dir: Path) -> int:
     n_refs = int((findings.get("corrections_delivered") or {})
                  .get("references_rewritten", 0))
 
-    sign_txt = (f"all {n_signed} signed deviations fall on their expected side"
+    sign_txt = (f"All {n_signed} of the differences land on the side they should"
                 if uniform else
-                f"WARNING: signed deviations are NOT uniform across the "
-                f"{n_signed} comparisons")
+                f"WARNING: the differences do NOT all land on the side they "
+                f"should, across the {n_signed} comparisons")
     subtitle = (
-        f"{n_refs} references rebuilt by an independent chain: geometry from "
-        f"STEP, meshed by Gmsh {validate['gmsh_version']},\n"
-        f"solved by CalculiX {validate['calculix_version']} \u2014 neither our "
-        "mesher nor our solver takes part in any reference value\n"
-        f"{sign_txt} \u00b7 the nodal peak stress is {ratio:.0f}\u00d7 more "
-        "sensitive to the mesh sizing policy than any global quantity")
+        f"{n_refs} reference answers were rebuilt by outside tools: shapes read "
+        f"from STEP files, meshed by Gmsh {validate['gmsh_version']},\n"
+        f"solved by CalculiX {validate['calculix_version']}. Our own mesher and "
+        "our own solver take no part in any reference answer.\n"
+        f"{sign_txt}.\n"
+        f"The peak stress at a single point reacts {ratio:.0f}\u00d7 more "
+        "strongly to the mesh sizing rule than any whole-part number.")
     footer = fs.footer_source(
         VALIDATE, FINDINGS, n=n_refs,
         note="closed forms: Howland (1930) Phil. Trans. R. Soc. A 229:49\u201386\n"
@@ -376,8 +380,8 @@ def build(out_dir: Path) -> int:
              "(docs/validation/hand-calcs.md)")
     fs.assert_glyphs(subtitle, footer)
 
-    title = ("Reference truth was rebuilt by an independent chain \u2014 and "
-             "the chain earned it")
+    title = ("The reference answers come from outside tools \u2014 and those "
+             "tools earned the job")
     fig, axes = fs.figure(
         title, subtitle=subtitle, footer=footer, size=(13.0, 10.4),
         nrows=2, ncols=2,

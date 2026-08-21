@@ -261,15 +261,22 @@ pixels share a frame, which §4 already lists as cosmetic: time and layout.
 One consequence for the recorder. `render_cinema.py` used to cut the inline GIF
 from the midpoint of the `advisor` act to the midpoint of the `mesh` act, a rule
 that presumes a cut to straddle and that no longer matches any act name the GUI
-prints. It now cuts the loop to the `build` act, which is exactly the overlap the
-inline loop exists to show; failing that name it falls back to the longest act
-reported, and failing an act table to `build`'s own scheduled fractions,
-0.17..0.37 of the take. The longest-act rule is deliberately the *fallback*: the
-longest act is `solve` at 0.63, so a rule that preferred it would inline the
-answer without the decision that produced it. Either way the window is computed
-from what the GUI printed and the rule that produced it is named in
-`manifest.json` as `window_source`, so the inline loop is never a hand-picked
-range that quietly stopped matching the film.
+prints. It then cut the loop to the `build` act, and that was still wrong for the
+README's purpose: `build` is the overlap, but the *decision* has already happened
+by the time it opens, so the inline loop showed a mesh appearing and never showed
+the network that chose it — the one half of this film a static mesh figure cannot
+carry. The loop now **opens on the `deliberate` act and runs 0.20 of the take
+forward**, which on the committed take is 1.2..5.2 s of 20 s: the pass lane
+scoring its 38 candidates, then the fill of the action it picked, with both
+counters advancing across the join. `build` alone is kept as the next rule, then
+the longest act reported, then `deliberate`'s own scheduled fractions,
+0.06..0.26 of the take, for a `--only gif` run with no act table to read — which
+on this take lands on the same 1.2..5.2 s the act rule does. The longest-act rule
+is deliberately far down: the longest act is `solve` at 0.63, so a rule that
+preferred it would inline the answer without the decision that produced it.
+Either way the window is computed from what the GUI printed and the rule that
+produced it is named in `manifest.json` as `window_source`, so the inline loop is
+never a hand-picked range that quietly stopped matching the film.
 
 ## 7. The fields animate in the order the answer is computed
 
@@ -332,11 +339,18 @@ would misrepresent an exactly linear response.
 ## 8. Packaging and provenance
 
 - **Three artifacts, because one format cannot do the job.** GitHub does not
-  render a repo-relative `<video>` reliably, so the README embeds a
-  palette-optimised GIF of a subset of the take and links the h264 mp4 for the
-  full one; `poster.png` is the first fully-composed frame, for renderers that
-  show neither. The GIF's width and frame rate are whatever the byte budget
-  allowed, and `manifest.json` records which rung of the ladder that was.
+  merely render a repo-relative `<video>` unreliably — it drops it. Measured
+  2026-08-21 against GitHub's own renderer (`POST /markdown`, `mode: gfm`):
+  `<video src="...">`, an absolute `raw.githubusercontent.com` src, and a
+  `<video><source><img fallback></video>` nest all render as an empty `<p>`, and
+  the nested `<img>` fallback is stripped with the element that contained it. A
+  bare raw URL degrades to a plain link. An animated `<img>` is the only markup
+  that survives sanitisation and plays inline, and GitHub marks it
+  `data-animated-image`. So the README embeds a palette-optimised GIF of a subset
+  of the take, centred at full column width, linked to the h264 mp4 for the full
+  one; `poster.png` is the first fully-composed frame, for renderers that show
+  neither. The GIF's width and frame rate are whatever the byte budget allowed,
+  and `manifest.json` records which rung of the ladder that was.
 - **The mp4's encoder is recorded, not assumed.** libx264 at CRF 18 is the
   reference path; a distribution ffmpeg without it (Fedora's `ffmpeg-free` ships
   libopenh264 and the NVENC wrappers and no libx264) falls to a named

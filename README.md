@@ -3,13 +3,18 @@
 A C++20 adaptive hybrid polyhedral mesher and the linear-elastostatics solver it
 was co-designed with.
 
-[![The advisor deciding, the mesher building it, and the solve appearing in the order it is computed](docs/assets/cinema/advisor_cinema.gif)](docs/assets/cinema/advisor_cinema.mp4)
+<p align="center">
+  <a href="docs/assets/cinema/advisor_cinema.mp4"><img
+    src="docs/assets/cinema/advisor_cinema.gif"
+    alt="The deployed advisor graph scoring its candidates, then the mesher building the action it chose"
+    width="100%"></a>
+</p>
 
 **The whole loop in one take.** The advisor's forward passes, the mesher building
 the action they chose, and the answer appearing in the order the solver computes
 it — `sphere_box_s0_c0` under axial tension, 11,692 elements, 13,146 DOF, max von
-Mises 2.489 MPa. Inline loop: the 4 s where the candidate sweep and the fill
-overlap. Full 20 s take:
+Mises 2.489 MPa. Inline loop: the 4 s in which the network scores its 38
+candidates and the mesher starts building the one it chose. Full 20 s take:
 [advisor_cinema.mp4](docs/assets/cinema/advisor_cinema.mp4) (h264 1920×1080,
 [poster](docs/assets/cinema/poster.png)).
 

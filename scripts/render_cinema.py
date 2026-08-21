@@ -131,16 +131,21 @@ H264_LADDER: tuple[tuple[str, tuple[str, ...]], ...] = (
 GIF_LADDER = ((960, 15), (960, 12), (800, 12), (720, 10), (640, 10))
 GIF_MAX_BYTES = 8 * 1024 * 1024
 #: The inline loop cannot be the whole take at a size a README will tolerate, so
-#: it shows the moment where both halves are live at once: the pass lane still
-#: sweeping while the mesher builds the action it picked. That is the act the GUI
-#: names `build`, so the window is cut from the act table the GUI printed rather
-#: than from a guess -- `build` when it is there, else the longest act reported,
-#: else these fractions. The GUI schedules skeleton 0.06, deliberate 0.11, build
-#: 0.20 and solve 0.63 of the take, so the fallback is `build`'s own span, 0.17 to
-#: 0.37, for a `--only gif` run with no act table to read. Note that `solve` is
-#: the longest act, which is why the longest-act rule is a fallback and not the
-#: first choice: it would show the answer without the decision that produced it.
-GIF_START_FRACTION = 0.17
+#: it shows the decision and its consequence: the pass lane scoring candidates
+#: inside `deliberate`, running on into `build` where the mesher lays down the
+#: action it picked. The window therefore opens at the start of the act the GUI
+#: names `deliberate` and runs GIF_DURATION_FRACTION of the take forward -- cut
+#: from the act table the GUI printed, not from a guess. Failing that name it is
+#: the `build` act alone, else the longest act reported, else these fractions.
+#: The GUI schedules skeleton 0.06, deliberate 0.11, build 0.20 and solve 0.63 of
+#: the take, so the fallback is deliberate's own start, 0.06, for a `--only gif`
+#: run with no act table to read. `build` alone was the earlier rule and is kept
+#: only beneath this one: it shows the mesher building an action whose decision
+#: already happened off screen, and the deployed network deciding is the half of
+#: this film a static mesh figure cannot show. `solve` is the longest act, which
+#: is why the longest-act rule sits below both: it would show the answer without
+#: the decision that produced it.
+GIF_START_FRACTION = 0.06
 GIF_DURATION_FRACTION = 0.20
 
 
@@ -668,20 +673,31 @@ def gif_window(report: GuiReport, total_s: float, start_arg: float | None,
     can say which rule produced the window rather than leaving two numbers
     unexplained.
 
-    Three act-table rules, in the order they mean something. ``build`` is the act
-    in which the candidate sweep and the fill overlap, so when the GUI reports it
-    the loop is that act. A take that instead reports separate ``advisor`` and
-    ``mesh`` acts is cut between the network choosing and the mesher building, and
-    the interesting window straddles that cut: advisor midpoint to mesh midpoint.
-    Failing both, the loop is centred on the longest act reported, which is at
-    least a real span the GUI printed. No rule invents an act name: each is
-    skipped unless the names it needs are present.
+    Four act-table rules, in the order they mean something. ``deliberate`` is the
+    act in which the deployed network scores its candidates, so when the GUI
+    reports it the loop opens there and runs forward into ``build``, showing the
+    decision and the fill it produced in one pass. ``build`` alone is the next
+    rule: the candidate sweep and the fill overlap there, but the decision has
+    already been made off screen. A take that instead reports separate ``advisor``
+    and ``mesh`` acts is cut between the network choosing and the mesher building,
+    and the interesting window straddles that cut: advisor midpoint to mesh
+    midpoint. Failing all three, the loop is centred on the longest act reported,
+    which is at least a real span the GUI printed. No rule invents an act name:
+    each is skipped unless the names it needs are present.
     """
+    deliberate_act = report.act("deliberate")
     build_act = report.act("build")
     advisor_act, mesh_act = report.act("advisor"), report.act("mesh")
     longest = (max(report.acts, key=lambda a: a["duration_s"])
                if report.acts else None)
-    if build_act:
+    if deliberate_act:
+        start = deliberate_act["start_s"]
+        end = start + GIF_DURATION_FRACTION * total_s
+        source = (f"opens on the deliberate act the GUI reported "
+                  f"({deliberate_act['duration_s']:g} s) and runs "
+                  f"{GIF_DURATION_FRACTION:g} of the take on into the fill it "
+                  f"chose")
+    elif build_act:
         start, end = build_act["start_s"], build_act["end_s"]
         source = (f"the build act the GUI reported, where the candidate sweep "
                   f"and the fill overlap ({build_act['duration_s']:g} s)")
@@ -989,6 +1005,26 @@ def main(argv: list[str] | None = None) -> int:
                 f"the GUI reports a {size[0]}x{size[1]} framebuffer, which "
                 "yuv420p cannot encode without resampling every UI hairline")
 
+    manifest_path = out_dir / "manifest.json"
+    # A `--only gif` run drives no GUI, so `report` is empty and the act rule
+    # would fall through to the scheduled fractions. The frames on disk were
+    # recorded by an earlier run whose act table is in the manifest beside them,
+    # and that table is the truth about those exact frames -- so read it back
+    # rather than guessing at fractions. The window's recorded source says it came
+    # from the manifest, so a reader can tell a re-encode from a fresh capture.
+    acts_from_manifest = False
+    if not report.acts and manifest_path.is_file():
+        try:
+            prior = json.loads(manifest_path.read_text()).get("report") or {}
+        except json.JSONDecodeError:
+            prior = {}
+        prior_acts = prior.get("acts")
+        if isinstance(prior_acts, list) and prior_acts:
+            report.acts = prior_acts
+            acts_from_manifest = True
+            print(f"    read {len(prior_acts)} acts back from "
+                  f"{rel(manifest_path)} (this run drove no GUI)")
+
     # ---- verify, then encode -----------------------------------------------
     frame_size = None
     if wanted & {"mp4", "gif", "poster"}:
@@ -1010,6 +1046,8 @@ def main(argv: list[str] | None = None) -> int:
         print("[gif]")
         gif_start, gif_duration, gif_source = gif_window(
             report, args.frames / FPS, args.gif_start, args.gif_duration)
+        if acts_from_manifest and args.gif_start is None and args.gif_duration is None:
+            gif_source += ", from the act table this manifest already carried"
         print(f"    window {gif_start:g}..{gif_start + gif_duration:g} s of "
               f"{args.frames / FPS:g} s ({gif_source})")
         outputs["gif"] = encode_gif(
@@ -1035,7 +1073,6 @@ def main(argv: list[str] | None = None) -> int:
     # ---- manifest -----------------------------------------------------------
     onnx = model_onnx(args.model_dir)
     onnx_sha, _ = fs.digest(onnx)
-    manifest_path = out_dir / "manifest.json"
     manifest = {
         "schema": "polymesh.cinema.manifest/1",
         "generated_utc": _dt.datetime.now(_dt.timezone.utc)
@@ -1116,11 +1153,16 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _merge_existing(manifest_path: Path, manifest: dict, out_dir: Path) -> None:
-    """Carry forward records for outputs this run did not touch.
+    """Carry forward what this run did not produce: output records, and the
+    report.
 
     A ``--only gif`` run must not erase the mp4's digest, and must not claim the
-    mp4 it did not make. Anything carried over keeps the timestamp of the run
-    that made it, under ``carried_over``.
+    mp4 it did not make. The same holds for the GUI's own account of the take: a
+    re-encode drives no GUI, so it has no act table, no advisor fields and no
+    solver token, and writing that emptiness over the record of the run that
+    actually captured the frames would destroy the provenance of the frames still
+    sitting on disk. Anything carried over keeps the timestamp of the run that
+    made it, under ``carried_over``.
     """
     if not manifest_path.is_file():
         return
@@ -1137,6 +1179,12 @@ def _merge_existing(manifest_path: Path, manifest: dict, out_dir: Path) -> None:
         carried = dict(record)
         carried["carried_over"] = previous.get("generated_utc")
         manifest["outputs"][name] = carried
+    if not (manifest.get("report") or {}).get("lines"):
+        prior = previous.get("report")
+        if isinstance(prior, dict) and prior.get("lines"):
+            carried = dict(prior)
+            carried["carried_over"] = previous.get("generated_utc")
+            manifest["report"] = carried
 
 
 if __name__ == "__main__":

@@ -16,6 +16,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
+          # OCCT's imported targets link TBB; ubuntu-24.04 omits libtbb.so without -dev.
           sudo apt-get install -y --no-install-recommends \
             ninja-build \
             cmake \
@@ -23,7 +24,6 @@ jobs:
             libeigen3-dev \
             nlohmann-json3-dev \
             libomp-dev \
-            # OCCT's imported targets link TBB; ubuntu-24.04 packages omit the .so without this.
             libtbb-dev \
             libgl1-mesa-dev \
             libx11-dev \

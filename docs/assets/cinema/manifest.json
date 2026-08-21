@@ -1,13 +1,10 @@
 {
   "schema": "polymesh.cinema.manifest/1",
-  "generated_utc": "2026-08-21T03:07:18Z",
-  "git_rev": "6c8cd63+dirty",
-  "stamp": "git 6c8cd63+dirty \u00b7 model.onnx sha256 74846b93d8dd",
+  "generated_utc": "2026-08-21T06:16:50Z",
+  "git_rev": "50033dc+dirty",
+  "stamp": "git 50033dc+dirty \u00b7 model.onnx sha256 74846b93d8dd",
   "stages_run": [
-    "frames",
-    "gif",
-    "mp4",
-    "poster"
+    "gif"
   ],
   "case": {
     "part": "sphere_box_s0_c0",
@@ -43,7 +40,7 @@
     ],
     "auto_spec": "load bench/geometries/corpus/primitives/sphere_box_s0.step; h 6.888; fix 0; loadface 5 528.197958 0 0; cinema on; cinema advisor bench/advisor; solve; record /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames 1200; quit",
     "env": {
-      "POLYMESH_CINEMA_STAMP": "git 6c8cd63+dirty \u00b7 model.onnx sha256 74846b93d8dd"
+      "POLYMESH_CINEMA_STAMP": "git 50033dc+dirty \u00b7 model.onnx sha256 74846b93d8dd"
     },
     "xvfb_screen": "1920x1080",
     "frame_size": "1920x1080",
@@ -51,7 +48,7 @@
     "frame_count": 1200,
     "fps": 60,
     "duration_s": 20.0,
-    "gui_wall_s": 84.218,
+    "gui_wall_s": null,
     "ffmpeg": "ffmpeg version 8.1.2 Copyright (c) 2000-2026 the FFmpeg developers"
   },
   "report": {
@@ -128,9 +125,28 @@
       "cinema: act build frames 205..443 t 3.4000..7.4000 s",
       "cinema: act solve frames 444..1199 t 7.4000..20.0000 s",
       "cinema: record /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames frames 1200 fps 60 candidates 38 stages 20 elements 11692 poster 30 width 1920 height 1080 skipped 0 solve_stages 2 solver direct_ldlt"
-    ]
+    ],
+    "carried_over": "2026-08-21T03:07:18Z"
   },
   "outputs": {
+    "gif": {
+      "file": "advisor_cinema.gif",
+      "width": 960,
+      "fps": 15,
+      "start_s": 1.2,
+      "duration_s": 4.0,
+      "bytes": 1962580,
+      "sha256": "d9787d4db805724894cf1a0f98dcf9fbc9685b1aa21747b64802bdbb27683022",
+      "attempts": [
+        {
+          "width": 960,
+          "fps": 15,
+          "bytes": 1962580
+        }
+      ],
+      "max_bytes": 8388608,
+      "window_source": "opens on the deliberate act the GUI reported (2.2 s) and runs 0.2 of the take on into the fill it chose, from the act table this manifest already carried"
+    },
     "mp4": {
       "file": "advisor_cinema.mp4",
       "codec": "h264",
@@ -149,25 +165,8 @@
       "faststart": true,
       "fps": 60,
       "bytes": 19067044,
-      "sha256": "796e8e27e26b4e1e43aa6f41bd98fd23a5fc5746ff721e9a6e11fd698bec6549"
-    },
-    "gif": {
-      "file": "advisor_cinema.gif",
-      "width": 960,
-      "fps": 15,
-      "start_s": 3.4,
-      "duration_s": 4.0,
-      "bytes": 2888626,
-      "sha256": "8f68f2eb03f693dfc273f6c2202f385d1b89d6dae903cb8d4db75c05e95513a4",
-      "attempts": [
-        {
-          "width": 960,
-          "fps": 15,
-          "bytes": 2888626
-        }
-      ],
-      "max_bytes": 8388608,
-      "window_source": "the build act the GUI reported, where the candidate sweep and the fill overlap (4 s)"
+      "sha256": "796e8e27e26b4e1e43aa6f41bd98fd23a5fc5746ff721e9a6e11fd698bec6549",
+      "carried_over": "2026-08-21T03:07:18Z"
     },
     "poster": {
       "file": "poster.png",
@@ -177,7 +176,8 @@
       "bytes": 67088,
       "source_bytes": 8296178,
       "sha256": "463f7c8fdb01a14e2e17dac5fb3edb3bb08815c021b3aef55b3ca7a5b71b76bf",
-      "frame_source": "reported by the GUI as the first fully-composed frame"
+      "frame_source": "reported by the GUI as the first fully-composed frame",
+      "carried_over": "2026-08-21T03:07:18Z"
     }
   }
 }

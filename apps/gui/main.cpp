@@ -69,6 +69,10 @@
 #include <thread>
 #include <vector>
 
+#ifndef _WIN32
+#include <sys/wait.h> // WIFEXITED / WEXITSTATUS for std::system's result
+#endif
+
 namespace polymesh::gui {
 
 namespace fea = polymesh::fea;
@@ -88,6 +92,20 @@ constexpr ImGuiWindowFlags kPanelFlags =
     ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
     ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBringToFrontOnFocus |
     ImGuiWindowFlags_NoScrollWithMouse;
+
+/// `App::improve_exit` when no self-improve run has finished this session. Not
+/// 0, which is a real exit status meaning the run succeeded.
+constexpr int kImproveNoRun = -1;
+
+/// `std::system`'s result as the command's own exit code. POSIX returns a wait
+/// status, where exit 1 reads as 256; Windows returns the code directly.
+int exit_code_of(int system_result) {
+#ifdef _WIN32
+    return system_result;
+#else
+    return WIFEXITED(system_result) ? WEXITSTATUS(system_result) : system_result;
+#endif
+}
 
 struct App {
     std::optional<Model> model;
@@ -141,6 +159,14 @@ struct App {
     SolveJob::State observed_job_state = SolveJob::State::kIdle;
     /// True while a background self-improve (LLM) run is in flight.
     std::atomic<bool> improve_running{false};
+    /// Exit status of the last finished self-improve run, or `kImproveNoRun`
+    /// when none has finished this session. The script shells out, so its
+    /// failure is a number nobody was reading: the launcher used to discard
+    /// `std::system`'s result, which -O0 let pass and an optimised build --
+    /// where _FORTIFY_SOURCE marks `system` warn_unused_result -- rejected. The
+    /// worker thread cannot touch `status`, so it parks the code here and the UI
+    /// reports it on a later frame.
+    std::atomic<int> improve_exit{kImproveNoRun};
     /// Screenshot plumbing (png_writer.hpp). Frames still to wait before the
     /// capture, -1 = idle. F12 asks for 0 (this frame); the File menu asks for
     /// 1 so the still-drawn popup stays out of the shot. Serviced at the end of
@@ -1442,9 +1468,19 @@ void draw_study_panel(App& app) {
             }
         }
         const bool running = app.improve_running.load();
-        ImGui::TextColored(running ? palette.status_warn : palette.text_dim,
-                           running ? "self-improve: running (see terminal)"
-                                   : "self-improve: idle");
+        const int improve_exit = app.improve_exit.load();
+        if (running) {
+            ImGui::TextColored(palette.status_warn, "self-improve: running (see terminal)");
+        } else if (improve_exit == kImproveNoRun) {
+            ImGui::TextColored(palette.text_dim, "self-improve: idle");
+        } else if (improve_exit == 0) {
+            ImGui::TextColored(palette.text_dim, "self-improve: last run finished cleanly");
+        } else {
+            // The script's own failure, surfaced. Reporting "idle" for a run
+            // that died is how a broken self-improve pass looked like no pass.
+            ImGui::TextColored(palette.status_warn, "self-improve: last run failed (exit %d)",
+                               improve_exit);
+        }
         auto launch_improve = [&app](const char* backend) {
             if (app.improve_running.exchange(true)) {
                 return;
@@ -1452,8 +1488,9 @@ void draw_study_panel(App& app) {
             const std::string cmd =
                 std::string("bash scripts/self_improve.sh --backend ") + backend;
             std::atomic<bool>* flag = &app.improve_running;
-            std::thread([flag, cmd] {
-                std::system(cmd.c_str());
+            std::atomic<int>* exit_code = &app.improve_exit;
+            std::thread([flag, exit_code, cmd] {
+                exit_code->store(exit_code_of(std::system(cmd.c_str())));
                 flag->store(false);
             }).detach();
             app.status = std::string("self-improve (") + backend + ") launched — see terminal";

@@ -345,8 +345,18 @@ FeaturePinReport pin_feature_nodes(const geom::CadModel& cad, const geom::CadTop
         if (chain.empty()) {
             continue;
         }
-        std::sort(chain.begin(), chain.end(),
-                  [](const Pinned& a, const Pinned& b) { return a.t < b.t; });
+        // Equal parameters are not hypothetical, and which way a tie falls is not
+        // cosmetic: for a closed chain the re-spacing below hands each node the
+        // target at its INDEX in this order, so transposing two tied nodes moves
+        // both of them. std::sort is unstable and libstdc++ and libc++ transpose
+        // a tie differently — measured on plate_hole hybrid at h = 4 mm, that
+        // flipped one pin from accepted to rejected (edge_pinned 1868 vs 1867)
+        // and the two standard libraries wrote different meshes. `chain` is built
+        // by walking `candidates`, which is already in mirror-canonical order, so
+        // a stable sort keeps that order for ties: platform-independent, and a
+        // node and its mirror image stay adjacent (ADR-0032, ADR-0036).
+        std::stable_sort(chain.begin(), chain.end(),
+                         [](const Pinned& a, const Pinned& b) { return a.t < b.t; });
 
         // Fourier re-spacing for closed chains. A closed sharp edge (a bore
         // rim, a sphere-cap seam) has a periodic coordinate signal; the

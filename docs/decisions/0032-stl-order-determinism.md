@@ -1,6 +1,7 @@
 # ADR-0032: The mesh may not depend on which standard library built it
 
-Status: accepted
+Status: accepted (2026-08-14); **amended 2026-08-21** (an unstable sort is the
+same defect)
 Date: 2026-08-14
 
 ## Context
@@ -90,3 +91,42 @@ later.
   investigate. Labelling standardises on gcc for this reason —
   `docs/training/ACCESS-hunter-pc.md` §4.1.
 - 409/409 ctest pass on the fixed tree.
+
+## Amendment 2026-08-21: an unstable sort is the same defect
+
+`cross-stdlib-determinism` failed on `plate_hole` `hybrid` while the other three
+pairs stayed byte-identical. No hash container was involved. `feature_pin.cpp`
+ordered each sharp-edge chain on its arclength parameter alone:
+
+```cpp
+std::sort(chain.begin(), chain.end(),
+          [](const Pinned& a, const Pinned& b) { return a.t < b.t; });
+```
+
+`std::sort` is not stable and that comparator is not total, so which of two nodes
+with equal `t` comes first is an implementation detail — the same class of detail
+as a bucket layout. The ties are not rare: on this part the box rims carry 3–88
+tied pairs per chain and the two bore rims 2–6. For a *closed* chain the Fourier
+re-spacing immediately below assigns each node the target at its **index** in
+this order, so transposing two tied nodes moves both of them.
+
+Measured at h = 4 mm: g++/libstdc++ pinned 1868 edge nodes and refused 16,
+clang/libc++ pinned 1867 and refused 17, and the two meshes differed in 732 node
+positions, worst 0.44 mm. A third build — **clang with libstdc++** — came out
+byte-identical to g++ (same md5), which isolates the standard library from the
+compiler and rules out floating point a second time.
+
+The fix is `std::stable_sort`. `chain` is built by walking `candidates`, which
+`sort_mirror_canonical` has already put in mirror-canonical order, so stability
+removes the platform dependence *and* keeps a node adjacent to its mirror image
+(ADR-0036). A node-id tie-break would have done only the first: ids do not
+mirror.
+
+The decision therefore extends: **any ordering an output depends on must be
+total.** A comparator that leaves ties, sorted unstably, is exactly as
+platform-dependent as iterating a hash map. Where the sequence is already
+canonical, `std::stable_sort` is the cheaper statement of the same requirement.
+
+Consequences: the gcc answer moved by one pin (1868 -> 1867, onto the libc++
+value), the BRep fill error improved (`rel_err` 4.842e-05 -> 4.82e-05), all four
+gate pairs are byte-identical, and 451/451 ctest pass.

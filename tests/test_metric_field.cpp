@@ -182,7 +182,7 @@ TEST_CASE("metric field grid interpolates nodes and preserves uniform metrics", 
         {0.02, 0.07, 0.11},
         Eigen::AngleAxisd(0.4, Eigen::Vector3d::UnitX()).toRotationMatrix());
     uniform.fill([&](const Eigen::Vector3d&) { return constant; });
-    for (const Eigen::Vector3d point :
+    for (const Eigen::Vector3d& point :
          {Eigen::Vector3d{0.2, 0.8, 1.7}, Eigen::Vector3d{-4.0, 1.0, 9.0},
           Eigen::Vector3d{1.0, 2.0, 3.0}}) {
         check_matrix_near(uniform.sample(point).M, constant.M, 1e-10);

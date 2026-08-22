@@ -1,8 +1,8 @@
 {
   "schema": "polymesh.cinema.manifest/1",
-  "generated_utc": "2026-08-22T02:55:01Z",
-  "git_rev": "8538b5d+dirty",
-  "stamp": "git 8538b5d+dirty \u00b7 model.onnx sha256 74846b93d8dd",
+  "generated_utc": "2026-08-22T03:34:54Z",
+  "git_rev": "6b83f13+dirty",
+  "stamp": "git 6b83f13+dirty \u00b7 model.onnx sha256 74846b93d8dd",
   "stages_run": [
     "frames",
     "gif",
@@ -47,7 +47,7 @@
     ],
     "auto_spec": "load tests/fixtures/parts/icecream_cone.step; h 12; material 200 0.3; spectral on; fix 1; loadface 0 0 0 -1000; cinema on; cinema advisor bench/advisor; adapt 1 0; wire off; solve; record /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames 3600; quit",
     "env": {
-      "POLYMESH_CINEMA_STAMP": "git 8538b5d+dirty \u00b7 model.onnx sha256 74846b93d8dd"
+      "POLYMESH_CINEMA_STAMP": "git 6b83f13+dirty \u00b7 model.onnx sha256 74846b93d8dd"
     },
     "xvfb_screen": "1920x1080",
     "frame_size": "1920x1080",
@@ -55,7 +55,7 @@
     "frame_count": 3600,
     "fps": 60,
     "duration_s": 60.0,
-    "gui_wall_s": 271.03,
+    "gui_wall_s": 281.208,
     "ffmpeg": "ffmpeg version 8.1.2 Copyright (c) 2000-2026 the FFmpeg developers"
   },
   "report": {
@@ -153,7 +153,12 @@
       "brep_curvature": 1.0,
       "edge_seeds": 36.0,
       "energy_kept": 0.995000702,
+      "field_samples": 1753.0,
       "geometry_seeds": 708.0,
+      "h_after_max": 0.00595266797,
+      "h_after_min": 0.00265737334,
+      "h_before_max": 0.00709219306,
+      "h_before_min": 0.00242629724,
       "modes_kept": 4155.0,
       "modes_total": 262143.0,
       "predicted_after": 1796.53939,
@@ -162,7 +167,7 @@
     "lines": [
       "cinema: maths glyphs merged from /usr/share/fonts/google-noto/NotoSansMath-Regular.ttf",
       "cinema: advisor bench/advisor candidates 38 gate_threshold 0.05 frames 39 decision hybrid_zoo h_rel 0.1 order 1 adapt_passes 0 eta_target 0 vetoed 1 ood_distance 90.9401 applied 0",
-      "cinema: spectral applied 1 modes_total 262143 modes_kept 4155 energy_kept 0.995000702 edge_seeds 36 predicted_before 1859.40282 predicted_after 1796.53939 geometry_seeds 708 bc_seeds 3563 brep_curvature 1",
+      "cinema: spectral applied 1 modes_total 262143 modes_kept 4155 energy_kept 0.995000702 edge_seeds 36 predicted_before 1859.40282 predicted_after 1796.53939 geometry_seeds 708 bc_seeds 3563 brep_curvature 1 field_samples 1753 h_before_min 0.00242629724 h_before_max 0.00709219306 h_after_min 0.00265737334 h_after_max 0.00595266797",
       "cinema: take /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames frames 3600 fps 60 duration 60.0000 s",
       "cinema: act skeleton frames 0..468 t 0.0000..7.8000 s",
       "cinema: act deliberate frames 469..1007 t 7.8000..16.8000 s",
@@ -190,8 +195,8 @@
       "pix_fmt": "yuv420p",
       "faststart": true,
       "fps": 60,
-      "bytes": 10271127,
-      "sha256": "287705c534d9eef6cd8ac0852b107ff58205f2e8fbe1f6b2b7ff0ce183bd717c"
+      "bytes": 10691229,
+      "sha256": "523595a962ea4f04ae9833984f2855dc088e7789e0faa9954ae7f7dda7630b0d"
     },
     "gif": {
       "file": "advisor_cinema.gif",
@@ -199,13 +204,13 @@
       "fps": 12,
       "start_s": 0.0,
       "duration_s": 60.0,
-      "bytes": 5453538,
-      "sha256": "63855c725262a94d5ede7826a35e3b4c8636ac1700cc1d12f83f416727a43ae8",
+      "bytes": 5640401,
+      "sha256": "2be19c0e5f19bd1f0add49aefb3cf17933f7274a543b1d8014f63dd20f7a6096",
       "attempts": [
         {
           "width": 1100,
           "fps": 12,
-          "bytes": 5453538
+          "bytes": 5640401
         }
       ],
       "max_bytes": 8388608,
@@ -216,9 +221,9 @@
       "source_frame": 48,
       "width": 1920,
       "height": 1080,
-      "bytes": 69713,
+      "bytes": 73388,
       "source_bytes": 8296178,
-      "sha256": "266906a99030fcb8720e9d6db5d4723bd3447156f3e3f99529008cdabcb6d442",
+      "sha256": "2d78b2fa5ca8bdf581f77261e2f1bddbe619d77f8667c01c55fcdad552b2676a",
       "frame_source": "reported by the GUI as the first fully-composed frame"
     }
   }

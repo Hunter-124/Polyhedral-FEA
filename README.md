@@ -18,11 +18,15 @@ frames as the inline GIF ([poster](docs/assets/cinema/poster.png)).
 
 The four chapters are concise and visual:
 
-- **Exact CAD.** A real edge-curvature trace is sampled, FFT-denoised and turned
-  into the size field. It remains fully open for about six seconds. This run
-  keeps 4,155 of 262,143 field modes at 99.5% energy, with 36 denoised curve
-  seeds; the exact BRep demand is re-imposed afterward so filtering cannot erase
-  a real feature.
+- **Exact CAD.** A real edge-curvature trace is sampled point-by-point on the
+  highlighted edge, transformed into its measured frequency bars, energy
+  truncated, inverse-transformed and then mapped back onto the part as 1,753
+  target-spacing rings. Ring diameter is proportional to the requested cell
+  width and colour runs orange/fine → cyan/coarse, so the spatial effect is
+  visible where the cells will be generated instead of existing only as a
+  chart. This run keeps 4,155 of 262,143 field modes at 99.5% energy, with 36
+  denoised curve seeds; the exact BRep demand is re-imposed afterward so
+  filtering cannot erase a real feature.
 - **Advisor.** The deployed ONNX graph runs all 39 measured forward passes, then
   holds its final network state for inspection. This part lands outside its
   validated envelope (Mahalanobis 90.94), so the model abstains instead of
@@ -41,7 +45,8 @@ The four chapters are concise and visual:
 
 Nothing in the take is a mock-up. Network nodes are the graph's own trunk
 tensors; connection strength is $|w_{ji}a_i|$; mesh frames are captured
-`pipeline::MeshStage` snapshots; spectral numbers come from
+`pipeline::MeshStage` snapshots; spectral numbers and the pre/post-filter
+on-part spacing samples come from two evaluations of
 `pipeline::build_refinement_plan`; material enters `fea::Material` and its
 $D(E,\nu)$ matrix; cell quality comes from `fea::summarize_cell_quality`; and the
 last cinema stage is replaced with `SolveJob::take_result()` after quadratic

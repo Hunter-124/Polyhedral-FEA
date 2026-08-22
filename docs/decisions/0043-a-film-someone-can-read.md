@@ -5,7 +5,8 @@
   keeps its subject and its honesty rules; §6 (concurrent acts) and the ticker
   design are superseded here
 - Revised (2026-08-21): longer curvature and settled-network holds, explicit
-  material/deformation telemetry, and structural incremental refinement.
+  material/deformation telemetry, structural incremental refinement, and an
+  on-part spectral-spacing explanation.
 - Touches: `apps/gui/cinema.{hpp,cpp}`, `apps/gui/main.cpp`,
   `apps/gui/viewport.{hpp,cpp}`, `src/fea/{include/fea,src}/stress.{hpp,cpp}`,
   `scripts/render_cinema.py`, `docs/assets/cinema/*`, `README.md`
@@ -98,6 +99,21 @@ fallback**. No vetoed action is pictured as executed.
 
 The solve boundary dissolves the microscope into the equation board. Pane
 geometry never changes; only opacity does.
+
+The opening follows the same rule. A curvature plot by itself explains a signal
+processing step but not a meshing decision, so the exact-CAD chapter now has five
+visible beats: sample κ(s) along a highlighted BRep edge; transform that trace;
+show which measured frequency modes survive the 99.5% energy threshold; inverse
+reconstruct the trace; and sweep target-h rings over the part. The ring geometry
+is evaluated from the production size field before and after filtering at the
+same deterministic surface points. Their diameter is proportional to target h
+and their colour is an explicit fine-to-coarse scale. They are labelled as
+spacing targets, never as generated elements.
+
+This is more motion but not more simultaneous prose. The frequency chart shares
+the existing feature panel, the rings use the existing part viewport, and the
+five short step labels replace the old four generic boxes. The 7.8 s act and
+pane geometry do not change.
 
 ## 4. Holding on results
 

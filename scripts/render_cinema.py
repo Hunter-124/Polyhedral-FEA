@@ -455,7 +455,9 @@ _ADVISOR_KEYS = ("candidates", "frames", "gate_threshold", "h_rel", "order",
                  "applied")
 _SPECTRAL_KEYS = ("applied", "modes_total", "modes_kept", "energy_kept",
                   "edge_seeds", "predicted_before", "predicted_after",
-                  "geometry_seeds", "bc_seeds", "brep_curvature")
+                  "geometry_seeds", "bc_seeds", "brep_curvature",
+                  "field_samples", "h_before_min", "h_before_max",
+                  "h_after_min", "h_after_max")
 #: Keys lifted out of the take announcement.
 _TAKE_KEYS = ("frames", "fps", "duration")
 

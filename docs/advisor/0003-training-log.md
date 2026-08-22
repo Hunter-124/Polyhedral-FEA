@@ -293,7 +293,7 @@ snapshots, cell/order/quality inspection and the authoritative final solve
 | --- | --- |
 | `network_layout.png` | the trained architecture, read live from the checkpoint |
 | `training_curves.png` | per-head convergence, first vs latest run |
-| `../assets/cinema/advisor_cinema.mp4` | 39 deployed-network passes on complex `icecream_cone`; honest OOD abstention; explicit E = 200 GPa, ν = 0.3 fallback; spectral sizing; real adaptive cell replacement; cell-quality, stress-gradient and ZZ fields; 60 s with readable holds — replaces the retired `activation_map.png` |
+| `../assets/cinema/advisor_cinema.mp4` | 39 deployed-network passes on complex `icecream_cone`; honest OOD abstention; exact edge sampling, retained FFT modes and measured target-h rings on the part; explicit E = 200 GPa, ν = 0.3 fallback; real adaptive cell replacement; cell-quality, stress-gradient and ZZ fields; 60 s with readable holds — replaces the retired `activation_map.png` |
 | `mesh_progress.png` | best-so-far accuracy and fidelity vs cumulative solver time |
 | `accuracy_vs_cost.png` | accuracy vs DOF and vs solve time, Pareto front, by mesher |
 | `fidelity_vs_h.png` | mesh-vs-BRep fidelity improving with resolution |

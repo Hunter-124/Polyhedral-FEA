@@ -649,7 +649,9 @@ fields, which is how the GUI's solve is cross-checked against the CLI's.)
   is the GUI's own framebuffer at a fixed 1/60 s virtual timestep, encoded by
   `scripts/render_cinema.py`. The 60 s default has four readable chapters:
   exact-CAD curvature plus production FFT sizing, fully open for about six
-  seconds; 39 deployed-network forward passes plus a held final state; real
+  seconds and animated through edge sampling, frequency-mode retention,
+  inverse reconstruction and 1,753 measured target-spacing rings directly on
+  the part; 39 deployed-network forward passes plus a held final state; real
   mesher snapshots plus a cell/order/quality microscope; and the authoritative
   two-pass solve with stress, recovered gradient, ZZ error, incremental
   refinement and exact linear load ramp.
@@ -663,6 +665,9 @@ fields, which is how the GUI's solve is cross-checked against the CLI's.)
   skipped cells. The transition keeps 27,808 unchanged cells rendered while
   2,688 old cells collapse and 8,143 replacements spawn. The spectral report
   keeps 4,155 / 262,143 field modes at 99.5% energy with 36 denoised edge seeds.
+  Its deterministic surface samples show target h narrowing from
+  2.426–7.092 mm before filtering to 2.657–5.953 mm after the exact geometry
+  floor is re-imposed.
 
   Material is an explicit scripted input: E = 200 GPa and Poisson's ratio
   ν = 0.3 feed both the advisor feature row and `fea::Material`'s constitutive

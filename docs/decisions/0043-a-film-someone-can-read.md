@@ -97,11 +97,12 @@ microscope. The complex default is OOD-refused, so the strip says **Advisor
 abstained — final network state** and then **Advisor abstained — verified
 fallback**. No vetoed action is pictured as executed.
 
-The solve boundary dissolves the microscope into the equation board. Pane
-geometry never changes; only opacity does.
+The solve boundary dissolves the completed cell microscope directly into the
+equation board. The network is not replayed between them. Pane geometry never
+changes; only opacity does.
 
 The opening follows the same rule. A curvature plot by itself explains a signal
-processing step but not a meshing decision, so the exact-CAD chapter now has five
+processing step but not a meshing decision, so the exact-CAD chapter has five
 visible beats: sample κ(s) along a highlighted BRep edge; transform that trace;
 show which measured frequency modes survive the 99.5% energy threshold; inverse
 reconstruct the trace; and sweep target-h rings over the part. The ring geometry
@@ -110,10 +111,11 @@ same deterministic surface points. Their diameter is proportional to target h
 and their colour is an explicit fine-to-coarse scale. They are labelled as
 spacing targets, never as generated elements.
 
-This is more motion but not more simultaneous prose. The frequency chart shares
-the existing feature panel, the rings use the existing part viewport, and the
-five short step labels replace the old four generic boxes. The 7.8 s act and
-pane geometry do not change.
+That completed state now crosses the chapter boundary instead of being erased.
+The feature panel dissolves directly into the network over 1.3 s; the on-part
+rings dim to a 0.22-alpha input map, remain through deliberation, and fade only
+as the chosen mesher starts emitting real cells on the same part. This adds
+continuity, not new data or simultaneous prose.
 
 ## 4. Holding on results
 
@@ -142,21 +144,30 @@ cells collapse/fade first, then only replacements use the established
 centroid-spawn animation. Tet4/tet10 compare by corner topology, so p-promotion
 does not make every surviving cell look replaced.
 
-## 5. Stress arriving, and its gradient
+## 5. One state hands directly to the next
 
-Two beats animate a **spatial reveal** of a field that is already complete: a
-plane travels across the part, the field's own colours are uncovered behind it,
-and ahead of it the surface is a neutral grey chosen to be unreachable through
-`fea_colormap` (measured: 0.67 minimum unit-RGB distance from any colour the map
-can produce, so an unswept region cannot be misread as a low field value). A
-leading band brightens toward white by up to 0.65, which is what makes the front
-read as a front.
+Moving result beats are **spatial handoffs** between already-complete measured
+states. The first stress field grows out of the authoritative mesh: the same cell
+rendering remains over the neutral pre-result surface and fades during the first
+42% of the front. Every later field keeps its predecessor ahead of the front at
+that predecessor's own scale: stress → recovered gradient → pass-0 ZZ error,
+later-pass stress → ZZ error, and final ZZ error → load-scaled stress.
 
-Nothing about the field changes as the front passes and no number on screen is
-tied to the front's position, which is why the front is the one motion in the
-film that is eased rather than linear: it is a camera move, and a linear front
-starts and stops with a visible jerk. The strip says what it is in those terms —
-"the field is already complete; what moves is how much of it has been uncovered".
+Behind the front, the arriving field's own colormap result is returned
+byte-for-byte. Ahead of it, the predecessor's own colormap result is returned
+byte-for-byte. Only the narrow feather blends those two display colours and
+brightens toward white by up to 0.65, so it reads as a handoff rather than an
+instantaneous recolour. No scalar and no displayed number is interpolated.
+
+The refinement boundary follows the same causal rule without inventing a scalar
+blend: for the first 32% of the beat, the exact ZZ map that made the marks fades
+as the exact old→new topology diff rises over it. The structural collapse/spawn
+then continues from that carried state. The movie never clears to an empty
+wireframe and never replays an earlier chapter to bridge a later one.
+
+The front is eased because it is presentation, not a physical time variable. The
+load factor remains strictly linear and continues to define the exact
+$u(\lambda)=\lambda u$ response independently of the eased colour handoff.
 
 **Which way it travels** is resolved from the real load case: the axis is the
 resultant of every `SimSetup::LoadSpec::force` in the take, and its sign is
@@ -185,12 +196,14 @@ It is a different field, not a relabelled copy.
 
 The network has said everything it has to say by the time the answer starts
 arriving, and what the closing act is doing is arithmetic that can be written
-down. So the panel's **content** cross-fades over 0.8 s into a board of the seven
-relations the solver evaluates, with the one this beat is computing lit, a rule
-down its left edge, and its own live numbers beside it: E = 200 GPa, ν = 0.3,
-unknown count, peak stress, steepest gradient, estimated error, marked-cell
-count and λ. The final strip distinguishes the true 0.0008111 mm displacement
-from the explicitly exaggerated 21.27 mm / 26,221× presentation.
+down. So the completed **cell microscope** cross-fades over 0.8 s directly into
+a board of the seven relations the solver evaluates. The previous implementation
+briefly restored the network at this boundary; that stepped backward in the
+story and is removed. The active relation is lit, a rule runs down the board's
+left edge, and live numbers sit beside it: E = 200 GPa, ν = 0.3, unknown count,
+peak stress, steepest gradient, estimated error, marked-cell count and λ. The
+final strip distinguishes the true 0.0008111 mm displacement from the explicitly
+exaggerated 21.27 mm / 26,221× presentation.
 
 Every equation is the expression the cited code implements, and the citation
 table is in `NOTES.md`. Two things the board deliberately does not show: the
@@ -263,9 +276,12 @@ fix.
 - `DisplayMode` gains `kResultsGradient`, and `Viewport::set_result` takes an
   optional extra per-node field interpolated onto the boundary samples through
   the same path the von Mises field already uses.
-- `Viewport::FieldSweep` participates in the result bake key, so a moving front
-  re-bakes. The load ramp already re-baked every frame, so per-frame baking is
-  established cost, not new.
+- `Viewport::FieldSweep` participates in the result bake key, including the
+  carried field id and its own maximum. A moving front therefore re-bakes both
+  measured colormap evaluations. The load ramp already re-baked every frame, so
+  per-frame baking is established cost, not new.
+- Result mode can composite the existing cinema mesh buffers over a fading
+  scalar surface; this is used only for mesh→stress and ZZ→refinement handoffs.
 - The left pane adds a production spectral-sizing trace and a cached
   `CinemaMeshInsight`; neither computes per frame.
 - The default take is 3600 frames (60 s). A shorter `--frames` still works:

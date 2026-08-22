@@ -656,6 +656,15 @@ fields, which is how the GUI's solve is cross-checked against the CLI's.)
   two-pass solve with stress, recovered gradient, ZZ error, incremental
   refinement and exact linear load ramp.
 
+  Chapter boundaries preserve causality on the same part instead of clearing to
+  a generic wireframe: target-h rings carry into advisor scoring and yield to
+  emitted cells; the authoritative mesh yields to stress; stress yields to the
+  recovered gradient; the preceding measured field yields to ZZ error; and that
+  error field remains beneath the topology transition it requested. The final
+  ZZ map hands directly to the load-scaled stress response. Each side retains
+  its own measured values and colour scale; only opacity and the narrow spatial
+  handoff feather blend their presentation.
+
   The default part is `icecream_cone.step`, a watertight cone+sphere Boolean.
   Its OOD distance is 90.94 against the validated 5.034 threshold, so the
   advisor abstains and no recommendation is applied. The labelled fallback is
@@ -681,7 +690,7 @@ fields, which is how the GUI's solve is cross-checked against the CLI's.)
   `SolveJob::take_result()` after final quadratic promotion and re-solve.
 
   Cosmetic work is limited to virtual pacing, opacity, centroid separation,
-  spatial field reveals, colour and layout. Experimental varyhedron,
+  spatial field handoffs, colour and layout. Experimental varyhedron,
   restricted-CVT poly-VEM and octahedral paths are named as **not used in this
   verified solve**, rather than implied. Full citations and per-beat
   disclosures are in [`assets/cinema/NOTES.md`](assets/cinema/NOTES.md);

@@ -14,11 +14,13 @@
 // one that pass really produced (`pipeline::SolveStage::result`) or is computed
 // from it by a named function, and every number on screen is the struct field or
 // the function named beside it. Only TIME, opacity, the shrink-toward-centroid
-// reveal, the spatial sweep front and the load factor are interpolated -- and
+// reveal, the spatial handoff front and the load factor are interpolated -- and
 // the load factor is interpolated because linear elastostatics makes u(λ) = λ·u
 // exact, so every frame of that ramp is a real solution rather than a blend of
-// two. No displayed number is ever interpolated, and no activation, element
-// count, error indicator or progress value is ever synthesised. When a source is
+// two. A handoff front keeps the previous measured field ahead of the arriving
+// measured field; only its narrow highlight band blends their display colours.
+// No displayed number is ever interpolated, and no activation, element count,
+// error indicator or progress value is ever synthesised. When a source is
 // missing the surface says WHICH one and skips that beat; it never substitutes a
 // plausible value.
 //
@@ -96,12 +98,12 @@ enum class CinemaAct { kSkeleton = 0, kDeliberate, kBuild, kMeshHold, kSolve };
 /// a per-element solve order or an iteration counter, because a direct sparse
 /// factorisation has neither.
 ///
-/// The two `*Sweep` beats are SPATIAL REVEALS of a field that is already
-/// complete: a plane travels across the part and the field's own colours are
-/// uncovered behind it (`Viewport::FieldSweep`). The field is not animated and
-/// no value on screen changes as the front passes -- what changes is how much of
-/// it has been uncovered. That is the honest way to show a static solution
-/// arriving, and it is stated on screen in those terms.
+/// The moving-field beats are SPATIAL HANDOFFS of fields that are already
+/// complete: a plane travels across the part, the new field's own colours replace
+/// either the mesh-grey state or the preceding measured field, and the previous
+/// state remains visible ahead of the front (`Viewport::FieldSweep`). No scalar
+/// value or displayed number changes as the front passes. This is stated on
+/// screen as a reveal/handoff rather than a physical propagation.
 enum class SolvePhase {
     kNone = 0,      // no SolveStage was delivered; nothing solved is drawn
     kStressSweep,   // that pass's von Mises field, uncovered along the load axis
@@ -305,7 +307,8 @@ struct CinemaCue {
     double spectral_filter_mix = 0.0;
     /// Spatial sweep of target-size rings over the part surface.
     double spectral_field_reveal = 0.0;
-    /// Whole on-part overlay opacity; eased out before the advisor act.
+    /// Whole on-part overlay opacity. The completed spacing field carries into
+    /// advisor scoring at low opacity, then fades only as real cells replace it.
     float spectral_overlay_alpha = 0.0f;
 
     // ---- the advisor pass lane (inside kDeliberate) -----------------------
@@ -350,9 +353,10 @@ struct CinemaCue {
     double solve_phase_span = 1.0; // phase length, seconds
     /// 0..1 through the refined mesh's element reveal, in `kRefine`.
     double refine_reveal = 0.0;
-    /// How far the spatial reveal front has travelled, 0..1 along
-    /// `CinemaState::sweep_axis`. Exactly 1 (everything uncovered) outside the
-    /// two sweep beats.
+    /// How far the current visual state has handed off to the next one, 0..1
+    /// along `CinemaState::sweep_axis`. Used by stress and gradient reveals,
+    /// gradient/stress → ZZ error, and ZZ error → final stress. Exactly 1 on
+    /// their still holds.
     double field_front = 1.0;
     /// The load factor λ the frame is drawn at. Exactly 1 outside `kLoadRamp`,
     /// and drawn on screen wherever it is not: linear elastostatics gives
@@ -367,11 +371,9 @@ struct CinemaCue {
     /// the pane's height sets the part's rendered size, so a width that moved
     /// mid-take would resize the subject inside one continuous shot.
     float panel_open = 1.0f;
-    /// Opacity of the network drawing and of the equation drawing. They cross
-    /// fade at the `kSolve` boundary — the same panel, a different thing in it —
-    /// and both are pure opacity: every node, every term and every number is
-    /// exactly what it would be at alpha 1.
-    float network_alpha = 1.0f;
+    /// Opacity of the equation drawing. At the `kSolve` boundary the completed
+    /// cell microscope dissolves directly into this board; the network is not
+    /// replayed between them.
     float equations_alpha = 0.0f;
 };
 
@@ -628,8 +630,8 @@ void cinema_act_window(const CinemaState& state, CinemaAct act, double& t0, doub
 [[nodiscard]] CinemaCue cinema_cue(const CinemaState& state);
 
 /// Draw parameters for this instant. Time, opacity, the shrink-toward-centroid
-/// fraction and the sweep front are the only interpolated quantities in the
-/// whole module.
+/// fraction and the spatial handoff front are the only interpolated display
+/// quantities in the module.
 [[nodiscard]] Viewport::CinemaView cinema_view(const CinemaState& state, const CinemaCue& cue);
 
 /// Everything the viewport render call needs for this instant, in one struct so
@@ -647,16 +649,18 @@ struct CinemaRender {
     /// λ: the drawn colour is then λ·s / s_max, i.e. the λ-scaled field against
     /// a fixed full-load legend, with no second copy of the field anywhere.
     float result_max = 1.0f;
-    /// The spatial reveal for this instant. Inactive on every beat that is not
-    /// a sweep, which is what leaves the held beats showing the whole field.
+    /// The spatial reveal/handoff for this instant. Inactive on still holds.
+    /// A moving beat may name the preceding measured field as its carry state;
+    /// otherwise the unswept side is the neutral mesh grey.
     Viewport::FieldSweep sweep;
 };
 
-/// What the viewport should display now. `kCinema` for the skeleton, the
-/// deliberation, the fill and the refine beats; the pass's own von Mises,
-/// recovered gradient or ZZ error field for the solve beats. Without a
-/// `pipeline::SolveStage` the closing act holds the final fill stage and the
-/// caption says so.
+/// What the viewport should display now. `kCinema` for the skeleton,
+/// deliberation, fill and held mesh; the pass's own von Mises, recovered
+/// gradient or ZZ error field for solved beats. During refinement, the exact ZZ
+/// field remains underneath while the exact old→new cell transition fades in.
+/// Without a `pipeline::SolveStage` the closing act holds the final fill stage
+/// and the caption says so.
 [[nodiscard]] CinemaRender cinema_render(CinemaState& state, const CinemaCue& cue,
                                          double base_deform_scale);
 

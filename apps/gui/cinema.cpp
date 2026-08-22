@@ -97,6 +97,17 @@ constexpr float kMeshEdgeWidth = 0.8f;
 /// rather than a hard edge, narrow enough that it is a front and not a fade.
 constexpr float kSweepFeather = 0.10f;
 
+/// The completed target-spacing field remains as a restrained annotation while
+/// the advisor starts scoring, then disappears only as the mesher replaces
+/// targets with actual cells.
+constexpr float kSizingCarryAlpha = 0.22f;
+/// Fraction of a refinement beat spent dissolving the measured ZZ field into
+/// the exact old→new topology transition it requested.
+constexpr double kFieldToMeshHandoff = 0.32;
+/// Fraction of a stress reveal over which the authoritative cell rendering
+/// remains on top, then yields to the solved field arriving beneath it.
+constexpr double kMeshToFieldHandoff = 0.42;
+
 /// Floor on λ when it is used as a DIVISOR for the colour scale. λ itself is
 /// never floored — the number on screen and the displacement are the real λ,
 /// including exactly 0 — but s_max / λ has to stay finite, and at λ = 1e-3 every
@@ -717,10 +728,9 @@ CinemaCue cinema_cue(const CinemaState& state) {
         start += span;
     }
 
-    // Open on the exact CAD alone, then slide the spectral analysis in during
-    // the first sixth of the act. The curve trace is fully open for roughly six
-    // seconds on the default take, long enough to follow raw curvature into its
-    // denoised signal and sizing statistics.
+    // Open on exact CAD and build the spectral story to completion. That final
+    // state is not erased at the act boundary: it crosses into advisor scoring
+    // and then remains dimly on the part until actual cells replace it.
     if (cue.act == CinemaAct::kSkeleton) {
         const double wait = 0.08 * cue.act_span;
         const double slide = 0.14 * cue.act_span;
@@ -731,20 +741,32 @@ CinemaCue cinema_cue(const CinemaState& state) {
         cue.spectral_spectrum_reveal = smoothstep((p - 0.24) / 0.22);
         cue.spectral_filter_mix = smoothstep((p - 0.42) / 0.25);
         cue.spectral_field_reveal = smoothstep((p - 0.56) / 0.30);
+        cue.spectral_overlay_alpha =
+            static_cast<float>(smoothstep((p - 0.05) / 0.08));
+    } else if (cue.act == CinemaAct::kDeliberate) {
+        cue.spectral_edge_reveal = 1.0;
+        cue.spectral_spectrum_reveal = 1.0;
+        cue.spectral_filter_mix = 1.0;
+        cue.spectral_field_reveal = 1.0;
+        const double bridge = std::min(1.3, 0.18 * cue.act_span);
+        const double q = smoothstep(cue.act_t / std::max(bridge, 1.0e-9));
+        cue.spectral_overlay_alpha =
+            static_cast<float>(1.0 + q * (kSizingCarryAlpha - 1.0f));
+    } else if (cue.act == CinemaAct::kBuild) {
+        cue.spectral_edge_reveal = 1.0;
+        cue.spectral_spectrum_reveal = 1.0;
+        cue.spectral_filter_mix = 1.0;
+        cue.spectral_field_reveal = 1.0;
+        const double handoff = std::max(cinema_decision_lead(state), 0.18 * cue.act_span);
         cue.spectral_overlay_alpha = static_cast<float>(
-            smoothstep((p - 0.05) / 0.08) *
-            (1.0 - smoothstep((p - 0.96) / 0.04)));
-        cue.network_alpha = 0.0f;
-        cue.equations_alpha = 0.0f;
+            kSizingCarryAlpha *
+            (1.0 - smoothstep(cue.act_t / std::max(handoff, 1.0e-9))));
     } else if (cue.act == CinemaAct::kSolve) {
-        // The panel's content swaps: the network has said everything it has to
-        // say by the time the answer starts arriving, and what the closing act
-        // is actually doing is arithmetic that can be written down. A dissolve,
-        // not a cut, and not a layout change.
+        // The completed cell microscope dissolves directly into the solver's
+        // equation board. Replaying the network here would move backwards.
         const double fade = cinema_panel_fade(state);
-        const auto x = static_cast<float>(smoothstep(cue.act_t / std::max(fade, 1.0e-9)));
-        cue.network_alpha = 1.0f - x;
-        cue.equations_alpha = x;
+        cue.equations_alpha =
+            static_cast<float>(smoothstep(cue.act_t / std::max(fade, 1.0e-9)));
     }
 
     // ---- lane 1: the advisor's forward passes ----------------------------
@@ -861,10 +883,11 @@ CinemaCue cinema_cue(const CinemaState& state) {
         switch (beat_phase) {
         case SolvePhase::kStressSweep:
         case SolvePhase::kGradientSweep:
-            // Eased, because this front is a camera move over a finished field
-            // and not a physical quantity: nothing on screen is labelled with
-            // it, and a linear front starts and stops with a visible jerk. The
-            // colours it uncovers are the pass's own values throughout.
+        case SolvePhase::kError:
+            // Eased because this is a display handoff across two already
+            // completed states, not a physical time variable. Behind the front
+            // is the arriving measured field; ahead is the prior measured field
+            // (or the authoritative mesh-grey state for the first stress beat).
             cue.field_front = smoothstep(x);
             break;
         case SolvePhase::kRefine:
@@ -880,9 +903,10 @@ CinemaCue cinema_cue(const CinemaState& state) {
         case SolvePhase::kLoadRamp:
             // Linear, never eased. λ is a number on screen and u(λ) = λ·u is
             // exact, so easing λ would give the deforming shape a rate of change
-            // the linear solve does not have — which is the one thing a ramp
-            // labelled "exact linear response" may not do.
+            // the linear solve does not have. The visual handoff from the ZZ map
+            // to stress may ease independently; it changes no λ or field value.
             cue.load_factor = std::clamp(x, 0.0, 1.0);
+            cue.field_front = smoothstep(x);
             break;
         default:
             break;
@@ -916,22 +940,28 @@ Viewport::CinemaView cinema_view(const CinemaState& state, const CinemaCue& cue)
         view.spectral_overlay_alpha = cue.spectral_overlay_alpha;
         break;
     case CinemaAct::kDeliberate:
-        // Nothing has been meshed while the network deliberates, so nothing may
-        // be drawn as mesh. The outline is the whole picture here.
+        // The completed spacing field stays on the same part as the deployed
+        // network begins scoring, then settles into a low-opacity input map.
         view.skeleton_alpha = 1.0f;
         view.reveal = 0.0f;
         view.mesh_alpha = 0.0f;
         view.shrink = 1.0f;
+        view.spectral_edge_reveal = static_cast<float>(cue.spectral_edge_reveal);
+        view.spectral_field_reveal = static_cast<float>(cue.spectral_field_reveal);
+        view.spectral_filter_mix = static_cast<float>(cue.spectral_filter_mix);
+        view.spectral_overlay_alpha = cue.spectral_overlay_alpha;
         break;
     case CinemaAct::kBuild:
-        // The outline stays as a dim reference frame so the growing fill can be
-        // read against the part it is filling. Through the DECISION lead-in the
-        // cue has selected no stage yet, and a reveal of 0 draws no element:
-        // the fill may not start before the action it executes is readable.
+        // The target-spacing annotation yields only when the chosen action starts
+        // producing actual cells in those same locations.
         view.skeleton_alpha = 0.45f;
         view.reveal = cue.stage_index >= 0 ? static_cast<float>(cue.stage_reveal) : 0.0f;
         view.mesh_alpha = 1.0f;
         view.shrink = cue.stage_index >= 0 ? shrink_for(cue.stage_reveal) : 1.0f;
+        view.spectral_edge_reveal = static_cast<float>(cue.spectral_edge_reveal);
+        view.spectral_field_reveal = static_cast<float>(cue.spectral_field_reveal);
+        view.spectral_filter_mix = static_cast<float>(cue.spectral_filter_mix);
+        view.spectral_overlay_alpha = cue.spectral_overlay_alpha;
         break;
     case CinemaAct::kMeshHold: {
         // A six-second result beat can do more than freeze: open the finished
@@ -955,26 +985,45 @@ Viewport::CinemaView cinema_view(const CinemaState& state, const CinemaCue& cue)
         break;
     }
     case CinemaAct::kSolve:
-        if (cue.solve_phase == SolvePhase::kRefine ||
-            cue.solve_phase == SolvePhase::kRefineHold) {
-            // Persistent cells remain rendered and briefly open by 0.06 toward
-            // their own centroids. The first 40% collapses/fades removed cells;
-            // the remaining 60% reveals only replacements in next-mesh order.
-            view.skeleton_alpha = 0.35f;
-            const double added =
-                smoothstep((std::clamp(cue.refine_reveal, 0.0, 1.0) - 0.40) / 0.60);
+        if (cue.solve_phase == SolvePhase::kRefine) {
+            // Start on the exact ZZ field that requested refinement, then lay the
+            // exact topology diff over it. Once the field has dissolved, the
+            // existing structural transition continues without a reset.
+            const double p = std::clamp(cue.refine_reveal, 0.0, 1.0);
+            const float handoff =
+                static_cast<float>(smoothstep(p / kFieldToMeshHandoff));
+            const double added = smoothstep((p - 0.40) / 0.60);
+            view.skeleton_alpha = 0.35f * handoff;
             view.reveal = static_cast<float>(added);
+            view.mesh_alpha = handoff;
+            view.shrink = 0.0f;
+            view.incremental_transition = true;
+            view.transition_progress = static_cast<float>(p);
+            view.overlay_on_results = true;
+            view.result_alpha = 1.0f - handoff;
+        } else if (cue.solve_phase == SolvePhase::kRefineHold) {
+            view.skeleton_alpha = 0.35f;
+            view.reveal = 1.0f;
             view.mesh_alpha = 1.0f;
             view.shrink = 0.0f;
             view.incremental_transition = true;
-            view.transition_progress = static_cast<float>(cue.refine_reveal);
+            view.transition_progress = 1.0f;
+        } else if (cue.solve_phase == SolvePhase::kStressSweep) {
+            // The finished mesh carries into analysis and fades only as stress
+            // colours arrive, avoiding a mesh→grey reset at the act/pass edge.
+            const float mesh_carry = static_cast<float>(
+                1.0 - smoothstep(cue.field_front / kMeshToFieldHandoff));
+            view.skeleton_alpha = 0.25f * mesh_carry;
+            view.reveal = 1.0f;
+            view.mesh_alpha = mesh_carry;
+            view.shrink = 0.0f;
+            view.overlay_on_results = mesh_carry > 0.0f;
         } else {
-            // Every other beat of this act renders a field, so these values are
-            // only reached when no `pipeline::SolveStage` arrived at all and the
-            // act holds the finished fill instead. The caption says which.
+            // Result modes draw their own surface. kNone is the no-solve fallback
+            // and therefore keeps the authoritative mesh instead.
             view.skeleton_alpha = 0.25f;
             view.reveal = 1.0f;
-            view.mesh_alpha = 1.0f;
+            view.mesh_alpha = cue.solve_phase == SolvePhase::kNone ? 1.0f : 0.0f;
             view.shrink = 0.0f;
         }
         break;
@@ -991,12 +1040,15 @@ CinemaRender cinema_render(CinemaState& state, const CinemaCue& cue,
     }
     const auto index = static_cast<std::size_t>(cue.solve_stage_index);
     const pipeline::SolveResult& result = state.solve_stages[index].result;
-    const auto arm_sweep = [&](bool moving) {
-        out.sweep.active = true;
+    const auto arm_sweep = [&](bool moving, DisplayMode carry = DisplayMode::kCinema,
+                               float carry_max = 1.0f) {
+        out.sweep.active = moving;
         out.sweep.axis = state.sweep_axis;
         out.sweep.feather = kSweepFeather;
         out.sweep.front =
             moving ? static_cast<float>(cue.field_front) * (1.0f + kSweepFeather) : 1.0f;
+        out.sweep.carry_mode = carry;
+        out.sweep.carry_max = carry_max;
     };
     switch (cue.solve_phase) {
     case SolvePhase::kStressSweep:
@@ -1017,26 +1069,42 @@ CinemaRender cinema_render(CinemaState& state, const CinemaCue& cue,
         // a gradient this module invented would be exactly the fabrication
         // this whole surface exists to rule out.
         const double gmax = state.gradient_max(index);
-        if (state.gradient_field(index).empty() || !(gmax > 0.0)) {
+        const bool has_gradient = !state.gradient_field(index).empty() && gmax > 0.0;
+        if (!has_gradient) {
             out.mode = DisplayMode::kResultsVonMises;
             out.result_max = static_cast<float>(result.max_von_mises);
         } else {
             out.mode = DisplayMode::kResultsGradient;
             out.result_max = static_cast<float>(gmax);
         }
-        arm_sweep(cue.solve_phase == SolvePhase::kGradientSweep);
+        arm_sweep(cue.solve_phase == SolvePhase::kGradientSweep,
+                  DisplayMode::kResultsVonMises,
+                  static_cast<float>(result.max_von_mises));
         break;
     }
     case SolvePhase::kError:
-    case SolvePhase::kErrorHold:
-        // The ZZ error field recovered from that same solve — the field that
-        // decided where the next pass refined.
+    case SolvePhase::kErrorHold: {
+        // The ZZ error field grows directly out of whichever measured field was
+        // on screen before it: gradient on pass 0, stress on later passes.
+        out.mode = DisplayMode::kResultsError;
+        out.result_max = static_cast<float>(result.max_nodal_eta);
+        const double gmax = state.gradient_max(index);
+        const bool carry_gradient =
+            index == 0 && !state.gradient_field(index).empty() && gmax > 0.0;
+        arm_sweep(cue.solve_phase == SolvePhase::kError,
+                  carry_gradient ? DisplayMode::kResultsGradient
+                                 : DisplayMode::kResultsVonMises,
+                  static_cast<float>(carry_gradient ? gmax : result.max_von_mises));
+        break;
+    }
+    case SolvePhase::kRefine:
+        // Keep the ZZ field under the exact topology transition during the
+        // opacity handoff configured by `cinema_view`.
         out.mode = DisplayMode::kResultsError;
         out.result_max = static_cast<float>(result.max_nodal_eta);
         break;
-    case SolvePhase::kRefine:
     case SolvePhase::kRefineHold:
-        break; // kCinema: these beats draw the refined MESH, not a field
+        break; // kCinema: the new mesh is complete and held
     case SolvePhase::kLoadRamp:
     case SolvePhase::kHold: {
         out.mode = DisplayMode::kResultsVonMises;
@@ -1050,6 +1118,9 @@ CinemaRender cinema_render(CinemaState& state, const CinemaCue& cue,
         // full-load legend, with no second copy of the field anywhere.
         out.result_max =
             static_cast<float>(result.max_von_mises / std::max(lambda, kMinLoadFactor));
+        arm_sweep(cue.solve_phase == SolvePhase::kLoadRamp,
+                  DisplayMode::kResultsError,
+                  static_cast<float>(result.max_nodal_eta));
         break;
     }
     case SolvePhase::kNone:
@@ -2583,8 +2654,8 @@ void draw_cinema_cells(const CinemaState& state, const CinemaCue& cue,
 void draw_cinema_panel(CinemaState& state, const CinemaCue& cue, const CinemaType& type,
                        const CinemaHud& hud) {
     // Four real views share one fixed pane: CAD spectrum, deployed network,
-    // emitted-cell microscope, solver equations. Transitions are opacity-only,
-    // so neither the part nor the panel geometry jumps between chapters.
+    // emitted-cell microscope, solver equations. Every boundary inherits the
+    // panel it follows and opacity-hands it to the next; pane geometry never moves.
     float feature_alpha = 0.0f;
     float network_alpha = 0.0f;
     float cell_alpha = 0.0f;
@@ -2592,7 +2663,11 @@ void draw_cinema_panel(CinemaState& state, const CinemaCue& cue, const CinemaTyp
     if (cue.act == CinemaAct::kSkeleton) {
         feature_alpha = cue.panel_open;
     } else if (cue.act == CinemaAct::kDeliberate) {
-        network_alpha = 1.0f;
+        const double bridge = std::min(1.3, 0.18 * cue.act_span);
+        const float blend = static_cast<float>(
+            smoothstep(cue.act_t / std::max(bridge, 1.0e-9)));
+        feature_alpha = 1.0f - blend;
+        network_alpha = blend;
     } else if (cue.act == CinemaAct::kBuild) {
         const double lead = cinema_decision_lead(state);
         const float blend = static_cast<float>(
@@ -2602,7 +2677,7 @@ void draw_cinema_panel(CinemaState& state, const CinemaCue& cue, const CinemaTyp
     } else if (cue.act == CinemaAct::kMeshHold) {
         cell_alpha = 1.0f;
     } else {
-        network_alpha = cue.network_alpha;
+        cell_alpha = 1.0f - cue.equations_alpha;
         equation_alpha = cue.equations_alpha;
     }
 
@@ -2728,7 +2803,7 @@ void build_caption(const CinemaState& state, const CinemaCue& cue, const CinemaH
     out.numbers = fmt("%s / %s cells · %s nodes · order-%d target",
                       grouped(drawn).c_str(), grouped(total).c_str(),
                       grouped(stage.mesh.nodes.size()).c_str(), hud.order);
-    out.note = "exact stage snapshot · mesher emission order · cell microscope at left";
+    out.note = "exact stage snapshot · target-spacing rings yield to emitted cells in place";
     out.note_color = palette.text_dim;
     if (hud.cinema_skipped_elements > 0) {
         out.note = fmt("%s cells could not be triangulated and are excluded from this view",
@@ -2787,7 +2862,7 @@ void solve_caption(CinemaState& state, const CinemaCue& cue, const CinemaHud& hu
         out.numbers =
             fmt("%s cells · %s unknowns · solved once%s", grouped(tr.n_elems).c_str(),
                 grouped(tr.n_dof).c_str(), pass_tag.c_str());
-        out.note = "completed von Mises field · reveal starts at the loaded surface";
+        out.note = "authoritative mesh stays visible while completed von Mises replaces it";
         break;
     case SolvePhase::kStressHold:
         out.headline = fmt("Peak stress %.4g MPa", r.max_von_mises / 1e6);
@@ -2799,7 +2874,7 @@ void solve_caption(CinemaState& state, const CinemaCue& cue, const CinemaHud& hu
     case SolvePhase::kGradientSweep:
         out.headline = "Stress gradient — spatial reveal";
         out.numbers = "|∇σvm| recovered at every resolvable node";
-        out.note = "least-squares recovery over each node's own neighboring cells";
+        out.note = "completed stress stays ahead of the least-squares gradient handoff";
         break;
     case SolvePhase::kGradientHold: {
         const double gmax = state.gradient_max(i);
@@ -2832,7 +2907,7 @@ void solve_caption(CinemaState& state, const CinemaCue& cue, const CinemaHud& hu
             out.numbers = fmt("ZZ global indicator %.3g%% · verification pass",
                               tr.global_eta * 100.0);
         }
-        out.note = "recovered stress vs solved stress · energy-norm indicator";
+        out.note = "prior measured field stays ahead · recovered-vs-solved energy indicator";
         break;
     case SolvePhase::kErrorHold:
         out.headline = "Local error map";

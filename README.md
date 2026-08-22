@@ -43,6 +43,15 @@ The four chapters are concise and visual:
   shown at 26,221×, or 21.27 mm / exactly 12% of the model diagonal; both the
   physical value and presentation scale stay on screen.
 
+The chapters are one continuous handoff rather than five resets. The completed
+target-spacing rings remain on the CAD as advisor scoring begins, dim to an input
+map, and disappear only where emitted cells take over. The finished mesh stays
+visible while stress arrives; stress remains ahead of the gradient front; the
+gradient (or stress on later passes) remains ahead of the ZZ field; and the ZZ
+map stays under the structural refinement it requested. The final error map then
+hands directly to the full-load stress response. No transition returns to an
+empty wireframe or replays an earlier chapter.
+
 Nothing in the take is a mock-up. Network nodes are the graph's own trunk
 tensors; connection strength is $|w_{ji}a_i|$; mesh frames are captured
 `pipeline::MeshStage` snapshots; spectral numbers and the pre/post-filter
@@ -52,7 +61,7 @@ $D(E,\nu)$ matrix; cell quality comes from `fea::summarize_cell_quality`; and th
 last cinema stage is replaced with `SolveJob::take_result()` after quadratic
 promotion and re-solve so the film, Studio and exported result agree. Cosmetic
 work is limited to virtual pacing, opacity, cell-centroid separation, spatial
-field reveals and the explicitly reported linear-load deformation scale.
+field handoffs and the explicitly reported linear-load deformation scale.
 
 Source citations and the disclosure behind every on-screen label:
 [docs/assets/cinema/NOTES.md](docs/assets/cinema/NOTES.md)

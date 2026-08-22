@@ -1,8 +1,8 @@
 {
   "schema": "polymesh.cinema.manifest/1",
-  "generated_utc": "2026-08-22T03:34:54Z",
-  "git_rev": "6b83f13+dirty",
-  "stamp": "git 6b83f13+dirty \u00b7 model.onnx sha256 74846b93d8dd",
+  "generated_utc": "2026-08-22T04:06:23Z",
+  "git_rev": "a480aa3+dirty",
+  "stamp": "git a480aa3+dirty \u00b7 model.onnx sha256 74846b93d8dd",
   "stages_run": [
     "frames",
     "gif",
@@ -47,7 +47,7 @@
     ],
     "auto_spec": "load tests/fixtures/parts/icecream_cone.step; h 12; material 200 0.3; spectral on; fix 1; loadface 0 0 0 -1000; cinema on; cinema advisor bench/advisor; adapt 1 0; wire off; solve; record /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames 3600; quit",
     "env": {
-      "POLYMESH_CINEMA_STAMP": "git 6b83f13+dirty \u00b7 model.onnx sha256 74846b93d8dd"
+      "POLYMESH_CINEMA_STAMP": "git a480aa3+dirty \u00b7 model.onnx sha256 74846b93d8dd"
     },
     "xvfb_screen": "1920x1080",
     "frame_size": "1920x1080",
@@ -55,7 +55,7 @@
     "frame_count": 3600,
     "fps": 60,
     "duration_s": 60.0,
-    "gui_wall_s": 281.208,
+    "gui_wall_s": 278.004,
     "ffmpeg": "ffmpeg version 8.1.2 Copyright (c) 2000-2026 the FFmpeg developers"
   },
   "report": {
@@ -195,8 +195,8 @@
       "pix_fmt": "yuv420p",
       "faststart": true,
       "fps": 60,
-      "bytes": 10691229,
-      "sha256": "523595a962ea4f04ae9833984f2855dc088e7789e0faa9954ae7f7dda7630b0d"
+      "bytes": 11887734,
+      "sha256": "d309e42268f9dc9303f83ec629fd10f004cf9339b1a666ee56ec6c7cee13096e"
     },
     "gif": {
       "file": "advisor_cinema.gif",
@@ -204,13 +204,13 @@
       "fps": 12,
       "start_s": 0.0,
       "duration_s": 60.0,
-      "bytes": 5640401,
-      "sha256": "2be19c0e5f19bd1f0add49aefb3cf17933f7274a543b1d8014f63dd20f7a6096",
+      "bytes": 6795425,
+      "sha256": "6a9760058e7c5d064fc6dbac351008385453c597e6bb51f9c79ec87b05d151f4",
       "attempts": [
         {
           "width": 1100,
           "fps": 12,
-          "bytes": 5640401
+          "bytes": 6795425
         }
       ],
       "max_bytes": 8388608,
@@ -221,9 +221,9 @@
       "source_frame": 48,
       "width": 1920,
       "height": 1080,
-      "bytes": 73388,
+      "bytes": 73591,
       "source_bytes": 8296178,
-      "sha256": "2d78b2fa5ca8bdf581f77261e2f1bddbe619d77f8667c01c55fcdad552b2676a",
+      "sha256": "58576288cb0e1362902c23a4d7e03c5ca19a3f3492deda4ebd0fcc718da86d2a",
       "frame_source": "reported by the GUI as the first fully-composed frame"
     }
   }

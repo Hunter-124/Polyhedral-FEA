@@ -51,6 +51,7 @@ in vec3 v_normal;
 in vec4 v_color;
 in vec3 v_pos;
 uniform vec3 u_eye;
+uniform float u_alpha;
 out vec4 frag;
 void main() {
     // Headlight diffuse + slight rim, double-sided.
@@ -59,7 +60,7 @@ void main() {
     float ndv = abs(dot(n, view_dir));
     float shade = 0.35 + 0.6 * ndv;
     float rim = pow(1.0 - ndv, 3.0) * 0.15;
-    frag = vec4(v_color.rgb * shade + vec3(rim), 1.0);
+    frag = vec4(v_color.rgb * shade + vec3(rim), u_alpha * v_color.a);
 })";
 
 constexpr const char* kLineVs = R"(#version 330 core
@@ -75,9 +76,10 @@ void main() {
 
 constexpr const char* kLineFs = R"(#version 330 core
 in vec4 v_color;
+uniform float u_alpha;
 out vec4 frag;
 void main() {
-    frag = v_color;
+    frag = vec4(v_color.rgb, u_alpha * v_color.a);
 })";
 
 constexpr const char* kBackgroundVs = R"(#version 330 core
@@ -574,36 +576,29 @@ bool element_face_loops(const fea::NodalElement& el, std::size_t node_count, Fac
     return out.count() > 0;
 }
 
-/// Unswept grey for the part of the surface the reveal front has not reached.
-/// Deliberately outside the `fea_colormap` range: the nearest colour that map
-/// can produce sits 0.67 away in unit RGB, and even at its least saturated
-/// point (t = 0.288) it still holds one channel at 0.85, so grey this flat and
-/// this dark is unreachable and an unswept region can never be misread as a
-/// field value.
+/// Neutral carry colour for the first solved field, deliberately outside the
+/// `fea_colormap` range. Later handoffs carry the preceding measured field
+/// instead, at that field's own scale.
 constexpr std::array<float, 3> kUnsweptGrey = {0.24f, 0.25f, 0.28f};
 /// How far the front itself pulls the blended colour toward white. A straight
-/// fade to grey has no visible edge; this band is the only thing that makes the
-/// wavefront read as a moving front rather than a shrinking colour patch.
+/// crossfade has no visible edge; this band is the only thing that makes the
+/// handoff read as a moving front rather than an abrupt field swap.
 constexpr float kFrontHighlight = 0.65f;
 
-/// Colour of one surface sample under the spatial reveal, where `x` is the
+/// Colour of one surface sample under the spatial handoff, where `x` is the
 /// sample's position along the sweep axis as a fraction of the result's own
-/// extent and `rgb` is the colour the un-swept bake would have given it.
+/// extent. `rgb` is the arriving field and `carry` is either the prior measured
+/// field or the neutral mesh-grey state.
 ///
-/// This is a REVEAL: behind `front - feather` the sample's own colour is
-/// returned bit for bit, so nothing about the field is animated, only how much
-/// of it has been uncovered.
-///   x <= front - feather : `rgb`, untouched.
-///   x >= front           : kUnsweptGrey.
-///   between              : `rgb` blended linearly to kUnsweptGrey by
-///                          w = (x - (front - feather)) / feather, then lifted
-///                          toward white by kFrontHighlight * w.
-/// The lift peaks at the front and is zero at the band's trailing edge, so the
-/// only discontinuity is the front line itself -- which is the wavefront.
-std::array<float, 3> sweep_sample_color(std::array<float, 3> rgb, float x, float front,
-                                        float feather) {
+/// Behind `front - feather`, the arriving colour is returned bit for bit. Ahead
+/// of `front`, the carried colour is returned bit for bit. Only the narrow
+/// feather blends their display colours and lifts its leading edge toward white.
+/// Neither source scalar nor either field's normalisation is interpolated.
+std::array<float, 3> sweep_sample_color(std::array<float, 3> rgb,
+                                        const std::array<float, 3>& carry, float x,
+                                        float front, float feather) {
     if (x >= front) {
-        return kUnsweptGrey;
+        return carry;
     }
     const float band = std::max(feather, 0.0f);
     const float lead = front - band;
@@ -611,8 +606,8 @@ std::array<float, 3> sweep_sample_color(std::array<float, 3> rgb, float x, float
         return rgb;
     }
     const float w = band > 0.0f ? (x - lead) / band : 1.0f;
-    for (int i = 0; i < 3; ++i) {
-        const float faded = rgb[i] + w * (kUnsweptGrey[i] - rgb[i]);
+    for (std::size_t i = 0; i < rgb.size(); ++i) {
+        const float faded = rgb[i] + w * (carry[i] - rgb[i]);
         rgb[i] = faded + kFrontHighlight * w * (1.0f - faded);
     }
     return rgb;
@@ -1571,10 +1566,30 @@ void Viewport::bake_result(DisplayMode mode, float deform_scale, float result_ma
         scalars = &result_scalar_extra_;
     }
 
-    // Spatial reveal, per surface sample (see sweep_sample_color). The colours
-    // behind the front are this pass's own values at this pass's own scale, so
-    // the reveal never changes what the picture says, only how much of it is
-    // uncovered yet.
+    // Optional measured carry field for a field-to-field handoff. kCinema is
+    // the sentinel for the neutral mesh-grey state that precedes the first solve.
+    const std::vector<double>* carry_scalars = nullptr;
+    switch (field_sweep_.carry_mode) {
+    case DisplayMode::kResultsVonMises:
+        carry_scalars = &result_scalar_vm_;
+        break;
+    case DisplayMode::kResultsDisplacement:
+        carry_scalars = &result_scalar_u_;
+        break;
+    case DisplayMode::kResultsError:
+        carry_scalars = &result_scalar_eta_;
+        break;
+    case DisplayMode::kResultsGradient:
+        carry_scalars = &result_scalar_extra_;
+        break;
+    default:
+        break;
+    }
+    const float carry_denom = field_sweep_.carry_max > 0.0f ? field_sweep_.carry_max : 1.0f;
+
+    // Spatial handoff, per surface sample (see sweep_sample_color). Both fields
+    // retain their own values and scales; only the moving feather blends their
+    // display colours.
     const float sweep_axis_norm = field_sweep_.axis.norm();
     Eigen::Vector3d sweep_dir = Eigen::Vector3d::Zero();
     double sweep_u_min = 0.0;
@@ -1621,12 +1636,18 @@ void Viewport::bake_result(DisplayMode mode, float deform_scale, float result_ma
         const double s = node < scalars->size() ? (*scalars)[node] : 0.0;
         auto rgb = fea_colormap(static_cast<float>(s) / denom);
         if (sweep_on) {
+            std::array<float, 3> carry = kUnsweptGrey;
+            if (carry_scalars != nullptr) {
+                const double prior = node < carry_scalars->size() ? (*carry_scalars)[node] : 0.0;
+                carry = fea_colormap(static_cast<float>(prior) / carry_denom);
+            }
             // Rest position, not the deformed one: the reveal is a fixed plane
             // through the part, and letting the exaggerated warp move it would
             // make the front wobble as the load ramps.
             const float x = static_cast<float>(
                 (sweep_dir.dot(result_rest_[node]) - sweep_u_min) / sweep_span);
-            rgb = sweep_sample_color(rgb, x, field_sweep_.front, field_sweep_.feather);
+            rgb = sweep_sample_color(rgb, carry, x, field_sweep_.front,
+                                     field_sweep_.feather);
         }
         data.insert(data.end(), {rgb[0], rgb[1], rgb[2], 1.0f});
     };
@@ -1736,6 +1757,13 @@ void Viewport::render(int width, int height, DisplayMode mode, float deform_scal
     const bool results_mode =
         mode == DisplayMode::kResultsVonMises || mode == DisplayMode::kResultsDisplacement ||
         mode == DisplayMode::kResultsError || mode == DisplayMode::kResultsGradient;
+    const float result_alpha =
+        results_mode ? std::clamp(cinema_view_.result_alpha, 0.0f, 1.0f) : 1.0f;
+    glUniform1f(glGetUniformLocation(model_program_, "u_alpha"), result_alpha);
+    if (result_alpha < 1.0f) {
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    }
 
     // Push filled surfaces slightly back so edge lines win the depth test.
     const bool draw_edges = show_wireframe || (show_undeformed && results_mode);
@@ -1761,12 +1789,14 @@ void Viewport::render(int width, int height, DisplayMode mode, float deform_scal
         const FieldSweep& baked = baked_sweep_;
         const bool sweep_changed =
             baked.active != field_sweep_.active || baked.axis != field_sweep_.axis ||
-            baked.front != field_sweep_.front || baked.feather != field_sweep_.feather;
+            baked.front != field_sweep_.front || baked.feather != field_sweep_.feather ||
+            baked.carry_mode != field_sweep_.carry_mode ||
+            baked.carry_max != field_sweep_.carry_max;
         if (result_dirty_ || baked_mode_ != mode || baked_scale_ != deform_scale ||
             baked_max_ != result_max || sweep_changed) {
             bake_result(mode, deform_scale, result_max);
         }
-        if (result_vertex_count_ > 0) {
+        if (result_alpha > 0.001f && result_vertex_count_ > 0) {
             glBindVertexArray(result_vao_);
             glDrawArrays(GL_TRIANGLES, 0, result_vertex_count_);
         }
@@ -1782,6 +1812,7 @@ void Viewport::render(int width, int height, DisplayMode mode, float deform_scal
                            view.data());
         glUniformMatrix4fv(glGetUniformLocation(line_program_, "u_proj"), 1, GL_FALSE,
                            proj.data());
+        glUniform1f(glGetUniformLocation(line_program_, "u_alpha"), result_alpha);
         // Core profile may clamp >1; still request 1.5 for drivers that honor it.
         glLineWidth(1.5f);
 
@@ -1805,6 +1836,13 @@ void Viewport::render(int width, int height, DisplayMode mode, float deform_scal
         glLineWidth(1.0f);
         glDisable(GL_BLEND);
     }
+
+    if (results_mode && cinema_view_.overlay_on_results) {
+        // The carried mesh is composited over the fading field. Its geometry is
+        // the exact recorded stage/transition already uploaded by the cinema.
+        draw_cinema(view, proj, eye);
+    }
+    glDisable(GL_BLEND);
 
     glBindVertexArray(0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -1846,6 +1884,7 @@ void Viewport::draw_cinema(const Eigen::Matrix4f& view, const Eigen::Matrix4f& p
                            view.data());
         glUniformMatrix4fv(glGetUniformLocation(line_program_, "u_proj"), 1, GL_FALSE,
                            proj.data());
+        glUniform1f(glGetUniformLocation(line_program_, "u_alpha"), 1.0f);
         // The opening act carries the frame on these lines alone, so they are
         // drawn heavier than the studio wireframe. Core profile may clamp the
         // width; drivers that honour it look better, and this path is cinema-
@@ -1893,11 +1932,15 @@ void Viewport::draw_cinema(const Eigen::Matrix4f& view, const Eigen::Matrix4f& p
         const bool draw_edges = cinema_view_.edges && cinema_edge_vertex_count_ > 0 &&
                                 cinema_view_.edge_alpha > 0.0f;
         if (draw_edges) {
-            // Push the fill back so the cell edges win the depth test against
-            // their own faces, same as the wireframe pass above.
+            // Push ordinary cinema fill back so its own edges win. A cinema mesh
+            // carried over an already depth-written result surface must instead
+            // come slightly forward or the previous state would be requested but
+            // fully occluded by the new one.
             glEnable(GL_POLYGON_OFFSET_FILL);
-            glPolygonOffset(1.0f, 1.0f);
+            const float offset = cinema_view_.overlay_on_results ? -1.0f : 1.0f;
+            glPolygonOffset(offset, offset);
         }
+        glDepthFunc(GL_LEQUAL);
         glUseProgram(cinema_program_);
         glUniformMatrix4fv(glGetUniformLocation(cinema_program_, "u_view"), 1, GL_FALSE,
                            view.data());
@@ -1941,6 +1984,7 @@ void Viewport::draw_cinema(const Eigen::Matrix4f& view, const Eigen::Matrix4f& p
             glDepthFunc(GL_LESS);
         }
     }
+    glDepthFunc(GL_LESS);
 
     glDisable(GL_BLEND);
 }

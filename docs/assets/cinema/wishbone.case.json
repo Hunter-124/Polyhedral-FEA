@@ -1,0 +1,171 @@
+{
+  "schema": "polymesh.cinema.case/1",
+  "part": "wishbone",
+  "geometry": "tests/fixtures/parts/wishbone.step",
+  "generator": {
+    "script": "scripts/gen_cad_parts.py",
+    "write": "python3 scripts/gen_cad_parts.py --part wishbone",
+    "verify": "python3 scripts/gen_cad_parts.py --part wishbone --check",
+    "note": "Every dimension below is a module constant in that script or a measurement of the shipped STEP. --check rebuilds from those constants and compares topology and volume-level facts; it never compares bytes, because the STEP header carries a write timestamp."
+  },
+  "description": "Suspension wishbone / A-arm. Two coaxial chassis-side bushing eyes on the y pivot axis fork through two swept arms with opposite out-of-plane profiles, tied by one swept cross-brace, into a single upright-side ball-joint boss. Frame: +x outboard toward the upright, +y the chassis pivot axis (fore-aft), +z up. SI metres.",
+  "material": {
+    "name": "structural steel",
+    "E": 200000000000.0,
+    "nu": 0.3,
+    "rho": 7850.0
+  },
+  "dimensions_m": {
+    "bbox_min": [-0.01, -0.164, -0.01],
+    "bbox_max": [0.334, 0.164, 0.075160215238],
+    "extent": [0.344, 0.328, 0.085160215238],
+    "bbox_diagonal": 0.482879138355948,
+    "volume_m3": 0.0010017366651648,
+    "mass_kg": 7.86363282154371,
+    "volume_over_bbox_volume": 0.104252,
+    "measurement": "tight bounding box via BRepBndLib::AddOptimal and BRepGProp volume of tests/fixtures/parts/wishbone.step after reopening it; OpenCASCADE's default 1e-7 m box gap has been removed from each bound.",
+    "topology": {
+      "solids": 1,
+      "faces": 15,
+      "edges": 66
+    },
+    "members": {
+      "arm_radius": 0.017,
+      "brace_radius": 0.013,
+      "eye_outer_radius": 0.03,
+      "eye_length": 0.048,
+      "boss_outer_radius": 0.034,
+      "boss_height": 0.06
+    },
+    "wall_thickness": {
+      "min_m": 0.02207,
+      "p1_m": 0.02326,
+      "p5_m": 0.02512,
+      "median_m": 0.03388,
+      "samples": 3923,
+      "method": "inward ray cast along the area-weighted vertex normal against the full tessellation of the reopened STEP",
+      "thinnest_location": "the bushing annulus at both eyes: eye_outer 0.030 - bore 0.008 = 0.022 m",
+      "why_it_is_a_first_class_dimension": "the mesher snaps boundary nodes to the exact BRep inside a band of 1.5 * fill_h, so a wall thinner than that band lets both sides snap onto each other and the skin goes non-manifold. An earlier 24/9.5 mm eye and 28/12 mm boss left a 14.5 mm minimum wall and failed the product fill guard at h = 8 mm and h = 16 mm."
+    }
+  },
+  "fixtures": [
+    {
+      "role": "support",
+      "label": "support_y_lo",
+      "cad_face_index": null,
+      "expected_gui_region": 5,
+      "surface_area_m2": 0.00904778684234,
+      "tessellated_area_m2": null,
+      "interface": "chassis bushing outer sleeve, -y eye",
+      "sleeve": {
+        "axis": [0.0, 1.0, 0.0],
+        "radius": 0.03,
+        "centre": [0.02, -0.14, 0.02],
+        "extent_along_axis": [-0.164, -0.116]
+      },
+      "fix": [true, true, true],
+      "description": "Press-fit chassis bushing sleeve; all translational DOFs constrained."
+    },
+    {
+      "role": "support",
+      "label": "support_y_hi",
+      "cad_face_index": null,
+      "expected_gui_region": 6,
+      "surface_area_m2": 0.00904778684234,
+      "tessellated_area_m2": null,
+      "interface": "chassis bushing outer sleeve, +y eye",
+      "sleeve": {
+        "axis": [0.0, 1.0, 0.0],
+        "radius": 0.03,
+        "centre": [0.02, 0.14, 0.02],
+        "extent_along_axis": [0.116, 0.164]
+      },
+      "fix": [true, true, true],
+      "description": "Second press-fit chassis bushing sleeve. Constraining two separated sleeves creates the real pivot baseline and torsional load path."
+    }
+  ],
+  "load": {
+    "role": "load",
+    "label": "loaded_boss",
+    "cad_face_index": null,
+    "expected_gui_region": 0,
+    "surface_area_m2": 0.0128176980277,
+    "tessellated_area_m2": null,
+    "interface": "upright-side outer ball-joint boss",
+    "sleeve": {
+      "axis": [0.0, 0.0, 1.0],
+      "radius": 0.034,
+      "centre": [0.3, 0.0, 0.044],
+      "extent_along_axis": [0.014, 0.074]
+    },
+    "resultant_n": [-25000.0, 0.0, -40000.0],
+    "resultant_magnitude_n": 47169.90566028302,
+    "resultant_direction_note": "32.005 degrees from vertical, tilted inboard (-x). Vertical plus lateral, no invented fore-aft component.",
+    "derivation": {
+      "case": "linear-elastic proof load for a suspension control-arm showcase",
+      "basis": "10 × the rounded 4.717 kN combined bump/cornering design vector",
+      "purpose": "Produces a visibly legible but still elastic distributed stress field on the two-sleeve/one-boss load path.",
+      "status": "authored numerical proof load, explicitly not a measured vehicle event"
+    },
+    "hand_check": {
+      "linearity": "The solver is linear elastostatic: multiplying the conserved resultant by 10 multiplies stress and physical displacement by exactly 10 while leaving the ZZ relative indicator unchanged.",
+      "solver_probe": "The verified h=5.5 mm tet4 probe with these distributed interfaces produced 3.316 MPa at 4.717 kN, so the exact linear 10× proof-load expectation is 33.160 MPa before the final take is regenerated.",
+      "status": "probe-derived expectation, not substituted for the final manifest"
+    },
+    "description": "Conserved resultant distributed over the complete outer boss sleeve. Two separated outer-sleeve supports plus one off-plane loaded boss produce a non-uniform bending-plus-torsion field while avoiding a point or edge singularity masquerading as material stress."
+  },
+  "mesh": {
+    "mesher": "tet",
+    "solver": "direct",
+    "order": 1,
+    "feature_grading": false,
+    "support_load_grading": false,
+    "spectral_filtering": true,
+    "h_m": 0.0055,
+    "adapt_passes": 0,
+    "eta_target": 0.0,
+    "h_rationale": "0.0055 m keeps the 1.5 * fill_h snap band at 0.00825 m, 2.67x below the measured 0.02207 m minimum wall. Geometry and support/load grading are disabled for the verified uniform fill; exact support/load regions still drive boundary conditions. Element spans: bushing wall 4.01, boss wall 4.36, brace diameter 4.73, arm diameter 6.18. h_rel is 0.0114 of the 0.4829 m bbox diagonal. The full ZZ field is reported without implying a hidden remesh.",
+    "boundary_node_supply_at_h": {
+      "support_outer_sleeve_each": "order of 598 surface triangles and 299 nodes; 34.27 elements around by 8.73 along",
+      "loaded_outer_boss": "order of 847 surface triangles and 423 nodes; 38.84 elements around by 10.91 along",
+      "purpose": "shows neither support nor loaded regions resolve to a starved patch"
+    },
+    "status": "High-resolution linear verification solve with distributed interfaces. Measured cells, DOF, quality and achieved error belong in manifest.json."
+  },
+  "region_selection": {
+    "cad_faces": 15,
+    "predicted_tessellation_regions": 11,
+    "method": "The GUI grows region ids by flood-filling the display tessellation across shared edges while adjacent facet normals stay within 30 degrees (src/pipeline/src/scene.cpp Model::load), over the per-face triangle soup built in TopExp face order at deflection 5e-4 * bbox diagonal and angular deflection 0.2 rad (src/geom/src/cad_model.cpp). Replaying that exact algorithm on the shipped STEP gives 11 regions from 15 CAD faces: region 3 merges the two arms, the brace and the two inboard eye annuli, because the arms now blend into those annuli tangentially (junction interior angle 150 to 203 degrees, i.e. G1-smooth, so the 30-degree fill crosses it). Region id therefore no longer equals CAD face index, and the mapping above is explicit.",
+    "region_id_map": {
+      "0": "LOAD: boss outer cylinder",
+      "1": "boss +z annulus",
+      "2": "boss -z annulus",
+      "3": "both arms + brace + both inboard eye annuli (merged, smooth blends)",
+      "4": "ball-joint bore",
+      "5": "SUPPORT: -y eye outer cylinder",
+      "6": "SUPPORT: +y eye outer cylinder",
+      "7": "-y eye outboard annulus",
+      "8": "-y bushing bore",
+      "9": "+y eye outboard annulus",
+      "10": "+y bushing bore"
+    },
+    "verification": "GUI probes completed successfully with fix 5; fix 6; loadface 0. Regions are verified against the built product rather than left as predictions.",
+    "area_keys": "Boss outer sleeve analytic area 0.0128176980 m2; each eye outer sleeve 0.00904778684 m2. The two equal support regions are intentionally interchangeable because both are fixed.",
+    "why_the_interfaces_survive": "Each selected outer sleeve is one uninterrupted cylindrical region bounded by 90-degree annular edges. The 30-degree region flood therefore does not escape into a bore or neighboring arm.",
+    "surface_quality": "Worst convex edge 77.98 degrees, worst re-entrant crotch 290.44 degrees, measured over every tessellated edge. No knife edge, no tangential cusp, and no non-adjacent CAD face pair in contact, so there is no coincident-skin site anywhere on the part."
+  },
+  "checks_enforced_by_generator": [
+    "valid BRep, exactly one solid, positive volume, before and after the bores are cut",
+    "all three bore axes classify OUT along their whole sleeve length, and wall material classifies IN just outside each bore",
+    "exactly three cylindrical faces at the two bore radii, each at full sleeve area, so no bore was interrupted by a boolean",
+    "both arms exceed 0.012 m of out-of-plane excursion from the plane through the three eye centres, with opposite signs, so the fork is never coplanar",
+    "each arm spine travels at least 0.015 m in z"
+  ],
+  "measured_out_of_plane_m": {
+    "arm_hi": 0.02542,
+    "arm_lo": -0.019942,
+    "arm_hi_z_travel": 0.03816,
+    "arm_lo_z_travel": 0.035823,
+    "note": "Signed peak distance from the plane through the two eye centres and the boss centre. Opposite signs are the numeric statement that this is a three-dimensional fork and not a perforated plate. The spines are unchanged from the first revision; only member and ring radii moved."
+  }
+}

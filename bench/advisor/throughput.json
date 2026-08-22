@@ -195,6 +195,48 @@
       "rows_per_s": 0.1719,
       "mesh_ms_frac": 0.9447,
       "mesh_cache_recommended": true
+    },
+    {
+      "batch": 3,
+      "started": "2026-08-22T19:02:39Z",
+      "wall_s": 3.6,
+      "pairs_total": 4800,
+      "dedup_hits": 0,
+      "launched": 4800,
+      "shards": [
+        {
+          "shard": 0,
+          "campaign": "advisor-batch-3-s0-hunter-pc",
+          "wall_s": 0.0,
+          "rows": 0,
+          "returncode": 1
+        },
+        {
+          "shard": 1,
+          "campaign": "advisor-batch-3-s1-hunter-pc",
+          "wall_s": 0.0,
+          "rows": 0,
+          "returncode": 1
+        },
+        {
+          "shard": 2,
+          "campaign": "advisor-batch-3-s2-hunter-pc",
+          "wall_s": 0.0,
+          "rows": 0,
+          "returncode": 1
+        },
+        {
+          "shard": 3,
+          "campaign": "advisor-batch-3-s3-hunter-pc",
+          "wall_s": 0.0,
+          "rows": 0,
+          "returncode": 1
+        }
+      ],
+      "rows_written": 0,
+      "rows_per_s": 0.0,
+      "mesh_ms_frac": 0.0,
+      "mesh_cache_recommended": false
     }
   ]
 }

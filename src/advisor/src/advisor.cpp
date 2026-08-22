@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "advisor/advisor.hpp"
+#include "advisor/calibration.hpp"
 
 #include <nlohmann/json.hpp>
 #include <onnxruntime_cxx_api.h>
@@ -98,12 +99,12 @@ double from_log10(double value) {
 // order. `rel_err_rel` is `rel_err` centred on its per-case median and is
 // deliberately adjacent to it, so a future head insertion cannot separate the
 // pair without this list failing the load-time check.
-constexpr std::array<const char*, 9> kOutputNames{"rel_err",  "rel_err_rel",   "geo_chamfer",
-                                                  "geo_p99",  "dof",           "mesh_ms",
-                                                  "solve_ms", "failure_logit", "policy"};
+constexpr std::array<const char*, 12> kOutputNames{
+    "rel_err",  "rel_err_rel", "geo_chamfer", "geo_p99",   "dof",           "mesh_ms",
+    "solve_ms", "solve_flops", "solve_bytes", "mesh_work", "failure_logit", "policy"};
 
 // The activation taps, in the order `scripts/advisor/export_onnx.py` appends
-// them AFTER the nine contract outputs. Appended, never interleaved: the
+// them AFTER the twelve contract outputs. Appended, never interleaved: the
 // contract indices above are what `evaluate()` unpacks positionally, so a tap
 // inserted among them would silently re-label every head.
 //
@@ -122,7 +123,7 @@ constexpr const char* kActivationLayoutSchema = "polymesh.advisor.activation_lay
 /// The `layers` names, in the order `AdvisorNet.activations()` emits them.
 constexpr std::array<const char*, 4> kLayerNames{"input", "trunk.fc1", "trunk.fc2", "heads"};
 
-/// The nine contract tensors, unpacked positionally. Index i is
+/// The twelve contract tensors, unpacked positionally. Index i is
 /// `kOutputNames[i]`, and construction has already proven the graph agrees with
 /// that list name-by-name, so these are not a guess.
 AdvisorRawOutputs unpack(const std::vector<std::vector<float>>& raw) {
@@ -134,8 +135,11 @@ AdvisorRawOutputs unpack(const std::vector<std::vector<float>>& raw) {
     out.dof_log10 = static_cast<double>(raw[4][0]);
     out.mesh_ms_log10 = static_cast<double>(raw[5][0]);
     out.solve_ms_log10 = static_cast<double>(raw[6][0]);
-    out.failure_logit = static_cast<double>(raw[7][0]);
-    out.policy.assign(raw[8].begin(), raw[8].end());
+    out.solve_flops_log10 = static_cast<double>(raw[7][0]);
+    out.solve_bytes_log10 = static_cast<double>(raw[8][0]);
+    out.mesh_work_log10 = static_cast<double>(raw[9][0]);
+    out.failure_logit = static_cast<double>(raw[10][0]);
+    out.policy.assign(raw[11].begin(), raw[11].end());
     return out;
 }
 
@@ -174,6 +178,8 @@ struct Advisor::Impl {
     /// regret across thresholds 0.05-0.8, so the choice is made on pick-failure
     /// rate instead: 27.5% at 0.05 against 31.2% at 0.5.
     double gate_threshold = std::numeric_limits<double>::quiet_NaN();
+    AdvisorObjective objective = AdvisorObjective::kAccuracy;
+    std::optional<HostCalibration> calibration;
 
     /// Out-of-distribution test, from ood.json.
     ///
@@ -627,7 +633,7 @@ void Advisor::Impl::load_activation_layout(const std::filesystem::path& dir,
                                std::to_string(hidden));
         }
 
-        // Seven regressors plus the failure logit plus one policy dimension per
+        // Ten regressors plus the failure logit plus one policy dimension per
         // action dim -- the same accounting `evaluate()` unpacks, so a drawn
         // "heads" layer cannot have more or fewer circles than the graph has
         // outputs.
@@ -1009,7 +1015,7 @@ AdvisorRawOutputs Advisor::Impl::forward(const FeatureColumns& columns,
 
     frame->outputs = out;
     // The `heads` layer of the drawing is the graph's own head outputs, in
-    // `NetworkLayout` "heads" order: the seven regressors, the failure logit,
+    // `NetworkLayout` "heads" order: the ten regressors, the failure logit,
     // then the policy vector. Copied from the SAME tensors the decision is made
     // from, so a lit head circle and the recommendation it justifies cannot
     // disagree. Reported pre-activation, exactly as the graph emits them: the
@@ -1042,15 +1048,35 @@ AdvisorRawOutputs Advisor::Impl::forward(const FeatureColumns& columns,
     return out;
 }
 
-Advisor::Advisor(const std::filesystem::path& model_dir) : impl_(std::make_unique<Impl>()) {
+Advisor::Advisor(const std::filesystem::path& model_dir, AdvisorObjective objective)
+    : impl_(std::make_unique<Impl>()) {
     const std::filesystem::path graph = model_dir / "model.onnx";
     if (!std::filesystem::exists(graph)) {
         throw AdvisorError("advisor: no model.onnx in " + model_dir.string());
     }
+    impl_->objective = objective;
+    if (objective == AdvisorObjective::kEfficiency) {
+        const std::filesystem::path calibration_path =
+            model_dir / "hosts" / (local_host_name() + ".json");
+        if (std::filesystem::exists(calibration_path)) {
+            const json host = read_json(calibration_path);
+            HostCalibration calibration;
+            calibration.host = host.at("host").get<std::string>();
+            calibration.flops_per_s = host.at("flops_per_s").get<double>();
+            calibration.bytes_per_s = host.at("bytes_per_s").get<double>();
+            calibration.ref_mesh_ms = host.at("ref_mesh_ms").get<double>();
+            calibration.generated_utc = host.at("generated_utc").get<std::string>();
+            if (!(calibration.flops_per_s > 0.0) || !(calibration.bytes_per_s > 0.0) ||
+                !(calibration.ref_mesh_ms > 0.0)) {
+                throw AdvisorError("advisor: invalid host calibration " +
+                                   calibration_path.string());
+            }
+            impl_->calibration = std::move(calibration);
+        }
+    }
     impl_->load_normalization(model_dir);
     impl_->load_clamps(model_dir);
     impl_->load_ood(model_dir);
-
     // Determinism: one intra-op thread, sequential execution, CPU only. A
     // recommendation that changes with the thread pool is not reproducible
     // evidence, and campaign rows must be replayable.
@@ -1073,7 +1099,7 @@ Advisor::Advisor(const std::filesystem::path& model_dir) : impl_(std::make_uniqu
     }
     impl_->input_name = impl_->session->GetInputNameAllocated(0, allocator).get();
 
-    // The nine contract outputs are still matched name-by-name and position-by
+    // The twelve contract outputs are still matched name-by-name and position-by
     // position: `evaluate()` unpacks them positionally, so this list is load
     // -time proof, not documentation. The three activation taps are the ONLY
     // permitted extras and only in their contract order -- anything else is a
@@ -1258,6 +1284,12 @@ AdvisorDecision Advisor::decide(const FeatureColumns& columns, double max_dof,
         // Every candidate is an action the campaign actually ran, so no query
         // asks the regression heads to extrapolate; that is the failure mode
         // that produced predicted_dof = 1.5e15 on an unseen part.
+        struct EfficiencyCandidate {
+            AdvisorDecision action;
+            double accuracy_score = std::numeric_limits<double>::infinity();
+            double predicted_seconds = std::numeric_limits<double>::infinity();
+        };
+        std::vector<EfficiencyCandidate> efficient_survivors;
         double best_score = std::numeric_limits<double>::infinity();
         double best_risk_score = std::numeric_limits<double>::infinity();
         AdvisorDecision best_survivor = impl.default_decision;
@@ -1317,6 +1349,39 @@ AdvisorDecision Advisor::decide(const FeatureColumns& columns, double max_dof,
                 best_survivor = candidate;
                 have_survivor = true;
             }
+            if (risk <= impl.gate_threshold && impl.calibration.has_value()) {
+                const double solve_seconds =
+                    predicted_seconds(from_log10(out.solve_flops_log10),
+                                      from_log10(out.solve_bytes_log10), *impl.calibration);
+                const double mesh_seconds =
+                    from_log10(out.mesh_work_log10) * impl.calibration->ref_mesh_ms / 1000.0;
+                const double total_seconds = solve_seconds + mesh_seconds;
+                if (std::isfinite(total_seconds)) {
+                    efficient_survivors.push_back({.action = candidate,
+                                                   .accuracy_score = score,
+                                                   .predicted_seconds = total_seconds});
+                }
+            }
+        }
+        if (have_survivor && impl.objective == AdvisorObjective::kEfficiency &&
+            impl.calibration.has_value()) {
+            // A 5% envelope is multiplicative in the de-logged relative error.
+            // In log10 space that is an additive log10(1.05), which remains
+            // well-defined even when the centred score itself is negative.
+            const double accuracy_limit = best_score + std::log10(1.05);
+            double best_seconds = std::numeric_limits<double>::infinity();
+            for (const EfficiencyCandidate& candidate : efficient_survivors) {
+                if (candidate.accuracy_score <= accuracy_limit &&
+                    candidate.predicted_seconds < best_seconds) {
+                    best_seconds = candidate.predicted_seconds;
+                    best_survivor = candidate.action;
+                }
+            }
+            best_survivor.note =
+                "efficiency objective: lowest calibrated cost within 5% of best accuracy";
+        } else if (have_survivor && impl.objective == AdvisorObjective::kEfficiency) {
+            best_survivor.note =
+                "efficiency objective requested without host calibration; accuracy used";
         }
 
         if (have_survivor) {
@@ -1366,6 +1431,16 @@ AdvisorDecision Advisor::decide(const FeatureColumns& columns, double max_dof,
     decision.predicted_dof = from_log10(scored.dof_log10);
     decision.predicted_mesh_ms = from_log10(scored.mesh_ms_log10);
     decision.predicted_solve_ms = from_log10(scored.solve_ms_log10);
+    decision.predicted_solve_flops = from_log10(scored.solve_flops_log10);
+    decision.predicted_solve_bytes = from_log10(scored.solve_bytes_log10);
+    decision.predicted_mesh_work = from_log10(scored.mesh_work_log10);
+    if (impl.calibration.has_value()) {
+        const double seconds = predicted_seconds(
+            decision.predicted_solve_flops, decision.predicted_solve_bytes, *impl.calibration);
+        if (std::isfinite(seconds)) {
+            decision.predicted_solve_seconds = seconds;
+        }
+    }
     // Reported RAW. This head is a log10 difference, not a log10 level, so
     // de-logging it would turn a per-case score into a meaningless ratio. A
     // non-finite output becomes NaN for the same reason `from_log10` does it:
@@ -1428,6 +1503,10 @@ AdvisorDecision Advisor::decide(const FeatureColumns& columns, double max_dof,
         vetoed.predicted_dof = unknown;
         vetoed.predicted_mesh_ms = unknown;
         vetoed.predicted_solve_ms = unknown;
+        vetoed.predicted_solve_flops = unknown;
+        vetoed.predicted_solve_bytes = unknown;
+        vetoed.predicted_mesh_work = unknown;
+        vetoed.predicted_solve_seconds.reset();
         vetoed.failure_prob = unknown;
         vetoed.ood_distance = decision.ood_distance;
         vetoed.clamped = decision.clamped;
@@ -1496,6 +1575,12 @@ std::string to_json(const AdvisorDecision& d) {
                    {"predicted_dof", d.predicted_dof},
                    {"predicted_mesh_ms", d.predicted_mesh_ms},
                    {"predicted_solve_ms", d.predicted_solve_ms},
+                   {"predicted_solve_flops", d.predicted_solve_flops},
+                   {"predicted_solve_bytes", d.predicted_solve_bytes},
+                   {"predicted_mesh_work", d.predicted_mesh_work},
+                   {"predicted_solve_seconds", d.predicted_solve_seconds.has_value()
+                                                   ? json(*d.predicted_solve_seconds)
+                                                   : json(nullptr)},
                    {"failure_prob", d.failure_prob},
                    {"ood_distance", d.ood_distance},
                    {"vetoed", d.vetoed},

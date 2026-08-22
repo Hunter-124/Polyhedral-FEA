@@ -21,11 +21,11 @@ stdout.
 |---|---|
 | Take | 3600 frames at a fixed 1/60 s virtual timestep = 60.000 s. The clock is set from the frame **index**, never accumulated from real frame time. |
 | Frame | 1920×1080. `--size` sets Xvfb and `POLYMESH_GUI_SIZE`; the recorded resolution is measured from the PNG rather than assumed. |
-| Acts | `skeleton` 0.13, `deliberate` 0.15, `build` 0.18, `mesh_hold` 0.09, `solve` 0.45. At 60 s these are 7.8 / 9.0 / 10.8 / 5.4 / 27.0 s. The GUI prints exact frame spans into the manifest. |
-| Left panel | 0.42 of the width. It opens once, then changes in place: exact-CAD spectrum → deployed network → actual-cell microscope → equation board. Every view cross-fades directly from the view before it; the solve boundary no longer replays the network. Pane geometry never moves after opening. |
-| Bottom strip | Constant height. Over-wide rows shrink to fit; they never wrap or clip. Labels remain stable while fast computation animates above them. |
-| Camera | Set once, at `cinema on`, to the union of the skeleton and the mesh bounds (`Viewport::frame_content(kCinema)`, yaw 0.70, pitch 0.72, 0.90 fill) and then locked. There is no cut anywhere in the film. |
-
+| Acts | `skeleton` 0.13, `deliberate` 0.15, `build` 0.18, `mesh_hold` 0.09, `solve` 0.45. At 60 s these are 7.8 / 9.0 / 10.8 / 5.4 / 27.0 s. |
+| Analysis pane | 0.42 of the width. Exact-CAD evidence → four wide activation lanes → cell audit → active-equation graph, with direct opacity handoffs. During build the measured final pass remains visible while the later real mesh lands. |
+| Bottom ledger | Constant height, horizontally composed: headline/numbers left, plain-language disclosure right, provenance full-width below. |
+| Camera | Fit before frame zero by solving the perspective inequalities on all eight corners at the settled pane aspect, then re-fit to the exact rest∪fully-exaggerated result envelope. It never moves during the captured take. |
+| Mechanics overlay | Two support glyphs and one force arrow are anchored to the selected CAD regions and persist through every act. The arrow direction and magnitude come from the real resultant. |
 ### What is interpolated
 
 Time, opacity, the shrink-toward-centroid reveal, the spatial handoff front, the
@@ -65,11 +65,11 @@ because interpolating it is exact rather than approximate — see
   and BC/load regions: once with spectral filtering disabled and once with the
   final `SimSetup`. The two `size_field` functions are evaluated at a
   deterministic, bounded walk over `Model::surface.vertices` and at every
-  sample of the selected CAD edge. The default yields 1,753 on-part samples:
-  target h is 2.426–7.092 mm before filtering and 2.657–5.953 mm after filtering.
-- The final plan's `SpectralSizingReport` supplies modes kept/total, retained
-  energy, denoised curve seeds, predicted density before/after, and exact-BRep
-  provenance.
+  sample of the selected CAD edge. The exact sample count and pre/post-filter
+  target-h ranges are printed by the GUI and copied into the manifest.
+- When feature grading is enabled, `SpectralSizingReport` supplies modes,
+  retained energy and density changes. The wishbone fallback records
+  `feature_grading=false`; its FFT is labelled geometry analysis only.
 - The upper chart is one real `CadEdge::kappa_samples` trace and the output of
   `geom::lowpass_signal(..., 0.995)`. A scan cursor advances over the same edge
   samples highlighted on the part. The lower chart is the non-DC first
@@ -96,10 +96,9 @@ inspectable hold. Candidate-specific prose does not flash during the pass lane:
 the strip keeps one stable explanation while the network itself carries motion.
 
 The feature panel and full on-part target-spacing field enter this act intact.
-Over the first 1.3 s the panel cross-fades directly into the deployed network
-while the rings settle to the restrained carry opacity. The network therefore
-appears as the consumer of the field just shown, not as a fresh scene over an
-empty wireframe.
+Over the first 1.3 s the panel cross-fades into four wide activation lanes while
+the rings settle to their carry opacity. The network therefore appears as the
+consumer of the field just shown, not a fresh scene over an empty wireframe.
 
 - **The node fills are the graph's own tensors**, read out of the ONNX session:
   `advisor::ActivationFrame::input` / `fc1` / `fc2` (post-GELU) / `heads`. Not a
@@ -113,20 +112,16 @@ empty wireframe.
   matplotlib's `RdBu_r` to 0.0115 in unit RGB). Blue negative, near-white zero,
   red positive. Zero lands on the neutral centre, so the range mapped onto
   [−1, 1] is symmetric.
-- **Connections**: the 180 strongest of 15,936, ranked per frame by
-  `|w_ji · a_i|` from the exported weight blocks
-  (`activation_layout.json` edge blocks 96×53, 96×96, 17×96). Ranking by weight
-  alone would be wrong — a large weight on a silent unit carries nothing. Line
-  opacity and width are both `|w_ji · a_i| / max`. The count is drawn from the
-  constant that selects it (`kDrawnConnections`), so shrinking it shrinks the
-  on-screen sentence too.
-- **Head names are shown in plain language.** The mapping is a table in
-  `apps/gui/cinema.cpp` (`kHeadNames`); `activation_layout.json` is not rewritten,
-  because it is the exporter's record of what the graph emits. An unmapped label
-  falls through **verbatim** rather than being de-underscored by a rule — a
-  mechanical transform would have produced a confident-looking label nobody chose.
+- **Connections**: the 180 strongest of 18,912, ranked per frame by
+  `score = activation_norm × abs(weight)`, then drawn through the branch-colored
+  `activation_layout.json` edge blocks (96×81, 96×96, 20×96). Opacity is the
+  replay channel during build; stroke width remains the measured normalised
+  `|w_ji · a_i|` so animation does not change the encoded magnitude.
+- **Head names are plain language.** Every head remains a measured circle in the
+  output lane; the selected head is named in the decision chip, while this file
+  carries the complete mapping. `activation_layout.json` is not rewritten.
 
-  | On screen | Graph tensor |
+  | Plain label | Graph tensor |
   |---|---|
   | predicted error | `rel_err` |
   | error vs this part's median | `rel_err_rel` |
@@ -135,6 +130,9 @@ empty wireframe.
   | unknowns | `dof` |
   | meshing time | `mesh_ms` |
   | solve time | `solve_ms` |
+  | portable solve work | `solve_flops` |
+  | portable data traffic | `solve_bytes` |
+  | host-normalized meshing work | `mesh_work` |
   | failure risk | `failure_logit` |
   | cell size | `policy_h_rel` |
   | refinement passes | `policy_adapt_passes` |
@@ -146,66 +144,59 @@ empty wireframe.
   | mesher: hybrid VEM | `policy_mesher_logit_hybrid_vem` |
   | mesher: hybrid, hex + pyramids | `policy_mesher_logit_hybrid_zoo` |
 
-- During the pass lane the strip reports only the measured forward-pass index,
-  total pass count, candidate count and failure-gate threshold. During the final
-  hold it names the settled decision/refusal. Candidate scores remain visible on
-  their real head units.
-- The default complex part is outside the advisor's validated operating
-  envelope. The OOD refusal is the deployed result, not an error in the film:
-  `AdvisorDecision::vetoed` is shown and its action is not applied.
+- During the pass lane the strip reports only measured pass/candidate/gate data.
+  The final state names one of four outcomes without conflation: applied action,
+  measured veto, unrecognised action, or unavailable advisor.
+- For the wishbone's new descriptor combination, the OOD distance is unavailable.
+  The safety gate abstains, the proposal is not applied, and the fallback remains explicit.
 
 ## Act 3 — `build`: the mesher executing the decision
 
-The advisor outcome is held for `CinemaState::kDecisionLead` (1.6 s) before the
-first cell appears. The default part is refused as out of distribution, so the
-explicit fallback remains authoritative: E = 200 GPa, ν = 0.3, graded tet,
-h = 12 mm, spectral sizing, one measured adaptive pass with no early η target,
-and quadratic CAD geometry. The strip labels this **Advisor abstained — verified
-fallback**; it never presents the vetoed hybrid action as executed.
+The advisor outcome is held for `CinemaState::kDecisionLead` (1.6 s). The
+wishbone is vetoed as out of distribution, so the explicit fallback remains
+authoritative: structural steel, a fine wall-resolving tet4 target, complete ZZ
+verification without an implied remesh, and explicit direct LDLT. The base mesh
+resolves each thin member with 4–6 elements; the opening FFT is geometry
+analysis, not a sizing input.
 
-- During the lead, the network holds its final measured pass. It then
-  cross-fades to the cell microscope as construction begins.
-- The 0.22-alpha target-spacing map carried from advisor scoring fades over the
-  larger of the 1.6 s decision lead or 18% of this act. Actual emitted cells
-  occupy the same part as those targets replace them; there is no clear/reset.
+- During build the measured refusal pass remains visible. A halo/connection
+  opacity wave travels through the fixed tensor values; only after it reaches
+  the output lane do the later real snapshot's cells land. The strip says
+  **aligned replay · computed sequentially**.
+- The 0.22-alpha target-spacing map carried from advisor scoring fades only as
+  real cells replace it in place. There is no clear/reset.
 - An accepted decision still writes mesher, `h = h_rel × bbox diagonal`, adapt
   passes, η target and order into `SimSetup`. A refusal or unrecognised mesher is
   never substituted silently.
 - Order above 2 maps to the one supported quadratic promotion
   (tet4/hex8 → tet10/hex20), and the executed order is displayed.
-- **Stages are the mesher's own.** One beat per `pipeline::MeshStage` of the
-  initial fill (`pass == 0`), in emission order, each carrying that stage's whole
-  `fea::NodalMesh`. The stage ids are `pipeline::kMeshStageNames`; the film draws
-  a plain-language name for each:
+- **Stages are the mesher's own.** `pipeline::MeshStage` snapshots retain their
+  real ids, pass, element/node counts and order in the manifest. The film folds
+  them into the refusal→fallback handoff rather than reserving a separate
+  “converting to solver elements” chapter:
 
-  | On screen | Stage id | What had finished |
+  | Manifest label | Stage id | What had finished |
   |---|---|---|
-  | laying down the cell grid | `lattice` | hex/pyramid/tet lattice at raw grid sites, unsnapped |
-  | splitting hexes into pyramids | `expand` | ADR-0013 hex→pyramid product expansion |
-  | pulling the surface onto the CAD | `snap` | free-surface boundary nodes projected onto the CAD surface |
-  | removing the cells the snap flattened | `peel` | snap-flattened transition fan tets deleted, boundary faces rebuilt |
-  | re-projecting the stragglers | `reproject` | per-node re-projection of the residual outliers |
-  | evening out the surface spacing | `smooth` | tangential relaxation of boundary-node spacing on curved walls |
-  | snapping what moved, again | `resnap` | second snap over the set the peel and smoothing left |
-  | pinning CAD edges and corners | `pin` | CAD vertices and sharp-edge curves hard-pinned (ADR-0035) |
-  | converting to solver elements | `fill` | the mesher's output in the solver element zoo |
-  | final checks | `ship` | exterior conform + ship gate + orphan compaction |
+  | laying down the cell grid | `lattice` | raw grid sites |
+  | splitting hexes into pyramids | `expand` | conformity transition expansion |
+  | pulling the surface onto the CAD | `snap` | free-surface projection |
+  | removing flattened cells | `peel` | invalid transition fans removed |
+  | re-projecting stragglers | `reproject` | residual projection |
+  | evening surface spacing | `smooth` | tangential relaxation |
+  | snapping what moved, again | `resnap` | second projection |
+  | pinning CAD edges and corners | `pin` | exact feature constraints |
+  | cells become the solve mesh | `fill` | solver element output |
+  | final checks | `ship` | conform/ship/orphan gates |
 
   A step that did not run never emits. A step that ran and moved nothing still
   emits, so two consecutive stages can be identical meshes — that is what the
   mesher did, and reporting it is preferred over hiding a round that ran.
-- **Cells appear in the mesher's own emission order** — their index in
-  `mesh.elements`. Nothing is sorted, and no cell is drawn before the stage that
-  built it. The count on screen is `reveal × cinema_element_count()`: exact
-  arithmetic on two real numbers, not an estimate of progress.
-- **Cells the viewport could not triangulate** (degenerate connectivity, faceless
-  poly-VEM cells) are counted by `Viewport::cinema_skipped_element_count()` and
-  called out on screen when nonzero, rather than the reveal being quietly
-  narrowed.
-- **The reveal shrink** pulls each cell toward its own centroid as it lands,
-  then closes over the first third of the stage beat. Cell edges are 0.8 px at
-  0.18 opacity so the dense 30k-cell take remains shaded geometry rather than a
-  black wire mass.
+- **Cells appear in the mesher's own emission order.** The presentation reveal
+  begins after the activation/refusal wave reaches the output lane; it does not
+  claim runtime progress. The source snapshot and displayed count are real.
+- Cells the viewport cannot triangulate are counted and called out, never hidden.
+- The reveal shrink pulls each cell toward its centroid as it lands, then closes.
+  Dense-mesh edges stay at 0.8 px / 0.18 opacity so shaded geometry survives.
 - **The cell microscope** reads the captured `NodalMesh`, not a second model. It
   reports the actual type histogram, displays order-1 corners beside order-2
   midside nodes, and shows `fea::summarize_cell_quality` once per snapshot.
@@ -228,11 +219,10 @@ is `SolveStage::result.volume_mesh`, not the linear construction scaffold.
 
 ## Act 5 — `solve`: the answer, in the order it is computed
 
-Intermediate passes are the real `pipeline::SolveStage` callbacks. After worker
+Intermediate passes are real `pipeline::SolveStage` callbacks. After worker
 finalisation, `CinemaState::adopt_final_result` replaces only the last snapshot
-with `SolveJob::take_result()` and refreshes its trace/quality. That makes final
-quadratic promotion, re-solve, VTU result and film byte-for-byte the same field.
-Beat order follows the adaptive loop with a hold after every moving result:
+with `SolveJob::take_result()`, so film, Studio and export use the same
+configured-order result. Beat order follows the real stage count:
 
 ```
 pass i:  stress sweep, stress hold
@@ -242,10 +232,16 @@ pass i:  stress sweep, stress hold
 after the last pass:  load ramp, hold
 ```
 
-The default has two solve stages. Their nominal 44.0 s beat sequence is scaled
-uniformly into the 27.0 s solve act (factor 0.613636), so no phase is dropped:
-both stress/error results and holds, the first-pass gradient, the incremental
-refine/re-refine hold, the load ramp and the final hold all remain present.
+The number of solve stages is data, not a storyboard constant. The recorder
+emits each stage's pass index, element/node/DOF count, global η and mark counts
+into `manifest.json`; `for_each_solve_beat` scales that sequence uniformly into
+the 27.0 s solve act without dropping a phase.
+
+The published wishbone stage is 40,170 tet4 cells / 9,796 nodes / 29,388 DOF,
+with 0.0200003 minimum and 0.249598 mean cell quality. The distributed 47.17 kN
+proof load gives 33.160 MPa true peak stress, 17.425 MPa p99 stress and
+0.0032879 mm physical peak displacement. `global_eta = 0.206942`; the film
+states that 20.69% verification result and never calls this take reference truth.
 
 There is no per-element solve order. The take replays completed fields, not a
 fabricated iteration timeline; the recorded solver token is described below.
@@ -282,8 +278,9 @@ longest bounding-box edge and the film says that is all it is.
 ### Stress
 
 `SolveStage::result.von_mises`, per node, Pa, drawn on the geometry that pass
-actually solved, at zero displacement exaggeration. The colour scale is that
-pass's own `max_von_mises`.
+actually solved, at zero displacement exaggeration. The colour scale is the
+measured nodal p99 so a constrained-node singularity cannot make 99% of the part
+dark; `max_von_mises` remains the true peak printed on screen and in the manifest.
 
 ### The stress gradient
 
@@ -291,6 +288,9 @@ pass's own `max_von_mises`.
 (`src/fea/src/stress.cpp`), in Pa/m, shown as MPa/mm. For each node it fits
 `s(x) ≈ s_i + g·(x − x_i)` over that node's own element patch by unweighted linear
 least squares and reports `|g|`.
+The display graph and viewport use the measured gradient p99; the steepest
+recovered value is still stated numerically. The final histogram bin is labelled
+`≥ p99` because it contains the complete upper tail.
 
 - It is a **recovery**, so it is exact for a field that is linear in x and
   first-order accurate on a curved one. Measured: rate 0.82 / 0.69 / 0.78 on
@@ -306,15 +306,15 @@ least squares and reports `|g|`.
 
 ### The error field
 
-`SolveStage::result.nodal_eta` — the Zienkiewicz-Zhu error field from that solve,
-colour-scaled by `max_nodal_eta`. The strip reports `PassTrace::global_eta` and
-the real `n_h_mark` / `n_p_mark` counts. With no configured adapt target it says
-**verification pass** rather than printing a fictitious 0% target.
+`SolveStage::result.nodal_eta` — the Zienkiewicz-Zhu error field from that solve.
+Colour uses the measured nodal p99 and the true `max_nodal_eta` remains data.
+The strip reports `PassTrace::global_eta`, the configured target and the real
+`n_h_mark` / `n_p_mark` counts.
 
 The error beat itself is a spatial handoff from the field immediately before it,
 not an instantaneous recolour. On pass 0 that carry field is the recovered
 gradient; on later passes it is von Mises stress because the gradient is shown
-only once. Both use their own maxima while the front crosses the part.
+only once. Each uses its own measured p99 display cap while the front crosses.
 
 ### Refine
 
@@ -324,15 +324,13 @@ snapshots by topological family plus corner coordinates quantized at
 family and compare only their four corners, so final polynomial promotion does
 not masquerade as wholesale h-refinement.
 
-The default measured transition preserves 27,808 cells, removes 2,688 and adds
-8,143 replacements. Its first 32% also performs the causal field→mesh handoff:
-the exact ZZ map that produced the marks fades only as the exact old→new topology
-diff rises over it. Persistent cells then remain rendered and briefly open by
-0.06 toward their centroids so internal changes can be seen; they never
-disappear. During the first 40% only removed cells collapse/fade; during the
-remaining 60% only added cells spawn with the existing centroid/reveal animation
-in the next mesh's storage order. The ending frame is exactly the mesh the next
-pass solved.
+The manifest records the measured kept/removed/added counts for this take. The
+transition's first 32% performs the causal field→mesh handoff: the exact ZZ map
+that produced the marks fades only as the exact old→new topology diff rises over
+it. Persistent cells remain rendered and briefly open by 0.06 toward their
+centroids; they never disappear. During the first 40% removed cells
+collapse/fade; during the remaining 60% added cells spawn in the next mesh's
+storage order. The ending frame is exactly the mesh the next pass solved.
 
 ### Load ramp
 
@@ -362,23 +360,21 @@ and a scaled force. A caller that also scaled non-zero prescribed displacements
 would have to do it in lockstep; nothing in `solve_elastostatics` does that
 automatically, and the film's case has none.
 
-The colour ramps with the shape because the stress scales with the load exactly as
-the displacement does. The scalar buffer stays the pass's own field and the
-**maximum is divided by λ** instead, making the drawn colour `λ·s / s_max`: the
-λ-scaled field against a fixed full-load legend, with no second copy of the field
-anywhere. λ itself is never floored — the number on screen and the displacement
-are the real λ, including exactly 0 — but the divisor is, at 1e-3, where every
-drawn colour is already within one part in a thousand of the bottom of the
-colormap.
+The colour ramps with the shape because stress scales with load exactly as
+displacement does. The scalar buffer stays the pass's own field and the measured
+**p99 display cap is divided by λ**, making the drawn colour `λ·s / p99`; the
+true maximum remains stated numerically. λ itself is never floored — the number
+and displacement are the real λ, including exactly 0 — but the divisor is
+floored at 1e-3, where every drawn colour is already within one part in a
+thousand of the bottom of the colormap.
 
 **The shape is exaggerated, and the physical answer is not.** After
 `CinemaState::adopt_final_result`, the studio computes
-`scale = 0.12 × bbox_diagonal / max_displacement` from that same final result.
-The viewport then draws exactly `x + scale·u`. This take's true maximum is
-0.0008111 mm; the reported 26,221× scale shows 21.27 mm, exactly 12% of the model
-diagonal. True displacement, shown displacement, factor and fraction are printed
-into the manifest, and true/shown values remain on screen through the ramp and
-hold.
+`scale = 0.12 × bbox_diagonal / max_displacement` from that same final result,
+and draws exactly `x + scale·u`. True displacement, shown displacement, factor
+and fraction are printed into the manifest and remain on screen through the
+ramp and hold. Before frame zero, the camera includes both rest and fully
+exaggerated node positions.
 
 ### Material
 
@@ -396,17 +392,17 @@ constitutive matrix.
 
 The recorder prints a `solver` token and the manifest records it.
 
-`fea::SolveOptions::on_note` is the solver's authoritative channel. A CG run
-names itself there. With no note, `cinema_solver_token` may prove direct LDLT
-only when total DOF is already below the free-DOF threshold; otherwise it records
-`note_absent` rather than guessing. The default final quadratic result takes that
-honest `note_absent` path, rendered as **solver method not reported** on screen.
+`fea::SolveOptions::on_note` is the authoritative channel. CG names itself and
+its convergence there; direct solves emit `direct LDLT selected for N free
+DOFs`. That note lives on the `SolveResult` it describes, so the final quadratic
+re-solve replaces the linear pass's provenance instead of inheriting or losing it.
 
-## The equation board
+## The active-equation graph
 
-The closing act replaces the network with the relations the solver actually
-evaluates, with the one this beat is computing lit and its own live numbers beside
-it. Every equation below is the expression the cited code implements.
+The closing act shows one relation the solver is using now, one plain-language
+explanation, and one graph from the same `SolveStage`. It does not dim six
+unrelated equation groups around the active one. The relations and citations
+remain:
 
 | On screen | Code | Citation |
 |---|---|---|

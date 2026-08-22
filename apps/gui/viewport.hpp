@@ -40,16 +40,12 @@ class Camera {
     /// keeping the current orbit angles. A zero-size box falls back to distance 1.
     void fit(const Eigen::Vector3d& bbox_min, const Eigen::Vector3d& bbox_max);
     /// Tight framing for a shot whose orbit is already chosen: backs off only
-    /// as far as the box's own PROJECTION at the current yaw/pitch needs,
-    /// instead of clearing its bounding sphere. A flat plate framed by `fit`
-    /// sits in the middle of a mostly empty pane, because its diagonal is
-    /// several times its projected height. `fill` is the fraction of the pane
-    /// the projection may occupy; the horizontal field is sized as if the pane
-    /// were square, so the result can never clip in a pane at least as wide as
-    /// it is tall (which the cinema pane always is) and only ever under-fills
-    /// it by the aspect ratio.
+    /// as far as the box's own projection at the current yaw/pitch needs.
+    /// `fill` is the fraction of the pane the projection may occupy; `aspect`
+    /// is the actual width / height of that pane, so a wide part uses the real
+    /// horizontal field instead of being conservatively fit as if it were square.
     void fit_oriented(const Eigen::Vector3d& bbox_min, const Eigen::Vector3d& bbox_max,
-                      float fill);
+                      float fill, float aspect);
     /// Absolute orbit angles, radians. Pitch is clamped to the same range
     /// `orbit` clamps to. For a composed shot that has to pick its own
     /// elevation rather than inherit whatever the user last dragged.
@@ -108,6 +104,10 @@ class Viewport {
     /// showing some other field under the gradient's legend.
     void set_result(const SolveResult& result,
                     const std::vector<double>* nodal_extra = nullptr);
+    /// Precomputes the exact rest-to-fully-exaggerated motion envelope used by
+    /// a cinema take. The camera is re-fit against this union before frame zero,
+    /// so the final loaded shape cannot clip and no mid-take reframe is needed.
+    void set_cinema_motion_bounds(const SolveResult& result, float deform_scale);
 
     /// BRep/feature-edge polylines of the part, drawn as the pre-mesh skeleton.
     void set_skeleton(const std::vector<std::vector<Eigen::Vector3d>>& polylines);
@@ -234,14 +234,12 @@ class Viewport {
     bool has_mesh_preview() const { return mesh_vertex_count_ > 0; }
     bool has_result() const { return !result_rest_.empty(); }
 
-    /// Frames whatever `mode` shows: camera target = the AABB center of the
-    /// uploaded geometry, distance = 1.9x its diagonal, orbit angles untouched.
-    /// Falls back to any other uploaded buffer when `mode` has none, and keeps
-    /// the current camera when nothing is uploaded at all. True = camera moved.
-    /// `kCinema` fits the union of the skeleton and the cinema mesh, so the
-    /// opening skeleton shot and the finished mesh share one framing, and uses
-    /// the tight `Camera::fit_oriented` so the part fills the cinema pane.
-    bool frame_content(DisplayMode mode);
+    /// Frames whatever `mode` shows. `aspect` is used by the tight cinema fit;
+    /// ordinary studio modes keep the diagonal-based framing they already use.
+    /// `kCinema` fits the union of the skeleton, recorded meshes, and the exact
+    /// rest-to-fully-exaggerated result envelope prepared by
+    /// `set_cinema_motion_bounds`, so the whole take shares one clip-safe shot.
+    bool frame_content(DisplayMode mode, float aspect = 1.0f);
 
     /// While set, an armed `set_result()` does NOT move the camera on its next
     /// bake. A cinema take is one continuous shot: re-framing when the result
@@ -352,6 +350,8 @@ class Viewport {
     Bounds result_bounds_;
     Bounds skeleton_bounds_;
     Bounds cinema_bounds_;
+    /// Rest ∪ fully exaggerated final result, computed before recording.
+    Bounds cinema_motion_bounds_;
     /// set_result() arms this; the first bake_result() of that result frames it.
     bool frame_on_bake_ = false;
     /// set_camera_locked(): holds the shot still for the duration of a take.

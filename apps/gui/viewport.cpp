@@ -54,13 +54,14 @@ uniform vec3 u_eye;
 uniform float u_alpha;
 out vec4 frag;
 void main() {
-    // Headlight diffuse + slight rim, double-sided.
+    // Bright, still-shaped headlight: fields stay legible at README scale while
+    // normals and a restrained rim continue to carry the three-dimensional form.
     vec3 n = normalize(v_normal);
     vec3 view_dir = normalize(u_eye - v_pos);
     float ndv = abs(dot(n, view_dir));
-    float shade = 0.35 + 0.6 * ndv;
-    float rim = pow(1.0 - ndv, 3.0) * 0.15;
-    frag = vec4(v_color.rgb * shade + vec3(rim), u_alpha * v_color.a);
+    float shade = 0.50 + 0.48 * ndv;
+    float rim = pow(1.0 - ndv, 3.0) * 0.20;
+    frag = vec4(min(v_color.rgb * shade + vec3(rim), vec3(1.0)), u_alpha * v_color.a);
 })";
 
 constexpr const char* kLineVs = R"(#version 330 core
@@ -101,6 +102,11 @@ void main() {
     float t = v_uv.y;
     vec3 color = t > 0.5 ? mix(u_mid, u_top, (t - 0.5) * 2.0)
                          : mix(u_bottom, u_mid, t * 2.0);
+    vec2 p = v_uv - vec2(0.54, 0.52);
+    float halo = exp(-5.5 * dot(p, p));
+    float vignette = smoothstep(0.82, 0.28, length(p));
+    color += vec3(0.012, 0.035, 0.050) * halo;
+    color *= 0.90 + 0.10 * vignette;
     frag = vec4(color, 1.0);
 })";
 
@@ -167,9 +173,9 @@ void main() {
     vec3 n = normalize(v_normal);
     vec3 view_dir = normalize(u_eye - v_pos);
     float ndv = abs(dot(n, view_dir));
-    float shade = 0.35 + 0.6 * ndv;
-    float rim = pow(1.0 - ndv, 3.0) * 0.15;
-    frag = vec4(v_color.rgb * shade + vec3(rim), u_alpha * v_color.a);
+    float shade = 0.50 + 0.48 * ndv;
+    float rim = pow(1.0 - ndv, 3.0) * 0.20;
+    frag = vec4(min(v_color.rgb * shade + vec3(rim), vec3(1.0)), u_alpha * v_color.a);
 })";
 
 constexpr const char* kCinemaLineVs = R"(#version 330 core
@@ -630,9 +636,13 @@ void Camera::fit(const Eigen::Vector3d& bbox_min, const Eigen::Vector3d& bbox_ma
 }
 
 void Camera::fit_oriented(const Eigen::Vector3d& bbox_min, const Eigen::Vector3d& bbox_max,
-                          float fill) {
+                          float fill, float aspect) {
     target_ = (0.5 * (bbox_min + bbox_max)).cast<float>();
     const Eigen::Vector3f half = (0.5 * (bbox_max - bbox_min)).cast<float>().cwiseAbs();
+    if (!(half.maxCoeff() > 1.0e-9f)) {
+        distance_ = 1.0f;
+        return;
+    }
     // Orbit basis, built exactly as eye()/view() build it. It depends only on
     // yaw/pitch, so it is available before the distance this function solves for.
     const Eigen::Vector3f dir(std::cos(pitch_) * std::cos(yaw_), std::sin(pitch_),
@@ -640,22 +650,31 @@ void Camera::fit_oriented(const Eigen::Vector3d& bbox_min, const Eigen::Vector3d
     const Eigen::Vector3f f = -Eigen::Vector3f(dir.x(), dir.z(), dir.y()); // eye -> target
     const Eigen::Vector3f s = f.cross(Eigen::Vector3f(0, 0, 1)).normalized();
     const Eigen::Vector3f u = s.cross(f);
-    // Support function of the AABB along a camera axis: the box's half-extent
-    // projected onto that axis, which for an axis-aligned box is the |dot| sum.
-    const auto extent = [&half](const Eigen::Vector3f& axis) {
-        return std::fabs(axis.x()) * half.x() + std::fabs(axis.y()) * half.y() +
-               std::fabs(axis.z()) * half.z();
-    };
-    const float lateral = std::max(extent(s), extent(u));
-    if (!(lateral > 1e-9f)) {
-        distance_ = 1.0f; // degenerate box (single point) -> neutral standoff
-        return;
+    const float safe_aspect = std::max(aspect, 1.0e-6f);
+    const float tan_y =
+        std::clamp(fill, 0.05f, 1.0f) * std::tan(0.5f * fov_y_);
+    const float tan_x = tan_y * safe_aspect;
+    float required = 0.0f;
+    // Solve the perspective inequalities on the eight AABB corners themselves:
+    //   |x| <= (distance + f·d) tan_x
+    //   |y| <= (distance + f·d) tan_y
+    // The old support-function bound maximised numerator and depth on different
+    // corners, discarding roughly half the frame on the previous hero.
+    for (int ix = -1; ix <= 1; ix += 2) {
+        for (int iy = -1; iy <= 1; iy += 2) {
+            for (int iz = -1; iz <= 1; iz += 2) {
+                const Eigen::Vector3f d(static_cast<float>(ix) * half.x(),
+                                        static_cast<float>(iy) * half.y(),
+                                        static_cast<float>(iz) * half.z());
+                const float depth_offset = f.dot(d);
+                required = std::max(
+                    {required, std::fabs(s.dot(d)) / tan_x - depth_offset,
+                     std::fabs(u.dot(d)) / tan_y - depth_offset,
+                     -depth_offset + 1.0e-3f * std::max(half.norm(), 1.0f)});
+            }
+        }
     }
-    // Half-angle budget. `extent(f)` is added because the near face of the box
-    // is that much closer than its centre and therefore projects that much
-    // larger; without it a deep box clips at its leading corner.
-    const float k = std::clamp(fill, 0.05f, 1.0f) * std::tan(0.5f * fov_y_);
-    distance_ = lateral / k + extent(f);
+    distance_ = required > 1.0e-9f ? required : 1.0f;
 }
 
 void Camera::set_orbit(float yaw, float pitch) {
@@ -1038,6 +1057,7 @@ void Viewport::set_skeleton(const std::vector<std::vector<Eigen::Vector3d>>& pol
     // straight chord in the model is a straight chord here.
     skeleton_data_.clear();
     skeleton_bounds_.reset();
+    cinema_motion_bounds_.reset();
     std::size_t segments = 0;
     for (const auto& line : polylines) {
         if (line.size() >= 2) {
@@ -1472,12 +1492,29 @@ void Viewport::set_result(const SolveResult& result, const std::vector<double>* 
     frame_on_bake_ = true;
 }
 
+void Viewport::set_cinema_motion_bounds(const SolveResult& result, float deform_scale) {
+    cinema_motion_bounds_.reset();
+    const auto& nodes = result.volume_mesh.nodes;
+    const bool has_displacement =
+        result.displacement.size() == 3 * static_cast<Eigen::Index>(nodes.size());
+    for (std::size_t i = 0; i < nodes.size(); ++i) {
+        cinema_motion_bounds_.add(nodes[i]);
+        if (has_displacement) {
+            const Eigen::Index base = 3 * static_cast<Eigen::Index>(i);
+            const Eigen::Vector3d moved =
+                nodes[i] + static_cast<double>(deform_scale) *
+                               result.displacement.segment<3>(base);
+            cinema_motion_bounds_.add(moved);
+        }
+    }
+}
+
 void Viewport::set_field_sweep(const FieldSweep& sweep) { field_sweep_ = sweep; }
 
-bool Viewport::frame_content(DisplayMode mode) {
-    // The cinema spans two uploads whose union has to be framed ONCE: the
-    // opening shot has only the skeleton and the closing one only the mesh, and
-    // a camera that moved between them would read as a cut, not a reveal.
+bool Viewport::frame_content(DisplayMode mode, float aspect) {
+    // The cinema spans several uploads whose union is framed before frame zero:
+    // exact skeleton, every recorded mesh, and the final displayed motion
+    // envelope. Once recording starts the camera remains locked.
     Bounds cinema_union;
     const Bounds* bounds = nullptr;
     switch (mode) {
@@ -1491,12 +1528,11 @@ bool Viewport::frame_content(DisplayMode mode) {
     case DisplayMode::kResultsDisplacement:
     case DisplayMode::kResultsError:
     case DisplayMode::kResultsGradient:
-        // Results are only bounded after the first bake; the undeformed mesh
-        // uploaded alongside them is the right stand-in until then.
         bounds = result_bounds_.valid ? &result_bounds_ : &mesh_bounds_;
         break;
     case DisplayMode::kCinema:
-        for (const Bounds* part : {&skeleton_bounds_, &cinema_bounds_}) {
+        for (const Bounds* part :
+             {&skeleton_bounds_, &cinema_bounds_, &cinema_motion_bounds_}) {
             if (part->valid) {
                 cinema_union.add(part->min);
                 cinema_union.add(part->max);
@@ -1520,22 +1556,13 @@ bool Viewport::frame_content(DisplayMode mode) {
         return false; // nothing uploaded — keep the current camera
     }
     if (mode == DisplayMode::kCinema) {
-        // The cinema pane is a fixed landscape rectangle and the orbit is not
-        // touched during a take, so the shot can be fitted to what the part
-        // actually projects to. `fit`'s bounding-sphere standoff leaves a wide
-        // plate occupying under half the pane, which is the wrong picture of a
-        // part that is meant to be the subject of the frame.
-        constexpr float kCinemaFill = 0.90f;
-        // The take also picks its own elevation. The studio's default 0.5 rad
-        // is a shallow three-quarter view, and a flat plate seen that flat
-        // projects to a third of the pane height however tightly it is fitted;
-        // 0.72 rad opens the top face up without turning the shot into a plan
-        // view. Same azimuth as the studio, so the cinema still looks like the
-        // same application.
+        constexpr float kCinemaFill = 0.84f; // reserves room for BC glyphs and force arrow
+        // A raised three-quarter view exposes the A-arm's fork, two rear eyes
+        // and out-of-plane loaded boss in one readable silhouette.
         constexpr float kCinemaYaw = 0.70f;
         constexpr float kCinemaPitch = 0.72f;
         camera.set_orbit(kCinemaYaw, kCinemaPitch);
-        camera.fit_oriented(bounds->min, bounds->max, kCinemaFill);
+        camera.fit_oriented(bounds->min, bounds->max, kCinemaFill, aspect);
         return true;
     }
     camera.fit(bounds->min, bounds->max);

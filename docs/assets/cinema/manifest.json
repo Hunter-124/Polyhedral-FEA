@@ -1,8 +1,8 @@
 {
   "schema": "polymesh.cinema.manifest/1",
-  "generated_utc": "2026-08-22T04:06:23Z",
-  "git_rev": "a480aa3+dirty",
-  "stamp": "git a480aa3+dirty \u00b7 model.onnx sha256 74846b93d8dd",
+  "generated_utc": "2026-08-22T22:06:21Z",
+  "git_rev": "ff1c548+dirty",
+  "stamp": "git ff1c548+dirty \u00b7 model.onnx sha256 01eb2109f8df",
   "stages_run": [
     "frames",
     "gif",
@@ -10,29 +10,36 @@
     "poster"
   ],
   "case": {
-    "part": "icecream_cone",
-    "step": "tests/fixtures/parts/icecream_cone.step",
-    "case_json": "docs/assets/cinema/icecream_cone.case.json",
-    "fix_face": 1,
+    "part": "wishbone",
+    "step": "tests/fixtures/parts/wishbone.step",
+    "case_json": "docs/assets/cinema/wishbone.case.json",
+    "fix_faces": [
+      5,
+      6
+    ],
     "load_face": 0,
     "load_n": [
+      -25000.0,
       0.0,
-      0.0,
-      -1000.0
+      -40000.0
     ],
-    "load_note": "GUI region 1 (planar foot) fixed; conserved -z 1000 N resultant on GUI region 0 (connected cone+scoop exterior)",
-    "h_mm_configured": 12.0,
+    "load_note": "GUI regions 5 and 6 (two chassis bushing outer sleeves) fixed; conserved (-25000, 0, -40000) N resultant on GUI region 0 (upright outer boss)",
+    "h_mm_configured": 5.5,
+    "mesher_configured": "tet",
+    "solver_configured": "direct",
+    "order_configured": 1,
+    "feature_grading_configured": false,
     "youngs_modulus_gpa": 200.0,
     "poissons_ratio": 0.3,
-    "adapt_passes_configured": 1,
+    "adapt_passes_configured": 0,
     "eta_target_configured": 0.0,
     "h_note": "configured before inference; an accepted advisor action overrides it, while a refusal leaves it unchanged",
-    "why": "complex cone+sphere Boolean with exact curved CAD, FFT sizing, quadratic geometry, positive quality margin and a measured OOD refusal before the verified fallback"
+    "why": "purpose-built 3D suspension A-arm: two chassis bushing sleeves, non-coplanar swept arms and brace, one loaded upright boss, and a combined bending/torsion field"
   },
   "model": {
     "dir": "bench/advisor",
     "onnx": "bench/advisor/model.onnx",
-    "onnx_sha256": "74846b93d8dd0ba772be33196f7b888458bc617d17ea715ce05e565e85ce393b"
+    "onnx_sha256": "01eb2109f8dfc088b56687752f84e457cac4a6f676e7a216571f8c72d444e9cf"
   },
   "capture": {
     "gui": "build/apps/gui/polymesh-gui",
@@ -43,11 +50,11 @@
       "-screen 0 1920x1080x24",
       "/home/hunter/Desktop/Polyhedral-FEA/build/apps/gui/polymesh-gui",
       "--auto",
-      "load tests/fixtures/parts/icecream_cone.step; h 12; material 200 0.3; spectral on; fix 1; loadface 0 0 0 -1000; cinema on; cinema advisor bench/advisor; adapt 1 0; wire off; solve; record /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames 3600; quit"
+      "load tests/fixtures/parts/wishbone.step; h 5.5; material 200 0.3; mesher tet; solver direct; order 1; feature off; spectral on; fix 5; fix 6; loadface 0 -25000 0 -40000; cinema on; cinema advisor bench/advisor; adapt 0 0; wire off; solve; record /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames 3600; quit"
     ],
-    "auto_spec": "load tests/fixtures/parts/icecream_cone.step; h 12; material 200 0.3; spectral on; fix 1; loadface 0 0 0 -1000; cinema on; cinema advisor bench/advisor; adapt 1 0; wire off; solve; record /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames 3600; quit",
+    "auto_spec": "load tests/fixtures/parts/wishbone.step; h 5.5; material 200 0.3; mesher tet; solver direct; order 1; feature off; spectral on; fix 5; fix 6; loadface 0 -25000 0 -40000; cinema on; cinema advisor bench/advisor; adapt 0 0; wire off; solve; record /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames 3600; quit",
     "env": {
-      "POLYMESH_CINEMA_STAMP": "git a480aa3+dirty \u00b7 model.onnx sha256 74846b93d8dd"
+      "POLYMESH_CINEMA_STAMP": "git ff1c548+dirty \u00b7 model.onnx sha256 01eb2109f8df"
     },
     "xvfb_screen": "1920x1080",
     "frame_size": "1920x1080",
@@ -55,7 +62,7 @@
     "frame_count": 3600,
     "fps": 60,
     "duration_s": 60.0,
-    "gui_wall_s": 278.004,
+    "gui_wall_s": 2837.221,
     "ffmpeg": "ffmpeg version 8.1.2 Copyright (c) 2000-2026 the FFmpeg developers"
   },
   "report": {
@@ -101,6 +108,35 @@
         "duration_s": 27.0
       }
     ],
+    "mesh_sequence": [
+      {
+        "index": 0,
+        "pass": 0,
+        "stage": "fill",
+        "elements": 40170,
+        "nodes": 9796
+      },
+      {
+        "index": 1,
+        "pass": 0,
+        "stage": "ship",
+        "elements": 40170,
+        "nodes": 9796
+      }
+    ],
+    "solve_sequence": [
+      {
+        "index": 0,
+        "pass": 0,
+        "elements": 40170,
+        "nodes": 9796,
+        "dof": 29388,
+        "global_eta": 0.206942168,
+        "h_mark": 34,
+        "p_mark": 29872,
+        "shape_mark": 0
+      }
+    ],
     "take": {
       "duration": 60.0,
       "fps": 60.0,
@@ -110,27 +146,29 @@
     "candidates": 38,
     "forward_passes": 39,
     "mesh_stages": 2,
-    "solve_stages": 2,
-    "elements": 35951,
-    "nodes": 52663,
-    "dof": 157989,
-    "quality_min": 0.0337755879,
-    "quality_mean": 0.291027184,
+    "solve_stages": 1,
+    "elements": 40170,
+    "nodes": 9796,
+    "dof": 29388,
+    "quality_min": 0.0200003155,
+    "quality_mean": 0.249598405,
     "youngs_modulus_pa": 200000000000.0,
     "poissons_ratio": 0.3,
-    "max_von_mises_pa": 11345088.5,
-    "global_eta": 0.0298759806,
-    "max_displacement_m": 8.11072974e-07,
-    "deformation_scale": 26220.9948,
-    "visible_displacement_m": 0.0212671402,
+    "stress_color_p99_pa": 17424544.8,
+    "error_color_p99": 0.00399045189,
+    "max_von_mises_pa": 33160121.7,
+    "global_eta": 0.206942168,
+    "max_displacement_m": 3.28786285e-06,
+    "deformation_scale": 18316.8151,
+    "visible_displacement_m": 0.0602231757,
     "visible_displacement_fraction": 0.12,
-    "unchanged_cells": 27808,
-    "removed_cells": 2688,
-    "added_cells": 8143,
+    "unchanged_cells": 0,
+    "removed_cells": 0,
+    "added_cells": 0,
     "elements_skipped": 0,
-    "solver": "note_absent",
+    "solver": "direct_ldlt",
     "solver_note": null,
-    "poster_frame": 48,
+    "poster_frame": 103,
     "framebuffer": "1920x1080",
     "advisor_activations": true,
     "advisor_unavailable": null,
@@ -143,38 +181,40 @@
       "frames": 39.0,
       "gate_threshold": 0.05,
       "h_rel": 0.1,
-      "ood_distance": 90.9401,
       "order": 1.0,
       "vetoed": 1.0
     },
     "spectral_fields": {
-      "applied": 1.0,
-      "bc_seeds": 3563.0,
-      "brep_curvature": 1.0,
-      "edge_seeds": 36.0,
-      "energy_kept": 0.995000702,
-      "field_samples": 1753.0,
-      "geometry_seeds": 708.0,
-      "h_after_max": 0.00595266797,
-      "h_after_min": 0.00265737334,
-      "h_before_max": 0.00709219306,
-      "h_before_min": 0.00242629724,
-      "modes_kept": 4155.0,
-      "modes_total": 262143.0,
-      "predicted_after": 1796.53939,
-      "predicted_before": 1859.40282
+      "applied": 0.0,
+      "bc_seeds": 0.0,
+      "brep_curvature": 0.0,
+      "edge_seeds": 0.0,
+      "energy_kept": 0.0,
+      "field_samples": 0.0,
+      "geometry_seeds": 0.0,
+      "h_after_max": 0.0,
+      "h_after_min": 0.0,
+      "h_before_max": 0.0,
+      "h_before_min": 0.0,
+      "modes_kept": 0.0,
+      "modes_total": 0.0,
+      "predicted_after": 0.0,
+      "predicted_before": 0.0
     },
     "lines": [
       "cinema: maths glyphs merged from /usr/share/fonts/google-noto/NotoSansMath-Regular.ttf",
-      "cinema: advisor bench/advisor candidates 38 gate_threshold 0.05 frames 39 decision hybrid_zoo h_rel 0.1 order 1 adapt_passes 0 eta_target 0 vetoed 1 ood_distance 90.9401 applied 0",
-      "cinema: spectral applied 1 modes_total 262143 modes_kept 4155 energy_kept 0.995000702 edge_seeds 36 predicted_before 1859.40282 predicted_after 1796.53939 geometry_seeds 708 bc_seeds 3563 brep_curvature 1 field_samples 1753 h_before_min 0.00242629724 h_before_max 0.00709219306 h_after_min 0.00265737334 h_after_max 0.00595266797",
+      "cinema: advisor bench/advisor candidates 38 gate_threshold 0.05 frames 39 decision hybrid_zoo h_rel 0.1 order 1 adapt_passes 0 eta_target 0 vetoed 1 ood_distance nan applied 0",
+      "cinema: spectral applied 0 modes_total 0 modes_kept 0 energy_kept 0 edge_seeds 0 predicted_before 0 predicted_after 0 geometry_seeds 0 bc_seeds 0 brep_curvature 0 field_samples 0 h_before_min 0 h_before_max 0 h_after_min 0 h_after_max 0",
       "cinema: take /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames frames 3600 fps 60 duration 60.0000 s",
       "cinema: act skeleton frames 0..468 t 0.0000..7.8000 s",
       "cinema: act deliberate frames 469..1007 t 7.8000..16.8000 s",
       "cinema: act build frames 1008..1655 t 16.8000..27.6000 s",
       "cinema: act mesh_hold frames 1656..1979 t 27.6000..33.0000 s",
       "cinema: act solve frames 1980..3599 t 33.0000..60.0000 s",
-      "cinema: record /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames frames 3600 fps 60 candidates 38 stages 2 elements 35951 nodes 52663 dof 157989 quality_min 0.0337755879 quality_mean 0.291027184 youngs_pa 2e+11 poisson 0.3 max_von_mises_pa 11345088.5 global_eta 0.0298759806 max_displacement_m 8.11072974e-07 deform_scale 26220.9948 visible_displacement_m 0.0212671402 visible_fraction 0.12 unchanged 27808 removed 2688 added 8143 poster 48 width 1920 height 1080 skipped 0 solve_stages 2 solver note_absent"
+      "cinema: mesh_stage index 0 pass 0 id fill elements 40170 nodes 9796",
+      "cinema: mesh_stage index 1 pass 0 id ship elements 40170 nodes 9796",
+      "cinema: solve_stage index 0 pass 0 elements 40170 nodes 9796 dof 29388 global_eta 0.206942168 h_mark 34 p_mark 29872 shape_mark 0",
+      "cinema: record /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames frames 3600 fps 60 candidates 38 stages 2 elements 40170 nodes 9796 dof 29388 quality_min 0.0200003155 quality_mean 0.249598405 youngs_pa 2e+11 poisson 0.3 max_von_mises_pa 33160121.7 stress_p99_pa 17424544.8 global_eta 0.206942168 error_p99 0.00399045189 max_displacement_m 3.28786285e-06 deform_scale 18316.8151 visible_displacement_m 0.0602231757 visible_fraction 0.12 unchanged 0 removed 0 added 0 poster 103 width 1920 height 1080 skipped 0 solve_stages 1 solver direct_ldlt"
     ]
   },
   "outputs": {
@@ -195,22 +235,32 @@
       "pix_fmt": "yuv420p",
       "faststart": true,
       "fps": 60,
-      "bytes": 11887734,
-      "sha256": "d309e42268f9dc9303f83ec629fd10f004cf9339b1a666ee56ec6c7cee13096e"
+      "bytes": 15004137,
+      "sha256": "3e04082b513d76fdaf054441b590ddd76577c99667b7864101fa5ee0ced34b30"
     },
     "gif": {
       "file": "advisor_cinema.gif",
-      "width": 1100,
-      "fps": 12,
+      "width": 960,
+      "fps": 10,
       "start_s": 0.0,
       "duration_s": 60.0,
-      "bytes": 6795425,
-      "sha256": "6a9760058e7c5d064fc6dbac351008385453c597e6bb51f9c79ec87b05d151f4",
+      "bytes": 7919210,
+      "sha256": "fa7b648839924590e490bcbfda70d4e40bb3c64b8a2dc00bd5ddafb57552f042",
       "attempts": [
         {
           "width": 1100,
           "fps": 12,
-          "bytes": 6795425
+          "bytes": 11878939
+        },
+        {
+          "width": 1100,
+          "fps": 10,
+          "bytes": 9867863
+        },
+        {
+          "width": 960,
+          "fps": 10,
+          "bytes": 7919210
         }
       ],
       "max_bytes": 8388608,
@@ -218,12 +268,12 @@
     },
     "poster": {
       "file": "poster.png",
-      "source_frame": 48,
+      "source_frame": 103,
       "width": 1920,
       "height": 1080,
-      "bytes": 73591,
+      "bytes": 199030,
       "source_bytes": 8296178,
-      "sha256": "58576288cb0e1362902c23a4d7e03c5ca19a3f3492deda4ebd0fcc718da86d2a",
+      "sha256": "90f063a8ba9d9bd9562d0ca327ab68736b901a18e0d9a91bf1cf4642f6fd966d",
       "frame_source": "reported by the GUI as the first fully-composed frame"
     }
   }

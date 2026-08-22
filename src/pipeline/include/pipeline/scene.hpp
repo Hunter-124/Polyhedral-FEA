@@ -22,8 +22,8 @@
 #include <functional>
 #include <map>
 #include <memory>
-#include <numbers>
 #include <mutex>
+#include <numbers>
 #include <optional>
 #include <set>
 #include <span>
@@ -154,6 +154,11 @@ struct SimSetup {
     /// Maximum solve footprint in decimal GB. 0 = automatic safety cap
     /// (70% of currently available system memory).
     double max_mem_gb = 0.0;
+    /// Linear solver selection. Product studies default to automatic; a
+    /// scripted verified showcase may request direct factorisation explicitly
+    /// when its measured sparse problem fits memory and iterative wall time
+    /// would dominate the recording.
+    fea::SolveMethod solve_method = fea::SolveMethod::kAuto;
     /// Hard pre-flight ceilings. 0 selects kDefaultMaxMeshElems / Dof.
     /// Set higher explicitly for deliberate large runs.
     std::size_t max_elems = 0;
@@ -504,6 +509,16 @@ struct SolveResult {
     // Boundary quads of the voxel mesh (node indices), for rendering.
     std::vector<std::array<std::uint32_t, 4>> boundary_quads;
     std::string mesh_note; // e.g. element/node counts, mesher version
+    /// The linear solver's own account of the solve that produced THIS result:
+    /// the method it chose, any memory-budget downgrade, and on the iterative
+    /// path its preconditioner and convergence. Verbatim
+    /// `fea::SolveOptions::on_note` lines, joined by newlines, from that solve
+    /// only — a p-elevated re-solve replaces the linear pass's account rather
+    /// than appending to it, because the displacement here is the re-solve's.
+    /// Empty when the backend said nothing, which is the normal outcome below
+    /// `fea::SolveOptions::cg_threshold`. An empty note is a fact about the
+    /// solve, never a licence to name a method that was not reported.
+    std::string solver_note;
     GeometryVolumeAssessment fill_geometry_volume;
     GeometryVolumeAssessment solved_geometry_volume;
 };
@@ -705,8 +720,12 @@ struct SolveStage {
     int pass = 0;            // adapt pass index (0 = initial)
     bool final_pass = false; // no further pass ran after this one
     PassTrace trace;         // the pass's own scalar telemetry
-    SolveResult result;      // mesh, displacement, von Mises and ZZ fields at that pass
-    std::string solver_note; // the linear solver's own account of what it did
+    /// Mesh, displacement, von Mises and ZZ fields at that pass, plus that
+    /// solve's own `SolveResult::solver_note`. The note lives on the result it
+    /// describes and nowhere else, so a consumer that replaces this stage's
+    /// result with the finished one (the p-elevated re-solve is finalisation,
+    /// not a pass) gets the finished solve's provenance with it.
+    SolveResult result;
 };
 /// Set to observe each pass as it completes; empty (the default) costs nothing.
 using SolveStageSink = std::function<void(const SolveStage&)>;
@@ -819,12 +838,14 @@ class SolveJob {
     void join_worker();
     void reset_control_flags();
     /// Solve options with CG progress wired into JobProgress (when applicable).
-    /// `note_sink`, when non-null, also accumulates every `fea::SolveOptions`
-    /// note verbatim (newline-separated) for `SolveStage::solver_note`; the
-    /// status line is written exactly as before either way. Null (the default)
-    /// leaves the pre-existing behaviour bit for bit.
+    /// `note_sink` accumulates every `fea::SolveOptions` note verbatim
+    /// (newline-separated) and becomes `SolveResult::solver_note` for the
+    /// solve these options drive; the status line is written exactly as
+    /// before. Every solve records its provenance — there is no unobserved
+    /// solve, because the authoritative result carries the note whether or not
+    /// anyone watched the passes.
     fea::SolveOptions solve_options_with_progress(int pass, int pass_count,
-                                                  std::string* note_sink = nullptr);
+                                                  std::string& note_sink);
 };
 
 } // namespace polymesh::pipeline

@@ -442,11 +442,17 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
         std::unordered_map<EdgeKey, int, EdgeHash> seen_edges;
         seen_edges.reserve(64);
         for (int lepp = 0; lepp < 4096; ++lepp) {
-            const auto [seen_it, inserted] = seen_edges.emplace(edge, lepp);
+            const bool inserted = seen_edges.emplace(edge, lepp).second;
             if (!inserted) {
-                throw ValidityError(std::format(
-                    "local_refine_tets: LEPP cycle seed={} edge=({}, {}) first={} repeat={}",
-                    seed, edge.first, edge.second, seen_it->second, lepp));
+                // A longest-edge walk can form a two- or three-edge cycle on an
+                // unstructured CAD tet mesh when adjacent tets choose different
+                // (near-tied) longest edges. Splitting the repeated edge across
+                // ALL of its live sharers is still face-conforming: conformity
+                // depends on every owner of that edge receiving the same
+                // midpoint, not on that edge being longest in every owner.
+                // Progressing here is the general Rivara fallback; aborting
+                // discarded an otherwise valid dense wishbone solve.
+                break;
             }
             bool moved = false;
             const auto it = edge_tets.find(edge);

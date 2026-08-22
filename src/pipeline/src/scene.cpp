@@ -6512,7 +6512,7 @@ void SolveJob::note_mesh_stats(const VolumeMeshOutput& vol) {
 }
 
 fea::SolveOptions SolveJob::solve_options_with_progress(int pass, int pass_count,
-                                                        std::string* note_sink) {
+                                                        std::string& note_sink) {
     // Keep the shared default method/tolerance policy. The per-run memory cap
     // is enforced during solve preflight; four-iteration callbacks make the
     // same hook a low-latency cooperative pause/cancel point without restarting
@@ -6527,13 +6527,11 @@ fea::SolveOptions SolveJob::solve_options_with_progress(int pass, int pass_count
     // counts is the normal outcome: `fea::SolveMethod::kAuto` picks direct
     // sparse LDLT below `SolveOptions::cg_threshold` (50,000 free DOF) and the
     // CG-flavoured notes never appear.
-    opt.on_note = [this, note_sink](std::string_view note) {
-        if (note_sink != nullptr) {
-            if (!note_sink->empty()) {
-                note_sink->push_back('\n');
-            }
-            note_sink->append(note);
+    opt.on_note = [this, &note_sink](std::string_view note) {
+        if (!note_sink.empty()) {
+            note_sink.push_back('\n');
         }
+        note_sink.append(note);
         set_status(std::string(note));
     };
     opt.on_progress = [this, pass, pass_count](int iter, int max_iters, double resid) {
@@ -7794,20 +7792,29 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                            pass, pass_count);
                 }
                 checkpoint();
-                // Notes for this pass only. Default-constructed it owns no
-                // heap, and the sink pointer stays null unless someone is
-                // listening, so the unobserved path is byte-for-byte the old
-                // one.
+                // The account of the solve whose displacement is currently in
+                // `u_try`, and of no other. `solve_here` clears the sink first,
+                // so the p-elevated re-solves below — which produce the
+                // authoritative result and are the only solve that result's
+                // displacement came from — leave their own words here rather
+                // than inheriting the linear pass's. A solve that says nothing
+                // leaves it empty, which is a fact and not a gap to fill.
                 std::string pass_solver_note;
-                const auto solve_opt = solve_options_with_progress(
-                    pass, pass_count, solve_stage_callback ? &pass_solver_note : nullptr);
+                fea::SolveCostMeasured pass_solve_cost;
+                const auto solve_here = [&] {
+                    pass_solver_note.clear();
+                    auto options =
+                        solve_options_with_progress(pass, pass_count, pass_solver_note);
+                    options.method = setup.solve_method;
+                    auto solved = fea::solve_elastostatics(
+                        vol.mesh, material, bc, loads, options, active_p_constraints());
+                    pass_solve_cost = std::move(solved.cost);
+                    return std::move(solved.u);
+                };
                 const auto solve_t0 = std::chrono::steady_clock::now();
                 update_solved_geometry_volume(model, vol);
 
-                auto pass_solve = fea::solve_elastostatics(
-                    vol.mesh, material, bc, loads, solve_opt, active_p_constraints());
-                fea::SolveCostMeasured pass_solve_cost = std::move(pass_solve.cost);
-                auto u_try = std::move(pass_solve.u);
+                auto u_try = solve_here();
                 const double pass_solve_ms = std::chrono::duration<double, std::milli>(
                                                  std::chrono::steady_clock::now() - solve_t0)
                                                  .count();
@@ -7877,12 +7884,13 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         fill_result_fields(stage.result, zz_try, u_try);
                         stage.result.fill_geometry_volume = vol.fill_geometry_volume;
                         stage.result.solved_geometry_volume = vol.solved_geometry_volume;
-                        // Only the two notes that exist at this instant. The
-                        // stop-reason suffix the final result carries is not
-                        // known yet and is not invented here.
+                        // Only the notes that exist at this instant: the two
+                        // mesh notes and this solve's own account of itself.
+                        // The stop-reason suffix the final result carries is
+                        // not known yet and is not invented here.
                         stage.result.mesh_note =
                             std::format("{} | {}", vol.mesher_note, hp_note);
-                        stage.solver_note = pass_solver_note;
+                        stage.result.solver_note = pass_solver_note;
                         solve_stage_callback(stage);
                     }
                 }
@@ -7894,10 +7902,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         publish_live_mesh(vol);
                         update_solved_geometry_volume(model, vol);
 
-                        u_try = fea::solve_elastostatics(
-                            vol.mesh, material, bc, loads,
-                            solve_options_with_progress(pass, pass_count),
-                            active_p_constraints()).u;
+                        u_try = solve_here();
                         zz_try = fea::recover_zz(vol.mesh, material, u_try);
                     }
                     SolveResult r;
@@ -7908,6 +7913,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     r.volume_mesh = std::move(vol.mesh);
                     r.boundary_quads = std::move(vol.boundary_quads);
                     fill_result_fields(r, zz_try, u_try);
+                    r.solver_note = std::move(pass_solver_note);
                     r.fill_geometry_volume = vol.fill_geometry_volume;
                     r.solved_geometry_volume = vol.solved_geometry_volume;
 
@@ -7939,10 +7945,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         if (maybe_p_elevate(hp_plan.p_mark, pnote)) {
                             publish_live_mesh(vol);
                             update_solved_geometry_volume(model, vol);
-                            u_try = fea::solve_elastostatics(
-                                vol.mesh, material, bc, loads,
-                                solve_options_with_progress(pass, pass_count),
-                                active_p_constraints()).u;
+                            u_try = solve_here();
                             zz_try = fea::recover_zz(vol.mesh, material, u_try);
                         }
                         SolveResult r;
@@ -7951,6 +7954,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         r.volume_mesh = std::move(vol.mesh);
                         r.boundary_quads = std::move(vol.boundary_quads);
                         fill_result_fields(r, zz_try, u_try);
+                        r.solver_note = std::move(pass_solver_note);
                         r.fill_geometry_volume = vol.fill_geometry_volume;
                         r.solved_geometry_volume = vol.solved_geometry_volume;
 
@@ -7970,10 +7974,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                             publish_live_mesh(vol);
                             update_solved_geometry_volume(model, vol);
 
-                            u_try = fea::solve_elastostatics(
-                                vol.mesh, material, bc, loads,
-                                solve_options_with_progress(pass, pass_count),
-                                active_p_constraints()).u;
+                            u_try = solve_here();
                             zz_try = fea::recover_zz(vol.mesh, material, u_try);
                         }
                         SolveResult r;
@@ -7982,6 +7983,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         r.volume_mesh = std::move(vol.mesh);
                         r.boundary_quads = std::move(vol.boundary_quads);
                         fill_result_fields(r, zz_try, u_try);
+                        r.solver_note = std::move(pass_solver_note);
                         r.fill_geometry_volume = vol.fill_geometry_volume;
                         r.solved_geometry_volume = vol.solved_geometry_volume;
 
@@ -8012,9 +8014,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     publish_live_mesh(vol);
                     update_solved_geometry_volume(model, vol);
 
-                    u_try = fea::solve_elastostatics(
-                        vol.mesh, material, bc, loads,
-                        solve_options_with_progress(pass, pass_count), active_p_constraints()).u;
+                    u_try = solve_here();
                     zz_try = fea::recover_zz(vol.mesh, material, u_try);
                 }
                 SolveResult r;
@@ -8024,6 +8024,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 r.volume_mesh = std::move(vol.mesh);
                 r.boundary_quads = std::move(vol.boundary_quads);
                 fill_result_fields(r, zz_try, u_try);
+                r.solver_note = std::move(pass_solver_note);
                 r.fill_geometry_volume = vol.fill_geometry_volume;
                 r.solved_geometry_volume = vol.solved_geometry_volume;
 

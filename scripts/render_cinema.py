@@ -92,9 +92,9 @@ DEFAULT_FRAMES = 3600
 #: screen is, which shows up as a 1600x1000 film rather than an error. 1080p
 #: without paying for a 4K framebuffer.
 DEFAULT_SCREEN = (1920, 1080)
-#: Complex quadratic solve plus 3600-frame capture. The published h=10 mm
-#: graded ice-cream-cone solve has historically completed in about two minutes;
-#: 30 minutes leaves headroom for software rendering and encoding.
+#: Dense quadratic wishbone solve, two adaptive passes, and 3600-frame capture.
+#: The default remains deliberately generous for software rendering and slower
+#: CG backends; the virtual film duration is still exactly 60 seconds.
 DEFAULT_TIMEOUT = 1800
 
 # h264 at CRF 18 is visually lossless on flat UI panels and thin lines, which is
@@ -161,31 +161,60 @@ def rel(path: Path) -> str:
 class Case:
     """One part plus one load case, spelled as the GUI's own --auto verbs.
 
-    ``fix_face`` and ``load_face`` are **GUI** face ids -- the ids the viewport
+    ``fix_faces`` and ``load_face`` are **GUI** face ids -- the ids the viewport
     assigns when it loads the part -- not the case JSON's selection boxes. They
-    are recorded here because they were measured (see the module docstring), and
-    they stay overridable from the command line because a change to face
-    discovery would renumber them.
+    are recorded here because they were measured, and stay overridable because a
+    change to face discovery would renumber them. Multiple support faces are
+    first-class: the GUI's repeatable ``fix`` verb accumulates into SimSetup.
     """
 
     name: str
     step: str
     case_json: str
     h_mm: float
-    fix_face: int
+    mesher: str
+    solver: str
+    order: int
+    feature_grading: bool
+    fix_faces: tuple[int, ...]
     load_face: int
     load: tuple[float, float, float]
     why: str
     load_note: str
     youngs_gpa: float = 200.0
     poisson: float = 0.3
-    # None preserves an accepted advisor action. The default OOD hero explicitly
-    # requests one measured pass after the advisor has abstained.
+    # None preserves an accepted advisor action. An OOD hero explicitly
+    # requests measured passes after the advisor has abstained.
     adapt_passes: int | None = None
     eta_target: float = 0.0
 
 
 CASES: dict[str, Case] = {
+    # Purpose-built suspension wishbone: two separate chassis bushing bores,
+    # two swept non-coplanar arms plus a brace, and one loaded upright bore.
+    # The deployed veto remains visible; the verified fallback runs a dense
+    # h=5.5 mm tet4 mesh and one ZZ-driven local refinement pass toward 10%.
+    "wishbone": Case(
+        name="wishbone",
+        step="tests/fixtures/parts/wishbone.step",
+        case_json="docs/assets/cinema/wishbone.case.json",
+        h_mm=5.5,
+        mesher="tet",
+        solver="direct",
+        order=1,
+        feature_grading=False,
+        fix_faces=(5, 6),
+        load_face=0,
+        load=(-25000.0, 0.0, -40000.0),
+        why="purpose-built 3D suspension A-arm: two chassis bushing sleeves, "
+            "non-coplanar swept arms and brace, one loaded upright boss, and a "
+            "combined bending/torsion field",
+        load_note="GUI regions 5 and 6 (two chassis bushing outer sleeves) fixed; "
+                  "conserved (-25000, 0, -40000) N resultant on GUI region 0 "
+                  "(upright outer boss)",
+        adapt_passes=0,
+        eta_target=0.0,
+    ),
     # The hero case is deliberately more demanding than the advisor corpus:
     # a watertight Boolean union of a truncated cone and an intersecting sphere,
     # with a sharp circular join, a curved scoop and a small planar foot. The
@@ -202,7 +231,11 @@ CASES: dict[str, Case] = {
         step="tests/fixtures/parts/icecream_cone.step",
         case_json="docs/assets/cinema/icecream_cone.case.json",
         h_mm=12.0,
-        fix_face=1,
+        mesher="graded_tet",
+        feature_grading=True,
+        solver="auto",
+        order=2,
+        fix_faces=(1,),
         load_face=0,
         load=(0.0, 0.0, -1000.0),
         why="complex cone+sphere Boolean with exact curved CAD, FFT sizing, "
@@ -232,7 +265,11 @@ CASES: dict[str, Case] = {
         # i.e. the same size the advisor's own h_rel resolves to here, so a
         # refusal falls back to a comparable mesh rather than to a different film.
         h_mm=6.888,
-        fix_face=0,
+        mesher="graded_tet",
+        feature_grading=True,
+        solver="auto",
+        fix_faces=(0,),
+        order=2,
         load_face=5,
         # 1e6 Pa along +x over the x_hi face, and that face's area is a
         # measurement rather than an authored number: this case's loaded face is
@@ -270,7 +307,11 @@ CASES: dict[str, Case] = {
         # on this part). This value governs only the case where the advisor
         # refuses and the GUI falls back to the study's own setting.
         h_mm=8.0,
-        fix_face=0,
+        mesher="graded_tet",
+        feature_grading=True,
+        solver="auto",
+        fix_faces=(0,),
+        order=2,
         load_face=5,
         # The case JSON specifies a 1e6 Pa traction over an `expected_area` of
         # 8.925720996e-05 m2 on the x_hi face. The GUI's `loadface` verb takes
@@ -282,7 +323,7 @@ CASES: dict[str, Case] = {
         load_note="1e6 Pa over 8.925720996e-05 m2 of the x_hi face = 89.257 N",
     ),
 }
-DEFAULT_CASE = "icecream_cone"
+DEFAULT_CASE = "wishbone"
 
 
 # ---------------------------------------------------------------------------
@@ -323,14 +364,20 @@ def auto_spec(case: Case, part: Path, model_dir: Path, frames_dir: Path,
         f"load {rel(part)}",
         f"h {case.h_mm:g}",
         f"material {case.youngs_gpa:.9g} {case.poisson:.9g}",
+        f"mesher {case.mesher}",
+        f"solver {case.solver}",
+        f"order {case.order}",
+        f"feature {'on' if case.feature_grading else 'off'}",
         "spectral on",
-        f"fix {case.fix_face}",
+    ]
+    actions.extend(f"fix {face}" for face in case.fix_faces)
+    actions.extend([
         # `.9g`, not `g`: preserve measured resultants instead of rounding the
         # physical case for display.
         f"loadface {case.load_face} {fx:.9g} {fy:.9g} {fz:.9g}",
         "cinema on",
         f"cinema advisor {rel(model_dir)}",
-    ]
+    ])
     if case.adapt_passes is not None:
         # Deliberately after `cinema advisor`: an accepted action normally owns
         # adapt settings, while this configured OOD fallback owns its real pass.
@@ -411,6 +458,16 @@ _TAKE_RE = re.compile(r"^cinema:\s+take\b(?P<rest>.*)$")
 _ACT_RE = re.compile(
     r"^cinema:\s+act\s+(?P<name>\S+)\s+frames\s+(?P<f0>\d+)\.\.(?P<f1>\d+)"
     r"\s+t\s+(?P<t0>[\d.]+)\.\.(?P<t1>[\d.]+)")
+_MESH_STAGE_RE = re.compile(
+    r"^cinema:\s+mesh_stage\s+index\s+(?P<index>\d+)\s+pass\s+(?P<pass>\d+)"
+    r"\s+id\s+(?P<id>\S+)\s+elements\s+(?P<elements>\d+)"
+    r"\s+nodes\s+(?P<nodes>\d+)")
+_SOLVE_STAGE_RE = re.compile(
+    r"^cinema:\s+solve_stage\s+index\s+(?P<index>\d+)\s+pass\s+(?P<pass>\d+)"
+    r"\s+elements\s+(?P<elements>\d+)\s+nodes\s+(?P<nodes>\d+)"
+    r"\s+dof\s+(?P<dof>\d+)\s+global_eta\s+(?P<global_eta>[\d.eE+-]+)"
+    r"\s+h_mark\s+(?P<h_mark>\d+)\s+p_mark\s+(?P<p_mark>\d+)"
+    r"\s+shape_mark\s+(?P<shape_mark>\d+)")
 #: The record summary, parsed as loose ``key value`` pairs plus one word-valued
 #: field, ``solver``.
 _SUMMARY_RE = re.compile(r"^cinema:\s+record\b(?P<rest>.*)$")
@@ -433,7 +490,7 @@ _UNAVAILABLE_RE = re.compile(
 #: the manifest -- progress chatter is not provenance.
 _PROGRESS_RE = re.compile(r"^cinema:\s+frame\s+\d+/\d+\b")
 
-_PAIR_RE = re.compile(r"(?P<key>[a-z_]+)\s+(?P<value>-?[\d.eE+-]*[\d.])")
+_PAIR_RE = re.compile(r"(?P<key>[a-z_][a-z0-9_]*)\s+(?P<value>-?[\d.eE+-]*[\d.])")
 
 #: Keys lifted out of the record summary into the manifest. ``stages`` counts the
 #: mesher's construction stages and ``solve_stages`` the completed adaptive
@@ -443,12 +500,10 @@ _PAIR_RE = re.compile(r"(?P<key>[a-z_]+)\s+(?P<value>-?[\d.eE+-]*[\d.])")
 #: trust.
 _SUMMARY_KEYS = ("frames", "fps", "candidates", "stages", "solve_stages",
                  "elements", "nodes", "dof", "quality_min", "quality_mean",
-                 "youngs_pa", "poisson", "max_von_mises_pa", "global_eta",
-                 "max_displacement_m", "deform_scale", "visible_displacement_m",
-                 "visible_fraction", "unchanged", "removed", "added", "skipped", "poster",
-                 "width", "height")
-#: Keys lifted out of the advisor line. ``candidates`` is the enumerated grid
-#: without the final re-score pass; ``frames`` counts every forward pass
+                 "youngs_pa", "poisson", "max_von_mises_pa", "stress_p99_pa",
+                 "global_eta", "error_p99", "max_displacement_m", "deform_scale",
+                 "visible_displacement_m", "visible_fraction", "unchanged",
+                 "removed", "added", "skipped", "poster", "width", "height")
 #: including it, so both are kept and named apart.
 _ADVISOR_KEYS = ("candidates", "frames", "gate_threshold", "h_rel", "order",
                  "adapt_passes", "eta_target", "vetoed", "ood_distance",
@@ -466,6 +521,8 @@ _TAKE_KEYS = ("frames", "fps", "duration")
 class GuiReport:
     """What the GUI said about the take. Absent fields stay None, never 0."""
     acts: list[dict]
+    mesh_sequence: list[dict]
+    solve_sequence: list[dict]
     counts: dict[str, float]
     advisor: dict[str, float]
     spectral: dict[str, float]
@@ -504,6 +561,8 @@ def _pairs(rest: str, keys: tuple[str, ...]) -> dict[str, float]:
 
 def parse_report(stdout: str) -> GuiReport:
     acts: list[dict] = []
+    mesh_sequence: list[dict] = []
+    solve_sequence: list[dict] = []
     counts: dict[str, float] = {}
     advisor: dict[str, float] = {}
     spectral: dict[str, float] = {}
@@ -537,6 +596,30 @@ def parse_report(stdout: str) -> GuiReport:
                 "duration_s": round(t1 - t0, 6),
             })
             continue
+        mesh_stage = _MESH_STAGE_RE.match(line)
+        if mesh_stage:
+            mesh_sequence.append({
+                "index": int(mesh_stage["index"]),
+                "pass": int(mesh_stage["pass"]),
+                "stage": mesh_stage["id"],
+                "elements": int(mesh_stage["elements"]),
+                "nodes": int(mesh_stage["nodes"]),
+            })
+            continue
+        solve_stage = _SOLVE_STAGE_RE.match(line)
+        if solve_stage:
+            solve_sequence.append({
+                "index": int(solve_stage["index"]),
+                "pass": int(solve_stage["pass"]),
+                "elements": int(solve_stage["elements"]),
+                "nodes": int(solve_stage["nodes"]),
+                "dof": int(solve_stage["dof"]),
+                "global_eta": float(solve_stage["global_eta"]),
+                "h_mark": int(solve_stage["h_mark"]),
+                "p_mark": int(solve_stage["p_mark"]),
+                "shape_mark": int(solve_stage["shape_mark"]),
+            })
+            continue
         summary = _SUMMARY_RE.match(line)
         if summary:
             counts.update(_pairs(summary["rest"], _SUMMARY_KEYS))
@@ -554,8 +637,9 @@ def parse_report(stdout: str) -> GuiReport:
             found = _DECISION_RE.search(advised["rest"])
             if found:
                 decision = found["decision"]
-    return GuiReport(acts=acts, counts=counts, advisor=advisor, spectral=spectral,
-                     take=take, decision=decision, solver=solver,
+    return GuiReport(acts=acts, mesh_sequence=mesh_sequence,
+                     solve_sequence=solve_sequence, counts=counts, advisor=advisor,
+                     spectral=spectral, take=take, decision=decision, solver=solver,
                      unavailable=unavailable, raw=raw)
 
 
@@ -849,9 +933,9 @@ def main(argv: list[str] | None = None) -> int:
                     help=f"case to record (default: {DEFAULT_CASE})")
     ap.add_argument("--step", type=Path, default=None,
                     help="override the STEP file of the selected case")
-    ap.add_argument("--fix-face", type=int, default=None,
-                    help="GUI face id to clamp; default is the case's measured "
-                         "id, which a change to face discovery would renumber")
+    ap.add_argument("--fix-face", type=int, action="append", default=None,
+                    help="GUI face id to clamp (repeatable); default is the case's "
+                         "measured support-face tuple")
     ap.add_argument("--load-face", type=int, default=None,
                     help="GUI face id to load; default is the case's measured id")
     ap.add_argument("--frames", type=int, default=DEFAULT_FRAMES,
@@ -910,9 +994,11 @@ def main(argv: list[str] | None = None) -> int:
             print(f"    case      {case.case_json}")
             adapt = (f"; adapt {case.adapt_passes} {case.eta_target:.9g}"
                      if case.adapt_passes is not None else "")
-            print(f"    verbs     h {case.h_mm:g}; "
+            print(f"    verbs     h {case.h_mm:g}; mesher {case.mesher}; "
+                  f"solver {case.solver}; order {case.order}; "
+                  f"feature {'on' if case.feature_grading else 'off'}; "
                   f"material {case.youngs_gpa:.9g} {case.poisson:.9g}{adapt}; "
-                  f"fix {case.fix_face}; "
+                  f"fix {'; fix '.join(str(face) for face in case.fix_faces)}; "
                   f"loadface {case.load_face} {fx:.9g} {fy:.9g} {fz:.9g}")
             print(f"    load      {case.load_note}")
             print(f"    h         configured before inference; accepted advice "
@@ -938,7 +1024,11 @@ def main(argv: list[str] | None = None) -> int:
         step=str(args.step) if args.step else base.step,
         case_json=base.case_json,
         h_mm=base.h_mm,
-        fix_face=base.fix_face if args.fix_face is None else args.fix_face,
+        mesher=base.mesher,
+        solver=base.solver,
+        order=base.order,
+        feature_grading=base.feature_grading,
+        fix_faces=base.fix_faces if args.fix_face is None else tuple(args.fix_face),
         load_face=base.load_face if args.load_face is None else args.load_face,
         load=base.load,
         why=base.why,
@@ -966,8 +1056,9 @@ def main(argv: list[str] | None = None) -> int:
 
     spec = auto_spec(case, part, args.model_dir, frames_dir.resolve(), args.frames)
     argv_gui = gui_argv(args.gui, spec, screen)
-    report = GuiReport(acts=[], counts={}, advisor={}, spectral={}, take={},
-                       decision=None, solver=None, unavailable=None, raw=[])
+    report = GuiReport(acts=[], mesh_sequence=[], solve_sequence=[], counts={},
+                       advisor={}, spectral={}, take={}, decision=None, solver=None,
+                       unavailable=None, raw=[])
     wall = None
 
     # ---- capture ------------------------------------------------------------
@@ -1108,11 +1199,15 @@ def main(argv: list[str] | None = None) -> int:
             "part": case.name,
             "step": rel(part),
             "case_json": case.case_json,
-            "fix_face": case.fix_face,
+            "fix_faces": list(case.fix_faces),
             "load_face": case.load_face,
             "load_n": list(case.load),
             "load_note": case.load_note,
             "h_mm_configured": case.h_mm,
+            "mesher_configured": case.mesher,
+            "solver_configured": case.solver,
+            "order_configured": case.order,
+            "feature_grading_configured": case.feature_grading,
             "youngs_modulus_gpa": case.youngs_gpa,
             "poissons_ratio": case.poisson,
             "adapt_passes_configured": case.adapt_passes,
@@ -1145,6 +1240,8 @@ def main(argv: list[str] | None = None) -> int:
         # missing value is null with a stated reason, never a filled-in guess.
         "report": {
             "acts": report.acts,
+            "mesh_sequence": report.mesh_sequence,
+            "solve_sequence": report.solve_sequence,
             "take": {key: report.take[key] for key in sorted(report.take)},
             "acts_note": (None if report.acts else
                           "the GUI printed no act table during this run, so "
@@ -1160,6 +1257,8 @@ def main(argv: list[str] | None = None) -> int:
             "quality_mean": report.counts.get("quality_mean"),
             "youngs_modulus_pa": report.counts.get("youngs_pa"),
             "poissons_ratio": report.counts.get("poisson"),
+            "stress_color_p99_pa": report.counts.get("stress_p99_pa"),
+            "error_color_p99": report.counts.get("error_p99"),
             "max_von_mises_pa": report.counts.get("max_von_mises_pa"),
             "global_eta": report.counts.get("global_eta"),
             "max_displacement_m": report.counts.get("max_displacement_m"),

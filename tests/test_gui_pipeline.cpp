@@ -5,6 +5,7 @@
 // interactive path covered by CI without a display.
 
 #include "fea/assembly.hpp"
+#include "fea/p_elevate.hpp"
 #include "fea/solve.hpp"
 #include "pipeline/scene.hpp"
 #include "support/box_model.hpp"
@@ -17,6 +18,7 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
+#include <optional>
 #include <string>
 #include <thread>
 #include <vector>
@@ -262,6 +264,46 @@ TEST_CASE("D2: eta_target=0 leaves adapt path unchanged (no eta-target stop note
     // Finished either via max passes or Dörfler early-stop — never η-target.
     REQUIRE((result->mesh_note.find("adapt_passes=") != std::string::npos ||
              result->mesh_note.find("adapt early-stop") != std::string::npos));
+}
+
+TEST_CASE("the p-elevated authoritative solve reports its own solver provenance") {
+    const auto model = polymesh::testsupport::box_model(0.1, 0.02, 0.02);
+    auto setup = cantilever_setup(model, 0.01);
+    REQUIRE(setup.p_elevate);
+
+    std::vector<SolveStage> stages;
+    SolveJob job;
+    job.on_solve_stage = [&stages](const SolveStage& stage) {
+        stages.push_back(stage);
+    };
+    job.start(model, setup);
+    std::optional<SolveResult> promoted;
+    for (int i = 0; i < 800; ++i) {
+        promoted = job.take_result();
+        if (promoted) {
+            break;
+        }
+        if (job.state() == SolveJob::State::kFailed) {
+            FAIL(job.status_text());
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    REQUIRE(promoted.has_value());
+    REQUIRE_FALSE(stages.empty());
+
+    // The emitted pass solved the linear mesh; its note belongs to that solve.
+    const auto pass_counts = fea::count_element_types(stages.front().result.volume_mesh);
+    CHECK(pass_counts.tet10 + pass_counts.hex20 == 0);
+    CHECK(stages.front().result.solver_note.find("direct LDLT selected") !=
+          std::string::npos);
+
+    // The authoritative result is the later quadratic re-solve. Before the
+    // provenance sink was threaded through every p-elevation branch this field
+    // was empty even though the real backend had named its method.
+    const auto promoted_counts = fea::count_element_types(promoted->volume_mesh);
+    REQUIRE(promoted_counts.tet10 + promoted_counts.hex20 > 0);
+    CHECK(promoted->solver_note.find("direct LDLT selected") != std::string::npos);
+    CHECK(promoted->solver_note != stages.front().result.solver_note);
 }
 
 TEST_CASE("D5: mesh_size=0 auto h yields finite mesh and note with auto h") {

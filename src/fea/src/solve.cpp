@@ -559,8 +559,12 @@ LinearSolveResult solve_elastostatics(const NodalMesh& mesh, const Material& mat
                         format_memory_bytes(budget.effective_cap_bytes),
                         limiting_resource_term(estimate, direct)));
     }
-    if (!decision.note.empty() && options.on_note) {
-        options.on_note(decision.note);
+    if (options.on_note) {
+        if (!decision.note.empty()) {
+            options.on_note(decision.note);
+        } else if (decision.method == SolveMethod::kDirect) {
+            options.on_note(std::format("direct LDLT selected for {} free DOFs", nfree));
+        }
     }
     init_runtime_performance();
 

@@ -32,6 +32,7 @@ jobs:
             ninja-build \
             cmake \
             g++ \
+            clang-tidy \
             libeigen3-dev \
             nlohmann-json3-dev \
             libomp-dev \
@@ -78,6 +79,11 @@ jobs:
 
       - name: Build (warnings are errors)
         run: cmake --build build
+
+      - name: clang-tidy first-party sources
+        run: |
+          run-clang-tidy -p build -j 0 \
+            -source-filter='.*[/\\]Polyhedral-FEA[/\\](apps|src|tests)[/\\]'
 
       - name: Test
         # Working directory for discovered tests is the repo root (bench/reference).

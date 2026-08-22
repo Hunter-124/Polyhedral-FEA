@@ -149,9 +149,7 @@ add_subdirectory(src/adapt)
 add_subdirectory(src/fea)
 add_subdirectory(src/bench)
 add_subdirectory(src/pipeline)
-if(POLYMESH_WITH_ADVISOR)
-    add_subdirectory(src/advisor)
-endif()
+add_subdirectory(src/advisor)
 
 # --- applications (depend on libraries; no reverse deps) ---
 add_subdirectory(apps/cli)

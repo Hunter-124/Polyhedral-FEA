@@ -6079,7 +6079,8 @@ void fill_result_fields(SolveResult& r, const fea::ZzRecovery& zz, const Eigen::
 
 PassTrace make_pass_trace(int pass, const fea::NodalMesh& mesh,
                           const fea::ZzRecovery& recovery, const adapt::HpDriverPlan& plan,
-                          double mesh_ms, double solve_ms) {
+                          double mesh_ms, double solve_ms,
+                          const fea::SolveCostMeasured& solve_cost) {
     PassTrace trace;
     trace.pass = pass;
     trace.n_elems = mesh.elements.size();
@@ -6111,6 +6112,11 @@ PassTrace make_pass_trace(int pass, const fea::NodalMesh& mesh,
     trace.predicted_dof_factor = plan.predicted_dof_factor;
     trace.mesh_ms = mesh_ms;
     trace.solve_ms = solve_ms;
+    trace.solve_flops = solve_cost.flops;
+    trace.solve_bytes = solve_cost.bytes;
+    trace.cg_iters = solve_cost.cg_iterations;
+    trace.factor_nnz = solve_cost.factor_nnz;
+    trace.solve_method = solve_cost.method;
     return trace;
 }
 } // namespace
@@ -7094,8 +7100,10 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 const auto solve_t0 = std::chrono::steady_clock::now();
                 update_solved_geometry_volume(model, vol);
 
-                auto u_try = fea::solve_elastostatics(vol.mesh, material, bc, loads, solve_opt,
-                                                      active_p_constraints());
+                auto pass_solve = fea::solve_elastostatics(
+                    vol.mesh, material, bc, loads, solve_opt, active_p_constraints());
+                fea::SolveCostMeasured pass_solve_cost = std::move(pass_solve.cost);
+                auto u_try = std::move(pass_solve.u);
                 const double pass_solve_ms = std::chrono::duration<double, std::milli>(
                                                  std::chrono::steady_clock::now() - solve_t0)
                                                  .count();
@@ -7143,8 +7151,9 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 // runs. `make_pass_trace` sorts a copy of the per-element η
                 // vector, so it is built once and shared rather than twice.
                 if ((setup.adapt_passes > 0 && pass_callback) || solve_stage_callback) {
-                    const PassTrace trace = make_pass_trace(pass, vol.mesh, zz_try, hp_plan,
-                                                            pass_mesh_ms, pass_solve_ms);
+                    const PassTrace trace =
+                        make_pass_trace(pass, vol.mesh, zz_try, hp_plan, pass_mesh_ms,
+                                        pass_solve_ms, pass_solve_cost);
                     if (setup.adapt_passes > 0 && pass_callback) {
                         pass_callback(trace);
                     }
@@ -7184,7 +7193,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         u_try = fea::solve_elastostatics(
                             vol.mesh, material, bc, loads,
                             solve_options_with_progress(pass, pass_count),
-                            active_p_constraints());
+                            active_p_constraints()).u;
                         zz_try = fea::recover_zz(vol.mesh, material, u_try);
                     }
                     SolveResult r;
@@ -7229,7 +7238,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                             u_try = fea::solve_elastostatics(
                                 vol.mesh, material, bc, loads,
                                 solve_options_with_progress(pass, pass_count),
-                                active_p_constraints());
+                                active_p_constraints()).u;
                             zz_try = fea::recover_zz(vol.mesh, material, u_try);
                         }
                         SolveResult r;
@@ -7260,7 +7269,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                             u_try = fea::solve_elastostatics(
                                 vol.mesh, material, bc, loads,
                                 solve_options_with_progress(pass, pass_count),
-                                active_p_constraints());
+                                active_p_constraints()).u;
                             zz_try = fea::recover_zz(vol.mesh, material, u_try);
                         }
                         SolveResult r;
@@ -7301,7 +7310,7 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
 
                     u_try = fea::solve_elastostatics(
                         vol.mesh, material, bc, loads,
-                        solve_options_with_progress(pass, pass_count), active_p_constraints());
+                        solve_options_with_progress(pass, pass_count), active_p_constraints()).u;
                     zz_try = fea::recover_zz(vol.mesh, material, u_try);
                 }
                 SolveResult r;

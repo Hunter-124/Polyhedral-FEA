@@ -110,6 +110,21 @@ struct SolveDecision {
     std::string note;
 };
 
+/// Portable work account for the numeric solve selected at runtime.
+struct SolveCostMeasured {
+    std::string method;
+    int cg_iterations = 0;
+    int cg_restarts = 0;
+    std::uint64_t factor_nnz = 0;
+    double flops = 0.0;
+    double bytes = 0.0;
+};
+
+struct LinearSolveResult {
+    Eigen::VectorXd u;
+    SolveCostMeasured cost;
+};
+
 /// Symmetric diagonal (Jacobi) equilibration of an SPD sparse matrix: returns
 /// s_i = 1/sqrt(a_ii). Throws FeaError if any diagonal entry is ≤ 0 (the
 /// matrix is not SPD). With S = diag(s) the exact congruence S·A·S has unit
@@ -134,19 +149,21 @@ symmetric_diagonal_scaling(const Eigen::SparseMatrix<double>& spd);
                                                 std::uint64_t effective_cap_bytes);
 
 /// Solves K u = f with the given Dirichlet and optional linear constraints.
-/// `loads` is the full-size global load vector (3N); returns the full-size
-/// displacement vector with prescribed and slave values in place. A prescribed
-/// Dirichlet DOF must not also be a slave. Throws FeaError if the reduced system
-/// is singular (insufficient constraints leave rigid-body modes) or CG fails.
+/// `loads` is the full-size global load vector (3N). The returned displacement
+/// has prescribed and slave values in place; `cost` records portable work for
+/// the concrete direct or iterative method. A prescribed Dirichlet DOF must not
+/// also be a slave. Throws FeaError if the reduced system is singular
+/// (insufficient constraints leave rigid-body modes) or CG fails.
 ///
 /// Default `options` use sparse LDLT for nfree ≤ `cg_threshold` (50000) and
 /// bounded CG above that; the choice never depends on element type.
 /// Force `SolveMethod::kDirect` for exact patch-test path; force `kCG` to
 /// exercise the iterative solver on small systems.
-Eigen::VectorXd solve_elastostatics(const NodalMesh& mesh, const Material& material,
-                                    const Dirichlet& dirichlet, const Eigen::VectorXd& loads,
-                                    const SolveOptions& options = {},
-                                    const LinearConstraints* constraints = nullptr);
+[[nodiscard]] LinearSolveResult
+solve_elastostatics(const NodalMesh& mesh, const Material& material,
+                    const Dirichlet& dirichlet, const Eigen::VectorXd& loads,
+                    const SolveOptions& options = {},
+                    const LinearConstraints* constraints = nullptr);
 
 /// Strain energy 1/2 u^T K u, joules.
 double strain_energy(const NodalMesh& mesh, const Material& material,

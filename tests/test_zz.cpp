@@ -29,7 +29,7 @@ TEST_CASE("ZZ recovery produces finite nodal stress and eta") {
             loads(3 * static_cast<Eigen::Index>(i) + 1) = 1.0;
         }
     }
-    const auto u = polymesh::fea::solve_elastostatics(mesh, mat, bc, loads);
+    const auto u = polymesh::fea::solve_elastostatics(mesh, mat, bc, loads).u;
     const auto zz = polymesh::fea::recover_zz(mesh, mat, u);
     REQUIRE(zz.nodal_stress.size() == mesh.nodes.size());
     REQUIRE(zz.element_eta.size() == mesh.elements.size());
@@ -65,7 +65,7 @@ CantileverResult hex_cantilever(const Eigen::Vector3d& origin) {
     for (auto& p : mesh.nodes) {
         p += origin;
     }
-    return {mesh, polymesh::fea::solve_elastostatics(mesh, mat, bc, loads)};
+    return {mesh, polymesh::fea::solve_elastostatics(mesh, mat, bc, loads).u};
 }
 
 double max_von_mises(const std::vector<polymesh::fea::Stress>& s) {

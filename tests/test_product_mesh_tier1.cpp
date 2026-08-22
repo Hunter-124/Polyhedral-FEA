@@ -81,7 +81,7 @@ TEST_CASE("E4 product mesh: unit box cantilever, max |u| > 0, finite stress") {
     }
 
     const fea::Material steel{.youngs_modulus = 200e9, .poissons_ratio = 0.3};
-    const auto u = fea::solve_elastostatics(vol.mesh, steel, bc, loads);
+    const auto u = fea::solve_elastostatics(vol.mesh, steel, bc, loads).u;
     REQUIRE(u.size() == 3 * static_cast<Eigen::Index>(vol.mesh.nodes.size()));
 
     double max_u = 0.0;
@@ -187,7 +187,7 @@ TEST_CASE("E4 product mesh: public cylinder_prism smoke (mesh+solve, not Lame to
     }
 
     const fea::Material steel{.youngs_modulus = 200e9, .poissons_ratio = 0.3};
-    const auto u = fea::solve_elastostatics(vol.mesh, steel, bc, loads);
+    const auto u = fea::solve_elastostatics(vol.mesh, steel, bc, loads).u;
     double max_u = 0.0;
     for (Eigen::Index i = 0; i < u.size() / 3; ++i) {
         max_u = std::max(max_u, u.segment<3>(3 * i).norm());

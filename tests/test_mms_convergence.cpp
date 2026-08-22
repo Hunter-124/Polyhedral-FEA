@@ -43,7 +43,7 @@ double solve_mms_error(ElementType type, int n, const ManufacturedSolution& mms)
     }
     const auto loads =
         assemble_body_load(mesh, [&](const Eigen::Vector3d& p) { return mms.body_force(p); });
-    const auto u = solve_elastostatics(mesh, mms.material, bc, loads);
+    const auto u = solve_elastostatics(mesh, mms.material, bc, loads).u;
     return energy_norm_error(mesh, mms.material, u, mms);
 }
 

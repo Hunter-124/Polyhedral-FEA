@@ -46,7 +46,7 @@ double patch_max_error(const fea::NodalMesh& mesh) {
     }
     const Eigen::VectorXd loads =
         Eigen::VectorXd::Zero(3 * static_cast<Eigen::Index>(mesh.nodes.size()));
-    const auto u = fea::solve_elastostatics(mesh, kSteel, bc, loads);
+    const auto u = fea::solve_elastostatics(mesh, kSteel, bc, loads).u;
     double max_error = 0.0;
     for (std::size_t i = 0; i < mesh.nodes.size(); ++i) {
         const Eigen::Vector3d exact = g * mesh.nodes[i];

@@ -290,6 +290,7 @@ class Plan:
     parts: list[tuple[str, str]]
     completed: set[tuple[str, str]]
     scanned: list[Path]
+    host_tag: str = ""
     rects: list[Rect] = field(default_factory=list)
     parts_source: str = ""
 
@@ -434,6 +435,7 @@ def make_plan(args: argparse.Namespace) -> Plan:
         parts=parts,
         completed=completed,
         scanned=scanned,
+        host_tag=args.host_tag,
         parts_source=parts_source,
     )
     plan.rects = build_rects(args.batch, plan, args.shards, args.host_tag)
@@ -453,6 +455,8 @@ def campaign_json(name: str, plan: Plan, case_paths: Iterable[str], comment: str
         "tiers": template["tiers"],
         "grid": template["grid"],
     }
+    if plan.host_tag:
+        body["host"] = plan.host_tag
     if "score" in template:
         body["score"] = template["score"]
     if "resources" in template:

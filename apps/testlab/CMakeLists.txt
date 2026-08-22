@@ -2,8 +2,8 @@
 add_executable(polymesh_testlab main.cpp)
 target_include_directories(polymesh_testlab PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(polymesh_testlab
-    PRIVATE polymesh::geom polymesh::mesh polymesh::adapt polymesh::fea polymesh::pipeline polymesh::bench_harness
-            nlohmann_json::nlohmann_json
+    PRIVATE polymesh::geom polymesh::mesh polymesh::adapt polymesh::fea polymesh::pipeline
+            polymesh::bench_harness polymesh::advisor_cost nlohmann_json::nlohmann_json
             polymesh_warnings polymesh_perf
 )
 if(TARGET polymesh::advisor)

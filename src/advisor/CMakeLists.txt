@@ -8,6 +8,17 @@
 # single-threaded CPU inference engine. The archive is pinned by SHA-256, so the
 # binary we link is reproducible.
 
+add_library(polymesh_advisor_cost
+    src/calibration.cpp
+)
+add_library(polymesh::advisor_cost ALIAS polymesh_advisor_cost)
+target_include_directories(polymesh_advisor_cost PUBLIC include)
+target_link_libraries(polymesh_advisor_cost PRIVATE polymesh_warnings)
+
+if(NOT POLYMESH_WITH_ADVISOR)
+    return()
+endif()
+
 include(FetchContent)
 
 set(POLYMESH_ONNXRUNTIME_VERSION "1.28.0" CACHE STRING "Prebuilt ONNX Runtime version")

@@ -103,7 +103,7 @@ TEST_CASE("Lame thick-walled cylinder: displacement and hoop stress vs closed fo
             const Eigen::Vector3d r_hat(q[0], q[1], 0.0);
             return Eigen::Vector3d(p * r_hat.normalized());
         });
-    const auto u = solve_elastostatics(mesh, material, bc, loads);
+    const auto u = solve_elastostatics(mesh, material, bc, loads).u;
     const auto stress = recover_nodal_stress(mesh, material, u);
 
     // Compare u_r and sigma_theta at inner-surface nodes against Lamé.

@@ -46,7 +46,7 @@ double constant_strain_max_error(const NodalMesh& mesh, const Eigen::Matrix3d& g
     }
     const Eigen::VectorXd loads =
         Eigen::VectorXd::Zero(3 * static_cast<Eigen::Index>(mesh.nodes.size()));
-    const auto u = solve_elastostatics(mesh, kSteel, bc, loads);
+    const auto u = solve_elastostatics(mesh, kSteel, bc, loads).u;
     double max_err = 0.0;
     for (std::size_t i = 0; i < mesh.nodes.size(); ++i) {
         const Eigen::Vector3d ue = g * mesh.nodes[i];

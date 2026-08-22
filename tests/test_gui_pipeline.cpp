@@ -108,7 +108,7 @@ TEST_CASE("GUI pipeline: box STL segments into six faces and solves end-to-end")
     }
 
     const fea::Material aluminum{.youngs_modulus = 70e9, .poissons_ratio = 0.33};
-    const auto u = fea::solve_elastostatics(voxel.mesh, aluminum, bc, loads);
+    const auto u = fea::solve_elastostatics(voxel.mesh, aluminum, bc, loads).u;
 
     // Tip should deflect downward; magnitude in a physically sane band
     // (draft mesher: sanity check, not a benchmark).
@@ -160,6 +160,8 @@ TEST_CASE("solve job fills nodal ZZ eta for error-field display") {
     setup.fixtures.insert(fixed);
     setup.loads[loaded].force = {0, 0, -100};
     SolveJob job;
+    std::optional<PassTrace> solve_trace;
+    job.on_solve_stage = [&](const SolveStage& stage) { solve_trace = stage.trace; };
     job.start(model, setup);
     std::optional<SolveResult> result;
     for (int i = 0; i < 500; ++i) {
@@ -177,6 +179,11 @@ TEST_CASE("solve job fills nodal ZZ eta for error-field display") {
     REQUIRE(result->element_eta.size() == result->volume_mesh.elements.size());
     REQUIRE(result->global_eta >= 0.0);
     REQUIRE(result->max_nodal_eta >= 0.0);
+    REQUIRE(solve_trace.has_value());
+    CHECK(solve_trace->solve_flops > 0.0);
+    CHECK(solve_trace->solve_bytes > 0.0);
+    CHECK(solve_trace->factor_nnz > 0);
+    CHECK(solve_trace->solve_method == "direct");
 }
 
 namespace {

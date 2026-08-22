@@ -174,7 +174,7 @@ TEST_CASE("local_refine_tets: refined tet mesh still solves elastostatics") {
         }
     }
     REQUIRE_FALSE(bc.dof_values.empty());
-    const auto u = polymesh::fea::solve_elastostatics(refined, mat, bc, loads);
+    const auto u = polymesh::fea::solve_elastostatics(refined, mat, bc, loads).u;
     REQUIRE(u.size() == 3 * static_cast<Eigen::Index>(refined.nodes.size()));
     REQUIRE(u.allFinite());
     REQUIRE(u.norm() > 0.0);

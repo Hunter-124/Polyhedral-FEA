@@ -7,6 +7,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -48,6 +49,7 @@ struct SolveResourceEstimate {
     std::uint64_t sparse_system_bytes = 0;
     std::uint64_t assembly_workspace_bytes = 0;
     std::uint64_t rhs_solution_bytes = 0;
+    std::uint64_t ldlt_factor_nnz = 0;
     std::uint64_t ldlt_factor_bytes = 0;
     std::uint64_t cg_workspace_bytes = 0;
 
@@ -73,8 +75,11 @@ struct EffectiveMemoryBudget {
 [[nodiscard]] EffectiveMemoryBudget effective_memory_budget(double max_mem_gb);
 
 /// Estimate the complete peak footprint before stiffness assembly allocates.
-[[nodiscard]] SolveResourceEstimate estimate_solve_resources(const NodalMesh& mesh,
-                                                             Eigen::Index nfree);
+/// `exact_factor_nnz` is the authoritative symbolic column count when the
+/// reduced pattern is available; the empty early-planning path uses an envelope.
+[[nodiscard]] SolveResourceEstimate
+estimate_solve_resources(const NodalMesh& mesh, Eigen::Index nfree,
+                         std::optional<std::uint64_t> exact_factor_nnz = std::nullopt);
 
 /// Largest named component for a method-specific estimate.
 [[nodiscard]] std::string_view limiting_resource_term(const SolveResourceEstimate& estimate,

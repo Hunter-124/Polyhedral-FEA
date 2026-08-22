@@ -23,6 +23,7 @@ add_executable(polymesh_tests
     test_cantilever.cpp
     test_iterative_solve.cpp
     test_resource_budget.cpp
+    test_solve_cost.cpp
     test_mms_convergence.cpp
     test_lame_cylinder.cpp
     test_kirsch_plate.cpp
@@ -89,7 +90,9 @@ target_include_directories(polymesh_tests PRIVATE .
     ${CMAKE_SOURCE_DIR}/apps/testlab
 )
 target_link_libraries(polymesh_tests
-    PRIVATE polymesh::geom polymesh::mesh polymesh::adapt polymesh::fea polymesh::bench_harness polymesh::pipeline Catch2::Catch2WithMain polymesh_warnings
+    PRIVATE polymesh::geom polymesh::mesh polymesh::adapt polymesh::fea
+            polymesh::bench_harness polymesh::pipeline polymesh::advisor_cost
+            Catch2::Catch2WithMain polymesh_warnings
 )
 
 

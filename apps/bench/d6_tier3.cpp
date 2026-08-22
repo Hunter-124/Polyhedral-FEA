@@ -334,7 +334,7 @@ SolveOut solve_l_mesh(NodalMesh linear, const polymesh::bench::ReferenceCase& re
     const auto loads = assemble_traction_load(mesh, load_faces, [&](const Eigen::Vector3d&) {
         return Eigen::Vector3d(traction, 0.0, 0.0);
     });
-    const auto u = solve_elastostatics(mesh, material, bc, loads);
+    const auto u = solve_elastostatics(mesh, material, bc, loads).u;
     const double energy = strain_energy(mesh, material, u);
     const auto t1 = clock::now();
 

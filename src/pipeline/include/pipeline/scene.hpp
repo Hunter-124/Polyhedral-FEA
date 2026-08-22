@@ -623,6 +623,11 @@ struct PassTrace {
     double predicted_dof_factor = 1.0;
     double mesh_ms = 0.0;
     double solve_ms = 0.0;
+    double solve_flops = 0.0;
+    double solve_bytes = 0.0;
+    int cg_iters = 0;
+    std::uint64_t factor_nnz = 0;
+    std::string solve_method;
 };
 
 /// Declared here rather than beside `MeshStage`: it holds a `PassTrace` and a

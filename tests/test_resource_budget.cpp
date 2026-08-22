@@ -3,6 +3,7 @@
 #include "fea/assembly.hpp"
 #include "fea/resource_budget.hpp"
 #include "fea/solve.hpp"
+#include "fea/solve_cost.hpp"
 #include "support/structured_mesh.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -44,6 +45,16 @@ TEST_CASE("solve resource estimate grows with mesh DOF") {
     CHECK(b.cg_peak_bytes > a.cg_peak_bytes);
 }
 
+TEST_CASE("solve resource estimate accepts exact symbolic factor count") {
+    const auto mesh = box_hex_mesh(3, 2, 2, {1.0, 1.0, 1.0});
+    const auto bc = fix_min_x(mesh);
+    const auto cost = analyze_solve_cost(mesh, bc);
+    const auto estimate = estimate_solve_resources(mesh, cost.nfree, cost.factor_nnz);
+
+    CHECK(estimate.ldlt_factor_nnz == cost.factor_nnz);
+    CHECK(estimate.ldlt_factor_bytes > 0);
+}
+
 TEST_CASE("CSR connectivity bound tracks an assembled small system") {
     const auto mesh = box_hex_mesh(4, 4, 4, {1.0, 1.0, 1.0});
     const auto ndof = 3 * static_cast<Eigen::Index>(mesh.nodes.size());
@@ -68,7 +79,7 @@ TEST_CASE("tiny explicit memory cap refuses before solve allocation") {
     options.max_mem_gb = 0.000001; // 1000 bytes
 
     try {
-        (void)solve_elastostatics(mesh, kSteel, bc, loads, options);
+        (void)solve_elastostatics(mesh, kSteel, bc, loads, options).u;
         FAIL("tiny memory cap should reject the solve");
     } catch (const FeaError& e) {
         const std::string message = e.what();
@@ -80,11 +91,13 @@ TEST_CASE("tiny explicit memory cap refuses before solve allocation") {
 }
 
 TEST_CASE("auto solve records LDLT to CG downgrade when only CG fits") {
-    const auto mesh = box_hex_mesh(3, 3, 3, {1.0, 1.0, 1.0});
+    const auto mesh = box_hex_mesh(6, 6, 6, {1.0, 1.0, 1.0});
     const auto bc = fix_min_x(mesh);
     const auto ndof = 3 * static_cast<Eigen::Index>(mesh.nodes.size());
     const auto nfree = ndof - static_cast<Eigen::Index>(bc.dof_values.size());
-    const auto estimate = estimate_solve_resources(mesh, nfree);
+    const auto symbolic = analyze_solve_cost(mesh, bc);
+    const auto estimate =
+        estimate_solve_resources(mesh, nfree, symbolic.factor_nnz);
     REQUIRE(estimate.direct_peak_bytes > estimate.cg_peak_bytes);
     const auto cap =
         estimate.cg_peak_bytes + (estimate.direct_peak_bytes - estimate.cg_peak_bytes) / 2;
@@ -101,7 +114,7 @@ TEST_CASE("auto solve records LDLT to CG downgrade when only CG fits") {
     options.max_mem_gb = static_cast<double>(cap) / 1'000'000'000.0;
     options.on_note = [&](std::string_view note) { recorded_notes.emplace_back(note); };
     const auto loads = Eigen::VectorXd::Zero(ndof);
-    const auto u = solve_elastostatics(mesh, kSteel, bc, loads, options);
+    const auto u = solve_elastostatics(mesh, kSteel, bc, loads, options).u;
     CHECK(u.isZero());
     REQUIRE(recorded_notes.size() >= 2);
     CHECK(recorded_notes.front() == decision.note);

@@ -97,6 +97,11 @@ FEATURE_COLUMNS = [
     "thin_p10_over_diag", "min_feature_h", "n_fix_faces", "n_load_faces",
     "fix_area_frac", "load_area_frac", "load_dir_x", "load_dir_y", "load_dir_z",
     "fix_load_dist_over_diag", "load_axis_alignment", "poisson",
+    "geo_n_inner_loops", "geo_hole_spacing_min_rel", "geo_hole_spacing_p10_rel",
+    "geo_feat_pair_dist_min_rel", "geo_feat_pair_dist_p10_rel",
+    "geo_feat_pair_dist_mean_rel", "geo_dihedral_p10", "geo_dihedral_p50",
+    "geo_dihedral_p90", "geo_singular_lambda_min", "load_to_feature_dist_min_rel",
+    "fix_to_feature_dist_min_rel", "case_load_multiaxiality",
 ]
 ACTION_COLUMNS = [
     "h", "h_rel", "mesher", "element_tendency", "skin_layers", "feature_refine",

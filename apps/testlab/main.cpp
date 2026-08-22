@@ -1822,7 +1822,25 @@ json case_features_json(const pipeline::CaseFeatures& f) {
             {"load_dir_z", f.load_dir_z},
             {"fix_load_dist_over_diag", f.fix_load_dist_over_diag},
             {"load_axis_alignment", f.load_axis_alignment},
-            {"poisson", f.poisson}};
+            {"poisson", f.poisson},
+            // Proximity / load / singularity columns, in the order
+            // `scripts/advisor/dataset.py:FEATURE_COLUMNS` appends them. The
+            // values ARE the sentinels documented on `pipeline::CaseFeatures`
+            // when there is nothing to measure, so a row never has to be
+            // distinguished from a row of zeros.
+            {"geo_n_inner_loops", f.geo_n_inner_loops},
+            {"geo_hole_spacing_min_rel", f.geo_hole_spacing_min_rel},
+            {"geo_hole_spacing_p10_rel", f.geo_hole_spacing_p10_rel},
+            {"geo_feat_pair_dist_min_rel", f.geo_feat_pair_dist_min_rel},
+            {"geo_feat_pair_dist_p10_rel", f.geo_feat_pair_dist_p10_rel},
+            {"geo_feat_pair_dist_mean_rel", f.geo_feat_pair_dist_mean_rel},
+            {"geo_dihedral_p10", f.geo_dihedral_p10},
+            {"geo_dihedral_p50", f.geo_dihedral_p50},
+            {"geo_dihedral_p90", f.geo_dihedral_p90},
+            {"geo_singular_lambda_min", f.geo_singular_lambda_min},
+            {"load_to_feature_dist_min_rel", f.load_to_feature_dist_min_rel},
+            {"fix_to_feature_dist_min_rel", f.fix_to_feature_dist_min_rel},
+            {"case_load_multiaxiality", f.case_load_multiaxiality}};
 }
 
 json action_json(const Config& cfg, double h, double h_rel) {
@@ -2349,12 +2367,20 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
             fix_regions.push_back({bc.box.lo, bc.box.hi, 0.5});
         }
         Eigen::Vector3d load_dir = Eigen::Vector3d::Zero();
+        // Per-region traction vectors, index-aligned with `load_regions`. The
+        // summed `load_dir` cannot express a two-patch case whose patches pull
+        // along different axes, which is exactly what archetype c3 does, so the
+        // vectors go through as well and `case_load_multiaxiality` measures the
+        // real angle instead of always reporting zero.
+        std::vector<Eigen::Vector3d> load_tractions;
+        load_tractions.reserve(part.loads.size());
         for (const auto& load : part.loads) {
             load_regions.push_back({load.box.lo, load.box.hi, 0.25});
+            load_tractions.push_back(load.traction);
             load_dir += load.traction;
         }
         const pipeline::CaseFeatures features = pipeline::extract_case_features(
-            model, fix_regions, load_regions, load_dir, part.nu);
+            model, fix_regions, load_regions, load_dir, part.nu, load_tractions);
         out.line["features"] = case_features_json(features);
         if (advisor != nullptr) {
             // The advisor is an observation, so its failure must not be

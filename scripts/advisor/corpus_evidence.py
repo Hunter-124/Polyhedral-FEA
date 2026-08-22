@@ -70,7 +70,13 @@ CASE_DIR = ROOT / "bench" / "geometries" / "corpus" / "primitives"
 #: these so "distant from the existing corpus" has a fixed referent.
 BASELINE_FAMILIES = ("box_hole", "channel", "l_bracket", "plate_notch",
                      "sphere_box", "stepped_shaft")
-NEW_FAMILIES = ("tube", "perforated_plate")
+#: Every family added since that baseline, in the order they were added. Listed
+#: here so `new_family_placement` reports each one's distance from the baseline
+#: instead of silently covering only the first two widening picks.
+NEW_FAMILIES = ("tube", "perforated_plate",
+                "ellipsoid_boss", "lobed_shaft", "twisted_loft",
+                "ribbed_plate", "gusset_bracket", "multi_hole_plate",
+                "bossed_plate")
 
 #: Slab depth as a fraction of the load characteristic length, and the fraction
 #: of the wall thickness the tube family uses for that characteristic length.
@@ -96,23 +102,88 @@ def family_of(part: str) -> str:
 # 1. descriptor distances
 # --------------------------------------------------------------------------- #
 
-def descriptor_distances(csv_path: Path) -> dict[str, Any]:
+def load_descriptors(csv_path: Path) -> tuple[list[str], np.ndarray, np.ndarray]:
+    """Descriptor names, the raw matrix and the per-row family from the CSV."""
     with csv_path.open("r", newline="", encoding="utf-8") as stream:
         rows = list(csv.DictReader(stream))
+    if not rows:
+        raise RuntimeError(f"{csv_path}: no descriptor rows")
     names = [name for name in rows[0] if name != "part"]
-    raw = np.asarray([[float(row[name]) for name in names] for row in rows], dtype=np.float64)
+    raw = np.asarray([[float(row[name]) for name in names] for row in rows],
+                     dtype=np.float64)
     families = np.asarray([family_of(row["part"]) for row in rows])
+    return names, raw, families
 
-    # Standardized so a descriptor with a wide native range cannot dominate the
-    # distance purely by units.
+
+def standardized_centroids(raw: np.ndarray, families: np.ndarray
+                           ) -> dict[str, np.ndarray]:
+    """Per-family centroid in z-score space. THE definition of that space.
+
+    Standardized so a descriptor with a wide native range cannot dominate the
+    distance purely by units. Kept as one function because the corpus-widening
+    evidence and the generator's `--check-coverage` gate must not be able to
+    disagree about what "descriptor distance" means.
+    """
     scale = np.where(raw.std(axis=0) > 0, raw.std(axis=0), 1.0)
     z = (raw - raw.mean(axis=0)) / scale
-    centroids = {f: z[families == f].mean(axis=0) for f in sorted(set(families))}
+    return {f: z[families == f].mean(axis=0) for f in sorted(set(families))}
 
-    pairwise: dict[str, dict[str, float]] = {}
-    for a, va in centroids.items():
-        pairwise[a] = {b: float(np.linalg.norm(va - vb))
-                       for b, vb in centroids.items() if b != a}
+
+def centroid_pairwise(centroids: dict[str, np.ndarray]) -> dict[str, dict[str, float]]:
+    return {a: {b: float(np.linalg.norm(va - vb))
+                for b, vb in centroids.items() if b != a}
+            for a, va in centroids.items()}
+
+
+def coverage_report(raw: np.ndarray, families: np.ndarray,
+                    new_families: tuple[str, ...] | list[str]) -> dict[str, Any]:
+    """Is each candidate family at least as distinct as the corpus already is?
+
+    The referent is the MINIMUM pairwise centroid distance among the families
+    that are not under test. A candidate closer to an existing family than the
+    existing families are to each other is a weaker test of transfer, not a
+    widening -- the `perforated_plate` lesson, made a gate instead of a
+    footnote. A candidate with no descriptor rows at all is a failure, never a
+    pass: an unmeasurable family cannot be certified distinct.
+    """
+    under_test = list(dict.fromkeys(new_families))
+    centroids = standardized_centroids(raw, families)
+    pairwise = centroid_pairwise(centroids)
+    baseline = [f for f in sorted(centroids) if f not in set(under_test)]
+    if len(baseline) < 2:
+        raise RuntimeError("coverage needs at least two reference families, "
+                           f"got {baseline}")
+    baseline_pairs = [pairwise[a][b] for i, a in enumerate(baseline)
+                      for b in baseline[i + 1:]]
+    threshold = float(np.min(baseline_pairs))
+    placement: dict[str, Any] = {}
+    for family in under_test:
+        if family not in centroids:
+            continue
+        distance, nearest = min((pairwise[family][b], b) for b in baseline)
+        placement[family] = {
+            "nearest_reference_family": nearest,
+            "distance_to_nearest_reference": distance,
+            "margin_over_threshold": distance - threshold,
+            "below_reference_minimum": bool(distance < threshold),
+        }
+    missing = [f for f in under_test if f not in centroids]
+    return {
+        "standardization": "per-column z-score over all geometries in the file",
+        "reference_families": baseline,
+        "n_reference_pairs": len(baseline_pairs),
+        "reference_min_pairwise_distance": threshold,
+        "families_under_test": placement,
+        "missing_descriptors": missing,
+        "ok": not missing and not any(entry["below_reference_minimum"]
+                                     for entry in placement.values()),
+    }
+
+
+def descriptor_distances(csv_path: Path) -> dict[str, Any]:
+    names, raw, families = load_descriptors(csv_path)
+    centroids = standardized_centroids(raw, families)
+    pairwise = centroid_pairwise(centroids)
 
     present_baseline = [f for f in BASELINE_FAMILIES if f in centroids]
     baseline_pairs = [pairwise[a][b] for i, a in enumerate(present_baseline)

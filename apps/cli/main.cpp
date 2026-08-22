@@ -71,7 +71,7 @@ int usage() {
         "              [--max-elems N] [--max-dof N] [--max-mem GB]\n"
         "              [--fix-box ...6] [--load-box ...6] [--bc-grade]\n"
         "              [--load-dir x y z] [--force N] [--traction Pa]\n"
-        "              [--advisor <model_dir>] [--advisor-max-dof N] (CAD inputs only)\n"
+        "              [--advisor <model_dir>] [--advisor-objective accuracy|efficiency]\n"
         "                             CAD: mesh + BCs + VTU; Gmsh: solve the imported\n"
         "                             volume mesh directly. Default BCs fix min-x and\n"
         "                             load max-x; boxes override selection.\n"
@@ -121,6 +121,8 @@ int usage() {
         "--advisor DIR: pick mesher/h/adapt/p-order with the learned mesh advisor\n"
         "               (DIR holds model.onnx, normalization.json, clamps.json);\n"
         "               every value is clamped and the decision is logged as JSON\n"
+        "--advisor-objective: accuracy (default) or calibrated efficiency; efficiency\n"
+        "               minimises predicted mesh+solve time inside a 5% accuracy envelope\n"
         "--max-elems N: pre-flight element ceiling (0=589824 default); auto-h\n"
         "               clamps to fit and over-ceiling meshes coarsen-and-retry;\n"
         "               with spectral sizing on (default) the size field is\n"
@@ -753,6 +755,7 @@ int cmd_solve(std::span<char*> args) {
     LoadSpec load_spec;
     std::string advisor_dir;
     std::size_t advisor_max_dof = 0; // 0 = no advisor budget (ADR-0034)
+    bool advisor_efficiency = false;
     for (std::size_t i = 3; i < args.size(); ++i) {
         if (std::strcmp(args[i], "-h") == 0 && i + 1 < args.size()) {
             h = std::atof(args[++i]);
@@ -823,6 +826,17 @@ int cmd_solve(std::span<char*> args) {
             bc_grade = true;
         } else if (std::strcmp(args[i], "--advisor") == 0 && i + 1 < args.size()) {
             advisor_dir = args[++i];
+        } else if (std::strcmp(args[i], "--advisor-objective") == 0 && i + 1 < args.size()) {
+            const std::string_view objective = args[++i];
+            if (objective == "accuracy") {
+                advisor_efficiency = false;
+            } else if (objective == "efficiency") {
+                advisor_efficiency = true;
+            } else {
+                std::fputs("solve: --advisor-objective must be accuracy or efficiency\n",
+                           stderr);
+                return 2;
+            }
         } else if (std::strcmp(args[i], "--advisor-max-dof") == 0) {
             if (!parse_ceiling(args, i, advisor_max_dof)) {
                 return usage();
@@ -888,7 +902,9 @@ int cmd_solve(std::span<char*> args) {
         }
         const auto features = polymesh::pipeline::extract_case_features(
             *model, advisor_fix, advisor_load, load_spec.dir, nu);
-        const polymesh::advisor::Advisor advisor(advisor_dir);
+        const polymesh::advisor::Advisor advisor(
+            advisor_dir, advisor_efficiency ? polymesh::advisor::AdvisorObjective::kEfficiency
+                                            : polymesh::advisor::AdvisorObjective::kAccuracy);
         const auto decision =
             advisor.recommend(features, static_cast<double>(advisor_max_dof));
         std::printf("advisor: %s\n", polymesh::advisor::to_json(decision).c_str());

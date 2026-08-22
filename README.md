@@ -6,62 +6,67 @@ was co-designed with.
 <p align="center">
   <a href="docs/assets/cinema/advisor_cinema.mp4"><img
     src="docs/assets/cinema/advisor_cinema.gif"
-    alt="Exact CAD Fourier sizing, deployed-network activations, incremental adaptive cell replacement, and final stress analysis"
+    alt="Wishbone CAD sizing, real advisor activations landing into its mesh, two fixed supports, applied force, refinement, and solved stress"
     width="100%"></a>
 </p>
 
 **A complete mesh-to-answer presentation, paced for reading.** The 60 s take
-uses a deliberately complex Boolean CAD part — a truncated cone fused to a
-spherical scoop — and holds every finished result before moving on.
-[The 1080p/60 fps MP4](docs/assets/cinema/advisor_cinema.mp4) carries the same
-frames as the inline GIF ([poster](docs/assets/cinema/poster.png)).
+uses a purpose-built suspension wishbone: two chassis-bushing bores, two
+non-coplanar swept arms and a curved brace converging at one loaded upright
+boss. [The 1080p/60 fps MP4](docs/assets/cinema/advisor_cinema.mp4) carries the
+same frames as the inline GIF ([poster](docs/assets/cinema/poster.png)).
 
 The four chapters are concise and visual:
 
-- **Exact CAD.** A real edge-curvature trace is sampled point-by-point on the
-  highlighted edge, transformed into its measured frequency bars, energy
-  truncated, inverse-transformed and then mapped back onto the part as 1,753
-  target-spacing rings. Ring diameter is proportional to the requested cell
-  width and colour runs orange/fine → cyan/coarse, so the spatial effect is
-  visible where the cells will be generated instead of existing only as a
-  chart. This run keeps 4,155 of 262,143 field modes at 99.5% energy, with 36
-  denoised curve seeds; the exact BRep demand is re-imposed afterward so
-  filtering cannot erase a real feature.
-- **Advisor.** The deployed ONNX graph runs all 39 measured forward passes, then
-  holds its final network state for inspection. This part lands outside its
-  validated envelope (Mahalanobis 90.94), so the model abstains instead of
-  extrapolating. The film says so and leaves the configured fallback unchanged.
-- **Mesher.** The verified graded/spectral/quadratic fallback begins with 30,496
-  cells. One real solve→ZZ→LEB adaptive pass preserves 27,808 cells, removes
-  2,688 and spawns 8,143 replacements; unchanged topology never disappears.
-  The authoritative mesh has 35,951 tet10 cells, 52,663 nodes and 157,989
-  unknowns, with shape-quality min/mean 0.03378/0.2910 and zero skipped cells.
-- **Analysis.** The authoritative final solve — not the pre-promotion scaffold —
-  uses $E=200$ GPa and $\nu=0.3$ in the constitutive matrix and supplies every
-  pixel: 11.35 MPa peak von Mises, recovered stress gradient, complete ZZ error
-  map and exact linear load ramp. The true 0.0008111 mm maximum displacement is
-  shown at 26,221×, or 21.27 mm / exactly 12% of the model diagonal; both the
-  physical value and presentation scale stay on screen.
+- **Exact CAD.** The generated STEP is one checked, positive-volume solid.
+  Real edge-curvature samples become frequency bars and a reconstructed curve.
+  Geometry-curvature grading is disabled for this hero, so the panel labels that
+  FFT as analysis; the real solve uses one uniform wall-resolving target. The
+  support glyphs and force arrow remain anchored to their selected regions.
+- **Advisor → mesh.** The deployed ONNX graph runs all 39 measured forward
+  passes in four wide activation lanes. Its safety gate cannot establish an OOD
+  distance for this new descriptor combination, so it abstains instead of
+  pretending the recommendation is validated. The film holds that measured
+  refusal and visibly hands it to the verified fallback while real `MeshStage`
+  cells land, labelled as an aligned replay of sequential work.
+- **Mesher.** The verified fallback uses a fine wall-resolving tet4 target.
+  Its complete ZZ verification field is shown and reported without implying a
+  hidden remesh. The refusal trace remains until the finished mesh audit
+  replaces it, and the old standalone “converting to solver elements” beat is
+  gone. The manifest records every emitted stage in its original order.
+- **Analysis.** The authoritative final solve supplies the viewport and teaching
+  graphs. One active equation is paired with the same stage's nodal stress or
+  gradient distribution, full ZZ verification, or exact straight-line response
+  $u(\lambda)=\lambda u$ and $\sigma(\lambda)=\lambda\sigma$. Plain language
+  leads; units, extrema, material constants, solver method and provenance remain.
 
-The chapters are one continuous handoff rather than five resets. The completed
-target-spacing rings remain on the CAD as advisor scoring begins, dim to an input
-map, and disappear only where emitted cells take over. The finished mesh stays
-visible while stress arrives; stress remains ahead of the gradient front; the
-gradient (or stress on later passes) remains ahead of the ZZ field; and the ZZ
-map stays under the structural refinement it requested. The final error map then
-hands directly to the full-load stress response. No transition returns to an
-empty wireframe or replays an earlier chapter.
+The published solve contains **40,170 tet4 cells**, **9,796 nodes** and **29,388
+unknowns**; minimum/mean shape quality is **0.0200 / 0.2496**. The 47.17 kN
+distributed proof load produces **33.16 MPa** true peak stress (**17.42 MPa
+p99**) and **0.00329 mm** physical peak displacement. The film also states the
+**20.69%** global ZZ indicator instead of laundering it into a confidence claim;
+this take is a visually legible high-resolution verification case, not a
+reference-truth benchmark.
+
+The chapters are one continuous handoff rather than five resets. Target-spacing
+rings remain on the CAD as advisor scoring begins and yield only where cells
+arrive. The refusal/fallback trace persists into the finished mesh. That mesh
+stays visible while stress arrives; stress remains ahead of the gradient front;
+the preceding measured field remains ahead of ZZ error; and the error map stays
+under the topology change it requested. Both fixed supports and the force arrow
+remain anchored through every chapter, following the displayed final
+deformation where appropriate.
 
 Nothing in the take is a mock-up. Network nodes are the graph's own trunk
-tensors; connection strength is $|w_{ji}a_i|$; mesh frames are captured
-`pipeline::MeshStage` snapshots; spectral numbers and the pre/post-filter
-on-part spacing samples come from two evaluations of
-`pipeline::build_refinement_plan`; material enters `fea::Material` and its
-$D(E,\nu)$ matrix; cell quality comes from `fea::summarize_cell_quality`; and the
-last cinema stage is replaced with `SolveJob::take_result()` after quadratic
-promotion and re-solve so the film, Studio and exported result agree. Cosmetic
-work is limited to virtual pacing, opacity, cell-centroid separation, spatial
-field handoffs and the explicitly reported linear-load deformation scale.
+tensors, connection strength is measured $|w_{ji}a_i|$, and mesh frames are
+captured `pipeline::MeshStage` snapshots. Fields are the corresponding
+`pipeline::SolveStage::result`; the published stage is replaced with
+`SolveJob::take_result()` after configured finalisation so film, Studio and
+export receive the same answer. Field colour uses each measured 99th percentile
+so an isolated peak cannot make the rest of the part invisible; true maxima
+remain stated numerically and the caps are written to the manifest. Cosmetic
+work is limited to framing, pacing, opacity, cell-centroid separation, spatial
+handoffs and the reported linear-load deformation scale.
 
 Source citations and the disclosure behind every on-screen label:
 [docs/assets/cinema/NOTES.md](docs/assets/cinema/NOTES.md)

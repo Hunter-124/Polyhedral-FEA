@@ -18,6 +18,7 @@
 #include <filesystem>
 #include <map>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -48,6 +49,10 @@ struct AdvisorDecision {
     double predicted_dof = 0.0;
     double predicted_mesh_ms = 0.0;
     double predicted_solve_ms = 0.0;
+    double predicted_solve_flops = 0.0;
+    double predicted_solve_bytes = 0.0;
+    double predicted_mesh_work = 0.0;
+    std::optional<double> predicted_solve_seconds;
 
     /// Centred accuracy score at the recommended action: the `rel_err` head's
     /// log10 prediction minus that case's median over the actions run, so it is
@@ -101,7 +106,7 @@ struct AdvisorDecision {
 [[nodiscard]] std::string to_json(const AdvisorDecision& decision);
 
 /// Raw head outputs for one (case, action) pair, exactly as the graph emits
-/// them: the seven regressors are log10 of their target, `failure_logit` is a
+/// them: the ten regressors are log10 of their target, `failure_logit` is a
 /// pre-sigmoid logit, and `policy` is the un-clamped action proposal.
 ///
 /// `rel_err_rel` is the one regressor that is not a log10 level but a log10
@@ -115,6 +120,9 @@ struct AdvisorRawOutputs {
     double dof_log10 = 0.0;
     double mesh_ms_log10 = 0.0;
     double solve_ms_log10 = 0.0;
+    double solve_flops_log10 = 0.0;
+    double solve_bytes_log10 = 0.0;
+    double mesh_work_log10 = 0.0;
     double failure_logit = 0.0;
     std::vector<double> policy;
 };
@@ -173,7 +181,7 @@ struct NetworkLayout {
 
 /// One forward pass of the production graph, as it happened. `input`, `fc1` and
 /// `fc2` are the graph's own trunk taps -- not a re-implementation -- and
-/// `heads` is the seven regressors, the failure logit, then the policy vector,
+/// `heads` is the ten regressors, the failure logit, then the policy vector,
 /// matching `NetworkLayout` layer "heads".
 struct ActivationFrame {
     int candidate = -1; // index into the enumerated candidate grid; -1 = final re-score pass
@@ -209,6 +217,11 @@ struct AdvisorExplanation {
     double gate_threshold = 0.0;
 };
 
+enum class AdvisorObjective {
+    kAccuracy,
+    kEfficiency,
+};
+
 /// A loaded advisor. Construction is the expensive part (ORT session + graph
 /// validation); `recommend` is a pair of single-row forward passes.
 ///
@@ -216,7 +229,8 @@ struct AdvisorExplanation {
 /// thread, no parallel execution mode.
 class Advisor {
   public:
-    explicit Advisor(const std::filesystem::path& model_dir);
+    explicit Advisor(const std::filesystem::path& model_dir,
+                     AdvisorObjective objective = AdvisorObjective::kAccuracy);
     ~Advisor();
     Advisor(Advisor&&) noexcept;
     Advisor& operator=(Advisor&&) noexcept;
@@ -267,7 +281,7 @@ class Advisor {
     /// Throws `AdvisorError` when `has_activations()` is false.
     ///
     /// Not the hot path, and deliberately a separate entry point: `recommend`
-    /// keeps requesting exactly the nine contract outputs, so a campaign run
+    /// keeps requesting exactly the twelve contract outputs, so a campaign run
     /// pays nothing for a facility only the drawing uses. `explain` asks the
     /// same session for the three extra tap tensors as well, which is a
     /// different `Run` -- graph optimization may fuse the trunk differently

@@ -1,18 +1,19 @@
 {
   "schema": "advisor-dataset-schema-v1",
   "source_row_schemas": [
-    "advisor-row-v3"
+    "advisor-row-v3",
+    "advisor-row-v4"
   ],
   "truth": {
     "rederived_from": "row answers[] via probe kinds mirrored from apps/testlab/main.cpp",
-    "rows_rescored": 2612,
-    "rows_unscored": 226,
+    "rows_rescored": 5793,
+    "rows_unscored": 2565,
     "unscored_reasons": {
-      "no_answers": 226
+      "no_answers": 2565
     },
-    "n_files": 42,
-    "sha256": "815720eeed7a8adcb0cefa27f917e2f2ada428a9308c44d02511443821d10350",
-    "newest_mtime": "2026-08-14T22:04:57Z",
+    "n_files": 296,
+    "sha256": "f85f49b8db80a55a975ab5a2da253afa35aa25ea253ea45dd6dc65c14080256b",
+    "newest_mtime": "2026-08-22T19:13:51Z",
     "roots": [
       "bench/reference",
       "bench/reference/corpus"
@@ -206,6 +207,84 @@
       "description": "Advisor context feature 'poisson'; geometric values are bbox-normalized."
     },
     {
+      "name": "geo_n_inner_loops",
+      "role": "context",
+      "dtype": "number",
+      "description": "Advisor context feature 'geo_n_inner_loops'; geometric values are bbox-normalized."
+    },
+    {
+      "name": "geo_hole_spacing_min_rel",
+      "role": "context",
+      "dtype": "number",
+      "description": "Advisor context feature 'geo_hole_spacing_min_rel'; geometric values are bbox-normalized."
+    },
+    {
+      "name": "geo_hole_spacing_p10_rel",
+      "role": "context",
+      "dtype": "number",
+      "description": "Advisor context feature 'geo_hole_spacing_p10_rel'; geometric values are bbox-normalized."
+    },
+    {
+      "name": "geo_feat_pair_dist_min_rel",
+      "role": "context",
+      "dtype": "number",
+      "description": "Advisor context feature 'geo_feat_pair_dist_min_rel'; geometric values are bbox-normalized."
+    },
+    {
+      "name": "geo_feat_pair_dist_p10_rel",
+      "role": "context",
+      "dtype": "number",
+      "description": "Advisor context feature 'geo_feat_pair_dist_p10_rel'; geometric values are bbox-normalized."
+    },
+    {
+      "name": "geo_feat_pair_dist_mean_rel",
+      "role": "context",
+      "dtype": "number",
+      "description": "Advisor context feature 'geo_feat_pair_dist_mean_rel'; geometric values are bbox-normalized."
+    },
+    {
+      "name": "geo_dihedral_p10",
+      "role": "context",
+      "dtype": "number",
+      "description": "Advisor context feature 'geo_dihedral_p10'; geometric values are bbox-normalized."
+    },
+    {
+      "name": "geo_dihedral_p50",
+      "role": "context",
+      "dtype": "number",
+      "description": "Advisor context feature 'geo_dihedral_p50'; geometric values are bbox-normalized."
+    },
+    {
+      "name": "geo_dihedral_p90",
+      "role": "context",
+      "dtype": "number",
+      "description": "Advisor context feature 'geo_dihedral_p90'; geometric values are bbox-normalized."
+    },
+    {
+      "name": "geo_singular_lambda_min",
+      "role": "context",
+      "dtype": "number",
+      "description": "Advisor context feature 'geo_singular_lambda_min'; geometric values are bbox-normalized."
+    },
+    {
+      "name": "load_to_feature_dist_min_rel",
+      "role": "context",
+      "dtype": "number",
+      "description": "Advisor context feature 'load_to_feature_dist_min_rel'; geometric values are bbox-normalized."
+    },
+    {
+      "name": "fix_to_feature_dist_min_rel",
+      "role": "context",
+      "dtype": "number",
+      "description": "Advisor context feature 'fix_to_feature_dist_min_rel'; geometric values are bbox-normalized."
+    },
+    {
+      "name": "case_load_multiaxiality",
+      "role": "context",
+      "dtype": "number",
+      "description": "Advisor context feature 'case_load_multiaxiality'; geometric values are bbox-normalized."
+    },
+    {
       "name": "case_poisson",
       "role": "context",
       "dtype": "number",
@@ -314,6 +393,12 @@
       "description": "Swept mesh-advisor action 'adapt_leb_waves'."
     },
     {
+      "name": "cost_only",
+      "role": "action",
+      "dtype": "boolean",
+      "description": "Swept mesh-advisor action 'cost_only'."
+    },
+    {
       "name": "order",
       "role": "action",
       "dtype": "number",
@@ -342,6 +427,72 @@
       "role": "outcome",
       "dtype": "number",
       "description": "Campaign outcome 'solve_ms'."
+    },
+    {
+      "name": "solve_flops",
+      "role": "outcome",
+      "dtype": "number",
+      "description": "Campaign outcome 'solve_flops'."
+    },
+    {
+      "name": "solve_bytes",
+      "role": "outcome",
+      "dtype": "number",
+      "description": "Campaign outcome 'solve_bytes'."
+    },
+    {
+      "name": "cg_iters",
+      "role": "outcome",
+      "dtype": "number",
+      "description": "Campaign outcome 'cg_iters'."
+    },
+    {
+      "name": "cg_flops_per_iter",
+      "role": "outcome",
+      "dtype": "number",
+      "description": "Campaign outcome 'cg_flops_per_iter'."
+    },
+    {
+      "name": "cg_bytes_per_iter",
+      "role": "outcome",
+      "dtype": "number",
+      "description": "Campaign outcome 'cg_bytes_per_iter'."
+    },
+    {
+      "name": "factor_nnz",
+      "role": "outcome",
+      "dtype": "number",
+      "description": "Campaign outcome 'factor_nnz'."
+    },
+    {
+      "name": "solve_method",
+      "role": "outcome",
+      "dtype": "string",
+      "description": "Campaign outcome 'solve_method'."
+    },
+    {
+      "name": "cost_label_source",
+      "role": "outcome",
+      "dtype": "string",
+      "description": "Campaign outcome 'cost_label_source'."
+    },
+    {
+      "name": "est_solve_flops",
+      "role": "outcome",
+      "dtype": "number",
+      "description": "Campaign outcome 'est_solve_flops'."
+    },
+    {
+      "name": "host",
+      "role": "outcome",
+      "dtype": "string",
+      "description": "Campaign outcome 'host'."
+    },
+    {
+      "name": "nfree",
+      "role": "outcome",
+      "dtype": "number",
+      "description": "Campaign outcome 'nfree'."
     },
     {
       "name": "n_dof",

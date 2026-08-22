@@ -291,3 +291,76 @@ fix.
   `cinema_ticker_reserve` / `draw_cinema_ticker` are gone, replaced by
   `cinema_caption` and `draw_cinema_strip`. `CinemaState::ticker_reserve` is gone
   with them.
+
+## 10. The hero is now a load path, not a prop
+
+The cone-and-scoop take proved the pipeline, but it was a poor engineering
+story: one small fixed face, one broad loaded region, a near-square silhouette,
+and no visible boundary-condition glyphs. The default hero is now the checked-in
+`wishbone.step`, generated deterministically by
+`scripts/gen_cad_parts.py::make_wishbone`. Two separate chassis-bushing outer
+sleeves are fixed, and a conserved vertical/inboard proof-load resultant is
+distributed over the upright-side outer boss. Two non-coplanar swept arms and a
+curved brace make that three-interface load path visible before the solve colours it.
+
+The force arrow and both fixed-support glyphs are anchored to the
+area-weighted centroids of the selected GUI regions. After the final solve, each
+anchor resolves once to the nearest authoritative result node so it follows the
+same displayed deformation as the part during the load ramp. Arrow direction is
+the actual resultant vector. Glyph size is presentation; location, count,
+direction and force magnitude are data.
+
+## 11. Cause and effect may be aligned, never relabelled
+
+The advisor pass and mesher are still sequential computations. The film now
+explains their causal relationship by holding the measured final pass and
+replaying only halo/trace opacity through four wide activation lanes while the
+later real `MeshStage` snapshot lands. The emitted cells remain the mesher's
+cells, in recorded stage order. The manifest carries that order explicitly.
+
+An accepted decision is labelled **chosen action**. Any measured refusal — OOD,
+feasibility, budget, or an unavailable OOD assessment — is instead labelled
+**safety refusal → verified fallback**; the network's unapplied proposal is
+never called the mesh being built. The cell reveal starts after the replay
+reaches the action heads, but the strip states that this is an aligned replay of
+sequential work, not a runtime-progress trace. The old
+standalone “converting to solver elements” presentation is gone.
+
+## 12. The solver pane teaches with the result
+
+Seven simultaneous dim equation groups were accurate and unreadable. The pane
+now shows one active relation and one graph from the same authoritative
+`SolveStage`:
+
+- a cached 24-bin spatial distribution for nodal von Mises stress or recovered
+  stress gradient;
+- measured global ZZ error beside the configured stopping target;
+- real before/after cell counts for the refinement transition; or
+- the exact straight-line relationship
+  $u(\lambda)=\lambda u,\ \sigma(\lambda)=\lambda\sigma$.
+
+These are distributions over nodes or elements, never time histories. Histograms
+are computed once per solve stage. To prevent a constrained-node singularity
+from flattening the whole field into one dark colour, the chart and viewport use
+the measured 99th percentile as their display cap; the true maximum remains
+visible numerically and the cap is stated on screen and in the manifest.
+
+The bottom caption is now a horizontal ledger: headline and live numbers on the
+left, plain-language disclosure on the right, and full-width provenance below.
+This spends width before shrinking type and returns vertical space to the part.
+
+## 13. One frame must contain the whole motion
+
+`Camera::fit_oriented` now solves the perspective inequalities on all eight AABB
+corners using the settled viewport aspect instead of fitting a wide pane as if it
+were square. Before frame zero, the viewport also unions the exact rest and
+fully exaggerated result positions. The shot therefore fills the available
+pane without clipping the final deformed boss and never reframes inside the
+take. The poster is selected only after the analysis pane finishes opening, not
+mid-slide.
+
+Solver provenance follows the `SolveResult` it describes, including the final
+quadratic re-solve, and the recorder emits ordered mesh/solve-stage rows. A
+generic LEPP-cycle fallback now bisects the repeated edge across all live
+sharers instead of aborting a valid unstructured CAD refinement; every owner
+receives the same midpoint, preserving conformity.

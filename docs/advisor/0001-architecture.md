@@ -16,7 +16,7 @@ A small multi-head MLP that maps
 ```
 
 plus a policy head that proposes an action. Per ADR-0027 §1 it is an
-**action-conditioned outcome model**, not a "best config" classifier: the seven
+**action-conditioned outcome model**, not a "best config" classifier: the ten
 regression heads answer *what would happen if you meshed it this way*, and only
 the policy head expresses a preference. That split is what makes the thing
 auditable — a recommendation always comes with the predicted consequences of the
@@ -26,10 +26,10 @@ action it recommends.
 
 | Stage | Artifact | Producer |
 | --- | --- | --- |
-| Geometry corpus | `bench/geometries/corpus/primitives/*.step` (32 parts, 8 families x 4 size regimes) | `scripts/gen_primitive_corpus.py` |
-| Load cases | `bench/geometries/corpus/primitives/*.case.json` (96; 3 per part) | same |
-| Ground truth | `bench/reference/corpus/*.json` (96: 8 closed-form, 88 external) | closed form where it exists, else **Gmsh 4.13.1 -> CalculiX 2.23** via `bench/reference/external_truth.py` (ADR-0029 §1). Promotion from our own solves is retired; `scripts/truth_guard.py` refuses to overwrite either source |
-| Campaign rows | `bench/campaigns/advisor-batch-*/results.jsonl` (`advisor-row-v3`) | `apps/testlab` via `scripts/advisor/run_batch.py` |
+| Geometry corpus | `bench/geometries/corpus/primitives/*.step` (60 parts, 15 families x 4 size regimes) | `scripts/gen_primitive_corpus.py` |
+| Load cases | `bench/geometries/corpus/primitives/*.case.json` (300; 5 per part) | same |
+| Ground truth | `bench/reference/corpus/*.json` (300: 8 analytic, 256 external, 36 pre-existing provisional) | closed form where it exists, else **Gmsh 4.13.1 -> CalculiX 2.23** via `bench/reference/external_truth.py` (ADR-0029 §1). The portable-cost retrain added 168 independently solved c3/c4/new-family truths; promotion from our own solves remains forbidden |
+| Campaign rows | `bench/campaigns/advisor-batch-*/results.jsonl` (`advisor-row-v4`, with v3 accepted for legacy rows) | `apps/testlab` via `scripts/advisor/run_batch.py` |
 | Flat table | `bench/advisor/dataset.csv` | `scripts/build_advisor_dataset.py` |
 | Model | `bench/advisor/{model.onnx,normalization.json,clamps.json}` | `scripts/advisor/export_onnx.py` |
 | Inference | `src/advisor` + `--advisor` on `polymesh solve` / `polymesh_testlab` | this milestone |
@@ -84,9 +84,9 @@ defined instead of quietly wrong.
 ## Heads
 
 Trunk: `Linear(D_eff -> 96) -> GELU -> Linear(96 -> 96) -> GELU`, where `D_eff`
-is the 42 continuous columns plus the two 4-dim embeddings. Around 16k
-parameters. It is deliberately small: the activation view in the dashboard has
-to stay legible, and 5k rows do not support anything larger.
+is the 73 continuous columns plus the two 4-dim embeddings. The current graph
+has `D=75`, `D_eff=81`, and 19,156 parameters. It remains deliberately small:
+the activation view in the dashboard has to stay legible.
 
 | Output | Meaning | Units |
 | --- | --- | --- |
@@ -97,6 +97,9 @@ to stay legible, and 5k rows do not support anything larger.
 | degrees of freedom (`dof`) | solve degrees of freedom | log10 |
 | meshing time (`mesh_ms`) | meshing wall time | log10 |
 | solve time (`solve_ms`) | solve wall time | log10 |
+| portable solve work (`solve_flops`) | symbolic direct work or CG iterations x per-iteration work | log10 FLOPs |
+| portable solve traffic (`solve_bytes`) | structural value/index/vector traffic for the selected method | log10 bytes |
+| normalized mesh work (`mesh_work`) | mesh wall time / committed host reference-mesh median | log10 ratio |
 | failure risk (`failure_logit`) | feasibility (mesh/solve failed, over budget, or untrusted) | logit |
 | recommended action (`policy`) | proposed action, `A` dims | mixed, see below |
 
@@ -201,12 +204,12 @@ Public API (`src/advisor/include/advisor/advisor.hpp`):
 - `apply_action(FeatureColumns&, AdvisorDecision)` — overwrite the action columns
 - `defaults()` — the clamp-box defaults, i.e. what a veto returns
 
-The graph is validated at load: exactly one input, exactly nine outputs, in this
-order and under exactly these names —
+The graph is validated at load: exactly one input, exactly twelve outputs, in
+this order and under exactly these names —
 
 ```
 rel_err, rel_err_rel, geo_chamfer, geo_p99, dof, mesh_ms, solve_ms,
-failure_logit, policy
+solve_flops, solve_bytes, mesh_work, failure_logit, policy
 ```
 
 — and an input width matching `input_columns`. `kOutputNames` in
@@ -221,6 +224,12 @@ inference.
 ```
 polymesh solve part.step --advisor bench/advisor -o out.vtu
 ```
+
+Use `--advisor-objective efficiency` to apply the optional host calibration.
+The chooser first finds the best feasible relative-accuracy score, keeps the
+actions within a multiplicative 5% accuracy envelope, and then selects the
+lowest predicted mesh-plus-roofline solve time. Missing calibration fails back
+to the default accuracy objective and says so in the decision note.
 
 The advisor runs before size resolution and grading, so its action is the one
 that actually meshes. The full decision is printed as JSON: a mesh chosen by a

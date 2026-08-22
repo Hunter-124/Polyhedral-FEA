@@ -658,12 +658,16 @@ TINY_FORCED: dict[str, list[float]] = {
     "dof": [4.20, 5.10, 3.40, 4.55],
     "mesh_ms": [2.10, 2.60, 1.80, 2.25],
     "solve_ms": [2.90, 3.50, 2.20, 3.05],
+    "solve_flops": [6.20, 7.10, 5.80, 6.50],
+    "solve_bytes": [7.00, 7.80, 6.50, 7.20],
+    "mesh_work": [-2.00, -1.00, 0.50, -1.50],
     "failure_logit": [-6.00, -4.50, 6.50, -5.25],
     # policy continuous dims, physical units
     "policy_h_rel": [0.080, 0.0005, 0.050, 0.120],
     "policy_adapt_passes": [2.0, 1.0, 3.0, 0.0],
     "policy_eta_target": [0.050, 0.020, 0.100, 0.030],
 }
+
 
 
 def synthetic_csv(path: Path, n_rows: int = 32) -> Path:
@@ -781,42 +785,83 @@ def tiny_raw_cases(normalization: dict[str, Any]) -> list[dict[str, Any]]:
     return cases
 
 
-def force_head_values(net: AdvisorNet, standardized: np.ndarray) -> None:
-    """Solve the final layer so the fixture cases hit the required outputs.
+def force_head_values(net: AdvisorNet, standardized: np.ndarray,
+                      cases: list[dict[str, Any]], normalization: dict[str, Any],
+                      clamps: dict[str, Any]) -> None:
+    """Pin parity outputs, then pin a real candidate accuracy/DOF tradeoff.
 
-    The trunk is untouched; only the head rows are re-fitted. With
-    ``n_cases << hidden`` the least-squares system is under-determined, so the
-    fit is exact to float32 rounding.
+    All heads first fit only the four exported parity rows, which keeps the
+    cross-runtime system well-conditioned. The already-fitted accuracy and
+    failure heads then identify two gate-passing candidate actions on the
+    nominal case. Only the DOF head receives those two additional equations:
+    the best-accuracy action is expensive and a lower-ranked action is cheap.
+    This makes the C++ max_dof fixture non-vacuous without perturbing any other
+    head's parity.
     """
     net.eval()
     with torch.no_grad():
         _, _, h2 = net.trunk(torch.from_numpy(standardized.astype(np.float32)))
-    design = np.concatenate(
+    base_design = np.concatenate(
         [h2.numpy().astype(np.float64), np.ones((h2.shape[0], 1))], axis=1)
-    rank = int(np.linalg.matrix_rank(design))
-    if rank < design.shape[0]:
+    if int(np.linalg.matrix_rank(base_design)) < base_design.shape[0]:
         raise SystemExit(
-            f"tiny fixture trunk activations are rank {rank} for {design.shape[0]} cases; "
-            f"cannot force distinct head outputs")
+            f"tiny fixture trunk activations cannot force {base_design.shape[0]} outputs")
 
-    def fit(target: list[float]) -> tuple[np.ndarray, float]:
-        solution, *_ = np.linalg.lstsq(design, np.asarray(target, dtype=np.float64), rcond=None)
+    def fit(matrix: np.ndarray, target: list[float]) -> tuple[np.ndarray, float]:
+        solution, *_ = np.linalg.lstsq(
+            matrix, np.asarray(target, dtype=np.float64), rcond=None)
         return solution[:-1], float(solution[-1])
 
     with torch.no_grad():
         for head in REGRESSION_HEADS:
-            weight, bias = fit(TINY_FORCED[head])
-            net.regression_heads[head].weight.copy_(torch.from_numpy(weight).view(1, -1).float())
+            weight, bias = fit(base_design, TINY_FORCED[head])
+            net.regression_heads[head].weight.copy_(
+                torch.from_numpy(weight).view(1, -1).float())
             net.regression_heads[head].bias.fill_(bias)
-        weight, bias = fit(TINY_FORCED["failure_logit"])
+        weight, bias = fit(base_design, TINY_FORCED["failure_logit"])
         net.failure_head.weight.copy_(torch.from_numpy(weight).view(1, -1).float())
         net.failure_head.bias.fill_(bias)
         groups = action_group_slices(net.config["mesher_choices"])
         start = groups["continuous"].start
         for offset, dim in enumerate(CONTINUOUS_ACTION_DIMS):
-            weight, bias = fit(TINY_FORCED[f"policy_{dim}"])
+            weight, bias = fit(base_design, TINY_FORCED[f"policy_{dim}"])
             net.policy_head.weight[start + offset].copy_(torch.from_numpy(weight).float())
             net.policy_head.bias[start + offset] = bias
+
+    candidate_inputs: list[np.ndarray] = []
+    for action in clamps["candidate_grid"]["actions"]:
+        raw = dict(cases[0]["features"])
+        raw["h_rel"] = float(action["h_rel"])
+        raw["adapt_passes"] = float(action["adapt_passes"])
+        raw["eta_target"] = float(action["eta_target"])
+        raw["order_idx"] = float(normalization["order_choices"].index(action["order"]))
+        raw["mesher_idx"] = float(
+            normalization["mesher_choices"].index(action["mesher"]))
+        candidate_inputs.append(standardize_row(raw, normalization))
+    candidate_matrix = np.stack(candidate_inputs).astype(np.float32)
+    with torch.no_grad():
+        _, _, candidate_h2 = net.trunk(torch.from_numpy(candidate_matrix))
+        candidate_outputs = net.heads(candidate_h2)
+    scores = candidate_outputs["rel_err_rel"].squeeze(1).numpy()
+    risks = 1.0 / (
+        1.0 + np.exp(-candidate_outputs["failure_logit"].squeeze(1).numpy()))
+    survivors = np.flatnonzero(risks <= float(clamps["gate_threshold"]))
+    if survivors.size < 2:
+        raise SystemExit("tiny fixture has fewer than two gate-passing candidate actions")
+    ranked = survivors[np.argsort(scores[survivors], kind="mergesort")]
+    chosen = candidate_h2[ranked[:2]].numpy().astype(np.float64)
+    dof_design = np.concatenate(
+        [np.vstack([h2.numpy().astype(np.float64), chosen]),
+         np.ones((base_design.shape[0] + 2, 1))],
+        axis=1,
+    )
+    if int(np.linalg.matrix_rank(dof_design)) < dof_design.shape[0]:
+        raise SystemExit("tiny fixture candidate tradeoff is rank deficient")
+    weight, bias = fit(dof_design, TINY_FORCED["dof"] + [6.0, 3.0])
+    with torch.no_grad():
+        net.regression_heads["dof"].weight.copy_(
+            torch.from_numpy(weight).view(1, -1).float())
+        net.regression_heads["dof"].bias.fill_(bias)
 
 
 def check_fixture_guarantees(cases: list[dict[str, Any]], clamps: dict[str, Any]) -> None:
@@ -944,6 +989,10 @@ def build_fixture(args: argparse.Namespace, directory: Path, taps: bool,
 
     normalization = data.normalization
     clamps = data.clamps
+    # The synthetic tradeoff points move the failure plane slightly. Keep the
+    # fixture's candidate gate wide enough to retain multiple measured actions;
+    # the residual veto remains 0.5 and still exercises the refusal arm.
+    clamps["gate_threshold"] = 0.1
     cases = tiny_raw_cases(normalization)
     # Raw (pre-standardization) matrix; NaN marks a column the case omits, which
     # is exactly the impute path both standardize_row and the C++ loader take.
@@ -952,7 +1001,7 @@ def build_fixture(args: argparse.Namespace, directory: Path, taps: bool,
           for column in normalization["input_columns"]]
          for case in cases], dtype=np.float64)
     standardized = np.stack([standardize_row(case["features"], normalization) for case in cases])
-    force_head_values(net, standardized)
+    force_head_values(net, standardized, cases, normalization, clamps)
 
     net.eval()
     with torch.no_grad():

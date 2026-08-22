@@ -85,7 +85,8 @@ add_library(polymesh::advisor ALIAS polymesh_advisor)
 target_include_directories(polymesh_advisor PUBLIC include)
 target_link_libraries(polymesh_advisor
     PUBLIC polymesh::pipeline
-    PRIVATE onnxruntime nlohmann_json::nlohmann_json polymesh_warnings polymesh_perf
+    PRIVATE polymesh::advisor_cost onnxruntime nlohmann_json::nlohmann_json
+            polymesh_warnings polymesh_perf
 )
 # ORT's C++ header is exception-based and warns under -Wconversion on GCC/Clang;
 # it is a vendored third-party header, not ours to fix.

@@ -112,7 +112,7 @@ TEST_CASE("hybrid zoo expanded product path patch test: constant strain") {
     const fea::Material mat{.youngs_modulus = 200e9, .poissons_ratio = 0.3};
     const Eigen::VectorXd loads =
         Eigen::VectorXd::Zero(3 * static_cast<Eigen::Index>(mesh.nodes.size()));
-    const auto u = fea::solve_elastostatics(mesh, mat, bc, loads);
+    const auto u = fea::solve_elastostatics(mesh, mat, bc, loads).u;
 
     double max_error = 0.0;
     for (std::size_t i = 0; i < mesh.nodes.size(); ++i) {

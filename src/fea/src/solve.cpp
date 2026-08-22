@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "fea/solve.hpp"
+#include "fea/solve_cost.hpp"
 
 #include "fea/backend.hpp"
 
@@ -127,6 +128,12 @@ struct CgAttempt {
     double true_relative_residual = std::numeric_limits<double>::infinity();
     CgStop stop = CgStop::kBreakdown;
 };
+
+struct ReducedSolveResult {
+    Eigen::VectorXd u;
+    SolveCostMeasured cost;
+};
+
 
 std::string_view cg_stop_text(CgStop stop) {
     switch (stop) {
@@ -269,8 +276,9 @@ CgAttempt run_cg(const Eigen::SparseMatrix<double>& a, const Eigen::VectorXd& rh
     return result;
 }
 
-Eigen::VectorXd solve_reduced(const Eigen::SparseMatrix<double>& kff,
-                              const Eigen::VectorXd& rhs, const SolveOptions& options) {
+ReducedSolveResult solve_reduced(const Eigen::SparseMatrix<double>& kff,
+                                 const Eigen::VectorXd& rhs, const SolveOptions& options,
+                                 const SolveCostEstimate& symbolic_cost) {
     const Eigen::Index nfree = kff.rows();
     const SolveMethod method = select_solve_method(nfree, options);
 
@@ -447,7 +455,18 @@ Eigen::VectorXd solve_reduced(const Eigen::SparseMatrix<double>& kff,
                 options.cg_tol, options.cg_accept_tol, selected_attempt.true_relative_residual,
                 selected_attempt.reliable_restarts, provenance));
         }
-        return std::move(selected_attempt.x);
+        SolveCostMeasured measured;
+        measured.method = selected_preconditioner.find("Jacobi") != std::string::npos
+                              ? "cg-jacobi"
+                              : "cg-ichol";
+        measured.cg_iterations = selected_attempt.iterations;
+        measured.cg_restarts = selected_attempt.reliable_restarts;
+        measured.factor_nnz = symbolic_cost.factor_nnz;
+        measured.flops =
+            static_cast<double>(measured.cg_iterations) * symbolic_cost.cg_flops_per_iter;
+        measured.bytes =
+            static_cast<double>(measured.cg_iterations) * symbolic_cost.cg_bytes_per_iter;
+        return {.u = std::move(selected_attempt.x), .cost = std::move(measured)};
     }
 
     Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> ldlt(kff);
@@ -459,14 +478,21 @@ Eigen::VectorXd solve_reduced(const Eigen::SparseMatrix<double>& kff,
     if (ldlt.info() != Eigen::Success) {
         throw FeaError("solve_elastostatics: back-substitution failed");
     }
-    return uf;
+    SolveCostMeasured measured;
+    measured.method = "direct";
+    measured.factor_nnz = symbolic_cost.factor_nnz;
+    measured.flops =
+        symbolic_cost.factor_flops + 4.0 * static_cast<double>(symbolic_cost.factor_nnz);
+    measured.bytes = estimate_direct_solve_bytes(symbolic_cost);
+    return {.u = uf, .cost = std::move(measured)};
 }
 
 } // namespace
 
-Eigen::VectorXd solve_elastostatics(const NodalMesh& mesh, const Material& material,
-                                    const Dirichlet& dirichlet, const Eigen::VectorXd& loads,
-                                    const SolveOptions& options,
+LinearSolveResult solve_elastostatics(const NodalMesh& mesh, const Material& material,
+                                      const Dirichlet& dirichlet,
+                                      const Eigen::VectorXd& loads,
+                                      const SolveOptions& options,
                                     const LinearConstraints* constraints) {
     const Eigen::Index ndof = 3 * static_cast<Eigen::Index>(mesh.nodes.size());
     if (loads.size() != ndof) {
@@ -514,7 +540,12 @@ Eigen::VectorXd solve_elastostatics(const NodalMesh& mesh, const Material& mater
     const Eigen::Index system_dofs = ndof - constrained_dofs;
     const Eigen::Index nfree =
         system_dofs - static_cast<Eigen::Index>(dirichlet.dof_values.size());
-    const auto estimate = estimate_solve_resources(mesh, nfree);
+    const auto symbolic_cost = analyze_solve_cost(mesh, dirichlet, constraints);
+    if (symbolic_cost.nfree != nfree) {
+        throw FeaError("solve_elastostatics: symbolic free-DOF count mismatch");
+    }
+    const auto estimate =
+        estimate_solve_resources(mesh, nfree, symbolic_cost.factor_nnz);
     const auto budget = effective_memory_budget(options.max_mem_gb);
     const auto decision =
         decide_solve_method(nfree, options, estimate, budget.effective_cap_bytes);
@@ -596,14 +627,17 @@ Eigen::VectorXd solve_elastostatics(const NodalMesh& mesh, const Material& mater
 
     // The allocation-free preflight above uses the post-constraint free count;
     // kAuto may downgrade LDLT to CG when only the iterative footprint fits.
-    const Eigen::VectorXd uf = solve_reduced(kff, rhs, selected_options);
+    ReducedSolveResult reduced_solve =
+        solve_reduced(kff, rhs, selected_options, symbolic_cost);
 
     Eigen::VectorXd u_system(system_dofs);
     for (Eigen::Index dof = 0; dof < system_dofs; ++dof) {
         const auto r = reduced[static_cast<std::size_t>(dof)];
-        u_system[dof] = r >= 0 ? uf[r] : system_dirichlet.at(dof);
+        u_system[dof] = r >= 0 ? reduced_solve.u[r] : system_dirichlet.at(dof);
     }
-    return has_linear_constraints ? constraints->recover(u_system, ndof) : u_system;
+    Eigen::VectorXd u = has_linear_constraints ? constraints->recover(u_system, ndof)
+                                               : std::move(u_system);
+    return {.u = std::move(u), .cost = std::move(reduced_solve.cost)};
 }
 
 double strain_energy(const NodalMesh& mesh, const Material& material,

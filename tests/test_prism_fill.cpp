@@ -160,7 +160,7 @@ TEST_CASE("prism product mesh solve smoke on unit box") {
         }
     }
     const fea::Material mat{.youngs_modulus = 200e9, .poissons_ratio = 0.3};
-    const auto u = fea::solve_elastostatics(vol.mesh, mat, bc, loads);
+    const auto u = fea::solve_elastostatics(vol.mesh, mat, bc, loads).u;
     REQUIRE(u.size() == loads.size());
     REQUIRE(u.allFinite());
     REQUIRE(u.norm() > 0.0);
@@ -186,7 +186,7 @@ TEST_CASE("prism constant-strain patch on prism_fill lattice") {
     const fea::Material mat{.youngs_modulus = 200e9, .poissons_ratio = 0.3};
     const Eigen::VectorXd loads =
         Eigen::VectorXd::Zero(static_cast<Eigen::Index>(3 * mesh.nodes.size()));
-    const auto u = fea::solve_elastostatics(mesh, mat, bc, loads);
+    const auto u = fea::solve_elastostatics(mesh, mat, bc, loads).u;
     for (std::uint32_t i = 0; i < mesh.nodes.size(); ++i) {
         const Eigen::Vector3d ui(u[static_cast<Eigen::Index>(3 * i)],
                                  u[static_cast<Eigen::Index>(3 * i + 1)],

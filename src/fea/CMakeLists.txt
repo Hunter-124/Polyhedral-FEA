@@ -11,6 +11,7 @@ add_library(polymesh_fea
     src/hp_assembly.cpp
     src/assembly.cpp
     src/constraints.cpp
+    src/solve_cost.cpp
     src/solve.cpp
     src/resource_budget.cpp
     src/traction.cpp

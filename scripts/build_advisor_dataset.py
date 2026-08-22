@@ -88,6 +88,8 @@ def has_engine_marker(row: dict[str, Any]) -> bool:
     return isinstance(answers, dict) and "load_area_status" in answers
 
 
+ADVISOR_ROW_SCHEMAS = frozenset({"advisor-row-v3", "advisor-row-v4"})
+
 FEATURE_COLUMNS = [
     "bbox_dx", "bbox_dy", "bbox_dz", "diag", "volume", "surface_area",
     "sa_over_v23", "n_faces", "n_sharp_edges", "sharp_edge_len_total",
@@ -98,7 +100,8 @@ FEATURE_COLUMNS = [
 ]
 ACTION_COLUMNS = [
     "h", "h_rel", "mesher", "element_tendency", "skin_layers", "feature_refine",
-    "bc_grading", "adapt_passes", "eta_target", "p_elevate", "adapt_leb_waves", "order",
+    "bc_grading", "adapt_passes", "eta_target", "p_elevate", "adapt_leb_waves",
+    "cost_only", "order",
 ]
 IDENTITY_COLUMNS = ["schema", "campaign", "cfg_id", "part", "tier"]
 CASE_COLUMNS = [
@@ -108,10 +111,12 @@ CASE_COLUMNS = [
 # ``error`` is the row's top-level failure string; it is the first signal
 # dataset.py::_failure_flag looks at, so it has to reach the CSV.
 TOP_OUTCOMES = [
-    "status", "error", "mesh_ms", "solve_ms", "n_dof", "n_elems", "n_nodes",
-    "geometry_fill_volume_err", "geometry_volume_err",
+    "status", "error", "mesh_ms", "solve_ms", "solve_flops", "solve_bytes",
+    "cg_iters", "cg_flops_per_iter", "cg_bytes_per_iter", "factor_nnz",
+    "solve_method", "est_solve_flops", "host", "nfree", "n_dof", "n_elems",
+    "n_nodes", "geometry_fill_volume_err", "geometry_volume_err",
 ]
-STRING_OUTCOMES = frozenset({"status", "error"})
+STRING_OUTCOMES = frozenset({"status", "error", "solve_method", "host"})
 
 
 def parse_args() -> argparse.Namespace:
@@ -462,7 +467,8 @@ def trusted(row: dict[str, Any]) -> bool | None:
 
 
 def flatten_row(campaign: str, row: dict[str, Any], case: dict[str, Any] | None) -> dict[str, Any]:
-    schema = row.get("schema") if row.get("schema") == "advisor-row-v3" else "legacy"
+    row_schema = row.get("schema")
+    schema = row_schema if row_schema in ADVISOR_ROW_SCHEMAS else "legacy"
     flat: dict[str, Any] = {
         "schema": schema,
         "campaign": campaign,
@@ -470,10 +476,10 @@ def flatten_row(campaign: str, row: dict[str, Any], case: dict[str, Any] | None)
         "part": row.get("part", ""),
         "tier": row.get("tier", np.nan),
     }
-    features = row.get("features", {}) if schema == "advisor-row-v3" else {}
+    features = row.get("features", {}) if schema in ADVISOR_ROW_SCHEMAS else {}
     for name in FEATURE_COLUMNS:
         flat[name] = features.get(name, np.nan)
-    action = row.get("action", {}) if schema == "advisor-row-v3" else {}
+    action = row.get("action", {}) if schema in ADVISOR_ROW_SCHEMAS else {}
     legacy = row.get("config", {}) if schema == "legacy" else {}
     for name in ACTION_COLUMNS:
         if schema == "legacy" and name in {"mesher", "feature_refine", "order"}:
@@ -649,9 +655,10 @@ def main() -> int:
     for key in sorted(unique, key=lambda item: tuple("" if value is None else str(value) for value in item)):
         _, part, _ = key
         campaign, row = unique[key]
-        source_schema = row.get("schema") if row.get("schema") == "advisor-row-v3" else "legacy"
+        row_schema = row.get("schema")
+        source_schema = row_schema if row_schema in ADVISOR_ROW_SCHEMAS else "legacy"
         source_schema_counts[source_schema] += 1
-        if source_schema != "advisor-row-v3":
+        if source_schema not in ADVISOR_ROW_SCHEMAS:
             excluded_legacy_rows += 1
             excluded_legacy_sources[campaign] += 1
             continue

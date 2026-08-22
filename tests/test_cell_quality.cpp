@@ -76,7 +76,7 @@ Cantilever cantilever(int nx, double load, double youngs) {
             loads(3 * static_cast<Eigen::Index>(i) + 1) = load;
         }
     }
-    c.u = polymesh::fea::solve_elastostatics(c.mesh, mat, bc, loads);
+    c.u = polymesh::fea::solve_elastostatics(c.mesh, mat, bc, loads).u;
     return c;
 }
 

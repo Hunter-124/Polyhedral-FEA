@@ -6,6 +6,7 @@
 // Anti-cheat: reference truths are loaded only from paths declared in case
 // files (bench/reference/*). No numeric answers are embedded here.
 
+#include "advisor/calibration.hpp"
 #ifdef POLYMESH_WITH_ADVISOR
 #include "advisor/advisor.hpp"
 #endif
@@ -15,6 +16,7 @@
 #include "fea/material.hpp"
 #include "fea/p_elevate.hpp"
 #include "fea/solve.hpp"
+#include "fea/solve_cost.hpp"
 #include "fea/stress.hpp"
 #include "fea/traction.hpp"
 #include "fea/vtu.hpp"
@@ -140,6 +142,7 @@ struct TierSpec {
 
 struct Campaign {
     std::string name;
+    std::string host;
     std::vector<std::string> parts; // case file paths (repo-relative)
     std::vector<TierSpec> tiers;
     json grid; // object of arrays
@@ -249,6 +252,7 @@ struct Config {
     double eta_target = 0.0;
     bool p_elevate = false;
     int adapt_leb_waves = 2;
+    bool cost_only = false;
     std::optional<double> h_rel;
 };
 
@@ -287,6 +291,10 @@ Campaign load_campaign(const fs::path& path) {
     const json j = json::parse(read_file(path));
     Campaign c;
     c.name = j.at("name").get<std::string>();
+    c.host = j.value("host", std::string{});
+    if (c.host.empty()) {
+        c.host = polymesh::advisor::local_host_name();
+    }
     for (const auto& p : j.at("parts")) {
         c.parts.push_back(p.get<std::string>());
     }
@@ -311,7 +319,7 @@ Campaign load_campaign(const fs::path& path) {
         "element_tendency", "bc_grading",     "curvature_turn_deg",
         "snap_boundary",    "skin_layers",    "adapt_passes",
         "eta_target",       "p_elevate",      "adapt_leb_waves",
-        "spectral_smooth",  "h_rel"};
+        "spectral_smooth",  "h_rel",          "cost_only"};
     for (auto it = c.grid.begin(); it != c.grid.end(); ++it) {
         if (!kGridKeys.contains(it.key())) {
             throw std::runtime_error("unknown grid key '" + it.key() + "'");
@@ -555,12 +563,19 @@ std::vector<Config> expand_grid(const json& grid) {
                 throw std::runtime_error("grid.adapt_leb_waves values must be in [1,4]");
             }
         }
+        if (values.contains("cost_only")) {
+            cfg.cost_only = values["cost_only"].get<bool>();
+        }
         if (values.contains("h_rel")) {
             const double value = values["h_rel"].get<double>();
             if (!(value > 0.0) || !std::isfinite(value)) {
                 throw std::runtime_error("grid.h_rel values must be finite and > 0");
             }
             cfg.h_rel = value;
+        }
+        if (cfg.cost_only && cfg.adapt_passes > 0) {
+            throw std::runtime_error(
+                "grid.cost_only=true requires adapt_passes=0 because adaptation needs ZZ");
         }
         out.push_back(std::move(cfg));
 
@@ -1823,6 +1838,7 @@ json action_json(const Config& cfg, double h, double h_rel) {
             {"eta_target", cfg.eta_target},
             {"p_elevate", cfg.p_elevate},
             {"adapt_leb_waves", cfg.adapt_leb_waves},
+            {"cost_only", cfg.cost_only},
             {"order", cfg.order}};
 }
 
@@ -2174,7 +2190,40 @@ struct RunOutcome {
     double accuracy_score = 0.0; // 0..1 mean over metrics
     double mesh_ms = 0.0;
     double solve_ms = 0.0;
+    double solve_flops = 0.0;
+    double solve_bytes = 0.0;
+    long long cg_iters = 0;
+    std::uint64_t factor_nnz = 0;
+    std::string solve_method;
 };
+
+void accumulate_solve_cost(RunOutcome& out, double flops, double bytes, int cg_iters,
+                           std::uint64_t factor_nnz, std::string_view method) {
+    out.solve_flops += flops;
+    out.solve_bytes += bytes;
+    out.cg_iters += cg_iters;
+    out.factor_nnz = factor_nnz > std::numeric_limits<std::uint64_t>::max() - out.factor_nnz
+                         ? std::numeric_limits<std::uint64_t>::max()
+                         : out.factor_nnz + factor_nnz;
+    if (!method.empty()) {
+        if (out.solve_method.empty()) {
+            out.solve_method = method;
+        } else if (out.solve_method != method) {
+            out.solve_method = "mixed";
+        }
+    }
+    out.line["solve_flops"] = out.solve_flops;
+    out.line["solve_bytes"] = out.solve_bytes;
+    out.line["cg_iters"] = out.cg_iters;
+    out.line["factor_nnz"] = out.factor_nnz;
+    out.line["solve_method"] =
+        out.solve_method.empty() ? json(nullptr) : json(out.solve_method);
+}
+
+void accumulate_solve_cost(RunOutcome& out, const fea::SolveCostMeasured& cost) {
+    accumulate_solve_cost(out, cost.flops, cost.bytes, cost.cg_iterations, cost.factor_nnz,
+                          cost.method);
+}
 // The row-first ordering depends on moving the mesh out of run_one, never copying
 // it. Enforce the precondition in the compiler rather than in a review comment.
 static_assert(std::is_move_constructible_v<pipeline::VolumeMeshOutput>,
@@ -2227,7 +2276,12 @@ void write_adapt_trace(const fs::path& run_dir,
                        {"global_shape", kShapeNames[shape]},
                        {"predicted_dof_factor", trace.predicted_dof_factor},
                        {"mesh_ms", trace.mesh_ms},
-                       {"solve_ms", trace.solve_ms}};
+                       {"solve_ms", trace.solve_ms},
+                       {"solve_flops", trace.solve_flops},
+                       {"solve_bytes", trace.solve_bytes},
+                       {"cg_iters", trace.cg_iters},
+                       {"factor_nnz", trace.factor_nnz},
+                       {"solve_method", trace.solve_method}};
         text << row.dump() << '\n';
     }
     std::error_code ec;
@@ -2247,8 +2301,8 @@ void write_adapt_trace(const fs::path& run_dir,
 RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_scale,
                    const fs::path& progress_path, const fs::path& mesh_preview_path,
                    const fs::path& warehouse_run_dir = {}, double max_run_wall_s = 900.0,
-                   const AdvisorScorer* advisor = nullptr, long long budget_dof = 0,
-                   long long budget_elems = 0) {
+                   const AdvisorScorer* advisor = nullptr, std::string_view host = {},
+                   long long budget_dof = 0, long long budget_elems = 0) {
     using clock = std::chrono::steady_clock;
     const auto t_all0 = clock::now();
     const auto wall_elapsed_s = [&]() -> double {
@@ -2263,10 +2317,17 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
     out.line["cfg_id"] = cfg.id;
     out.line["config"] = cfg.values;
     out.line["part"] = part.part;
-    out.line["schema"] = "advisor-row-v3";
+    out.line["schema"] = "advisor-row-v4";
     out.line["action"] = action_json(cfg, 0.0, cfg.h_rel.value_or(0.0));
     out.line["features"] = case_features_json(pipeline::CaseFeatures{});
     out.line["tier"] = tier;
+    out.line["host"] = host.empty() ? polymesh::advisor::local_host_name() : std::string(host);
+    out.line["solve_flops"] = nullptr;
+    out.line["solve_bytes"] = nullptr;
+    out.line["cg_iters"] = 0;
+    out.line["factor_nnz"] = 0;
+    out.line["solve_method"] = nullptr;
+    out.line["est_solve_flops"] = nullptr;
 
     ProgressHeartbeat beat(progress_path, "mesh", cfg.id, part.part, tier, t_all0);
 
@@ -2403,6 +2464,8 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
             for (const auto& trace : adapt_traces) {
                 out.mesh_ms += trace.mesh_ms;
                 out.solve_ms += trace.solve_ms;
+                accumulate_solve_cost(out, trace.solve_flops, trace.solve_bytes,
+                                      trace.cg_iters, trace.factor_nnz, trace.solve_method);
             }
             write_adapt_trace(warehouse_run_dir, adapt_traces);
         } else {
@@ -2510,6 +2573,37 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
             throw std::runtime_error("no Dirichlet DOFs matched BC boxes for part " +
                                      part.part);
         }
+        const fea::SolveCostEstimate estimated_cost = fea::analyze_solve_cost(vol.mesh, bc);
+        const double direct_flops =
+            estimated_cost.factor_flops + 4.0 * static_cast<double>(estimated_cost.factor_nnz);
+        out.line["nfree"] = estimated_cost.nfree;
+        out.line["est_solve_flops"] = direct_flops;
+        out.line["cg_flops_per_iter"] = estimated_cost.cg_flops_per_iter;
+        out.line["cg_bytes_per_iter"] = estimated_cost.cg_bytes_per_iter;
+        if (cfg.cost_only) {
+            const fea::SolveOptions defaults;
+            if (estimated_cost.nfree <= defaults.cg_threshold) {
+                fea::SolveCostMeasured symbolic;
+                symbolic.method = "direct";
+                symbolic.factor_nnz = estimated_cost.factor_nnz;
+                symbolic.flops = direct_flops;
+                symbolic.bytes = fea::estimate_direct_solve_bytes(estimated_cost);
+                accumulate_solve_cost(out, symbolic);
+            } else {
+                out.factor_nnz = estimated_cost.factor_nnz;
+                out.solve_method = "cg-symbolic";
+                out.line["factor_nnz"] = out.factor_nnz;
+                out.line["solve_method"] = out.solve_method;
+            }
+            out.line["mesh_ms"] = out.mesh_ms;
+            out.line["solve_ms"] = 0.0;
+            out.line["status"] = "cost_only";
+            out.accuracy_score = 0.0;
+            stamp_wall(out.line);
+            out.mesh = std::move(vol);
+            beat.set_phase("done", 1.0);
+            return out;
+        }
         const auto resolved_loads = resolve_load_faces(
             vol.mesh, model.cad ? &*model.cad : nullptr, h, selection_part.loads);
         const auto loads = make_loads(vol.mesh, selection_part.loads, resolved_loads);
@@ -2583,7 +2677,10 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
             beat.set_cg(iter, resid);
             beat.set_frac(frac);
         };
-        const Eigen::VectorXd u = fea::solve_elastostatics(vol.mesh, mat, bc, loads, sopt);
+        fea::LinearSolveResult solved =
+            fea::solve_elastostatics(vol.mesh, mat, bc, loads, sopt);
+        accumulate_solve_cost(out, solved.cost);
+        const Eigen::VectorXd& u = solved.u;
         const auto t_solve1 = clock::now();
         out.solve_ms += std::chrono::duration<double, std::milli>(t_solve1 - t_solve0).count();
 
@@ -2709,6 +2806,12 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
 
         out.line["mesh_ms"] = out.mesh_ms;
         out.line["solve_ms"] = out.solve_ms;
+        out.line["solve_flops"] = out.solve_flops;
+        out.line["solve_bytes"] = out.solve_bytes;
+        out.line["cg_iters"] = out.cg_iters;
+        out.line["factor_nnz"] = out.factor_nnz;
+        out.line["solve_method"] =
+            out.solve_method.empty() ? json(nullptr) : json(out.solve_method);
         // solve_suspect: residual/reaction/orphan gate failed — answers recorded
         // but accuracy scores zeroed so analyze can filter untrusted runs.
         out.line["status"] = health_ok ? "ok" : "solve_suspect";
@@ -3099,9 +3202,9 @@ int run_campaign(const fs::path& camp_dir, bool resume, const AdvisorScorer* adv
                     wh_dir =
                         camp_dir / "runs" / cfg_id / part.part / ("t" + std::to_string(tier));
                 }
-                const RunOutcome ro =
-                    run_one(cfg, part, tier, ts.h_scale, progress_path, mesh_preview_path,
-                            wh_dir, run_limit, advisor, camp.max_dof, camp.max_elems);
+                const RunOutcome ro = run_one(cfg, part, tier, ts.h_scale, progress_path,
+                                              mesh_preview_path, wh_dir, run_limit, advisor,
+                                              camp.host, camp.max_dof, camp.max_elems);
                 results_app << ro.line.dump() << '\n';
                 results_app.flush();
                 // A silently dropped row is worse than a stopped campaign: the

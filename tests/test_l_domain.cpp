@@ -133,7 +133,7 @@ LSolve solve_l(int n, const polymesh::bench::ReferenceCase& ref) {
     const auto loads = assemble_traction_load(mesh, load_faces, [&](const Eigen::Vector3d&) {
         return Eigen::Vector3d(traction, 0.0, 0.0);
     });
-    const auto u = solve_elastostatics(mesh, material, bc, loads);
+    const auto u = solve_elastostatics(mesh, material, bc, loads).u;
     const double energy = strain_energy(mesh, material, u);
     const auto stress = recover_nodal_stress(mesh, material, u);
 

@@ -50,22 +50,21 @@ std::uint64_t dense_square_cap(Eigen::Index rows) {
     return sat_mul(n, n);
 }
 
-std::uint64_t ldlt_factor_nnz(std::uint64_t csr_nnz, Eigen::Index nfree) {
+std::uint64_t ldlt_factor_nnz_envelope(std::uint64_t csr_nnz, Eigen::Index nfree) {
     if (nfree <= 0) {
         return 0;
     }
 
-    // Eigen's analyzePattern() is not a cheap count-only query: it calls
-    // resizeNonZeros() for L and therefore allocates the factor we are trying to
-    // guard.  Use a measured 3-D elasticity-pattern envelope instead.  This
-    // workstation's real SimplicialLDLT factorizations measured:
-    //   DOF       CSR nnz      L nnz       L/CSR
-    //   1,536       95,832      221,289       2.31
-    //  12,288      876,024    6,242,457       7.13
-    //  41,472    3,087,000   40,885,965      13.24
-    // Because csr_nnz here is already the larger per-element upper bound,
-    // 1.8*cbrt(n/1000), floored at 4, envelopes the corresponding L/upper
-    // ratios and keeps growing instead of assuming constant fill.
+    // Early element-count planning has no reduced pattern to analyze. Keep a
+    // conservative measured 3-D envelope here only; solve preflight passes the
+    // exact Gilbert-Ng-Peyton column count from analyze_solve_cost().
+    // Historical SimplicialLDLT measurements behind the envelope:
+    //   DOF       CSR nnz      strict-L nnz  L/CSR
+    //   1,536       95,832         221,289     2.31
+    //  12,288      876,024       6,242,457     7.13
+    //  41,472    3,087,000      40,885,965    13.24
+    // csr_nnz is already the larger per-element upper bound, so the growing
+    // ratio remains deliberately conservative until an exact pattern exists.
     const double scale = std::max(4.0, 1.8 * std::cbrt(static_cast<double>(nfree) / 1000.0));
     const long double predicted = static_cast<long double>(csr_nnz) * scale;
     const auto dense_lower = sat_mul(index_as_u64(nfree), sat_add(index_as_u64(nfree), 1)) / 2;
@@ -135,7 +134,8 @@ EffectiveMemoryBudget effective_memory_budget(double max_mem_gb) {
     return out;
 }
 
-SolveResourceEstimate estimate_solve_resources(const NodalMesh& mesh, Eigen::Index nfree) {
+SolveResourceEstimate estimate_solve_resources(const NodalMesh& mesh, Eigen::Index nfree,
+                                               std::optional<std::uint64_t> exact_factor_nnz) {
     SolveResourceEstimate out;
     out.ndof = 3 * static_cast<Eigen::Index>(mesh.nodes.size());
     out.nfree = std::clamp(nfree, Eigen::Index{0}, out.ndof);
@@ -184,7 +184,9 @@ SolveResourceEstimate estimate_solve_resources(const NodalMesh& mesh, Eigen::Ind
         sat_add(sat_mul(ndof_u, 2 * sizeof(double) + sizeof(Eigen::Index)),
                 sat_mul(nfree_u, 2 * sizeof(double)));
 
-    const auto factor_nnz = ldlt_factor_nnz(free_nnz, out.nfree);
+    const auto factor_nnz =
+        exact_factor_nnz.value_or(ldlt_factor_nnz_envelope(free_nnz, out.nfree));
+    out.ldlt_factor_nnz = factor_nnz;
     out.ldlt_factor_bytes = sat_add(csr_bytes(factor_nnz, out.nfree),
                                     sat_mul(nfree_u, sizeof(double) + 5 * sizeof(int)));
 

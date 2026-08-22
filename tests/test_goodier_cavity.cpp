@@ -79,7 +79,7 @@ double solve_scf(int nr, int nt, int np, const polymesh::bench::ReferenceCase& r
 
     const Eigen::VectorXd loads =
         Eigen::VectorXd::Zero(3 * static_cast<Eigen::Index>(mesh.nodes.size()));
-    const auto u = solve_elastostatics(mesh, material, bc, loads);
+    const auto u = solve_elastostatics(mesh, material, bc, loads).u;
     const auto stress = recover_nodal_stress(mesh, material, u);
 
     double peak_hoop = -1e300;

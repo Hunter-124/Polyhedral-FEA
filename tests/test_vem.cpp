@@ -97,7 +97,7 @@ TEST_CASE("VEM patch test: constant strain on hex-as-poly mesh") {
     }
     const Eigen::VectorXd loads =
         Eigen::VectorXd::Zero(3 * static_cast<Eigen::Index>(mesh.nodes.size()));
-    const auto u = solve_elastostatics(mesh, kSteel, bc, loads);
+    const auto u = solve_elastostatics(mesh, kSteel, bc, loads).u;
     double max_err = 0.0;
     for (std::size_t i = 0; i < mesh.nodes.size(); ++i) {
         const Eigen::Vector3d ue = g * mesh.nodes[i];
@@ -140,7 +140,7 @@ TEST_CASE("VEM k=2 patch test: constant strain on hex mid-edge mesh") {
     }
     const Eigen::VectorXd loads =
         Eigen::VectorXd::Zero(3 * static_cast<Eigen::Index>(mesh.nodes.size()));
-    const auto u = solve_elastostatics(mesh, kSteel, bc, loads);
+    const auto u = solve_elastostatics(mesh, kSteel, bc, loads).u;
     double max_err = 0.0;
     for (std::size_t i = 0; i < mesh.nodes.size(); ++i) {
         const Eigen::Vector3d ue = g * mesh.nodes[i];
@@ -165,7 +165,7 @@ TEST_CASE("VEM k=2 exact quadratic: degree-2 MMS nearly zero energy error") {
     }
     const auto loads =
         assemble_body_load(mesh, [&](const Eigen::Vector3d& p) { return mms.body_force(p); });
-    const auto u = solve_elastostatics(mesh, kSteel, bc, loads);
+    const auto u = solve_elastostatics(mesh, kSteel, bc, loads).u;
     const double error = energy_norm_error(mesh, kSteel, u, mms);
     const auto zero = Eigen::VectorXd::Zero(u.size());
     const double scale = energy_norm_error(mesh, kSteel, zero, mms);
@@ -188,7 +188,7 @@ TEST_CASE("VEM k=2 MMS energy-norm order ~ 2 on hex path") {
         }
         const auto loads = assemble_body_load(
             mesh, [&](const Eigen::Vector3d& p) { return mms.body_force(p); });
-        const auto u = solve_elastostatics(mesh, kSteel, bc, loads);
+        const auto u = solve_elastostatics(mesh, kSteel, bc, loads).u;
         return energy_norm_error(mesh, kSteel, u, mms);
     };
     const double e_coarse = solve_err(2);

@@ -32,7 +32,7 @@ TEST_CASE("gravity-loaded cantilever matches Timoshenko beam theory") {
 
     const auto loads = assemble_body_load(
         mesh, [&](const Eigen::Vector3d&) { return Eigen::Vector3d(0.0, 0.0, bz); });
-    const auto u = solve_elastostatics(mesh, steel, bc, loads);
+    const auto u = solve_elastostatics(mesh, steel, bc, loads).u;
 
     // Average tip deflection over the end-face nodes.
     double tip = 0.0;

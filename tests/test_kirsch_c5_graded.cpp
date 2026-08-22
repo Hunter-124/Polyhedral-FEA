@@ -154,7 +154,7 @@ KirschRun run_kirsch_annulus(int nr, int nt, int nz, RadialMap map,
             return Eigen::Vector3d(s * n);
         });
     REQUIRE(loads.norm() > 0.0);
-    const auto u = solve_elastostatics(mesh, material, bc, loads);
+    const auto u = solve_elastostatics(mesh, material, bc, loads).u;
     REQUIRE(u.norm() > 0.0);
     const auto stress = recover_nodal_stress(mesh, material, u);
 

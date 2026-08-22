@@ -2,6 +2,7 @@
 
 // PolyMesh CLI — geometry check, tet mesh, elastostatic solve + VTU export.
 
+#include "advisor/calibration.hpp"
 #ifdef POLYMESH_WITH_ADVISOR
 #include "advisor/advisor.hpp"
 #endif
@@ -26,14 +27,19 @@
 #include "pipeline/surface_render.hpp"
 
 #include <Eigen/Eigenvalues>
+#include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <format>
+#include <fstream>
 #include <limits>
 #include <map>
 #include <optional>
@@ -79,6 +85,7 @@ int usage() {
         "              [--wireframe] [--stats out.json]\n"
         "                             headless PNG of the same boundary surface the\n"
         "                             Studio viewport paints — no GL, no window\n"
+        "  calibrate --out host.json   benchmark portable FLOP/byte rates and reference mesh\n"
         "  backend                    print compute backend + OpenMP/opt summary\n"
         "\n"
         "inputs: CAD (.step .stp .brep .brp); solve also accepts Gmsh 2.x ASCII .msh.\n"
@@ -1215,8 +1222,9 @@ int cmd_solve(std::span<char*> args) {
             polymesh::pipeline::update_solved_geometry_volume(*model, vol);
         }
         u = polymesh::fea::solve_elastostatics(
-            vol.mesh, mat, bc2, loads2, solve_options,
-            curved_constraints.empty() ? nullptr : &curved_constraints);
+                vol.mesh, mat, bc2, loads2, solve_options,
+                curved_constraints.empty() ? nullptr : &curved_constraints)
+                .u;
         zz = polymesh::fea::recover_zz(vol.mesh, mat, u);
     };
     for (int pass = 0; pass <= adapt_passes; ++pass) {
@@ -1237,7 +1245,7 @@ int cmd_solve(std::span<char*> args) {
             polymesh::pipeline::update_solved_geometry_volume(*model, vol);
         }
 
-        u = polymesh::fea::solve_elastostatics(vol.mesh, mat, bc, loads, solve_options);
+        u = polymesh::fea::solve_elastostatics(vol.mesh, mat, bc, loads, solve_options).u;
         zz = polymesh::fea::recover_zz(vol.mesh, mat, u);
         const bool last_pass =
             (pass == adapt_passes) || (eta_target > 0.0 && zz.global_eta <= eta_target);
@@ -1573,9 +1581,11 @@ int cmd_diag(std::span<char*> args) {
                 std::fprintf(stderr, "diag: %.*s\n", static_cast<int>(note.size()),
                              note.data());
             };
-            const Eigen::VectorXd uu = polymesh::fea::solve_elastostatics(
-                vol.mesh, mat, bc, loads, solve_options,
-                curved_constraints.empty() ? nullptr : &curved_constraints);
+            const Eigen::VectorXd uu =
+                polymesh::fea::solve_elastostatics(
+                    vol.mesh, mat, bc, loads, solve_options,
+                    curved_constraints.empty() ? nullptr : &curved_constraints)
+                    .u;
             const auto zz = polymesh::fea::recover_zz(vol.mesh, mat, uu);
             solve_ms = ms(clock::now() - t0);
             global_eta = zz.global_eta;
@@ -1871,6 +1881,141 @@ int cmd_render(std::span<char*> args) {
     return 0;
 }
 
+double median_sample(std::vector<double> samples) {
+    if (samples.empty()) {
+        throw std::runtime_error("calibrate: no benchmark samples");
+    }
+    std::sort(samples.begin(), samples.end());
+    return samples[samples.size() / 2];
+}
+
+double benchmark_flops_per_second() {
+    using clock = std::chrono::steady_clock;
+    constexpr std::size_t kIterations = 8'000'000;
+    constexpr double kFlopsPerIteration = 16.0; // eight double FMAs
+    std::vector<double> rates;
+    rates.reserve(3);
+    for (int trial = 0; trial < 3; ++trial) {
+        std::array<double, 8> accumulators{
+            0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8,
+        };
+        const auto started = clock::now();
+        for (std::size_t iteration = 0; iteration < kIterations; ++iteration) {
+            accumulators[0] = std::fma(1.0000001, 0.9999999, accumulators[0]);
+            accumulators[1] = std::fma(1.0000002, 0.9999998, accumulators[1]);
+            accumulators[2] = std::fma(1.0000003, 0.9999997, accumulators[2]);
+            accumulators[3] = std::fma(1.0000004, 0.9999996, accumulators[3]);
+            accumulators[4] = std::fma(1.0000005, 0.9999995, accumulators[4]);
+            accumulators[5] = std::fma(1.0000006, 0.9999994, accumulators[5]);
+            accumulators[6] = std::fma(1.0000007, 0.9999993, accumulators[6]);
+            accumulators[7] = std::fma(1.0000008, 0.9999992, accumulators[7]);
+        }
+        const double seconds = std::chrono::duration<double>(clock::now() - started).count();
+        volatile double sink = 0.0;
+        for (const double value : accumulators) {
+            sink = sink + value;
+        }
+        static_cast<void>(sink);
+        if (!(seconds > 0.0)) {
+            throw std::runtime_error("calibrate: FLOP timer did not advance");
+        }
+        rates.push_back(kFlopsPerIteration * static_cast<double>(kIterations) / seconds);
+    }
+    return median_sample(std::move(rates));
+}
+
+double benchmark_bytes_per_second() {
+    using clock = std::chrono::steady_clock;
+    constexpr std::size_t kValues = 1U << 23;               // three 64 MiB arrays
+    constexpr double kBytesPerValue = 3.0 * sizeof(double); // two reads, one write
+    std::vector<double> a(kValues, 0.0);
+    std::vector<double> b(kValues, 1.0);
+    std::vector<double> c(kValues, 2.0);
+    std::vector<double> rates;
+    rates.reserve(5);
+    for (int trial = 0; trial < 5; ++trial) {
+        const auto started = clock::now();
+        for (std::size_t i = 0; i < kValues; ++i) {
+            a[i] = b[i] + 1.25 * c[i];
+        }
+        const double seconds = std::chrono::duration<double>(clock::now() - started).count();
+        volatile double sink = a[static_cast<std::size_t>(trial)];
+        static_cast<void>(sink);
+        if (!(seconds > 0.0)) {
+            throw std::runtime_error("calibrate: byte timer did not advance");
+        }
+        rates.push_back(kBytesPerValue * static_cast<double>(kValues) / seconds);
+    }
+    return median_sample(std::move(rates));
+}
+
+double benchmark_reference_mesh_ms() {
+    using clock = std::chrono::steady_clock;
+    constexpr std::string_view kReferencePart = "tests/fixtures/parts/plate_hole.step";
+    constexpr double kReferenceH = 0.004;
+    const auto model = polymesh::pipeline::Model::load(std::string(kReferencePart));
+    std::vector<double> samples;
+    samples.reserve(5);
+    for (int trial = 0; trial < 5; ++trial) {
+        const auto started = clock::now();
+        const auto plan =
+            polymesh::pipeline::build_refinement_plan(model, kReferenceH, {}, true, true, 0);
+        auto volume = polymesh::pipeline::volume_mesh(
+            model, kReferenceH, polymesh::pipeline::VolumeMesher::kGradedTet, 2, true,
+            plan.refine_seeds, plan.seed_band, 0.0, 0, 0, 0, {}, plan.size_field);
+        volume.mesh.check_validity();
+        samples.push_back(
+            std::chrono::duration<double, std::milli>(clock::now() - started).count());
+    }
+    return median_sample(std::move(samples));
+}
+
+int cmd_calibrate(std::span<char*> args) {
+    std::filesystem::path output_path;
+    for (std::size_t i = 2; i < args.size(); ++i) {
+        if (std::strcmp(args[i], "--out") == 0 && i + 1 < args.size()) {
+            output_path = args[++i];
+        } else {
+            return usage();
+        }
+    }
+    if (output_path.empty()) {
+        std::fputs("calibrate: --out host.json is required\n", stderr);
+        return usage();
+    }
+
+    polymesh::advisor::HostCalibration calibration;
+    calibration.host = polymesh::advisor::local_host_name();
+    calibration.flops_per_s = benchmark_flops_per_second();
+    calibration.bytes_per_s = benchmark_bytes_per_second();
+    calibration.ref_mesh_ms = benchmark_reference_mesh_ms();
+    calibration.generated_utc = polymesh::advisor::utc_timestamp();
+    if (!(calibration.flops_per_s > 0.0) || !(calibration.bytes_per_s > 0.0) ||
+        !(calibration.ref_mesh_ms > 0.0)) {
+        throw std::runtime_error("calibrate: benchmark produced a non-positive result");
+    }
+
+    const nlohmann::json document{
+        {"host", calibration.host},
+        {"flops_per_s", calibration.flops_per_s},
+        {"bytes_per_s", calibration.bytes_per_s},
+        {"ref_mesh_ms", calibration.ref_mesh_ms},
+        {"generated_utc", calibration.generated_utc},
+    };
+    if (!output_path.parent_path().empty()) {
+        std::filesystem::create_directories(output_path.parent_path());
+    }
+    std::ofstream output(output_path);
+    if (!output) {
+        throw std::runtime_error("calibrate: cannot write " + output_path.string());
+    }
+    output << document.dump(2) << '\n';
+    if (!output) {
+        throw std::runtime_error("calibrate: write failed for " + output_path.string());
+    }
+    std::printf("wrote %s\n", output_path.string().c_str());
+    return 0;
+}
 } // namespace
 
 int main(int argc, char** argv) {
@@ -1895,6 +2040,9 @@ int main(int argc, char** argv) {
         }
         if (command == "render") {
             return cmd_render(args);
+        }
+        if (command == "calibrate") {
+            return cmd_calibrate(args);
         }
         if (command == "backend" && args.size() == 2) {
             polymesh::fea::init_runtime_performance();

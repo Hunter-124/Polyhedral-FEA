@@ -229,6 +229,13 @@ struct CinemaHud {
     int order = 1;           // SimSetup::p_elevate ? 2 : 1
     int adapt_passes = 0;    // SimSetup::adapt_passes
     double eta_target = 0.0; // SimSetup::eta_target
+    /// Isotropic material values used both by the advisor feature row and by
+    /// fea::Material in the authoritative solve.
+    double youngs_modulus = 0.0; // SimSetup::youngs_modulus, Pa
+    double poissons_ratio = 0.0; // SimSetup::poissons_ratio
+    /// Undeformed model bounding-box diagonal, metres. The studio's automatic
+    /// exaggeration targets a stated fraction of this length.
+    double model_diagonal = 0.0;
     /// Resultant of every `SimSetup::LoadSpec::force` this take is solving, in
     /// newtons. Stated beside the load factor λ so "λ = 0.500" reads as a real
     /// load case (264.099 N of 528.198 N on the film's part) rather than as a
@@ -251,6 +258,9 @@ struct CinemaHud {
     /// not triangulate (degenerate connectivity, faceless poly-VEM cells).
     /// Stated on screen when nonzero rather than quietly narrowing the reveal.
     std::size_t cinema_skipped_elements = 0;
+    std::size_t unchanged_elements = 0;
+    std::size_t removed_elements = 0;
+    std::size_t added_elements = 0;
     /// $POLYMESH_CINEMA_STAMP, drawn verbatim. The render script puts the git
     /// revision and the model sha256 here; the cinema never computes it,
     /// because a provenance line a program invents is not provenance.
@@ -423,11 +433,10 @@ class CinemaState {
     ///
     /// Each entry keeps its whole `fea::NodalMesh`, which is what makes the
     /// reveal honest -- the elements drawn are the elements that stage actually
-    /// contained -- and is also this feature's memory cost. On the film's case
-    /// (sphere_box_s0 at the advisor's own h_rel = 0.08) a pass-0 stage is
-    /// 11,692 tet4 cells over 4,382 nodes, so the whole pass-0 list is a few
-    /// megabytes; on a 100k-element fill it would be tens of megabytes per
-    /// stage, which is why the sink is installed only while `active`.
+    /// contained -- and is also this feature's memory cost. The default initial
+    /// fill carries 30,496 tet4 cells; a 100k-element fill would retain tens of
+    /// megabytes per stage, which is why the sink is installed only while
+    /// `active`.
     std::vector<pipeline::MeshStage> stages;
 
     /// Worker-thread sink for `pipeline::SolveJob::on_mesh_stage`. Copies the
@@ -451,8 +460,8 @@ class CinemaState {
     /// This is the ONLY source the closing act draws a field from. Each entry
     /// carries that pass's own `SolveResult` -- its mesh, its displacement, its
     /// von Mises and its ZZ error -- so the field shown beside "pass 0" is the
-    /// field pass 0 produced and not the final answer relabelled. Measured cost
-    /// on the film's case: 1,314,253 B per stage, two stages.
+    /// field pass 0 produced and not the final answer relabelled. The default
+    /// retains two full stages because it runs one measured adaptive pass.
     std::vector<pipeline::SolveStage> solve_stages;
     std::vector<CinemaMeshInsight> solve_insights;
 
@@ -475,10 +484,9 @@ class CinemaState {
     /// |∇σ_vm| at every node of solve stage `index`, from
     /// `fea::nodal_scalar_gradient_magnitude` on that pass's own von Mises
     /// field and its own mesh, in Pa/m. Computed on first use and cached: the
-    /// recovery is a least-squares fit per node over that node's element patch,
-    /// which is milliseconds on this film's 4,382-node mesh but is not a
-    /// per-frame cost, and the virtual clock means a first-use stall cannot
-    /// change a recorded frame.
+    /// recovery is a least-squares fit per node over that node's element patch.
+    /// It is cached rather than paid per frame, and the virtual clock means a
+    /// first-use stall cannot change a recorded frame.
     ///
     /// Empty when the stage does not exist or the recovery could not run. The
     /// gradient beat then says so and draws no gradient field, because a
@@ -510,9 +518,8 @@ class CinemaState {
 
     /// Which mesh the viewport's per-element cinema buffer currently holds.
     /// Public so `sync_cinema_viewport` can keep the upload to actual changes:
-    /// `Viewport::set_cinema_mesh` rebuilds every element's own faces (1200 B
-    /// per tet4 cell, so 14 MB for this film's 11,692-element fill), which is
-    /// not a per-frame cost.
+    /// `Viewport::set_cinema_mesh` rebuilds every element's own faces (1296 B
+    /// per tet4 cell), which is not a per-frame cost.
     CinemaMeshSource uploaded_mesh_source = CinemaMeshSource::kNone;
     int uploaded_mesh_index = -1;
     /// Index of the solve stage whose `SolveResult` is currently uploaded to

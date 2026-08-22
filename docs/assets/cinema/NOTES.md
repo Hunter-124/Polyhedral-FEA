@@ -21,7 +21,7 @@ stdout.
 |---|---|
 | Take | 3600 frames at a fixed 1/60 s virtual timestep = 60.000 s. The clock is set from the frame **index**, never accumulated from real frame time. |
 | Frame | 1920×1080. `--size` sets Xvfb and `POLYMESH_GUI_SIZE`; the recorded resolution is measured from the PNG rather than assumed. |
-| Acts | `skeleton` 0.09, `deliberate` 0.12, `build` 0.24, `mesh_hold` 0.11, `solve` 0.44. The GUI prints exact frame spans into the manifest. |
+| Acts | `skeleton` 0.13, `deliberate` 0.15, `build` 0.18, `mesh_hold` 0.09, `solve` 0.45. At 60 s these are 7.8 / 9.0 / 10.8 / 5.4 / 27.0 s. The GUI prints exact frame spans into the manifest. |
 | Left panel | 0.42 of the width. It opens once, then changes in place: exact-CAD spectrum → deployed network → actual-cell microscope → equation board. Build and solve transitions are opacity-only; pane geometry never moves after opening. |
 | Bottom strip | Constant height. Over-wide rows shrink to fit; they never wrap or clip. Labels remain stable while fast computation animates above them. |
 | Camera | Set once, at `cinema on`, to the union of the skeleton and the mesh bounds (`Viewport::frame_content(kCinema)`, yaw 0.70, pitch 0.72, 0.90 fill) and then locked. There is no cut anywhere in the film. |
@@ -58,13 +58,17 @@ because interpolating it is exact rather than approximate — see
 - The left chart is one real `CadEdge::kappa_samples` trace and the output of
   `geom::lowpass_signal(..., 0.995)`. The line morph is cosmetic opacity/geometry;
   the reported modes and samples are not interpolated.
+- The analysis panel starts opening at 0.624 s and reaches full width at
+  1.716 s, leaving about 6.08 s fully open on the default take.
 
 ## Act 2 — `deliberate`: choosing a mesh
 
-One beat per real forward pass of the deployed graph, in chooser order: one per
-candidate and one final re-score. The default take records 38 + 1 = 39 passes at
-0.185 s each. Candidate-specific prose does not flash at that rate: the strip
-keeps one stable explanation while the network itself carries the motion.
+The first 65% of the act shows one real forward pass per beat in chooser order:
+one per candidate and one final re-score. The default records 38 + 1 = 39 passes
+at 0.15 s each. The remaining 3.15 s holds the final re-score/refusal state at
+full size, and the 1.6 s decision lead at the start of the next act extends that
+inspectable hold. Candidate-specific prose does not flash during the pass lane:
+the strip keeps one stable explanation while the network itself carries motion.
 
 - **The node fills are the graph's own tensors**, read out of the ONNX session:
   `advisor::ActivationFrame::input` / `fc1` / `fc2` (post-GELU) / `heads`. Not a
@@ -111,9 +115,10 @@ keeps one stable explanation while the network itself carries the motion.
   | mesher: hybrid VEM | `policy_mesher_logit_hybrid_vem` |
   | mesher: hybrid, hex + pyramids | `policy_mesher_logit_hybrid_zoo` |
 
-- The strip reports only the measured forward-pass index, total pass count,
-  candidate count and failure-gate threshold. Candidate scores remain visible
-  on their real head units, but no paragraph tries to change every 0.185 s.
+- During the pass lane the strip reports only the measured forward-pass index,
+  total pass count, candidate count and failure-gate threshold. During the final
+  hold it names the settled decision/refusal. Candidate scores remain visible on
+  their real head units.
 - The default complex part is outside the advisor's validated operating
   envelope. The OOD refusal is the deployed result, not an error in the film:
   `AdvisorDecision::vetoed` is shown and its action is not applied.
@@ -122,9 +127,10 @@ keeps one stable explanation while the network itself carries the motion.
 
 The advisor outcome is held for `CinemaState::kDecisionLead` (1.6 s) before the
 first cell appears. The default part is refused as out of distribution, so the
-configured fallback remains authoritative: graded tet, h = 12 mm, spectral
-sizing on, quadratic CAD geometry. The strip labels this **Advisor abstained —
-verified fallback**; it never presents the vetoed hybrid action as executed.
+explicit fallback remains authoritative: E = 200 GPa, ν = 0.3, graded tet,
+h = 12 mm, spectral sizing, one measured adaptive pass with no early η target,
+and quadratic CAD geometry. The strip labels this **Advisor abstained — verified
+fallback**; it never presents the vetoed hybrid action as executed.
 
 - During the lead, the network holds its final measured pass. It then
   cross-fades to the cell microscope as construction begins.
@@ -178,7 +184,7 @@ verified fallback**; it never presents the vetoed hybrid action as executed.
 
 ## Act 4 — `mesh_hold`: the finished mesh
 
-6.6 s on the authoritative mesh consumed by the first solve. It opens every
+5.4 s on the authoritative mesh consumed by the first solve. It opens every
 cell by 0.10 toward its own centroid, holds the exploded topology, closes it,
 then leaves the delivered mesh still for the final fifth of the act.
 
@@ -202,10 +208,10 @@ pass i:  stress sweep, stress hold
 after the last pass:  load ramp, hold
 ```
 
-At the 60 s default, a single-pass take uses literal beat lengths: stress reveal
-2.6 s, stress hold 3.2 s, gradient reveal 2.6 s, gradient hold 3.0 s, error
-reveal 2.4 s, error hold 2.8 s, load ramp 4.4 s, final hold 5.4 s. Multi-pass
-takes scale proportionally and never truncate the ending.
+The default has two solve stages. Their nominal 44.0 s beat sequence is scaled
+uniformly into the 27.0 s solve act (factor 0.613636), so no phase is dropped:
+both stress/error results and holds, the first-pass gradient, the incremental
+refine/re-refine hold, the load ramp and the final hold all remain present.
 
 There is no per-element solve order. The take replays completed fields, not a
 fabricated iteration timeline; the recorded solver token is described below.
@@ -268,14 +274,19 @@ the real `n_h_mark` / `n_p_mark` counts. With no configured adapt target it says
 
 ### Refine
 
-`SolveStage::result.volume_mesh` of the **next** pass — the mesh that pass
-actually solved — revealed element by element in that mesh's own storage order.
-Naming the source is what stops this beat from silently redrawing the pass-0 fill
-and calling it refined.
+The viewport compares the previous and next `SolveStage::result.volume_mesh`
+snapshots by topological family plus corner coordinates quantized at
+`max(1e-10 × union_bbox_diagonal, 1e-12 m)`. Tet4 and tet10 share the tetrahedron
+family and compare only their four corners, so final polynomial promotion does
+not masquerade as wholesale h-refinement.
 
-When a later pass exists, an unchanged delivered count is labelled a re-fill,
-not a finer mesh. The default complex take is deliberately single-pass; its
-error field is still shown and no unrecorded refinement is implied.
+The default measured transition preserves 27,808 cells, removes 2,688 and adds
+8,143 replacements. Persistent cells remain rendered and briefly open by 0.06
+toward their centroids so internal changes can be seen; they never disappear.
+During the first 40% only removed cells collapse/fade; during the remaining 60%
+only added cells spawn with the existing centroid/reveal animation in the next
+mesh's storage order. The starting frame is the old topology and the ending
+frame is exactly the mesh the next pass solved.
 
 ### Load ramp
 
@@ -314,10 +325,26 @@ are the real λ, including exactly 0 — but the divisor is, at 1e-3, where ever
 drawn colour is already within one part in a thousand of the bottom of the
 colormap.
 
-**The shape is exaggerated.** The film states the factor
-(`λ × App::deform_scale`) on screen throughout the ramp and final hold. The
-manifest and strip carry the take's measured displacement; the film does not
-transcribe an older case's value.
+**The shape is exaggerated, and the physical answer is not.** After
+`CinemaState::adopt_final_result`, the studio computes
+`scale = 0.12 × bbox_diagonal / max_displacement` from that same final result.
+The viewport then draws exactly `x + scale·u`. This take's true maximum is
+0.0008111 mm; the reported 26,221× scale shows 21.27 mm, exactly 12% of the model
+diagonal. True displacement, shown displacement, factor and fraction are printed
+into the manifest, and true/shown values remain on screen through the ramp and
+hold.
+
+### Material
+
+The recorder sets `material 200 0.3` before advisor inference and solving.
+`SimSetup::poissons_ratio` enters the advisor feature row, then the solve builds
+`fea::Material{E, ν}` from the same setup. `Material::d_matrix()` evaluates
+Lamé parameters
+`λ = Eν / ((1+ν)(1−2ν))` and `μ = E / (2(1+ν))`; assembly uses
+`K_e = ∫ BᵀD(E,ν)B dV`, and stress recovery applies the same `D` to `ε = Bu`.
+Invalid E or ν now fails before assembly. The equation board shows the actual
+E = 200 GPa and ν = 0.3 rather than relying on GUI defaults or an unlabeled
+constitutive matrix.
 
 ### Which solver ran
 

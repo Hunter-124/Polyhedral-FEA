@@ -6265,6 +6265,13 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
             std::map<int, std::vector<std::uint32_t>> region_nodes;
             Eigen::VectorXd loads;
             bool bc_provenance_noted = false;
+            if (!std::isfinite(setup.youngs_modulus) || setup.youngs_modulus <= 0.0) {
+                throw fea::FeaError("Young's modulus must be finite and positive");
+            }
+            if (!std::isfinite(setup.poissons_ratio) || setup.poissons_ratio <= -1.0 ||
+                setup.poissons_ratio >= 0.5) {
+                throw fea::FeaError("Poisson's ratio must be finite and in (-1, 0.5)");
+            }
             const fea::Material material{.youngs_modulus = setup.youngs_modulus,
                                          .poissons_ratio = setup.poissons_ratio};
 

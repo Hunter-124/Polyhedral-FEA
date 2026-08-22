@@ -6,7 +6,7 @@ was co-designed with.
 <p align="center">
   <a href="docs/assets/cinema/advisor_cinema.mp4"><img
     src="docs/assets/cinema/advisor_cinema.gif"
-    alt="Exact CAD curvature and Fourier sizing, an advisor safety refusal, a quadratic cell microscope, and the final stress analysis"
+    alt="Exact CAD Fourier sizing, deployed-network activations, incremental adaptive cell replacement, and final stress analysis"
     width="100%"></a>
 </p>
 
@@ -19,31 +19,35 @@ frames as the inline GIF ([poster](docs/assets/cinema/poster.png)).
 The four chapters are concise and visual:
 
 - **Exact CAD.** A real edge-curvature trace is sampled, FFT-denoised and turned
-  into the size field. This run keeps 4,155 of 262,143 field modes at 99.5%
-  energy, with 36 denoised curve seeds; the exact BRep demand is re-imposed
-  afterward so filtering cannot erase a real feature.
-- **Advisor.** The deployed ONNX graph runs all 39 measured forward passes.
-  This part lands outside its validated envelope (Mahalanobis 90.94), so the
-  model abstains instead of extrapolating. The film says so and leaves the
-  configured fallback unchanged.
-- **Mesher.** The verified graded/spectral/quadratic fallback builds 30,496
-  tet10 cells over 44,907 nodes (134,721 total unknowns). A cell microscope
-  opens the finished mesh, shows tet4 → tet10 midside promotion, and reports the
-  measured shape-quality range: minimum 0.04675, mean 0.2926, zero skipped
-  cells.
+  into the size field. It remains fully open for about six seconds. This run
+  keeps 4,155 of 262,143 field modes at 99.5% energy, with 36 denoised curve
+  seeds; the exact BRep demand is re-imposed afterward so filtering cannot erase
+  a real feature.
+- **Advisor.** The deployed ONNX graph runs all 39 measured forward passes, then
+  holds its final network state for inspection. This part lands outside its
+  validated envelope (Mahalanobis 90.94), so the model abstains instead of
+  extrapolating. The film says so and leaves the configured fallback unchanged.
+- **Mesher.** The verified graded/spectral/quadratic fallback begins with 30,496
+  cells. One real solve→ZZ→LEB adaptive pass preserves 27,808 cells, removes
+  2,688 and spawns 8,143 replacements; unchanged topology never disappears.
+  The authoritative mesh has 35,951 tet10 cells, 52,663 nodes and 157,989
+  unknowns, with shape-quality min/mean 0.03378/0.2910 and zero skipped cells.
 - **Analysis.** The authoritative final solve — not the pre-promotion scaffold —
-  supplies every pixel: 8.509 MPa peak von Mises, recovered stress gradient,
-  complete ZZ error map, exact linear load ramp, and a 5.4 s final hold.
+  uses $E=200$ GPa and $\nu=0.3$ in the constitutive matrix and supplies every
+  pixel: 11.35 MPa peak von Mises, recovered stress gradient, complete ZZ error
+  map and exact linear load ramp. The true 0.0008111 mm maximum displacement is
+  shown at 26,221×, or 21.27 mm / exactly 12% of the model diagonal; both the
+  physical value and presentation scale stay on screen.
 
 Nothing in the take is a mock-up. Network nodes are the graph's own trunk
 tensors; connection strength is $|w_{ji}a_i|$; mesh frames are captured
 `pipeline::MeshStage` snapshots; spectral numbers come from
-`pipeline::build_refinement_plan`; cell quality comes from
-`fea::summarize_cell_quality`; and the last cinema stage is replaced with
-`SolveJob::take_result()` after quadratic promotion and re-solve so the film,
-Studio and exported result agree. Cosmetic work is limited to virtual pacing,
-opacity, cell-centroid separation, spatial field reveals and the exact linear
-load factor.
+`pipeline::build_refinement_plan`; material enters `fea::Material` and its
+$D(E,\nu)$ matrix; cell quality comes from `fea::summarize_cell_quality`; and the
+last cinema stage is replaced with `SolveJob::take_result()` after quadratic
+promotion and re-solve so the film, Studio and exported result agree. Cosmetic
+work is limited to virtual pacing, opacity, cell-centroid separation, spatial
+field reveals and the explicitly reported linear-load deformation scale.
 
 Source citations and the disclosure behind every on-screen label:
 [docs/assets/cinema/NOTES.md](docs/assets/cinema/NOTES.md)

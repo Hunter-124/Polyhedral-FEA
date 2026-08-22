@@ -95,6 +95,10 @@ constexpr ImGuiWindowFlags kPanelFlags =
 /// `App::improve_exit` when no self-improve run has finished this session. Not
 /// 0, which is a real exit status meaning the run succeeded.
 constexpr int kImproveNoRun = -1;
+/// Presentation-only exaggeration target. The solve stays in true SI units;
+/// the viewport maps the authoritative final max |u| to exactly this fraction
+/// of the undeformed model diagonal and reports both values in the film.
+constexpr double kAutoDeformationFraction = 0.12;
 
 /// `std::system`'s result as the command's own exit code. POSIX returns a wait
 /// status, where exit 1 reads as 256; Windows returns the code directly.
@@ -509,6 +513,11 @@ CinemaHud make_cinema_hud(const App& app) {
     hud.order = app.setup.p_elevate ? 2 : 1;
     hud.adapt_passes = app.setup.adapt_passes;
     hud.eta_target = app.setup.eta_target;
+    hud.youngs_modulus = app.setup.youngs_modulus;
+    hud.poissons_ratio = app.setup.poissons_ratio;
+    if (app.model) {
+        hud.model_diagonal = (app.model->bbox_max - app.model->bbox_min).norm();
+    }
     // Vector sum, not a sum of magnitudes: two opposed face loads resultant to
     // zero and the load factor has to say so.
     Eigen::Vector3d total_force = Eigen::Vector3d::Zero();
@@ -531,6 +540,9 @@ CinemaHud make_cinema_hud(const App& app) {
     hud.deform_scale = app.deform_scale;
     hud.cinema_elements = app.viewport.cinema_element_count();
     hud.cinema_skipped_elements = app.viewport.cinema_skipped_element_count();
+    hud.unchanged_elements = app.viewport.cinema_unchanged_element_count();
+    hud.removed_elements = app.viewport.cinema_removed_element_count();
+    hud.added_elements = app.viewport.cinema_added_element_count();
     hud.stamp = app.cinema_stamp;
     return hud;
 }
@@ -605,6 +617,25 @@ void tick_auto(AutoRunner& run, App& app, GLFWwindow* window) {
             return fail("h wants one positive element size in mm");
         }
         app.setup.mesh_size = mm / 1000.0; // SimSetup::mesh_size is metres
+    } else if (verb == "material") {
+        double e_gpa = 0.0;
+        double nu = 0.0;
+        if (args.size() != 2 || !parse_auto_double(args[0], e_gpa) ||
+            !parse_auto_double(args[1], nu) || e_gpa <= 0.0 || nu <= -1.0 || nu >= 0.5) {
+            return fail("material wants <E_GPa> <nu>, with E > 0 and -1 < nu < 0.5");
+        }
+        app.setup.youngs_modulus = e_gpa * 1e9;
+        app.setup.poissons_ratio = nu;
+    } else if (verb == "adapt") {
+        int passes = 0;
+        double eta_target = 0.0;
+        if (args.size() != 2 || !parse_auto_int(args[0], passes) ||
+            !parse_auto_double(args[1], eta_target) || passes < 0 || passes > 8 ||
+            eta_target < 0.0) {
+            return fail("adapt wants <passes 0..8> <eta_target >= 0>");
+        }
+        app.setup.adapt_passes = passes;
+        app.setup.eta_target = eta_target;
     } else if (verb == "spectral") {
         if (args.size() != 1 || (args[0] != "on" && args[0] != "off")) {
             return fail("spectral wants on or off");
@@ -896,13 +927,29 @@ void service_cinema_record(AutoRunner& run, App& app, GLFWwindow* window) {
         quality_min = cine.solve_insights.back().quality_min;
         quality_mean = cine.solve_insights.back().quality_mean;
     }
-    std::printf("cinema: record %s frames %d fps 60 candidates %zu stages %zu elements %zu "
-                "nodes %zu dof %zu quality_min %.9g quality_mean %.9g poster %d width %d "
-                "height %d skipped %zu solve_stages %zu solver %s\n",
-                cine.record_dir.c_str(), cine.record_frames, candidates, cine.stages.size(),
-                app.viewport.cinema_element_count(), nodes, dof, quality_min, quality_mean,
-                poster, fb_w, fb_h, app.viewport.cinema_skipped_element_count(),
-                cine.solve_stages.size(), cinema_solver_token(cine));
+    const double max_displacement = app.result ? app.result->max_displacement : 0.0;
+    const double max_von_mises = app.result ? app.result->max_von_mises : 0.0;
+    const double global_eta = app.result ? app.result->global_eta : 0.0;
+    const double model_diagonal =
+        app.model ? (app.model->bbox_max - app.model->bbox_min).norm() : 0.0;
+    const double visible_displacement = app.deform_scale * max_displacement;
+    const double visible_fraction =
+        model_diagonal > 0.0 ? visible_displacement / model_diagonal : 0.0;
+    std::printf(
+        "cinema: record %s frames %d fps 60 candidates %zu stages %zu elements %zu "
+        "nodes %zu dof %zu quality_min %.9g quality_mean %.9g youngs_pa %.9g "
+        "poisson %.9g max_von_mises_pa %.9g global_eta %.9g max_displacement_m %.9g "
+        "deform_scale %.9g visible_displacement_m %.9g visible_fraction %.9g unchanged %zu "
+        "removed %zu added %zu poster %d width %d height %d skipped %zu solve_stages %zu "
+        "solver %s\n",
+        cine.record_dir.c_str(), cine.record_frames, candidates, cine.stages.size(),
+        app.viewport.cinema_element_count(), nodes, dof, quality_min, quality_mean,
+        app.setup.youngs_modulus, app.setup.poissons_ratio, max_von_mises, global_eta,
+        max_displacement, app.deform_scale, visible_displacement, visible_fraction,
+        app.viewport.cinema_unchanged_element_count(),
+        app.viewport.cinema_removed_element_count(), app.viewport.cinema_added_element_count(),
+        poster, fb_w, fb_h, app.viewport.cinema_skipped_element_count(),
+        cine.solve_stages.size(), cinema_solver_token(cine));
     std::fflush(stdout);
     cine.record_dir.clear();
     glfwSwapInterval(1);
@@ -2394,11 +2441,13 @@ int run(int argc, char** argv) {
             app.viewport.set_result(*app.result);
             set_mesh_info(app, app.result->mesh_note, app.result->volume_mesh.nodes.size(),
                           app.result->volume_mesh.elements.size());
-            // Auto-exaggeration: map max |u| to ~12% of model diagonal so the
-            // deformed shape is visible without cranking a tiny true-scale slider.
+            // Auto-exaggeration is computed only after the cinema has adopted
+            // this same authoritative result. The resulting screen geometry is
+            // exactly x + scale*u; true and shown displacement are both reported.
             if (app.model && app.result->max_displacement > 1e-30) {
                 const double diag = (app.model->bbox_max - app.model->bbox_min).norm();
-                app.deform_auto = (0.12 * diag) / app.result->max_displacement;
+                app.deform_auto =
+                    (kAutoDeformationFraction * diag) / app.result->max_displacement;
                 app.deform_auto = std::clamp(app.deform_auto, 1.0, 1e9);
             } else {
                 app.deform_auto = 1.0;

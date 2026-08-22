@@ -10,7 +10,9 @@
     "mesher": "graded_tet",
     "h_m": 0.012,
     "spectral_sizing": true,
-    "quadratic_cad_geometry": true
+    "quadratic_cad_geometry": true,
+    "adapt_passes": 1,
+    "eta_target": 0.0
   },
   "fixture": {
     "gui_region": 1,

@@ -10,7 +10,9 @@ compile_commands.json
 !bench/campaigns/**/runs/**/mesh.vtu
 /polymesh-setup/
 
+# Machine-local editor/tooling config, never part of the published tree.
 /.omp/
+/.claude/
 
 # machine-local graphify artifacts (committed: graph.json, GRAPH_REPORT.md,
 # .graphify_labels.json, manifest.json — see CONTRIBUTING.md §8)

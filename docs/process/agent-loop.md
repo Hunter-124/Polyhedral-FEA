@@ -55,11 +55,9 @@ After 3 failed attempts on the same ID:
 - When DISPLAY available: `build/apps/gui/polymesh-gui fixtures/...` manual smoke  
 - Never require a human-only display test as the sole gate for a mesh/solver change  
 
-## `/loop` vs this file
-`.claude/commands/loop.md` is current (updated 2026-08-16): it prescribes the
-same C++ flow as this file — `clang-format` on touched sources,
+## Per-change checks
+Every iteration, in order: `clang-format` on the sources you touched,
 `cmake --build build -j$(nproc)`, `ctest --test-dir build --output-on-failure`,
-plus `scripts/check_cross_stdlib_mesh.sh` for mesh-ordering changes. The two
-docs agree; this file is the harness-level policy, `/loop` is the per-phase
-iteration script. Prediction + benchmark comparison still apply for physics
-epics.
+plus `scripts/check_cross_stdlib_mesh.sh` whenever mesh ordering can change.
+Physics epics additionally require a prediction stated up front and a
+comparison against the benchmark of record.

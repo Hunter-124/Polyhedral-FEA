@@ -38,6 +38,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from cost_labels import portable_cost_label
 
 ROOT = Path(__file__).resolve().parents[2]
 ADVISOR_DIR = ROOT / "bench" / "advisor"
@@ -193,10 +194,13 @@ PASSTHROUGH_COLUMNS: list[str] = list(CATEGORICAL_INDEX_COLUMNS)
 # --- heads ------------------------------------------------------------------
 
 REGRESSION_HEADS: list[str] = [
-    "rel_err", "rel_err_rel", "geo_chamfer", "geo_p99", "dof", "mesh_ms", "solve_ms",
+    "rel_err", "rel_err_rel", "geo_chamfer", "geo_p99", "dof", "mesh_ms",
+    "solve_ms", "solve_flops", "solve_bytes", "mesh_work",
 ]
 ACCURACY_HEADS: list[str] = ["rel_err", "rel_err_rel", "geo_chamfer", "geo_p99"]
-COST_HEADS: list[str] = ["dof", "mesh_ms", "solve_ms"]
+COST_HEADS: list[str] = [
+    "dof", "mesh_ms", "solve_ms", "solve_flops", "solve_bytes", "mesh_work",
+]
 OUTPUT_NAMES: list[str] = REGRESSION_HEADS + ["failure_logit", "policy"]
 HEAD_NAMES: list[str] = REGRESSION_HEADS + ["failure"]
 
@@ -219,10 +223,13 @@ TARGET_SOURCES: dict[str, tuple[str, float]] = {
     "dof": ("n_dof", 1.0),
     "mesh_ms": ("mesh_ms", 1e-3),
     "solve_ms": ("solve_ms", 1e-3),
+    "solve_flops": ("solve_flops", 1.0),
+    "solve_bytes": ("solve_bytes", 1.0),
+    "mesh_work": ("mesh_work", 1e-12),
 }
 
 #: statuses that are *not* a failure (C7 failure head definition)
-OK_STATUSES: frozenset[str] = frozenset({"ok", "solve_suspect"})
+OK_STATUSES: frozenset[str] = frozenset({"ok", "solve_suspect", "cost_only"})
 
 # --- C4 clamp box -----------------------------------------------------------
 
@@ -747,8 +754,13 @@ def _raw_targets(rows: list[dict[str, str]]) -> tuple[dict[str, np.ndarray], dic
     n = len(rows)
     targets: dict[str, np.ndarray] = {}
     masks: dict[str, np.ndarray] = {}
+    portable_heads = {"solve_flops", "solve_bytes", "mesh_work"}
     for head, (column, floor) in TARGET_SOURCES.items():
-        raw = np.asarray([to_float(row.get(column)) for row in rows], dtype=np.float64)
+        raw = np.asarray(
+            [portable_cost_label(row, head) if head in portable_heads
+             else to_float(row.get(column)) for row in rows],
+            dtype=np.float64,
+        )
         present = np.isfinite(raw)
         values = np.zeros(n, dtype=np.float64)
         if present.any():

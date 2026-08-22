@@ -202,20 +202,10 @@ MATERIAL = {"E": 2.1e11, "nu": 0.3, "rho": 7850}
 TRACTION_AXIAL = 1.0e6
 TRACTION_TRANSVERSE = 1.0e5
 TRACTION_OBLIQUE = 2.0e5
-#: c3's second region is a band of wall around the whole section, so its area is
-#: an order of magnitude larger than an end face; the traction is scaled down to
-#: match so neither region's resultant swamps the other and the two-region angle
-#: `case_load_multiaxiality` reads is carried by comparable forces.
-TRACTION_BAND = 2.0e4
 #: c4 presses on the largest axis-aligned planar face, whose area is likewise
 #: much larger than an end section.
 PRESSURE_NORMAL = 2.0e4
 
-#: c3's second region: an axial band centred at mid-span, half-width as a
-#: fraction of the axial extent. Wide enough that a coarse mesh always has face
-#: centroids inside it (h_rel tops out at 0.20, so 0.10 of the extent is at
-#: least half an element), narrow enough to stay clear of both end selections.
-BAND_HALF_FRAC = 0.05
 #: c4's slab: half-depth along the pressed face's normal as a fraction of the
 #: part's extent along that normal, plus an in-plane pad. A planar face's facet
 #: centroids lie exactly in its plane, so the depth only has to stay well below
@@ -1325,46 +1315,38 @@ def load_box(geom: Geometry) -> list[list[float]]:
     return _slab(geom, geom.axis, "hi", depth, pad)
 
 
-def band_box(geom: Geometry) -> list[list[float]]:
-    """Select box for c3's second region: a full-perimeter band at mid-span.
+def split_end_boxes(geom: Geometry) -> tuple[list[list[float]], list[list[float]], int]:
+    """Split the free end face into two disjoint load patches for c3.
 
-    WHY A BAND AND NOT A SECOND FACE. c3 exists to make two load regions with
-    non-parallel resultants, and every family must have one. Eleven of the fifteen
-    families have exactly two planar faces (the two section ends), one of which is
-    clamped, so there is no second FACE to load -- a second region has to come off
-    the wall. A band spanning the whole cross-section is the only wall region that
-    is robust for all of them: it contains face centroids at every mesh size and
-    on every section shape, hollow or solid, planar or spline, because it cuts the
-    solid rather than skimming one side of it. A one-sided patch on a curved wall
-    would select nothing at coarse h on a small-radius shaft.
-
-    The band is axially clear of both end selections (it is centred at mid-span
-    and 10 % of the extent wide, against end slabs of order 1 % of a section
-    length), so c3's two boxes are provably disjoint.
+    A mid-span wall band made the selected area a mesh-dependent staircase:
+    c3 answers moved by 3-25% between external-truth rungs even while every
+    single-region case converged. Splitting the planar end face through its
+    area centroid gives every family two robust, distinct patches, including
+    concave L sections whose bbox midpoint lies in the void. Each carries an
+    authored half-face area, so the independent truth chain can keep both
+    resultants fixed while the boundary triangulation refines.
     """
-    pad = r10(PAD_FRAC * geom.diag)
-    lo = [geom.lo[i] - pad for i in range(3)]
-    hi = [geom.hi[i] + pad for i in range(3)]
-    mid = 0.5 * (geom.lo[geom.axis] + geom.hi[geom.axis])
-    half = BAND_HALF_FRAC * geom.extent(geom.axis)
-    lo[geom.axis] = mid - half
-    hi[geom.axis] = mid + half
-    return [[r10(v) for v in lo], [r10(v) for v in hi]]
-
-
-def band_area_estimate(geom: Geometry) -> float:
-    """Bbox-perimeter estimate of the c3 band's loaded area (surrogate truth only).
-
-    The band's exact area needs the section perimeter, which for four families has
-    no closed form. This is the bbox side perimeter times the band length: right
-    to within the section's shape factor, and used ONLY inside the provisional
-    first-order surrogate that the independent Gmsh/CalculiX chain replaces. It is
-    never an authored `expected_area`: the case leaves that out, so testlab
-    rescales the traction onto the exact CAD rule area instead.
-    """
-    others = [i for i in range(3) if i != geom.axis]
-    perimeter = 2.0 * (geom.extent(others[0]) + geom.extent(others[1]))
-    return r10(perimeter * 2.0 * BAND_HALF_FRAC * geom.extent(geom.axis))
+    primary = load_box(geom)
+    second = [list(primary[0]), list(primary[1])]
+    primary = [list(primary[0]), list(primary[1])]
+    transverse_axes = [axis for axis in range(3) if axis != geom.axis]
+    split_axis = max(transverse_axes, key=geom.extent)
+    middle = 0.5 * (geom.lo[split_axis] + geom.hi[split_axis])
+    load_faces = [face for face in axis_aligned_planar_faces(geom.shape, geom.name)
+                  if is_primary_load_face(geom, face)]
+    if load_faces:
+        load_face = max(load_faces, key=lambda face: face.area)
+        split_axis = max(transverse_axes,
+                         key=lambda axis: load_face.hi[axis] - load_face.lo[axis])
+        middle = load_face.centroid[split_axis]
+    gap = 1e-8 * geom.diag
+    primary[1][split_axis] = r10(middle - gap)
+    second[0][split_axis] = r10(middle + gap)
+    return (
+        [[r10(value) for value in primary[0]], [r10(value) for value in primary[1]]],
+        [[r10(value) for value in second[0]], [r10(value) for value in second[1]]],
+        split_axis,
+    )
 
 
 def _in_box(point: tuple[float, float, float], box: list[list[float]]) -> bool:
@@ -1455,12 +1437,14 @@ def case_specs(geom: Geometry) -> list[dict[str, Any]]:
     transverse[geom.transverse] = -TRACTION_TRANSVERSE
     direction = oblique_direction(geom, rng)
     oblique = [r10(TRACTION_OBLIQUE * component) for component in direction]
-    band = [0.0, 0.0, 0.0]
-    band[geom.transverse] = -TRACTION_BAND
+    multiregion = [0.0, 0.0, 0.0]
+    multiregion[geom.transverse] = -TRACTION_TRANSVERSE
     face = pressure_face(geom)
     pressure = [r10(-PRESSURE_NORMAL * component) for component in face.normal]
     primary_area = (geom.end_area if geom.family != "sphere_box"
                     else geom.params["box_section_area"])
+    c3_primary_box, c3_secondary_box, c3_split_axis = split_end_boxes(geom)
+    c3_patch_area = r10(0.5 * primary_area)
 
     return [
         {
@@ -1495,33 +1479,36 @@ def case_specs(geom: Geometry) -> list[dict[str, Any]]:
             "archetype": "two_region_multiaxial",
             "traction": [r10(v) for v in axial],
             "normal_min_dot": 0.7,
-            # Second region: a mid-span band carrying a transverse traction. The
-            # two resultants are perpendicular by construction, which is the only
-            # configuration in which `case_load_multiaxiality` is nonzero, and the
-            # band is the region no family can fail to resolve (see band_box).
+            # Two disjoint halves of the free end face carry perpendicular
+            # resultants. Authored half-face areas let the external chain fix
+            # both resultants as its boundary triangulation refines.
+            "primary_box": c3_primary_box,
+            "primary_expected_area": c3_patch_area,
             "extra_regions": [{
-                "box": band_box(geom),
-                "traction": [r10(v) for v in band],
-                # Box-only: a transverse traction on a wall band has no reason to
-                # align with any wall normal, so a normal filter would keep only
-                # the two side walls and drop the top and bottom.
+                "box": c3_secondary_box,
+                "traction": [r10(v) for v in multiregion],
                 "normal_min_dot": -1.0,
+                "expected_area": c3_patch_area,
             }],
             "corpus_extra": {"load_regions": [
-                {"kind": "end_slab",
+                {"kind": "end_face_half",
                  "face": f"{AXIS_NAMES[geom.axis]}_hi",
+                 "split_axis": AXIS_NAMES[c3_split_axis],
+                 "split_side": "low",
                  "resultant": "axial"},
-                {"kind": "mid_span_band",
-                 "axis": AXIS_NAMES[geom.axis],
-                 "span_frac": [r10(0.5 - BAND_HALF_FRAC), r10(0.5 + BAND_HALF_FRAC)],
+                {"kind": "end_face_half",
+                 "face": f"{AXIS_NAMES[geom.axis]}_hi",
+                 "split_axis": AXIS_NAMES[c3_split_axis],
+                 "split_side": "high",
                  "resultant": "transverse"},
             ]},
             "analytic": None,
             "truth_regions": [
-                {"area": primary_area, "span": geom.span,
-                 "traction": [r10(v) for v in axial], "region": "end_slab"},
-                {"area": band_area_estimate(geom), "span": r10(0.5 * geom.span),
-                 "traction": [r10(v) for v in band], "region": "mid_span_band"},
+                {"area": c3_patch_area, "span": geom.span,
+                 "traction": [r10(v) for v in axial], "region": "end_face_half_low"},
+                {"area": c3_patch_area, "span": geom.span,
+                 "traction": [r10(v) for v in multiregion],
+                 "region": "end_face_half_high"},
             ],
         },
         {
@@ -1575,10 +1562,10 @@ def case_json(geom: Geometry, spec: dict[str, Any]) -> dict[str, Any]:
     select["normal_min_dot"] = spec["normal_min_dot"]
     loads: list[dict[str, Any]] = [{"select": select, "traction": spec["traction"]}]
     for extra in spec.get("extra_regions", []):
-        loads.append({
-            "select": {"box": extra["box"], "normal_min_dot": extra["normal_min_dot"]},
-            "traction": extra["traction"],
-        })
+        extra_select = {"box": extra["box"], "normal_min_dot": extra["normal_min_dot"]}
+        if extra.get("expected_area") is not None:
+            extra_select["expected_area"] = extra["expected_area"]
+        loads.append({"select": extra_select, "traction": extra["traction"]})
     corpus: dict[str, Any] = {
         "family": geom.family,
         "regime": geom.regime,
@@ -1865,10 +1852,9 @@ def region_surrogate_reference(geom: Geometry, case_name: str,
         "delta_transverse_total_m": r10(delta_perp),
         "model": "per-region axial P*L/(E*A) + Euler-Bernoulli P*L^3/(3*E*I) on an "
                  "equivalent rectangular section, superposed; "
-                 "U = 0.5 * sum(P_i * delta_i). The c3 band area is a bbox-perimeter "
-                 "estimate (band_area_estimate), so this surrogate is weaker than the "
-                 "legacy one and is scored against nothing until the external chain "
-                 "replaces it.",
+                 "U = 0.5 * sum(P_i * delta_i). The c3 end-face patches each use "
+                 "half of the exact generated end area; this remains provisional "
+                 "until the external chain replaces it.",
     }
     note = ("Provisional superposed first-order surrogate; not a validated truth. "
             "Replaced ONLY by the independent Gmsh 4.13.1 + CalculiX 2.23 chain "
@@ -2418,9 +2404,18 @@ def run_self_test() -> int:
                f"c3's two regions must pull in independent directions, dot={dot}")
     check_that(c3["loads"][0]["select"]["box"] != c3["loads"][1]["select"]["box"],
                "c3's two regions must be distinct boxes")
-    band = c3["loads"][1]["select"]["box"]
-    check_that(band[0][0] > geom.lo[0] and band[1][0] < geom.hi[0],
-               "c3's band must stay clear of both ends")
+    first_box = c3["loads"][0]["select"]["box"]
+    second_box = c3["loads"][1]["select"]["box"]
+    split_axes = [axis for axis in range(3)
+                  if first_box[1][axis] < second_box[0][axis]]
+    check_that(len(split_axes) == 1,
+               "c3's end-face patches must be separated along exactly one axis")
+    split_axis = split_axes[0]
+    check_that(split_axis != geom.axis,
+               "c3's end-face patches must split transverse to the part axis")
+    check_that(abs(c3["loads"][0]["select"]["expected_area"] -
+                   c3["loads"][1]["select"]["expected_area"]) < 1e-15,
+               "c3's two half-face patches must carry equal authored areas")
     c4 = cases[4]
     normal = c4["corpus"]["pressure_face_outward_normal"]
     traction = c4["loads"][0]["traction"]

@@ -81,10 +81,10 @@ FRAMES_DIR = REPO / "build/cinema/frames"
 #: video's duration is the take's own virtual duration.
 FPS = 60
 #: 3600 frames = 60.0 s of virtual time. The take is paced as a professional
-#: presentation rather than a loop: 5.4 s for exact-CAD/spectral sizing, 7.2 s
-#: for the advisor, 14.4 s for construction and the cell microscope, 6.6 s for
-#: an exploded-then-closed mesh hold, and 26.4 s for solved fields. Shorter
-#: recordings scale every beat rather than truncating the end.
+#: presentation rather than a loop: 7.8 s for exact-CAD/spectral sizing, 9.0 s
+#: for the advisor (including a 3.15 s final-state hold), 10.8 s for
+#: construction/cell inspection, 5.4 s for the mesh hold, and 27.0 s for the
+#: two-pass solved-field/refinement sequence. Shorter recordings scale every beat.
 DEFAULT_FRAMES = 3600
 #: The Xvfb screen AND, via ``POLYMESH_GUI_SIZE``, the GUI window itself: the
 #: window otherwise opens at the interactive default it has always had
@@ -177,6 +177,12 @@ class Case:
     load: tuple[float, float, float]
     why: str
     load_note: str
+    youngs_gpa: float = 200.0
+    poisson: float = 0.3
+    # None preserves an accepted advisor action. The default OOD hero explicitly
+    # requests one measured pass after the advisor has abstained.
+    adapt_passes: int | None = None
+    eta_target: float = 0.0
 
 
 CASES: dict[str, Case] = {
@@ -186,11 +192,11 @@ CASES: dict[str, Case] = {
     # shipped OOD gate refuses it instead of extrapolating; that refusal is part
     # of the film, then the configured product fallback runs unchanged.
     #
-    # h=12 mm / graded / quadratic keeps the measured cell-quality minimum
-    # above the 0.02 ship floor on this part (0.02194, no inverted cells) while
-    # still carrying 37,804 curved cells before face-native BC grading. Spectral
-    # sizing is explicitly enabled and its real report is printed into the
-    # cinema manifest.
+    # h=12 mm / graded / quadratic begins at 30,496 cells. The configured real
+    # adaptive pass finishes at 35,951 tet10 cells with measured shape-quality
+    # minimum 0.03378 (above the 0.02 ship floor) and preserves 27,808 cells
+    # while replacing only the changed topology. Spectral sizing is explicitly
+    # enabled and its real report is printed into the cinema manifest.
     "icecream_cone": Case(
         name="icecream_cone",
         step="tests/fixtures/parts/icecream_cone.step",
@@ -204,6 +210,10 @@ CASES: dict[str, Case] = {
             "refusal before the verified fallback",
         load_note="GUI region 1 (planar foot) fixed; conserved -z 1000 N "
                   "resultant on GUI region 0 (connected cone+scoop exterior)",
+        youngs_gpa=200.0,
+        poisson=0.3,
+        adapt_passes=1,
+        eta_target=0.0,
     ),
     # Earlier advised take, retained as `--part sphere_box_s0_c0`. Of the 44
     # primitives in the corpus only 23 are advised at all. Of those, sphere_box_s0
@@ -309,9 +319,10 @@ def auto_spec(case: Case, part: Path, model_dir: Path, frames_dir: Path,
     built and cannot be recovered afterwards.
     """
     fx, fy, fz = case.load
-    return "; ".join([
+    actions = [
         f"load {rel(part)}",
         f"h {case.h_mm:g}",
+        f"material {case.youngs_gpa:.9g} {case.poisson:.9g}",
         "spectral on",
         f"fix {case.fix_face}",
         # `.9g`, not `g`: preserve measured resultants instead of rounding the
@@ -319,11 +330,18 @@ def auto_spec(case: Case, part: Path, model_dir: Path, frames_dir: Path,
         f"loadface {case.load_face} {fx:.9g} {fy:.9g} {fz:.9g}",
         "cinema on",
         f"cinema advisor {rel(model_dir)}",
+    ]
+    if case.adapt_passes is not None:
+        # Deliberately after `cinema advisor`: an accepted action normally owns
+        # adapt settings, while this configured OOD fallback owns its real pass.
+        actions.append(f"adapt {case.adapt_passes} {case.eta_target:.9g}")
+    actions.extend([
         "wire off",
         "solve",
         f"record {frames_dir} {frames}",
         "quit",
     ])
+    return "; ".join(actions)
 
 
 def gui_argv(gui: Path, spec: str, screen: tuple[int, int]) -> list[str]:
@@ -425,7 +443,10 @@ _PAIR_RE = re.compile(r"(?P<key>[a-z_]+)\s+(?P<value>-?[\d.eE+-]*[\d.])")
 #: trust.
 _SUMMARY_KEYS = ("frames", "fps", "candidates", "stages", "solve_stages",
                  "elements", "nodes", "dof", "quality_min", "quality_mean",
-                 "skipped", "poster", "width", "height")
+                 "youngs_pa", "poisson", "max_von_mises_pa", "global_eta",
+                 "max_displacement_m", "deform_scale", "visible_displacement_m",
+                 "visible_fraction", "unchanged", "removed", "added", "skipped", "poster",
+                 "width", "height")
 #: Keys lifted out of the advisor line. ``candidates`` is the enumerated grid
 #: without the final re-score pass; ``frames`` counts every forward pass
 #: including it, so both are kept and named apart.
@@ -885,7 +906,11 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  {case.name}{mark}")
             print(f"    part      {case.step}")
             print(f"    case      {case.case_json}")
-            print(f"    verbs     h {case.h_mm:g}; fix {case.fix_face}; "
+            adapt = (f"; adapt {case.adapt_passes} {case.eta_target:.9g}"
+                     if case.adapt_passes is not None else "")
+            print(f"    verbs     h {case.h_mm:g}; "
+                  f"material {case.youngs_gpa:.9g} {case.poisson:.9g}{adapt}; "
+                  f"fix {case.fix_face}; "
                   f"loadface {case.load_face} {fx:.9g} {fy:.9g} {fz:.9g}")
             print(f"    load      {case.load_note}")
             print(f"    h         configured before inference; accepted advice "
@@ -916,6 +941,10 @@ def main(argv: list[str] | None = None) -> int:
         load=base.load,
         why=base.why,
         load_note=base.load_note,
+        youngs_gpa=base.youngs_gpa,
+        poisson=base.poisson,
+        adapt_passes=base.adapt_passes,
+        eta_target=base.eta_target,
     )
     match = re.fullmatch(r"(\d+)x(\d+)", args.size)
     if not match:
@@ -1082,6 +1111,10 @@ def main(argv: list[str] | None = None) -> int:
             "load_n": list(case.load),
             "load_note": case.load_note,
             "h_mm_configured": case.h_mm,
+            "youngs_modulus_gpa": case.youngs_gpa,
+            "poissons_ratio": case.poisson,
+            "adapt_passes_configured": case.adapt_passes,
+            "eta_target_configured": case.eta_target,
             "h_note": "configured before inference; an accepted advisor action "
                       "overrides it, while a refusal leaves it unchanged",
             "why": case.why,
@@ -1123,6 +1156,17 @@ def main(argv: list[str] | None = None) -> int:
             "dof": _as_int(report.counts.get("dof")),
             "quality_min": report.counts.get("quality_min"),
             "quality_mean": report.counts.get("quality_mean"),
+            "youngs_modulus_pa": report.counts.get("youngs_pa"),
+            "poissons_ratio": report.counts.get("poisson"),
+            "max_von_mises_pa": report.counts.get("max_von_mises_pa"),
+            "global_eta": report.counts.get("global_eta"),
+            "max_displacement_m": report.counts.get("max_displacement_m"),
+            "deformation_scale": report.counts.get("deform_scale"),
+            "visible_displacement_m": report.counts.get("visible_displacement_m"),
+            "visible_displacement_fraction": report.counts.get("visible_fraction"),
+            "unchanged_cells": _as_int(report.counts.get("unchanged")),
+            "removed_cells": _as_int(report.counts.get("removed")),
+            "added_cells": _as_int(report.counts.get("added")),
             "elements_skipped": _as_int(report.counts.get("skipped")),
             "solver": report.solver,
             "solver_note": (None if report.solver else

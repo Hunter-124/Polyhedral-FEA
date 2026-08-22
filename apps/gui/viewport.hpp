@@ -115,16 +115,27 @@ class Viewport {
     /// tagged with its index in `mesh.elements` so the reveal order is the
     /// mesher's own emission order. Interior faces are therefore stored once per
     /// owning element, which is the point — the two copies belong to different
-    /// elements and appear at different times. Measured cost for tet4 cells:
-    /// 4 triangles (12 vertices x 56 B) plus 6 edges (12 vertices x 44 B) =
-    /// 1200 B per element exactly, so a 200k-tet mesh holds 229 MiB of GL
-    /// buffers. Upload the mesh you intend to film, not the finest adapt pass.
+    /// elements and appear at different times. Measured tet4 cost with the
+    /// transition-role scalar is 4 triangles (12 vertices × 60 B) plus 6 edges
+    /// (12 vertices × 48 B) = 1296 B per element, so a 200k-tet transition is
+    /// substantial. Upload the mesh you intend to film, not an arbitrary finest
+    /// pass.
     void set_cinema_mesh(const fea::NodalMesh& mesh);
+    /// Uploads a structural old→new mesh transition. Cells with the same
+    /// topological family and quantized corner coordinates remain visible;
+    /// removed cells collapse/fade and only newly added cells use the existing
+    /// centroid-spawn reveal. Tet4→tet10 promotion compares corner topology, so
+    /// polynomial order does not masquerade as wholesale h-refinement.
+    void set_cinema_mesh_transition(const fea::NodalMesh& previous,
+                                    const fea::NodalMesh& next);
     std::size_t cinema_element_count() const;
     /// Elements whose faces could not be built (degenerate connectivity, or a
     /// poly-VEM cell with no face loops). Counted, never silently dropped, so
     /// the panel can say on screen that the reveal is not the whole mesh.
     std::size_t cinema_skipped_element_count() const;
+    std::size_t cinema_unchanged_element_count() const;
+    std::size_t cinema_removed_element_count() const;
+    std::size_t cinema_added_element_count() const;
     /// Cinema draw parameters, applied only in `DisplayMode::kCinema`.
     struct CinemaView {
         float skeleton_alpha = 1.0f; // 0..1
@@ -137,18 +148,20 @@ class Viewport {
         ///
         /// Both exist because element COUNT decides whether cell edges are
         /// information or noise. On the 568-element case this reveal was first
-        /// tuned for, 1.5 px at full opacity drew a readable cell diagram. The
-        /// film's case is sphere_box_s0 at 11,692 cells in the same pane, and
-        /// the same settings there were measured (two binaries differing only in
-        /// these numbers, same take, same frame indices) to put 22-50% of the
-        /// part's own painted pixels into near-black cell outline, against
-        /// 3.4-8.9% at 1.0 px and 0.30 opacity. At half the part being outline
-        /// the fill's shading is gone and so is the reveal front, because a
-        /// front made of dark lines does not read against a dark background.
+        /// tuned for, 1.5 px at full opacity drew a readable cell diagram. On
+        /// dense five-figure cell counts, the same settings were measured to put
+        /// 22-50% of the part's painted pixels into near-black outline, against
+        /// 3.4-8.9% at 1.0 px and 0.30 opacity.
+        /// At half the part being outline, the fill's shading and reveal front
+        /// are gone: a front made of dark lines cannot read against a dark background.
         /// The defaults here stay the old values, so a caller that does not set
         /// them gets exactly the previous behaviour.
         float edge_alpha = 1.0f;
         float edge_width = 1.5f;
+        /// When true, `transition_progress` drives the structural old→new cell
+        /// replacement uploaded by `set_cinema_mesh_transition`.
+        bool incremental_transition = false;
+        float transition_progress = 1.0f; // 0 = previous topology, 1 = next topology
     };
     void set_cinema_view(const CinemaView& view);
 
@@ -268,6 +281,10 @@ class Viewport {
     std::size_t cinema_element_count_ = 0;
     std::size_t cinema_skipped_element_count_ = 0;
     CinemaView cinema_view_;
+    bool cinema_transition_active_ = false;
+    std::size_t cinema_unchanged_element_count_ = 0;
+    std::size_t cinema_removed_element_count_ = 0;
+    std::size_t cinema_added_element_count_ = 0;
     // CPU-side copies for overlay recolor and picking.
     std::vector<float> model_vertex_data_;
     // Results-mode CPU data, re-baked when mode/scale/range changes.
@@ -301,6 +318,14 @@ class Viewport {
     bool frame_on_bake_ = false;
     /// set_camera_locked(): holds the shot still for the duration of a take.
     bool camera_locked_ = false;
+    struct CinemaCellRef {
+        const fea::NodalMesh* mesh = nullptr;
+        std::size_t element = 0;
+        float role = 0.0f;         // -1 removed, 0 persistent/ordinary, +1 added
+        float reveal_index = 0.0f; // normalised only within the cells being spawned
+    };
+    void upload_cinema_cells(const std::vector<CinemaCellRef>& cells,
+                             std::size_t logical_element_count);
     void bake_result(DisplayMode mode, float deform_scale, float result_max);
     void ensure_framebuffer(int width, int height);
     void draw_cinema(const Eigen::Matrix4f& view, const Eigen::Matrix4f& proj,

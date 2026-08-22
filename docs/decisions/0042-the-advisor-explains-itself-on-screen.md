@@ -4,11 +4,12 @@
 - Revised (2026-08-20, round two): the acts run concurrently (§6), the solved
   fields animate in the order they are computed (§7), and the recorded case moved
   to `sphere_box_s0_c0` (§5)
-- Revised (2026-08-21, presentation cut): ADR-0043 now owns pacing and the
-  current default. It uses complex `icecream_cone`, shows the deployed OOD
-  abstention, then a labelled graded/spectral/quadratic fallback with a cell
-  microscope and authoritative post-promotion result. Sections 5–7 below retain
-  the prior `sphere_box_s0_c0` cut as decision history.
+- Revised (2026-08-21, presentation cut): ADR-0043 owns pacing and the complex
+  `icecream_cone` default, including its deployed OOD abstention, labelled
+  graded/spectral/quadratic fallback, cell microscope and authoritative result.
+- Revised (2026-08-21, adaptive cut): the explicit fallback now runs one real
+  adaptive pass and replaces only structurally changed cells on screen (§7).
+  Sections 5–6 retain the prior `sphere_box_s0_c0` cut as decision history.
 - Supersedes: `docs/advisor/figures/activation_map.png` and the
   `activation_map()` generator in `scripts/advisor/figures.py`, both deleted
 - Touches: `scripts/advisor/export_onnx.py`, `src/advisor/*`, `src/mesh/*`,
@@ -251,37 +252,24 @@ mesher built, and that is not what happened: `Advisor::explain()` runs to
 completion in `load_cinema_advisor`, before `solve` is issued, so every pass on
 screen — including the ones still to come — had already happened when the mesher
 emitted its first stage. What preserves the causal order under the overlap is
-that the decision is locked and on screen from the first frame of `build`, with a
-lead-in before the first element appears: `CinemaState::kDecisionLead` is 0.6 s,
-capped at a fifth of the `build` act, so at the recorder's 1200-frame default it
-is the full 0.6 s — 36 frames of decided action with zero elements drawn — and it
-only shortens below roughly 450 frames. The cinema replays two recorded sequences
-on one clock; the ticker states that, and the ADR states it here.
+that the decision is locked and on screen before the first element appears.
+`CinemaState::kDecisionLead` is now 1.6 s, capped at a fifth of `build`; the
+60 s default receives the full 96-frame lead. The advisor act also reserves its
+last 3.15 s for the final re-score/refusal state, so the settled network is
+inspectable before that lead begins.
 
 Nothing about the data changed. Each activation frame still belongs to the
 candidate pass that produced it, each mesh stage still belongs to the stage that
 emitted it, and both still carry their own index on screen. What changed is which
 pixels share a frame, which §4 already lists as cosmetic: time and layout.
 
-One consequence for the recorder. `render_cinema.py` used to cut the inline GIF
-from the midpoint of the `advisor` act to the midpoint of the `mesh` act, a rule
-that presumes a cut to straddle and that no longer matches any act name the GUI
-prints. It then cut the loop to the `build` act, and that was still wrong for the
-README's purpose: `build` is the overlap, but the *decision* has already happened
-by the time it opens, so the inline loop showed a mesh appearing and never showed
-the network that chose it — the one half of this film a static mesh figure cannot
-carry. The loop now **opens on the `deliberate` act and runs 0.20 of the take
-forward**, which on the committed take is 1.2..5.2 s of 20 s: the pass lane
-scoring its 38 candidates, then the fill of the action it picked, with both
-counters advancing across the join. `build` alone is kept as the next rule, then
-the longest act reported, then `deliberate`'s own scheduled fractions,
-0.06..0.26 of the take, for a `--only gif` run with no act table to read — which
-on this take lands on the same 1.2..5.2 s the act rule does. The longest-act rule
-is deliberately far down: the longest act is `solve` at 0.63, so a rule that
-preferred it would inline the answer without the decision that produced it.
-Either way the window is computed from what the GUI printed and the rule that
-produced it is named in `manifest.json` as `window_source`, so the inline loop is
-never a hand-picked range that quietly stopped matching the film.
+The inline GIF now carries the complete 60 s take rather than selecting a chapter
+window. This costs more frames but preserves the sequence the artifact exists to
+show: exact CAD and spectral sizing, the advisor's passes and held refusal, mesh
+construction, the solved/error fields, structural refinement, the second solve,
+the exact load ramp and the final answer. The manifest records the complete
+window and its act table, so no hand-picked subset can quietly drift away from
+the film.
 
 ## 7. The fields animate in the order the answer is computed
 
@@ -291,19 +279,20 @@ case, and the film is restricted to them.
 
 **The adaptive loop, which is the order the answer is computed.** A solve, the
 error field recovered from that solve, the refinement that field asked for, then
-the next solve. `adapt_passes` is 1 on this case, so that is two real solves, and
-the loop is observable rather than reconstructed: `pipeline::SolveStage` carries
-the pass index, the pass's own `PassTrace`, its `SolveResult` — mesh,
-displacement, von Mises, nodal and element η — and the linear solver's note, and
-`pipeline::SolveJob::on_solve_stage` delivers one per completed pass. It is the
-same shape as the mesh-stage sink of §3 and for the same reason: the film shows
-boundaries the code actually has, and unset the callback costs a null check.
+the next solve. The current complex fallback explicitly requests one pass, so
+that is two real solves. `pipeline::SolveStage` carries the pass index, the
+pass's own `PassTrace`, its `SolveResult` — mesh, displacement, von Mises, nodal
+and element η — and the linear solver's note, and
+`pipeline::SolveJob::on_solve_stage` delivers one per completed pass.
 
-On screen that becomes the `SolvePhase` sequence — `kField`, the pass's own von
-Mises field on its own mesh; `kError`, the ZZ field recovered from that same
-solve; `kRefine`, the mesh the *next* pass solved on, revealed element by
-element; then `kLoadRamp` and `kHold` — one phase per real step, named in the
-ticker so a viewer can tell which step they are looking at.
+On screen that becomes the `SolvePhase` sequence: each pass's own stress and ZZ
+fields, then `kRefine` between passes, then the final load ramp and hold.
+`kRefine` no longer hides the old mesh and reveals the whole next mesh. A
+corner-topology diff partitions the snapshots into persistent, removed and
+added cells. Persistent cells stay rendered; only removed cells collapse/fade
+and only added cells use the centroid-spawn reveal. Tet4 and tet10 compare by
+their four corners, so polynomial promotion is not misreported as topology
+replacement.
 
 **The load factor, which is exact rather than interpolated.** In linear
 elastostatics u(λ) = λ·u identically, so ramping λ from 0 to 1 draws the true

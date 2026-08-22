@@ -648,25 +648,32 @@ fields, which is how the GUI's solve is cross-checked against the CLI's.)
 - **Advisor cinema** (`assets/cinema/advisor_cinema.mp4`, `.gif`, `poster.png`)
   is the GUI's own framebuffer at a fixed 1/60 s virtual timestep, encoded by
   `scripts/render_cinema.py`. The 60 s default has four readable chapters:
-  exact-CAD curvature plus production FFT sizing; 39 deployed-network forward
-  passes; real mesher snapshots plus a cell/order/quality microscope; and the
-  authoritative final solve with stress, recovered gradient, ZZ error and exact
-  linear load ramp.
+  exact-CAD curvature plus production FFT sizing, fully open for about six
+  seconds; 39 deployed-network forward passes plus a held final state; real
+  mesher snapshots plus a cell/order/quality microscope; and the authoritative
+  two-pass solve with stress, recovered gradient, ZZ error, incremental
+  refinement and exact linear load ramp.
 
   The default part is `icecream_cone.step`, a watertight cone+sphere Boolean.
   Its OOD distance is 90.94 against the validated 5.034 threshold, so the
   advisor abstains and no recommendation is applied. The labelled fallback is
-  graded tet at h = 12 mm with spectral sizing and quadratic CAD geometry:
-  30,496 tet10 cells, 44,907 nodes, 134,721 total unknowns, shape quality
-  min/mean 0.04675/0.2926, and zero skipped cells. The spectral report keeps
-  4,155 / 262,143 field modes at 99.5% energy with 36 denoised edge seeds.
+  graded tet at h = 12 mm with spectral sizing, one forced measured adaptive
+  pass and quadratic CAD geometry. It finishes at 35,951 tet10 cells, 52,663
+  nodes, 157,989 total unknowns, shape quality min/mean 0.03378/0.2910, and zero
+  skipped cells. The transition keeps 27,808 unchanged cells rendered while
+  2,688 old cells collapse and 8,143 replacements spawn. The spectral report
+  keeps 4,155 / 262,143 field modes at 99.5% energy with 36 denoised edge seeds.
+
+  Material is an explicit scripted input: E = 200 GPa and Poisson's ratio
+  ν = 0.3 feed both the advisor feature row and `fea::Material`'s constitutive
+  matrix. The final 11.35 MPa field is the same authoritative result Studio and
+  VTU export receive. Its true maximum movement is 0.0008111 mm; the presentation
+  draws 21.27 mm at 26,221× (exactly 12% of the model diagonal) and labels both.
 
   Every panel consumes production data: ONNX trunk taps and exported weights;
-  `pipeline::build_refinement_plan`; captured `MeshStage`/`NodalMesh`
-  snapshots; `fea::summarize_cell_quality`; and `SolveJob::take_result()` after
-  final quadratic promotion and re-solve. That last adoption is load-bearing:
-  the 8.509 MPa field in the film is the same authoritative result Studio and
-  VTU export receive, not the earlier linear callback snapshot.
+  `pipeline::build_refinement_plan`; captured `MeshStage`/`SolveStage` meshes;
+  `fea::summarize_cell_quality`; structural corner-topology differencing; and
+  `SolveJob::take_result()` after final quadratic promotion and re-solve.
 
   Cosmetic work is limited to virtual pacing, opacity, centroid separation,
   spatial field reveals, colour and layout. Experimental varyhedron,

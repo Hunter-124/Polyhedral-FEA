@@ -32,28 +32,24 @@ namespace {
 
 /// Act spans as fractions of the take, tuned at the render script's 3600-frame
 /// default (60.0 s).
+/// The opening now gives the curvature/FFT trace six readable seconds at full
+/// size. The advisor lane spends its first 65% on the real candidate passes and
+/// its last 35% holding the final re-score/refusal state, so the network's
+/// settled activation pattern is inspectable instead of flashing for one beat.
+/// The adaptive closing act receives 27 seconds and scales its real pass beats
+/// proportionally when more than one solve stage exists.
 ///
-/// The opening now has enough room for a real curvature/FFT story, the build
-/// has enough room to inspect individual cells rather than flash stage names,
-/// and the completed mesh gets 6.6 s of its own. The closing act keeps 26.4 s:
-/// on a single-pass showcase every moving result and every still hold below is
-/// therefore paid at its literal `beat_seconds` value.
+/// Measured pacing on the film's default 60 s take:
 ///
-/// Measured pacing on the film's default take:
-///
-///   exact-CAD / spectral opening  5.400 s
-///   forward pass                 0.185 s (stable strip; activations animate)
-///   two-stage graded fill        6.750 s/stage after the decision lead
-///   exploded + closed mesh hold  6.600 s
-///   solve / recovery sequence   26.400 s
+///   exact-CAD / spectral opening  7.800 s
+///   advisor passes + result hold  9.000 s
+///   graded fill                   10.800 s
+///   exploded + closed mesh hold  5.400 s
+///   solve / recovery sequence    27.000 s
 ///
 /// Candidate-specific prose is deliberately absent from the fast pass lane.
 /// The network is the motion there; the strip carries one stable explanation.
-constexpr std::array<double, kCinemaActCount> kActFraction = {0.09, 0.12, 0.24, 0.11, 0.44};
-
-/// Readable beat lengths for the 60 s default. A single solve pass uses exactly
-/// 26.4 s; extra adaptive passes scale the sequence proportionally, never clip
-/// it. Moving reveals take 2.4-4.4 s and still results take 2.8-5.4 s.
+constexpr std::array<double, kCinemaActCount> kActFraction = {0.13, 0.15, 0.18, 0.09, 0.45};
 double beat_seconds(SolvePhase phase) {
     switch (phase) {
     case SolvePhase::kStressSweep:
@@ -718,12 +714,13 @@ CinemaCue cinema_cue(const CinemaState& state) {
         start += span;
     }
 
-    // Open on the exact CAD alone, then slide the spectral analysis in early
-    // enough to leave more than three readable seconds at full size. The pane
-    // reaches its final width once and never moves again.
+    // Open on the exact CAD alone, then slide the spectral analysis in during
+    // the first sixth of the act. The curve trace is fully open for roughly six
+    // seconds on the default take, long enough to follow raw curvature into its
+    // denoised signal and sizing statistics.
     if (cue.act == CinemaAct::kSkeleton) {
-        const double wait = 0.18 * cue.act_span;
-        const double slide = 0.22 * cue.act_span;
+        const double wait = 0.08 * cue.act_span;
+        const double slide = 0.14 * cue.act_span;
         cue.panel_open = static_cast<float>(
             smoothstep((cue.act_t - wait) / std::max(slide, 1.0e-9)));
         cue.network_alpha = 0.0f;
@@ -754,11 +751,12 @@ CinemaCue cinema_cue(const CinemaState& state) {
     if (n_frames > 0) {
         const double lane_t0 = kActFraction[0] * total;
         const double lane_t1 = (kActFraction[0] + kActFraction[1]) * total;
-        const double beat = (lane_t1 - lane_t0) / static_cast<double>(n_frames);
+        const double scan_t1 = lane_t0 + 0.65 * (lane_t1 - lane_t0);
+        const double beat = (scan_t1 - lane_t0) / static_cast<double>(n_frames);
         cue.pass_beat_seconds = beat;
         if (cue.act == CinemaAct::kSkeleton) {
             cue.frame_index = -1;
-        } else if (cue.act == CinemaAct::kDeliberate) {
+        } else if (cue.act == CinemaAct::kDeliberate && state.t < scan_t1) {
             const auto i =
                 static_cast<std::size_t>((state.t - lane_t0) / std::max(beat, 1.0e-9));
             cue.frame_index = static_cast<int>(std::min(i, n_frames - 1));
@@ -944,12 +942,17 @@ Viewport::CinemaView cinema_view(const CinemaState& state, const CinemaCue& cue)
     case CinemaAct::kSolve:
         if (cue.solve_phase == SolvePhase::kRefine ||
             cue.solve_phase == SolvePhase::kRefineHold) {
-            // The refined mesh appearing, element by element, in the order it is
-            // stored in the mesh the next pass actually solved.
+            // Persistent cells remain rendered and briefly open by 0.06 toward
+            // their own centroids. The first 40% collapses/fades removed cells;
+            // the remaining 60% reveals only replacements in next-mesh order.
             view.skeleton_alpha = 0.35f;
-            view.reveal = static_cast<float>(cue.refine_reveal);
+            const double added =
+                smoothstep((std::clamp(cue.refine_reveal, 0.0, 1.0) - 0.40) / 0.60);
+            view.reveal = static_cast<float>(added);
             view.mesh_alpha = 1.0f;
-            view.shrink = shrink_for(cue.refine_reveal);
+            view.shrink = 0.0f;
+            view.incremental_transition = true;
+            view.transition_progress = static_cast<float>(cue.refine_reveal);
         } else {
             // Every other beat of this act renders a field, so these values are
             // only reached when no `pipeline::SolveStage` arrived at all and the
@@ -1085,15 +1088,22 @@ void sync_cinema_viewport(CinemaState& state, const CinemaCue& cue, const Cinema
         (cue.mesh_source != state.uploaded_mesh_source ||
          cue.mesh_source_index != state.uploaded_mesh_index)) {
         const auto i = static_cast<std::size_t>(cue.mesh_source_index);
-        const fea::NodalMesh* mesh = nullptr;
+        bool uploaded = false;
         if (cue.mesh_source == CinemaMeshSource::kFillStage && i < state.stages.size()) {
-            mesh = &state.stages[i].mesh;
+            viewport.set_cinema_mesh(state.stages[i].mesh);
+            uploaded = true;
         } else if (cue.mesh_source == CinemaMeshSource::kSolvedPass &&
                    i < state.solve_stages.size()) {
-            mesh = &state.solve_stages[i].result.volume_mesh;
+            if (i > 0) {
+                viewport.set_cinema_mesh_transition(
+                    state.solve_stages[i - 1].result.volume_mesh,
+                    state.solve_stages[i].result.volume_mesh);
+            } else {
+                viewport.set_cinema_mesh(state.solve_stages[i].result.volume_mesh);
+            }
+            uploaded = true;
         }
-        if (mesh != nullptr) {
-            viewport.set_cinema_mesh(*mesh);
+        if (uploaded) {
             state.uploaded_mesh_source = cue.mesh_source;
             state.uploaded_mesh_index = cue.mesh_source_index;
         }
@@ -1591,8 +1601,13 @@ void draw_cinema_equations(const CinemaState& state, const CinemaCue& cue,
     {
         EquationGroup g{"strain + stress", {}, {}, on_stress || on_ramp};
         g.lines.push_back({plain("ε = B u", g.lit ? lit : dim),
-                           plain("        σ = D ε", g.lit ? lit : dim)});
+                           plain("        σ = D(E,ν) ε", g.lit ? lit : dim)});
         g.lines.push_back({plain("λ = Eν / (1+ν)(1−2ν),   μ = E / 2(1+ν)", dim)});
+        if (g.lit) {
+            g.live = {plain(fmt("E = %.6g GPa · ν = %.6g", hud.youngs_modulus / 1e9,
+                                hud.poissons_ratio),
+                            hot)};
+        }
         groups.push_back(std::move(g));
     }
 
@@ -2391,6 +2406,18 @@ void deliberate_caption(const CinemaState& state, const CinemaCue& cue, CinemaCa
     const auto& explanation = *state.explanation;
     const auto& frames = explanation.frames;
     const std::size_t candidates = frames.empty() ? 0 : frames.size() - 1;
+    if (cue.chosen_pass_held) {
+        out.headline = state.decision_applied ? "Advisor decision — final network state"
+                                              : "Advisor abstained — final network state";
+        out.headline_color =
+            state.decision_applied ? palette.status_ok : palette.status_warn;
+        out.numbers = fmt("final re-score held for inspection · %s candidates compared",
+                          grouped(candidates).c_str());
+        out.note = state.decision_note;
+        out.note_color =
+            state.decision_applied ? palette.text_dim : palette.status_warn;
+        return;
+    }
     out.headline = "Mesh search — deployed advisor network";
     if (cue.frame_index < 0 || static_cast<std::size_t>(cue.frame_index) >= frames.size()) {
         out.numbers = fmt("%s candidate meshes · measured forward passes only",
@@ -2555,37 +2582,31 @@ void solve_caption(CinemaState& state, const CinemaCue& cue, const CinemaHud& hu
         break;
     case SolvePhase::kRefine: {
         const std::size_t next = i + 1;
-        out.headline = "Rebuilding where the error was";
+        out.headline = "Replacing only cells changed by refinement";
         if (next < state.solve_stages.size()) {
-            const auto& nx = state.solve_stages[next];
-            out.numbers =
-                fmt("%s cells → %s cells · %s unknowns", grouped(tr.n_elems).c_str(),
-                    grouped(nx.trace.n_elems).c_str(), grouped(nx.trace.n_dof).c_str());
-            out.note = "the mesh the next pass actually solved, appearing in that mesh's own "
-                       "storage order";
+            out.numbers = fmt("%s kept · %s removed · %s replacement cells",
+                              grouped(hud.unchanged_elements).c_str(),
+                              grouped(hud.removed_elements).c_str(),
+                              grouped(hud.added_elements).c_str());
+            out.note = "corner-topology diff · unchanged cells stay rendered · changed cells "
+                       "collapse and spawn";
         }
         break;
     }
     case SolvePhase::kRefineHold: {
         const std::size_t next = i + 1;
-        out.headline = "The refined mesh";
+        out.headline = "Incremental refinement complete";
         out.headline_color = palette.status_ok;
         if (next < state.solve_stages.size()) {
             const auto& nx = state.solve_stages[next];
-            out.numbers =
-                fmt("%s cells · %s nodes · %s unknowns", grouped(nx.trace.n_elems).c_str(),
-                    grouped(nx.trace.n_nodes).c_str(), grouped(nx.trace.n_dof).c_str());
-            if (nx.trace.n_elems == tr.n_elems) {
-                out.headline = "Refined — and the count came back the same";
-                out.headline_color = palette.status_warn;
-                out.note = fmt("the marks above drove a remesh whose ship gate returned the "
-                               "same %s cells, so this is a re-fill and not a finer mesh",
-                               grouped(nx.trace.n_elems).c_str());
-                out.note_color = palette.status_warn;
-            } else {
-                out.note = "solved again from here — the loop can run as many times as the "
-                           "error target asks for";
-            }
+            out.numbers = fmt("%s cells · %s preserved from the previous pass · %s unknowns",
+                              grouped(nx.trace.n_elems).c_str(),
+                              grouped(hud.unchanged_elements).c_str(),
+                              grouped(nx.trace.n_dof).c_str());
+            out.note = fmt("%s old cells replaced by %s solved cells; polynomial promotion "
+                           "does not count as a topology change",
+                           grouped(hud.removed_elements).c_str(),
+                           grouped(hud.added_elements).c_str());
         }
         break;
     }
@@ -2595,8 +2616,11 @@ void solve_caption(CinemaState& state, const CinemaCue& cue, const CinemaHud& hu
         out.numbers =
             fmt("%.4g MPa · %.4g mm at this load", cue.load_factor * r.max_von_mises / 1e6,
                 cue.load_factor * r.max_displacement * 1e3);
-        out.note = fmt("exact linear response u(λ)=λu · visible deformation %.3g×",
-                       cue.load_factor * hud.deform_scale);
+        out.note = fmt(
+            "exact linear response · true %.4g mm · shown %.4g mm at %.3g×",
+            cue.load_factor * r.max_displacement * 1e3,
+            cue.load_factor * hud.deform_scale * r.max_displacement * 1e3,
+            cue.load_factor * hud.deform_scale);
         break;
     case SolvePhase::kHold: {
         out.headline = fmt("Full load — %.4g MPa peak", r.max_von_mises / 1e6);
@@ -2609,8 +2633,13 @@ void solve_caption(CinemaState& state, const CinemaCue& cue, const CinemaHud& hu
         out.numbers = fmt("%.4g mm largest movement · %s cells · %s unknowns · %s",
                           r.max_displacement * 1e3, grouped(tr.n_elems).c_str(),
                           grouped(tr.n_dof).c_str(), method);
-        out.note = fmt("final field held still · visible deformation %.3g× · full-load scale",
-                       hud.deform_scale);
+        const double shown_mm = hud.deform_scale * r.max_displacement * 1e3;
+        const double shown_pct =
+            hud.model_diagonal > 0.0
+                ? 100.0 * hud.deform_scale * r.max_displacement / hud.model_diagonal
+                : 0.0;
+        out.note = fmt("true %.4g mm · display %.4g mm (%.2f%% of model) · %.3g×",
+                       r.max_displacement * 1e3, shown_mm, shown_pct, hud.deform_scale);
         break;
     }
     case SolvePhase::kNone:

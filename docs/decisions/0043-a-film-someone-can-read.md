@@ -4,6 +4,8 @@
 - Revises: [ADR-0042](0042-the-advisor-explains-itself-on-screen.md) — the film
   keeps its subject and its honesty rules; §6 (concurrent acts) and the ticker
   design are superseded here
+- Revised (2026-08-21): longer curvature and settled-network holds, explicit
+  material/deformation telemetry, and structural incremental refinement.
 - Touches: `apps/gui/cinema.{hpp,cpp}`, `apps/gui/main.cpp`,
   `apps/gui/viewport.{hpp,cpp}`, `src/fea/{include/fea,src}/stress.{hpp,cpp}`,
   `scripts/render_cinema.py`, `docs/assets/cinema/*`, `README.md`
@@ -44,7 +46,7 @@ of work and none of its outcomes.
 
 The strip now carries exactly four rows, at a constant height, every act:
 
-1. a concise label — "Peak stress 8.509 MPa", "Stress gradient",
+1. a concise label — "Peak stress 11.35 MPa", "Stress gradient",
    "Estimated solution error";
 2. the two-to-four numbers that matter on this beat;
 3. the one disclosure that applies to it;
@@ -87,31 +89,42 @@ The fast advisor lane runs only inside deliberation. Its strip stays stable —
 pass index, total passes, candidate count, gate threshold — while the measured
 activations animate.
 
-The build act holds the advisor outcome for 1.6 s, then dissolves the network
-into a cell microscope as the first cells appear. The microscope reads the
-captured `NodalMesh`: actual type counts, tet4→tet10 node placement and cached
-min/mean cell quality. The complex default is OOD-refused, so the strip says
-**Advisor abstained — verified fallback** and the configured graded/spectral/
-quadratic setup remains unchanged. No vetoed action is pictured as executed.
+The advisor act now spends 65% on the 39 real passes and 35% holding the final
+re-score/refusal state. That gives the settled network 3.15 s before the build
+act, whose 1.6 s decision lead extends the hold before dissolving into the cell
+microscope. The complex default is OOD-refused, so the strip says **Advisor
+abstained — final network state** and then **Advisor abstained — verified
+fallback**. No vetoed action is pictured as executed.
 
-The solve boundary dissolves that microscope into the equation board. Pane
+The solve boundary dissolves the microscope into the equation board. Pane
 geometry never changes; only opacity does.
 
 ## 4. Holding on results
 
-The 60 s default spends time on outcomes, not transient prose:
+The 60 s default spends 7.8 s on exact CAD/spectral sizing, including about
+6.08 s with the panel fully open, and 9.0 s on the advisor, including its
+3.15 s settled-state hold. Its two-pass closing sequence is scaled uniformly
+into 27.0 s:
 
-| Beat | Length | What is held |
+| Beat | Default length | What is held |
 |---|---:|---|
-| `mesh_hold` | 6.6 s | exploded topology, then the closed authoritative mesh |
-| `stress_hold` | 3.2 s | solved von Mises field |
-| `gradient_hold` | 3.0 s | recovered stress gradient |
-| `error_hold` | 2.8 s | ZZ error field |
-| `refine_hold` | 3.4 s | next solved mesh, when another pass exists |
-| `hold` | 5.4 s | finished full-load answer |
+| `mesh_hold` | 5.4 s | exploded topology, then the closed initial solve mesh |
+| `stress_hold` | 1.96 s per pass | solved von Mises field |
+| `gradient_hold` | 1.84 s | recovered first-pass stress gradient |
+| `error_hold` | 1.72 s per pass | ZZ error field |
+| `refine_hold` | 2.09 s | next solved mesh after incremental cell replacement |
+| `hold` | 3.31 s | finished full-load answer |
 
-Moving beats are also slower: 2.4–4.4 s. A single-pass closing act uses its
-literal 26.4 s beat budget; multi-pass takes scale proportionally.
+Moving beats are 1.47–2.70 s. Every beat is retained; the multi-pass schedule
+scales proportionally rather than truncating the ending.
+
+The refinement beat is structural rather than a full redraw. A corner-topology
+diff identifies 27,808 persistent, 2,688 removed and 8,143 added cells in the
+default take. Persistent cells never leave the framebuffer; they briefly open
+by 0.06 toward their centroids so changed interior cells can be seen. Removed
+cells collapse/fade first, then only replacements use the established
+centroid-spawn animation. Tet4/tet10 compare by corner topology, so p-promotion
+does not make every surviving cell look replaced.
 
 ## 5. Stress arriving, and its gradient
 
@@ -156,11 +169,12 @@ It is a different field, not a relabelled copy.
 
 The network has said everything it has to say by the time the answer starts
 arriving, and what the closing act is doing is arithmetic that can be written
-down. So the panel's **content** cross-fades over 0.5 s into a board of the seven
+down. So the panel's **content** cross-fades over 0.8 s into a board of the seven
 relations the solver evaluates, with the one this beat is computing lit, a rule
-down its left edge, and its own live numbers beside it: the unknown count, the
-peak stress, the steepest gradient, the estimated error against its target, the
-marked-cell count, λ.
+down its left edge, and its own live numbers beside it: E = 200 GPa, ν = 0.3,
+unknown count, peak stress, steepest gradient, estimated error, marked-cell
+count and λ. The final strip distinguishes the true 0.0008111 mm displacement
+from the explicitly exaggerated 21.27 mm / 26,221× presentation.
 
 Every equation is the expression the cited code implements, and the citation
 table is in `NOTES.md`. Two things the board deliberately does not show: the

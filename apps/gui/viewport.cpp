@@ -25,6 +25,7 @@
 #include <cstdio>
 #include <limits>
 #include <utility>
+#include <unordered_map>
 
 namespace polymesh::gui {
 namespace {
@@ -111,23 +112,40 @@ layout(location = 1) in vec3 in_normal;
 layout(location = 2) in vec4 in_color;
 layout(location = 3) in vec3 in_centroid;
 layout(location = 4) in float in_index;
+layout(location = 5) in float in_role;
 uniform mat4 u_view;
 uniform mat4 u_proj;
 uniform float u_shrink;
+uniform float u_transition;
+uniform int u_transition_active;
 out vec3 v_normal;
 out vec4 v_color;
 out vec3 v_pos;
 flat out float v_index;
 void main() {
-    // Toward its OWN element's centroid, so the cells separate from each other
-    // instead of the whole mesh scaling about one point.
-    vec3 pos = mix(in_pos, in_centroid, u_shrink);
+    float shrink = u_shrink;
+    float alpha = 1.0;
+    float index_value = in_index;
+    if (u_transition_active != 0) {
+        if (in_role < -0.5) {
+            float q = smoothstep(0.0, 0.45, u_transition);
+            shrink = 0.92 * q;
+            alpha = 1.0 - q;
+            index_value = -1.0;
+        } else if (in_role > 0.5) {
+            float q = clamp((u_transition - 0.40) / 0.60, 0.0, 1.0);
+            shrink = 0.72 * (1.0 - smoothstep(0.0, 0.35, q));
+            alpha = smoothstep(0.0, 0.20, q);
+        } else {
+            shrink = 0.06 * sin(3.14159265 * u_transition);
+            index_value = -1.0;
+        }
+    }
+    vec3 pos = mix(in_pos, in_centroid, shrink);
     v_normal = in_normal;
-    v_color = in_color;
+    v_color = vec4(in_color.rgb, in_color.a * alpha);
     v_pos = pos;
-    // flat: the index is per-element, and interpolating it would let a
-    // triangle straddle the reveal threshold and get cut through the middle.
-    v_index = in_index;
+    v_index = index_value;
     gl_Position = u_proj * u_view * vec4(pos, 1.0);
 })";
 
@@ -141,13 +159,9 @@ uniform float u_reveal;
 uniform float u_alpha;
 out vec4 frag;
 void main() {
-    // v_index is element_index / element_count, so this draws exactly the
-    // elements with index < u_reveal * count -- whole cells, never a part of one.
-    if (v_index >= u_reveal) {
+    if (v_index >= u_reveal || v_color.a <= 0.001) {
         discard;
     }
-    // Same headlight/rim shading as kModelFs so a revealed cell looks like the
-    // same material the mesh-preview mode shows.
     vec3 n = normalize(v_normal);
     vec3 view_dir = normalize(u_eye - v_pos);
     float ndv = abs(dot(n, view_dir));
@@ -161,15 +175,36 @@ layout(location = 0) in vec3 in_pos;
 layout(location = 1) in vec4 in_color;
 layout(location = 2) in vec3 in_centroid;
 layout(location = 3) in float in_index;
+layout(location = 4) in float in_role;
 uniform mat4 u_view;
 uniform mat4 u_proj;
 uniform float u_shrink;
+uniform float u_transition;
+uniform int u_transition_active;
 out vec4 v_color;
 flat out float v_index;
 void main() {
-    vec3 pos = mix(in_pos, in_centroid, u_shrink);
-    v_color = in_color;
-    v_index = in_index;
+    float shrink = u_shrink;
+    float alpha = 1.0;
+    float index_value = in_index;
+    if (u_transition_active != 0) {
+        if (in_role < -0.5) {
+            float q = smoothstep(0.0, 0.45, u_transition);
+            shrink = 0.92 * q;
+            alpha = 1.0 - q;
+            index_value = -1.0;
+        } else if (in_role > 0.5) {
+            float q = clamp((u_transition - 0.40) / 0.60, 0.0, 1.0);
+            shrink = 0.72 * (1.0 - smoothstep(0.0, 0.35, q));
+            alpha = smoothstep(0.0, 0.20, q);
+        } else {
+            shrink = 0.06 * sin(3.14159265 * u_transition);
+            index_value = -1.0;
+        }
+    }
+    vec3 pos = mix(in_pos, in_centroid, shrink);
+    v_color = vec4(in_color.rgb, in_color.a * alpha);
+    v_index = index_value;
     gl_Position = u_proj * u_view * vec4(pos, 1.0);
 })";
 
@@ -180,7 +215,7 @@ uniform float u_reveal;
 uniform float u_alpha;
 out vec4 frag;
 void main() {
-    if (v_index >= u_reveal) {
+    if (v_index >= u_reveal || v_color.a <= 0.001) {
         discard;
     }
     frag = vec4(v_color.rgb, u_alpha * v_color.a);
@@ -223,10 +258,10 @@ void bind_line_attr(GLuint vao, GLuint vbo) {
                           reinterpret_cast<void*>(3 * sizeof(float)));
 }
 
-// Interleaved float counts per vertex for the two cinema buffers. Named here so
-// the attribute binding and the packing loops cannot drift apart.
-constexpr int kCinemaFillFloats = 14; // pos3 normal3 rgba4 centroid3 index1
-constexpr int kCinemaEdgeFloats = 11; // pos3 rgba4 centroid3 index1
+// Interleaved float counts per vertex for the two cinema buffers. The final
+// role scalar is -1 removed, 0 persistent/ordinary, +1 newly added.
+constexpr int kCinemaFillFloats = 15; // pos3 normal3 rgba4 centroid3 index1 role1
+constexpr int kCinemaEdgeFloats = 12; // pos3 rgba4 centroid3 index1 role1
 
 void bind_cinema_attr(GLuint vao, GLuint vbo) {
     glBindVertexArray(vao);
@@ -243,6 +278,7 @@ void bind_cinema_attr(GLuint vao, GLuint vbo) {
     attr(2, 4, 6);  // color
     attr(3, 3, 10); // element centroid
     attr(4, 1, 13); // element index / element count
+    attr(5, 1, 14); // transition role
 }
 
 void bind_cinema_line_attr(GLuint vao, GLuint vbo) {
@@ -259,6 +295,7 @@ void bind_cinema_line_attr(GLuint vao, GLuint vbo) {
     attr(1, 4, 3);
     attr(2, 3, 7);
     attr(3, 1, 10);
+    attr(4, 1, 11); // transition role
 }
 
 /// Element-type colors for mesh preview and for the cinema reveal. One function
@@ -320,6 +357,74 @@ std::size_t corner_node_count(const fea::NodalElement& el) {
         return el.nodes.size();
     }
     return el.nodes.size();
+}
+enum class CinemaCellFamily : std::uint8_t { kTet, kHex, kPrism, kPyramid, kPoly };
+
+struct CinemaCellKey {
+    CinemaCellFamily family = CinemaCellFamily::kPoly;
+    std::uint8_t count = 0;
+    std::array<std::array<std::int64_t, 3>, 8> corners{};
+
+    bool operator==(const CinemaCellKey&) const = default;
+};
+
+struct CinemaCellKeyHash {
+    std::size_t operator()(const CinemaCellKey& key) const {
+        std::size_t h = static_cast<std::size_t>(key.family) * 1315423911u + key.count;
+        for (std::size_t i = 0; i < key.count; ++i) {
+            for (const std::int64_t v : key.corners[i]) {
+                const auto x = static_cast<std::uint64_t>(v);
+                h ^= static_cast<std::size_t>(x + 0x9e3779b97f4a7c15ull + (h << 6u) +
+                                              (h >> 2u));
+            }
+        }
+        return h;
+    }
+};
+
+std::optional<CinemaCellKey> cinema_cell_key(const fea::NodalMesh& mesh,
+                                             const fea::NodalElement& element,
+                                             const Eigen::Vector3d& origin,
+                                             double inverse_tolerance) {
+    const std::size_t corners = corner_node_count(element);
+    if (corners < 4 || corners > 8 || element.nodes.size() < corners) {
+        return std::nullopt;
+    }
+    CinemaCellKey key;
+    key.count = static_cast<std::uint8_t>(corners);
+    switch (element.type) {
+    case fea::ElementType::kTet4:
+    case fea::ElementType::kTet10:
+        key.family = CinemaCellFamily::kTet;
+        break;
+    case fea::ElementType::kHex8:
+    case fea::ElementType::kHex20:
+        key.family = CinemaCellFamily::kHex;
+        break;
+    case fea::ElementType::kPrism6:
+        key.family = CinemaCellFamily::kPrism;
+        break;
+    case fea::ElementType::kPyramid5:
+        key.family = CinemaCellFamily::kPyramid;
+        break;
+    case fea::ElementType::kPolyVem:
+        key.family = CinemaCellFamily::kPoly;
+        break;
+    }
+    for (auto& corner : key.corners) {
+        corner = {std::numeric_limits<std::int64_t>::max(),
+                  std::numeric_limits<std::int64_t>::max(),
+                  std::numeric_limits<std::int64_t>::max()};
+    }
+    for (std::size_t i = 0; i < corners; ++i) {
+        if (element.nodes[i] >= mesh.nodes.size()) {
+            return std::nullopt;
+        }
+        const Eigen::Vector3d p = (mesh.nodes[element.nodes[i]] - origin) * inverse_tolerance;
+        key.corners[i] = {std::llround(p.x()), std::llround(p.y()), std::llround(p.z())};
+    }
+    std::sort(key.corners.begin(), key.corners.end());
+    return key;
 }
 
 /// Every face of ONE element, outward-oriented, in the same node-order
@@ -894,37 +999,133 @@ void Viewport::set_skeleton(const std::vector<std::vector<Eigen::Vector3d>>& pol
 }
 
 void Viewport::set_cinema_mesh(const fea::NodalMesh& mesh) {
-    // EVERY element's own faces, not the shared boundary surface: a solid that
-    // grows one cell at a time has to show its real cut faces, and the shrink
-    // only reads as discrete cells if the interior facets exist to be seen.
-    // The header carries the measured memory this costs.
+    std::vector<CinemaCellRef> cells;
+    cells.reserve(mesh.elements.size());
+    const double denom = mesh.elements.empty() ? 1.0 : static_cast<double>(mesh.elements.size());
+    for (std::size_t i = 0; i < mesh.elements.size(); ++i) {
+        cells.push_back({&mesh, i, 0.0f, static_cast<float>(static_cast<double>(i) / denom)});
+    }
+    cinema_transition_active_ = false;
+    cinema_unchanged_element_count_ = 0;
+    cinema_removed_element_count_ = 0;
+    cinema_added_element_count_ = 0;
+    upload_cinema_cells(cells, mesh.elements.size());
+}
+
+void Viewport::set_cinema_mesh_transition(const fea::NodalMesh& previous,
+                                          const fea::NodalMesh& next) {
+    Eigen::Vector3d lo = Eigen::Vector3d::Zero();
+    Eigen::Vector3d hi = Eigen::Vector3d::Zero();
+    bool have_bounds = false;
+    for (const fea::NodalMesh* mesh : {&previous, &next}) {
+        for (const Eigen::Vector3d& p : mesh->nodes) {
+            if (have_bounds) {
+                lo = lo.cwiseMin(p);
+                hi = hi.cwiseMax(p);
+            } else {
+                lo = p;
+                hi = p;
+                have_bounds = true;
+            }
+        }
+    }
+    const double diagonal = have_bounds ? (hi - lo).norm() : 0.0;
+    const double tolerance = std::max(diagonal * 1.0e-10, 1.0e-12);
+    const double inverse_tolerance = 1.0 / tolerance;
+
+    using KeyMap = std::unordered_multimap<CinemaCellKey, std::size_t, CinemaCellKeyHash>;
+    KeyMap old_by_key;
+    old_by_key.reserve(previous.elements.size());
+    for (std::size_t i = 0; i < previous.elements.size(); ++i) {
+        if (const auto key =
+                cinema_cell_key(previous, previous.elements[i], lo, inverse_tolerance)) {
+            old_by_key.emplace(*key, i);
+        }
+    }
+
+    std::vector<bool> old_matched(previous.elements.size(), false);
+    std::vector<std::size_t> unchanged;
+    std::vector<std::size_t> added;
+    unchanged.reserve(std::min(previous.elements.size(), next.elements.size()));
+    added.reserve(next.elements.size() / 4 + 8);
+    for (std::size_t i = 0; i < next.elements.size(); ++i) {
+        const auto key = cinema_cell_key(next, next.elements[i], lo, inverse_tolerance);
+        if (!key) {
+            added.push_back(i);
+            continue;
+        }
+        const auto range = old_by_key.equal_range(*key);
+        auto match = range.first;
+        while (match != range.second && old_matched[match->second]) {
+            ++match;
+        }
+        if (match == range.second) {
+            added.push_back(i);
+            continue;
+        }
+        old_matched[match->second] = true;
+        unchanged.push_back(i);
+    }
+
+    std::vector<std::size_t> removed;
+    removed.reserve(previous.elements.size() - std::min(previous.elements.size(),
+                                                        unchanged.size()));
+    for (std::size_t i = 0; i < old_matched.size(); ++i) {
+        if (!old_matched[i]) {
+            removed.push_back(i);
+        }
+    }
+
+    std::vector<CinemaCellRef> cells;
+    cells.reserve(unchanged.size() + removed.size() + added.size());
+    for (const std::size_t i : unchanged) {
+        cells.push_back({&next, i, 0.0f, -1.0f});
+    }
+    for (const std::size_t i : removed) {
+        cells.push_back({&previous, i, -1.0f, -1.0f});
+    }
+    const double added_denom = added.empty() ? 1.0 : static_cast<double>(added.size());
+    for (std::size_t ordinal = 0; ordinal < added.size(); ++ordinal) {
+        cells.push_back({&next, added[ordinal], 1.0f,
+                         static_cast<float>(static_cast<double>(ordinal) / added_denom)});
+    }
+
+    cinema_transition_active_ = true;
+    cinema_unchanged_element_count_ = unchanged.size();
+    cinema_removed_element_count_ = removed.size();
+    cinema_added_element_count_ = added.size();
+    upload_cinema_cells(cells, next.elements.size());
+}
+
+void Viewport::upload_cinema_cells(const std::vector<CinemaCellRef>& cells,
+                                   std::size_t logical_element_count) {
+    // EVERY selected element's own faces, not the shared boundary surface. In a
+    // transition the selection is persistent-next + removed-previous +
+    // added-next, and the role scalar lets the shader animate those sets
+    // independently without rebuilding topology per frame.
     cinema_bounds_.reset();
-    cinema_element_count_ = mesh.elements.size();
+    cinema_element_count_ = logical_element_count;
     cinema_skipped_element_count_ = 0;
 
-    std::vector<float> data;  // fill:  pos3 normal3 rgba4 centroid3 index1
-    std::vector<float> edata; // edges: pos3 rgba4 centroid3 index1
-    // A tet — the common case — gives 4 triangles (12 fill vertices) and 6
-    // distinct edges (12 line vertices). Reserve for that; hexes and poly cells
-    // grow the buffers from there.
-    data.reserve(mesh.elements.size() * 12 * kCinemaFillFloats);
-    edata.reserve(mesh.elements.size() * 12 * kCinemaEdgeFloats);
+    std::vector<float> data;  // pos3 normal3 rgba4 centroid3 index1 role1
+    std::vector<float> edata; // pos3 rgba4 centroid3 index1 role1
+    data.reserve(cells.size() * 12 * kCinemaFillFloats);
+    edata.reserve(cells.size() * 12 * kCinemaEdgeFloats);
 
-    // Normalising by the element COUNT (not count - 1) is what makes the shader
-    // test `index / count >= reveal` equivalent to `index >= reveal * count`,
-    // so reveal = 0 draws nothing and reveal = 1 draws every element.
-    const double denom =
-        cinema_element_count_ > 0 ? static_cast<double>(cinema_element_count_) : 1.0;
     FaceLoops loops;
     std::vector<std::pair<std::uint32_t, std::uint32_t>> edges;
-    for (std::size_t ei = 0; ei < mesh.elements.size(); ++ei) {
-        const auto& el = mesh.elements[ei];
+    for (const CinemaCellRef& cell : cells) {
+        if (cell.mesh == nullptr || cell.element >= cell.mesh->elements.size()) {
+            continue;
+        }
+        const auto& mesh = *cell.mesh;
+        const auto& el = mesh.elements[cell.element];
         if (!element_face_loops(el, mesh.nodes.size(), loops)) {
-            // Degenerate connectivity or a poly-VEM cell with no usable face
-            // loops. Counted so the panel can say the reveal is not the whole
-            // mesh; the index normalisation still uses the full element count,
-            // so the remaining cells keep their true position in the order.
-            ++cinema_skipped_element_count_;
+            // Removed cells are historical transition geometry; skipped counts
+            // describe only the authoritative next mesh.
+            if (cell.role >= 0.0f) {
+                ++cinema_skipped_element_count_;
+            }
             continue;
         }
         const std::size_t corners = corner_node_count(el);
@@ -932,16 +1133,14 @@ void Viewport::set_cinema_mesh(const fea::NodalMesh& mesh) {
         for (std::size_t i = 0; i < corners; ++i) {
             centroid += mesh.nodes[el.nodes[i]];
         }
-        // Node average, not the volume centroid: the shrink only needs a point
-        // inside the cell to collapse toward. Exact for a simplex, and inside
-        // the hull for anything convex, which every element type here is.
         centroid /= static_cast<double>(corners);
-        const float index_t = static_cast<float>(static_cast<double>(ei) / denom);
-        const auto rgb = type_color(el.type);
-        // Alternate the shade on the emission index, which is also the reveal
-        // order: the cell that just appeared reads as distinct from the one
-        // before it instead of merging into one flat blob of element colour.
-        const float shade = (ei & 1u) ? 1.0f : 0.82f;
+        auto rgb = type_color(el.type);
+        if (cell.role < -0.5f) {
+            rgb = {0.95f, 0.42f, 0.22f};
+        } else if (cell.role > 0.5f) {
+            rgb = {0.20f, 0.82f, 0.88f};
+        }
+        const float shade = (cell.element & 1u) ? 1.0f : 0.82f;
 
         for (std::size_t li = 0; li < loops.count(); ++li) {
             const std::uint32_t begin = loops.starts[li];
@@ -949,9 +1148,6 @@ void Viewport::set_cinema_mesh(const fea::NodalMesh& mesh) {
             if (n_face < 3) {
                 continue;
             }
-            // Newell's normal: the area-weighted average over the whole loop, so
-            // it is right for quads and for the non-planar poly-VEM facets that
-            // a three-point cross product would get wrong.
             Eigen::Vector3d nrm = Eigen::Vector3d::Zero();
             for (std::size_t k = 0; k < n_face; ++k) {
                 const Eigen::Vector3d& p = mesh.nodes[loops.nodes[begin + k]];
@@ -970,10 +1166,8 @@ void Viewport::set_cinema_mesh(const fea::NodalMesh& mesh) {
                              rgb[0] * shade, rgb[1] * shade, rgb[2] * shade, 1.0f,
                              static_cast<float>(centroid.x()),
                              static_cast<float>(centroid.y()),
-                             static_cast<float>(centroid.z()), index_t});
+                             static_cast<float>(centroid.z()), cell.reveal_index, cell.role});
             };
-            // Fan from the first corner. Every element type here has convex
-            // faces, so a fan covers them without self-overlap.
             for (std::size_t k = 1; k + 1 < n_face; ++k) {
                 emit_fill(loops.nodes[begin]);
                 emit_fill(loops.nodes[begin + k]);
@@ -981,11 +1175,6 @@ void Viewport::set_cinema_mesh(const fea::NodalMesh& mesh) {
             }
         }
 
-        // Distinct edges of THIS element. Deduplicated within the element only,
-        // by linear search: a cell has at most a few dozen edge instances (12
-        // for a hex, 6 for a tet), so the quadratic scan is cheaper than the
-        // hash set it would replace, and neighbouring elements deliberately
-        // keep their own copy of a shared edge.
         edges.clear();
         for (std::size_t li = 0; li < loops.count(); ++li) {
             const std::uint32_t begin = loops.starts[li];
@@ -1009,7 +1198,7 @@ void Viewport::set_cinema_mesh(const fea::NodalMesh& mesh) {
                          {static_cast<float>(p.x()), static_cast<float>(p.y()),
                           static_cast<float>(p.z()), 0.02f, 0.02f, 0.04f, 1.0f,
                           static_cast<float>(centroid.x()), static_cast<float>(centroid.y()),
-                          static_cast<float>(centroid.z()), index_t});
+                          static_cast<float>(centroid.z()), cell.reveal_index, cell.role});
         };
         for (const auto& [a, b] : edges) {
             emit_edge(a);
@@ -1035,6 +1224,18 @@ std::size_t Viewport::cinema_element_count() const { return cinema_element_count
 std::size_t Viewport::cinema_skipped_element_count() const {
     return cinema_skipped_element_count_;
 }
+std::size_t Viewport::cinema_unchanged_element_count() const {
+    return cinema_unchanged_element_count_;
+}
+
+std::size_t Viewport::cinema_removed_element_count() const {
+    return cinema_removed_element_count_;
+}
+
+std::size_t Viewport::cinema_added_element_count() const {
+    return cinema_added_element_count_;
+}
+
 
 void Viewport::set_cinema_view(const CinemaView& view) { cinema_view_ = view; }
 
@@ -1448,6 +1649,9 @@ void Viewport::draw_cinema(const Eigen::Matrix4f& view, const Eigen::Matrix4f& p
     const float reveal = std::clamp(cinema_view_.reveal, 0.0f, 1.0f);
     const float shrink = std::clamp(cinema_view_.shrink, 0.0f, 1.0f);
     const float mesh_alpha = std::clamp(cinema_view_.mesh_alpha, 0.0f, 1.0f);
+    const bool incremental =
+        cinema_view_.incremental_transition && cinema_transition_active_;
+    const float transition = std::clamp(cinema_view_.transition_progress, 0.0f, 1.0f);
 
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -1488,9 +1692,10 @@ void Viewport::draw_cinema(const Eigen::Matrix4f& view, const Eigen::Matrix4f& p
         glLineWidth(1.0f);
     }
 
-    // reveal == 0 would discard every fragment anyway; skipping the draw keeps
-    // the pre-mesh act from paying for a full pass over the element buffer.
-    if (cinema_vertex_count_ > 0 && reveal > 0.0f && mesh_alpha > 0.0f) {
+    // An incremental transition still draws persistent/removed cells when the
+    // added-cell reveal is zero.
+    if (cinema_vertex_count_ > 0 && (reveal > 0.0f || incremental) &&
+        mesh_alpha > 0.0f) {
         const bool draw_edges = cinema_view_.edges && cinema_edge_vertex_count_ > 0 &&
                                 cinema_view_.edge_alpha > 0.0f;
         if (draw_edges) {
@@ -1507,6 +1712,9 @@ void Viewport::draw_cinema(const Eigen::Matrix4f& view, const Eigen::Matrix4f& p
         glUniform3f(glGetUniformLocation(cinema_program_, "u_eye"), eye.x(), eye.y(), eye.z());
         glUniform1f(glGetUniformLocation(cinema_program_, "u_reveal"), reveal);
         glUniform1f(glGetUniformLocation(cinema_program_, "u_shrink"), shrink);
+        glUniform1f(glGetUniformLocation(cinema_program_, "u_transition"), transition);
+        glUniform1i(glGetUniformLocation(cinema_program_, "u_transition_active"),
+                    incremental ? 1 : 0);
         glUniform1f(glGetUniformLocation(cinema_program_, "u_alpha"), mesh_alpha);
         // Depth writes stay ON while mesh_alpha < 1: the fade is an act
         // transition, not a material. A solid that stops occluding itself
@@ -1526,6 +1734,10 @@ void Viewport::draw_cinema(const Eigen::Matrix4f& view, const Eigen::Matrix4f& p
             // fill, so the same reveal/shrink keep the two exactly in step.
             glUniform1f(glGetUniformLocation(cinema_line_program_, "u_reveal"), reveal);
             glUniform1f(glGetUniformLocation(cinema_line_program_, "u_shrink"), shrink);
+            glUniform1f(glGetUniformLocation(cinema_line_program_, "u_transition"),
+                        transition);
+            glUniform1i(glGetUniformLocation(cinema_line_program_, "u_transition_active"),
+                        incremental ? 1 : 0);
             glUniform1f(glGetUniformLocation(cinema_line_program_, "u_alpha"),
                         mesh_alpha * std::clamp(cinema_view_.edge_alpha, 0.0f, 1.0f));
             glLineWidth(std::clamp(cinema_view_.edge_width, 0.5f, 8.0f));

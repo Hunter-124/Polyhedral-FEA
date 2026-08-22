@@ -910,9 +910,20 @@ def solve_rung(
     chosen = selections[0]
     load_faces = faces[chosen]
     loads = np.zeros_like(nodes)
+    region_load_vectors: list[np.ndarray] = []
+    region_scales: list[float] = []
     for region, region_chosen in zip(case.loads, selections):
-        loads = loads + consistent_face_loads(nodes, faces[region_chosen],
-                                              region.traction)
+        region_load = consistent_face_loads(nodes, faces[region_chosen],
+                                            region.traction)
+        scale = 1.0
+        if len(case.loads) > 1 and region.expected_area:
+            selected_area = float(area[region_chosen].sum())
+            if selected_area > 0.0:
+                scale = float(region.expected_area / selected_area)
+                region_load *= scale
+        region_load_vectors.append(region_load)
+        region_scales.append(scale)
+        loads += region_load
     fixed = fixed_boundary_nodes(nodes, faces, case.fix_box)
     if fixed.size < 3:
         row.update(status="empty-fix-selection")
@@ -957,9 +968,10 @@ def solve_rung(
                 "normal_min_dot": region.normal_min_dot,
                 "n_faces": int(region_chosen.sum()),
                 "area_m2": float(area[region_chosen].sum()),
+                "expected_area_m2": region.expected_area,
+                "resultant_scale": region_scales[index],
                 "resultant_N": [
-                    float(v) for v in consistent_face_loads(
-                        nodes, faces[region_chosen], region.traction).sum(axis=0)
+                    float(v) for v in region_load_vectors[index].sum(axis=0)
                 ],
             }
             for index, (region, region_chosen) in enumerate(zip(case.loads, selections))

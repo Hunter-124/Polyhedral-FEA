@@ -118,10 +118,13 @@ CASE_COLUMNS = [
 TOP_OUTCOMES = [
     "status", "error", "mesh_ms", "solve_ms", "solve_flops", "solve_bytes",
     "cg_iters", "cg_flops_per_iter", "cg_bytes_per_iter", "factor_nnz",
-    "solve_method", "est_solve_flops", "host", "nfree", "n_dof", "n_elems",
-    "n_nodes", "geometry_fill_volume_err", "geometry_volume_err",
+    "solve_method", "cost_label_source", "est_solve_flops", "host", "nfree",
+    "n_dof", "n_elems", "n_nodes", "geometry_fill_volume_err",
+    "geometry_volume_err",
 ]
-STRING_OUTCOMES = frozenset({"status", "error", "solve_method", "host"})
+STRING_OUTCOMES = frozenset(
+    {"status", "error", "solve_method", "cost_label_source", "host"}
+)
 
 
 def parse_args() -> argparse.Namespace:

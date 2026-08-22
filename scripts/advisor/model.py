@@ -272,7 +272,7 @@ class AdvisorNet(nn.Module):
 
 def _matrix(weight: Tensor) -> list[list[float]]:
     """``weight[j][i]`` = source neuron ``i`` -> destination neuron ``j``."""
-    return [[float(value) for value in row] for row in weight.detach()]
+    return weight.detach().cpu().tolist()
 
 
 def main() -> int:

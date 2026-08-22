@@ -2236,6 +2236,8 @@ void accumulate_solve_cost(RunOutcome& out, double flops, double bytes, int cg_i
     out.line["factor_nnz"] = out.factor_nnz;
     out.line["solve_method"] =
         out.solve_method.empty() ? json(nullptr) : json(out.solve_method);
+    out.line["cost_label_source"] =
+        out.solve_method.empty() ? json(nullptr) : json("measured-" + out.solve_method);
 }
 
 void accumulate_solve_cost(RunOutcome& out, const fea::SolveCostMeasured& cost) {
@@ -2345,6 +2347,7 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
     out.line["cg_iters"] = 0;
     out.line["factor_nnz"] = 0;
     out.line["solve_method"] = nullptr;
+    out.line["cost_label_source"] = nullptr;
     out.line["est_solve_flops"] = nullptr;
 
     ProgressHeartbeat beat(progress_path, "mesh", cfg.id, part.part, tier, t_all0);
@@ -2624,6 +2627,9 @@ RunOutcome run_one(const Config& cfg, const PartCase& part, int tier, double h_s
             out.line["mesh_ms"] = out.mesh_ms;
             out.line["solve_ms"] = 0.0;
             out.line["status"] = "cost_only";
+            out.line["cost_label_source"] = estimated_cost.nfree <= defaults.cg_threshold
+                                                ? "symbolic-direct"
+                                                : "symbolic-cg-per-iteration";
             out.accuracy_score = 0.0;
             stamp_wall(out.line);
             out.mesh = std::move(vol);

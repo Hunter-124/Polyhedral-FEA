@@ -1,0 +1,891 @@
+{
+  "provenance": {
+    "git_revision": "5cd26e80c690f15c95b9e20fb8abc02a2f30fd7a-dirty",
+    "created_utc": "2026-08-22T19:01:35Z",
+    "python": "3.14.6",
+    "numpy": "2.4.6",
+    "torch": "2.12.1+cu129"
+  },
+  "descriptor_distances": {
+    "descriptor_columns": [
+      "geo_curved_area_frac",
+      "geo_cyl_area_frac",
+      "geo_plane_area_frac",
+      "geo_other_area_frac",
+      "geo_min_curv_radius_rel",
+      "geo_log_curv_radius_mean",
+      "geo_log_curv_radius_std",
+      "geo_n_faces",
+      "geo_n_edges",
+      "geo_face_area_cv",
+      "geo_aspect_max",
+      "geo_aspect_mid",
+      "geo_volume_frac",
+      "geo_area_over_v23",
+      "geo_min_face_size_rel",
+      "geo_n_inner_loops",
+      "geo_hole_spacing_min_rel",
+      "geo_hole_spacing_p10_rel",
+      "geo_feat_pair_dist_min_rel",
+      "geo_feat_pair_dist_p10_rel",
+      "geo_feat_pair_dist_mean_rel",
+      "geo_dihedral_p10",
+      "geo_dihedral_p50",
+      "geo_dihedral_p90",
+      "geo_singular_lambda_min"
+    ],
+    "n_geometries": 60,
+    "standardization": "per-column z-score over all geometries in the file",
+    "family_centroid_pairwise_distance": {
+      "bossed_plate": {
+        "box_hole": 4.5127930476167215,
+        "channel": 4.494995427422684,
+        "ellipsoid_boss": 5.658302031584544,
+        "gusset_bracket": 5.056304615320448,
+        "l_bracket": 3.9648484376273734,
+        "lobed_shaft": 6.965882677487584,
+        "multi_hole_plate": 6.800409765738255,
+        "perforated_plate": 6.350807220953743,
+        "plate_notch": 5.273708058720255,
+        "ribbed_plate": 3.7786972380707664,
+        "sphere_box": 5.3084119524079965,
+        "stepped_shaft": 5.506611825113185,
+        "tube": 6.508151641577494,
+        "twisted_loft": 9.60354086338299
+      },
+      "box_hole": {
+        "bossed_plate": 4.5127930476167215,
+        "channel": 7.097934181301249,
+        "ellipsoid_boss": 7.591985500663844,
+        "gusset_bracket": 7.054075066646732,
+        "l_bracket": 6.7863518364283415,
+        "lobed_shaft": 8.199432208837154,
+        "multi_hole_plate": 5.489755986605083,
+        "perforated_plate": 4.594845188361108,
+        "plate_notch": 5.47654536611037,
+        "ribbed_plate": 5.639860331159981,
+        "sphere_box": 7.287372136149274,
+        "stepped_shaft": 7.278473379926322,
+        "tube": 8.148973359489819,
+        "twisted_loft": 10.794356199314143
+      },
+      "channel": {
+        "bossed_plate": 4.494995427422684,
+        "box_hole": 7.097934181301249,
+        "ellipsoid_boss": 3.4862071742020766,
+        "gusset_bracket": 4.812179725282963,
+        "l_bracket": 2.551413125721141,
+        "lobed_shaft": 6.273727003270837,
+        "multi_hole_plate": 8.635017005416811,
+        "perforated_plate": 8.31808736909729,
+        "plate_notch": 5.904708851661023,
+        "ribbed_plate": 4.928292168972982,
+        "sphere_box": 4.441469230570183,
+        "stepped_shaft": 7.015617515414227,
+        "tube": 6.571712677711629,
+        "twisted_loft": 9.049984194312017
+      },
+      "ellipsoid_boss": {
+        "bossed_plate": 5.658302031584544,
+        "box_hole": 7.591985500663844,
+        "channel": 3.4862071742020766,
+        "gusset_bracket": 6.128970764597714,
+        "l_bracket": 4.179616647384831,
+        "lobed_shaft": 5.206943109499258,
+        "multi_hole_plate": 9.118819053625666,
+        "perforated_plate": 8.994989340834387,
+        "plate_notch": 6.307285648841356,
+        "ribbed_plate": 6.45007212522592,
+        "sphere_box": 2.3244104959409495,
+        "stepped_shaft": 7.081968544514021,
+        "tube": 7.716586553567723,
+        "twisted_loft": 8.563238612667368
+      },
+      "gusset_bracket": {
+        "bossed_plate": 5.056304615320448,
+        "box_hole": 7.054075066646732,
+        "channel": 4.812179725282963,
+        "ellipsoid_boss": 6.128970764597714,
+        "l_bracket": 3.0301125477546167,
+        "lobed_shaft": 8.534180443505017,
+        "multi_hole_plate": 8.48147611585649,
+        "perforated_plate": 8.257632163771916,
+        "plate_notch": 7.49751663081106,
+        "ribbed_plate": 2.9447917125130716,
+        "sphere_box": 6.7882826342435365,
+        "stepped_shaft": 7.912580823864654,
+        "tube": 8.85527783459503,
+        "twisted_loft": 10.719797129274616
+      },
+      "l_bracket": {
+        "bossed_plate": 3.9648484376273734,
+        "box_hole": 6.7863518364283415,
+        "channel": 2.551413125721141,
+        "ellipsoid_boss": 4.179616647384831,
+        "gusset_bracket": 3.0301125477546167,
+        "lobed_shaft": 6.715237919419951,
+        "multi_hole_plate": 8.303414144363657,
+        "perforated_plate": 8.044713062501922,
+        "plate_notch": 6.125954712613721,
+        "ribbed_plate": 3.5871158726877344,
+        "sphere_box": 5.098271017710261,
+        "stepped_shaft": 6.785934141951565,
+        "tube": 7.386493071206942,
+        "twisted_loft": 9.312899182492382
+      },
+      "lobed_shaft": {
+        "bossed_plate": 6.965882677487584,
+        "box_hole": 8.199432208837154,
+        "channel": 6.273727003270837,
+        "ellipsoid_boss": 5.206943109499258,
+        "gusset_bracket": 8.534180443505017,
+        "l_bracket": 6.715237919419951,
+        "multi_hole_plate": 9.62613089056217,
+        "perforated_plate": 9.455318362119588,
+        "plate_notch": 7.132924815204606,
+        "ribbed_plate": 8.002548320971965,
+        "sphere_box": 5.687452178362361,
+        "stepped_shaft": 6.8848013398054135,
+        "tube": 6.9522671551384185,
+        "twisted_loft": 6.9104606036128295
+      },
+      "multi_hole_plate": {
+        "bossed_plate": 6.800409765738255,
+        "box_hole": 5.489755986605083,
+        "channel": 8.635017005416811,
+        "ellipsoid_boss": 9.118819053625666,
+        "gusset_bracket": 8.48147611585649,
+        "l_bracket": 8.303414144363657,
+        "lobed_shaft": 9.62613089056217,
+        "perforated_plate": 2.7295376351180236,
+        "plate_notch": 4.992477196155719,
+        "ribbed_plate": 7.5193867120907525,
+        "sphere_box": 8.861058269611126,
+        "stepped_shaft": 8.024370294111668,
+        "tube": 8.86106034493169,
+        "twisted_loft": 11.917663809952195
+      },
+      "perforated_plate": {
+        "bossed_plate": 6.350807220953743,
+        "box_hole": 4.594845188361108,
+        "channel": 8.31808736909729,
+        "ellipsoid_boss": 8.994989340834387,
+        "gusset_bracket": 8.257632163771916,
+        "l_bracket": 8.044713062501922,
+        "lobed_shaft": 9.455318362119588,
+        "multi_hole_plate": 2.7295376351180236,
+        "plate_notch": 4.34416778788597,
+        "ribbed_plate": 7.124093111918476,
+        "sphere_box": 8.732076017097977,
+        "stepped_shaft": 8.555476737054217,
+        "tube": 9.043267501373718,
+        "twisted_loft": 11.79380442741986
+      },
+      "plate_notch": {
+        "bossed_plate": 5.273708058720255,
+        "box_hole": 5.47654536611037,
+        "channel": 5.904708851661023,
+        "ellipsoid_boss": 6.307285648841356,
+        "gusset_bracket": 7.49751663081106,
+        "l_bracket": 6.125954712613721,
+        "lobed_shaft": 7.132924815204606,
+        "multi_hole_plate": 4.992477196155719,
+        "perforated_plate": 4.34416778788597,
+        "ribbed_plate": 6.7992979536233,
+        "sphere_box": 5.989508464492394,
+        "stepped_shaft": 7.419102634584832,
+        "tube": 7.367267700692097,
+        "twisted_loft": 9.99196044011809
+      },
+      "ribbed_plate": {
+        "bossed_plate": 3.7786972380707664,
+        "box_hole": 5.639860331159981,
+        "channel": 4.928292168972982,
+        "ellipsoid_boss": 6.45007212522592,
+        "gusset_bracket": 2.9447917125130716,
+        "l_bracket": 3.5871158726877344,
+        "lobed_shaft": 8.002548320971965,
+        "multi_hole_plate": 7.5193867120907525,
+        "perforated_plate": 7.124093111918476,
+        "plate_notch": 6.7992979536233,
+        "sphere_box": 7.13643765204156,
+        "stepped_shaft": 7.277638173098088,
+        "tube": 8.31447641399788,
+        "twisted_loft": 10.412976909261703
+      },
+      "sphere_box": {
+        "bossed_plate": 5.3084119524079965,
+        "box_hole": 7.287372136149274,
+        "channel": 4.441469230570183,
+        "ellipsoid_boss": 2.3244104959409495,
+        "gusset_bracket": 6.7882826342435365,
+        "l_bracket": 5.098271017710261,
+        "lobed_shaft": 5.687452178362361,
+        "multi_hole_plate": 8.861058269611126,
+        "perforated_plate": 8.732076017097977,
+        "plate_notch": 5.989508464492394,
+        "ribbed_plate": 7.13643765204156,
+        "stepped_shaft": 6.772729835013914,
+        "tube": 7.456938045826461,
+        "twisted_loft": 8.852970983776292
+      },
+      "stepped_shaft": {
+        "bossed_plate": 5.506611825113185,
+        "box_hole": 7.278473379926322,
+        "channel": 7.015617515414227,
+        "ellipsoid_boss": 7.081968544514021,
+        "gusset_bracket": 7.912580823864654,
+        "l_bracket": 6.785934141951565,
+        "lobed_shaft": 6.8848013398054135,
+        "multi_hole_plate": 8.024370294111668,
+        "perforated_plate": 8.555476737054217,
+        "plate_notch": 7.419102634584832,
+        "ribbed_plate": 7.277638173098088,
+        "sphere_box": 6.772729835013914,
+        "tube": 4.543722923059489,
+        "twisted_loft": 9.666376510961708
+      },
+      "tube": {
+        "bossed_plate": 6.508151641577494,
+        "box_hole": 8.148973359489819,
+        "channel": 6.571712677711629,
+        "ellipsoid_boss": 7.716586553567723,
+        "gusset_bracket": 8.85527783459503,
+        "l_bracket": 7.386493071206942,
+        "lobed_shaft": 6.9522671551384185,
+        "multi_hole_plate": 8.86106034493169,
+        "perforated_plate": 9.043267501373718,
+        "plate_notch": 7.367267700692097,
+        "ribbed_plate": 8.31447641399788,
+        "sphere_box": 7.456938045826461,
+        "stepped_shaft": 4.543722923059489,
+        "twisted_loft": 9.540428225365856
+      },
+      "twisted_loft": {
+        "bossed_plate": 9.60354086338299,
+        "box_hole": 10.794356199314143,
+        "channel": 9.049984194312017,
+        "ellipsoid_boss": 8.563238612667368,
+        "gusset_bracket": 10.719797129274616,
+        "l_bracket": 9.312899182492382,
+        "lobed_shaft": 6.9104606036128295,
+        "multi_hole_plate": 11.917663809952195,
+        "perforated_plate": 11.79380442741986,
+        "plate_notch": 9.99196044011809,
+        "ribbed_plate": 10.412976909261703,
+        "sphere_box": 8.852970983776292,
+        "stepped_shaft": 9.666376510961708,
+        "tube": 9.540428225365856
+      }
+    },
+    "nearest_other_family": {
+      "bossed_plate": "ribbed_plate",
+      "box_hole": "bossed_plate",
+      "channel": "l_bracket",
+      "ellipsoid_boss": "sphere_box",
+      "gusset_bracket": "ribbed_plate",
+      "l_bracket": "channel",
+      "lobed_shaft": "ellipsoid_boss",
+      "multi_hole_plate": "perforated_plate",
+      "perforated_plate": "multi_hole_plate",
+      "plate_notch": "perforated_plate",
+      "ribbed_plate": "gusset_bracket",
+      "sphere_box": "ellipsoid_boss",
+      "stepped_shaft": "tube",
+      "tube": "stepped_shaft",
+      "twisted_loft": "lobed_shaft"
+    },
+    "baseline_family_pairwise": {
+      "min": 2.551413125721141,
+      "median": 6.772729835013914,
+      "max": 7.419102634584832,
+      "n_pairs": 15
+    },
+    "new_family_placement": {
+      "tube": {
+        "nearest_baseline_family": "stepped_shaft",
+        "distance_to_nearest_baseline": 4.543722923059489,
+        "below_baseline_minimum": false,
+        "distances_to_baseline": {
+          "stepped_shaft": 4.543722923059489,
+          "channel": 6.571712677711629,
+          "plate_notch": 7.367267700692097,
+          "l_bracket": 7.386493071206942,
+          "sphere_box": 7.456938045826461,
+          "box_hole": 8.148973359489819
+        },
+        "transfer_test_strength": "at least as distinct as the existing corpus's closest pair"
+      },
+      "perforated_plate": {
+        "nearest_baseline_family": "plate_notch",
+        "distance_to_nearest_baseline": 4.34416778788597,
+        "below_baseline_minimum": false,
+        "distances_to_baseline": {
+          "plate_notch": 4.34416778788597,
+          "box_hole": 4.594845188361108,
+          "l_bracket": 8.044713062501922,
+          "channel": 8.31808736909729,
+          "stepped_shaft": 8.555476737054217,
+          "sphere_box": 8.732076017097977
+        },
+        "transfer_test_strength": "at least as distinct as the existing corpus's closest pair"
+      },
+      "ellipsoid_boss": {
+        "nearest_baseline_family": "sphere_box",
+        "distance_to_nearest_baseline": 2.3244104959409495,
+        "below_baseline_minimum": true,
+        "distances_to_baseline": {
+          "sphere_box": 2.3244104959409495,
+          "channel": 3.4862071742020766,
+          "l_bracket": 4.179616647384831,
+          "plate_notch": 6.307285648841356,
+          "stepped_shaft": 7.081968544514021,
+          "box_hole": 7.591985500663844
+        },
+        "transfer_test_strength": "weaker than the existing corpus's closest pair"
+      },
+      "lobed_shaft": {
+        "nearest_baseline_family": "sphere_box",
+        "distance_to_nearest_baseline": 5.687452178362361,
+        "below_baseline_minimum": false,
+        "distances_to_baseline": {
+          "sphere_box": 5.687452178362361,
+          "channel": 6.273727003270837,
+          "l_bracket": 6.715237919419951,
+          "stepped_shaft": 6.8848013398054135,
+          "plate_notch": 7.132924815204606,
+          "box_hole": 8.199432208837154
+        },
+        "transfer_test_strength": "at least as distinct as the existing corpus's closest pair"
+      },
+      "twisted_loft": {
+        "nearest_baseline_family": "sphere_box",
+        "distance_to_nearest_baseline": 8.852970983776292,
+        "below_baseline_minimum": false,
+        "distances_to_baseline": {
+          "sphere_box": 8.852970983776292,
+          "channel": 9.049984194312017,
+          "l_bracket": 9.312899182492382,
+          "stepped_shaft": 9.666376510961708,
+          "plate_notch": 9.99196044011809,
+          "box_hole": 10.794356199314143
+        },
+        "transfer_test_strength": "at least as distinct as the existing corpus's closest pair"
+      },
+      "ribbed_plate": {
+        "nearest_baseline_family": "l_bracket",
+        "distance_to_nearest_baseline": 3.5871158726877344,
+        "below_baseline_minimum": false,
+        "distances_to_baseline": {
+          "l_bracket": 3.5871158726877344,
+          "channel": 4.928292168972982,
+          "box_hole": 5.639860331159981,
+          "plate_notch": 6.7992979536233,
+          "sphere_box": 7.13643765204156,
+          "stepped_shaft": 7.277638173098088
+        },
+        "transfer_test_strength": "at least as distinct as the existing corpus's closest pair"
+      },
+      "gusset_bracket": {
+        "nearest_baseline_family": "l_bracket",
+        "distance_to_nearest_baseline": 3.0301125477546167,
+        "below_baseline_minimum": false,
+        "distances_to_baseline": {
+          "l_bracket": 3.0301125477546167,
+          "channel": 4.812179725282963,
+          "sphere_box": 6.7882826342435365,
+          "box_hole": 7.054075066646732,
+          "plate_notch": 7.49751663081106,
+          "stepped_shaft": 7.912580823864654
+        },
+        "transfer_test_strength": "at least as distinct as the existing corpus's closest pair"
+      },
+      "multi_hole_plate": {
+        "nearest_baseline_family": "plate_notch",
+        "distance_to_nearest_baseline": 4.992477196155719,
+        "below_baseline_minimum": false,
+        "distances_to_baseline": {
+          "plate_notch": 4.992477196155719,
+          "box_hole": 5.489755986605083,
+          "stepped_shaft": 8.024370294111668,
+          "l_bracket": 8.303414144363657,
+          "channel": 8.635017005416811,
+          "sphere_box": 8.861058269611126
+        },
+        "transfer_test_strength": "at least as distinct as the existing corpus's closest pair"
+      },
+      "bossed_plate": {
+        "nearest_baseline_family": "l_bracket",
+        "distance_to_nearest_baseline": 3.9648484376273734,
+        "below_baseline_minimum": false,
+        "distances_to_baseline": {
+          "l_bracket": 3.9648484376273734,
+          "channel": 4.494995427422684,
+          "box_hole": 4.5127930476167215,
+          "plate_notch": 5.273708058720255,
+          "sphere_box": 5.3084119524079965,
+          "stepped_shaft": 5.506611825113185
+        },
+        "transfer_test_strength": "at least as distinct as the existing corpus's closest pair"
+      }
+    }
+  },
+  "tube_load_slab": {
+    "available": true,
+    "identity": "ring/annulus = 2 * slab_depth / wall, exactly; the radii cancel",
+    "slab_depth_rule": "LOAD_SLAB_FRAC (0.01) * 0.2 * wall",
+    "per_regime": {
+      "tube_s0": {
+        "wall_m": 0.001287701751,
+        "r_outer_m": 0.0048801532,
+        "inward_slab_depth_m": 2.575403502e-06,
+        "ring_over_annulus": 0.004,
+        "counterfactual_ring_over_annulus_if_scaled_off_diameter": 0.15159265555739698,
+        "annulus_area_m2": 3.427536597e-05,
+        "emitted_inward_slab_depth_m": 2.5753999999961197e-06,
+        "emitted_ring_over_annulus": 0.003999994560846287,
+        "derivation_matches_emitted_case": true,
+        "authored_expected_area_m2": 3.427536597e-05,
+        "authored_matches_analytic_annulus": true
+      },
+      "tube_s1": {
+        "wall_m": 0.001712981064,
+        "r_outer_m": 0.009047068464,
+        "inward_slab_depth_m": 3.425962128e-06,
+        "ring_over_annulus": 0.004,
+        "counterfactual_ring_over_annulus_if_scaled_off_diameter": 0.21125904200888468,
+        "annulus_area_m2": 8.815500561e-05,
+        "emitted_inward_slab_depth_m": 3.4260000000008173e-06,
+        "emitted_ring_over_annulus": 0.004000044217652621,
+        "derivation_matches_emitted_case": true,
+        "authored_expected_area_m2": 8.815500561e-05,
+        "authored_matches_analytic_annulus": true
+      },
+      "tube_s2": {
+        "wall_m": 0.003548311508,
+        "r_outer_m": 0.01592967207,
+        "inward_slab_depth_m": 7.096623016e-06,
+        "ring_over_annulus": 0.004,
+        "counterfactual_ring_over_annulus_if_scaled_off_diameter": 0.1795746741410394,
+        "annulus_area_m2": 0.0003155929718,
+        "emitted_inward_slab_depth_m": 7.096600000006115e-06,
+        "emitted_ring_over_annulus": 0.003999987027072548,
+        "derivation_matches_emitted_case": true,
+        "authored_expected_area_m2": 0.0003155929718,
+        "authored_matches_analytic_annulus": true
+      },
+      "tube_s3": {
+        "wall_m": 0.009403695672,
+        "r_outer_m": 0.03673756914,
+        "inward_slab_depth_m": 1.8807391344e-05,
+        "ring_over_annulus": 0.004,
+        "counterfactual_ring_over_annulus_if_scaled_off_diameter": 0.15626864339894816,
+        "annulus_area_m2": 0.001892835798,
+        "emitted_inward_slab_depth_m": 1.880739999998715e-05,
+        "emitted_ring_over_annulus": 0.004000001840975602,
+        "derivation_matches_emitted_case": true,
+        "authored_expected_area_m2": 0.001892835798,
+        "authored_matches_analytic_annulus": true
+      }
+    },
+    "ratio_min": 0.004,
+    "ratio_max": 0.004,
+    "counterfactual_ratio_min": 0.15159265555739698,
+    "counterfactual_ratio_max": 0.21125904200888468,
+    "authored_area_tolerance": 0.01,
+    "load_area_health_tolerance": 0.05,
+    "within_authored_area_tolerance": true,
+    "note": "For the transverse and oblique archetypes the CAD-side rule substitutes the slab's thin axis at min_dot 0.7 and drops the walls (apps/testlab/main.cpp:1865-1875), while the mesh-side selector honours normal_min_dot = -1 literally and keeps every in-box face (main.cpp:937-975). The traction is then rescaled onto the smaller CAD area, so the resultant stays correct while the distribution smears onto the walls. A thin slab is what prevents that; a normal filter cannot, because the filter is relative to the traction, which is transverse in those cases and can never select an axial annulus."
+  },
+  "family_recovery": {
+    "method": "leave-one-out 1-nearest-neighbour in standardized descriptor space",
+    "baseline_six_families": {
+      "n_geometries": 24,
+      "n_families": 6,
+      "correct": 24,
+      "rate": 1.0
+    },
+    "all_families": {
+      "n_geometries": 60,
+      "n_families": 15,
+      "correct": 60,
+      "rate": 1.0
+    },
+    "implication_negative": "descriptors encode family identity, so they cannot transfer under leave-one-family-out",
+    "implication_positive": "the same property makes them a strong out-of-distribution signal; see bench/advisor/ood.json"
+  },
+  "learning_curve": {
+    "available": true,
+    "source": "bench/advisor/learning_curve.json",
+    "source_provenance": {
+      "git_revision": "4bda9706871c5280c2f889da9c67c59390735c9e-dirty",
+      "created_utc": "2026-08-13T05:47:55Z",
+      "python": "3.11.9",
+      "numpy": "2.4.4",
+      "torch": "2.11.0+cpu",
+      "seed": 1234,
+      "dataset_csv": "C:\\Users\\Yakub\\Desktop\\Polyhedral-FEA\\bench\\advisor\\dataset.csv",
+      "dataset_sha256": "9493253fca1d6c55f1ddfdaf36f377e0e3e60f9f35a42d28ff6c398d95b35fa2",
+      "dataset_rows": 3456,
+      "split_mode": "family",
+      "fold": 0,
+      "n_folds": 6,
+      "held_out_groups": [
+        "box_hole"
+      ],
+      "n_inputs": 58,
+      "n_actions": 7,
+      "geometry_features": [
+        "geo_curved_area_frac",
+        "geo_cyl_area_frac",
+        "geo_plane_area_frac",
+        "geo_other_area_frac",
+        "geo_min_curv_radius_rel",
+        "geo_log_curv_radius_mean",
+        "geo_log_curv_radius_std",
+        "geo_n_faces",
+        "geo_n_edges",
+        "geo_face_area_cv",
+        "geo_aspect_max",
+        "geo_aspect_mid",
+        "geo_volume_frac",
+        "geo_area_over_v23",
+        "geo_min_face_size_rel"
+      ],
+      "geometry_features_sha256": "0d3727248faf01a9e9ecc1fbb1859b11ced935920ebdb7807daf5d1d52e82096",
+      "epochs": 25
+    },
+    "objective": "rel_err",
+    "bootstrap_draws": 4000,
+    "rng_seed": 7,
+    "by_training_family_count": {
+      "1": {
+        "n_points": 14,
+        "mean_train_rows": 576.0,
+        "mean_regret": {
+          "advisor_argmin": 0.5034455955458162,
+          "advisor_efficiency": 0.5615349717222021,
+          "advisor_gated_0.05": 0.47963159553390666,
+          "advisor_gated_0.1": 0.48069106481298585,
+          "advisor_gated_0.2": 0.48069106481298585,
+          "advisor_gated_0.35": 0.48069106481298585,
+          "advisor_gated_0.5": 0.48069106481298585,
+          "advisor_gated_0.8": 0.48069106481298585,
+          "advisor_policy": 0.6516468816442371,
+          "constant_config": 0.5321718381324206,
+          "default": 0.5200992610202991,
+          "family_lookup": 0.5321718381324206,
+          "finest_action": 0.44248309203595415,
+          "oracle": 0.0,
+          "random": 0.4910166116561882,
+          "spend_budget": 0.2324442227060596
+        }
+      },
+      "2": {
+        "n_points": 15,
+        "mean_train_rows": 1152.0,
+        "mean_regret": {
+          "advisor_argmin": 0.5227980513397293,
+          "advisor_efficiency": 0.44095044705835684,
+          "advisor_gated_0.05": 0.4591777135786187,
+          "advisor_gated_0.1": 0.46014914743007274,
+          "advisor_gated_0.2": 0.46219196417498304,
+          "advisor_gated_0.35": 0.46299023461243555,
+          "advisor_gated_0.5": 0.46219196417498304,
+          "advisor_gated_0.8": 0.46219196417498304,
+          "advisor_policy": 0.5354855382737393,
+          "constant_config": 0.530130312383537,
+          "default": 0.5186178482642086,
+          "family_lookup": 0.530130312383537,
+          "finest_action": 0.4461760905454867,
+          "oracle": 0.0,
+          "random": 0.46918089242835503,
+          "spend_budget": 0.2252973597496748
+        }
+      },
+      "3": {
+        "n_points": 15,
+        "mean_train_rows": 1728.0,
+        "mean_regret": {
+          "advisor_argmin": 0.3811531620992658,
+          "advisor_efficiency": 0.3729755261563696,
+          "advisor_gated_0.05": 0.3736450004352567,
+          "advisor_gated_0.1": 0.3736450004352567,
+          "advisor_gated_0.2": 0.38108320710792515,
+          "advisor_gated_0.35": 0.38385479096970004,
+          "advisor_gated_0.5": 0.3599983605517385,
+          "advisor_gated_0.8": 0.367873500894186,
+          "advisor_policy": 0.594630258791666,
+          "constant_config": 0.5250856196287915,
+          "default": 0.5186178482642086,
+          "family_lookup": 0.5250856196287915,
+          "finest_action": 0.4461760905454867,
+          "oracle": 0.0,
+          "random": 0.46918089242835503,
+          "spend_budget": 0.2252973597496748
+        }
+      },
+      "4": {
+        "n_points": 15,
+        "mean_train_rows": 2304.0,
+        "mean_regret": {
+          "advisor_argmin": 0.41999644648102635,
+          "advisor_efficiency": 0.43031365799640003,
+          "advisor_gated_0.05": 0.39320782806543225,
+          "advisor_gated_0.1": 0.39320782806543225,
+          "advisor_gated_0.2": 0.39584421932102287,
+          "advisor_gated_0.35": 0.39182136011853197,
+          "advisor_gated_0.5": 0.39182136011853197,
+          "advisor_gated_0.8": 0.40013100077113556,
+          "advisor_policy": 0.629525556635215,
+          "constant_config": 0.524098640058138,
+          "default": 0.5186178482642086,
+          "family_lookup": 0.524098640058138,
+          "finest_action": 0.4461760905454867,
+          "oracle": 0.0,
+          "random": 0.46918089242835503,
+          "spend_budget": 0.2252973597496748
+        }
+      },
+      "5": {
+        "n_points": 15,
+        "mean_train_rows": 2880.0,
+        "mean_regret": {
+          "advisor_argmin": 0.5444375863635086,
+          "advisor_efficiency": 0.4594830691258217,
+          "advisor_gated_0.05": 0.4923690064215205,
+          "advisor_gated_0.1": 0.5104021454152341,
+          "advisor_gated_0.2": 0.517861933936365,
+          "advisor_gated_0.35": 0.5323505055702602,
+          "advisor_gated_0.5": 0.5246763750212268,
+          "advisor_gated_0.8": 0.49700080894399434,
+          "advisor_policy": 0.5437148172951614,
+          "constant_config": 0.5274936620960944,
+          "default": 0.5186178482642086,
+          "family_lookup": 0.5274936620960944,
+          "finest_action": 0.4461760905454867,
+          "oracle": 0.0,
+          "random": 0.46918089242835503,
+          "spend_budget": 0.2252973597496748
+        }
+      }
+    },
+    "slope_fits": {
+      "advisor_argmin": {
+        "slope_decades_per_family": -0.0017357081204528826,
+        "ci95": [
+          -0.050793240109113055,
+          0.04630381595136244
+        ],
+        "indistinguishable_from_flat": true,
+        "degenerate_constant_series": false,
+        "n_points": 74,
+        "residual_sd": 0.2848647819665655
+      },
+      "advisor_efficiency": {
+        "slope_decades_per_family": -0.020563846669090828,
+        "ci95": [
+          -0.0681471727308928,
+          0.027794083008451615
+        ],
+        "indistinguishable_from_flat": true,
+        "degenerate_constant_series": false,
+        "n_points": 74,
+        "residual_sd": 0.293871217239373
+      },
+      "advisor_gated_0.05": {
+        "slope_decades_per_family": -0.003606084790749037,
+        "ci95": [
+          -0.0514613904197061,
+          0.04506262548949282
+        ],
+        "indistinguishable_from_flat": true,
+        "degenerate_constant_series": false,
+        "n_points": 74,
+        "residual_sd": 0.2746441129226044
+      },
+      "advisor_gated_0.1": {
+        "slope_decades_per_family": -0.00025791309449823494,
+        "ci95": [
+          -0.048459786821217155,
+          0.04633194217998856
+        ],
+        "indistinguishable_from_flat": true,
+        "degenerate_constant_series": false,
+        "n_points": 74,
+        "residual_sd": 0.2745330478888623
+      },
+      "advisor_gated_0.2": {
+        "slope_decades_per_family": 0.0012821130284588378,
+        "ci95": [
+          -0.04577682848395906,
+          0.04825793507990882
+        ],
+        "indistinguishable_from_flat": true,
+        "degenerate_constant_series": false,
+        "n_points": 74,
+        "residual_sd": 0.27470827412997706
+      },
+      "advisor_gated_0.35": {
+        "slope_decades_per_family": 0.0037258267437358093,
+        "ci95": [
+          -0.045546166287933024,
+          0.05072091296706684
+        ],
+        "indistinguishable_from_flat": true,
+        "degenerate_constant_series": false,
+        "n_points": 74,
+        "residual_sd": 0.2778972074133043
+      },
+      "advisor_gated_0.5": {
+        "slope_decades_per_family": 0.0023202133464072508,
+        "ci95": [
+          -0.04544105751003699,
+          0.048569915948584806
+        ],
+        "indistinguishable_from_flat": true,
+        "degenerate_constant_series": false,
+        "n_points": 74,
+        "residual_sd": 0.27938255140626755
+      },
+      "advisor_gated_0.8": {
+        "slope_decades_per_family": -0.002482687766055756,
+        "ci95": [
+          -0.05237522893181283,
+          0.04466910345770779
+        ],
+        "indistinguishable_from_flat": true,
+        "degenerate_constant_series": false,
+        "n_points": 74,
+        "residual_sd": 0.2762835591520726
+      },
+      "advisor_policy": {
+        "slope_decades_per_family": -0.011678502019099452,
+        "ci95": [
+          -0.04578382276911009,
+          0.024278851617989688
+        ],
+        "indistinguishable_from_flat": true,
+        "degenerate_constant_series": false,
+        "n_points": 74,
+        "residual_sd": 0.2343974135798291
+      },
+      "constant_config": {
+        "slope_decades_per_family": -0.001520771623235494,
+        "ci95": [
+          -0.03103093393581297,
+          0.027604762538921135
+        ],
+        "indistinguishable_from_flat": true,
+        "degenerate_constant_series": false,
+        "n_points": 74,
+        "residual_sd": 0.1789259988802354
+      },
+      "default": {
+        "slope_decades_per_family": -0.000288052480350889,
+        "ci95": [
+          -0.029790702597813915,
+          0.030773594802723608
+        ],
+        "indistinguishable_from_flat": true,
+        "degenerate_constant_series": false,
+        "n_points": 74,
+        "residual_sd": 0.18189457521729524
+      },
+      "family_lookup": {
+        "slope_decades_per_family": -0.001520771623235494,
+        "ci95": [
+          -0.029971735268743253,
+          0.027687142812644304
+        ],
+        "indistinguishable_from_flat": true,
+        "degenerate_constant_series": false,
+        "n_points": 74,
+        "residual_sd": 0.1789259988802354
+      },
+      "finest_action": {
+        "slope_decades_per_family": 0.0007180830435202619,
+        "ci95": [
+          -0.035003825495427715,
+          0.035879182688649265
+        ],
+        "indistinguishable_from_flat": true,
+        "degenerate_constant_series": false,
+        "n_points": 74,
+        "residual_sd": 0.21772045461259698
+      },
+      "oracle": {
+        "slope_decades_per_family": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "indistinguishable_from_flat": true,
+        "degenerate_constant_series": true,
+        "n_points": 74,
+        "residual_sd": 0.0
+      },
+      "random": {
+        "slope_decades_per_family": -0.004245834294300928,
+        "ci95": [
+          -0.029519669748200434,
+          0.02258545975324875
+        ],
+        "indistinguishable_from_flat": true,
+        "degenerate_constant_series": false,
+        "n_points": 74,
+        "residual_sd": 0.16320976666193746
+      },
+      "spend_budget": {
+        "slope_decades_per_family": -0.0013896677970748296,
+        "ci95": [
+          -0.030952390223187676,
+          0.02929636696661895
+        ],
+        "indistinguishable_from_flat": true,
+        "degenerate_constant_series": false,
+        "n_points": 74,
+        "residual_sd": 0.18179078861050182
+      }
+    },
+    "controls_note": "the non-learning choosers (finest_action, constant_config, default) must come out flat; any slope there would mean the curve is measuring the shrinking candidate pool rather than learning"
+  },
+  "power": {
+    "residual_sd": 0.28,
+    "seeds_per_point": 5,
+    "method": "closed-form OLS standard error on the slope",
+    "by_family_count": {
+      "6": {
+        "n_points": 150,
+        "slope_se": 0.01616580753730952,
+        "ci95_half_width": 0.03168498277312666
+      },
+      "8": {
+        "n_points": 280,
+        "slope_se": 0.008366600265340756,
+        "ci95_half_width": 0.016398536520067883
+      },
+      "10": {
+        "n_points": 450,
+        "slope_se": 0.005112077203381551,
+        "ci95_half_width": 0.010019671318627838
+      },
+      "12": {
+        "n_points": 660,
+        "slope_se": 0.0034465617474213166,
+        "ci95_half_width": 0.00675526102494578
+      },
+      "16": {
+        "n_points": 1200,
+        "slope_se": 0.0018708286933869708,
+        "ci95_half_width": 0.0036668242390384626
+      },
+      "20": {
+        "n_points": 1900,
+        "slope_se": 0.0011727909432167475,
+        "ci95_half_width": 0.002298670248704825
+      }
+    },
+    "interpretation": "eight families is the smallest corpus at which a per-family effect of about 0.02 decades becomes detectable, which is what makes the widening hypothesis falsifiable rather than merely open"
+  }
+}

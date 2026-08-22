@@ -1,0 +1,441 @@
+{
+  "converged_at": 0.06,
+  "written": 14,
+  "unvalidated": 0,
+  "audit": [
+    {
+      "case_id": "channel_s1_c3",
+      "family": "channel",
+      "action": "external-truth-written",
+      "metrics": [
+        {
+          "metric": "strain_energy",
+          "old_value": 9.815807342e-05,
+          "new_value": 6.819497486442e-05,
+          "change_pct": -30.52535314886786,
+          "old_tol": 1.0,
+          "new_tol": 0.17,
+          "reference_uncertainty_rel": 0.0566444516128702,
+          "external_value": 6.819497486442e-05,
+          "source": "external-gmsh-mesh+calculix-solver"
+        },
+        {
+          "metric": "tip_deflection",
+          "old_value": 1.485530336e-05,
+          "new_value": 6.165431251784621e-06,
+          "change_pct": -58.49676642493943,
+          "old_tol": 1.0,
+          "new_tol": 0.11,
+          "reference_uncertainty_rel": 0.03539659460219529,
+          "external_value": 6.165431251784621e-06,
+          "source": "external-gmsh-mesh+calculix-solver"
+        }
+      ],
+      "wall_time_s": 3.0,
+      "n_dof_fine": 26250
+    },
+    {
+      "case_id": "channel_s3_c3",
+      "family": "channel",
+      "action": "external-truth-written",
+      "metrics": [
+        {
+          "metric": "strain_energy",
+          "old_value": 0.0033537213,
+          "new_value": 0.0023742006995360002,
+          "change_pct": -29.206976753375415,
+          "old_tol": 1.0,
+          "new_tol": 0.25,
+          "reference_uncertainty_rel": 0.08040101569937544,
+          "external_value": 0.0023742006995360002,
+          "source": "external-gmsh-mesh+calculix-solver"
+        },
+        {
+          "metric": "tip_deflection",
+          "old_value": 4.154585495e-05,
+          "new_value": 2.0182427148010323e-05,
+          "change_pct": -51.42132188084789,
+          "old_tol": 1.0,
+          "new_tol": 0.13,
+          "reference_uncertainty_rel": 0.042156869205141785,
+          "external_value": 2.0182427148010323e-05,
+          "source": "external-gmsh-mesh+calculix-solver"
+        }
+      ],
+      "wall_time_s": 3.1,
+      "n_dof_fine": 26655
+    },
+    {
+      "case_id": "l_bracket_s2_c3",
+      "family": "l_bracket",
+      "action": "external-truth-written",
+      "metrics": [
+        {
+          "metric": "strain_energy",
+          "old_value": 0.000480680942,
+          "new_value": 0.0051831190596866,
+          "change_pct": 978.2867816895058,
+          "old_tol": 1.0,
+          "new_tol": 0.059,
+          "reference_uncertainty_rel": 0.019584062849683122,
+          "external_value": 0.0051831190596866,
+          "source": "external-gmsh-mesh+calculix-solver"
+        },
+        {
+          "metric": "tip_deflection",
+          "old_value": 5.069115768e-06,
+          "new_value": 5.359491948856146e-05,
+          "change_pct": 957.2833989488295,
+          "old_tol": 1.0,
+          "new_tol": 0.13,
+          "reference_uncertainty_rel": 0.040932720492796344,
+          "external_value": 5.359491948856146e-05,
+          "source": "external-gmsh-mesh+calculix-solver"
+        }
+      ],
+      "wall_time_s": 3.8,
+      "n_dof_fine": 23247
+    },
+    {
+      "case_id": "lobed_shaft_s1_c3",
+      "family": "lobed_shaft",
+      "action": "external-truth-written",
+      "metrics": [
+        {
+          "metric": "strain_energy",
+          "old_value": 0.0001838358603,
+          "new_value": 0.000146907652348715,
+          "change_pct": -20.087597648805954,
+          "old_tol": 1.0,
+          "new_tol": 0.092,
+          "reference_uncertainty_rel": 0.030615031921737854,
+          "external_value": 0.000146907652348715,
+          "source": "external-gmsh-mesh+calculix-solver"
+        },
+        {
+          "metric": "tip_deflection",
+          "old_value": 4.30615874e-06,
+          "new_value": 3.465458453622493e-06,
+          "change_pct": -19.523207042235214,
+          "old_tol": 1.0,
+          "new_tol": 0.094,
+          "reference_uncertainty_rel": 0.0311643430671311,
+          "external_value": 3.465458453622493e-06,
+          "source": "external-gmsh-mesh+calculix-solver"
+        }
+      ],
+      "wall_time_s": 534.0,
+      "n_dof_fine": 495441
+    },
+    {
+      "case_id": "lobed_shaft_s2_c3",
+      "family": "lobed_shaft",
+      "action": "external-truth-written",
+      "metrics": [
+        {
+          "metric": "strain_energy",
+          "old_value": 0.0008537767825,
+          "new_value": 0.000676034294653306,
+          "change_pct": -20.818379170048928,
+          "old_tol": 1.0,
+          "new_tol": 0.087,
+          "reference_uncertainty_rel": 0.028913412431514664,
+          "external_value": 0.000676034294653306,
+          "source": "external-gmsh-mesh+calculix-solver"
+        },
+        {
+          "metric": "tip_deflection",
+          "old_value": 1.141189455e-05,
+          "new_value": 9.233588161960128e-06,
+          "change_pct": -19.08803466852813,
+          "old_tol": 1.0,
+          "new_tol": 0.057,
+          "reference_uncertainty_rel": 0.018740076451361002,
+          "external_value": 9.233588161960128e-06,
+          "source": "external-gmsh-mesh+calculix-solver"
+        }
+      ],
+      "wall_time_s": 820.3,
+      "n_dof_fine": 634620
+    },
+    {
+      "case_id": "lobed_shaft_s3_c3",
+      "family": "lobed_shaft",
+      "action": "external-truth-written",
+      "metrics": [
+        {
+          "metric": "strain_energy",
+          "old_value": 0.004751642572,
+          "new_value": 0.0038881311991936997,
+          "change_pct": -18.172902522060753,
+          "old_tol": 1.0,
+          "new_tol": 0.079,
+          "reference_uncertainty_rel": 0.026110286035459906,
+          "external_value": 0.0038881311991936997,
+          "source": "external-gmsh-mesh+calculix-solver"
+        },
+        {
+          "metric": "tip_deflection",
+          "old_value": 1.283371863e-05,
+          "new_value": 1.1504703380109535e-05,
+          "change_pct": -10.355652077206756,
+          "old_tol": 1.0,
+          "new_tol": 0.056,
+          "reference_uncertainty_rel": 0.018588805869757526,
+          "external_value": 1.1504703380109535e-05,
+          "source": "external-gmsh-mesh+calculix-solver"
+        }
+      ],
+      "wall_time_s": 663.1,
+      "n_dof_fine": 545337
+    },
+    {
+      "case_id": "ribbed_plate_s1_c3",
+      "family": "ribbed_plate",
+      "action": "external-truth-written",
+      "metrics": [
+        {
+          "metric": "strain_energy",
+          "old_value": 0.0001405034587,
+          "new_value": 0.00019857072977141001,
+          "change_pct": 41.32800118137592,
+          "old_tol": 1.0,
+          "new_tol": 0.066,
+          "reference_uncertainty_rel": 0.02188786112694568,
+          "external_value": 0.00019857072977141001,
+          "source": "external-gmsh-mesh+calculix-solver"
+        },
+        {
+          "metric": "tip_deflection",
+          "old_value": 1.705636557e-05,
+          "new_value": 2.662667857895959e-05,
+          "change_pct": 56.10991960557274,
+          "old_tol": 1.0,
+          "new_tol": 0.035,
+          "reference_uncertainty_rel": 0.011643776249059585,
+          "external_value": 2.662667857895959e-05,
+          "source": "external-gmsh-mesh+calculix-solver"
+        }
+      ],
+      "wall_time_s": 1.6,
+      "n_dof_fine": 19155
+    },
+    {
+      "case_id": "ribbed_plate_s2_c3",
+      "family": "ribbed_plate",
+      "action": "external-truth-written",
+      "metrics": [
+        {
+          "metric": "strain_energy",
+          "old_value": 0.0006274520403,
+          "new_value": 0.00107836550294067,
+          "change_pct": 71.86421171330917,
+          "old_tol": 1.0,
+          "new_tol": 0.049,
+          "reference_uncertainty_rel": 0.01619781417824877,
+          "external_value": 0.00107836550294067,
+          "source": "external-gmsh-mesh+calculix-solver"
+        },
+        {
+          "metric": "tip_deflection",
+          "old_value": 2.502672816e-05,
+          "new_value": 5.117869099825575e-05,
+          "change_pct": 104.49613177983932,
+          "old_tol": 1.0,
+          "new_tol": 0.065,
+          "reference_uncertainty_rel": 0.02142026761799992,
+          "external_value": 5.117869099825575e-05,
+          "source": "external-gmsh-mesh+calculix-solver"
+        }
+      ],
+      "wall_time_s": 1.5,
+      "n_dof_fine": 18027
+    },
+    {
+      "case_id": "ribbed_plate_s3_c3",
+      "family": "ribbed_plate",
+      "action": "external-truth-written",
+      "metrics": [
+        {
+          "metric": "strain_energy",
+          "old_value": 0.003455032056,
+          "new_value": 0.0061555386935373,
+          "change_pct": 78.16155085587721,
+          "old_tol": 1.0,
+          "new_tol": 0.073,
+          "reference_uncertainty_rel": 0.024159037154556667,
+          "external_value": 0.0061555386935373,
+          "source": "external-gmsh-mesh+calculix-solver"
+        },
+        {
+          "metric": "tip_deflection",
+          "old_value": 5.729901733e-05,
+          "new_value": 0.00011639803268695109,
+          "change_pct": 103.141411687018,
+          "old_tol": 1.0,
+          "new_tol": 0.045,
+          "reference_uncertainty_rel": 0.014912851864585536,
+          "external_value": 0.00011639803268695109,
+          "source": "external-gmsh-mesh+calculix-solver"
+        }
+      ],
+      "wall_time_s": 1.3,
+      "n_dof_fine": 13095
+    },
+    {
+      "case_id": "stepped_shaft_s0_c3",
+      "family": "stepped_shaft",
+      "action": "external-truth-written",
+      "metrics": [
+        {
+          "metric": "strain_energy",
+          "old_value": 4.193226449e-06,
+          "new_value": 1.96136287830844e-06,
+          "change_pct": -53.22544818021488,
+          "old_tol": 1.0,
+          "new_tol": 0.064,
+          "reference_uncertainty_rel": 0.021191555953223987,
+          "external_value": 1.96136287830844e-06,
+          "source": "external-gmsh-mesh+calculix-solver"
+        },
+        {
+          "metric": "tip_deflection",
+          "old_value": 8.998350174e-06,
+          "new_value": 4.13559979792141e-06,
+          "change_pct": -54.040466108210715,
+          "old_tol": 1.0,
+          "new_tol": 0.042,
+          "reference_uncertainty_rel": 0.013750055457161459,
+          "external_value": 4.13559979792141e-06,
+          "source": "external-gmsh-mesh+calculix-solver"
+        }
+      ],
+      "wall_time_s": 46.4,
+      "n_dof_fine": 195276
+    },
+    {
+      "case_id": "tube_s1_c3",
+      "family": "tube",
+      "action": "external-truth-written",
+      "metrics": [
+        {
+          "metric": "strain_energy",
+          "old_value": 3.474979258e-05,
+          "new_value": 2.1244581623716496e-05,
+          "change_pct": -38.86414839798593,
+          "old_tol": 1.0,
+          "new_tol": 0.082,
+          "reference_uncertainty_rel": 0.027046691687295968,
+          "external_value": 2.1244581623716496e-05,
+          "source": "external-gmsh-mesh+calculix-solver"
+        },
+        {
+          "metric": "tip_deflection",
+          "old_value": 1.006952797e-05,
+          "new_value": 5.01254813374859e-06,
+          "change_pct": -50.22062455477156,
+          "old_tol": 1.0,
+          "new_tol": 0.067,
+          "reference_uncertainty_rel": 0.0223087183649738,
+          "external_value": 5.01254813374859e-06,
+          "source": "external-gmsh-mesh+calculix-solver"
+        }
+      ],
+      "wall_time_s": 18.5,
+      "n_dof_fine": 117096
+    },
+    {
+      "case_id": "tube_s2_c3",
+      "family": "tube",
+      "action": "external-truth-written",
+      "metrics": [
+        {
+          "metric": "strain_energy",
+          "old_value": 0.0002403083635,
+          "new_value": 0.00014632542074959,
+          "change_pct": -39.1093099639081,
+          "old_tol": 1.0,
+          "new_tol": 0.082,
+          "reference_uncertainty_rel": 0.027180017927979677,
+          "external_value": 0.00014632542074959,
+          "source": "external-gmsh-mesh+calculix-solver"
+        },
+        {
+          "metric": "tip_deflection",
+          "old_value": 2.000926534e-05,
+          "new_value": 1.0105883763214585e-05,
+          "change_pct": -49.49397895677771,
+          "old_tol": 1.0,
+          "new_tol": 0.066,
+          "reference_uncertainty_rel": 0.0217249572212207,
+          "external_value": 1.0105883763214585e-05,
+          "source": "external-gmsh-mesh+calculix-solver"
+        }
+      ],
+      "wall_time_s": 19.0,
+      "n_dof_fine": 124869
+    },
+    {
+      "case_id": "twisted_loft_s1_c3",
+      "family": "twisted_loft",
+      "action": "external-truth-written",
+      "metrics": [
+        {
+          "metric": "strain_energy",
+          "old_value": 0.0001351719341,
+          "new_value": 0.00022943478717747401,
+          "change_pct": 69.73552143430788,
+          "old_tol": 1.0,
+          "new_tol": 0.17,
+          "reference_uncertainty_rel": 0.05529218457776868,
+          "external_value": 0.00022943478717747401,
+          "source": "external-gmsh-mesh+calculix-solver"
+        },
+        {
+          "metric": "tip_deflection",
+          "old_value": 2.985332179e-06,
+          "new_value": 7.278170857343046e-06,
+          "change_pct": 143.7976888649297,
+          "old_tol": 1.0,
+          "new_tol": 0.13,
+          "reference_uncertainty_rel": 0.04068432341797293,
+          "external_value": 7.278170857343046e-06,
+          "source": "external-gmsh-mesh+calculix-solver"
+        }
+      ],
+      "wall_time_s": 164.4,
+      "n_dof_fine": 265218
+    },
+    {
+      "case_id": "twisted_loft_s3_c3",
+      "family": "twisted_loft",
+      "action": "external-truth-written",
+      "metrics": [
+        {
+          "metric": "strain_energy",
+          "old_value": 0.003831113612,
+          "new_value": 0.00593669663371197,
+          "change_pct": 54.96007779870482,
+          "old_tol": 1.0,
+          "new_tol": 0.069,
+          "reference_uncertainty_rel": 0.022949911835769325,
+          "external_value": 0.00593669663371197,
+          "source": "external-gmsh-mesh+calculix-solver"
+        },
+        {
+          "metric": "tip_deflection",
+          "old_value": 9.270810715e-06,
+          "new_value": 2.0854506477789698e-05,
+          "change_pct": 124.94803441566869,
+          "old_tol": 1.0,
+          "new_tol": 0.056,
+          "reference_uncertainty_rel": 0.018418547766973492,
+          "external_value": 2.0854506477789698e-05,
+          "source": "external-gmsh-mesh+calculix-solver"
+        }
+      ],
+      "wall_time_s": 119.1,
+      "n_dof_fine": 215811
+    }
+  ]
+}

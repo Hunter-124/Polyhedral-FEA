@@ -90,12 +90,13 @@ def head_residuals(model: torch.nn.Module, split: Split) -> dict[str, np.ndarray
     if split.n_rows == 0:
         return residuals
     model.eval()
-    outputs = model(torch.from_numpy(split.x))
+    device = next(model.parameters()).device
+    outputs = model(torch.from_numpy(split.x).to(device))
     for head in ACCURACY_HEADS:
         mask = split.masks[head]
         if not mask.any():
             continue
-        prediction = outputs[head].squeeze(1).detach().numpy().astype(np.float64)
+        prediction = outputs[head].squeeze(1).detach().cpu().numpy().astype(np.float64)
         target = split.targets[head].astype(np.float64)
         residual = np.abs(prediction - target)
         residuals[head] = np.where(mask, residual, np.nan)

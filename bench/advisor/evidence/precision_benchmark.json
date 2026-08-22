@@ -1,0 +1,88 @@
+{
+  "schema": "polymesh.advisor.precision-benchmark/1",
+  "generated_utc": "2026-08-22T19:15:14.842573+00:00",
+  "host": "hunter-pc",
+  "torch": "2.12.1+cu129",
+  "cuda": "12.9",
+  "gpu": "NVIDIA GeForce RTX 3080 Ti",
+  "compute_capability": [
+    8,
+    6
+  ],
+  "bf16_supported": true,
+  "note": "INT4/INT8 rows are QAT fake quantization with FP16/BF16 backward and optimizer state, not native integer training.",
+  "rows": [
+    {
+      "network": "shared",
+      "precision": "fp32",
+      "batch": 4096,
+      "steps": 100,
+      "seconds": 0.9329802819997894,
+      "steps_per_s": 107.18340133154344,
+      "examples_per_s": 439023.2118540019,
+      "peak_memory_bytes": 30378496,
+      "parameters": 19156,
+      "native_integer_backward": null
+    },
+    {
+      "network": "shared",
+      "precision": "tf32",
+      "batch": 4096,
+      "steps": 100,
+      "seconds": 0.3285945479997281,
+      "steps_per_s": 304.3264126222896,
+      "examples_per_s": 1246520.9861008981,
+      "peak_memory_bytes": 30378496,
+      "parameters": 19156,
+      "native_integer_backward": null
+    },
+    {
+      "network": "shared",
+      "precision": "fp16",
+      "batch": 4096,
+      "steps": 100,
+      "seconds": 0.9849865209998825,
+      "steps_per_s": 101.52423192399394,
+      "examples_per_s": 415843.25396067917,
+      "peak_memory_bytes": 24112128,
+      "parameters": 19156,
+      "native_integer_backward": null
+    },
+    {
+      "network": "shared",
+      "precision": "bf16",
+      "batch": 4096,
+      "steps": 100,
+      "seconds": 0.8065998690003653,
+      "steps_per_s": 123.9772083324684,
+      "examples_per_s": 507810.64532979054,
+      "peak_memory_bytes": 24110592,
+      "parameters": 19156,
+      "native_integer_backward": null
+    },
+    {
+      "network": "hybrid_qat",
+      "precision": "fp16",
+      "batch": 4096,
+      "steps": 100,
+      "seconds": 1.6060366940000677,
+      "steps_per_s": 62.265077985818294,
+      "examples_per_s": 255037.75942991173,
+      "peak_memory_bytes": 32695808,
+      "parameters": 23975,
+      "native_integer_backward": false
+    },
+    {
+      "network": "hybrid_qat",
+      "precision": "bf16",
+      "batch": 4096,
+      "steps": 100,
+      "seconds": 1.1561829499996747,
+      "steps_per_s": 86.49150205858695,
+      "examples_per_s": 354269.19243197213,
+      "peak_memory_bytes": 32694272,
+      "parameters": 23975,
+      "native_integer_backward": false
+    }
+  ]
+}

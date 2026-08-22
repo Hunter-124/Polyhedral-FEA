@@ -89,10 +89,17 @@ STAGE_A_WEIGHTS: dict[str, float] = {
     "dof": 0.0,
     "mesh_ms": 0.0,
     "solve_ms": 0.0,
+    "solve_flops": 0.0,
+    "solve_bytes": 0.0,
+    "mesh_work": 0.0,
     "failure": 1.0,
     "policy": 0.3,
 }
-STAGE_B_TARGETS: dict[str, float] = {"dof": 0.25, "mesh_ms": 0.25, "solve_ms": 0.5}
+STAGE_B_TARGETS: dict[str, float] = {
+    "solve_flops": 0.5,
+    "solve_bytes": 0.25,
+    "mesh_work": 0.25,
+}
 
 DEFAULT_WEIGHTS: dict[str, Any] = {
     "stage_a": dict(STAGE_A_WEIGHTS),
@@ -259,22 +266,25 @@ def head_weights_for(stage: str, run: int, entry_run: int | None,
 class SplitTensors:
     """Torch view of a :class:`~advisor.dataset.Split`."""
 
-    def __init__(self, split: Split) -> None:
+    def __init__(self, split: Split, device: torch.device | str = "cpu") -> None:
         self.split = split
-        self.x = torch.from_numpy(np.ascontiguousarray(split.x, dtype=np.float32))
+        self.x = torch.from_numpy(
+            np.ascontiguousarray(split.x, dtype=np.float32)).to(device)
         self.targets = {
-            head: torch.from_numpy(np.ascontiguousarray(values, dtype=np.float32))
+            head: torch.from_numpy(
+                np.ascontiguousarray(values, dtype=np.float32)).to(device)
             for head, values in split.targets.items()
         }
         self.masks = {
-            head: torch.from_numpy(np.ascontiguousarray(values, dtype=bool))
+            head: torch.from_numpy(np.ascontiguousarray(values, dtype=bool)).to(device)
             for head, values in split.masks.items()
         }
-        self.failure = torch.from_numpy(np.ascontiguousarray(split.failure, dtype=np.float32))
+        self.failure = torch.from_numpy(
+            np.ascontiguousarray(split.failure, dtype=np.float32)).to(device)
         self.policy_target = torch.from_numpy(
-            np.ascontiguousarray(split.policy_target, dtype=np.float32))
+            np.ascontiguousarray(split.policy_target, dtype=np.float32)).to(device)
         self.policy_mask = torch.from_numpy(
-            np.ascontiguousarray(split.policy_mask, dtype=bool))
+            np.ascontiguousarray(split.policy_mask, dtype=bool)).to(device)
 
     @property
     def n_rows(self) -> int:
@@ -351,7 +361,8 @@ class PolicyObjective:
         if policy.numel() == 0:
             return policy.sum() * 0.0
         values = policy[:, self.groups["continuous"]]
-        excess = torch.relu(values.abs() - self.halfwidths.to(values.dtype))
+        excess = torch.relu(
+            values.abs() - self.halfwidths.to(device=values.device, dtype=values.dtype))
         return excess.sum(dim=1).mean()
 
     @torch.no_grad()
@@ -434,13 +445,14 @@ def evaluate(model: AdvisorNet, tensors: SplitTensors, weights: dict[str, float]
             metrics[f"{head}_mae"] = float(residual.mean())
     logit = outputs["failure_logit"].squeeze(1)
     metrics["failure_bce"] = float(masked_bce(logit, tensors.failure))
-    probability = torch.sigmoid(logit).numpy()
-    labels = tensors.failure.numpy()
+    probability = torch.sigmoid(logit).cpu().numpy()
+    labels = tensors.failure.cpu().numpy()
     metrics["failure_acc"] = float(((probability >= 0.5).astype(np.float64) == labels).mean())
     metrics["failure_auc"] = _auc(probability.astype(np.float64), labels.astype(np.float64))
     metrics["policy_mse"] = policy_objective.mse(
         outputs["policy"], tensors.policy_target, tensors.policy_mask)
-    batch = BatchView(tensors, torch.arange(tensors.n_rows))
+    batch = BatchView(
+        tensors, torch.arange(tensors.n_rows, device=tensors.x.device))
     total, _ = compute_loss(outputs, batch, weights, policy_objective, beta)
     metrics["total_loss"] = float(total)
     return metrics
@@ -532,7 +544,9 @@ def build_model(data: AdvisorData, warm_start: Path | None) -> tuple[AdvisorNet,
 
 def activation_record(model: AdvisorNet, data: AdvisorData, split: Split,
                       row: int, run: int) -> dict[str, Any]:
-    x = torch.from_numpy(np.ascontiguousarray(split.x[row:row + 1], dtype=np.float32))
+    device = next(model.parameters()).device
+    x = torch.from_numpy(
+        np.ascontiguousarray(split.x[row:row + 1], dtype=np.float32)).to(device)
     payload = model.activations(x)
     return {
         "run": run,
@@ -561,7 +575,7 @@ def train_one_run(model: AdvisorNet, optimizer: torch.optim.Optimizer,
     for epoch in range(1, epochs + 1):
         model.train()
         if train.n_rows:
-            order = torch.randperm(train.n_rows, generator=generator)
+            order = torch.randperm(train.n_rows, generator=generator).to(train.x.device)
             epoch_loss = 0.0
             epoch_penalty = 0.0
             n_batches = 0
@@ -592,6 +606,26 @@ def train_one_run(model: AdvisorNet, optimizer: torch.optim.Optimizer,
 def run_training(args: argparse.Namespace) -> int:
     torch.set_num_threads(max(1, int(args.threads)))
     torch.manual_seed(SEED)
+    requested_device = str(args.device)
+    if requested_device == "auto":
+        requested_device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = torch.device(requested_device)
+    if device.type == "cuda" and not torch.cuda.is_available():
+        raise SystemExit("--device cuda requested but CUDA is unavailable")
+    precision = str(args.precision)
+    if precision == "auto":
+        precision = (
+            "tf32"
+            if device.type == "cuda" and torch.cuda.get_device_capability(device)[0] >= 8
+            else "fp32"
+        )
+    if precision not in {"fp32", "tf32"}:
+        raise SystemExit(
+            "production training supports fp32/tf32; FP16/BF16 and hybrid INT4/INT8 "
+            "remain measured QAT experiments in precision_benchmark.py"
+        )
+    torch.backends.cuda.matmul.allow_tf32 = precision == "tf32"
+    torch.set_float32_matmul_precision("high" if precision == "tf32" else "highest")
 
     data = load_from_args(args)
     config = load_weights_config(args.weights)
@@ -605,6 +639,7 @@ def run_training(args: argparse.Namespace) -> int:
     print(f"inputs D     : {len(data.input_columns)}   actions A: {len(data.action_dims)}")
     print(f"split        : train={data.train.n_rows} val={data.val.n_rows} "
           f"(val parts: {sorted(set(data.val.parts))})")
+    print(f"device       : {device}   precision: {precision}")
 
     for _ in range(int(args.runs)):
         history = read_history()
@@ -615,10 +650,11 @@ def run_training(args: argparse.Namespace) -> int:
 
         pruned = load_pruned()
         active = data.train.select(keep_mask(data.train, pruned))
-        train_tensors = SplitTensors(active)
-        val_tensors = SplitTensors(data.val)
+        train_tensors = SplitTensors(active, device)
+        val_tensors = SplitTensors(data.val, device)
 
         model, optimizer_state, warm = build_model(data, LATEST_CHECKPOINT)
+        model.to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=float(args.lr),
                                      weight_decay=float(args.weight_decay))
         if optimizer_state is not None:
@@ -658,6 +694,8 @@ def run_training(args: argparse.Namespace) -> int:
             "train": train_metrics,
             "val": val_metrics,
             "timestamp": utc_now(),
+            "device": str(device),
+            "precision": precision,
         }
         metrics_payload = dict(record)
         metrics_payload.update({
@@ -806,8 +844,9 @@ def run_self_test(args: argparse.Namespace) -> int:
         weights_path = root / "weights.json"
         config = load_weights_config(weights_path)
         check(weights_path.is_file(), "weights.json created with Stage A defaults")
-        check(config["stage_a"]["dof"] == 0.0 and config["stage_a"]["rel_err_rel"] == 1.0,
-              "Stage A zeroes the cost heads and keeps rel_err at 1.0")
+        check(config["stage_a"]["solve_flops"] == 0.0
+              and config["stage_a"]["rel_err_rel"] == 1.0,
+              "Stage A zeroes portable cost heads and keeps relative accuracy at 1.0")
 
         history_path = root / "history.jsonl"
         for record in _synthetic_history(plateauing[:29]):
@@ -822,14 +861,14 @@ def run_self_test(args: argparse.Namespace) -> int:
               f"30 records -> stage B transition on run 31 (got {stage},{transition},{entry})")
 
         weights = head_weights_for(stage, 31, entry, config)
-        expected_first = config["stage_b_targets"]["solve_ms"] / config["ramp_runs"]
-        check(abs(weights["solve_ms"] - expected_first) < 1e-12,
+        expected_first = config["stage_b_targets"]["solve_flops"] / config["ramp_runs"]
+        check(abs(weights["solve_flops"] - expected_first) < 1e-12,
               f"stage B ramp starts at 1/{config['ramp_runs']} of the target weight")
-        check(abs(head_weights_for("B", 35, 31, config)["solve_ms"]
-                  - config["stage_b_targets"]["solve_ms"]) < 1e-12,
+        check(abs(head_weights_for("B", 35, 31, config)["solve_flops"]
+                  - config["stage_b_targets"]["solve_flops"]) < 1e-12,
               "stage B ramp reaches the full target weight after ramp_runs")
-        check(head_weights_for("B", 99, 31, config)["solve_ms"]
-              == config["stage_b_targets"]["solve_ms"],
+        check(head_weights_for("B", 99, 31, config)["solve_flops"]
+              == config["stage_b_targets"]["solve_flops"],
               "stage B ramp saturates, never exceeds the target")
 
         # Once a B record exists, the stage sticks and never re-triggers.
@@ -882,6 +921,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--weight-decay", type=float, default=1e-4,
                         help="Adam L2 regularisation; the net overfits small corpora without it")
     parser.add_argument("--threads", type=int, default=4, help="torch CPU threads")
+    parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto",
+                        help="training device (default: CUDA when available)")
+    parser.add_argument("--precision", choices=("auto", "fp32", "tf32"), default="auto",
+                        help="matmul precision; auto selects measured-fast TF32 on Ampere")
     parser.add_argument("--csv", default=None, help="dataset CSV override")
     add_split_args(parser)
     parser.add_argument("--weights", type=Path, default=None, help="weights.json override")

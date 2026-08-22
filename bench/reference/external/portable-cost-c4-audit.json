@@ -1,0 +1,38 @@
+{
+  "converged_at": 0.02,
+  "written": 1,
+  "unvalidated": 0,
+  "audit": [
+    {
+      "case_id": "twisted_loft_s1_c4",
+      "family": "twisted_loft",
+      "action": "external-truth-written",
+      "metrics": [
+        {
+          "metric": "strain_energy",
+          "old_value": 7.148298621e-08,
+          "new_value": 1.0453078635299999e-07,
+          "change_pct": 46.23170056985786,
+          "old_tol": 1.0,
+          "new_tol": 0.02,
+          "reference_uncertainty_rel": 8.941825600862748e-05,
+          "external_value": 1.0453078635299999e-07,
+          "source": "external-gmsh-mesh+calculix-solver"
+        },
+        {
+          "metric": "tip_deflection",
+          "old_value": 1.142857143e-08,
+          "new_value": 1.6796984211065413e-08,
+          "change_pct": 46.97361182845068,
+          "old_tol": 1.0,
+          "new_tol": 0.02,
+          "reference_uncertainty_rel": 0.0004499646396211257,
+          "external_value": 1.6796984211065413e-08,
+          "source": "external-gmsh-mesh+calculix-solver"
+        }
+      ],
+      "wall_time_s": 175.1,
+      "n_dof_fine": 265218
+    }
+  ]
+}

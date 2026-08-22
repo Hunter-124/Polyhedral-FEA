@@ -193,16 +193,23 @@ struct CinemaMeshInsight {
     std::size_t quality_unmeasured = 0;
 };
 
-/// The exact spectral-sizing evidence and one real CAD-edge curvature trace
-/// shown in the opening chapter. `prepare_cinema_features` fills the plan
-/// report from `pipeline::build_refinement_plan`; `build_cinema_skeleton`
-/// fills the curve samples from `geom::extract_topology`.
+/// Exact spectral-sizing evidence plus the real CAD samples used to explain it
+/// both in the opening panel and directly on the part.
+///
+/// `prepare_cinema_features` evaluates the production size field twice (before
+/// and after spectral filtering) at deterministic surface samples. The viewport
+/// draws those values as spacing rings; this structure retains the physical
+/// target sizes so the animation is data-driven rather than decorative.
 struct CinemaSizingStory {
     bool prepared = false;
     bool brep_curvature = false;
     std::size_t geometry_seeds = 0;
     std::size_t bc_seeds = 0;
     double h_min = 0.0;
+    double sampled_h_before_min = 0.0;
+    double sampled_h_before_max = 0.0;
+    double sampled_h_after_min = 0.0;
+    double sampled_h_after_max = 0.0;
     pipeline::SpectralSizingReport spectral;
 
     std::uint32_t edge_id = 0;
@@ -213,6 +220,18 @@ struct CinemaSizingStory {
     std::vector<double> stations;
     std::vector<double> curvature_raw;
     std::vector<double> curvature_filtered;
+    /// Magnitudes and the exact retention mask of the even-reflected FFT used
+    /// by `geom::lowpass_signal`; DC is included at index zero.
+    std::vector<double> curve_spectrum;
+    std::vector<std::uint8_t> curve_mode_kept;
+    std::vector<Eigen::Vector3d> edge_points;
+    std::vector<double> edge_h_before;
+    std::vector<double> edge_h_after;
+
+    /// Surface samples of the size field, in metres. Entries align by index.
+    std::vector<Eigen::Vector3d> field_points;
+    std::vector<double> field_h_before;
+    std::vector<double> field_h_after;
 };
 
 /// `CinemaType` for a frame `height` pixels tall.
@@ -275,6 +294,19 @@ struct CinemaCue {
     CinemaAct act = CinemaAct::kSkeleton;
     double act_t = 0.0;    // seconds into the act
     double act_span = 1.0; // act length, seconds
+
+    // ---- spectral-sizing explanation (inside kSkeleton) ------------------
+
+    /// Sequential reveal of the selected CAD-edge samples.
+    double spectral_edge_reveal = 0.0;
+    /// Frequency bars rising from the FFT of that same curvature trace.
+    double spectral_spectrum_reveal = 0.0;
+    /// Morph from the unfiltered to the energy-truncated signal/size field.
+    double spectral_filter_mix = 0.0;
+    /// Spatial sweep of target-size rings over the part surface.
+    double spectral_field_reveal = 0.0;
+    /// Whole on-part overlay opacity; eased out before the advisor act.
+    float spectral_overlay_alpha = 0.0f;
 
     // ---- the advisor pass lane (inside kDeliberate) -----------------------
 
@@ -526,6 +558,9 @@ class CinemaState {
     /// the viewport, -1 when none. Same role: the upload is a whole boundary
     /// re-bake, so it happens on pass changes and not per frame.
     int uploaded_solve_stage = -1;
+    /// True once the opening's surface and selected-edge spacing samples have
+    /// been uploaded. The sample set is immutable for a take.
+    bool uploaded_sizing_story = false;
     /// Forgets every upload, so a fresh take never draws the previous run's
     /// geometry on its first frame.
     void invalidate_uploads();

@@ -28,12 +28,16 @@ stdout.
 
 ### What is interpolated
 
-Time, opacity, the shrink-toward-centroid reveal, the spatial sweep front, and
-the load factor λ. That is the whole list.
+Time, opacity, the shrink-toward-centroid reveal, the spatial sweep front, the
+pre/post-filter spacing-glyph morph, and the load factor λ. That is the whole
+list.
 
-No displayed **number** is ever interpolated. No activation, element count, error
-indicator, stress value or progress value is ever synthesised. Where a source is
-missing the film says which one and shows nothing in its place.
+No displayed **number** is ever interpolated. The opening rings interpolate
+marker diameter and colour between two measured target-h evaluations; their
+before/after millimetre ranges are computed values, and no intermediate value
+is labelled as another measurement. No activation, element count, error
+indicator, stress value or progress value is ever synthesised. Where a source
+is missing the film says which one and shows nothing in its place.
 
 λ is the one interpolated quantity that is also displayed, and it is displayed
 because interpolating it is exact rather than approximate — see
@@ -51,13 +55,30 @@ because interpolating it is exact rather than approximate — see
 - `skeleton_polylines` / `skeleton_points` are the counts of what was extracted
   and pushed to the viewport, not an estimate of the part's complexity.
 - Nothing is drawn as mesh in this act or the next. Nothing has been meshed yet.
+  The points on the part are explicitly **target-spacing rings**, not elements:
+  ring diameter is proportional to target `h`, orange means finer and cyan
+  coarser.
 - `prepare_cinema_features` calls the production
-  `pipeline::build_refinement_plan` with the final `SimSetup`. Its
-  `SpectralSizingReport` supplies modes kept/total, retained energy, denoised
-  curve seeds, predicted density before/after, and exact-BRep provenance.
-- The left chart is one real `CadEdge::kappa_samples` trace and the output of
-  `geom::lowpass_signal(..., 0.995)`. The line morph is cosmetic opacity/geometry;
-  the reported modes and samples are not interpolated.
+  `pipeline::build_refinement_plan` twice with the same resolved `h`, geometry
+  and BC/load regions: once with spectral filtering disabled and once with the
+  final `SimSetup`. The two `size_field` functions are evaluated at a
+  deterministic, bounded walk over `Model::surface.vertices` and at every
+  sample of the selected CAD edge. The default yields 1,753 on-part samples:
+  target h is 2.426–7.092 mm before filtering and 2.657–5.953 mm after filtering.
+- The final plan's `SpectralSizingReport` supplies modes kept/total, retained
+  energy, denoised curve seeds, predicted density before/after, and exact-BRep
+  provenance.
+- The upper chart is one real `CadEdge::kappa_samples` trace and the output of
+  `geom::lowpass_signal(..., 0.995)`. A scan cursor advances over the same edge
+  samples highlighted on the part. The lower chart is the non-DC first
+  conjugate half of the exact even-reflected FFT: retained modes stay teal and
+  discarded modes dim as the inverse reconstruction takes over. The DC bar is
+  omitted because it is mean curvature, always retained, and excluded from
+  `modes_total`; showing it would flatten every non-DC mode that actually
+  explains spacing variation. No spectrum is invented or decoratively seeded.
+- The last opening beat sweeps the pre/post-filter `h(x)` rings over the part,
+  so the viewer can see where the frequency-space change affects the eventual
+  cell spacing rather than infer it from a chart alone.
 - The analysis panel starts opening at 0.624 s and reaches full width at
   1.716 s, leaving about 6.08 s fully open on the default take.
 

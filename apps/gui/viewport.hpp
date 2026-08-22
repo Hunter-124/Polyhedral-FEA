@@ -111,6 +111,18 @@ class Viewport {
 
     /// BRep/feature-edge polylines of the part, drawn as the pre-mesh skeleton.
     void set_skeleton(const std::vector<std::vector<Eigen::Vector3d>>& polylines);
+    /// Uploads the opening act's measured target spacing at deterministic
+    /// surface samples plus the selected CAD-edge samples. `h_before` and
+    /// `h_after` are physical target cell widths in metres and must align with
+    /// their point arrays. The viewport normalises them only for colour/marker
+    /// size; no displayed number is reconstructed from that normalisation.
+    void set_cinema_sizing_samples(
+        const std::vector<Eigen::Vector3d>& field_points,
+        const std::vector<double>& field_h_before,
+        const std::vector<double>& field_h_after,
+        const std::vector<Eigen::Vector3d>& edge_points,
+        const std::vector<double>& edge_h_before,
+        const std::vector<double>& edge_h_after);
     /// Per-element geometry for the cinema reveal: every element's own faces,
     /// tagged with its index in `mesh.elements` so the reveal order is the
     /// mesher's own emission order. Interior faces are therefore stored once per
@@ -162,6 +174,13 @@ class Viewport {
         /// replacement uploaded by `set_cinema_mesh_transition`.
         bool incremental_transition = false;
         float transition_progress = 1.0f; // 0 = previous topology, 1 = next topology
+        /// Opening spectral-spacing overlay. Edge samples appear in curve order;
+        /// field samples sweep over the part and morph from pre-filter to final
+        /// target h. Point-ring diameter is proportional to target h.
+        float spectral_edge_reveal = 0.0f;
+        float spectral_field_reveal = 0.0f;
+        float spectral_filter_mix = 0.0f;
+        float spectral_overlay_alpha = 0.0f;
     };
     void set_cinema_view(const CinemaView& view);
 
@@ -247,6 +266,7 @@ class Viewport {
     std::uint32_t fbo_ = 0, color_texture_ = 0, depth_rbo_ = 0;
     int fb_width_ = 0, fb_height_ = 0;
     std::uint32_t model_program_ = 0, background_program_ = 0, line_program_ = 0;
+    std::uint32_t sizing_program_ = 0;
     // Setup-mode model buffers.
     std::uint32_t model_vao_ = 0, model_vbo_ = 0;
     int model_vertex_count_ = 0;
@@ -270,6 +290,12 @@ class Viewport {
     int skeleton_vertex_count_ = 0;
     std::vector<float> skeleton_data_;
     float skeleton_baked_alpha_ = -1.0f;
+    // Cinema: spacing rings drawn directly on the part. Each vertex stores
+    // position, pre/post-filter normalised h, sweep order and kind (surface or
+    // selected edge). One point shader turns those into circular target-h
+    // glyphs without rebuilding geometry per frame.
+    std::uint32_t sizing_vao_ = 0, sizing_vbo_ = 0;
+    int sizing_vertex_count_ = 0;
     // Cinema: per-element faces and per-element edges, each vertex carrying its
     // element's centroid and normalised index so the reveal and the shrink are
     // pure uniform changes (see kCinemaVs).

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "cinema.hpp"
 
-#include "adapt/spectral_sizing.hpp"
+#include "geom/signal_fft.hpp"
 #include "colormap.hpp"
 #include "theme.hpp"
 
@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <complex>
 #include <cstdarg>
 #include <cstdint>
 #include <cstdio>
@@ -25,6 +26,7 @@
 #include <numeric>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 
 namespace polymesh::gui {
@@ -592,6 +594,7 @@ void CinemaState::invalidate_uploads() {
     uploaded_mesh_source = CinemaMeshSource::kNone;
     uploaded_mesh_index = -1;
     uploaded_solve_stage = -1;
+    uploaded_sizing_story = false;
 }
 
 void CinemaState::advance(double dt) {
@@ -723,6 +726,14 @@ CinemaCue cinema_cue(const CinemaState& state) {
         const double slide = 0.14 * cue.act_span;
         cue.panel_open = static_cast<float>(
             smoothstep((cue.act_t - wait) / std::max(slide, 1.0e-9)));
+        const double p = cue.act_t / std::max(cue.act_span, 1.0e-9);
+        cue.spectral_edge_reveal = smoothstep((p - 0.08) / 0.20);
+        cue.spectral_spectrum_reveal = smoothstep((p - 0.24) / 0.22);
+        cue.spectral_filter_mix = smoothstep((p - 0.42) / 0.25);
+        cue.spectral_field_reveal = smoothstep((p - 0.56) / 0.30);
+        cue.spectral_overlay_alpha = static_cast<float>(
+            smoothstep((p - 0.05) / 0.08) *
+            (1.0 - smoothstep((p - 0.96) / 0.04)));
         cue.network_alpha = 0.0f;
         cue.equations_alpha = 0.0f;
     } else if (cue.act == CinemaAct::kSolve) {
@@ -899,6 +910,10 @@ Viewport::CinemaView cinema_view(const CinemaState& state, const CinemaCue& cue)
         view.reveal = 0.0f;
         view.mesh_alpha = 0.0f;
         view.shrink = 1.0f;
+        view.spectral_edge_reveal = static_cast<float>(cue.spectral_edge_reveal);
+        view.spectral_field_reveal = static_cast<float>(cue.spectral_field_reveal);
+        view.spectral_filter_mix = static_cast<float>(cue.spectral_filter_mix);
+        view.spectral_overlay_alpha = cue.spectral_overlay_alpha;
         break;
     case CinemaAct::kDeliberate:
         // Nothing has been meshed while the network deliberates, so nothing may
@@ -1082,6 +1097,16 @@ const char* cinema_solver_token(const CinemaState& state) {
 
 void sync_cinema_viewport(CinemaState& state, const CinemaCue& cue, const CinemaRender& render,
                           Viewport& viewport) {
+    if (!state.uploaded_sizing_story) {
+        // Empty vectors deliberately clear the previous take's VBO when this
+        // input supplied no spectral story. A failed extractor must never leave
+        // the last part's spacing rings hovering over the new skeleton.
+        viewport.set_cinema_sizing_samples(
+            state.sizing.field_points, state.sizing.field_h_before,
+            state.sizing.field_h_after, state.sizing.edge_points,
+            state.sizing.edge_h_before, state.sizing.edge_h_after);
+        state.uploaded_sizing_story = true;
+    }
     // Per-element buffer: re-uploaded only when the cue names a different mesh,
     // because `set_cinema_mesh` rebuilds every element's own faces.
     if (cue.mesh_source != CinemaMeshSource::kNone && cue.mesh_source_index >= 0 &&
@@ -1183,6 +1208,63 @@ std::pair<Eigen::Vector3f, std::string> resolve_sweep_axis(const pipeline::Model
             "resultant of every SimSetup::LoadSpec::force in this take"};
 }
 
+void capture_curve_spectrum(CinemaSizingStory& sizing) {
+    sizing.curve_spectrum.clear();
+    sizing.curve_mode_kept.clear();
+    if (sizing.stations.size() < 3 ||
+        sizing.stations.size() != sizing.curvature_raw.size()) {
+        return;
+    }
+
+    std::size_t n = 8;
+    while (n < sizing.curvature_raw.size()) {
+        n <<= 1;
+    }
+    const auto interpolate = [&](double station) {
+        const auto it =
+            std::upper_bound(sizing.stations.begin(), sizing.stations.end(), station);
+        if (it == sizing.stations.begin()) {
+            return sizing.curvature_raw.front();
+        }
+        if (it == sizing.stations.end()) {
+            return sizing.curvature_raw.back();
+        }
+        const std::size_t hi =
+            static_cast<std::size_t>(it - sizing.stations.begin());
+        const std::size_t lo = hi - 1;
+        const double t = (station - sizing.stations[lo]) /
+                         (sizing.stations[hi] - sizing.stations[lo]);
+        return sizing.curvature_raw[lo] +
+               t * (sizing.curvature_raw[hi] - sizing.curvature_raw[lo]);
+    };
+
+    // This is the exact even-reflection preparation used by
+    // geom::lowpass_signal before its FFT.
+    std::vector<std::complex<double>> spectrum(2 * n);
+    for (std::size_t i = 0; i < n; ++i) {
+        const double station =
+            static_cast<double>(i) / static_cast<double>(n - 1);
+        const std::complex<double> value{interpolate(station), 0.0};
+        spectrum[i] = value;
+        spectrum[2 * n - 1 - i] = value;
+    }
+    geom::fft_inplace(spectrum, false);
+    std::vector<std::complex<double>> kept = spectrum;
+    (void)geom::truncate_modes(kept, 0.995);
+
+    // A real input has a conjugate-symmetric spectrum. Plot one half, including
+    // DC and Nyquist, so frequency increases monotonically across the panel
+    // instead of showing the mirrored half twice.
+    const std::size_t visible_modes = n + 1;
+    sizing.curve_spectrum.reserve(visible_modes);
+    sizing.curve_mode_kept.reserve(visible_modes);
+    for (std::size_t k = 0; k < visible_modes; ++k) {
+        sizing.curve_spectrum.push_back(std::abs(spectrum[k]));
+        sizing.curve_mode_kept.push_back(
+            static_cast<std::uint8_t>(k == 0 || std::norm(kept[k]) > 0.0));
+    }
+}
+
 void capture_curve_story(CinemaState& state, const geom::CadTopology& topology) {
     state.sizing.edge_id = 0;
     state.sizing.edge_length = 0.0;
@@ -1192,7 +1274,11 @@ void capture_curve_story(CinemaState& state, const geom::CadTopology& topology) 
     state.sizing.stations.clear();
     state.sizing.curvature_raw.clear();
     state.sizing.curvature_filtered.clear();
-
+    state.sizing.curve_spectrum.clear();
+    state.sizing.curve_mode_kept.clear();
+    state.sizing.edge_points.clear();
+    state.sizing.edge_h_before.clear();
+    state.sizing.edge_h_after.clear();
     double best_score = -1.0;
     for (const auto& edge : topology.edges) {
         if (edge.samples.size() < 3 || edge.kappa_samples.size() != edge.samples.size()) {
@@ -1239,7 +1325,9 @@ void capture_curve_story(CinemaState& state, const geom::CadTopology& topology) 
         state.sizing.stations = std::move(stations);
         state.sizing.curvature_raw = edge.kappa_samples;
         state.sizing.curvature_filtered = std::move(filtered);
+        state.sizing.edge_points = edge.samples;
     }
+    capture_curve_spectrum(state.sizing);
 }
 } // namespace
 
@@ -1320,6 +1408,16 @@ void prepare_cinema_features(CinemaState& state, const pipeline::Model& model,
         }
     }
 
+    state.uploaded_sizing_story = false;
+    state.sizing.field_points.clear();
+    state.sizing.field_h_before.clear();
+    state.sizing.field_h_after.clear();
+    state.sizing.edge_h_before.clear();
+    state.sizing.edge_h_after.clear();
+    state.sizing.sampled_h_before_min = 0.0;
+    state.sizing.sampled_h_before_max = 0.0;
+    state.sizing.sampled_h_after_min = 0.0;
+    state.sizing.sampled_h_after_max = 0.0;
     try {
         double h = setup.mesh_size;
         if (!(h > 0.0)) {
@@ -1330,28 +1428,97 @@ void prepare_cinema_features(CinemaState& state, const pipeline::Model& model,
         const pipeline::RefinementPlan plan =
             pipeline::build_refinement_plan(model, h, regions, setup.use_feature_grading,
                                             setup.spectral_smooth, 0);
+        std::optional<pipeline::RefinementPlan> baseline_plan;
+        if (setup.spectral_smooth && plan.spectral.applied) {
+            baseline_plan = pipeline::build_refinement_plan(
+                model, h, regions, setup.use_feature_grading, false, 0);
+        }
+        const pipeline::RefinementPlan& baseline =
+            baseline_plan ? *baseline_plan : plan;
+
         state.sizing.prepared = true;
         state.sizing.brep_curvature = plan.geometry_curvature_from_brep;
         state.sizing.geometry_seeds = plan.n_geometry_seeds;
         state.sizing.bc_seeds = plan.n_bc_seeds;
         state.sizing.h_min = plan.h_min;
         state.sizing.spectral = plan.spectral;
+
+        const auto valid_h = [](double value) {
+            return std::isfinite(value) && value > 0.0;
+        };
+        const auto append_sample =
+            [&](const Eigen::Vector3d& point, std::vector<Eigen::Vector3d>& points,
+                std::vector<double>& before, std::vector<double>& after) {
+                if (!baseline.size_field || !plan.size_field) {
+                    return;
+                }
+                const double h_before = baseline.size_field(point);
+                const double h_after = plan.size_field(point);
+                if (!valid_h(h_before) || !valid_h(h_after)) {
+                    return;
+                }
+                points.push_back(point);
+                before.push_back(h_before);
+                after.push_back(h_after);
+            };
+
+        // Bound the point pass while retaining deterministic coverage of the
+        // whole tessellated surface. The selected BRep edge is stored
+        // separately and always keeps all of its samples.
+        constexpr std::size_t kMaxFieldSamples = 1800;
+        const std::size_t stride = std::max<std::size_t>(
+            1, (model.surface.vertices.size() + kMaxFieldSamples - 1) /
+                   kMaxFieldSamples);
+        for (std::size_t i = 0; i < model.surface.vertices.size(); i += stride) {
+            append_sample(model.surface.vertices[i], state.sizing.field_points,
+                          state.sizing.field_h_before, state.sizing.field_h_after);
+        }
+        std::vector<Eigen::Vector3d> accepted_edge_points;
+        accepted_edge_points.reserve(state.sizing.edge_points.size());
+        for (const auto& point : state.sizing.edge_points) {
+            append_sample(point, accepted_edge_points, state.sizing.edge_h_before,
+                          state.sizing.edge_h_after);
+        }
+        state.sizing.edge_points = std::move(accepted_edge_points);
+
+        const auto range = [](const std::vector<double>& values) {
+            if (values.empty()) {
+                return std::pair{0.0, 0.0};
+            }
+            const auto [lo, hi] = std::minmax_element(values.begin(), values.end());
+            return std::pair{*lo, *hi};
+        };
+        std::tie(state.sizing.sampled_h_before_min,
+                 state.sizing.sampled_h_before_max) =
+            range(state.sizing.field_h_before);
+        std::tie(state.sizing.sampled_h_after_min,
+                 state.sizing.sampled_h_after_max) =
+            range(state.sizing.field_h_after);
     } catch (const std::exception&) {
         // The worker remains authoritative and will report the actual failure.
         // The feature panel simply declines to draw a report it could not
         // compute; it never blocks the solve or substitutes plausible values.
         state.sizing.prepared = false;
         state.sizing.spectral = {};
+        state.sizing.field_points.clear();
+        state.sizing.field_h_before.clear();
+        state.sizing.field_h_after.clear();
+        state.sizing.edge_h_before.clear();
+        state.sizing.edge_h_after.clear();
     }
 
     const auto& spectral = state.sizing.spectral;
     std::printf("cinema: spectral applied %d modes_total %zu modes_kept %zu "
                 "energy_kept %.9g edge_seeds %zu predicted_before %.9g "
-                "predicted_after %.9g geometry_seeds %zu bc_seeds %zu brep_curvature %d\n",
+                "predicted_after %.9g geometry_seeds %zu bc_seeds %zu brep_curvature %d "
+                "field_samples %zu h_before_min %.9g h_before_max %.9g "
+                "h_after_min %.9g h_after_max %.9g\n",
                 spectral.applied ? 1 : 0, spectral.modes_total, spectral.modes_kept,
                 spectral.energy_kept, spectral.n_edge_curve_seeds, spectral.predicted_before,
                 spectral.predicted_after, state.sizing.geometry_seeds, state.sizing.bc_seeds,
-                state.sizing.brep_curvature ? 1 : 0);
+                state.sizing.brep_curvature ? 1 : 0, state.sizing.field_points.size(),
+                state.sizing.sampled_h_before_min, state.sizing.sampled_h_before_max,
+                state.sizing.sampled_h_after_min, state.sizing.sampled_h_after_max);
     std::fflush(stdout);
 }
 
@@ -2104,21 +2271,27 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
     const float wrap = std::max(120.0f, region.x);
 
     dl->AddText(font, type.caption, origin, faded(palette.text, alpha),
-                "Exact CAD curvature → spectral sizing");
+                "Exact curvature → frequency modes → target spacing");
     const std::string summary =
         state.sizing.spectral.applied
-            ? fmt("%s / %s field modes kept · %.2f%% energy · %s curve seeds",
+            ? fmt("%s / %s field modes · %.2f%% energy · N density %.0f → %.0f",
                   grouped(state.sizing.spectral.modes_kept).c_str(),
                   grouped(state.sizing.spectral.modes_total).c_str(),
                   100.0 * state.sizing.spectral.energy_kept,
-                  grouped(state.sizing.spectral.n_edge_curve_seeds).c_str())
+                  state.sizing.spectral.predicted_before,
+                  state.sizing.spectral.predicted_after)
             : std::string("spectral sizing report arrives with the verified mesh setup");
     dl->AddText(font, type.label, ImVec2(origin.x, origin.y + type.caption * 1.55f),
                 faded(state.sizing.spectral.applied ? palette.accent : palette.text_dim, alpha),
                 summary.c_str(), nullptr, wrap);
+    const std::string rings =
+        fmt("%s on-part samples · ring diameter = target h · orange fine → cyan coarse",
+            grouped(state.sizing.field_points.size()).c_str());
+    dl->AddText(font, type.legend, ImVec2(origin.x, origin.y + type.caption * 2.55f),
+                faded(palette.text_dim, alpha), rings.c_str(), nullptr, wrap);
 
-    const float chart_top = origin.y + type.caption * 3.0f;
-    const float chart_h = std::max(150.0f, std::min(region.y * 0.43f, 330.0f));
+    const float chart_top = origin.y + type.caption * 3.65f;
+    const float chart_h = std::max(240.0f, std::min(region.y * 0.54f, 420.0f));
     const float chart_w = std::max(120.0f, region.x);
     dl->AddRectFilled(ImVec2(origin.x, chart_top),
                       ImVec2(origin.x + chart_w, chart_top + chart_h),
@@ -2126,6 +2299,17 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
     dl->AddRect(ImVec2(origin.x, chart_top),
                 ImVec2(origin.x + chart_w, chart_top + chart_h),
                 faded(palette.border, 0.8f * alpha), 6.0f);
+
+    const float pad = 13.0f;
+    const float split_y = chart_top + chart_h * 0.58f;
+    dl->AddLine(ImVec2(origin.x + pad, split_y),
+                ImVec2(origin.x + chart_w - pad, split_y),
+                faded(palette.border, 0.72f * alpha), 1.0f);
+    dl->AddText(font, type.legend, ImVec2(origin.x + pad, chart_top + 8.0f),
+                faded(palette.text_dim, alpha), "SIGNAL DOMAIN  κ(s) along selected CAD edge");
+    dl->AddText(font, type.legend, ImVec2(origin.x + pad, split_y + 7.0f),
+                faded(palette.text_dim, alpha),
+                "FREQUENCY DOMAIN  |FFT(κ − mean κ)| · teal retained, grey discarded");
 
     const auto& raw = state.sizing.curvature_raw;
     const auto& filtered = state.sizing.curvature_filtered;
@@ -2138,60 +2322,136 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
             hi = std::max({hi, raw[i], filtered[i]});
         }
         const double span = std::max(hi - lo, 1.0e-12);
-        const double blend = smoothstep(
-            (cue.act_t - 0.9) / std::max(0.42 * cue.act_span, 1.0e-9));
-        const auto point = [&](std::size_t i, double value) {
-            const float x = origin.x + 14.0f +
-                            (chart_w - 28.0f) * static_cast<float>(stations[i]);
-            const float y = chart_top + chart_h - 18.0f -
-                            (chart_h - 38.0f) * static_cast<float>((value - lo) / span);
+        const float plot_top = chart_top + type.legend * 1.65f;
+        const float plot_bottom = split_y - 10.0f;
+        const auto point = [&](double station, double value) {
+            const float x = origin.x + pad +
+                            (chart_w - 2.0f * pad) * static_cast<float>(station);
+            const float y = plot_bottom -
+                            (plot_bottom - plot_top) * static_cast<float>((value - lo) / span);
             return ImVec2(x, y);
         };
-        for (std::size_t i = 1; i < raw.size(); ++i) {
-            dl->AddLine(point(i - 1, raw[i - 1]), point(i, raw[i]),
-                        faded(palette.text_dim, 0.42f * alpha), 1.0f);
-            const double y0 = raw[i - 1] + blend * (filtered[i - 1] - raw[i - 1]);
-            const double y1 = raw[i] + blend * (filtered[i] - raw[i]);
-            dl->AddLine(point(i - 1, y0), point(i, y1),
-                        faded(palette.accent, alpha), 2.4f);
+
+        const double revealed =
+            cue.spectral_edge_reveal * static_cast<double>(raw.size() - 1);
+        const std::size_t whole =
+            std::min(static_cast<std::size_t>(std::floor(revealed)), raw.size() - 1);
+        for (std::size_t i = 1; i <= whole; ++i) {
+            dl->AddLine(point(stations[i - 1], raw[i - 1]),
+                        point(stations[i], raw[i]),
+                        faded(palette.text_dim, 0.62f * alpha), 1.2f);
+            const double y0 = raw[i - 1] +
+                              cue.spectral_filter_mix * (filtered[i - 1] - raw[i - 1]);
+            const double y1 =
+                raw[i] + cue.spectral_filter_mix * (filtered[i] - raw[i]);
+            dl->AddLine(point(stations[i - 1], y0), point(stations[i], y1),
+                        faded(palette.accent, alpha), 2.6f);
+            dl->AddCircleFilled(point(stations[i], y1), 2.6f,
+                                faded(palette.accent_soft_top, alpha));
         }
-        dl->AddText(font, type.legend, ImVec2(origin.x + 12.0f, chart_top + 9.0f),
-                    faded(palette.text_dim, alpha), "sampled curvature");
+        if (whole + 1 < raw.size()) {
+            const double part = revealed - static_cast<double>(whole);
+            const double station =
+                stations[whole] + part * (stations[whole + 1] - stations[whole]);
+            const double raw_value =
+                raw[whole] + part * (raw[whole + 1] - raw[whole]);
+            const double filtered_value =
+                filtered[whole] + part * (filtered[whole + 1] - filtered[whole]);
+            const double value =
+                raw_value + cue.spectral_filter_mix * (filtered_value - raw_value);
+            dl->AddLine(point(stations[whole], raw[whole]), point(station, raw_value),
+                        faded(palette.text_dim, 0.62f * alpha), 1.2f);
+            const double start = raw[whole] +
+                                 cue.spectral_filter_mix *
+                                     (filtered[whole] - raw[whole]);
+            dl->AddLine(point(stations[whole], start), point(station, value),
+                        faded(palette.accent, alpha), 2.6f);
+            const ImVec2 scan = point(station, value);
+            dl->AddLine(ImVec2(scan.x, plot_top), ImVec2(scan.x, plot_bottom),
+                        faded(palette.accent_soft_top, 0.5f * alpha), 1.0f);
+            dl->AddCircleFilled(scan, 4.2f, faded(palette.accent_soft_top, alpha));
+        }
         const std::string edge =
-            fmt("CAD edge %u · %.3g mm", state.sizing.edge_id, state.sizing.edge_length * 1e3);
+            fmt("edge %u · %.3g mm · %s/%s curve modes",
+                state.sizing.edge_id, state.sizing.edge_length * 1e3,
+                grouped(state.sizing.curve_modes_kept).c_str(),
+                grouped(state.sizing.curve_modes_total).c_str());
         const float ew = font->CalcTextSizeA(type.legend, FLT_MAX, 0.0f, edge.c_str()).x;
         dl->AddText(font, type.legend,
-                    ImVec2(origin.x + chart_w - ew - 12.0f, chart_top + 9.0f),
+                    ImVec2(origin.x + chart_w - ew - pad, chart_top + 8.0f),
                     faded(palette.accent, alpha), edge.c_str());
     } else {
-        dl->AddText(font, type.label, ImVec2(origin.x + 14.0f, chart_top + 20.0f),
+        dl->AddText(font, type.label, ImVec2(origin.x + pad, chart_top + 36.0f),
                     faded(palette.status_warn, alpha),
                     "No curved CAD edge supplied a resolvable curvature trace.");
     }
 
-    const std::array<const char*, 4> steps{
-        "sample exact curve", "FFT curvature", "keep 99.5% energy", "size the cells"};
-    const float gap = 8.0f;
-    const float box_w = (chart_w - gap * 3.0f) / 4.0f;
-    const float box_y = chart_top + chart_h + type.label * 1.1f;
+    const auto& spectrum = state.sizing.curve_spectrum;
+    const auto& kept = state.sizing.curve_mode_kept;
+    if (spectrum.size() >= 2 && kept.size() == spectrum.size()) {
+        // DC is the mean curvature, not spacing variation. `truncate_modes`
+        // always preserves it and excludes it from modes_total, so omitting it
+        // here both matches the report's denominator and stops one huge bar
+        // from flattening every explanatory non-DC mode.
+        const double max_magnitude =
+            std::max(*std::max_element(spectrum.begin() + 1, spectrum.end()),
+                     1.0e-12);
+        const float bars_top = split_y + type.legend * 1.8f;
+        const float bars_bottom = chart_top + chart_h - 11.0f;
+        const float bars_h = std::max(1.0f, bars_bottom - bars_top);
+        const float bars_w = chart_w - 2.0f * pad;
+        const std::size_t mode_count = spectrum.size() - 1;
+        const float slot = bars_w / static_cast<float>(mode_count);
+        const std::size_t visible = std::min(
+            mode_count,
+            static_cast<std::size_t>(std::ceil(
+                cue.spectral_spectrum_reveal * static_cast<double>(mode_count))));
+        const double log_max = std::log1p(max_magnitude);
+        for (std::size_t mode = 0; mode < visible; ++mode) {
+            const std::size_t i = mode + 1;
+            const float magnitude = static_cast<float>(
+                std::log1p(spectrum[i]) / std::max(log_max, 1.0e-12));
+            const float x0 = origin.x + pad + static_cast<float>(mode) * slot;
+            const float x1 = x0 + std::max(1.0f, slot - 1.0f);
+            const float y0 = bars_bottom - bars_h * magnitude;
+            const bool survives = kept[i] != 0;
+            const float discarded_alpha =
+                static_cast<float>(1.0 - 0.82 * cue.spectral_filter_mix);
+            const ImVec4 color =
+                survives ? palette.accent
+                         : ImVec4(palette.text_dim.x, palette.text_dim.y,
+                                  palette.text_dim.z,
+                                  palette.text_dim.w * discarded_alpha);
+            dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x1, bars_bottom),
+                              faded(color, alpha), 1.0f);
+        }
+    }
+    const std::array<const char*, 5> steps{
+        "1 sample κ(s)", "2 FFT", "3 rank energy", "4 inverse FFT", "5 map h(x)"};
+    const std::array<double, 5> progress{
+        cue.spectral_edge_reveal, cue.spectral_spectrum_reveal,
+        cue.spectral_filter_mix, cue.spectral_filter_mix,
+        cue.spectral_field_reveal};
+    const float gap = 6.0f;
+    const float box_w = (chart_w - gap * 4.0f) / 5.0f;
+    const float box_y = chart_top + chart_h + type.label * 0.85f;
     for (std::size_t i = 0; i < steps.size(); ++i) {
         const float x = origin.x + static_cast<float>(i) * (box_w + gap);
-        const bool active =
-            cue.act_t / std::max(cue.act_span, 1.0e-9) >= 0.16 * static_cast<double>(i);
-        dl->AddRectFilled(ImVec2(x, box_y), ImVec2(x + box_w, box_y + type.label * 2.4f),
+        const bool active = progress[i] > (i == 3 ? 0.45 : 0.04);
+        dl->AddRectFilled(ImVec2(x, box_y), ImVec2(x + box_w, box_y + type.label * 2.2f),
                           faded(active ? palette.accent_mid : palette.panel_bg,
-                                alpha * (active ? 0.62f : 0.45f)),
+                                alpha * (active ? 0.66f : 0.44f)),
                           5.0f);
-        dl->AddText(font, type.legend, ImVec2(x + 8.0f, box_y + 8.0f),
-                    faded(active ? palette.text : palette.text_dim, alpha), steps[i], nullptr,
-                    std::max(20.0f, box_w - 16.0f));
+        dl->AddText(font, type.legend, ImVec2(x + 7.0f, box_y + 7.0f),
+                    faded(active ? palette.text : palette.text_dim, alpha),
+                    steps[i], nullptr, std::max(20.0f, box_w - 14.0f));
     }
     const std::string floor =
         state.sizing.brep_curvature
-            ? "Exact BRep curvature is re-imposed after filtering — real features cannot blur."
+            ? "After filtering, exact BRep curvature is re-imposed as a floor — "
+              "real features cannot blur."
             : "No exact-BRep curvature report is available for this input.";
-    dl->AddText(font, type.legend,
-                ImVec2(origin.x, box_y + type.label * 3.0f),
+    dl->AddText(font, type.legend, ImVec2(origin.x, box_y + type.label * 2.7f),
                 faded(state.sizing.brep_curvature ? palette.status_ok : palette.status_warn,
                       alpha),
                 floor.c_str(), nullptr, wrap);
@@ -2362,11 +2622,13 @@ void skeleton_caption(const CinemaState& state, CinemaCaption& out) {
     out.headline = "Exact CAD + spectral size field";
     switch (state.skeleton_source) {
     case SkeletonSource::kBrepEdges:
-        out.numbers = fmt("%s exact edges · 32 samples per edge · %s / %s field modes kept",
-                          grouped(state.skeleton_polylines).c_str(),
-                          grouped(state.sizing.spectral.modes_kept).c_str(),
-                          grouped(state.sizing.spectral.modes_total).c_str());
-        out.note = "CAD curvature → FFT denoise → geometry floor → target cell sizes";
+        out.numbers =
+            fmt("%s exact edges · %s selected-edge samples · %s on-part target sizes",
+                grouped(state.skeleton_polylines).c_str(),
+                grouped(state.sizing.edge_points.size()).c_str(),
+                grouped(state.sizing.field_points.size()).c_str());
+        out.note =
+            "κ(s) sweep → FFT energy selection → inverse transform → h(x) rings on the part";
         out.note_color = palette.text_dim;
         break;
     case SkeletonSource::kSharpEdges:

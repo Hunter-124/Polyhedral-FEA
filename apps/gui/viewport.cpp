@@ -221,6 +221,63 @@ void main() {
     frag = vec4(v_color.rgb, u_alpha * v_color.a);
 })";
 
+// Opening-act target-spacing glyphs. Surface and selected-edge samples carry
+// the production size field before/after spectral truncation. The shader only
+// turns physical h into a relative marker diameter and colour: larger rings are
+// coarser target cells, smaller orange rings are finer target cells.
+constexpr const char* kSizingVs = R"(#version 330 core
+layout(location = 0) in vec3 in_pos;
+layout(location = 1) in float in_h_before;
+layout(location = 2) in float in_h_after;
+layout(location = 3) in float in_order;
+layout(location = 4) in float in_kind;
+uniform mat4 u_view;
+uniform mat4 u_proj;
+uniform float u_edge_reveal;
+uniform float u_field_reveal;
+uniform float u_filter_mix;
+uniform float u_alpha;
+out vec4 v_color;
+flat out float v_kind;
+void main() {
+    float reveal = in_kind > 0.5 ? u_edge_reveal : u_field_reveal;
+    float h = mix(in_h_before, in_h_after, u_filter_mix);
+    float visible = in_order <= reveal ? 1.0 : 0.0;
+    vec3 fine = vec3(0.98, 0.39, 0.18);
+    vec3 coarse = vec3(0.20, 0.82, 0.91);
+    vec3 color = mix(fine, coarse, h);
+    if (in_kind > 0.5) {
+        color = mix(color, vec3(1.0), 0.30);
+    }
+    v_color = vec4(color, u_alpha * visible);
+    v_kind = in_kind;
+    gl_PointSize = (in_kind > 0.5 ? mix(9.0, 21.0, h)
+                                  : mix(4.0, 12.0, h));
+    gl_Position = u_proj * u_view * vec4(in_pos, 1.0);
+    // Keep a sample drawn on the surface from losing a z-fight with the cells
+    // it is explaining.
+    gl_Position.z -= 0.0015 * gl_Position.w;
+})";
+
+constexpr const char* kSizingFs = R"(#version 330 core
+in vec4 v_color;
+flat in float v_kind;
+out vec4 frag;
+void main() {
+    if (v_color.a <= 0.001) {
+        discard;
+    }
+    float radius = length(gl_PointCoord - vec2(0.5));
+    if (radius > 0.5) {
+        discard;
+    }
+    float ring = smoothstep(0.31, 0.39, radius);
+    float interior_alpha = v_kind > 0.5 ? 0.58 : 0.22;
+    float alpha = mix(interior_alpha, 0.95, ring) * v_color.a;
+    vec3 color = mix(v_color.rgb * 0.72, v_color.rgb, ring);
+    frag = vec4(color, alpha);
+})";
+
 GLuint compile(GLenum type, const char* src) {
     const GLuint shader = glCreateShader(type);
     glShaderSource(shader, 1, &src, nullptr);
@@ -296,6 +353,23 @@ void bind_cinema_line_attr(GLuint vao, GLuint vbo) {
     attr(2, 3, 7);
     attr(3, 1, 10);
     attr(4, 1, 11); // transition role
+}
+
+void bind_sizing_attr(GLuint vao, GLuint vbo) {
+    glBindVertexArray(vao);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    constexpr GLsizei stride = 7 * sizeof(float); // pos3 h_before h_after order kind
+    const auto attr = [](GLuint index, GLint size, int offset_floats) {
+        glEnableVertexAttribArray(index);
+        glVertexAttribPointer(index, size, GL_FLOAT, GL_FALSE, stride,
+                              reinterpret_cast<void*>(
+                                  static_cast<std::uintptr_t>(offset_floats) * sizeof(float)));
+    };
+    attr(0, 3, 0);
+    attr(1, 1, 3);
+    attr(2, 1, 4);
+    attr(3, 1, 5);
+    attr(4, 1, 6);
 }
 
 /// Element-type colors for mesh preview and for the cinema reveal. One function
@@ -669,6 +743,7 @@ void Viewport::init() {
     line_program_ = link(kLineVs, kLineFs);
     cinema_program_ = link(kCinemaVs, kCinemaFs);
     cinema_line_program_ = link(kCinemaLineVs, kCinemaLineFs);
+    sizing_program_ = link(kSizingVs, kSizingFs);
     glGenVertexArrays(1, &background_vao_);
     glGenVertexArrays(1, &model_vao_);
     glGenBuffers(1, &model_vbo_);
@@ -686,6 +761,8 @@ void Viewport::init() {
     glGenBuffers(1, &cinema_vbo_);
     glGenVertexArrays(1, &cinema_edge_vao_);
     glGenBuffers(1, &cinema_edge_vbo_);
+    glGenVertexArrays(1, &sizing_vao_);
+    glGenBuffers(1, &sizing_vbo_);
 
     const auto bind_attr = [](GLuint vao, GLuint vbo) {
         glBindVertexArray(vao);
@@ -708,6 +785,7 @@ void Viewport::init() {
     bind_line_attr(skeleton_vao_, skeleton_vbo_);
     bind_cinema_attr(cinema_vao_, cinema_vbo_);
     bind_cinema_line_attr(cinema_edge_vao_, cinema_edge_vbo_);
+    bind_sizing_attr(sizing_vao_, sizing_vbo_);
     glBindVertexArray(0);
 }
 
@@ -996,6 +1074,97 @@ void Viewport::set_skeleton(const std::vector<std::vector<Eigen::Vector3d>>& pol
     glBufferData(GL_ARRAY_BUFFER,
                  static_cast<GLsizeiptr>(skeleton_data_.size() * sizeof(float)),
                  skeleton_data_.data(), GL_DYNAMIC_DRAW);
+}
+
+void Viewport::set_cinema_sizing_samples(
+    const std::vector<Eigen::Vector3d>& field_points,
+    const std::vector<double>& field_h_before,
+    const std::vector<double>& field_h_after,
+    const std::vector<Eigen::Vector3d>& edge_points,
+    const std::vector<double>& edge_h_before,
+    const std::vector<double>& edge_h_after) {
+    sizing_vertex_count_ = 0;
+    const bool field_ok = field_points.size() == field_h_before.size() &&
+                          field_points.size() == field_h_after.size();
+    const bool edge_ok = edge_points.size() == edge_h_before.size() &&
+                         edge_points.size() == edge_h_after.size();
+    if (!field_ok || !edge_ok) {
+        glBindBuffer(GL_ARRAY_BUFFER, sizing_vbo_);
+        glBufferData(GL_ARRAY_BUFFER, 0, nullptr, GL_DYNAMIC_DRAW);
+        return;
+    }
+
+    double h_lo = std::numeric_limits<double>::infinity();
+    double h_hi = 0.0;
+    const auto measure = [&](const std::vector<double>& values) {
+        for (const double h : values) {
+            if (std::isfinite(h) && h > 0.0) {
+                h_lo = std::min(h_lo, h);
+                h_hi = std::max(h_hi, h);
+            }
+        }
+    };
+    measure(field_h_before);
+    measure(field_h_after);
+    measure(edge_h_before);
+    measure(edge_h_after);
+    if (!std::isfinite(h_lo) || !(h_hi > 0.0)) {
+        glBindBuffer(GL_ARRAY_BUFFER, sizing_vbo_);
+        glBufferData(GL_ARRAY_BUFFER, 0, nullptr, GL_DYNAMIC_DRAW);
+        return;
+    }
+    const double h_span = std::max(h_hi - h_lo, std::numeric_limits<double>::epsilon());
+    const auto normalise_h = [&](double h) {
+        if (!std::isfinite(h) || !(h > 0.0)) {
+            return 0.5f;
+        }
+        return static_cast<float>(std::clamp((h - h_lo) / h_span, 0.0, 1.0));
+    };
+
+    Eigen::Vector3d lo = Eigen::Vector3d::Zero();
+    Eigen::Vector3d hi = Eigen::Vector3d::Zero();
+    if (!field_points.empty()) {
+        lo = field_points.front();
+        hi = field_points.front();
+        for (const auto& p : field_points) {
+            lo = lo.cwiseMin(p);
+            hi = hi.cwiseMax(p);
+        }
+    }
+    const Eigen::Vector3d extent = hi - lo;
+    int sweep_axis = 0;
+    for (int axis = 1; axis < 3; ++axis) {
+        if (extent[axis] > extent[sweep_axis]) {
+            sweep_axis = axis;
+        }
+    }
+    const double sweep_span = std::max(extent[sweep_axis], 1.0e-12);
+
+    std::vector<float> data;
+    data.reserve((field_points.size() + edge_points.size()) * 7);
+    const auto append = [&](const Eigen::Vector3d& p, double before, double after,
+                            float order, float kind) {
+        data.insert(data.end(),
+                    {static_cast<float>(p.x()), static_cast<float>(p.y()),
+                     static_cast<float>(p.z()), normalise_h(before),
+                     normalise_h(after), order, kind});
+    };
+    for (std::size_t i = 0; i < field_points.size(); ++i) {
+        const float order = static_cast<float>(
+            std::clamp((field_points[i][sweep_axis] - lo[sweep_axis]) / sweep_span, 0.0, 1.0));
+        append(field_points[i], field_h_before[i], field_h_after[i], order, 0.0f);
+    }
+    const double edge_denom =
+        edge_points.size() > 1 ? static_cast<double>(edge_points.size() - 1) : 1.0;
+    for (std::size_t i = 0; i < edge_points.size(); ++i) {
+        append(edge_points[i], edge_h_before[i], edge_h_after[i],
+               static_cast<float>(static_cast<double>(i) / edge_denom), 1.0f);
+    }
+
+    sizing_vertex_count_ = static_cast<int>(field_points.size() + edge_points.size());
+    glBindBuffer(GL_ARRAY_BUFFER, sizing_vbo_);
+    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(data.size() * sizeof(float)),
+                 data.data(), GL_DYNAMIC_DRAW);
 }
 
 void Viewport::set_cinema_mesh(const fea::NodalMesh& mesh) {
@@ -1690,6 +1859,31 @@ void Viewport::draw_cinema(const Eigen::Matrix4f& view, const Eigen::Matrix4f& p
         glDrawArrays(GL_LINES, 0, skeleton_vertex_count_);
         glDepthMask(GL_TRUE);
         glLineWidth(1.0f);
+    }
+
+    const float sizing_alpha =
+        std::clamp(cinema_view_.spectral_overlay_alpha, 0.0f, 1.0f);
+    if (sizing_vertex_count_ > 0 && sizing_alpha > 0.0f) {
+        glUseProgram(sizing_program_);
+        glUniformMatrix4fv(glGetUniformLocation(sizing_program_, "u_view"), 1, GL_FALSE,
+                           view.data());
+        glUniformMatrix4fv(glGetUniformLocation(sizing_program_, "u_proj"), 1, GL_FALSE,
+                           proj.data());
+        glUniform1f(glGetUniformLocation(sizing_program_, "u_edge_reveal"),
+                    std::clamp(cinema_view_.spectral_edge_reveal, 0.0f, 1.0f));
+        glUniform1f(glGetUniformLocation(sizing_program_, "u_field_reveal"),
+                    std::clamp(cinema_view_.spectral_field_reveal, 0.0f, 1.0f));
+        glUniform1f(glGetUniformLocation(sizing_program_, "u_filter_mix"),
+                    std::clamp(cinema_view_.spectral_filter_mix, 0.0f, 1.0f));
+        glUniform1f(glGetUniformLocation(sizing_program_, "u_alpha"), sizing_alpha);
+        glEnable(GL_PROGRAM_POINT_SIZE);
+        glDepthMask(GL_FALSE);
+        glDepthFunc(GL_LEQUAL);
+        glBindVertexArray(sizing_vao_);
+        glDrawArrays(GL_POINTS, 0, sizing_vertex_count_);
+        glDepthFunc(GL_LESS);
+        glDepthMask(GL_TRUE);
+        glDisable(GL_PROGRAM_POINT_SIZE);
     }
 
     // An incremental transition still draws persistent/removed cells when the

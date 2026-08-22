@@ -148,7 +148,10 @@ class Viewport {
     std::size_t cinema_unchanged_element_count() const;
     std::size_t cinema_removed_element_count() const;
     std::size_t cinema_added_element_count() const;
-    /// Cinema draw parameters, applied only in `DisplayMode::kCinema`.
+    /// Cinema draw parameters. The primary path is `DisplayMode::kCinema`; a
+    /// result frame may also opt into the same buffers as a carryover overlay so
+    /// a solved field can grow out of the mesh that preceded it, or refinement
+    /// can grow over the error field that requested it.
     struct CinemaView {
         float skeleton_alpha = 1.0f; // 0..1
         float reveal = 0.0f;         // elements with index < reveal * count are drawn
@@ -174,6 +177,11 @@ class Viewport {
         /// replacement uploaded by `set_cinema_mesh_transition`.
         bool incremental_transition = false;
         float transition_progress = 1.0f; // 0 = previous topology, 1 = next topology
+        /// Draw the cinema buffers after a result surface. `result_alpha` fades
+        /// that surface while the carried mesh rises; both are still the exact
+        /// recorded states, merely composited by opacity.
+        bool overlay_on_results = false;
+        float result_alpha = 1.0f;
         /// Opening spectral-spacing overlay. Edge samples appear in curve order;
         /// field samples sweep over the part and morph from pre-filter to final
         /// target h. Point-ring diameter is proportional to target h.
@@ -187,16 +195,20 @@ class Viewport {
     /// Spatial reveal of the scalar field in the results modes.
     ///
     /// This is a REVEAL, not a field modification. The colours behind the front
-    /// are the pass's own values at the pass's own scale, byte for byte what
-    /// the un-swept bake would have produced; ahead of the front the sample is
-    /// painted an unstressed grey that no colormap entry can produce. Nothing
-    /// about the field is animated -- only how much of it has been uncovered --
-    /// so a frame grabbed mid-sweep can still be read straight off the legend.
+    /// are the current pass's own values at its own scale. Ahead of it, the
+    /// previous named field remains visible at its own scale when `carry_mode`
+    /// names one; `kCinema` means the neutral pre-result grey. The narrow front
+    /// feather is the only blend. No scalar value or displayed number is
+    /// interpolated, so both sides of a mid-sweep frame remain readable.
     struct FieldSweep {
         bool active = false;
         Eigen::Vector3f axis{1, 0, 0}; // need not be unit
         float front = 1.0f;            // fraction of the result's own extent along axis
         float feather = 0.06f;         // width of the leading band, same fraction units
+        /// Previous field shown ahead of the front. Only result modes are valid;
+        /// kCinema selects neutral grey instead of borrowing a scalar field.
+        DisplayMode carry_mode = DisplayMode::kCinema;
+        float carry_max = 1.0f;
     };
     /// Inactive, a zero-length `axis`, or a result with zero extent along the
     /// axis all leave every colour exactly as the un-swept bake produced it.

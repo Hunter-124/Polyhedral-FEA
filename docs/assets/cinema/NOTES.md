@@ -22,22 +22,24 @@ stdout.
 | Take | 3600 frames at a fixed 1/60 s virtual timestep = 60.000 s. The clock is set from the frame **index**, never accumulated from real frame time. |
 | Frame | 1920×1080. `--size` sets Xvfb and `POLYMESH_GUI_SIZE`; the recorded resolution is measured from the PNG rather than assumed. |
 | Acts | `skeleton` 0.13, `deliberate` 0.15, `build` 0.18, `mesh_hold` 0.09, `solve` 0.45. At 60 s these are 7.8 / 9.0 / 10.8 / 5.4 / 27.0 s. The GUI prints exact frame spans into the manifest. |
-| Left panel | 0.42 of the width. It opens once, then changes in place: exact-CAD spectrum → deployed network → actual-cell microscope → equation board. Build and solve transitions are opacity-only; pane geometry never moves after opening. |
+| Left panel | 0.42 of the width. It opens once, then changes in place: exact-CAD spectrum → deployed network → actual-cell microscope → equation board. Every view cross-fades directly from the view before it; the solve boundary no longer replays the network. Pane geometry never moves after opening. |
 | Bottom strip | Constant height. Over-wide rows shrink to fit; they never wrap or clip. Labels remain stable while fast computation animates above them. |
 | Camera | Set once, at `cinema on`, to the union of the skeleton and the mesh bounds (`Viewport::frame_content(kCinema)`, yaw 0.70, pitch 0.72, 0.90 fill) and then locked. There is no cut anywhere in the film. |
 
 ### What is interpolated
 
-Time, opacity, the shrink-toward-centroid reveal, the spatial sweep front, the
+Time, opacity, the shrink-toward-centroid reveal, the spatial handoff front, the
 pre/post-filter spacing-glyph morph, and the load factor λ. That is the whole
 list.
 
 No displayed **number** is ever interpolated. The opening rings interpolate
 marker diameter and colour between two measured target-h evaluations; their
 before/after millimetre ranges are computed values, and no intermediate value
-is labelled as another measurement. No activation, element count, error
-indicator, stress value or progress value is ever synthesised. Where a source
-is missing the film says which one and shows nothing in its place.
+is labelled as another measurement. During result handoffs, the old and new
+fields each retain their own measured scalar values and own normalization; only
+the narrow front feather blends display colours. No activation, element count,
+error indicator, stress value or progress value is ever synthesised. Where a
+source is missing the film says which one and shows nothing in its place.
 
 λ is the one interpolated quantity that is also displayed, and it is displayed
 because interpolating it is exact rather than approximate — see
@@ -78,7 +80,9 @@ because interpolating it is exact rather than approximate — see
   explains spacing variation. No spectrum is invented or decoratively seeded.
 - The last opening beat sweeps the pre/post-filter `h(x)` rings over the part,
   so the viewer can see where the frequency-space change affects the eventual
-  cell spacing rather than infer it from a chart alone.
+  cell spacing rather than infer it from a chart alone. The completed field
+  remains at full opacity across the chapter boundary, dims to a 0.22-alpha
+  input map over the first 1.3 s of advisor scoring, and is not cleared.
 - The analysis panel starts opening at 0.624 s and reaches full width at
   1.716 s, leaving about 6.08 s fully open on the default take.
 
@@ -90,6 +94,12 @@ at 0.15 s each. The remaining 3.15 s holds the final re-score/refusal state at
 full size, and the 1.6 s decision lead at the start of the next act extends that
 inspectable hold. Candidate-specific prose does not flash during the pass lane:
 the strip keeps one stable explanation while the network itself carries motion.
+
+The feature panel and full on-part target-spacing field enter this act intact.
+Over the first 1.3 s the panel cross-fades directly into the deployed network
+while the rings settle to the restrained carry opacity. The network therefore
+appears as the consumer of the field just shown, not as a fresh scene over an
+empty wireframe.
 
 - **The node fills are the graph's own tensors**, read out of the ONNX session:
   `advisor::ActivationFrame::input` / `fc1` / `fc2` (post-GELU) / `heads`. Not a
@@ -155,6 +165,9 @@ fallback**; it never presents the vetoed hybrid action as executed.
 
 - During the lead, the network holds its final measured pass. It then
   cross-fades to the cell microscope as construction begins.
+- The 0.22-alpha target-spacing map carried from advisor scoring fades over the
+  larger of the 1.6 s decision lead or 18% of this act. Actual emitted cells
+  occupy the same part as those targets replace them; there is no clear/reset.
 - An accepted decision still writes mesher, `h = h_rel × bbox diagonal`, adapt
   passes, η target and order into `SimSetup`. A refusal or unrecognised mesher is
   never substituted silently.
@@ -237,20 +250,25 @@ refine/re-refine hold, the load ramp and the final hold all remain present.
 There is no per-element solve order. The take replays completed fields, not a
 fabricated iteration timeline; the recorded solver token is described below.
 
-### The sweeps are reveals, not animations
+### The sweeps are handoffs, not physical animations
 
-The two `*_sweep` beats uncover a field that is **already complete**. A plane
-travels across the part; behind it the surface carries that pass's own values at
-that pass's own colour scale, ahead of it the surface is a neutral grey
-deliberately outside the `fea_colormap` range (0.67 minimum unit-RGB distance from
-any colour the map can produce, so an unswept region cannot be misread as a field
-value); within the leading band the colour lifts toward white by up to 0.65, which
-is what makes the front read as a front.
+Every moving field beat starts from the state already on screen. A plane travels
+across the part; behind it the arriving field carries its own values at its own
+colour scale, while ahead of it the preceding measured field remains at its own
+scale. The first stress beat is the sole exception: its carry state is the
+authoritative mesh over the neutral grey used before any solved scalar exists.
+The mesh overlay fades during the first 42% of that front instead of disappearing
+on the solve boundary.
 
-Nothing about the field changes as the front passes, and no number on screen is
-tied to the front's position. The front is eased (`smoothstep`) precisely because
-it is a camera move and not a physical quantity — a linear front starts and stops
-with a visible jerk.
+Stress therefore hands to the recovered gradient; gradient hands to pass-0 ZZ
+error; later-pass stress hands to that pass's ZZ error; and the final ZZ map hands
+to the load-scaled stress field. Within the leading band, display colours blend
+and lift toward white by up to 0.65 so the boundary reads as a moving front.
+Outside that narrow feather, both fields are returned byte-for-byte from their
+own colormap evaluations. No scalar or displayed number is interpolated.
+
+The front is eased (`smoothstep`) precisely because it is presentation and not a
+physical time variable — a linear front starts and stops with a visible jerk.
 
 **Which way it travels** is resolved from the real load case
 (`resolve_sweep_axis`): the axis is the resultant of every
@@ -293,6 +311,11 @@ colour-scaled by `max_nodal_eta`. The strip reports `PassTrace::global_eta` and
 the real `n_h_mark` / `n_p_mark` counts. With no configured adapt target it says
 **verification pass** rather than printing a fictitious 0% target.
 
+The error beat itself is a spatial handoff from the field immediately before it,
+not an instantaneous recolour. On pass 0 that carry field is the recovered
+gradient; on later passes it is von Mises stress because the gradient is shown
+only once. Both use their own maxima while the front crosses the part.
+
 ### Refine
 
 The viewport compares the previous and next `SolveStage::result.volume_mesh`
@@ -302,12 +325,14 @@ family and compare only their four corners, so final polynomial promotion does
 not masquerade as wholesale h-refinement.
 
 The default measured transition preserves 27,808 cells, removes 2,688 and adds
-8,143 replacements. Persistent cells remain rendered and briefly open by 0.06
-toward their centroids so internal changes can be seen; they never disappear.
-During the first 40% only removed cells collapse/fade; during the remaining 60%
-only added cells spawn with the existing centroid/reveal animation in the next
-mesh's storage order. The starting frame is the old topology and the ending
-frame is exactly the mesh the next pass solved.
+8,143 replacements. Its first 32% also performs the causal field→mesh handoff:
+the exact ZZ map that produced the marks fades only as the exact old→new topology
+diff rises over it. Persistent cells then remain rendered and briefly open by
+0.06 toward their centroids so internal changes can be seen; they never
+disappear. During the first 40% only removed cells collapse/fade; during the
+remaining 60% only added cells spawn with the existing centroid/reveal animation
+in the next mesh's storage order. The ending frame is exactly the mesh the next
+pass solved.
 
 ### Load ramp
 

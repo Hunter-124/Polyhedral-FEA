@@ -60,6 +60,21 @@ FEATURE_COLUMNS: list[str] = [
     "thin_p10_over_diag", "min_feature_h", "n_fix_faces", "n_load_faces",
     "fix_area_frac", "load_area_frac", "load_dir_x", "load_dir_y", "load_dir_z",
     "fix_load_dist_over_diag", "load_axis_alignment", "poisson",
+    # Proximity / crease / singularity block, appended for the portable-cost
+    # retrain in the order the contract fixes and `pipeline::CaseFeatures`
+    # declares. Appended, never inserted: the C++ side reads inputs by name but
+    # the ONNX graph is positional, so an insertion silently reindexes a shipped
+    # model. The first ten are also emitted per PART by
+    # `geometry_features.py`; `_load_geometry_features` drops those duplicates
+    # because the per-ROW value comes from the shipped C++ extractor with the
+    # case's own inputs, and two columns of the same name would leave one of
+    # them permanently NaN.
+    "geo_n_inner_loops", "geo_hole_spacing_min_rel", "geo_hole_spacing_p10_rel",
+    "geo_feat_pair_dist_min_rel", "geo_feat_pair_dist_p10_rel",
+    "geo_feat_pair_dist_mean_rel", "geo_dihedral_p10", "geo_dihedral_p50",
+    "geo_dihedral_p90", "geo_singular_lambda_min",
+    "load_to_feature_dist_min_rel", "fix_to_feature_dist_min_rel",
+    "case_load_multiaxiality",
 ]
 CASE_COLUMNS: list[str] = [
     "case_poisson", "case_n_fix_regions", "case_n_load_regions", "case_load_dir_x",
@@ -98,7 +113,14 @@ def _load_geometry_features() -> tuple[list[str], dict[str, dict[str, float]]]:
         rows = list(csv.DictReader(stream))
     if not rows:
         return [], {}
-    names = [name for name in rows[0] if name != "part"]
+    # A name carried by both this table and the per-row feature vector is taken
+    # from the ROW: `pipeline::extract_case_features` measured it on the same
+    # BRep with the case's own inputs, while this table can only be a per-part
+    # average. Keeping both would put the name twice in ``INPUT_COLUMNS``, and
+    # since positions are resolved with ``list.index`` the second copy would
+    # stay NaN forever and train as an imputed constant.
+    names = [name for name in rows[0]
+             if name != "part" and name not in FEATURE_COLUMNS]
 
     def cell(value: Any) -> float:
         try:

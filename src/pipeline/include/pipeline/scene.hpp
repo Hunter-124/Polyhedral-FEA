@@ -22,6 +22,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <numbers>
 #include <mutex>
 #include <optional>
 #include <set>
@@ -323,13 +324,76 @@ struct CaseFeatures {
     double geo_volume_frac = 0.0;
     double geo_area_over_v23 = 0.0;
     double geo_min_face_size_rel = 0.0;
+
+    // --- proximity / load / singularity descriptors ---------------------------
+    //
+    // Thirteen columns, in the exact order the portable-cost retrain contract
+    // fixes them, mirrored by `scripts/advisor/geometry_features.py` (the ten
+    // part-level `geo_*` ones) and listed in
+    // `scripts/advisor/dataset.py:FEATURE_COLUMNS`. Unlike the OOD-only block
+    // above these are meant as network INPUTS: they carry the proximity,
+    // load-interaction and regularity signal the v7 feature vector had no
+    // column for.
+    //
+    // Every one is scale-free: lengths are divided by the bbox diagonal, angles
+    // are radians, counts are dimensionless.
+    //
+    // The defaults ARE the documented "nothing to measure" sentinels, so a
+    // surface-only model, a build without OpenCASCADE, or a part with no holes
+    // and no salient features reports the same finite value as an explicit
+    // measurement of emptiness rather than a zero that means "touching":
+    //   counts            0
+    //   distances/spacing 1.0  (one full diagonal away = "infinitely far")
+    //   dihedral          pi   (flat: a smooth continuation, no crease)
+    //   singular lambda   1.0  (no singularity: stress bounded at the corner)
+    //   multiaxiality     0.0  (one load axis)
+
+    /// Distinct cylindrical bores (material outside the cylinder). A boss or a
+    /// shaft is material INSIDE its cylinder and is deliberately not counted.
+    double geo_n_inner_loops = 0.0;
+    /// Order statistics of the pairwise axis-line distances between bores.
+    double geo_hole_spacing_min_rel = 1.0;
+    double geo_hole_spacing_p10_rel = 1.0;
+    /// Order statistics of the pairwise distances between salient-feature
+    /// cluster centroids (edge-connected groups of faces below
+    /// `kSalientFaceAreaFraction` of the total BRep area). Fixed length
+    /// regardless of how many features the part has.
+    double geo_feat_pair_dist_min_rel = 1.0;
+    double geo_feat_pair_dist_p10_rel = 1.0;
+    double geo_feat_pair_dist_mean_rel = 1.0;
+    /// Dihedral distribution over sharp BRep edges, radians, in the
+    /// `geom::CadEdge::dihedral_rad` convention (pi = flat, smaller = sharper).
+    double geo_dihedral_p10 = std::numbers::pi;
+    double geo_dihedral_p50 = std::numbers::pi;
+    double geo_dihedral_p90 = std::numbers::pi;
+    /// Smallest Williams corner-singularity exponent over the reentrant edges:
+    /// stress behaves as r^(lambda-1), so lambda < 1 is a singularity and
+    /// lambda = 1 is a smooth corner. Geometry only - no solve, no mesh.
+    double geo_singular_lambda_min = 1.0;
+    /// Distance from the load / fixture region centroid to the nearest salient
+    /// feature cluster: the "is the stress raiser under the load" signal.
+    double load_to_feature_dist_min_rel = 1.0;
+    double fix_to_feature_dist_min_rel = 1.0;
+    /// Angle (rad, in [0, pi/2]) between the axes of the two largest load
+    /// resultants; 0 for a single load region or a single load axis.
+    double case_load_multiaxiality = 0.0;
 };
 
 /// Extract cheap, deterministic advisor context without meshing or solving.
-CaseFeatures extract_case_features(const Model& model,
-                                   std::span<const RefineRegion> fix_regions,
-                                   std::span<const RefineRegion> load_regions,
-                                   const Eigen::Vector3d& load_dir, double poisson);
+///
+/// `load_region_tractions` is index-aligned with `load_regions` and carries the
+/// per-region traction VECTOR (Pa, direction included) when the caller knows
+/// it. It is what makes `case_load_multiaxiality` measurable: `load_dir` is one
+/// summed direction for the whole case, so a two-patch load with an axial and a
+/// transverse traction is indistinguishable from a single oblique one without
+/// the per-region vectors. Callers that only have the summed direction pass
+/// nothing and get the documented single-axis sentinel 0.0; entries that are
+/// zero or non-finite fall back to `load_dir`.
+CaseFeatures
+extract_case_features(const Model& model, std::span<const RefineRegion> fix_regions,
+                      std::span<const RefineRegion> load_regions,
+                      const Eigen::Vector3d& load_dir, double poisson,
+                      std::span<const Eigen::Vector3d> load_region_tractions = {});
 
 /// What the spectral sizing pass did (ADR-0034). Zeroed when spectral sizing
 /// was not requested or no size field existed to filter.

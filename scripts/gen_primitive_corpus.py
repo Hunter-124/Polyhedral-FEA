@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Generate the procedural primitive corpus for the learned mesh advisor (ADR-0027).
 
-Six families x four size regimes = 24 manifold STEP solids, three boundary-condition
-load cases each = 72 ``*.case.json`` files, and one ``bench/reference/corpus/*.json``
-truth file per case.
+Fifteen families x four size regimes = 60 manifold STEP solids, five
+boundary-condition load cases each = 300 ``*.case.json`` files, and one
+``bench/reference/corpus/*.json`` truth file per case.
 
 Everything is deterministic: the per-part seed table below is committed literally and
 parameter jitter comes only from ``random.Random(seed)``. No clock, no environment, no
@@ -23,15 +23,27 @@ Truth is layered:
 * ``stepped_shaft`` case ``c1`` (transverse end load) carries the analytic
   Euler-Bernoulli + Cowper-shear stepped-cantilever tip deflection and its work-conjugate
   strain energy.
-* Every other case gets a first-order beam surrogate marked ``"source": "provisional"``
-  with a 100 % tolerance; ``scripts/advisor/promote_truth.py`` replaces those values with
-  the ``advisor-truth-0`` overkill reference answers, once, and never recomputes them.
+* Every other LEGACY case (families 1-11, archetypes c0-c2) gets a first-order beam
+  surrogate marked ``"source": "provisional"`` with a 100 % tolerance;
+  ``scripts/advisor/promote_truth.py`` replaces those values with the
+  ``advisor-truth-0`` overkill reference answers, once, and never recomputes them.
+* Cases added by the portable-cost retrain -- the four reinforcement/proximity
+  families and archetypes ``c3``/``c4`` on every family -- also start from that
+  surrogate, but they are deliberately EXCLUDED from the ``advisor-truth-0``
+  campaign: their truth may come only from the independent Gmsh 4.13.1 ->
+  CalculiX 2.23 chain (``bench/reference/external_truth.py``, ADR-0029). Promoting
+  our own solver into a reference it will then be scored against is the one thing
+  that would make the score self-assessment, so the internal ladder is not offered
+  to them at all. Their scored probes are ``strain_energy`` and ``tip_deflection``
+  only -- never a nodal peak stress (ADR-0032 section 4.1).
 
 Run from the repo root::
 
     python scripts/gen_primitive_corpus.py
     python scripts/gen_primitive_corpus.py --check
     python scripts/gen_primitive_corpus.py --family stepped_shaft
+    python scripts/gen_primitive_corpus.py --check-coverage
+    python scripts/gen_primitive_corpus.py --self-test
 """
 from __future__ import annotations
 
@@ -94,6 +106,9 @@ except ImportError as exc:  # pragma: no cover
 STEP_DIR = ROOT / "bench" / "geometries" / "corpus" / "primitives"
 CASE_DIR = STEP_DIR  # cases live next to their STEP; see build_advisor_dataset.load_cases
 REFERENCE_DIR = ROOT / "bench" / "reference" / "corpus"
+#: Manifest of cases whose truth may come only from the independent chain.
+EXTERNAL_PENDING_JSON = (ROOT / "bench" / "reference" / "external"
+                         / "pending-external-truth.json")
 TRUTH_CAMPAIGN_DIR = ROOT / "bench" / "campaigns" / "advisor-truth-0"
 
 # Same allowlist promote_truth.py uses: only truth this repo generated itself may
@@ -127,6 +142,27 @@ FAMILIES = (
     "ellipsoid_boss",
     "lobed_shaft",
     "twisted_loft",
+    # Added 2026-08-22 for the portable-cost retrain. The eleven families above
+    # are all single-load-path solids: one prismatic or revolved body, features
+    # that either weaken it (holes, notches) or hang off it (bosses). None of
+    # them is REINFORCED, and none puts two features close enough to interact,
+    # so the proximity and load-interaction features the retrain adds have no
+    # variance to learn from on the old corpus:
+    #   `ribbed_plate`     parallel stiffening ribs -- a second load path, and
+    #                      1-3 re-entrant rib/plate junctions per part.
+    #   `gusset_bracket`   an l_bracket whose corner is braced by a triangular
+    #                      web: the corner singularity is deliberately relieved.
+    #   `multi_hole_plate` 2-4 bores with a DELIBERATELY near-touching pair, so
+    #                      hole spacing is small against the hole radius rather
+    #                      than against the part (contrast `perforated_plate`,
+    #                      whose row is evenly spaced with a wide ligament).
+    #   `bossed_plate`     one boss beside the load patch and one remote from
+    #                      it, which is the only way load-to-feature distance
+    #                      varies within a family.
+    "ribbed_plate",
+    "gusset_bracket",
+    "multi_hole_plate",
+    "bossed_plate",
 )
 
 #: Nominal overall size (m) of each size regime. Same band as tests/fixtures/parts.
@@ -146,7 +182,19 @@ SEEDS = (
     900007, 900023, 900041, 900067,  # ellipsoid_boss   s0..s3
     1000003, 1000033, 1000037, 1000081,  # lobed_shaft  s0..s3
     1100009, 1100021, 1100053, 1100077,  # twisted_loft s0..s3
+    1200011, 1200023, 1200043, 1200059,  # ribbed_plate     s0..s3
+    1300021, 1300031, 1300049, 1300063,  # gusset_bracket   s0..s3
+    1400017, 1400029, 1400039, 1400071,  # multi_hole_plate s0..s3
+    1500013, 1500029, 1500047, 1500061,  # bossed_plate     s0..s3
 )
+
+#: Families and archetypes added by the portable-cost retrain. Named once, here,
+#: because three separate rules key off "is this case new": it may not enter the
+#: internal overkill truth campaign, its scored probes are restricted to
+#: strain_energy / tip_deflection, and `--check-coverage` measures it.
+RETRAIN_FAMILIES = ("ribbed_plate", "gusset_bracket", "multi_hole_plate",
+                    "bossed_plate")
+RETRAIN_ARCHETYPES = (3, 4)
 
 MATERIAL = {"E": 2.1e11, "nu": 0.3, "rho": 7850}
 
@@ -154,6 +202,26 @@ MATERIAL = {"E": 2.1e11, "nu": 0.3, "rho": 7850}
 TRACTION_AXIAL = 1.0e6
 TRACTION_TRANSVERSE = 1.0e5
 TRACTION_OBLIQUE = 2.0e5
+#: c3's second region is a band of wall around the whole section, so its area is
+#: an order of magnitude larger than an end face; the traction is scaled down to
+#: match so neither region's resultant swamps the other and the two-region angle
+#: `case_load_multiaxiality` reads is carried by comparable forces.
+TRACTION_BAND = 2.0e4
+#: c4 presses on the largest axis-aligned planar face, whose area is likewise
+#: much larger than an end section.
+PRESSURE_NORMAL = 2.0e4
+
+#: c3's second region: an axial band centred at mid-span, half-width as a
+#: fraction of the axial extent. Wide enough that a coarse mesh always has face
+#: centroids inside it (h_rel tops out at 0.20, so 0.10 of the extent is at
+#: least half an element), narrow enough to stay clear of both end selections.
+BAND_HALF_FRAC = 0.05
+#: c4's slab: half-depth along the pressed face's normal as a fraction of the
+#: part's extent along that normal, plus an in-plane pad. A planar face's facet
+#: centroids lie exactly in its plane, so the depth only has to stay well below
+#: the distance to the nearest parallel face.
+PRESSURE_SLAB_FRAC = 0.02
+PRESSURE_PAD_FRAC = 0.02
 
 #: Selection-slab depths, as a fraction of the loaded/fixed cross-section's smallest
 #: extent. 0.01 reproduces the working tests/fixtures/parts/cantilever.case.json slab
@@ -176,8 +244,13 @@ AXIS_NAMES = ("x", "y", "z")
 
 
 def r10(value: float) -> float:
-    """Round to 10 significant digits so emitted JSON is stable and readable."""
-    return float(f"{float(value):.10g}")
+    """Round to 10 significant digits so emitted JSON is stable and readable.
+
+    ``+ 0.0`` normalises a signed zero: ``-0.0`` is a valid double but in a
+    traction vector it reads as a direction, and it is not one. The addition is
+    the exact identity on every other value, so no previously emitted number moves.
+    """
+    return float(f"{float(value):.10g}") + 0.0
 
 
 def jitter(rng: random.Random, low: float, high: float) -> float:
@@ -306,6 +379,110 @@ def _lofted_sections(sections: list[list[tuple[float, float, float]]], name: str
     if not loft.IsDone():
         raise RuntimeError(f"{name}: loft through the spline sections failed")
     return _healed(loft.Shape(), name)
+
+
+def _triangular_prism(p0: tuple[float, float, float], p1: tuple[float, float, float],
+                      p2: tuple[float, float, float], extrude: tuple[float, float, float],
+                      name: str):
+    """Solid triangular web: the triangle p0-p1-p2 swept along `extrude`."""
+    corners = [gp_Pnt(*p0), gp_Pnt(*p1), gp_Pnt(*p2)]
+    wire = BRepBuilderAPI_MakeWire()
+    for start, end in ((0, 1), (1, 2), (2, 0)):
+        wire.Add(BRepBuilderAPI_MakeEdge(corners[start], corners[end]).Edge())
+    if not wire.IsDone():
+        raise RuntimeError(f"{name}: gusset triangle wire construction failed")
+    face = BRepBuilderAPI_MakeFace(wire.Wire())
+    if not face.IsDone():
+        raise RuntimeError(f"{name}: gusset triangle is not a valid planar face")
+    prism = BRepPrimAPI_MakePrism(face.Face(), gp_Vec(*extrude))
+    prism.Build()
+    if not prism.IsDone():
+        raise RuntimeError(f"{name}: gusset extrusion failed")
+    return _healed(prism.Shape(), name)
+
+
+@dataclass(frozen=True)
+class PlanarFace:
+    """One planar BRep face whose outward normal is parallel to a bbox axis."""
+
+    axis: int
+    side: str
+    """``lo`` when the outward normal points along -axis, ``hi`` along +axis."""
+    area: float
+    centroid: tuple[float, float, float]
+    lo: tuple[float, float, float]
+    hi: tuple[float, float, float]
+    straight_edges: bool
+    """True when every bounding edge is a straight line, i.e. a mesh of this face
+    reproduces its exact area and an authored ``expected_area`` is honest."""
+
+    @property
+    def normal(self) -> tuple[float, float, float]:
+        out = [0.0, 0.0, 0.0]
+        out[self.axis] = 1.0 if self.side == "hi" else -1.0
+        return (out[0], out[1], out[2])
+
+
+def axis_aligned_planar_faces(shape, name: str, *, tol: float = 1.0e-9
+                              ) -> list[PlanarFace]:
+    """Every planar face of `shape` whose outward normal is a bbox axis direction.
+
+    WHY THE RESTRICTION. A case traction is one constant vector per region, so a
+    "normal pressure" is only expressible on a PLANAR face -- and a selection box
+    is axis-aligned, so isolating a face with an oblique normal would need a box
+    that also encloses whatever else lies in its fat bounding volume. Every family
+    in the corpus has at least one axis-aligned planar face (a section end, a wall
+    or a plate face), so restricting the c4 candidate set costs no family and
+    removes the whole class of "the slab caught a neighbour" defect. Oblique faces
+    (the gusset web's hypotenuse) are skipped, not approximated.
+    """
+    from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
+    from OCP.GeomAbs import GeomAbs_Line, GeomAbs_Plane
+    from OCP.TopAbs import TopAbs_EDGE, TopAbs_FACE, TopAbs_REVERSED
+    from OCP.TopExp import TopExp_Explorer
+    from OCP.TopoDS import TopoDS
+
+    out: list[PlanarFace] = []
+    explorer = TopExp_Explorer(shape, TopAbs_FACE)
+    while explorer.More():
+        face = TopoDS.Face_s(explorer.Current())
+        explorer.Next()
+        surface = BRepAdaptor_Surface(face)
+        if surface.GetType() != GeomAbs_Plane:
+            continue
+        direction = surface.Plane().Axis().Direction()
+        components = [direction.X(), direction.Y(), direction.Z()]
+        if face.Orientation() == TopAbs_REVERSED:
+            components = [-value for value in components]
+        axis = max(range(3), key=lambda i: abs(components[i]))
+        if abs(abs(components[axis]) - 1.0) > 1.0e-7:
+            continue  # oblique normal: not addressable by an axis-aligned slab
+        props = GProp_GProps()
+        BRepGProp.SurfaceProperties_s(face, props)
+        centre = props.CentreOfMass()
+        bounds = Bnd_Box()
+        BRepBndLib.Add_s(face, bounds, True)
+        x0, y0, z0, x1, y1, z1 = bounds.Get()
+        straight = True
+        edges = TopExp_Explorer(face, TopAbs_EDGE)
+        while edges.More():
+            if BRepAdaptor_Curve(TopoDS.Edge_s(edges.Current())).GetType() != GeomAbs_Line:
+                straight = False
+                break
+            edges.Next()
+        area = float(props.Mass())
+        if not area > tol * tol:
+            continue
+        out.append(PlanarFace(
+            axis=axis, side="hi" if components[axis] > 0.0 else "lo",
+            area=area,
+            centroid=(centre.X(), centre.Y(), centre.Z()),
+            lo=(x0, y0, z0), hi=(x1, y1, z1),
+            straight_edges=straight,
+        ))
+    if not out:
+        raise RuntimeError(f"{name}: no axis-aligned planar face to press on")
+    return out
 
 
 def _face_area_at(shape, axis: int, coord: float, name: str, *, tol: float = 1e-9) -> float:
@@ -859,6 +1036,231 @@ def build_twisted_loft(name: str, scale: float, rng: random.Random) -> Geometry:
     )
 
 
+def build_ribbed_plate(name: str, scale: float, rng: random.Random) -> Geometry:
+    """Plate stiffened by 1-3 parallel ribs on its +z face; the reinforcement family.
+
+    Every earlier family has ONE load path: material either carries the load or
+    is missing from it. A rib adds a second, much stiffer path over part of the
+    span, so the stress field is set by how the load divides between plate and
+    rib -- which is a function of the rib/plate stiffness ratio, not of any
+    single length. The ribs stop clear of both ends, so the fixed and loaded end
+    faces stay plain rectangles (exact `expected_area`) and every rib
+    contributes two re-entrant junction edges plus a free rib end, which is the
+    proximity/singularity structure the retrain's features exist to see.
+    """
+    half_w = r10(0.5 * scale)
+    half_h = r10(half_w * jitter(rng, 0.34, 0.44))
+    thickness = r10(half_h * jitter(rng, 0.16, 0.24))
+    n_ribs = 1 + int(rng.random() * 3.0)  # 1, 2 or 3, deterministic under the seed
+    rib_w = r10(thickness * jitter(rng, 0.8, 1.3))
+    rib_h = r10(thickness * jitter(rng, 1.6, 2.6))
+    pitch = r10(2.0 * half_h / (n_ribs + 1))
+    if pitch <= 1.6 * rib_w:
+        raise ValueError(f"{name}: rib pitch {pitch} too tight for rib width {rib_w}")
+    rib_x0 = r10(-0.76 * half_w)
+    rib_len = r10(1.52 * half_w)
+    shape = _box((-half_w, -half_h, 0.0),
+                 (r10(2.0 * half_w), r10(2.0 * half_h), thickness))
+    for index in range(n_ribs):
+        y0 = r10(-half_h + pitch * (index + 1) - 0.5 * rib_w)
+        shape = _fuse(shape, _box((rib_x0, y0, thickness), (rib_len, rib_w, rib_h)), name)
+    _require_solid(shape, name)
+    return Geometry(
+        name=name, family="ribbed_plate", regime=-1, seed=-1, shape=shape,
+        lo=(-half_w, -half_h, 0.0), hi=(half_w, half_h, r10(thickness + rib_h)),
+        axis=0, transverse=2,
+        end_area=r10(2.0 * half_h * thickness), guard_end_area=True,
+        load_region="end_slab",
+        fix_axis=0, fix_side="lo",
+        fix_char_len=thickness, load_char_len=thickness,
+        span=r10(2.0 * half_w),
+        params={"half_w": half_w, "half_h": half_h, "thickness": thickness,
+                "n_ribs": float(n_ribs), "rib_w": rib_w, "rib_h": rib_h,
+                "rib_pitch": pitch, "rib_x0": rib_x0, "rib_len": rib_len,
+                "rib_h_over_thickness": r10(rib_h / thickness),
+                "rib_pitch_over_rib_w": r10(pitch / rib_w),
+                "stiffened_frac_of_span": r10(rib_len / (2.0 * half_w))},
+        analytic=None,
+    )
+
+
+def build_gusset_bracket(name: str, scale: float, rng: random.Random) -> Geometry:
+    """L-bracket whose inner corner is braced by a triangular gusset web.
+
+    `l_bracket` is the corpus's re-entrant-corner family: its inner corner is a
+    stress singularity whose exponent depends only on the opening angle. Bracing
+    it changes that -- the web carries the corner in direct tension, so the same
+    opening angle now sits on a stiffer support and the corner's contribution to
+    the solution is smaller. It is the one family where the singularity strength
+    and the geometry that produces it move independently, which is exactly what
+    a learned regularity feature must be able to tell apart.
+    """
+    leg_x = r10(scale)
+    leg_z = r10(scale * jitter(rng, 0.55, 0.75))
+    depth = r10(scale * jitter(rng, 0.18, 0.28))
+    wall = r10(scale * jitter(rng, 0.06, 0.10))
+    if wall >= min(leg_x, leg_z) / 3.0:
+        raise ValueError(f"{name}: wall {wall} too thick for legs {leg_x}/{leg_z}")
+    # TWO thin webs rather than one. A single web -- centred or full depth -- left
+    # the family's standardized descriptor centroid closer to `l_bracket` than the
+    # existing corpus's closest pair (measured: 2.07 centred, 1.38 full depth,
+    # against a 2.32 threshold), so it would have been a weaker transfer test than
+    # a new family is worth. A pair of webs is also the more honest reinforcement:
+    # it puts two braced toes on each leg at a known spacing, which is a proximity
+    # configuration the corpus has nowhere else.
+    # Bounded by the depth, not only by the wall: two webs at quarter and three-
+    # quarter depth must clear both the side faces and each other, which needs
+    # t < depth/2 whatever the wall happens to be.
+    web_t = r10(min(wall * jitter(rng, 0.45, 0.70), 0.30 * depth))
+    if 2.0 * web_t >= 0.8 * depth:
+        raise ValueError(f"{name}: webs {web_t} too thick for depth {depth}")
+    reach_x = r10((leg_x - wall) * jitter(rng, 0.45, 0.70))
+    reach_z = r10((leg_z - wall) * jitter(rng, 0.45, 0.70))
+    horizontal = _box((0.0, 0.0, 0.0), (leg_x, depth, wall))
+    vertical = _box((0.0, 0.0, 0.0), (wall, depth, leg_z))
+    shape = _fuse(horizontal, vertical, name)
+    for centre in (0.25, 0.75):
+        y0 = r10(centre * depth - 0.5 * web_t)
+        shape = _fuse(shape, _triangular_prism(
+            (wall, y0, wall), (r10(wall + reach_x), y0, wall),
+            (wall, y0, r10(wall + reach_z)), (0.0, web_t, 0.0), name), name)
+    _require_solid(shape, name)
+    return Geometry(
+        name=name, family="gusset_bracket", regime=-1, seed=-1, shape=shape,
+        lo=(0.0, 0.0, 0.0), hi=(leg_x, depth, leg_z),
+        axis=0, transverse=2,
+        end_area=r10(depth * wall), guard_end_area=True,
+        load_region="end_slab",
+        fix_axis=2, fix_side="hi",
+        fix_char_len=wall, load_char_len=min(depth, wall),
+        span=r10(leg_x + leg_z),
+        params={"leg_x": leg_x, "leg_z": leg_z, "depth": depth, "wall": wall,
+                "n_gussets": 2.0, "gusset_t": web_t,
+                "gusset_reach_x": reach_x, "gusset_reach_z": reach_z,
+                "gusset_t_over_wall": r10(web_t / wall),
+                "web_spacing": r10(0.5 * depth),
+                "web_spacing_over_t": r10(0.5 * depth / web_t),
+                "gusset_area": r10(reach_x * reach_z),
+                "gusset_volume_frac": r10(
+                    reach_x * reach_z * web_t
+                    / (leg_x * depth * wall + wall * depth * (leg_z - wall)
+                       + reach_x * reach_z * web_t)),
+                "brace_frac_of_leg_x": r10(reach_x / leg_x)},
+        analytic=None,
+    )
+
+
+def build_multi_hole_plate(name: str, scale: float, rng: random.Random) -> Geometry:
+    """Plate with 2-4 bores of TWO radii, including a near-touching pair.
+
+    The proximity family. `perforated_plate` already carries many holes, but its
+    row is evenly spaced, single-radius and on the centre line, so hole-to-hole
+    distance is a constant of the family and carries no information. Here the
+    central pair is separated by 0.30-0.55 of the SMALLER hole's radius, the two
+    radii differ by up to 1.8x, and the remaining bores sit off the centre line at
+    the far corners. Minimum spacing, spacing/radius and mean feature-pair
+    distance therefore all vary within one part, which is the only configuration
+    in which a proximity feature can be shown to matter -- and it is what pulls
+    the family's descriptor centroid clear of `perforated_plate`, which a
+    single-radius row did not do (`--check-coverage`).
+    """
+    half_w = r10(0.5 * scale)
+    half_h = r10(half_w * jitter(rng, 0.38, 0.50))
+    thickness = r10(half_h * jitter(rng, 0.18, 0.26))
+    hole_r = r10(half_h * jitter(rng, 0.16, 0.22))
+    small_r = r10(hole_r * jitter(rng, 0.55, 0.85))
+    n_holes = 2 + int(rng.random() * 3.0)  # 2, 3 or 4, deterministic under the seed
+    gap = r10(small_r * jitter(rng, 0.30, 0.55))
+    pair_dx = r10(hole_r + small_r + gap)
+    bores = [(r10(-0.5 * pair_dx), 0.0, hole_r), (r10(0.5 * pair_dx), 0.0, small_r)]
+    if n_holes >= 3:
+        bores.append((r10(-0.55 * half_w), r10(0.45 * half_h), small_r))
+    if n_holes >= 4:
+        bores.append((r10(0.55 * half_w), r10(-0.45 * half_h), hole_r))
+    for centre_x, centre_y, radius in bores:
+        if abs(centre_x) + radius > 0.85 * half_w \
+                or abs(centre_y) + radius > 0.72 * half_h:
+            raise ValueError(f"{name}: bore at ({centre_x}, {centre_y}) breaks the margin")
+    margin = r10(max(thickness * 0.5, 1e-4))
+    shape = _box((-half_w, -half_h, 0.0),
+                 (r10(2.0 * half_w), r10(2.0 * half_h), thickness))
+    for centre_x, centre_y, radius in bores:
+        drill = _cyl((centre_x, centre_y, r10(-margin)), (0.0, 0.0, 1.0), radius,
+                     r10(thickness + 2.0 * margin))
+        shape = _cut(shape, drill, name)
+    _require_solid(shape, name)
+    return Geometry(
+        name=name, family="multi_hole_plate", regime=-1, seed=-1, shape=shape,
+        lo=(-half_w, -half_h, 0.0), hi=(half_w, half_h, thickness),
+        axis=0, transverse=2,
+        end_area=r10(2.0 * half_h * thickness), guard_end_area=True,
+        load_region="end_slab",
+        fix_axis=0, fix_side="lo",
+        fix_char_len=thickness, load_char_len=thickness,
+        span=r10(2.0 * half_w),
+        params={"half_w": half_w, "half_h": half_h, "thickness": thickness,
+                "hole_r": hole_r, "small_hole_r": small_r,
+                "radius_ratio": r10(hole_r / small_r),
+                "n_holes": float(n_holes),
+                "pair_gap": gap, "pair_centre_distance": pair_dx,
+                "pair_gap_over_small_r": r10(gap / small_r),
+                "hole_r_over_thickness": r10(hole_r / thickness)},
+        analytic=None,
+    )
+
+
+def build_bossed_plate(name: str, scale: float, rng: random.Random) -> Geometry:
+    """Plate with 1-2 cylindrical bosses: one beside the load patch, one remote.
+
+    Load-to-feature distance is the one retrain feature that no existing family
+    varies: `sphere_box` and `ellipsoid_boss` put their boss ON the loaded face,
+    everything else keeps its features far from the load. Here the near boss sits
+    about one diameter inboard of the loaded end and the far boss (when present)
+    sits the same distance from the fixture, so within one family the same
+    feature type appears at two very different distances from the load.
+    """
+    half_w = r10(0.5 * scale)
+    half_h = r10(half_w * jitter(rng, 0.34, 0.46))
+    thickness = r10(half_h * jitter(rng, 0.18, 0.26))
+    boss_r = r10(half_h * jitter(rng, 0.26, 0.36))
+    boss_h = r10(thickness * jitter(rng, 1.2, 2.0))
+    n_bosses = 1 + int(rng.random() * 2.0)  # 1 or 2, deterministic under the seed
+    centres = [(r10(half_w - boss_r * jitter(rng, 1.8, 2.4)), 0.0)]
+    if n_bosses >= 2:
+        centres.append((r10(-half_w + boss_r * jitter(rng, 1.8, 2.4)), 0.0))
+    # The end faces must stay plain rectangles, so a boss has to keep clear of the
+    # end by a fraction of its own radius -- the jitter band above guarantees at
+    # least 0.8 R, and this is the guard that keeps that true if the band moves.
+    for centre_x, centre_y in centres:
+        if half_w - abs(centre_x) - boss_r < 0.5 * boss_r \
+                or abs(centre_y) + boss_r > 0.8 * half_h:
+            raise ValueError(f"{name}: boss at ({centre_x}, {centre_y}) breaks the margin")
+    shape = _box((-half_w, -half_h, 0.0),
+                 (r10(2.0 * half_w), r10(2.0 * half_h), thickness))
+    for centre_x, centre_y in centres:
+        shape = _fuse(shape, _cyl((centre_x, centre_y, thickness), (0.0, 0.0, 1.0),
+                                  boss_r, boss_h), name)
+    _require_solid(shape, name)
+    return Geometry(
+        name=name, family="bossed_plate", regime=-1, seed=-1, shape=shape,
+        lo=(-half_w, -half_h, 0.0), hi=(half_w, half_h, r10(thickness + boss_h)),
+        axis=0, transverse=2,
+        end_area=r10(2.0 * half_h * thickness), guard_end_area=True,
+        load_region="end_slab",
+        fix_axis=0, fix_side="lo",
+        fix_char_len=thickness, load_char_len=thickness,
+        span=r10(2.0 * half_w),
+        params={"half_w": half_w, "half_h": half_h, "thickness": thickness,
+                "boss_r": boss_r, "boss_h": boss_h, "n_bosses": float(n_bosses),
+                "near_boss_x": centres[0][0],
+                "near_boss_clearance": r10(half_w - centres[0][0] - boss_r),
+                "far_boss_x": centres[1][0] if n_bosses >= 2 else 0.0,
+                "boss_h_over_thickness": r10(boss_h / thickness),
+                "boss_r_over_half_h": r10(boss_r / half_h)},
+        analytic=None,
+    )
+
+
 BUILDERS = {
     "box_hole": build_box_hole,
     "l_bracket": build_l_bracket,
@@ -871,6 +1273,10 @@ BUILDERS = {
     "ellipsoid_boss": build_ellipsoid_boss,
     "lobed_shaft": build_lobed_shaft,
     "twisted_loft": build_twisted_loft,
+    "ribbed_plate": build_ribbed_plate,
+    "gusset_bracket": build_gusset_bracket,
+    "multi_hole_plate": build_multi_hole_plate,
+    "bossed_plate": build_bossed_plate,
 }
 
 
@@ -919,6 +1325,110 @@ def load_box(geom: Geometry) -> list[list[float]]:
     return _slab(geom, geom.axis, "hi", depth, pad)
 
 
+def band_box(geom: Geometry) -> list[list[float]]:
+    """Select box for c3's second region: a full-perimeter band at mid-span.
+
+    WHY A BAND AND NOT A SECOND FACE. c3 exists to make two load regions with
+    non-parallel resultants, and every family must have one. Eleven of the fifteen
+    families have exactly two planar faces (the two section ends), one of which is
+    clamped, so there is no second FACE to load -- a second region has to come off
+    the wall. A band spanning the whole cross-section is the only wall region that
+    is robust for all of them: it contains face centroids at every mesh size and
+    on every section shape, hollow or solid, planar or spline, because it cuts the
+    solid rather than skimming one side of it. A one-sided patch on a curved wall
+    would select nothing at coarse h on a small-radius shaft.
+
+    The band is axially clear of both end selections (it is centred at mid-span
+    and 10 % of the extent wide, against end slabs of order 1 % of a section
+    length), so c3's two boxes are provably disjoint.
+    """
+    pad = r10(PAD_FRAC * geom.diag)
+    lo = [geom.lo[i] - pad for i in range(3)]
+    hi = [geom.hi[i] + pad for i in range(3)]
+    mid = 0.5 * (geom.lo[geom.axis] + geom.hi[geom.axis])
+    half = BAND_HALF_FRAC * geom.extent(geom.axis)
+    lo[geom.axis] = mid - half
+    hi[geom.axis] = mid + half
+    return [[r10(v) for v in lo], [r10(v) for v in hi]]
+
+
+def band_area_estimate(geom: Geometry) -> float:
+    """Bbox-perimeter estimate of the c3 band's loaded area (surrogate truth only).
+
+    The band's exact area needs the section perimeter, which for four families has
+    no closed form. This is the bbox side perimeter times the band length: right
+    to within the section's shape factor, and used ONLY inside the provisional
+    first-order surrogate that the independent Gmsh/CalculiX chain replaces. It is
+    never an authored `expected_area`: the case leaves that out, so testlab
+    rescales the traction onto the exact CAD rule area instead.
+    """
+    others = [i for i in range(3) if i != geom.axis]
+    perimeter = 2.0 * (geom.extent(others[0]) + geom.extent(others[1]))
+    return r10(perimeter * 2.0 * BAND_HALF_FRAC * geom.extent(geom.axis))
+
+
+def _in_box(point: tuple[float, float, float], box: list[list[float]]) -> bool:
+    return all(box[0][i] <= point[i] <= box[1][i] for i in range(3))
+
+
+def is_primary_load_face(geom: Geometry, face: PlanarFace) -> bool:
+    """Does `face` carry archetype c0's traction?
+
+    True only for the planar face lying IN the loaded end plane of an ``end_slab``
+    load region. The plane test is the load-bearing half: `stepped_shaft`'s
+    shoulder annulus also faces +axis, and treating it as c0's face would have
+    pushed c4 onto the tip disc -- a scaled copy of c0 -- while a genuinely
+    independent face was available. A ``spherical_cap`` region loads a curved
+    boss, so no planar face is its.
+    """
+    if geom.load_region != "end_slab" or face.axis != geom.axis or face.side != "hi":
+        return False
+    return abs(face.centroid[face.axis] - geom.hi[face.axis]) <= 1e-7 * geom.diag
+
+
+def pressure_face(geom: Geometry) -> PlanarFace:
+    """The face c4 presses on: the largest axis-aligned planar face off the fixture.
+
+    Ties are real -- a prismatic box has four identical wall faces -- so the area
+    is quantised to nine significant digits before ordering and the remainder is
+    broken by axis then side. Without that, two faces whose areas differ in the
+    last ulp of an OCC integration would swap between runs and the emitted case
+    would not be reproducible, which is the one property this generator sells.
+
+    A face whose centroid lies inside the fixture box is skipped: pressing on the
+    clamped face is a load that does no work and a case that measures nothing.
+
+    c0's own end face is used only as a LAST resort. Pressing on it produces the
+    same face set and an antiparallel traction, so linearity makes the solution an
+    exact scalar multiple of c0's and the case teaches nothing new. Four families
+    (`tube`, `lobed_shaft`, `twisted_loft` and any solid of revolution) have
+    exactly two planar faces and one of them is clamped, so for those the last
+    resort is all there is; the case still records that it is scale-equivalent to
+    c0 (`scaled_duplicate_of`) instead of pretending to be independent.
+    """
+    fix = fix_box(geom)
+    candidates = [face for face in axis_aligned_planar_faces(geom.shape, geom.name)
+                  if not _in_box(face.centroid, fix)]
+    if not candidates:
+        raise RuntimeError(f"{geom.name}: every planar face lies inside the fixture")
+    independent = [face for face in candidates if not is_primary_load_face(geom, face)]
+    return sorted(independent or candidates,
+                  key=lambda f: (-float(f"{f.area:.9g}"), f.axis,
+                                 0 if f.side == "lo" else 1, f.centroid))[0]
+
+
+def pressure_box(geom: Geometry, face: PlanarFace) -> list[list[float]]:
+    """Thin slab around one planar face, padded in-plane, straddling its plane."""
+    depth = r10(max(PRESSURE_SLAB_FRAC * geom.extent(face.axis), 1e-9))
+    pad = r10(PRESSURE_PAD_FRAC * geom.diag)
+    lo = [face.lo[i] - pad for i in range(3)]
+    hi = [face.hi[i] + pad for i in range(3)]
+    plane = geom.hi[face.axis] if face.side == "hi" else geom.lo[face.axis]
+    lo[face.axis] = plane - depth
+    hi[face.axis] = plane + depth
+    return [[r10(v) for v in lo], [r10(v) for v in hi]]
+
+
 def oblique_direction(geom: Geometry, rng: random.Random) -> tuple[float, float, float]:
     """Unit vector off every axis (each |component| >= 0.26), axial part positive."""
     raw = [jitter(rng, 0.45, 1.0) for _ in range(3)]
@@ -930,7 +1440,14 @@ def oblique_direction(geom: Geometry, rng: random.Random) -> tuple[float, float,
 
 
 def case_specs(geom: Geometry) -> list[dict[str, Any]]:
-    """Three load cases per part: axial, transverse, oblique."""
+    """Five load cases per part: axial, transverse, oblique, two-region, pressure.
+
+    A spec is the primary region plus optional extras. ``traction`` and
+    ``normal_min_dot`` always describe the FIRST ``loads[]`` entry, which is the
+    one testlab's tip/load-area probes read (``compute_probes`` uses
+    ``loads.front()``), so the primary region of every archetype stays the region
+    the scored displacement probe is defined on.
+    """
     rng = random.Random(geom.seed + 1)
     axial = [0.0, 0.0, 0.0]
     axial[geom.axis] = TRACTION_AXIAL
@@ -938,6 +1455,12 @@ def case_specs(geom: Geometry) -> list[dict[str, Any]]:
     transverse[geom.transverse] = -TRACTION_TRANSVERSE
     direction = oblique_direction(geom, rng)
     oblique = [r10(TRACTION_OBLIQUE * component) for component in direction]
+    band = [0.0, 0.0, 0.0]
+    band[geom.transverse] = -TRACTION_BAND
+    face = pressure_face(geom)
+    pressure = [r10(-PRESSURE_NORMAL * component) for component in face.normal]
+    primary_area = (geom.end_area if geom.family != "sphere_box"
+                    else geom.params["box_section_area"])
 
     return [
         {
@@ -967,32 +1490,116 @@ def case_specs(geom: Geometry) -> list[dict[str, Any]]:
             "normal_min_dot": -1.0,
             "analytic": None,
         },
+        {
+            "index": 3,
+            "archetype": "two_region_multiaxial",
+            "traction": [r10(v) for v in axial],
+            "normal_min_dot": 0.7,
+            # Second region: a mid-span band carrying a transverse traction. The
+            # two resultants are perpendicular by construction, which is the only
+            # configuration in which `case_load_multiaxiality` is nonzero, and the
+            # band is the region no family can fail to resolve (see band_box).
+            "extra_regions": [{
+                "box": band_box(geom),
+                "traction": [r10(v) for v in band],
+                # Box-only: a transverse traction on a wall band has no reason to
+                # align with any wall normal, so a normal filter would keep only
+                # the two side walls and drop the top and bottom.
+                "normal_min_dot": -1.0,
+            }],
+            "corpus_extra": {"load_regions": [
+                {"kind": "end_slab",
+                 "face": f"{AXIS_NAMES[geom.axis]}_hi",
+                 "resultant": "axial"},
+                {"kind": "mid_span_band",
+                 "axis": AXIS_NAMES[geom.axis],
+                 "span_frac": [r10(0.5 - BAND_HALF_FRAC), r10(0.5 + BAND_HALF_FRAC)],
+                 "resultant": "transverse"},
+            ]},
+            "analytic": None,
+            "truth_regions": [
+                {"area": primary_area, "span": geom.span,
+                 "traction": [r10(v) for v in axial], "region": "end_slab"},
+                {"area": band_area_estimate(geom), "span": r10(0.5 * geom.span),
+                 "traction": [r10(v) for v in band], "region": "mid_span_band"},
+            ],
+        },
+        {
+            "index": 4,
+            "archetype": "face_pressure",
+            "traction": pressure,
+            # Traction is antiparallel to the pressed face's own normal, so the
+            # 0.7 filter keeps that face and drops every perpendicular neighbour
+            # the in-plane pad reaches.
+            "normal_min_dot": 0.7,
+            "primary_box": pressure_box(geom, face),
+            # Authored only when the face is straight-edged: a mesh of a polygon
+            # reproduces its exact area, a mesh of a hole-punched or spline-bounded
+            # face does not, and an authored area that a correct mesh cannot match
+            # is the drift warning this guard exists to raise.
+            "primary_expected_area": r10(face.area) if face.straight_edges else None,
+            "corpus_extra": {
+                "loaded_face": f"{AXIS_NAMES[face.axis]}_{face.side}",
+                "load_face_boundary": "straight" if face.straight_edges else "curved",
+                "pressure_Pa": PRESSURE_NORMAL,
+                "pressure_face_area_m2": r10(face.area),
+                "pressure_face_outward_normal": [r10(v) for v in face.normal],
+                # Two faces can share a `loaded_face` key: stepped_shaft's tip disc
+                # and its shoulder annulus both face +x. The centroid names which.
+                "pressure_face_centroid_m": [r10(v) for v in face.centroid],
+                # Stated, not hidden: on a solid whose only free planar face is
+                # c0's, this case's solution is -PRESSURE_NORMAL/TRACTION_AXIAL
+                # times c0's, so a consumer that wants independent rows can drop
+                # it on this key instead of discovering the redundancy in a fit.
+                **({"scaled_duplicate_of": "c0",
+                    "scale_vs_c0": r10(-PRESSURE_NORMAL / TRACTION_AXIAL)}
+                   if is_primary_load_face(geom, face) else {}),
+            },
+            "analytic": None,
+            "truth_regions": [
+                {"area": r10(face.area), "span": geom.span, "traction": pressure,
+                 "region": (f"pressure_face_{AXIS_NAMES[face.axis]}_{face.side}"
+                            f"@{r10(face.centroid[face.axis])}")},
+            ],
+        },
     ]
 
 
 def case_json(geom: Geometry, spec: dict[str, Any]) -> dict[str, Any]:
     name = f"{geom.name}_c{spec['index']}"
-    select: dict[str, Any] = {"box": load_box(geom)}
-    if geom.guard_end_area:
-        select["expected_area"] = geom.end_area
+    select: dict[str, Any] = {"box": spec.get("primary_box") or load_box(geom)}
+    guard = (spec["primary_expected_area"] if "primary_expected_area" in spec
+             else (geom.end_area if geom.guard_end_area else None))
+    if guard is not None:
+        select["expected_area"] = guard
     select["normal_min_dot"] = spec["normal_min_dot"]
+    loads: list[dict[str, Any]] = [{"select": select, "traction": spec["traction"]}]
+    for extra in spec.get("extra_regions", []):
+        loads.append({
+            "select": {"box": extra["box"], "normal_min_dot": extra["normal_min_dot"]},
+            "traction": extra["traction"],
+        })
+    corpus: dict[str, Any] = {
+        "family": geom.family,
+        "regime": geom.regime,
+        "seed": geom.seed,
+        "archetype": spec["archetype"],
+        "fixed_face": f"{AXIS_NAMES[geom.fix_axis]}_{geom.fix_side}",
+        "loaded_face": f"{AXIS_NAMES[geom.axis]}_hi",
+        "load_face_boundary": geom.load_face_boundary,
+        "generator": "scripts/gen_primitive_corpus.py",
+    }
+    # Archetype-specific metadata overrides the primary-region defaults in place,
+    # so the key ORDER of the block is the same for every case.
+    corpus.update(spec.get("corpus_extra", {}))
     return {
         "part": name,
         "geometry": f"bench/geometries/corpus/primitives/{geom.name}.step",
         "material": dict(MATERIAL),
         "bcs": [{"select": {"box": fix_box(geom)}, "fix": [True, True, True]}],
-        "loads": [{"select": select, "traction": spec["traction"]}],
+        "loads": loads,
         "reference": f"bench/reference/corpus/{name}.json",
-        "corpus": {
-            "family": geom.family,
-            "regime": geom.regime,
-            "seed": geom.seed,
-            "archetype": spec["archetype"],
-            "fixed_face": f"{AXIS_NAMES[geom.fix_axis]}_{geom.fix_side}",
-            "loaded_face": f"{AXIS_NAMES[geom.axis]}_hi",
-            "load_face_boundary": geom.load_face_boundary,
-            "generator": "scripts/gen_primitive_corpus.py",
-        },
+        "corpus": corpus,
     }
 
 
@@ -1110,6 +1717,34 @@ def stepped_cantilever_reference(geom: Geometry, case_name: str,
     }
 
 
+def _beam_region_response(*, area: float, span: float, transverse_extent: float,
+                          traction: list[float], axis: int) -> dict[str, float]:
+    """First-order response of ONE loaded region on an equivalent rectangular beam.
+
+    Axial ``P*L/(E*A)`` plus Euler-Bernoulli ``P*L^3/(3*E*I)``, and the work each
+    does. One definition, used by the single-region surrogate and the multi-region
+    one, so the two archetype families cannot drift into different physics.
+    """
+    young = MATERIAL["E"]
+    # Radius of gyration of an equivalent solid rectangular section.
+    inertia = area * transverse_extent * transverse_extent / 12.0
+    axial_t = abs(traction[axis])
+    perp_sq = sum(traction[i] ** 2 for i in range(3) if i != axis)
+    perp_t = math.sqrt(perp_sq)
+    delta_axial = axial_t * span / young
+    load_perp = perp_t * area
+    delta_perp = load_perp * span ** 3 / (3.0 * young * inertia)
+    return {
+        "inertia": inertia,
+        "axial_t": axial_t,
+        "perp_t": perp_t,
+        "delta_axial": delta_axial,
+        "load_perp": load_perp,
+        "delta_perp": delta_perp,
+        "energy": 0.5 * (axial_t * area * delta_axial + load_perp * delta_perp),
+    }
+
+
 def provisional_reference(geom: Geometry, case_name: str,
                           traction: list[float]) -> dict[str, Any]:
     """First-order beam surrogate, superseded by the advisor-truth-0 overkill solve.
@@ -1123,18 +1758,17 @@ def provisional_reference(geom: Geometry, case_name: str,
         else geom.params["box_section_area"]
     span = geom.span
     transverse_extent = geom.extent(geom.transverse)
-    # Radius of gyration of an equivalent solid rectangular section.
-    inertia = area * transverse_extent * transverse_extent / 12.0
-
-    axial_t = abs(traction[geom.axis])
-    perp_sq = sum(traction[i] ** 2 for i in range(3) if i != geom.axis)
-    perp_t = math.sqrt(perp_sq)
-
-    delta_axial = axial_t * span / young
-    load_perp = perp_t * area
-    delta_perp = load_perp * span ** 3 / (3.0 * young * inertia)
+    response = _beam_region_response(area=area, span=span,
+                                     transverse_extent=transverse_extent,
+                                     traction=traction, axis=geom.axis)
+    inertia = response["inertia"]
+    axial_t = response["axial_t"]
+    perp_t = response["perp_t"]
+    delta_axial = response["delta_axial"]
+    load_perp = response["load_perp"]
+    delta_perp = response["delta_perp"]
     deflection = math.sqrt(delta_axial ** 2 + delta_perp ** 2)
-    energy = 0.5 * (axial_t * area * delta_axial + load_perp * delta_perp)
+    energy = response["energy"]
     if not (deflection > 0.0 and energy > 0.0):
         raise RuntimeError(f"{case_name}: provisional surrogate produced a null truth")
 
@@ -1181,12 +1815,102 @@ def provisional_reference(geom: Geometry, case_name: str,
     }
 
 
+def region_surrogate_reference(geom: Geometry, case_name: str,
+                               regions: list[dict[str, Any]]) -> dict[str, Any]:
+    """Superposed first-order surrogate for the multi-region and pressure archetypes.
+
+    Same physics as ``provisional_reference``, summed over regions, and marked
+    ``provisional`` so the truth guard treats it as this repo's own seed. It is a
+    PLACEHOLDER whose only jobs are to let ``load_metrics`` parse the reference and
+    to declare which probes the case is scored on; the 100 % tolerance says so.
+
+    Unlike the legacy archetypes, these cases are NOT eligible for the internal
+    overkill campaign (see ``truth_campaign``): the values here are replaced only by
+    the independent Gmsh -> CalculiX chain in ``bench/reference/external_truth.py``.
+    Both probes are global quantities, never a nodal peak, so refining the candidate
+    mesh can only move them toward the reference (ADR-0032 section 4.1).
+    """
+    transverse_extent = geom.extent(geom.transverse)
+    responses = [
+        _beam_region_response(area=region["area"], span=region["span"],
+                              transverse_extent=transverse_extent,
+                              traction=region["traction"], axis=geom.axis)
+        for region in regions
+    ]
+    delta_axial = sum(response["delta_axial"] for response in responses)
+    delta_perp = sum(response["delta_perp"] for response in responses)
+    deflection = math.sqrt(delta_axial ** 2 + delta_perp ** 2)
+    energy = sum(response["energy"] for response in responses)
+    if not (deflection > 0.0 and energy > 0.0):
+        raise RuntimeError(f"{case_name}: region surrogate produced a null truth")
+
+    inputs = {
+        "E": MATERIAL["E"],
+        "transverse_extent_m": r10(transverse_extent),
+        "regions": [
+            {
+                "region": region["region"],
+                "area_m2": r10(region["area"]),
+                "span_m": r10(region["span"]),
+                "traction_Pa": [r10(v) for v in region["traction"]],
+                "axial_traction_Pa": r10(response["axial_t"]),
+                "transverse_traction_Pa": r10(response["perp_t"]),
+                "delta_axial_m": r10(response["delta_axial"]),
+                "delta_transverse_m": r10(response["delta_perp"]),
+                "work_J": r10(response["energy"]),
+            }
+            for region, response in zip(regions, responses)
+        ],
+        "delta_axial_total_m": r10(delta_axial),
+        "delta_transverse_total_m": r10(delta_perp),
+        "model": "per-region axial P*L/(E*A) + Euler-Bernoulli P*L^3/(3*E*I) on an "
+                 "equivalent rectangular section, superposed; "
+                 "U = 0.5 * sum(P_i * delta_i). The c3 band area is a bbox-perimeter "
+                 "estimate (band_area_estimate), so this surrogate is weaker than the "
+                 "legacy one and is scored against nothing until the external chain "
+                 "replaces it.",
+    }
+    note = ("Provisional superposed first-order surrogate; not a validated truth. "
+            "Replaced ONLY by the independent Gmsh 4.13.1 + CalculiX 2.23 chain "
+            "(bench/reference/external_truth.py); this case is excluded from the "
+            "advisor-truth-0 internal campaign by construction.")
+    return {
+        "part": case_name,
+        "geometry": f"bench/geometries/corpus/primitives/{geom.name}.step",
+        "family": geom.family,
+        "truth_source": "provisional",
+        "notes": note,
+        "metrics": [
+            {
+                "name": "strain_energy",
+                "value": r10(energy),
+                "tol": 1.0,
+                "probe": {"kind": "strain_energy"},
+                "derivation": DERIV_PROVISIONAL,
+                "source": "provisional",
+                "inputs": inputs,
+            },
+            {
+                "name": "tip_deflection",
+                "value": r10(deflection),
+                "tol": 1.0,
+                "probe": {"kind": "tip_deflection"},
+                "derivation": DERIV_PROVISIONAL,
+                "source": "provisional",
+                "inputs": inputs,
+            },
+        ],
+    }
+
+
 def reference_json(geom: Geometry, spec: dict[str, Any]) -> dict[str, Any]:
     case_name = f"{geom.name}_c{spec['index']}"
     if spec["analytic"] == "kirsch":
         return kirsch_reference(geom, case_name)
     if spec["analytic"] == "stepped_cantilever":
         return stepped_cantilever_reference(geom, case_name, spec["traction"])
+    if spec.get("truth_regions") is not None:
+        return region_surrogate_reference(geom, case_name, spec["truth_regions"])
     return provisional_reference(geom, case_name, spec["traction"])
 
 
@@ -1220,15 +1944,31 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
 TRUTH_H_REL_LADDER = (0.060, 0.038, 0.024)
 
 
+def internal_truth_eligible(family: str, archetype_index: int) -> bool:
+    """May this case's truth come from OUR OWN overkill solve?
+
+    Only for cases that predate the portable-cost retrain. The internal ladder
+    promotes this engine's finest mesh into the reference the same engine is then
+    scored against, which is self-assessment; the corpus's value is that 88 of its
+    references do not work that way. Rather than widen that hole, every case added
+    by the retrain is excluded here and labelled exclusively by the independent
+    Gmsh -> CalculiX chain. This predicate is the single place that rule lives.
+    """
+    return family not in RETRAIN_FAMILIES and archetype_index not in RETRAIN_ARCHETYPES
+
+
 def truth_campaign(case_paths: list[str]) -> dict[str, Any]:
     n_runs = len(case_paths) * len(TRUTH_H_REL_LADDER)
     return {
         "name": "advisor-truth-0",
         "comment": (
-            f"Overkill reference solves for the procedural primitive corpus: "
+            f"Overkill reference solves for the LEGACY procedural primitive corpus: "
             f"{len(case_paths)} cases x {len(TRUTH_H_REL_LADDER)} resolution rungs x 1 "
-            f"tier = {n_runs} runs. Ground truth for every case without a closed form; "
-            "promoted into bench/reference/corpus/*.json by "
+            f"tier = {n_runs} runs. Ground truth for every legacy case without a closed "
+            "form. Cases added by the portable-cost retrain are absent by construction "
+            "(internal_truth_eligible): their truth comes only from the independent "
+            "Gmsh + CalculiX chain, never from this engine. Promoted into "
+            "bench/reference/corpus/*.json by "
             "scripts/advisor/promote_truth.py (finest health-ok row per part wins) and "
             "never recomputed. The ladder replaces a single h_rel=0.005 because testlab "
             "refuses any run predicting more than 120000 elements, which h_rel=0.005 "
@@ -1269,6 +2009,7 @@ def generate(families: list[str], regimes: list[int],
     n_parts = 0
     n_cases = 0
     protected_skipped: list[str] = []
+    external_only: list[str] = []
     for family in FAMILIES:
         if family not in families:
             continue
@@ -1299,9 +2040,12 @@ def generate(families: list[str], regimes: list[int],
                     protected_skipped.append(f"{name}: {detail}")
                 else:
                     write_json(reference_path, reference_json(geom, spec))
-                case_paths.append(
-                    f"bench/geometries/corpus/primitives/{name}.case.json"
-                )
+                if internal_truth_eligible(geom.family, spec["index"]):
+                    case_paths.append(
+                        f"bench/geometries/corpus/primitives/{name}.case.json"
+                    )
+                else:
+                    external_only.append(name)
                 n_cases += 1
     if set(families) == set(FAMILIES) and set(regimes) == set(range(len(REGIME_SCALE))):
         write_json(TRUTH_CAMPAIGN_DIR / "campaign.json", truth_campaign(case_paths))
@@ -1310,6 +2054,32 @@ def generate(families: list[str], regimes: list[int],
     else:
         print("partial selection: bench/campaigns/advisor-truth-0/campaign.json "
               "left untouched (regenerate with the full corpus)")
+    if external_only:
+        manifest = {
+            "comment": (
+                "Cases whose reference truth may come ONLY from the independent "
+                "Gmsh + CalculiX chain: the four reinforcement/proximity families and "
+                "archetypes c3/c4 on every family. They are absent from "
+                "bench/campaigns/advisor-truth-0/campaign.json by construction, so "
+                "scripts/advisor/promote_truth.py can never reach them. Scored probes "
+                "are strain_energy and tip_deflection only. Regenerate this file with "
+                "scripts/gen_primitive_corpus.py."
+            ),
+            "generator": "scripts/gen_primitive_corpus.py",
+            "truth_chain": "bench/reference/external_truth.py "
+                           "(gmsh 4.13.1 mesh -> calculix 2.23 solve)",
+            "command": ("python bench/reference/external_truth.py --stage generate "
+                        "$(jq -r '.cases[] | \"--case \" + .' "
+                        "bench/reference/external/pending-external-truth.json)"),
+            "n_cases": len(external_only),
+            "cases": sorted(external_only),
+        }
+        write_json(EXTERNAL_PENDING_JSON, manifest)
+        print(f"  {len(external_only)} case(s) are EXCLUDED from the internal "
+              "overkill campaign and carry a provisional seed until the independent "
+              "chain labels them:")
+        print(f"    wrote {EXTERNAL_PENDING_JSON.relative_to(ROOT)}")
+        print(f"    {manifest['command']}")
     return n_parts, n_cases, protected_skipped
 
 
@@ -1343,6 +2113,20 @@ ACCEPTED_PROBE_KINDS = frozenset({
     # still a defect this list cannot catch.
     "peak_vm", "peak_vm_over_nominal",
 })
+
+
+#: Probe kinds a case added by the portable-cost retrain may be scored on. Global
+#: quantities only: a nodal peak beside a rib root, a gusset toe or a
+#: near-touching bore pair is a stress SINGULARITY, so refining the candidate mesh
+#: drives it away from any finite reference and the score would punish the advisor
+#: for meshing better (ADR-0032 section 4.1, and the smoke_bar max_von_mises
+#: lesson). Enforced here rather than left to the reference author.
+RETRAIN_PROBE_KINDS = frozenset({
+    "strain_energy", "energy", "max_displacement", "tip_deflection",
+})
+
+#: Archetype index -> the number of ``loads[]`` entries the archetype must emit.
+ARCHETYPE_LOAD_REGIONS = {0: 1, 1: 1, 2: 1, 3: 2, 4: 1}
 
 
 def check() -> int:
@@ -1389,8 +2173,34 @@ def check() -> int:
                     )
                 if key not in region:
                     problems.append(f"{path.name}: {group}[{i}] missing '{key}'")
-        if not any(abs(v) > 0.0 for v in case["loads"][0]["traction"]):
-            problems.append(f"{path.name}: zero traction")
+        for i, region in enumerate(case["loads"]):
+            if not any(abs(v) > 0.0 for v in region["traction"]):
+                problems.append(f"{path.name}: loads[{i}] has zero traction")
+        boxes = [region["select"]["box"] for region in case["loads"]]
+        if len(boxes) != len({json.dumps(box) for box in boxes}):
+            problems.append(f"{path.name}: two load regions share the same select box")
+
+        corpus = case.get("corpus", {})
+        family = corpus.get("family", "")
+        index = int(str(case["part"]).rsplit("_c", 1)[-1])
+        expected_regions = ARCHETYPE_LOAD_REGIONS.get(index)
+        if expected_regions is not None and len(case["loads"]) != expected_regions:
+            problems.append(f"{path.name}: archetype c{index} must emit "
+                            f"{expected_regions} load region(s), found "
+                            f"{len(case['loads'])}")
+        if index == 4:
+            normal = corpus.get("pressure_face_outward_normal")
+            pressure = corpus.get("pressure_Pa")
+            traction = case["loads"][0]["traction"]
+            if not isinstance(normal, list) or len(normal) != 3 or not pressure:
+                problems.append(f"{path.name}: c4 must declare pressure_Pa and "
+                                "pressure_face_outward_normal")
+            else:
+                want = [-float(pressure) * float(v) for v in normal]
+                if max(abs(a - b) for a, b in zip(traction, want)) > 1e-6 * float(pressure):
+                    problems.append(
+                        f"{path.name}: c4 traction {traction} is not the declared "
+                        f"pressure along -normal {want}")
 
         ref_path = ROOT / case["reference"]
         if not ref_path.is_file():
@@ -1408,6 +2218,12 @@ def check() -> int:
             if kind not in ACCEPTED_PROBE_KINDS:
                 problems.append(f"{ref_path.name}: probe kind '{kind}' is not accepted "
                                 "by testlab evaluate_probe")
+            if not internal_truth_eligible(family, index) \
+                    and kind not in RETRAIN_PROBE_KINDS:
+                problems.append(
+                    f"{ref_path.name}: probe kind '{kind}' is not allowed for a case "
+                    "added by the portable-cost retrain (global quantities only, "
+                    f"one of {sorted(RETRAIN_PROBE_KINDS)})")
             if not isinstance(metric.get("value"), (int, float)):
                 problems.append(f"{ref_path.name}: metric '{metric.get('name')}' "
                                 "has no numeric value")
@@ -1431,6 +2247,15 @@ def check() -> int:
                             f"{missing[:3]}")
         print(f"checked {campaign_path.relative_to(ROOT)} "
               f"({len(campaign['parts'])} parts)")
+        ineligible = [p for p in campaign["parts"]
+                      if not internal_truth_eligible(
+                          Path(p).name.split(".case.json")[0].rsplit("_s", 1)[0],
+                          int(Path(p).name.split(".case.json")[0].rsplit("_c", 1)[-1]))]
+        if ineligible:
+            problems.append(
+                f"campaign.json offers the internal overkill ladder to "
+                f"{len(ineligible)} case(s) whose truth must be independent: "
+                f"{ineligible[:3]}")
     else:
         problems.append(f"missing {campaign_path.relative_to(ROOT)}")
 
@@ -1440,6 +2265,219 @@ def check() -> int:
             print(f"  - {problem}", file=sys.stderr)
         return 1
     print("check: OK")
+    return 0
+
+
+# ── --check-coverage ────────────────────────────────────────────────────────
+
+
+def _coverage_module():
+    """Import the descriptor machinery lazily.
+
+    Lazily because ``advisor.corpus_evidence`` pulls in numpy and the dataset
+    loader, and neither generation nor ``--check`` needs either; a generator that
+    cannot emit a STEP because a training-side import moved would be a silly way
+    to break the corpus.
+    """
+    import importlib
+
+    return importlib.import_module("advisor.corpus_evidence")
+
+
+def check_coverage(new_families: tuple[str, ...] = RETRAIN_FAMILIES, *,
+                   duplicate_of: str | None = None,
+                   csv_path: Path | None = None) -> int:
+    """Is every new family at least as far from the corpus as the corpus is wide?
+
+    The gate the `perforated_plate` lesson earned: that family landed CLOSER to an
+    existing one than the existing families were to each other, which makes it a
+    weaker test of transfer, and nothing in the generator noticed. Now the
+    generator refuses to call a family a widening until its standardized
+    descriptor centroid clears the corpus's own minimum pairwise distance.
+
+    ``duplicate_of`` is the negative test: it injects a near-duplicate of an
+    existing family (its own descriptor rows, nudged by one part in a million) and
+    passes only if the gate REJECTS it. A gate that has never been shown to fail is
+    not evidence that anything passed it.
+    """
+    import numpy as np
+
+    evidence = _coverage_module()
+    csv_path = csv_path or evidence.FEATURES_CSV
+    names, raw, families = evidence.load_descriptors(csv_path)
+    under_test = list(new_families)
+    if duplicate_of is not None:
+        if duplicate_of not in set(families.tolist()):
+            print(f"error: no descriptor rows for '{duplicate_of}' to clone",
+                  file=sys.stderr)
+            return 2
+        source = raw[families == duplicate_of]
+        clone_name = f"{duplicate_of}_nearduplicate"
+        raw = np.vstack([raw, source * (1.0 + 1.0e-6)])
+        families = np.concatenate([families, np.full(source.shape[0], clone_name)])
+        under_test = [clone_name]
+    report = evidence.coverage_report(raw, families, under_test)
+    print(f"descriptor space: {len(names)} columns, {raw.shape[0]} geometries, "
+          f"{len(report['reference_families'])} reference families")
+    print(f"reference minimum pairwise centroid distance: "
+          f"{report['reference_min_pairwise_distance']:.4f} "
+          f"over {report['n_reference_pairs']} pairs")
+    for family, entry in sorted(report["families_under_test"].items()):
+        verdict = "REJECT" if entry["below_reference_minimum"] else "ok"
+        print(f"  {family:<24} d={entry['distance_to_nearest_reference']:.4f} "
+              f"to {entry['nearest_reference_family']:<18} "
+              f"margin={entry['margin_over_threshold']:+.4f}  {verdict}")
+    for family in report["missing_descriptors"]:
+        print(f"  {family:<24} NO DESCRIPTOR ROWS -- cannot be certified distinct; "
+              f"regenerate {csv_path.name} first")
+
+    if duplicate_of is not None:
+        rejected = all(entry["below_reference_minimum"]
+                       for entry in report["families_under_test"].values())
+        if not rejected or not report["families_under_test"]:
+            print("negative test FAILED: the gate accepted a near-duplicate family",
+                  file=sys.stderr)
+            return 1
+        print("negative test passed: the near-duplicate was rejected")
+        return 0
+    if not report["ok"]:
+        print("coverage FAILED: see the rejected families above", file=sys.stderr)
+        return 1
+    print("coverage: OK")
+    return 0
+
+
+# ── --self-test ─────────────────────────────────────────────────────────────
+
+
+#: SHA-256 of the comma-joined seed table as it stood before the portable-cost
+#: retrain appended to it. Every campaign row, every reference truth and every
+#: committed STEP in the legacy corpus is a function of these 44 integers in this
+#: order, so a reordering is a silent corpus swap. A checksum pins the order
+#: without a second copy of the table to drift from.
+LEGACY_SEED_DIGEST = "e4f066278c07721a2ce7655ec2fc64daf8960d47082762f655337144c28e85c8"
+LEGACY_SEED_COUNT = 44
+
+
+def _seed_digest(seeds: tuple[int, ...]) -> str:
+    import hashlib
+
+    return hashlib.sha256(",".join(str(seed) for seed in seeds).encode()).hexdigest()
+
+
+def _selftest_geometry(name: str = "selftest_s0") -> Geometry:
+    """A plain 3:1:0.5 plate, so the archetype contracts can be checked without CAD."""
+    shape = _box((0.0, -0.05, 0.0), (0.30, 0.10, 0.02))
+    return Geometry(
+        name=name, family="selftest", regime=0, seed=12345, shape=shape,
+        lo=(0.0, -0.05, 0.0), hi=(0.30, 0.05, 0.02),
+        axis=0, transverse=2,
+        end_area=0.002, guard_end_area=True, load_region="end_slab",
+        fix_axis=0, fix_side="lo", fix_char_len=0.02, load_char_len=0.02,
+        span=0.30, params={}, analytic=None,
+    )
+
+
+def run_self_test() -> int:
+    """The invariants the corpus's reproducibility and truth discipline rest on."""
+    failures: list[str] = []
+
+    def check_that(condition: bool, message: str) -> None:
+        if not condition:
+            failures.append(message)
+
+    print("self-test: tables")
+    check_that(len(FAMILIES) == 15, f"expected 15 families, got {len(FAMILIES)}")
+    check_that(len(SEEDS) == len(FAMILIES) * len(REGIME_SCALE),
+               f"seed table has {len(SEEDS)} entries for "
+               f"{len(FAMILIES) * len(REGIME_SCALE)} parts")
+    check_that(len(set(SEEDS)) == len(SEEDS), "seed table repeats a seed")
+    check_that(set(BUILDERS) == set(FAMILIES), "BUILDERS and FAMILIES disagree")
+    check_that(_seed_digest(SEEDS[:LEGACY_SEED_COUNT]) == LEGACY_SEED_DIGEST,
+               "the first 44 seeds changed: the legacy corpus is no longer "
+               "reproducible from this table")
+    check_that(FAMILIES[len(FAMILIES) - len(RETRAIN_FAMILIES):] == RETRAIN_FAMILIES,
+               "the retrain families are not the last entries in FAMILIES")
+
+    print("self-test: archetype contracts")
+    geom = _selftest_geometry()
+    specs = case_specs(geom)
+    check_that([spec["index"] for spec in specs] == [0, 1, 2, 3, 4],
+               "case_specs must emit archetypes c0..c4 in order")
+    cases = [case_json(geom, spec) for spec in specs]
+    for spec, case in zip(specs, cases):
+        want = ARCHETYPE_LOAD_REGIONS[spec["index"]]
+        check_that(len(case["loads"]) == want,
+                   f"c{spec['index']} emitted {len(case['loads'])} load regions, "
+                   f"want {want}")
+    c3 = cases[3]
+    first = c3["loads"][0]["traction"]
+    second = c3["loads"][1]["traction"]
+    dot = sum(a * b for a, b in zip(first, second))
+    check_that(abs(dot) < 1e-9,
+               f"c3's two regions must pull in independent directions, dot={dot}")
+    check_that(c3["loads"][0]["select"]["box"] != c3["loads"][1]["select"]["box"],
+               "c3's two regions must be distinct boxes")
+    band = c3["loads"][1]["select"]["box"]
+    check_that(band[0][0] > geom.lo[0] and band[1][0] < geom.hi[0],
+               "c3's band must stay clear of both ends")
+    c4 = cases[4]
+    normal = c4["corpus"]["pressure_face_outward_normal"]
+    traction = c4["loads"][0]["traction"]
+    check_that(all(abs(t + PRESSURE_NORMAL * n) < 1e-9 * PRESSURE_NORMAL
+                   for t, n in zip(traction, normal)),
+               f"c4 traction {traction} must be the pressure along -{normal}")
+    check_that(abs(abs(sum(n * n for n in normal)) - 1.0) < 1e-9,
+               f"c4 face normal {normal} is not a unit axis direction")
+    check_that(c4["loads"][0]["select"]["box"] != cases[0]["loads"][0]["select"]["box"],
+               "c4 must select its own face, not the c0 end slab")
+
+    print("self-test: truth discipline")
+    for spec, case in zip(specs, cases):
+        reference = reference_json(geom, spec)
+        kinds = {metric["probe"]["kind"] for metric in reference["metrics"]}
+        if spec["index"] in RETRAIN_ARCHETYPES:
+            check_that(kinds <= RETRAIN_PROBE_KINDS,
+                       f"c{spec['index']} reference uses non-global probes {kinds}")
+            check_that(all(metric["source"] in SELF_GENERATED_SOURCES
+                           for metric in reference["metrics"]),
+                       f"c{spec['index']} seed must be overwritable by the external "
+                       "chain")
+        check_that(all(metric["value"] > 0.0 for metric in reference["metrics"]),
+                   f"c{spec['index']} reference carries a non-positive value")
+    for family in RETRAIN_FAMILIES:
+        check_that(not internal_truth_eligible(family, 0),
+                   f"{family} must never be offered the internal overkill ladder")
+    for index in RETRAIN_ARCHETYPES:
+        check_that(not internal_truth_eligible(FAMILIES[0], index),
+                   f"archetype c{index} must never be offered the internal ladder")
+    check_that(internal_truth_eligible("box_hole", 0),
+               "legacy cases must stay eligible for the internal ladder")
+
+    print("self-test: coverage gate")
+    import numpy as np
+
+    rng = np.random.default_rng(11)
+    base = rng.normal(size=(24, 6)) + np.repeat(np.arange(6.0), 4)[:, None] * 3.0
+    families = np.repeat([f"fam{i}" for i in range(6)], 4)
+    evidence = _coverage_module()
+    distinct = evidence.coverage_report(
+        np.vstack([base, base[:4] + 40.0]),
+        np.concatenate([families, np.full(4, "distinct")]), ["distinct"])
+    check_that(distinct["ok"], "the gate rejected a genuinely distant family")
+    duplicate = evidence.coverage_report(
+        np.vstack([base, base[:4] * (1.0 + 1e-6)]),
+        np.concatenate([families, np.full(4, "clone")]), ["clone"])
+    check_that(not duplicate["ok"], "the gate accepted a near-duplicate family")
+    absent = evidence.coverage_report(base, families, ["never_generated"])
+    check_that(not absent["ok"], "the gate passed a family with no descriptor rows")
+
+    if failures:
+        print(f"\nself-test FAILED: {len(failures)} check(s)", file=sys.stderr)
+        for message in failures:
+            print(f"  - {message}", file=sys.stderr)
+        return 1
+    print("\nself-test passed")
     return 0
 
 
@@ -1460,8 +2498,29 @@ def main(argv: list[str] | None = None) -> int:
                         help="DESTRUCTIVE: also re-seed reference truths whose source "
                              "is protected (analytic / external-*), discarding an "
                              "independent answer for a first-order surrogate")
+    parser.add_argument("--check-coverage", action="store_true",
+                        help="measure each retrain family's standardized descriptor "
+                             "centroid against the corpus's own minimum pairwise "
+                             "distance and fail if it is closer; writes nothing")
+    parser.add_argument("--coverage-negative-test", metavar="FAMILY",
+                        help="inject a near-duplicate of FAMILY and require "
+                             "--check-coverage to reject it (gate self-check)")
+    parser.add_argument("--coverage-csv", type=Path, default=None,
+                        help="descriptor CSV to measure coverage against; defaults "
+                             "to bench/advisor/geometry_features.csv. Point it at a "
+                             "freshly regenerated file to gate BEFORE committing it")
+    parser.add_argument("--self-test", action="store_true",
+                        help="check the table, archetype and truth-discipline "
+                             "invariants; touches no artifact")
     args = parser.parse_args(argv)
 
+    if args.self_test:
+        return run_self_test()
+    if args.coverage_negative_test:
+        return check_coverage(duplicate_of=args.coverage_negative_test,
+                              csv_path=args.coverage_csv)
+    if args.check_coverage:
+        return check_coverage(csv_path=args.coverage_csv)
     if args.check:
         return check()
 

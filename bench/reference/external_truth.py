@@ -64,8 +64,34 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
-GMSH = ROOT / "tools" / "gmsh" / "gmsh-4.13.1-Windows64" / "gmsh.exe"
-CCX = ROOT / "tools" / "calculix" / "calculix_2.23_4win" / "ccx_static.exe"
+
+
+def resolve_pinned_tool(env_name: str, candidates: tuple[Path, ...]) -> Path:
+    """Resolve an explicit override or one of the repository's pinned layouts."""
+    override = os.environ.get(env_name, "").strip()
+    if override:
+        return Path(override).expanduser().resolve()
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return candidates[0]
+
+
+GMSH = resolve_pinned_tool(
+    "POLYMESH_GMSH",
+    (
+        ROOT / "tools" / "gmsh" / "gmsh-4.13.1-Linux64" / "bin" / "gmsh",
+        ROOT / "tools" / "gmsh" / "gmsh-4.13.1-Windows64" / "gmsh.exe",
+    ),
+)
+CCX = resolve_pinned_tool(
+    "POLYMESH_CCX",
+    (
+        ROOT / "tools" / "calculix" / "ccx_2.23_container",
+        ROOT / "tools" / "calculix" / "CalculiX" / "ccx_2.23" / "src" / "ccx_2.23",
+        ROOT / "tools" / "calculix" / "calculix_2.23_4win" / "ccx_static.exe",
+    ),
+)
 GMSH_VERSION = "4.13.1"
 CCX_VERSION = "2.23"
 CASE_DIR = ROOT / "bench" / "geometries" / "corpus" / "primitives"
@@ -725,6 +751,16 @@ def von_mises(s: np.ndarray) -> np.ndarray:
 # --------------------------------------------------------------------------- #
 # case model
 # --------------------------------------------------------------------------- #
+@dataclass(frozen=True)
+class LoadRegion:
+    """One ``loads[]`` entry of a case: the box, the traction and the case's rule."""
+
+    box: list
+    traction: np.ndarray
+    normal_min_dot: float
+    expected_area: float | None
+
+
 @dataclass
 class Case:
     case_id: str
@@ -733,21 +769,35 @@ class Case:
     step: Path
     family: str
     loaded_axis: int
-    traction: np.ndarray
     fix_box: list
-    load_box: list
+    loads: list[LoadRegion]
+    """Every load region, in the case file's order. Archetype c3 has two."""
     metrics: dict = field(default_factory=dict)
 
     @property
     def analytic(self) -> bool:
         return self.reference.get("truth_source") == "analytic"
 
+    @property
+    def primary(self) -> LoadRegion:
+        """The first region.
+
+        The scored displacement probe is defined on it and nothing else:
+        apps/testlab's ``compute_probes`` reads ``resolved_loads.front()``, so a
+        reference computed over the union of regions would not be the quantity the
+        campaign compares against. Everything that needs "the" load box or "the"
+        traction means this one.
+        """
+        return self.loads[0]
+
 
 def load_case(case_id: str) -> Case:
     case = load_json(CASE_DIR / f"{case_id}.case.json")
     reference = load_json(REF_DIR / f"{case_id}.json")
-    if len(case["bcs"]) != 1 or len(case["loads"]) != 1:
-        raise RuntimeError(f"{case_id}: expected exactly one BC and one load")
+    if len(case["bcs"]) != 1:
+        raise RuntimeError(f"{case_id}: expected exactly one BC")
+    if not case["loads"]:
+        raise RuntimeError(f"{case_id}: no load regions")
     loaded_face = case["corpus"]["loaded_face"]
     return Case(
         case_id=case_id,
@@ -756,9 +806,18 @@ def load_case(case_id: str) -> Case:
         step=ROOT / case["geometry"],
         family=case["corpus"]["family"],
         loaded_axis=AXES[loaded_face[0]],
-        traction=np.asarray([float(v) for v in case["loads"][0]["traction"]], dtype=np.float64),
         fix_box=case["bcs"][0]["select"]["box"],
-        load_box=case["loads"][0]["select"]["box"],
+        loads=[
+            LoadRegion(
+                box=entry["select"]["box"],
+                traction=np.asarray([float(v) for v in entry["traction"]],
+                                    dtype=np.float64),
+                normal_min_dot=float(
+                    entry["select"].get("normal_min_dot", FACE_NORMAL_MIN_DOT)),
+                expected_area=entry["select"].get("expected_area"),
+            )
+            for entry in case["loads"]
+        ],
         metrics={m["name"]: m for m in reference["metrics"]},
     )
 
@@ -809,32 +868,51 @@ def solve_rung(
     faces = free_faces(tets)
     area, centroid, normal = face_geometry(nodes, faces)
 
-    # Load surface. The primary rule is the case's own specification, exactly as
-    # apps/testlab applies it: free faces whose centroid is inside the load box,
-    # kept when |n.t_hat| > select.normal_min_dot, with normal_min_dot = -1
-    # meaning "no normal filter" and an empty filter falling back to box-only.
-    # The alternative interpretation (only the loaded CAD end face, which is what
-    # the closed-form references assume) is reported alongside so any divergence
-    # is visible instead of silently baked into a truth value.
-    sel = in_box(centroid, case.load_box)
+    # Load surface, per region. The primary rule is the case's own specification,
+    # exactly as apps/testlab applies it: free faces whose centroid is inside the
+    # load box, kept when |n.t_hat| > select.normal_min_dot, with
+    # normal_min_dot = -1 meaning "no normal filter" and an empty filter falling
+    # back to box-only. The alternative interpretation (only the loaded CAD end
+    # face, which is what the closed-form references assume) is reported alongside
+    # so any divergence is visible instead of silently baked into a truth value.
+    #
+    # A case may declare more than one region (archetype c3 loads an end face and a
+    # mid-span band). Each region's consistent nodal load is integrated over its own
+    # faces and the vectors are SUMMED -- the same superposition apps/testlab does in
+    # make_loads, which is exact for a linear static problem. Every per-region
+    # statistic below is still reported for the PRIMARY region, so a single-region
+    # case emits byte-identical rows to before; the extra regions appear under
+    # `regions` and in the totals.
+    def select_region(region: LoadRegion) -> np.ndarray:
+        in_region = in_box(centroid, region.box)
+        traction_norm = float(np.linalg.norm(region.traction))
+        if include_wall_strip:
+            return in_region
+        if region.normal_min_dot > -1.0 and traction_norm > 0.0:
+            t_hat = region.traction / traction_norm
+            filtered = in_region & (np.abs(normal @ t_hat) > region.normal_min_dot)
+            return filtered if filtered.any() else in_region
+        return in_region
+
+    primary = case.primary
+    sel = in_box(centroid, primary.box)
     axis_dot = np.abs(normal[:, case.loaded_axis])
     end_face = sel & (axis_dot > FACE_NORMAL_MIN_DOT)
-    min_dot = float(case.case["loads"][0]["select"].get("normal_min_dot", FACE_NORMAL_MIN_DOT))
-    traction_norm = float(np.linalg.norm(case.traction))
-    if min_dot > -1.0 and traction_norm > 0.0:
-        t_hat = case.traction / traction_norm
-        case_rule = sel & (np.abs(normal @ t_hat) > min_dot)
-        if not case_rule.any():
-            case_rule = sel
-    else:
-        case_rule = sel
-    chosen = sel if include_wall_strip else case_rule
-    if not chosen.any():
+    min_dot = primary.normal_min_dot
+    selections = [select_region(region) for region in case.loads]
+    empty = [index for index, chosen in enumerate(selections) if not chosen.any()]
+    if empty:
         row.update(status="empty-load-selection")
+        if len(case.loads) > 1:
+            row["empty_regions"] = empty
         return row
 
+    chosen = selections[0]
     load_faces = faces[chosen]
-    loads = consistent_face_loads(nodes, load_faces, case.traction)
+    loads = np.zeros_like(nodes)
+    for region, region_chosen in zip(case.loads, selections):
+        loads = loads + consistent_face_loads(nodes, faces[region_chosen],
+                                              region.traction)
     fixed = fixed_boundary_nodes(nodes, faces, case.fix_box)
     if fixed.size < 3:
         row.update(status="empty-fix-selection")
@@ -865,11 +943,28 @@ def solve_rung(
         resultant_N=[float(v) for v in resultant],
         resultant_mag_N=float(np.linalg.norm(resultant)),
     )
-    expected_area = case.case["loads"][0]["select"].get("expected_area")
+    expected_area = primary.expected_area
     if expected_area:
         row["load_area_rel_err_vs_cad"] = float(
             abs(row["load_area_m2"] - expected_area) / expected_area
         )
+    if len(case.loads) > 1:
+        row["n_load_regions"] = len(case.loads)
+        row["regions"] = [
+            {
+                "index": index,
+                "traction_Pa": [float(v) for v in region.traction],
+                "normal_min_dot": region.normal_min_dot,
+                "n_faces": int(region_chosen.sum()),
+                "area_m2": float(area[region_chosen].sum()),
+                "resultant_N": [
+                    float(v) for v in consistent_face_loads(
+                        nodes, faces[region_chosen], region.traction).sum(axis=0)
+                ],
+            }
+            for index, (region, region_chosen) in enumerate(zip(case.loads, selections))
+        ]
+        row["total_load_area_m2"] = sum(entry["area_m2"] for entry in row["regions"])
     if mesh_only:
         row["status"] = "mesh-only"
         if not keep:
@@ -1085,6 +1180,12 @@ def match_by_coordinates(reference: np.ndarray, other: np.ndarray) -> np.ndarray
 def cross_check(case_id: str, work: Path, diag_cache: dict) -> dict:
     """Solve one identical Gmsh mesh with CalculiX and with the PolyMesh CLI."""
     case = load_case(case_id)
+    if len(case.loads) > 1:
+        # The CLI takes ONE --load-box/--load-dir/--force, so a multi-region case
+        # cannot be posed to it. Refuse rather than cross-check a different problem
+        # and report the difference as a solver discrepancy.
+        return {"case_id": case_id, "status": "multi-region-not-crosscheckable",
+                "n_load_regions": len(case.loads)}
     if not POLYMESH.is_file():
         return {"case_id": case_id, "status": "polymesh-cli-missing"}
     key = case.step.stem
@@ -1100,14 +1201,15 @@ def cross_check(case_id: str, work: Path, diag_cache: dict) -> dict:
     stem = f"{case.case_id}-h{h:.6g}-c{curvature}"
     msh = work / f"{stem}.msh"
     vtu = work / f"{stem}-polymesh.vtu"
-    direction = case.traction / np.linalg.norm(case.traction)
+    direction = case.primary.traction / np.linalg.norm(case.primary.traction)
     command = [
         str(POLYMESH), "solve", str(msh), "-o", str(vtu),
         "-h", f"{h:.17g}",
         "-E", f"{float(case.case['material']['E']):.17g}",
         "-nu", f"{float(case.case['material']['nu']):.17g}",
         "--fix-box", *[f"{float(v):.17g}" for corner in case.fix_box for v in corner],
-        "--load-box", *[f"{float(v):.17g}" for corner in case.load_box for v in corner],
+        "--load-box", *[f"{float(v):.17g}"
+                        for corner in case.primary.box for v in corner],
         "--load-dir", *[f"{v:.17g}" for v in direction],
         "--force", f"{row['resultant_mag_N']:.17g}",
     ]
@@ -1137,10 +1239,10 @@ def cross_check(case_id: str, work: Path, diag_cache: dict) -> dict:
     nodes, tets = parse_msh2(msh)
     faces = free_faces(tets)
     _, centroid, normal = face_geometry(nodes, faces)
-    min_dot = float(case.case["loads"][0]["select"].get("normal_min_dot", FACE_NORMAL_MIN_DOT))
-    sel = in_box(centroid, case.load_box)
+    min_dot = case.primary.normal_min_dot
+    sel = in_box(centroid, case.primary.box)
     if min_dot > -1.0:
-        t_hat = case.traction / np.linalg.norm(case.traction)
+        t_hat = case.primary.traction / np.linalg.norm(case.primary.traction)
         chosen = sel & (np.abs(normal @ t_hat) > min_dot)
         if not chosen.any():
             chosen = sel
@@ -1152,7 +1254,7 @@ def cross_check(case_id: str, work: Path, diag_cache: dict) -> dict:
     tip_cli = float(np.linalg.norm(u_cli[slot], axis=1).mean())
     out["polymesh"]["tip_deflection_m"] = tip_cli
     # 1/2 f.u with the same applied load vector: PolyMesh prints no energy.
-    loads = consistent_face_loads(nodes, faces[chosen], case.traction)
+    loads = consistent_face_loads(nodes, faces[chosen], case.primary.traction)
     all_slots = match_by_coordinates(nodes, points)
     out["polymesh"]["strain_energy_work_J"] = 0.5 * float(np.sum(loads * u_cli[all_slots]))
     ccx_tip = row["tip_deflection_m"]

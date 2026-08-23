@@ -1,0 +1,11 @@
+{
+  "campaign": "cost-corrected-final-cfg-a26d3cda-1",
+  "completed_runs": 0,
+  "started_utc": "2026-08-23T06:00:00Z",
+  "state": "running",
+  "survivors": [
+    "cfg-a26d3cda"
+  ],
+  "tier": 0,
+  "updated_utc": "2026-08-23T06:00:00Z"
+}

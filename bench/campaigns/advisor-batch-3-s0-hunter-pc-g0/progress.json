@@ -1,0 +1,14 @@
+{
+  "cg_iter": null,
+  "cg_resid": null,
+  "elapsed_ms": 2222156.625057,
+  "n_elems": 27028,
+  "n_nodes": 39835,
+  "phase": "assemble",
+  "phase_frac": 0.0,
+  "run": {
+    "cfg_id": "cfg-7b6c6eab",
+    "part": "lobed_shaft_s0_c0",
+    "tier": 0
+  }
+}

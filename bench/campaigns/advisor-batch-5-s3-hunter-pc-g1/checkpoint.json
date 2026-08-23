@@ -1,0 +1,11 @@
+{
+  "campaign": "advisor-batch-5-s3-hunter-pc-g1",
+  "state": "running",
+  "tier": 0,
+  "completed_runs": 0,
+  "survivors": [
+    "cfg-6a17c483"
+  ],
+  "started_utc": "2026-08-23T02:24:06Z",
+  "updated_utc": "2026-08-23T02:24:06Z"
+}

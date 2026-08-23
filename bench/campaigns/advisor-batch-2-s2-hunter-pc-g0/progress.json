@@ -1,0 +1,14 @@
+{
+  "cg_iter": null,
+  "cg_resid": null,
+  "elapsed_ms": 51699.733738,
+  "n_elems": 1436,
+  "n_nodes": 7808,
+  "phase": "assemble",
+  "phase_frac": 0.0,
+  "run": {
+    "cfg_id": "cfg-6a17c483",
+    "part": "sphere_box_s1_c4",
+    "tier": 0
+  }
+}

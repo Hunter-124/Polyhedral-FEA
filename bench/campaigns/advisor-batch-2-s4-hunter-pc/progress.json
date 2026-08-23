@@ -1,12 +1,12 @@
 {
   "cg_iter": null,
   "cg_resid": null,
-  "elapsed_ms": 0.0,
-  "phase": "done",
-  "phase_frac": 1.0,
+  "elapsed_ms": 1506.149,
+  "phase": "mesh",
+  "phase_frac": 0.0,
   "run": {
-    "cfg_id": "",
-    "part": "",
+    "cfg_id": "cfg-8dbcf95c",
+    "part": "perforated_plate_s2_c1",
     "tier": 0
   }
 }

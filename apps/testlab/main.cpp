@@ -1964,6 +1964,8 @@ PartCase with_exact_cad_selections(const pipeline::Model& model, const PartCase&
                 }
             }
         }
+        const bool authored_virtual_patch =
+            resolved.loads.size() > 1 && load.expected_area && *load.expected_area > 0.0;
         const bool use_aligned = !aligned_faces.empty();
         const auto& selected = use_aligned ? aligned_faces : box_faces;
         double exact_area = 0.0;
@@ -1971,7 +1973,7 @@ PartCase with_exact_cad_selections(const pipeline::Model& model, const PartCase&
             const auto it =
                 std::find_if(topology.faces.begin(), topology.faces.end(),
                              [&](const geom::CadFace& face) { return face.id == face_id; });
-            if (it != topology.faces.end()) {
+            if (it != topology.faces.end() && !authored_virtual_patch) {
                 load.cad_face_ids.push_back(face_id);
                 exact_area += it->area;
             }
@@ -1986,7 +1988,14 @@ PartCase with_exact_cad_selections(const pipeline::Model& model, const PartCase&
              filtered_rule_area > 0.0)
                 ? filtered_rule_area
                 : box_rule_area;
-        if (rule_area > 0.0) {
+        if (authored_virtual_patch) {
+            // A multi-region case cuts one CAD face into virtual patches. The
+            // generator records their exact BRep-clipped areas; the coarse
+            // display tessellation's centroid sum is only an approximation and
+            // must not replace the authored continuum measure. Nor may the
+            // whole-face fallback above erase the split.
+            load.cad_rule_area = *load.expected_area;
+        } else if (rule_area > 0.0) {
             // The case's rule evaluated on the exact CAD tessellation rather than on
             // the candidate mesh. On a curved loaded surface the mesh's answer is
             // quantised to facet size -- 15 facets on a spherical boss put the

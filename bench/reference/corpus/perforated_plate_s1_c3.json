@@ -7,7 +7,7 @@
   "metrics": [
     {
       "name": "strain_energy",
-      "value": 0.000389333877391425,
+      "value": 0.00038933382734990403,
       "tol": 0.021,
       "probe": {
         "kind": "strain_energy"
@@ -71,11 +71,11 @@
             "n_nodes": 10743,
             "n_elems": 5744,
             "n_dof": 32040,
-            "wall_mesh_s": 0.78,
+            "wall_mesh_s": 0.62,
             "wall_solve_s": 1.62,
             "values": {
-              "strain_energy": 0.00038676102560381,
-              "tip_deflection": 7.247931167395502e-05
+              "strain_energy": 0.00038676097788593997,
+              "tip_deflection": 7.247930803226111e-05
             }
           },
           {
@@ -85,11 +85,11 @@
             "n_nodes": 23128,
             "n_elems": 13037,
             "n_dof": 69105,
-            "wall_mesh_s": 2.17,
-            "wall_solve_s": 4.4,
+            "wall_mesh_s": 1.8,
+            "wall_solve_s": 3.93,
             "values": {
-              "strain_energy": 0.000389333877391425,
-              "tip_deflection": 7.252698327420033e-05
+              "strain_energy": 0.00038933382734990403,
+              "tip_deflection": 7.252697860788165e-05
             }
           }
         ],
@@ -108,33 +108,33 @@
           "box_only_area_m2": 9.156122281031108e-05,
           "end_face_vs_selected_rel_diff": 0.0,
           "resultant_N": [
-            96.94717709999999,
+            96.94717106000002,
             0.0,
-            -9.694717709999999
+            -9.694717106000002
           ]
         },
         "checks": {
-          "calculix_internal_energy_vs_half_f_dot_u_rel_gap": 0.9323010478775187,
-          "reaction_vs_applied_resultant_rel_err": 2.9913197135937324e-08,
+          "calculix_internal_energy_vs_half_f_dot_u_rel_gap": 0.9323010492528814,
+          "reaction_vs_applied_resultant_rel_err": 1.093379029456848e-08,
           "frd_vs_dat_displacement_rel_err": null
         },
-        "wall_time_s": 9.3,
+        "wall_time_s": 8.3,
         "uncertainty": {
-          "rung_to_rung_delta": 0.006652303663737242,
+          "rung_to_rung_delta": 0.006652298476509776,
           "richardson_error_rel": null,
           "richardson_order": null,
-          "discretisation_rel": 0.006652303663737242,
+          "discretisation_rel": 0.006652298476509776,
           "mesh_policy_rel": 2e-05,
-          "numerical_rel": 0.006672303663737242,
+          "numerical_rel": 0.006672298476509776,
           "idealisation_bias_rel": 0.0,
-          "reference_uncertainty_rel": 0.006672303663737242,
+          "reference_uncertainty_rel": 0.006672298476509776,
           "tol_basis": "tol = max(idealisation_bias 0 + 3 x numerical_uncertainty 0.006672, floor 0.02) = 0.02002 -> 0.021 (rounded up, 2 s.f.). Numerical uncertainty is the measured rung-to-rung change (or the Richardson error estimate, whichever is larger) plus the measured sensitivity to the mesh sizing policy. The idealisation bias is the measured gap between the closed form and the converged 3D external solve, and is added at full size because it is a bias, not scatter."
         }
       }
     },
     {
       "name": "tip_deflection",
-      "value": 7.252698327420033e-05,
+      "value": 7.252697860788165e-05,
       "tol": 0.02,
       "probe": {
         "kind": "tip_deflection"
@@ -198,11 +198,11 @@
             "n_nodes": 10743,
             "n_elems": 5744,
             "n_dof": 32040,
-            "wall_mesh_s": 0.78,
+            "wall_mesh_s": 0.62,
             "wall_solve_s": 1.62,
             "values": {
-              "strain_energy": 0.00038676102560381,
-              "tip_deflection": 7.247931167395502e-05
+              "strain_energy": 0.00038676097788593997,
+              "tip_deflection": 7.247930803226111e-05
             }
           },
           {
@@ -212,11 +212,11 @@
             "n_nodes": 23128,
             "n_elems": 13037,
             "n_dof": 69105,
-            "wall_mesh_s": 2.17,
-            "wall_solve_s": 4.4,
+            "wall_mesh_s": 1.8,
+            "wall_solve_s": 3.93,
             "values": {
-              "strain_energy": 0.000389333877391425,
-              "tip_deflection": 7.252698327420033e-05
+              "strain_energy": 0.00038933382734990403,
+              "tip_deflection": 7.252697860788165e-05
             }
           }
         ],
@@ -235,26 +235,26 @@
           "box_only_area_m2": 9.156122281031108e-05,
           "end_face_vs_selected_rel_diff": 0.0,
           "resultant_N": [
-            96.94717709999999,
+            96.94717106000002,
             0.0,
-            -9.694717709999999
+            -9.694717106000002
           ]
         },
         "checks": {
-          "calculix_internal_energy_vs_half_f_dot_u_rel_gap": 0.9323010478775187,
-          "reaction_vs_applied_resultant_rel_err": 2.9913197135937324e-08,
+          "calculix_internal_energy_vs_half_f_dot_u_rel_gap": 0.9323010492528814,
+          "reaction_vs_applied_resultant_rel_err": 1.093379029456848e-08,
           "frd_vs_dat_displacement_rel_err": null
         },
-        "wall_time_s": 9.3,
+        "wall_time_s": 8.3,
         "uncertainty": {
-          "rung_to_rung_delta": 0.0006577270002199077,
+          "rung_to_rung_delta": 0.0006577128964768869,
           "richardson_error_rel": null,
           "richardson_order": null,
-          "discretisation_rel": 0.0006577270002199077,
+          "discretisation_rel": 0.0006577128964768869,
           "mesh_policy_rel": 2e-05,
-          "numerical_rel": 0.0006777270002199078,
+          "numerical_rel": 0.000677712896476887,
           "idealisation_bias_rel": 0.0,
-          "reference_uncertainty_rel": 0.0006777270002199078,
+          "reference_uncertainty_rel": 0.000677712896476887,
           "tol_basis": "tol = max(idealisation_bias 0 + 3 x numerical_uncertainty 0.0006777, floor 0.02) = 0.002033 -> 0.02 (rounded up, 2 s.f.). Numerical uncertainty is the measured rung-to-rung change (or the Richardson error estimate, whichever is larger) plus the measured sensitivity to the mesh sizing policy. The idealisation bias is the measured gap between the closed form and the converged 3D external solve, and is added at full size because it is a bias, not scatter."
         }
       }
@@ -265,6 +265,6 @@
     "pipeline": "gmsh-mesh -> calculix-solve -> probe",
     "gmsh_version": "4.13.1",
     "calculix_version": "2.23",
-    "generated": "2026-08-22T19:10:04.653274+00:00"
+    "generated": "2026-08-23T05:08:07.219333+00:00"
   }
 }

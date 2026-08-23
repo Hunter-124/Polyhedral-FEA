@@ -6,14 +6,15 @@
   ],
   "truth": {
     "rederived_from": "row answers[] via probe kinds mirrored from apps/testlab/main.cpp",
-    "rows_rescored": 5793,
-    "rows_unscored": 2565,
+    "rows_rescored": 17155,
+    "rows_unscored": 18855,
     "unscored_reasons": {
-      "no_answers": 2565
+      "answers.strain_energy_absent": 15,
+      "no_answers": 18840
     },
-    "n_files": 296,
-    "sha256": "f85f49b8db80a55a975ab5a2da253afa35aa25ea253ea45dd6dc65c14080256b",
-    "newest_mtime": "2026-08-22T19:13:51Z",
+    "n_files": 306,
+    "sha256": "90787123d1cd6cfd6f61c613dc2f1ebc16b4286f5d688fd568222762170397da",
+    "newest_mtime": "2026-08-23T05:08:07Z",
     "roots": [
       "bench/reference",
       "bench/reference/corpus"

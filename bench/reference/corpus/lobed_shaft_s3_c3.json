@@ -7,12 +7,12 @@
   "metrics": [
     {
       "name": "strain_energy",
-      "value": 0.0038881311991936997,
-      "tol": 0.079,
+      "value": 0.00383172974288092,
+      "tol": 0.069,
       "probe": {
         "kind": "strain_energy"
       },
-      "derivation": "Gmsh 4.13.1 CAD-conforming tet10 mesh of the case STEP file solved by CalculiX 2.23 (C3D10, PaStiX direct); neither the PolyMesh mesher nor the PolyMesh solver takes part in this value, replacing the previous overkill-reference value that our own mesher produced. Measured rung-to-rung change 0.0261; see provenance for both rungs, DOF counts and the energy/equilibrium checks.",
+      "derivation": "Gmsh 4.13.1 CAD-conforming tet10 mesh of the case STEP file solved by CalculiX 2.23 (C3D10, PaStiX direct); neither the PolyMesh mesher nor the PolyMesh solver takes part in this value, replacing the previous overkill-reference value that our own mesher produced. Measured rung-to-rung change 0.0228; see provenance for both rungs, DOF counts and the energy/equilibrium checks.",
       "source": "external-gmsh-mesh+calculix-solver",
       "inputs": {
         "E": 210000000000.0,
@@ -71,11 +71,11 @@
             "n_nodes": 30291,
             "n_elems": 19657,
             "n_dof": 89997,
-            "wall_mesh_s": 5.12,
-            "wall_solve_s": 13.41,
+            "wall_mesh_s": 5.53,
+            "wall_solve_s": 13.34,
             "values": {
-              "strain_energy": 0.0038758690479457998,
-              "tip_deflection": 1.1483272105717956e-05
+              "strain_energy": 0.0039212145966405,
+              "tip_deflection": 1.1383601427343668e-05
             }
           },
           {
@@ -85,75 +85,61 @@
             "n_nodes": 69632,
             "n_elems": 46734,
             "n_dof": 207492,
-            "wall_mesh_s": 13.5,
-            "wall_solve_s": 70.68,
+            "wall_mesh_s": 14.73,
+            "wall_solve_s": 66.21,
             "values": {
-              "strain_energy": 0.0037892681103301397,
-              "tip_deflection": 1.1294969288094043e-05
-            }
-          },
-          {
-            "h_rel": 0.026159334126040427,
-            "mesh_size_m": 0.010468827411539679,
-            "curvature_points_per_2pi": 49,
-            "n_nodes": 182679,
-            "n_elems": 126676,
-            "n_dof": 545337,
-            "wall_mesh_s": 62.16,
-            "wall_solve_s": 495.38,
-            "values": {
-              "strain_energy": 0.0038881311991936997,
-              "tip_deflection": 1.1504703380109535e-05
+              "strain_energy": 0.00383172974288092,
+              "tip_deflection": 1.118886955332247e-05
             }
           }
         ],
         "refinement_ratio": 1.45,
         "convergence_delta_between_h_rel": [
-          0.03793103448275862,
-          0.026159334126040427
+          0.055,
+          0.03793103448275862
         ],
         "converged_at": 0.06,
         "load": {
           "definition": "case traction (Pa) applied as energy-conjugate tri6 nodal loads over the free faces whose centroid lies in the case load box, kept when |n.t_hat| > select.normal_min_dot (the rule apps/testlab applies)",
           "normal_min_dot": 0.7,
-          "n_load_faces": 216,
-          "load_area_m2": 0.0031033648672700656,
-          "loaded_cad_end_face_area_m2": 0.0031033648672700656,
-          "box_only_area_m2": 0.0031033648672700656,
+          "n_load_faces": 126,
+          "load_area_m2": 0.0032070830380343212,
+          "loaded_cad_end_face_area_m2": 0.0032070830380343212,
+          "box_only_area_m2": 0.0032070830380343212,
           "end_face_vs_selected_rel_diff": 0.0,
           "resultant_N": [
-            3085.4073549999976,
+            3160.0745349999997,
             0.0,
-            -308.5407354999999
+            -301.0587707
           ]
         },
         "checks": {
-          "calculix_internal_energy_vs_half_f_dot_u_rel_gap": 0.3688175881480613,
-          "reaction_vs_applied_resultant_rel_err": 1.1505774005614465e-07,
+          "calculix_internal_energy_vs_half_f_dot_u_rel_gap": 0.3487922644900301,
+          "reaction_vs_applied_resultant_rel_err": 1.4677567032743113e-07,
           "frd_vs_dat_displacement_rel_err": null
         },
-        "wall_time_s": 663.1,
+        "wall_time_s": 101.1,
         "uncertainty": {
-          "rung_to_rung_delta": 0.026090286035459907,
-          "richardson_error_rel": 0.02542689117179526,
+          "rung_to_rung_delta": 0.02282069791238828,
+          "richardson_error_rel": null,
           "richardson_order": null,
-          "discretisation_rel": 0.026090286035459907,
+          "discretisation_rel": 0.02282069791238828,
           "mesh_policy_rel": 2e-05,
-          "numerical_rel": 0.026110286035459906,
+          "numerical_rel": 0.02284069791238828,
           "idealisation_bias_rel": 0.0,
-          "reference_uncertainty_rel": 0.026110286035459906,
-          "tol_basis": "tol = max(idealisation_bias 0 + 3 x numerical_uncertainty 0.02611, floor 0.02) = 0.07833 -> 0.079 (rounded up, 2 s.f.). Numerical uncertainty is the measured rung-to-rung change (or the Richardson error estimate, whichever is larger) plus the measured sensitivity to the mesh sizing policy. The idealisation bias is the measured gap between the closed form and the converged 3D external solve, and is added at full size because it is a bias, not scatter."
+          "reference_uncertainty_rel": 0.02284069791238828,
+          "tol_basis": "tol = max(idealisation_bias 0 + 3 x numerical_uncertainty 0.02284, floor 0.02) = 0.06852 -> 0.069 (rounded up, 2 s.f.). Numerical uncertainty is the measured rung-to-rung change (or the Richardson error estimate, whichever is larger) plus the measured sensitivity to the mesh sizing policy. The idealisation bias is the measured gap between the closed form and the converged 3D external solve, and is added at full size because it is a bias, not scatter."
         }
       }
     },
     {
       "name": "tip_deflection",
-      "value": 1.1504703380109535e-05,
-      "tol": 0.056,
+      "value": 1.118886955332247e-05,
+      "tol": 0.052,
       "probe": {
         "kind": "tip_deflection"
       },
-      "derivation": "Gmsh 4.13.1 CAD-conforming tet10 mesh of the case STEP file solved by CalculiX 2.23 (C3D10, PaStiX direct); neither the PolyMesh mesher nor the PolyMesh solver takes part in this value, replacing the previous overkill-reference value that our own mesher produced. Measured rung-to-rung change 0.0186; see provenance for both rungs, DOF counts and the energy/equilibrium checks.",
+      "derivation": "Gmsh 4.13.1 CAD-conforming tet10 mesh of the case STEP file solved by CalculiX 2.23 (C3D10, PaStiX direct); neither the PolyMesh mesher nor the PolyMesh solver takes part in this value, replacing the previous overkill-reference value that our own mesher produced. Measured rung-to-rung change 0.0171; see provenance for both rungs, DOF counts and the energy/equilibrium checks.",
       "source": "external-gmsh-mesh+calculix-solver",
       "inputs": {
         "E": 210000000000.0,
@@ -212,11 +198,11 @@
             "n_nodes": 30291,
             "n_elems": 19657,
             "n_dof": 89997,
-            "wall_mesh_s": 5.12,
-            "wall_solve_s": 13.41,
+            "wall_mesh_s": 5.53,
+            "wall_solve_s": 13.34,
             "values": {
-              "strain_energy": 0.0038758690479457998,
-              "tip_deflection": 1.1483272105717956e-05
+              "strain_energy": 0.0039212145966405,
+              "tip_deflection": 1.1383601427343668e-05
             }
           },
           {
@@ -226,64 +212,50 @@
             "n_nodes": 69632,
             "n_elems": 46734,
             "n_dof": 207492,
-            "wall_mesh_s": 13.5,
-            "wall_solve_s": 70.68,
+            "wall_mesh_s": 14.73,
+            "wall_solve_s": 66.21,
             "values": {
-              "strain_energy": 0.0037892681103301397,
-              "tip_deflection": 1.1294969288094043e-05
-            }
-          },
-          {
-            "h_rel": 0.026159334126040427,
-            "mesh_size_m": 0.010468827411539679,
-            "curvature_points_per_2pi": 49,
-            "n_nodes": 182679,
-            "n_elems": 126676,
-            "n_dof": 545337,
-            "wall_mesh_s": 62.16,
-            "wall_solve_s": 495.38,
-            "values": {
-              "strain_energy": 0.0038881311991936997,
-              "tip_deflection": 1.1504703380109535e-05
+              "strain_energy": 0.00383172974288092,
+              "tip_deflection": 1.118886955332247e-05
             }
           }
         ],
         "refinement_ratio": 1.45,
         "convergence_delta_between_h_rel": [
-          0.03793103448275862,
-          0.026159334126040427
+          0.055,
+          0.03793103448275862
         ],
         "converged_at": 0.06,
         "load": {
           "definition": "case traction (Pa) applied as energy-conjugate tri6 nodal loads over the free faces whose centroid lies in the case load box, kept when |n.t_hat| > select.normal_min_dot (the rule apps/testlab applies)",
           "normal_min_dot": 0.7,
-          "n_load_faces": 216,
-          "load_area_m2": 0.0031033648672700656,
-          "loaded_cad_end_face_area_m2": 0.0031033648672700656,
-          "box_only_area_m2": 0.0031033648672700656,
+          "n_load_faces": 126,
+          "load_area_m2": 0.0032070830380343212,
+          "loaded_cad_end_face_area_m2": 0.0032070830380343212,
+          "box_only_area_m2": 0.0032070830380343212,
           "end_face_vs_selected_rel_diff": 0.0,
           "resultant_N": [
-            3085.4073549999976,
+            3160.0745349999997,
             0.0,
-            -308.5407354999999
+            -301.0587707
           ]
         },
         "checks": {
-          "calculix_internal_energy_vs_half_f_dot_u_rel_gap": 0.3688175881480613,
-          "reaction_vs_applied_resultant_rel_err": 1.1505774005614465e-07,
+          "calculix_internal_energy_vs_half_f_dot_u_rel_gap": 0.3487922644900301,
+          "reaction_vs_applied_resultant_rel_err": 1.4677567032743113e-07,
           "frd_vs_dat_displacement_rel_err": null
         },
-        "wall_time_s": 663.1,
+        "wall_time_s": 101.1,
         "uncertainty": {
-          "rung_to_rung_delta": 0.018568805869757527,
-          "richardson_error_rel": 0.01823029113276407,
+          "rung_to_rung_delta": 0.017106350328943226,
+          "richardson_error_rel": null,
           "richardson_order": null,
-          "discretisation_rel": 0.018568805869757527,
+          "discretisation_rel": 0.017106350328943226,
           "mesh_policy_rel": 2e-05,
-          "numerical_rel": 0.018588805869757526,
+          "numerical_rel": 0.017126350328943225,
           "idealisation_bias_rel": 0.0,
-          "reference_uncertainty_rel": 0.018588805869757526,
-          "tol_basis": "tol = max(idealisation_bias 0 + 3 x numerical_uncertainty 0.01859, floor 0.02) = 0.05577 -> 0.056 (rounded up, 2 s.f.). Numerical uncertainty is the measured rung-to-rung change (or the Richardson error estimate, whichever is larger) plus the measured sensitivity to the mesh sizing policy. The idealisation bias is the measured gap between the closed form and the converged 3D external solve, and is added at full size because it is a bias, not scatter."
+          "reference_uncertainty_rel": 0.017126350328943225,
+          "tol_basis": "tol = max(idealisation_bias 0 + 3 x numerical_uncertainty 0.01713, floor 0.02) = 0.05138 -> 0.052 (rounded up, 2 s.f.). Numerical uncertainty is the measured rung-to-rung change (or the Richardson error estimate, whichever is larger) plus the measured sensitivity to the mesh sizing policy. The idealisation bias is the measured gap between the closed form and the converged 3D external solve, and is added at full size because it is a bias, not scatter."
         }
       }
     }
@@ -293,6 +265,6 @@
     "pipeline": "gmsh-mesh -> calculix-solve -> probe",
     "gmsh_version": "4.13.1",
     "calculix_version": "2.23",
-    "generated": "2026-08-22T19:10:09.976916+00:00"
+    "generated": "2026-08-23T05:08:07.204823+00:00"
   }
 }

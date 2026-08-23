@@ -947,7 +947,7 @@ FeatureColumns to_columns(const pipeline::CaseFeatures& f) {
         {"case_load_dir_z", f.load_dir_z},
     };
 
-    // Exact-BRep descriptors. The shipped ONNX contract is the 62 columns of
+    // Exact-BRep descriptors. The shipped ONNX contract is the 75 columns of
     // normalization.json:input_columns and these are among it, so encode()
     // consumes them when present (and imputes them when absent); they also
     // feed the out-of-distribution test in ood.json, which reads this map by
@@ -977,6 +977,21 @@ FeatureColumns to_columns(const pipeline::CaseFeatures& f) {
         columns.emplace("geo_volume_frac", f.geo_volume_frac);
         columns.emplace("geo_area_over_v23", f.geo_area_over_v23);
         columns.emplace("geo_min_face_size_rel", f.geo_min_face_size_rel);
+        columns.emplace("geo_n_inner_loops", f.geo_n_inner_loops);
+        columns.emplace("geo_hole_spacing_min_rel", f.geo_hole_spacing_min_rel);
+        columns.emplace("geo_hole_spacing_p10_rel", f.geo_hole_spacing_p10_rel);
+        columns.emplace("geo_feat_pair_dist_min_rel", f.geo_feat_pair_dist_min_rel);
+        columns.emplace("geo_feat_pair_dist_p10_rel", f.geo_feat_pair_dist_p10_rel);
+        columns.emplace("geo_feat_pair_dist_mean_rel", f.geo_feat_pair_dist_mean_rel);
+        columns.emplace("geo_dihedral_p10", f.geo_dihedral_p10);
+        columns.emplace("geo_dihedral_p50", f.geo_dihedral_p50);
+        columns.emplace("geo_dihedral_p90", f.geo_dihedral_p90);
+        columns.emplace("geo_singular_lambda_min", f.geo_singular_lambda_min);
+        columns.emplace("load_to_feature_dist_min_rel",
+                        f.load_to_feature_dist_min_rel);
+        columns.emplace("fix_to_feature_dist_min_rel",
+                        f.fix_to_feature_dist_min_rel);
+        columns.emplace("case_load_multiaxiality", f.case_load_multiaxiality);
     }
     return columns;
 }

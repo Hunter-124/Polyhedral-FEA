@@ -689,12 +689,9 @@ TEST_CASE("advisor max_dof budget filter: gated enumeration respects the budget"
         CHECK(same_number(unfiltered.predicted_dof, budget_off.predicted_dof));
         CHECK(same_number(unfiltered.predicted_mesh_ms, budget_off.predicted_mesh_ms));
         CHECK(same_number(unfiltered.predicted_solve_ms, budget_off.predicted_solve_ms));
-        CHECK(same_number(unfiltered.predicted_solve_flops,
-                          budget_off.predicted_solve_flops));
-        CHECK(same_number(unfiltered.predicted_solve_bytes,
-                          budget_off.predicted_solve_bytes));
-        CHECK(same_number(unfiltered.predicted_mesh_work,
-                          budget_off.predicted_mesh_work));
+        CHECK(same_number(unfiltered.predicted_solve_flops, budget_off.predicted_solve_flops));
+        CHECK(same_number(unfiltered.predicted_solve_bytes, budget_off.predicted_solve_bytes));
+        CHECK(same_number(unfiltered.predicted_mesh_work, budget_off.predicted_mesh_work));
         CHECK(same_number(unfiltered.failure_prob, budget_off.failure_prob));
         CHECK(same_number(unfiltered.ood_distance, budget_off.ood_distance));
         CHECK_FALSE(budget_off.budget_refusal);

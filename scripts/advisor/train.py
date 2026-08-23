@@ -889,12 +889,13 @@ def run_self_test(args: argparse.Namespace) -> int:
     print("self-test: guardrail barrier")
     objective = PolicyObjective(["graded_tet", "hex"])
     policy = torch.zeros(1, 4 + 4 + 2)
-    policy[0, 0] = 0.15  # h_rel inside [0, 0.2]
+    h_halfwidth = float(objective.halfwidths[0])
+    policy[0, 0] = 0.75 * h_halfwidth
     check(float(objective.penalty(policy)) == 0.0, "in-box policy incurs zero penalty")
-    policy[0, 0] = 0.5   # h_rel above the 0.2 half-width
+    policy[0, 0] = h_halfwidth + 0.3
     check(abs(float(objective.penalty(policy)) - 0.3) < 1e-6,
-          "out-of-box policy penalty equals the excess (0.5 - 0.2)")
-    policy[0, 0] = -0.5  # symmetric box, |value| is what matters
+          "out-of-box policy penalty equals the measured excess")
+    policy[0, 0] = -(h_halfwidth + 0.3)
     check(abs(float(objective.penalty(policy)) - 0.3) < 1e-6,
           "penalty uses |value| so negative excursions are penalised too")
 

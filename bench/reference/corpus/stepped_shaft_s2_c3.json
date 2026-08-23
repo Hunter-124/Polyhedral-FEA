@@ -71,8 +71,8 @@
             "n_nodes": 25268,
             "n_elems": 15561,
             "n_dof": 74997,
-            "wall_mesh_s": 3.03,
-            "wall_solve_s": 5.19,
+            "wall_mesh_s": 2.3,
+            "wall_solve_s": 3.73,
             "values": {
               "strain_energy": 0.00012032500171179001,
               "tip_deflection": 1.6115170856133092e-05
@@ -85,8 +85,8 @@
             "n_nodes": 69393,
             "n_elems": 45240,
             "n_dof": 206658,
-            "wall_mesh_s": 10.46,
-            "wall_solve_s": 30.23,
+            "wall_mesh_s": 8.25,
+            "wall_solve_s": 20.67,
             "values": {
               "strain_energy": 0.00012103600924625801,
               "tip_deflection": 1.6162649380787006e-05
@@ -118,7 +118,7 @@
           "reaction_vs_applied_resultant_rel_err": 1.5955885423349501e-07,
           "frd_vs_dat_displacement_rel_err": null
         },
-        "wall_time_s": 49.8,
+        "wall_time_s": 35.6,
         "uncertainty": {
           "rung_to_rung_delta": 0.005909059001478797,
           "richardson_error_rel": null,
@@ -198,8 +198,8 @@
             "n_nodes": 25268,
             "n_elems": 15561,
             "n_dof": 74997,
-            "wall_mesh_s": 3.03,
-            "wall_solve_s": 5.19,
+            "wall_mesh_s": 2.3,
+            "wall_solve_s": 3.73,
             "values": {
               "strain_energy": 0.00012032500171179001,
               "tip_deflection": 1.6115170856133092e-05
@@ -212,8 +212,8 @@
             "n_nodes": 69393,
             "n_elems": 45240,
             "n_dof": 206658,
-            "wall_mesh_s": 10.46,
-            "wall_solve_s": 30.23,
+            "wall_mesh_s": 8.25,
+            "wall_solve_s": 20.67,
             "values": {
               "strain_energy": 0.00012103600924625801,
               "tip_deflection": 1.6162649380787006e-05
@@ -245,7 +245,7 @@
           "reaction_vs_applied_resultant_rel_err": 1.5955885423349501e-07,
           "frd_vs_dat_displacement_rel_err": null
         },
-        "wall_time_s": 49.8,
+        "wall_time_s": 35.6,
         "uncertainty": {
           "rung_to_rung_delta": 0.002946200513651071,
           "richardson_error_rel": null,
@@ -265,6 +265,6 @@
     "pipeline": "gmsh-mesh -> calculix-solve -> probe",
     "gmsh_version": "4.13.1",
     "calculix_version": "2.23",
-    "generated": "2026-08-22T19:10:04.691107+00:00"
+    "generated": "2026-08-23T05:08:07.225748+00:00"
   }
 }

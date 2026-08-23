@@ -7,7 +7,7 @@
   "metrics": [
     {
       "name": "strain_energy",
-      "value": 0.00068684333958304,
+      "value": 0.00068684333927504,
       "tol": 0.025,
       "probe": {
         "kind": "strain_energy"
@@ -71,10 +71,10 @@
             "n_nodes": 26763,
             "n_elems": 16538,
             "n_dof": 79482,
-            "wall_mesh_s": 3.26,
-            "wall_solve_s": 5.89,
+            "wall_mesh_s": 2.85,
+            "wall_solve_s": 4.99,
             "values": {
-              "strain_energy": 0.0006925466713086101,
+              "strain_energy": 0.00069254667100651,
               "tip_deflection": 2.6734672345643016e-05
             }
           },
@@ -85,10 +85,10 @@
             "n_nodes": 72393,
             "n_elems": 47382,
             "n_dof": 215658,
-            "wall_mesh_s": 16.96,
-            "wall_solve_s": 41.04,
+            "wall_mesh_s": 13.35,
+            "wall_solve_s": 25.81,
             "values": {
-              "strain_energy": 0.00068684333958304,
+              "strain_energy": 0.00068684333927504,
               "tip_deflection": 2.659529251898879e-05
             }
           }
@@ -108,26 +108,26 @@
           "box_only_area_m2": 0.0003830140448736947,
           "end_face_vs_selected_rel_diff": 0.0,
           "resultant_N": [
-            378.33444879999996,
+            378.3344487000001,
             0.0,
-            -37.833444879999995
+            -37.83344487
           ]
         },
         "checks": {
-          "calculix_internal_energy_vs_half_f_dot_u_rel_gap": 0.6680203037752362,
-          "reaction_vs_applied_resultant_rel_err": 1.289864037083676e-07,
+          "calculix_internal_energy_vs_half_f_dot_u_rel_gap": 0.6680203037141148,
+          "reaction_vs_applied_resultant_rel_err": 1.287220877301608e-07,
           "frd_vs_dat_displacement_rel_err": null
         },
-        "wall_time_s": 68.2,
+        "wall_time_s": 47.7,
         "uncertainty": {
-          "rung_to_rung_delta": 0.008235303065991646,
+          "rung_to_rung_delta": 0.008235303078103003,
           "richardson_error_rel": null,
           "richardson_order": null,
-          "discretisation_rel": 0.008235303065991646,
+          "discretisation_rel": 0.008235303078103003,
           "mesh_policy_rel": 2e-05,
-          "numerical_rel": 0.008255303065991645,
+          "numerical_rel": 0.008255303078103002,
           "idealisation_bias_rel": 0.0,
-          "reference_uncertainty_rel": 0.008255303065991645,
+          "reference_uncertainty_rel": 0.008255303078103002,
           "tol_basis": "tol = max(idealisation_bias 0 + 3 x numerical_uncertainty 0.008255, floor 0.02) = 0.02477 -> 0.025 (rounded up, 2 s.f.). Numerical uncertainty is the measured rung-to-rung change (or the Richardson error estimate, whichever is larger) plus the measured sensitivity to the mesh sizing policy. The idealisation bias is the measured gap between the closed form and the converged 3D external solve, and is added at full size because it is a bias, not scatter."
         }
       }
@@ -198,10 +198,10 @@
             "n_nodes": 26763,
             "n_elems": 16538,
             "n_dof": 79482,
-            "wall_mesh_s": 3.26,
-            "wall_solve_s": 5.89,
+            "wall_mesh_s": 2.85,
+            "wall_solve_s": 4.99,
             "values": {
-              "strain_energy": 0.0006925466713086101,
+              "strain_energy": 0.00069254667100651,
               "tip_deflection": 2.6734672345643016e-05
             }
           },
@@ -212,10 +212,10 @@
             "n_nodes": 72393,
             "n_elems": 47382,
             "n_dof": 215658,
-            "wall_mesh_s": 16.96,
-            "wall_solve_s": 41.04,
+            "wall_mesh_s": 13.35,
+            "wall_solve_s": 25.81,
             "values": {
-              "strain_energy": 0.00068684333958304,
+              "strain_energy": 0.00068684333927504,
               "tip_deflection": 2.659529251898879e-05
             }
           }
@@ -235,17 +235,17 @@
           "box_only_area_m2": 0.0003830140448736947,
           "end_face_vs_selected_rel_diff": 0.0,
           "resultant_N": [
-            378.33444879999996,
+            378.3344487000001,
             0.0,
-            -37.833444879999995
+            -37.83344487
           ]
         },
         "checks": {
-          "calculix_internal_energy_vs_half_f_dot_u_rel_gap": 0.6680203037752362,
-          "reaction_vs_applied_resultant_rel_err": 1.289864037083676e-07,
+          "calculix_internal_energy_vs_half_f_dot_u_rel_gap": 0.6680203037141148,
+          "reaction_vs_applied_resultant_rel_err": 1.287220877301608e-07,
           "frd_vs_dat_displacement_rel_err": null
         },
-        "wall_time_s": 68.2,
+        "wall_time_s": 47.7,
         "uncertainty": {
           "rung_to_rung_delta": 0.005213448096622754,
           "richardson_error_rel": null,
@@ -265,6 +265,6 @@
     "pipeline": "gmsh-mesh -> calculix-solve -> probe",
     "gmsh_version": "4.13.1",
     "calculix_version": "2.23",
-    "generated": "2026-08-22T19:10:04.691872+00:00"
+    "generated": "2026-08-23T05:08:07.226036+00:00"
   }
 }

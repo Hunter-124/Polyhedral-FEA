@@ -7,13 +7,16 @@
     "dof": 0.0,
     "mesh_ms": 0.0,
     "solve_ms": 0.0,
+    "solve_flops": 0.0,
+    "solve_bytes": 0.0,
+    "mesh_work": 0.0,
     "failure": 1.0,
     "policy": 0.3
   },
   "stage_b_targets": {
-    "dof": 0.25,
-    "mesh_ms": 0.25,
-    "solve_ms": 0.5
+    "solve_flops": 0.5,
+    "solve_bytes": 0.25,
+    "mesh_work": 0.25
   },
   "beta": 1.0,
   "ramp_runs": 5,

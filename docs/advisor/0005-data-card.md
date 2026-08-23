@@ -4,14 +4,14 @@ Companions: [0004 — model card](0004-model-card.md),
 [0003 — training log](0003-training-log.md),
 [ADR-0027](../decisions/0027-learned-mesh-advisor.md).
 
-> **Status.** The regeneration has **landed**. The corpus is final for this cycle:
-> **2,412 rows, `dataset.csv` SHA-256 `3c0d6bd7a7d3…`**, generated on the
-> corrected engine with a re-aimed action grid. All reference truths were replaced
-> with an independent chain — **96 references: 88 external (Gmsh + CalculiX) and 8
-> closed-form** — with evidence-derived tolerances near 0.02, roughly five times
-> tighter than the promoted-overkill truths they replaced. Counts below are as of
-> that dataset hash; the *structural* caveats are hash-independent and are what
-> this card exists to record.
+> **Status.** The portable-cost regeneration has **landed**. The final table is
+> **36,010 rows, `dataset.csv` SHA-256 `f0a5c150c275…`**, with 15,578
+> accuracy-supervised rows and 17,707 portable-cost-supervised rows. The
+> procedural corpus has 300 references: **256 external Gmsh 4.13.1 + CalculiX
+> 2.23, 8 closed-form, and 36 protected pre-existing provisional references**.
+> The exhaustive matrix hit its explicit two-day contingency at 37,525/57,600
+> full rows and 4,517/4,800 cost rows; every omission is machine-readable in
+> `evidence/campaign_coverage.json`, never imputed as a measured result.
 
 ## Provenance
 
@@ -176,8 +176,7 @@ Two code paths:
 
 ### How the corpus splits, and what it costs
 
-Measured on the final `bench/advisor/dataset.csv` — 2,412 rows, SHA-256
-`3c0d6bd7a7d3…`:
+Historical v6 measurement on its 2,412-row dataset (SHA `3c0d6bd7a7d3…`):
 
 | element order (`order`) | refinement passes (`adapt_passes`) | rows | share |
 |---|---|---:|---:|
@@ -238,11 +237,11 @@ schema, is future work; see the model card's limitations.
 
 ## Known defects in the features
 
-> Counts in this section are as of the final `dataset.csv` — **2,412 rows,
-> SHA-256 `3c0d6bd7a7d3…`**. Re-derive with
-> `python scripts/advisor/dataset.py`.
+> Counts in this subsection are the historical v6 **2,412-row** table
+> (`3c0d6bd7a7d3…`). Current portable-cost counts are at the top of this card;
+> re-derive them with `python scripts/advisor/dataset.py`.
 
-**Six of the 58 candidate input columns are constant** on the final corpus and
+**Six of the 58 candidate input columns were constant** on that v6 corpus and
 therefore carry no information:
 
 `diag` (1.0 by construction), **`curved_frac` (1.0 in every row — its formula
@@ -307,9 +306,9 @@ deployed chooser enumerates is one the model has actually seen.
   empty one — `channel` now scores and `tube`, the thin-walled addition, does not.
   This is one of four findings that land on `tube`; they share a cause and are
   collected above rather than repeated here.
-- Failure rate is **33.0 %** (621 `mesh_fail`, 102 `over_budget`, 72
-  `solve_fail`, from 2,412 rows). A refusal to alias a feature away is the
-  dominant mesh-failure cause and is concentrated at coarse rungs.
+- Final failure rate is **43.6%** (12,763 `mesh_fail`, 2,153 `solve_fail`, and
+  775 `over_budget`, from 36,010 rows). The 1,439 `solve_suspect` rows are not
+  feasibility failures; they retain geometry/cost supervision while accuracy is masked.
 - Yield versus `h_rel` is covered in its own retraction below, because the
   previously published direction was wrong.
 

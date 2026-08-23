@@ -71,7 +71,7 @@ from gen_cad_parts import (  # noqa: E402  -- path bootstrap must precede this i
 
 try:  # pragma: no cover - import guard mirrors scripts/gen_cad_parts.py
     from OCP.Bnd import Bnd_Box
-    from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut, BRepAlgoAPI_Fuse
+    from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Cut, BRepAlgoAPI_Fuse
     from OCP.BRepBndLib import BRepBndLib
     from OCP.BRepBuilderAPI import (
         BRepBuilderAPI_GTransform,
@@ -405,6 +405,7 @@ class PlanarFace:
     straight_edges: bool
     """True when every bounding edge is a straight line, i.e. a mesh of this face
     reproduces its exact area and an authored ``expected_area`` is honest."""
+    topo_face: Any = field(repr=False, compare=False)
 
     @property
     def normal(self) -> tuple[float, float, float]:
@@ -469,6 +470,7 @@ def axis_aligned_planar_faces(shape, name: str, *, tol: float = 1.0e-9
             centroid=(centre.X(), centre.Y(), centre.Z()),
             lo=(x0, y0, z0), hi=(x1, y1, z1),
             straight_edges=straight,
+            topo_face=face,
         ))
     if not out:
         raise RuntimeError(f"{name}: no axis-aligned planar face to press on")
@@ -1315,16 +1317,43 @@ def load_box(geom: Geometry) -> list[list[float]]:
     return _slab(geom, geom.axis, "hi", depth, pad)
 
 
-def split_end_boxes(geom: Geometry) -> tuple[list[list[float]], list[list[float]], int]:
+def planar_face_area_in_box(face: PlanarFace, box: list[list[float]]) -> float:
+    """Exact area of one planar CAD face clipped by an axis-aligned region."""
+    lo, hi = box
+    clip = BRepPrimAPI_MakeBox(
+        gp_Pnt(float(lo[0]), float(lo[1]), float(lo[2])),
+        gp_Pnt(float(hi[0]), float(hi[1]), float(hi[2])),
+    ).Shape()
+    common = BRepAlgoAPI_Common(face.topo_face, clip)
+    common.Build()
+    if not common.IsDone():
+        raise RuntimeError("c3 end-face patch clipping failed")
+    from OCP.TopAbs import TopAbs_FACE
+    from OCP.TopExp import TopExp_Explorer
+    from OCP.TopoDS import TopoDS
+    area = 0.0
+    explorer = TopExp_Explorer(common.Shape(), TopAbs_FACE)
+    while explorer.More():
+        props = GProp_GProps()
+        BRepGProp.SurfaceProperties_s(TopoDS.Face_s(explorer.Current()), props)
+        area += float(props.Mass())
+        explorer.Next()
+    if not area > 0.0:
+        raise RuntimeError("c3 end-face patch has zero exact CAD area")
+    return area
+
+
+def split_end_boxes(
+    geom: Geometry, fallback_area: float,
+) -> tuple[list[list[float]], list[list[float]], int, float, float]:
     """Split the free end face into two disjoint load patches for c3.
 
     A mid-span wall band made the selected area a mesh-dependent staircase:
     c3 answers moved by 3-25% between external-truth rungs even while every
     single-region case converged. Splitting the planar end face through its
     area centroid gives every family two robust, distinct patches, including
-    concave L sections whose bbox midpoint lies in the void. Each carries an
-    authored half-face area, so the independent truth chain can keep both
-    resultants fixed while the boundary triangulation refines.
+    concave L sections whose bbox midpoint lies in the void. Exact clipped CAD
+    areas preserve each patch's resultant as the boundary triangulation refines.
     """
     primary = load_box(geom)
     second = [list(primary[0]), list(primary[1])]
@@ -1342,11 +1371,22 @@ def split_end_boxes(geom: Geometry) -> tuple[list[list[float]], list[list[float]
     gap = 1e-8 * geom.diag
     primary[1][split_axis] = r10(middle - gap)
     second[0][split_axis] = r10(middle + gap)
-    return (
-        [[r10(value) for value in primary[0]], [r10(value) for value in primary[1]]],
-        [[r10(value) for value in second[0]], [r10(value) for value in second[1]]],
-        split_axis,
-    )
+    primary_box = [
+        [r10(value) for value in primary[0]],
+        [r10(value) for value in primary[1]],
+    ]
+    second_box = [
+        [r10(value) for value in second[0]],
+        [r10(value) for value in second[1]],
+    ]
+    if load_faces:
+        primary_area = planar_face_area_in_box(load_face, primary_box)
+        second_area = planar_face_area_in_box(load_face, second_box)
+    else:
+        # Curved end caps have no planar source face. They are symmetric in the
+        # generated corpus, so the authored half area remains exact by design.
+        primary_area = second_area = 0.5 * fallback_area
+    return primary_box, second_box, split_axis, primary_area, second_area
 
 
 def _in_box(point: tuple[float, float, float], box: list[list[float]]) -> bool:
@@ -1443,8 +1483,10 @@ def case_specs(geom: Geometry) -> list[dict[str, Any]]:
     pressure = [r10(-PRESSURE_NORMAL * component) for component in face.normal]
     primary_area = (geom.end_area if geom.family != "sphere_box"
                     else geom.params["box_section_area"])
-    c3_primary_box, c3_secondary_box, c3_split_axis = split_end_boxes(geom)
-    c3_patch_area = r10(0.5 * primary_area)
+    (c3_primary_box, c3_secondary_box, c3_split_axis,
+     c3_primary_area, c3_secondary_area) = split_end_boxes(geom, primary_area)
+    c3_primary_area = r10(c3_primary_area)
+    c3_secondary_area = r10(c3_secondary_area)
 
     return [
         {
@@ -1483,12 +1525,12 @@ def case_specs(geom: Geometry) -> list[dict[str, Any]]:
             # resultants. Authored half-face areas let the external chain fix
             # both resultants as its boundary triangulation refines.
             "primary_box": c3_primary_box,
-            "primary_expected_area": c3_patch_area,
+            "primary_expected_area": c3_primary_area,
             "extra_regions": [{
                 "box": c3_secondary_box,
                 "traction": [r10(v) for v in multiregion],
                 "normal_min_dot": -1.0,
-                "expected_area": c3_patch_area,
+                "expected_area": c3_secondary_area,
             }],
             "corpus_extra": {"load_regions": [
                 {"kind": "end_face_half",
@@ -1504,9 +1546,9 @@ def case_specs(geom: Geometry) -> list[dict[str, Any]]:
             ]},
             "analytic": None,
             "truth_regions": [
-                {"area": c3_patch_area, "span": geom.span,
+                {"area": c3_primary_area, "span": geom.span,
                  "traction": [r10(v) for v in axial], "region": "end_face_half_low"},
-                {"area": c3_patch_area, "span": geom.span,
+                {"area": c3_secondary_area, "span": geom.span,
                  "traction": [r10(v) for v in multiregion],
                  "region": "end_face_half_high"},
             ],

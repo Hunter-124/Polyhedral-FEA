@@ -605,6 +605,18 @@ def main() -> int:
                 unique[key] = (campaign, row)
                 continue
             held_campaign, held_row = previous
+            held_eligible = held_row.get("advisor_training_eligible") is not False
+            new_eligible = row.get("advisor_training_eligible") is not False
+            if held_eligible != new_eligible:
+                # A corrected row that produced an honest mesh always beats a
+                # resolution-refusal row for the same (case, action), regardless
+                # of campaign naming. Applying this after dedup silently dropped
+                # corrected reruns whenever the old directory sorted first.
+                winner = (held_campaign, held_row) if held_eligible else (campaign, row)
+                loser_campaign = campaign if held_eligible else held_campaign
+                unique[key] = winner
+                superseded[(loser_campaign, winner[0])] += 1
+                continue
             if held_campaign == campaign:
                 # Same directory: warehouse rows are visited last and win an exact
                 # duplicate of the same run, which is the original behaviour.

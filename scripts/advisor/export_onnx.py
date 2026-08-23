@@ -127,7 +127,7 @@ class ExportWrapper(nn.Module):
     """Adapts ``AdvisorNet`` to the flat tuple signature ONNX needs.
 
     ``taps`` selects the graph shape: ``forward_tuple_explain``, whose outputs
-    are the nine C6 names followed by the three trunk taps, or the bare
+    are the twelve contract names followed by the three trunk taps, or the bare
     ``forward_tuple`` contract. Both shapes must remain exportable: the C++
     reports ``has_activations() == false`` and still recommends against an
     untapped model directory, and ``tests/fixtures/advisor_tiny/`` is the
@@ -163,27 +163,25 @@ def activation_layout_path(model_path: Path) -> Path:
 # --------------------------------------------------------------------------- #
 
 def graph_output_names(net: AdvisorNet, taps: bool = True) -> list[str]:
-    """Graph output order: the nine C6 names, then the activation taps.
+    """Graph output order: the twelve contract names, then the activation taps.
 
-    The C6 names stay first and keep their indices because the C++ loader
-    validates output ``i`` by name for ``i < 9``; anything appended after that
-    is invisible to it.
+    The contract names stay first and keep their indices because the C++ loader
+    validates every output ``i`` by name before accepting the graph.
     """
     return list(net.output_names) + (list(ACTIVATION_OUTPUT_NAMES) if taps else [])
 
 
 def export_graph(net: AdvisorNet, path: Path, taps: bool = True) -> Path | None:
-    """Write the C6 graph -- one ``features`` input, nine named outputs -- with
-    the three trunk taps appended, plus its ``activation_layout.json`` sidecar.
+    """Write the contract graph -- one ``features`` input, twelve named outputs --
+    with the three trunk taps appended, plus its ``activation_layout.json`` sidecar.
 
-    Naming the taps as graph outputs costs the production ``Advisor::Impl::run``
+    Naming the taps as graph outputs costs the production ``Advisor::Impl::run`
     nothing. They are not new arithmetic: ``forward_tuple_explain`` shares one
     trunk evaluation with the heads (see ``AdvisorNet.heads``), so the taps are
-    tensors the graph already had to materialise on the way to the nine
-    contract outputs. ORT computes and returns only the outputs the caller
-    names in ``Run``, and the C++ names exactly the nine; the extra graph
-    outputs merely stop those three intermediates from being fusible or
-    reusable buffers.
+    tensors the graph already had to materialise on the way to the twelve
+    contract outputs. ORT computes and returns only the outputs the caller names
+    in ``Run``, and the C++ names exactly the twelve; the extra graph outputs
+    merely stop those three intermediates from being fusible or reusable buffers.
 
     ``taps=False`` writes the pre-activation graph shape and no sidecar, which
     is what a model directory looked like before this feature and what the C++

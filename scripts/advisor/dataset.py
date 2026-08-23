@@ -38,7 +38,10 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from cost_labels import portable_cost_label
+try:
+    from .cost_labels import portable_cost_label
+except ImportError:  # direct `python scripts/advisor/dataset.py`
+    from cost_labels import portable_cost_label
 
 ROOT = Path(__file__).resolve().parents[2]
 ADVISOR_DIR = ROOT / "bench" / "advisor"
@@ -50,7 +53,7 @@ CLAMPS_JSON = ADVISOR_DIR / "clamps.json"
 #: feature/action vector. Legacy campaign rows leave all 26 features and most
 #: of the action columns empty, so training on them silently learns from
 #: imputed constants; ``load_dataset`` rejects them outright.
-ADVISOR_ROW_SCHEMA = "advisor-row-v3"
+ADVISOR_ROW_SCHEMAS = frozenset({"advisor-row-v3", "advisor-row-v4"})
 
 # --- C2 input columns -------------------------------------------------------
 
@@ -241,7 +244,7 @@ OK_STATUSES: frozenset[str] = frozenset({"ok", "solve_suspect", "cost_only"})
 ORDER_CHOICES: list[int] = [1, 2]
 CONTINUOUS_ACTION_DIMS: list[str] = ["h_rel", "adapt_passes", "eta_target"]
 CLAMP_BOX: dict[str, tuple[float, float]] = {
-    "h_rel": (0.005, 0.2),
+    "h_rel": (0.005, 0.28),
     # The plan's floor of 0.005 excluded eta_target's own default. In the
     # harness 0.0 means "no adaptive error target", which is a legal and common
     # action (every adapt_passes=0 row uses it), so the box has to contain it —
@@ -837,21 +840,23 @@ def _best_actions(rows: list[dict[str, str]], failure: np.ndarray,
 
 
 def _reject_non_advisor_rows(rows: list[dict[str, str]], path: Path) -> list[dict[str, str]]:
-    """Keep only ``advisor-row-v3`` rows; abort with the counts we did find.
+    """Keep only advisor-row-v3/v4 rows; abort with the counts we did find.
 
     Legacy rows carry real outcome targets but no features, so they impute to
-    the training median and become constant inputs. Training on them produces a
-    model whose ``normalization.json`` is degenerate and whose geometry heads
-    never saw a single supervised example, with no error anywhere in the
-    pipeline. The LightGBM baseline already refuses such data; so does this.
+    the same point in feature space and are not suitable for training. V3 rows
+    remain valid accuracy supervision; V4 adds portable-cost labels.
     """
     counts = Counter(str(row.get("schema", "") or "").strip() or "<blank>" for row in rows)
-    kept = [row for row in rows if str(row.get("schema", "") or "").strip() == ADVISOR_ROW_SCHEMA]
+    kept = [
+        row for row in rows
+        if str(row.get("schema", "") or "").strip() in ADVISOR_ROW_SCHEMAS
+    ]
     if kept:
         return kept
-    inventory = ", ".join(f"{name}={counts[name]}" for name in sorted(counts))
-    raise SystemExit(
-        f"advisor dataset has no '{ADVISOR_ROW_SCHEMA}' rows: {path}\n"
+    inventory = ", ".join(f"{key}={counts[key]}" for key in sorted(counts))
+    expected = ", ".join(sorted(ADVISOR_ROW_SCHEMAS))
+    raise DatasetError(
+        f"advisor dataset has no supported rows ({expected}): {path}\n"
         f"rows by schema: {inventory} ({len(rows)} total)\n"
         f"Legacy rows have no CaseFeatures and no action vector, so every model "
         f"input would be an imputed constant. Run an advisor campaign and rebuild:\n"

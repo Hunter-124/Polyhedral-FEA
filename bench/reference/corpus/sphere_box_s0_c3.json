@@ -72,7 +72,7 @@
             "n_elems": 3813,
             "n_dof": 18528,
             "wall_mesh_s": 0.48,
-            "wall_solve_s": 1.04,
+            "wall_solve_s": 0.92,
             "values": {
               "strain_energy": 7.930585086513e-05,
               "tip_deflection": 6.007443753345857e-07
@@ -85,8 +85,8 @@
             "n_nodes": 18499,
             "n_elems": 11735,
             "n_dof": 53598,
-            "wall_mesh_s": 2.09,
-            "wall_solve_s": 7.27,
+            "wall_mesh_s": 1.83,
+            "wall_solve_s": 5.02,
             "values": {
               "strain_energy": 7.877783079861001e-05,
               "tip_deflection": 5.940948404740407e-07
@@ -118,7 +118,7 @@
           "reaction_vs_applied_resultant_rel_err": 7.517558400355742e-08,
           "frd_vs_dat_displacement_rel_err": null
         },
-        "wall_time_s": 11.1,
+        "wall_time_s": 8.4,
         "uncertainty": {
           "rung_to_rung_delta": 0.006658021580500436,
           "richardson_error_rel": null,
@@ -199,7 +199,7 @@
             "n_elems": 3813,
             "n_dof": 18528,
             "wall_mesh_s": 0.48,
-            "wall_solve_s": 1.04,
+            "wall_solve_s": 0.92,
             "values": {
               "strain_energy": 7.930585086513e-05,
               "tip_deflection": 6.007443753345857e-07
@@ -212,8 +212,8 @@
             "n_nodes": 18499,
             "n_elems": 11735,
             "n_dof": 53598,
-            "wall_mesh_s": 2.09,
-            "wall_solve_s": 7.27,
+            "wall_mesh_s": 1.83,
+            "wall_solve_s": 5.02,
             "values": {
               "strain_energy": 7.877783079861001e-05,
               "tip_deflection": 5.940948404740407e-07
@@ -245,7 +245,7 @@
           "reaction_vs_applied_resultant_rel_err": 7.517558400355742e-08,
           "frd_vs_dat_displacement_rel_err": null
         },
-        "wall_time_s": 11.1,
+        "wall_time_s": 8.4,
         "uncertainty": {
           "rung_to_rung_delta": 0.011068825832687208,
           "richardson_error_rel": null,
@@ -265,6 +265,6 @@
     "pipeline": "gmsh-mesh -> calculix-solve -> probe",
     "gmsh_version": "4.13.1",
     "calculix_version": "2.23",
-    "generated": "2026-08-22T19:10:04.681741+00:00"
+    "generated": "2026-08-23T05:08:07.223257+00:00"
   }
 }

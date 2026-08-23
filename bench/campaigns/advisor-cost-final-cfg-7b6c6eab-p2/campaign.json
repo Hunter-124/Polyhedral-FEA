@@ -1,0 +1,129 @@
+{
+  "name": "advisor-cost-final-cfg-7b6c6eab-p2",
+  "comment": "final cost config cfg-7b6c6eab, part shard 2; host hunter-pc",
+  "warehouse": false,
+  "parts": [
+    "bench/geometries/corpus/primitives/lobed_shaft_s0_c3.case.json",
+    "bench/geometries/corpus/primitives/lobed_shaft_s1_c1.case.json",
+    "bench/geometries/corpus/primitives/lobed_shaft_s1_c4.case.json",
+    "bench/geometries/corpus/primitives/lobed_shaft_s2_c2.case.json",
+    "bench/geometries/corpus/primitives/lobed_shaft_s3_c0.case.json",
+    "bench/geometries/corpus/primitives/lobed_shaft_s3_c3.case.json",
+    "bench/geometries/corpus/primitives/multi_hole_plate_s0_c1.case.json",
+    "bench/geometries/corpus/primitives/multi_hole_plate_s0_c4.case.json",
+    "bench/geometries/corpus/primitives/multi_hole_plate_s1_c2.case.json",
+    "bench/geometries/corpus/primitives/multi_hole_plate_s2_c0.case.json",
+    "bench/geometries/corpus/primitives/multi_hole_plate_s2_c3.case.json",
+    "bench/geometries/corpus/primitives/multi_hole_plate_s3_c1.case.json",
+    "bench/geometries/corpus/primitives/multi_hole_plate_s3_c4.case.json",
+    "bench/geometries/corpus/primitives/perforated_plate_s0_c2.case.json",
+    "bench/geometries/corpus/primitives/perforated_plate_s1_c0.case.json",
+    "bench/geometries/corpus/primitives/perforated_plate_s1_c3.case.json",
+    "bench/geometries/corpus/primitives/perforated_plate_s2_c1.case.json",
+    "bench/geometries/corpus/primitives/perforated_plate_s2_c4.case.json",
+    "bench/geometries/corpus/primitives/perforated_plate_s3_c2.case.json",
+    "bench/geometries/corpus/primitives/plate_notch_s0_c0.case.json",
+    "bench/geometries/corpus/primitives/plate_notch_s0_c3.case.json",
+    "bench/geometries/corpus/primitives/plate_notch_s1_c1.case.json",
+    "bench/geometries/corpus/primitives/plate_notch_s1_c4.case.json",
+    "bench/geometries/corpus/primitives/plate_notch_s2_c2.case.json",
+    "bench/geometries/corpus/primitives/plate_notch_s3_c0.case.json",
+    "bench/geometries/corpus/primitives/plate_notch_s3_c3.case.json",
+    "bench/geometries/corpus/primitives/ribbed_plate_s0_c1.case.json",
+    "bench/geometries/corpus/primitives/ribbed_plate_s0_c4.case.json",
+    "bench/geometries/corpus/primitives/ribbed_plate_s1_c2.case.json",
+    "bench/geometries/corpus/primitives/ribbed_plate_s2_c0.case.json",
+    "bench/geometries/corpus/primitives/ribbed_plate_s2_c3.case.json",
+    "bench/geometries/corpus/primitives/ribbed_plate_s3_c1.case.json",
+    "bench/geometries/corpus/primitives/ribbed_plate_s3_c4.case.json",
+    "bench/geometries/corpus/primitives/sphere_box_s0_c2.case.json",
+    "bench/geometries/corpus/primitives/sphere_box_s1_c0.case.json",
+    "bench/geometries/corpus/primitives/sphere_box_s1_c3.case.json",
+    "bench/geometries/corpus/primitives/sphere_box_s2_c1.case.json",
+    "bench/geometries/corpus/primitives/sphere_box_s2_c4.case.json",
+    "bench/geometries/corpus/primitives/sphere_box_s3_c2.case.json",
+    "bench/geometries/corpus/primitives/stepped_shaft_s0_c0.case.json",
+    "bench/geometries/corpus/primitives/stepped_shaft_s0_c3.case.json",
+    "bench/geometries/corpus/primitives/stepped_shaft_s1_c1.case.json",
+    "bench/geometries/corpus/primitives/stepped_shaft_s1_c4.case.json",
+    "bench/geometries/corpus/primitives/stepped_shaft_s2_c2.case.json",
+    "bench/geometries/corpus/primitives/stepped_shaft_s3_c0.case.json",
+    "bench/geometries/corpus/primitives/stepped_shaft_s3_c3.case.json",
+    "bench/geometries/corpus/primitives/tube_s0_c1.case.json",
+    "bench/geometries/corpus/primitives/tube_s0_c4.case.json",
+    "bench/geometries/corpus/primitives/tube_s1_c2.case.json",
+    "bench/geometries/corpus/primitives/tube_s2_c0.case.json",
+    "bench/geometries/corpus/primitives/tube_s2_c3.case.json",
+    "bench/geometries/corpus/primitives/tube_s3_c1.case.json",
+    "bench/geometries/corpus/primitives/tube_s3_c4.case.json",
+    "bench/geometries/corpus/primitives/twisted_loft_s0_c2.case.json",
+    "bench/geometries/corpus/primitives/twisted_loft_s1_c0.case.json",
+    "bench/geometries/corpus/primitives/twisted_loft_s1_c3.case.json",
+    "bench/geometries/corpus/primitives/twisted_loft_s2_c1.case.json",
+    "bench/geometries/corpus/primitives/twisted_loft_s2_c4.case.json",
+    "bench/geometries/corpus/primitives/twisted_loft_s3_c2.case.json"
+  ],
+  "tiers": [
+    {
+      "h_scale": 1.0,
+      "keep_frac": 1.0
+    }
+  ],
+  "grid": {
+    "mesher": [
+      "graded_tet",
+      "hex",
+      "hybrid_vem",
+      "hybrid_zoo"
+    ],
+    "h_rel": [
+      0.05,
+      0.06
+    ],
+    "element_tendency": [
+      0.0
+    ],
+    "feature_refine": [
+      false
+    ],
+    "bc_grading": [
+      false
+    ],
+    "order": [
+      1,
+      2
+    ],
+    "skin_layers": [
+      1
+    ],
+    "adapt_passes": [
+      0
+    ],
+    "cost_only": [
+      true
+    ],
+    "eta_target": [
+      0.0
+    ],
+    "p_elevate": [
+      false
+    ],
+    "adapt_leb_waves": [
+      1
+    ]
+  },
+  "host": "hunter-pc",
+  "score": {
+    "w_time": 0.0,
+    "w_err": 0.0,
+    "w_dof": 0.0,
+    "geometry_volume_tol": 0.01,
+    "geometry_surface_tol": 0.02
+  },
+  "resources": {
+    "max_dof": 800000,
+    "max_elems": 500000,
+    "max_run_wall_s": 180,
+    "max_pack_wall_s": 7200
+  }
+}

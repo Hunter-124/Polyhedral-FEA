@@ -1,0 +1,11 @@
+{
+  "campaign": "advisor-cost-final-cfg-7b6c6eab-p1",
+  "completed_runs": 6,
+  "started_utc": "2026-08-23T03:20:00Z",
+  "state": "running",
+  "survivors": [
+    "cfg-7b6c6eab"
+  ],
+  "tier": 0,
+  "updated_utc": "2026-08-23T03:50:08Z"
+}

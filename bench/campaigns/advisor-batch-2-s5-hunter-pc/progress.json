@@ -1,12 +1,14 @@
 {
   "cg_iter": null,
   "cg_resid": null,
-  "elapsed_ms": 0.0,
-  "phase": "done",
-  "phase_frac": 1.0,
+  "elapsed_ms": 88309.855244,
+  "n_elems": 3906,
+  "n_nodes": 6013,
+  "phase": "solve",
+  "phase_frac": 0.0,
   "run": {
-    "cfg_id": "",
-    "part": "",
+    "cfg_id": "cfg-798f247a",
+    "part": "sphere_box_s0_c4",
     "tier": 0
   }
 }

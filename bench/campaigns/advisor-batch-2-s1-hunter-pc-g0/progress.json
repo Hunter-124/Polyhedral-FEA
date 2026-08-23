@@ -1,0 +1,12 @@
+{
+  "cg_iter": null,
+  "cg_resid": null,
+  "elapsed_ms": 10538.581207,
+  "phase": "mesh",
+  "phase_frac": 0.0,
+  "run": {
+    "cfg_id": "cfg-7b2febf4",
+    "part": "sphere_box_s2_c4",
+    "tier": 0
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "cg_iter": null,
+  "cg_resid": null,
+  "elapsed_ms": 91831.86335,
+  "n_elems": 8352,
+  "n_nodes": 12429,
+  "phase": "assemble",
+  "phase_frac": 0.0,
+  "run": {
+    "cfg_id": "cfg-7fe27914",
+    "part": "ellipsoid_boss_s3_c0",
+    "tier": 0
+  }
+}

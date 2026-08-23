@@ -1,0 +1,12 @@
+{
+  "cg_iter": null,
+  "cg_resid": null,
+  "elapsed_ms": 4991908.089403,
+  "phase": "mesh",
+  "phase_frac": 0.0,
+  "run": {
+    "cfg_id": "cfg-7b6c6eab",
+    "part": "multi_hole_plate_s0_c0",
+    "tier": 0
+  }
+}

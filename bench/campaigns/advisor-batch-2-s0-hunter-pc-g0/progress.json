@@ -1,0 +1,12 @@
+{
+  "cg_iter": null,
+  "cg_resid": null,
+  "elapsed_ms": 224244.423978,
+  "phase": "mesh",
+  "phase_frac": 0.0,
+  "run": {
+    "cfg_id": "cfg-d03d8aa9",
+    "part": "lobed_shaft_s1_c2",
+    "tier": 0
+  }
+}

@@ -1,12 +1,12 @@
 {
   "cg_iter": null,
   "cg_resid": null,
-  "elapsed_ms": 0.0,
-  "phase": "done",
-  "phase_frac": 1.0,
+  "elapsed_ms": 53227.784322,
+  "phase": "mesh",
+  "phase_frac": 0.0,
   "run": {
-    "cfg_id": "",
-    "part": "",
+    "cfg_id": "cfg-21794659",
+    "part": "twisted_loft_s1_c0",
     "tier": 0
   }
 }

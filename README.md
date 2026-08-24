@@ -18,9 +18,10 @@ same frames as the inline GIF ([poster](docs/assets/cinema/poster.png)).
 
 The four chapters are concise and visual:
 
-- **Assembly → exact CAD.** The take opens on a shaded wishbone inside
-  procedural interface hardware anchored to the real support and load regions.
-  Those unsolved neighbouring parts peel away before the analysis pane opens.
+- **Assembly → exact CAD.** The take opens on a shaded wishbone with both
+  chassis-eye bolts and the upright-side ball-joint stud seated directly on
+  their real bore axes. That unsolved interface hardware peels away before the
+  analysis pane opens.
   The selected exact CAD edge is then drawn from its ordered samples; three
   adjacent points, their tangent/normal construction, the measured
   $\kappa(s)$ trace and its FFT animate in one continuous drill-down. The old
@@ -32,15 +33,17 @@ The four chapters are concise and visual:
   baseline remains authoritative when the OOD check abstains, while real
   `MeshStage` cells replace the shaded CAD body in place.
 - **Mesher.** The configured baseline uses a fine wall-resolving tet4 target.
-  Cell topology is shown as one tetrahedron assembling into a connected
-  multi-cell patch rather than two duplicate diagrams; quadratic runs add their
-  real midside nodes. The measured type mix and min/mean quality stay graphical
-  and numeric.
+  A 10.2 s microscope assembles the same six-tetrahedra cube patch first as
+  tet4/p1 and then as tet10/p2, exposing their shared diagonal and all midside
+  nodes. The bottom ledger remains explicit that the published solve executed
+  tet4/p1; the right card is a topology comparison, not a fabricated solve.
+  Measured type mix and min/mean quality stay graphical and numeric.
 - **Analysis.** The authoritative final solve supplies the viewport and compact
   symbolic boards for stress, gradient, ZZ verification, refinement and the
-  exact response $u(\lambda)=\lambda u$, $\sigma(\lambda)=\lambda\sigma$. The
-  load arrow grows into the loaded surface, fixed supports reveal independently,
-  and the exaggerated result is limited to 4% of the model diagonal with a
+  exact response $u(\lambda)=\lambda u$, $\sigma(\lambda)=\lambda\sigma$.
+  Interface symbols stay absent from the assembly, advisor and meshing acts.
+  They reveal only immediately before gradient recovery and final deformation;
+  the exaggerated result is limited to 4% of the model diagonal with a
   translucent undeformed CAD ghost behind it.
 
 The published solve contains **40,170 tet4 cells**, **9,796 nodes** and **29,388
@@ -51,16 +54,17 @@ p99**) and **0.00329 mm** physical peak displacement. The film also states the
 this take is a visually legible high-resolution verification case, not a
 reference-truth benchmark.
 
-The chapters are one continuous handoff rather than five resets. Assembly
+The chapters are one continuous handoff rather than five resets. Solid assembly
 context peels away to expose the shaded CAD body; the sampled edge becomes its
 curvature signal and spectrum; the solid body gives way only where recorded
-cells land. That mesh stays visible while stress arrives, then hands off to the
-gradient and ZZ fields. Support symbols and the force arrow remain anchored to
-the actual interface regions and follow the displayed final deformation where
-appropriate. Their pulses, the advisor wave and mesh reveal are deterministic
-motion cues, not measured quantities.
+cells land. No whole-part CAD edge cage is composited over the shaded body.
+The mesh stays visible while stress arrives, then hands off to the gradient and
+ZZ fields. Support and load symbols appear only in the two mechanics windows:
+immediately before gradient recovery, and immediately before the exact
+load/deformation ramp. Their pulses, the advisor wave and mesh reveal are
+deterministic motion cues, not measured quantities.
 
-Nothing in the take is a mock-up. Network nodes are the graph's own trunk
+No measured result in the take is mocked. Network nodes are the graph's own trunk
 tensors, connection strength is measured $|w_{ji}a_i|$, and mesh frames are
 captured `pipeline::MeshStage` snapshots. Fields are the corresponding
 `pipeline::SolveStage::result`; the published stage is replaced with

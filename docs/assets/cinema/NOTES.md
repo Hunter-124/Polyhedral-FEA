@@ -21,11 +21,11 @@ stdout.
 |---|---|
 | Take | 3600 frames at a fixed 1/60 s virtual timestep = 60.000 s. The clock is set from the frame **index**, never accumulated from real frame time. |
 | Frame | 1920×1080. `--size` sets Xvfb and `POLYMESH_GUI_SIZE`; the recorded resolution is measured from the PNG rather than assumed. |
-| Acts | `skeleton` 0.20, `deliberate` 0.15, `build` 0.17, `mesh_hold` 0.08, `solve` 0.40. At 60 s these are 12.0 / 9.0 / 10.2 / 4.8 / 24.0 s. |
-| Analysis pane | 0.42 of the width. Actual CAD-edge construction → curvature/FFT graphics → four activation lanes → cell/mesh patch → symbolic solve board, with direct opacity handoffs. |
+| Acts | `skeleton` 0.18, `deliberate` 0.13, `build` 0.17, `mesh_hold` 0.17, `solve` 0.35. At 60 s these are 10.8 / 7.8 / 10.2 / 10.2 / 21.0 s. |
+| Analysis pane | 0.42 of the width. Actual CAD-edge construction → curvature/FFT graphics → four activation lanes → tet4/tet10 patch comparison → symbolic solve board, with direct opacity handoffs. |
 | Bottom ledger | Constant height and deliberately sparse: active symbol/numeric result left, optional measurement note right, provenance below. |
 | Camera | Fit before frame zero against the exact rest∪4%-displayed deformation envelope. It never moves during the take. |
-| Mechanics overlay | Support symbols reveal independently. The force arrow grows from outside the model and terminates on the loaded region. During the exact linear load ramp, arrow length and stated resultant scale by λ. |
+| Mechanics overlay | Hidden throughout assembly, advisor and meshing. Support/load symbols reveal only immediately before gradient recovery and the final deformation ramp. During the exact linear load ramp, arrow length and stated resultant scale by λ. |
 ### What is interpolated
 
 Time, opacity, assembly strip distance, the shrink-toward-centroid reveal, the
@@ -50,14 +50,20 @@ because interpolating it is exact rather than approximate — see
 
 - The analysed wishbone is the same crease-aware shaded `Model::surface` used by
   Studio setup mode, not a wireframe substitute.
-- Cinema-only neighbouring hardware is generated from the actual support and
-  load marker positions: interface collars/hubs plus the support-side connector.
-  It is never appended to `Model`, `NodalMesh`, fixtures, loads or solve data.
-  Per-vertex strip vectors move it outward while opacity falls; it exists only
-  to establish assembly context before the analysed component is isolated.
-- The panel stays closed for the assembly view. It begins opening at 3.36 s and
-  reaches full width at 4.56 s on the default take, after the context has started
-  peeling away.
+- Cinema-only interface hardware is generated in the physical frame implied by
+  the real support and load marker positions. The support baseline supplies the
+  common bushing axis; the support-to-load direction and that baseline resolve
+  the vertical ball-joint axis.
+- The 48 mm bushing eyes each receive a bolt through the exact bore axis, with
+  washers seated on the measured end planes and nuts beyond them. The loaded
+  boss receives a ball, stud and nut on its vertical bore axis. Every generated
+  solid therefore intersects the interface it belongs to; no disconnected
+  chassis pipes or decorative cage surround the analysed component.
+- This hardware is never appended to `Model`, `NodalMesh`, fixtures, loads or
+  solve data. Per-vertex strip vectors peel the three complete fastener groups
+  away.
+- The panel begins opening at 2.92 s and reaches full width at 4.00 s on the
+  default take. The assembly is held complete before peeling begins at 2.59 s.
 - Exact edge curves come from `geom::extract_topology(*model.cad, 32)`. For mesh
   inputs without a BRep, only `geom::detect_sharp_edges(model.surface, 30°)` is
   available and the fallback is not called exact CAD.
@@ -82,7 +88,7 @@ because interpolating it is exact rather than approximate — see
 
 The first 65% of the act shows one real forward pass per beat in chooser order:
 108 candidate actions and one final re-score. At the default 60 s duration the
-109 measured passes use a 53.7 ms display beat; the remaining 3.15 s holds the
+109 measured passes use a 46.5 ms display beat; the remaining 2.73 s holds the
 final state, and the 1.6 s decision lead at the start of the next act extends
 that inspectable hold. No candidate-specific prose is drawn. The measured node,
 edge and lane motion is the explanation.
@@ -195,19 +201,22 @@ is geometry analysis, not a sizing input.
 - Cells the viewport cannot triangulate are counted and called out, never hidden.
 - The reveal shrink pulls each cell toward its centroid as it lands, then closes.
   Dense-mesh edges stay at 0.8 px / 0.18 opacity so shaded geometry survives.
-- **The cell microscope** reads the captured `NodalMesh`, not a second model.
-  Its top rail is the actual type histogram. One card shows a tetrahedron at the
-  executed order; the second assembles four tetrahedra sharing a central node
-  so a connected mesh patch, not a duplicate element, is visible. Quadratic
-  runs add midside nodes to every displayed edge. `qmin` and `q̄` come from
-  `fea::summarize_cell_quality`, computed once when the snapshot is drained.
-  No experimental cell family is named or implied when it was not used.
+- **The cell microscope owns 10.2 s.** Its top rail is the captured mesh's
+  actual type histogram. Both cards use one cube split into six conforming
+  tetrahedra around a shared body diagonal, so shared topology is unmistakable.
+  The left card assembles tet4/p1 over 3.0 s. The right begins 2.8 s later,
+  assembles the same patch as tet10/p2 over 3.2 s, and adds one midside node to
+  every unique patch edge. The remaining time holds both completed patches.
+- These are conventional topology diagrams. The published solve remains tet4/p1
+  in the bottom ledger and manifest; the tet10/p2 card does not claim that a
+  quadratic wishbone solve ran. The measured `qmin` and `q̄` still come from
+  `fea::summarize_cell_quality` on the captured `NodalMesh`.
 
 ## Act 4 — `mesh_hold`: the finished mesh
 
-4.8 s on the authoritative mesh consumed by the first solve. It opens every
-cell by 0.10 toward its own centroid, holds the exploded topology, closes it,
-then leaves the delivered mesh still for the final fifth of the act.
+10.2 s on the authoritative mesh consumed by the first solve. It opens every
+cell by 0.10 toward its own centroid, holds the exploded topology through the
+cell comparison, then closes back to the delivered mesh before analysis.
 
 Counts come from `SolveStage::trace`; type mix and min/mean shape quality come
 from the aligned `CinemaMeshInsight`. On quadratic CAD runs the viewport source
@@ -231,7 +240,7 @@ after the last pass:  load ramp, hold
 The number of solve stages is data, not a storyboard constant. The recorder
 emits each stage's pass index, element/node/DOF count, global η and mark counts
 into `manifest.json`; `for_each_solve_beat` scales that sequence uniformly into
-the 24.0 s solve act without dropping a phase.
+the 21.0 s solve act without dropping a phase.
 
 The published wishbone stage is 40,170 tet4 cells / 9,796 nodes / 29,388 DOF,
 with 0.0200003 minimum and 0.249598 mean cell quality. The distributed 47.17 kN
@@ -327,6 +336,20 @@ it. Persistent cells remain rendered and briefly open by 0.06 toward their
 centroids; they never disappear. During the first 40% removed cells
 collapse/fade; during the remaining 60% added cells spawn in the next mesh's
 storage order. The ending frame is exactly the mesh the next pass solved.
+
+### Mechanics overlay windows
+
+Support glyphs and the load arrow are absent from the opening, advisor,
+construction, cell-microscope and initial stress-sweep frames. They reveal over
+the final 38% of the stress hold, remain through gradient recovery, and fade
+during the final 28% of the gradient hold. On the final solve pass they return
+over the last 40% of the error hold, immediately before deformation begins, and
+remain through the exact load ramp and result hold. An intermediate pass does
+not receive that second reveal because refinement, not deformation, follows it.
+
+The symbols remain anchored to the actual selected regions and follow the
+displayed node displacement once deformation is active. They are presentation
+annotations; no calculated reaction magnitude is invented.
 
 ### Load ramp
 

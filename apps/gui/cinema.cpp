@@ -33,26 +33,20 @@
 namespace polymesh::gui {
 namespace {
 
-/// Act spans as fractions of the take, tuned at the render script's 3600-frame
-/// default (60.0 s).
-/// The opening now gives the curvature/FFT trace six readable seconds at full
-/// size. The advisor lane spends its first 65% on the real candidate passes and
-/// its last 35% holding the final re-score/refusal state, so the network's
-/// settled activation pattern is inspectable instead of flashing for one beat.
-/// The adaptive closing act receives 27 seconds and scales its real pass beats
-/// proportionally when more than one solve stage exists.
+/// Act spans as fractions of the 60 s public take.
 ///
-/// Measured pacing on the film's default 60 s take:
+/// The opening holds the complete assembly before the interface hardware peels
+/// away. The cell microscope then receives a full ten seconds: enough to build
+/// a connected linear patch, elevate the same topology to quadratic order, and
+/// hold both states for comparison. The solve still has 21 seconds, and its
+/// recorded phases scale proportionally to fit that window.
 ///
-///   exact-CAD / spectral opening  7.800 s
-///   advisor passes + result hold  9.000 s
-///   graded fill                   10.800 s
-///   exploded + closed mesh hold  5.400 s
-///   solve / recovery sequence    27.000 s
-///
-/// Candidate-specific prose is deliberately absent from the fast pass lane.
-/// The network is the motion there; the strip carries one stable explanation.
-constexpr std::array<double, kCinemaActCount> kActFraction = {0.20, 0.15, 0.17, 0.08, 0.40};
+///   mated assembly / exact CAD  10.8 s
+///   advisor                      7.8 s
+///   emitted mesh                10.2 s
+///   tet4 → tet10 microscope     10.2 s
+///   solve / recovery            21.0 s
+constexpr std::array<double, kCinemaActCount> kActFraction = {0.18, 0.13, 0.17, 0.17, 0.35};
 double beat_seconds(SolvePhase phase) {
     switch (phase) {
     case SolvePhase::kStressSweep:
@@ -797,21 +791,20 @@ CinemaCue cinema_cue(const CinemaState& state) {
         start += span;
     }
 
-    // Open on exact CAD and build the spectral story to completion. That final
-    // state is not erased at the act boundary: it crosses into advisor scoring
-    // and then remains dimly on the part until actual cells replace it.
+    // Hold the mated assembly first, then strip only its neighbouring hardware
+    // before extracting ordered samples from the still-shaded CAD body.
     if (cue.act == CinemaAct::kSkeleton) {
-        const double wait = 0.28 * cue.act_span;
+        const double wait = 0.27 * cue.act_span;
         const double slide = 0.10 * cue.act_span;
         cue.panel_open = static_cast<float>(
             smoothstep((cue.act_t - wait) / std::max(slide, 1.0e-9)));
         const double p = cue.act_t / std::max(cue.act_span, 1.0e-9);
-        cue.spectral_edge_reveal = smoothstep((p - 0.32) / 0.23);
-        cue.spectral_spectrum_reveal = smoothstep((p - 0.52) / 0.18);
-        cue.spectral_filter_mix = smoothstep((p - 0.68) / 0.16);
-        cue.spectral_field_reveal = smoothstep((p - 0.80) / 0.18);
+        cue.spectral_edge_reveal = smoothstep((p - 0.44) / 0.20);
+        cue.spectral_spectrum_reveal = smoothstep((p - 0.62) / 0.15);
+        cue.spectral_filter_mix = smoothstep((p - 0.76) / 0.12);
+        cue.spectral_field_reveal = smoothstep((p - 0.86) / 0.12);
         cue.spectral_overlay_alpha =
-            static_cast<float>(smoothstep((p - 0.28) / 0.10));
+            static_cast<float>(smoothstep((p - 0.40) / 0.10));
     } else if (cue.act == CinemaAct::kDeliberate) {
         cue.spectral_edge_reveal = 1.0;
         cue.spectral_spectrum_reveal = 1.0;
@@ -1019,11 +1012,10 @@ Viewport::CinemaView cinema_view(const CinemaState&, const CinemaCue& cue) {
         const double p = cue.act_t / std::max(cue.act_span, 1.0e-9);
         view.model_alpha = 1.0f;
         view.assembly_strip =
-            static_cast<float>(smoothstep((p - 0.12) / 0.24));
+            static_cast<float>(smoothstep((p - 0.24) / 0.20));
         view.assembly_alpha =
-            static_cast<float>(1.0 - smoothstep((p - 0.18) / 0.22));
-        view.skeleton_alpha =
-            static_cast<float>(0.16 * smoothstep((p - 0.30) / 0.14));
+            static_cast<float>(1.0 - smoothstep((p - 0.30) / 0.18));
+        view.skeleton_alpha = 0.0f;
         view.reveal = 0.0f;
         view.mesh_alpha = 0.0f;
         view.shrink = 1.0f;
@@ -1034,11 +1026,10 @@ Viewport::CinemaView cinema_view(const CinemaState&, const CinemaCue& cue) {
         break;
     }
     case CinemaAct::kDeliberate:
-        // Keep the smooth CAD surface as the network consumes the measured
-        // geometry features. The full edge cage is only a faint registration
-        // cue now; it is no longer the hero representation.
+        // The shaded CAD body remains the reference while the advisor consumes
+        // its measured features. No whole-part edge cage is composited over it.
         view.model_alpha = 1.0f;
-        view.skeleton_alpha = 0.07f;
+        view.skeleton_alpha = 0.0f;
         view.reveal = 0.0f;
         view.mesh_alpha = 0.0f;
         view.shrink = 1.0f;
@@ -1051,7 +1042,7 @@ Viewport::CinemaView cinema_view(const CinemaState&, const CinemaCue& cue) {
         // The shaded CAD body gives way exactly where recorded cells land.
         view.model_alpha =
             static_cast<float>(1.0 - smoothstep(cue.mesh_action_reveal));
-        view.skeleton_alpha = 0.05f * view.model_alpha;
+        view.skeleton_alpha = 0.0f;
         view.reveal =
             cue.stage_index >= 0 ? static_cast<float>(cue.mesh_action_reveal) : 0.0f;
         view.mesh_alpha = 1.0f;
@@ -1063,20 +1054,19 @@ Viewport::CinemaView cinema_view(const CinemaState&, const CinemaCue& cue) {
         view.spectral_overlay_alpha = cue.spectral_overlay_alpha;
         break;
     case CinemaAct::kMeshHold: {
-        // A six-second result beat can do more than freeze: open the finished
-        // cells just enough to expose their topology, hold that microscope
-        // view, then close them and leave the exact delivered mesh still for
-        // the final fifth. The subject never rotates or changes data.
+        // Open the finished cells enough to expose topology, hold the
+        // microscope view, then close back to the delivered mesh. CAD feature
+        // outlines stay off: only real element edges belong in this act.
         const double x = cue.act_t / std::max(cue.act_span, 1.0e-9);
         double exploded = 0.0;
-        if (x < 0.18) {
-            exploded = smoothstep(x / 0.18);
-        } else if (x < 0.55) {
+        if (x < 0.16) {
+            exploded = smoothstep(x / 0.16);
+        } else if (x < 0.72) {
             exploded = 1.0;
-        } else if (x < 0.78) {
-            exploded = 1.0 - smoothstep((x - 0.55) / 0.23);
+        } else if (x < 0.90) {
+            exploded = 1.0 - smoothstep((x - 0.72) / 0.18);
         }
-        view.skeleton_alpha = 0.30f;
+        view.skeleton_alpha = 0.0f;
         view.reveal = 1.0f;
         view.mesh_alpha = 1.0f;
         view.shrink = static_cast<float>(0.10 * exploded);
@@ -1096,7 +1086,7 @@ Viewport::CinemaView cinema_view(const CinemaState&, const CinemaCue& cue) {
             const float handoff =
                 static_cast<float>(smoothstep(p / kFieldToMeshHandoff));
             const double added = smoothstep((p - 0.40) / 0.60);
-            view.skeleton_alpha = 0.35f * handoff;
+            view.skeleton_alpha = 0.0f;
             view.reveal = static_cast<float>(added);
             view.mesh_alpha = handoff;
             view.shrink = 0.0f;
@@ -1105,7 +1095,7 @@ Viewport::CinemaView cinema_view(const CinemaState&, const CinemaCue& cue) {
             view.overlay_on_results = true;
             view.result_alpha = 1.0f - handoff;
         } else if (cue.solve_phase == SolvePhase::kRefineHold) {
-            view.skeleton_alpha = 0.35f;
+            view.skeleton_alpha = 0.0f;
             view.reveal = 1.0f;
             view.mesh_alpha = 1.0f;
             view.shrink = 0.0f;
@@ -1116,7 +1106,7 @@ Viewport::CinemaView cinema_view(const CinemaState&, const CinemaCue& cue) {
             // colours arrive, avoiding a mesh→grey reset at the act/pass edge.
             const float mesh_carry = static_cast<float>(
                 1.0 - smoothstep(cue.field_front / kMeshToFieldHandoff));
-            view.skeleton_alpha = 0.25f * mesh_carry;
+            view.skeleton_alpha = 0.0f;
             view.reveal = 1.0f;
             view.mesh_alpha = mesh_carry;
             view.shrink = 0.0f;
@@ -1124,7 +1114,7 @@ Viewport::CinemaView cinema_view(const CinemaState&, const CinemaCue& cue) {
         } else {
             // Result modes draw their own surface. kNone is the no-solve fallback
             // and therefore keeps the authoritative mesh instead.
-            view.skeleton_alpha = 0.25f;
+            view.skeleton_alpha = 0.0f;
             view.reveal = 1.0f;
             view.mesh_alpha = cue.solve_phase == SolvePhase::kNone ? 1.0f : 0.0f;
             view.shrink = 0.0f;
@@ -2819,95 +2809,151 @@ void draw_cinema_cells(const CinemaState& state, const CinemaCue& cue,
     const float card_h = std::max(260.0f, region.y - (card_top - origin.y) - 14.0f);
     const float card_gap = 12.0f;
     const float card_w = (region.x - card_gap) * 0.5f;
-    for (int card = 0; card < 2; ++card) {
+    const float fade_seconds = std::max(0.9f, 0.17f * static_cast<float>(cue.act_span));
+    const float visible_t =
+        std::max(0.0f, static_cast<float>(cue.act_t) - fade_seconds);
+    const float linear_progress =
+        std::clamp(visible_t / 3.0f, 0.0f, 1.0f);
+    const float quadratic_progress =
+        std::clamp((visible_t - 2.8f) / 3.2f, 0.0f, 1.0f);
+
+    static const std::array<Eigen::Vector3f, 8> kNodes{{
+        {-1.0f, -1.0f, -1.0f}, {1.0f, -1.0f, -1.0f},
+        {-1.0f, 1.0f, -1.0f},  {1.0f, 1.0f, -1.0f},
+        {-1.0f, -1.0f, 1.0f},  {1.0f, -1.0f, 1.0f},
+        {-1.0f, 1.0f, 1.0f},   {1.0f, 1.0f, 1.0f},
+    }};
+    static constexpr std::array<std::array<int, 4>, 6> kCells{{
+        {{0, 1, 3, 7}}, {{0, 3, 2, 7}}, {{0, 2, 6, 7}},
+        {{0, 6, 4, 7}}, {{0, 4, 5, 7}}, {{0, 5, 1, 7}},
+    }};
+    static constexpr std::array<std::array<int, 2>, 6> kTetEdges{{
+        {{0, 1}}, {{0, 2}}, {{0, 3}}, {{1, 2}}, {{1, 3}}, {{2, 3}},
+    }};
+    static constexpr std::array<std::array<int, 3>, 4> kTetFaces{{
+        {{0, 1, 2}}, {{0, 1, 3}}, {{0, 2, 3}}, {{1, 2, 3}},
+    }};
+    static constexpr std::array<std::array<int, 2>, 19> kPatchEdges{{
+        {{0, 1}}, {{0, 3}}, {{0, 7}}, {{1, 3}}, {{1, 7}},
+        {{3, 7}}, {{0, 2}}, {{2, 3}}, {{2, 7}}, {{0, 6}},
+        {{2, 6}}, {{6, 7}}, {{0, 4}}, {{4, 6}}, {{4, 7}},
+        {{0, 5}}, {{4, 5}}, {{5, 7}}, {{1, 5}},
+    }};
+    const std::array<ImVec4, 6> cell_colors{{
+        palette.accent, palette.accent_soft_top, palette.status_ok,
+        palette.sim_fixture, palette.accent, palette.accent_soft_top,
+    }};
+
+    const auto draw_patch = [&](int card, float progress, bool quadratic,
+                                const char* title) {
         const float x = origin.x + static_cast<float>(card) * (card_w + card_gap);
-        dl->AddRectFilled(ImVec2(x, card_top), ImVec2(x + card_w, card_top + card_h),
-                          faded(palette.panel_bg, 0.50f * alpha), 8.0f);
-        dl->AddRect(ImVec2(x, card_top), ImVec2(x + card_w, card_top + card_h),
-                    faded(palette.border, 0.72f * alpha), 8.0f);
-        if (card == 0) {
-            const float wobble =
-                0.035f * std::sin(static_cast<float>(cue.act_t) * 2.4f);
-            const std::array<ImVec2, 4> p{{
-                {x + card_w * (0.50f + wobble), card_top + card_h * 0.18f},
-                {x + card_w * 0.17f, card_top + card_h * 0.80f},
-                {x + card_w * 0.83f, card_top + card_h * 0.80f},
-                {x + card_w * (0.62f - wobble), card_top + card_h * 0.50f},
-            }};
-            constexpr std::array<std::array<int, 2>, 6> edges{{
-                {{0, 1}}, {{0, 2}}, {{0, 3}}, {{1, 2}}, {{1, 3}}, {{2, 3}},
-            }};
-            for (const auto& edge : edges) {
-                dl->AddLine(p[edge[0]], p[edge[1]],
-                            faded(palette.text, 0.72f * alpha), 2.2f);
-                if (hud.order >= 2) {
-                    const ImVec2 mid{0.5f * (p[edge[0]].x + p[edge[1]].x),
-                                     0.5f * (p[edge[0]].y + p[edge[1]].y)};
-                    dl->AddCircleFilled(mid, 4.0f, faded(palette.accent, alpha));
-                }
-            }
-            for (const ImVec2 point : p) {
-                dl->AddCircleFilled(point, 6.0f, faded(palette.text, alpha));
-            }
-            const std::string p_order = std::format("p{}", hud.order);
-            dl->AddText(font, type.caption,
-                        ImVec2(x + 16.0f, card_top + 14.0f),
-                        faded(palette.accent, alpha), p_order.c_str());
-        } else {
-            const ImVec2 center(x + 0.5f * card_w, card_top + 0.47f * card_h);
-            const float raw =
-                std::clamp(static_cast<float>(cue.act_t / 1.2), 0.0f, 1.0f);
-            const float assemble = raw * raw * (3.0f - 2.0f * raw);
-            static constexpr std::array<ImVec2, 5> local_nodes{{
-                {0.00f, -0.34f}, {-0.35f, 0.30f}, {0.35f, 0.30f},
-                {0.13f, 0.02f}, {0.00f, 0.08f},
-            }};
-            std::array<ImVec2, local_nodes.size()> nodes{};
-            for (std::size_t i = 0; i < local_nodes.size(); ++i) {
-                nodes[i] = ImVec2(center.x + assemble * local_nodes[i].x * card_w,
-                                  center.y + assemble * local_nodes[i].y * card_h);
-            }
-            static constexpr std::array<std::array<int, 4>, 4> cells{{
-                {{4, 0, 1, 2}}, {{4, 0, 1, 3}},
-                {{4, 0, 2, 3}}, {{4, 1, 2, 3}},
-            }};
-            constexpr std::array<std::array<int, 2>, 6> edges{{
-                {{0, 1}}, {{0, 2}}, {{0, 3}}, {{1, 2}}, {{1, 3}}, {{2, 3}},
-            }};
-            for (std::size_t cell = 0; cell < cells.size(); ++cell) {
-                const ImVec4 cell_color =
-                    cell % 2 == 0 ? palette.accent_soft_top : palette.text;
-                for (const auto& edge : edges) {
-                    const ImVec2 a = nodes[static_cast<std::size_t>(
-                        cells[cell][static_cast<std::size_t>(edge[0])])];
-                    const ImVec2 b = nodes[static_cast<std::size_t>(
-                        cells[cell][static_cast<std::size_t>(edge[1])])];
-                    dl->AddLine(a, b,
-                                faded(cell_color, (0.38f + 0.44f * assemble) * alpha),
-                                1.7f);
-                    if (hud.order >= 2) {
-                        dl->AddCircleFilled(
-                            ImVec2(0.5f * (a.x + b.x), 0.5f * (a.y + b.y)),
-                            2.7f, faded(palette.accent, alpha));
-                    }
-                }
-            }
-            for (const ImVec2 node : nodes) {
-                dl->AddCircleFilled(node, 4.0f, faded(palette.text, alpha));
-            }
-            const double q_mean =
-                solved != nullptr && solved->quality_measured > 0 ? solved->quality_mean : 0.0;
-            const double q_min =
-                solved != nullptr && solved->quality_measured > 0 ? solved->quality_min : 0.0;
-            const std::string quality = fmt("qmin %.3f   q̄ %.3f", q_min, q_mean);
-            const ImVec2 quality_size =
-                font->CalcTextSizeA(type.label, FLT_MAX, 0.0f, quality.c_str());
-            dl->AddText(font, type.label,
-                        ImVec2(center.x - 0.5f * quality_size.x,
-                               card_top + card_h - type.label * 1.8f),
-                        faded(palette.status_ok, alpha), quality.c_str());
+        const ImVec2 p0{x, card_top};
+        const ImVec2 p1{x + card_w, card_top + card_h};
+        dl->AddRectFilled(p0, p1, faded(palette.panel_bg, 0.50f * alpha), 8.0f);
+        dl->AddRect(p0, p1, faded(palette.border, 0.72f * alpha), 8.0f);
+        dl->AddText(font, type.caption, ImVec2(x + 16.0f, card_top + 14.0f),
+                    faded(quadratic ? palette.status_ok : palette.accent, alpha),
+                    title);
+
+        const float yaw = -0.72f + 0.035f * std::sin(static_cast<float>(cue.act_t) * 0.6f);
+        const float pitch = 0.54f;
+        const float cy = std::cos(yaw);
+        const float sy = std::sin(yaw);
+        const float cp = std::cos(pitch);
+        const float sp = std::sin(pitch);
+        const float scale = std::min(card_w * 0.29f, card_h * 0.30f);
+        const ImVec2 center{x + 0.50f * card_w, card_top + 0.49f * card_h};
+        std::array<ImVec2, kNodes.size()> projected{};
+        std::array<float, kNodes.size()> depth{};
+        for (std::size_t i = 0; i < kNodes.size(); ++i) {
+            const Eigen::Vector3f& q = kNodes[i];
+            const float rx = cy * q.x() + sy * q.z();
+            const float rz = -sy * q.x() + cy * q.z();
+            const float ry = cp * q.y() - sp * rz;
+            depth[i] = sp * q.y() + cp * rz;
+            projected[i] = ImVec2(center.x + scale * rx, center.y - scale * ry);
         }
-    }
+        std::array<int, kCells.size()> order{{0, 1, 2, 3, 4, 5}};
+        std::sort(order.begin(), order.end(), [&](int lhs, int rhs) {
+            const auto mean_depth = [&](int cell) {
+                float total = 0.0f;
+                for (const int node : kCells[static_cast<std::size_t>(cell)]) {
+                    total += depth[static_cast<std::size_t>(node)];
+                }
+                return total;
+            };
+            return mean_depth(lhs) < mean_depth(rhs);
+        });
+        for (const int cell_index : order) {
+            const float cell_progress = static_cast<float>(
+                smoothstep(progress * static_cast<float>(kCells.size()) -
+                           static_cast<float>(cell_index)));
+            if (cell_progress <= 0.0f) {
+                continue;
+            }
+            const auto& cell = kCells[static_cast<std::size_t>(cell_index)];
+            const ImVec4 color = cell_colors[static_cast<std::size_t>(cell_index)];
+            for (const auto& face : kTetFaces) {
+                const ImVec2 a =
+                    projected[static_cast<std::size_t>(cell[static_cast<std::size_t>(face[0])])];
+                const ImVec2 b =
+                    projected[static_cast<std::size_t>(cell[static_cast<std::size_t>(face[1])])];
+                const ImVec2 c =
+                    projected[static_cast<std::size_t>(cell[static_cast<std::size_t>(face[2])])];
+                dl->AddTriangleFilled(a, b, c,
+                                      faded(color, 0.055f * cell_progress * alpha));
+            }
+            for (const auto& edge : kTetEdges) {
+                const ImVec2 a =
+                    projected[static_cast<std::size_t>(cell[static_cast<std::size_t>(edge[0])])];
+                const ImVec2 b =
+                    projected[static_cast<std::size_t>(cell[static_cast<std::size_t>(edge[1])])];
+                dl->AddLine(a, b, faded(color, 0.62f * cell_progress * alpha), 1.8f);
+            }
+        }
+        if (progress > 0.72f) {
+            const float shared =
+                static_cast<float>(smoothstep((progress - 0.72f) / 0.20f));
+            dl->AddLine(projected[0], projected[7],
+                        faded(palette.status_warn, shared * alpha), 3.4f);
+        }
+        for (std::size_t i = 0; i < projected.size(); ++i) {
+            const float node_progress = static_cast<float>(
+                smoothstep(progress * static_cast<float>(projected.size()) -
+                           static_cast<float>(i)));
+            if (node_progress > 0.0f) {
+                dl->AddCircleFilled(projected[i], 5.2f,
+                                    faded(palette.text, node_progress * alpha));
+            }
+        }
+        if (quadratic) {
+            const float midside =
+                static_cast<float>(smoothstep((progress - 0.38f) / 0.48f));
+            for (const auto& edge : kPatchEdges) {
+                const ImVec2 a = projected[static_cast<std::size_t>(edge[0])];
+                const ImVec2 b = projected[static_cast<std::size_t>(edge[1])];
+                dl->AddCircleFilled(ImVec2(0.5f * (a.x + b.x), 0.5f * (a.y + b.y)),
+                                    3.6f, faded(palette.status_ok, midside * alpha));
+            }
+        }
+    };
+
+    const std::string linear_title =
+        hud.order >= 2 ? "tet10 · p2" : "tet4 · p1";
+    draw_patch(0, linear_progress, false, linear_title.c_str());
+    draw_patch(1, quadratic_progress, true, "tet10 · p2");
+
+    const double q_mean =
+        solved != nullptr && solved->quality_measured > 0 ? solved->quality_mean : 0.0;
+    const double q_min =
+        solved != nullptr && solved->quality_measured > 0 ? solved->quality_min : 0.0;
+    const std::string quality = fmt("qmin %.3f   q̄ %.3f", q_min, q_mean);
+    const ImVec2 quality_size =
+        font->CalcTextSizeA(type.label, FLT_MAX, 0.0f, quality.c_str());
+    dl->AddText(font, type.label,
+                ImVec2(origin.x + 0.5f * region.x - 0.5f * quality_size.x,
+                       card_top + card_h - type.label * 1.8f),
+                faded(palette.status_ok, alpha), quality.c_str());
     ImGui::Dummy(ImVec2(region.x, std::max(1.0f, region.y - 2.0f)));
 }
 

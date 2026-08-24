@@ -192,8 +192,8 @@ class Case:
 CASES: dict[str, Case] = {
     # Purpose-built suspension wishbone: two separate chassis bushing bores,
     # two swept non-coplanar arms plus a brace, and one loaded upright bore.
-    # The deployed veto remains visible; the verified fallback runs a dense
-    # h=5.5 mm tet4 mesh and one ZZ-driven local refinement pass toward 10%.
+    # The deployed OOD check remains visible; the configured baseline runs a
+    # dense h=5.5 mm tet4 mesh with complete ZZ verification.
     "wishbone": Case(
         name="wishbone",
         step="tests/fixtures/parts/wishbone.step",
@@ -218,8 +218,8 @@ CASES: dict[str, Case] = {
     # The hero case is deliberately more demanding than the advisor corpus:
     # a watertight Boolean union of a truncated cone and an intersecting sphere,
     # with a sharp circular join, a curved scoop and a small planar foot. The
-    # shipped OOD gate refuses it instead of extrapolating; that refusal is part
-    # of the film, then the configured product fallback runs unchanged.
+    # advisor abstains outside its calibrated envelope, leaving the configured
+    # baseline unchanged.
     #
     # h=12 mm / graded / quadratic begins at 30,496 cells. The configured real
     # adaptive pass finishes at 35,951 tet10 cells with measured shape-quality
@@ -240,7 +240,7 @@ CASES: dict[str, Case] = {
         load=(0.0, 0.0, -1000.0),
         why="complex cone+sphere Boolean with exact curved CAD, FFT sizing, "
             "quadratic geometry, positive quality margin and a measured OOD "
-            "refusal before the verified fallback",
+            "abstention with the configured baseline retained",
         load_note="GUI region 1 (planar foot) fixed; conserved -z 1000 N "
                   "resultant on GUI region 0 (connected cone+scoop exterior)",
         youngs_gpa=200.0,
@@ -1002,7 +1002,7 @@ def main(argv: list[str] | None = None) -> int:
                   f"loadface {case.load_face} {fx:.9g} {fy:.9g} {fz:.9g}")
             print(f"    load      {case.load_note}")
             print(f"    h         configured before inference; accepted advice "
-                  f"overrides it, refusal keeps it")
+                  f"overrides it, abstention keeps the baseline")
             print(f"    why       {case.why}")
         print(f"\noutputs land in {rel(OUT_DIR)}; frames in "
               f"{rel(FRAMES_DIR)} (gitignored by the repo-root /build*/ rule)")
@@ -1096,9 +1096,8 @@ def main(argv: list[str] | None = None) -> int:
                 "scripts/advisor/export_onnx.py) or pass --allow-no-activations "
                 "to publish the surface as it is.")
         if report.advisor.get("vetoed"):
-            print("    note: the advisor vetoed this part as out of "
-                  "distribution, so the panel draws a refusal rather than an "
-                  "explanation")
+            print("    note: the advisor abstained outside its calibrated "
+                  "distribution; the configured baseline remains active")
         if report.solver is not None:
             print(f"    solver {report.solver} (as the GUI reported it; the "
                   "method is chosen from the free DOF count, not requested "
@@ -1213,7 +1212,7 @@ def main(argv: list[str] | None = None) -> int:
             "adapt_passes_configured": case.adapt_passes,
             "eta_target_configured": case.eta_target,
             "h_note": "configured before inference; an accepted advisor action "
-                      "overrides it, while a refusal leaves it unchanged",
+                      "overrides it, while abstention keeps the baseline unchanged",
             "why": case.why,
         },
         "model": {

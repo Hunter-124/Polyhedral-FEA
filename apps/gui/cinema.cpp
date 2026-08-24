@@ -1846,7 +1846,7 @@ bool load_cinema_advisor(CinemaState& state, const pipeline::Model& model,
                                            : "the feasibility gate declined the prediction")
                 : decision.note;
         state.decision_note = std::format(
-            "advisor abstained: {}; the verified fallback below stays unchanged", why);
+            "advisor abstained: {}; the configured baseline below stays unchanged", why);
     } else if (const auto mesher = pipeline::mesher_from_name(decision.mesher)) {
         const double diag = (model.bbox_max - model.bbox_min).norm();
         setup.mesher = *mesher;
@@ -2363,7 +2363,7 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
                 "the measured pass that chose this mesh — replayed while its real cells land";
         } else if (state.decision_vetoed) {
             caption =
-                "the measured refusal pass — the verified fallback lands after abstention";
+                "the measured OOD check — the configured baseline remains active";
         } else if (state.decision_unrecognized) {
             caption =
                 "the measured pass named an unavailable mesher — the studio setup remains";
@@ -2420,7 +2420,10 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
     // remain circles because positions, never node geometry, are transformed.
     constexpr float kSidePad = 14.0f;
     const float header_h = std::floor(type.legend * 1.25f);
-    const float chip_h = frame != nullptr ? std::floor(type.label * 3.0f) : 0.0f;
+    const float chip_h =
+        frame != nullptr
+            ? std::floor(type.label * (state.decision_applied ? 3.0f : 4.5f))
+            : 0.0f;
     const float lanes_top = graph_top + header_h;
     const float lanes_h = std::max(
         120.0f, graph_h - header_h - chip_h - std::floor(type.legend * 0.6f));
@@ -2439,14 +2442,41 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
     };
     const bool replaying = cue.act == CinemaAct::kBuild || cue.act == CinemaAct::kMeshHold;
     const auto wave_strength = [&](float lane) {
-        if (!replaying) {
+        float at = lane;
+        if (cue.pass_lane_live) {
+            const double beat = std::max(cue.pass_beat_seconds, 1.0e-6);
+            at = static_cast<float>(
+                std::fmod(std::max(cue.act_t, 0.0) / beat, 1.0) *
+                static_cast<double>(values.size() - 1));
+        } else if (replaying) {
+            at = static_cast<float>(cue.activation_wave) *
+                 static_cast<float>(values.size() - 1);
+        } else {
             return 1.0f;
         }
-        const float at = static_cast<float>(cue.activation_wave) *
-                         static_cast<float>(values.size() - 1);
         const float d = at - lane;
-        return 0.30f + 0.70f * std::exp(-2.2f * d * d);
+        return 0.42f + 0.58f * std::exp(-2.2f * d * d);
     };
+
+    // Quiet lane bands keep the 81/96/96/20 topology legible while the measured
+    // activations change. During candidate scoring their highlight advances one
+    // layer per feed-forward beat; it is a timing cue only and never alters a
+    // tensor value.
+    for (std::size_t l = 0; l < values.size(); ++l) {
+        const float top = lanes_top + lane_h * static_cast<float>(l) + type.legend * 1.15f;
+        const float bottom = lanes_top + lane_h * static_cast<float>(l + 1) - 4.0f;
+        const float pulse = wave_strength(static_cast<float>(l));
+        dl->AddRectFilled(ImVec2(origin.x + kSidePad, top),
+                          ImVec2(origin.x + region.x - kSidePad, bottom),
+                          faded(l == 3 ? palette.accent : palette.panel_bg,
+                                (l == 3 ? 0.028f : 0.055f) * pulse * alpha),
+                          5.0f);
+        dl->AddLine(ImVec2(origin.x + kSidePad, row_y(l)),
+                    ImVec2(origin.x + region.x - kSidePad, row_y(l)),
+                    faded(l == 3 ? palette.accent : palette.text_dim,
+                          (0.08f + 0.10f * pulse) * alpha),
+                    1.0f);
+    }
 
     // ---- connections ----------------------------------------------------
     if (drawn > 0) {
@@ -2466,7 +2496,7 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
     }
 
     // ---- nodes, drawn over the connections ------------------------------
-    constexpr float kNodeMin = 1.3f;
+    constexpr float kNodeMin = 1.8f;
     static constexpr std::array<const char*, 4> kLanePlain{
         {"1  what it measures", "2  hidden layer 1", "3  hidden layer 2",
          "4  what it predicts"}};
@@ -2476,7 +2506,7 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
             continue;
         }
         const float spacing = band_w / static_cast<float>(layer.size);
-        const float r_max = std::clamp(0.46f * spacing, 1.8f, kNodeRadiusMax);
+        const float r_max = std::clamp(0.46f * spacing, 2.6f, kNodeRadiusMax);
         const std::string header = std::format("{} · {} units", kLanePlain[l], layer.size);
         dl->AddText(font, type.legend,
                     ImVec2(origin.x + kSidePad,
@@ -2527,7 +2557,7 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
                            ? std::format("SELECTED  {}", winner_text)
                            : std::string("SELECTED  action head unavailable");
         } else if (state.decision_vetoed) {
-            selected = "REFUSED BY SAFETY GATE  ·  verified fallback takes over";
+            selected = "ADVISOR ABSTAINED  ·  configured baseline remains active";
         } else if (state.decision_unrecognized) {
             selected = "UNRECOGNISED ACTION  ·  studio setup remains";
         }
@@ -3008,7 +3038,9 @@ void deliberate_caption(const CinemaState& state, const CinemaCue& cue, CinemaCa
             state.decision_applied ? palette.status_ok : palette.status_warn;
         out.numbers = fmt("final re-score held for inspection · %s candidates compared",
                           grouped(candidates).c_str());
-        out.note = state.decision_note;
+        out.note = state.decision_vetoed
+                       ? "outside calibrated descriptor envelope · configured baseline unchanged"
+                       : state.decision_note;
         out.note_color =
             state.decision_applied ? palette.text_dim : palette.status_warn;
         return;
@@ -3037,13 +3069,15 @@ void build_caption(const CinemaState& state, const CinemaCue& cue, const CinemaH
     }
     if (cue.stage_index < 0) {
         out.headline = state.decision_applied ? "Advisor selection locked"
-                                              : "Advisor abstained — verified fallback";
+                                              : "Advisor abstained — configured baseline";
         out.headline_color = state.decision_applied ? palette.status_ok : palette.status_warn;
         out.numbers = fmt("%s · %.3g mm target · order %d · %d refinement pass%s",
                           std::string(mesher_plain(hud.mesher)).c_str(),
                           hud.mesh_size * 1e3, hud.order, hud.adapt_passes,
                           hud.adapt_passes == 1 ? "" : "es");
-        out.note = state.decision_note;
+        out.note = state.decision_vetoed
+                       ? "outside calibrated descriptor envelope · configured baseline unchanged"
+                       : state.decision_note;
         out.note_color = state.decision_applied ? palette.text_dim : palette.status_warn;
         return;
     }
@@ -3060,8 +3094,8 @@ void build_caption(const CinemaState& state, const CinemaCue& cue, const CinemaH
         handoff = "aligned replay: measured chosen pass → its later real mesh · sequential";
         handoff_color = palette.text_dim;
     } else if (state.decision_vetoed) {
-        prefix = "Verified fallback landing";
-        handoff = "measured refusal → configured verified fallback · sequential";
+        prefix = "Configured baseline landing";
+        handoff = "measured OOD check → configured baseline · sequential";
     } else if (state.decision_unrecognized) {
         prefix = "Studio setup landing";
         handoff = "unrecognised advised mesher → unchanged studio setup · sequential";
@@ -3106,7 +3140,9 @@ void mesh_hold_caption(const CinemaState& state, const CinemaCue& cue, const Cin
         }
     }
     if (out.note.empty()) {
-        out.note = state.decision_note;
+        out.note = state.decision_vetoed
+                       ? "outside calibrated descriptor envelope · configured baseline unchanged"
+                       : state.decision_note;
     }
     out.note_color = palette.text_dim;
 }

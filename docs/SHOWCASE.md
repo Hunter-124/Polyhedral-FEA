@@ -589,19 +589,22 @@ python scripts/render_showcase.py --only architecture
 
 ![PolyMesh Studio](assets/showcase/gui_studio.png)
 
-**`gui_studio.png`** — *PolyMesh Studio* with a solved part: viewport, study
-setup (material, element size, fixtures, loads), and the results panel with
-stress, deflection, and the ZZ indicator η. Captured in-app: **F12** (or *File →
-save screenshot*) writes the window framebuffer to a PNG, and
-`POLYMESH_GUI_SHOT=/abs/path.png` writes to a fixed path, which is how the
-headless capture is scripted. The fully scripted run (load, size, fixtures,
-load, solve, frame, capture, quit) goes through `--auto`, which drives the
-same code paths as the buttons — this is what produced this image:
+**`gui_studio.png`** — *PolyMesh Studio* with a solved part: the live viewport,
+material and mesh setup, fixture/load selection, campaign and Test Lab state,
+the measured stress legend, and the solve summary in the status ledger. The
+capture uses the practical 8 mm Cartesian tet case shown on screen: 4,320 cells,
+22,920 unknowns and a 2.478 MPa peak. Captured in-app, **F12** (or *File → save
+screenshot*) writes the window framebuffer to a PNG, and
+`POLYMESH_GUI_SHOT=/abs/path.png` writes to a fixed path. The fully scripted run
+(load, size, mesher, solver, fixtures, load, solve, frame, capture, quit) goes
+through `--auto`, which drives the same code paths as the buttons:
 
 ```sh
-xvfb-run -a ./build/apps/gui/polymesh-gui --auto \
-  "load tests/fixtures/parts/plate_hole.step; h 6; fix 0; loadface 5 1000 0 0; \
-   solve; wire off; frame; shot $PWD/docs/assets/showcase/gui_studio.png; quit"
+POLYMESH_GUI_SIZE=1920x1080 xvfb-run -a -s "-screen 0 1920x1080x24" \
+  ./build/apps/gui/polymesh-gui --auto \
+  "load tests/fixtures/parts/plate_hole.step; h 8; mesher tet; solver direct; \
+   fix 0; loadface 5 1000 0 0; solve; wire off; frame; \
+   shot $PWD/docs/assets/showcase/gui_studio.png; quit"
 ```
 (`wire off` because the results wireframe is baked in a near-black line colour
 and covers the shaded field at this zoom; interactively that is the *wireframe
@@ -665,22 +668,24 @@ fields, which is how the GUI's solve is cross-checked against the CLI's.)
   reconstructed curve as geometry analysis. Geometry-curvature grading is
   disabled for this hero; the real solve uses a uniform wall-resolving target.
   Support glyphs and the resultant-force arrow remain anchored to their selected
-  regions through the displayed deformation.
+  regions through the displayed deformation. During the exact linear load ramp,
+  the arrow length and numeric resultant scale by the displayed λ.
 
   The advisor uses four wide activation lanes rather than four compressed
   portrait columns. Every node remains a circle sized/coloured by the deployed
   graph's own tensor, and every shown connection remains one of the strongest
-  measured $|w_{ji}a_i|$ paths. For this new descriptor combination the safety
-  gate cannot establish an OOD distance, so the deployed outcome is abstention,
-  not an extrapolated recommendation. That measured refusal is held while the
-  configured fallback's later real mesh lands. The film labels the pairing an
-  aligned replay of sequential work.
+  measured $|w_{ji}a_i|$ paths. A restrained input→hidden→output timing band
+  advances once per measured forward pass without changing those values. For
+  this new descriptor combination the OOD check places the case outside the
+  calibrated envelope, so the advisor abstains rather than extrapolating. The
+  configured, independently verified baseline remains authoritative while the
+  later real mesh lands through a compact, explicitly sequential flow trace.
 
   Chapter boundaries preserve causality on the same part instead of clearing to
-  a generic wireframe: target-h rings yield to emitted cells; the refusal/
-  fallback trace yields to the mesh audit; the authoritative mesh yields to
-  stress; stress yields to the recovered gradient; the preceding measured field
-  yields to ZZ error; and that error remains beneath the topology transition it
+  a generic wireframe: target-h rings yield to emitted cells; the advisor
+  outcome yields to the mesh audit; the authoritative mesh yields to stress;
+  stress yields to the recovered gradient; the preceding measured field yields
+  to ZZ error; and that error remains beneath the topology transition it
   requested. Both supports and the force arrow persist throughout.
 
   The solver pane is a teaching surface rather than a wall of notation. It keeps

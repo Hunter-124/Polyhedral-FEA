@@ -2009,6 +2009,8 @@ void draw_cinema_mechanics(App& app, const CinemaCue& cue,
                                ? std::clamp(static_cast<float>(cue.act_t / 1.0), 0.0f, 1.0f)
                                : 1.0f;
     const float mechanics_alpha = 0.88f * entering;
+    const float mechanics_pulse =
+        0.5f + 0.5f * std::sin(static_cast<float>(cue.act_t) * 5.2f);
 
     for (std::size_t i = 0; i < app.cinema.support_markers.size(); ++i) {
         const auto& marker = app.cinema.support_markers[i];
@@ -2022,7 +2024,9 @@ void draw_cinema_mechanics(App& app, const CinemaCue& cue,
         const ImVec2 p = *projected;
         const ImVec4 c = palette.sim_fixture;
         dl->AddCircleFilled(p, 7.0f, color(c, mechanics_alpha));
-        dl->AddCircle(p, 16.0f, color(c, 0.48f * mechanics_alpha), 0, 2.0f);
+        dl->AddCircle(p, 15.0f + 3.0f * mechanics_pulse,
+                      color(c, (0.32f + 0.20f * mechanics_pulse) * mechanics_alpha),
+                      0, 2.0f);
         dl->AddLine(ImVec2(p.x - 14.0f, p.y + 13.0f),
                     ImVec2(p.x + 14.0f, p.y + 13.0f),
                     color(c, mechanics_alpha), 3.0f);
@@ -2036,8 +2040,8 @@ void draw_cinema_mechanics(App& app, const CinemaCue& cue,
             std::format("FIXED SUPPORT {}", static_cast<char>('A' + i));
         const float label_w =
             font->CalcTextSizeA(type.legend, FLT_MAX, 0.0f, label.c_str()).x;
-        const ImVec2 desired(i == 0 ? p.x - label_w - 20.0f : p.x + 20.0f,
-                             p.y - type.legend * 2.1f);
+        const ImVec2 desired(i == 0 ? p.x - label_w - 34.0f : p.x + 24.0f,
+                             p.y - type.legend * (i == 0 ? 3.2f : 2.1f));
         const ImVec2 label_at =
             label_position(label, type.legend, desired, p.x);
         dl->AddLine(p, ImVec2(i == 0 ? label_at.x + label_w : label_at.x,
@@ -2050,10 +2054,18 @@ void draw_cinema_mechanics(App& app, const CinemaCue& cue,
         if (!(marker.vector.norm() > 0.0)) {
             continue;
         }
+        const double force_scale =
+            cue.solve_phase == SolvePhase::kLoadRamp
+                ? std::clamp(cue.load_factor, 0.0, 1.0)
+                : 1.0;
+        if (!(force_scale > 1.0e-4)) {
+            continue;
+        }
         const Eigen::Vector3d centre =
             displayed_marker_position(app.cinema, marker, render);
         const Eigen::Vector3d direction = marker.vector.normalized();
-        const double length = 0.17 * std::max(app.cinema.model_diagonal, 1.0e-6);
+        const double length =
+            0.17 * force_scale * std::max(app.cinema.model_diagonal, 1.0e-6);
         const auto tail = project_cinema_point(
             app.viewport.camera, centre - 0.50 * length * direction, image_min, image_size);
         const auto head = project_cinema_point(
@@ -2069,18 +2081,23 @@ void draw_cinema_mechanics(App& app, const CinemaCue& cue,
         }
         const ImVec2 unit(delta.x / n, delta.y / n);
         const ImVec2 normal(-unit.y, unit.x);
-        dl->AddLine(*tail, *head, color(c, 0.20f * mechanics_alpha), 10.0f);
-        dl->AddLine(*tail, *head, color(c, mechanics_alpha), 4.0f);
+        dl->AddLine(*tail, *head,
+                    color(c, (0.12f + 0.14f * mechanics_pulse) * mechanics_alpha),
+                    9.0f + 2.0f * mechanics_pulse);
+        dl->AddLine(*tail, *head, color(c, mechanics_alpha), 3.5f);
         const ImVec2 wing_a(head->x - 18.0f * unit.x + 9.0f * normal.x,
                             head->y - 18.0f * unit.y + 9.0f * normal.y);
         const ImVec2 wing_b(head->x - 18.0f * unit.x - 9.0f * normal.x,
                             head->y - 18.0f * unit.y - 9.0f * normal.y);
         dl->AddTriangleFilled(*head, wing_a, wing_b, color(c, mechanics_alpha));
         const std::string label =
-            std::format("{:.3g} kN APPLIED FORCE", marker.vector.norm() / 1e3);
+            std::format("{:.3g} kN APPLIED FORCE",
+                        force_scale * marker.vector.norm() / 1e3);
         const ImVec2 label_at = label_position(
             label, type.label,
-            ImVec2(tail->x + 10.0f, tail->y + type.label * 1.8f), tail->x);
+            ImVec2(head->x + 18.0f, head->y + type.label * 0.65f), head->x);
+        dl->AddLine(*head, ImVec2(label_at.x - 5.0f, label_at.y + type.label * 0.45f),
+                    color(c, 0.45f * mechanics_alpha), 1.0f);
         dl->AddText(font, type.label, label_at, color(c, mechanics_alpha), label.c_str());
     }
 
@@ -2097,9 +2114,9 @@ void draw_cinema_mechanics(App& app, const CinemaCue& cue,
             const ImVec4 flow =
                 app.cinema.decision_applied ? palette.accent : palette.status_warn;
             dl->AddBezierCubic(start, c1, c2, *target,
-                               color(flow, 0.18f * a), 12.0f);
+                               color(flow, 0.11f * a), 7.0f);
             dl->AddBezierCubic(start, c1, c2, *target,
-                               color(flow, 0.92f * a), 2.6f);
+                               color(flow, 0.84f * a), 2.2f);
             const auto bezier = [&](float t) {
                 const float q = 1.0f - t;
                 return ImVec2(q * q * q * start.x + 3.0f * q * q * t * c1.x +
@@ -2107,19 +2124,34 @@ void draw_cinema_mechanics(App& app, const CinemaCue& cue,
                               q * q * q * start.y + 3.0f * q * q * t * c1.y +
                                   3.0f * q * t * t * c2.y + t * t * t * target->y);
             };
-            for (int i = 0; i < 4; ++i) {
+            for (int i = 0; i < 5; ++i) {
                 const float t = std::fmod(
-                    static_cast<float>(cue.activation_wave) + 0.23f * static_cast<float>(i),
+                    static_cast<float>(cue.activation_wave) +
+                        0.19f * static_cast<float>(i),
                     1.0f);
-                dl->AddCircleFilled(bezier(t), 4.5f, color(flow, a));
+                dl->AddCircleFilled(bezier(t), 3.2f, color(flow, a));
             }
+            const float target_pulse =
+                0.5f + 0.5f * std::sin(static_cast<float>(cue.act_t) * 6.0f);
+            dl->AddCircle(*target, 9.0f + 4.0f * target_pulse,
+                          color(flow, (0.28f + 0.34f * target_pulse) * a), 0, 1.6f);
             const char* bridge = app.cinema.decision_applied
                                      ? "CHOSEN ACTION → RECORDED CELLS"
                                  : app.cinema.decision_vetoed
-                                     ? "SAFETY REFUSAL → VERIFIED FALLBACK CELLS"
+                                     ? "ADVISOR ABSTAINED → VERIFIED BASELINE CELLS"
                                      : "UNRECOGNISED ACTION → STUDIO SETUP";
-            dl->AddText(font, type.legend,
-                        ImVec2(start.x + 10.0f, start.y - type.legend * 1.5f),
+            const ImVec2 text_at(start.x + 10.0f, start.y - type.legend * 1.5f);
+            const ImVec2 text_size =
+                font->CalcTextSizeA(type.legend, FLT_MAX, 0.0f, bridge);
+            dl->AddRectFilled(ImVec2(text_at.x - 8.0f, text_at.y - 5.0f),
+                              ImVec2(text_at.x + text_size.x + 8.0f,
+                                     text_at.y + text_size.y + 5.0f),
+                              color(palette.panel_bg, 0.78f * a), 6.0f);
+            dl->AddRect(ImVec2(text_at.x - 8.0f, text_at.y - 5.0f),
+                        ImVec2(text_at.x + text_size.x + 8.0f,
+                               text_at.y + text_size.y + 5.0f),
+                        color(flow, 0.42f * a), 6.0f, 0, 1.0f);
+            dl->AddText(font, type.legend, text_at,
                         color(app.cinema.decision_applied ? palette.accent
                                                          : palette.status_warn,
                               a),

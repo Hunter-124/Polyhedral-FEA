@@ -197,8 +197,8 @@ is geometry analysis, not a sizing input.
   Dense-mesh edges stay at 0.8 px / 0.18 opacity so shaded geometry survives.
 - **The cell microscope** reads the captured `NodalMesh`, not a second model.
   Its top rail is the actual type histogram. One card shows a tetrahedron at the
-  executed order; the second assembles seven connected tetrahedral glyphs from
-  one origin so a mesh patch, not a duplicate element, is visible. Quadratic
+  executed order; the second assembles four tetrahedra sharing a central node
+  so a connected mesh patch, not a duplicate element, is visible. Quadratic
   runs add midside nodes to every displayed edge. `qmin` and `q̄` come from
   `fea::summarize_cell_quality`, computed once when the snapshot is drained.
   No experimental cell family is named or implied when it was not used.

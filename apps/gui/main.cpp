@@ -2097,10 +2097,14 @@ void draw_cinema_mechanics(App& app, const CinemaCue& cue,
         dl->AddTriangleFilled(*head, wing_a, wing_b, color(c, arrow_alpha));
         const std::string label =
             std::format("{:.3g} kN", force_scale * marker.vector.norm() / 1e3);
+        const float label_w =
+            font->CalcTextSizeA(type.label, FLT_MAX, 0.0f, label.c_str()).x;
         const ImVec2 label_at = label_position(
             label, type.label,
-            ImVec2(tail->x + 10.0f, tail->y + type.label * 0.75f), tail->x);
-        dl->AddLine(*tail, ImVec2(label_at.x - 5.0f, label_at.y + type.label * 0.45f),
+            ImVec2(tail->x - label_w - 10.0f, tail->y - type.label * 1.35f),
+            tail->x);
+        dl->AddLine(*tail, ImVec2(label_at.x + label_w + 5.0f,
+                                  label_at.y + type.label * 0.45f),
                     color(c, 0.45f * arrow_alpha), 1.0f);
         dl->AddText(font, type.label, label_at, color(c, arrow_alpha), label.c_str());
     }

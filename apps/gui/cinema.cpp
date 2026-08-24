@@ -1983,7 +1983,7 @@ void draw_cinema_equations(const CinemaState& state, const CinemaCue& cue,
                     sub("all", palette.text), plain(" η", palette.text),
                     sub("e", palette.text), sup("2", palette.text)};
     } else if (stage != nullptr && on_ramp) {
-        equation = {plain("u(λ) = λu₁   ·   σ(λ) = λσ₁   ·   f(λ) = λf₁",
+        equation = {plain("u(λ) = λu(1)   ·   σ(λ) = λσ(1)   ·   f(λ) = λf(1)",
                           palette.text)};
     }
 
@@ -2596,7 +2596,12 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
                 (aa * (b.y - c.y) + bb * (c.y - a.y) + cc * (a.y - b.y)) / d,
                 (aa * (c.x - b.x) + bb * (a.x - c.x) + cc * (b.x - a.x)) / d);
             const float radius = std::hypot(center.x - b.x, center.y - b.y);
-            if (std::isfinite(radius) && radius < (edge_right - origin.x) * 0.8f) {
+            const bool inside =
+                center.x - radius >= origin.x + pad &&
+                center.x + radius <= edge_right - pad &&
+                center.y - radius >= edge_top &&
+                center.y + radius <= edge_bottom;
+            if (std::isfinite(radius) && inside) {
                 dl->AddCircle(center, radius, faded(palette.status_warn, 0.62f * alpha),
                               0, 1.4f);
                 dl->AddLine(center, b, faded(palette.status_warn, 0.78f * alpha), 1.4f);
@@ -2856,40 +2861,42 @@ void draw_cinema_cells(const CinemaState& state, const CinemaCue& cue,
             const float raw =
                 std::clamp(static_cast<float>(cue.act_t / 1.2), 0.0f, 1.0f);
             const float assemble = raw * raw * (3.0f - 2.0f * raw);
-            static constexpr std::array<ImVec2, 7> offsets{{
-                {-0.23f, -0.18f}, {0.02f, -0.22f}, {0.24f, -0.12f},
-                {-0.18f, 0.08f},  {0.10f, 0.05f},  {-0.04f, 0.27f},
-                {0.25f, 0.24f},
+            static constexpr std::array<ImVec2, 5> local_nodes{{
+                {0.00f, -0.34f}, {-0.35f, 0.30f}, {0.35f, 0.30f},
+                {0.13f, 0.02f}, {0.00f, 0.08f},
+            }};
+            std::array<ImVec2, local_nodes.size()> nodes{};
+            for (std::size_t i = 0; i < local_nodes.size(); ++i) {
+                nodes[i] = ImVec2(center.x + assemble * local_nodes[i].x * card_w,
+                                  center.y + assemble * local_nodes[i].y * card_h);
+            }
+            static constexpr std::array<std::array<int, 4>, 4> cells{{
+                {{4, 0, 1, 2}}, {{4, 0, 1, 3}},
+                {{4, 0, 2, 3}}, {{4, 1, 2, 3}},
             }};
             constexpr std::array<std::array<int, 2>, 6> edges{{
                 {{0, 1}}, {{0, 2}}, {{0, 3}}, {{1, 2}}, {{1, 3}}, {{2, 3}},
             }};
-            for (std::size_t cell = 0; cell < offsets.size(); ++cell) {
-                const float cx = center.x + assemble * offsets[cell].x * card_w;
-                const float cy = center.y + assemble * offsets[cell].y * card_h;
-                const float s = 0.115f * std::min(card_w, card_h) *
-                                (0.86f + 0.04f * static_cast<float>(cell % 4));
-                const std::array<ImVec2, 4> p{{
-                    {cx, cy - s},
-                    {cx - 0.82f * s, cy + 0.72f * s},
-                    {cx + 0.82f * s, cy + 0.72f * s},
-                    {cx + 0.35f * s, cy + 0.12f * s},
-                }};
+            for (std::size_t cell = 0; cell < cells.size(); ++cell) {
                 const ImVec4 cell_color =
                     cell % 2 == 0 ? palette.accent_soft_top : palette.text;
                 for (const auto& edge : edges) {
-                    dl->AddLine(p[edge[0]], p[edge[1]],
-                                faded(cell_color, (0.46f + 0.36f * assemble) * alpha),
-                                1.5f);
+                    const ImVec2 a = nodes[static_cast<std::size_t>(
+                        cells[cell][static_cast<std::size_t>(edge[0])])];
+                    const ImVec2 b = nodes[static_cast<std::size_t>(
+                        cells[cell][static_cast<std::size_t>(edge[1])])];
+                    dl->AddLine(a, b,
+                                faded(cell_color, (0.38f + 0.44f * assemble) * alpha),
+                                1.7f);
                     if (hud.order >= 2) {
-                        const ImVec2 mid{0.5f * (p[edge[0]].x + p[edge[1]].x),
-                                         0.5f * (p[edge[0]].y + p[edge[1]].y)};
-                        dl->AddCircleFilled(mid, 2.5f, faded(palette.accent, alpha));
+                        dl->AddCircleFilled(
+                            ImVec2(0.5f * (a.x + b.x), 0.5f * (a.y + b.y)),
+                            2.7f, faded(palette.accent, alpha));
                     }
                 }
-                for (const ImVec2 point : p) {
-                    dl->AddCircleFilled(point, 3.2f, faded(cell_color, alpha));
-                }
+            }
+            for (const ImVec2 node : nodes) {
+                dl->AddCircleFilled(node, 4.0f, faded(palette.text, alpha));
             }
             const double q_mean =
                 solved != nullptr && solved->quality_measured > 0 ? solved->quality_mean : 0.0;
@@ -3182,7 +3189,7 @@ void solve_caption(CinemaState& state, const CinemaCue& cue, const CinemaHud& hu
                 cue.load_factor * hud.load_newtons / 1e3,
                 cue.load_factor * r.max_von_mises / 1e6,
                 cue.load_factor * r.max_displacement * 1e3);
-        out.note = "u = λu₁ · σ = λσ₁";
+        out.note = "u = λu(1) · σ = λσ(1)";
         break;
     case SolvePhase::kHold: {
         out.headline = fmt("σmax %.4g MPa", r.max_von_mises / 1e6);

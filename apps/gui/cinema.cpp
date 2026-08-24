@@ -1768,10 +1768,7 @@ bool load_cinema_advisor(CinemaState& state, const pipeline::Model& model,
 #ifndef POLYMESH_WITH_ADVISOR
     (void)model;
     (void)setup;
-    return unavailable(
-        "this polymesh-gui was configured with POLYMESH_WITH_ADVISOR=OFF, so it "
-        "carries no inference module at all — reconfigure with "
-        "-DPOLYMESH_WITH_ADVISOR=ON");
+    return unavailable("advisor inference was not compiled into this build");
 #else
     state.explanation.reset();
     state.layout = advisor::NetworkLayout{};

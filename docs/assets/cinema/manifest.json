@@ -1,8 +1,8 @@
 {
   "schema": "polymesh.cinema.manifest/1",
-  "generated_utc": "2026-08-22T22:06:21Z",
-  "git_rev": "ff1c548+dirty",
-  "stamp": "git ff1c548+dirty \u00b7 model.onnx sha256 01eb2109f8df",
+  "generated_utc": "2026-08-24T11:13:33Z",
+  "git_rev": "7b12f69+dirty",
+  "stamp": "git 7b12f69+dirty \u00b7 model.onnx sha256 03b4062c8c2b",
   "stages_run": [
     "frames",
     "gif",
@@ -33,13 +33,13 @@
     "poissons_ratio": 0.3,
     "adapt_passes_configured": 0,
     "eta_target_configured": 0.0,
-    "h_note": "configured before inference; an accepted advisor action overrides it, while a refusal leaves it unchanged",
+    "h_note": "configured before inference; an accepted advisor action overrides it, while abstention keeps the baseline unchanged",
     "why": "purpose-built 3D suspension A-arm: two chassis bushing sleeves, non-coplanar swept arms and brace, one loaded upright boss, and a combined bending/torsion field"
   },
   "model": {
     "dir": "bench/advisor",
     "onnx": "bench/advisor/model.onnx",
-    "onnx_sha256": "01eb2109f8dfc088b56687752f84e457cac4a6f676e7a216571f8c72d444e9cf"
+    "onnx_sha256": "03b4062c8c2bd618399068a72f93099974ca5834c6993db347af2485071401bd"
   },
   "capture": {
     "gui": "build/apps/gui/polymesh-gui",
@@ -54,7 +54,7 @@
     ],
     "auto_spec": "load tests/fixtures/parts/wishbone.step; h 5.5; material 200 0.3; mesher tet; solver direct; order 1; feature off; spectral on; fix 5; fix 6; loadface 0 -25000 0 -40000; cinema on; cinema advisor bench/advisor; adapt 0 0; wire off; solve; record /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames 3600; quit",
     "env": {
-      "POLYMESH_CINEMA_STAMP": "git ff1c548+dirty \u00b7 model.onnx sha256 01eb2109f8df"
+      "POLYMESH_CINEMA_STAMP": "git 7b12f69+dirty \u00b7 model.onnx sha256 03b4062c8c2b"
     },
     "xvfb_screen": "1920x1080",
     "frame_size": "1920x1080",
@@ -62,7 +62,7 @@
     "frame_count": 3600,
     "fps": 60,
     "duration_s": 60.0,
-    "gui_wall_s": 2837.221,
+    "gui_wall_s": 1523.668,
     "ffmpeg": "ffmpeg version 8.1.2 Copyright (c) 2000-2026 the FFmpeg developers"
   },
   "report": {
@@ -70,42 +70,42 @@
       {
         "act": "skeleton",
         "first_frame": 0,
-        "last_frame": 468,
+        "last_frame": 719,
         "start_s": 0.0,
-        "end_s": 7.8,
-        "duration_s": 7.8
+        "end_s": 12.0,
+        "duration_s": 12.0
       },
       {
         "act": "deliberate",
-        "first_frame": 469,
-        "last_frame": 1007,
-        "start_s": 7.8,
-        "end_s": 16.8,
+        "first_frame": 720,
+        "last_frame": 1259,
+        "start_s": 12.0,
+        "end_s": 21.0,
         "duration_s": 9.0
       },
       {
         "act": "build",
-        "first_frame": 1008,
-        "last_frame": 1655,
-        "start_s": 16.8,
-        "end_s": 27.6,
-        "duration_s": 10.8
+        "first_frame": 1260,
+        "last_frame": 1872,
+        "start_s": 21.0,
+        "end_s": 31.2,
+        "duration_s": 10.2
       },
       {
         "act": "mesh_hold",
-        "first_frame": 1656,
-        "last_frame": 1979,
-        "start_s": 27.6,
-        "end_s": 33.0,
-        "duration_s": 5.4
+        "first_frame": 1873,
+        "last_frame": 2159,
+        "start_s": 31.2,
+        "end_s": 36.0,
+        "duration_s": 4.8
       },
       {
         "act": "solve",
-        "first_frame": 1980,
+        "first_frame": 2160,
         "last_frame": 3599,
-        "start_s": 33.0,
+        "start_s": 36.0,
         "end_s": 60.0,
-        "duration_s": 27.0
+        "duration_s": 24.0
       }
     ],
     "mesh_sequence": [
@@ -143,8 +143,8 @@
       "frames": 3600.0
     },
     "acts_note": null,
-    "candidates": 38,
-    "forward_passes": 39,
+    "candidates": 108,
+    "forward_passes": 109,
     "mesh_stages": 2,
     "solve_stages": 1,
     "elements": 40170,
@@ -159,16 +159,16 @@
     "max_von_mises_pa": 33160121.7,
     "global_eta": 0.206942168,
     "max_displacement_m": 3.28786285e-06,
-    "deformation_scale": 18316.8151,
-    "visible_displacement_m": 0.0602231757,
-    "visible_displacement_fraction": 0.12,
+    "deformation_scale": 6105.60502,
+    "visible_displacement_m": 0.0200743919,
+    "visible_displacement_fraction": 0.04,
     "unchanged_cells": 0,
     "removed_cells": 0,
     "added_cells": 0,
     "elements_skipped": 0,
     "solver": "direct_ldlt",
     "solver_note": null,
-    "poster_frame": 103,
+    "poster_frame": 159,
     "framebuffer": "1920x1080",
     "advisor_activations": true,
     "advisor_unavailable": null,
@@ -176,11 +176,12 @@
     "advisor_fields": {
       "adapt_passes": 0.0,
       "applied": 0.0,
-      "candidates": 38.0,
+      "candidates": 108.0,
       "eta_target": 0.0,
-      "frames": 39.0,
+      "frames": 109.0,
       "gate_threshold": 0.05,
       "h_rel": 0.1,
+      "ood_distance": 67.6049,
       "order": 1.0,
       "vetoed": 1.0
     },
@@ -203,18 +204,18 @@
     },
     "lines": [
       "cinema: maths glyphs merged from /usr/share/fonts/google-noto/NotoSansMath-Regular.ttf",
-      "cinema: advisor bench/advisor candidates 38 gate_threshold 0.05 frames 39 decision hybrid_zoo h_rel 0.1 order 1 adapt_passes 0 eta_target 0 vetoed 1 ood_distance nan applied 0",
+      "cinema: advisor bench/advisor candidates 108 gate_threshold 0.05 frames 109 decision hybrid_zoo h_rel 0.1 order 1 adapt_passes 0 eta_target 0 vetoed 1 ood_distance 67.6049 applied 0",
       "cinema: spectral applied 0 modes_total 0 modes_kept 0 energy_kept 0 edge_seeds 0 predicted_before 0 predicted_after 0 geometry_seeds 0 bc_seeds 0 brep_curvature 0 field_samples 0 h_before_min 0 h_before_max 0 h_after_min 0 h_after_max 0",
       "cinema: take /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames frames 3600 fps 60 duration 60.0000 s",
-      "cinema: act skeleton frames 0..468 t 0.0000..7.8000 s",
-      "cinema: act deliberate frames 469..1007 t 7.8000..16.8000 s",
-      "cinema: act build frames 1008..1655 t 16.8000..27.6000 s",
-      "cinema: act mesh_hold frames 1656..1979 t 27.6000..33.0000 s",
-      "cinema: act solve frames 1980..3599 t 33.0000..60.0000 s",
+      "cinema: act skeleton frames 0..719 t 0.0000..12.0000 s",
+      "cinema: act deliberate frames 720..1259 t 12.0000..21.0000 s",
+      "cinema: act build frames 1260..1872 t 21.0000..31.2000 s",
+      "cinema: act mesh_hold frames 1873..2159 t 31.2000..36.0000 s",
+      "cinema: act solve frames 2160..3599 t 36.0000..60.0000 s",
       "cinema: mesh_stage index 0 pass 0 id fill elements 40170 nodes 9796",
       "cinema: mesh_stage index 1 pass 0 id ship elements 40170 nodes 9796",
       "cinema: solve_stage index 0 pass 0 elements 40170 nodes 9796 dof 29388 global_eta 0.206942168 h_mark 34 p_mark 29872 shape_mark 0",
-      "cinema: record /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames frames 3600 fps 60 candidates 38 stages 2 elements 40170 nodes 9796 dof 29388 quality_min 0.0200003155 quality_mean 0.249598405 youngs_pa 2e+11 poisson 0.3 max_von_mises_pa 33160121.7 stress_p99_pa 17424544.8 global_eta 0.206942168 error_p99 0.00399045189 max_displacement_m 3.28786285e-06 deform_scale 18316.8151 visible_displacement_m 0.0602231757 visible_fraction 0.12 unchanged 0 removed 0 added 0 poster 103 width 1920 height 1080 skipped 0 solve_stages 1 solver direct_ldlt"
+      "cinema: record /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames frames 3600 fps 60 candidates 108 stages 2 elements 40170 nodes 9796 dof 29388 quality_min 0.0200003155 quality_mean 0.249598405 youngs_pa 2e+11 poisson 0.3 max_von_mises_pa 33160121.7 stress_p99_pa 17424544.8 global_eta 0.206942168 error_p99 0.00399045189 max_displacement_m 3.28786285e-06 deform_scale 6105.60502 visible_displacement_m 0.0200743919 visible_fraction 0.04 unchanged 0 removed 0 added 0 poster 159 width 1920 height 1080 skipped 0 solve_stages 1 solver direct_ldlt"
     ]
   },
   "outputs": {
@@ -235,8 +236,8 @@
       "pix_fmt": "yuv420p",
       "faststart": true,
       "fps": 60,
-      "bytes": 15004137,
-      "sha256": "3e04082b513d76fdaf054441b590ddd76577c99667b7864101fa5ee0ced34b30"
+      "bytes": 12653921,
+      "sha256": "b2dfaf88c57577201667bb8b183f61a5480d552e45515b7314d6f68fd60834d1"
     },
     "gif": {
       "file": "advisor_cinema.gif",
@@ -244,23 +245,23 @@
       "fps": 10,
       "start_s": 0.0,
       "duration_s": 60.0,
-      "bytes": 7919210,
-      "sha256": "fa7b648839924590e490bcbfda70d4e40bb3c64b8a2dc00bd5ddafb57552f042",
+      "bytes": 8173342,
+      "sha256": "6ca7a3e6bd53799c55f8fa38f7747c32eafdc3acb3df11310a249856d81f4233",
       "attempts": [
         {
           "width": 1100,
           "fps": 12,
-          "bytes": 11878939
+          "bytes": 14191835
         },
         {
           "width": 1100,
           "fps": 10,
-          "bytes": 9867863
+          "bytes": 10307123
         },
         {
           "width": 960,
           "fps": 10,
-          "bytes": 7919210
+          "bytes": 8173342
         }
       ],
       "max_bytes": 8388608,
@@ -268,12 +269,12 @@
     },
     "poster": {
       "file": "poster.png",
-      "source_frame": 103,
+      "source_frame": 159,
       "width": 1920,
       "height": 1080,
-      "bytes": 199030,
+      "bytes": 136444,
       "source_bytes": 8296178,
-      "sha256": "90f063a8ba9d9bd9562d0ca327ab68736b901a18e0d9a91bf1cf4642f6fd966d",
+      "sha256": "1573b27fef7b8a77482292d5ae62d898856c3ce5ed6cacada028fd515693a39a",
       "frame_source": "reported by the GUI as the first fully-composed frame"
     }
   }

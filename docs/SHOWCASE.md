@@ -664,12 +664,12 @@ fields, which is how the GUI's solve is cross-checked against the CLI's.)
   0.00329 mm physical peak displacement. Its global ZZ indicator is 20.69% and
   remains visible as verification evidence; this is not labelled reference truth.
 
-  The opening now starts in a shaded assembly context. Procedural neighbouring
-  hardware is anchored to the real fixture/load interface positions, clearly
-  excluded from the solved model, then strips outward to expose the wishbone.
-  The selected exact CAD edge is projected from its ordered samples; three
-  adjacent points, tangent/normal construction, measured curvature signal and
-  FFT animate together. The old full-part wireframe opening is gone.
+  The opening now starts on a mechanically mated interface rather than
+  decorative surrounding pipes. Bolts, washers and nuts cross both bushing
+  bores on their measured common axis; the ball and stud sit directly in the
+  upright-side bore on its vertical axis. This unsolved hardware strips outward
+  before ordered CAD samples, tangent/normal construction, measured curvature
+  and FFT take over. No whole-part wireframe cage is drawn.
 
   The advisor uses four activation lanes. Every node remains sized/coloured by
   the deployed graph's own tensor, and every shown connection remains one of the
@@ -679,20 +679,24 @@ fields, which is how the GUI's solve is cross-checked against the CLI's.)
   calibrated envelope; the configured, independently verified baseline remains
   authoritative while real cells replace the shaded CAD body in place.
 
-  Chapter boundaries preserve causality on the same part: assembly context peels
+  Chapter boundaries preserve causality on the same part: mated hardware peels
   away; exact edge samples become $\kappa(s)$ and its spectrum; the CAD surface
   yields locally to emitted cells; the mesh yields to stress, gradient and ZZ
-  fields. The cell microscope shows one actual-order tetrahedron assembling into
-  a connected multi-cell patch, with real midside nodes when a quadratic run is
-  shown, rather than two duplicate cell diagrams.
+  fields. The cell microscope now owns 10.2 s. Both cards assemble a connected
+  six-tetrahedra cube patch around one shared body diagonal; the second elevates
+  that same topology from tet4/p1 to tet10/p2 with every midside node visible.
+  The bottom ledger and manifest continue to identify the executed wishbone
+  solve as tet4/p1, so the p2 card is a topology comparison rather than a
+  claimed production result.
 
-  Support symbols reveal independently. The force arrow grows from outside the
-  model and terminates on the loaded region; during the exact linear load ramp,
-  its length and numeric resultant scale by the displayed λ. Final deformation
-  is limited to 4% of the model diagonal, down from 12%, and a translucent
-  undeformed CAD surface remains behind the exaggerated result. Compact symbolic
-  boards and measured histograms replace explanatory paragraphs; p99 colour
-  caps, physical maxima and manifest values remain authoritative.
+  Support and load symbols are absent during assembly, advisor inference and
+  meshing. They reveal only at the end of the stress hold immediately before
+  gradient recovery, fade after that calculation, then return at the end of the
+  final error hold immediately before the exact deformation ramp. The force
+  arrow terminates on the loaded region; during that linear ramp, its length and
+  numeric resultant scale by the displayed λ. Final deformation is limited to
+  4% of the model diagonal, and a translucent undeformed CAD surface remains
+  behind the exaggerated result.
 
   Framing is solved from all eight corners with the settled viewport aspect and
   includes the complete rest-to-4%-displayed deformation envelope before frame

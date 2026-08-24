@@ -2005,25 +2005,52 @@ void draw_cinema_mechanics(App& app, const CinemaCue& cue,
                                 image_min.y + image_size.y - size - 8.0f));
         return desired;
     };
-    const float entering = cue.act == CinemaAct::kSkeleton
-                               ? std::clamp(static_cast<float>(cue.act_t / 1.0), 0.0f, 1.0f)
-                               : 1.0f;
-    const float mechanics_alpha = 0.88f * entering;
+    const double phase_x =
+        cue.solve_phase_t / std::max(cue.solve_phase_span, 1.0e-9);
+    const auto smooth = [](double x) {
+        x = std::clamp(x, 0.0, 1.0);
+        return static_cast<float>(x * x * (3.0 - 2.0 * x));
+    };
+    const bool final_stage =
+        cue.solve_stage_index >= 0 &&
+        static_cast<std::size_t>(cue.solve_stage_index + 1) >=
+            app.cinema.solve_stages.size();
+    float mechanics_visibility = 0.0f;
+    switch (cue.solve_phase) {
+    case SolvePhase::kStressHold:
+        mechanics_visibility = smooth((phase_x - 0.62) / 0.28);
+        break;
+    case SolvePhase::kGradientSweep:
+        mechanics_visibility = 1.0f;
+        break;
+    case SolvePhase::kGradientHold:
+        mechanics_visibility = 1.0f - smooth((phase_x - 0.72) / 0.23);
+        break;
+    case SolvePhase::kErrorHold:
+        mechanics_visibility =
+            final_stage ? smooth((phase_x - 0.60) / 0.30) : 0.0f;
+        break;
+    case SolvePhase::kLoadRamp:
+    case SolvePhase::kHold:
+        mechanics_visibility = 1.0f;
+        break;
+    default:
+        break;
+    }
+    const float mechanics_alpha = 0.90f * mechanics_visibility;
     const float mechanics_pulse =
-        0.5f + 0.5f * std::sin(static_cast<float>(cue.act_t) * 5.2f);
+        0.5f + 0.5f * std::sin(static_cast<float>(cue.solve_phase_t) * 5.2f);
 
     for (std::size_t i = 0; i < app.cinema.support_markers.size(); ++i) {
         const auto& marker = app.cinema.support_markers[i];
+        const float delay = 0.10f * static_cast<float>(i);
         const float reveal_raw =
-            cue.act == CinemaAct::kSkeleton
-                ? std::clamp((static_cast<float>(cue.act_t) - 0.55f -
-                              0.22f * static_cast<float>(i)) /
-                                 0.65f,
-                             0.0f, 1.0f)
-                : 1.0f;
+            std::clamp((mechanics_visibility - delay) /
+                           std::max(1.0f - delay, 1.0e-3f),
+                       0.0f, 1.0f);
         const float support_reveal =
             reveal_raw * reveal_raw * (3.0f - 2.0f * reveal_raw);
-        const float marker_alpha = mechanics_alpha * support_reveal;
+        const float marker_alpha = 0.90f * support_reveal;
         const Eigen::Vector3d world =
             displayed_marker_position(app.cinema, marker, render);
         const auto projected =
@@ -2056,11 +2083,7 @@ void draw_cinema_mechanics(App& app, const CinemaCue& cue,
             cue.solve_phase == SolvePhase::kLoadRamp
                 ? std::clamp(cue.load_factor, 0.0, 1.0)
                 : 1.0;
-        const double entry_raw =
-            cue.act == CinemaAct::kSkeleton
-                ? std::clamp((cue.act_t - 1.0) / 0.9, 0.0, 1.0)
-                : 1.0;
-        const double entry = entry_raw * entry_raw * (3.0 - 2.0 * entry_raw);
+        const double entry = static_cast<double>(mechanics_visibility);
         const double drawn_scale = force_scale * entry;
         if (!(drawn_scale > 1.0e-4)) {
             continue;

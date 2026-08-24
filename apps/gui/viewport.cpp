@@ -1136,7 +1136,7 @@ void Viewport::set_cinema_assembly_context(
     const std::vector<Eigen::Vector3d>& load_positions,
     const Eigen::Vector3d& subject_center, double model_diagonal) {
     std::vector<float> data;
-    constexpr int kSegments = 24;
+    constexpr int kSegments = 32;
     const double scale = std::max(model_diagonal, 1.0e-6);
     const auto unit_or = [](const Eigen::Vector3d& v, const Eigen::Vector3d& fallback) {
         const double n = v.norm();
@@ -1152,8 +1152,28 @@ void Viewport::set_cinema_assembly_context(
                      static_cast<float>(strip.x()), static_cast<float>(strip.y()),
                      static_cast<float>(strip.z())});
     };
-    const auto cylinder = [&](const Eigen::Vector3d& center, const Eigen::Vector3d& axis_raw,
-                              double radius, double half_length, const ImVec4& color,
+    const auto triangle = [&](const Eigen::Vector3d& a, const Eigen::Vector3d& b,
+                              const Eigen::Vector3d& c, const ImVec4& color,
+                              const Eigen::Vector3d& strip) {
+        Eigen::Vector3d normal = (b - a).cross(c - a);
+        const double norm = normal.norm();
+        if (!(norm > 1.0e-12)) {
+            return;
+        }
+        normal /= norm;
+        emit(a, normal, color, strip);
+        emit(b, normal, color, strip);
+        emit(c, normal, color, strip);
+    };
+    const auto quad = [&](const Eigen::Vector3d& a, const Eigen::Vector3d& b,
+                          const Eigen::Vector3d& c, const Eigen::Vector3d& d,
+                          const ImVec4& color, const Eigen::Vector3d& strip) {
+        triangle(a, b, c, color, strip);
+        triangle(a, c, d, color, strip);
+    };
+    const auto cylinder = [&](const Eigen::Vector3d& center,
+                              const Eigen::Vector3d& axis_raw, double radius,
+                              double half_length, const ImVec4& color,
                               const Eigen::Vector3d& strip) {
         const Eigen::Vector3d w = unit_or(axis_raw, Eigen::Vector3d::UnitX());
         const Eigen::Vector3d seed =
@@ -1167,59 +1187,112 @@ void Viewport::set_cinema_assembly_context(
                               static_cast<double>(kSegments);
             const Eigen::Vector3d r0 = std::cos(a0) * u + std::sin(a0) * v;
             const Eigen::Vector3d r1 = std::cos(a1) * u + std::sin(a1) * v;
-            const Eigen::Vector3d p00 = center - half_length * w + radius * r0;
-            const Eigen::Vector3d p01 = center - half_length * w + radius * r1;
-            const Eigen::Vector3d p10 = center + half_length * w + radius * r0;
-            const Eigen::Vector3d p11 = center + half_length * w + radius * r1;
-            emit(p00, r0, color, strip);
-            emit(p10, r0, color, strip);
-            emit(p11, r1, color, strip);
-            emit(p00, r0, color, strip);
-            emit(p11, r1, color, strip);
-            emit(p01, r1, color, strip);
             const Eigen::Vector3d lo = center - half_length * w;
             const Eigen::Vector3d hi = center + half_length * w;
-            emit(lo, -w, color, strip);
-            emit(p01, -w, color, strip);
-            emit(p00, -w, color, strip);
-            emit(hi, w, color, strip);
-            emit(p10, w, color, strip);
-            emit(p11, w, color, strip);
+            quad(lo + radius * r0, hi + radius * r0,
+                 hi + radius * r1, lo + radius * r1, color, strip);
+            triangle(lo, lo + radius * r1, lo + radius * r0, color, strip);
+            triangle(hi, hi + radius * r0, hi + radius * r1, color, strip);
         }
     };
-    const ImVec4 chassis{0.28f, 0.36f, 0.45f, 0.62f};
-    const ImVec4 interface{0.40f, 0.56f, 0.68f, 0.70f};
-    std::vector<Eigen::Vector3d> anchors;
-    anchors.reserve(support_positions.size());
+    const auto sphere = [&](const Eigen::Vector3d& center, double radius,
+                            const ImVec4& color, const Eigen::Vector3d& strip) {
+        constexpr int kLatitude = 12;
+        for (int lat = 0; lat < kLatitude; ++lat) {
+            const double p0 = -0.5 * std::numbers::pi +
+                              std::numbers::pi * static_cast<double>(lat) /
+                                  static_cast<double>(kLatitude);
+            const double p1 = -0.5 * std::numbers::pi +
+                              std::numbers::pi * static_cast<double>(lat + 1) /
+                                  static_cast<double>(kLatitude);
+            for (int lon = 0; lon < kSegments; ++lon) {
+                const double t0 = 2.0 * std::numbers::pi * static_cast<double>(lon) /
+                                  static_cast<double>(kSegments);
+                const double t1 =
+                    2.0 * std::numbers::pi * static_cast<double>(lon + 1) /
+                    static_cast<double>(kSegments);
+                const auto point = [&](double p, double t) {
+                    Eigen::Vector3d result;
+                    result.x() = center.x() + radius * std::cos(p) * std::cos(t);
+                    result.y() = center.y() + radius * std::cos(p) * std::sin(t);
+                    result.z() = center.z() + radius * std::sin(p);
+                    return result;
+                };
+                const Eigen::Vector3d a = point(p0, t0);
+                const Eigen::Vector3d b = point(p0, t1);
+                const Eigen::Vector3d c = point(p1, t1);
+                const Eigen::Vector3d d = point(p1, t0);
+                triangle(a, b, c, color, strip);
+                triangle(a, c, d, color, strip);
+            }
+        }
+    };
+
+    Eigen::Vector3d support_center = subject_center;
+    if (!support_positions.empty()) {
+        support_center.setZero();
+        for (const Eigen::Vector3d& p : support_positions) {
+            support_center += p;
+        }
+        support_center /= static_cast<double>(support_positions.size());
+    }
+    Eigen::Vector3d load_center = subject_center;
+    if (!load_positions.empty()) {
+        load_center.setZero();
+        for (const Eigen::Vector3d& p : load_positions) {
+            load_center += p;
+        }
+        load_center /= static_cast<double>(load_positions.size());
+    }
+    Eigen::Vector3d pivot = Eigen::Vector3d::UnitY();
+    if (support_positions.size() >= 2) {
+        pivot = unit_or(support_positions.back() - support_positions.front(), pivot);
+    }
+    const Eigen::Vector3d outboard = unit_or(
+        load_center - support_center,
+        unit_or(subject_center - support_center, Eigen::Vector3d::UnitX()));
+    Eigen::Vector3d vertical = unit_or(outboard.cross(pivot), Eigen::Vector3d::UnitZ());
+    if (vertical.dot(Eigen::Vector3d::UnitZ()) < 0.0) {
+        vertical = -vertical;
+    }
+
+    const ImVec4 steel{0.62f, 0.67f, 0.72f, 1.0f};
+    const ImVec4 dark_steel{0.30f, 0.38f, 0.46f, 1.0f};
+    const Eigen::Vector3d support_strip =
+        -0.22 * scale * outboard;
+    const Eigen::Vector3d joint_strip =
+        0.18 * scale * outboard + 0.08 * scale * vertical;
+
+    constexpr std::array<double, 2> kSides{-1.0, 1.0};
     for (const Eigen::Vector3d& p : support_positions) {
-        const Eigen::Vector3d outward =
-            unit_or(p - subject_center, Eigen::Vector3d::UnitX());
-        const Eigen::Vector3d strip = 0.18 * scale * outward;
-        const Eigen::Vector3d anchor = p + 0.045 * scale * outward;
-        anchors.push_back(anchor);
-        cylinder(anchor, outward, 0.040 * scale, 0.055 * scale, chassis, strip);
-        cylinder(p + 0.010 * scale * outward, outward, 0.062 * scale,
-                 0.010 * scale, interface, strip);
+        // The shipped eyes are 48 mm long on the pivot axis. Washers sit
+        // directly on those end faces and one bolt crosses the exact bore axis.
+        cylinder(p, pivot, 0.012 * scale, 0.080 * scale,
+                 steel, support_strip);
+        for (const double side : kSides) {
+            cylinder(p + side * 0.056 * scale * pivot, pivot,
+                     0.036 * scale, 0.004 * scale,
+                     dark_steel, support_strip);
+            cylinder(p + side * 0.072 * scale * pivot, pivot,
+                     0.025 * scale, 0.012 * scale,
+                     steel, support_strip);
+        }
     }
-    if (anchors.size() >= 2) {
-        const Eigen::Vector3d a = anchors[0];
-        const Eigen::Vector3d b = anchors[1];
-        const Eigen::Vector3d axis = b - a;
-        const Eigen::Vector3d strip =
-            0.10 * scale *
-            unit_or(0.5 * (a + b) - subject_center, Eigen::Vector3d::UnitZ());
-        cylinder(0.5 * (a + b), axis, 0.024 * scale, 0.5 * axis.norm(),
-                 chassis, strip);
-    }
+
     for (const Eigen::Vector3d& p : load_positions) {
-        const Eigen::Vector3d outward =
-            unit_or(p - subject_center, Eigen::Vector3d::UnitY());
-        const Eigen::Vector3d strip = 0.20 * scale * outward;
-        cylinder(p + 0.020 * scale * outward, outward, 0.085 * scale,
-                 0.012 * scale, interface, strip);
-        cylinder(p + 0.052 * scale * outward, outward, 0.036 * scale,
-                 0.050 * scale, chassis, strip);
+        // The upright-side boss is vertical. The ball lies in its bore and the
+        // stud/nut continue on that same axis; every visible part intersects
+        // the interface it belongs to.
+        sphere(p + 0.010 * scale * vertical, 0.030 * scale,
+               dark_steel, joint_strip);
+        cylinder(p + 0.074 * scale * vertical, vertical,
+                 0.013 * scale, 0.090 * scale,
+                 steel, joint_strip);
+        cylinder(p + 0.172 * scale * vertical, vertical,
+                 0.027 * scale, 0.012 * scale,
+                 dark_steel, joint_strip);
     }
+
     assembly_vertex_count_ = static_cast<int>(data.size() / 13);
     glBindBuffer(GL_ARRAY_BUFFER, assembly_vbo_);
     glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(data.size() * sizeof(float)),

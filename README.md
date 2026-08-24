@@ -18,29 +18,30 @@ same frames as the inline GIF ([poster](docs/assets/cinema/poster.png)).
 
 The four chapters are concise and visual:
 
-- **Exact CAD.** The generated STEP is one checked, positive-volume solid.
-  Real edge-curvature samples become frequency bars and a reconstructed curve.
-  Geometry-curvature grading is disabled for this hero, so the panel labels that
-  FFT as analysis; the real solve uses one uniform wall-resolving target. The
-  support glyphs and force arrow remain anchored to their selected regions; the
-  arrow scales with the exact displayed load factor during the closing ramp.
+- **Assembly → exact CAD.** The take opens on a shaded wishbone inside
+  procedural interface hardware anchored to the real support and load regions.
+  Those unsolved neighbouring parts peel away before the analysis pane opens.
+  The selected exact CAD edge is then drawn from its ordered samples; three
+  adjacent points, their tangent/normal construction, the measured
+  $\kappa(s)$ trace and its FFT animate in one continuous drill-down. The old
+  full-part wireframe opening is gone.
 - **Advisor → mesh.** The deployed ONNX graph runs all 109 measured forward
-  passes in four wide activation lanes. A restrained feed-forward band makes
-  each pass readable without changing any tensor value. Its OOD check places
-  this new descriptor combination outside the calibrated envelope, so the
-  advisor abstains rather than extrapolating. The configured, independently
-  verified baseline remains authoritative while real `MeshStage` cells land;
-  a compact flow trace labels the views as a sequential replay.
+  passes in four activation lanes. Counts, signed node response, weighted
+  connections and the feed-forward wave carry the explanation; the prose wall
+  and raw tensor-style labels are gone. The configured, independently verified
+  baseline remains authoritative when the OOD check abstains, while real
+  `MeshStage` cells replace the shaded CAD body in place.
 - **Mesher.** The configured baseline uses a fine wall-resolving tet4 target.
-  Its complete ZZ verification field is shown and reported without implying a
-  hidden remesh. The advisor outcome remains until the finished mesh audit
-  replaces it, and the old standalone “converting to solver elements” beat is
-  gone. The manifest records every emitted stage in its original order.
-- **Analysis.** The authoritative final solve supplies the viewport and teaching
-  graphs. One active equation is paired with the same stage's nodal stress or
-  gradient distribution, full ZZ verification, or exact straight-line response
-  $u(\lambda)=\lambda u$ and $\sigma(\lambda)=\lambda\sigma$. Plain language
-  leads; units, extrema, material constants, solver method and provenance remain.
+  Cell topology is shown as one tetrahedron assembling into a connected
+  multi-cell patch rather than two duplicate diagrams; quadratic runs add their
+  real midside nodes. The measured type mix and min/mean quality stay graphical
+  and numeric.
+- **Analysis.** The authoritative final solve supplies the viewport and compact
+  symbolic boards for stress, gradient, ZZ verification, refinement and the
+  exact response $u(\lambda)=\lambda u$, $\sigma(\lambda)=\lambda\sigma$. The
+  load arrow grows into the loaded surface, fixed supports reveal independently,
+  and the exaggerated result is limited to 4% of the model diagonal with a
+  translucent undeformed CAD ghost behind it.
 
 The published solve contains **40,170 tet4 cells**, **9,796 nodes** and **29,388
 unknowns**; minimum/mean shape quality is **0.0200 / 0.2496**. The 47.17 kN
@@ -50,15 +51,14 @@ p99**) and **0.00329 mm** physical peak displacement. The film also states the
 this take is a visually legible high-resolution verification case, not a
 reference-truth benchmark.
 
-The chapters are one continuous handoff rather than five resets. Target-spacing
-rings remain on the CAD as advisor scoring begins and yield only where cells
-arrive. The advisor-outcome trace persists into the finished mesh. That mesh
-stays visible while stress arrives; stress remains ahead of the gradient front;
-the preceding measured field remains ahead of ZZ error; and the error map stays
-under the topology change it requested. Both fixed supports and the force arrow
-remain anchored through every chapter, following the displayed final
-deformation where appropriate. Support rings, feed-forward bands and flow dots
-provide deterministic motion cues without masquerading as measured quantities.
+The chapters are one continuous handoff rather than five resets. Assembly
+context peels away to expose the shaded CAD body; the sampled edge becomes its
+curvature signal and spectrum; the solid body gives way only where recorded
+cells land. That mesh stays visible while stress arrives, then hands off to the
+gradient and ZZ fields. Support symbols and the force arrow remain anchored to
+the actual interface regions and follow the displayed final deformation where
+appropriate. Their pulses, the advisor wave and mesh reveal are deterministic
+motion cues, not measured quantities.
 
 Nothing in the take is a mock-up. Network nodes are the graph's own trunk
 tensors, connection strength is measured $|w_{ji}a_i|$, and mesh frames are

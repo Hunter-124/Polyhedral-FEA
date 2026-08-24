@@ -24,6 +24,7 @@
 #include <cmath>
 #include <cstdio>
 #include <limits>
+#include <numbers>
 #include <utility>
 #include <unordered_map>
 
@@ -62,6 +63,25 @@ void main() {
     float shade = 0.50 + 0.48 * ndv;
     float rim = pow(1.0 - ndv, 3.0) * 0.20;
     frag = vec4(min(v_color.rgb * shade + vec3(rim), vec3(1.0)), u_alpha * v_color.a);
+})";
+
+constexpr const char* kAssemblyVs = R"(#version 330 core
+layout(location = 0) in vec3 in_pos;
+layout(location = 1) in vec3 in_normal;
+layout(location = 2) in vec4 in_color;
+layout(location = 3) in vec3 in_strip;
+uniform mat4 u_view;
+uniform mat4 u_proj;
+uniform float u_strip;
+out vec3 v_normal;
+out vec4 v_color;
+out vec3 v_pos;
+void main() {
+    vec3 p = in_pos + u_strip * in_strip;
+    v_normal = in_normal;
+    v_color = in_color;
+    v_pos = p;
+    gl_Position = u_proj * u_view * vec4(p, 1.0);
 })";
 
 constexpr const char* kLineVs = R"(#version 330 core
@@ -321,6 +341,22 @@ void bind_line_attr(GLuint vao, GLuint vbo) {
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, stride,
                           reinterpret_cast<void*>(3 * sizeof(float)));
+}
+
+void bind_assembly_attr(GLuint vao, GLuint vbo) {
+    glBindVertexArray(vao);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    constexpr GLsizei stride = 13 * sizeof(float); // pos3 normal3 color4 strip3
+    const auto attr = [](GLuint index, GLint size, int offset_floats) {
+        glEnableVertexAttribArray(index);
+        glVertexAttribPointer(index, size, GL_FLOAT, GL_FALSE, stride,
+                              reinterpret_cast<void*>(
+                                  static_cast<std::uintptr_t>(offset_floats) * sizeof(float)));
+    };
+    attr(0, 3, 0);
+    attr(1, 3, 3);
+    attr(2, 4, 6);
+    attr(3, 3, 10);
 }
 
 // Interleaved float counts per vertex for the two cinema buffers. The final
@@ -753,6 +789,7 @@ Viewport::~Viewport() = default;
 
 void Viewport::init() {
     model_program_ = link(kModelVs, kModelFs);
+    assembly_program_ = link(kAssemblyVs, kModelFs);
     background_program_ = link(kBackgroundVs, kBackgroundFs);
     line_program_ = link(kLineVs, kLineFs);
     cinema_program_ = link(kCinemaVs, kCinemaFs);
@@ -771,6 +808,8 @@ void Viewport::init() {
     glGenBuffers(1, &result_edge_vbo_);
     glGenVertexArrays(1, &skeleton_vao_);
     glGenBuffers(1, &skeleton_vbo_);
+    glGenVertexArrays(1, &assembly_vao_);
+    glGenBuffers(1, &assembly_vbo_);
     glGenVertexArrays(1, &cinema_vao_);
     glGenBuffers(1, &cinema_vbo_);
     glGenVertexArrays(1, &cinema_edge_vao_);
@@ -797,6 +836,7 @@ void Viewport::init() {
     bind_line_attr(mesh_edge_vao_, mesh_edge_vbo_);
     bind_line_attr(result_edge_vao_, result_edge_vbo_);
     bind_line_attr(skeleton_vao_, skeleton_vbo_);
+    bind_assembly_attr(assembly_vao_, assembly_vbo_);
     bind_cinema_attr(cinema_vao_, cinema_vbo_);
     bind_cinema_line_attr(cinema_edge_vao_, cinema_edge_vbo_);
     bind_sizing_attr(sizing_vao_, sizing_vbo_);
@@ -1089,6 +1129,101 @@ void Viewport::set_skeleton(const std::vector<std::vector<Eigen::Vector3d>>& pol
     glBufferData(GL_ARRAY_BUFFER,
                  static_cast<GLsizeiptr>(skeleton_data_.size() * sizeof(float)),
                  skeleton_data_.data(), GL_DYNAMIC_DRAW);
+}
+
+void Viewport::set_cinema_assembly_context(
+    const std::vector<Eigen::Vector3d>& support_positions,
+    const std::vector<Eigen::Vector3d>& load_positions,
+    const Eigen::Vector3d& subject_center, double model_diagonal) {
+    std::vector<float> data;
+    constexpr int kSegments = 24;
+    const double scale = std::max(model_diagonal, 1.0e-6);
+    const auto unit_or = [](const Eigen::Vector3d& v, const Eigen::Vector3d& fallback) {
+        const double n = v.norm();
+        return n > 1.0e-12 ? (v / n).eval() : fallback;
+    };
+    const auto emit = [&](const Eigen::Vector3d& p, const Eigen::Vector3d& n,
+                          const ImVec4& color, const Eigen::Vector3d& strip) {
+        data.insert(data.end(),
+                    {static_cast<float>(p.x()), static_cast<float>(p.y()),
+                     static_cast<float>(p.z()), static_cast<float>(n.x()),
+                     static_cast<float>(n.y()), static_cast<float>(n.z()),
+                     color.x, color.y, color.z, color.w,
+                     static_cast<float>(strip.x()), static_cast<float>(strip.y()),
+                     static_cast<float>(strip.z())});
+    };
+    const auto cylinder = [&](const Eigen::Vector3d& center, const Eigen::Vector3d& axis_raw,
+                              double radius, double half_length, const ImVec4& color,
+                              const Eigen::Vector3d& strip) {
+        const Eigen::Vector3d w = unit_or(axis_raw, Eigen::Vector3d::UnitX());
+        const Eigen::Vector3d seed =
+            std::fabs(w.z()) < 0.85 ? Eigen::Vector3d::UnitZ() : Eigen::Vector3d::UnitY();
+        const Eigen::Vector3d u = unit_or(w.cross(seed), Eigen::Vector3d::UnitX());
+        const Eigen::Vector3d v = w.cross(u).normalized();
+        for (int i = 0; i < kSegments; ++i) {
+            const double a0 = 2.0 * std::numbers::pi * static_cast<double>(i) /
+                              static_cast<double>(kSegments);
+            const double a1 = 2.0 * std::numbers::pi * static_cast<double>(i + 1) /
+                              static_cast<double>(kSegments);
+            const Eigen::Vector3d r0 = std::cos(a0) * u + std::sin(a0) * v;
+            const Eigen::Vector3d r1 = std::cos(a1) * u + std::sin(a1) * v;
+            const Eigen::Vector3d p00 = center - half_length * w + radius * r0;
+            const Eigen::Vector3d p01 = center - half_length * w + radius * r1;
+            const Eigen::Vector3d p10 = center + half_length * w + radius * r0;
+            const Eigen::Vector3d p11 = center + half_length * w + radius * r1;
+            emit(p00, r0, color, strip);
+            emit(p10, r0, color, strip);
+            emit(p11, r1, color, strip);
+            emit(p00, r0, color, strip);
+            emit(p11, r1, color, strip);
+            emit(p01, r1, color, strip);
+            const Eigen::Vector3d lo = center - half_length * w;
+            const Eigen::Vector3d hi = center + half_length * w;
+            emit(lo, -w, color, strip);
+            emit(p01, -w, color, strip);
+            emit(p00, -w, color, strip);
+            emit(hi, w, color, strip);
+            emit(p10, w, color, strip);
+            emit(p11, w, color, strip);
+        }
+    };
+    const ImVec4 chassis{0.28f, 0.36f, 0.45f, 0.62f};
+    const ImVec4 interface{0.40f, 0.56f, 0.68f, 0.70f};
+    std::vector<Eigen::Vector3d> anchors;
+    anchors.reserve(support_positions.size());
+    for (const Eigen::Vector3d& p : support_positions) {
+        const Eigen::Vector3d outward =
+            unit_or(p - subject_center, Eigen::Vector3d::UnitX());
+        const Eigen::Vector3d strip = 0.18 * scale * outward;
+        const Eigen::Vector3d anchor = p + 0.045 * scale * outward;
+        anchors.push_back(anchor);
+        cylinder(anchor, outward, 0.040 * scale, 0.055 * scale, chassis, strip);
+        cylinder(p + 0.010 * scale * outward, outward, 0.062 * scale,
+                 0.010 * scale, interface, strip);
+    }
+    if (anchors.size() >= 2) {
+        const Eigen::Vector3d a = anchors[0];
+        const Eigen::Vector3d b = anchors[1];
+        const Eigen::Vector3d axis = b - a;
+        const Eigen::Vector3d strip =
+            0.10 * scale *
+            unit_or(0.5 * (a + b) - subject_center, Eigen::Vector3d::UnitZ());
+        cylinder(0.5 * (a + b), axis, 0.024 * scale, 0.5 * axis.norm(),
+                 chassis, strip);
+    }
+    for (const Eigen::Vector3d& p : load_positions) {
+        const Eigen::Vector3d outward =
+            unit_or(p - subject_center, Eigen::Vector3d::UnitY());
+        const Eigen::Vector3d strip = 0.20 * scale * outward;
+        cylinder(p + 0.020 * scale * outward, outward, 0.085 * scale,
+                 0.012 * scale, interface, strip);
+        cylinder(p + 0.052 * scale * outward, outward, 0.036 * scale,
+                 0.050 * scale, chassis, strip);
+    }
+    assembly_vertex_count_ = static_cast<int>(data.size() / 13);
+    glBindBuffer(GL_ARRAY_BUFFER, assembly_vbo_);
+    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(data.size() * sizeof(float)),
+                 data.data(), GL_DYNAMIC_DRAW);
 }
 
 void Viewport::set_cinema_sizing_samples(
@@ -1786,6 +1921,17 @@ void Viewport::render(int width, int height, DisplayMode mode, float deform_scal
         mode == DisplayMode::kResultsError || mode == DisplayMode::kResultsGradient;
     const float result_alpha =
         results_mode ? std::clamp(cinema_view_.result_alpha, 0.0f, 1.0f) : 1.0f;
+    const float rest_alpha =
+        results_mode ? std::clamp(cinema_view_.rest_surface_alpha, 0.0f, 1.0f) : 0.0f;
+    if (rest_alpha > 0.0f && model_vertex_count_ > 0) {
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glUniform1f(glGetUniformLocation(model_program_, "u_alpha"), rest_alpha);
+        glDepthMask(GL_FALSE);
+        glBindVertexArray(model_vao_);
+        glDrawArrays(GL_TRIANGLES, 0, model_vertex_count_);
+        glDepthMask(GL_TRUE);
+    }
     glUniform1f(glGetUniformLocation(model_program_, "u_alpha"), result_alpha);
     if (result_alpha < 1.0f) {
         glEnable(GL_BLEND);
@@ -1889,6 +2035,39 @@ void Viewport::draw_cinema(const Eigen::Matrix4f& view, const Eigen::Matrix4f& p
 
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    const float model_alpha = std::clamp(cinema_view_.model_alpha, 0.0f, 1.0f);
+    if (model_vertex_count_ > 0 && model_alpha > 0.0f) {
+        glUseProgram(model_program_);
+        glUniformMatrix4fv(glGetUniformLocation(model_program_, "u_view"), 1, GL_FALSE,
+                           view.data());
+        glUniformMatrix4fv(glGetUniformLocation(model_program_, "u_proj"), 1, GL_FALSE,
+                           proj.data());
+        glUniform3f(glGetUniformLocation(model_program_, "u_eye"),
+                    eye.x(), eye.y(), eye.z());
+        glUniform1f(glGetUniformLocation(model_program_, "u_alpha"), model_alpha);
+        glBindVertexArray(model_vao_);
+        glDrawArrays(GL_TRIANGLES, 0, model_vertex_count_);
+    }
+
+    const float assembly_alpha =
+        std::clamp(cinema_view_.assembly_alpha, 0.0f, 1.0f);
+    if (assembly_vertex_count_ > 0 && assembly_alpha > 0.0f) {
+        glUseProgram(assembly_program_);
+        glUniformMatrix4fv(glGetUniformLocation(assembly_program_, "u_view"), 1, GL_FALSE,
+                           view.data());
+        glUniformMatrix4fv(glGetUniformLocation(assembly_program_, "u_proj"), 1, GL_FALSE,
+                           proj.data());
+        glUniform3f(glGetUniformLocation(assembly_program_, "u_eye"),
+                    eye.x(), eye.y(), eye.z());
+        glUniform1f(glGetUniformLocation(assembly_program_, "u_alpha"), assembly_alpha);
+        glUniform1f(glGetUniformLocation(assembly_program_, "u_strip"),
+                    std::clamp(cinema_view_.assembly_strip, 0.0f, 1.0f));
+        glDepthMask(GL_FALSE);
+        glBindVertexArray(assembly_vao_);
+        glDrawArrays(GL_TRIANGLES, 0, assembly_vertex_count_);
+        glDepthMask(GL_TRUE);
+    }
 
     if (skeleton_vertex_count_ > 0 && skeleton_alpha > 0.0f) {
         if (skeleton_alpha != skeleton_baked_alpha_) {

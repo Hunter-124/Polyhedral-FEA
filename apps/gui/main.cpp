@@ -98,7 +98,7 @@ constexpr int kImproveNoRun = -1;
 /// Presentation-only exaggeration target. The solve stays in true SI units;
 /// the viewport maps the authoritative final max |u| to exactly this fraction
 /// of the undeformed model diagonal and reports both values in the film.
-constexpr double kAutoDeformationFraction = 0.12;
+constexpr double kAutoDeformationFraction = 0.04;
 
 /// `std::system`'s result as the command's own exit code. POSIX returns a wait
 /// status, where exit 1 reads as 256; Windows returns the code directly.
@@ -2014,6 +2014,16 @@ void draw_cinema_mechanics(App& app, const CinemaCue& cue,
 
     for (std::size_t i = 0; i < app.cinema.support_markers.size(); ++i) {
         const auto& marker = app.cinema.support_markers[i];
+        const float reveal_raw =
+            cue.act == CinemaAct::kSkeleton
+                ? std::clamp((static_cast<float>(cue.act_t) - 0.55f -
+                              0.22f * static_cast<float>(i)) /
+                                 0.65f,
+                             0.0f, 1.0f)
+                : 1.0f;
+        const float support_reveal =
+            reveal_raw * reveal_raw * (3.0f - 2.0f * reveal_raw);
+        const float marker_alpha = mechanics_alpha * support_reveal;
         const Eigen::Vector3d world =
             displayed_marker_position(app.cinema, marker, render);
         const auto projected =
@@ -2023,31 +2033,19 @@ void draw_cinema_mechanics(App& app, const CinemaCue& cue,
         }
         const ImVec2 p = *projected;
         const ImVec4 c = palette.sim_fixture;
-        dl->AddCircleFilled(p, 7.0f, color(c, mechanics_alpha));
+        dl->AddCircleFilled(p, 7.0f, color(c, marker_alpha));
         dl->AddCircle(p, 15.0f + 3.0f * mechanics_pulse,
-                      color(c, (0.32f + 0.20f * mechanics_pulse) * mechanics_alpha),
+                      color(c, (0.32f + 0.20f * mechanics_pulse) * marker_alpha),
                       0, 2.0f);
         dl->AddLine(ImVec2(p.x - 14.0f, p.y + 13.0f),
                     ImVec2(p.x + 14.0f, p.y + 13.0f),
-                    color(c, mechanics_alpha), 3.0f);
+                    color(c, marker_alpha), 3.0f);
         for (int hatch = -2; hatch <= 2; ++hatch) {
             const float x = p.x + static_cast<float>(hatch) * 6.0f;
             dl->AddLine(ImVec2(x - 4.0f, p.y + 20.0f),
                         ImVec2(x + 3.0f, p.y + 13.0f),
-                        color(c, 0.72f * mechanics_alpha), 1.5f);
+                        color(c, 0.72f * marker_alpha), 1.5f);
         }
-        const std::string label =
-            std::format("FIXED SUPPORT {}", static_cast<char>('A' + i));
-        const float label_w =
-            font->CalcTextSizeA(type.legend, FLT_MAX, 0.0f, label.c_str()).x;
-        const ImVec2 desired(i == 0 ? p.x - label_w - 34.0f : p.x + 24.0f,
-                             p.y - type.legend * (i == 0 ? 3.2f : 2.1f));
-        const ImVec2 label_at =
-            label_position(label, type.legend, desired, p.x);
-        dl->AddLine(p, ImVec2(i == 0 ? label_at.x + label_w : label_at.x,
-                             label_at.y + type.legend * 0.55f),
-                    color(c, 0.48f * mechanics_alpha), 1.0f);
-        dl->AddText(font, type.legend, label_at, color(c, mechanics_alpha), label.c_str());
     }
 
     for (const auto& marker : app.cinema.load_markers) {
@@ -2058,18 +2056,24 @@ void draw_cinema_mechanics(App& app, const CinemaCue& cue,
             cue.solve_phase == SolvePhase::kLoadRamp
                 ? std::clamp(cue.load_factor, 0.0, 1.0)
                 : 1.0;
-        if (!(force_scale > 1.0e-4)) {
+        const double entry_raw =
+            cue.act == CinemaAct::kSkeleton
+                ? std::clamp((cue.act_t - 1.0) / 0.9, 0.0, 1.0)
+                : 1.0;
+        const double entry = entry_raw * entry_raw * (3.0 - 2.0 * entry_raw);
+        const double drawn_scale = force_scale * entry;
+        if (!(drawn_scale > 1.0e-4)) {
             continue;
         }
         const Eigen::Vector3d centre =
             displayed_marker_position(app.cinema, marker, render);
         const Eigen::Vector3d direction = marker.vector.normalized();
         const double length =
-            0.17 * force_scale * std::max(app.cinema.model_diagonal, 1.0e-6);
+            0.17 * drawn_scale * std::max(app.cinema.model_diagonal, 1.0e-6);
         const auto tail = project_cinema_point(
-            app.viewport.camera, centre - 0.50 * length * direction, image_min, image_size);
+            app.viewport.camera, centre - length * direction, image_min, image_size);
         const auto head = project_cinema_point(
-            app.viewport.camera, centre + 0.50 * length * direction, image_min, image_size);
+            app.viewport.camera, centre, image_min, image_size);
         if (!tail || !head) {
             continue;
         }
@@ -2081,24 +2085,24 @@ void draw_cinema_mechanics(App& app, const CinemaCue& cue,
         }
         const ImVec2 unit(delta.x / n, delta.y / n);
         const ImVec2 normal(-unit.y, unit.x);
+        const float arrow_alpha = mechanics_alpha * static_cast<float>(entry);
         dl->AddLine(*tail, *head,
-                    color(c, (0.12f + 0.14f * mechanics_pulse) * mechanics_alpha),
+                    color(c, (0.12f + 0.14f * mechanics_pulse) * arrow_alpha),
                     9.0f + 2.0f * mechanics_pulse);
-        dl->AddLine(*tail, *head, color(c, mechanics_alpha), 3.5f);
+        dl->AddLine(*tail, *head, color(c, arrow_alpha), 3.5f);
         const ImVec2 wing_a(head->x - 18.0f * unit.x + 9.0f * normal.x,
                             head->y - 18.0f * unit.y + 9.0f * normal.y);
         const ImVec2 wing_b(head->x - 18.0f * unit.x - 9.0f * normal.x,
                             head->y - 18.0f * unit.y - 9.0f * normal.y);
-        dl->AddTriangleFilled(*head, wing_a, wing_b, color(c, mechanics_alpha));
+        dl->AddTriangleFilled(*head, wing_a, wing_b, color(c, arrow_alpha));
         const std::string label =
-            std::format("{:.3g} kN APPLIED FORCE",
-                        force_scale * marker.vector.norm() / 1e3);
+            std::format("{:.3g} kN", force_scale * marker.vector.norm() / 1e3);
         const ImVec2 label_at = label_position(
             label, type.label,
-            ImVec2(head->x + 18.0f, head->y + type.label * 0.65f), head->x);
-        dl->AddLine(*head, ImVec2(label_at.x - 5.0f, label_at.y + type.label * 0.45f),
-                    color(c, 0.45f * mechanics_alpha), 1.0f);
-        dl->AddText(font, type.label, label_at, color(c, mechanics_alpha), label.c_str());
+            ImVec2(tail->x + 10.0f, tail->y + type.label * 0.75f), tail->x);
+        dl->AddLine(*tail, ImVec2(label_at.x - 5.0f, label_at.y + type.label * 0.45f),
+                    color(c, 0.45f * arrow_alpha), 1.0f);
+        dl->AddText(font, type.label, label_at, color(c, arrow_alpha), label.c_str());
     }
 
     if (cue.action_bridge_alpha > 0.0f && app.cinema.advisor_ran) {
@@ -2135,27 +2139,6 @@ void draw_cinema_mechanics(App& app, const CinemaCue& cue,
                 0.5f + 0.5f * std::sin(static_cast<float>(cue.act_t) * 6.0f);
             dl->AddCircle(*target, 9.0f + 4.0f * target_pulse,
                           color(flow, (0.28f + 0.34f * target_pulse) * a), 0, 1.6f);
-            const char* bridge = app.cinema.decision_applied
-                                     ? "CHOSEN ACTION → RECORDED CELLS"
-                                 : app.cinema.decision_vetoed
-                                     ? "ADVISOR ABSTAINED → VERIFIED BASELINE CELLS"
-                                     : "UNRECOGNISED ACTION → STUDIO SETUP";
-            const ImVec2 text_at(start.x + 10.0f, start.y - type.legend * 1.5f);
-            const ImVec2 text_size =
-                font->CalcTextSizeA(type.legend, FLT_MAX, 0.0f, bridge);
-            dl->AddRectFilled(ImVec2(text_at.x - 8.0f, text_at.y - 5.0f),
-                              ImVec2(text_at.x + text_size.x + 8.0f,
-                                     text_at.y + text_size.y + 5.0f),
-                              color(palette.panel_bg, 0.78f * a), 6.0f);
-            dl->AddRect(ImVec2(text_at.x - 8.0f, text_at.y - 5.0f),
-                        ImVec2(text_at.x + text_size.x + 8.0f,
-                               text_at.y + text_size.y + 5.0f),
-                        color(flow, 0.42f * a), 6.0f, 0, 1.0f);
-            dl->AddText(font, type.legend, text_at,
-                        color(app.cinema.decision_applied ? palette.accent
-                                                         : palette.status_warn,
-                              a),
-                        bridge);
         }
     }
 }
@@ -2178,8 +2161,7 @@ void draw_cinema_viewport(App& app, const CinemaRender& render,
     if (ImGui::IsMouseDragging(ImGuiMouseButton_Middle) ||
         (ImGui::IsMouseDragging(ImGuiMouseButton_Left) && io.KeyShift)) {
         app.viewport.camera.pan(io.MouseDelta.x, io.MouseDelta.y, size.y);
-    } else if (ImGui::IsMouseDragging(ImGuiMouseButton_Right) ||
-               ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+    } else if (ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
         app.viewport.camera.orbit(io.MouseDelta.x, io.MouseDelta.y);
     }
     if (io.MouseWheel != 0.0f) {

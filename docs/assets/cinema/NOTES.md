@@ -21,16 +21,17 @@ stdout.
 |---|---|
 | Take | 3600 frames at a fixed 1/60 s virtual timestep = 60.000 s. The clock is set from the frame **index**, never accumulated from real frame time. |
 | Frame | 1920×1080. `--size` sets Xvfb and `POLYMESH_GUI_SIZE`; the recorded resolution is measured from the PNG rather than assumed. |
-| Acts | `skeleton` 0.13, `deliberate` 0.15, `build` 0.18, `mesh_hold` 0.09, `solve` 0.45. At 60 s these are 7.8 / 9.0 / 10.8 / 5.4 / 27.0 s. |
-| Analysis pane | 0.42 of the width. Exact-CAD evidence → four wide activation lanes → cell audit → active-equation graph, with direct opacity handoffs. During build the measured final pass remains visible while the later real mesh lands. |
-| Bottom ledger | Constant height, horizontally composed: headline/numbers left, plain-language disclosure right, provenance full-width below. |
-| Camera | Fit before frame zero by solving the perspective inequalities on all eight corners at the settled pane aspect, then re-fit to the exact rest∪fully-exaggerated result envelope. It never moves during the captured take. |
-| Mechanics overlay | Two support glyphs and one force arrow are anchored to the selected CAD regions and persist through every act. Their soft pulse is presentation-only. During the exact linear load ramp the arrow length and stated resultant scale by the displayed λ; direction comes from the real resultant. |
+| Acts | `skeleton` 0.20, `deliberate` 0.15, `build` 0.17, `mesh_hold` 0.08, `solve` 0.40. At 60 s these are 12.0 / 9.0 / 10.2 / 4.8 / 24.0 s. |
+| Analysis pane | 0.42 of the width. Actual CAD-edge construction → curvature/FFT graphics → four activation lanes → cell/mesh patch → symbolic solve board, with direct opacity handoffs. |
+| Bottom ledger | Constant height and deliberately sparse: active symbol/numeric result left, optional measurement note right, provenance below. |
+| Camera | Fit before frame zero against the exact rest∪4%-displayed deformation envelope. It never moves during the take. |
+| Mechanics overlay | Support symbols reveal independently. The force arrow grows from outside the model and terminates on the loaded region. During the exact linear load ramp, arrow length and stated resultant scale by λ. |
 ### What is interpolated
 
-Time, opacity, the shrink-toward-centroid reveal, the spatial handoff front, the
-pre/post-filter spacing-glyph morph, the presentation-only pulse phases, and the
-load factor λ. That is the whole list.
+Time, opacity, assembly strip distance, the shrink-toward-centroid reveal, the
+spatial handoff front, pre/post-filter spacing-glyph morph, presentation-only
+pulse phases, undeformed-ghost opacity, and the load factor λ. That is the whole
+list.
 
 No displayed **number** is ever interpolated. The opening rings interpolate
 marker diameter and colour between two measured target-h evaluations; their
@@ -45,46 +46,37 @@ source is missing the film says which one and shows nothing in its place.
 because interpolating it is exact rather than approximate — see
 [the load ramp](#load-ramp) below.
 
-## Act 1 — `skeleton`: the part
+## Act 1 — `skeleton`: assembly to measured curvature
 
-- **Outline source** is stated on screen and is one of:
-  - `geom::extract_topology(*model.cad, 32)` — the STEP file's exact edge
-    curves and the same 32-sample curvature traces used by product sizing.
-  - `geom::detect_sharp_edges(model.surface, 30°)` — the tessellation's crease
-    network, for mesh input that carries no BRep. The film calls this out as **not**
-    a CAD skeleton when it happens.
-  - unavailable, with the extractor's own message drawn verbatim.
-- `skeleton_polylines` / `skeleton_points` are the counts of what was extracted
-  and pushed to the viewport, not an estimate of the part's complexity.
-- Nothing is drawn as mesh in this act or the next. Nothing has been meshed yet.
-  The points on the part are explicitly **target-spacing rings**, not elements:
-  ring diameter is proportional to target `h`, orange means finer and cyan
-  coarser.
-- `prepare_cinema_features` calls the production
-  `pipeline::build_refinement_plan` twice with the same resolved `h`, geometry
-  and BC/load regions: once with spectral filtering disabled and once with the
-  final `SimSetup`. The two `size_field` functions are evaluated at a
-  deterministic, bounded walk over `Model::surface.vertices` and at every
-  sample of the selected CAD edge. The exact sample count and pre/post-filter
-  target-h ranges are printed by the GUI and copied into the manifest.
-- When feature grading is enabled, `SpectralSizingReport` supplies modes,
-  retained energy and density changes. The wishbone fallback records
-  `feature_grading=false`; its FFT is labelled geometry analysis only.
-- The upper chart is one real `CadEdge::kappa_samples` trace and the output of
-  `geom::lowpass_signal(..., 0.995)`. A scan cursor advances over the same edge
-  samples highlighted on the part. The lower chart is the non-DC first
-  conjugate half of the exact even-reflected FFT: retained modes stay teal and
-  discarded modes dim as the inverse reconstruction takes over. The DC bar is
-  omitted because it is mean curvature, always retained, and excluded from
-  `modes_total`; showing it would flatten every non-DC mode that actually
-  explains spacing variation. No spectrum is invented or decoratively seeded.
-- The last opening beat sweeps the pre/post-filter `h(x)` rings over the part,
-  so the viewer can see where the frequency-space change affects the eventual
-  cell spacing rather than infer it from a chart alone. The completed field
-  remains at full opacity across the chapter boundary, dims to a 0.22-alpha
-  input map over the first 1.3 s of advisor scoring, and is not cleared.
-- The analysis panel starts opening at 0.624 s and reaches full width at
-  1.716 s, leaving about 6.08 s fully open on the default take.
+- The analysed wishbone is the same crease-aware shaded `Model::surface` used by
+  Studio setup mode, not a wireframe substitute.
+- Cinema-only neighbouring hardware is generated from the actual support and
+  load marker positions: interface collars/hubs plus the support-side connector.
+  It is never appended to `Model`, `NodalMesh`, fixtures, loads or solve data.
+  Per-vertex strip vectors move it outward while opacity falls; it exists only
+  to establish assembly context before the analysed component is isolated.
+- The panel stays closed for the assembly view. It begins opening at 3.36 s and
+  reaches full width at 4.56 s on the default take, after the context has started
+  peeling away.
+- Exact edge curves come from `geom::extract_topology(*model.cad, 32)`. For mesh
+  inputs without a BRep, only `geom::detect_sharp_edges(model.surface, 30°)` is
+  available and the fallback is not called exact CAD.
+- `capture_curve_story` retains the selected edge's ordered `curve_points`
+  independently of optional size-field samples. A uniform-mesh hero therefore
+  still shows the real extraction geometry even though it has no `h(x)` rings.
+- The left inset projects the selected CAD edge through its two widest axes.
+  Three adjacent ordered samples are highlighted; their secant tangent, outward
+  normal and bounded circumcircle construction animate with the scan. The right
+  trace is the corresponding measured `CadEdge::kappa_samples`, not a fitted
+  decorative curve.
+- The lower bars are the non-DC first conjugate half of the exact
+  even-reflected FFT. Retained modes stay cyan and discarded modes dim during
+  reconstruction. Five graphical icons show sample → spectrum → retained modes
+  → inverse signal → sizing, without prose labels.
+- For the published wishbone `feature_grading=false`, so FFT content is geometry
+  evidence only and the solve remains a uniform wall-resolving target. No
+  spacing ring or sizing claim is fabricated when the production size field is
+  absent.
 
 ## Act 2 — `deliberate`: choosing a mesh
 
@@ -92,14 +84,12 @@ The first 65% of the act shows one real forward pass per beat in chooser order:
 108 candidate actions and one final re-score. At the default 60 s duration the
 109 measured passes use a 53.7 ms display beat; the remaining 3.15 s holds the
 final state, and the 1.6 s decision lead at the start of the next act extends
-that inspectable hold. Candidate-specific prose does not flash during the pass
-lane: the strip keeps one stable explanation while the network itself carries
-motion.
+that inspectable hold. No candidate-specific prose is drawn. The measured node,
+edge and lane motion is the explanation.
 
-The feature panel and full on-part target-spacing field enter this act intact.
-Over the first 1.3 s the panel cross-fades into four wide activation lanes while
-the rings settle to their carry opacity. The network therefore appears as the
-consumer of the field just shown, not a fresh scene over an empty wireframe.
+The shaded CAD surface remains in the viewport while the graphical curvature
+panel cross-fades into four activation lanes over the first 1.3 s. No wireframe
+reset and no fabricated sizing overlay are introduced.
 
 - **The node fills are the graph's own tensors**, read out of the ONNX session:
   `advisor::ActivationFrame::input` / `fc1` / `fc2` (post-GELU) / `heads`. Not a
@@ -122,9 +112,10 @@ consumer of the field just shown, not a fresh scene over an empty wireframe.
   a subdued band advances input → hidden 1 → hidden 2 → outputs once per pass.
   During mesh construction the same bands follow `activation_wave`. Node fill,
   radius, sign and every connection rank remain the recorded tensors.
-- **Head names are plain language.** Every head remains a measured circle in the
-  output lane; the selected head is named in the decision chip, while this file
-  carries the complete mapping. `activation_layout.json` is not rewritten.
+- **Display text is deliberately bounded.** The four lanes show only their
+  measured unit counts. The outcome chip is a state glyph, arrow, mesh glyph and
+  either the selected action values or measured OOD distance. The tensor-name
+  mapping remains here for audit and is not painted over the animation.
 
   | Plain label | Graph tensor |
   |---|---|
@@ -149,11 +140,12 @@ consumer of the field just shown, not a fresh scene over an empty wireframe.
   | mesher: hybrid VEM | `policy_mesher_logit_hybrid_vem` |
   | mesher: hybrid, hex + pyramids | `policy_mesher_logit_hybrid_zoo` |
 
-- During the pass lane the strip reports only measured pass/candidate/gate data.
-  The final state names one of four outcomes without conflation: applied action,
-  advisor abstention, unrecognised action, or unavailable advisor.
-- For the wishbone's new descriptor combination, the OOD distance is unavailable.
-  The advisor abstains and the configured baseline remains authoritative.
+- During scoring the bottom ledger shows only network shape and pass count. The
+  final state reduces to the selected action values or `d = 67.6049`; a crossed
+  decision glyph and mesh glyph carry the abstention handoff without a slogan.
+- The wishbone lies outside the calibrated descriptor envelope at Mahalanobis
+  distance 67.6049. The advisor abstains and the configured baseline remains
+  authoritative.
 
 ## Act 3 — `build`: the mesher executing the decision
 
@@ -165,13 +157,12 @@ LDLT. The base mesh resolves each thin member with 4–6 elements; the opening F
 is geometry analysis, not a sizing input.
 
 - During build the measured OOD-check state remains visible. A restrained
-  halo/connection wave travels through the fixed tensor values; only after it
-  reaches the output lane do the later real snapshot's cells land. A compact
-  bridge pill, five moving dots and a pulsing target ring show presentation
-  direction without claiming concurrency. The strip says
-  **aligned replay · computed sequentially**.
-- The 0.22-alpha target-spacing map carried from advisor scoring fades only as
-  real cells replace it in place. There is no clear/reset.
+  halo/connection wave travels through fixed tensor values; only after it
+  reaches the output lane do later recorded cells land. Five moving dots and a
+  pulsing target ring show presentation direction without claiming concurrency
+  or adding another label.
+- Any target-spacing overlay fades only as cells replace it. On the published
+  uniform-size wishbone that overlay is honestly empty.
 - An accepted decision still writes mesher, `h = h_rel × bbox diagonal`, adapt
   passes, η target and order into `SimSetup`. An abstention or unrecognised
   mesher never silently changes the configured baseline.
@@ -204,19 +195,17 @@ is geometry analysis, not a sizing input.
 - Cells the viewport cannot triangulate are counted and called out, never hidden.
 - The reveal shrink pulls each cell toward its centroid as it lands, then closes.
   Dense-mesh edges stay at 0.8 px / 0.18 opacity so shaded geometry survives.
-- **The cell microscope** reads the captured `NodalMesh`, not a second model. It
-  reports the actual type histogram, displays order-1 corners beside order-2
-  midside nodes, and shows `fea::summarize_cell_quality` once per snapshot.
-  `CinemaMeshInsight` is computed when worker snapshots are drained, never per
-  frame.
-
-- The panel names varyhedron, restricted-CVT poly-VEM and octahedral as
-  **experimental alternatives — not used in this verified solve**. Presence in
-  the codebase is not presented as evidence that this take exercised them.
+- **The cell microscope** reads the captured `NodalMesh`, not a second model.
+  Its top rail is the actual type histogram. One card shows a tetrahedron at the
+  executed order; the second assembles seven connected tetrahedral glyphs from
+  one origin so a mesh patch, not a duplicate element, is visible. Quadratic
+  runs add midside nodes to every displayed edge. `qmin` and `q̄` come from
+  `fea::summarize_cell_quality`, computed once when the snapshot is drained.
+  No experimental cell family is named or implied when it was not used.
 
 ## Act 4 — `mesh_hold`: the finished mesh
 
-5.4 s on the authoritative mesh consumed by the first solve. It opens every
+4.8 s on the authoritative mesh consumed by the first solve. It opens every
 cell by 0.10 toward its own centroid, holds the exploded topology, closes it,
 then leaves the delivered mesh still for the final fifth of the act.
 
@@ -242,7 +231,7 @@ after the last pass:  load ramp, hold
 The number of solve stages is data, not a storyboard constant. The recorder
 emits each stage's pass index, element/node/DOF count, global η and mark counts
 into `manifest.json`; `for_each_solve_beat` scales that sequence uniformly into
-the 27.0 s solve act without dropping a phase.
+the 24.0 s solve act without dropping a phase.
 
 The published wishbone stage is 40,170 tet4 cells / 9,796 nodes / 29,388 DOF,
 with 0.0200003 minimum and 0.249598 mean cell quality. The distributed 47.17 kN
@@ -382,11 +371,13 @@ thousand of the bottom of the colormap.
 
 **The shape is exaggerated, and the physical answer is not.** After
 `CinemaState::adopt_final_result`, the studio computes
-`scale = 0.12 × bbox_diagonal / max_displacement` from that same final result,
-and draws exactly `x + scale·u`. True displacement, shown displacement, factor
-and fraction are printed into the manifest and remain on screen through the
-ramp and hold. Before frame zero, the camera includes both rest and fully
-exaggerated node positions.
+`scale = 0.04 × bbox_diagonal / max_displacement` from that same final result,
+down from the previous 0.12. It draws exactly `x + scale·u`. A translucent
+undeformed CAD surface is rendered first without depth writes, then the
+deformed measured result is drawn normally, so the ghost cannot occlude or
+alter it. True displacement, displayed displacement, factor and fraction are
+recorded in the manifest. The camera includes both rest and fully displayed
+node positions before frame zero.
 
 ### Material
 
@@ -396,9 +387,9 @@ The recorder sets `material 200 0.3` before advisor inference and solving.
 Lamé parameters
 `λ = Eν / ((1+ν)(1−2ν))` and `μ = E / (2(1+ν))`; assembly uses
 `K_e = ∫ BᵀD(E,ν)B dV`, and stress recovery applies the same `D` to `ε = Bu`.
-Invalid E or ν now fails before assembly. The equation board shows the actual
-E = 200 GPa and ν = 0.3 rather than relying on GUI defaults or an unlabeled
-constitutive matrix.
+Invalid E or ν fails before assembly. The compact symbolic board keeps the
+constitutive chain visible; exact E, ν, solver and counts remain in the manifest
+and bottom ledger rather than another prose panel.
 
 ### Which solver ran
 

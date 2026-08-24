@@ -664,44 +664,41 @@ fields, which is how the GUI's solve is cross-checked against the CLI's.)
   0.00329 mm physical peak displacement. Its global ZZ indicator is 20.69% and
   remains visible as verification evidence; this is not labelled reference truth.
 
-  The exact-CAD chapter shows measured curvature, frequency modes and the
-  reconstructed curve as geometry analysis. Geometry-curvature grading is
-  disabled for this hero; the real solve uses a uniform wall-resolving target.
-  Support glyphs and the resultant-force arrow remain anchored to their selected
-  regions through the displayed deformation. During the exact linear load ramp,
-  the arrow length and numeric resultant scale by the displayed λ.
+  The opening now starts in a shaded assembly context. Procedural neighbouring
+  hardware is anchored to the real fixture/load interface positions, clearly
+  excluded from the solved model, then strips outward to expose the wishbone.
+  The selected exact CAD edge is projected from its ordered samples; three
+  adjacent points, tangent/normal construction, measured curvature signal and
+  FFT animate together. The old full-part wireframe opening is gone.
 
-  The advisor uses four wide activation lanes rather than four compressed
-  portrait columns. Every node remains a circle sized/coloured by the deployed
-  graph's own tensor, and every shown connection remains one of the strongest
-  measured $|w_{ji}a_i|$ paths. A restrained input→hidden→output timing band
-  advances once per measured forward pass without changing those values. For
-  this new descriptor combination the OOD check places the case outside the
-  calibrated envelope, so the advisor abstains rather than extrapolating. The
-  configured, independently verified baseline remains authoritative while the
-  later real mesh lands through a compact, explicitly sequential flow trace.
+  The advisor uses four activation lanes. Every node remains sized/coloured by
+  the deployed graph's own tensor, and every shown connection remains one of the
+  strongest measured $|w_{ji}a_i|$ paths. Counts, signed response, the
+  input→hidden→output wave and a decision→mesh glyph replace the previous prose
+  blocks and raw-looking labels. The OOD check still abstains outside the
+  calibrated envelope; the configured, independently verified baseline remains
+  authoritative while real cells replace the shaded CAD body in place.
 
-  Chapter boundaries preserve causality on the same part instead of clearing to
-  a generic wireframe: target-h rings yield to emitted cells; the advisor
-  outcome yields to the mesh audit; the authoritative mesh yields to stress;
-  stress yields to the recovered gradient; the preceding measured field yields
-  to ZZ error; and that error remains beneath the topology transition it
-  requested. Both supports and the force arrow persist throughout.
+  Chapter boundaries preserve causality on the same part: assembly context peels
+  away; exact edge samples become $\kappa(s)$ and its spectrum; the CAD surface
+  yields locally to emitted cells; the mesh yields to stress, gradient and ZZ
+  fields. The cell microscope shows one actual-order tetrahedron assembling into
+  a connected multi-cell patch, with real midside nodes when a quadratic run is
+  shown, rather than two duplicate cell diagrams.
 
-  The solver pane is a teaching surface rather than a wall of notation. It keeps
-  one active engineering equation and pairs it with real data from the same
-  `SolveStage`: a cached nodal stress/gradient distribution, global ZZ error
-  against the configured target, before/after refinement counts, or the exact
-  linear $\lambda$ response. These are spatial distributions, never time
-  histories. Colour and histogram ranges use the measured 99th percentile so
-  isolated constrained-region peaks cannot hide the rest of the part; the true
-  maxima remain on screen and in the manifest.
+  Support symbols reveal independently. The force arrow grows from outside the
+  model and terminates on the loaded region; during the exact linear load ramp,
+  its length and numeric resultant scale by the displayed λ. Final deformation
+  is limited to 4% of the model diagonal, down from 12%, and a translucent
+  undeformed CAD surface remains behind the exaggerated result. Compact symbolic
+  boards and measured histograms replace explanatory paragraphs; p99 colour
+  caps, physical maxima and manifest values remain authoritative.
 
   Framing is solved from all eight corners with the settled viewport aspect and
-  includes the full displayed deformation envelope before frame zero. The
-  horizontal caption ledger spends its formerly empty right side on the
-  plain-language disclosure and keeps provenance full-width below. The poster
-  comes from the first frame after the analysis pane has finished opening.
+  includes the complete rest-to-4%-displayed deformation envelope before frame
+  zero. The bottom ledger is deliberately sparse: active symbols and necessary
+  numbers on the left, optional measurement note on the right, provenance below.
+  The poster comes from the first fully composed opening frame.
 
   Every panel consumes production data: ONNX trunk taps and exported weights;
   `pipeline::build_refinement_plan`; captured `MeshStage`/`SolveStage` meshes;

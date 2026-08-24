@@ -243,6 +243,10 @@ struct CinemaSizingStory {
     std::vector<double> stations;
     std::vector<double> curvature_raw;
     std::vector<double> curvature_filtered;
+    /// Exact ordered samples of the CAD edge whose discrete curvature produced
+    /// `curvature_raw`. Kept independently of optional size-field samples so a
+    /// uniform-mesh take can still show the real extraction geometry.
+    std::vector<Eigen::Vector3d> curve_points;
     /// Magnitudes and the exact retention mask of the even-reflected FFT used
     /// by `geom::lowpass_signal`; DC is included at index zero.
     std::vector<double> curve_spectrum;

@@ -25,12 +25,12 @@ stdout.
 | Analysis pane | 0.42 of the width. Exact-CAD evidence → four wide activation lanes → cell audit → active-equation graph, with direct opacity handoffs. During build the measured final pass remains visible while the later real mesh lands. |
 | Bottom ledger | Constant height, horizontally composed: headline/numbers left, plain-language disclosure right, provenance full-width below. |
 | Camera | Fit before frame zero by solving the perspective inequalities on all eight corners at the settled pane aspect, then re-fit to the exact rest∪fully-exaggerated result envelope. It never moves during the captured take. |
-| Mechanics overlay | Two support glyphs and one force arrow are anchored to the selected CAD regions and persist through every act. The arrow direction and magnitude come from the real resultant. |
+| Mechanics overlay | Two support glyphs and one force arrow are anchored to the selected CAD regions and persist through every act. Their soft pulse is presentation-only. During the exact linear load ramp the arrow length and stated resultant scale by the displayed λ; direction comes from the real resultant. |
 ### What is interpolated
 
 Time, opacity, the shrink-toward-centroid reveal, the spatial handoff front, the
-pre/post-filter spacing-glyph morph, and the load factor λ. That is the whole
-list.
+pre/post-filter spacing-glyph morph, the presentation-only pulse phases, and the
+load factor λ. That is the whole list.
 
 No displayed **number** is ever interpolated. The opening rings interpolate
 marker diameter and colour between two measured target-h evaluations; their
@@ -89,11 +89,12 @@ because interpolating it is exact rather than approximate — see
 ## Act 2 — `deliberate`: choosing a mesh
 
 The first 65% of the act shows one real forward pass per beat in chooser order:
-one per candidate and one final re-score. The default records 38 + 1 = 39 passes
-at 0.15 s each. The remaining 3.15 s holds the final re-score/refusal state at
-full size, and the 1.6 s decision lead at the start of the next act extends that
-inspectable hold. Candidate-specific prose does not flash during the pass lane:
-the strip keeps one stable explanation while the network itself carries motion.
+108 candidate actions and one final re-score. At the default 60 s duration the
+109 measured passes use a 53.7 ms display beat; the remaining 3.15 s holds the
+final state, and the 1.6 s decision lead at the start of the next act extends
+that inspectable hold. Candidate-specific prose does not flash during the pass
+lane: the strip keeps one stable explanation while the network itself carries
+motion.
 
 The feature panel and full on-part target-spacing field enter this act intact.
 Over the first 1.3 s the panel cross-fades into four wide activation lanes while
@@ -117,6 +118,10 @@ consumer of the field just shown, not a fresh scene over an empty wireframe.
   `activation_layout.json` edge blocks (96×81, 96×96, 20×96). Opacity is the
   replay channel during build; stroke width remains the measured normalised
   `|w_ji · a_i|` so animation does not change the encoded magnitude.
+- **Lane motion is a timing cue, not another value.** During candidate scoring,
+  a subdued band advances input → hidden 1 → hidden 2 → outputs once per pass.
+  During mesh construction the same bands follow `activation_wave`. Node fill,
+  radius, sign and every connection rank remain the recorded tensors.
 - **Head names are plain language.** Every head remains a measured circle in the
   output lane; the selected head is named in the decision chip, while this file
   carries the complete mapping. `activation_layout.json` is not rewritten.
@@ -146,33 +151,35 @@ consumer of the field just shown, not a fresh scene over an empty wireframe.
 
 - During the pass lane the strip reports only measured pass/candidate/gate data.
   The final state names one of four outcomes without conflation: applied action,
-  measured veto, unrecognised action, or unavailable advisor.
+  advisor abstention, unrecognised action, or unavailable advisor.
 - For the wishbone's new descriptor combination, the OOD distance is unavailable.
-  The safety gate abstains, the proposal is not applied, and the fallback remains explicit.
+  The advisor abstains and the configured baseline remains authoritative.
 
 ## Act 3 — `build`: the mesher executing the decision
 
 The advisor outcome is held for `CinemaState::kDecisionLead` (1.6 s). The
-wishbone is vetoed as out of distribution, so the explicit fallback remains
-authoritative: structural steel, a fine wall-resolving tet4 target, complete ZZ
-verification without an implied remesh, and explicit direct LDLT. The base mesh
-resolves each thin member with 4–6 elements; the opening FFT is geometry
-analysis, not a sizing input.
+wishbone is outside the calibrated descriptor envelope, so the configured
+baseline remains authoritative: structural steel, a fine wall-resolving tet4
+target, complete ZZ verification without an implied remesh, and explicit direct
+LDLT. The base mesh resolves each thin member with 4–6 elements; the opening FFT
+is geometry analysis, not a sizing input.
 
-- During build the measured refusal pass remains visible. A halo/connection
-  opacity wave travels through the fixed tensor values; only after it reaches
-  the output lane do the later real snapshot's cells land. The strip says
+- During build the measured OOD-check state remains visible. A restrained
+  halo/connection wave travels through the fixed tensor values; only after it
+  reaches the output lane do the later real snapshot's cells land. A compact
+  bridge pill, five moving dots and a pulsing target ring show presentation
+  direction without claiming concurrency. The strip says
   **aligned replay · computed sequentially**.
 - The 0.22-alpha target-spacing map carried from advisor scoring fades only as
   real cells replace it in place. There is no clear/reset.
 - An accepted decision still writes mesher, `h = h_rel × bbox diagonal`, adapt
-  passes, η target and order into `SimSetup`. A refusal or unrecognised mesher is
-  never substituted silently.
+  passes, η target and order into `SimSetup`. An abstention or unrecognised
+  mesher never silently changes the configured baseline.
 - Order above 2 maps to the one supported quadratic promotion
   (tet4/hex8 → tet10/hex20), and the executed order is displayed.
 - **Stages are the mesher's own.** `pipeline::MeshStage` snapshots retain their
   real ids, pass, element/node counts and order in the manifest. The film folds
-  them into the refusal→fallback handoff rather than reserving a separate
+  them into the advisor-outcome handoff rather than reserving a separate
   “converting to solver elements” chapter:
 
   | Manifest label | Stage id | What had finished |
@@ -335,6 +342,11 @@ storage order. The ending frame is exactly the mesh the next pass solved.
 ### Load ramp
 
 λ from 0 to 1, linear and never eased.
+
+The force overlay follows the same exact λ: arrow length and its numeric kN
+label scale from zero to the recorded full resultant, while its direction stays
+fixed. The small support/force glows and advisor-lane pulses are explicitly
+presentation timing cues; they encode no additional mechanical quantity.
 
 `u(λ) = λ·u` and `σ(λ) = λ·σ` are **exact**, so every frame of the ramp is the
 real solution of a real load case and not an interpolation between two pictures.

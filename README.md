@@ -22,16 +22,18 @@ The four chapters are concise and visual:
   Real edge-curvature samples become frequency bars and a reconstructed curve.
   Geometry-curvature grading is disabled for this hero, so the panel labels that
   FFT as analysis; the real solve uses one uniform wall-resolving target. The
-  support glyphs and force arrow remain anchored to their selected regions.
-- **Advisor → mesh.** The deployed ONNX graph runs all 39 measured forward
-  passes in four wide activation lanes. Its safety gate cannot establish an OOD
-  distance for this new descriptor combination, so it abstains instead of
-  pretending the recommendation is validated. The film holds that measured
-  refusal and visibly hands it to the verified fallback while real `MeshStage`
-  cells land, labelled as an aligned replay of sequential work.
-- **Mesher.** The verified fallback uses a fine wall-resolving tet4 target.
+  support glyphs and force arrow remain anchored to their selected regions; the
+  arrow scales with the exact displayed load factor during the closing ramp.
+- **Advisor → mesh.** The deployed ONNX graph runs all 109 measured forward
+  passes in four wide activation lanes. A restrained feed-forward band makes
+  each pass readable without changing any tensor value. Its OOD check places
+  this new descriptor combination outside the calibrated envelope, so the
+  advisor abstains rather than extrapolating. The configured, independently
+  verified baseline remains authoritative while real `MeshStage` cells land;
+  a compact flow trace labels the views as a sequential replay.
+- **Mesher.** The configured baseline uses a fine wall-resolving tet4 target.
   Its complete ZZ verification field is shown and reported without implying a
-  hidden remesh. The refusal trace remains until the finished mesh audit
+  hidden remesh. The advisor outcome remains until the finished mesh audit
   replaces it, and the old standalone “converting to solver elements” beat is
   gone. The manifest records every emitted stage in its original order.
 - **Analysis.** The authoritative final solve supplies the viewport and teaching
@@ -50,12 +52,13 @@ reference-truth benchmark.
 
 The chapters are one continuous handoff rather than five resets. Target-spacing
 rings remain on the CAD as advisor scoring begins and yield only where cells
-arrive. The refusal/fallback trace persists into the finished mesh. That mesh
+arrive. The advisor-outcome trace persists into the finished mesh. That mesh
 stays visible while stress arrives; stress remains ahead of the gradient front;
 the preceding measured field remains ahead of ZZ error; and the error map stays
 under the topology change it requested. Both fixed supports and the force arrow
 remain anchored through every chapter, following the displayed final
-deformation where appropriate.
+deformation where appropriate. Support rings, feed-forward bands and flow dots
+provide deterministic motion cues without masquerading as measured quantities.
 
 Nothing in the take is a mock-up. Network nodes are the graph's own trunk
 tensors, connection strength is measured $|w_{ji}a_i|$, and mesh frames are

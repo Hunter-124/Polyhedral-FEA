@@ -28,7 +28,7 @@
     "description": "conserved resultant on the connected curved cone+scoop exterior"
   },
   "advisor": {
-    "policy": "run the deployed explanation and keep this configured mesh unchanged on refusal",
-    "expected_outcome": "out-of-distribution refusal"
+    "policy": "run the deployed explanation and retain this configured baseline when the advisor abstains",
+    "expected_outcome": "out-of-distribution abstention"
   }
 }

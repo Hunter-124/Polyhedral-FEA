@@ -52,7 +52,7 @@ namespace {
 ///
 /// Candidate-specific prose is deliberately absent from the fast pass lane.
 /// The network is the motion there; the strip carries one stable explanation.
-constexpr std::array<double, kCinemaActCount> kActFraction = {0.13, 0.15, 0.18, 0.09, 0.45};
+constexpr std::array<double, kCinemaActCount> kActFraction = {0.20, 0.15, 0.17, 0.08, 0.40};
 double beat_seconds(SolvePhase phase) {
     switch (phase) {
     case SolvePhase::kStressSweep:
@@ -220,42 +220,6 @@ std::string_view head_name(std::string_view tensor) {
     return tensor;
 }
 
-/// Plain-English names for `pipeline::kMeshStageNames`, in the same spirit: the
-/// stage ids are the pipeline's stable vocabulary and stay in the manifest, and
-/// what the film says is what the step did.
-std::string_view stage_name(std::string_view stage) {
-    if (stage == "lattice") {
-        return "laying down the cell grid";
-    }
-    if (stage == "expand") {
-        return "splitting hexes into pyramids";
-    }
-    if (stage == "snap") {
-        return "pulling the surface onto the CAD";
-    }
-    if (stage == "peel") {
-        return "removing the cells the snap flattened";
-    }
-    if (stage == "reproject") {
-        return "re-projecting the stragglers";
-    }
-    if (stage == "smooth") {
-        return "evening out the surface spacing";
-    }
-    if (stage == "resnap") {
-        return "snapping what moved, again";
-    }
-    if (stage == "pin") {
-        return "pinning CAD edges and corners";
-    }
-    if (stage == "fill") {
-        return "converting to solver elements";
-    }
-    if (stage == "ship") {
-        return "final checks";
-    }
-    return stage;
-}
 
 /// Plain-English names for the mesher vocabulary `pipeline::mesher_name`
 /// returns. The vocabulary strings themselves are what the model was trained on
@@ -837,17 +801,17 @@ CinemaCue cinema_cue(const CinemaState& state) {
     // state is not erased at the act boundary: it crosses into advisor scoring
     // and then remains dimly on the part until actual cells replace it.
     if (cue.act == CinemaAct::kSkeleton) {
-        const double wait = 0.08 * cue.act_span;
-        const double slide = 0.14 * cue.act_span;
+        const double wait = 0.28 * cue.act_span;
+        const double slide = 0.10 * cue.act_span;
         cue.panel_open = static_cast<float>(
             smoothstep((cue.act_t - wait) / std::max(slide, 1.0e-9)));
         const double p = cue.act_t / std::max(cue.act_span, 1.0e-9);
-        cue.spectral_edge_reveal = smoothstep((p - 0.08) / 0.20);
-        cue.spectral_spectrum_reveal = smoothstep((p - 0.24) / 0.22);
-        cue.spectral_filter_mix = smoothstep((p - 0.42) / 0.25);
-        cue.spectral_field_reveal = smoothstep((p - 0.56) / 0.30);
+        cue.spectral_edge_reveal = smoothstep((p - 0.32) / 0.23);
+        cue.spectral_spectrum_reveal = smoothstep((p - 0.52) / 0.18);
+        cue.spectral_filter_mix = smoothstep((p - 0.68) / 0.16);
+        cue.spectral_field_reveal = smoothstep((p - 0.80) / 0.18);
         cue.spectral_overlay_alpha =
-            static_cast<float>(smoothstep((p - 0.05) / 0.08));
+            static_cast<float>(smoothstep((p - 0.28) / 0.10));
     } else if (cue.act == CinemaAct::kDeliberate) {
         cue.spectral_edge_reveal = 1.0;
         cue.spectral_spectrum_reveal = 1.0;
@@ -1038,7 +1002,7 @@ CinemaCue cinema_cue(const CinemaState& state) {
     return cue;
 }
 
-Viewport::CinemaView cinema_view(const CinemaState& state, const CinemaCue& cue) {
+Viewport::CinemaView cinema_view(const CinemaState&, const CinemaCue& cue) {
     Viewport::CinemaView view;
     view.edges = true;
     view.edge_alpha = kMeshEdgeAlpha;
@@ -1051,9 +1015,15 @@ Viewport::CinemaView cinema_view(const CinemaState& state, const CinemaCue& cue)
             kRevealShrink * (1.0 - smoothstep(std::min(1.0, reveal / kRevealShrinkFraction))));
     };
     switch (cue.act) {
-    case CinemaAct::kSkeleton:
-        view.skeleton_alpha = static_cast<float>(
-            smoothstep(state.t / std::max(cinema_opening_fade(state), 1.0e-9)));
+    case CinemaAct::kSkeleton: {
+        const double p = cue.act_t / std::max(cue.act_span, 1.0e-9);
+        view.model_alpha = 1.0f;
+        view.assembly_strip =
+            static_cast<float>(smoothstep((p - 0.12) / 0.24));
+        view.assembly_alpha =
+            static_cast<float>(1.0 - smoothstep((p - 0.18) / 0.22));
+        view.skeleton_alpha =
+            static_cast<float>(0.16 * smoothstep((p - 0.30) / 0.14));
         view.reveal = 0.0f;
         view.mesh_alpha = 0.0f;
         view.shrink = 1.0f;
@@ -1062,10 +1032,13 @@ Viewport::CinemaView cinema_view(const CinemaState& state, const CinemaCue& cue)
         view.spectral_filter_mix = static_cast<float>(cue.spectral_filter_mix);
         view.spectral_overlay_alpha = cue.spectral_overlay_alpha;
         break;
+    }
     case CinemaAct::kDeliberate:
-        // The completed spacing field stays on the same part as the deployed
-        // network begins scoring, then settles into a low-opacity input map.
-        view.skeleton_alpha = 1.0f;
+        // Keep the smooth CAD surface as the network consumes the measured
+        // geometry features. The full edge cage is only a faint registration
+        // cue now; it is no longer the hero representation.
+        view.model_alpha = 1.0f;
+        view.skeleton_alpha = 0.07f;
         view.reveal = 0.0f;
         view.mesh_alpha = 0.0f;
         view.shrink = 1.0f;
@@ -1075,9 +1048,10 @@ Viewport::CinemaView cinema_view(const CinemaState& state, const CinemaCue& cue)
         view.spectral_overlay_alpha = cue.spectral_overlay_alpha;
         break;
     case CinemaAct::kBuild:
-        // The target-spacing annotation yields only when the chosen action starts
-        // producing actual cells in those same locations.
-        view.skeleton_alpha = 0.45f;
+        // The shaded CAD body gives way exactly where recorded cells land.
+        view.model_alpha =
+            static_cast<float>(1.0 - smoothstep(cue.mesh_action_reveal));
+        view.skeleton_alpha = 0.05f * view.model_alpha;
         view.reveal =
             cue.stage_index >= 0 ? static_cast<float>(cue.mesh_action_reveal) : 0.0f;
         view.mesh_alpha = 1.0f;
@@ -1110,6 +1084,10 @@ Viewport::CinemaView cinema_view(const CinemaState& state, const CinemaCue& cue)
         break;
     }
     case CinemaAct::kSolve:
+        if (cue.solve_phase == SolvePhase::kLoadRamp ||
+            cue.solve_phase == SolvePhase::kHold) {
+            view.rest_surface_alpha = 0.18f;
+        }
         if (cue.solve_phase == SolvePhase::kRefine) {
             // Start on the exact ZZ field that requested refinement, then lay the
             // exact topology diff over it. Once the field has dissolved, the
@@ -1490,6 +1468,7 @@ void capture_curve_story(CinemaState& state, const geom::CadTopology& topology) 
     state.sizing.curve_spectrum.clear();
     state.sizing.curve_mode_kept.clear();
     state.sizing.edge_points.clear();
+    state.sizing.curve_points.clear();
     state.sizing.edge_h_before.clear();
     state.sizing.edge_h_after.clear();
     double best_score = -1.0;
@@ -1538,7 +1517,7 @@ void capture_curve_story(CinemaState& state, const geom::CadTopology& topology) 
         state.sizing.stations = std::move(stations);
         state.sizing.curvature_raw = edge.kappa_samples;
         state.sizing.curvature_filtered = std::move(filtered);
-        state.sizing.edge_points = edge.samples;
+        state.sizing.curve_points = edge.samples;
     }
     capture_curve_spectrum(state.sizing);
 }
@@ -1564,6 +1543,19 @@ void build_cinema_skeleton(CinemaState& state, const pipeline::Model& model,
             state.load_markers.push_back({region, *position, load.force});
         }
     }
+
+    std::vector<Eigen::Vector3d> support_positions;
+    support_positions.reserve(state.support_markers.size());
+    for (const auto& marker : state.support_markers) {
+        support_positions.push_back(marker.position);
+    }
+    std::vector<Eigen::Vector3d> load_positions;
+    load_positions.reserve(state.load_markers.size());
+    for (const auto& marker : state.load_markers) {
+        load_positions.push_back(marker.position);
+    }
+    viewport.set_cinema_assembly_context(
+        support_positions, load_positions, state.subject_center, state.model_diagonal);
 
     if (model.cad && !model.cad->empty()) {
         try {
@@ -1961,102 +1953,51 @@ void draw_cinema_equations(const CinemaState& state, const CinemaCue& cue,
     const bool on_refine = phase == SolvePhase::kRefine || phase == SolvePhase::kRefineHold;
     const bool on_ramp = phase == SolvePhase::kLoadRamp || phase == SolvePhase::kHold;
 
-    std::string title = "Structural solve — the numbers become a picture";
-    std::string explain =
-        "The same measured field on the part is summarised here for a fast engineering read.";
-    std::string live = "waiting for an authoritative solve stage";
-    std::string technical;
     Runs equation{plain("K u = f", palette.accent)};
-
     const CinemaHistogram* histogram = nullptr;
     const char* histogram_unit = "";
     double histogram_scale = 1.0;
     if (stage != nullptr && on_stress) {
-        title = "Stress distribution — where the material works hardest";
-        explain =
-            "Each bar counts mesh nodes in a von Mises stress range; this is space, not time.";
-        equation = {plain("K u = f   ·   ε = B u   ·   σ = D(E,ν) ε   ·   σ", palette.text),
-                    sub("vm", palette.text), plain(" = equivalent stress", palette.text)};
-        live = fmt("peak %.4g MPa · mean over %s solved nodes",
-                   stage->result.max_von_mises / 1e6,
-                   grouped(stage->result.von_mises.size()).c_str());
+        equation = {plain("K u = f   ·   ε = B u   ·   σ = D ε   ·   σ", palette.text),
+                    sub("vm", palette.text)};
         if (stage_index < state.stress_histograms.size()) {
             histogram = &state.stress_histograms[stage_index];
             histogram_unit = "MPa";
             histogram_scale = 1e-6;
         }
     } else if (stage != nullptr && on_gradient) {
-        title = "Stress gradient — how quickly the field changes";
-        explain =
-            "Tall bars mean many nodes share that change rate; the far right locates sharp hot spots.";
-        equation = {plain("|∇σ", palette.text), sub("vm", palette.text),
-                    plain("| from a least-squares fit over each node's cells", palette.text)};
-        const double gmax = const_cast<CinemaState&>(state).gradient_max(stage_index);
-        live = gmax > 0.0 ? fmt("steepest %.4g MPa/mm · spatial node distribution", gmax / 1e9)
-                          : std::string("no gradient could be recovered on this pass");
+        equation = {plain("|∇σ", palette.text), sub("vm", palette.text), plain("|", palette.text)};
         histogram = &const_cast<CinemaState&>(state).gradient_histogram(stage_index);
         histogram_unit = "MPa/mm";
         histogram_scale = 1e-9;
     } else if (stage != nullptr && on_error) {
-        title = "Estimated discretisation error — is the mesh fine enough?";
-        explain =
-            "The measured ZZ indicator is compared with the requested stopping target.";
         equation = {plain("η", palette.text), sub("e", palette.text),
                     plain(" = ‖σ* − σ", palette.text), sub("h", palette.text),
                     plain("‖", palette.text), sub("E,e", palette.text),
                     plain(" / ‖σ", palette.text), sub("h", palette.text),
                     plain("‖", palette.text), sub("E,Ω", palette.text)};
-        live = fmt("global estimate %.3g%% · target %.3g%%", stage->trace.global_eta * 100.0,
-                   hud.eta_target * 100.0);
     } else if (stage != nullptr && on_refine) {
-        title = "Adaptive refinement — spend cells where error is concentrated";
-        explain =
-            "The largest local indicators are marked first, then the next real mesh replaces them.";
         equation = {plain("Σ", palette.text), sub("marked", palette.text),
                     plain(" η", palette.text), sub("e", palette.text),
                     sup("2", palette.text), plain(" ≥ θ Σ", palette.text),
                     sub("all", palette.text), plain(" η", palette.text),
                     sub("e", palette.text), sup("2", palette.text)};
-        live = fmt("%s cells marked · pass %zu → pass %zu",
-                   grouped(stage->trace.n_h_mark).c_str(), stage_index, stage_index + 1);
     } else if (stage != nullptr && on_ramp) {
-        title = "Load response — force, stress and deflection rise together";
-        explain =
-            "Linear elastostatics puts stress and displacement on the same exact straight line.";
-        equation = {plain("u(λ) = λu   ·   σ(λ) = λσ   ·   f(λ) = λf", palette.text)};
-        live = fmt("λ %.3f · %.4g kN · %.4g MPa · %.4g mm physical deflection",
-                   cue.load_factor, cue.load_factor * hud.load_newtons / 1e3,
-                   cue.load_factor * stage->result.max_von_mises / 1e6,
-                   cue.load_factor * stage->result.max_displacement * 1e3);
+        equation = {plain("u(λ) = λu₁   ·   σ(λ) = λσ₁   ·   f(λ) = λf₁",
+                          palette.text)};
     }
 
-    const std::string_view token = cinema_solver_token(state);
-    const char* method = token == "direct_ldlt"
-                             ? "direct LDLT"
-                             : (token == "cg" ? "conjugate gradient" : "method not reported");
-    if (stage != nullptr) {
-        technical = fmt("%s unknowns · %s · E %.6g GPa · ν %.4g",
-                        grouped(stage->trace.n_dof).c_str(), method,
-                        hud.youngs_modulus / 1e9, hud.poissons_ratio);
-    }
 
-    dl->AddText(font, type.caption, origin, faded(palette.text, alpha), title.c_str());
-    dl->AddText(font, type.legend,
-                ImVec2(origin.x, origin.y + type.caption * 1.45f),
-                faded(palette.text_dim, alpha), explain.c_str(), nullptr, region.x);
-    const float equation_y = origin.y + type.caption * 3.05f;
+    const float equation_y = origin.y + 10.0f;
     const float equation_w = runs_width(font, type.caption, equation);
     const float equation_size =
         equation_w > region.x && equation_w > 0.0f
             ? std::max(12.0f, type.caption * region.x / equation_w)
             : type.caption;
     draw_runs(dl, font, equation_size, ImVec2(origin.x, equation_y), equation, alpha);
-    dl->AddText(font, type.label,
-                ImVec2(origin.x, equation_y + type.caption * 1.45f),
-                faded(palette.accent, alpha), live.c_str(), nullptr, region.x);
 
-    const float pipeline_h = type.legend * 4.8f;
-    const float chart_top = equation_y + type.caption * 3.0f;
+    const float pipeline_h = type.legend * 3.4f;
+    const float chart_top = equation_y + type.caption * 2.0f;
     const float chart_bottom = origin.y + region.y - pipeline_h;
     const float chart_h = std::max(180.0f, chart_bottom - chart_top);
     const ImVec2 chart_min(origin.x, chart_top);
@@ -2126,7 +2067,7 @@ void draw_cinema_equations(const CinemaState& state, const CinemaCue& cue,
         const double target = hud.eta_target * 100.0;
         const double scale = std::max({measured, target, 1.0e-12});
         const std::array<double, 2> values{{target, measured}};
-        const std::array<const char*, 2> labels{{"requested target", "measured estimate"}};
+        const std::array<const char*, 2> labels{{"η*", "ηZZ"}};
         const std::array<ImVec4, 2> colors{{palette.text_dim, palette.accent}};
         const float bar_w = (right - left) * 0.22f;
         for (std::size_t i = 0; i < values.size(); ++i) {
@@ -2149,7 +2090,7 @@ void draw_cinema_equations(const CinemaState& state, const CinemaCue& cue,
                                       ? state.solve_stages[stage_index + 1].trace.n_elems
                                       : before;
         const std::array<std::size_t, 2> counts{{before, after}};
-        const std::array<const char*, 2> labels{{"before", "after"}};
+        const std::array<const char*, 2> labels{{"n", "n+1"}};
         const std::size_t max_count = std::max<std::size_t>({before, after, 1});
         const float bar_w = (right - left) * 0.24f;
         for (std::size_t i = 0; i < counts.size(); ++i) {
@@ -2180,18 +2121,8 @@ void draw_cinema_equations(const CinemaState& state, const CinemaCue& cue,
         dl->AddCircleFilled(ImVec2(x, y), 9.0f, faded(palette.accent, alpha));
         dl->AddCircle(ImVec2(x, y), 15.0f,
                       faded(palette.accent_soft_top, 0.55f * alpha), 0, 2.0f);
-        dl->AddText(font, type.legend, ImVec2(left, bottom + 8.0f),
-                    faded(palette.text_dim, alpha), "0 load");
-        dl->AddText(font, type.legend,
-                    ImVec2(right - type.legend * 4.3f, bottom + 8.0f),
-                    faded(palette.text_dim, alpha), "full load");
-        dl->AddText(font, type.label, ImVec2(left + 8.0f, top + 8.0f),
-                    faded(palette.text, alpha),
-                    "stress ratio = displacement ratio = λ");
     }
 
-    static constexpr std::array<const char*, 6> kSteps{
-        {"solve", "stress", "gradient", "estimate", "refine", "response"}};
     int active = 0;
     if (on_stress) {
         active = 1;
@@ -2204,26 +2135,21 @@ void draw_cinema_equations(const CinemaState& state, const CinemaCue& cue,
     } else if (on_ramp) {
         active = 5;
     }
-    const float chips_y = chart_max.y + type.legend * 0.55f;
-    const float gap = 5.0f;
-    const float chip_w = (region.x - gap * 5.0f) / 6.0f;
-    for (std::size_t i = 0; i < kSteps.size(); ++i) {
-        const float x = origin.x + static_cast<float>(i) * (chip_w + gap);
-        const bool lit_step = static_cast<int>(i) == active;
-        dl->AddRectFilled(ImVec2(x, chips_y),
-                          ImVec2(x + chip_w, chips_y + type.legend * 2.0f),
-                          faded(lit_step ? palette.accent_mid : palette.panel_bg,
-                                alpha * (lit_step ? 0.82f : 0.55f)),
-                          5.0f);
-        dl->AddText(font, type.legend,
-                    ImVec2(x + 7.0f, chips_y + type.legend * 0.42f),
-                    faded(lit_step ? palette.text : palette.text_dim, alpha),
-                    kSteps[i]);
-    }
-    if (!technical.empty()) {
-        dl->AddText(font, type.legend,
-                    ImVec2(origin.x, chips_y + type.legend * 2.45f),
-                    faded(palette.text_dim, alpha), technical.c_str(), nullptr, region.x);
+    const float rail_y = chart_max.y + type.legend * 1.15f;
+    const float rail_left = origin.x + 20.0f;
+    const float rail_right = origin.x + region.x - 20.0f;
+    dl->AddLine(ImVec2(rail_left, rail_y), ImVec2(rail_right, rail_y),
+                faded(palette.text_dim, 0.45f * alpha), 2.0f);
+    for (int i = 0; i < 6; ++i) {
+        const float x = rail_left + (rail_right - rail_left) *
+                                        static_cast<float>(i) / 5.0f;
+        const bool lit = i <= active;
+        dl->AddCircleFilled(ImVec2(x, rail_y), lit ? 7.0f : 4.5f,
+                            faded(lit ? palette.accent : palette.text_dim, alpha));
+        if (i == active) {
+            dl->AddCircle(ImVec2(x, rail_y), 13.0f,
+                          faded(palette.accent_soft_top, 0.65f * alpha), 0, 2.0f);
+        }
     }
     ImGui::Dummy(ImVec2(region.x, std::max(1.0f, region.y - 2.0f)));
 }
@@ -2237,8 +2163,7 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
     (void)cue;
     (void)type;
     ImGui::TextColored(palette.status_warn,
-                       "no network to draw: this polymesh-gui was built with "
-                       "POLYMESH_WITH_ADVISOR=OFF");
+                       "advisor support is not compiled into this build");
     ImGui::TextWrapped("%s", state.advisor_note.c_str());
 #else
     if (!state.explanation || state.layout.empty()) {
@@ -2349,53 +2274,17 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
         }
     }
 
-    // ---- what the panel says, before anything is placed ------------------
-    // Two lines, not six. The exhaustive version of these disclosures — every
-    // normalisation constant, every edge block shape, the exact colormap — is
-    // in docs/assets/cinema/NOTES.md, which the strip names on screen. Six
-    // stacked paragraphs at 13 px was a wall nobody read; two at 22 px is a
-    // caption people do.
-    std::string caption =
-        "the deployed network scoring one candidate mesh per beat — its own tensors";
-    if (cue.chosen_pass_held) {
-        if (state.decision_applied) {
-            caption =
-                "the measured pass that chose this mesh — replayed while its real cells land";
-        } else if (state.decision_vetoed) {
-            caption =
-                "the measured OOD check — the configured baseline remains active";
-        } else if (state.decision_unrecognized) {
-            caption =
-                "the measured pass named an unavailable mesher — the studio setup remains";
-        }
-    }
-    const std::string legend =
-        frame == nullptr
-            ? std::string("structure only: no forward pass is being shown on this beat")
-            : fmt("%zu strongest of %zu connections · circle size is how hard a unit is "
-                  "firing · blue is negative, red positive · head names in plain language",
-                  drawn, total_connections);
+    // The network is the explanation: measured nodes, measured signed edges,
+    // and a timed feed-forward pulse. Prose belongs in NOTES.md, not over the
+    // graph.
 
     // ---- geometry, derived from the measured text ------------------------
     ImFont* font = type.font != nullptr ? type.font : ImGui::GetFont();
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const ImVec2 origin = ImGui::GetCursorScreenPos();
     const ImVec2 region = ImGui::GetContentRegionAvail();
-    const float wrap = std::max(120.0f, region.x);
-
-    const auto para_h = [&](float size, const std::string& s) {
-        return font->CalcTextSizeA(size, FLT_MAX, wrap, s.c_str()).y +
-               std::floor(size * 0.35f);
-    };
-    const float caption_h = para_h(type.caption, caption);
-    const float legend_h = para_h(type.legend, legend);
-    dl->AddText(font, type.caption, origin, faded(palette.text, alpha), caption.c_str(),
-                nullptr, wrap);
-
-    const float graph_top = origin.y + caption_h;
-    const float graph_h = std::max(140.0f, region.y - caption_h - legend_h);
-    dl->AddText(font, type.legend, ImVec2(origin.x, graph_top + graph_h),
-                faded(palette.text_dim, alpha), legend.c_str(), nullptr, wrap);
+    const float graph_top = origin.y + 4.0f;
+    const float graph_h = std::max(140.0f, region.y - 4.0f);
 
     const auto& heads = layout.layers[3];
     int winner = -1;
@@ -2421,9 +2310,7 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
     constexpr float kSidePad = 14.0f;
     const float header_h = std::floor(type.legend * 1.25f);
     const float chip_h =
-        frame != nullptr
-            ? std::floor(type.label * (state.decision_applied ? 3.0f : 4.5f))
-            : 0.0f;
+        frame != nullptr ? std::floor(type.label * 2.5f) : 0.0f;
     const float lanes_top = graph_top + header_h;
     const float lanes_h = std::max(
         120.0f, graph_h - header_h - chip_h - std::floor(type.legend * 0.6f));
@@ -2497,9 +2384,6 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
 
     // ---- nodes, drawn over the connections ------------------------------
     constexpr float kNodeMin = 1.8f;
-    static constexpr std::array<const char*, 4> kLanePlain{
-        {"1  what it measures", "2  hidden layer 1", "3  hidden layer 2",
-         "4  what it predicts"}};
     for (std::size_t l = 0; l < values.size(); ++l) {
         const auto& layer = layout.layers[l];
         if (layer.size == 0) {
@@ -2507,13 +2391,13 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
         }
         const float spacing = band_w / static_cast<float>(layer.size);
         const float r_max = std::clamp(0.46f * spacing, 2.6f, kNodeRadiusMax);
-        const std::string header = std::format("{} · {} units", kLanePlain[l], layer.size);
+        const std::string count = grouped(layer.size);
         dl->AddText(font, type.legend,
                     ImVec2(origin.x + kSidePad,
                            lanes_top + lane_h * static_cast<float>(l)),
                     faded(l == 3 ? palette.accent : palette.text_dim,
                           alpha * wave_strength(static_cast<float>(l))),
-                    header.c_str());
+                    count.c_str());
         const float pulse = wave_strength(static_cast<float>(l));
         for (std::size_t i = 0; i < layer.size; ++i) {
             const float a = values[l] != nullptr ? (*values[l])[i] : 0.0f;
@@ -2539,10 +2423,8 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
         }
     }
 
-    // One readable outcome instead of seventeen overlapping long labels. Every
-    // head node and value remains in the measured row above; NOTES.md carries
-    // the complete name table, while the film names the selected action that
-    // causally continues into the emitted mesh.
+    // Outcome glyph: decision state → mesh. No prose is needed here; the
+    // measured OOD distance or selected action remains the only text.
     if (frame != nullptr) {
         const float chip_top = lanes_top + lanes_h + type.legend * 0.25f;
         dl->AddRectFilled(ImVec2(origin.x, chip_top),
@@ -2550,31 +2432,49 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
                           faded(palette.panel_bg, 0.72f * alpha), 7.0f);
         dl->AddRect(ImVec2(origin.x, chip_top),
                     ImVec2(origin.x + region.x, chip_top + chip_h),
-                    faded(palette.accent, 0.75f * alpha), 7.0f, 0, 1.4f);
-        std::string selected = "ADVISOR RESULT UNAVAILABLE";
+                    faded(palette.accent, 0.62f * alpha), 7.0f, 0, 1.2f);
+        const ImVec2 state_at(origin.x + 28.0f, chip_top + 0.5f * chip_h);
+        const ImVec4 state_color =
+            state.decision_applied ? palette.status_ok : palette.status_warn;
+        dl->AddCircle(state_at, 11.0f, faded(state_color, alpha), 0, 2.2f);
         if (state.decision_applied) {
-            selected = winner >= 0
-                           ? std::format("SELECTED  {}", winner_text)
-                           : std::string("SELECTED  action head unavailable");
-        } else if (state.decision_vetoed) {
-            selected = "ADVISOR ABSTAINED  ·  configured baseline remains active";
-        } else if (state.decision_unrecognized) {
-            selected = "UNRECOGNISED ACTION  ·  studio setup remains";
+            dl->AddLine(ImVec2(state_at.x - 5.0f, state_at.y),
+                        ImVec2(state_at.x - 1.0f, state_at.y + 5.0f),
+                        faded(state_color, alpha), 2.2f);
+            dl->AddLine(ImVec2(state_at.x - 1.0f, state_at.y + 5.0f),
+                        ImVec2(state_at.x + 7.0f, state_at.y - 6.0f),
+                        faded(state_color, alpha), 2.2f);
+        } else {
+            dl->AddLine(ImVec2(state_at.x - 7.0f, state_at.y + 7.0f),
+                        ImVec2(state_at.x + 7.0f, state_at.y - 7.0f),
+                        faded(state_color, alpha), 2.2f);
         }
-        dl->AddText(font, type.label, ImVec2(origin.x + 12.0f, chip_top + 8.0f),
-                    faded(palette.accent, alpha), selected.c_str());
-        const std::string action =
+        const ImVec2 arrow_a(state_at.x + 18.0f, state_at.y);
+        const ImVec2 grid_at(state_at.x + 74.0f, state_at.y);
+        dl->AddLine(arrow_a, ImVec2(grid_at.x - 19.0f, grid_at.y),
+                    faded(state_color, 0.72f * alpha), 2.0f);
+        dl->AddTriangleFilled(ImVec2(grid_at.x - 14.0f, grid_at.y),
+                              ImVec2(grid_at.x - 22.0f, grid_at.y - 5.0f),
+                              ImVec2(grid_at.x - 22.0f, grid_at.y + 5.0f),
+                              faded(state_color, 0.72f * alpha));
+        for (int i = -1; i <= 1; ++i) {
+            const float d = static_cast<float>(i) * 7.0f;
+            dl->AddLine(ImVec2(grid_at.x - 10.0f, grid_at.y + d),
+                        ImVec2(grid_at.x + 10.0f, grid_at.y + d),
+                        faded(palette.accent, alpha), 1.2f);
+            dl->AddLine(ImVec2(grid_at.x + d, grid_at.y - 10.0f),
+                        ImVec2(grid_at.x + d, grid_at.y + 10.0f),
+                        faded(palette.accent, alpha), 1.2f);
+        }
+        const auto& decision = state.explanation->decision;
+        const std::string value =
             state.decision_applied
-                ? fmt("%s · h/L %.3g · order %d · %d adapt pass%s",
-                      std::string(mesher_plain(frame->action.mesher)).c_str(),
-                      frame->action.h_rel, frame->action.order,
-                      frame->action.adapt_passes,
-                      frame->action.adapt_passes == 1 ? "" : "es")
-                : state.decision_note;
-        dl->AddText(font, type.legend,
-                    ImVec2(origin.x + 12.0f, chip_top + type.label * 1.65f),
-                    faded(state.decision_applied ? palette.text : palette.status_warn, alpha),
-                    action.c_str(), nullptr, region.x - 24.0f);
+                ? fmt("%s · h/L %.3g · p%d", std::string(mesher_plain(frame->action.mesher)).c_str(),
+                      frame->action.h_rel, frame->action.order)
+                : fmt("d = %.3g", decision.ood_distance);
+        dl->AddText(font, type.label,
+                    ImVec2(grid_at.x + 26.0f, state_at.y - 0.5f * type.label),
+                    faded(state_color, alpha), value.c_str());
     }
 
     ImGui::Dummy(ImVec2(region.x, std::max(1.0f, region.y - 2.0f)));
@@ -2583,21 +2483,6 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
 
 namespace {
 
-std::string mesh_mix_text(const CinemaMeshInsight& insight) {
-    std::string out;
-    for (std::size_t i = 0; i < insight.type_counts.size(); ++i) {
-        const std::size_t count = insight.type_counts[i];
-        if (count == 0) {
-            continue;
-        }
-        if (!out.empty()) {
-            out += " · ";
-        }
-        const auto type = static_cast<fea::ElementType>(i);
-        out += std::format("{} {}", grouped(count), fea::element_type_name(type));
-    }
-    return out.empty() ? std::string("no cells measured") : out;
-}
 
 void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
                           const CinemaType& type, float alpha) {
@@ -2608,36 +2493,12 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const ImVec2 origin = ImGui::GetCursorScreenPos();
     const ImVec2 region = ImGui::GetContentRegionAvail();
-    const float wrap = std::max(120.0f, region.x);
-
-    const bool curvature_sizing =
-        state.sizing.spectral.applied && state.sizing.brep_curvature;
-    const bool bc_sizing = state.sizing.spectral.applied && state.sizing.bc_seeds > 0;
     dl->AddText(font, type.caption, origin, faded(palette.text, alpha),
-                curvature_sizing
-                    ? "Exact curvature → frequency modes → target spacing"
-                    : "Exact curvature study · support/load target spacing");
-    const std::string summary =
-        state.sizing.spectral.applied
-            ? fmt("%s / %s field modes · %.2f%% energy · N density %.0f → %.0f",
-                  grouped(state.sizing.spectral.modes_kept).c_str(),
-                  grouped(state.sizing.spectral.modes_total).c_str(),
-                  100.0 * state.sizing.spectral.energy_kept,
-                  state.sizing.spectral.predicted_before,
-                  state.sizing.spectral.predicted_after)
-            : std::string("uniform solve · FFT is geometry evidence, not a sizing input");
-    dl->AddText(font, type.label, ImVec2(origin.x, origin.y + type.caption * 1.55f),
-                faded(state.sizing.spectral.applied ? palette.accent : palette.text_dim, alpha),
-                summary.c_str(), nullptr, wrap);
-    const std::string rings =
-        fmt("%s on-part samples · ring diameter = target h · orange fine → cyan coarse",
-            grouped(state.sizing.field_points.size()).c_str());
-    dl->AddText(font, type.legend, ImVec2(origin.x, origin.y + type.caption * 2.55f),
-                faded(palette.text_dim, alpha), rings.c_str(), nullptr, wrap);
+                "CAD  →  κ(s)  →  FFT  →  h(x)");
 
-    const float chart_top = origin.y + type.caption * 3.65f;
+    const float chart_top = origin.y + type.caption * 1.7f;
     const float chart_h = std::max(
-        240.0f, region.y - (chart_top - origin.y) - type.label * 6.0f);
+        260.0f, region.y - (chart_top - origin.y) - type.label * 4.2f);
     const float chart_w = std::max(120.0f, region.x);
     dl->AddRectFilled(ImVec2(origin.x, chart_top),
                       ImVec2(origin.x + chart_w, chart_top + chart_h),
@@ -2651,11 +2512,103 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
     dl->AddLine(ImVec2(origin.x + pad, split_y),
                 ImVec2(origin.x + chart_w - pad, split_y),
                 faded(palette.border, 0.72f * alpha), 1.0f);
-    dl->AddText(font, type.legend, ImVec2(origin.x + pad, chart_top + 8.0f),
-                faded(palette.text_dim, alpha), "SIGNAL DOMAIN  κ(s) along selected CAD edge");
-    dl->AddText(font, type.legend, ImVec2(origin.x + pad, split_y + 7.0f),
-                faded(palette.text_dim, alpha),
-                "FREQUENCY DOMAIN  |FFT(κ − mean κ)| · teal retained, grey discarded");
+    const float edge_right = origin.x + chart_w * 0.35f;
+    const float curve_left = edge_right + pad * 1.5f;
+
+    // The left inset is the selected CAD edge itself, projected through its two
+    // widest world axes. Three adjacent samples and their circumcircle expose
+    // the actual discrete-curvature construction; the right trace is the
+    // measured κ(s) those samples produced.
+    const auto& edge_points = state.sizing.curve_points;
+    if (edge_points.size() >= 3) {
+        Eigen::Vector3d lo = edge_points.front();
+        Eigen::Vector3d hi = edge_points.front();
+        for (const auto& p : edge_points) {
+            lo = lo.cwiseMin(p);
+            hi = hi.cwiseMax(p);
+        }
+        std::array<int, 3> axes{0, 1, 2};
+        const Eigen::Vector3d range = hi - lo;
+        std::sort(axes.begin(), axes.end(),
+                  [&](int a, int b) { return range[a] > range[b]; });
+        const int ax = axes[0];
+        const int ay = axes[1];
+        const double sx = std::max(range[ax], 1.0e-12);
+        const double sy = std::max(range[ay], 1.0e-12);
+        const float edge_top = chart_top + pad;
+        const float edge_bottom = split_y - pad;
+        const auto edge_point = [&](const Eigen::Vector3d& p) {
+            return ImVec2(origin.x + pad +
+                              (edge_right - origin.x - 2.0f * pad) *
+                                  static_cast<float>((p[ax] - lo[ax]) / sx),
+                          edge_bottom -
+                              (edge_bottom - edge_top) *
+                                  static_cast<float>((p[ay] - lo[ay]) / sy));
+        };
+        const double reveal =
+            cue.spectral_edge_reveal * static_cast<double>(edge_points.size() - 1);
+        const std::size_t whole = std::min(
+            static_cast<std::size_t>(std::floor(reveal)), edge_points.size() - 1);
+        for (std::size_t i = 1; i < edge_points.size(); ++i) {
+            const bool lit = i <= whole;
+            dl->AddLine(edge_point(edge_points[i - 1]), edge_point(edge_points[i]),
+                        faded(lit ? palette.accent : palette.text_dim,
+                              alpha * (lit ? 0.92f : 0.22f)),
+                        lit ? 2.4f : 1.0f);
+        }
+        const std::size_t sample =
+            std::clamp<std::size_t>(whole, 1, edge_points.size() - 2);
+        const ImVec2 a = edge_point(edge_points[sample - 1]);
+        const ImVec2 b = edge_point(edge_points[sample]);
+        const ImVec2 c = edge_point(edge_points[sample + 1]);
+        for (const ImVec2 p : {a, b, c}) {
+            dl->AddCircleFilled(p, 4.0f, faded(palette.accent_soft_top, alpha));
+        }
+        const float tangent_norm = std::hypot(c.x - a.x, c.y - a.y);
+        if (tangent_norm > 1.0e-4f) {
+            const ImVec2 tangent((c.x - a.x) / tangent_norm,
+                                 (c.y - a.y) / tangent_norm);
+            ImVec2 normal(-tangent.y, tangent.x);
+            const ImVec2 inset_center(0.5f * (origin.x + edge_right),
+                                      0.5f * (edge_top + edge_bottom));
+            if (normal.x * (b.x - inset_center.x) +
+                    normal.y * (b.y - inset_center.y) <
+                0.0f) {
+                normal.x = -normal.x;
+                normal.y = -normal.y;
+            }
+            dl->AddLine(ImVec2(b.x - 24.0f * tangent.x, b.y - 24.0f * tangent.y),
+                        ImVec2(b.x + 24.0f * tangent.x, b.y + 24.0f * tangent.y),
+                        faded(palette.text, 0.76f * alpha), 1.5f);
+            const ImVec2 normal_tip(b.x + 34.0f * normal.x,
+                                    b.y + 34.0f * normal.y);
+            dl->AddLine(b, normal_tip, faded(palette.status_warn, 0.86f * alpha), 2.0f);
+            dl->AddCircleFilled(normal_tip, 3.5f,
+                                faded(palette.status_warn, alpha));
+        }
+        const float d =
+            2.0f * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
+        if (std::fabs(d) > 1.0e-4f) {
+            const float aa = a.x * a.x + a.y * a.y;
+            const float bb = b.x * b.x + b.y * b.y;
+            const float cc = c.x * c.x + c.y * c.y;
+            const ImVec2 center(
+                (aa * (b.y - c.y) + bb * (c.y - a.y) + cc * (a.y - b.y)) / d,
+                (aa * (c.x - b.x) + bb * (a.x - c.x) + cc * (b.x - a.x)) / d);
+            const float radius = std::hypot(center.x - b.x, center.y - b.y);
+            if (std::isfinite(radius) && radius < (edge_right - origin.x) * 0.8f) {
+                dl->AddCircle(center, radius, faded(palette.status_warn, 0.62f * alpha),
+                              0, 1.4f);
+                dl->AddLine(center, b, faded(palette.status_warn, 0.78f * alpha), 1.4f);
+            }
+        }
+        const ImVec2 arrow_a(edge_right + 2.0f, 0.5f * (edge_top + edge_bottom));
+        const ImVec2 arrow_b(curve_left - 6.0f, arrow_a.y);
+        dl->AddLine(arrow_a, arrow_b, faded(palette.accent, 0.72f * alpha), 2.0f);
+        dl->AddTriangleFilled(arrow_b, ImVec2(arrow_b.x - 8.0f, arrow_b.y - 5.0f),
+                              ImVec2(arrow_b.x - 8.0f, arrow_b.y + 5.0f),
+                              faded(palette.accent, 0.72f * alpha));
+    }
 
     const auto& raw = state.sizing.curvature_raw;
     const auto& filtered = state.sizing.curvature_filtered;
@@ -2671,8 +2624,9 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
         const float plot_top = chart_top + type.legend * 1.65f;
         const float plot_bottom = split_y - 10.0f;
         const auto point = [&](double station, double value) {
-            const float x = origin.x + pad +
-                            (chart_w - 2.0f * pad) * static_cast<float>(station);
+            const float x = curve_left +
+                            (origin.x + chart_w - pad - curve_left) *
+                                static_cast<float>(station);
             const float y = plot_bottom -
                             (plot_bottom - plot_top) * static_cast<float>((value - lo) / span);
             return ImVec2(x, y);
@@ -2717,19 +2671,6 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
                         faded(palette.accent_soft_top, 0.5f * alpha), 1.0f);
             dl->AddCircleFilled(scan, 4.2f, faded(palette.accent_soft_top, alpha));
         }
-        const std::string edge =
-            fmt("edge %u · %.3g mm · %s/%s curve modes",
-                state.sizing.edge_id, state.sizing.edge_length * 1e3,
-                grouped(state.sizing.curve_modes_kept).c_str(),
-                grouped(state.sizing.curve_modes_total).c_str());
-        const float ew = font->CalcTextSizeA(type.legend, FLT_MAX, 0.0f, edge.c_str()).x;
-        dl->AddText(font, type.legend,
-                    ImVec2(origin.x + chart_w - ew - pad, chart_top + 8.0f),
-                    faded(palette.accent, alpha), edge.c_str());
-    } else {
-        dl->AddText(font, type.label, ImVec2(origin.x + pad, chart_top + 36.0f),
-                    faded(palette.status_warn, alpha),
-                    "No curved CAD edge supplied a resolvable curvature trace.");
     }
 
     const auto& spectrum = state.sizing.curve_spectrum;
@@ -2742,7 +2683,7 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
         const double max_magnitude =
             std::max(*std::max_element(spectrum.begin() + 1, spectrum.end()),
                      1.0e-12);
-        const float bars_top = split_y + type.legend * 1.8f;
+        const float bars_top = split_y + pad;
         const float bars_bottom = chart_top + chart_h - 11.0f;
         const float bars_h = std::max(1.0f, bars_bottom - bars_top);
         const float bars_w = chart_w - 2.0f * pad;
@@ -2772,38 +2713,62 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
                               faded(color, alpha), 1.0f);
         }
     }
-    const std::array<const char*, 5> steps{
-        "1 sample κ(s)", "2 FFT", "3 rank energy", "4 inverse FFT", "5 map h(x)"};
     const std::array<double, 5> progress{
         cue.spectral_edge_reveal, cue.spectral_spectrum_reveal,
         cue.spectral_filter_mix, cue.spectral_filter_mix,
         cue.spectral_field_reveal};
-    const float gap = 6.0f;
+    const float gap = 8.0f;
     const float box_w = (chart_w - gap * 4.0f) / 5.0f;
-    const float box_y = chart_top + chart_h + type.label * 0.85f;
-    for (std::size_t i = 0; i < steps.size(); ++i) {
+    const float box_y = chart_top + chart_h + type.label * 0.45f;
+    for (std::size_t i = 0; i < progress.size(); ++i) {
         const float x = origin.x + static_cast<float>(i) * (box_w + gap);
         const bool active = progress[i] > (i == 3 ? 0.45 : 0.04);
+        const ImVec4 c = active ? palette.accent : palette.text_dim;
         dl->AddRectFilled(ImVec2(x, box_y), ImVec2(x + box_w, box_y + type.label * 2.2f),
                           faded(active ? palette.accent_mid : palette.panel_bg,
-                                alpha * (active ? 0.66f : 0.44f)),
-                          5.0f);
-        dl->AddText(font, type.legend, ImVec2(x + 7.0f, box_y + 7.0f),
-                    faded(active ? palette.text : palette.text_dim, alpha),
-                    steps[i], nullptr, std::max(20.0f, box_w - 14.0f));
+                                alpha * (active ? 0.50f : 0.30f)),
+                          6.0f);
+        const ImVec2 mid(x + 0.5f * box_w, box_y + type.label * 1.1f);
+        if (i == 0) {
+            dl->AddLine(ImVec2(mid.x - 22.0f, mid.y + 7.0f),
+                        ImVec2(mid.x, mid.y - 8.0f), faded(c, alpha), 2.0f);
+            dl->AddLine(ImVec2(mid.x, mid.y - 8.0f),
+                        ImVec2(mid.x + 22.0f, mid.y + 7.0f), faded(c, alpha), 2.0f);
+            for (float dx : {-22.0f, 0.0f, 22.0f}) {
+                dl->AddCircleFilled(ImVec2(mid.x + dx, mid.y + (dx == 0.0f ? -8.0f : 7.0f)),
+                                    3.5f, faded(c, alpha));
+            }
+        } else if (i == 1 || i == 2) {
+            for (int bar = 0; bar < 5; ++bar) {
+                const float h = (i == 1 ? std::sin(0.8f * static_cast<float>(bar)) + 1.2f
+                                        : 2.2f - 0.35f * static_cast<float>(bar)) * 7.0f;
+                const float bx = mid.x - 24.0f + 12.0f * static_cast<float>(bar);
+                dl->AddRectFilled(ImVec2(bx, mid.y + 14.0f - h),
+                                  ImVec2(bx + 7.0f, mid.y + 14.0f),
+                                  faded(i == 2 && bar > 2 ? palette.text_dim : c, alpha), 1.0f);
+            }
+        } else if (i == 3) {
+            ImVec2 prev(mid.x - 27.0f, mid.y);
+            for (int k = 1; k <= 18; ++k) {
+                const float px = mid.x - 27.0f + 3.0f * static_cast<float>(k);
+                const float py = mid.y - 9.0f * std::sin(0.55f * static_cast<float>(k));
+                const ImVec2 next(px, py);
+                dl->AddLine(prev, next, faded(c, alpha), 2.0f);
+                prev = next;
+            }
+        } else {
+            for (int ring = 0; ring < 3; ++ring) {
+                dl->AddCircle(ImVec2(mid.x - 20.0f + 20.0f * static_cast<float>(ring), mid.y),
+                              5.0f + 3.0f * static_cast<float>(ring),
+                              faded(ring == 0 ? palette.status_warn : c, alpha), 0, 2.0f);
+            }
+        }
+        if (i + 1 < progress.size()) {
+            const ImVec2 a(x + box_w + 1.0f, mid.y);
+            const ImVec2 b(x + box_w + gap - 2.0f, mid.y);
+            dl->AddLine(a, b, faded(palette.text_dim, 0.55f * alpha), 1.5f);
+        }
     }
-    const std::string floor =
-        state.sizing.brep_curvature
-            ? "Exact BRep curvature is re-imposed after filtering."
-            : (state.skeleton_source == SkeletonSource::kBrepEdges
-                   ? (bc_sizing
-                          ? "Exact curve measured above · h(x) is driven by supports/load."
-                          : "Exact curve measured above · uniform mesh does not grade from it.")
-                   : "No exact-BRep curvature report is available for this input.");
-    dl->AddText(font, type.legend, ImVec2(origin.x, box_y + type.label * 2.7f),
-                faded(state.sizing.brep_curvature ? palette.status_ok : palette.status_warn,
-                      alpha),
-                floor.c_str(), nullptr, wrap);
     ImGui::Dummy(ImVec2(region.x, std::max(1.0f, region.y - 2.0f)));
 }
 
@@ -2827,20 +2792,8 @@ void draw_cinema_cells(const CinemaState& state, const CinemaCue& cue,
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const ImVec2 origin = ImGui::GetCursorScreenPos();
     const ImVec2 region = ImGui::GetContentRegionAvail();
-    const float wrap = std::max(120.0f, region.x);
-
-    dl->AddText(font, type.caption, origin, faded(palette.text, alpha),
-                "Cell microscope — actual emitted topology");
-    std::string stage = "waiting for the first emitted cell";
-    if (index < state.stages.size() && emitted != nullptr) {
-        stage = std::format("{} · {}", stage_name(state.stages[index].stage),
-                            mesh_mix_text(*emitted));
-    }
-    dl->AddText(font, type.label, ImVec2(origin.x, origin.y + type.caption * 1.55f),
-                faded(palette.accent, alpha), stage.c_str(), nullptr, wrap);
-
-    const float bar_y = origin.y + type.caption * 3.2f;
-    const float bar_h = 18.0f;
+    const float bar_y = origin.y + 10.0f;
+    const float bar_h = 14.0f;
     if (emitted != nullptr) {
         const std::size_t total =
             std::max<std::size_t>(1, std::accumulate(emitted->type_counts.begin(),
@@ -2853,78 +2806,104 @@ void draw_cinema_cells(const CinemaState& state, const CinemaCue& cue,
             }
             const float w = region.x * static_cast<float>(emitted->type_counts[i]) /
                             static_cast<float>(total);
-            const auto rgb = element_type_color(static_cast<fea::ElementType>(i));
             dl->AddRectFilled(ImVec2(x, bar_y), ImVec2(x + w, bar_y + bar_h),
-                              rgba(rgb, alpha), 2.0f);
+                              rgba(element_type_color(static_cast<fea::ElementType>(i)), alpha),
+                              2.0f);
             x += w;
         }
     }
 
-    const float card_top = bar_y + bar_h + type.label * 1.4f;
-    const float card_h = std::max(
-        260.0f, region.y - (card_top - origin.y) - type.label * 6.4f);
+    const float card_top = bar_y + bar_h + 16.0f;
+    const float card_h = std::max(260.0f, region.y - (card_top - origin.y) - 14.0f);
     const float card_gap = 12.0f;
     const float card_w = (region.x - card_gap) * 0.5f;
-    const auto draw_tet = [&](float x, bool quadratic) {
+    for (int card = 0; card < 2; ++card) {
+        const float x = origin.x + static_cast<float>(card) * (card_w + card_gap);
         dl->AddRectFilled(ImVec2(x, card_top), ImVec2(x + card_w, card_top + card_h),
-                          faded(palette.panel_bg, 0.58f * alpha), 7.0f);
+                          faded(palette.panel_bg, 0.50f * alpha), 8.0f);
         dl->AddRect(ImVec2(x, card_top), ImVec2(x + card_w, card_top + card_h),
-                    faded(palette.border, alpha), 7.0f);
-        const std::array<ImVec2, 4> p{{
-            {x + card_w * 0.50f, card_top + card_h * 0.19f},
-            {x + card_w * 0.18f, card_top + card_h * 0.78f},
-            {x + card_w * 0.82f, card_top + card_h * 0.78f},
-            {x + card_w * 0.63f, card_top + card_h * 0.53f},
-        }};
-        constexpr std::array<std::array<int, 2>, 6> edges{{
-            {{0, 1}}, {{0, 2}}, {{0, 3}}, {{1, 2}}, {{1, 3}}, {{2, 3}},
-        }};
-        for (const auto& edge : edges) {
-            dl->AddLine(p[edge[0]], p[edge[1]], faded(palette.text, 0.72f * alpha), 2.0f);
-            if (quadratic) {
-                const ImVec2 mid{0.5f * (p[edge[0]].x + p[edge[1]].x),
-                                 0.5f * (p[edge[0]].y + p[edge[1]].y)};
-                dl->AddCircleFilled(mid, 4.2f, faded(palette.accent, alpha));
+                    faded(palette.border, 0.72f * alpha), 8.0f);
+        if (card == 0) {
+            const float wobble =
+                0.035f * std::sin(static_cast<float>(cue.act_t) * 2.4f);
+            const std::array<ImVec2, 4> p{{
+                {x + card_w * (0.50f + wobble), card_top + card_h * 0.18f},
+                {x + card_w * 0.17f, card_top + card_h * 0.80f},
+                {x + card_w * 0.83f, card_top + card_h * 0.80f},
+                {x + card_w * (0.62f - wobble), card_top + card_h * 0.50f},
+            }};
+            constexpr std::array<std::array<int, 2>, 6> edges{{
+                {{0, 1}}, {{0, 2}}, {{0, 3}}, {{1, 2}}, {{1, 3}}, {{2, 3}},
+            }};
+            for (const auto& edge : edges) {
+                dl->AddLine(p[edge[0]], p[edge[1]],
+                            faded(palette.text, 0.72f * alpha), 2.2f);
+                if (hud.order >= 2) {
+                    const ImVec2 mid{0.5f * (p[edge[0]].x + p[edge[1]].x),
+                                     0.5f * (p[edge[0]].y + p[edge[1]].y)};
+                    dl->AddCircleFilled(mid, 4.0f, faded(palette.accent, alpha));
+                }
             }
+            for (const ImVec2 point : p) {
+                dl->AddCircleFilled(point, 6.0f, faded(palette.text, alpha));
+            }
+            const std::string p_order = std::format("p{}", hud.order);
+            dl->AddText(font, type.caption,
+                        ImVec2(x + 16.0f, card_top + 14.0f),
+                        faded(palette.accent, alpha), p_order.c_str());
+        } else {
+            const ImVec2 center(x + 0.5f * card_w, card_top + 0.47f * card_h);
+            const float raw =
+                std::clamp(static_cast<float>(cue.act_t / 1.2), 0.0f, 1.0f);
+            const float assemble = raw * raw * (3.0f - 2.0f * raw);
+            static constexpr std::array<ImVec2, 7> offsets{{
+                {-0.23f, -0.18f}, {0.02f, -0.22f}, {0.24f, -0.12f},
+                {-0.18f, 0.08f},  {0.10f, 0.05f},  {-0.04f, 0.27f},
+                {0.25f, 0.24f},
+            }};
+            constexpr std::array<std::array<int, 2>, 6> edges{{
+                {{0, 1}}, {{0, 2}}, {{0, 3}}, {{1, 2}}, {{1, 3}}, {{2, 3}},
+            }};
+            for (std::size_t cell = 0; cell < offsets.size(); ++cell) {
+                const float cx = center.x + assemble * offsets[cell].x * card_w;
+                const float cy = center.y + assemble * offsets[cell].y * card_h;
+                const float s = 0.115f * std::min(card_w, card_h) *
+                                (0.86f + 0.04f * static_cast<float>(cell % 4));
+                const std::array<ImVec2, 4> p{{
+                    {cx, cy - s},
+                    {cx - 0.82f * s, cy + 0.72f * s},
+                    {cx + 0.82f * s, cy + 0.72f * s},
+                    {cx + 0.35f * s, cy + 0.12f * s},
+                }};
+                const ImVec4 cell_color =
+                    cell % 2 == 0 ? palette.accent_soft_top : palette.text;
+                for (const auto& edge : edges) {
+                    dl->AddLine(p[edge[0]], p[edge[1]],
+                                faded(cell_color, (0.46f + 0.36f * assemble) * alpha),
+                                1.5f);
+                    if (hud.order >= 2) {
+                        const ImVec2 mid{0.5f * (p[edge[0]].x + p[edge[1]].x),
+                                         0.5f * (p[edge[0]].y + p[edge[1]].y)};
+                        dl->AddCircleFilled(mid, 2.5f, faded(palette.accent, alpha));
+                    }
+                }
+                for (const ImVec2 point : p) {
+                    dl->AddCircleFilled(point, 3.2f, faded(cell_color, alpha));
+                }
+            }
+            const double q_mean =
+                solved != nullptr && solved->quality_measured > 0 ? solved->quality_mean : 0.0;
+            const double q_min =
+                solved != nullptr && solved->quality_measured > 0 ? solved->quality_min : 0.0;
+            const std::string quality = fmt("qmin %.3f   q̄ %.3f", q_min, q_mean);
+            const ImVec2 quality_size =
+                font->CalcTextSizeA(type.label, FLT_MAX, 0.0f, quality.c_str());
+            dl->AddText(font, type.label,
+                        ImVec2(center.x - 0.5f * quality_size.x,
+                               card_top + card_h - type.label * 1.8f),
+                        faded(palette.status_ok, alpha), quality.c_str());
         }
-        for (const ImVec2 point : p) {
-            dl->AddCircleFilled(point, 6.0f, faded(palette.text, alpha));
-        }
-        const char* title = quadratic ? "order 2 · tet10" : "order 1 · tet4";
-        const char* subline =
-            quadratic ? "six midside nodes bend with the exact CAD"
-                      : "four corners define the linear fill";
-        dl->AddText(font, type.label, ImVec2(x + 12.0f, card_top + 10.0f),
-                    faded(quadratic ? palette.accent : palette.text, alpha), title);
-        dl->AddText(font, type.legend,
-                    ImVec2(x + 12.0f, card_top + card_h - type.legend * 2.2f),
-                    faded(palette.text_dim, alpha), subline, nullptr, card_w - 24.0f);
-    };
-    draw_tet(origin.x, false);
-    draw_tet(origin.x + card_w + card_gap, hud.order >= 2);
-
-    const float facts_y = card_top + card_h + type.label * 1.1f;
-    std::string quality = "quality summary arrives with the emitted mesh";
-    if (solved != nullptr && solved->quality_measured > 0) {
-        quality = fmt("shape quality  min %.4g · mean %.4g · %s cells measured",
-                      solved->quality_min, solved->quality_mean,
-                      grouped(solved->quality_measured).c_str());
     }
-    dl->AddText(font, type.label, ImVec2(origin.x, facts_y),
-                faded(palette.status_ok, alpha), quality.c_str(), nullptr, wrap);
-    const std::string facts = fmt(
-        "spectral sizing %s · exact BRep curvature %s · polynomial order %d · "
-        "ZZ recovery %s",
-        state.sizing.spectral.applied ? "on" : "off",
-        state.sizing.brep_curvature ? "on" : "off", hud.order,
-        state.solve_stages.empty() ? "waiting" : "measured");
-    dl->AddText(font, type.legend, ImVec2(origin.x, facts_y + type.label * 1.7f),
-                faded(palette.text_dim, alpha), facts.c_str(), nullptr, wrap);
-    dl->AddText(font, type.legend, ImVec2(origin.x, facts_y + type.label * 3.1f),
-                faded(palette.status_warn, 0.78f * alpha),
-                "experimental alternatives: varyhedron · CVT poly-VEM · octahedral — "
-                "not used in this verified solve",
-                nullptr, wrap);
     ImGui::Dummy(ImVec2(region.x, std::max(1.0f, region.y - 2.0f)));
 }
 
@@ -2972,42 +2951,32 @@ void draw_cinema_panel(CinemaState& state, const CinemaCue& cue, const CinemaTyp
 
 namespace {
 
-void skeleton_caption(const CinemaState& state, CinemaCaption& out) {
-    const bool curvature_sizing =
-        state.sizing.spectral.applied && state.sizing.brep_curvature;
-    const bool bc_sizing = state.sizing.spectral.applied && state.sizing.bc_seeds > 0;
-    out.headline = curvature_sizing
-                       ? "Exact CAD + spectral curvature size field"
-                       : (bc_sizing ? "Exact CAD + support/load size field"
-                                    : "Exact CAD + uniform size target");
+void skeleton_caption(const CinemaState& state, const CinemaCue& cue,
+                      CinemaCaption& out) {
+    const double p = cue.act_t / std::max(cue.act_span, 1.0e-9);
+    if (p < 0.30) {
+        return;
+    }
     switch (state.skeleton_source) {
     case SkeletonSource::kBrepEdges:
+        out.headline = "CAD  →  κ(s)  →  FFT";
         out.numbers =
-            fmt("%s exact edges · %s curve samples · %s on-part target sizes",
+            fmt("%s edges · %s exact samples",
                 grouped(state.skeleton_polylines).c_str(),
-                grouped(state.sizing.edge_points.size()).c_str(),
-                grouped(state.sizing.field_points.size()).c_str());
-        out.note = curvature_sizing
-                       ? "κ(s) → FFT energy selection → inverse transform → h(x)"
-                       : (bc_sizing
-                              ? "κ(s) FFT analysis · h(x) rings follow supports and load"
-                              : "κ(s) FFT is analysis only · uniform h solve");
-        out.note_color = curvature_sizing ? palette.text_dim : palette.status_warn;
+                grouped(state.sizing.curve_points.size()).c_str());
         break;
     case SkeletonSource::kSharpEdges:
+        out.headline = "surface  →  crease graph";
         out.numbers =
-            fmt("%s tessellation creases", grouped(state.skeleton_polylines).c_str());
-        out.note = "mesh input · no BRep curvature or CAD-edge spectrum is claimed";
-        out.note_color = palette.status_warn;
+            fmt("%s creases", grouped(state.skeleton_polylines).c_str());
         break;
     case SkeletonSource::kUnavailable:
-        out.headline = "CAD feature extraction unavailable";
+        out.headline = "CAD extraction unavailable";
         out.note = state.skeleton_note;
         out.note_color = palette.status_err;
         break;
     case SkeletonSource::kNone:
-        out.headline = "No part loaded";
-        out.note = "no substitute geometry is drawn";
+        out.headline = "No part";
         out.note_color = palette.status_err;
         break;
     }
@@ -3018,7 +2987,7 @@ void deliberate_caption(const CinemaState& state, const CinemaCue& cue, CinemaCa
     (void)state;
     (void)cue;
     out.headline = "Advisor unavailable";
-    out.note = "POLYMESH_WITH_ADVISOR=OFF";
+    out.note = "advisor support is not compiled into this build";
     out.note_color = palette.status_err;
 #else
     if (!state.explanation) {
@@ -3032,30 +3001,25 @@ void deliberate_caption(const CinemaState& state, const CinemaCue& cue, CinemaCa
     const auto& frames = explanation.frames;
     const std::size_t candidates = frames.empty() ? 0 : frames.size() - 1;
     if (cue.chosen_pass_held) {
-        out.headline = state.decision_applied ? "Advisor decision — final network state"
-                                              : "Advisor abstained — final network state";
+        const auto& decision = explanation.decision;
+        out.headline = state.decision_applied
+                           ? fmt("%s · h/L %.3g · p%d",
+                                 std::string(mesher_plain(decision.mesher)).c_str(),
+                                 decision.h_rel, decision.order)
+                           : fmt("d = %.3g", decision.ood_distance);
         out.headline_color =
             state.decision_applied ? palette.status_ok : palette.status_warn;
-        out.numbers = fmt("final re-score held for inspection · %s candidates compared",
-                          grouped(candidates).c_str());
-        out.note = state.decision_vetoed
-                       ? "outside calibrated descriptor envelope · configured baseline unchanged"
-                       : state.decision_note;
-        out.note_color =
-            state.decision_applied ? palette.text_dim : palette.status_warn;
+        out.numbers = fmt("%s passes · %s candidates",
+                          grouped(frames.size()).c_str(), grouped(candidates).c_str());
         return;
     }
-    out.headline = "Mesh search — deployed advisor network";
+    out.headline = "81  →  96  →  96  →  20";
     if (cue.frame_index < 0 || static_cast<std::size_t>(cue.frame_index) >= frames.size()) {
-        out.numbers = fmt("%s candidate meshes · measured forward passes only",
-                          grouped(candidates).c_str());
+        out.numbers = fmt("%s candidates", grouped(candidates).c_str());
         return;
     }
-    out.numbers = fmt("forward pass %d / %s · %s candidates compared", cue.frame_index + 1,
-                      grouped(frames.size()).c_str(), grouped(candidates).c_str());
-    out.note = fmt("circle = activation · line = |weight × activation| · %.3g%% failure gate",
-                   explanation.gate_threshold * 100.0);
-    out.note_color = palette.text_dim;
+    out.numbers = fmt("%d / %s", cue.frame_index + 1,
+                      grouped(frames.size()).c_str());
 #endif
 }
 
@@ -3068,17 +3032,10 @@ void build_caption(const CinemaState& state, const CinemaCue& cue, const CinemaH
         return;
     }
     if (cue.stage_index < 0) {
-        out.headline = state.decision_applied ? "Advisor selection locked"
-                                              : "Advisor abstained — configured baseline";
-        out.headline_color = state.decision_applied ? palette.status_ok : palette.status_warn;
-        out.numbers = fmt("%s · %.3g mm target · order %d · %d refinement pass%s",
-                          std::string(mesher_plain(hud.mesher)).c_str(),
-                          hud.mesh_size * 1e3, hud.order, hud.adapt_passes,
-                          hud.adapt_passes == 1 ? "" : "es");
-        out.note = state.decision_vetoed
-                       ? "outside calibrated descriptor envelope · configured baseline unchanged"
-                       : state.decision_note;
-        out.note_color = state.decision_applied ? palette.text_dim : palette.status_warn;
+        out.headline = fmt("h %.3g mm · p%d", hud.mesh_size * 1e3, hud.order);
+        out.numbers = std::string(mesher_plain(hud.mesher));
+        out.headline_color =
+            state.decision_applied ? palette.status_ok : palette.status_warn;
         return;
     }
     const auto idx = static_cast<std::size_t>(cue.stage_index);
@@ -3086,74 +3043,40 @@ void build_caption(const CinemaState& state, const CinemaCue& cue, const CinemaH
         return;
     }
     const auto& stage = state.stages[idx];
-    std::string prefix = "Studio setup landing";
-    std::string handoff = "advisor unavailable → studio setup · sequential";
-    ImVec4 handoff_color = palette.status_warn;
-    if (state.decision_applied) {
-        prefix = "Chosen action landing";
-        handoff = "aligned replay: measured chosen pass → its later real mesh · sequential";
-        handoff_color = palette.text_dim;
-    } else if (state.decision_vetoed) {
-        prefix = "Configured baseline landing";
-        handoff = "measured OOD check → configured baseline · sequential";
-    } else if (state.decision_unrecognized) {
-        prefix = "Studio setup landing";
-        handoff = "unrecognised advised mesher → unchanged studio setup · sequential";
-    }
-    out.headline =
-        stage.stage == "fill"
-            ? prefix + " — cells become the solve mesh"
-            : fmt("%s — %s", prefix.c_str(),
-                  std::string(stage_name(stage.stage)).c_str());
     const std::size_t total = stage.mesh.elements.size();
     const auto drawn = static_cast<std::size_t>(
         cue.mesh_action_reveal * static_cast<double>(total));
-    out.numbers = fmt("%s / %s real cells · %s nodes · order-%d target",
-                      grouped(drawn).c_str(), grouped(total).c_str(),
+    out.headline = fmt("%s / %s cells",
+                       grouped(drawn).c_str(), grouped(total).c_str());
+    out.numbers = fmt("%s nodes · p%d",
                       grouped(stage.mesh.nodes.size()).c_str(), hud.order);
-    out.note = std::move(handoff);
-    out.note_color = handoff_color;
-    if (hud.cinema_skipped_elements > 0) {
-        out.note = fmt("%s cells could not be triangulated and are excluded from this view",
-                       grouped(hud.cinema_skipped_elements).c_str());
-        out.note_color = palette.status_warn;
-    }
+    out.headline_color = palette.accent;
 }
 
 void mesh_hold_caption(const CinemaState& state, const CinemaCue& cue, const CinemaHud& hud,
                        CinemaCaption& out) {
     const double x = cue.act_t / std::max(cue.act_span, 1.0e-9);
-    out.headline = x < 0.78 ? "Cell topology — exploded view"
-                            : "Authoritative mesh — ready to solve";
+    out.headline = x < 0.78 ? "tet4  ·  p1" : "K u = f";
     out.headline_color = palette.status_ok;
     if (!state.solve_stages.empty()) {
         const auto& stage = state.solve_stages.front();
-        out.numbers = fmt("%s cells · %s nodes · %s unknowns · order %d",
+        out.numbers = fmt("%s cells · %s nodes · %s unknowns",
                           grouped(stage.trace.n_elems).c_str(),
                           grouped(stage.trace.n_nodes).c_str(),
-                          grouped(stage.trace.n_dof).c_str(), hud.order);
+                          grouped(stage.trace.n_dof).c_str());
         if (!state.solve_insights.empty()) {
             const auto& insight = state.solve_insights.front();
-            out.note = fmt("%s · shape quality min %.4g / mean %.4g",
-                           mesh_mix_text(insight).c_str(), insight.quality_min,
-                           insight.quality_mean);
+            out.note = fmt("qmin %.4g · q̄ %.4g",
+                           insight.quality_min, insight.quality_mean);
         }
     }
-    if (out.note.empty()) {
-        out.note = state.decision_vetoed
-                       ? "outside calibrated descriptor envelope · configured baseline unchanged"
-                       : state.decision_note;
-    }
-    out.note_color = palette.text_dim;
+    (void)hud;
 }
 
 void solve_caption(CinemaState& state, const CinemaCue& cue, const CinemaHud& hud,
                    CinemaCaption& out) {
     if (state.solve_stages.empty()) {
-        out.headline = "No solve passes were delivered";
-        out.note = "pipeline::SolveJob::on_solve_stage received none, so this act holds the "
-                   "finished mesh instead of a field — nothing is drawn in place of an answer "
-                   "that never arrived";
+        out.headline = "No solve result";
         out.note_color = palette.status_err;
         return;
     }
@@ -3163,7 +3086,7 @@ void solve_caption(CinemaState& state, const CinemaCue& cue, const CinemaHud& hu
     const auto& tr = stage.trace;
     const bool many = state.solve_stages.size() > 1;
     const std::string pass_tag =
-        many ? fmt(" (pass %d of %zu)", stage.pass + 1, state.solve_stages.size())
+        many ? fmt(" · %d/%zu", stage.pass + 1, state.solve_stages.size())
              : std::string{};
     out.note_color = palette.text_dim;
     const double stress_p99 =
@@ -3172,33 +3095,26 @@ void solve_caption(CinemaState& state, const CinemaCue& cue, const CinemaHud& hu
         i < state.error_histograms.size() ? state.error_histograms[i].p99 : 0.0;
     switch (cue.solve_phase) {
     case SolvePhase::kStressSweep:
-        out.headline = "Stress field — spatial reveal";
-        out.numbers =
-            fmt("%s cells · %s unknowns · solved once%s", grouped(tr.n_elems).c_str(),
-                grouped(tr.n_dof).c_str(), pass_tag.c_str());
-        out.note = stress_p99 > 0.0
-                       ? fmt("authoritative mesh → von Mises · colour cap p99 %.4g MPa",
-                             stress_p99 / 1e6)
-                       : std::string("authoritative mesh stays visible while von Mises arrives");
+        out.headline = "σvm(x)";
+        out.numbers = fmt("%s cells · %s unknowns%s",
+                          grouped(tr.n_elems).c_str(), grouped(tr.n_dof).c_str(),
+                          pass_tag.c_str());
+        out.note = stress_p99 > 0.0 ? fmt("p99 %.4g MPa", stress_p99 / 1e6)
+                                    : std::string{};
         break;
     case SolvePhase::kStressHold:
-        out.headline = fmt("Peak stress %.4g MPa", r.max_von_mises / 1e6);
+        out.headline = fmt("σmax %.4g MPa", r.max_von_mises / 1e6);
         out.headline_color = palette.status_ok;
-        out.numbers = fmt("largest movement %.4g mm · undeformed shape%s",
-                          r.max_displacement * 1e3, pass_tag.c_str());
-        out.note = stress_p99 > 0.0
-                       ? fmt("colour scale p99 %.4g MPa · true peak stated above",
-                             stress_p99 / 1e6)
-                       : std::string("von Mises stress on the exact geometry this pass solved");
+        out.numbers = fmt("umax %.4g mm%s", r.max_displacement * 1e3,
+                          pass_tag.c_str());
+        out.note = stress_p99 > 0.0 ? fmt("p99 %.4g MPa", stress_p99 / 1e6)
+                                    : std::string{};
         break;
     case SolvePhase::kGradientSweep: {
         const double gp99 = state.gradient_histogram(i).p99;
-        out.headline = "Stress gradient — spatial reveal";
-        out.numbers = "|∇σvm| recovered at every resolvable node";
-        out.note = gp99 > 0.0
-                       ? fmt("stress → gradient handoff · colour cap p99 %.4g MPa/mm",
-                             gp99 / 1e9)
-                       : std::string("completed stress stays ahead of the gradient handoff");
+        out.headline = "|∇σvm|(x)";
+        out.numbers = gp99 > 0.0 ? fmt("p99 %.4g MPa/mm", gp99 / 1e9)
+                                 : std::string{};
         break;
     }
     case SolvePhase::kGradientHold: {
@@ -3206,120 +3122,80 @@ void solve_caption(CinemaState& state, const CinemaCue& cue, const CinemaHud& hu
         const double gp99 = state.gradient_histogram(i).p99;
         const std::size_t unresolved = state.gradient_unresolved(i);
         if (gmax > 0.0) {
-            out.headline = fmt("Steepest change %.4g MPa per mm", gmax / 1e9);
+            out.headline = fmt("|∇σ|max %.4g MPa/mm", gmax / 1e9);
             out.headline_color = palette.status_ok;
-            out.numbers = gp99 > 0.0
-                              ? fmt("red = p99 %.4g MPa/mm · steepest stated above",
-                                    gp99 / 1e9)
-                              : std::string("recovered change rate");
-            out.note =
-                unresolved > 0
-                    ? fmt("%s nodes had coplanar neighborhoods and report zero gradient",
-                          grouped(unresolved).c_str())
-                    : std::string("stress-riser intensity, measured per unit distance");
-            out.note_color = unresolved > 0 ? palette.status_warn : palette.text_dim;
+            out.numbers = gp99 > 0.0 ? fmt("p99 %.4g MPa/mm", gp99 / 1e9)
+                                     : std::string{};
+            if (unresolved > 0) {
+                out.note = fmt("%s unresolved nodes", grouped(unresolved).c_str());
+                out.note_color = palette.status_warn;
+            }
         } else {
-            out.headline = "No gradient could be recovered here";
+            out.headline = "|∇σ| unavailable";
             out.headline_color = palette.status_warn;
-            out.numbers = "the stress field itself is still on screen";
-            out.note = "nothing is drawn in place of a gradient that could not be computed";
-            out.note_color = palette.status_warn;
         }
         break;
     }
     case SolvePhase::kError:
-        out.headline = "Estimated solution error";
-        if (hud.eta_target > 0.0) {
-            out.numbers = fmt("ZZ indicator %.3g%% · target %.3g%%",
-                              tr.global_eta * 100.0, hud.eta_target * 100.0);
-        } else {
-            out.numbers = fmt("ZZ global indicator %.3g%% · verification pass",
-                              tr.global_eta * 100.0);
-        }
-        out.note = error_p99 > 0.0
-                       ? fmt("prior field → ZZ indicator · colour cap p99 %.4g%%",
-                             error_p99 * 100.0)
-                       : std::string("prior field stays ahead · recovered-vs-solved indicator");
+        out.headline = "ηZZ";
+        out.numbers = hud.eta_target > 0.0
+                          ? fmt("%.3g%%  /  %.3g%%", tr.global_eta * 100.0,
+                                hud.eta_target * 100.0)
+                          : fmt("%.3g%%", tr.global_eta * 100.0);
+        out.note = error_p99 > 0.0 ? fmt("p99 %.4g%%", error_p99 * 100.0)
+                                   : std::string{};
         break;
     case SolvePhase::kErrorHold:
-        out.headline = "Local error map";
-        out.numbers = fmt("%s h-refinement marks · %s p-refinement marks",
+        out.headline = "ηe  →  h / p";
+        out.numbers = fmt("%s h · %s p",
                           grouped(tr.n_h_mark).c_str(), grouped(tr.n_p_mark).c_str());
-        out.note = error_p99 > 0.0
-                       ? fmt("colour cap p99 %.4g%% · %s", error_p99 * 100.0,
-                             i + 1 < state.solve_stages.size()
-                                 ? "this field drives the next solved mesh"
-                                 : "no unrecorded refinement is implied")
-                       : std::string("reported in full");
+        out.note = error_p99 > 0.0 ? fmt("p99 %.4g%%", error_p99 * 100.0)
+                                   : std::string{};
         break;
     case SolvePhase::kRefine: {
         const std::size_t next = i + 1;
-        out.headline = "Replacing only cells changed by refinement";
+        out.headline = "ηe  →  Δmesh";
         if (next < state.solve_stages.size()) {
-            out.numbers = fmt("%s kept · %s removed · %s replacement cells",
+            out.numbers = fmt("%s kept · %s removed · %s added",
                               grouped(hud.unchanged_elements).c_str(),
                               grouped(hud.removed_elements).c_str(),
                               grouped(hud.added_elements).c_str());
-            out.note = error_p99 > 0.0
-                           ? fmt("ZZ p99 %.4g%% → corner-topology diff · kept cells stay",
-                                 error_p99 * 100.0)
-                           : std::string("corner-topology diff · kept cells stay rendered");
         }
         break;
     }
     case SolvePhase::kRefineHold: {
         const std::size_t next = i + 1;
-        out.headline = "Incremental refinement complete";
+        out.headline = "mesh n + 1";
         out.headline_color = palette.status_ok;
         if (next < state.solve_stages.size()) {
             const auto& nx = state.solve_stages[next];
-            out.numbers = fmt("%s cells · %s preserved from the previous pass · %s unknowns",
+            out.numbers = fmt("%s cells · %s unknowns",
                               grouped(nx.trace.n_elems).c_str(),
-                              grouped(hud.unchanged_elements).c_str(),
                               grouped(nx.trace.n_dof).c_str());
-            out.note = fmt("%s old cells replaced by %s solved cells; polynomial promotion "
-                           "does not count as a topology change",
-                           grouped(hud.removed_elements).c_str(),
-                           grouped(hud.added_elements).c_str());
         }
         break;
     }
     case SolvePhase::kLoadRamp:
-        out.headline = fmt("Load response — %.4g / %.4g N",
-                           cue.load_factor * hud.load_newtons, hud.load_newtons);
+        out.headline = fmt("λ %.3f", cue.load_factor);
         out.numbers =
-            fmt("%.4g MPa · %.4g mm at this load", cue.load_factor * r.max_von_mises / 1e6,
+            fmt("%.4g kN · %.4g MPa · %.4g mm",
+                cue.load_factor * hud.load_newtons / 1e3,
+                cue.load_factor * r.max_von_mises / 1e6,
                 cue.load_factor * r.max_displacement * 1e3);
-        out.note = stress_p99 > 0.0
-                       ? fmt("exact linear response · colour p99 %.4g MPa · true %.4g mm · "
-                             "shown %.4g mm at %.3g×",
-                             stress_p99 / 1e6,
-                             cue.load_factor * r.max_displacement * 1e3,
-                             cue.load_factor * hud.deform_scale * r.max_displacement * 1e3,
-                             cue.load_factor * hud.deform_scale)
-                       : fmt("exact linear response · true %.4g mm · shown %.4g mm at %.3g×",
-                             cue.load_factor * r.max_displacement * 1e3,
-                             cue.load_factor * hud.deform_scale * r.max_displacement * 1e3,
-                             cue.load_factor * hud.deform_scale);
+        out.note = "u = λu₁ · σ = λσ₁";
         break;
     case SolvePhase::kHold: {
-        out.headline = fmt("Full load — %.4g MPa peak", r.max_von_mises / 1e6);
+        out.headline = fmt("σmax %.4g MPa", r.max_von_mises / 1e6);
         out.headline_color = palette.status_ok;
         const std::string_view token = cinema_solver_token(state);
         const char* method = token == "direct_ldlt"
-                                 ? "factorised, not iterated"
-                                 : (token == "cg" ? "conjugate gradient"
-                                                  : "solver method not reported");
-        out.numbers = fmt("%.4g mm largest movement · %s cells · %s unknowns · %s",
+                                 ? "LDLT"
+                                 : (token == "cg" ? "CG" : "solver");
+        out.numbers = fmt("umax %.4g mm · %s cells · %s unknowns · %s",
                           r.max_displacement * 1e3, grouped(tr.n_elems).c_str(),
                           grouped(tr.n_dof).c_str(), method);
         const double shown_mm = hud.deform_scale * r.max_displacement * 1e3;
-        const double shown_pct =
-            hud.model_diagonal > 0.0
-                ? 100.0 * hud.deform_scale * r.max_displacement / hud.model_diagonal
-                : 0.0;
-        out.note = fmt("true %.4g mm · display %.4g mm (%.2f%% of model) · %.3g×",
-                       r.max_displacement * 1e3, shown_mm, shown_pct, hud.deform_scale);
+        out.note = fmt("display %.4g mm · %.3g×", shown_mm, hud.deform_scale);
         break;
     }
     case SolvePhase::kNone:
@@ -3358,7 +3234,7 @@ CinemaCaption cinema_caption(const CinemaState& state, const CinemaCue& cue,
     out.note_color = palette.text_dim;
     switch (cue.act) {
     case CinemaAct::kSkeleton:
-        skeleton_caption(state, out);
+        skeleton_caption(state, cue, out);
         break;
     case CinemaAct::kDeliberate:
         deliberate_caption(state, cue, out);
@@ -3380,10 +3256,9 @@ CinemaCaption cinema_caption(const CinemaState& state, const CinemaCue& cue,
     // put one disclosure on screen instead of six.
     const std::string part = hud.part.empty() ? std::string("(no part)") : hud.part;
     out.footer = hud.stamp.empty()
-                     ? fmt("%s · POLYMESH_CINEMA_STAMP not set, so this run carries no "
-                           "provenance line · full disclosures: docs/assets/cinema/NOTES.md",
+                     ? fmt("%s · provenance unavailable · docs/assets/cinema/NOTES.md",
                            part.c_str())
-                     : fmt("%s · %s · full disclosures: docs/assets/cinema/NOTES.md",
+                     : fmt("%s · %s · docs/assets/cinema/NOTES.md",
                            part.c_str(), hud.stamp.c_str());
     return out;
 }

@@ -689,18 +689,24 @@ fields, which is how the GUI's solve is cross-checked against the CLI's.)
   outside the calibrated envelope, so the configured independently verified
   baseline is generated.
 
-  The cell microscope owns 10.2 s and spends all of it on one tet10 rather than a
-  dense six-tet cube comparison. The card animates what makes the element
-  higher-order: its six midside nodes lift off their chords and curve all six
-  edges, with the straight tet4 chords left underneath as the dim reference, each
-  curved edge drawn from the quadratic map itself and each face filled as the
-  quadratic triangle's own four sub-triangles. Beneath it the quadratic edge
-  basis $N_1=(1-\xi)(1-2\xi)$, $N_2=\xi(2\xi-1)$, $N_3=4\xi(1-\xi)$ is plotted
-  against the two straight p1 hats, and one lit edge carries the plot's $\xi$
-  cursor so the curve and the geometry are visibly the same three functions. The
-  bottom ledger and manifest continue to identify the executed wishbone solve as
-  tet4/p1, so the card teaches the supported element rather than claiming that
-  this particular solve ran at p2.
+  The cell microscope owns 10.2 s and spends it on the difference between the two
+  element orders rather than on one curved element. Left and right hold the same
+  cell in the same pose against the same circular CAD arc, whose sagitta is 18%
+  of the chord. Both columns open identical — 4 nodes, 12 DOF, a straight edge
+  and a shaded lune where the surface has been missed. Then the right column
+  grows its six midside nodes, lifts them onto the arc, ticks its counters to 10
+  nodes and 30 DOF, and closes the lune; the white arc is stroked over the
+  element's own edge, so "lands on it" is visible rather than asserted. Under
+  each cell a swatch states the strain that order can hold: one flat tone for
+  p1's constant gradient, a ramp for p2's linear one. The plot beneath unrolls
+  the same comparison along the edge — deviation from the straight chord, with
+  the exact arc, the p1 edge pinned at zero, the p2 quadratic on top of the arc,
+  and the shaded area between them being what p1 discards. Every percentage on
+  the card ("18.0% off the CAD arc" against "0.6%") is computed at draw time from
+  the arc drawn beside it: $g(s)=\sqrt{R^2-(s-\tfrac12)^2}-(R-h)$ sampled against
+  $0$ and against $4s(1-s)h$. The bottom ledger and manifest continue to identify
+  the executed wishbone solve as tet4/p1, so the card teaches the supported
+  element rather than claiming that this particular solve ran at p2.
 
   Mechanics symbols remain absent during exact-CAD analysis, advisor inference
   and meshing. Immediately before gradient recovery and final deformation, each

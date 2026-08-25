@@ -164,6 +164,12 @@ class Viewport {
         float reveal = 0.0f;         // elements with index < reveal * count are drawn
         float shrink = 0.0f;         // 0 = touching, 1 = collapsed to centroids
         float mesh_alpha = 1.0f;
+        /// Width of the "just arrived" highlight trailing the reveal front, in
+        /// the same normalised element-index units as `reveal`. Cells inside it
+        /// are lit hot and cool back to their element-type colour as the front
+        /// moves on; 0 disables the highlight entirely. This colours only the
+        /// cinema cell buffers, never the CAD body or the BC overlays.
+        float arrival_band = 0.0f;
         bool edges = true;
         /// Per-element edge opacity, multiplied into `mesh_alpha` for the edge
         /// pass only, and the GL line width that pass draws at.

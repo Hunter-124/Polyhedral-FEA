@@ -31,13 +31,19 @@ The three chapters are concise and visual:
   weighted connections and the feed-forward wave carry the explanation. The
   final pass locks, then—after a 0.55 s causal handoff—the real `MeshStage` cells
   replace the shaded CAD body in emission order while the selected network
-  remains visible. The live shown/total counter follows the same reveal. Advisor
-  scoring and meshing share one chapter, but are not falsely claimed to execute
-  concurrently. When the OOD check abstains, that same path names and generates
-  the configured, independently verified baseline. The 10.2 s microscope then
-  isolates one legible higher-order tetrahedron: four corners, six midside nodes,
-  and all six quadratic edges drawn corner→midside→corner. The bottom ledger
-  remains clear that the published solve itself executed tet4/p1.
+  remains visible. Each cell arrives collapsed toward its own centroid and lit
+  hot, then opens out and cools into its element-type colour, so the reveal reads
+  as cells being placed rather than as a wash over finished geometry; the CAD
+  body clears within the first third of the fill instead of greying out the cells
+  that are arriving. The live shown/total counter follows the same reveal.
+  Advisor scoring and meshing share one chapter, but are not falsely claimed to
+  execute concurrently. When the OOD check abstains, that same path names and
+  generates the configured, independently verified baseline. The 10.2 s
+  microscope then gives the pane to one tet10: its six midside nodes lift off
+  their chords and visibly curve all six edges away from the dim tet4 chords, and
+  the quadratic edge basis $N_1,N_2,N_3$ is plotted beneath with one lit edge
+  sharing the plot's $\xi$ cursor. The bottom ledger remains clear that the
+  published solve itself executed tet4/p1.
 - **Analysis.** The authoritative final solve supplies stress, recovered
   gradient, ZZ verification, refinement and the exact response
   $u(\lambda)=\lambda u$, $\sigma(\lambda)=\lambda\sigma$. The chassis

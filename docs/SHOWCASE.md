@@ -679,17 +679,28 @@ fields, which is how the GUI's solve is cross-checked against the CLI's.)
   the deliberation window. The final pass locks and the actual `MeshStage`
   snapshot begins 0.55 s later without a chapter or panel reset; a live
   shown/total cell counter follows the emission-order reveal while the chosen
-  network remains visible. This preserves the real ordering—chooser first,
-  mesher second—without presenting them as unrelated chapters or pretending
-  they ran concurrently. The OOD check still abstains outside the calibrated
-  envelope, so the configured independently verified baseline is generated.
+  network remains visible. Cells are coloured as they are drawn: a bounded band
+  behind the reveal front arrives collapsed toward each cell's own centroid and
+  lit hot, then opens to full size and cools into its element-type colour, and
+  the CAD body clears over the first third of the fill so the arriving cells are
+  not depth-occluded by a half-opaque surface. This preserves the real
+  ordering—chooser first, mesher second—without presenting them as unrelated
+  chapters or pretending they ran concurrently. The OOD check still abstains
+  outside the calibrated envelope, so the configured independently verified
+  baseline is generated.
 
-  The cell microscope owns 10.2 s and now gives the space to one unambiguous
-  higher-order element rather than a dense six-tet cube comparison. The tet10
-  card shows four corner nodes, all six midside nodes, and every quadratic edge
-  as corner→midside→corner. The bottom ledger and manifest continue to identify
-  the executed wishbone solve as tet4/p1, so the card teaches supported element
-  anatomy rather than claiming that this particular solve ran at p2.
+  The cell microscope owns 10.2 s and spends all of it on one tet10 rather than a
+  dense six-tet cube comparison. The card animates what makes the element
+  higher-order: its six midside nodes lift off their chords and curve all six
+  edges, with the straight tet4 chords left underneath as the dim reference, each
+  curved edge drawn from the quadratic map itself and each face filled as the
+  quadratic triangle's own four sub-triangles. Beneath it the quadratic edge
+  basis $N_1=(1-\xi)(1-2\xi)$, $N_2=\xi(2\xi-1)$, $N_3=4\xi(1-\xi)$ is plotted
+  against the two straight p1 hats, and one lit edge carries the plot's $\xi$
+  cursor so the curve and the geometry are visibly the same three functions. The
+  bottom ledger and manifest continue to identify the executed wishbone solve as
+  tet4/p1, so the card teaches the supported element rather than claiming that
+  this particular solve ran at p2.
 
   Mechanics symbols remain absent during exact-CAD analysis, advisor inference
   and meshing. Immediately before gradient recovery and final deformation, each

@@ -2983,20 +2983,19 @@ void draw_cinema_cells(const CinemaState& state, const CinemaCue& cue,
     dl->AddRectFilled(card_min, card_max, faded(palette.panel_bg, 0.50f * alpha), 8.0f);
     dl->AddRect(card_min, card_max, faded(palette.border, 0.72f * alpha), 8.0f);
 
-    // A p2 tet is not a tet4 with extra dots on it. Its six midside nodes are
-    // the degrees of freedom that bend the element's own geometry and let strain
-    // vary linearly inside the cell, so that is what this card animates: the
-    // midside nodes lift off their chords and curve every edge, with the tet4
-    // chord kept underneath as the dim reference. The plot below is the real
-    // quadratic edge basis, and one lit edge carries the plot's ξ cursor so the
-    // curve and the geometry are visibly the same three functions.
-    const char* title = "tet10 · p2 · quadratic tetrahedron";
+    // The subject of this card is the difference between the two element
+    // orders, so both orders are on it. Left and right hold the same cell in
+    // the same pose against the same CAD arc: a tet4 owns corner nodes only, so
+    // its edge cannot leave the straight chord and misses the surface, while a
+    // tet10's midside nodes slide onto the arc and close that gap. Every
+    // percentage drawn here is measured off the arc beside it at draw time.
+    const char* title = "p1 vs p2 · what the extra nodes buy";
     dl->AddText(font, type.caption, ImVec2(card_min.x + 18.0f, card_min.y + 15.0f),
                 faded(palette.status_ok, alpha), title);
-    const char* topology = "10 nodes · 30 DOF · midside nodes curve the cell (tet4: 4 · 12)";
+    const char* subtitle = "same cell · same CAD arc · only the element order differs";
     dl->AddText(font, type.legend,
                 ImVec2(card_min.x + 18.0f, card_min.y + 15.0f + type.caption * 1.35f),
-                faded(palette.text_dim, alpha), topology);
+                faded(palette.text_dim, alpha), subtitle);
 
     const float t = static_cast<float>(cue.act_t);
     const float fade_seconds = 0.17f * static_cast<float>(cue.act_span);
@@ -3004,27 +3003,47 @@ void draw_cinema_cells(const CinemaState& state, const CinemaCue& cue,
     const float progress =
         std::clamp(visible_t / std::max(0.62f * static_cast<float>(cue.act_span), 1.0e-6f),
                    0.0f, 1.0f);
-    const float corner_alpha = static_cast<float>(smoothstep(progress / 0.26));
-    const float midside_alpha = static_cast<float>(smoothstep((progress - 0.20) / 0.30));
-    const float bend = 0.34f * static_cast<float>(smoothstep((progress - 0.34) / 0.30)) *
-                       (0.80f + 0.20f * std::sin(t * 1.15f));
-    const float plot_alpha =
-        static_cast<float>(smoothstep((progress - 0.52) / 0.30)) * alpha;
+    const float corner_alpha = static_cast<float>(smoothstep(progress / 0.22));
+    const float arc_alpha = static_cast<float>(smoothstep((progress - 0.10) / 0.22));
+    const float midside_alpha = static_cast<float>(smoothstep((progress - 0.26) / 0.32));
+    const float field_alpha = static_cast<float>(smoothstep((progress - 0.44) / 0.26));
+    const float plot_alpha = static_cast<float>(smoothstep((progress - 0.56) / 0.28)) * alpha;
     const float xi = 0.5f - 0.5f * std::cos(t * 0.85f);
 
-    // Quadratic Lagrange basis on an edge: corner nodes at ξ = 0 and 1, midside
-    // node at ξ = 0.5. The same three functions map the edge's geometry and
+    // A circular CAD arc through one edge's two corners, sagitta 18% of the
+    // chord, written as deviation from that chord at chord parameter s. A p1
+    // edge can only ever answer zero here; a p2 edge answers the quadratic
+    // through the arc's own midpoint. The distance between those two answers is
+    // the element order, drawn.
+    constexpr float kSag = 0.18f;
+    constexpr float kArcR = (0.25f + kSag * kSag) / (2.0f * kSag);
+    const auto exact_dev = [](float s) {
+        const float x = s - 0.5f;
+        return std::sqrt(std::max(0.0f, kArcR * kArcR - x * x)) - (kArcR - kSag);
+    };
+    const auto p2_dev = [](float s) { return 4.0f * s * (1.0f - s) * kSag; };
+
+    // Quadratic Lagrange basis on an edge: corners at ξ = 0 and 1, midside node
+    // at ξ = 0.5. The same three functions map the edge's geometry and
     // interpolate its field, which is the whole point of the element.
     const auto basis = [](float s) {
         return std::array<float, 3>{(1.0f - s) * (1.0f - 2.0f * s), s * (2.0f * s - 1.0f),
                                     4.0f * s * (1.0f - s)};
     };
+    const auto mix_color = [](const ImVec4& a, const ImVec4& b, float u) {
+        return ImVec4(a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u, a.z + (b.z - a.z) * u,
+                      a.w + (b.w - a.w) * u);
+    };
 
+    // Posed so that edge 0 — the one held against the CAD arc — has its outward
+    // direction exactly along -y: the centroid of the other two corners sits at
+    // y = +0.025, so chord - centroid is pure -y and the whole sagitta projects
+    // into the screen plane instead of hiding along the view direction.
     static const std::array<Eigen::Vector3f, 4> kCorners{{
-        {-1.0f, -0.78f, -0.58f},
-        {1.0f, -0.72f, -0.52f},
-        {-0.48f, 0.96f, -0.44f},
-        {0.10f, -0.05f, 1.0f},
+        {-1.0f, -0.70f, 0.0f},
+        {1.0f, -0.70f, 0.0f},
+        {-0.25f, 0.95f, -0.55f},
+        {0.25f, 0.55f, 0.55f},
     }};
     static constexpr std::array<std::array<std::size_t, 2>, 6> kEdges{{
         {{0, 1}}, {{0, 2}}, {{0, 3}}, {{1, 2}}, {{1, 3}}, {{2, 3}},
@@ -3033,54 +3052,6 @@ void draw_cinema_cells(const CinemaState& state, const CinemaCue& cue,
         {{0, 1, 2}}, {{0, 1, 3}}, {{0, 2, 3}}, {{1, 2, 3}},
     }};
     constexpr std::size_t kLitEdge = 0;
-
-    // Everything below the element is anchored off the card's bottom so the
-    // basis plot, its legend and the honest solve note cannot collide with the
-    // measured-quality line on a short pane.
-    const float quality_y = card_top + card_h - type.label * 1.8f;
-    const float note_y = quality_y - type.legend * 1.75f;
-    const float legend_y = note_y - type.legend * 1.55f;
-    const float plot_bottom = legend_y - 12.0f;
-    const float plot_top =
-        std::max(card_min.y + 0.52f * card_h, plot_bottom - 0.24f * card_h);
-    const float plot_left = card_min.x + 26.0f;
-    const float plot_right = card_max.x - 26.0f;
-    const float body_top = card_min.y + 0.17f * card_h;
-
-    const float yaw = -0.70f + 0.10f * std::sin(t * 0.42f);
-    const float pitch = 0.46f;
-    const float cy = std::cos(yaw);
-    const float sy = std::sin(yaw);
-    const float cp = std::cos(pitch);
-    const float sp = std::sin(pitch);
-    const float scale =
-        std::min(region.x * 0.26f, std::max(24.0f, 0.42f * (plot_top - body_top)));
-    const ImVec2 center(card_min.x + 0.50f * region.x, 0.5f * (body_top + plot_top));
-    // Orthographic and affine, so projecting the quadratic edge map is the same
-    // curve as the quadratic map of the projected nodes.
-    const auto project = [&](const Eigen::Vector3f& q) {
-        const float rx = cy * q.x() + sy * q.z();
-        const float rz = -sy * q.x() + cy * q.z();
-        const float ry = cp * q.y() - sp * rz;
-        return ImVec2(center.x + scale * rx, center.y - scale * ry);
-    };
-
-    std::array<ImVec2, kCorners.size()> corner2{};
-    Eigen::Vector3f body = Eigen::Vector3f::Zero();
-    for (std::size_t i = 0; i < kCorners.size(); ++i) {
-        corner2[i] = project(kCorners[i]);
-        body += kCorners[i];
-    }
-    body *= 0.25f;
-    std::array<ImVec2, kEdges.size()> mid2{};
-    for (std::size_t e = 0; e < kEdges.size(); ++e) {
-        const Eigen::Vector3f chord =
-            0.5f * (kCorners[kEdges[e][0]] + kCorners[kEdges[e][1]]);
-        Eigen::Vector3f out = chord - body;
-        const float n = out.norm();
-        out = n > 1.0e-6f ? Eigen::Vector3f(out / n) : Eigen::Vector3f::UnitY();
-        mid2[e] = project(chord + bend * out);
-    }
     const auto edge_of = [](std::size_t a, std::size_t b) {
         for (std::size_t e = 0; e < kEdges.size(); ++e) {
             if ((kEdges[e][0] == a && kEdges[e][1] == b) ||
@@ -3090,111 +3061,336 @@ void draw_cinema_cells(const CinemaState& state, const CinemaCue& cue,
         }
         return std::size_t{0};
     };
-    const auto edge_point = [&](std::size_t e, float s) {
-        const std::array<float, 3> n = basis(s);
-        const ImVec2 a = corner2[kEdges[e][0]];
-        const ImVec2 b = corner2[kEdges[e][1]];
-        const ImVec2 m = mid2[e];
-        return ImVec2(n[0] * a.x + n[1] * b.x + n[2] * m.x,
-                      n[0] * a.y + n[1] * b.y + n[2] * m.y);
+
+    // Everything is anchored off the card's bottom so the plot, its legend and
+    // the honest solve note cannot collide with the measured-quality line on a
+    // short pane.
+    const float quality_y = card_top + card_h - type.label * 1.8f;
+    const float note_y = quality_y - type.legend * 1.75f;
+    const float legend_y = note_y - type.legend * 1.55f;
+    const float plot_bottom = legend_y - 12.0f;
+    const float plot_top =
+        std::max(card_min.y + 0.56f * card_h, plot_bottom - 0.22f * card_h);
+    const float plot_left = card_min.x + 26.0f;
+    const float plot_right = card_max.x - 26.0f;
+
+    const float col_top = card_min.y + 15.0f + type.caption * 1.35f + type.legend * 1.85f;
+    const float col_bottom = plot_top - 24.0f;
+    const float head_y = col_top;
+    const float count_y = head_y + type.label * 1.25f;
+    const float miss_y = count_y + type.legend * 1.40f;
+    const float caption_y = col_bottom - type.legend * 1.15f;
+    const float swatch_y = caption_y - 17.0f;
+    const float body_top = miss_y + type.legend * 1.55f;
+    const float body_bottom = swatch_y - 8.0f;
+    const float col_w = 0.46f * region.x;
+    dl->AddLine(ImVec2(card_min.x + 0.5f * region.x, col_top),
+                ImVec2(card_min.x + 0.5f * region.x, col_bottom),
+                faded(palette.border, 0.55f * alpha), 1.0f);
+
+    const float yaw = -0.42f + 0.10f * std::sin(t * 0.42f);
+    const float pitch = 0.46f;
+    const float cy = std::cos(yaw);
+    const float sy = std::sin(yaw);
+    const float cp = std::cos(pitch);
+    const float sp = std::sin(pitch);
+    const float scale =
+        std::min(0.34f * col_w, std::max(22.0f, 0.44f * (body_bottom - body_top)));
+    // Orthographic and affine, so projecting a quadratic edge map is the same
+    // curve as the quadratic map of the projected nodes.
+    const auto project = [&](const Eigen::Vector3f& q, ImVec2 c) {
+        const float rx = cy * q.x() + sy * q.z();
+        const float rz = -sy * q.x() + cy * q.z();
+        const float ry = cp * q.y() - sp * rz;
+        return ImVec2(c.x + scale * rx, c.y - scale * ry);
+    };
+    Eigen::Vector3f body = Eigen::Vector3f::Zero();
+    for (const auto& corner : kCorners) {
+        body += corner;
+    }
+    body *= 0.25f;
+
+    const auto draw_order = [&](float cx, bool quadratic) {
+        const ImVec2 center(cx, 0.5f * (body_top + body_bottom));
+        std::array<ImVec2, kCorners.size()> corner2{};
+        for (std::size_t i = 0; i < kCorners.size(); ++i) {
+            corner2[i] = project(kCorners[i], center);
+        }
+        // A tet10 lifts each midside node off its chord onto the surface it is
+        // meant to represent. A tet4 has no such node, so its interior map uses
+        // the chord midpoint and stays affine — the same code, order zero lift.
+        const float lift = quadratic ? midside_alpha : 0.0f;
+        std::array<ImVec2, kEdges.size()> mid2{};
+        std::array<Eigen::Vector3f, kEdges.size()> up{};
+        for (std::size_t e = 0; e < kEdges.size(); ++e) {
+            const Eigen::Vector3f a = kCorners[kEdges[e][0]];
+            const Eigen::Vector3f b = kCorners[kEdges[e][1]];
+            const Eigen::Vector3f chord = 0.5f * (a + b);
+            const Eigen::Vector3f dir = (b - a).normalized();
+            Eigen::Vector3f out = chord - body;
+            out -= out.dot(dir) * dir;
+            const float n = out.norm();
+            up[e] = n > 1.0e-6f ? Eigen::Vector3f(out / n) : Eigen::Vector3f::UnitY();
+            mid2[e] = project(chord + lift * kSag * (b - a).norm() * up[e], center);
+        }
+        const auto edge_point = [&](std::size_t e, float s) {
+            const std::array<float, 3> n = basis(s);
+            const ImVec2 a = corner2[kEdges[e][0]];
+            const ImVec2 b = corner2[kEdges[e][1]];
+            const ImVec2 m = mid2[e];
+            return ImVec2(n[0] * a.x + n[1] * b.x + n[2] * m.x,
+                          n[0] * a.y + n[1] * b.y + n[2] * m.y);
+        };
+        const auto face_point = [&](const std::array<std::size_t, 3>& face,
+                                    const std::array<float, 3>& l) {
+            ImVec2 p(0.0f, 0.0f);
+            for (std::size_t k = 0; k < 3; ++k) {
+                const float w = l[k] * (2.0f * l[k] - 1.0f);
+                p.x += w * corner2[face[k]].x;
+                p.y += w * corner2[face[k]].y;
+            }
+            for (std::size_t k = 0; k < 3; ++k) {
+                const std::size_t k2 = (k + 1) % 3;
+                const float w = 4.0f * l[k] * l[k2];
+                const ImVec2 m = mid2[edge_of(face[k], face[k2])];
+                p.x += w * m.x;
+                p.y += w * m.y;
+            }
+            return p;
+        };
+
+        const Eigen::Vector3f lit_a = kCorners[kEdges[kLitEdge][0]];
+        const Eigen::Vector3f lit_b = kCorners[kEdges[kLitEdge][1]];
+        const float lit_len = (lit_b - lit_a).norm();
+        const auto surface_point = [&](float s, float dev) {
+            return project(lit_a + (lit_b - lit_a) * s + up[kLitEdge] * (lit_len * dev),
+                           center);
+        };
+        const auto element_dev = [&](float s) { return quadratic ? lift * p2_dev(s) : 0.0f; };
+
+        // One flat tint for the body: the strain difference is stated in its own
+        // swatch below, where a ramp reads at video scale instead of fighting
+        // the element's own edges and nodes for the same pixels. Filled on a
+        // barycentric grid through the quadratic face map so the tint reaches
+        // the bulged rim instead of leaving a dark crescent inside each curved
+        // edge, with the AA fringe off so the grid leaves no seams.
+        const ImU32 tint = faded(palette.accent, 0.085f * corner_alpha * alpha);
+        {
+            constexpr int kSub = 5;
+            const auto lattice = [](int p, int q) {
+                const float l2 = static_cast<float>(p) / static_cast<float>(kSub);
+                const float l3 = static_cast<float>(q) / static_cast<float>(kSub);
+                return std::array<float, 3>{1.0f - l2 - l3, l2, l3};
+            };
+            const ImDrawListFlags saved = dl->Flags;
+            dl->Flags &= ~ImDrawListFlags_AntiAliasedFill;
+            for (const auto& face : kFaces) {
+                for (int i = 0; i < kSub; ++i) {
+                    for (int j = 0; i + j < kSub; ++j) {
+                        dl->AddTriangleFilled(face_point(face, lattice(i, j)),
+                                              face_point(face, lattice(i + 1, j)),
+                                              face_point(face, lattice(i, j + 1)), tint);
+                        if (i + j + 2 <= kSub) {
+                            dl->AddTriangleFilled(face_point(face, lattice(i + 1, j)),
+                                                  face_point(face, lattice(i + 1, j + 1)),
+                                                  face_point(face, lattice(i, j + 1)), tint);
+                        }
+                    }
+                }
+            }
+            dl->Flags = saved;
+        }
+
+        // The lune between the element's edge and the CAD arc is the geometry
+        // this order gets wrong: permanent for p1, collapsing as the p2 midside
+        // node reaches the arc. Filled as an explicit triangle strip between
+        // the two curves — a concave-polygon fill of a crescent this thin drops
+        // slivers, and a gap that renders as dashes is worse than no gap.
+        constexpr int kArcSamples = 26;
+        if (arc_alpha > 0.0f) {
+            // Anti-aliased fills fringe every triangle, and a strip of them
+            // seams into visible hatching. The fringe is off for the strip only.
+            const ImU32 gap_fill = faded(palette.status_err, 0.46f * arc_alpha * alpha);
+            const ImDrawListFlags saved = dl->Flags;
+            dl->Flags &= ~ImDrawListFlags_AntiAliasedFill;
+            for (int k = 0; k < kArcSamples; ++k) {
+                const float s0 = static_cast<float>(k) / kArcSamples;
+                const float s1 = static_cast<float>(k + 1) / kArcSamples;
+                const ImVec2 a0 = surface_point(s0, exact_dev(s0));
+                const ImVec2 a1 = surface_point(s1, exact_dev(s1));
+                const ImVec2 e0 = surface_point(s0, element_dev(s0));
+                const ImVec2 e1 = surface_point(s1, element_dev(s1));
+                dl->AddTriangleFilled(a0, a1, e1, gap_fill);
+                dl->AddTriangleFilled(a0, e1, e0, gap_fill);
+            }
+            dl->Flags = saved;
+        }
+
+        for (std::size_t e = 0; e < kEdges.size(); ++e) {
+            if (quadratic) {
+                // The chord the midside node left behind, kept as the dim tet4
+                // reference inside the p2 column too.
+                dl->AddLine(corner2[kEdges[e][0]], corner2[kEdges[e][1]],
+                            faded(palette.text_dim, 0.30f * midside_alpha * alpha), 1.2f);
+            }
+            constexpr int kEdgeSamples = 18;
+            for (int k = 0; k <= kEdgeSamples; ++k) {
+                dl->PathLineTo(edge_point(e, static_cast<float>(k) / kEdgeSamples));
+            }
+            const bool lit = e == kLitEdge;
+            dl->PathStroke(faded(lit ? palette.status_warn : palette.status_ok,
+                                 (lit ? 0.95f : 0.60f) * corner_alpha * alpha),
+                           0, lit ? 2.8f : 2.4f);
+        }
+        if (arc_alpha > 0.0f) {
+            // The arc is stroked after the element's own edges, so in the p2
+            // column the surface rides visibly along the edge that landed on
+            // it — "lands on it" is a thing to see, not a claim to read.
+            for (int k = 0; k <= kArcSamples; ++k) {
+                const float s = static_cast<float>(k) / kArcSamples;
+                dl->PathLineTo(surface_point(s, exact_dev(s)));
+            }
+            dl->PathStroke(faded(palette.text, 0.85f * arc_alpha * alpha), 0, 2.2f);
+        }
+        if (quadratic) {
+            // Midside nodes are diamonds and corners are circles: at video
+            // scale a shape difference survives where a radius difference does
+            // not, and the count difference is the point of the card.
+            for (const ImVec2 mid : mid2) {
+                dl->AddNgonFilled(mid, 6.2f, faded(palette.status_ok, midside_alpha * alpha),
+                                  4);
+                dl->AddNgon(mid, 9.6f,
+                            faded(palette.status_ok, 0.40f * midside_alpha * alpha), 4, 1.4f);
+            }
+        }
+        for (const ImVec2 point : corner2) {
+            dl->AddCircleFilled(point, 6.6f, faded(palette.text, corner_alpha * alpha));
+            dl->AddCircle(point, 9.6f,
+                          faded(palette.accent_soft_top, 0.45f * corner_alpha * alpha), 0,
+                          1.6f);
+        }
+
+        // The gap tick, then the same number in text: measured off the drawn
+        // arc, so it falls as the midside node climbs onto it.
+        float miss = 0.0f;
+        for (int k = 0; k <= 64; ++k) {
+            const float s = static_cast<float>(k) / 64.0f;
+            miss = std::max(miss, std::abs(exact_dev(s) - element_dev(s)));
+        }
+        const ImVec4 miss_color = miss > 0.02f ? palette.status_err : palette.status_ok;
+        dl->AddLine(surface_point(0.5f, element_dev(0.5f)),
+                    surface_point(0.5f, exact_dev(0.5f)),
+                    faded(miss_color, 0.90f * arc_alpha * alpha), 1.8f);
+
+        const auto centered = [&](float y, float px, const char* text, const ImVec4& color,
+                                  float a) {
+            const float w = font->CalcTextSizeA(px, FLT_MAX, 0.0f, text).x;
+            dl->AddText(font, px, ImVec2(cx - 0.5f * w, y), faded(color, a), text);
+        };
+        centered(head_y, type.label, quadratic ? "tet10 · p2" : "tet4 · p1",
+                 quadratic ? palette.status_ok : palette.text, alpha);
+        const int nodes =
+            quadratic ? 4 + static_cast<int>(std::lround(6.0f * midside_alpha)) : 4;
+        const int dof =
+            quadratic ? 12 + static_cast<int>(std::lround(18.0f * midside_alpha)) : 12;
+        centered(count_y, type.legend, fmt("%d nodes · %d DOF", nodes, dof).c_str(),
+                 palette.text_dim, alpha);
+        centered(miss_y, type.legend, fmt("%.1f%% off the CAD arc", 100.0f * miss).c_str(),
+                 miss_color, arc_alpha * alpha);
+
+        // Strain order as a swatch across the cell: a p1 tet can only hold one
+        // constant gradient, so its bar is one tone, while a p2 tet's varies
+        // linearly inside the cell, so its bar ramps. Same two end colours in
+        // both, so the flat bar is read as the degenerate case of the ramp.
+        if (field_alpha > 0.0f) {
+            const float swatch_w = std::min(0.62f * col_w, 220.0f);
+            const ImVec2 swatch_min(cx - 0.5f * swatch_w, swatch_y);
+            const ImVec2 swatch_max(cx + 0.5f * swatch_w, swatch_y + 11.0f);
+            const ImVec4 lo = palette.status_ok;
+            const ImVec4 hi = palette.status_err;
+            const float a = 0.80f * field_alpha * alpha;
+            if (quadratic) {
+                dl->AddRectFilledMultiColor(swatch_min, swatch_max, faded(lo, a),
+                                            faded(hi, a), faded(hi, a), faded(lo, a));
+            } else {
+                dl->AddRectFilled(swatch_min, swatch_max,
+                                  faded(mix_color(lo, hi, 0.5f), a));
+            }
+            dl->AddRect(swatch_min, swatch_max, faded(palette.border, a), 2.0f);
+        }
+        centered(caption_y, type.legend,
+                 quadratic ? "strain varies linearly in the cell"
+                           : "strain is constant in the cell",
+                 palette.text_dim, field_alpha * alpha);
     };
 
-    // Each curved face is filled as the quadratic triangle's own four
-    // sub-triangles, so the tint follows the bent boundary instead of the
-    // straight one.
-    const ImU32 tint = faded(palette.accent, 0.085f * corner_alpha * alpha);
-    for (const auto& face : kFaces) {
-        const ImVec2 m01 = mid2[edge_of(face[0], face[1])];
-        const ImVec2 m12 = mid2[edge_of(face[1], face[2])];
-        const ImVec2 m20 = mid2[edge_of(face[2], face[0])];
-        dl->AddTriangleFilled(corner2[face[0]], m01, m20, tint);
-        dl->AddTriangleFilled(m01, corner2[face[1]], m12, tint);
-        dl->AddTriangleFilled(m20, m12, corner2[face[2]], tint);
-        dl->AddTriangleFilled(m01, m12, m20, tint);
-    }
-    for (std::size_t e = 0; e < kEdges.size(); ++e) {
-        // The straight chord is the tet4 edge the midside node left behind: the
-        // bend then reads as a difference between two elements, not as styling.
-        dl->AddLine(corner2[kEdges[e][0]], corner2[kEdges[e][1]],
-                    faded(palette.text_dim, 0.34f * midside_alpha * alpha), 1.2f);
-        const bool lit = e == kLitEdge;
-        constexpr int kEdgeSamples = 18;
-        for (int k = 0; k <= kEdgeSamples; ++k) {
-            dl->PathLineTo(edge_point(e, static_cast<float>(k) / kEdgeSamples));
-        }
-        dl->PathStroke(faded(lit ? palette.status_warn : palette.status_ok,
-                             (lit ? 0.95f : 0.62f) * corner_alpha * alpha),
-                       0, lit ? 3.6f : 2.6f);
-    }
-    for (const ImVec2 mid : mid2) {
-        // Midside nodes are diamonds and corners are circles: at video scale a
-        // shape difference survives where a radius difference does not.
-        dl->AddNgonFilled(mid, 6.6f, faded(palette.status_ok, midside_alpha * alpha), 4);
-        dl->AddNgon(mid, 10.0f, faded(palette.status_ok, 0.42f * midside_alpha * alpha), 4,
-                    1.4f);
-    }
-    for (const ImVec2 point : corner2) {
-        dl->AddCircleFilled(point, 7.0f, faded(palette.text, corner_alpha * alpha));
-        dl->AddCircle(point, 10.0f,
-                      faded(palette.accent_soft_top, 0.48f * corner_alpha * alpha), 0, 1.6f);
-    }
+    draw_order(card_min.x + 0.27f * region.x, false);
+    draw_order(card_min.x + 0.73f * region.x, true);
 
     if (plot_alpha > 0.0f) {
-        const ImVec2 marker = edge_point(kLitEdge, xi);
-        dl->AddCircleFilled(marker, 5.2f, faded(palette.status_warn, plot_alpha));
-        dl->AddCircle(marker, 11.0f, faded(palette.status_warn, 0.55f * plot_alpha), 0, 1.8f);
-
         const ImVec2 frame_min(plot_left - 12.0f, plot_top - 10.0f);
         const ImVec2 frame_max(plot_right + 12.0f, plot_bottom + 10.0f);
         dl->AddRectFilled(frame_min, frame_max, faded(palette.panel_bg, 0.72f * plot_alpha),
                           6.0f);
         dl->AddRect(frame_min, frame_max, faded(palette.border, 0.85f * plot_alpha), 6.0f);
+        constexpr float kPlotLo = -0.015f;
+        constexpr float kPlotHi = kSag * 1.18f;
         const auto at = [&](float s, float v) {
             return ImVec2(plot_left + (plot_right - plot_left) * s,
-                          plot_bottom - (plot_bottom - plot_top) * (v + 0.20f) / 1.20f);
+                          plot_bottom - (plot_bottom - plot_top) * (v - kPlotLo) /
+                                            (kPlotHi - kPlotLo));
         };
-        // N = 0 and N = 1 rails, then the two straight hats a tet4 edge
-        // interpolates with, so the quadratic curves are read against p1.
+        // The shaded area is the deviation a straight edge cannot represent: the
+        // same lune as the left column, unrolled along the edge. Triangle strip
+        // for the same reason as the lune — a thin concave fill drops slivers.
+        constexpr int kSamples = 48;
+        const ImU32 band_fill = faded(palette.status_err, 0.13f * plot_alpha);
+        const ImDrawListFlags plot_saved = dl->Flags;
+        dl->Flags &= ~ImDrawListFlags_AntiAliasedFill;
+        for (int k = 0; k < kSamples; ++k) {
+            const float s0 = static_cast<float>(k) / kSamples;
+            const float s1 = static_cast<float>(k + 1) / kSamples;
+            dl->AddTriangleFilled(at(s0, exact_dev(s0)), at(s1, exact_dev(s1)),
+                                  at(s1, 0.0f), band_fill);
+            dl->AddTriangleFilled(at(s0, exact_dev(s0)), at(s1, 0.0f), at(s0, 0.0f),
+                                  band_fill);
+        }
+        dl->Flags = plot_saved;
+        for (int k = 0; k <= kSamples; ++k) {
+            const float s = static_cast<float>(k) / kSamples;
+            dl->PathLineTo(at(s, exact_dev(s)));
+        }
+        dl->PathStroke(faded(palette.text, 0.85f * plot_alpha), 0, 3.4f);
         dl->AddLine(at(0.0f, 0.0f), at(1.0f, 0.0f),
-                    faded(palette.text_dim, 0.55f * plot_alpha), 1.2f);
-        dl->AddLine(at(0.0f, 1.0f), at(1.0f, 1.0f),
-                    faded(palette.text_dim, 0.22f * plot_alpha), 1.0f);
-        dl->AddLine(at(0.0f, 1.0f), at(1.0f, 0.0f),
-                    faded(palette.text_dim, 0.26f * plot_alpha), 1.0f);
-        dl->AddLine(at(0.0f, 0.0f), at(1.0f, 1.0f),
-                    faded(palette.text_dim, 0.26f * plot_alpha), 1.0f);
-        constexpr int kPlotSamples = 56;
-        for (int c = 0; c < 3; ++c) {
-            for (int k = 0; k <= kPlotSamples; ++k) {
-                const float s = static_cast<float>(k) / kPlotSamples;
-                dl->PathLineTo(at(s, basis(s)[static_cast<std::size_t>(c)]));
-            }
-            dl->PathStroke(faded(c == 2 ? palette.status_ok : palette.text,
-                                 (c == 2 ? 0.95f : 0.85f) * plot_alpha),
-                           0, c == 2 ? 3.0f : 2.0f);
+                    faded(palette.status_err, 0.95f * plot_alpha), 2.8f);
+        for (int k = 0; k <= kSamples; ++k) {
+            const float s = static_cast<float>(k) / kSamples;
+            dl->PathLineTo(at(s, p2_dev(s)));
         }
-        // Named on the curves themselves; a colour key in a caption is one more
-        // thing to hold in mind while the cursor is moving.
-        dl->AddText(font, type.legend, at(0.02f, 0.88f),
-                    faded(palette.text, 0.85f * plot_alpha), "N1");
-        dl->AddText(font, type.legend, at(0.93f, 0.88f),
-                    faded(palette.text, 0.85f * plot_alpha), "N2");
-        dl->AddText(font, type.legend, at(0.47f, 0.88f),
-                    faded(palette.status_ok, 0.95f * plot_alpha), "N3");
-        const std::array<float, 3> n_xi = basis(xi);
-        dl->AddLine(at(xi, -0.20f), at(xi, 1.0f),
+        dl->PathStroke(faded(palette.status_ok, 0.95f * plot_alpha), 0, 2.2f);
+        dl->AddText(font, type.legend,
+                    ImVec2(at(0.16f, exact_dev(0.16f)).x, at(0.16f, exact_dev(0.16f)).y -
+                                                              type.legend * 1.45f),
+                    faded(palette.text, 0.90f * plot_alpha), "CAD arc");
+        dl->AddText(font, type.legend, at(0.50f, 0.62f * kSag),
+                    faded(palette.status_ok, 0.95f * plot_alpha), "p2 edge lands on it");
+        dl->AddText(font, type.legend,
+                    ImVec2(at(0.05f, 0.0f).x, at(0.05f, 0.0f).y + 4.0f),
+                    faded(palette.status_err, 0.95f * plot_alpha), "p1 edge");
+        dl->AddLine(at(xi, kPlotLo), at(xi, kPlotHi),
                     faded(palette.status_warn, 0.45f * plot_alpha), 1.4f);
-        for (int c = 0; c < 3; ++c) {
-            dl->AddCircleFilled(at(xi, n_xi[static_cast<std::size_t>(c)]), 4.2f,
-                                faded(c == 2 ? palette.status_ok : palette.text, plot_alpha));
-        }
-        const std::string cursor = fmt("ξ %.2f   N3 %.2f", xi, n_xi[2]);
+        dl->AddCircleFilled(at(xi, exact_dev(xi)), 4.2f, faded(palette.text, plot_alpha));
+        dl->AddCircleFilled(at(xi, p2_dev(xi)), 4.2f, faded(palette.status_ok, plot_alpha));
+        dl->AddCircleFilled(at(xi, 0.0f), 4.2f, faded(palette.status_err, plot_alpha));
+        const std::string cursor =
+            fmt("ξ %.2f · p1 off %.1f%% · p2 off %.2f%%", xi, 100.0f * exact_dev(xi),
+                100.0f * std::abs(exact_dev(xi) - p2_dev(xi)));
         const float cursor_w =
             font->CalcTextSizeA(type.legend, FLT_MAX, 0.0f, cursor.c_str()).x;
         dl->AddText(font, type.legend, ImVec2(plot_right - cursor_w - 4.0f, plot_top + 2.0f),
                     faded(palette.status_warn, plot_alpha), cursor.c_str());
-        const char* legend =
-            "corner · midside basis on one edge · ξ runs along the lit edge · dim: tet4 linear";
+        const char* legend = "deviation from the straight chord · % of edge length · the "
+                             "shaded area is what p1 discards";
         dl->AddText(font, type.legend, ImVec2(plot_left, legend_y),
                     faded(palette.text_dim, plot_alpha), legend);
     }

@@ -39,11 +39,13 @@ The three chapters are concise and visual:
   Advisor scoring and meshing share one chapter, but are not falsely claimed to
   execute concurrently. When the OOD check abstains, that same path names and
   generates the configured, independently verified baseline. The 10.2 s
-  microscope then gives the pane to one tet10: its six midside nodes lift off
-  their chords and visibly curve all six edges away from the dim tet4 chords, and
-  the quadratic edge basis $N_1,N_2,N_3$ is plotted beneath with one lit edge
-  sharing the plot's $\xi$ cursor. The bottom ledger remains clear that the
-  published solve itself executed tet4/p1.
+  microscope then puts both element orders side by side against one CAD arc: the
+  columns open identical (4 nodes · 12 DOF · 18.0% off the arc), then the right
+  one grows its six midside nodes onto the arc, ticks to 10 nodes · 30 DOF, and
+  collapses the shaded miss to 0.6%, while a swatch under each cell states the
+  strain each order can hold — constant against linear. Every percentage is
+  measured at draw time off the arc drawn beside it. The bottom ledger remains
+  clear that the published solve itself executed tet4/p1.
 - **Analysis.** The authoritative final solve supplies stress, recovered
   gradient, ZZ verification, refinement and the exact response
   $u(\lambda)=\lambda u$, $\sigma(\lambda)=\lambda\sigma$. The chassis

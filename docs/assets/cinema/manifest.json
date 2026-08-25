@@ -1,8 +1,8 @@
 {
   "schema": "polymesh.cinema.manifest/1",
-  "generated_utc": "2026-08-25T08:02:41Z",
-  "git_rev": "d09966b+dirty",
-  "stamp": "git d09966b+dirty \u00b7 model.onnx sha256 03b4062c8c2b",
+  "generated_utc": "2026-08-25T17:56:40Z",
+  "git_rev": "8af15fe+dirty",
+  "stamp": "git 8af15fe+dirty \u00b7 model.onnx sha256 03b4062c8c2b",
   "stages_run": [
     "frames",
     "gif",
@@ -54,7 +54,7 @@
     ],
     "auto_spec": "load tests/fixtures/parts/wishbone.step; h 5.5; material 200 0.3; mesher tet; solver direct; order 1; feature off; spectral on; fix 9; fix 10; loadface 5 -2500 0 -4000; cinema on; cinema advisor bench/advisor; adapt 0 0; wire off; solve; record /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames 3600; quit",
     "env": {
-      "POLYMESH_CINEMA_STAMP": "git d09966b+dirty \u00b7 model.onnx sha256 03b4062c8c2b"
+      "POLYMESH_CINEMA_STAMP": "git 8af15fe+dirty \u00b7 model.onnx sha256 03b4062c8c2b"
     },
     "xvfb_screen": "1920x1080",
     "frame_size": "1920x1080",
@@ -62,7 +62,7 @@
     "frame_count": 3600,
     "fps": 60,
     "duration_s": 60.0,
-    "gui_wall_s": 1613.664,
+    "gui_wall_s": 1597.159,
     "ffmpeg": "ffmpeg version 8.1.2 Copyright (c) 2000-2026 the FFmpeg developers"
   },
   "report": {
@@ -239,8 +239,8 @@
       "pix_fmt": "yuv420p",
       "faststart": true,
       "fps": 60,
-      "bytes": 17040281,
-      "sha256": "c1be37455e872867b4e359620ffd546075f2c9feddf6f6df8060c5ed0f5f801e"
+      "bytes": 16753658,
+      "sha256": "b87ff152d90dcf26a6a2f2082c13d204f6058f77b896138a25811945ccf32f60"
     },
     "gif": {
       "file": "advisor_cinema.gif",
@@ -248,33 +248,33 @@
       "fps": 10,
       "start_s": 0.0,
       "duration_s": 60.0,
-      "bytes": 6122286,
-      "sha256": "91e762b071b143c5ce87074f9b75382e25e8fb73400eade99a58c48fa4843d46",
+      "bytes": 6836354,
+      "sha256": "cd2f82cc8893d89d3a900e99b0590a88a74d9297f34a6f2fef61f5654c3f3865",
       "attempts": [
         {
           "width": 1100,
           "fps": 12,
-          "bytes": 14357930
+          "bytes": 15175117
         },
         {
           "width": 1100,
           "fps": 10,
-          "bytes": 13822698
+          "bytes": 14121793
         },
         {
           "width": 960,
           "fps": 10,
-          "bytes": 10151565
+          "bytes": 11907089
         },
         {
           "width": 860,
           "fps": 10,
-          "bytes": 8885619
+          "bytes": 9163312
         },
         {
           "width": 720,
           "fps": 10,
-          "bytes": 6122286
+          "bytes": 6836354
         }
       ],
       "max_bytes": 8388608,
@@ -285,9 +285,9 @@
       "source_frame": 143,
       "width": 1920,
       "height": 1080,
-      "bytes": 162362,
+      "bytes": 162207,
       "source_bytes": 8296178,
-      "sha256": "fb29f9e13636c39ac1557e37c02bd9c82804b650cad4c97958acddc5b1e61ab8",
+      "sha256": "0c8556657677e16da8261653b3ec18eaca8050328385be2bc65cbbb11964a55e",
       "frame_source": "reported by the GUI as the first fully-composed frame"
     }
   }

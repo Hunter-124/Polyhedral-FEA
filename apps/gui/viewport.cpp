@@ -24,7 +24,6 @@
 #include <cmath>
 #include <cstdio>
 #include <limits>
-#include <numbers>
 #include <utility>
 #include <unordered_map>
 
@@ -63,25 +62,6 @@ void main() {
     float shade = 0.50 + 0.48 * ndv;
     float rim = pow(1.0 - ndv, 3.0) * 0.20;
     frag = vec4(min(v_color.rgb * shade + vec3(rim), vec3(1.0)), u_alpha * v_color.a);
-})";
-
-constexpr const char* kAssemblyVs = R"(#version 330 core
-layout(location = 0) in vec3 in_pos;
-layout(location = 1) in vec3 in_normal;
-layout(location = 2) in vec4 in_color;
-layout(location = 3) in vec3 in_strip;
-uniform mat4 u_view;
-uniform mat4 u_proj;
-uniform float u_strip;
-out vec3 v_normal;
-out vec4 v_color;
-out vec3 v_pos;
-void main() {
-    vec3 p = in_pos + u_strip * in_strip;
-    v_normal = in_normal;
-    v_color = in_color;
-    v_pos = p;
-    gl_Position = u_proj * u_view * vec4(p, 1.0);
 })";
 
 constexpr const char* kLineVs = R"(#version 330 core
@@ -249,38 +229,44 @@ void main() {
     frag = vec4(v_color.rgb, u_alpha * v_color.a);
 })";
 
-// Opening-act target-spacing glyphs. Surface and selected-edge samples carry
-// the production size field before/after spectral truncation. The shader only
-// turns physical h into a relative marker diameter and colour: larger rings are
-// coarser target cells, smaller orange rings are finer target cells.
+// Opening-act evidence glyphs. Surface samples carry physical target spacing;
+// selected-edge samples carry measured curvature. Each family is normalised on
+// the CPU independently, so colour never equates curvature with cell size. The
+// edge cursor is the same scalar that drives the κ(s) graph.
 constexpr const char* kSizingVs = R"(#version 330 core
 layout(location = 0) in vec3 in_pos;
-layout(location = 1) in float in_h_before;
-layout(location = 2) in float in_h_after;
+layout(location = 1) in float in_value_before;
+layout(location = 2) in float in_value_after;
 layout(location = 3) in float in_order;
 layout(location = 4) in float in_kind;
 uniform mat4 u_view;
 uniform mat4 u_proj;
 uniform float u_edge_reveal;
+uniform float u_edge_cursor;
+uniform float u_edge_cursor_alpha;
 uniform float u_field_reveal;
 uniform float u_filter_mix;
 uniform float u_alpha;
 out vec4 v_color;
 flat out float v_kind;
 void main() {
-    float reveal = in_kind > 0.5 ? u_edge_reveal : u_field_reveal;
-    float h = mix(in_h_before, in_h_after, u_filter_mix);
+    bool edge = in_kind > 0.5;
+    float reveal = edge ? u_edge_reveal : u_field_reveal;
+    float value = mix(in_value_before, in_value_after, u_filter_mix);
     float visible = in_order <= reveal ? 1.0 : 0.0;
-    vec3 fine = vec3(0.98, 0.39, 0.18);
-    vec3 coarse = vec3(0.20, 0.82, 0.91);
-    vec3 color = mix(fine, coarse, h);
-    if (in_kind > 0.5) {
-        color = mix(color, vec3(1.0), 0.30);
-    }
-    v_color = vec4(color, u_alpha * visible);
+    vec3 low = vec3(0.20, 0.82, 0.91);
+    vec3 high = vec3(0.98, 0.39, 0.18);
+    vec3 color = mix(low, high, value);
+    float cursor = edge
+        ? (1.0 - smoothstep(0.018, 0.085, abs(in_order - u_edge_cursor))) *
+              u_edge_cursor_alpha
+        : 0.0;
+    color = mix(color, vec3(1.0), 0.48 * cursor);
+    float opacity = edge ? (0.42 + 0.58 * cursor) : 1.0;
+    v_color = vec4(color, u_alpha * visible * opacity);
     v_kind = in_kind;
-    gl_PointSize = (in_kind > 0.5 ? mix(9.0, 21.0, h)
-                                  : mix(4.0, 12.0, h));
+    gl_PointSize = edge ? mix(9.0, 23.0, cursor)
+                        : mix(4.0, 12.0, value);
     gl_Position = u_proj * u_view * vec4(in_pos, 1.0);
     // Keep a sample drawn on the surface from losing a z-fight with the cells
     // it is explaining.
@@ -341,22 +327,6 @@ void bind_line_attr(GLuint vao, GLuint vbo) {
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, stride,
                           reinterpret_cast<void*>(3 * sizeof(float)));
-}
-
-void bind_assembly_attr(GLuint vao, GLuint vbo) {
-    glBindVertexArray(vao);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    constexpr GLsizei stride = 13 * sizeof(float); // pos3 normal3 color4 strip3
-    const auto attr = [](GLuint index, GLint size, int offset_floats) {
-        glEnableVertexAttribArray(index);
-        glVertexAttribPointer(index, size, GL_FLOAT, GL_FALSE, stride,
-                              reinterpret_cast<void*>(
-                                  static_cast<std::uintptr_t>(offset_floats) * sizeof(float)));
-    };
-    attr(0, 3, 0);
-    attr(1, 3, 3);
-    attr(2, 4, 6);
-    attr(3, 3, 10);
 }
 
 // Interleaved float counts per vertex for the two cinema buffers. The final
@@ -789,7 +759,6 @@ Viewport::~Viewport() = default;
 
 void Viewport::init() {
     model_program_ = link(kModelVs, kModelFs);
-    assembly_program_ = link(kAssemblyVs, kModelFs);
     background_program_ = link(kBackgroundVs, kBackgroundFs);
     line_program_ = link(kLineVs, kLineFs);
     cinema_program_ = link(kCinemaVs, kCinemaFs);
@@ -808,8 +777,6 @@ void Viewport::init() {
     glGenBuffers(1, &result_edge_vbo_);
     glGenVertexArrays(1, &skeleton_vao_);
     glGenBuffers(1, &skeleton_vbo_);
-    glGenVertexArrays(1, &assembly_vao_);
-    glGenBuffers(1, &assembly_vbo_);
     glGenVertexArrays(1, &cinema_vao_);
     glGenBuffers(1, &cinema_vbo_);
     glGenVertexArrays(1, &cinema_edge_vao_);
@@ -836,7 +803,6 @@ void Viewport::init() {
     bind_line_attr(mesh_edge_vao_, mesh_edge_vbo_);
     bind_line_attr(result_edge_vao_, result_edge_vbo_);
     bind_line_attr(skeleton_vao_, skeleton_vbo_);
-    bind_assembly_attr(assembly_vao_, assembly_vbo_);
     bind_cinema_attr(cinema_vao_, cinema_vbo_);
     bind_cinema_line_attr(cinema_edge_vao_, cinema_edge_vbo_);
     bind_sizing_attr(sizing_vao_, sizing_vbo_);
@@ -1131,217 +1097,50 @@ void Viewport::set_skeleton(const std::vector<std::vector<Eigen::Vector3d>>& pol
                  skeleton_data_.data(), GL_DYNAMIC_DRAW);
 }
 
-void Viewport::set_cinema_assembly_context(
-    const std::vector<Eigen::Vector3d>& support_positions,
-    const std::vector<Eigen::Vector3d>& load_positions,
-    const Eigen::Vector3d& subject_center, double model_diagonal) {
-    std::vector<float> data;
-    constexpr int kSegments = 32;
-    const double scale = std::max(model_diagonal, 1.0e-6);
-    const auto unit_or = [](const Eigen::Vector3d& v, const Eigen::Vector3d& fallback) {
-        const double n = v.norm();
-        return n > 1.0e-12 ? (v / n).eval() : fallback;
-    };
-    const auto emit = [&](const Eigen::Vector3d& p, const Eigen::Vector3d& n,
-                          const ImVec4& color, const Eigen::Vector3d& strip) {
-        data.insert(data.end(),
-                    {static_cast<float>(p.x()), static_cast<float>(p.y()),
-                     static_cast<float>(p.z()), static_cast<float>(n.x()),
-                     static_cast<float>(n.y()), static_cast<float>(n.z()),
-                     color.x, color.y, color.z, color.w,
-                     static_cast<float>(strip.x()), static_cast<float>(strip.y()),
-                     static_cast<float>(strip.z())});
-    };
-    const auto triangle = [&](const Eigen::Vector3d& a, const Eigen::Vector3d& b,
-                              const Eigen::Vector3d& c, const ImVec4& color,
-                              const Eigen::Vector3d& strip) {
-        Eigen::Vector3d normal = (b - a).cross(c - a);
-        const double norm = normal.norm();
-        if (!(norm > 1.0e-12)) {
-            return;
-        }
-        normal /= norm;
-        emit(a, normal, color, strip);
-        emit(b, normal, color, strip);
-        emit(c, normal, color, strip);
-    };
-    const auto quad = [&](const Eigen::Vector3d& a, const Eigen::Vector3d& b,
-                          const Eigen::Vector3d& c, const Eigen::Vector3d& d,
-                          const ImVec4& color, const Eigen::Vector3d& strip) {
-        triangle(a, b, c, color, strip);
-        triangle(a, c, d, color, strip);
-    };
-    const auto cylinder = [&](const Eigen::Vector3d& center,
-                              const Eigen::Vector3d& axis_raw, double radius,
-                              double half_length, const ImVec4& color,
-                              const Eigen::Vector3d& strip) {
-        const Eigen::Vector3d w = unit_or(axis_raw, Eigen::Vector3d::UnitX());
-        const Eigen::Vector3d seed =
-            std::fabs(w.z()) < 0.85 ? Eigen::Vector3d::UnitZ() : Eigen::Vector3d::UnitY();
-        const Eigen::Vector3d u = unit_or(w.cross(seed), Eigen::Vector3d::UnitX());
-        const Eigen::Vector3d v = w.cross(u).normalized();
-        for (int i = 0; i < kSegments; ++i) {
-            const double a0 = 2.0 * std::numbers::pi * static_cast<double>(i) /
-                              static_cast<double>(kSegments);
-            const double a1 = 2.0 * std::numbers::pi * static_cast<double>(i + 1) /
-                              static_cast<double>(kSegments);
-            const Eigen::Vector3d r0 = std::cos(a0) * u + std::sin(a0) * v;
-            const Eigen::Vector3d r1 = std::cos(a1) * u + std::sin(a1) * v;
-            const Eigen::Vector3d lo = center - half_length * w;
-            const Eigen::Vector3d hi = center + half_length * w;
-            quad(lo + radius * r0, hi + radius * r0,
-                 hi + radius * r1, lo + radius * r1, color, strip);
-            triangle(lo, lo + radius * r1, lo + radius * r0, color, strip);
-            triangle(hi, hi + radius * r0, hi + radius * r1, color, strip);
-        }
-    };
-    const auto sphere = [&](const Eigen::Vector3d& center, double radius,
-                            const ImVec4& color, const Eigen::Vector3d& strip) {
-        constexpr int kLatitude = 12;
-        for (int lat = 0; lat < kLatitude; ++lat) {
-            const double p0 = -0.5 * std::numbers::pi +
-                              std::numbers::pi * static_cast<double>(lat) /
-                                  static_cast<double>(kLatitude);
-            const double p1 = -0.5 * std::numbers::pi +
-                              std::numbers::pi * static_cast<double>(lat + 1) /
-                                  static_cast<double>(kLatitude);
-            for (int lon = 0; lon < kSegments; ++lon) {
-                const double t0 = 2.0 * std::numbers::pi * static_cast<double>(lon) /
-                                  static_cast<double>(kSegments);
-                const double t1 =
-                    2.0 * std::numbers::pi * static_cast<double>(lon + 1) /
-                    static_cast<double>(kSegments);
-                const auto point = [&](double p, double t) {
-                    Eigen::Vector3d result;
-                    result.x() = center.x() + radius * std::cos(p) * std::cos(t);
-                    result.y() = center.y() + radius * std::cos(p) * std::sin(t);
-                    result.z() = center.z() + radius * std::sin(p);
-                    return result;
-                };
-                const Eigen::Vector3d a = point(p0, t0);
-                const Eigen::Vector3d b = point(p0, t1);
-                const Eigen::Vector3d c = point(p1, t1);
-                const Eigen::Vector3d d = point(p1, t0);
-                triangle(a, b, c, color, strip);
-                triangle(a, c, d, color, strip);
-            }
-        }
-    };
-
-    Eigen::Vector3d support_center = subject_center;
-    if (!support_positions.empty()) {
-        support_center.setZero();
-        for (const Eigen::Vector3d& p : support_positions) {
-            support_center += p;
-        }
-        support_center /= static_cast<double>(support_positions.size());
-    }
-    Eigen::Vector3d load_center = subject_center;
-    if (!load_positions.empty()) {
-        load_center.setZero();
-        for (const Eigen::Vector3d& p : load_positions) {
-            load_center += p;
-        }
-        load_center /= static_cast<double>(load_positions.size());
-    }
-    Eigen::Vector3d pivot = Eigen::Vector3d::UnitY();
-    if (support_positions.size() >= 2) {
-        pivot = unit_or(support_positions.back() - support_positions.front(), pivot);
-    }
-    const Eigen::Vector3d outboard = unit_or(
-        load_center - support_center,
-        unit_or(subject_center - support_center, Eigen::Vector3d::UnitX()));
-    Eigen::Vector3d vertical = unit_or(outboard.cross(pivot), Eigen::Vector3d::UnitZ());
-    if (vertical.dot(Eigen::Vector3d::UnitZ()) < 0.0) {
-        vertical = -vertical;
-    }
-
-    const ImVec4 steel{0.62f, 0.67f, 0.72f, 1.0f};
-    const ImVec4 dark_steel{0.30f, 0.38f, 0.46f, 1.0f};
-    const Eigen::Vector3d support_strip =
-        -0.22 * scale * outboard;
-    const Eigen::Vector3d joint_strip =
-        0.18 * scale * outboard + 0.08 * scale * vertical;
-
-    constexpr std::array<double, 2> kSides{-1.0, 1.0};
-    for (const Eigen::Vector3d& p : support_positions) {
-        // The shipped eyes are 48 mm long on the pivot axis. Washers sit
-        // directly on those end faces and one bolt crosses the exact bore axis.
-        cylinder(p, pivot, 0.012 * scale, 0.080 * scale,
-                 steel, support_strip);
-        for (const double side : kSides) {
-            cylinder(p + side * 0.056 * scale * pivot, pivot,
-                     0.036 * scale, 0.004 * scale,
-                     dark_steel, support_strip);
-            cylinder(p + side * 0.072 * scale * pivot, pivot,
-                     0.025 * scale, 0.012 * scale,
-                     steel, support_strip);
-        }
-    }
-
-    for (const Eigen::Vector3d& p : load_positions) {
-        // The upright-side boss is vertical. The ball lies in its bore and the
-        // stud/nut continue on that same axis; every visible part intersects
-        // the interface it belongs to.
-        sphere(p + 0.010 * scale * vertical, 0.030 * scale,
-               dark_steel, joint_strip);
-        cylinder(p + 0.074 * scale * vertical, vertical,
-                 0.013 * scale, 0.090 * scale,
-                 steel, joint_strip);
-        cylinder(p + 0.172 * scale * vertical, vertical,
-                 0.027 * scale, 0.012 * scale,
-                 dark_steel, joint_strip);
-    }
-
-    assembly_vertex_count_ = static_cast<int>(data.size() / 13);
-    glBindBuffer(GL_ARRAY_BUFFER, assembly_vbo_);
-    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(data.size() * sizeof(float)),
-                 data.data(), GL_DYNAMIC_DRAW);
-}
-
-void Viewport::set_cinema_sizing_samples(
-    const std::vector<Eigen::Vector3d>& field_points,
-    const std::vector<double>& field_h_before,
-    const std::vector<double>& field_h_after,
-    const std::vector<Eigen::Vector3d>& edge_points,
-    const std::vector<double>& edge_h_before,
-    const std::vector<double>& edge_h_after) {
+void Viewport::set_cinema_feature_samples(const std::vector<Eigen::Vector3d>& field_points,
+                                          const std::vector<double>& field_h_before,
+                                          const std::vector<double>& field_h_after,
+                                          const std::vector<Eigen::Vector3d>& curve_points,
+                                          const std::vector<double>& curvature_raw,
+                                          const std::vector<double>& curvature_filtered) {
     sizing_vertex_count_ = 0;
     const bool field_ok = field_points.size() == field_h_before.size() &&
                           field_points.size() == field_h_after.size();
-    const bool edge_ok = edge_points.size() == edge_h_before.size() &&
-                         edge_points.size() == edge_h_after.size();
-    if (!field_ok || !edge_ok) {
+    const bool curve_ok = curve_points.size() == curvature_raw.size() &&
+                          curve_points.size() == curvature_filtered.size();
+    if (!field_ok || !curve_ok) {
         glBindBuffer(GL_ARRAY_BUFFER, sizing_vbo_);
         glBufferData(GL_ARRAY_BUFFER, 0, nullptr, GL_DYNAMIC_DRAW);
         return;
     }
 
-    double h_lo = std::numeric_limits<double>::infinity();
-    double h_hi = 0.0;
-    const auto measure = [&](const std::vector<double>& values) {
-        for (const double h : values) {
-            if (std::isfinite(h) && h > 0.0) {
-                h_lo = std::min(h_lo, h);
-                h_hi = std::max(h_hi, h);
+    const auto value_range = [](const std::vector<double>& before,
+                                const std::vector<double>& after) {
+        double lo = std::numeric_limits<double>::infinity();
+        double hi = -std::numeric_limits<double>::infinity();
+        const auto measure = [&](const std::vector<double>& values) {
+            for (const double value : values) {
+                if (std::isfinite(value)) {
+                    lo = std::min(lo, value);
+                    hi = std::max(hi, value);
+                }
             }
-        }
+        };
+        measure(before);
+        measure(after);
+        return std::pair{lo, hi};
     };
-    measure(field_h_before);
-    measure(field_h_after);
-    measure(edge_h_before);
-    measure(edge_h_after);
-    if (!std::isfinite(h_lo) || !(h_hi > 0.0)) {
-        glBindBuffer(GL_ARRAY_BUFFER, sizing_vbo_);
-        glBufferData(GL_ARRAY_BUFFER, 0, nullptr, GL_DYNAMIC_DRAW);
-        return;
-    }
-    const double h_span = std::max(h_hi - h_lo, std::numeric_limits<double>::epsilon());
-    const auto normalise_h = [&](double h) {
-        if (!std::isfinite(h) || !(h > 0.0)) {
+    const auto [h_lo, h_hi] = value_range(field_h_before, field_h_after);
+    const auto [k_lo, k_hi] = value_range(curvature_raw, curvature_filtered);
+    const auto normalise = [](double value, double lo, double hi) {
+        if (!std::isfinite(value) || !std::isfinite(lo) || !std::isfinite(hi)) {
             return 0.5f;
         }
-        return static_cast<float>(std::clamp((h - h_lo) / h_span, 0.0, 1.0));
+        const double span = hi - lo;
+        if (!(span > std::numeric_limits<double>::epsilon())) {
+            return 0.5f;
+        }
+        return static_cast<float>(std::clamp((value - lo) / span, 0.0, 1.0));
     };
 
     Eigen::Vector3d lo = Eigen::Vector3d::Zero();
@@ -1364,27 +1163,27 @@ void Viewport::set_cinema_sizing_samples(
     const double sweep_span = std::max(extent[sweep_axis], 1.0e-12);
 
     std::vector<float> data;
-    data.reserve((field_points.size() + edge_points.size()) * 7);
-    const auto append = [&](const Eigen::Vector3d& p, double before, double after,
-                            float order, float kind) {
-        data.insert(data.end(),
-                    {static_cast<float>(p.x()), static_cast<float>(p.y()),
-                     static_cast<float>(p.z()), normalise_h(before),
-                     normalise_h(after), order, kind});
+    data.reserve((field_points.size() + curve_points.size()) * 7);
+    const auto append = [&](const Eigen::Vector3d& p, float before, float after, float order,
+                            float kind) {
+        data.insert(data.end(), {static_cast<float>(p.x()), static_cast<float>(p.y()),
+                                 static_cast<float>(p.z()), before, after, order, kind});
     };
     for (std::size_t i = 0; i < field_points.size(); ++i) {
         const float order = static_cast<float>(
             std::clamp((field_points[i][sweep_axis] - lo[sweep_axis]) / sweep_span, 0.0, 1.0));
-        append(field_points[i], field_h_before[i], field_h_after[i], order, 0.0f);
+        append(field_points[i], normalise(field_h_before[i], h_lo, h_hi),
+               normalise(field_h_after[i], h_lo, h_hi), order, 0.0f);
     }
-    const double edge_denom =
-        edge_points.size() > 1 ? static_cast<double>(edge_points.size() - 1) : 1.0;
-    for (std::size_t i = 0; i < edge_points.size(); ++i) {
-        append(edge_points[i], edge_h_before[i], edge_h_after[i],
-               static_cast<float>(static_cast<double>(i) / edge_denom), 1.0f);
+    const double curve_denom =
+        curve_points.size() > 1 ? static_cast<double>(curve_points.size() - 1) : 1.0;
+    for (std::size_t i = 0; i < curve_points.size(); ++i) {
+        append(curve_points[i], normalise(curvature_raw[i], k_lo, k_hi),
+               normalise(curvature_filtered[i], k_lo, k_hi),
+               static_cast<float>(static_cast<double>(i) / curve_denom), 1.0f);
     }
 
-    sizing_vertex_count_ = static_cast<int>(field_points.size() + edge_points.size());
+    sizing_vertex_count_ = static_cast<int>(field_points.size() + curve_points.size());
     glBindBuffer(GL_ARRAY_BUFFER, sizing_vbo_);
     glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(data.size() * sizeof(float)),
                  data.data(), GL_DYNAMIC_DRAW);
@@ -2102,8 +1901,7 @@ void Viewport::draw_cinema(const Eigen::Matrix4f& view, const Eigen::Matrix4f& p
     const float reveal = std::clamp(cinema_view_.reveal, 0.0f, 1.0f);
     const float shrink = std::clamp(cinema_view_.shrink, 0.0f, 1.0f);
     const float mesh_alpha = std::clamp(cinema_view_.mesh_alpha, 0.0f, 1.0f);
-    const bool incremental =
-        cinema_view_.incremental_transition && cinema_transition_active_;
+    const bool incremental = cinema_view_.incremental_transition && cinema_transition_active_;
     const float transition = std::clamp(cinema_view_.transition_progress, 0.0f, 1.0f);
 
     glEnable(GL_BLEND);
@@ -2116,30 +1914,10 @@ void Viewport::draw_cinema(const Eigen::Matrix4f& view, const Eigen::Matrix4f& p
                            view.data());
         glUniformMatrix4fv(glGetUniformLocation(model_program_, "u_proj"), 1, GL_FALSE,
                            proj.data());
-        glUniform3f(glGetUniformLocation(model_program_, "u_eye"),
-                    eye.x(), eye.y(), eye.z());
+        glUniform3f(glGetUniformLocation(model_program_, "u_eye"), eye.x(), eye.y(), eye.z());
         glUniform1f(glGetUniformLocation(model_program_, "u_alpha"), model_alpha);
         glBindVertexArray(model_vao_);
         glDrawArrays(GL_TRIANGLES, 0, model_vertex_count_);
-    }
-
-    const float assembly_alpha =
-        std::clamp(cinema_view_.assembly_alpha, 0.0f, 1.0f);
-    if (assembly_vertex_count_ > 0 && assembly_alpha > 0.0f) {
-        glUseProgram(assembly_program_);
-        glUniformMatrix4fv(glGetUniformLocation(assembly_program_, "u_view"), 1, GL_FALSE,
-                           view.data());
-        glUniformMatrix4fv(glGetUniformLocation(assembly_program_, "u_proj"), 1, GL_FALSE,
-                           proj.data());
-        glUniform3f(glGetUniformLocation(assembly_program_, "u_eye"),
-                    eye.x(), eye.y(), eye.z());
-        glUniform1f(glGetUniformLocation(assembly_program_, "u_alpha"), assembly_alpha);
-        glUniform1f(glGetUniformLocation(assembly_program_, "u_strip"),
-                    std::clamp(cinema_view_.assembly_strip, 0.0f, 1.0f));
-        glDepthMask(GL_FALSE);
-        glBindVertexArray(assembly_vao_);
-        glDrawArrays(GL_TRIANGLES, 0, assembly_vertex_count_);
-        glDepthMask(GL_TRUE);
     }
 
     if (skeleton_vertex_count_ > 0 && skeleton_alpha > 0.0f) {
@@ -2179,8 +1957,7 @@ void Viewport::draw_cinema(const Eigen::Matrix4f& view, const Eigen::Matrix4f& p
         glLineWidth(1.0f);
     }
 
-    const float sizing_alpha =
-        std::clamp(cinema_view_.spectral_overlay_alpha, 0.0f, 1.0f);
+    const float sizing_alpha = std::clamp(cinema_view_.spectral_overlay_alpha, 0.0f, 1.0f);
     if (sizing_vertex_count_ > 0 && sizing_alpha > 0.0f) {
         glUseProgram(sizing_program_);
         glUniformMatrix4fv(glGetUniformLocation(sizing_program_, "u_view"), 1, GL_FALSE,
@@ -2189,6 +1966,10 @@ void Viewport::draw_cinema(const Eigen::Matrix4f& view, const Eigen::Matrix4f& p
                            proj.data());
         glUniform1f(glGetUniformLocation(sizing_program_, "u_edge_reveal"),
                     std::clamp(cinema_view_.spectral_edge_reveal, 0.0f, 1.0f));
+        glUniform1f(glGetUniformLocation(sizing_program_, "u_edge_cursor"),
+                    std::clamp(cinema_view_.spectral_curve_cursor, 0.0f, 1.0f));
+        glUniform1f(glGetUniformLocation(sizing_program_, "u_edge_cursor_alpha"),
+                    std::clamp(cinema_view_.spectral_curve_cursor_alpha, 0.0f, 1.0f));
         glUniform1f(glGetUniformLocation(sizing_program_, "u_field_reveal"),
                     std::clamp(cinema_view_.spectral_field_reveal, 0.0f, 1.0f));
         glUniform1f(glGetUniformLocation(sizing_program_, "u_filter_mix"),
@@ -2206,8 +1987,7 @@ void Viewport::draw_cinema(const Eigen::Matrix4f& view, const Eigen::Matrix4f& p
 
     // An incremental transition still draws persistent/removed cells when the
     // added-cell reveal is zero.
-    if (cinema_vertex_count_ > 0 && (reveal > 0.0f || incremental) &&
-        mesh_alpha > 0.0f) {
+    if (cinema_vertex_count_ > 0 && (reveal > 0.0f || incremental) && mesh_alpha > 0.0f) {
         const bool draw_edges = cinema_view_.edges && cinema_edge_vertex_count_ > 0 &&
                                 cinema_view_.edge_alpha > 0.0f;
         if (draw_edges) {

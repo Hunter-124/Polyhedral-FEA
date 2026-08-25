@@ -207,12 +207,16 @@ struct CinemaHistogram {
 };
 
 /// One mechanics callout anchored to the selected CAD region that supplied it.
-/// `result_node` is resolved once after the final solve so the callout follows
-/// the exact displayed deformation during the load ramp.
+/// `surface_points` are that region's actual tessellated vertices; support
+/// glyphs outline their projected footprint rather than drawing a generic
+/// ground symbol at an area centroid. `result_node` is resolved once after the
+/// final solve so load/reaction arrows follow the exact displayed deformation.
 struct CinemaMechanicsMarker {
     int region = -1;
     Eigen::Vector3d position = Eigen::Vector3d::Zero();
-    Eigen::Vector3d vector = Eigen::Vector3d::Zero(); // zero for a support
+    Eigen::Vector3d vector = Eigen::Vector3d::Zero();   // prescribed load
+    Eigen::Vector3d reaction = Eigen::Vector3d::Zero(); // solved support resultant
+    std::vector<Eigen::Vector3d> surface_points;
     std::size_t result_node = std::numeric_limits<std::size_t>::max();
 };
 
@@ -251,9 +255,6 @@ struct CinemaSizingStory {
     /// by `geom::lowpass_signal`; DC is included at index zero.
     std::vector<double> curve_spectrum;
     std::vector<std::uint8_t> curve_mode_kept;
-    std::vector<Eigen::Vector3d> edge_points;
-    std::vector<double> edge_h_before;
-    std::vector<double> edge_h_after;
 
     /// Surface samples of the size field, in metres. Entries align by index.
     std::vector<Eigen::Vector3d> field_points;
@@ -326,14 +327,22 @@ struct CinemaCue {
 
     /// Sequential reveal of the selected CAD-edge samples.
     double spectral_edge_reveal = 0.0;
+    /// Cursor shared by the selected CAD edge and κ(s) trace. During sample
+    /// extraction it follows the reveal front; during inverse reconstruction
+    /// it sweeps the filtered trace back over those same model-space samples.
+    double spectral_curve_cursor = 0.0;
+    /// Opacity of that shared cursor. It fades after reconstruction rather than
+    /// teleporting to a new sample at the advisor handoff.
+    double spectral_curve_cursor_alpha = 0.0;
     /// Frequency bars rising from the FFT of that same curvature trace.
     double spectral_spectrum_reveal = 0.0;
-    /// Morph from the unfiltered to the energy-truncated signal/size field.
+    /// Morph from measured curvature to its energy-truncated reconstruction.
     double spectral_filter_mix = 0.0;
-    /// Spatial sweep of target-size rings over the part surface.
+    /// Spatial sweep of target-size rings when the production plan actually
+    /// carries a size field. Uniform production takes leave this at zero.
     double spectral_field_reveal = 0.0;
-    /// Whole on-part overlay opacity. The completed spacing field carries into
-    /// advisor scoring at low opacity, then fades only as real cells replace it.
+    /// Whole on-part overlay opacity. Exact edge samples carry into advisor
+    /// scoring at low opacity, then fade only as real cells replace them.
     float spectral_overlay_alpha = 0.0f;
 
     // ---- the advisor pass lane (inside kDeliberate) -----------------------
@@ -432,16 +441,11 @@ class CinemaState {
     /// `cinema_opening_fade()`, which also caps it at half the opening act so a
     /// short take does not spend its whole first act fading up.
     static constexpr double kOpeningFade = 0.8;
-    /// How long the DECISION is on screen at the head of the build act before
-    /// the first element of the fill appears, seconds. Capped at a fifth of that
-    /// act by `cinema_decision_lead()` so a short take does not spend the whole
-    /// build stretch holding a caption.
-    ///
-    /// The fill is the execution of the advised action, so the action has to be
-    /// readable BEFORE the thing it produced starts appearing; without the lead
-    /// the two would arrive on the same frame and a viewer could not tell which
-    /// followed which.
-    static constexpr double kDecisionLead = 1.6;
+    /// Short causal handoff between the final measured advisor pass and the
+    /// first emitted cell. The chooser really finishes before meshing starts;
+    /// this beat is only long enough to make that ordering readable while both
+    /// remain in one continuous advisor→mesh chapter.
+    static constexpr double kDecisionLead = 0.55;
     /// How long the network/equation cross fade takes, seconds. Capped at a
     /// tenth of the closing act by `cinema_panel_fade()`.
     static constexpr double kPanelFade = 0.8;

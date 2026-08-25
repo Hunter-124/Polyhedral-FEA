@@ -16,35 +16,39 @@ non-coplanar swept arms and a curved brace converging at one loaded upright
 boss. [The 1080p/60 fps MP4](docs/assets/cinema/advisor_cinema.mp4) carries the
 same frames as the inline GIF ([poster](docs/assets/cinema/poster.png)).
 
-The four chapters are concise and visual:
+The three chapters are concise and visual:
 
-- **Assembly → exact CAD.** The take opens on a shaded wishbone with both
-  chassis-eye bolts and the upright-side ball-joint stud seated directly on
-  their real bore axes. That unsolved interface hardware peels away before the
-  analysis pane opens.
-  The selected exact CAD edge is then drawn from its ordered samples; three
-  adjacent points, their tangent/normal construction, the measured
-  $\kappa(s)$ trace and its FFT animate in one continuous drill-down. The old
-  full-part wireframe opening is gone.
+- **Exact CAD.** The take starts directly on the shaded analysed wishbone; no
+  presentation-only neighbouring hardware is generated. One cursor is shared by
+  the highlighted model-space CAD sample and the corresponding point on the
+  measured $\kappa(s)$ graph. The complete trace then transforms into its real
+  even-reflected FFT and reconstructs back across those same samples. Because
+  the published configuration has `feature_grading=false`, the sequence ends
+  explicitly at **uniform target unchanged** rather than fabricating $h(x)$.
 - **Advisor → mesh.** The deployed ONNX graph runs all 109 measured forward
-  passes in four activation lanes. Counts, signed node response, weighted
-  connections and the feed-forward wave carry the explanation; the prose wall
-  and raw tensor-style labels are gone. The configured, independently verified
-  baseline remains authoritative when the OOD check abstains, while real
-  `MeshStage` cells replace the shaded CAD body in place.
-- **Mesher.** The configured baseline uses a fine wall-resolving tet4 target.
-  A 10.2 s microscope assembles the same six-tetrahedra cube patch first as
-  tet4/p1 and then as tet10/p2, exposing their shared diagonal and all midside
-  nodes. The bottom ledger remains explicit that the published solve executed
-  tet4/p1; the right card is a topology comparison, not a fabricated solve.
-  Measured type mix and min/mean quality stay graphical and numeric.
-- **Analysis.** The authoritative final solve supplies the viewport and compact
-  symbolic boards for stress, gradient, ZZ verification, refinement and the
-  exact response $u(\lambda)=\lambda u$, $\sigma(\lambda)=\lambda\sigma$.
-  Interface symbols stay absent from the assembly, advisor and meshing acts.
-  They reveal only immediately before gradient recovery and final deformation;
-  the exaggerated result is limited to 4% of the model diagonal with a
-  translucent undeformed CAD ghost behind it.
+  passes in four activation lanes. Candidate count, signed node response,
+  weighted connections and the feed-forward wave carry the explanation. The
+  final pass locks, then—after a 0.55 s causal handoff—the real `MeshStage` cells
+  immediately replace the shaded CAD body while the selected network remains
+  visible. Advisor scoring and cell generation share one chapter and one
+  on-screen shown/total cell counter; they are not presented as unrelated acts
+  or falsely claimed to execute concurrently. When the OOD check abstains, that
+  same path names and generates the configured, independently verified
+  baseline. The 10.2 s microscope then assembles one connected six-tetrahedra
+  cube patch as tet4/p1 and tet10/p2. The quadratic card connects every corner
+  through its midside node with two explicit edge segments. The bottom ledger
+  remains clear that the published solve executed tet4/p1.
+- **Analysis.** The authoritative final solve supplies stress, recovered
+  gradient, ZZ verification, refinement and the exact response
+  $u(\lambda)=\lambda u$, $\sigma(\lambda)=\lambda\sigma$. Fixed-region
+  footprints are projected from their actual selected CAD vertices. This p1
+  take has no MPC transform, so reaction arrows are complete resultants summed
+  from solved prescribed-DOF residuals on each fixed region; a constrained
+  higher-order run suppresses them rather than mislabel generalized MPC forces.
+  The applied-force arrow terminates on its actual loaded surface. These
+  mechanics symbols reveal only immediately before gradient recovery and
+  final deformation. The exaggerated result is limited to 4% of the model
+  diagonal with a translucent undeformed CAD ghost behind it.
 
 The published solve contains **40,170 tet4 cells**, **9,796 nodes** and **29,388
 unknowns**; minimum/mean shape quality is **0.0200 / 0.2496**. The 47.17 kN
@@ -54,15 +58,16 @@ p99**) and **0.00329 mm** physical peak displacement. The film also states the
 this take is a visually legible high-resolution verification case, not a
 reference-truth benchmark.
 
-The chapters are one continuous handoff rather than five resets. Solid assembly
-context peels away to expose the shaded CAD body; the sampled edge becomes its
-curvature signal and spectrum; the solid body gives way only where recorded
-cells land. No whole-part CAD edge cage is composited over the shaded body.
-The mesh stays visible while stress arrives, then hands off to the gradient and
-ZZ fields. Support and load symbols appear only in the two mechanics windows:
-immediately before gradient recovery, and immediately before the exact
-load/deformation ramp. Their pulses, the advisor wave and mesh reveal are
-deterministic motion cues, not measured quantities.
+The chapters are one continuous handoff rather than five resets. The same
+model-space sample cursor drives the CAD edge and curvature plot; the global FFT
+reconstruction then sweeps back over that edge. The advisor lane remains visible
+as its selected action becomes recorded cells, and the mesh stays visible while
+stress arrives before handing off to gradient and ZZ fields. No whole-part CAD
+edge cage or neighbouring assembly context is composited over the shaded body.
+Fixed-region outlines, solved reaction vectors and the prescribed load appear
+only in the two mechanics windows: immediately before gradient recovery and
+immediately before the exact load/deformation ramp. Only pulse opacity is a
+deterministic motion cue; reaction magnitudes and directions come from the solve.
 
 No measured result in the take is mocked. Network nodes are the graph's own trunk
 tensors, connection strength is measured $|w_{ji}a_i|$, and mesh frames are

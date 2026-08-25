@@ -137,12 +137,13 @@ TEST_CASE("mesh-only job produces volume mesh for GUI preview") {
 }
 
 TEST_CASE("solve job fills nodal ZZ eta for error-field display") {
-    const auto model = polymesh::testsupport::box_model(0.1, 0.02, 0.02);
+    const auto model = polymesh::testsupport::box_model(0.1, 0.04, 0.04);
     SimSetup setup;
     setup.mesh_size = 0.01;
     setup.mesher = VolumeMesher::kTetFill;
     setup.youngs_modulus = 70e9;
     setup.poissons_ratio = 0.33;
+    setup.p_elevate = false; // nodal reaction attribution is exact without MPCs
     // Fixture min-x, load max-x via regions from model.
     int fixed = -1, loaded = -1;
     for (std::size_t t = 0; t < model.surface.triangles.size(); ++t) {
@@ -181,6 +182,27 @@ TEST_CASE("solve job fills nodal ZZ eta for error-field display") {
     REQUIRE(result->element_eta.size() == result->volume_mesh.elements.size());
     REQUIRE(result->global_eta >= 0.0);
     REQUIRE(result->max_nodal_eta >= 0.0);
+    REQUIRE(result->reactions.size() ==
+            3 * static_cast<Eigen::Index>(result->volume_mesh.nodes.size()));
+    REQUIRE(result->reactions_complete);
+    const auto fixed_members = result->boundary_region_nodes.find(fixed);
+    REQUIRE(fixed_members != result->boundary_region_nodes.end());
+    REQUIRE_FALSE(fixed_members->second.empty());
+    Eigen::Vector3d fixed_reaction = Eigen::Vector3d::Zero();
+    for (const std::uint32_t node : fixed_members->second) {
+        REQUIRE(node < result->volume_mesh.nodes.size());
+        fixed_reaction += result->reactions.segment<3>(3 * static_cast<Eigen::Index>(node));
+    }
+    Eigen::Vector3d all_reactions = Eigen::Vector3d::Zero();
+    for (std::size_t node = 0; node < result->volume_mesh.nodes.size(); ++node) {
+        all_reactions += result->reactions.segment<3>(3 * static_cast<Eigen::Index>(node));
+    }
+    INFO("fixed reaction = " << fixed_reaction.transpose()
+                             << ", all reactions = " << all_reactions.transpose()
+                             << ", fixed nodes = " << fixed_members->second.size());
+    CHECK(std::abs(fixed_reaction.x()) <= 1e-6);
+    CHECK(std::abs(fixed_reaction.y()) <= 1e-6);
+    CHECK(std::abs(fixed_reaction.z() - 100.0) <= 1e-6);
     REQUIRE(solve_trace.has_value());
     CHECK(solve_trace->solve_flops > 0.0);
     CHECK(solve_trace->solve_bytes > 0.0);

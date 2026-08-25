@@ -1981,9 +1981,9 @@ Eigen::Vector3d displayed_marker_position(const CinemaState& state,
                result.displacement.segment<3>(base);
 }
 
-void draw_cinema_mechanics(App& app, const CinemaCue& cue,
-                           const CinemaRender& render, const CinemaType& type,
-                           const ImVec2& image_min, const ImVec2& image_size) {
+void draw_cinema_mechanics(App& app, const CinemaCue& cue, const CinemaRender& render,
+                           const CinemaType& type, const ImVec2& image_min,
+                           const ImVec2& image_size) {
     ImDrawList* dl = ImGui::GetWindowDrawList();
     ImFont* font = type.font != nullptr ? type.font : ImGui::GetFont();
     const auto color = [](ImVec4 c, float alpha) {
@@ -2001,20 +2001,17 @@ void draw_cinema_mechanics(App& app, const CinemaCue& cue,
         desired.x = std::clamp(desired.x, left, std::max(left, right - width));
         desired.y =
             std::clamp(desired.y, image_min.y + 8.0f,
-                       std::max(image_min.y + 8.0f,
-                                image_min.y + image_size.y - size - 8.0f));
+                       std::max(image_min.y + 8.0f, image_min.y + image_size.y - size - 8.0f));
         return desired;
     };
-    const double phase_x =
-        cue.solve_phase_t / std::max(cue.solve_phase_span, 1.0e-9);
+    const double phase_x = cue.solve_phase_t / std::max(cue.solve_phase_span, 1.0e-9);
     const auto smooth = [](double x) {
         x = std::clamp(x, 0.0, 1.0);
         return static_cast<float>(x * x * (3.0 - 2.0 * x));
     };
     const bool final_stage =
         cue.solve_stage_index >= 0 &&
-        static_cast<std::size_t>(cue.solve_stage_index + 1) >=
-            app.cinema.solve_stages.size();
+        static_cast<std::size_t>(cue.solve_stage_index + 1) >= app.cinema.solve_stages.size();
     float mechanics_visibility = 0.0f;
     switch (cue.solve_phase) {
     case SolvePhase::kStressHold:
@@ -2027,8 +2024,7 @@ void draw_cinema_mechanics(App& app, const CinemaCue& cue,
         mechanics_visibility = 1.0f - smooth((phase_x - 0.72) / 0.23);
         break;
     case SolvePhase::kErrorHold:
-        mechanics_visibility =
-            final_stage ? smooth((phase_x - 0.60) / 0.30) : 0.0f;
+        mechanics_visibility = final_stage ? smooth((phase_x - 0.60) / 0.30) : 0.0f;
         break;
     case SolvePhase::kLoadRamp:
     case SolvePhase::kHold:
@@ -2041,113 +2037,170 @@ void draw_cinema_mechanics(App& app, const CinemaCue& cue,
     const float mechanics_pulse =
         0.5f + 0.5f * std::sin(static_cast<float>(cue.solve_phase_t) * 5.2f);
 
-    for (std::size_t i = 0; i < app.cinema.support_markers.size(); ++i) {
-        const auto& marker = app.cinema.support_markers[i];
-        const float delay = 0.10f * static_cast<float>(i);
-        const float reveal_raw =
-            std::clamp((mechanics_visibility - delay) /
-                           std::max(1.0f - delay, 1.0e-3f),
-                       0.0f, 1.0f);
-        const float support_reveal =
-            reveal_raw * reveal_raw * (3.0f - 2.0f * reveal_raw);
-        const float marker_alpha = 0.90f * support_reveal;
-        const Eigen::Vector3d world =
-            displayed_marker_position(app.cinema, marker, render);
-        const auto projected =
-            project_cinema_point(app.viewport.camera, world, image_min, image_size);
-        if (!projected) {
-            continue;
+    const auto convex_footprint = [&](const CinemaMechanicsMarker& marker) {
+        std::vector<ImVec2> points;
+        points.reserve(marker.surface_points.size());
+        for (const auto& world : marker.surface_points) {
+            if (const auto p =
+                    project_cinema_point(app.viewport.camera, world, image_min, image_size)) {
+                points.push_back(*p);
+            }
         }
-        const ImVec2 p = *projected;
-        const ImVec4 c = palette.sim_fixture;
-        dl->AddCircleFilled(p, 7.0f, color(c, marker_alpha));
-        dl->AddCircle(p, 15.0f + 3.0f * mechanics_pulse,
-                      color(c, (0.32f + 0.20f * mechanics_pulse) * marker_alpha),
-                      0, 2.0f);
-        dl->AddLine(ImVec2(p.x - 14.0f, p.y + 13.0f),
-                    ImVec2(p.x + 14.0f, p.y + 13.0f),
-                    color(c, marker_alpha), 3.0f);
-        for (int hatch = -2; hatch <= 2; ++hatch) {
-            const float x = p.x + static_cast<float>(hatch) * 6.0f;
-            dl->AddLine(ImVec2(x - 4.0f, p.y + 20.0f),
-                        ImVec2(x + 3.0f, p.y + 13.0f),
-                        color(c, 0.72f * marker_alpha), 1.5f);
+        std::sort(points.begin(), points.end(), [](const ImVec2& a, const ImVec2& b) {
+            return a.x < b.x || (a.x == b.x && a.y < b.y);
+        });
+        points.erase(std::unique(points.begin(), points.end(),
+                                 [](const ImVec2& a, const ImVec2& b) {
+                                     return a.x == b.x && a.y == b.y;
+                                 }),
+                     points.end());
+        if (points.size() < 3) {
+            return points;
         }
-    }
-
-    for (const auto& marker : app.cinema.load_markers) {
-        if (!(marker.vector.norm() > 0.0)) {
-            continue;
+        const auto cross = [](const ImVec2& a, const ImVec2& b, const ImVec2& c) {
+            return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+        };
+        std::vector<ImVec2> hull;
+        hull.reserve(2 * points.size());
+        for (const ImVec2& point : points) {
+            while (hull.size() >= 2 &&
+                   cross(hull[hull.size() - 2], hull.back(), point) <= 0.0f) {
+                hull.pop_back();
+            }
+            hull.push_back(point);
         }
-        const double force_scale =
-            cue.solve_phase == SolvePhase::kLoadRamp
-                ? std::clamp(cue.load_factor, 0.0, 1.0)
-                : 1.0;
-        const double entry = static_cast<double>(mechanics_visibility);
-        const double drawn_scale = force_scale * entry;
-        if (!(drawn_scale > 1.0e-4)) {
-            continue;
+        const std::size_t lower = hull.size();
+        for (std::size_t i = points.size() - 1; i-- > 0;) {
+            const ImVec2& point = points[i];
+            while (hull.size() > lower &&
+                   cross(hull[hull.size() - 2], hull.back(), point) <= 0.0f) {
+                hull.pop_back();
+            }
+            hull.push_back(point);
         }
-        const Eigen::Vector3d centre =
-            displayed_marker_position(app.cinema, marker, render);
-        const Eigen::Vector3d direction = marker.vector.normalized();
-        const double length =
-            0.17 * drawn_scale * std::max(app.cinema.model_diagonal, 1.0e-6);
-        const auto tail = project_cinema_point(
-            app.viewport.camera, centre - length * direction, image_min, image_size);
-        const auto head = project_cinema_point(
-            app.viewport.camera, centre, image_min, image_size);
+        if (!hull.empty()) {
+            hull.pop_back();
+        }
+        return hull;
+    };
+    const auto draw_vector = [&](const Eigen::Vector3d& tail_world,
+                                 const Eigen::Vector3d& head_world, const ImVec4& c,
+                                 float alpha, const std::string& label, float label_side,
+                                 float label_t) {
+        const auto tail =
+            project_cinema_point(app.viewport.camera, tail_world, image_min, image_size);
+        const auto head =
+            project_cinema_point(app.viewport.camera, head_world, image_min, image_size);
         if (!tail || !head) {
-            continue;
+            return;
         }
-        const ImVec4 c = palette.sim_load;
         const ImVec2 delta(head->x - tail->x, head->y - tail->y);
         const float n = std::hypot(delta.x, delta.y);
         if (!(n > 2.0f)) {
-            continue;
+            return;
         }
         const ImVec2 unit(delta.x / n, delta.y / n);
         const ImVec2 normal(-unit.y, unit.x);
-        const float arrow_alpha = mechanics_alpha * static_cast<float>(entry);
-        dl->AddLine(*tail, *head,
-                    color(c, (0.12f + 0.14f * mechanics_pulse) * arrow_alpha),
+        dl->AddLine(*tail, *head, color(c, (0.13f + 0.12f * mechanics_pulse) * alpha),
                     9.0f + 2.0f * mechanics_pulse);
-        dl->AddLine(*tail, *head, color(c, arrow_alpha), 3.5f);
+        dl->AddLine(*tail, *head, color(c, alpha), 3.5f);
         const ImVec2 wing_a(head->x - 18.0f * unit.x + 9.0f * normal.x,
                             head->y - 18.0f * unit.y + 9.0f * normal.y);
         const ImVec2 wing_b(head->x - 18.0f * unit.x - 9.0f * normal.x,
                             head->y - 18.0f * unit.y - 9.0f * normal.y);
-        dl->AddTriangleFilled(*head, wing_a, wing_b, color(c, arrow_alpha));
-        const std::string label =
-            std::format("{:.3g} kN", force_scale * marker.vector.norm() / 1e3);
-        const float label_w =
-            font->CalcTextSizeA(type.label, FLT_MAX, 0.0f, label.c_str()).x;
-        const ImVec2 label_at = label_position(
-            label, type.label,
-            ImVec2(tail->x - label_w - 10.0f, tail->y - type.label * 1.35f),
-            tail->x);
-        dl->AddLine(*tail, ImVec2(label_at.x + label_w + 5.0f,
-                                  label_at.y + type.label * 0.45f),
-                    color(c, 0.45f * arrow_alpha), 1.0f);
-        dl->AddText(font, type.label, label_at, color(c, arrow_alpha), label.c_str());
+        dl->AddTriangleFilled(*head, wing_a, wing_b, color(c, alpha));
+        if (label.empty()) {
+            return;
+        }
+        const ImVec2 label_anchor(tail->x + label_t * delta.x, tail->y + label_t * delta.y);
+        const float label_w = font->CalcTextSizeA(type.label, FLT_MAX, 0.0f, label.c_str()).x;
+        const ImVec2 desired(label_anchor.x + label_side * 30.0f * normal.x - 0.5f * label_w,
+                             label_anchor.y + label_side * 30.0f * normal.y -
+                                 0.5f * type.label);
+        const ImVec2 label_at = label_position(label, type.label, desired, label_anchor.x);
+        dl->AddText(font, type.label, label_at, color(c, alpha), label.c_str());
+    };
+
+    Eigen::Vector3d total_load = Eigen::Vector3d::Zero();
+    for (const auto& marker : app.cinema.load_markers) {
+        total_load += marker.vector;
+    }
+    const double load_norm = std::max(total_load.norm(), 1.0);
+    const double force_scale =
+        cue.solve_phase == SolvePhase::kLoadRamp ? std::clamp(cue.load_factor, 0.0, 1.0) : 1.0;
+
+    for (const auto& marker : app.cinema.support_markers) {
+        const ImVec4 c = palette.sim_fixture;
+        const std::vector<ImVec2> hull = convex_footprint(marker);
+        if (hull.size() >= 3) {
+            dl->AddConvexPolyFilled(hull.data(), static_cast<int>(hull.size()),
+                                    color(c, 0.12f * mechanics_alpha));
+            dl->AddPolyline(hull.data(), static_cast<int>(hull.size()),
+                            color(c, mechanics_alpha), ImDrawFlags_Closed, 3.0f);
+            ImVec2 centroid(0.0f, 0.0f);
+            for (const ImVec2& point : hull) {
+                centroid.x += point.x;
+                centroid.y += point.y;
+            }
+            centroid.x /= static_cast<float>(hull.size());
+            centroid.y /= static_cast<float>(hull.size());
+            const std::size_t stride = std::max<std::size_t>(1, hull.size() / 6);
+            for (std::size_t i = 0; i < hull.size(); i += stride) {
+                const ImVec2 delta(hull[i].x - centroid.x, hull[i].y - centroid.y);
+                const float length = std::max(std::hypot(delta.x, delta.y), 1.0f);
+                const ImVec2 tick(hull[i].x + 8.0f * delta.x / length,
+                                  hull[i].y + 8.0f * delta.y / length);
+                dl->AddLine(hull[i], tick, color(c, 0.78f * mechanics_alpha), 2.0f);
+            }
+        } else if (const auto anchor = project_cinema_point(
+                       app.viewport.camera,
+                       displayed_marker_position(app.cinema, marker, render), image_min,
+                       image_size)) {
+            dl->AddCircle(*anchor, 13.0f, color(c, mechanics_alpha), 0, 3.0f);
+        }
+
+        const double reaction_magnitude = marker.reaction.norm();
+        const double scaled_magnitude = force_scale * reaction_magnitude;
+        if (!(scaled_magnitude > 1.0e-4)) {
+            continue;
+        }
+        const Eigen::Vector3d tail = displayed_marker_position(app.cinema, marker, render);
+        const double relative =
+            std::clamp(std::sqrt(reaction_magnitude / load_norm), 0.0, 1.15);
+        const double length =
+            0.15 * force_scale * relative * std::max(app.cinema.model_diagonal, 1.0e-6);
+        const Eigen::Vector3d head = tail + length * marker.reaction.normalized();
+        const std::string label = reaction_magnitude / load_norm >= 0.02
+                                      ? std::format("R  {:.3g} kN", scaled_magnitude / 1e3)
+                                      : std::string{};
+        draw_vector(tail, head, c, mechanics_alpha, label, 1.0f, 0.78f);
+    }
+
+    for (const auto& marker : app.cinema.load_markers) {
+        if (!(marker.vector.norm() > 0.0) || !(force_scale > 1.0e-4)) {
+            continue;
+        }
+        const Eigen::Vector3d head = displayed_marker_position(app.cinema, marker, render);
+        const Eigen::Vector3d direction = marker.vector.normalized();
+        const double length = 0.17 * force_scale * std::max(app.cinema.model_diagonal, 1.0e-6);
+        const Eigen::Vector3d tail = head - length * direction;
+        draw_vector(tail, head, palette.sim_load, mechanics_alpha,
+                    std::format("F  {:.3g} kN", force_scale * marker.vector.norm() / 1e3),
+                    -1.0f, 0.20f);
     }
 
     if (cue.action_bridge_alpha > 0.0f && app.cinema.advisor_ran) {
-        const auto target = project_cinema_point(app.viewport.camera,
-                                                 app.cinema.subject_center,
-                                                 image_min, image_size);
+        const auto target = project_cinema_point(
+            app.viewport.camera, app.cinema.subject_center, image_min, image_size);
         if (target) {
-            const ImVec2 start(image_min.x + 3.0f,
-                               image_min.y + image_size.y * 0.78f);
+            const ImVec2 start(image_min.x + 3.0f, image_min.y + image_size.y * 0.78f);
             const ImVec2 c1(image_min.x + image_size.x * 0.13f, start.y);
             const ImVec2 c2(target->x - image_size.x * 0.18f, target->y);
             const float a = cue.action_bridge_alpha;
             const ImVec4 flow =
                 app.cinema.decision_applied ? palette.accent : palette.status_warn;
-            dl->AddBezierCubic(start, c1, c2, *target,
-                               color(flow, 0.11f * a), 7.0f);
-            dl->AddBezierCubic(start, c1, c2, *target,
-                               color(flow, 0.84f * a), 2.2f);
+            dl->AddBezierCubic(start, c1, c2, *target, color(flow, 0.11f * a), 7.0f);
+            dl->AddBezierCubic(start, c1, c2, *target, color(flow, 0.84f * a), 2.2f);
             const auto bezier = [&](float t) {
                 const float q = 1.0f - t;
                 return ImVec2(q * q * q * start.x + 3.0f * q * q * t * c1.x +
@@ -2156,10 +2209,9 @@ void draw_cinema_mechanics(App& app, const CinemaCue& cue,
                                   3.0f * q * t * t * c2.y + t * t * t * target->y);
             };
             for (int i = 0; i < 5; ++i) {
-                const float t = std::fmod(
-                    static_cast<float>(cue.activation_wave) +
-                        0.19f * static_cast<float>(i),
-                    1.0f);
+                const float t = std::fmod(static_cast<float>(cue.activation_wave) +
+                                              0.19f * static_cast<float>(i),
+                                          1.0f);
                 dl->AddCircleFilled(bezier(t), 3.2f, color(flow, a));
             }
             const float target_pulse =

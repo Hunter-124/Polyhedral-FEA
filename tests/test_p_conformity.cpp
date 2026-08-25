@@ -172,8 +172,11 @@ TEST_CASE("selective p interface passes affine patch only when constrained",
     fea::SolveOptions options;
     options.method = fea::SolveMethod::kDirect;
     const auto constrained_bc = affine_boundary(elevated.mesh, extents, &elevated.constraints);
-    const auto u_constrained = fea::solve_elastostatics(
-        elevated.mesh, kMaterial, constrained_bc, loads, options, &elevated.constraints).u;
+    const auto constrained_solve = fea::solve_elastostatics(
+        elevated.mesh, kMaterial, constrained_bc, loads, options,
+        &elevated.constraints);
+    CHECK_FALSE(constrained_solve.reactions_complete);
+    const Eigen::VectorXd& u_constrained = constrained_solve.u;
     const double constrained_error = affine_max_error(elevated.mesh, u_constrained);
 
     const auto discontinuous_bc = affine_boundary(elevated.mesh, extents);

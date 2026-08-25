@@ -111,26 +111,19 @@ class Viewport {
 
     /// BRep/feature-edge polylines of the part, drawn as the pre-mesh skeleton.
     void set_skeleton(const std::vector<std::vector<Eigen::Vector3d>>& polylines);
-    /// Procedural assembly context anchored to the run's real support/load
-    /// interface positions. These unsolved neighbouring parts are cinema-only:
-    /// they establish where the wishbone lives before peeling away to expose
-    /// the analysed component.
-    void set_cinema_assembly_context(
-        const std::vector<Eigen::Vector3d>& support_positions,
-        const std::vector<Eigen::Vector3d>& load_positions,
-        const Eigen::Vector3d& subject_center, double model_diagonal);
-    /// Uploads the opening act's measured target spacing at deterministic
-    /// surface samples plus the selected CAD-edge samples. `h_before` and
-    /// `h_after` are physical target cell widths in metres and must align with
-    /// their point arrays. The viewport normalises them only for colour/marker
-    /// size; no displayed number is reconstructed from that normalisation.
-    void set_cinema_sizing_samples(
+    /// Uploads measured surface target spacing and the exact CAD-edge
+    /// curvature trace used by the opening analysis. Surface values are
+    /// physical target cell widths in metres. Curve values are measured
+    /// curvature before/after Fourier truncation and align with `curve_points`.
+    /// The two families are normalised independently, so curvature can never be
+    /// mislabeled as target spacing.
+    void set_cinema_feature_samples(
         const std::vector<Eigen::Vector3d>& field_points,
         const std::vector<double>& field_h_before,
         const std::vector<double>& field_h_after,
-        const std::vector<Eigen::Vector3d>& edge_points,
-        const std::vector<double>& edge_h_before,
-        const std::vector<double>& edge_h_after);
+        const std::vector<Eigen::Vector3d>& curve_points,
+        const std::vector<double>& curvature_raw,
+        const std::vector<double>& curvature_filtered);
     /// Per-element geometry for the cinema reveal: every element's own faces,
     /// tagged with its index in `mesh.elements` so the reveal order is the
     /// mesher's own emission order. Interior faces are therefore stored once per
@@ -162,11 +155,8 @@ class Viewport {
     /// can grow over the error field that requested it.
     struct CinemaView {
         float skeleton_alpha = 1.0f; // 0..1
-        /// Smooth CAD surface and unsolved neighbouring assembly context used
-        /// only in the opening drill-down.
+        /// Smooth CAD surface used throughout the opening drill-down.
         float model_alpha = 0.0f;
-        float assembly_alpha = 0.0f;
-        float assembly_strip = 0.0f;
         /// Undeformed CAD ghost behind exaggerated result displacement.
         float rest_surface_alpha = 0.0f;
         float reveal = 0.0f;         // elements with index < reveal * count are drawn
@@ -201,6 +191,9 @@ class Viewport {
         /// field samples sweep over the part and morph from pre-filter to final
         /// target h. Point-ring diameter is proportional to target h.
         float spectral_edge_reveal = 0.0f;
+        /// Cursor shared by the model-space edge and the κ(s) graph.
+        float spectral_curve_cursor = 0.0f;
+        float spectral_curve_cursor_alpha = 0.0f;
         float spectral_field_reveal = 0.0f;
         float spectral_filter_mix = 0.0f;
         float spectral_overlay_alpha = 0.0f;
@@ -290,7 +283,7 @@ class Viewport {
 
     std::uint32_t fbo_ = 0, color_texture_ = 0, depth_rbo_ = 0;
     int fb_width_ = 0, fb_height_ = 0;
-    std::uint32_t model_program_ = 0, assembly_program_ = 0;
+    std::uint32_t model_program_ = 0;
     std::uint32_t background_program_ = 0, line_program_ = 0;
     std::uint32_t sizing_program_ = 0;
     // Setup-mode model buffers.
@@ -316,11 +309,6 @@ class Viewport {
     int skeleton_vertex_count_ = 0;
     std::vector<float> skeleton_data_;
     float skeleton_baked_alpha_ = -1.0f;
-    // Cinema opening: shaded interface hardware generated from the actual
-    // support/load marker positions. Per-vertex strip vectors let it peel away
-    // without rebuilding geometry.
-    std::uint32_t assembly_vao_ = 0, assembly_vbo_ = 0;
-    int assembly_vertex_count_ = 0;
     // Cinema: spacing rings drawn directly on the part. Each vertex stores
     // position, pre/post-filter normalised h, sweep order and kind (surface or
     // selected edge). One point shader turns those into circular target-h

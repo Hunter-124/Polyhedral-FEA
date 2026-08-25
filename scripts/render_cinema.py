@@ -190,10 +190,10 @@ class Case:
 
 
 CASES: dict[str, Case] = {
-    # Purpose-built suspension wishbone: two separate chassis bushing bores,
-    # two swept non-coplanar arms plus a brace, and one loaded upright bore.
-    # The deployed OOD check remains visible; the configured baseline runs a
-    # dense h=5.5 mm tet4 mesh with complete ZZ verification.
+    # Purpose-built suspension wishbone: the two chassis pins act through the
+    # bushing bores, and the upright proof load enters through the ball-joint
+    # bore. The deployed OOD check remains visible; the configured baseline
+    # preserves the previously verified wall-resolving tet fill.
     "wishbone": Case(
         name="wishbone",
         step="tests/fixtures/parts/wishbone.step",
@@ -203,15 +203,15 @@ CASES: dict[str, Case] = {
         solver="direct",
         order=1,
         feature_grading=False,
-        fix_faces=(5, 6),
-        load_face=0,
-        load=(-25000.0, 0.0, -40000.0),
-        why="purpose-built 3D suspension A-arm: two chassis bushing sleeves, "
-            "non-coplanar swept arms and brace, one loaded upright boss, and a "
-            "combined bending/torsion field",
-        load_note="GUI regions 5 and 6 (two chassis bushing outer sleeves) fixed; "
-                  "conserved (-25000, 0, -40000) N resultant on GUI region 0 "
-                  "(upright outer boss)",
+        fix_faces=(9, 10),
+        load_face=5,
+        load=(-2500.0, 0.0, -4000.0),
+        why="purpose-built 3D suspension A-arm: two chassis pin bores, "
+            "non-coplanar swept arms and brace, one loaded ball-joint bore, "
+            "a wall-resolving tet mesh, and a combined bending/torsion field",
+        load_note="GUI regions 9 and 10 (two chassis bushing bores) fixed; "
+                  "conserved (-2500, 0, -4000) N resultant on GUI region 5 "
+                  "(upright ball-joint bore)",
         adapt_passes=0,
         eta_target=0.0,
     ),

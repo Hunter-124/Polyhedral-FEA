@@ -19,42 +19,43 @@ same frames as the inline GIF ([poster](docs/assets/cinema/poster.png)).
 The three chapters are concise and visual:
 
 - **Exact CAD.** The take starts directly on the shaded analysed wishbone; no
-  presentation-only neighbouring hardware is generated. One cursor is shared by
-  the highlighted model-space CAD sample and the corresponding point on the
-  measured $\kappa(s)$ graph. The complete trace then transforms into its real
-  even-reflected FFT and reconstructs back across those same samples. Because
+  presentation-only neighbouring hardware is generated. The complete BRep edge
+  network is sampled and coloured by measured curvature while one representative
+  edge shares its cursor with the corresponding point on the $\kappa(s)$ graph.
+  Every eligible curve is independently Fourier-filtered; the representative
+  trace exposes the real even-reflected FFT and inverse reconstruction. Because
   the published configuration has `feature_grading=false`, the sequence ends
   explicitly at **uniform target unchanged** rather than fabricating $h(x)$.
 - **Advisor → mesh.** The deployed ONNX graph runs all 109 measured forward
   passes in four activation lanes. Candidate count, signed node response,
   weighted connections and the feed-forward wave carry the explanation. The
   final pass locks, then—after a 0.55 s causal handoff—the real `MeshStage` cells
-  immediately replace the shaded CAD body while the selected network remains
-  visible. Advisor scoring and cell generation share one chapter and one
-  on-screen shown/total cell counter; they are not presented as unrelated acts
-  or falsely claimed to execute concurrently. When the OOD check abstains, that
-  same path names and generates the configured, independently verified
-  baseline. The 10.2 s microscope then assembles one connected six-tetrahedra
-  cube patch as tet4/p1 and tet10/p2. The quadratic card connects every corner
-  through its midside node with two explicit edge segments. The bottom ledger
-  remains clear that the published solve executed tet4/p1.
+  replace the shaded CAD body in emission order while the selected network
+  remains visible. The live shown/total counter follows the same reveal. Advisor
+  scoring and meshing share one chapter, but are not falsely claimed to execute
+  concurrently. When the OOD check abstains, that same path names and generates
+  the configured, independently verified baseline. The 10.2 s microscope then
+  isolates one legible higher-order tetrahedron: four corners, six midside nodes,
+  and all six quadratic edges drawn corner→midside→corner. The bottom ledger
+  remains clear that the published solve itself executed tet4/p1.
 - **Analysis.** The authoritative final solve supplies stress, recovered
   gradient, ZZ verification, refinement and the exact response
-  $u(\lambda)=\lambda u$, $\sigma(\lambda)=\lambda\sigma$. Fixed-region
-  footprints are projected from their actual selected CAD vertices. This p1
-  take has no MPC transform, so reaction arrows are complete resultants summed
-  from solved prescribed-DOF residuals on each fixed region; a constrained
-  higher-order run suppresses them rather than mislabel generalized MPC forces.
-  The applied-force arrow terminates on its actual loaded surface. These
-  mechanics symbols reveal only immediately before gradient recovery and
-  final deformation. The exaggerated result is limited to 4% of the model
-  diagonal with a translucent undeformed CAD ghost behind it.
+  $u(\lambda)=\lambda u$, $\sigma(\lambda)=\lambda\sigma$. The chassis
+  constraints act on the two internal bushing bores—not the exterior housings—
+  and the upright load is distributed over the internal ball-joint bore. Their
+  projected footprints come from the actual selected CAD vertices. This p1 take
+  has no MPC transform, so reaction arrows are complete resultants summed from
+  solved prescribed-DOF residuals; a constrained higher-order run suppresses
+  them rather than mislabel generalized MPC forces. Mechanics symbols reveal
+  only immediately before gradient recovery and final deformation. The
+  exaggerated result is limited to 4% of the model diagonal with a translucent
+  undeformed CAD ghost behind it.
 
 The published solve contains **40,170 tet4 cells**, **9,796 nodes** and **29,388
-unknowns**; minimum/mean shape quality is **0.0200 / 0.2496**. The 47.17 kN
-distributed proof load produces **33.16 MPa** true peak stress (**17.42 MPa
-p99**) and **0.00329 mm** physical peak displacement. The film also states the
-**20.69%** global ZZ indicator instead of laundering it into a confidence claim;
+unknowns**; minimum/mean shape quality is **0.0200 / 0.2496**. The **4.717 kN**
+distributed design load produces **202.49 MPa** true peak stress (**108.82 MPa
+p99**) and **1.198 mm** physical peak displacement. The film also states the
+**29.77%** global ZZ indicator instead of laundering it into a confidence claim;
 this take is a visually legible high-resolution verification case, not a
 reference-truth benchmark.
 

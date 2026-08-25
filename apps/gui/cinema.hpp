@@ -192,12 +192,15 @@ struct CinemaMeshInsight {
 };
 
 inline constexpr std::size_t kCinemaHistogramBins = 24;
+inline constexpr std::size_t kCinemaQuantileSamples = 33;
 
 /// Fixed-size distribution summary computed once from one authoritative scalar
-/// field. It powers the solver pane's teaching graphs without rescanning a
-/// six-figure node array every frame.
+/// field. Quantiles drive the solver pane's monotonic percentile curves; bins
+/// remain available for numeric audits without forcing the UI into a misleading
+/// zero-dominated histogram.
 struct CinemaHistogram {
     std::array<std::size_t, kCinemaHistogramBins> bins{};
+    std::array<double, kCinemaQuantileSamples> quantiles{};
     std::size_t samples = 0;
     std::size_t tallest_bin = 0;
     double min = 0.0;
@@ -255,6 +258,13 @@ struct CinemaSizingStory {
     /// by `geom::lowpass_signal`; DC is included at index zero.
     std::vector<double> curve_spectrum;
     std::vector<std::uint8_t> curve_mode_kept;
+
+    /// Every eligible BRep edge processed independently by the same Fourier
+    /// low-pass. These samples cover the part's edge network; the selected
+    /// representative edge above remains the one tied to the κ(s) graph cursor.
+    std::vector<Eigen::Vector3d> network_points;
+    std::vector<double> network_curvature_raw;
+    std::vector<double> network_curvature_filtered;
 
     /// Surface samples of the size field, in metres. Entries align by index.
     std::vector<Eigen::Vector3d> field_points;

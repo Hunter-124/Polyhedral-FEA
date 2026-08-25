@@ -27,8 +27,14 @@ The three chapters are concise and visual:
   the published configuration has `feature_grading=false`, the sequence ends
   explicitly at **uniform target unchanged** rather than fabricating $h(x)$.
 - **Advisor → mesh.** The deployed ONNX graph runs all 109 measured forward
-  passes in four activation lanes. Candidate count, signed node response,
-  weighted connections and the feed-forward wave carry the explanation. The
+  passes in four activation lanes. Signed node response, the strongest measured
+  connections and the feed-forward wave carry each pass; because 68 of the 81
+  input columns are this part and only 13 are the candidate, the panel brackets
+  the 13 it owns and plots the ranking score of every candidate on a strip that
+  fills one mark at a time, gate-passed filled, gate-declined hollow, a ring on
+  the candidate the chooser picked. Activations and connections are scaled by
+  percentiles pooled over the whole ensemble, so a pass looks different when it
+  is different instead of being renormalised into the same picture. The
   final pass locks, then—after a 0.55 s causal handoff—the real `MeshStage` cells
   replace the shaded CAD body in emission order while the selected network
   remains visible. Each cell arrives collapsed toward its own centroid and lit

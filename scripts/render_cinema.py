@@ -504,10 +504,17 @@ _SUMMARY_KEYS = ("frames", "fps", "candidates", "stages", "solve_stages",
                  "global_eta", "error_p99", "max_displacement_m", "deform_scale",
                  "visible_displacement_m", "visible_fraction", "unchanged",
                  "removed", "added", "skipped", "poster", "width", "height")
-#: including it, so both are kept and named apart.
+#: including it, so both are kept and named apart. The ``panel_*`` keys are the
+#: network panel's own display provenance: the pooled percentiles it scales
+#: activations and connection strengths by, the candidate columns it found by
+#: measuring the ensemble, and the score range and ranked winner its candidate
+#: strip plots.
 _ADVISOR_KEYS = ("candidates", "frames", "gate_threshold", "h_rel", "order",
                  "adapt_passes", "eta_target", "vetoed", "ood_distance",
-                 "applied")
+                 "applied", "panel_action_columns", "panel_case_columns",
+                 "panel_winner_candidate", "panel_score_min", "panel_score_max",
+                 "panel_input_p98", "panel_fc1_p98", "panel_fc2_p98",
+                 "panel_heads_p98", "panel_contribution_p98")
 _SPECTRAL_KEYS = ("applied", "modes_total", "modes_kept", "energy_kept",
                   "edge_seeds", "predicted_before", "predicted_after",
                   "geometry_seeds", "bc_seeds", "brep_curvature",

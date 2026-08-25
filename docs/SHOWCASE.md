@@ -673,10 +673,23 @@ fields, which is how the GUI's solve is cross-checked against the CLI's.)
   Because the published run has `feature_grading=false`, it ends at “uniform h
   unchanged” and draws no fabricated spatial sizing field.
 
-  The advisor uses four activation lanes. Every node remains sized/coloured by
-  the deployed graph's own tensor, and every shown connection remains one of the
-  strongest measured $|w_{ji}a_i|$ paths. All measured candidate passes now fill
-  the deliberation window. The final pass locks and the actual `MeshStage`
+  The advisor uses four activation lanes over a candidate strip. Every node
+  remains sized/coloured by the deployed graph's own tensor, and every shown
+  connection remains one of the strongest measured $|w_{ji}a_i|$ paths, but both
+  are now scaled by percentiles pooled over all 109 passes rather than by the
+  pass being drawn: dividing each pass by its own maximum divided out exactly the
+  pass-to-pass difference the panel exists to show, and 71–87% of the hidden
+  units fell under a tenth of that maximum and collapsed to the floor radius, so
+  every pass rendered as the same picture. Two neighbouring grid points also
+  differ by one step in one action column and share 85% of their drawn
+  connections, so the graph alone cannot distinguish candidates: 13 of the 81
+  input columns are the candidate and are bracketed as such, the other 68 are
+  this part, and the strip beneath plots the ranking key the chooser sorts on
+  ($\texttt{rel\_err\_rel}$, lower better) as one mark per scored pass — filled
+  where the feasibility gate passed, hollow where it declined, ringed on the
+  candidate whose action the chooser went on to recommend, which is matched from
+  the recommended pass rather than re-ranked here. All measured candidate passes
+  fill the deliberation window. The final pass locks and the actual `MeshStage`
   snapshot begins 0.55 s later without a chapter or panel reset; a live
   shown/total cell counter follows the emission-order reveal while the chosen
   network remains visible. Cells are coloured as they are drawn: a bounded band

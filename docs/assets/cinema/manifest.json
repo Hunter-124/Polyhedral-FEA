@@ -1,8 +1,8 @@
 {
   "schema": "polymesh.cinema.manifest/1",
-  "generated_utc": "2026-08-25T17:56:40Z",
-  "git_rev": "8af15fe+dirty",
-  "stamp": "git 8af15fe+dirty \u00b7 model.onnx sha256 03b4062c8c2b",
+  "generated_utc": "2026-08-25T21:02:57Z",
+  "git_rev": "62e7920+dirty",
+  "stamp": "git 62e7920+dirty \u00b7 model.onnx sha256 03b4062c8c2b",
   "stages_run": [
     "frames",
     "gif",
@@ -54,7 +54,7 @@
     ],
     "auto_spec": "load tests/fixtures/parts/wishbone.step; h 5.5; material 200 0.3; mesher tet; solver direct; order 1; feature off; spectral on; fix 9; fix 10; loadface 5 -2500 0 -4000; cinema on; cinema advisor bench/advisor; adapt 0 0; wire off; solve; record /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames 3600; quit",
     "env": {
-      "POLYMESH_CINEMA_STAMP": "git 8af15fe+dirty \u00b7 model.onnx sha256 03b4062c8c2b"
+      "POLYMESH_CINEMA_STAMP": "git 62e7920+dirty \u00b7 model.onnx sha256 03b4062c8c2b"
     },
     "xvfb_screen": "1920x1080",
     "frame_size": "1920x1080",
@@ -62,7 +62,7 @@
     "frame_count": 3600,
     "fps": 60,
     "duration_s": 60.0,
-    "gui_wall_s": 1597.159,
+    "gui_wall_s": 1588.098,
     "ffmpeg": "ffmpeg version 8.1.2 Copyright (c) 2000-2026 the FFmpeg developers"
   },
   "report": {
@@ -183,6 +183,16 @@
       "h_rel": 0.1,
       "ood_distance": 67.6031,
       "order": 1.0,
+      "panel_action_columns": 13.0,
+      "panel_case_columns": 68.0,
+      "panel_contribution_p98": 2.56529,
+      "panel_fc1_p98": 18.362,
+      "panel_fc2_p98": 33.101,
+      "panel_heads_p98": 127.315,
+      "panel_input_p98": 9.86192,
+      "panel_score_max": 5.83291,
+      "panel_score_min": 1.27218,
+      "panel_winner_candidate": 29.0,
       "vetoed": 1.0
     },
     "spectral_fields": {
@@ -205,6 +215,7 @@
     "lines": [
       "cinema: maths glyphs merged from /usr/share/fonts/google-noto/NotoSansMath-Regular.ttf",
       "cinema: advisor bench/advisor candidates 108 gate_threshold 0.05 frames 109 decision hybrid_zoo h_rel 0.1 order 1 adapt_passes 0 eta_target 0 vetoed 1 ood_distance 67.6031 applied 0",
+      "cinema: advisor panel panel_action_columns 13 panel_case_columns 68 panel_winner_candidate 29 panel_score_min 1.27218 panel_score_max 5.83291 panel_input_p98 9.86192 panel_fc1_p98 18.362 panel_fc2_p98 33.101 panel_heads_p98 127.315 panel_contribution_p98 2.56529",
       "cinema: spectral applied 0 modes_total 0 modes_kept 0 energy_kept 0 edge_seeds 0 predicted_before 0 predicted_after 0 geometry_seeds 0 bc_seeds 0 brep_curvature 0 field_samples 0 h_before_min 0 h_before_max 0 h_after_min 0 h_after_max 0",
       "cinema: reaction region 9 fx 1772.2704 fy 754.056525 fz 2147.11649 magnitude 2884.38084",
       "cinema: reaction region 10 fx 727.729605 fy -754.056524 fz 1852.88351 magnitude 2128.70122",
@@ -239,8 +250,8 @@
       "pix_fmt": "yuv420p",
       "faststart": true,
       "fps": 60,
-      "bytes": 16753658,
-      "sha256": "b87ff152d90dcf26a6a2f2082c13d204f6058f77b896138a25811945ccf32f60"
+      "bytes": 18618077,
+      "sha256": "170183afefe3bc5366722007f5ed20cf1f351a551b4733193ea5c2d03cab286c"
     },
     "gif": {
       "file": "advisor_cinema.gif",
@@ -248,33 +259,33 @@
       "fps": 10,
       "start_s": 0.0,
       "duration_s": 60.0,
-      "bytes": 6836354,
-      "sha256": "cd2f82cc8893d89d3a900e99b0590a88a74d9297f34a6f2fef61f5654c3f3865",
+      "bytes": 6320924,
+      "sha256": "79637c6309c3513818f9ed56e5c85bf4b9191ddd0a2d884543d64488a1967cd2",
       "attempts": [
         {
           "width": 1100,
           "fps": 12,
-          "bytes": 15175117
+          "bytes": 14934265
         },
         {
           "width": 1100,
           "fps": 10,
-          "bytes": 14121793
+          "bytes": 12512907
         },
         {
           "width": 960,
           "fps": 10,
-          "bytes": 11907089
+          "bytes": 10789239
         },
         {
           "width": 860,
           "fps": 10,
-          "bytes": 9163312
+          "bytes": 8737886
         },
         {
           "width": 720,
           "fps": 10,
-          "bytes": 6836354
+          "bytes": 6320924
         }
       ],
       "max_bytes": 8388608,
@@ -285,9 +296,9 @@
       "source_frame": 143,
       "width": 1920,
       "height": 1080,
-      "bytes": 162207,
+      "bytes": 162404,
       "source_bytes": 8296178,
-      "sha256": "0c8556657677e16da8261653b3ec18eaca8050328385be2bc65cbbb11964a55e",
+      "sha256": "d90f6d11389532f9f59ce62c0c5806653c9124d3b5f6738c3e7e0bcd00ee86fe",
       "frame_source": "reported by the GUI as the first fully-composed frame"
     }
   }

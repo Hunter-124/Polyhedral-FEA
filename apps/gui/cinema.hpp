@@ -499,6 +499,41 @@ class CinemaState {
     std::optional<advisor::AdvisorExplanation> explanation;
     /// The deployed graph's shape and weights, from `activation_layout.json`.
     advisor::NetworkLayout layout;
+
+    /// Display scales and per-candidate structure pooled over EVERY forward
+    /// pass of this take, computed once when the explanation is loaded.
+    ///
+    /// The panel needs these because the obvious per-frame normalisation is
+    /// self-defeating: dividing each pass by its own largest activation divides
+    /// out exactly the pass-to-pass difference the surface exists to show, and
+    /// leaves four rows that look identical while the counter runs. A scale
+    /// pooled over the ensemble makes a drawn radius mean the same thing in
+    /// pass 1 and pass 109, so what changes is visible and what does not stays
+    /// quiet.
+    struct AdvisorScale {
+        /// 98th percentile of |activation| over all passes, per layer. A
+        /// percentile rather than the maximum: one saturated unit would
+        /// otherwise flatten every other unit in its row to the floor radius.
+        std::array<float, 4> layer{1.0f, 1.0f, 1.0f, 1.0f};
+        /// 98th percentile of |w_ji * a_i| over all passes and all blocks, so
+        /// the drawn connections keep a common brightness scale.
+        float contribution = 1.0f;
+        /// Input columns whose value differs between passes, measured from the
+        /// frames themselves: these are the candidate action's own columns, and
+        /// the rest are this part's case features, identical in every pass by
+        /// construction. Drawing them alike is what made one pass look like the
+        /// next.
+        std::vector<int> action_columns;
+        /// Score range over the ranked candidates, for the candidate strip.
+        float score_min = 0.0f;
+        float score_max = 0.0f;
+        /// Frame index of the candidate whose action the chooser went on to
+        /// recommend, found by matching the recommended pass's action rather
+        /// than by re-ranking anything here. -1 when no candidate matches.
+        int winner_frame = -1;
+        bool ready = false;
+    };
+    AdvisorScale advisor_scale;
 #endif
     /// The model directory `cinema advisor` was pointed at, for the footer.
     std::string advisor_dir;

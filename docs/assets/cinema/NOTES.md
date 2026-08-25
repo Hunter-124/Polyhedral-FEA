@@ -144,17 +144,16 @@ than mislabeled as runtime concurrency.
   final state reduces to the selected action values or `d = 67.6049`; a crossed
   decision glyph and mesh glyph carry the abstention handoff without a slogan.
 - The wishbone lies outside the calibrated descriptor envelope at Mahalanobis
-  distance 67.6049. The advisor abstains and the configured baseline remains
+  distance 67.6031. The advisor abstains and the configured baseline remains
   authoritative.
 
 ## Act 3 — `build`: the mesher executing the decision
 
 The advisor outcome is held for `CinemaState::kDecisionLead` (0.55 s). The
 wishbone is outside the calibrated descriptor envelope, so the configured
-baseline remains authoritative: structural steel, a fine wall-resolving tet4
-target, complete ZZ verification without an implied remesh, and explicit direct
-LDLT. The base mesh resolves each thin member with 4–6 elements; the opening FFT
-is geometry analysis, not a sizing input.
+baseline remains authoritative: structural steel, a wall-resolving tet4 target,
+complete ZZ verification without an implied remesh, and explicit direct LDLT.
+The opening FFT is geometry analysis, not a sizing input.
 
 - During build the measured OOD-check state remains visible. A restrained
   halo/connection wave travels through fixed tensor values; only after it
@@ -191,21 +190,21 @@ is geometry analysis, not a sizing input.
   mesher did, and reporting it is preferred over hiding a round that ran.
 - **Cells appear in the mesher's own emission order.** The presentation reveal
   begins after the activation/refusal wave reaches the output lane; it does not
-  claim runtime progress. The source snapshot and displayed count are real.
+  claim runtime concurrency. The source snapshot and live shown/total count are
+  real, and the chosen network remains visible throughout.
 - Cells the viewport cannot triangulate are counted and called out, never hidden.
 - The reveal shrink pulls each cell toward its centroid as it lands, then closes.
-  Dense-mesh edges stay at 0.8 px / 0.18 opacity so shaded geometry survives.
+  Dense-mesh edges use 1.0 px / 0.34 opacity, and identical internal faces carry
+  identical shading so coplanar duplicates cannot flicker into speckle.
 - **The cell microscope owns 10.2 s.** Its top rail is the captured mesh's
-  actual type histogram. Both cards use one cube split into six conforming
-  tetrahedra around a shared body diagonal, so shared topology is unmistakable.
-  The left card assembles tet4/p1 over 3.0 s. The right begins 2.8 s later,
-  assembles the same patch as tet10/p2 over 3.2 s, and draws every quadratic
-  edge as corner→midside and midside→corner segments. The remaining time holds
-  both completed patches.
-- These are conventional topology diagrams. The published solve remains tet4/p1
-  in the bottom ledger and manifest; the tet10/p2 card does not claim that a
-  quadratic wishbone solve ran. The measured `qmin` and `q̄` still come from
-  `fea::summarize_cell_quality` on the captured `NodalMesh`.
+  actual type histogram. One large tet10 card replaces the old cube comparison:
+  it draws four corners, six midside nodes and each of the six quadratic edges
+  as corner→midside→corner.
+- This is a conventional higher-order topology diagram. The published solve
+  remains tet4/p1 in the bottom ledger and manifest; the tet10/p2 card teaches
+  the supported element rather than claiming a quadratic wishbone solve. The
+  measured `qmin` and `q̄` still come from `fea::summarize_cell_quality` on the
+  captured `NodalMesh`.
 
 ## Act 4 — `mesh_hold`: the finished mesh
 
@@ -238,10 +237,10 @@ into `manifest.json`; `for_each_solve_beat` scales that sequence uniformly into
 the 21.0 s solve act without dropping a phase.
 
 The published wishbone stage is 40,170 tet4 cells / 9,796 nodes / 29,388 DOF,
-with 0.0200003 minimum and 0.249598 mean cell quality. The distributed 47.17 kN
-proof load gives 33.160 MPa true peak stress, 17.425 MPa p99 stress and
-0.0032879 mm physical peak displacement. `global_eta = 0.206942`; the film
-states that 20.69% verification result and never calls this take reference truth.
+with 0.0200003 minimum and 0.249598 mean cell quality. The distributed 4.717 kN
+design load gives 202.486 MPa true peak stress, 108.823 MPa p99 stress and
+1.19836 mm physical peak displacement. `global_eta = 0.297684`; the film states
+that 29.77% verification result and never calls this take reference truth.
 
 There is no per-element solve order. The take replays completed fields, not a
 fabricated iteration timeline; the recorded solver token is described below.
@@ -344,17 +343,15 @@ and result hold. An intermediate pass does not receive that second reveal
 because refinement, not deformation, follows it.
 
 Each support footprint is the 2D convex projection of the actual tessellated
-vertices belonging to that fixed CAD region. It is not a generic ground glyph at
-an area centroid. `fea::solve_elastostatics` returns prescribed generalized
-reactions in the original 3N layout and marks `reactions_complete=false` when an
-MPC transform makes nodal attribution non-unique. The cinema then suppresses
-reaction arrows rather than labeling MPC forces as physical support resultants.
-For this published p1 take the flag is true.
-`SolveResult::boundary_region_nodes` retains the exact CAD-face membership used
-to constrain the solve—including shared edge/vertex nodes that a one-owner
-nearest-region map loses—and the overlay sums one resultant per support. The
-load arrow terminates at the loaded surface point farthest opposite its force
-direction, so its line of action reaches material rather than a bore void.
+vertices belonging to its internal bushing-bore region. It is not a generic
+ground glyph or an exterior housing clamp. `fea::solve_elastostatics` returns
+prescribed generalized reactions in the original 3N layout and marks
+`reactions_complete=false` when an MPC transform makes nodal attribution
+non-unique. The cinema then suppresses reaction arrows rather than labeling MPC
+forces as physical support resultants. For this published p1 take the flag is
+true. `SolveResult::boundary_region_nodes` retains the exact CAD-face membership
+used to constrain the solve. The load arrow terminates on the internal
+ball-joint-bore surface along its force direction.
 
 ### Load ramp
 

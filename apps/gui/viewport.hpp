@@ -111,19 +111,21 @@ class Viewport {
 
     /// BRep/feature-edge polylines of the part, drawn as the pre-mesh skeleton.
     void set_skeleton(const std::vector<std::vector<Eigen::Vector3d>>& polylines);
-    /// Uploads measured surface target spacing and the exact CAD-edge
-    /// curvature trace used by the opening analysis. Surface values are
-    /// physical target cell widths in metres. Curve values are measured
-    /// curvature before/after Fourier truncation and align with `curve_points`.
-    /// The two families are normalised independently, so curvature can never be
-    /// mislabeled as target spacing.
+    /// Uploads measured surface target spacing, the representative CAD-edge
+    /// curvature trace tied to the graph cursor, and the complete processed
+    /// CAD-edge network. Surface values are physical target cell widths in
+    /// metres. Curvature families are normalised together but independently of
+    /// spacing, so curvature can never be mislabeled as target h.
     void set_cinema_feature_samples(
         const std::vector<Eigen::Vector3d>& field_points,
         const std::vector<double>& field_h_before,
         const std::vector<double>& field_h_after,
         const std::vector<Eigen::Vector3d>& curve_points,
         const std::vector<double>& curvature_raw,
-        const std::vector<double>& curvature_filtered);
+        const std::vector<double>& curvature_filtered,
+        const std::vector<Eigen::Vector3d>& network_points,
+        const std::vector<double>& network_curvature_raw,
+        const std::vector<double>& network_curvature_filtered);
     /// Per-element geometry for the cinema reveal: every element's own faces,
     /// tagged with its index in `mesh.elements` so the reveal order is the
     /// mesher's own emission order. Interior faces are therefore stored once per

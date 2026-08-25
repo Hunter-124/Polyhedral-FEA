@@ -1,8 +1,8 @@
 {
   "schema": "polymesh.cinema.manifest/1",
-  "generated_utc": "2026-08-25T00:58:48Z",
-  "git_rev": "47e2345+dirty",
-  "stamp": "git 47e2345+dirty \u00b7 model.onnx sha256 03b4062c8c2b",
+  "generated_utc": "2026-08-25T06:09:30Z",
+  "git_rev": "85daf6c+dirty",
+  "stamp": "git 85daf6c+dirty \u00b7 model.onnx sha256 03b4062c8c2b",
   "stages_run": [
     "frames",
     "gif",
@@ -14,16 +14,16 @@
     "step": "tests/fixtures/parts/wishbone.step",
     "case_json": "docs/assets/cinema/wishbone.case.json",
     "fix_faces": [
-      5,
-      6
+      9,
+      10
     ],
-    "load_face": 0,
+    "load_face": 5,
     "load_n": [
-      -25000.0,
+      -2500.0,
       0.0,
-      -40000.0
+      -4000.0
     ],
-    "load_note": "GUI regions 5 and 6 (two chassis bushing outer sleeves) fixed; conserved (-25000, 0, -40000) N resultant on GUI region 0 (upright outer boss)",
+    "load_note": "GUI regions 9 and 10 (two chassis bushing bores) fixed; conserved (-2500, 0, -4000) N resultant on GUI region 5 (upright ball-joint bore)",
     "h_mm_configured": 5.5,
     "mesher_configured": "tet",
     "solver_configured": "direct",
@@ -34,7 +34,7 @@
     "adapt_passes_configured": 0,
     "eta_target_configured": 0.0,
     "h_note": "configured before inference; an accepted advisor action overrides it, while abstention keeps the baseline unchanged",
-    "why": "purpose-built 3D suspension A-arm: two chassis bushing sleeves, non-coplanar swept arms and brace, one loaded upright boss, and a combined bending/torsion field"
+    "why": "purpose-built 3D suspension A-arm: two chassis pin bores, non-coplanar swept arms and brace, one loaded ball-joint bore, a wall-resolving tet mesh, and a combined bending/torsion field"
   },
   "model": {
     "dir": "bench/advisor",
@@ -50,11 +50,11 @@
       "-screen 0 1920x1080x24",
       "/home/hunter/Desktop/Polyhedral-FEA/build/apps/gui/polymesh-gui",
       "--auto",
-      "load tests/fixtures/parts/wishbone.step; h 5.5; material 200 0.3; mesher tet; solver direct; order 1; feature off; spectral on; fix 5; fix 6; loadface 0 -25000 0 -40000; cinema on; cinema advisor bench/advisor; adapt 0 0; wire off; solve; record /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames 3600; quit"
+      "load tests/fixtures/parts/wishbone.step; h 5.5; material 200 0.3; mesher tet; solver direct; order 1; feature off; spectral on; fix 9; fix 10; loadface 5 -2500 0 -4000; cinema on; cinema advisor bench/advisor; adapt 0 0; wire off; solve; record /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames 3600; quit"
     ],
-    "auto_spec": "load tests/fixtures/parts/wishbone.step; h 5.5; material 200 0.3; mesher tet; solver direct; order 1; feature off; spectral on; fix 5; fix 6; loadface 0 -25000 0 -40000; cinema on; cinema advisor bench/advisor; adapt 0 0; wire off; solve; record /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames 3600; quit",
+    "auto_spec": "load tests/fixtures/parts/wishbone.step; h 5.5; material 200 0.3; mesher tet; solver direct; order 1; feature off; spectral on; fix 9; fix 10; loadface 5 -2500 0 -4000; cinema on; cinema advisor bench/advisor; adapt 0 0; wire off; solve; record /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames 3600; quit",
     "env": {
-      "POLYMESH_CINEMA_STAMP": "git 47e2345+dirty \u00b7 model.onnx sha256 03b4062c8c2b"
+      "POLYMESH_CINEMA_STAMP": "git 85daf6c+dirty \u00b7 model.onnx sha256 03b4062c8c2b"
     },
     "xvfb_screen": "1920x1080",
     "frame_size": "1920x1080",
@@ -62,7 +62,7 @@
     "frame_count": 3600,
     "fps": 60,
     "duration_s": 60.0,
-    "gui_wall_s": 1517.869,
+    "gui_wall_s": 1612.768,
     "ffmpeg": "ffmpeg version 8.1.2 Copyright (c) 2000-2026 the FFmpeg developers"
   },
   "report": {
@@ -131,9 +131,9 @@
         "elements": 40170,
         "nodes": 9796,
         "dof": 29388,
-        "global_eta": 0.206942168,
-        "h_mark": 34,
-        "p_mark": 29872,
+        "global_eta": 0.297684119,
+        "h_mark": 165,
+        "p_mark": 38916,
         "shape_mark": 0
       }
     ],
@@ -154,12 +154,12 @@
     "quality_mean": 0.249598405,
     "youngs_modulus_pa": 200000000000.0,
     "poissons_ratio": 0.3,
-    "stress_color_p99_pa": 17424544.8,
-    "error_color_p99": 0.00399045189,
-    "max_von_mises_pa": 33160121.7,
-    "global_eta": 0.206942168,
-    "max_displacement_m": 3.28786285e-06,
-    "deformation_scale": 6105.60502,
+    "stress_color_p99_pa": 108823023.0,
+    "error_color_p99": 0.00362034091,
+    "max_von_mises_pa": 202485998.0,
+    "global_eta": 0.297684119,
+    "max_displacement_m": 0.00119835874,
+    "deformation_scale": 16.7515713,
     "visible_displacement_m": 0.0200743919,
     "visible_displacement_fraction": 0.04,
     "unchanged_cells": 0,
@@ -181,7 +181,7 @@
       "frames": 109.0,
       "gate_threshold": 0.05,
       "h_rel": 0.1,
-      "ood_distance": 67.6049,
+      "ood_distance": 67.6031,
       "order": 1.0,
       "vetoed": 1.0
     },
@@ -204,11 +204,11 @@
     },
     "lines": [
       "cinema: maths glyphs merged from /usr/share/fonts/google-noto/NotoSansMath-Regular.ttf",
-      "cinema: advisor bench/advisor candidates 108 gate_threshold 0.05 frames 109 decision hybrid_zoo h_rel 0.1 order 1 adapt_passes 0 eta_target 0 vetoed 1 ood_distance 67.6049 applied 0",
+      "cinema: advisor bench/advisor candidates 108 gate_threshold 0.05 frames 109 decision hybrid_zoo h_rel 0.1 order 1 adapt_passes 0 eta_target 0 vetoed 1 ood_distance 67.6031 applied 0",
       "cinema: spectral applied 0 modes_total 0 modes_kept 0 energy_kept 0 edge_seeds 0 predicted_before 0 predicted_after 0 geometry_seeds 0 bc_seeds 0 brep_curvature 0 field_samples 0 h_before_min 0 h_before_max 0 h_after_min 0 h_after_max 0",
-      "cinema: reaction region 5 fx 24714.0933 fy -140.237194 fz 39948.5526 magnitude 46975.4503",
-      "cinema: reaction region 6 fx 285.906737 fy 140.237194 fz 51.4474085 magnitude 322.577074",
-      "cinema: reactions complete 1 balance_rel 2.99530366e-15 support_fx 25000 support_fy -7.99786903e-11 support_fz 40000",
+      "cinema: reaction region 9 fx 1772.2704 fy 754.056525 fz 2147.11649 magnitude 2884.38084",
+      "cinema: reaction region 10 fx 727.729605 fy -754.056524 fz 1852.88351 magnitude 2128.70122",
+      "cinema: reactions complete 1 balance_rel 5.90870806e-11 support_fx 2500 support_fy 5.28823421e-08 support_fz 4000",
       "cinema: take /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames frames 3600 fps 60 duration 60.0000 s",
       "cinema: act skeleton frames 0..647 t 0.0000..10.8000 s",
       "cinema: act deliberate frames 648..1115 t 10.8000..18.6000 s",
@@ -217,8 +217,8 @@
       "cinema: act solve frames 2341..3599 t 39.0000..60.0000 s",
       "cinema: mesh_stage index 0 pass 0 id fill elements 40170 nodes 9796",
       "cinema: mesh_stage index 1 pass 0 id ship elements 40170 nodes 9796",
-      "cinema: solve_stage index 0 pass 0 elements 40170 nodes 9796 dof 29388 global_eta 0.206942168 h_mark 34 p_mark 29872 shape_mark 0",
-      "cinema: record /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames frames 3600 fps 60 candidates 108 stages 2 elements 40170 nodes 9796 dof 29388 quality_min 0.0200003155 quality_mean 0.249598405 youngs_pa 2e+11 poisson 0.3 max_von_mises_pa 33160121.7 stress_p99_pa 17424544.8 global_eta 0.206942168 error_p99 0.00399045189 max_displacement_m 3.28786285e-06 deform_scale 6105.60502 visible_displacement_m 0.0200743919 visible_fraction 0.04 unchanged 0 removed 0 added 0 poster 143 width 1920 height 1080 skipped 0 solve_stages 1 solver direct_ldlt"
+      "cinema: solve_stage index 0 pass 0 elements 40170 nodes 9796 dof 29388 global_eta 0.297684119 h_mark 165 p_mark 38916 shape_mark 0",
+      "cinema: record /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames frames 3600 fps 60 candidates 108 stages 2 elements 40170 nodes 9796 dof 29388 quality_min 0.0200003155 quality_mean 0.249598405 youngs_pa 2e+11 poisson 0.3 max_von_mises_pa 202485998 stress_p99_pa 108823023 global_eta 0.297684119 error_p99 0.00362034091 max_displacement_m 0.00119835874 deform_scale 16.7515713 visible_displacement_m 0.0200743919 visible_fraction 0.04 unchanged 0 removed 0 added 0 poster 143 width 1920 height 1080 skipped 0 solve_stages 1 solver direct_ldlt"
     ]
   },
   "outputs": {
@@ -239,37 +239,42 @@
       "pix_fmt": "yuv420p",
       "faststart": true,
       "fps": 60,
-      "bytes": 14096399,
-      "sha256": "bb2a824769018c118fbb4a0064278652435c43148a193bb215e293e870d3dd8f"
+      "bytes": 14128867,
+      "sha256": "b121a72995e2d4ac7f41498be32c062047adb1a21cb5781d6a187e1a6ec3b408"
     },
     "gif": {
       "file": "advisor_cinema.gif",
-      "width": 860,
+      "width": 720,
       "fps": 10,
       "start_s": 0.0,
       "duration_s": 60.0,
-      "bytes": 7630188,
-      "sha256": "c420ccd52551ebd3dd82d194fb6eefde2702942a3dd2557a251356268b8371a3",
+      "bytes": 5796711,
+      "sha256": "05d671a2daa0fe5665ceea88b1e24fed82950a46a1894ae33f39c79dcb5c294a",
       "attempts": [
         {
           "width": 1100,
           "fps": 12,
-          "bytes": 15051549
+          "bytes": 13012187
         },
         {
           "width": 1100,
           "fps": 10,
-          "bytes": 10905846
+          "bytes": 12593923
         },
         {
           "width": 960,
           "fps": 10,
-          "bytes": 8623154
+          "bytes": 10328395
         },
         {
           "width": 860,
           "fps": 10,
-          "bytes": 7630188
+          "bytes": 8637449
+        },
+        {
+          "width": 720,
+          "fps": 10,
+          "bytes": 5796711
         }
       ],
       "max_bytes": 8388608,
@@ -280,9 +285,9 @@
       "source_frame": 143,
       "width": 1920,
       "height": 1080,
-      "bytes": 145197,
+      "bytes": 162461,
       "source_bytes": 8296178,
-      "sha256": "665f2c7fee1084f77cc5e834456cc6f6e60667c740d854add714be6c59716499",
+      "sha256": "c1e956bce8f9939fbd1dbb383816911e6877754162076455c84ed4701a992313",
       "frame_source": "reported by the GUI as the first fully-composed frame"
     }
   }

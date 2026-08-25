@@ -230,9 +230,9 @@ void main() {
 })";
 
 // Opening-act evidence glyphs. Surface samples carry physical target spacing;
-// selected-edge samples carry measured curvature. Each family is normalised on
-// the CPU independently, so colour never equates curvature with cell size. The
-// edge cursor is the same scalar that drives the κ(s) graph.
+// the representative edge carries the κ(s) cursor; the remaining edge-network
+// samples show every independently filtered CAD curve on the part. Curvature is
+// normalised independently of cell size, so colour never conflates the two.
 constexpr const char* kSizingVs = R"(#version 330 core
 layout(location = 0) in vec3 in_pos;
 layout(location = 1) in float in_value_before;
@@ -251,22 +251,26 @@ out vec4 v_color;
 flat out float v_kind;
 void main() {
     bool edge = in_kind > 0.5;
+    bool selected_edge = in_kind > 0.5 && in_kind < 1.5;
+    bool edge_network = in_kind > 1.5;
     float reveal = edge ? u_edge_reveal : u_field_reveal;
     float value = mix(in_value_before, in_value_after, u_filter_mix);
     float visible = in_order <= reveal ? 1.0 : 0.0;
     vec3 low = vec3(0.20, 0.82, 0.91);
     vec3 high = vec3(0.98, 0.39, 0.18);
     vec3 color = mix(low, high, value);
-    float cursor = edge
+    float cursor = selected_edge
         ? (1.0 - smoothstep(0.018, 0.085, abs(in_order - u_edge_cursor))) *
               u_edge_cursor_alpha
         : 0.0;
     color = mix(color, vec3(1.0), 0.48 * cursor);
-    float opacity = edge ? (0.42 + 0.58 * cursor) : 1.0;
+    float opacity = selected_edge ? (0.52 + 0.48 * cursor)
+                                  : (edge_network ? 0.72 : 1.0);
     v_color = vec4(color, u_alpha * visible * opacity);
     v_kind = in_kind;
-    gl_PointSize = edge ? mix(9.0, 23.0, cursor)
-                        : mix(4.0, 12.0, value);
+    gl_PointSize = selected_edge ? mix(9.0, 23.0, cursor)
+                                 : (edge_network ? mix(5.0, 8.0, value)
+                                                 : mix(4.0, 12.0, value));
     gl_Position = u_proj * u_view * vec4(in_pos, 1.0);
     // Keep a sample drawn on the surface from losing a z-fight with the cells
     // it is explaining.
@@ -286,7 +290,7 @@ void main() {
         discard;
     }
     float ring = smoothstep(0.31, 0.39, radius);
-    float interior_alpha = v_kind > 0.5 ? 0.58 : 0.22;
+    float interior_alpha = v_kind > 1.5 ? 0.34 : (v_kind > 0.5 ? 0.58 : 0.22);
     float alpha = mix(interior_alpha, 0.95, ring) * v_color.a;
     vec3 color = mix(v_color.rgb * 0.72, v_color.rgb, ring);
     frag = vec4(color, alpha);
@@ -1097,18 +1101,25 @@ void Viewport::set_skeleton(const std::vector<std::vector<Eigen::Vector3d>>& pol
                  skeleton_data_.data(), GL_DYNAMIC_DRAW);
 }
 
-void Viewport::set_cinema_feature_samples(const std::vector<Eigen::Vector3d>& field_points,
-                                          const std::vector<double>& field_h_before,
-                                          const std::vector<double>& field_h_after,
-                                          const std::vector<Eigen::Vector3d>& curve_points,
-                                          const std::vector<double>& curvature_raw,
-                                          const std::vector<double>& curvature_filtered) {
+void Viewport::set_cinema_feature_samples(
+    const std::vector<Eigen::Vector3d>& field_points,
+    const std::vector<double>& field_h_before,
+    const std::vector<double>& field_h_after,
+    const std::vector<Eigen::Vector3d>& curve_points,
+    const std::vector<double>& curvature_raw,
+    const std::vector<double>& curvature_filtered,
+    const std::vector<Eigen::Vector3d>& network_points,
+    const std::vector<double>& network_curvature_raw,
+    const std::vector<double>& network_curvature_filtered) {
     sizing_vertex_count_ = 0;
     const bool field_ok = field_points.size() == field_h_before.size() &&
                           field_points.size() == field_h_after.size();
     const bool curve_ok = curve_points.size() == curvature_raw.size() &&
                           curve_points.size() == curvature_filtered.size();
-    if (!field_ok || !curve_ok) {
+    const bool network_ok =
+        network_points.size() == network_curvature_raw.size() &&
+        network_points.size() == network_curvature_filtered.size();
+    if (!field_ok || !curve_ok || !network_ok) {
         glBindBuffer(GL_ARRAY_BUFFER, sizing_vbo_);
         glBufferData(GL_ARRAY_BUFFER, 0, nullptr, GL_DYNAMIC_DRAW);
         return;
@@ -1131,7 +1142,15 @@ void Viewport::set_cinema_feature_samples(const std::vector<Eigen::Vector3d>& fi
         return std::pair{lo, hi};
     };
     const auto [h_lo, h_hi] = value_range(field_h_before, field_h_after);
-    const auto [k_lo, k_hi] = value_range(curvature_raw, curvature_filtered);
+    double k_lo = std::numeric_limits<double>::infinity();
+    double k_hi = -std::numeric_limits<double>::infinity();
+    for (const auto& [before, after] :
+         {std::pair{&curvature_raw, &curvature_filtered},
+          std::pair{&network_curvature_raw, &network_curvature_filtered}}) {
+        const auto [lo_value, hi_value] = value_range(*before, *after);
+        k_lo = std::min(k_lo, lo_value);
+        k_hi = std::max(k_hi, hi_value);
+    }
     const auto normalise = [](double value, double lo, double hi) {
         if (!std::isfinite(value) || !std::isfinite(lo) || !std::isfinite(hi)) {
             return 0.5f;
@@ -1163,7 +1182,7 @@ void Viewport::set_cinema_feature_samples(const std::vector<Eigen::Vector3d>& fi
     const double sweep_span = std::max(extent[sweep_axis], 1.0e-12);
 
     std::vector<float> data;
-    data.reserve((field_points.size() + curve_points.size()) * 7);
+    data.reserve((field_points.size() + curve_points.size() + network_points.size()) * 7);
     const auto append = [&](const Eigen::Vector3d& p, float before, float after, float order,
                             float kind) {
         data.insert(data.end(), {static_cast<float>(p.x()), static_cast<float>(p.y()),
@@ -1182,8 +1201,16 @@ void Viewport::set_cinema_feature_samples(const std::vector<Eigen::Vector3d>& fi
                normalise(curvature_filtered[i], k_lo, k_hi),
                static_cast<float>(static_cast<double>(i) / curve_denom), 1.0f);
     }
+    const double network_denom =
+        network_points.size() > 1 ? static_cast<double>(network_points.size() - 1) : 1.0;
+    for (std::size_t i = 0; i < network_points.size(); ++i) {
+        append(network_points[i], normalise(network_curvature_raw[i], k_lo, k_hi),
+               normalise(network_curvature_filtered[i], k_lo, k_hi),
+               static_cast<float>(static_cast<double>(i) / network_denom), 2.0f);
+    }
 
-    sizing_vertex_count_ = static_cast<int>(field_points.size() + curve_points.size());
+    sizing_vertex_count_ =
+        static_cast<int>(field_points.size() + curve_points.size() + network_points.size());
     glBindBuffer(GL_ARRAY_BUFFER, sizing_vbo_);
     glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(data.size() * sizeof(float)),
                  data.data(), GL_DYNAMIC_DRAW);
@@ -1331,7 +1358,7 @@ void Viewport::upload_cinema_cells(const std::vector<CinemaCellRef>& cells,
         } else if (cell.role > 0.5f) {
             rgb = {0.20f, 0.82f, 0.88f};
         }
-        const float shade = (cell.element & 1u) ? 1.0f : 0.82f;
+        constexpr float shade = 0.92f;
 
         for (std::size_t li = 0; li < loops.count(); ++li) {
             const std::uint32_t begin = loops.starts[li];

@@ -53,66 +53,65 @@
       "role": "support",
       "label": "support_y_lo",
       "cad_face_index": null,
-      "expected_gui_region": 5,
-      "surface_area_m2": 0.00904778684234,
+      "expected_gui_region": 9,
+      "surface_area_m2": 0.00241274315796,
       "tessellated_area_m2": null,
-      "interface": "chassis bushing outer sleeve, -y eye",
+      "interface": "chassis pin through -y bushing bore",
       "sleeve": {
         "axis": [0.0, 1.0, 0.0],
-        "radius": 0.03,
+        "radius": 0.008,
         "centre": [0.02, -0.14, 0.02],
         "extent_along_axis": [-0.164, -0.116]
       },
       "fix": [true, true, true],
-      "description": "Press-fit chassis bushing sleeve; all translational DOFs constrained."
+      "description": "Bonded rigid-pin idealisation on the internal bushing bore; all translational DOFs constrained on the actual chassis interface."
     },
     {
       "role": "support",
       "label": "support_y_hi",
       "cad_face_index": null,
-      "expected_gui_region": 6,
-      "surface_area_m2": 0.00904778684234,
+      "expected_gui_region": 10,
+      "surface_area_m2": 0.00241274315796,
       "tessellated_area_m2": null,
-      "interface": "chassis bushing outer sleeve, +y eye",
+      "interface": "chassis pin through +y bushing bore",
       "sleeve": {
         "axis": [0.0, 1.0, 0.0],
-        "radius": 0.03,
+        "radius": 0.008,
         "centre": [0.02, 0.14, 0.02],
         "extent_along_axis": [0.116, 0.164]
       },
       "fix": [true, true, true],
-      "description": "Second press-fit chassis bushing sleeve. Constraining two separated sleeves creates the real pivot baseline and torsional load path."
+      "description": "Second bonded rigid-pin idealisation. The separated internal bores create the chassis pivot baseline and torsional load path."
     }
   ],
   "load": {
     "role": "load",
-    "label": "loaded_boss",
+    "label": "loaded_ball_joint_bore",
     "cad_face_index": null,
-    "expected_gui_region": 0,
-    "surface_area_m2": 0.0128176980277,
+    "expected_gui_region": 5,
+    "surface_area_m2": 0.00376991118431,
     "tessellated_area_m2": null,
-    "interface": "upright-side outer ball-joint boss",
+    "interface": "upright-side ball-joint bore",
     "sleeve": {
       "axis": [0.0, 0.0, 1.0],
-      "radius": 0.034,
+      "radius": 0.010,
       "centre": [0.3, 0.0, 0.044],
       "extent_along_axis": [0.014, 0.074]
     },
-    "resultant_n": [-25000.0, 0.0, -40000.0],
-    "resultant_magnitude_n": 47169.90566028302,
+    "resultant_n": [-2500.0, 0.0, -4000.0],
+    "resultant_magnitude_n": 4716.990566028302,
     "resultant_direction_note": "32.005 degrees from vertical, tilted inboard (-x). Vertical plus lateral, no invented fore-aft component.",
     "derivation": {
-      "case": "linear-elastic proof load for a suspension control-arm showcase",
-      "basis": "10 × the rounded 4.717 kN combined bump/cornering design vector",
-      "purpose": "Produces a visibly legible but still elastic distributed stress field on the two-sleeve/one-boss load path.",
-      "status": "authored numerical proof load, explicitly not a measured vehicle event"
+      "case": "linear-elastic suspension control-arm design vector",
+      "basis": "rounded 4.717 kN combined bump/cornering design load",
+      "purpose": "Produces a distributed bending-plus-torsion field between the chassis pin bores and ball-joint bore in the declared linear-elastic model.",
+      "status": "authored numerical design load, explicitly not a measured vehicle event"
     },
     "hand_check": {
-      "linearity": "The solver is linear elastostatic: multiplying the conserved resultant by 10 multiplies stress and physical displacement by exactly 10 while leaving the ZZ relative indicator unchanged.",
-      "solver_probe": "The verified h=5.5 mm tet4 probe with these distributed interfaces produced 3.316 MPa at 4.717 kN, so the exact linear 10× proof-load expectation is 33.160 MPa before the final take is regenerated.",
-      "status": "probe-derived expectation, not substituted for the final manifest"
+      "linearity": "The solver is linear elastostatic: scaling the conserved resultant scales stress and displacement by the same factor while leaving the ZZ relative indicator unchanged.",
+      "status": "The published bore-loaded take records 202.486 MPa peak stress and 1.19836 mm peak displacement in manifest.json."
     },
-    "description": "Conserved resultant distributed over the complete outer boss sleeve. Two separated outer-sleeve supports plus one off-plane loaded boss produce a non-uniform bending-plus-torsion field while avoiding a point or edge singularity masquerading as material stress."
+    "description": "The conserved resultant is distributed over the complete internal ball-joint bore, where the upright joint actually transfers load. Both chassis constraints likewise act on internal bushing bores; no exterior housing face is treated as ground."
   },
   "mesh": {
     "mesher": "tet",
@@ -124,34 +123,34 @@
     "h_m": 0.0055,
     "adapt_passes": 0,
     "eta_target": 0.0,
-    "h_rationale": "0.0055 m keeps the 1.5 * fill_h snap band at 0.00825 m, 2.67x below the measured 0.02207 m minimum wall. Geometry and support/load grading are disabled for the verified uniform fill; exact support/load regions still drive boundary conditions. Element spans: bushing wall 4.01, boss wall 4.36, brace diameter 4.73, arm diameter 6.18. h_rel is 0.0114 of the 0.4829 m bbox diagonal. The full ZZ field is reported without implying a hidden remesh.",
+    "h_rationale": "0.0055 m keeps the 1.5 * fill_h snap band at 0.00825 m, 2.67x below the measured 0.02207 m minimum wall. Geometry and support/load grading are disabled for the uniform fill; exact bore regions drive boundary conditions.",
     "boundary_node_supply_at_h": {
-      "support_outer_sleeve_each": "order of 598 surface triangles and 299 nodes; 34.27 elements around by 8.73 along",
-      "loaded_outer_boss": "order of 847 surface triangles and 423 nodes; 38.84 elements around by 10.91 along",
-      "purpose": "shows neither support nor loaded regions resolve to a starved patch"
+      "support_bore_each": "about 9 elements around by 9 along",
+      "loaded_ball_joint_bore": "about 11 elements around by 11 along",
+      "purpose": "distributed internal interfaces rather than point or edge constraints"
     },
-    "status": "High-resolution linear verification solve with distributed interfaces. Measured cells, DOF, quality and achieved error belong in manifest.json."
+    "status": "Wall-resolving tet verification solve with distributed bore interfaces. The cinema's tet10 card teaches the supported higher-order element explicitly; the manifest records the executed solve order."
   },
   "region_selection": {
     "cad_faces": 15,
     "predicted_tessellation_regions": 11,
-    "method": "The GUI grows region ids by flood-filling the display tessellation across shared edges while adjacent facet normals stay within 30 degrees (src/pipeline/src/scene.cpp Model::load), over the per-face triangle soup built in TopExp face order at deflection 5e-4 * bbox diagonal and angular deflection 0.2 rad (src/geom/src/cad_model.cpp). Replaying that exact algorithm on the shipped STEP gives 11 regions from 15 CAD faces: region 3 merges the two arms, the brace and the two inboard eye annuli, because the arms now blend into those annuli tangentially (junction interior angle 150 to 203 degrees, i.e. G1-smooth, so the 30-degree fill crosses it). Region id therefore no longer equals CAD face index, and the mapping above is explicit.",
+    "method": "The GUI grows region ids by flood-filling the display tessellation across shared edges while adjacent facet normals stay within 30 degrees (src/pipeline/src/scene.cpp Model::load), over the per-face triangle soup built in TopExp face order. Region id therefore does not equal CAD face index. The map below comes from a fresh built-GUI overlay capture of every region 0..10 rather than from CAD ordering assumptions.",
     "region_id_map": {
-      "0": "LOAD: boss outer cylinder",
-      "1": "boss +z annulus",
-      "2": "boss -z annulus",
-      "3": "both arms + brace + both inboard eye annuli (merged, smooth blends)",
-      "4": "ball-joint bore",
-      "5": "SUPPORT: -y eye outer cylinder",
-      "6": "SUPPORT: +y eye outer cylinder",
-      "7": "-y eye outboard annulus",
-      "8": "-y bushing bore",
-      "9": "+y eye outboard annulus",
-      "10": "+y bushing bore"
+      "0": "ball-joint boss outer cylinder",
+      "1": "ball-joint boss back annulus",
+      "2": "ball-joint boss front annulus",
+      "3": "upper arm + brace + blended annuli",
+      "4": "lower main arm",
+      "5": "LOAD: ball-joint bore",
+      "6": "upper chassis eye outer cylinder",
+      "7": "right chassis eye outer cylinder",
+      "8": "chassis-eye annulus",
+      "9": "SUPPORT: upper chassis bushing bore",
+      "10": "SUPPORT: right chassis bushing bore"
     },
-    "verification": "GUI probes completed successfully with fix 5; fix 6; loadface 0. Regions are verified against the built product rather than left as predictions.",
-    "area_keys": "Boss outer sleeve analytic area 0.0128176980 m2; each eye outer sleeve 0.00904778684 m2. The two equal support regions are intentionally interchangeable because both are fixed.",
-    "why_the_interfaces_survive": "Each selected outer sleeve is one uninterrupted cylindrical region bounded by 90-degree annular edges. The 30-degree region flood therefore does not escape into a bore or neighboring arm.",
+    "verification": "A fresh GUI face-overlay sweep captured all regions 0..10 from the built product. The cinema uses fix 9; fix 10; loadface 5.",
+    "area_keys": "Ball-joint bore analytic area 0.00376991118 m2; each bushing bore 0.00241274316 m2.",
+    "why_the_interfaces_survive": "Each selected bore is one uninterrupted cylindrical region bounded by annular edges. The applied regions are the three visible internal bores, not adjacent arms or exterior housings.",
     "surface_quality": "Worst convex edge 77.98 degrees, worst re-entrant crotch 290.44 degrees, measured over every tessellated edge. No knife edge, no tangential cusp, and no non-adjacent CAD face pair in contact, so there is no coincident-skin site anywhere on the part."
   },
   "checks_enforced_by_generator": [

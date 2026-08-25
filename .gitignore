@@ -13,14 +13,18 @@ compile_commands.json
 # Machine-local editor/tooling config, never part of the published tree.
 /.omp/
 /.claude/
+/.aicadvault/
 
 # machine-local graphify artifacts (committed: graph.json, GRAPH_REPORT.md,
-# .graphify_labels.json, manifest.json — see CONTRIBUTING.md §8)
+# .graphify_labels.json, manifest.json — see CONTRIBUTING.md §8). Dated
+# subdirectories are per-run snapshots of those same four files.
 graphify-out/.graphify_python
 graphify-out/.graphify_root
+graphify-out/.graphify_labels.json.sig
 graphify-out/cache/
 graphify-out/cost.json
 graphify-out/graph.html
+graphify-out/20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/
 imgui.ini
 
 # Accidental local CAD/smoke dumps at repo root (fixtures live under bench/, examples/)
@@ -42,19 +46,20 @@ bench/self_improve/
 
 # Training corpora for the learned mesh advisor (ADR-0027). Multi-GB; licence
 # provenance lives in bench/advisor/corpus_manifest.json, never committed.
+# The shipped artifacts (model.onnx, clamps.json, ood.json, dashboard.html) are
+# tracked, since --advisor bench/advisor has to work from a clone.
 /bench/geometries/corpus/
 /bench/advisor/dataset.csv
 /bench/advisor/runs/
-/bench/advisor/model.onnx
-/bench/advisor/dashboard.html
 /bench/advisor/.cache/
 # Python bytecode from scripts/
 __pycache__/
 *.pyc
 
 # Advisor campaign warehouses. The rows (results.jsonl) and the provenance
-# (campaign.json, checkpoint.json) are tracked; raw per-run meshes/renders and
-# previews are not, wherever a campaign is located (including archive-v2/).
+# (campaign.json, checkpoint.json) are tracked, as are the meshes, renders and
+# previews already committed under runs/ (git-LFS, see .gitattributes). New raw
+# per-run output is scratch; add one to the warehouse with `git add -f`.
 /bench/campaigns/**/runs/
 /bench/campaigns/**/mesh_preview.pmp
 

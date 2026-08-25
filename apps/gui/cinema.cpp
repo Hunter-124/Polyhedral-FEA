@@ -35,13 +35,13 @@ namespace {
 
 /// Act spans as fractions of the 60 s public take.
 ///
-/// The opening holds the complete assembly before the interface hardware peels
-/// away. The cell microscope then receives a full ten seconds: enough to build
-/// a connected linear patch, elevate the same topology to quadratic order, and
-/// hold both states for comparison. The solve still has 21 seconds, and its
-/// recorded phases scale proportionally to fit that window.
+/// The opening starts directly on the analysed CAD body. The cell microscope
+/// receives a full ten seconds: enough to build a connected linear patch,
+/// elevate the same topology to quadratic order, and hold both states for
+/// comparison. The solve still has 21 seconds, and its recorded phases scale
+/// proportionally to fit that window.
 ///
-///   mated assembly / exact CAD  10.8 s
+///   exact CAD / edge analysis    10.8 s
 ///   advisor                      7.8 s
 ///   emitted mesh                10.2 s
 ///   tet4 → tet10 microscope     10.2 s
@@ -318,6 +318,22 @@ std::optional<Eigen::Vector3d> region_centroid(const pipeline::Model& model, int
         return std::nullopt;
     }
     return weighted / area_sum;
+}
+std::vector<Eigen::Vector3d> region_surface_points(const pipeline::Model& model, int region) {
+    std::vector<Eigen::Vector3d> points;
+    std::vector<std::uint8_t> used(model.surface.vertices.size(), 0);
+    for (std::size_t ti = 0; ti < model.surface.triangles.size(); ++ti) {
+        if (ti >= model.triangle_region.size() || model.triangle_region[ti] != region) {
+            continue;
+        }
+        for (const std::uint32_t node : model.surface.triangles[ti]) {
+            if (node < model.surface.vertices.size() && used[node] == 0) {
+                used[node] = 1;
+                points.push_back(model.surface.vertices[node]);
+            }
+        }
+    }
+    return points;
 }
 
 /// Construction stages belonging to the initial fill, which is the fill the
@@ -627,12 +643,65 @@ void CinemaState::adopt_final_result(const pipeline::SolveResult& result) {
     }
     stress_histograms.back() = inspect_histogram(result.von_mises);
     error_histograms.back() = inspect_histogram(result.nodal_eta);
-    const auto resolve_nodes = [&](std::vector<CinemaMechanicsMarker>& markers) {
+    if (result.reactions_complete &&
+        result.reactions.size() ==
+            3 * static_cast<Eigen::Index>(result.volume_mesh.nodes.size())) {
+        for (auto& marker : support_markers) {
+            marker.reaction.setZero();
+            const auto members = result.boundary_region_nodes.find(marker.region);
+            if (members == result.boundary_region_nodes.end()) {
+                continue;
+            }
+            for (const std::uint32_t node : members->second) {
+                if (node < result.volume_mesh.nodes.size()) {
+                    marker.reaction +=
+                        result.reactions.segment<3>(3 * static_cast<Eigen::Index>(node));
+                }
+            }
+        }
+    } else {
+        for (auto& marker : support_markers) {
+            marker.reaction.setZero();
+        }
+    }
+    Eigen::Vector3d support_resultant = Eigen::Vector3d::Zero();
+    for (const auto& marker : support_markers) {
+        support_resultant += marker.reaction;
+        std::printf("cinema: reaction region %d fx %.9g fy %.9g fz %.9g "
+                    "magnitude %.9g\n",
+                    marker.region, marker.reaction.x(), marker.reaction.y(),
+                    marker.reaction.z(), marker.reaction.norm());
+    }
+    Eigen::Vector3d load_resultant = Eigen::Vector3d::Zero();
+    for (const auto& marker : load_markers) {
+        load_resultant += marker.vector;
+    }
+    const double reaction_balance =
+        (support_resultant + load_resultant).norm() / std::max(load_resultant.norm(), 1.0);
+    std::printf("cinema: reactions complete %d balance_rel %.9g "
+                "support_fx %.9g support_fy %.9g support_fz %.9g\n",
+                result.reactions_complete ? 1 : 0, reaction_balance, support_resultant.x(),
+                support_resultant.y(), support_resultant.z());
+    std::fflush(stdout);
+    const auto resolve_nodes = [&](std::vector<CinemaMechanicsMarker>& markers,
+                                   bool reaction_anchor) {
         for (auto& marker : markers) {
+            Eigen::Vector3d anchor = marker.position;
+            const Eigen::Vector3d direction =
+                reaction_anchor ? marker.reaction : -marker.vector;
+            if (direction.norm() > 0.0 && !marker.surface_points.empty()) {
+                const Eigen::Vector3d unit = direction.normalized();
+                anchor = *std::max_element(
+                    marker.surface_points.begin(), marker.surface_points.end(),
+                    [&](const Eigen::Vector3d& a, const Eigen::Vector3d& b) {
+                        return unit.dot(a - marker.position) < unit.dot(b - marker.position);
+                    });
+            }
+            marker.position = anchor;
             marker.result_node = std::numeric_limits<std::size_t>::max();
             double best = std::numeric_limits<double>::infinity();
             for (std::size_t i = 0; i < result.volume_mesh.nodes.size(); ++i) {
-                const double d2 = (result.volume_mesh.nodes[i] - marker.position).squaredNorm();
+                const double d2 = (result.volume_mesh.nodes[i] - anchor).squaredNorm();
                 if (d2 < best) {
                     best = d2;
                     marker.result_node = i;
@@ -640,8 +709,8 @@ void CinemaState::adopt_final_result(const pipeline::SolveResult& result) {
             }
         }
     };
-    resolve_nodes(support_markers);
-    resolve_nodes(load_markers);
+    resolve_nodes(support_markers, true);
+    resolve_nodes(load_markers, false);
     gradients_.clear();
     invalidate_uploads();
 }
@@ -791,25 +860,31 @@ CinemaCue cinema_cue(const CinemaState& state) {
         start += span;
     }
 
-    // Hold the mated assembly first, then strip only its neighbouring hardware
-    // before extracting ordered samples from the still-shaded CAD body.
+    // Start directly on the analysed CAD body, then extract its ordered edge
+    // samples without inventing neighbouring hardware.
     if (cue.act == CinemaAct::kSkeleton) {
-        const double wait = 0.27 * cue.act_span;
-        const double slide = 0.10 * cue.act_span;
+        const double wait = 0.06 * cue.act_span;
+        const double slide = 0.08 * cue.act_span;
         cue.panel_open = static_cast<float>(
             smoothstep((cue.act_t - wait) / std::max(slide, 1.0e-9)));
         const double p = cue.act_t / std::max(cue.act_span, 1.0e-9);
-        cue.spectral_edge_reveal = smoothstep((p - 0.44) / 0.20);
-        cue.spectral_spectrum_reveal = smoothstep((p - 0.62) / 0.15);
-        cue.spectral_filter_mix = smoothstep((p - 0.76) / 0.12);
-        cue.spectral_field_reveal = smoothstep((p - 0.86) / 0.12);
+        cue.spectral_edge_reveal = smoothstep((p - 0.12) / 0.28);
+        cue.spectral_spectrum_reveal = smoothstep((p - 0.40) / 0.18);
+        cue.spectral_filter_mix = smoothstep((p - 0.62) / 0.22);
+        cue.spectral_curve_cursor =
+            p < 0.62 ? cue.spectral_edge_reveal : 1.0 - cue.spectral_filter_mix;
+        cue.spectral_curve_cursor_alpha = 1.0 - smoothstep((p - 0.84) / 0.12);
+        cue.spectral_field_reveal =
+            state.sizing.field_points.empty() ? 0.0 : smoothstep((p - 0.84) / 0.12);
         cue.spectral_overlay_alpha =
-            static_cast<float>(smoothstep((p - 0.40) / 0.10));
+            static_cast<float>(smoothstep((p - 0.10) / 0.08));
     } else if (cue.act == CinemaAct::kDeliberate) {
         cue.spectral_edge_reveal = 1.0;
         cue.spectral_spectrum_reveal = 1.0;
         cue.spectral_filter_mix = 1.0;
-        cue.spectral_field_reveal = 1.0;
+        cue.spectral_curve_cursor = 0.0;
+        cue.spectral_curve_cursor_alpha = 0.0;
+        cue.spectral_field_reveal = state.sizing.field_points.empty() ? 0.0 : 1.0;
         const double bridge = std::min(1.3, 0.18 * cue.act_span);
         const double q = smoothstep(cue.act_t / std::max(bridge, 1.0e-9));
         cue.spectral_overlay_alpha =
@@ -818,7 +893,9 @@ CinemaCue cinema_cue(const CinemaState& state) {
         cue.spectral_edge_reveal = 1.0;
         cue.spectral_spectrum_reveal = 1.0;
         cue.spectral_filter_mix = 1.0;
-        cue.spectral_field_reveal = 1.0;
+        cue.spectral_curve_cursor = 0.0;
+        cue.spectral_curve_cursor_alpha = 0.0;
+        cue.spectral_field_reveal = state.sizing.field_points.empty() ? 0.0 : 1.0;
         const double handoff = std::max(cinema_decision_lead(state), 0.18 * cue.act_span);
         cue.spectral_overlay_alpha = static_cast<float>(
             kSizingCarryAlpha *
@@ -846,7 +923,7 @@ CinemaCue cinema_cue(const CinemaState& state) {
     if (n_frames > 0) {
         const double lane_t0 = kActFraction[0] * total;
         const double lane_t1 = (kActFraction[0] + kActFraction[1]) * total;
-        const double scan_t1 = lane_t0 + 0.65 * (lane_t1 - lane_t0);
+        const double scan_t1 = lane_t1;
         const double beat = (scan_t1 - lane_t0) / static_cast<double>(n_frames);
         cue.pass_beat_seconds = beat;
         if (cue.act == CinemaAct::kSkeleton) {
@@ -890,7 +967,9 @@ CinemaCue cinema_cue(const CinemaState& state) {
                 cue.activation_wave = cue.stage_reveal;
                 // A later audit snapshot with identical topology carries the
                 // already-landed mesh; resetting reveal to zero here made the
-                // cells vanish between `fill` and `ship`.
+                // cells vanish between `fill` and `ship`. The first real stage
+                // begins immediately after the causal lead: the network wave
+                // already reached its action heads during that lead.
                 const bool same_topology =
                     clamped > 0 &&
                     state.stages[clamped - 1].mesh.nodes.size() ==
@@ -898,8 +977,7 @@ CinemaCue cinema_cue(const CinemaState& state) {
                     state.stages[clamped - 1].mesh.elements.size() ==
                         state.stages[clamped].mesh.elements.size();
                 cue.mesh_action_reveal =
-                    same_topology ? 1.0
-                                  : smoothstep((cue.stage_reveal - 0.28) / 0.72);
+                    same_topology ? 1.0 : smoothstep(cue.stage_reveal);
                 cue.mesh_source = CinemaMeshSource::kFillStage;
                 cue.mesh_source_index = cue.stage_index;
             }
@@ -1009,17 +1087,15 @@ Viewport::CinemaView cinema_view(const CinemaState&, const CinemaCue& cue) {
     };
     switch (cue.act) {
     case CinemaAct::kSkeleton: {
-        const double p = cue.act_t / std::max(cue.act_span, 1.0e-9);
         view.model_alpha = 1.0f;
-        view.assembly_strip =
-            static_cast<float>(smoothstep((p - 0.24) / 0.20));
-        view.assembly_alpha =
-            static_cast<float>(1.0 - smoothstep((p - 0.30) / 0.18));
         view.skeleton_alpha = 0.0f;
         view.reveal = 0.0f;
         view.mesh_alpha = 0.0f;
         view.shrink = 1.0f;
         view.spectral_edge_reveal = static_cast<float>(cue.spectral_edge_reveal);
+        view.spectral_curve_cursor = static_cast<float>(cue.spectral_curve_cursor);
+        view.spectral_curve_cursor_alpha =
+            static_cast<float>(cue.spectral_curve_cursor_alpha);
         view.spectral_field_reveal = static_cast<float>(cue.spectral_field_reveal);
         view.spectral_filter_mix = static_cast<float>(cue.spectral_filter_mix);
         view.spectral_overlay_alpha = cue.spectral_overlay_alpha;
@@ -1034,6 +1110,9 @@ Viewport::CinemaView cinema_view(const CinemaState&, const CinemaCue& cue) {
         view.mesh_alpha = 0.0f;
         view.shrink = 1.0f;
         view.spectral_edge_reveal = static_cast<float>(cue.spectral_edge_reveal);
+        view.spectral_curve_cursor = static_cast<float>(cue.spectral_curve_cursor);
+        view.spectral_curve_cursor_alpha =
+            static_cast<float>(cue.spectral_curve_cursor_alpha);
         view.spectral_field_reveal = static_cast<float>(cue.spectral_field_reveal);
         view.spectral_filter_mix = static_cast<float>(cue.spectral_filter_mix);
         view.spectral_overlay_alpha = cue.spectral_overlay_alpha;
@@ -1049,6 +1128,9 @@ Viewport::CinemaView cinema_view(const CinemaState&, const CinemaCue& cue) {
         view.shrink =
             cue.stage_index >= 0 ? shrink_for(cue.mesh_action_reveal) : 1.0f;
         view.spectral_edge_reveal = static_cast<float>(cue.spectral_edge_reveal);
+        view.spectral_curve_cursor = static_cast<float>(cue.spectral_curve_cursor);
+        view.spectral_curve_cursor_alpha =
+            static_cast<float>(cue.spectral_curve_cursor_alpha);
         view.spectral_field_reveal = static_cast<float>(cue.spectral_field_reveal);
         view.spectral_filter_mix = static_cast<float>(cue.spectral_filter_mix);
         view.spectral_overlay_alpha = cue.spectral_overlay_alpha;
@@ -1280,12 +1362,13 @@ void sync_cinema_viewport(CinemaState& state, const CinemaCue& cue, const Cinema
                           Viewport& viewport) {
     if (!state.uploaded_sizing_story) {
         // Empty vectors deliberately clear the previous take's VBO when this
-        // input supplied no spectral story. A failed extractor must never leave
-        // the last part's spacing rings hovering over the new skeleton.
-        viewport.set_cinema_sizing_samples(
+        // input supplied no feature story. A failed extractor must never leave
+        // the last part's samples hovering over the new CAD body. Uniform takes
+        // still upload the exact curvature edge but no fabricated h(x) rings.
+        viewport.set_cinema_feature_samples(
             state.sizing.field_points, state.sizing.field_h_before,
-            state.sizing.field_h_after, state.sizing.edge_points,
-            state.sizing.edge_h_before, state.sizing.edge_h_after);
+            state.sizing.field_h_after, state.sizing.curve_points,
+            state.sizing.curvature_raw, state.sizing.curvature_filtered);
         state.uploaded_sizing_story = true;
     }
     // Per-element buffer: re-uploaded only when the cue names a different mesh,
@@ -1457,10 +1540,7 @@ void capture_curve_story(CinemaState& state, const geom::CadTopology& topology) 
     state.sizing.curvature_filtered.clear();
     state.sizing.curve_spectrum.clear();
     state.sizing.curve_mode_kept.clear();
-    state.sizing.edge_points.clear();
     state.sizing.curve_points.clear();
-    state.sizing.edge_h_before.clear();
-    state.sizing.edge_h_after.clear();
     double best_score = -1.0;
     for (const auto& edge : topology.edges) {
         if (edge.samples.size() < 3 || edge.kappa_samples.size() != edge.samples.size()) {
@@ -1525,27 +1605,23 @@ void build_cinema_skeleton(CinemaState& state, const pipeline::Model& model,
     state.load_markers.clear();
     for (const int region : setup.fixtures) {
         if (const auto position = region_centroid(model, region)) {
-            state.support_markers.push_back({region, *position, Eigen::Vector3d::Zero()});
+            CinemaMechanicsMarker marker;
+            marker.region = region;
+            marker.position = *position;
+            marker.surface_points = region_surface_points(model, region);
+            state.support_markers.push_back(std::move(marker));
         }
     }
     for (const auto& [region, load] : setup.loads) {
         if (const auto position = region_centroid(model, region)) {
-            state.load_markers.push_back({region, *position, load.force});
+            CinemaMechanicsMarker marker;
+            marker.region = region;
+            marker.position = *position;
+            marker.vector = load.force;
+            marker.surface_points = region_surface_points(model, region);
+            state.load_markers.push_back(std::move(marker));
         }
     }
-
-    std::vector<Eigen::Vector3d> support_positions;
-    support_positions.reserve(state.support_markers.size());
-    for (const auto& marker : state.support_markers) {
-        support_positions.push_back(marker.position);
-    }
-    std::vector<Eigen::Vector3d> load_positions;
-    load_positions.reserve(state.load_markers.size());
-    for (const auto& marker : state.load_markers) {
-        load_positions.push_back(marker.position);
-    }
-    viewport.set_cinema_assembly_context(
-        support_positions, load_positions, state.subject_center, state.model_diagonal);
 
     if (model.cad && !model.cad->empty()) {
         try {
@@ -1623,8 +1699,6 @@ void prepare_cinema_features(CinemaState& state, const pipeline::Model& model,
     state.sizing.field_points.clear();
     state.sizing.field_h_before.clear();
     state.sizing.field_h_after.clear();
-    state.sizing.edge_h_before.clear();
-    state.sizing.edge_h_after.clear();
     state.sizing.sampled_h_before_min = 0.0;
     state.sizing.sampled_h_before_max = 0.0;
     state.sizing.sampled_h_after_min = 0.0;
@@ -1684,13 +1758,6 @@ void prepare_cinema_features(CinemaState& state, const pipeline::Model& model,
             append_sample(model.surface.vertices[i], state.sizing.field_points,
                           state.sizing.field_h_before, state.sizing.field_h_after);
         }
-        std::vector<Eigen::Vector3d> accepted_edge_points;
-        accepted_edge_points.reserve(state.sizing.edge_points.size());
-        for (const auto& point : state.sizing.edge_points) {
-            append_sample(point, accepted_edge_points, state.sizing.edge_h_before,
-                          state.sizing.edge_h_after);
-        }
-        state.sizing.edge_points = std::move(accepted_edge_points);
 
         const auto range = [](const std::vector<double>& values) {
             if (values.empty()) {
@@ -1714,8 +1781,6 @@ void prepare_cinema_features(CinemaState& state, const pipeline::Model& model,
         state.sizing.field_points.clear();
         state.sizing.field_h_before.clear();
         state.sizing.field_h_after.clear();
-        state.sizing.edge_h_before.clear();
-        state.sizing.edge_h_after.clear();
     }
 
     const auto& spectral = state.sizing.spectral;
@@ -2422,9 +2487,13 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
                     faded(palette.accent, 0.62f * alpha), 7.0f, 0, 1.2f);
         const ImVec2 state_at(origin.x + 28.0f, chip_top + 0.5f * chip_h);
         const ImVec4 state_color =
-            state.decision_applied ? palette.status_ok : palette.status_warn;
+            cue.pass_lane_live
+                ? palette.accent
+                : (state.decision_applied ? palette.status_ok : palette.status_warn);
         dl->AddCircle(state_at, 11.0f, faded(state_color, alpha), 0, 2.2f);
-        if (state.decision_applied) {
+        if (cue.pass_lane_live) {
+            dl->AddCircleFilled(state_at, 4.0f, faded(state_color, alpha));
+        } else if (state.decision_applied) {
             dl->AddLine(ImVec2(state_at.x - 5.0f, state_at.y),
                         ImVec2(state_at.x - 1.0f, state_at.y + 5.0f),
                         faded(state_color, alpha), 2.2f);
@@ -2454,11 +2523,30 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
                         faded(palette.accent, alpha), 1.2f);
         }
         const auto& decision = state.explanation->decision;
-        const std::string value =
-            state.decision_applied
-                ? fmt("%s · h/L %.3g · p%d", std::string(mesher_plain(frame->action.mesher)).c_str(),
-                      frame->action.h_rel, frame->action.order)
-                : fmt("d = %.3g", decision.ood_distance);
+        std::string value;
+        if (cue.pass_lane_live) {
+            value = fmt("candidate %s / %s",
+                        grouped(static_cast<std::size_t>(cue.frame_index) + 1).c_str(),
+                        grouped(state.explanation->frames.size()).c_str());
+        } else if (cue.stage_index >= 0 &&
+                   static_cast<std::size_t>(cue.stage_index) < state.stages.size()) {
+            const std::size_t total_cells =
+                state.stages[static_cast<std::size_t>(cue.stage_index)].mesh.elements.size();
+            const std::size_t visible_cells = std::min(
+                total_cells, static_cast<std::size_t>(std::floor(
+                                 cue.mesh_action_reveal * static_cast<double>(total_cells))));
+            const std::string source = state.decision_applied
+                                           ? std::string(mesher_plain(frame->action.mesher))
+                                           : std::string("configured baseline");
+            value = fmt("%s  →  %s / %s cells", source.c_str(),
+                        grouped(visible_cells).c_str(), grouped(total_cells).c_str());
+        } else if (state.decision_applied) {
+            value = fmt("%s · h/L %.3g · p%d",
+                        std::string(mesher_plain(frame->action.mesher)).c_str(),
+                        frame->action.h_rel, frame->action.order);
+        } else {
+            value = fmt("d = %.3g · configured baseline", decision.ood_distance);
+        }
         dl->AddText(font, type.label,
                     ImVec2(grid_at.x + 26.0f, state_at.y - 0.5f * type.label),
                     faded(state_color, alpha), value.c_str());
@@ -2481,23 +2569,21 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
     const ImVec2 origin = ImGui::GetCursorScreenPos();
     const ImVec2 region = ImGui::GetContentRegionAvail();
     dl->AddText(font, type.caption, origin, faded(palette.text, alpha),
-                "CAD  →  κ(s)  →  FFT  →  h(x)");
+                "CAD edge  ↔  κ(s)  ↔  FFT");
 
     const float chart_top = origin.y + type.caption * 1.7f;
-    const float chart_h = std::max(
-        260.0f, region.y - (chart_top - origin.y) - type.label * 4.2f);
+    const float chart_h =
+        std::max(260.0f, region.y - (chart_top - origin.y) - type.label * 2.2f);
     const float chart_w = std::max(120.0f, region.x);
     dl->AddRectFilled(ImVec2(origin.x, chart_top),
                       ImVec2(origin.x + chart_w, chart_top + chart_h),
                       faded(palette.panel_bg, 0.52f * alpha), 6.0f);
-    dl->AddRect(ImVec2(origin.x, chart_top),
-                ImVec2(origin.x + chart_w, chart_top + chart_h),
+    dl->AddRect(ImVec2(origin.x, chart_top), ImVec2(origin.x + chart_w, chart_top + chart_h),
                 faded(palette.border, 0.8f * alpha), 6.0f);
 
     const float pad = 13.0f;
     const float split_y = chart_top + chart_h * 0.58f;
-    dl->AddLine(ImVec2(origin.x + pad, split_y),
-                ImVec2(origin.x + chart_w - pad, split_y),
+    dl->AddLine(ImVec2(origin.x + pad, split_y), ImVec2(origin.x + chart_w - pad, split_y),
                 faded(palette.border, 0.72f * alpha), 1.0f);
     const float edge_right = origin.x + chart_w * 0.35f;
     const float curve_left = edge_right + pad * 1.5f;
@@ -2516,8 +2602,7 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
         }
         std::array<int, 3> axes{0, 1, 2};
         const Eigen::Vector3d range = hi - lo;
-        std::sort(axes.begin(), axes.end(),
-                  [&](int a, int b) { return range[a] > range[b]; });
+        std::sort(axes.begin(), axes.end(), [&](int a, int b) { return range[a] > range[b]; });
         const int ax = axes[0];
         const int ay = axes[1];
         const double sx = std::max(range[ax], 1.0e-12);
@@ -2528,70 +2613,67 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
             return ImVec2(origin.x + pad +
                               (edge_right - origin.x - 2.0f * pad) *
                                   static_cast<float>((p[ax] - lo[ax]) / sx),
-                          edge_bottom -
-                              (edge_bottom - edge_top) *
-                                  static_cast<float>((p[ay] - lo[ay]) / sy));
+                          edge_bottom - (edge_bottom - edge_top) *
+                                            static_cast<float>((p[ay] - lo[ay]) / sy));
         };
         const double reveal =
             cue.spectral_edge_reveal * static_cast<double>(edge_points.size() - 1);
-        const std::size_t whole = std::min(
-            static_cast<std::size_t>(std::floor(reveal)), edge_points.size() - 1);
+        const std::size_t whole =
+            std::min(static_cast<std::size_t>(std::floor(reveal)), edge_points.size() - 1);
         for (std::size_t i = 1; i < edge_points.size(); ++i) {
             const bool lit = i <= whole;
-            dl->AddLine(edge_point(edge_points[i - 1]), edge_point(edge_points[i]),
-                        faded(lit ? palette.accent : palette.text_dim,
-                              alpha * (lit ? 0.92f : 0.22f)),
-                        lit ? 2.4f : 1.0f);
+            dl->AddLine(
+                edge_point(edge_points[i - 1]), edge_point(edge_points[i]),
+                faded(lit ? palette.accent : palette.text_dim, alpha * (lit ? 0.92f : 0.22f)),
+                lit ? 2.4f : 1.0f);
         }
-        const std::size_t sample =
-            std::clamp<std::size_t>(whole, 1, edge_points.size() - 2);
+        const std::size_t sample = std::clamp<std::size_t>(
+            static_cast<std::size_t>(std::llround(
+                cue.spectral_curve_cursor * static_cast<double>(edge_points.size() - 1))),
+            1, edge_points.size() - 2);
+        const float construction_alpha =
+            alpha * static_cast<float>(cue.spectral_curve_cursor_alpha);
         const ImVec2 a = edge_point(edge_points[sample - 1]);
         const ImVec2 b = edge_point(edge_points[sample]);
         const ImVec2 c = edge_point(edge_points[sample + 1]);
         for (const ImVec2 p : {a, b, c}) {
-            dl->AddCircleFilled(p, 4.0f, faded(palette.accent_soft_top, alpha));
+            dl->AddCircleFilled(p, 4.0f, faded(palette.accent_soft_top, construction_alpha));
         }
         const float tangent_norm = std::hypot(c.x - a.x, c.y - a.y);
         if (tangent_norm > 1.0e-4f) {
-            const ImVec2 tangent((c.x - a.x) / tangent_norm,
-                                 (c.y - a.y) / tangent_norm);
+            const ImVec2 tangent((c.x - a.x) / tangent_norm, (c.y - a.y) / tangent_norm);
             ImVec2 normal(-tangent.y, tangent.x);
             const ImVec2 inset_center(0.5f * (origin.x + edge_right),
                                       0.5f * (edge_top + edge_bottom));
-            if (normal.x * (b.x - inset_center.x) +
-                    normal.y * (b.y - inset_center.y) <
-                0.0f) {
+            if (normal.x * (b.x - inset_center.x) + normal.y * (b.y - inset_center.y) < 0.0f) {
                 normal.x = -normal.x;
                 normal.y = -normal.y;
             }
             dl->AddLine(ImVec2(b.x - 24.0f * tangent.x, b.y - 24.0f * tangent.y),
                         ImVec2(b.x + 24.0f * tangent.x, b.y + 24.0f * tangent.y),
-                        faded(palette.text, 0.76f * alpha), 1.5f);
-            const ImVec2 normal_tip(b.x + 34.0f * normal.x,
-                                    b.y + 34.0f * normal.y);
-            dl->AddLine(b, normal_tip, faded(palette.status_warn, 0.86f * alpha), 2.0f);
+                        faded(palette.text, 0.76f * construction_alpha), 1.5f);
+            const ImVec2 normal_tip(b.x + 34.0f * normal.x, b.y + 34.0f * normal.y);
+            dl->AddLine(b, normal_tip, faded(palette.status_warn, 0.86f * construction_alpha),
+                        2.0f);
             dl->AddCircleFilled(normal_tip, 3.5f,
-                                faded(palette.status_warn, alpha));
+                                faded(palette.status_warn, construction_alpha));
         }
-        const float d =
-            2.0f * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
+        const float d = 2.0f * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
         if (std::fabs(d) > 1.0e-4f) {
             const float aa = a.x * a.x + a.y * a.y;
             const float bb = b.x * b.x + b.y * b.y;
             const float cc = c.x * c.x + c.y * c.y;
-            const ImVec2 center(
-                (aa * (b.y - c.y) + bb * (c.y - a.y) + cc * (a.y - b.y)) / d,
-                (aa * (c.x - b.x) + bb * (a.x - c.x) + cc * (b.x - a.x)) / d);
+            const ImVec2 center((aa * (b.y - c.y) + bb * (c.y - a.y) + cc * (a.y - b.y)) / d,
+                                (aa * (c.x - b.x) + bb * (a.x - c.x) + cc * (b.x - a.x)) / d);
             const float radius = std::hypot(center.x - b.x, center.y - b.y);
             const bool inside =
-                center.x - radius >= origin.x + pad &&
-                center.x + radius <= edge_right - pad &&
-                center.y - radius >= edge_top &&
-                center.y + radius <= edge_bottom;
+                center.x - radius >= origin.x + pad && center.x + radius <= edge_right - pad &&
+                center.y - radius >= edge_top && center.y + radius <= edge_bottom;
             if (std::isfinite(radius) && inside) {
-                dl->AddCircle(center, radius, faded(palette.status_warn, 0.62f * alpha),
-                              0, 1.4f);
-                dl->AddLine(center, b, faded(palette.status_warn, 0.78f * alpha), 1.4f);
+                dl->AddCircle(center, radius,
+                              faded(palette.status_warn, 0.62f * construction_alpha), 0, 1.4f);
+                dl->AddLine(center, b, faded(palette.status_warn, 0.78f * construction_alpha),
+                            1.4f);
             }
         }
         const ImVec2 arrow_a(edge_right + 2.0f, 0.5f * (edge_top + edge_bottom));
@@ -2599,6 +2681,9 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
         dl->AddLine(arrow_a, arrow_b, faded(palette.accent, 0.72f * alpha), 2.0f);
         dl->AddTriangleFilled(arrow_b, ImVec2(arrow_b.x - 8.0f, arrow_b.y - 5.0f),
                               ImVec2(arrow_b.x - 8.0f, arrow_b.y + 5.0f),
+                              faded(palette.accent, 0.72f * alpha));
+        dl->AddTriangleFilled(arrow_a, ImVec2(arrow_a.x + 8.0f, arrow_a.y - 5.0f),
+                              ImVec2(arrow_a.x + 8.0f, arrow_a.y + 5.0f),
                               faded(palette.accent, 0.72f * alpha));
     }
 
@@ -2616,26 +2701,22 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
         const float plot_top = chart_top + type.legend * 1.65f;
         const float plot_bottom = split_y - 10.0f;
         const auto point = [&](double station, double value) {
-            const float x = curve_left +
-                            (origin.x + chart_w - pad - curve_left) *
-                                static_cast<float>(station);
+            const float x = curve_left + (origin.x + chart_w - pad - curve_left) *
+                                             static_cast<float>(station);
             const float y = plot_bottom -
                             (plot_bottom - plot_top) * static_cast<float>((value - lo) / span);
             return ImVec2(x, y);
         };
 
-        const double revealed =
-            cue.spectral_edge_reveal * static_cast<double>(raw.size() - 1);
+        const double revealed = cue.spectral_edge_reveal * static_cast<double>(raw.size() - 1);
         const std::size_t whole =
             std::min(static_cast<std::size_t>(std::floor(revealed)), raw.size() - 1);
         for (std::size_t i = 1; i <= whole; ++i) {
-            dl->AddLine(point(stations[i - 1], raw[i - 1]),
-                        point(stations[i], raw[i]),
+            dl->AddLine(point(stations[i - 1], raw[i - 1]), point(stations[i], raw[i]),
                         faded(palette.text_dim, 0.62f * alpha), 1.2f);
-            const double y0 = raw[i - 1] +
-                              cue.spectral_filter_mix * (filtered[i - 1] - raw[i - 1]);
-            const double y1 =
-                raw[i] + cue.spectral_filter_mix * (filtered[i] - raw[i]);
+            const double y0 =
+                raw[i - 1] + cue.spectral_filter_mix * (filtered[i - 1] - raw[i - 1]);
+            const double y1 = raw[i] + cue.spectral_filter_mix * (filtered[i] - raw[i]);
             dl->AddLine(point(stations[i - 1], y0), point(stations[i], y1),
                         faded(palette.accent, alpha), 2.6f);
             dl->AddCircleFilled(point(stations[i], y1), 2.6f,
@@ -2645,23 +2726,38 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
             const double part = revealed - static_cast<double>(whole);
             const double station =
                 stations[whole] + part * (stations[whole + 1] - stations[whole]);
-            const double raw_value =
-                raw[whole] + part * (raw[whole + 1] - raw[whole]);
+            const double raw_value = raw[whole] + part * (raw[whole + 1] - raw[whole]);
             const double filtered_value =
                 filtered[whole] + part * (filtered[whole + 1] - filtered[whole]);
             const double value =
                 raw_value + cue.spectral_filter_mix * (filtered_value - raw_value);
             dl->AddLine(point(stations[whole], raw[whole]), point(station, raw_value),
                         faded(palette.text_dim, 0.62f * alpha), 1.2f);
-            const double start = raw[whole] +
-                                 cue.spectral_filter_mix *
-                                     (filtered[whole] - raw[whole]);
+            const double start =
+                raw[whole] + cue.spectral_filter_mix * (filtered[whole] - raw[whole]);
             dl->AddLine(point(stations[whole], start), point(station, value),
                         faded(palette.accent, alpha), 2.6f);
+        }
+        if (cue.spectral_edge_reveal > 0.0 && cue.spectral_curve_cursor_alpha > 0.0) {
+            const double cursor = std::clamp(cue.spectral_curve_cursor, 0.0, 1.0) *
+                                  static_cast<double>(raw.size() - 1);
+            const std::size_t lo_index =
+                std::min(static_cast<std::size_t>(std::floor(cursor)), raw.size() - 1);
+            const std::size_t hi_index = std::min(lo_index + 1, raw.size() - 1);
+            const double part = cursor - static_cast<double>(lo_index);
+            const double station =
+                stations[lo_index] + part * (stations[hi_index] - stations[lo_index]);
+            const double raw_value = raw[lo_index] + part * (raw[hi_index] - raw[lo_index]);
+            const double filtered_value =
+                filtered[lo_index] + part * (filtered[hi_index] - filtered[lo_index]);
+            const double value =
+                raw_value + cue.spectral_filter_mix * (filtered_value - raw_value);
             const ImVec2 scan = point(station, value);
+            const float cursor_alpha =
+                alpha * static_cast<float>(cue.spectral_curve_cursor_alpha);
             dl->AddLine(ImVec2(scan.x, plot_top), ImVec2(scan.x, plot_bottom),
-                        faded(palette.accent_soft_top, 0.5f * alpha), 1.0f);
-            dl->AddCircleFilled(scan, 4.2f, faded(palette.accent_soft_top, alpha));
+                        faded(palette.accent_soft_top, 0.52f * cursor_alpha), 1.2f);
+            dl->AddCircleFilled(scan, 4.6f, faded(palette.accent_soft_top, cursor_alpha));
         }
     }
 
@@ -2673,8 +2769,7 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
         // here both matches the report's denominator and stops one huge bar
         // from flattening every explanatory non-DC mode.
         const double max_magnitude =
-            std::max(*std::max_element(spectrum.begin() + 1, spectrum.end()),
-                     1.0e-12);
+            std::max(*std::max_element(spectrum.begin() + 1, spectrum.end()), 1.0e-12);
         const float bars_top = split_y + pad;
         const float bars_bottom = chart_top + chart_h - 11.0f;
         const float bars_h = std::max(1.0f, bars_bottom - bars_top);
@@ -2682,14 +2777,13 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
         const std::size_t mode_count = spectrum.size() - 1;
         const float slot = bars_w / static_cast<float>(mode_count);
         const std::size_t visible = std::min(
-            mode_count,
-            static_cast<std::size_t>(std::ceil(
-                cue.spectral_spectrum_reveal * static_cast<double>(mode_count))));
+            mode_count, static_cast<std::size_t>(std::ceil(cue.spectral_spectrum_reveal *
+                                                           static_cast<double>(mode_count))));
         const double log_max = std::log1p(max_magnitude);
         for (std::size_t mode = 0; mode < visible; ++mode) {
             const std::size_t i = mode + 1;
-            const float magnitude = static_cast<float>(
-                std::log1p(spectrum[i]) / std::max(log_max, 1.0e-12));
+            const float magnitude =
+                static_cast<float>(std::log1p(spectrum[i]) / std::max(log_max, 1.0e-12));
             const float x0 = origin.x + pad + static_cast<float>(mode) * slot;
             const float x1 = x0 + std::max(1.0f, slot - 1.0f);
             const float y0 = bars_bottom - bars_h * magnitude;
@@ -2698,69 +2792,24 @@ void draw_cinema_features(const CinemaState& state, const CinemaCue& cue,
                 static_cast<float>(1.0 - 0.82 * cue.spectral_filter_mix);
             const ImVec4 color =
                 survives ? palette.accent
-                         : ImVec4(palette.text_dim.x, palette.text_dim.y,
-                                  palette.text_dim.z,
+                         : ImVec4(palette.text_dim.x, palette.text_dim.y, palette.text_dim.z,
                                   palette.text_dim.w * discarded_alpha);
-            dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x1, bars_bottom),
-                              faded(color, alpha), 1.0f);
+            dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x1, bars_bottom), faded(color, alpha),
+                              1.0f);
         }
     }
-    const std::array<double, 5> progress{
-        cue.spectral_edge_reveal, cue.spectral_spectrum_reveal,
-        cue.spectral_filter_mix, cue.spectral_filter_mix,
-        cue.spectral_field_reveal};
-    const float gap = 8.0f;
-    const float box_w = (chart_w - gap * 4.0f) / 5.0f;
-    const float box_y = chart_top + chart_h + type.label * 0.45f;
-    for (std::size_t i = 0; i < progress.size(); ++i) {
-        const float x = origin.x + static_cast<float>(i) * (box_w + gap);
-        const bool active = progress[i] > (i == 3 ? 0.45 : 0.04);
-        const ImVec4 c = active ? palette.accent : palette.text_dim;
-        dl->AddRectFilled(ImVec2(x, box_y), ImVec2(x + box_w, box_y + type.label * 2.2f),
-                          faded(active ? palette.accent_mid : palette.panel_bg,
-                                alpha * (active ? 0.50f : 0.30f)),
-                          6.0f);
-        const ImVec2 mid(x + 0.5f * box_w, box_y + type.label * 1.1f);
-        if (i == 0) {
-            dl->AddLine(ImVec2(mid.x - 22.0f, mid.y + 7.0f),
-                        ImVec2(mid.x, mid.y - 8.0f), faded(c, alpha), 2.0f);
-            dl->AddLine(ImVec2(mid.x, mid.y - 8.0f),
-                        ImVec2(mid.x + 22.0f, mid.y + 7.0f), faded(c, alpha), 2.0f);
-            for (float dx : {-22.0f, 0.0f, 22.0f}) {
-                dl->AddCircleFilled(ImVec2(mid.x + dx, mid.y + (dx == 0.0f ? -8.0f : 7.0f)),
-                                    3.5f, faded(c, alpha));
-            }
-        } else if (i == 1 || i == 2) {
-            for (int bar = 0; bar < 5; ++bar) {
-                const float h = (i == 1 ? std::sin(0.8f * static_cast<float>(bar)) + 1.2f
-                                        : 2.2f - 0.35f * static_cast<float>(bar)) * 7.0f;
-                const float bx = mid.x - 24.0f + 12.0f * static_cast<float>(bar);
-                dl->AddRectFilled(ImVec2(bx, mid.y + 14.0f - h),
-                                  ImVec2(bx + 7.0f, mid.y + 14.0f),
-                                  faded(i == 2 && bar > 2 ? palette.text_dim : c, alpha), 1.0f);
-            }
-        } else if (i == 3) {
-            ImVec2 prev(mid.x - 27.0f, mid.y);
-            for (int k = 1; k <= 18; ++k) {
-                const float px = mid.x - 27.0f + 3.0f * static_cast<float>(k);
-                const float py = mid.y - 9.0f * std::sin(0.55f * static_cast<float>(k));
-                const ImVec2 next(px, py);
-                dl->AddLine(prev, next, faded(c, alpha), 2.0f);
-                prev = next;
-            }
-        } else {
-            for (int ring = 0; ring < 3; ++ring) {
-                dl->AddCircle(ImVec2(mid.x - 20.0f + 20.0f * static_cast<float>(ring), mid.y),
-                              5.0f + 3.0f * static_cast<float>(ring),
-                              faded(ring == 0 ? palette.status_warn : c, alpha), 0, 2.0f);
-            }
-        }
-        if (i + 1 < progress.size()) {
-            const ImVec2 a(x + box_w + 1.0f, mid.y);
-            const ImVec2 b(x + box_w + gap - 2.0f, mid.y);
-            dl->AddLine(a, b, faded(palette.text_dim, 0.55f * alpha), 1.5f);
-        }
-    }
+    const std::string status =
+        state.sizing.field_points.empty()
+            ? fmt("%s / %s modes · same CAD edge · uniform h unchanged",
+                  grouped(state.sizing.curve_modes_kept).c_str(),
+                  grouped(state.sizing.curve_modes_total).c_str())
+            : fmt("%s / %s modes · reconstructed on CAD · measured h(x)",
+                  grouped(state.sizing.curve_modes_kept).c_str(),
+                  grouped(state.sizing.curve_modes_total).c_str());
+    dl->AddText(
+        font, type.label, ImVec2(origin.x, chart_top + chart_h + type.label * 0.48f),
+        faded(state.sizing.field_points.empty() ? palette.text_dim : palette.accent, alpha),
+        status.c_str());
     ImGui::Dummy(ImVec2(region.x, std::max(1.0f, region.y - 2.0f)));
 }
 
@@ -2932,8 +2981,13 @@ void draw_cinema_cells(const CinemaState& state, const CinemaCue& cue,
             for (const auto& edge : kPatchEdges) {
                 const ImVec2 a = projected[static_cast<std::size_t>(edge[0])];
                 const ImVec2 b = projected[static_cast<std::size_t>(edge[1])];
-                dl->AddCircleFilled(ImVec2(0.5f * (a.x + b.x), 0.5f * (a.y + b.y)),
-                                    3.6f, faded(palette.status_ok, midside * alpha));
+                const ImVec2 mid(0.5f * (a.x + b.x), 0.5f * (a.y + b.y));
+                const ImU32 edge_color =
+                    faded(palette.status_ok, 0.92f * midside * alpha);
+                dl->AddLine(a, mid, edge_color, 2.4f);
+                dl->AddLine(mid, b, edge_color, 2.4f);
+                dl->AddCircleFilled(mid, 3.8f,
+                                    faded(palette.status_ok, midside * alpha));
             }
         }
     };
@@ -3086,6 +3140,7 @@ void build_caption(const CinemaState& state, const CinemaCue& cue, const CinemaH
         out.numbers = std::string(mesher_plain(hud.mesher));
         out.headline_color =
             state.decision_applied ? palette.status_ok : palette.status_warn;
+        out.note = "chooser complete · recorded stage follows";
         return;
     }
     const auto idx = static_cast<std::size_t>(cue.stage_index);
@@ -3101,6 +3156,7 @@ void build_caption(const CinemaState& state, const CinemaCue& cue, const CinemaH
     out.numbers = fmt("%s nodes · p%d",
                       grouped(stage.mesh.nodes.size()).c_str(), hud.order);
     out.headline_color = palette.accent;
+    out.note = "recorded cells · causal replay";
 }
 
 void mesh_hold_caption(const CinemaState& state, const CinemaCue& cue, const CinemaHud& hud,
@@ -3271,8 +3327,7 @@ void draw_fitted(ImDrawList* dl, ImFont* font, float size, ImVec2 at, float widt
 std::vector<CinemaChapter> cinema_chapters() {
     return {
         {"exact CAD", CinemaAct::kSkeleton},
-        {"advisor", CinemaAct::kDeliberate},
-        {"mesher", CinemaAct::kBuild},
+        {"advisor → mesh", CinemaAct::kDeliberate},
         {"analysis", CinemaAct::kSolve},
     };
 }
@@ -3330,11 +3385,12 @@ void draw_cinema_strip(const CinemaState& state, const CinemaCue& cue, const Cin
     const ImVec2 origin = ImGui::GetCursorScreenPos();
     const float width = std::max(80.0f, ImGui::GetContentRegionAvail().x);
 
-    // ---- the chapter bar -------------------------------------------------
-    // Four words and a progress line. It exists so a first-time viewer knows
-    // where they are in half a second without reading a clock.
+    // Three causal chapters and one progress line. Advisor scoring, its chosen
+    // action and the real cell landing remain one continuous chapter.
     const auto chapters = cinema_chapters();
-    const CinemaAct here = cue.act == CinemaAct::kMeshHold ? CinemaAct::kBuild : cue.act;
+    const CinemaAct here = cue.act == CinemaAct::kBuild || cue.act == CinemaAct::kMeshHold
+                               ? CinemaAct::kDeliberate
+                               : cue.act;
     float x = origin.x;
     const float chapter_h = std::floor(type.chapter * 1.9f);
     const float gap = std::floor(type.chapter * 1.6f);

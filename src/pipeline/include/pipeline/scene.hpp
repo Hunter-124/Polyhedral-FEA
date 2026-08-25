@@ -496,7 +496,13 @@ GeometryVolumeAssessment measure_geometry_volume(const Model& model,
 /// Solve products, ready for rendering / VTU.
 struct SolveResult {
     fea::NodalMesh volume_mesh;
-    Eigen::VectorXd displacement;    // 3N
+    Eigen::VectorXd displacement; // 3N
+    /// Solved support reactions in the original 3N layout. Only prescribed
+    /// DOFs are nonzero; values are generalized residuals after MPC transform.
+    Eigen::VectorXd reactions; // 3N
+    /// True only when no MPC transform makes nodal reaction attribution
+    /// ambiguous.
+    bool reactions_complete = true;
     std::vector<double> von_mises;   // per node, Pa
     std::vector<double> u_magnitude; // per node, m
     /// Nodal average of element ZZ indicators (for error-field display).
@@ -508,6 +514,10 @@ struct SolveResult {
     double global_eta = 0.0; // ZZ indicator
     // Boundary quads of the voxel mesh (node indices), for rendering.
     std::vector<std::array<std::uint32_t, 4>> boundary_quads;
+    /// Authoritative boundary-condition membership used for this solve,
+    /// including exact CAD-face edge/vertex members that a one-owner nearest
+    /// region map cannot represent. Keys are GUI region ids.
+    std::map<int, std::vector<std::uint32_t>> boundary_region_nodes;
     std::string mesh_note; // e.g. element/node counts, mesher version
     /// The linear solver's own account of the solve that produced THIS result:
     /// the method it chose, any memory-budget downgrade, and on the iterative

@@ -664,39 +664,45 @@ fields, which is how the GUI's solve is cross-checked against the CLI's.)
   0.00329 mm physical peak displacement. Its global ZZ indicator is 20.69% and
   remains visible as verification evidence; this is not labelled reference truth.
 
-  The opening now starts on a mechanically mated interface rather than
-  decorative surrounding pipes. Bolts, washers and nuts cross both bushing
-  bores on their measured common axis; the ball and stud sit directly in the
-  upright-side bore on its vertical axis. This unsolved hardware strips outward
-  before ordered CAD samples, tangent/normal construction, measured curvature
-  and FFT take over. No whole-part wireframe cage is drawn.
+  The opening starts directly on the analysed shaded CAD body. No neighbouring
+  interface hardware or whole-part wireframe cage is generated. The selected
+  exact edge and the measured $\kappa(s)$ plot share one cursor: each
+  model-space sample lights with the graph point it produced. The real
+  even-reflected FFT then truncates and reconstructs that trace back over the
+  same edge. Because the published run has `feature_grading=false`, it ends at
+  “uniform h unchanged” and draws no fabricated spatial sizing field.
 
   The advisor uses four activation lanes. Every node remains sized/coloured by
   the deployed graph's own tensor, and every shown connection remains one of the
-  strongest measured $|w_{ji}a_i|$ paths. Counts, signed response, the
-  input→hidden→output wave and a decision→mesh glyph replace the previous prose
-  blocks and raw-looking labels. The OOD check still abstains outside the
-  calibrated envelope; the configured, independently verified baseline remains
-  authoritative while real cells replace the shaded CAD body in place.
+  strongest measured $|w_{ji}a_i|$ paths. All measured candidate passes now fill
+  the deliberation window. The final pass locks and the actual `MeshStage`
+  snapshots begin 0.55 s later without a chapter or panel reset; an on-screen
+  shown/total cell counter ties the held action directly to the shaded CAD body.
+  This preserves the real ordering—chooser first, mesher second—without
+  presenting them as unrelated chapters or pretending they ran concurrently.
+  The OOD check still abstains outside the calibrated envelope, so the
+  configured independently verified baseline is the path actually generated.
 
-  Chapter boundaries preserve causality on the same part: mated hardware peels
-  away; exact edge samples become $\kappa(s)$ and its spectrum; the CAD surface
-  yields locally to emitted cells; the mesh yields to stress, gradient and ZZ
-  fields. The cell microscope now owns 10.2 s. Both cards assemble a connected
+  The cell microscope owns 10.2 s. Both cards assemble a connected
   six-tetrahedra cube patch around one shared body diagonal; the second elevates
-  that same topology from tet4/p1 to tet10/p2 with every midside node visible.
-  The bottom ledger and manifest continue to identify the executed wishbone
-  solve as tet4/p1, so the p2 card is a topology comparison rather than a
-  claimed production result.
+  that same topology from tet4/p1 to tet10/p2. Every quadratic edge is drawn as
+  corner→midside and midside→corner segments rather than floating midpoint
+  dots. The bottom ledger and manifest continue to identify the executed
+  wishbone solve as tet4/p1, so the p2 card is a topology comparison rather than
+  a claimed production result.
 
-  Support and load symbols are absent during assembly, advisor inference and
-  meshing. They reveal only at the end of the stress hold immediately before
-  gradient recovery, fade after that calculation, then return at the end of the
-  final error hold immediately before the exact deformation ramp. The force
-  arrow terminates on the loaded region; during that linear ramp, its length and
-  numeric resultant scale by the displayed λ. Final deformation is limited to
-  4% of the model diagonal, and a translucent undeformed CAD surface remains
-  behind the exaggerated result.
+  Mechanics symbols remain absent during exact-CAD analysis, advisor inference
+  and meshing. Immediately before gradient recovery and final deformation, each
+  fixed support is outlined from the projected vertices of its actual selected
+  CAD region. This p1 take has no MPC transform, so reaction vectors and
+  magnitudes are complete resultants summed from the prescribed generalized
+  residual using the exact boundary-condition membership that produced the
+  solve. `reactions_complete=false` suppresses arrows on MPC-constrained runs
+  rather than mislabeling generalized forces as nodal support resultants.
+  The prescribed-force arrow terminates at the loaded region's surface point on
+  its line of action. During the exact linear ramp, applied and reaction vectors
+  scale by the displayed $\lambda$. Final deformation remains limited to 4% of
+  the model diagonal with a translucent undeformed CAD surface behind it.
 
   Framing is solved from all eight corners with the settled viewport aspect and
   includes the complete rest-to-4%-displayed deformation envelope before frame

@@ -122,6 +122,17 @@ struct SolveCostMeasured {
 
 struct LinearSolveResult {
     Eigen::VectorXd u;
+    /// Support reactions in newtons, in the original 3N DOF layout. Entries at
+    /// prescribed DOFs are the generalized residual K_system·u_system−f_system
+    /// after linear-constraint transformation; every other entry is zero.
+    /// Reporting only prescribed generalized residuals avoids mislabeling MPC
+    /// slave forces as external support reactions.
+    Eigen::VectorXd reactions;
+    /// False when multipoint constraints make original-node reaction
+    /// attribution non-unique. Generalized prescribed reactions remain in
+    /// `reactions`, but callers must not present them as a complete nodal
+    /// support resultant.
+    bool reactions_complete = true;
     SolveCostMeasured cost;
 };
 

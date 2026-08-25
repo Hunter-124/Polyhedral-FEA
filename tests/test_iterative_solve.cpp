@@ -165,10 +165,19 @@ TEST_CASE("CG may accept a measured residual without claiming target convergence
         }
         notes += note;
     };
-    const Eigen::VectorXd u =
-        solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, options).u;
+    const LinearSolveResult solved =
+        solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, options);
+    const Eigen::VectorXd& u = solved.u;
     const Eigen::SparseMatrix<double> k = assemble_stiffness(setup.mesh, kSteel);
     const Eigen::VectorXd full_residual = setup.loads - k * u;
+    REQUIRE(solved.reactions.size() == setup.loads.size());
+    Eigen::VectorXd expected_reactions = Eigen::VectorXd::Zero(setup.loads.size());
+    for (const auto& [dof, value] : setup.bc.dof_values) {
+        (void)value;
+        expected_reactions[dof] = -full_residual[dof];
+    }
+    CHECK((solved.reactions - expected_reactions).norm() <=
+          1e-12 * std::max(1.0, expected_reactions.norm()));
 
     double free_residual2 = 0.0;
     double free_load2 = 0.0;

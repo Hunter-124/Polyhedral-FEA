@@ -1,8 +1,8 @@
 {
   "schema": "polymesh.cinema.manifest/1",
-  "generated_utc": "2026-08-24T19:19:44Z",
-  "git_rev": "20629b4+dirty",
-  "stamp": "git 20629b4+dirty \u00b7 model.onnx sha256 03b4062c8c2b",
+  "generated_utc": "2026-08-25T00:58:48Z",
+  "git_rev": "47e2345+dirty",
+  "stamp": "git 47e2345+dirty \u00b7 model.onnx sha256 03b4062c8c2b",
   "stages_run": [
     "frames",
     "gif",
@@ -54,7 +54,7 @@
     ],
     "auto_spec": "load tests/fixtures/parts/wishbone.step; h 5.5; material 200 0.3; mesher tet; solver direct; order 1; feature off; spectral on; fix 5; fix 6; loadface 0 -25000 0 -40000; cinema on; cinema advisor bench/advisor; adapt 0 0; wire off; solve; record /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames 3600; quit",
     "env": {
-      "POLYMESH_CINEMA_STAMP": "git 20629b4+dirty \u00b7 model.onnx sha256 03b4062c8c2b"
+      "POLYMESH_CINEMA_STAMP": "git 47e2345+dirty \u00b7 model.onnx sha256 03b4062c8c2b"
     },
     "xvfb_screen": "1920x1080",
     "frame_size": "1920x1080",
@@ -62,7 +62,7 @@
     "frame_count": 3600,
     "fps": 60,
     "duration_s": 60.0,
-    "gui_wall_s": 1603.018,
+    "gui_wall_s": 1517.869,
     "ffmpeg": "ffmpeg version 8.1.2 Copyright (c) 2000-2026 the FFmpeg developers"
   },
   "report": {
@@ -206,6 +206,9 @@
       "cinema: maths glyphs merged from /usr/share/fonts/google-noto/NotoSansMath-Regular.ttf",
       "cinema: advisor bench/advisor candidates 108 gate_threshold 0.05 frames 109 decision hybrid_zoo h_rel 0.1 order 1 adapt_passes 0 eta_target 0 vetoed 1 ood_distance 67.6049 applied 0",
       "cinema: spectral applied 0 modes_total 0 modes_kept 0 energy_kept 0 edge_seeds 0 predicted_before 0 predicted_after 0 geometry_seeds 0 bc_seeds 0 brep_curvature 0 field_samples 0 h_before_min 0 h_before_max 0 h_after_min 0 h_after_max 0",
+      "cinema: reaction region 5 fx 24714.0933 fy -140.237194 fz 39948.5526 magnitude 46975.4503",
+      "cinema: reaction region 6 fx 285.906737 fy 140.237194 fz 51.4474085 magnitude 322.577074",
+      "cinema: reactions complete 1 balance_rel 2.99530366e-15 support_fx 25000 support_fy -7.99786903e-11 support_fz 40000",
       "cinema: take /home/hunter/Desktop/Polyhedral-FEA/build/cinema/frames frames 3600 fps 60 duration 60.0000 s",
       "cinema: act skeleton frames 0..647 t 0.0000..10.8000 s",
       "cinema: act deliberate frames 648..1115 t 10.8000..18.6000 s",
@@ -236,32 +239,37 @@
       "pix_fmt": "yuv420p",
       "faststart": true,
       "fps": 60,
-      "bytes": 12743605,
-      "sha256": "21d5ae4463e25886cdd1d4573b6371b986759a43dc7d78bde32048b25210826c"
+      "bytes": 14096399,
+      "sha256": "bb2a824769018c118fbb4a0064278652435c43148a193bb215e293e870d3dd8f"
     },
     "gif": {
       "file": "advisor_cinema.gif",
-      "width": 960,
+      "width": 860,
       "fps": 10,
       "start_s": 0.0,
       "duration_s": 60.0,
-      "bytes": 7822485,
-      "sha256": "59a613dd0b374b07a912c1b1e80e695fdc1304beecacd560a0db8ad1cea1e043",
+      "bytes": 7630188,
+      "sha256": "c420ccd52551ebd3dd82d194fb6eefde2702942a3dd2557a251356268b8371a3",
       "attempts": [
         {
           "width": 1100,
           "fps": 12,
-          "bytes": 12227318
+          "bytes": 15051549
         },
         {
           "width": 1100,
           "fps": 10,
-          "bytes": 9705433
+          "bytes": 10905846
         },
         {
           "width": 960,
           "fps": 10,
-          "bytes": 7822485
+          "bytes": 8623154
+        },
+        {
+          "width": 860,
+          "fps": 10,
+          "bytes": 7630188
         }
       ],
       "max_bytes": 8388608,
@@ -272,9 +280,9 @@
       "source_frame": 143,
       "width": 1920,
       "height": 1080,
-      "bytes": 121805,
+      "bytes": 145197,
       "source_bytes": 8296178,
-      "sha256": "465639096eec966ee005f3a1aa0f0d00f00fbbca68cacd10d97968fe9dfeda11",
+      "sha256": "665f2c7fee1084f77cc5e834456cc6f6e60667c740d854add714be6c59716499",
       "frame_source": "reported by the GUI as the first fully-composed frame"
     }
   }

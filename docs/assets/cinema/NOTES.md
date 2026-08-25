@@ -25,77 +25,71 @@ stdout.
 | Analysis pane | 0.42 of the width. Actual CAD-edge construction → curvature/FFT graphics → four activation lanes → tet4/tet10 patch comparison → symbolic solve board, with direct opacity handoffs. |
 | Bottom ledger | Constant height and deliberately sparse: active symbol/numeric result left, optional measurement note right, provenance below. |
 | Camera | Fit before frame zero against the exact rest∪4%-displayed deformation envelope. It never moves during the take. |
-| Mechanics overlay | Hidden throughout assembly, advisor and meshing. Support/load symbols reveal only immediately before gradient recovery and the final deformation ramp. During the exact linear load ramp, arrow length and stated resultant scale by λ. |
+| Mechanics overlay | Hidden throughout exact-CAD analysis, advisor and meshing. Actual fixed-region footprints, solved reactions and the prescribed load reveal only immediately before gradient recovery and the final deformation ramp. During the exact linear load ramp, both vector lengths and stated resultants scale by λ. |
 ### What is interpolated
 
-Time, opacity, assembly strip distance, the shrink-toward-centroid reveal, the
-spatial handoff front, pre/post-filter spacing-glyph morph, presentation-only
-pulse phases, undeformed-ghost opacity, and the load factor λ. That is the whole
-list.
+Time, opacity, the shrink-toward-centroid reveal, the spatial handoff front,
+measured curvature→filtered-curvature colour morph, presentation-only pulse
+phases, undeformed-ghost opacity, and the load factor λ. That is the whole list.
 
-No displayed **number** is ever interpolated. The opening rings interpolate
-marker diameter and colour between two measured target-h evaluations; their
-before/after millimetre ranges are computed values, and no intermediate value
-is labelled as another measurement. During result handoffs, the old and new
-fields each retain their own measured scalar values and own normalization; only
-the narrow front feather blends display colours. No activation, element count,
-error indicator, stress value or progress value is ever synthesised. Where a
-source is missing the film says which one and shows nothing in its place.
+No displayed **number** is ever interpolated. Selected-edge marker colour
+morphs between independently normalised measured raw and filtered curvature;
+it is never presented as target spacing. When a production size field exists,
+its separate surface rings interpolate marker diameter/colour between two
+measured target-h evaluations. The published uniform take has no such rings.
+During result handoffs, old and new fields retain their own measured values and
+normalization; only the narrow front feather blends display colours. No
+activation, element count, error indicator, stress value or progress value is
+synthesised. Missing sources remain visibly absent.
 
 λ is the one interpolated quantity that is also displayed, and it is displayed
 because interpolating it is exact rather than approximate — see
 [the load ramp](#load-ramp) below.
 
-## Act 1 — `skeleton`: assembly to measured curvature
+## Act 1 — `skeleton`: exact CAD to measured curvature
 
-- The analysed wishbone is the same crease-aware shaded `Model::surface` used by
-  Studio setup mode, not a wireframe substitute.
-- Cinema-only interface hardware is generated in the physical frame implied by
-  the real support and load marker positions. The support baseline supplies the
-  common bushing axis; the support-to-load direction and that baseline resolve
-  the vertical ball-joint axis.
-- The 48 mm bushing eyes each receive a bolt through the exact bore axis, with
-  washers seated on the measured end planes and nuts beyond them. The loaded
-  boss receives a ball, stud and nut on its vertical bore axis. Every generated
-  solid therefore intersects the interface it belongs to; no disconnected
-  chassis pipes or decorative cage surround the analysed component.
-- This hardware is never appended to `Model`, `NodalMesh`, fixtures, loads or
-  solve data. Per-vertex strip vectors peel the three complete fastener groups
-  away.
-- The panel begins opening at 2.92 s and reaches full width at 4.00 s on the
-  default take. The assembly is held complete before peeling begins at 2.59 s.
+- The take starts directly on the analysed wishbone: the same crease-aware
+  shaded `Model::surface` used by Studio setup mode. No neighbouring bolts,
+  studs, chassis pieces or other cinema-only solids are generated.
+- The panel begins opening at 0.65 s and reaches full width at 1.51 s on the
+  default take.
 - Exact edge curves come from `geom::extract_topology(*model.cad, 32)`. For mesh
   inputs without a BRep, only `geom::detect_sharp_edges(model.surface, 30°)` is
   available and the fallback is not called exact CAD.
 - `capture_curve_story` retains the selected edge's ordered `curve_points`
   independently of optional size-field samples. A uniform-mesh hero therefore
   still shows the real extraction geometry even though it has no `h(x)` rings.
-- The left inset projects the selected CAD edge through its two widest axes.
-  Three adjacent ordered samples are highlighted; their secant tangent, outward
-  normal and bounded circumcircle construction animate with the scan. The right
-  trace is the corresponding measured `CadEdge::kappa_samples`, not a fitted
-  decorative curve.
-- The lower bars are the non-DC first conjugate half of the exact
-  even-reflected FFT. Retained modes stay cyan and discarded modes dim during
-  reconstruction. Five graphical icons show sample → spectrum → retained modes
-  → inverse signal → sizing, without prose labels.
+- One `spectral_curve_cursor` drives both the model-space point shader and the
+  vertical cursor on the measured $\kappa(s)$ graph. During extraction it
+  advances from sample 0 to the final sample. During inverse reconstruction it
+  returns continuously from the final sample to sample 0; a separate opacity
+  fades it before the advisor handoff, so it never teleports.
+- The left inset projects that same CAD edge through its two widest axes. Three
+  adjacent ordered samples expose their secant tangent, normal and bounded
+  circumcircle construction. The right trace uses the corresponding
+  `CadEdge::kappa_samples`, not a fitted decorative curve.
+- The lower bars are the non-DC first conjugate half of the exact even-reflected
+  FFT used by `geom::lowpass_signal`. Retained modes stay cyan and discarded
+  modes dim; the bidirectional edge↔graph arrow and shared cursor show the
+  reconstruction returning to the model.
 - For the published wishbone `feature_grading=false`, so FFT content is geometry
-  evidence only and the solve remains a uniform wall-resolving target. No
-  spacing ring or sizing claim is fabricated when the production size field is
-  absent.
+  evidence only and the solve remains a uniform wall-resolving target. The panel
+  states “uniform h unchanged”; no spacing ring or sizing claim is fabricated
+  when the production size field is absent.
 
 ## Act 2 — `deliberate`: choosing a mesh
 
-The first 65% of the act shows one real forward pass per beat in chooser order:
-108 candidate actions and one final re-score. At the default 60 s duration the
-109 measured passes use a 46.5 ms display beat; the remaining 2.73 s holds the
-final state, and the 1.6 s decision lead at the start of the next act extends
-that inspectable hold. No candidate-specific prose is drawn. The measured node,
-edge and lane motion is the explanation.
+All 109 real forward passes—108 candidate actions and one final re-score—fill
+the complete 7.8 s act in chooser order, a 71.6 ms display beat at the default
+duration. The chosen pass then locks for a 0.55 s causal handoff and the first
+real emitted cell follows immediately. No candidate-specific prose is drawn;
+the measured node, edge and lane motion is the explanation.
 
 The shaded CAD surface remains in the viewport while the graphical curvature
-panel cross-fades into four activation lanes over the first 1.3 s. No wireframe
-reset and no fabricated sizing overlay are introduced.
+panel cross-fades into four activation lanes over the first 1.3 s. Advisor
+scoring, the held selected action and real cell generation share one visible
+“advisor → mesh” chapter; their true sequential ordering is preserved rather
+than mislabeled as runtime concurrency.
 
 - **The node fills are the graph's own tensors**, read out of the ONNX session:
   `advisor::ActivationFrame::input` / `fc1` / `fc2` (post-GELU) / `heads`. Not a
@@ -155,7 +149,7 @@ reset and no fabricated sizing overlay are introduced.
 
 ## Act 3 — `build`: the mesher executing the decision
 
-The advisor outcome is held for `CinemaState::kDecisionLead` (1.6 s). The
+The advisor outcome is held for `CinemaState::kDecisionLead` (0.55 s). The
 wishbone is outside the calibrated descriptor envelope, so the configured
 baseline remains authoritative: structural steel, a fine wall-resolving tet4
 target, complete ZZ verification without an implied remesh, and explicit direct
@@ -205,8 +199,9 @@ is geometry analysis, not a sizing input.
   actual type histogram. Both cards use one cube split into six conforming
   tetrahedra around a shared body diagonal, so shared topology is unmistakable.
   The left card assembles tet4/p1 over 3.0 s. The right begins 2.8 s later,
-  assembles the same patch as tet10/p2 over 3.2 s, and adds one midside node to
-  every unique patch edge. The remaining time holds both completed patches.
+  assembles the same patch as tet10/p2 over 3.2 s, and draws every quadratic
+  edge as corner→midside and midside→corner segments. The remaining time holds
+  both completed patches.
 - These are conventional topology diagrams. The published solve remains tet4/p1
   in the bottom ledger and manifest; the tet10/p2 card does not claim that a
   quadratic wishbone solve ran. The measured `qmin` and `q̄` still come from
@@ -339,26 +334,34 @@ storage order. The ending frame is exactly the mesh the next pass solved.
 
 ### Mechanics overlay windows
 
-Support glyphs and the load arrow are absent from the opening, advisor,
-construction, cell-microscope and initial stress-sweep frames. They reveal over
-the final 38% of the stress hold, remain through gradient recovery, and fade
-during the final 28% of the gradient hold. On the final solve pass they return
-over the last 40% of the error hold, immediately before deformation begins, and
-remain through the exact load ramp and result hold. An intermediate pass does
-not receive that second reveal because refinement, not deformation, follows it.
+Fixed-region outlines, solved reaction arrows and the prescribed-load arrow are
+absent from the opening, advisor, construction, cell-microscope and initial
+stress-sweep frames. They reveal over the final 38% of the stress hold, remain
+through gradient recovery, and fade during the final 28% of the gradient hold.
+On the final solve pass they return over the last 40% of the error hold,
+immediately before deformation begins, and remain through the exact load ramp
+and result hold. An intermediate pass does not receive that second reveal
+because refinement, not deformation, follows it.
 
-The symbols remain anchored to the actual selected regions and follow the
-displayed node displacement once deformation is active. They are presentation
-annotations; no calculated reaction magnitude is invented.
+Each support footprint is the 2D convex projection of the actual tessellated
+vertices belonging to that fixed CAD region. It is not a generic ground glyph at
+an area centroid. `fea::solve_elastostatics` returns prescribed generalized
+reactions in the original 3N layout and marks `reactions_complete=false` when an
+MPC transform makes nodal attribution non-unique. The cinema then suppresses
+reaction arrows rather than labeling MPC forces as physical support resultants.
+For this published p1 take the flag is true.
+`SolveResult::boundary_region_nodes` retains the exact CAD-face membership used
+to constrain the solve—including shared edge/vertex nodes that a one-owner
+nearest-region map loses—and the overlay sums one resultant per support. The
+load arrow terminates at the loaded surface point farthest opposite its force
+direction, so its line of action reaches material rather than a bore void.
 
 ### Load ramp
 
-λ from 0 to 1, linear and never eased.
-
-The force overlay follows the same exact λ: arrow length and its numeric kN
-label scale from zero to the recorded full resultant, while its direction stays
-fixed. The small support/force glows and advisor-lane pulses are explicitly
-presentation timing cues; they encode no additional mechanical quantity.
+λ runs from 0 to 1, linear and never eased. Applied-force and solved-reaction
+arrow lengths and kN labels scale by that same exact λ while their directions
+remain fixed. Glow opacity and advisor-lane pulses are presentation cues; the
+vector magnitudes and directions are measured solve data.
 
 `u(λ) = λ·u` and `σ(λ) = λ·σ` are **exact**, so every frame of the ramp is the
 real solution of a real load case and not an interpolation between two pictures.

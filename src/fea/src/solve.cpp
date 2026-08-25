@@ -639,9 +639,20 @@ LinearSolveResult solve_elastostatics(const NodalMesh& mesh, const Material& mat
         const auto r = reduced[static_cast<std::size_t>(dof)];
         u_system[dof] = r >= 0 ? reduced_solve.u[r] : system_dirichlet.at(dof);
     }
+    const Eigen::VectorXd system_reactions = k_system * u_system - f_system;
+    Eigen::VectorXd reactions = Eigen::VectorXd::Zero(ndof);
+    for (const auto& [dof, value] : dirichlet.dof_values) {
+        (void)value;
+        const Eigen::Index system_dof =
+            original_to_system[static_cast<std::size_t>(dof)];
+        reactions[dof] = system_reactions[system_dof];
+    }
     Eigen::VectorXd u = has_linear_constraints ? constraints->recover(u_system, ndof)
                                                : std::move(u_system);
-    return {.u = std::move(u), .cost = std::move(reduced_solve.cost)};
+    return {.u = std::move(u),
+            .reactions = std::move(reactions),
+            .reactions_complete = !has_linear_constraints,
+            .cost = std::move(reduced_solve.cost)};
 }
 
 double strain_energy(const NodalMesh& mesh, const Material& material,

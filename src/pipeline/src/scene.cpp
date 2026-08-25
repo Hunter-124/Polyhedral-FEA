@@ -6745,8 +6745,11 @@ void SolveJob::start_mesh(const Model& model, const SimSetup& setup) {
 }
 
 namespace {
-void fill_result_fields(SolveResult& r, const fea::ZzRecovery& zz, const Eigen::VectorXd& u) {
+void fill_result_fields(SolveResult& r, const fea::ZzRecovery& zz, const Eigen::VectorXd& u,
+                        const Eigen::VectorXd& reactions, bool reactions_complete) {
     r.displacement = u;
+    r.reactions = reactions;
+    r.reactions_complete = reactions_complete;
     r.global_eta = zz.global_eta;
     r.element_eta = zz.element_eta;
     const auto n_nodes = r.volume_mesh.nodes.size();
@@ -7801,6 +7804,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                 // leaves it empty, which is a fact and not a gap to fill.
                 std::string pass_solver_note;
                 fea::SolveCostMeasured pass_solve_cost;
+                Eigen::VectorXd pass_reactions;
+                bool pass_reactions_complete = false;
                 const auto solve_here = [&] {
                     pass_solver_note.clear();
                     auto options =
@@ -7809,6 +7814,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     auto solved = fea::solve_elastostatics(
                         vol.mesh, material, bc, loads, options, active_p_constraints());
                     pass_solve_cost = std::move(solved.cost);
+                    pass_reactions = std::move(solved.reactions);
+                    pass_reactions_complete = solved.reactions_complete;
                     return std::move(solved.u);
                 };
                 const auto solve_t0 = std::chrono::steady_clock::now();
@@ -7881,7 +7888,9 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         // is also why `on_pass` reports its trace here.
                         stage.result.volume_mesh = vol.mesh;
                         stage.result.boundary_quads = vol.boundary_quads;
-                        fill_result_fields(stage.result, zz_try, u_try);
+                        stage.result.boundary_region_nodes = region_nodes;
+                        fill_result_fields(stage.result, zz_try, u_try, pass_reactions,
+                                           pass_reactions_complete);
                         stage.result.fill_geometry_volume = vol.fill_geometry_volume;
                         stage.result.solved_geometry_volume = vol.solved_geometry_volume;
                         // Only the notes that exist at this instant: the two
@@ -7912,7 +7921,9 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         setup.adapt_passes, h_use, pnote);
                     r.volume_mesh = std::move(vol.mesh);
                     r.boundary_quads = std::move(vol.boundary_quads);
-                    fill_result_fields(r, zz_try, u_try);
+                    r.boundary_region_nodes = region_nodes;
+                    fill_result_fields(r, zz_try, u_try, pass_reactions,
+                                       pass_reactions_complete);
                     r.solver_note = std::move(pass_solver_note);
                     r.fill_geometry_volume = vol.fill_geometry_volume;
                     r.solved_geometry_volume = vol.solved_geometry_volume;
@@ -7953,7 +7964,9 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                                                   reason, pnote);
                         r.volume_mesh = std::move(vol.mesh);
                         r.boundary_quads = std::move(vol.boundary_quads);
-                        fill_result_fields(r, zz_try, u_try);
+                        r.boundary_region_nodes = region_nodes;
+                        fill_result_fields(r, zz_try, u_try, pass_reactions,
+                                           pass_reactions_complete);
                         r.solver_note = std::move(pass_solver_note);
                         r.fill_geometry_volume = vol.fill_geometry_volume;
                         r.solved_geometry_volume = vol.solved_geometry_volume;
@@ -7982,7 +7995,9 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                                                   vol.mesher_note, hp_note, h_use, pnote);
                         r.volume_mesh = std::move(vol.mesh);
                         r.boundary_quads = std::move(vol.boundary_quads);
-                        fill_result_fields(r, zz_try, u_try);
+                        r.boundary_region_nodes = region_nodes;
+                        fill_result_fields(r, zz_try, u_try, pass_reactions,
+                                           pass_reactions_complete);
                         r.solver_note = std::move(pass_solver_note);
                         r.fill_geometry_volume = vol.fill_geometry_volume;
                         r.solved_geometry_volume = vol.solved_geometry_volume;
@@ -8023,7 +8038,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                                           adapt_seeds.size(), pnote);
                 r.volume_mesh = std::move(vol.mesh);
                 r.boundary_quads = std::move(vol.boundary_quads);
-                fill_result_fields(r, zz_try, u_try);
+                r.boundary_region_nodes = region_nodes;
+                fill_result_fields(r, zz_try, u_try, pass_reactions, pass_reactions_complete);
                 r.solver_note = std::move(pass_solver_note);
                 r.fill_geometry_volume = vol.fill_geometry_volume;
                 r.solved_geometry_volume = vol.solved_geometry_volume;

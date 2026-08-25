@@ -1891,6 +1891,125 @@ void prepare_cinema_features(CinemaState& state, const pipeline::Model& model,
 
 // ---- act 2: the network ---------------------------------------------------
 
+#ifdef POLYMESH_WITH_ADVISOR
+namespace {
+
+/// A high percentile of `values`, by partial selection. `values` is reordered.
+float percentile(std::vector<float>& values, double q) {
+    if (values.empty()) {
+        return 1.0f;
+    }
+    const auto at = values.begin() +
+                    static_cast<std::ptrdiff_t>(q * static_cast<double>(values.size() - 1));
+    std::nth_element(values.begin(), at, values.end());
+    return *at > 0.0f ? *at : 1.0f;
+}
+
+/// Everything the network panel needs to draw one pass so that it can be told
+/// apart from the other 108. Computed once per take: the ensemble is fixed the
+/// moment `explain` returns, and none of it may be recomputed per frame from
+/// the pass being drawn, which is precisely the mistake that made every pass
+/// look alike.
+CinemaState::AdvisorScale advisor_display_scale(const advisor::NetworkLayout& layout,
+                                                const advisor::AdvisorExplanation& ex) {
+    CinemaState::AdvisorScale scale;
+    if (layout.layers.size() != 4 || ex.frames.empty()) {
+        return scale;
+    }
+    const auto tap = [](const advisor::ActivationFrame& f,
+                        std::size_t l) -> const std::vector<float>& {
+        return l == 0 ? f.input : (l == 1 ? f.fc1 : (l == 2 ? f.fc2 : f.heads));
+    };
+    std::vector<float> pool;
+    for (std::size_t l = 0; l < 4; ++l) {
+        pool.clear();
+        pool.reserve(ex.frames.size() * layout.layers[l].size);
+        for (const auto& f : ex.frames) {
+            for (const float v : tap(f, l)) {
+                pool.push_back(std::fabs(v));
+            }
+        }
+        scale.layer[l] = percentile(pool, 0.98);
+    }
+
+    // The same |w_ji * a_i| the panel ranks on, over every pass, so line
+    // brightness compares across passes instead of being renormalised inside
+    // each one.
+    pool.clear();
+    for (const auto& f : ex.frames) {
+        for (std::size_t b = 0; b < layout.edges.size() && b + 1 < 4; ++b) {
+            const auto& block = layout.edges[b];
+            const auto& src = tap(f, b);
+            if (block.weights.size() != block.rows * block.cols || block.cols != src.size()) {
+                continue;
+            }
+            for (std::size_t j = 0; j < block.rows; ++j) {
+                const float* row = block.weights.data() + j * block.cols;
+                for (std::size_t i = 0; i < block.cols; ++i) {
+                    pool.push_back(std::fabs(row[i] * src[i]));
+                }
+            }
+        }
+    }
+    scale.contribution = percentile(pool, 0.98);
+
+    // Which input columns the candidate grid actually moves. Measured across
+    // the ensemble rather than read off a column-name list, so a re-exported
+    // feature order cannot make this annotation a lie.
+    const auto& first = ex.frames.front().input;
+    for (std::size_t i = 0; i < first.size(); ++i) {
+        for (const auto& f : ex.frames) {
+            if (i < f.input.size() && std::fabs(f.input[i] - first[i]) > 1.0e-6f) {
+                scale.action_columns.push_back(static_cast<int>(i));
+                break;
+            }
+        }
+    }
+
+    bool any_ranked = false;
+    for (const auto& f : ex.frames) {
+        if (!f.ranked || !std::isfinite(f.score)) {
+            continue;
+        }
+        const auto s = static_cast<float>(f.score);
+        scale.score_min = any_ranked ? std::min(scale.score_min, s) : s;
+        scale.score_max = any_ranked ? std::max(scale.score_max, s) : s;
+        any_ranked = true;
+    }
+
+    // The candidate the chooser went on to recommend, identified by matching
+    // the recommended pass's own action. This is a lookup, never a second
+    // ranking: a re-ranked "winner" here could disagree with the shipped
+    // decision, which is the one thing this surface must never do.
+    const advisor::ActivationFrame* recommended = nullptr;
+    for (const auto& f : ex.frames) {
+        if (f.recommended) {
+            recommended = &f;
+        }
+    }
+    if (recommended != nullptr) {
+        const auto& want = recommended->action;
+        for (std::size_t n = 0; n < ex.frames.size(); ++n) {
+            const auto& f = ex.frames[n];
+            if (f.candidate < 0) {
+                continue;
+            }
+            if (f.action.mesher == want.mesher && f.action.order == want.order &&
+                f.action.adapt_passes == want.adapt_passes &&
+                std::fabs(f.action.h_rel - want.h_rel) < 1.0e-9 &&
+                std::fabs(f.action.eta_target - want.eta_target) < 1.0e-9) {
+                scale.winner_frame = static_cast<int>(n);
+                break;
+            }
+        }
+    }
+    scale.ready = true;
+    return scale;
+}
+
+} // namespace
+#endif
+
 bool load_cinema_advisor(CinemaState& state, const pipeline::Model& model,
                          pipeline::SimSetup& setup, const std::string& dir) {
     state.advisor_dir = dir;
@@ -1918,6 +2037,7 @@ bool load_cinema_advisor(CinemaState& state, const pipeline::Model& model,
 #else
     state.explanation.reset();
     state.layout = advisor::NetworkLayout{};
+    state.advisor_scale = CinemaState::AdvisorScale{};
 
     if (model.surface.triangles.empty()) {
         return unavailable(
@@ -1961,6 +2081,7 @@ bool load_cinema_advisor(CinemaState& state, const pipeline::Model& model,
         }
         state.layout = advisor.layout();
         state.explanation = advisor.explain(features, static_cast<double>(setup.max_dof));
+        state.advisor_scale = advisor_display_scale(state.layout, *state.explanation);
     } catch (const std::exception& e) {
         return unavailable(e.what());
     }
@@ -2020,6 +2141,23 @@ bool load_cinema_advisor(CinemaState& state, const pipeline::Model& model,
                 decision.mesher.c_str(), decision.h_rel, decision.order, decision.adapt_passes,
                 decision.eta_target, decision.vetoed ? 1 : 0, decision.ood_distance,
                 state.decision_applied ? 1 : 0);
+    // What the network panel drew with, so the display scales and the strip's
+    // range are auditable from the render log rather than taken on trust.
+    const auto& scale = state.advisor_scale;
+    std::printf("cinema: advisor panel panel_action_columns %zu panel_case_columns %zu "
+                "panel_winner_candidate %d panel_score_min %.6g panel_score_max %.6g "
+                "panel_input_p98 %.6g panel_fc1_p98 %.6g panel_fc2_p98 %.6g "
+                "panel_heads_p98 %.6g panel_contribution_p98 %.6g\n",
+                scale.action_columns.size(),
+                state.layout.layers.empty()
+                    ? 0
+                    : state.layout.layers[0].size - scale.action_columns.size(),
+                scale.winner_frame >= 0 &&
+                        static_cast<std::size_t>(scale.winner_frame) < explanation.frames.size()
+                    ? explanation.frames[static_cast<std::size_t>(scale.winner_frame)].candidate
+                    : -1,
+                scale.score_min, scale.score_max, scale.layer[0], scale.layer[1],
+                scale.layer[2], scale.layer[3], scale.contribution);
     std::fflush(stdout);
     return true;
 #endif
@@ -2373,24 +2511,34 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
         }
     }
 
-    // Per-layer normalisation. Trunk and head magnitudes differ by roughly a
-    // factor of ten, so one shared scale would flatten the trunk into a flat
-    // grey column — the same reason scripts/advisor/figures.py scales the
-    // activation heatmap per row.
-    std::array<float, 4> layer_max{1.0f, 1.0f, 1.0f, 1.0f};
-    for (std::size_t l = 0; l < values.size(); ++l) {
-        if (values[l] == nullptr) {
-            continue;
+    // Per-layer normalisation, POOLED OVER THE WHOLE TAKE rather than over the
+    // pass being drawn. Trunk and head magnitudes differ by roughly a factor of
+    // ten, so one shared scale across layers would flatten the trunk into a
+    // grey rule — the same reason scripts/advisor/figures.py scales the
+    // activation heatmap per row. But scaling each PASS by its own maximum is
+    // worse than that: it divides out the pass-to-pass difference this surface
+    // exists to show, and renders 109 different forward passes as one identical
+    // picture. `CinemaState::AdvisorScale` is the 98th percentile over every
+    // pass, so a radius means the same activation in pass 1 and pass 109.
+    std::array<float, 4> layer_scale = state.advisor_scale.layer;
+    if (!state.advisor_scale.ready) {
+        for (std::size_t l = 0; l < values.size(); ++l) {
+            if (values[l] == nullptr) {
+                continue;
+            }
+            float m = 0.0f;
+            for (const float v : *values[l]) {
+                m = std::max(m, std::fabs(v));
+            }
+            layer_scale[l] = m > 0.0f ? m : 1.0f;
         }
-        float m = 0.0f;
-        for (const float v : *values[l]) {
-            m = std::max(m, std::fabs(v));
-        }
-        layer_max[l] = m > 0.0f ? m : 1.0f;
     }
 
     // Connections ranked by |w_ji * a_i| for THIS frame: a large weight on a
     // silent unit carries nothing, so weight alone would be the wrong ranking.
+    // Brightness, though, is scaled by the same pooled percentile the nodes
+    // use, for the same reason: renormalising inside each pass makes every pass
+    // look equally bright and therefore identical.
     std::size_t total_connections = 0;
     for (const auto& block : layout.edges) {
         total_connections += block.rows * block.cols;
@@ -2398,7 +2546,7 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
     auto& picks = state.edge_scratch_;
     picks.clear();
     std::size_t drawn = 0;
-    float value_max = 0.0f;
+    float value_scale = state.advisor_scale.ready ? state.advisor_scale.contribution : 0.0f;
     if (frame != nullptr && total_connections > 0) {
         picks.reserve(total_connections);
         for (std::size_t b = 0; b < layout.edges.size(); ++b) {
@@ -2412,7 +2560,9 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
                 const float* row = block.weights.data() + j * block.cols;
                 for (std::size_t i = 0; i < block.cols; ++i) {
                     const float v = row[i] * src[i];
-                    value_max = std::max(value_max, std::fabs(v));
+                    if (!state.advisor_scale.ready) {
+                        value_scale = std::max(value_scale, std::fabs(v));
+                    }
                     picks.push_back({std::fabs(v), v, static_cast<int>(b), static_cast<int>(i),
                                      static_cast<int>(j)});
                 }
@@ -2469,11 +2619,19 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
     // remain circles because positions, never node geometry, are transformed.
     constexpr float kSidePad = 14.0f;
     const float header_h = std::floor(type.legend * 1.25f);
-    const float chip_h =
-        frame != nullptr ? std::floor(type.label * 2.5f) : 0.0f;
+    const float chip_h = frame != nullptr ? std::floor(type.label * 2.5f) : 0.0f;
+    // The candidate strip below the lanes. Every scored pass leaves one mark on
+    // it, so a viewer can tell pass 27 from pass 82 — which the graph alone
+    // cannot show: two neighbouring grid points differ by one step in one
+    // action column, and their drawn connection sets overlap by 85%.
+    const bool strip_live = frame != nullptr && state.advisor_scale.ready &&
+                            state.advisor_scale.score_max > state.advisor_scale.score_min;
+    const float strip_h =
+        strip_live ? std::clamp(0.20f * graph_h, 96.0f, 156.0f) : 0.0f;
     const float lanes_top = graph_top + header_h;
-    const float lanes_h = std::max(
-        120.0f, graph_h - header_h - chip_h - std::floor(type.legend * 0.6f));
+    const float lanes_h =
+        std::max(120.0f, graph_h - header_h - chip_h - strip_h -
+                             std::floor(type.legend * (strip_live ? 1.1f : 0.6f)));
     const float lane_h = lanes_h / static_cast<float>(values.size());
     const float band_w = std::max(120.0f, region.x - 2.0f * kSidePad);
     const auto row_y = [&](std::size_t layer) {
@@ -2527,17 +2685,22 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
 
     // ---- connections ----------------------------------------------------
     if (drawn > 0) {
-        const float inv_max = value_max > 0.0f ? 1.0f / value_max : 0.0f;
+        const float inv_scale = value_scale > 0.0f ? 1.0f / value_scale : 0.0f;
         for (std::size_t k = 0; k < drawn; ++k) {
             const auto& pick = picks[k];
             const auto b = static_cast<std::size_t>(pick.block);
-            const float t = std::clamp(pick.value * inv_max, -1.0f, 1.0f);
-            const float weight = std::clamp(pick.rank * inv_max, 0.0f, 1.0f);
+            const float weight = std::clamp(pick.rank * inv_scale, 0.0f, 1.0f);
+            // RdBu is white in the middle, so mapping a contribution straight
+            // onto it painted the strongest connections pale. Only the top few
+            // hundred of ~19,000 are drawn at all: every one of them is a
+            // significant contribution, and its SIGN is the thing worth reading,
+            // so the ramp starts away from the neutral midpoint.
+            const float t = (pick.value < 0.0f ? -1.0f : 1.0f) * (0.34f + 0.66f * weight);
             const float pulse = wave_strength(static_cast<float>(b) + 0.5f);
             dl->AddLine(node_point(b, static_cast<std::size_t>(pick.src)),
                         node_point(b + 1, static_cast<std::size_t>(pick.dst)),
                         rgba(signed_colormap(t),
-                             (0.04f + 0.86f * weight) * pulse * alpha),
+                             (0.06f + 0.84f * weight) * pulse * alpha),
                         0.55f + 1.55f * weight);
         }
     }
@@ -2561,10 +2724,10 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
         const float pulse = wave_strength(static_cast<float>(l));
         for (std::size_t i = 0; i < layer.size; ++i) {
             const float a = values[l] != nullptr ? (*values[l])[i] : 0.0f;
-            const float mag = std::clamp(std::fabs(a) / layer_max[l], 0.0f, 1.0f);
+            const float mag = std::clamp(std::fabs(a) / layer_scale[l], 0.0f, 1.0f);
             const float r = kNodeMin + (r_max - kNodeMin) * mag;
             const ImVec2 point = node_point(l, i);
-            const auto rgb = signed_colormap(a / layer_max[l]);
+            const auto rgb = signed_colormap(std::clamp(a / layer_scale[l], -1.0f, 1.0f));
             if (mag > 0.30f) {
                 dl->AddCircleFilled(point, r * 3.0f,
                                     rgba(rgb, 0.065f * mag * pulse * alpha));
@@ -2583,10 +2746,177 @@ void draw_cinema_network(CinemaState& state, const CinemaCue& cue, const CinemaT
         }
     }
 
+    // The input row is 81 columns wide and only 13 of them move between passes:
+    // the candidate's own action columns, measured across the ensemble in
+    // `advisor_display_scale`. The other 68 are this part's case features and
+    // are identical in every pass by construction. Drawing all 81 alike is a
+    // large part of why pass 27 and pass 82 looked like the same picture, so the
+    // columns the candidate actually moves are bracketed and named.
+    if (frame != nullptr && !state.advisor_scale.action_columns.empty() &&
+        layout.layers[0].size > 0) {
+        const auto& cols = state.advisor_scale.action_columns;
+        const std::size_t n_in = layout.layers[0].size;
+        const float y = row_y(0) + 10.0f;
+        const float half = 0.5f * band_w / static_cast<float>(n_in);
+        const ImU32 mark = faded(palette.accent, 0.78f * alpha);
+        std::size_t k = 0;
+        float last_x1 = origin.x + kSidePad;
+        while (k < cols.size()) {
+            std::size_t j = k;
+            while (j + 1 < cols.size() && cols[j + 1] == cols[j] + 1) {
+                ++j;
+            }
+            const float x0 = node_x(static_cast<std::size_t>(cols[k]), n_in) - half;
+            const float x1 = node_x(static_cast<std::size_t>(cols[j]), n_in) + half;
+            dl->AddLine(ImVec2(x0, y), ImVec2(x1, y), mark, 2.0f);
+            dl->AddLine(ImVec2(x0, y - 4.0f), ImVec2(x0, y), mark, 1.4f);
+            dl->AddLine(ImVec2(x1, y - 4.0f), ImVec2(x1, y), mark, 1.4f);
+            last_x1 = std::max(last_x1, x1);
+            k = j + 1;
+        }
+        // The label ends under the last bracketed run rather than at the left
+        // margin, so the count and the columns it counts are read together.
+        const std::string moved = fmt("%s action columns: the candidate",
+                                      grouped(cols.size()).c_str());
+        const std::string fixed = fmt(" · %s case columns: this part, every pass",
+                                      grouped(n_in - cols.size()).c_str());
+        const float w_moved =
+            font->CalcTextSizeA(type.legend, FLT_MAX, 0.0f, moved.c_str()).x;
+        const float w_fixed =
+            font->CalcTextSizeA(type.legend, FLT_MAX, 0.0f, fixed.c_str()).x;
+        const ImVec2 at(std::max(origin.x + kSidePad, last_x1 - w_moved - w_fixed),
+                        y + 4.0f);
+        dl->AddText(font, type.legend, at, faded(palette.accent, 0.9f * alpha),
+                    moved.c_str());
+        dl->AddText(font, type.legend, ImVec2(at.x + w_moved, at.y),
+                    faded(palette.text_dim, 0.85f * alpha), fixed.c_str());
+    }
+
+    // ---- every candidate, on one strip ----------------------------------
+    //
+    // The graph above can only ever show ONE pass, and two neighbouring grid
+    // points differ by a single step in a single action column: their drawn
+    // connection sets overlap by 85%, so the sweep alone reads as a still
+    // picture with a counter running over it. This strip is the part that
+    // genuinely differs per candidate — the ranking key the chooser sorts on,
+    // one mark per scored pass, accumulating in enumeration order — so the act
+    // has a visible record of 108 distinct candidates instead of one blur.
+    if (strip_live) {
+        const auto& scale = state.advisor_scale;
+        std::size_t n_cand = 0;
+        for (const auto& f : frames) {
+            if (f.candidate >= 0) {
+                ++n_cand;
+            }
+        }
+        const float strip_top = lanes_top + lanes_h + std::floor(type.legend * 0.35f);
+        const float head_y = strip_top;
+        const float plot_top = strip_top + std::floor(type.legend * 1.35f);
+        const float plot_bot = strip_top + strip_h - std::floor(type.legend * 1.35f);
+        constexpr float kGutter = 62.0f;
+        const float plot_x0 = origin.x + kSidePad + kGutter;
+        const float plot_x1 = origin.x + region.x - kSidePad;
+        const float span = std::max(1.0e-6f, scale.score_max - scale.score_min);
+        const auto mark_x = [&](int candidate) {
+            return plot_x0 + (plot_x1 - plot_x0) *
+                                 (static_cast<float>(candidate) + 0.5f) /
+                                 static_cast<float>(std::max<std::size_t>(n_cand, 1));
+        };
+        const auto mark_y = [&](double score) {
+            const float u = (static_cast<float>(score) - scale.score_min) / span;
+            return plot_bot - std::clamp(u, 0.0f, 1.0f) * (plot_bot - plot_top);
+        };
+        dl->AddRectFilled(ImVec2(plot_x0 - 6.0f, plot_top - 4.0f),
+                          ImVec2(plot_x1, plot_bot + 4.0f),
+                          faded(palette.panel_bg, 0.5f * alpha), 4.0f);
+        dl->AddLine(ImVec2(plot_x0 - 6.0f, plot_bot + 4.0f),
+                    ImVec2(plot_x1, plot_bot + 4.0f), faded(palette.text_dim, 0.22f * alpha),
+                    1.0f);
+
+        // Axis ends, so the two directions are named rather than assumed.
+        const auto gutter_text = [&](float y, const std::string& text, ImVec4 color,
+                                     float a) {
+            const float w = font->CalcTextSizeA(type.legend, FLT_MAX, 0.0f, text.c_str()).x;
+            dl->AddText(font, type.legend, ImVec2(plot_x0 - 12.0f - w, y - type.legend * 0.5f),
+                        faded(color, a * alpha), text.c_str());
+        };
+        gutter_text(plot_top, fmt("%+.2f", scale.score_max), palette.text_dim, 0.7f);
+        gutter_text(plot_bot, fmt("%+.2f", scale.score_min), palette.text_dim, 0.7f);
+        // `score` is `rel_err_rel`: the accuracy head's log10 prediction centred
+        // on this case's median over the actions, which is the key the chooser
+        // ranks candidates on. Calling it a predicted error would overstate it —
+        // it is comparable between actions on this part and meaningless as an
+        // absolute number.
+        dl->AddText(font, type.legend, ImVec2(origin.x + kSidePad, head_y),
+                    faded(palette.text_dim, 0.9f * alpha),
+                    "ranking score of every candidate · lower is better");
+
+        // Legend swatches, drawn rather than written, so the two marker states
+        // are read off the same shapes the strip uses.
+        const float legend_x = plot_x1 - 236.0f;
+        const float legend_y = head_y + type.legend * 0.55f;
+        dl->AddCircleFilled(ImVec2(legend_x, legend_y), 3.0f,
+                            faded(palette.status_ok, 0.9f * alpha));
+        dl->AddText(font, type.legend, ImVec2(legend_x + 8.0f, head_y),
+                    faded(palette.text_dim, 0.8f * alpha), "gate passed");
+        dl->AddCircle(ImVec2(legend_x + 126.0f, legend_y), 3.0f,
+                      faded(palette.status_warn, 0.9f * alpha), 0, 1.3f);
+        dl->AddText(font, type.legend, ImVec2(legend_x + 134.0f, head_y),
+                    faded(palette.text_dim, 0.8f * alpha), "gate declined");
+
+        // Only passes the sweep has actually reached are on the strip: it fills
+        // as the chooser works, and is complete once the chosen pass is held.
+        const int revealed = cue.frame_index;
+        for (std::size_t n = 0; n < frames.size() && static_cast<int>(n) <= revealed; ++n) {
+            const auto& f = frames[n];
+            if (f.candidate < 0) {
+                continue;
+            }
+            const float x = mark_x(f.candidate);
+            if (!f.ranked || !std::isfinite(f.score)) {
+                // A pass whose score could not be ranked is drawn as one, at the
+                // bottom rule, rather than being left off the record.
+                dl->AddLine(ImVec2(x - 3.0f, plot_bot + 1.0f), ImVec2(x + 3.0f, plot_bot + 7.0f),
+                            faded(palette.status_err, 0.8f * alpha), 1.4f);
+                dl->AddLine(ImVec2(x - 3.0f, plot_bot + 7.0f), ImVec2(x + 3.0f, plot_bot + 1.0f),
+                            faded(palette.status_err, 0.8f * alpha), 1.4f);
+                continue;
+            }
+            const float y = mark_y(f.score);
+            const bool current = static_cast<int>(n) == revealed;
+            if (f.over_budget) {
+                dl->AddCircle(ImVec2(x, y), 3.0f, faded(palette.status_err, 0.75f * alpha), 0,
+                              1.3f);
+            } else if (f.gate_pass) {
+                dl->AddCircleFilled(ImVec2(x, y), current ? 4.0f : 2.7f,
+                                    faded(palette.status_ok, (current ? 1.0f : 0.8f) * alpha));
+            } else {
+                dl->AddCircle(ImVec2(x, y), current ? 4.0f : 2.7f,
+                              faded(palette.status_warn, (current ? 1.0f : 0.72f) * alpha), 0,
+                              1.4f);
+            }
+            if (current) {
+                dl->AddLine(ImVec2(x, plot_top - 4.0f), ImVec2(x, plot_bot + 4.0f),
+                            faded(palette.accent, 0.45f * alpha), 1.2f);
+            }
+            if (static_cast<int>(n) == scale.winner_frame) {
+                dl->AddCircle(ImVec2(x, y), 8.0f, faded(palette.accent, 0.95f * alpha), 0,
+                              2.0f);
+            }
+        }
+        if (scale.winner_frame >= 0 && revealed >= scale.winner_frame) {
+            dl->AddText(font, type.legend,
+                        ImVec2(plot_x0, plot_bot + std::floor(type.legend * 0.35f)),
+                        faded(palette.accent, 0.85f * alpha),
+                        "ring · the candidate the ranking picked");
+        }
+    }
+
     // Outcome glyph: decision state → mesh. No prose is needed here; the
     // measured OOD distance or selected action remains the only text.
     if (frame != nullptr) {
-        const float chip_top = lanes_top + lanes_h + type.legend * 0.25f;
+        const float chip_top = lanes_top + lanes_h + strip_h +
+                               std::floor(type.legend * (strip_live ? 0.7f : 0.25f));
         dl->AddRectFilled(ImVec2(origin.x, chip_top),
                           ImVec2(origin.x + region.x, chip_top + chip_h),
                           faded(palette.panel_bg, 0.72f * alpha), 7.0f);

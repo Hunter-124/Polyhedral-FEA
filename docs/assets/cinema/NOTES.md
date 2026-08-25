@@ -22,7 +22,7 @@ stdout.
 | Take | 3600 frames at a fixed 1/60 s virtual timestep = 60.000 s. The clock is set from the frame **index**, never accumulated from real frame time. |
 | Frame | 1920×1080. `--size` sets Xvfb and `POLYMESH_GUI_SIZE`; the recorded resolution is measured from the PNG rather than assumed. |
 | Acts | `skeleton` 0.18, `deliberate` 0.13, `build` 0.17, `mesh_hold` 0.17, `solve` 0.35. At 60 s these are 10.8 / 7.8 / 10.2 / 10.2 / 21.0 s. |
-| Analysis pane | 0.42 of the width. Actual CAD-edge construction → curvature/FFT graphics → four activation lanes → paired tet4/tet10 card measuring both orders against one CAD arc → symbolic solve board, with direct opacity handoffs. |
+| Analysis pane | 0.42 of the width. Actual CAD-edge construction → curvature/FFT graphics → four activation lanes over a strip carrying every candidate's score → paired tet4/tet10 card measuring both orders against one CAD arc → symbolic solve board, with direct opacity handoffs. |
 | Bottom ledger | Constant height and deliberately sparse: active symbol/numeric result left, optional measurement note right, provenance below. |
 | Camera | Fit before frame zero against the exact rest∪4%-displayed deformation envelope. It never moves during the take. |
 | Mechanics overlay | Hidden throughout exact-CAD analysis, advisor and meshing. Actual fixed-region footprints, solved reactions and the prescribed load reveal only immediately before gradient recovery and the final deformation ramp. During the exact linear load ramp, both vector lengths and stated resultants scale by λ. |
@@ -82,8 +82,9 @@ because interpolating it is exact rather than approximate — see
 All 109 real forward passes—108 candidate actions and one final re-score—fill
 the complete 7.8 s act in chooser order, a 71.6 ms display beat at the default
 duration. The chosen pass then locks for a 0.55 s causal handoff and the first
-real emitted cell follows immediately. No candidate-specific prose is drawn;
-the measured node, edge and lane motion is the explanation.
+real emitted cell follows immediately. No candidate-specific prose is drawn:
+the graph is the pass being scored and the strip beneath it is the score every
+pass got, one mark at a time.
 
 The shaded CAD surface remains in the viewport while the graphical curvature
 panel cross-fades into four activation lanes over the first 1.3 s. Advisor
@@ -94,28 +95,61 @@ than mislabeled as runtime concurrency.
 - **The node fills are the graph's own tensors**, read out of the ONNX session:
   `advisor::ActivationFrame::input` / `fc1` / `fc2` (post-GELU) / `heads`. Not a
   re-implementation of the forward pass.
-- **Node radius and fill are `|a| / max|a| within each layer`**, not against one
-  shared scale. Trunk and head magnitudes differ by roughly 10×, and one shared
-  scale flattens the trunk into a uniform grey column. The same reason
-  `scripts/advisor/figures.py` scales its activation heatmap per row.
+- **Node radius and fill are `|a| / p98` where `p98` is that layer's 98th
+  percentile over EVERY pass of the take**, not against one shared scale and not
+  against the pass being drawn. Trunk and head magnitudes differ by roughly 10×,
+  so one scale across layers flattens the trunk into a uniform grey rule — the
+  same reason `scripts/advisor/figures.py` scales its activation heatmap per
+  row. Scaling each pass by its own maximum is worse: it divides out the
+  pass-to-pass difference the panel exists to show, and 71–87% of the hidden
+  units then land under a tenth of that pass's maximum and collapse to the floor
+  radius, so 109 different forward passes render as one identical picture. The
+  pooled percentiles are reported on the GUI's own `cinema: advisor panel` line
+  and land in the manifest as `panel_input_p98` / `panel_fc1_p98` /
+  `panel_fc2_p98` / `panel_heads_p98`.
 - **Colour is the sign** of the activation, through
   `gui/colormap.hpp::signed_colormap` (ColorBrewer RdBu reversed, agreeing with
   matplotlib's `RdBu_r` to 0.0115 in unit RGB). Blue negative, near-white zero,
   red positive. Zero lands on the neutral centre, so the range mapped onto
   [−1, 1] is symmetric.
-- **Connections**: the 180 strongest of 18,912, ranked per frame by
-  `score = activation_norm × abs(weight)`, then drawn through the branch-colored
-  `activation_layout.json` edge blocks (96×81, 96×96, 20×96). Opacity is the
-  replay channel during build; stroke width remains the measured normalised
-  `|w_ji · a_i|` so animation does not change the encoded magnitude.
+- **Connections**: the strongest 180 of 18,912, ranked per frame by the measured
+  contribution `|w_ji · a_i|` — a large weight on a silent unit carries nothing,
+  so weight alone would be the wrong ranking — drawn through the
+  `activation_layout.json` edge blocks (96×81, 96×96, 20×96). Brightness and
+  stroke width scale by `panel_contribution_p98`, the same quantity's 98th
+  percentile over every pass, so a bright line means the same contribution in
+  pass 1 and pass 109. Only significant contributions are drawn at all, so the
+  colour ramp starts away from RdBu's white midpoint: otherwise the strongest
+  connections in the graph were painted the palest.
+- **The input row says which of its columns the candidate owns.** 13 of the 81
+  input units differ between passes and the other 68 are this part's case
+  features, identical in every pass by construction. Those 13 are bracketed and
+  counted on screen. Which columns they are is measured from the ensemble, not
+  read off a column-name list, and the counts are published as
+  `panel_action_columns` / `panel_case_columns`.
+- **The candidate strip is the part that differs per candidate.** The graph can
+  only show one pass, and two neighbouring grid points differ by one step in one
+  action column: their drawn connection sets overlap by 85%, so the sweep alone
+  reads as a still picture with a counter running over it. The strip plots the
+  ranking key the chooser actually sorts on — `rel_err_rel`, the accuracy head's
+  log10 prediction centred on this case's median, lower better — one mark per
+  scored pass, accumulating in enumeration order. A filled mark passed the
+  feasibility gate, a hollow one was declined by it, a cross could not be
+  ranked, and the ring is the candidate whose action the chooser went on to
+  recommend. That last one is found by matching the recommended pass's own
+  action, never by re-ranking anything in the GUI: a second ranking here could
+  disagree with the shipped decision. Range and winner are published as
+  `panel_score_min` / `panel_score_max` / `panel_winner_candidate`.
 - **Lane motion is a timing cue, not another value.** During candidate scoring,
   a subdued band advances input → hidden 1 → hidden 2 → outputs once per pass.
   During mesh construction the same bands follow `activation_wave`. Node fill,
   radius, sign and every connection rank remain the recorded tensors.
 - **Display text is deliberately bounded.** The four lanes show only their
-  measured unit counts. The outcome chip is a state glyph, arrow, mesh glyph and
-  either the selected action values or measured OOD distance. The tensor-name
-  mapping remains here for audit and is not painted over the animation.
+  measured unit counts, the input row its two column counts, and the strip one
+  caption, two axis ends and two marker keys. The outcome chip is a state glyph,
+  arrow, mesh glyph and either the selected action values or measured OOD
+  distance. The tensor-name mapping remains here for audit and is not painted
+  over the animation.
 
   | Plain label | Graph tensor |
   |---|---|

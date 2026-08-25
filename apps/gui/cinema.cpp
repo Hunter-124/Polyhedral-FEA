@@ -87,6 +87,13 @@ constexpr double kRevealShrinkFraction = 0.24;
 constexpr float kMeshEdgeAlpha = 0.34f;
 constexpr float kMeshEdgeWidth = 1.0f;
 
+/// Width of the "just arrived" cell highlight trailing the reveal front, as a
+/// fraction of the mesh's element count. At the showcase's 40k cells this is
+/// roughly 1.8k cells: enough that the front reads as cells being drawn one
+/// after another, small enough that the settled mesh keeps its own element
+/// colour instead of the part turning into a highlight.
+constexpr float kArrivalBand = 0.045f;
+
 /// Width of the field sweep's leading band, as a fraction of the part's extent
 /// along the sweep axis. Wide enough that the highlight reads as a moving front
 /// rather than a hard edge, narrow enough that it is a front and not a fade.
@@ -1152,8 +1159,14 @@ Viewport::CinemaView cinema_view(const CinemaState& state, const CinemaCue& cue)
         // Recorded construction prefixes replace the CAD body while the chosen
         // advisor output remains live in the pane. Later prefixes transition
         // from the exact preceding snapshot instead of restarting from empty.
+        // The CAD body clears out over the first third of the fill. It was
+        // previously faded in lockstep with the whole reveal, which left a
+        // half-opaque grey surface depth-occluding the cells for most of the
+        // act: the arriving cells were measured at a few thousand visible
+        // pixels until the very end. The handoff still reads CAD → cells, but
+        // the cells own the shot while they are being drawn.
         view.model_alpha =
-            static_cast<float>(1.0 - smoothstep(cue.mesh_action_reveal));
+            static_cast<float>(1.0 - smoothstep(cue.mesh_action_reveal / 0.32));
         view.skeleton_alpha = 0.0f;
         view.mesh_alpha = 1.0f;
         if (cue.stage_index > 0 &&
@@ -1248,6 +1261,15 @@ Viewport::CinemaView cinema_view(const CinemaState& state, const CinemaCue& cue)
             view.shrink = 0.0f;
         }
         break;
+    }
+    // Cells are lit as they arrive, and only while cells are actually arriving:
+    // the band tapers to nothing as the reveal completes, so a finished mesh is
+    // its own element colour rather than a mesh with a hot tail frozen into it.
+    if (cue.act == CinemaAct::kBuild ||
+        (cue.act == CinemaAct::kSolve && cue.solve_phase == SolvePhase::kRefine)) {
+        const double front = std::clamp(static_cast<double>(view.reveal), 0.0, 1.0);
+        view.arrival_band =
+            kArrivalBand * static_cast<float>(1.0 - smoothstep((front - 0.88) / 0.12));
     }
     return view;
 }
@@ -2921,16 +2943,20 @@ void draw_cinema_cells(const CinemaState& state, const CinemaCue& cue,
     const ImVec2 origin = ImGui::GetCursorScreenPos();
     const ImVec2 region = ImGui::GetContentRegionAvail();
     const float bar_y = origin.y + 10.0f;
-    const float bar_h = 14.0f;
+    const float bar_h = std::max(18.0f, type.legend + 2.0f);
     if (solved != nullptr) {
         const std::size_t total =
             std::max<std::size_t>(1, std::accumulate(solved->type_counts.begin(),
                                                      solved->type_counts.end(),
                                                      std::size_t{0}));
         float x = origin.x;
+        std::size_t dominant = 0;
         for (std::size_t i = 0; i < solved->type_counts.size(); ++i) {
             if (solved->type_counts[i] == 0) {
                 continue;
+            }
+            if (solved->type_counts[i] > solved->type_counts[dominant]) {
+                dominant = i;
             }
             const float w = region.x * static_cast<float>(solved->type_counts[i]) /
                             static_cast<float>(total);
@@ -2939,6 +2965,15 @@ void draw_cinema_cells(const CinemaState& state, const CinemaCue& cue,
                               2.0f);
             x += w;
         }
+        // A full-width unlabelled bar says nothing. Name what it is a bar of.
+        const auto dominant_type = static_cast<fea::ElementType>(dominant);
+        const std::string mix =
+            fmt("element mix · %s %.0f%%", fea::element_type_name(dominant_type),
+                100.0 * static_cast<double>(solved->type_counts[dominant]) /
+                    static_cast<double>(total));
+        dl->AddText(font, type.legend,
+                    ImVec2(origin.x + 8.0f, bar_y + 0.5f * (bar_h - type.legend)),
+                    faded(palette.window_bg, 0.92f * alpha), mix.c_str());
     }
 
     const float card_top = bar_y + bar_h + 16.0f;
@@ -2948,25 +2983,42 @@ void draw_cinema_cells(const CinemaState& state, const CinemaCue& cue,
     dl->AddRectFilled(card_min, card_max, faded(palette.panel_bg, 0.50f * alpha), 8.0f);
     dl->AddRect(card_min, card_max, faded(palette.border, 0.72f * alpha), 8.0f);
 
-    constexpr bool quadratic = true;
-    const char* title = "tet10 · p2 · higher-order anatomy";
+    // A p2 tet is not a tet4 with extra dots on it. Its six midside nodes are
+    // the degrees of freedom that bend the element's own geometry and let strain
+    // vary linearly inside the cell, so that is what this card animates: the
+    // midside nodes lift off their chords and curve every edge, with the tet4
+    // chord kept underneath as the dim reference. The plot below is the real
+    // quadratic edge basis, and one lit edge carries the plot's ξ cursor so the
+    // curve and the geometry are visibly the same three functions.
+    const char* title = "tet10 · p2 · quadratic tetrahedron";
     dl->AddText(font, type.caption, ImVec2(card_min.x + 18.0f, card_min.y + 15.0f),
                 faded(palette.status_ok, alpha), title);
-    const char* topology = "4 corner + 6 midside · quadratic edge interpolation";
+    const char* topology = "10 nodes · 30 DOF · midside nodes curve the cell (tet4: 4 · 12)";
     dl->AddText(font, type.legend,
                 ImVec2(card_min.x + 18.0f, card_min.y + 15.0f + type.caption * 1.35f),
                 faded(palette.text_dim, alpha), topology);
 
+    const float t = static_cast<float>(cue.act_t);
     const float fade_seconds = 0.17f * static_cast<float>(cue.act_span);
-    const float visible_t =
-        std::max(0.0f, static_cast<float>(cue.act_t) - fade_seconds);
+    const float visible_t = std::max(0.0f, t - fade_seconds);
     const float progress =
         std::clamp(visible_t / std::max(0.62f * static_cast<float>(cue.act_span), 1.0e-6f),
                    0.0f, 1.0f);
-    const float corner_alpha =
-        static_cast<float>(smoothstep(std::min(1.0f, progress / 0.42f)));
-    const float midside_alpha =
-        quadratic ? static_cast<float>(smoothstep((progress - 0.30f) / 0.52f)) : 0.0f;
+    const float corner_alpha = static_cast<float>(smoothstep(progress / 0.26));
+    const float midside_alpha = static_cast<float>(smoothstep((progress - 0.20) / 0.30));
+    const float bend = 0.34f * static_cast<float>(smoothstep((progress - 0.34) / 0.30)) *
+                       (0.80f + 0.20f * std::sin(t * 1.15f));
+    const float plot_alpha =
+        static_cast<float>(smoothstep((progress - 0.52) / 0.30)) * alpha;
+    const float xi = 0.5f - 0.5f * std::cos(t * 0.85f);
+
+    // Quadratic Lagrange basis on an edge: corner nodes at ξ = 0 and 1, midside
+    // node at ξ = 0.5. The same three functions map the edge's geometry and
+    // interpolate its field, which is the whole point of the element.
+    const auto basis = [](float s) {
+        return std::array<float, 3>{(1.0f - s) * (1.0f - 2.0f * s), s * (2.0f * s - 1.0f),
+                                    4.0f * s * (1.0f - s)};
+    };
 
     static const std::array<Eigen::Vector3f, 4> kCorners{{
         {-1.0f, -0.78f, -0.58f},
@@ -2974,67 +3026,193 @@ void draw_cinema_cells(const CinemaState& state, const CinemaCue& cue,
         {-0.48f, 0.96f, -0.44f},
         {0.10f, -0.05f, 1.0f},
     }};
-    static constexpr std::array<std::array<int, 2>, 6> kEdges{{
+    static constexpr std::array<std::array<std::size_t, 2>, 6> kEdges{{
         {{0, 1}}, {{0, 2}}, {{0, 3}}, {{1, 2}}, {{1, 3}}, {{2, 3}},
     }};
-    static constexpr std::array<std::array<int, 3>, 4> kFaces{{
+    static constexpr std::array<std::array<std::size_t, 3>, 4> kFaces{{
         {{0, 1, 2}}, {{0, 1, 3}}, {{0, 2, 3}}, {{1, 2, 3}},
     }};
+    constexpr std::size_t kLitEdge = 0;
 
-    const float yaw = -0.70f + 0.035f * std::sin(static_cast<float>(cue.act_t) * 0.6f);
-    const float pitch = 0.50f;
+    // Everything below the element is anchored off the card's bottom so the
+    // basis plot, its legend and the honest solve note cannot collide with the
+    // measured-quality line on a short pane.
+    const float quality_y = card_top + card_h - type.label * 1.8f;
+    const float note_y = quality_y - type.legend * 1.75f;
+    const float legend_y = note_y - type.legend * 1.55f;
+    const float plot_bottom = legend_y - 12.0f;
+    const float plot_top =
+        std::max(card_min.y + 0.52f * card_h, plot_bottom - 0.24f * card_h);
+    const float plot_left = card_min.x + 26.0f;
+    const float plot_right = card_max.x - 26.0f;
+    const float body_top = card_min.y + 0.17f * card_h;
+
+    const float yaw = -0.70f + 0.10f * std::sin(t * 0.42f);
+    const float pitch = 0.46f;
     const float cy = std::cos(yaw);
     const float sy = std::sin(yaw);
     const float cp = std::cos(pitch);
     const float sp = std::sin(pitch);
-    const float scale = std::min(region.x * 0.31f, card_h * 0.36f);
-    const ImVec2 center(card_min.x + 0.50f * region.x, card_min.y + 0.55f * card_h);
-    std::array<ImVec2, kCorners.size()> projected{};
-    for (std::size_t i = 0; i < kCorners.size(); ++i) {
-        const Eigen::Vector3f& q = kCorners[i];
+    const float scale =
+        std::min(region.x * 0.26f, std::max(24.0f, 0.42f * (plot_top - body_top)));
+    const ImVec2 center(card_min.x + 0.50f * region.x, 0.5f * (body_top + plot_top));
+    // Orthographic and affine, so projecting the quadratic edge map is the same
+    // curve as the quadratic map of the projected nodes.
+    const auto project = [&](const Eigen::Vector3f& q) {
         const float rx = cy * q.x() + sy * q.z();
         const float rz = -sy * q.x() + cy * q.z();
         const float ry = cp * q.y() - sp * rz;
-        projected[i] = ImVec2(center.x + scale * rx, center.y - scale * ry);
-    }
+        return ImVec2(center.x + scale * rx, center.y - scale * ry);
+    };
 
-    for (const auto& face : kFaces) {
-        dl->AddTriangleFilled(projected[face[0]], projected[face[1]], projected[face[2]],
-                              faded(palette.accent, 0.075f * corner_alpha * alpha));
+    std::array<ImVec2, kCorners.size()> corner2{};
+    Eigen::Vector3f body = Eigen::Vector3f::Zero();
+    for (std::size_t i = 0; i < kCorners.size(); ++i) {
+        corner2[i] = project(kCorners[i]);
+        body += kCorners[i];
     }
-    for (const auto& edge : kEdges) {
-        const ImVec2 a = projected[edge[0]];
-        const ImVec2 b = projected[edge[1]];
-        const ImVec2 mid(0.5f * (a.x + b.x), 0.5f * (a.y + b.y));
-        const ImU32 edge_color =
-            faded(quadratic ? palette.status_ok : palette.accent,
-                  (0.48f + 0.44f * midside_alpha) * corner_alpha * alpha);
-        dl->AddLine(a, quadratic ? mid : b, edge_color, quadratic ? 2.8f : 2.2f);
-        if (quadratic) {
-            dl->AddLine(mid, b, edge_color, 2.8f);
-            dl->AddCircleFilled(mid, 5.4f,
-                                faded(palette.status_ok, midside_alpha * alpha));
-            dl->AddCircle(mid, 8.0f,
-                          faded(palette.accent_soft_top, 0.46f * midside_alpha * alpha), 0,
-                          1.4f);
+    body *= 0.25f;
+    std::array<ImVec2, kEdges.size()> mid2{};
+    for (std::size_t e = 0; e < kEdges.size(); ++e) {
+        const Eigen::Vector3f chord =
+            0.5f * (kCorners[kEdges[e][0]] + kCorners[kEdges[e][1]]);
+        Eigen::Vector3f out = chord - body;
+        const float n = out.norm();
+        out = n > 1.0e-6f ? Eigen::Vector3f(out / n) : Eigen::Vector3f::UnitY();
+        mid2[e] = project(chord + bend * out);
+    }
+    const auto edge_of = [](std::size_t a, std::size_t b) {
+        for (std::size_t e = 0; e < kEdges.size(); ++e) {
+            if ((kEdges[e][0] == a && kEdges[e][1] == b) ||
+                (kEdges[e][0] == b && kEdges[e][1] == a)) {
+                return e;
+            }
         }
+        return std::size_t{0};
+    };
+    const auto edge_point = [&](std::size_t e, float s) {
+        const std::array<float, 3> n = basis(s);
+        const ImVec2 a = corner2[kEdges[e][0]];
+        const ImVec2 b = corner2[kEdges[e][1]];
+        const ImVec2 m = mid2[e];
+        return ImVec2(n[0] * a.x + n[1] * b.x + n[2] * m.x,
+                      n[0] * a.y + n[1] * b.y + n[2] * m.y);
+    };
+
+    // Each curved face is filled as the quadratic triangle's own four
+    // sub-triangles, so the tint follows the bent boundary instead of the
+    // straight one.
+    const ImU32 tint = faded(palette.accent, 0.085f * corner_alpha * alpha);
+    for (const auto& face : kFaces) {
+        const ImVec2 m01 = mid2[edge_of(face[0], face[1])];
+        const ImVec2 m12 = mid2[edge_of(face[1], face[2])];
+        const ImVec2 m20 = mid2[edge_of(face[2], face[0])];
+        dl->AddTriangleFilled(corner2[face[0]], m01, m20, tint);
+        dl->AddTriangleFilled(m01, corner2[face[1]], m12, tint);
+        dl->AddTriangleFilled(m20, m12, corner2[face[2]], tint);
+        dl->AddTriangleFilled(m01, m12, m20, tint);
     }
-    for (const ImVec2 point : projected) {
+    for (std::size_t e = 0; e < kEdges.size(); ++e) {
+        // The straight chord is the tet4 edge the midside node left behind: the
+        // bend then reads as a difference between two elements, not as styling.
+        dl->AddLine(corner2[kEdges[e][0]], corner2[kEdges[e][1]],
+                    faded(palette.text_dim, 0.34f * midside_alpha * alpha), 1.2f);
+        const bool lit = e == kLitEdge;
+        constexpr int kEdgeSamples = 18;
+        for (int k = 0; k <= kEdgeSamples; ++k) {
+            dl->PathLineTo(edge_point(e, static_cast<float>(k) / kEdgeSamples));
+        }
+        dl->PathStroke(faded(lit ? palette.status_warn : palette.status_ok,
+                             (lit ? 0.95f : 0.62f) * corner_alpha * alpha),
+                       0, lit ? 3.6f : 2.6f);
+    }
+    for (const ImVec2 mid : mid2) {
+        // Midside nodes are diamonds and corners are circles: at video scale a
+        // shape difference survives where a radius difference does not.
+        dl->AddNgonFilled(mid, 6.6f, faded(palette.status_ok, midside_alpha * alpha), 4);
+        dl->AddNgon(mid, 10.0f, faded(palette.status_ok, 0.42f * midside_alpha * alpha), 4,
+                    1.4f);
+    }
+    for (const ImVec2 point : corner2) {
         dl->AddCircleFilled(point, 7.0f, faded(palette.text, corner_alpha * alpha));
         dl->AddCircle(point, 10.0f,
                       faded(palette.accent_soft_top, 0.48f * corner_alpha * alpha), 0, 1.6f);
     }
 
+    if (plot_alpha > 0.0f) {
+        const ImVec2 marker = edge_point(kLitEdge, xi);
+        dl->AddCircleFilled(marker, 5.2f, faded(palette.status_warn, plot_alpha));
+        dl->AddCircle(marker, 11.0f, faded(palette.status_warn, 0.55f * plot_alpha), 0, 1.8f);
+
+        const ImVec2 frame_min(plot_left - 12.0f, plot_top - 10.0f);
+        const ImVec2 frame_max(plot_right + 12.0f, plot_bottom + 10.0f);
+        dl->AddRectFilled(frame_min, frame_max, faded(palette.panel_bg, 0.72f * plot_alpha),
+                          6.0f);
+        dl->AddRect(frame_min, frame_max, faded(palette.border, 0.85f * plot_alpha), 6.0f);
+        const auto at = [&](float s, float v) {
+            return ImVec2(plot_left + (plot_right - plot_left) * s,
+                          plot_bottom - (plot_bottom - plot_top) * (v + 0.20f) / 1.20f);
+        };
+        // N = 0 and N = 1 rails, then the two straight hats a tet4 edge
+        // interpolates with, so the quadratic curves are read against p1.
+        dl->AddLine(at(0.0f, 0.0f), at(1.0f, 0.0f),
+                    faded(palette.text_dim, 0.55f * plot_alpha), 1.2f);
+        dl->AddLine(at(0.0f, 1.0f), at(1.0f, 1.0f),
+                    faded(palette.text_dim, 0.22f * plot_alpha), 1.0f);
+        dl->AddLine(at(0.0f, 1.0f), at(1.0f, 0.0f),
+                    faded(palette.text_dim, 0.26f * plot_alpha), 1.0f);
+        dl->AddLine(at(0.0f, 0.0f), at(1.0f, 1.0f),
+                    faded(palette.text_dim, 0.26f * plot_alpha), 1.0f);
+        constexpr int kPlotSamples = 56;
+        for (int c = 0; c < 3; ++c) {
+            for (int k = 0; k <= kPlotSamples; ++k) {
+                const float s = static_cast<float>(k) / kPlotSamples;
+                dl->PathLineTo(at(s, basis(s)[static_cast<std::size_t>(c)]));
+            }
+            dl->PathStroke(faded(c == 2 ? palette.status_ok : palette.text,
+                                 (c == 2 ? 0.95f : 0.85f) * plot_alpha),
+                           0, c == 2 ? 3.0f : 2.0f);
+        }
+        // Named on the curves themselves; a colour key in a caption is one more
+        // thing to hold in mind while the cursor is moving.
+        dl->AddText(font, type.legend, at(0.02f, 0.88f),
+                    faded(palette.text, 0.85f * plot_alpha), "N1");
+        dl->AddText(font, type.legend, at(0.93f, 0.88f),
+                    faded(palette.text, 0.85f * plot_alpha), "N2");
+        dl->AddText(font, type.legend, at(0.47f, 0.88f),
+                    faded(palette.status_ok, 0.95f * plot_alpha), "N3");
+        const std::array<float, 3> n_xi = basis(xi);
+        dl->AddLine(at(xi, -0.20f), at(xi, 1.0f),
+                    faded(palette.status_warn, 0.45f * plot_alpha), 1.4f);
+        for (int c = 0; c < 3; ++c) {
+            dl->AddCircleFilled(at(xi, n_xi[static_cast<std::size_t>(c)]), 4.2f,
+                                faded(c == 2 ? palette.status_ok : palette.text, plot_alpha));
+        }
+        const std::string cursor = fmt("ξ %.2f   N3 %.2f", xi, n_xi[2]);
+        const float cursor_w =
+            font->CalcTextSizeA(type.legend, FLT_MAX, 0.0f, cursor.c_str()).x;
+        dl->AddText(font, type.legend, ImVec2(plot_right - cursor_w - 4.0f, plot_top + 2.0f),
+                    faded(palette.status_warn, plot_alpha), cursor.c_str());
+        const char* legend =
+            "corner · midside basis on one edge · ξ runs along the lit edge · dim: tet4 linear";
+        dl->AddText(font, type.legend, ImVec2(plot_left, legend_y),
+                    faded(palette.text_dim, plot_alpha), legend);
+    }
+    const char* honest = "supported element path · this take solved tet4 · p1";
+    dl->AddText(font, type.legend, ImVec2(plot_left, note_y),
+                faded(palette.text_dim, 0.85f * alpha), honest);
+
     const double q_mean =
         solved != nullptr && solved->quality_measured > 0 ? solved->quality_mean : 0.0;
     const double q_min =
         solved != nullptr && solved->quality_measured > 0 ? solved->quality_min : 0.0;
-    const std::string quality = fmt("measured mesh   qmin %.3f   q̄ %.3f", q_min, q_mean);
+    // "qmean", not a macron: ImGui composes no combining marks, so q + U+0304
+    // rasterised as a missing-glyph box in the published take.
+    const std::string quality = fmt("measured mesh   qmin %.3f   qmean %.3f", q_min, q_mean);
     const ImVec2 quality_size =
         font->CalcTextSizeA(type.label, FLT_MAX, 0.0f, quality.c_str());
     dl->AddText(font, type.label,
-                ImVec2(origin.x + 0.5f * region.x - 0.5f * quality_size.x,
-                       card_top + card_h - type.label * 1.8f),
+                ImVec2(origin.x + 0.5f * region.x - 0.5f * quality_size.x, quality_y),
                 faded(palette.status_ok, alpha), quality.c_str());
     ImGui::Dummy(ImVec2(region.x, std::max(1.0f, region.y - 2.0f)));
 }
@@ -3210,8 +3388,8 @@ void mesh_hold_caption(const CinemaState& state, const CinemaCue& cue, const Cin
                           grouped(stage.trace.n_dof).c_str());
         if (!state.solve_insights.empty()) {
             const auto& insight = state.solve_insights.front();
-            out.note = fmt("qmin %.4g · q̄ %.4g",
-                           insight.quality_min, insight.quality_mean);
+            out.note =
+                fmt("qmin %.4g · qmean %.4g", insight.quality_min, insight.quality_mean);
         }
     }
     (void)hud;

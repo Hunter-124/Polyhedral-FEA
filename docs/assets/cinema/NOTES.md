@@ -22,7 +22,7 @@ stdout.
 | Take | 3600 frames at a fixed 1/60 s virtual timestep = 60.000 s. The clock is set from the frame **index**, never accumulated from real frame time. |
 | Frame | 1920×1080. `--size` sets Xvfb and `POLYMESH_GUI_SIZE`; the recorded resolution is measured from the PNG rather than assumed. |
 | Acts | `skeleton` 0.18, `deliberate` 0.13, `build` 0.17, `mesh_hold` 0.17, `solve` 0.35. At 60 s these are 10.8 / 7.8 / 10.2 / 10.2 / 21.0 s. |
-| Analysis pane | 0.42 of the width. Actual CAD-edge construction → curvature/FFT graphics → four activation lanes → tet4/tet10 patch comparison → symbolic solve board, with direct opacity handoffs. |
+| Analysis pane | 0.42 of the width. Actual CAD-edge construction → curvature/FFT graphics → four activation lanes → tet10 element card with its quadratic edge basis → symbolic solve board, with direct opacity handoffs. |
 | Bottom ledger | Constant height and deliberately sparse: active symbol/numeric result left, optional measurement note right, provenance below. |
 | Camera | Fit before frame zero against the exact rest∪4%-displayed deformation envelope. It never moves during the take. |
 | Mechanics overlay | Hidden throughout exact-CAD analysis, advisor and meshing. Actual fixed-region footprints, solved reactions and the prescribed load reveal only immediately before gradient recovery and the final deformation ramp. During the exact linear load ramp, both vector lengths and stated resultants scale by λ. |
@@ -196,15 +196,43 @@ The opening FFT is geometry analysis, not a sizing input.
 - The reveal shrink pulls each cell toward its centroid as it lands, then closes.
   Dense-mesh edges use 1.0 px / 0.34 opacity, and identical internal faces carry
   identical shading so coplanar duplicates cannot flicker into speckle.
-- **The cell microscope owns 10.2 s.** Its top rail is the captured mesh's
-  actual type histogram. One large tet10 card replaces the old cube comparison:
-  it draws four corners, six midside nodes and each of the six quadratic edges
-  as corner→midside→corner.
-- This is a conventional higher-order topology diagram. The published solve
-  remains tet4/p1 in the bottom ledger and manifest; the tet10/p2 card teaches
-  the supported element rather than claiming a quadratic wishbone solve. The
-  measured `qmin` and `q̄` still come from `fea::summarize_cell_quality` on the
-  captured `NodalMesh`.
+- **Arriving cells are coloured while they are drawn.** `CinemaView::arrival_band`
+  is a width in the same normalised element-index units as `reveal`, so a cell's
+  age behind the front is `reveal - index` and the highlight is a pure uniform
+  write: no geometry is rebuilt per frame. Inside the band a cell arrives
+  collapsed toward its own centroid and lit hot, then opens to full size and
+  cools into its element-type colour; its outline brightens with it, so a cell's
+  edges never separate from the cell. The band is 0.045 of the mesh (about 1.8k
+  of the showcase's 40,170 cells) and tapers to zero as the reveal completes, so
+  a finished mesh carries no frozen hot tail.
+- The CAD body now clears over the first third of the fill rather than fading in
+  lockstep with the whole reveal. Measured on the previous take, the half-opaque
+  surface depth-occluded the arriving cells for most of the act: mid-build frames
+  carried only a few thousand cell pixels against about twenty thousand once the
+  body was gone. The CAD → cells handoff still reads, but the cells own the shot
+  while they are being placed.
+- **The cell microscope owns 10.2 s.** Its top rail is the captured mesh's actual
+  type histogram, labelled with the dominant element type and its share. The
+  card then spends the pane on one tet10 and animates what makes it
+  higher-order: the six midside nodes lift off their chords and curve all six
+  edges, the straight tet4 chords stay underneath as the dim reference, each
+  curved edge is drawn from the quadratic map itself, and each face is filled as
+  the quadratic triangle's own four sub-triangles. Corner nodes are circles and
+  midside nodes are diamonds, because a shape difference survives video scaling
+  where a radius difference does not.
+- Beneath the element, the real quadratic edge basis is plotted against the two
+  straight p1 hats: `N1 = (1-ξ)(1-2ξ)`, `N2 = ξ(2ξ-1)`, `N3 = 4ξ(1-ξ)`. One lit
+  edge carries the plot's ξ cursor and its marker is evaluated with those same
+  three functions, so the drawn curve and the drawn geometry are the same maths.
+  The projection is affine, so projecting the quadratic edge map and mapping the
+  projected nodes agree exactly.
+- This is a conventional higher-order element diagram. The published solve
+  remains tet4/p1 in the bottom ledger and manifest, and the card says so on its
+  own face; it teaches the supported element rather than claiming a quadratic
+  wishbone solve. The measured `qmin` and `qmean` still come from
+  `fea::summarize_cell_quality` on the captured `NodalMesh`. The on-screen label
+  is spelled `qmean`: ImGui composes no combining marks, so `q` plus U+0304
+  rasterised as a missing-glyph box in the previous take.
 
 ## Act 4 — `mesh_hold`: the finished mesh
 

@@ -124,6 +124,8 @@ layout(location = 5) in float in_role;
 uniform mat4 u_view;
 uniform mat4 u_proj;
 uniform float u_shrink;
+uniform float u_reveal;
+uniform float u_arrival;
 uniform float u_transition;
 uniform int u_transition_active;
 out vec3 v_normal;
@@ -148,6 +150,13 @@ void main() {
             shrink = 0.06 * sin(3.14159265 * u_transition);
             index_value = -1.0;
         }
+    } else if (u_arrival > 0.001) {
+        // A cell that has just been emitted arrives collapsed toward its own
+        // centroid and opens to full size as the front moves past it, so the
+        // reveal reads as cells being placed one after another rather than as a
+        // colour wash sweeping over finished geometry.
+        float heat = 1.0 - clamp((u_reveal - index_value) / u_arrival, 0.0, 1.0);
+        shrink = max(shrink, 0.62 * heat * heat);
     }
     vec3 pos = mix(in_pos, in_centroid, shrink);
     v_normal = in_normal;
@@ -157,6 +166,11 @@ void main() {
     gl_Position = u_proj * u_view * vec4(pos, 1.0);
 })";
 
+// The arrival band is a pure uniform: `u_arrival` is a width in the same
+// normalised element-index units as `u_reveal`, so a cell's age behind the
+// front is `u_reveal - v_index`. Cells inside the band are lit hot and cool
+// back into their own element-type colour as the front leaves them behind. A
+// zero width disables it, which is what a settled mesh asks for.
 constexpr const char* kCinemaFs = R"(#version 330 core
 in vec3 v_normal;
 in vec4 v_color;
@@ -164,6 +178,7 @@ in vec3 v_pos;
 flat in float v_index;
 uniform vec3 u_eye;
 uniform float u_reveal;
+uniform float u_arrival;
 uniform float u_alpha;
 out vec4 frag;
 void main() {
@@ -175,7 +190,14 @@ void main() {
     float ndv = abs(dot(n, view_dir));
     float shade = 0.50 + 0.48 * ndv;
     float rim = pow(1.0 - ndv, 3.0) * 0.20;
-    frag = vec4(min(v_color.rgb * shade + vec3(rim), vec3(1.0)), u_alpha * v_color.a);
+    vec3 lit = min(v_color.rgb * shade + vec3(rim), vec3(1.0));
+    if (u_arrival > 0.001) {
+        float heat = 1.0 - clamp((u_reveal - v_index) / u_arrival, 0.0, 1.0);
+        float w = heat * heat;
+        vec3 hot = mix(vec3(1.00, 0.72, 0.30), vec3(1.00, 0.97, 0.88), w);
+        lit = mix(lit, hot, 0.96 * w);
+    }
+    frag = vec4(lit, u_alpha * v_color.a);
 })";
 
 constexpr const char* kCinemaLineVs = R"(#version 330 core
@@ -187,6 +209,8 @@ layout(location = 4) in float in_role;
 uniform mat4 u_view;
 uniform mat4 u_proj;
 uniform float u_shrink;
+uniform float u_reveal;
+uniform float u_arrival;
 uniform float u_transition;
 uniform int u_transition_active;
 out vec4 v_color;
@@ -209,6 +233,11 @@ void main() {
             shrink = 0.06 * sin(3.14159265 * u_transition);
             index_value = -1.0;
         }
+    } else if (u_arrival > 0.001) {
+        // Same arrival pop as the fill, so a cell's outline never separates
+        // from the cell it belongs to.
+        float heat = 1.0 - clamp((u_reveal - index_value) / u_arrival, 0.0, 1.0);
+        shrink = max(shrink, 0.62 * heat * heat);
     }
     vec3 pos = mix(in_pos, in_centroid, shrink);
     v_color = vec4(in_color.rgb, in_color.a * alpha);
@@ -220,13 +249,25 @@ constexpr const char* kCinemaLineFs = R"(#version 330 core
 in vec4 v_color;
 flat in float v_index;
 uniform float u_reveal;
+uniform float u_arrival;
 uniform float u_alpha;
 out vec4 frag;
 void main() {
     if (v_index >= u_reveal || v_color.a <= 0.001) {
         discard;
     }
-    frag = vec4(v_color.rgb, u_alpha * v_color.a);
+    vec3 rgb = v_color.rgb;
+    float a = u_alpha * v_color.a;
+    if (u_arrival > 0.001) {
+        // The dense-mesh edge is a near-black annotation. Inside the arrival
+        // band it becomes a bright outline instead, so the newest cells read as
+        // individually drawn rather than as a lit patch.
+        float heat = 1.0 - clamp((u_reveal - v_index) / u_arrival, 0.0, 1.0);
+        float w = heat * heat;
+        rgb = mix(rgb, vec3(1.00, 0.88, 0.62), w);
+        a = mix(a, min(1.0, a + 0.55), w);
+    }
+    frag = vec4(rgb, a);
 })";
 
 // Opening-act evidence glyphs. Surface samples carry physical target spacing;
@@ -1928,6 +1969,7 @@ void Viewport::draw_cinema(const Eigen::Matrix4f& view, const Eigen::Matrix4f& p
     const float reveal = std::clamp(cinema_view_.reveal, 0.0f, 1.0f);
     const float shrink = std::clamp(cinema_view_.shrink, 0.0f, 1.0f);
     const float mesh_alpha = std::clamp(cinema_view_.mesh_alpha, 0.0f, 1.0f);
+    const float arrival = std::clamp(cinema_view_.arrival_band, 0.0f, 1.0f);
     const bool incremental = cinema_view_.incremental_transition && cinema_transition_active_;
     const float transition = std::clamp(cinema_view_.transition_progress, 0.0f, 1.0f);
 
@@ -2034,6 +2076,7 @@ void Viewport::draw_cinema(const Eigen::Matrix4f& view, const Eigen::Matrix4f& p
                            proj.data());
         glUniform3f(glGetUniformLocation(cinema_program_, "u_eye"), eye.x(), eye.y(), eye.z());
         glUniform1f(glGetUniformLocation(cinema_program_, "u_reveal"), reveal);
+        glUniform1f(glGetUniformLocation(cinema_program_, "u_arrival"), arrival);
         glUniform1f(glGetUniformLocation(cinema_program_, "u_shrink"), shrink);
         glUniform1f(glGetUniformLocation(cinema_program_, "u_transition"), transition);
         glUniform1i(glGetUniformLocation(cinema_program_, "u_transition_active"),
@@ -2056,6 +2099,7 @@ void Viewport::draw_cinema(const Eigen::Matrix4f& view, const Eigen::Matrix4f& p
             // The edge buffer carries the same centroids and indices as the
             // fill, so the same reveal/shrink keep the two exactly in step.
             glUniform1f(glGetUniformLocation(cinema_line_program_, "u_reveal"), reveal);
+            glUniform1f(glGetUniformLocation(cinema_line_program_, "u_arrival"), arrival);
             glUniform1f(glGetUniformLocation(cinema_line_program_, "u_shrink"), shrink);
             glUniform1f(glGetUniformLocation(cinema_line_program_, "u_transition"),
                         transition);

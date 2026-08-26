@@ -134,7 +134,6 @@ struct ReducedSolveResult {
     SolveCostMeasured cost;
 };
 
-
 std::string_view cg_stop_text(CgStop stop) {
     switch (stop) {
     case CgStop::kConverged:
@@ -490,10 +489,9 @@ ReducedSolveResult solve_reduced(const Eigen::SparseMatrix<double>& kff,
 } // namespace
 
 LinearSolveResult solve_elastostatics(const NodalMesh& mesh, const Material& material,
-                                      const Dirichlet& dirichlet,
-                                      const Eigen::VectorXd& loads,
+                                      const Dirichlet& dirichlet, const Eigen::VectorXd& loads,
                                       const SolveOptions& options,
-                                    const LinearConstraints* constraints) {
+                                      const LinearConstraints* constraints) {
     const Eigen::Index ndof = 3 * static_cast<Eigen::Index>(mesh.nodes.size());
     if (loads.size() != ndof) {
         throw FeaError(std::format("solve_elastostatics: load vector size {} != 3N = {}",
@@ -544,8 +542,7 @@ LinearSolveResult solve_elastostatics(const NodalMesh& mesh, const Material& mat
     if (symbolic_cost.nfree != nfree) {
         throw FeaError("solve_elastostatics: symbolic free-DOF count mismatch");
     }
-    const auto estimate =
-        estimate_solve_resources(mesh, nfree, symbolic_cost.factor_nnz);
+    const auto estimate = estimate_solve_resources(mesh, nfree, symbolic_cost.factor_nnz);
     const auto budget = effective_memory_budget(options.max_mem_gb);
     const auto decision =
         decide_solve_method(nfree, options, estimate, budget.effective_cap_bytes);
@@ -643,12 +640,11 @@ LinearSolveResult solve_elastostatics(const NodalMesh& mesh, const Material& mat
     Eigen::VectorXd reactions = Eigen::VectorXd::Zero(ndof);
     for (const auto& [dof, value] : dirichlet.dof_values) {
         (void)value;
-        const Eigen::Index system_dof =
-            original_to_system[static_cast<std::size_t>(dof)];
+        const Eigen::Index system_dof = original_to_system[static_cast<std::size_t>(dof)];
         reactions[dof] = system_reactions[system_dof];
     }
-    Eigen::VectorXd u = has_linear_constraints ? constraints->recover(u_system, ndof)
-                                               : std::move(u_system);
+    Eigen::VectorXd u =
+        has_linear_constraints ? constraints->recover(u_system, ndof) : std::move(u_system);
     return {.u = std::move(u),
             .reactions = std::move(reactions),
             .reactions_complete = !has_linear_constraints,

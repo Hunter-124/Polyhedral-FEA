@@ -289,7 +289,22 @@ Eigen::SparseMatrix<double> free_dof_pattern(const NodalMesh& mesh, const Dirich
         }
     };
 
+    // One reserve for the whole build. Reserving `entries.size() + k` per element
+    // asks for an exact capacity every iteration, which defeats the vector's
+    // geometric growth and reallocates-and-copies the whole buffer once per
+    // element: the 60k-tet10 l_bracket case in tests/test_brep_fidelity.cpp spent
+    // over 30 minutes copying triplets instead of the ~1 s the pattern build
+    // costs. Every element contributes at most (3 * nodes)^2 entries, since the
+    // local DOF list is deduplicated and prescribed DOFs are dropped, so this is
+    // an upper bound unless linear constraints expand a slave into several
+    // masters -- and then normal geometric growth takes over.
+    std::size_t estimated_entries = static_cast<std::size_t>(nfree);
+    for (const auto& element : mesh.elements) {
+        const std::size_t width = 3 * element.nodes.size();
+        estimated_entries += width * width;
+    }
     std::vector<Eigen::Triplet<double>> entries;
+    entries.reserve(estimated_entries);
     for (const auto& element : mesh.elements) {
         std::vector<Eigen::Index> local;
         local.reserve(3 * element.nodes.size());
@@ -303,7 +318,6 @@ Eigen::SparseMatrix<double> free_dof_pattern(const NodalMesh& mesh, const Dirich
         }
         std::sort(local.begin(), local.end());
         local.erase(std::unique(local.begin(), local.end()), local.end());
-        entries.reserve(entries.size() + local.size() * local.size());
         for (const Eigen::Index row : local) {
             for (const Eigen::Index col : local) {
                 entries.emplace_back(row, col, 1.0);

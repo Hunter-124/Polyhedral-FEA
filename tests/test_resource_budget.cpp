@@ -96,8 +96,7 @@ TEST_CASE("auto solve records LDLT to CG downgrade when only CG fits") {
     const auto ndof = 3 * static_cast<Eigen::Index>(mesh.nodes.size());
     const auto nfree = ndof - static_cast<Eigen::Index>(bc.dof_values.size());
     const auto symbolic = analyze_solve_cost(mesh, bc);
-    const auto estimate =
-        estimate_solve_resources(mesh, nfree, symbolic.factor_nnz);
+    const auto estimate = estimate_solve_resources(mesh, nfree, symbolic.factor_nnz);
     REQUIRE(estimate.direct_peak_bytes > estimate.cg_peak_bytes);
     const auto cap =
         estimate.cg_peak_bytes + (estimate.direct_peak_bytes - estimate.cg_peak_bytes) / 2;

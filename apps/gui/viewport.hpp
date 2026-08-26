@@ -116,16 +116,15 @@ class Viewport {
     /// CAD-edge network. Surface values are physical target cell widths in
     /// metres. Curvature families are normalised together but independently of
     /// spacing, so curvature can never be mislabeled as target h.
-    void set_cinema_feature_samples(
-        const std::vector<Eigen::Vector3d>& field_points,
-        const std::vector<double>& field_h_before,
-        const std::vector<double>& field_h_after,
-        const std::vector<Eigen::Vector3d>& curve_points,
-        const std::vector<double>& curvature_raw,
-        const std::vector<double>& curvature_filtered,
-        const std::vector<Eigen::Vector3d>& network_points,
-        const std::vector<double>& network_curvature_raw,
-        const std::vector<double>& network_curvature_filtered);
+    void set_cinema_feature_samples(const std::vector<Eigen::Vector3d>& field_points,
+                                    const std::vector<double>& field_h_before,
+                                    const std::vector<double>& field_h_after,
+                                    const std::vector<Eigen::Vector3d>& curve_points,
+                                    const std::vector<double>& curvature_raw,
+                                    const std::vector<double>& curvature_filtered,
+                                    const std::vector<Eigen::Vector3d>& network_points,
+                                    const std::vector<double>& network_curvature_raw,
+                                    const std::vector<double>& network_curvature_filtered);
     /// Per-element geometry for the cinema reveal: every element's own faces,
     /// tagged with its index in `mesh.elements` so the reveal order is the
     /// mesher's own emission order. Interior faces are therefore stored once per
@@ -161,8 +160,8 @@ class Viewport {
         float model_alpha = 0.0f;
         /// Undeformed CAD ghost behind exaggerated result displacement.
         float rest_surface_alpha = 0.0f;
-        float reveal = 0.0f;         // elements with index < reveal * count are drawn
-        float shrink = 0.0f;         // 0 = touching, 1 = collapsed to centroids
+        float reveal = 0.0f; // elements with index < reveal * count are drawn
+        float shrink = 0.0f; // 0 = touching, 1 = collapsed to centroids
         float mesh_alpha = 1.0f;
         /// Width of the "just arrived" highlight trailing the reveal front, in
         /// the same normalised element-index units as `reveal`. Cells inside it

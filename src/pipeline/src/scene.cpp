@@ -466,8 +466,7 @@ double quantile_floor(const std::vector<double>& ascending, double q) {
     if (ascending.empty()) {
         return 0.0;
     }
-    const auto index =
-        static_cast<std::size_t>(q * static_cast<double>(ascending.size() - 1));
+    const auto index = static_cast<std::size_t>(q * static_cast<double>(ascending.size() - 1));
     return ascending[std::min(index, ascending.size() - 1)];
 }
 
@@ -481,8 +480,7 @@ struct ExactCircle {
 /// u = p1−p0, v = p2−p0, and (a, b) from the two equal-distance conditions.
 /// Collinear input has no circle — which is exactly how the straight seam edge
 /// of a closed cylinder gets rejected.
-std::optional<ExactCircle> circle_through(const Eigen::Vector3d& p0,
-                                          const Eigen::Vector3d& p1,
+std::optional<ExactCircle> circle_through(const Eigen::Vector3d& p0, const Eigen::Vector3d& p1,
                                           const Eigen::Vector3d& p2, double scale) {
     const Eigen::Vector3d u = p1 - p0;
     const Eigen::Vector3d v = p2 - p0;
@@ -490,8 +488,7 @@ std::optional<ExactCircle> circle_through(const Eigen::Vector3d& p0,
     const double vv = v.squaredNorm();
     const double uv = u.dot(v);
     const double det = uu * vv - uv * uv; // |u×v|², zero exactly when collinear
-    const double floor_det =
-        kGeometryRelTol * kGeometryRelTol * scale * scale * scale * scale;
+    const double floor_det = kGeometryRelTol * kGeometryRelTol * scale * scale * scale * scale;
     if (!(det > floor_det) || !std::isfinite(det)) {
         return std::nullopt;
     }
@@ -502,8 +499,7 @@ std::optional<ExactCircle> circle_through(const Eigen::Vector3d& p0,
     ExactCircle circle;
     circle.center = p0 + w;
     circle.radius = w.norm();
-    if (!(circle.radius > 0.0) || !std::isfinite(circle.radius) ||
-        !(normal.norm() > 0.0)) {
+    if (!(circle.radius > 0.0) || !std::isfinite(circle.radius) || !(normal.norm() > 0.0)) {
         return std::nullopt;
     }
     circle.axis = normal.normalized();
@@ -707,10 +703,11 @@ std::vector<Eigen::Vector3d> salient_feature_centroids(const geom::CadTopology& 
         const std::size_t key = root(face_index);
         auto found = clusters.find(key);
         if (found == clusters.end()) {
-            found = clusters
-                        .emplace(key, std::pair<Eigen::Vector3d, double>{
-                                          Eigen::Vector3d::Zero(), 0.0})
-                        .first;
+            found =
+                clusters
+                    .emplace(key,
+                             std::pair<Eigen::Vector3d, double>{Eigen::Vector3d::Zero(), 0.0})
+                    .first;
         }
         found->second.first += weight * position[face_index];
         found->second.second += weight;
@@ -770,8 +767,7 @@ std::vector<double> pairwise_distances(const std::vector<Eigen::Vector3d>& point
 double williams_lambda(double omega) {
     constexpr int kScanIntervals = 4096;
     constexpr int kBisections = 100;
-    if (!std::isfinite(omega) || omega <= std::numbers::pi ||
-        omega > 2.0 * std::numbers::pi) {
+    if (!std::isfinite(omega) || omega <= std::numbers::pi || omega > 2.0 * std::numbers::pi) {
         return 1.0; // outside the reentrant domain (π, 2π]: nothing singular
     }
     double smallest = 1.0;
@@ -994,8 +990,8 @@ ProximityFeatures proximity_features(const geom::CadModel& cad, double diag) {
             if (faces == neighbours.end() || edge_id >= topo.edges.size()) {
                 continue;
             }
-            const auto opening = crease_opening_angle(cad, topo.edges[edge_id],
-                                                      faces->second[0], faces->second[1], diag);
+            const auto opening = crease_opening_angle(
+                cad, topo.edges[edge_id], faces->second[0], faces->second[1], diag);
             if (!opening || !(*opening > std::numbers::pi)) {
                 continue;
             }
@@ -1010,10 +1006,11 @@ ProximityFeatures proximity_features(const geom::CadModel& cad, double diag) {
 
 } // namespace
 
-CaseFeatures extract_case_features(
-    const Model& model, std::span<const RefineRegion> fix_regions,
-    std::span<const RefineRegion> load_regions, const Eigen::Vector3d& load_dir,
-    double poisson, std::span<const Eigen::Vector3d> load_region_tractions) {
+CaseFeatures extract_case_features(const Model& model,
+                                   std::span<const RefineRegion> fix_regions,
+                                   std::span<const RefineRegion> load_regions,
+                                   const Eigen::Vector3d& load_dir, double poisson,
+                                   std::span<const Eigen::Vector3d> load_region_tractions) {
     CaseFeatures out;
     // Salient-feature cluster centroids (world coordinates), measured from the
     // BRep below and consumed after the boundary-condition regions have been
@@ -7811,8 +7808,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     auto options =
                         solve_options_with_progress(pass, pass_count, pass_solver_note);
                     options.method = setup.solve_method;
-                    auto solved = fea::solve_elastostatics(
-                        vol.mesh, material, bc, loads, options, active_p_constraints());
+                    auto solved = fea::solve_elastostatics(vol.mesh, material, bc, loads,
+                                                           options, active_p_constraints());
                     pass_solve_cost = std::move(solved.cost);
                     pass_reactions = std::move(solved.reactions);
                     pass_reactions_complete = solved.reactions_complete;

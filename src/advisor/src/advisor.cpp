@@ -987,10 +987,8 @@ FeatureColumns to_columns(const pipeline::CaseFeatures& f) {
         columns.emplace("geo_dihedral_p50", f.geo_dihedral_p50);
         columns.emplace("geo_dihedral_p90", f.geo_dihedral_p90);
         columns.emplace("geo_singular_lambda_min", f.geo_singular_lambda_min);
-        columns.emplace("load_to_feature_dist_min_rel",
-                        f.load_to_feature_dist_min_rel);
-        columns.emplace("fix_to_feature_dist_min_rel",
-                        f.fix_to_feature_dist_min_rel);
+        columns.emplace("load_to_feature_dist_min_rel", f.load_to_feature_dist_min_rel);
+        columns.emplace("fix_to_feature_dist_min_rel", f.fix_to_feature_dist_min_rel);
         columns.emplace("case_load_multiaxiality", f.case_load_multiaxiality);
     }
     return columns;

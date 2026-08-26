@@ -102,7 +102,8 @@ TEST_CASE("CG honours its iteration cap instead of grinding") {
     opt.cg_accept_tol = 1e-14;
     opt.cg_max_iters = 2;
     try {
-        static_cast<void>(solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, opt).u);
+        static_cast<void>(
+            solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, opt).u);
         FAIL("two CG iterations unexpectedly converged");
     } catch (const polymesh::fea::FeaError& e) {
         const std::string message = e.what();
@@ -224,14 +225,16 @@ TEST_CASE("solve rejects invalid CG tolerances and non-finite inputs") {
 
     Eigen::VectorXd invalid_loads = setup.loads;
     invalid_loads[0] = std::numeric_limits<double>::quiet_NaN();
-    CHECK_THROWS_AS(solve_elastostatics(setup.mesh, kSteel, setup.bc, invalid_loads, options).u,
-                    polymesh::fea::FeaError);
+    CHECK_THROWS_AS(
+        solve_elastostatics(setup.mesh, kSteel, setup.bc, invalid_loads, options).u,
+        polymesh::fea::FeaError);
 
     Dirichlet invalid_bc = setup.bc;
     REQUIRE_FALSE(invalid_bc.dof_values.empty());
     invalid_bc.dof_values.begin()->second = std::numeric_limits<double>::infinity();
-    CHECK_THROWS_AS(solve_elastostatics(setup.mesh, kSteel, invalid_bc, setup.loads, options).u,
-                    polymesh::fea::FeaError);
+    CHECK_THROWS_AS(
+        solve_elastostatics(setup.mesh, kSteel, invalid_bc, setup.loads, options).u,
+        polymesh::fea::FeaError);
 }
 
 TEST_CASE("forced CG matches direct LDLT on small cantilever") {
@@ -277,7 +280,8 @@ TEST_CASE("CG progress reporting does not introduce recurrence restarts") {
     SolveOptions plain;
     plain.method = SolveMethod::kCG;
     plain.cg_tol = 1e-10;
-    const auto u_plain = solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, plain).u;
+    const auto u_plain =
+        solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, plain).u;
 
     SolveOptions reported = plain;
     reported.cg_progress_chunk = 1; // stress the old pathological case
@@ -537,6 +541,8 @@ TEST_CASE("equilibrated CG converges on a diagonally heterogeneous MPC system") 
     // The direct path solves the identical reduced system; CG must agree.
     SolveOptions opt_direct;
     opt_direct.method = SolveMethod::kDirect;
-    const Eigen::VectorXd u_direct = solve_elastostatics(setup.mesh, kSteel, setup.bc, setup.loads, opt_direct, &constraints).u;
+    const Eigen::VectorXd u_direct = solve_elastostatics(setup.mesh, kSteel, setup.bc,
+                                                         setup.loads, opt_direct, &constraints)
+                                         .u;
     CHECK((u_cg - u_direct).norm() / u_direct.norm() < 1e-5);
 }

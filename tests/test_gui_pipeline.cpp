@@ -295,9 +295,7 @@ TEST_CASE("the p-elevated authoritative solve reports its own solver provenance"
 
     std::vector<SolveStage> stages;
     SolveJob job;
-    job.on_solve_stage = [&stages](const SolveStage& stage) {
-        stages.push_back(stage);
-    };
+    job.on_solve_stage = [&stages](const SolveStage& stage) { stages.push_back(stage); };
     job.start(model, setup);
     std::optional<SolveResult> promoted;
     for (int i = 0; i < 800; ++i) {
@@ -316,8 +314,7 @@ TEST_CASE("the p-elevated authoritative solve reports its own solver provenance"
     // The emitted pass solved the linear mesh; its note belongs to that solve.
     const auto pass_counts = fea::count_element_types(stages.front().result.volume_mesh);
     CHECK(pass_counts.tet10 + pass_counts.hex20 == 0);
-    CHECK(stages.front().result.solver_note.find("direct LDLT selected") !=
-          std::string::npos);
+    CHECK(stages.front().result.solver_note.find("direct LDLT selected") != std::string::npos);
 
     // The authoritative result is the later quadratic re-solve. Before the
     // provenance sink was threaded through every p-elevation branch this field

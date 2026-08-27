@@ -408,7 +408,7 @@ nlohmann::json result_surface_json(const pipeline::SolveResult& result) {
                 static_cast<float>(interpolate_scalar(*sample, result.u_magnitude)));
             eta.push_back(static_cast<float>(interpolate_scalar(*sample, result.nodal_eta)));
         }
-        for (const std::pair<const fea::SurfaceSample*, const fea::SurfaceSample*> edge :
+        for (const std::pair<const fea::SurfaceSample*, const fea::SurfaceSample*>& edge :
              {std::pair{&a, &b}, std::pair{&b, &c}, std::pair{&c, &a}}) {
             append_point(edges, edge.first->position);
             append_point(edges, edge.second->position);

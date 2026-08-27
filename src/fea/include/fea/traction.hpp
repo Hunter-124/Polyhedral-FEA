@@ -111,6 +111,25 @@ ConsistentLoad consistent_face_load(const NodalMesh& mesh,
                                     const std::vector<SurfaceFace>& faces,
                                     const Eigen::Vector3d& total_force);
 
+/// Round-off ceiling for `ConsistentLoad::conservation_error`, in newtons.
+///
+/// The nodal sum is accumulated term by term over `n_terms` contributions,
+/// each of order `|requested| / n_terms`, so the naive-summation bound on the
+/// accumulated rounding is `n_terms * eps * |requested|`; this returns that
+/// bound with an 8x safety factor, plus a 1e-9 N absolute floor so a zero or
+/// micro-load case is not asked for exactness beyond double precision. Same
+/// idiom as the geometry-coverage tolerance in `pipeline/scene.cpp`: an
+/// absolute floor plus a magnitude-scaled term.
+///
+/// This is a ROUND-OFF bound and nothing else. A real assembly defect — a
+/// dropped face, a mis-scaled traction, a fallback that splits by node count —
+/// loses a *fraction* of the requested load and still fails this check by many
+/// orders of magnitude. An absolute tolerance, by contrast, cannot be met by a
+/// correct assembly once the load exceeds roughly 1e6 N, which is an ordinary
+/// structural magnitude.
+[[nodiscard]] double load_conservation_tolerance(double requested_newtons,
+                                                 std::size_t n_terms);
+
 /// An axis-aligned box a surface load is confined to, as `--load-box` names it.
 struct LoadRegion {
     Eigen::Vector3d lo;

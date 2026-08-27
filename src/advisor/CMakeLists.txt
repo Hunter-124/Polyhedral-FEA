@@ -33,6 +33,20 @@ elseif(UNIX AND NOT APPLE AND CMAKE_SIZEOF_VOID_P EQUAL 8)
     set(_ort_hash "SHA256=a3e1b79d7bb1bf09696ce675f49e4064e6c81f6202b8225624fff0e93f8d6407")
     set(_ort_implib "")
     set(_ort_runtime "lib/libonnxruntime.so")
+elseif(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
+    set(_ort_archive "onnxruntime-osx-arm64-${POLYMESH_ONNXRUNTIME_VERSION}.tgz")
+    set(_ort_hash "SHA256=1268b359718099bde2cedb55787f182a130067bc4f31e8c88478c445b850d3d8")
+    set(_ort_implib "")
+    set(_ort_runtime "lib/libonnxruntime.dylib")
+elseif(APPLE)
+    # Not an oversight: ONNX Runtime 1.28.0 publishes onnxruntime-osx-arm64
+    # and nothing else for macOS. There is no osx-x86_64 archive to pin, so an
+    # Intel Mac has to say so rather than download something that is not there.
+    message(FATAL_ERROR
+        "POLYMESH_WITH_ADVISOR=ON on macOS/${CMAKE_SYSTEM_PROCESSOR}, but ONNX Runtime "
+        "${POLYMESH_ONNXRUNTIME_VERSION} ships only onnxruntime-osx-arm64-"
+        "${POLYMESH_ONNXRUNTIME_VERSION}.tgz for macOS. Build on Apple silicon, or "
+        "reconfigure with -DPOLYMESH_WITH_ADVISOR=OFF.")
 else()
     set(_ort_archive "")
 endif()
@@ -109,6 +123,13 @@ elseif(UNIX AND NOT APPLE)
             FILES_MATCHING
             PATTERN "libonnxruntime.so*"
             PATTERN "libonnxruntime_providers_shared.so*"
+            PATTERN "cmake" EXCLUDE
+            PATTERN "pkgconfig" EXCLUDE)
+elseif(APPLE)
+    install(DIRECTORY "${onnxruntime_SOURCE_DIR}/lib/"
+            DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+            FILES_MATCHING
+            PATTERN "libonnxruntime*.dylib"
             PATTERN "cmake" EXCLUDE
             PATTERN "pkgconfig" EXCLUDE)
 endif()

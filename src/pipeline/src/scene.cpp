@@ -7392,11 +7392,15 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     const auto applied =
                         fea::consistent_face_load(vol.mesh, faces, requested_force);
                     if (applied.area > 0.0) {
-                        if (applied.conservation_error > 1e-9) {
+                        const double tol = fea::load_conservation_tolerance(
+                            requested_force.norm(), faces.size());
+                        if (applied.conservation_error > tol) {
                             throw fea::FeaError(std::format(
                                 "load on region {}: traction assembly lost {:.3g} N of the "
-                                "requested {:.6g} N resultant",
-                                region, applied.conservation_error, requested_force.norm()));
+                                "requested {:.6g} N resultant, above the {:.3g} N round-off "
+                                "ceiling",
+                                region, applied.conservation_error, requested_force.norm(),
+                                tol));
                         }
                         loads += applied.loads;
                         continue;
@@ -7409,11 +7413,14 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                         fallback_sum += per_node;
                     }
                     const double conservation_error = (fallback_sum - requested_force).norm();
-                    if (conservation_error > 1e-9) {
+                    const double fallback_tol = fea::load_conservation_tolerance(
+                        requested_force.norm(), it->second.size());
+                    if (conservation_error > fallback_tol) {
                         throw fea::FeaError(std::format(
                             "load on region {}: nodal fallback lost {:.3g} N of the "
-                            "requested {:.6g} N resultant",
-                            region, conservation_error, requested_force.norm()));
+                            "requested {:.6g} N resultant, above the {:.3g} N round-off "
+                            "ceiling",
+                            region, conservation_error, requested_force.norm(), fallback_tol));
                     }
                     vol.mesher_note += std::format(
                         " | load region {} node fallback={} Σf=({:.6g},{:.6g},{:.6g}) N",

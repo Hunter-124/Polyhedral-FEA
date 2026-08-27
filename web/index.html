@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#111310">
+    <title>PolyMesh Web</title>
+    <link rel="stylesheet" href="app.css">
+    <link rel="icon" type="image/svg+xml" href="assets/polymesh-mark.svg">
+</head>
+<body>
+    <a class="skip-link" href="#study">Skip to study setup</a>
+    <header class="app-header">
+        <a class="brand" href="/" aria-label="PolyMesh home">
+            <img src="assets/polymesh-mark.svg" width="32" height="32" alt="">
+            <span>POLYMESH</span>
+        </a>
+        <div class="product-byline">A Chudware product</div>
+        <div id="health" class="health" data-state="waiting">Connecting</div>
+    </header>
+
+    <main class="app-shell">
+        <aside id="study" class="study-column" aria-label="Study setup">
+            <section class="panel setup-section" aria-labelledby="geometry-title">
+                <div class="section-heading">
+                    <span class="step-index">01</span>
+                    <div><p class="eyebrow">Geometry</p><h2 id="geometry-title">Load a part</h2></div>
+                </div>
+                <label id="drop-zone" class="drop-zone" for="part-file" tabindex="0">
+                    <input id="part-file" type="file" accept=".step,.stp,.brep,.stl">
+                    <strong>Drop STEP, BRep, or STL</strong>
+                    <span>or choose a file from this device</span>
+                </label>
+                <div id="upload-error" class="message message-error" role="alert" hidden></div>
+                <div>
+                    <p class="control-label">Bundled examples</p>
+                    <div id="examples" class="example-row" aria-live="polite"><span class="muted">Loading examples</span></div>
+                </div>
+                <dl id="part-facts" class="fact-grid" hidden>
+                    <div><dt>Triangles</dt><dd id="part-triangles">—</dd></div>
+                    <div><dt>Regions</dt><dd id="part-regions">—</dd></div>
+                    <div class="wide"><dt>Bounds</dt><dd id="part-bounds">—</dd></div>
+                </dl>
+            </section>
+
+            <section class="panel setup-section" aria-labelledby="setup-title">
+                <div class="section-heading">
+                    <span class="step-index">02</span>
+                    <div><p class="eyebrow">Study</p><h2 id="setup-title">Mesh and material</h2></div>
+                </div>
+                <div class="control-grid">
+                    <label class="field wide"><span>Material</span>
+                        <select id="material">
+                            <option value="steel">Structural steel — E 200 GPa, ν 0.30</option>
+                            <option value="aluminum">Aluminum 6061-T6 — E 68.9 GPa, ν 0.33</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </label>
+                    <label class="field"><span>Element size <small>model units</small></span><input id="element-size" type="number" min="0" step="any" disabled></label>
+                    <label class="field"><span>Mesher</span>
+                        <select id="mesher">
+                            <option value="graded" selected>Graded tet</option>
+                            <option value="hybrid">Hybrid zoo</option>
+                            <option value="tet">Tetrahedral</option>
+                            <option value="hex">Hex dominant</option>
+                            <option value="hexvem">Hex VEM</option>
+                            <option value="hexpyr">Hex + pyramid</option>
+                            <option value="prism">Prism sweep</option>
+                            <option value="octa">Octahedral</option>
+                            <option value="hybridvem">Hybrid VEM</option>
+                            <option value="vary">Varyhedron</option>
+                            <option value="cvt">CVT polyhedral</option>
+                        </select>
+                    </label>
+                </div>
+                <details class="advanced">
+                    <summary>Advanced</summary>
+                    <div class="control-grid advanced-grid">
+                        <label class="field"><span>Young's modulus <small>Pa</small></span><input id="youngs" type="number" min="0" step="any" value="200000000000"></label>
+                        <label class="field"><span>Poisson ratio</span><input id="poisson" type="number" min="-0.99" max="0.499" step="0.01" value="0.30"></label>
+                        <label class="field"><span>Adaptive passes <small>0 = off</small></span><input id="adapt-passes" type="number" min="0" max="20" step="1" value="0"></label>
+                        <label class="field"><span>Eta target</span><input id="eta-target" type="number" min="0" step="any" value="0.05"></label>
+                        <label class="field"><span>Skin layers</span><input id="skin-layers" type="number" min="1" max="20" step="1" value="2"></label>
+                        <label class="check"><input id="feature-grading" type="checkbox" checked><span>Feature grading</span></label>
+                    </div>
+                </details>
+            </section>
+
+            <section class="panel setup-section" aria-labelledby="bc-title">
+                <div class="section-heading">
+                    <span class="step-index">03</span>
+                    <div><p class="eyebrow">Boundary conditions</p><h2 id="bc-title">Fixture and load</h2></div>
+                </div>
+                <fieldset id="fixture-box" class="box-editor" disabled>
+                    <legend><span class="box-swatch fixture"></span>Fixture box <small>model units</small></legend>
+                    <div class="axis-grid" data-box="fixture"></div>
+                </fieldset>
+                <fieldset id="load-box" class="box-editor" disabled>
+                    <legend><span class="box-swatch load"></span>Load box <small>model units</small></legend>
+                    <div class="axis-grid" data-box="load"></div>
+                    <div class="force-grid">
+                        <label>Fx <span>N</span><input id="force-x" type="number" step="any" value="0"></label>
+                        <label>Fy <span>N</span><input id="force-y" type="number" step="any" value="0"></label>
+                        <label>Fz <span>N</span><input id="force-z" type="number" step="any" value="-1000"></label>
+                    </div>
+                </fieldset>
+            </section>
+
+            <section class="run-panel">
+                <div id="run-message" class="run-message" role="status">Load geometry to configure a real study.</div>
+                <div class="actions">
+                    <button id="run" class="button" type="button" disabled>Run study</button>
+                    <button id="stop" class="button button-danger" type="button" hidden>Stop</button>
+                </div>
+            </section>
+        </aside>
+
+        <section class="workspace" aria-label="Visualization and results">
+            <div class="viewport-toolbar">
+                <div id="field-switcher" class="segmented" role="group" aria-label="Display field">
+                    <button type="button" data-field="cad" aria-pressed="true">CAD</button>
+                    <button type="button" data-field="mesh" aria-pressed="false">Mesh</button>
+                    <button type="button" data-field="von_mises" aria-pressed="false" disabled>von Mises</button>
+                    <button type="button" data-field="displacement" aria-pressed="false" disabled>Displacement</button>
+                    <button type="button" data-field="eta" aria-pressed="false" disabled>ZZ error</button>
+                </div>
+                <div class="toolbar-actions">
+                    <label class="toggle"><input id="wireframe" type="checkbox" checked><span>Wire</span></label>
+                    <label class="toggle"><input id="ghost" type="checkbox"><span>Ghost</span></label>
+                    <button id="fit" class="tool-button" type="button">Fit</button>
+                </div>
+            </div>
+
+            <div id="viewport-wrap" class="viewport-wrap">
+                <canvas id="viewport" aria-label="Interactive 3D model viewport"></canvas>
+                <canvas id="network" class="network-canvas" aria-label="Live advisor neural network activations" hidden></canvas>
+                <div class="viewport-caption">
+                    <p id="stage" class="eyebrow">Waiting for geometry</p>
+                    <p id="progress-copy">Drop a supported part or choose an example.</p>
+                </div>
+                <div id="colorbar" class="colorbar" hidden>
+                    <span id="colorbar-max">—</span><div class="color-ramp"></div><span id="colorbar-min">—</span><strong id="colorbar-unit"></strong>
+                </div>
+                <div class="deformation-control">
+                    <label for="deform">Deformation</label>
+                    <select id="deform" disabled><option value="auto">Auto</option><option value="1">True 1×</option><option value="custom">Custom</option></select>
+                    <label id="deform-custom-wrap" hidden><span class="sr-only">Custom deformation scale</span><input id="deform-custom" type="number" min="0" step="any" value="10">×</label>
+                </div>
+            </div>
+
+            <div class="results-grid">
+                <section class="panel result-panel" aria-labelledby="results-title">
+                    <div class="result-heading"><div><p class="eyebrow">Measured output</p><h2 id="results-title">Run results</h2></div><a id="export-vtu" class="button button-secondary button-small disabled" aria-disabled="true">Export VTU</a></div>
+                    <dl class="metric-grid">
+                        <div><dt>Nodes</dt><dd id="metric-nodes">—</dd></div>
+                        <div><dt>Elements</dt><dd id="metric-elements">—</dd></div>
+                        <div><dt>DOF</dt><dd id="metric-dof">—</dd></div>
+                        <div><dt>Peak stress</dt><dd id="metric-stress">—</dd><span>MPa</span></div>
+                        <div><dt>Peak displacement</dt><dd id="metric-displacement">—</dd><span>mm</span></div>
+                        <div><dt>Global eta</dt><dd id="metric-eta">—</dd></div>
+                        <div><dt>Solver</dt><dd id="metric-solver">—</dd></div>
+                        <div><dt>Mesh / solve</dt><dd id="metric-timing">—</dd><span>ms</span></div>
+                    </dl>
+                    <div id="run-notes" class="run-notes"></div>
+                </section>
+                <section id="convergence-panel" class="panel result-panel" aria-labelledby="convergence-title" hidden>
+                    <p class="eyebrow">Adaptive solve</p><h2 id="convergence-title">Convergence</h2>
+                    <div class="table-scroll"><table><thead><tr><th>Pass</th><th>Elements</th><th>DOF</th><th>Eta</th><th>Mesh / solve ms</th></tr></thead><tbody id="convergence-body"></tbody></table></div>
+                </section>
+            </div>
+        </section>
+    </main>
+    <script type="module" src="app.js"></script>
+</body>
+</html>

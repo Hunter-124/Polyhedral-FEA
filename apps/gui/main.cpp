@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
-// PolyMesh Studio desktop app: import geometry, click faces to assign fixtures
-// and loads, tune mesher/solver settings, solve, and inspect stress/deflection
-// results. The default constrained workspace is Study setup | viewport | FEA
-// Results; repository campaign/Test Lab panels are available only in the
-// Developer workspace. Panels cannot be dragged out, collapsed, or lost.
-// Test Lab talks to the harness only via docs/dag/interfaces.md file formats.
+// PolyMesh desktop app: a four-step study rail, the modeling canvas, and an
+// on-demand results rail. Geometry, boundary conditions, mesh and solve data
+// remain authoritative pipeline values; ordinary jobs stream their real mesh,
+// advisor and convergence stages through LiveView. The repository Test Lab is
+// reachable as a separate developer surface and talks to the harness only via
+// docs/dag/interfaces.md file formats.
 // F12 / File menu / POLYMESH_GUI_SHOT capture the window to a PNG.
 // --auto "load p.step; h 6; fix 5; solve; wire off; shot out.png; quit" scripts
 // the app end-to-end without pointer input (doc captures, agent operation).
@@ -20,8 +20,8 @@
 // The take is a fixed sequence: exact-CAD/spectral analysis, measured advisor
 // passes, the mesher's stage snapshots and cell microscope, then the real
 // solve/estimate/refine loop from `pipeline::SolveJob::on_solve_stage`.
-// Both worker-thread sinks are installed by `cinema on` and removed by `cinema off`,
-// so a studio session that never enters the cinema pays nothing for either.
+// Cinema installs its expensive whole-stage sinks only while a scripted take is
+// active; ordinary interactive runs install LiveView's bounded queues instead.
 // POLYMESH_GUI_SIZE=<w>x<h> sets the window (default 1600x1000).
 // POLYMESH_GUI_SCALE=0.75..3 overrides GLFW monitor scale for deterministic capture.
 
@@ -30,6 +30,7 @@
 #include "fea/backend.hpp"
 #include "fea/boundary_faces.hpp"
 #include "fea/vtu.hpp"
+#include "live_view.hpp"
 #include "pipeline/scene.hpp"
 #include "png_writer.hpp"
 #include "testlab_panel.hpp"
@@ -51,7 +52,6 @@
 #endif
 
 #include <algorithm>
-#include <atomic>
 #include <cctype>
 #include <cmath>
 #include <cstdint>
@@ -62,15 +62,11 @@
 #include <filesystem>
 #include <format>
 #include <limits>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <thread>
 #include <vector>
-
-#ifndef _WIN32
-#include <sys/wait.h> // WIFEXITED / WEXITSTATUS for std::system's result
-#endif
 
 namespace polymesh::gui {
 
@@ -92,9 +88,6 @@ constexpr ImGuiWindowFlags kPanelFlags =
     ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBringToFrontOnFocus |
     ImGuiWindowFlags_NoScrollWithMouse;
 
-/// `App::improve_exit` when no self-improve run has finished this session. Not
-/// 0, which is a real exit status meaning the run succeeded.
-constexpr int kImproveNoRun = -1;
 /// Presentation-only exaggeration target. The solve stays in true SI units;
 /// the viewport maps the authoritative final max |u| to exactly this fraction
 /// of the undeformed model diagonal and reports both values in the film.
@@ -105,6 +98,7 @@ enum class DeformationView { kAuto, kTrueScale, kCustom };
 
 float requested_ui_scale = 1.0f;
 float ui_scale_override = 0.0f;
+std::filesystem::path executable_dir;
 
 float window_content_scale(GLFWwindow* window) {
     if (ui_scale_override > 0.0f) {
@@ -118,16 +112,6 @@ float window_content_scale(GLFWwindow* window) {
 
 void content_scale_callback(GLFWwindow* window, float, float) {
     requested_ui_scale = window_content_scale(window);
-}
-
-/// `std::system`'s result as the command's own exit code. POSIX returns a wait
-/// status, where exit 1 reads as 256; Windows returns the code directly.
-int exit_code_of(int system_result) {
-#ifdef _WIN32
-    return system_result;
-#else
-    return WIFEXITED(system_result) ? WEXITSTATUS(system_result) : system_result;
-#endif
 }
 
 struct App {
@@ -147,7 +131,11 @@ struct App {
         s.p_elevate = true;           // authoritative projected quadratic CAD geometry
         return s;
     }();
+    std::mutex pass_trace_mutex;
+    std::vector<pipeline::PassTrace> pass_traces;
+    LiveView live;
     SolveJob job;
+    bool live_callbacks_attached = false;
     std::optional<SolveResult> result;
     std::optional<VolumeMeshOutput> mesh_preview;
     Viewport viewport;
@@ -156,6 +144,11 @@ struct App {
     MeshPreset mesh_preset = MeshPreset::kBalanced;
     DeformationView deformation_view = DeformationView::kAuto;
     bool advanced_setup = false;
+    int material_preset = 0;
+    int expanded_step = 0;
+    bool model_step_seen = false;
+    bool boundary_step_seen = false;
+    std::string advisor_dir;
     int selected_region = -1;
     int hovered_region = -1;
     /// Multiplier on true displacement for viewport exaggeration.
@@ -167,7 +160,7 @@ struct App {
     bool show_wireframe = false;
     bool show_undeformed = false;
     char open_path[512] = "";
-    std::string status = "drop a .step / .brep CAD part on the window, or type a path below";
+    std::string status = "drop a .step / .brep / .stl part, or type a path below";
     std::string mesh_status;
     std::string mesh_note; // mesher note (and DOF line) after mesh/solve
     std::size_t dof_count = 0;
@@ -183,16 +176,6 @@ struct App {
     /// Last worker state observed by the UI, used to restore a retained result
     /// exactly once when a replacement solve is cancelled.
     SolveJob::State observed_job_state = SolveJob::State::kIdle;
-    /// True while a background self-improve (LLM) run is in flight.
-    std::atomic<bool> improve_running{false};
-    /// Exit status of the last finished self-improve run, or `kImproveNoRun`
-    /// when none has finished this session. The script shells out, so its
-    /// failure is a number nobody was reading: the launcher used to discard
-    /// `std::system`'s result, which -O0 let pass and an optimised build --
-    /// where _FORTIFY_SOURCE marks `system` warn_unused_result -- rejected. The
-    /// worker thread cannot touch `status`, so it parks the code here and the UI
-    /// reports it on a later frame.
-    std::atomic<int> improve_exit{kImproveNoRun};
     /// Screenshot plumbing (png_writer.hpp). Frames still to wait before the
     /// capture, -1 = idle. F12 asks for 0 (this frame); the File menu asks for
     /// 1 so the still-drawn popup stays out of the shot. Serviced at the end of
@@ -215,6 +198,8 @@ struct App {
     /// all, in which case the film falls back to the UI face and is legible
     /// rather than crisp.
     ImFont* cinema_font = nullptr;
+    /// Monospaced Chudware face for live telemetry and result values.
+    ImFont* mono_font = nullptr;
     /// The activation cinema (cinema.hpp). Inert until an `--auto cinema on`:
     /// the stage sink is not installed, the clock does not run, and the studio
     /// draws exactly what it drew before this feature existed.
@@ -235,7 +220,7 @@ bool is_geometry_path(const std::string& path) {
         return false;
     }
     const auto ext = lower.substr(dot);
-    return ext == ".step" || ext == ".stp" || ext == ".brep" || ext == ".brp";
+    return ext == ".step" || ext == ".stp" || ext == ".brep" || ext == ".brp" || ext == ".stl";
 }
 
 void set_mesh_info(App& app, const std::string& note, std::size_t nnodes, std::size_t nelems) {
@@ -815,20 +800,19 @@ void tick_auto(AutoRunner& run, App& app, GLFWwindow* window) {
             // The sinks have to be installed before the worker starts, so
             // toggling them under a live job would be a data race on
             // SolveJob::on_mesh_stage / on_solve_stage. Refuse rather than race.
-            if (worker_busy) {
+            if (worker_busy || app.live.active()) {
                 return fail(
-                    "cinema on while a mesh/solve is running — the stage sinks must be "
-                    "installed before the worker starts");
+                    "cinema on while a live mesh/solve animation is active — wait for it to "
+                    "finish before installing the cinema stage sinks");
             }
             app.cinema.active = true;
             app.cinema.t = 0.0;
             app.cinema.duration = CinemaState::kDefaultDuration;
             app.cinema.clear_stages();
             app.cinema.clear_solve_stages();
-            // Installed only for the take: one copies a whole NodalMesh per
-            // construction stage and the other a whole SolveResult per adaptive
-            // pass (1.3 MB each on this film's case), which no ordinary solve
-            // should pay for.
+            // Cinema retains the complete take. Ordinary interactive runs use
+            // LiveView's bounded queues instead; scripted auto runs without
+            // cinema keep these expensive whole-stage callbacks unset.
             app.job.on_mesh_stage = [cine = &app.cinema](const pipeline::MeshStage& stage) {
                 cine->push_stage(stage);
             };
@@ -874,6 +858,7 @@ void tick_auto(AutoRunner& run, App& app, GLFWwindow* window) {
             // A missing directory or a graph without the trunk taps is NOT a
             // scripting failure: it is a real condition the cinema is required
             // to state on screen, so the take must go on and record it.
+            app.advisor_dir = args[1];
             load_cinema_advisor(app.cinema, *app.model, app.setup, args[1]);
         } else {
             return fail("cinema wants `on`, `off`, or `advisor <model dir>`");
@@ -1098,45 +1083,79 @@ void service_cinema_record(AutoRunner& run, App& app, GLFWwindow* window) {
 /// a glyph that silently fell back is the kind of defect that reaches a
 /// committed asset and is then argued about, so the recorder's log says which
 /// file supplied the maths.
-void merge_maths_glyphs(ImGuiIO& io, float size) {
+/// Merges a symbol fallback face over whatever face was just added, filling the
+/// codepoints the primary face does not carry. ImGui keeps the FIRST glyph
+/// added for a codepoint, so this fills gaps and never overrides the primary.
+///
+/// MEASURED: the brand face is Rubik, which has no Greek block at all, so
+/// Poisson's ratio rendered as "? 0.3" in the Material step the moment the
+/// studio adopted the Chudware faces. Liberation Sans, the previous default,
+/// happened to cover Greek and hid the need for this. The ranges below are
+/// therefore every non-Latin block `kRanges` asks for — Greek included, not
+/// just maths — and the merge is applied to the body, header and mono faces,
+/// not only to the film's face.
+void merge_symbol_glyphs(ImGuiIO& io, float size) {
     static const ImWchar kMathsRanges[] = {
+        0x0370, 0x03FF, // Greek (σ, ν, Ω, θ, η, λ, ε) — absent from Rubik
+        0x2010, 0x203A, // dashes, quotes, ·, —, ‖
         0x2190, 0x21FF, // arrows (→, ⇒)
-        0x2200, 0x22FF, // maths operators (∇, √, ∫, ‖-adjacent, −, ≥)
+        0x2200, 0x22FF, // maths operators (∇, √, ∫, −, ≈, ≤, ≥, ×, ∞)
+        0x2300, 0x2300, // ⌀ diameter sign
         0,
     };
-    static constexpr const char* kMathsFaces[] = {
+    // Every face that exists is merged, in order, up to `kMaxFallbackFaces`.
+    // ImGui keeps the first glyph added for a codepoint, so the ordering is
+    // load-bearing: NotoSansMath stays first and therefore remains the source
+    // of the film's maths glyphs exactly as the cinema notes record, while a
+    // broad face merged after it fills the Greek block that neither Rubik nor
+    // a maths-only face carries. Merging one face and stopping is what left ν
+    // as tofu.
+    static constexpr const char* kFallbackFaces[] = {
         "/usr/share/fonts/google-noto/NotoSansMath-Regular.ttf",
         "/usr/share/fonts/dejavu/DejaVuSans.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/google-noto/NotoSans-Regular.ttf",
+        "/usr/share/fonts/liberation-sans-fonts/LiberationSans-Regular.ttf",
         "/usr/share/fonts/gdouros-symbola/Symbola.ttf",
         "C:/Windows/Fonts/seguisym.ttf",
         "C:/Windows/Fonts/cambria.ttc",
         "/System/Library/Fonts/Supplemental/Symbola.ttf",
         "/System/Library/Fonts/Apple Symbols.ttf",
     };
+    constexpr int kMaxFallbackFaces = 3;
     ImFontConfig cfg;
     cfg.MergeMode = true;
-    for (const char* path : kMathsFaces) {
+    int merged = 0;
+    static bool logged = false;
+    for (const char* path : kFallbackFaces) {
+        if (merged >= kMaxFallbackFaces) {
+            break;
+        }
         std::error_code ec;
         if (!std::filesystem::is_regular_file(std::filesystem::path{path}, ec)) {
             continue;
         }
         if (io.Fonts->AddFontFromFileTTF(path, size, &cfg, kMathsRanges) != nullptr) {
-            std::printf("cinema: maths glyphs merged from %s\n", path);
-            std::fflush(stdout);
-            return;
+            if (!logged) {
+                std::printf("fonts: symbol fallback merged from %s\n", path);
+            }
+            merged += 1;
         }
     }
-    std::printf("cinema: no maths fallback face found; the equation board draws ∇ and the "
-                "rest of U+2190..U+22FF from the UI face alone\n");
+    if (merged == 0 && !logged) {
+        std::printf("fonts: no symbol fallback face found; Greek, arrows and maths operators "
+                    "draw from the UI face alone\n");
+    }
+    logged = true;
     std::fflush(stdout);
 }
 
-/// Loads a proportional UI face at 16 px, and the SAME file again at
-/// `kCinemaAtlasSize` for the film: $POLYMESH_GUI_FONT first, then the usual
-/// per-platform locations. Returns false when none exist — ImGui's stock bitmap
-/// font stays in place and everything still works. Existence is checked first
-/// because AddFontFromFileTTF asserts on a missing file in debug builds.
+/// Loads Rubik at 16 px and the same face at `kCinemaAtlasSize`: an explicit
+/// $POLYMESH_GUI_FONT first, then installed and source-tree Chudware assets,
+/// then the existing platform fallbacks. JetBrains Mono is loaded separately
+/// for telemetry. Missing assets are never fatal — ImGui's stock bitmap font
+/// remains the final fallback. Paths are checked because AddFontFromFileTTF
+/// asserts on a missing file in debug builds.
 ///
 /// The second face is not a luxury. ImGui rasterises one pixel size per
 /// `ImFont` and scales every other size from it, so the film's 40 px headline
@@ -1162,7 +1181,7 @@ void merge_maths_glyphs(ImGuiIO& io, float size) {
 /// the missing block into the film's own face is not. ImGui keeps the FIRST
 /// glyph added for a codepoint, so the merge fills gaps and never overrides a
 /// glyph the UI face already has.
-bool load_ui_font(float atlas_scale, ImFont** cinema_out) {
+bool load_ui_font(float atlas_scale, ImFont** cinema_out, ImFont** mono_out) {
     ImGuiIO& io = ImGui::GetIO();
     // Static: ImGui keeps the pointer until the atlas is built.
     static const ImWchar kRanges[] = {
@@ -1174,51 +1193,114 @@ bool load_ui_font(float atlas_scale, ImFont** cinema_out) {
         0x2300, 0x2300, // ⌀ diameter sign
         0,
     };
-    auto try_load = [&io, cinema_out, atlas_scale](const char* path) {
+    ImFont* body = nullptr;
+    auto try_body = [&](const std::filesystem::path& path) {
         std::error_code ec;
-        if (path == nullptr || path[0] == '\0' ||
-            !std::filesystem::is_regular_file(std::filesystem::path{path}, ec)) {
+        if (path.empty() || !std::filesystem::is_regular_file(path, ec)) {
             return false;
         }
-        if (io.Fonts->AddFontFromFileTTF(path, 16.0f * atlas_scale, nullptr, kRanges) ==
-            nullptr) {
+        body = io.Fonts->AddFontFromFileTTF(path.string().c_str(), 16.0f * atlas_scale,
+                                            nullptr, kRanges);
+        if (body == nullptr) {
             return false;
         }
+        // The body face needs the fallback as much as the film's does: Rubik
+        // carries no Greek, and Poisson's ratio is on the Material step.
+        merge_symbol_glyphs(io, 16.0f * atlas_scale);
         if (cinema_out != nullptr) {
-            *cinema_out = io.Fonts->AddFontFromFileTTF(path, kCinemaAtlasSize * atlas_scale,
-                                                       nullptr, kRanges);
+            *cinema_out = io.Fonts->AddFontFromFileTTF(
+                path.string().c_str(), kCinemaAtlasSize * atlas_scale, nullptr, kRanges);
             if (*cinema_out != nullptr) {
-                merge_maths_glyphs(io, kCinemaAtlasSize * atlas_scale);
+                merge_symbol_glyphs(io, kCinemaAtlasSize * atlas_scale);
             }
         }
         return true;
     };
-    if (try_load(std::getenv("POLYMESH_GUI_FONT"))) {
-        return true;
+
+    std::error_code ec;
+    const auto source_root =
+        std::filesystem::path{__FILE__}.parent_path().parent_path().parent_path();
+    const auto cwd = std::filesystem::current_path(ec);
+    const auto installed_fonts = executable_dir / ".." / "share" / "polymesh" / "fonts";
+    std::vector<std::filesystem::path> brand_roots{installed_fonts,
+                                                   source_root / "assets/fonts"};
+    if (!ec) {
+        brand_roots.push_back(cwd / "assets/fonts");
     }
-    static constexpr const char* kFallbacks[] = {
-        // Linux
-        "/usr/share/fonts/liberation-sans-fonts/LiberationSans-Regular.ttf",
-        "/usr/share/fonts/google-noto/NotoSans-Regular.ttf",
-        "/usr/share/fonts/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        // Windows — without these the stock ASCII bitmap font was used, which
-        // is what produced "?" for every symbol in the GUI screenshots.
-        "C:/Windows/Fonts/segoeui.ttf",
-        "C:/Windows/Fonts/arial.ttf",
-        // macOS
-        "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
-        "/Library/Fonts/Arial Unicode.ttf",
-    };
-    for (const char* path : kFallbacks) {
-        if (try_load(path)) {
-            return true;
+
+    bool loaded = false;
+    if (const char* override_font = std::getenv("POLYMESH_GUI_FONT");
+        override_font != nullptr && override_font[0] != '\0') {
+        loaded = try_body(override_font);
+    }
+    if (!loaded) {
+        for (const auto& root : brand_roots) {
+            if (try_body(root / "Rubik-Regular.ttf")) {
+                loaded = true;
+                break;
+            }
         }
     }
-    ImFontConfig fallback;
-    fallback.SizePixels = 13.0f * atlas_scale;
-    io.Fonts->AddFontDefault(&fallback);
-    return false;
+    if (!loaded) {
+        static constexpr const char* kFallbacks[] = {
+            "/usr/share/fonts/liberation-sans-fonts/LiberationSans-Regular.ttf",
+            "/usr/share/fonts/google-noto/NotoSans-Regular.ttf",
+            "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "C:/Windows/Fonts/segoeui.ttf",
+            "C:/Windows/Fonts/arial.ttf",
+            "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+            "/Library/Fonts/Arial Unicode.ttf",
+        };
+        for (const char* path : kFallbacks) {
+            if (try_body(path)) {
+                loaded = true;
+                break;
+            }
+        }
+    }
+    if (!loaded) {
+        ImFontConfig fallback;
+        fallback.SizePixels = 13.0f * atlas_scale;
+        body = io.Fonts->AddFontDefault(&fallback);
+    }
+
+    // Workflow headers use the branded medium weight when it is present.
+    for (const auto& root : brand_roots) {
+        const auto path = root / "Rubik-Medium.ttf";
+        std::error_code medium_ec;
+        if (!std::filesystem::is_regular_file(path, medium_ec)) {
+            continue;
+        }
+        if (io.Fonts->AddFontFromFileTTF(path.string().c_str(), 16.0f * atlas_scale, nullptr,
+                                         kRanges) != nullptr) {
+            merge_symbol_glyphs(io, 16.0f * atlas_scale);
+            break;
+        }
+    }
+
+    if (mono_out != nullptr) {
+        *mono_out = nullptr;
+        for (const auto& root : brand_roots) {
+            const auto path = root / "JetBrainsMono-Regular.ttf";
+            std::error_code mono_ec;
+            if (!std::filesystem::is_regular_file(path, mono_ec)) {
+                continue;
+            }
+            *mono_out = io.Fonts->AddFontFromFileTTF(path.string().c_str(),
+                                                     15.5f * atlas_scale, nullptr, kRanges);
+            if (*mono_out != nullptr) {
+                // Numerics in the live overlays and stat rows are drawn in this
+                // face, and they carry η, σ and ν.
+                merge_symbol_glyphs(io, 15.5f * atlas_scale);
+                break;
+            }
+        }
+        if (*mono_out == nullptr) {
+            *mono_out = body;
+        }
+    }
+    return loaded;
 }
 
 void rebuild_ui_fonts(App& app, float scale) {
@@ -1231,17 +1313,12 @@ void rebuild_ui_fonts(App& app, float scale) {
     io.Fonts->Clear();
     set_ui_scale(scale);
     io.FontGlobalScale = 1.0f / scale;
-    apply_theme(active_theme);
+    apply_theme();
     app.cinema_font = nullptr;
-    app.custom_font = load_ui_font(scale, &app.cinema_font);
+    app.mono_font = nullptr;
+    app.custom_font = load_ui_font(scale, &app.cinema_font, &app.mono_font);
     io.Fonts->Build();
     ImGui_ImplOpenGL3_CreateFontsTexture();
-
-    const float ratio = scale / old_scale;
-    auto& settings = app.testlab.settings;
-    settings.testlab_width *= ratio;
-    settings.sim_width *= ratio;
-    settings.results_width *= ratio;
 }
 
 /// Default window size, and the opt-in override that lets a headless capture
@@ -1344,6 +1421,35 @@ void set_window_icon(GLFWwindow* window) {
     glfwSetWindowIcon(window, 1, &image);
 }
 
+std::string format_legend_value(float value, const char* unit) {
+    const double v = static_cast<double>(value);
+    if (std::strcmp(unit, "Pa") == 0) {
+        if (std::abs(v) >= 1e9) {
+            return std::format("{:.3g} GPa", v / 1e9);
+        }
+        if (std::abs(v) >= 1e6) {
+            return std::format("{:.3g} MPa", v / 1e6);
+        }
+        if (std::abs(v) >= 1e3) {
+            return std::format("{:.3g} kPa", v / 1e3);
+        }
+        return std::format("{:.3g} Pa", v);
+    }
+    if (std::strcmp(unit, "m") == 0) {
+        if (std::abs(v) >= 1.0) {
+            return std::format("{:.3g} m", v);
+        }
+        if (std::abs(v) >= 1e-3) {
+            return std::format("{:.3g} mm", v * 1e3);
+        }
+        if (std::abs(v) >= 1e-6) {
+            return std::format("{:.3g} µm", v * 1e6);
+        }
+        return std::format("{:.3g} nm", v * 1e9);
+    }
+    return unit[0] == '\0' ? std::format("{:.3g}", v) : std::format("{:.3g} {}", v, unit);
+}
+
 void draw_colorbar(const char* title, float vmin, float vmax, const char* unit) {
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const ImVec2 p0 = ImGui::GetCursorScreenPos();
@@ -1364,9 +1470,11 @@ void draw_colorbar(const char* title, float vmin, float vmax, const char* unit) 
     ImGui::SameLine();
     ImGui::BeginGroup();
     ImGui::Text("%s", title);
-    ImGui::Text("%.3g %s", static_cast<double>(vmax), unit);
+    const std::string maximum = format_legend_value(vmax, unit);
+    ImGui::TextUnformatted(maximum.c_str());
     ImGui::Dummy(ImVec2(0, h - 48));
-    ImGui::Text("%.3g", static_cast<double>(vmin));
+    const std::string minimum = format_legend_value(vmin, unit);
+    ImGui::TextUnformatted(minimum.c_str());
     ImGui::EndGroup();
 }
 
@@ -1405,455 +1513,867 @@ void apply_mesh_preset(App& app, MeshPreset preset) {
     }
 }
 
-void draw_model_group(App& app) {
-    iw::begin_group_box("Model");
-    ImGui::TextWrapped("Drop STEP/BRep CAD anywhere on the window");
-    iw::input_text("path", app.open_path, sizeof(app.open_path), "path/to/part.step");
-    if (iw::button("Open model", ImVec2(-1, 0), true) && app.open_path[0] != '\0') {
+void detach_live_callbacks(App& app) {
+    if (!app.live_callbacks_attached) {
+        return;
+    }
+    app.live.detach(app.job);
+    app.live_callbacks_attached = false;
+}
+
+void start_interactive_job(App& app, bool mesh_only) {
+    std::optional<advisor::AdvisorExplanation> explanation;
+    std::optional<advisor::NetworkLayout> layout;
+    if (!app.advisor_dir.empty()) {
+        const bool explained =
+            load_cinema_advisor(app.cinema, *app.model, app.setup, app.advisor_dir);
+#ifdef POLYMESH_WITH_ADVISOR
+        if (explained && app.cinema.explanation) {
+            explanation = std::move(app.cinema.explanation);
+            layout = std::move(app.cinema.layout);
+            if (app.cinema.decision_applied) {
+                app.mesh_preset = MeshPreset::kCustom;
+            }
+        }
+#else
+        (void)explained;
+#endif
+    }
+
+    app.live.reset();
+    app.live.set_setup(app.setup);
+    app.live.set_explanation(std::move(explanation), std::move(layout));
+    app.live.attach(app.job);
+    app.live_callbacks_attached = true;
+
+    {
+        std::scoped_lock lock(app.pass_trace_mutex);
+        app.pass_traces.clear();
+    }
+    auto live_pass_sink = std::move(app.job.on_pass);
+    app.job.on_pass = [&app,
+                       sink = std::move(live_pass_sink)](const pipeline::PassTrace& trace) {
+        if (sink) {
+            sink(trace);
+        }
+        std::scoped_lock lock(app.pass_trace_mutex);
+        app.pass_traces.push_back(trace);
+    };
+
+    fea::set_openmp_threads(app.testlab.settings.max_threads);
+    app.live_mesh_seen_gen = 0;
+    app.status = mesh_only ? "meshing…" : "solving…";
+    if (mesh_only) {
+        app.job.start_mesh(*app.model, app.setup);
+    } else {
+        app.job.start(*app.model, app.setup);
+    }
+}
+
+bool begin_guided_step(App& app, int index, const char* title, const char* subtitle,
+                       bool done) {
+    bool open = app.expanded_step == index;
+    const bool visible = iw::begin_step(index + 1, title, subtitle, done, &open);
+    if (open) {
+        app.expanded_step = index;
+    } else if (app.expanded_step == index) {
+        app.expanded_step = -1;
+    }
+    return visible;
+}
+
+void draw_model_step(App& app) {
+    const std::string subtitle =
+        app.model ? std::format("{} · {} triangles · {} faces", app.model->name,
+                                app.model->surface.triangles.size(), app.model->region_count)
+                  : "Open or drop STEP, BRep, or STL";
+    if (!begin_guided_step(app, 0, "Model", subtitle.c_str(), app.model.has_value())) {
+        return;
+    }
+    ImGui::TextWrapped("Drop a part anywhere, or enter its path.");
+    iw::input_text("Part path", app.open_path, sizeof(app.open_path), "path/to/part.step");
+    if (iw::button("Open model", ImVec2(-1, 0), true,
+                   "Load STEP/STP, OpenCASCADE BRep, or STL geometry. You can also drag a "
+                   "part anywhere onto the window.") &&
+        app.open_path[0] != '\0') {
         load_model(app, app.open_path);
     }
     if (app.model) {
-        ImGui::TextWrapped("%s", app.model->name.c_str());
-        ImGui::TextColored(palette.text_dim, "%zu triangles · %d CAD faces",
-                           app.model->surface.triangles.size(), app.model->region_count);
+        iw::stat_row("Part", app.model->name.c_str(), app.mono_font);
+        const auto triangles = std::format("{}", app.model->surface.triangles.size());
+        const auto faces = std::format("{}", app.model->region_count);
+        iw::stat_row("Triangles", triangles.c_str(), app.mono_font);
+        iw::stat_row("CAD faces", faces.c_str(), app.mono_font);
     }
-    iw::end_group_box();
+    iw::end_step();
 }
 
-void draw_material_mesh_group(App& app) {
-    iw::begin_group_box("Material & mesh");
+void draw_material_step(App& app) {
+    static const char* kMaterials[] = {
+        "Structural steel · 200 GPa / 0.30",
+        "Aluminium 6061 · 69 GPa / 0.33",
+        "Titanium Ti-6Al-4V · 116 GPa / 0.34",
+        "Manual",
+    };
+    static const char* kMaterialHelp[] = {
+        "Structural steel baseline: Young's modulus 200 GPa, Poisson's ratio 0.30.",
+        "Aluminium 6061 baseline: Young's modulus 69 GPa, Poisson's ratio 0.33.",
+        "Ti-6Al-4V baseline: Young's modulus 116 GPa, Poisson's ratio 0.34.",
+        "Enter an isotropic linear-elastic Young's modulus and Poisson's ratio manually.",
+    };
+    const std::string subtitle = std::format(
+        "{:.3g} GPa · ν {:.3g}", app.setup.youngs_modulus / 1e9, app.setup.poissons_ratio);
+    if (!begin_guided_step(app, 1, "Material", subtitle.c_str(), true)) {
+        return;
+    }
+    int material = app.material_preset;
+    if (iw::selector("Preset", &material, kMaterials, 4, kMaterialHelp)) {
+        app.material_preset = material;
+        if (material == 0) {
+            app.setup.youngs_modulus = 200e9;
+            app.setup.poissons_ratio = 0.30;
+        } else if (material == 1) {
+            app.setup.youngs_modulus = 69e9;
+            app.setup.poissons_ratio = 0.33;
+        } else if (material == 2) {
+            app.setup.youngs_modulus = 116e9;
+            app.setup.poissons_ratio = 0.34;
+        }
+    }
     double e_gpa = app.setup.youngs_modulus / 1e9;
     if (iw::input_double("Young's modulus (GPa)", &e_gpa, "%.1f")) {
         app.setup.youngs_modulus = e_gpa * 1e9;
+        app.material_preset = 3;
     }
-    iw::input_double("Poisson's ratio", &app.setup.poissons_ratio, "%.3f");
-    ImGui::Spacing();
-
-    int preset = static_cast<int>(app.mesh_preset);
-    static const char* kPresets[] = {"Fast", "Standard", "Fine", "Manual"};
-    if (iw::selector("Mesh preset", &preset, kPresets, 4)) {
-        apply_mesh_preset(app, static_cast<MeshPreset>(preset));
+    iw::tooltip("Material stiffness E. PolyMesh currently solves isotropic, linear "
+                "elastostatics; enter the value in gigapascals.");
+    if (iw::input_double("Poisson's ratio", &app.setup.poissons_ratio, "%.3f")) {
+        app.material_preset = 3;
     }
-    if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Fast: linear tet preview, no adaptivity.\n"
-                          "Standard: graded curved mesh, two adaptive passes.\n"
-                          "Fine: tighter η target and four passes.\n"
-                          "Manual: keep the Advanced values below.");
-    }
-
-    double h_mm = app.setup.mesh_size * 1e3;
-    if (iw::input_double("Element size (mm, 0 = auto)", &h_mm, "%.2f")) {
-        app.setup.mesh_size = std::max(0.0, h_mm / 1e3);
-    }
-    iw::checkbox("Advanced controls", &app.advanced_setup);
-
-    if (app.advanced_setup) {
-        ImGui::Separator();
-        static const char* kMesherLabels[] = {
-            "Graded tet", "Tet grid",   "Hex grid", "Hex + pyramid", "Prism sweep",
-            "Hybrid zoo", "Hybrid VEM", "Hex VEM",  "Varyhedron",    "CVT poly",
-        };
-        static constexpr VolumeMesher kMesherValues[] = {
-            VolumeMesher::kGradedTet,  VolumeMesher::kTetFill,    VolumeMesher::kHexFill,
-            VolumeMesher::kHexPyramid, VolumeMesher::kPrismSweep, VolumeMesher::kHybrid,
-            VolumeMesher::kHybridVem,  VolumeMesher::kHexVem,     VolumeMesher::kVaryhedron,
-            VolumeMesher::kCvtPoly,
-        };
-        int mesher_index = 0;
-        for (int i = 0; i < static_cast<int>(std::size(kMesherValues)); ++i) {
-            if (kMesherValues[static_cast<std::size_t>(i)] == app.setup.mesher) {
-                mesher_index = i;
-                break;
-            }
-        }
-        if (iw::selector("Mesher", &mesher_index, kMesherLabels,
-                         static_cast<int>(std::size(kMesherLabels)))) {
-            app.setup.mesher = kMesherValues[static_cast<std::size_t>(mesher_index)];
-            app.mesh_preset = MeshPreset::kCustom;
-        }
-
-        int passes = app.setup.adapt_passes;
-        ImGui::TextColored(palette.text_dim, "Adaptive passes");
-        ImGui::SetNextItemWidth(-FLT_MIN);
-        if (ImGui::SliderInt("##adapt_passes", &passes, 0, 8)) {
-            app.setup.adapt_passes = passes;
-            app.mesh_preset = MeshPreset::kCustom;
-        }
-        double eta = app.setup.eta_target;
-        if (iw::input_double("ZZ η target (0 = off)", &eta, "%.4g")) {
-            app.setup.eta_target = std::max(0.0, eta);
-            app.mesh_preset = MeshPreset::kCustom;
-        }
-        bool feature = app.setup.use_feature_grading;
-        if (iw::checkbox("Geometry feature grading", &feature)) {
-            app.setup.use_feature_grading = feature;
-            app.mesh_preset = MeshPreset::kCustom;
-        }
-        bool curved = app.setup.p_elevate;
-        if (iw::checkbox("Curved quadratic solve geometry", &curved)) {
-            app.setup.p_elevate = curved;
-            app.mesh_preset = MeshPreset::kCustom;
-        }
-        int skin = app.setup.skin_layers;
-        ImGui::TextColored(palette.text_dim, "Boundary skin layers");
-        ImGui::SetNextItemWidth(-FLT_MIN);
-        if (ImGui::SliderInt("##skin_layers", &skin, 1, 4)) {
-            app.setup.skin_layers = skin;
-            app.mesh_preset = MeshPreset::kCustom;
-        }
-    }
-    iw::end_group_box();
+    iw::tooltip("Lateral contraction ratio ν. For stable isotropic elasticity use "
+                "-1 < ν < 0.5; most structural metals are near 0.30.");
+    iw::end_step();
 }
 
-void draw_boundary_conditions_group(App& app) {
-    iw::begin_group_box("Fixtures & loads");
+void draw_boundary_step(App& app) {
+    const bool done = !app.setup.fixtures.empty() && !app.setup.loads.empty();
+    const std::string subtitle =
+        std::format("{} fixture{} · {} load{}", app.setup.fixtures.size(),
+                    app.setup.fixtures.size() == 1 ? "" : "s", app.setup.loads.size(),
+                    app.setup.loads.size() == 1 ? "" : "s");
+    if (!begin_guided_step(app, 2, "Fixtures & loads", subtitle.c_str(), done)) {
+        return;
+    }
     if (!app.model) {
-        ImGui::TextColored(palette.text_dim, "Open a model to assign CAD faces");
-    } else {
-        if (app.mode != DisplayMode::kSetup) {
-            ImGui::TextColored(palette.status_warn, "Face editing uses the CAD view");
-            if (iw::button("Show CAD and select faces", ImVec2(-1, 0), true)) {
-                app.mode = DisplayMode::kSetup;
-                app.pick_faces = true;
-                app.overlays_dirty = true;
-            }
-        } else {
+        ImGui::TextColored(palette.text_dim, "Open a model to assign CAD faces.");
+        iw::end_step();
+        return;
+    }
+    if (app.mode != DisplayMode::kSetup) {
+        if (iw::button("Show CAD and select faces", ImVec2(-1, 0), true,
+                       "Return to the original CAD boundary and enable face picking. "
+                       "Fixtures and loads attach to CAD face ids, not display triangles.")) {
+            app.mode = DisplayMode::kSetup;
             app.pick_faces = true;
-            ImGui::TextWrapped("Click a face · right-drag orbit · shift+left-drag pan");
+            app.overlays_dirty = true;
         }
-
-        ImGui::TextColored(palette.text_dim, "CAD faces");
-        const float rows = static_cast<float>(std::min(app.model->region_count, 4));
-        const float list_h =
-            std::clamp(rows * ImGui::GetTextLineHeightWithSpacing() + ui_px(8.0f),
-                       ui_px(64.0f), ui_px(120.0f));
-        if (ImGui::BeginChild("##face_list", ImVec2(-FLT_MIN, list_h), ImGuiChildFlags_Borders,
-                              ImGuiWindowFlags_HorizontalScrollbar)) {
-            for (int region = 0; region < app.model->region_count; ++region) {
-                const bool is_fixture = app.setup.fixtures.contains(region);
-                const bool is_load = app.setup.loads.contains(region);
-                const char* tag = is_fixture ? " · fixture" : (is_load ? " · load" : "");
-                if (is_fixture) {
-                    ImGui::PushStyleColor(ImGuiCol_Text, palette.sim_fixture);
-                } else if (is_load) {
-                    ImGui::PushStyleColor(ImGuiCol_Text, palette.sim_load);
-                }
-                if (ImGui::Selectable(std::format("Face {}{}", region, tag).c_str(),
-                                      app.selected_region == region)) {
-                    app.selected_region = region;
-                    app.mode = DisplayMode::kSetup;
-                    app.overlays_dirty = true;
-                    if (is_load) {
-                        const auto& force = app.setup.loads[region].force;
-                        app.load_force[0] = static_cast<float>(force[0]);
-                        app.load_force[1] = static_cast<float>(force[1]);
-                        app.load_force[2] = static_cast<float>(force[2]);
-                    }
-                }
-                if (is_fixture || is_load) {
-                    ImGui::PopStyleColor();
-                }
-            }
-        }
-        ImGui::EndChild();
-
-        if (app.selected_region >= 0) {
-            const bool fixed = app.setup.fixtures.contains(app.selected_region);
-            ImGui::Text("Selected face %d", app.selected_region);
-            if (iw::button(fixed ? "Remove fixture" : "Fix all DOFs", ImVec2(-1, 0))) {
-                if (fixed) {
-                    app.setup.fixtures.erase(app.selected_region);
-                } else {
-                    app.setup.fixtures.insert(app.selected_region);
-                    app.setup.loads.erase(app.selected_region);
-                }
-                app.overlays_dirty = true;
-            }
-            iw::input_float3("Force (N)", app.load_force);
-            const bool loaded = app.setup.loads.contains(app.selected_region);
-            if (iw::button(loaded ? "Update load" : "Apply load", ImVec2(-1, 0))) {
-                app.setup.loads[app.selected_region].force =
-                    Eigen::Vector3d(app.load_force[0], app.load_force[1], app.load_force[2]);
-                app.setup.fixtures.erase(app.selected_region);
-                app.overlays_dirty = true;
-            }
-            if (loaded && iw::button("Remove load", ImVec2(-1, 0))) {
-                app.setup.loads.erase(app.selected_region);
-                app.overlays_dirty = true;
-            }
-        } else {
-            ImGui::TextColored(palette.text_dim, "No face selected");
-        }
+    } else {
+        app.pick_faces = true;
+        ImGui::TextWrapped("Click a face · right-drag orbit · shift+left-drag pan");
     }
 
-    ImGui::TextColored(palette.sim_fixture, "%zu fixtures", app.setup.fixtures.size());
-    ImGui::SameLine(0.0f, ui_px(16.0f));
-    ImGui::TextColored(palette.sim_load, "%zu loads", app.setup.loads.size());
+    iw::field_label("CAD faces");
+    const float rows = static_cast<float>(std::min(app.model->region_count, 5));
+    const float list_h = std::clamp(rows * ImGui::GetTextLineHeightWithSpacing() + ui_px(8.0f),
+                                    ui_px(68.0f), ui_px(136.0f));
+    if (ImGui::BeginChild("##face_list", ImVec2(-FLT_MIN, list_h), ImGuiChildFlags_Borders,
+                          ImGuiWindowFlags_HorizontalScrollbar)) {
+        for (int region = 0; region < app.model->region_count; ++region) {
+            const bool is_fixture = app.setup.fixtures.contains(region);
+            const bool is_load = app.setup.loads.contains(region);
+            const char* tag = is_fixture ? " · fixture" : (is_load ? " · load" : "");
+            if (is_fixture) {
+                ImGui::PushStyleColor(ImGuiCol_Text, palette.sim_fixture);
+            } else if (is_load) {
+                ImGui::PushStyleColor(ImGuiCol_Text, palette.sim_load);
+            }
+            if (ImGui::Selectable(std::format("Face {}{}", region, tag).c_str(),
+                                  app.selected_region == region)) {
+                app.selected_region = region;
+                app.mode = DisplayMode::kSetup;
+                app.overlays_dirty = true;
+                if (is_load) {
+                    const auto& force = app.setup.loads[region].force;
+                    app.load_force[0] = static_cast<float>(force[0]);
+                    app.load_force[1] = static_cast<float>(force[1]);
+                    app.load_force[2] = static_cast<float>(force[2]);
+                }
+            }
+            if (is_fixture || is_load) {
+                ImGui::PopStyleColor();
+            }
+        }
+    }
+    ImGui::EndChild();
+
+    if (app.selected_region >= 0) {
+        const bool fixed = app.setup.fixtures.contains(app.selected_region);
+        const bool loaded = app.setup.loads.contains(app.selected_region);
+        ImGui::Text("Face %d", app.selected_region);
+        if (iw::button(
+                fixed ? "Remove fixture" : "Fix all translations", ImVec2(-1, 0), false,
+                fixed ? "Release this CAD face."
+                      : "Set ux = uy = uz = 0 on every node belonging to this CAD "
+                        "face. Rotations are not independent DOFs in this solid model.")) {
+            if (fixed) {
+                app.setup.fixtures.erase(app.selected_region);
+            } else {
+                app.setup.fixtures.insert(app.selected_region);
+                app.setup.loads.erase(app.selected_region);
+            }
+            app.overlays_dirty = true;
+        }
+        iw::input_float3("Force (N)", app.load_force);
+        iw::tooltip("Resultant force vector [Fx, Fy, Fz] in newtons. PolyMesh integrates "
+                    "a consistent traction over the selected CAD face so the assembled "
+                    "nodal loads conserve this resultant.");
+        if (iw::button(loaded ? "Update face load" : "Apply face load", ImVec2(-1, 0), false,
+                       "Apply the entered resultant to this CAD face as a consistent "
+                       "surface traction. The vector is a total force, not pressure.")) {
+            app.setup.loads[app.selected_region].force =
+                Eigen::Vector3d(app.load_force[0], app.load_force[1], app.load_force[2]);
+            app.setup.fixtures.erase(app.selected_region);
+            app.overlays_dirty = true;
+        }
+        if (loaded && iw::button("Remove load", ImVec2(-1, 0))) {
+            app.setup.loads.erase(app.selected_region);
+            app.overlays_dirty = true;
+        }
+    } else {
+        ImGui::TextColored(palette.text_dim, "Select a face in the list or viewport.");
+    }
     if (!app.setup.fixtures.empty() || !app.setup.loads.empty()) {
-        if (iw::button("Clear boundary conditions", ImVec2(-1, 0))) {
+        if (iw::button("Clear all fixtures and loads", ImVec2(-1, 0), false,
+                       "Remove every boundary condition from this study. The model and "
+                       "mesh settings stay unchanged.")) {
             app.setup.fixtures.clear();
             app.setup.loads.clear();
             app.overlays_dirty = true;
         }
     }
-    iw::end_group_box();
+    iw::end_step();
 }
 
-void draw_resources_group(App& app) {
-    iw::begin_group_box("Compute limits");
-    int threads = app.testlab.settings.max_threads;
-    const int hardware_threads = fea::openmp_default_threads();
-    ImGui::TextColored(palette.text_dim, "Threads (0 = all, hardware %d)", hardware_threads);
-    ImGui::SetNextItemWidth(-FLT_MIN);
-    if (ImGui::SliderInt("##max_threads", &threads, 0, std::max(1, hardware_threads))) {
-        app.testlab.settings.max_threads = threads;
-    }
-    double memory_gb = app.testlab.settings.max_mem_gb;
-    if (iw::input_double("Memory cap (GB, 0 = auto)", &memory_gb, "%.2f")) {
-        app.testlab.settings.max_mem_gb = std::max(0.0, memory_gb);
-    }
-    app.setup.max_mem_gb = app.testlab.settings.max_mem_gb;
-    const auto budget = fea::effective_memory_budget(app.setup.max_mem_gb);
-    const auto cap = fea::format_memory_bytes(budget.effective_cap_bytes);
-    ImGui::TextColored(palette.status_ok, "Enforced cap: %s", cap.c_str());
-    ImGui::TextWrapped("%s", fea::performance_description().c_str());
-    iw::end_group_box();
-}
-
-void draw_run_group(App& app) {
-    iw::begin_group_box("Run");
+void draw_run_step(App& app) {
     const auto state = app.job.state();
-    const bool busy = state == SolveJob::State::kMeshing || state == SolveJob::State::kSolving;
-    const bool paused = busy && app.job.pause_requested();
+    const bool worker_busy =
+        state == SolveJob::State::kMeshing || state == SolveJob::State::kSolving;
+    const bool paused = worker_busy && app.job.pause_requested();
+    const char* subtitle = app.live.caption();
+    if (!worker_busy) {
+        subtitle = app.result         ? "Study complete"
+                   : app.mesh_preview ? "Mesh preview ready"
+                                      : "Choose fidelity and run";
+    } else if (subtitle == nullptr || subtitle[0] == '\0') {
+        subtitle = "Preparing study";
+    }
+    if (!begin_guided_step(app, 3, "Run", subtitle,
+                           app.result.has_value() || app.mesh_preview.has_value())) {
+        return;
+    }
 
-    if (busy) {
+    int preset = static_cast<int>(app.mesh_preset);
+    static const char* kPresets[] = {"Fast", "Standard", "Fine", "Manual"};
+    static const char* kPresetHelp[] = {
+        "Fast setup check: straight-sided tetrahedra, no error-driven refinement. "
+        "Use this to validate geometry, fixtures, and loads—not as a final accuracy claim.",
+        "Recommended first study: geometry-aware graded tetrahedra, quadratic field "
+        "interpolation, and two ZZ-guided refinement passes toward η ≤ 0.12.",
+        "Higher-accuracy study: four ZZ-guided refinement passes toward η ≤ 0.05 with "
+        "quadratic elements. Expect more memory and solve time.",
+        "Keep the exact mesher, element size, polynomial order, and adaptivity choices "
+        "shown under Advanced.",
+    };
+    if (iw::selector("Mesh fidelity", &preset, kPresets, 4, kPresetHelp)) {
+        apply_mesh_preset(app, static_cast<MeshPreset>(preset));
+    }
+    double h_mm = app.setup.mesh_size * 1e3;
+    if (iw::input_double("Element size (mm, 0 = auto)", &h_mm, "%.2f")) {
+        app.setup.mesh_size = std::max(0.0, h_mm / 1e3);
+        app.mesh_preset = MeshPreset::kCustom;
+    }
+
+    iw::tooltip("Characteristic element size in millimetres. Set 0 for the mesher's "
+                "geometry-derived estimate; smaller values increase element count, "
+                "memory use, and solve time.");
+    if (worker_busy) {
         const auto progress = app.job.progress();
-        const char* phase = progress.phase.empty()
-                                ? (state == SolveJob::State::kMeshing ? "mesh" : "solve")
-                                : progress.phase.c_str();
-        ImGui::TextColored(paused ? palette.accent : palette.status_warn, "%s%s", phase,
-                           paused ? " · paused" : "");
         float overall = static_cast<float>(std::clamp(progress.phase_frac, 0.0, 1.0));
         if (progress.pass_count > 0) {
             const float span = 1.0f / static_cast<float>(progress.pass_count + 1);
             overall = std::clamp(static_cast<float>(progress.pass) * span + overall * span,
                                  0.0f, 1.0f);
         }
-        ImGui::ProgressBar(overall, ImVec2(-FLT_MIN, 0),
-                           std::format("{:.0f}%", 100.0 * overall).c_str());
-        ImGui::TextColored(palette.text_dim, "%.1f s elapsed", progress.elapsed_ms / 1000.0);
+        const std::string value =
+            std::format("{:.0f}% · {:.1f} s", 100.0f * overall, progress.elapsed_ms / 1000.0);
+        iw::progress(subtitle, overall, value.c_str());
         if (progress.cg_iter > 0) {
-            ImGui::Text("CG %d · residual %.3g", progress.cg_iter, progress.cg_resid);
+            const auto cg =
+                std::format("{} · residual {:.3g}", progress.cg_iter, progress.cg_resid);
+            iw::stat_row("CG iteration", cg.c_str(), app.mono_font);
         }
-        ImGui::TextWrapped("%s", app.job.status_text().c_str());
-        app.status = app.job.status_text();
     }
 
-    auto apply_resource_caps = [&]() {
-        fea::set_openmp_threads(app.testlab.settings.max_threads);
-    };
-    ImGui::BeginDisabled(!app.model || busy);
-    if (iw::button("Mesh preview", ImVec2(-1, 0))) {
-        apply_resource_caps();
-        app.live_mesh_seen_gen = 0;
-        app.status = "meshing…";
-        app.job.start_mesh(*app.model, app.setup);
+    ImGui::BeginDisabled(!app.model || worker_busy || app.cinema.active ||
+                         state != SolveJob::State::kIdle);
+    if (iw::button("Build mesh only", ImVec2(-1, 0), false,
+                   "Generate and inspect the volume mesh without assembling or solving "
+                   "the elasticity system. This is the fastest way to validate topology.")) {
+        start_interactive_job(app, true);
     }
-    if (iw::button(busy ? "Working…" : "Solve study", ImVec2(-1, 0), true)) {
-        apply_resource_caps();
-        app.live_mesh_seen_gen = 0;
-        app.status = "solving…";
-        if (app.cinema.active) {
-            prepare_cinema_features(app.cinema, *app.model, app.setup);
-        }
-        app.job.start(*app.model, app.setup);
+    if (iw::button(worker_busy ? "Working…" : "Solve study", ImVec2(-1, 0), true,
+                   "Run the complete study: advisor deliberation when available, volume "
+                   "meshing, stiffness assembly, linear solve, ZZ error recovery, and any "
+                   "requested adaptive passes.")) {
+        start_interactive_job(app, false);
     }
     ImGui::EndDisabled();
 
-    if (busy) {
+    if (worker_busy) {
         const float gap = ui_px(8.0f);
-        const float button_width = (ImGui::GetContentRegionAvail().x - gap) * 0.5f;
+        const float width = (ImGui::GetContentRegionAvail().x - gap) * 0.5f;
         if (paused) {
-            if (iw::button("Resume", ImVec2(button_width, 0), true)) {
+            if (iw::button("Resume", ImVec2(width, 0), true)) {
                 app.job.request_resume();
-                app.status = "resuming…";
             }
-        } else if (iw::button("Pause", ImVec2(button_width, 0))) {
+        } else if (iw::button("Pause", ImVec2(width, 0))) {
             app.job.request_pause();
-            app.status = "pause requested…";
         }
         ImGui::SameLine(0.0f, gap);
-        if (iw::button("Cancel", ImVec2(button_width, 0))) {
+        if (iw::button("Cancel", ImVec2(width, 0))) {
             app.job.request_cancel();
-            app.status = "cancelling…";
         }
-    }
-
-    if (state == SolveJob::State::kFailed) {
-        ImGui::TextColored(palette.status_err, "%s", app.job.status_text().c_str());
-        if (iw::button("Dismiss error", ImVec2(-1, 0))) {
+    } else if (state == SolveJob::State::kFailed || state == SolveJob::State::kCancelled) {
+        ImGui::TextColored(state == SolveJob::State::kFailed ? palette.status_err
+                                                             : palette.status_warn,
+                           "%s", app.job.status_text().c_str());
+        if (iw::button("Dismiss", ImVec2(-1, 0))) {
             app.job.clear_failure();
+            detach_live_callbacks(app);
             app.status = "ready";
         }
-    } else if (state == SolveJob::State::kCancelled) {
-        ImGui::TextColored(palette.status_warn, "%s", app.job.status_text().c_str());
-        if (iw::button("Dismiss cancellation", ImVec2(-1, 0))) {
-            app.job.clear_failure();
-            app.status = "ready";
-        }
-    } else if (!busy && state != SolveJob::State::kIdle) {
-        ImGui::TextColored(palette.status_ok, "%s", app.job.status_text().c_str());
     }
-    iw::end_group_box();
+    iw::end_step();
 }
 
-void draw_diagnostics_group(App& app) {
-    iw::begin_group_box("Developer diagnostics");
-    const auto progress = app.job.progress();
-    if (progress.n_elems > 0 && progress.elapsed_ms > 0.0) {
-        const double elements_per_second =
-            static_cast<double>(progress.n_elems) / (progress.elapsed_ms / 1000.0);
-        ImGui::Text("Throughput %.0f elements/s", elements_per_second);
+void draw_advanced(App& app) {
+    if (!iw::disclosure("Advanced", &app.advanced_setup) || !app.advanced_setup) {
+        return;
     }
-    const bool running = app.improve_running.load();
-    const int improve_exit = app.improve_exit.load();
-    if (running) {
-        ImGui::TextColored(palette.status_warn, "Self-improve running");
-    } else if (improve_exit == kImproveNoRun) {
-        ImGui::TextColored(palette.text_dim, "Self-improve idle");
-    } else if (improve_exit == 0) {
-        ImGui::TextColored(palette.status_ok, "Last self-improve completed");
-    } else {
-        ImGui::TextColored(palette.status_err, "Last self-improve failed (exit %d)",
-                           improve_exit);
-    }
-    auto launch_improve = [&app](const char* backend) {
-        if (app.improve_running.exchange(true)) {
-            return;
-        }
-        const std::string command =
-            std::string("bash scripts/self_improve.sh --backend ") + backend;
-        std::atomic<bool>* running_flag = &app.improve_running;
-        std::atomic<int>* exit_code = &app.improve_exit;
-        std::thread([running_flag, exit_code, command] {
-            exit_code->store(exit_code_of(std::system(command.c_str())));
-            running_flag->store(false);
-        }).detach();
-        app.status = std::string("self-improve (") + backend + ") launched";
+    static const char* kMesherLabels[] = {
+        "Graded tet", "Tet grid",   "Hex grid", "Hex + pyramid", "Prism sweep",
+        "Hybrid zoo", "Hybrid VEM", "Hex VEM",  "Varyhedron",    "CVT poly",
     };
-    ImGui::BeginDisabled(running);
-    if (iw::button("Run with OMP", ImVec2(-1, 0))) {
-        launch_improve("omp");
+    static const char* kMesherHelp[] = {
+        "Geometry-aware graded tetrahedra. Robust general-purpose choice with local "
+        "feature refinement and longest-edge bisection.",
+        "Uniform tetrahedral fill. Fastest topology check; less geometry-aware than the "
+        "graded pipeline.",
+        "Structured hexahedral fill where the geometry permits it.",
+        "Hex-dominant fill closed with pyramids at transitions.",
+        "Prismatic sweep for geometry with a usable sweep direction.",
+        "Hybrid element zoo: hex, prism, pyramid, tet, and arbitrary cells selected by "
+        "local geometry. This is PolyMesh's full construction pipeline.",
+        "Hybrid finite elements plus Virtual Element Method cells for arbitrary "
+        "polyhedra, assembled into one global system.",
+        "Hex-dominant mesh with VEM fallback where a conforming hex transition would "
+        "otherwise create poor cells.",
+        "General varyhedral cells retained instead of being shattered into sliver tets.",
+        "Centroidal Voronoi polyhedra. Experimental; use when cell isotropy matters more "
+        "than CAD-aligned topology.",
+    };
+    static constexpr VolumeMesher kMesherValues[] = {
+        VolumeMesher::kGradedTet,  VolumeMesher::kTetFill,    VolumeMesher::kHexFill,
+        VolumeMesher::kHexPyramid, VolumeMesher::kPrismSweep, VolumeMesher::kHybrid,
+        VolumeMesher::kHybridVem,  VolumeMesher::kHexVem,     VolumeMesher::kVaryhedron,
+        VolumeMesher::kCvtPoly,
+    };
+    int mesher = 0;
+    for (int i = 0; i < static_cast<int>(std::size(kMesherValues)); ++i) {
+        if (kMesherValues[static_cast<std::size_t>(i)] == app.setup.mesher) {
+            mesher = i;
+            break;
+        }
     }
-    if (iw::button("Run with Grok", ImVec2(-1, 0))) {
-        launch_improve("grok");
+    if (iw::selector("Mesher", &mesher, kMesherLabels,
+                     static_cast<int>(std::size(kMesherLabels)), kMesherHelp)) {
+        app.setup.mesher = kMesherValues[static_cast<std::size_t>(mesher)];
+        app.mesh_preset = MeshPreset::kCustom;
     }
-    ImGui::EndDisabled();
-    iw::end_group_box();
+    int passes = app.setup.adapt_passes;
+    iw::field_label("Adaptive passes");
+    ImGui::SetNextItemWidth(-FLT_MIN);
+    if (ImGui::SliderInt("##adapt_passes", &passes, 0, 8)) {
+        app.setup.adapt_passes = passes;
+        app.mesh_preset = MeshPreset::kCustom;
+    }
+    iw::tooltip("Number of solve → recover error → refine cycles after the initial solve. "
+                "Zero disables adaptivity.");
+
+    if (iw::input_double("ZZ η target (0 = off)", &app.setup.eta_target, "%.4g")) {
+        app.setup.eta_target = std::max(0.0, app.setup.eta_target);
+        app.mesh_preset = MeshPreset::kCustom;
+    }
+    iw::tooltip("Target global Zienkiewicz–Zhu recovery indicator η. This is an error "
+                "estimator, not a confidence score. Set 0 to disable the target.");
+
+    bool mesh_options_changed = false;
+    const bool grading_changed =
+        iw::checkbox("Geometry feature grading", &app.setup.use_feature_grading);
+    iw::tooltip("Reduce element size near CAD edges, corners, curvature, fixtures, and "
+                "loads instead of spending the same density everywhere.");
+    mesh_options_changed |= grading_changed;
+    const bool order_changed = iw::checkbox("Quadratic elements (P2)", &app.setup.p_elevate);
+    iw::tooltip("Elevate supported linear cells to quadratic Tet10/Hex20 interpolation "
+                "and use curved geometry where the CAD boundary provides it.");
+    mesh_options_changed |= order_changed;
+    if (mesh_options_changed) {
+        app.mesh_preset = MeshPreset::kCustom;
+    }
+
+    int skin = app.setup.skin_layers;
+    iw::field_label("Boundary skin layers");
+    ImGui::SetNextItemWidth(-FLT_MIN);
+    if (ImGui::SliderInt("##skin_layers", &skin, 1, 4)) {
+        app.setup.skin_layers = skin;
+        app.mesh_preset = MeshPreset::kCustom;
+    }
+    iw::tooltip("Number of protected boundary layers before interior coarsening. More "
+                "layers preserve near-surface resolution at higher memory cost.");
+
+    int threads = app.testlab.settings.max_threads;
+    const int hardware_threads = fea::openmp_default_threads();
+    iw::field_label("Thread cap (0 = all)");
+    ImGui::SetNextItemWidth(-FLT_MIN);
+    if (ImGui::SliderInt("##max_threads", &threads, 0, std::max(1, hardware_threads))) {
+        app.testlab.settings.max_threads = threads;
+    }
+    iw::tooltip("Maximum OpenMP worker threads for meshing, assembly, and solving. Zero "
+                "uses the machine default.");
+
+    if (iw::input_double("Memory cap (GB, 0 = auto)", &app.testlab.settings.max_mem_gb,
+                         "%.2f")) {
+        app.testlab.settings.max_mem_gb = std::max(0.0, app.testlab.settings.max_mem_gb);
+    }
+    iw::tooltip("Hard study memory ceiling in GiB. Zero derives a safe cap from available "
+                "system memory; the mesher refuses a predicted over-budget case.");
+    app.setup.max_mem_gb = app.testlab.settings.max_mem_gb;
+    const auto budget = fea::effective_memory_budget(app.setup.max_mem_gb);
+    const auto cap = fea::format_memory_bytes(budget.effective_cap_bytes);
+    iw::stat_row("Enforced memory", cap.c_str(), app.mono_font);
+}
+
+void draw_pipeline_dock(App& app) {
+    // Each stage row carries a label with a mono detail line under it, so a row
+    // narrower than 34 dp runs the detail into the next stage's label. Add the
+    // child's own padding and its "Study pipeline" caption and that is the rail
+    // height below which this dock stays closed rather than clip Results or
+    // stack text on text.
+    const float row_floor = ui_px(34.0f);
+    const float dock_chrome = ui_px(68.0f);
+    const ImVec2 available = ImGui::GetContentRegionAvail();
+    if (available.y < dock_chrome + 6.0f * row_floor || available.x < ui_px(220.0f)) {
+        return;
+    }
+    ImGui::Dummy(ImVec2(0.0f, ui_px(8.0f)));
+    const ImVec2 size = ImGui::GetContentRegionAvail();
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, palette.surface_hi);
+    ImGui::BeginChild("##study_pipeline", size,
+                      ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding,
+                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    iw::field_label("Study pipeline");
+
+    const auto state = app.job.state();
+    const auto progress = app.job.progress();
+    const bool model_done = app.model.has_value();
+    const bool setup_done = !app.setup.fixtures.empty() && !app.setup.loads.empty();
+    const bool mesh_done = app.mesh_preview.has_value() || app.result.has_value() ||
+                           state == SolveJob::State::kSolving ||
+                           state == SolveJob::State::kDone;
+    const bool solve_done = app.result.has_value();
+    const bool advisor_done = app.cinema.advisor_ran;
+
+    std::string mesh_detail{pipeline::mesher_name(app.setup.mesher)};
+    if (state == SolveJob::State::kMeshing) {
+        mesh_detail =
+            progress.phase.empty() ? std::string{"constructing cells"} : progress.phase;
+    } else if (mesh_done) {
+        const std::size_t elements = app.result ? app.result->volume_mesh.elements.size()
+                                                : app.mesh_preview->mesh.elements.size();
+        mesh_detail = std::format("{} elements", elements);
+    }
+    std::string solve_detail{"linear elastostatics"};
+    if (state == SolveJob::State::kSolving) {
+        solve_detail = progress.cg_iter > 0 ? std::format("CG iteration {}", progress.cg_iter)
+                                            : std::string{"assemble / solve / recover"};
+    } else if (solve_done) {
+        solve_detail = "linear system complete";
+    }
+    std::array<std::string, 6> detail{
+        app.model ? app.model->name : std::string{"STEP / BRep / STL"},
+        std::format("{} fixture{} · {} load{}", app.setup.fixtures.size(),
+                    app.setup.fixtures.size() == 1 ? "" : "s", app.setup.loads.size(),
+                    app.setup.loads.size() == 1 ? "" : "s"),
+        app.advisor_dir.empty()
+            ? "not configured"
+            : (app.cinema.decision_vetoed
+                   ? "abstained · baseline kept"
+                   : (app.cinema.decision_applied ? "decision applied" : "ready before mesh")),
+        std::move(mesh_detail),
+        std::move(solve_detail),
+        solve_done ? std::format("fields ready · η {:.3g}", app.result->global_eta)
+                   : std::string{"stress · displacement · ZZ η"},
+    };
+    static constexpr const char* kLabels[] = {
+        "Geometry", "Study setup", "Mesh advisor", "Volume mesh", "Solve", "Results",
+    };
+    const std::array<bool, 6> done{
+        model_done, setup_done, advisor_done, mesh_done, solve_done, solve_done,
+    };
+    int current = !model_done                          ? 0
+                  : !setup_done                        ? 1
+                  : state == SolveJob::State::kMeshing ? 3
+                  : state == SolveJob::State::kSolving ? 4
+                  : solve_done                         ? 5
+                                                       : 2;
+
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    // Fit every phase into the rail we actually have. The previous fixed 42 dp
+    // rows clipped Solve/Results at 1000px-tall windows; the 26-30 dp
+    // replacement stopped clipping but ran each detail line into the next
+    // stage's label. row_floor is the smallest row that holds a label above a
+    // mono detail line, and the dock's entry guard above refuses to open below
+    // six of them. The rows own their own rhythm — every offset below is
+    // measured from `row`, so ImGui's inter-item spacing would silently add a
+    // seventh row's worth of height and clip Results again.
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ui_px(0.0f), ui_px(0.0f)));
+    const float row_h =
+        std::clamp(ImGui::GetContentRegionAvail().y / 6.0f, row_floor, ui_px(40.0f));
+    const float dot_x = ImGui::GetCursorScreenPos().x + ui_px(8.0f);
+    // Every row shares one text budget: the child's right content edge. Both the
+    // label and the mono detail are ellipsized against it, so a long detail line
+    // ("stress · displacement · ZZ η") ends in "..." instead of being sliced
+    // through its last glyph by the clip rect.
+    const float text_limit = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
+    ImFont* detail_font = app.mono_font != nullptr ? app.mono_font : ImGui::GetFont();
+    const float detail_size =
+        app.mono_font != nullptr ? app.mono_font->FontSize : ImGui::GetFontSize();
+    char fitted[192]{};
+    for (int i = 0; i < 6; ++i) {
+        const ImVec2 row = ImGui::GetCursorScreenPos();
+        const float cy = row.y + ui_px(13.0f);
+        if (i < 5) {
+            dl->AddLine(ImVec2(dot_x, cy + ui_px(7.0f)),
+                        ImVec2(dot_x, cy + row_h - ui_px(7.0f)),
+                        ImGui::GetColorU32(palette.border), ui_px(1.0f));
+        }
+        const ImVec4 tone = done[static_cast<std::size_t>(i)]
+                                ? palette.accent
+                                : (i == current ? palette.accent2 : palette.text_disabled);
+        if (done[static_cast<std::size_t>(i)]) {
+            dl->AddCircleFilled(ImVec2(dot_x, cy), ui_px(5.0f), ImGui::GetColorU32(tone));
+        } else {
+            dl->AddCircle(ImVec2(dot_x, cy), ui_px(5.0f), ImGui::GetColorU32(tone), 0,
+                          ui_px(i == current ? 2.0f : 1.0f));
+        }
+        const float text_x = row.x + ui_px(24.0f);
+        const float budget = std::max(0.0f, text_limit - text_x);
+        dl->AddText(ImVec2(text_x, row.y),
+                    ImGui::GetColorU32(i == current ? palette.text : palette.text_dim),
+                    iw::fit_text(fitted, sizeof(fitted), kLabels[i], budget, ImGui::GetFont(),
+                                 ImGui::GetFontSize()));
+        dl->AddText(detail_font, detail_size, ImVec2(text_x, row.y + ui_px(18.0f)),
+                    ImGui::GetColorU32(palette.text_disabled),
+                    iw::fit_text(fitted, sizeof(fitted),
+                                 detail[static_cast<std::size_t>(i)].c_str(), budget,
+                                 detail_font, detail_size));
+        ImGui::Dummy(ImVec2(0.0f, row_h));
+    }
+    ImGui::PopStyleVar();
+    ImGui::EndChild();
+    ImGui::PopStyleColor();
 }
 
 void draw_study_panel(App& app) {
-    draw_model_group(app);
-    draw_material_mesh_group(app);
-    draw_run_group(app);
-    draw_boundary_conditions_group(app);
-    if (app.advanced_setup) {
-        draw_resources_group(app);
+    const bool model_done = app.model.has_value();
+    const bool boundary_done = !app.setup.fixtures.empty() && !app.setup.loads.empty();
+    if (!model_done) {
+        app.model_step_seen = false;
+        app.expanded_step = 0;
+    } else if (!app.model_step_seen) {
+        app.model_step_seen = true;
+        app.expanded_step = 2;
     }
-    if (app.workspace == WorkspaceMode::kDeveloper) {
-        draw_diagnostics_group(app);
+    if (!boundary_done) {
+        app.boundary_step_seen = false;
+    } else if (!app.boundary_step_seen) {
+        app.boundary_step_seen = true;
+        app.expanded_step = 3;
+    }
+
+    draw_model_step(app);
+    draw_material_step(app);
+    draw_boundary_step(app);
+    draw_run_step(app);
+    draw_advanced(app);
+    if (!app.advanced_setup) {
+        draw_pipeline_dock(app);
+    }
+}
+
+std::vector<pipeline::PassTrace> pass_trace_snapshot(App& app) {
+    std::scoped_lock lock(app.pass_trace_mutex);
+    return app.pass_traces;
+}
+
+void draw_camera_actions(App& app) {
+    iw::field_label("Camera");
+    const float gap = ui_px(4.0f);
+    const float width =
+        std::max(ui_px(42.0f), (ImGui::GetContentRegionAvail().x - 3.0f * gap) / 4.0f);
+    constexpr float kPi = 3.14159265358979323846f;
+    if (iw::button("Iso", ImVec2(width, 0), false,
+                   "Isometric engineering view, then fit the current field to the pane.")) {
+        app.viewport.camera.set_orbit(0.70f, 0.50f);
+        app.viewport.frame_content(app.mode);
+    }
+    ImGui::SameLine(0.0f, gap);
+    if (iw::button("Front", ImVec2(width, 0), false,
+                   "Look square-on from the front, then fit the current field.")) {
+        app.viewport.camera.set_orbit(0.0f, 0.0f);
+        app.viewport.frame_content(app.mode);
+    }
+    ImGui::SameLine(0.0f, gap);
+    if (iw::button("Right", ImVec2(width, 0), false,
+                   "Look square-on from the right, then fit the current field.")) {
+        app.viewport.camera.set_orbit(0.5f * kPi, 0.0f);
+        app.viewport.frame_content(app.mode);
+    }
+    ImGui::SameLine(0.0f, gap);
+    if (iw::button("Top", ImVec2(width, 0), false,
+                   "Look down from above, then fit the current field.")) {
+        app.viewport.camera.set_orbit(0.0f, 0.5f * kPi - 0.01f);
+        app.viewport.frame_content(app.mode);
+    }
+
+    const float action_gap = ui_px(4.0f);
+    const float action_width =
+        std::max(ui_px(92.0f), (ImGui::GetContentRegionAvail().x - action_gap) * 0.5f);
+    if (iw::button("Fit field", ImVec2(action_width, 0), false,
+                   "Keep the current orientation and fit the active CAD, mesh, or result "
+                   "field to the pane. Keyboard shortcut: F.")) {
+        app.viewport.frame_content(app.mode);
+    }
+    ImGui::SameLine(0.0f, action_gap);
+    if (iw::button("Save image", ImVec2(action_width, 0), false,
+                   "Capture the complete studio window as a PNG. Keyboard shortcut: F12.")) {
+        app.shot_countdown = 0;
     }
 }
 
 void draw_analysis_panel(App& app) {
-    iw::begin_group_box("Study status");
-    if (!app.model) {
-        ImGui::TextColored(palette.text_dim, "1  Open STEP/BRep CAD");
-        ImGui::TextColored(palette.text_dim, "2  Select fixture and load faces");
-        ImGui::TextColored(palette.text_dim, "3  Mesh preview or solve");
-    } else {
-        ImGui::TextWrapped("%s", app.model->name.c_str());
-        ImGui::TextColored(palette.text_dim, "%zu fixtures · %zu loads",
-                           app.setup.fixtures.size(), app.setup.loads.size());
-        if (app.dof_count > 0) {
-            ImGui::Text("%zu DOF", app.dof_count);
-        }
-        const auto state = app.job.state();
-        if (state == SolveJob::State::kMeshing || state == SolveJob::State::kSolving) {
-            ImGui::TextWrapped("%s", app.job.status_text().c_str());
-        } else if (app.result) {
-            ImGui::TextColored(palette.status_ok, "Solved");
-        } else if (app.mesh_preview) {
-            ImGui::TextColored(palette.status_ok, "Mesh preview ready");
-        } else {
-            ImGui::TextColored(palette.status_ok, "Ready");
-        }
-    }
-    iw::end_group_box();
-
-    if (app.mesh_preview || app.result) {
-        iw::begin_group_box("Display");
-        static const char* kModes[] = {"CAD", "Mesh", "Stress", "Deflection", "Error η"};
+    const bool has_output = app.result.has_value() || app.mesh_preview.has_value();
+    static const char* kModes[] = {"CAD", "Mesh", "Stress", "Deflection", "Error η"};
+    static const char* kModeHelp[] = {
+        "Original CAD boundary. Use this view to pick face ids for fixtures and loads.",
+        "Volume-mesh boundary coloured by element family. Turn on edges to inspect "
+        "topology and local density.",
+        "Von Mises equivalent stress. This combines the deviatoric stress state into one "
+        "yield-oriented scalar; it is not maximum principal stress.",
+        "Displacement magnitude |u|. Deformation can be magnified for legibility or shown "
+        "at the physically true 1× scale.",
+        "Nodal Zienkiewicz–Zhu recovery indicator η. It drives adaptivity and estimates "
+        "discretisation error; it is not a probability or confidence score.",
+    };
+    if (has_output) {
         int mode = std::clamp(static_cast<int>(app.mode), 0, 4);
-        if (iw::selector("Field", &mode, kModes, 5)) {
+        if (iw::selector("Field", &mode, kModes, 5, kModeHelp)) {
             app.mode = static_cast<DisplayMode>(mode);
             sanitize_display_mode(app);
         }
         iw::checkbox("Wireframe edges", &app.show_wireframe);
+        iw::tooltip("Overlay boundary element edges. Useful for topology inspection; dense "
+                    "meshes can obscure a scalar field, so it defaults off.");
         if (app.result) {
-            iw::checkbox("Undeformed outline", &app.show_undeformed);
+            iw::checkbox("Undeformed reference", &app.show_undeformed);
+            iw::tooltip("Draw the original, unloaded boundary behind the deformed result.");
             static const char* kDeformationModes[] = {"Auto", "True 1×", "Custom"};
+            static const char* kDeformationHelp[] = {
+                "Magnify displacement just enough to make the deformation legible. The "
+                "reported displacement values remain physical.",
+                "Draw the deformed body at its true physical scale (magnification = 1).",
+                "Choose an explicit visual magnification. This changes geometry display "
+                "only, never the computed displacement.",
+            };
             int deformation = static_cast<int>(app.deformation_view);
-            if (iw::selector("Deformation", &deformation, kDeformationModes, 3)) {
+            if (iw::selector("Deformation", &deformation, kDeformationModes, 3,
+                             kDeformationHelp)) {
                 app.deformation_view = static_cast<DeformationView>(deformation);
-                if (app.deformation_view == DeformationView::kAuto) {
-                    app.deform_scale = app.deform_auto;
-                } else if (app.deformation_view == DeformationView::kTrueScale) {
-                    app.deform_scale = 1.0;
-                }
+                app.deform_scale = app.deformation_view == DeformationView::kAuto
+                                       ? app.deform_auto
+                                       : (app.deformation_view == DeformationView::kTrueScale
+                                              ? 1.0
+                                              : app.deform_scale);
             }
             if (app.deformation_view == DeformationView::kCustom) {
                 const double scale_max =
                     std::max({100.0, app.deform_auto * 20.0, app.deform_scale * 2.0});
-                iw::slider_double("Deformation scale", &app.deform_scale, 0.0, scale_max,
+                iw::slider_double("Visual magnification", &app.deform_scale, 0.0, scale_max,
                                   "%.3gx");
+                iw::tooltip("Purely visual displacement magnification. All legends and "
+                            "reported values remain the unscaled physical solution.");
             }
-            ImGui::TextColored(palette.text_dim, "Auto scale %.3gx", app.deform_auto);
         }
-        iw::end_group_box();
+    } else {
+        iw::field_label("Live instrumentation");
+        ImGui::TextWrapped(app.live.active()
+                               ? "Real ONNX activations and meshing telemetry from this run "
+                                 "stay in this rail; the centre remains geometry-only."
+                               : "The advisor and mesher will report real frames here when "
+                                 "the study starts. Nothing synthetic is shown while idle.");
     }
 
-    iw::begin_group_box("Results");
+    if (app.model) {
+        ImGui::Separator();
+        draw_camera_actions(app);
+    }
+
+    // Both instrument flags are needed before the pass table decides how much
+    // rail it may spend: the table and the eta plot carry the same per-pass
+    // numbers, and of the two only the plot needs room to be legible.
+    const bool advisor_instrument = app.live.has_advisor_content();
+    const bool convergence_instrument = app.live.has_convergence_content();
+    const float instrument_reserve =
+        (advisor_instrument || convergence_instrument) ? ui_px(220.0f) : 0.0f;
+    if (has_output) {
+        ImGui::Separator();
+    }
     if (app.result) {
-        ImGui::Text("von Mises max");
-        ImGui::TextColored(palette.accent, "%.4g MPa", app.result->max_von_mises / 1e6);
-        ImGui::Text("Deflection max");
-        ImGui::TextColored(palette.accent, "%.4g mm", app.result->max_displacement * 1e3);
-        ImGui::Text("ZZ error");
-        ImGui::TextColored(palette.accent, "global %.4g · nodal max %.4g",
-                           app.result->global_eta, app.result->max_nodal_eta);
-        ImGui::TextColored(palette.text_dim, "%zu nodes · %zu elements",
-                           app.result->volume_mesh.nodes.size(),
-                           app.result->volume_mesh.elements.size());
-        if (iw::button("Export result VTU", ImVec2(-1, 0), true)) {
+        const auto stress = std::format("{:.4g} MPa", app.result->max_von_mises / 1e6);
+        const auto displacement = std::format("{:.4g} mm", app.result->max_displacement * 1e3);
+        const auto error = std::format("{:.4g}", app.result->global_eta);
+        const auto nodes = std::format("{}", app.result->volume_mesh.nodes.size());
+        const auto elements = std::format("{}", app.result->volume_mesh.elements.size());
+        const auto dof = std::format("{}", app.dof_count);
+        iw::stat_row("Max von Mises", stress.c_str(), app.mono_font);
+        iw::stat_row("Max displacement", displacement.c_str(), app.mono_font);
+        iw::stat_row("Global ZZ η", error.c_str(), app.mono_font);
+        iw::stat_row("Nodes", nodes.c_str(), app.mono_font);
+        iw::stat_row("Elements", elements.c_str(), app.mono_font);
+        iw::stat_row("DOF", dof.c_str(), app.mono_font);
+
+        const auto traces = pass_trace_snapshot(app);
+        if (!traces.empty() && !traces.back().solve_method.empty()) {
+            iw::stat_row("Solver", traces.back().solve_method.c_str(), app.mono_font);
+        }
+        // The full per-pass table is a luxury; the docked plot is the instrument.
+        // When both cannot fit, the table collapses to its one honest summary row
+        // rather than starving the plot below it.
+        const float table_height =
+            ImGui::GetTextLineHeightWithSpacing() * static_cast<float>(traces.size() + 1);
+        const float after_table = ImGui::GetContentRegionAvail().y - table_height -
+                                  ImGui::GetFrameHeightWithSpacing();
+        if (traces.size() > 1 && after_table < instrument_reserve) {
+            const auto span = std::format("{} passes · η {:.3g} → {:.3g}", traces.size(),
+                                          traces.front().global_eta, traces.back().global_eta);
+            iw::stat_row("Adaptive history", span.c_str(), app.mono_font);
+        } else if (traces.size() > 1 &&
+                   ImGui::BeginTable("##convergence", 4,
+                                     ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerH)) {
+            ImGui::TableSetupColumn("Pass");
+            ImGui::TableSetupColumn("Elements");
+            ImGui::TableSetupColumn("η");
+            ImGui::TableSetupColumn("Solve");
+            ImGui::TableHeadersRow();
+            for (const auto& trace : traces) {
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                ImGui::Text("%d", trace.pass);
+                ImGui::TableSetColumnIndex(1);
+                ImGui::Text("%zu", trace.n_elems);
+                ImGui::TableSetColumnIndex(2);
+                ImGui::Text("%.3g", trace.global_eta);
+                ImGui::TableSetColumnIndex(3);
+                ImGui::Text("%.0f ms", trace.solve_ms);
+            }
+            ImGui::EndTable();
+        }
+        if (iw::button("Export result · VTU", ImVec2(-1, 0), true,
+                       "Write the volume mesh and current result fields for ParaView: "
+                       "displacement, von Mises stress, and element quality.")) {
             const std::string output =
                 app.model ? (app.model->name + "_result.vtu") : "result.vtu";
-            std::string error;
-            app.status = export_result_vtu(app, output, error)
+            std::string error_text;
+            app.status = export_result_vtu(app, output, error_text)
                              ? std::format("wrote {}", output)
-                             : std::format("export failed: {}", error);
+                             : std::format("export failed: {}", error_text);
         }
     } else if (app.mesh_preview) {
-        ImGui::TextColored(palette.accent, "Mesh preview ready");
-        ImGui::Text("%zu nodes", app.mesh_preview->mesh.nodes.size());
-        ImGui::Text("%zu elements", app.mesh_preview->mesh.elements.size());
-        ImGui::Text("%zu DOF", 3 * app.mesh_preview->mesh.nodes.size());
-        ImGui::TextColored(palette.text_dim, "%s",
-                           pipeline::mesher_name(app.setup.mesher).data());
-    } else {
-        ImGui::TextWrapped("Mesh statistics and solved fields will appear here.");
+        const auto nodes = std::format("{}", app.mesh_preview->mesh.nodes.size());
+        const auto elements = std::format("{}", app.mesh_preview->mesh.elements.size());
+        const auto dof = std::format("{}", 3 * app.mesh_preview->mesh.nodes.size());
+        iw::stat_row("Nodes", nodes.c_str(), app.mono_font);
+        iw::stat_row("Elements", elements.c_str(), app.mono_font);
+        iw::stat_row("DOF", dof.c_str(), app.mono_font);
+        iw::stat_row("Mesher", pipeline::mesher_name(app.setup.mesher).data(), app.mono_font);
     }
-    iw::end_group_box();
+
+    if (advisor_instrument || convergence_instrument) {
+        // The floors come from LiveView, not from a second copy of its numbers
+        // here. The old local 270 dp advisor floor was 32 dp short of what
+        // draw_advisor actually measures, so a mid-solve rail reserved 298 dp for
+        // the advisor, the advisor declined it, and the rail showed a hole.
+        const float advisor_floor = app.live.advisor_dock_floor();
+        const float convergence_floor = app.live.convergence_dock_floor();
+        // A residual band this tall is legible rather than merely drawable.
+        const float convergence_share = std::max(convergence_floor, ui_px(180.0f));
+        const float dock_floor =
+            convergence_instrument
+                ? (advisor_instrument ? std::min(convergence_floor, advisor_floor)
+                                      : convergence_floor)
+                : advisor_floor;
+        const ImVec2 available = ImGui::GetContentRegionAvail();
+        if (available.y >= dock_floor) {
+            ImGui::BeginChild("##instrument_dock", available, ImGuiChildFlags_None,
+                              ImGuiWindowFlags_NoScrollbar |
+                                  ImGuiWindowFlags_NoScrollWithMouse);
+            const ImVec2 minimum = ImGui::GetCursorScreenPos();
+            const ImVec2 size = ImGui::GetContentRegionAvail();
+            const ImVec2 maximum(minimum.x + size.x, minimum.y + size.y);
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            // Split only when both instruments clear their own floor, and hand
+            // each one a rect the other never sees — passing the full dock to
+            // both painted the convergence card over the advisor's lanes.
+            if (advisor_instrument && convergence_instrument &&
+                size.y >= advisor_floor + convergence_share) {
+                const float convergence_height = std::min(
+                    std::max(convergence_share, size.y * 0.40f), size.y - advisor_floor);
+                const float boundary = maximum.y - convergence_height;
+                app.live.draw_advisor_dock(dl, minimum, ImVec2(maximum.x, boundary),
+                                           app.mono_font);
+                app.live.draw_convergence_dock(dl, ImVec2(minimum.x, boundary), maximum,
+                                               app.mono_font);
+            } else if (convergence_instrument) {
+                // After a solve the residual is the instrument the user is
+                // staring at, so it takes the whole leftover rather than leaving
+                // a hole where the advisor would have declined to draw.
+                app.live.draw_convergence_dock(dl, minimum, maximum, app.mono_font);
+            } else {
+                app.live.draw_advisor_dock(dl, minimum, maximum, app.mono_font);
+            }
+            ImGui::EndChild();
+        }
+    }
 }
 
 void draw_viewport_content(App& app) {
@@ -1867,6 +2387,11 @@ void draw_viewport_content(App& app) {
                                      app.hovered_region);
         app.overlays_dirty = false;
     }
+    bool live_canvas = false;
+    if (app.live.active()) {
+        live_canvas = app.live.tick(ImGui::GetIO().DeltaTime, app.viewport);
+    }
+    const DisplayMode render_mode = live_canvas ? DisplayMode::kCinema : app.mode;
     float result_max = 1.0f;
     if (app.result) {
         if (app.mode == DisplayMode::kResultsVonMises) {
@@ -1882,7 +2407,7 @@ void draw_viewport_content(App& app) {
         std::max(1, static_cast<int>(std::lround(size.x * framebuffer_scale.x)));
     const int framebuffer_h =
         std::max(1, static_cast<int>(std::lround(size.y * framebuffer_scale.y)));
-    app.viewport.render(framebuffer_w, framebuffer_h, app.mode,
+    app.viewport.render(framebuffer_w, framebuffer_h, render_mode,
                         static_cast<float>(app.deform_scale), result_max, app.show_wireframe,
                         app.show_undeformed);
     ImGui::Image(static_cast<ImTextureID>(app.viewport.texture()), size, ImVec2(0, 1),
@@ -1893,11 +2418,15 @@ void draw_viewport_content(App& app) {
     const bool viewport_hovered = ImGui::IsItemHovered();
     const ImVec2 item_min = ImGui::GetItemRectMin();
     const ImVec2 item_max = ImGui::GetItemRectMax();
+    if (app.live.active()) {
+        app.live.draw_overlays(ImGui::GetWindowDrawList(), item_min, item_max, app.mono_font);
+    }
 
     // Colorbar overlay (results modes only). NoInputs so it never steals camera.
-    if (app.result && (app.mode == DisplayMode::kResultsVonMises ||
-                       app.mode == DisplayMode::kResultsDisplacement ||
-                       app.mode == DisplayMode::kResultsError)) {
+    if (!live_canvas && app.result &&
+        (app.mode == DisplayMode::kResultsVonMises ||
+         app.mode == DisplayMode::kResultsDisplacement ||
+         app.mode == DisplayMode::kResultsError)) {
         ImGui::SetCursorScreenPos(ImVec2(item_min.x + 12, item_min.y + 12));
         ImGui::BeginChild("##cbar", ImVec2(148, 170), false,
                           ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoInputs |
@@ -1918,8 +2447,10 @@ void draw_viewport_content(App& app) {
     constexpr float kFrameBtnW = 84.0f;
     ImGui::SetCursorScreenPos(ImVec2(item_max.x - kFrameBtnW - 12.0f, item_min.y + 12.0f));
     if (ImGui::Button("frame (F)", ImVec2(kFrameBtnW, 0))) {
-        app.viewport.frame_content(app.mode);
+        app.viewport.frame_content(render_mode);
     }
+    iw::tooltip("Fit the current CAD, mesh, or result field to the available viewport. "
+                "Keyboard shortcut: F.");
     const bool over_frame_button = ImGui::IsItemHovered();
 
     // Camera works whenever the cursor is over the 3D image (all display modes).
@@ -2378,86 +2909,58 @@ void draw_cinema_frame(App& app) {
     ImGui::PopStyleColor();
 }
 
-/// Drag splitter between columns. Mutates `*width` by mouse delta * `sign`
-/// (+1 grows left column to the right; -1 grows right column to the left).
-void draw_column_splitter(const char* id, float row_h, float* width, float sign = 1.0f) {
-    const float splitter = ui_px(6.0f);
-    ImGui::InvisibleButton(id, ImVec2(splitter, row_h));
-    if (ImGui::IsItemActive()) {
-        *width += sign * ImGui::GetIO().MouseDelta.x;
-    }
-    if (ImGui::IsItemHovered() || ImGui::IsItemActive()) {
-        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-        ImGui::GetWindowDrawList()->AddRectFilled(ImGui::GetItemRectMin(),
-                                                  ImGui::GetItemRectMax(),
-                                                  ImGui::GetColorU32(palette.accent_mid));
-    }
-}
-
-/// Fixed, constrained layout: menu bar on top; workspace columns
-/// Test Lab | Sim Setup | viewport | Results; status strip bottom.
-/// One host window tiles children with zero gap so chrome never leaks.
-///
-/// `cinema on` replaces the whole thing with the cinema composition; with
-/// cinema off nothing below this branch changes.
+/// Guided product layout: workflow rail | canvas | optional results rail.
+/// The developer Test Lab is a separate, explicitly selected surface and never
+/// adds columns to the ordinary study.
 void draw_frame(App& app) {
     if (app.cinema.active) {
         draw_cinema_frame(app);
         return;
     }
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
-    auto& settings = app.testlab.settings;
-
-    auto pick_theme = [&app, &settings](ThemeId id) {
-        if (active_theme == id) {
-            return;
-        }
-        apply_theme(id);
-        settings.theme = id;
-        app.viewport.invalidate_colors();
-        app.overlays_dirty = true;
-    };
+    const auto job_state = app.job.state();
+    const bool worker_busy =
+        job_state == SolveJob::State::kMeshing || job_state == SolveJob::State::kSolving;
 
     float menu_height = 0.0f;
     if (ImGui::BeginMainMenuBar()) {
         menu_height = ImGui::GetWindowSize().y;
         if (ImGui::BeginMenu("File")) {
+            if (ImGui::MenuItem("Open model…")) {
+                app.workspace = WorkspaceMode::kStudy;
+                app.expanded_step = 0;
+                app.status = "enter a STEP, BRep, or STL path, or drop the file";
+            }
+            ImGui::BeginDisabled(!app.result);
+            if (ImGui::MenuItem("Export result · VTU")) {
+                const std::string output =
+                    app.model ? (app.model->name + "_result.vtu") : "result.vtu";
+                std::string error_text;
+                app.status = export_result_vtu(app, output, error_text)
+                                 ? std::format("wrote {}", output)
+                                 : std::format("export failed: {}", error_text);
+            }
+            ImGui::EndDisabled();
             if (ImGui::MenuItem("Save screenshot", "F12")) {
                 app.shot_countdown = 1;
             }
+            ImGui::Separator();
+            ImGui::BeginDisabled(worker_busy || app.live.active() || app.cinema.active);
+            const bool developer = app.workspace == WorkspaceMode::kDeveloper;
+            if (ImGui::MenuItem(developer ? "Return to Study" : "Developer Test Lab")) {
+                app.workspace = developer ? WorkspaceMode::kStudy : WorkspaceMode::kDeveloper;
+            }
+            ImGui::EndDisabled();
             ImGui::Separator();
             if (ImGui::MenuItem("Quit")) {
                 glfwSetWindowShouldClose(glfwGetCurrentContext(), GLFW_TRUE);
             }
             ImGui::EndMenu();
         }
-        if (ImGui::BeginMenu("Workspace")) {
-            if (ImGui::MenuItem("Study", nullptr, app.workspace == WorkspaceMode::kStudy)) {
-                app.workspace = WorkspaceMode::kStudy;
-            }
-            if (ImGui::MenuItem("Developer / Test Lab", nullptr,
-                                app.workspace == WorkspaceMode::kDeveloper)) {
-                app.workspace = WorkspaceMode::kDeveloper;
-                app.advanced_setup = true;
-            }
-            ImGui::EndMenu();
-        }
-        if (ImGui::BeginMenu("View")) {
-            if (ImGui::MenuItem("Studio theme", nullptr, active_theme == ThemeId::kStudio)) {
-                pick_theme(ThemeId::kStudio);
-            }
-            if (ImGui::MenuItem("Interwebz theme", nullptr,
-                                active_theme == ThemeId::kInterwebz)) {
-                pick_theme(ThemeId::kInterwebz);
-            }
-            if (ImGui::MenuItem("Slate theme", nullptr, active_theme == ThemeId::kSlate)) {
-                pick_theme(ThemeId::kSlate);
-            }
-            ImGui::Separator();
-            ImGui::MenuItem("Advanced setup", nullptr, &app.advanced_setup);
-            ImGui::EndMenu();
-        }
         if (ImGui::BeginMenu("Help")) {
+            if (ImGui::MenuItem("How to read a study")) {
+                ImGui::OpenPopup("How to read a study");
+            }
             if (ImGui::MenuItem("About PolyMesh")) {
                 ImGui::OpenPopup("About PolyMesh");
             }
@@ -2467,14 +2970,47 @@ void draw_frame(App& app) {
     }
 
     if (ImGui::BeginPopupModal("About PolyMesh", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextColored(palette.accent, "PolyMesh Studio");
+        ImGui::TextColored(palette.accent, "PolyMesh");
         ImGui::Text("Version %s", POLYMESH_VERSION);
         ImGui::TextUnformatted("Adaptive polyhedral finite element analysis");
         ImGui::Separator();
         ImGui::TextColored(palette.text_dim,
                            "STEP/BRep · geometry-aware meshing · linear elasticity");
-        ImGui::TextColored(palette.text_dim, "BSD-3-Clause");
+        ImGui::TextColored(palette.text_dim, "A Chudware product · BSD-3-Clause");
         if (iw::button("Close", ImVec2(-1, 0), true)) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    ImGui::SetNextWindowSize(ImVec2(ui_px(560.0f), 0.0f), ImGuiCond_Appearing);
+    if (ImGui::BeginPopupModal("How to read a study", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextColored(palette.accent, "Reading PolyMesh without hiding the engineering");
+        ImGui::Separator();
+        iw::field_label("Fields");
+        ImGui::BulletText("Stress");
+        ImGui::SameLine();
+        ImGui::TextWrapped("is von Mises equivalent stress: a yield-oriented scalar, not "
+                           "maximum principal stress.");
+        ImGui::BulletText("Deflection");
+        ImGui::SameLine();
+        ImGui::TextWrapped("is displacement magnitude |u|. Auto deformation magnifies the "
+                           "shape only; every reported value remains physical.");
+        ImGui::BulletText("Error η");
+        ImGui::SameLine();
+        ImGui::TextWrapped("is the Zienkiewicz–Zhu recovery estimator that drives mesh "
+                           "adaptivity. It is not a probability or confidence score.");
+        iw::field_label("What happens when you press Solve");
+        ImGui::TextWrapped("The optional ONNX advisor scores real candidate actions under "
+                           "your DOF budget. It may abstain. PolyMesh then constructs the "
+                           "volume mesh, assembles one FE/VEM stiffness system, solves linear "
+                           "elastostatics, recovers stress, estimates error, and refines when "
+                           "requested.");
+        iw::field_label("3D controls");
+        ImGui::TextWrapped("Right-drag orbit · Shift+left-drag pan · wheel zoom · F frame · "
+                           "F12 screenshot. In CAD mode, left-click picks a face.");
+        if (iw::button("Close guide", ImVec2(-1, 0), true)) {
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
@@ -2494,38 +3030,11 @@ void draw_frame(App& app) {
 
     const float status_height =
         std::floor(std::max(ui_px(30.0f), ImGui::GetTextLineHeight() + ui_px(12.0f)));
-    const float splitter = ui_px(6.0f);
     const float content_y = std::floor(viewport->Pos.y + menu_height);
     const float content_height =
         std::floor(viewport->Pos.y + viewport->Size.y - status_height) - content_y;
     const float content_width = std::floor(viewport->Size.x);
     const bool developer = app.workspace == WorkspaceMode::kDeveloper;
-
-    if (developer) {
-        const float min_view = ui_px(300.0f);
-        const float max_side =
-            std::max(ui_px(190.0f), (content_width - min_view - 3.0f * splitter) * 0.36f);
-        settings.testlab_width =
-            std::floor(std::clamp(settings.testlab_width, ui_px(210.0f), max_side));
-        settings.sim_width =
-            std::floor(std::clamp(settings.sim_width, ui_px(250.0f), max_side));
-        settings.results_width =
-            std::floor(std::clamp(settings.results_width, ui_px(210.0f), max_side));
-    } else {
-        const float min_view = ui_px(420.0f);
-        const float max_side =
-            std::max(ui_px(240.0f), (content_width - min_view - 2.0f * splitter) * 0.42f);
-        settings.sim_width =
-            std::floor(std::clamp(settings.sim_width, ui_px(280.0f), max_side));
-        settings.results_width =
-            std::floor(std::clamp(settings.results_width, ui_px(250.0f), max_side));
-        const float overflow = settings.sim_width + settings.results_width + 2.0f * splitter +
-                               min_view - content_width;
-        if (overflow > 0.0f) {
-            settings.results_width =
-                std::max(ui_px(220.0f), settings.results_width - overflow);
-        }
-    }
 
     ImGui::SetNextWindowPos(ImVec2(std::floor(viewport->Pos.x), content_y));
     ImGui::SetNextWindowSize(ImVec2(content_width, content_height));
@@ -2535,55 +3044,68 @@ void draw_frame(App& app) {
                  kPanelFlags | ImGuiWindowFlags_NoScrollbar |
                      ImGuiWindowFlags_NoScrollWithMouse);
     const float row_height = ImGui::GetContentRegionAvail().y;
-    const ImVec2 panel_padding(ui_px(12.0f), ui_px(12.0f));
+    const ImVec2 panel_padding(ui_px(14.0f), ui_px(14.0f));
+    const float gap = ui_px(1.0f);
 
     if (developer) {
+        const float left = std::floor((content_width - gap) * 0.46f);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, panel_padding);
-        ImGui::BeginChild("testlab", ImVec2(settings.testlab_width, row_height),
+        ImGui::BeginChild("testlab", ImVec2(left, row_height),
                           ImGuiChildFlags_AlwaysUseWindowPadding);
         draw_testlab_panel(app.testlab);
         ImGui::EndChild();
         ImGui::PopStyleVar();
-
-        ImGui::SameLine(0.0f, 0.0f);
-        draw_column_splitter("##split_tl_sim", row_height, &settings.testlab_width);
-        ImGui::SameLine(0.0f, 0.0f);
-    }
-
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, panel_padding);
-    ImGui::BeginChild("study", ImVec2(settings.sim_width, row_height),
-                      ImGuiChildFlags_AlwaysUseWindowPadding);
-    draw_study_panel(app);
-    ImGui::EndChild();
-    ImGui::PopStyleVar();
-
-    ImGui::SameLine(0.0f, 0.0f);
-    draw_column_splitter("##split_study_view", row_height, &settings.sim_width);
-    ImGui::SameLine(0.0f, 0.0f);
-
-    const float right_band = settings.results_width + splitter;
-    const float view_width = std::max(1.0f, ImGui::GetContentRegionAvail().x - right_band);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-    ImGui::BeginChild("viewport", ImVec2(view_width, row_height), ImGuiChildFlags_None,
-                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-    draw_viewport_content(app);
-    ImGui::EndChild();
-    ImGui::PopStyleVar();
-
-    ImGui::SameLine(0.0f, 0.0f);
-    draw_column_splitter("##split_view_results", row_height, &settings.results_width, -1.0f);
-    ImGui::SameLine(0.0f, 0.0f);
-
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, panel_padding);
-    ImGui::BeginChild("results", ImVec2(0.0f, row_height),
-                      ImGuiChildFlags_AlwaysUseWindowPadding);
-    if (developer) {
+        ImGui::SameLine(0.0f, gap);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, panel_padding);
+        ImGui::BeginChild("testlab_results", ImVec2(0.0f, row_height),
+                          ImGuiChildFlags_AlwaysUseWindowPadding);
         draw_results_panel(app.testlab);
+        ImGui::EndChild();
+        ImGui::PopStyleVar();
     } else {
-        draw_analysis_panel(app);
+        const bool show_results = app.mesh_preview.has_value() || app.result.has_value() ||
+                                  app.live.has_advisor_content() ||
+                                  app.live.has_convergence_content();
+        const float left =
+            std::floor(std::clamp(content_width * 0.235f, ui_px(292.0f), ui_px(372.0f)));
+        float right =
+            show_results
+                ? std::floor(std::clamp(content_width * 0.235f, ui_px(310.0f), ui_px(388.0f)))
+                : 0.0f;
+        const float minimum_canvas = ui_px(300.0f);
+        const float overflow =
+            left + right + (show_results ? 2.0f : 1.0f) * gap + minimum_canvas - content_width;
+        if (overflow > 0.0f && show_results) {
+            right = std::max(ui_px(232.0f), right - overflow);
+        }
+
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, panel_padding);
+        ImGui::BeginChild("study", ImVec2(left, row_height),
+                          ImGuiChildFlags_AlwaysUseWindowPadding);
+        draw_study_panel(app);
+        ImGui::EndChild();
+        ImGui::PopStyleVar();
+        ImGui::SameLine(0.0f, gap);
+
+        const float view_width =
+            std::max(1.0f, content_width - left - (show_results ? right + 2.0f * gap : gap));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+        ImGui::BeginChild("viewport", ImVec2(view_width, row_height), ImGuiChildFlags_None,
+                          ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+        draw_viewport_content(app);
+        ImGui::EndChild();
+        ImGui::PopStyleVar();
+
+        if (show_results) {
+            ImGui::SameLine(0.0f, gap);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, panel_padding);
+            ImGui::BeginChild("results", ImVec2(0.0f, row_height),
+                              ImGuiChildFlags_AlwaysUseWindowPadding);
+            draw_analysis_panel(app);
+            ImGui::EndChild();
+            ImGui::PopStyleVar();
+        }
     }
-    ImGui::EndChild();
-    ImGui::PopStyleVar();
 
     ImGui::End();
     ImGui::PopStyleVar(2);
@@ -2601,17 +3123,40 @@ void draw_frame(App& app) {
     std::string status_text;
     if (app.shot_msg_ttl > 0.0f && !app.shot_msg.empty()) {
         status_text = app.shot_msg;
+    } else if (developer) {
+        const std::string head =
+            app.testlab.git_head.empty() ? "unknown" : app.testlab.git_head;
+        status_text = std::format("Developer Test Lab · {} · {}", head, app.testlab.status);
+    } else if (!app.model) {
+        status_text = app.status;
     } else {
-        status_text = app.model ? app.model->name + " · " + app.status : app.status;
-        if (app.dof_count > 0) {
-            status_text += std::format(" · {} DOF", app.dof_count);
+        std::size_t nodes = 0;
+        std::size_t elements = 0;
+        if (app.result) {
+            nodes = app.result->volume_mesh.nodes.size();
+            elements = app.result->volume_mesh.elements.size();
+        } else if (app.mesh_preview) {
+            nodes = app.mesh_preview->mesh.nodes.size();
+            elements = app.mesh_preview->mesh.elements.size();
+        } else {
+            const auto progress = app.job.progress();
+            nodes = progress.n_nodes;
+            elements = progress.n_elems;
         }
-        if (developer) {
-            const std::string head =
-                app.testlab.git_head.empty() ? "unknown" : app.testlab.git_head;
-            status_text += std::format(" · dev {} · {}", head, app.testlab.status);
+        status_text = app.model->name;
+        if (nodes > 0 || elements > 0) {
+            status_text +=
+                std::format(" · {} elements · {} nodes · {} DOF", elements, nodes, nodes * 3);
+        }
+        if (app.live.active() && app.live.caption()[0] != '\0') {
+            status_text += std::format(" · {}", app.live.caption());
+        }
+        const auto traces = pass_trace_snapshot(app);
+        if (!traces.empty() && !traces.back().solve_method.empty()) {
+            status_text += std::format(" · {}", traces.back().solve_method);
         }
     }
+
     const char* hint = "F frame · F12 screenshot · right-drag orbit · wheel zoom";
     const float available = ImGui::GetContentRegionAvail().x;
     const float status_width = ImGui::CalcTextSize(status_text.c_str()).x;
@@ -2625,14 +3170,13 @@ void draw_frame(App& app) {
             ImVec2(line_origin.x + available - hint_width, line_origin.y),
             ImGui::GetColorU32(palette.text_dim), hint);
     }
-
     ImGui::End();
     ImGui::PopStyleVar();
     ImGui::PopStyleColor();
 }
 
 int run(int argc, char** argv) {
-    // argv: an optional positional part path, an optional --auto "<spec>", in
+
     // either order. Parsed before any GL/ImGui state exists so a bad command
     // line exits without a window to tear down.
     std::string part_path;
@@ -2651,6 +3195,23 @@ int run(int argc, char** argv) {
         } else if (part_path.empty()) {
             part_path = arg;
         }
+    }
+    {
+        std::error_code ec;
+        std::filesystem::path exe;
+#if defined(__linux__)
+        exe = std::filesystem::read_symlink("/proc/self/exe", ec);
+#endif
+        if (exe.empty()) {
+            ec.clear();
+            exe = argc > 0 && argv[0] != nullptr ? std::filesystem::path{argv[0]}
+                                                 : std::filesystem::path{};
+            if (exe.is_relative()) {
+                exe = std::filesystem::current_path(ec) / exe;
+            }
+        }
+        const auto resolved = std::filesystem::weakly_canonical(exe, ec);
+        executable_dir = (ec ? exe : resolved).parent_path();
     }
 
     int window_w = kDefaultWindowW;
@@ -2679,8 +3240,11 @@ int run(int argc, char** argv) {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+#ifdef __APPLE__
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
+#endif
     const std::string window_title =
-        std::format("PolyMesh Studio {} — Adaptive Polyhedral FEA", POLYMESH_VERSION);
+        std::format("PolyMesh {} — Adaptive Polyhedral FEA", POLYMESH_VERSION);
     GLFWwindow* window =
         glfwCreateWindow(window_w, window_h, window_title.c_str(), nullptr, nullptr);
     if (!window) {
@@ -2722,7 +3286,8 @@ int run(int argc, char** argv) {
     ImGui::GetIO().FontGlobalScale = 1.0f / ui_scale;
     apply_theme();
     ImFont* cinema_font = nullptr;
-    const bool ttf_loaded = load_ui_font(ui_scale, &cinema_font);
+    ImFont* mono_font = nullptr;
+    const bool ttf_loaded = load_ui_font(ui_scale, &cinema_font, &mono_font);
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
 
@@ -2732,6 +3297,30 @@ int run(int argc, char** argv) {
     glfwSetWindowContentScaleCallback(window, content_scale_callback);
     app.custom_font = ttf_loaded;
     app.cinema_font = cinema_font;
+    app.mono_font = mono_font;
+    if (const char* advisor_env = std::getenv("POLYMESH_ADVISOR_DIR");
+        advisor_env != nullptr && advisor_env[0] != '\0') {
+        app.advisor_dir = advisor_env;
+    } else {
+        std::error_code ec;
+        const auto source_root =
+            std::filesystem::path{__FILE__}.parent_path().parent_path().parent_path();
+        const auto cwd = std::filesystem::current_path(ec);
+        std::vector<std::filesystem::path> advisor_roots{
+            executable_dir / ".." / "share" / "polymesh" / "advisor",
+            source_root / "bench" / "advisor",
+        };
+        if (!ec) {
+            advisor_roots.push_back(cwd / "bench" / "advisor");
+        }
+        for (const auto& root : advisor_roots) {
+            std::error_code model_ec;
+            if (std::filesystem::is_regular_file(root / "model.onnx", model_ec)) {
+                app.advisor_dir = root.string();
+                break;
+            }
+        }
+    }
     if (const char* shot_env = std::getenv("POLYMESH_GUI_SHOT");
         shot_env != nullptr && shot_env[0] != '\0') {
         app.shot_env_path = shot_env;
@@ -2775,7 +3364,7 @@ int run(int argc, char** argv) {
                 }
             }
             if (chosen.empty()) {
-                app.status = std::format("drop ignored (want .step/.stp/.brep/.brp): {}",
+                app.status = std::format("drop ignored (want .step/.stp/.brep/.brp/.stl): {}",
                                          app.pending_drops.front());
             } else {
                 load_model(app, chosen);
@@ -2858,6 +3447,7 @@ int run(int argc, char** argv) {
         }
 
         if (auto mesh = app.job.take_mesh()) {
+            detach_live_callbacks(app);
             const bool was_mesh = app.mode == DisplayMode::kMeshPreview;
             app.mesh_preview = std::move(mesh);
             app.viewport.set_mesh(*app.mesh_preview);
@@ -2870,6 +3460,7 @@ int run(int argc, char** argv) {
             }
         }
         if (auto result = app.job.take_result()) {
+            detach_live_callbacks(app);
             if (app.cinema.active) {
                 app.cinema.drain_stages();
                 app.cinema.drain_solve_stages();

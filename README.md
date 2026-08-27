@@ -248,6 +248,28 @@ model, calibration, and limitation evidence is in the
   non-interruptible for hours, so campaign coverage is published rather than
   silently filled.
 
+## Install
+
+Tagged releases publish a relocatable archive for each supported host:
+
+| Host | Archive |
+|---|---|
+| Linux, x86-64 | `polymesh-<version>-linux-x86_64.tar.gz` |
+| Windows, x64 | `polymesh-<version>-windows-x64.zip` |
+| macOS, Apple silicon | `polymesh-<version>-macos-arm64.tar.gz` |
+
+Each archive contains `polymesh`, `polymesh-gui`, `polymesh-webd`, the web
+frontend and other runtime assets under `share/`, and the redistributable part of
+the shared-library closure beside the binaries. None of them is a fully static
+build: Linux needs a host glibc plus OpenGL and X11/Wayland, Windows needs the
+Visual C++ 2015–2022 Redistributable (x64) and an OpenGL 3.3 driver, and the
+macOS archive is ad-hoc signed rather than notarized and needs macOS 14 or newer
+on Apple silicon with the Gatekeeper quarantine attribute cleared.
+
+Extraction, checksum verification, per-platform prerequisites and first-run
+commands are in [docs/install.md](docs/install.md). Build from source instead
+with the recipe below.
+
 ## Build
 
 Ubuntu or Debian, matching CI (`.github/workflows/ci.yml`):
@@ -322,6 +344,11 @@ and VTU export live in the dedicated Results inspector. Repository campaigns and
 self-improve tools remain available under **Workspace → Developer / Test Lab**
 instead of consuming the default product surface. CI also launches this installed
 GUI under Xvfb.
+
+`dist/polymesh/bin/polymesh-webd` serves the browser companion on a local HTTP
+port: the same import → mesh → solve pipeline, with the mesh revealed cell by
+cell in the mesher's own emission order and the advisor's real activations
+played back while it works. See [docs/webapp.md](docs/webapp.md).
 
 ## Layout
 

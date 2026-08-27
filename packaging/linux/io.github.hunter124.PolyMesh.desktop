@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=PolyMesh Studio
+Name=PolyMesh
 GenericName=Finite Element Analysis
 Comment=Mesh, solve, and inspect adaptive polyhedral FEA studies
 Exec=polymesh-gui %F

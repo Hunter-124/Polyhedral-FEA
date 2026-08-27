@@ -29,7 +29,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            ninja-build cmake g++ libeigen3-dev nlohmann-json3-dev libomp-dev \
+            ninja-build cmake g++ patchelf binutils libeigen3-dev nlohmann-json3-dev libomp-dev \
             libtbb-dev libfontconfig1-dev libfreetype-dev libgl1-mesa-dev \
             libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
             libxext-dev xvfb xauth desktop-file-utils appstream \
@@ -44,40 +44,302 @@ jobs:
             -DPOLYMESH_BUILD_TESTS=OFF \
             -DPOLYMESH_WITH_GUI=ON \
             -DPOLYMESH_WITH_OCC=ON \
-            -DPOLYMESH_WITH_ADVISOR=ON
-          cmake --build build --parallel 2
+            -DPOLYMESH_WITH_ADVISOR=ON \
+            -DPOLYMESH_STATIC_RUNTIME=ON
+          cmake --build build --target polymesh polymesh-gui polymesh-webd --parallel 2
           cmake --install build --prefix "$PWD/build/stage"
+          scripts/bundle_linux.sh "$PWD/build/stage" "$PWD/build/bundle"
           cmake --build build --target package
 
       - name: Validate installed runtime
         run: |
-          test "$(build/stage/bin/polymesh --version)" = "polymesh ${POLYMESH_VERSION}"
-          build/stage/bin/polymesh backend
+          bundle="$PWD/build/bundle"
+          test "$(env -i PATH=/usr/bin:/bin HOME="$HOME" \
+            "$bundle/bin/polymesh" --version)" = "polymesh ${POLYMESH_VERSION}"
+          env -i PATH=/usr/bin:/bin HOME="$HOME" "$bundle/bin/polymesh" backend
+          env -i PATH=/usr/bin:/bin HOME="$HOME" "$bundle/bin/polymesh-webd" --help
+          for binary in polymesh polymesh-gui polymesh-webd; do
+            test -x "$bundle/bin/$binary"
+            readelf -d "$bundle/bin/$binary" | grep -E \
+              'RUNPATH.*\[\$ORIGIN/\.\./lib\]'
+          done
           desktop-file-validate \
-            build/stage/share/applications/io.github.hunter124.PolyMesh.desktop
+            "$bundle/share/applications/io.github.hunter124.PolyMesh.desktop"
           appstreamcli validate --no-net \
-            build/stage/share/metainfo/io.github.hunter124.PolyMesh.metainfo.xml
-          xvfb-run -a env POLYMESH_GUI_SIZE=1280x800 \
-            build/stage/bin/polymesh-gui \
-            build/stage/share/polymesh/examples/unit_box.step \
-            --auto "shot build/stage/gui-smoke.png; quit"
-          test -s build/stage/gui-smoke.png
-          readelf -d build/stage/bin/polymesh | grep -F '$ORIGIN/../lib'
-          sha256sum "build/polymesh-${POLYMESH_VERSION}-Linux.tar.gz" \
-            > "build/polymesh-${POLYMESH_VERSION}-Linux.tar.gz.sha256"
+            "$bundle/share/metainfo/io.github.hunter124.PolyMesh.metainfo.xml"
+          xvfb-run -a env -u LD_LIBRARY_PATH POLYMESH_GUI_SIZE=1280x800 \
+            "$bundle/bin/polymesh-gui" \
+            "$bundle/share/polymesh/examples/unit_box.step" \
+            --auto "shot $PWD/build/gui-smoke.png; quit"
+          test -s build/gui-smoke.png
+          archive="build/polymesh-${POLYMESH_VERSION}-linux-x86_64.tar.gz"
+          tar -tzf "$archive" | grep -F 'lib/BUNDLED-LIBRARIES.txt'
+          sha256sum "$archive" > "$archive.sha256"
 
       - uses: actions/upload-artifact@v4
         with:
           name: polymesh-${{ env.POLYMESH_VERSION }}-linux
           path: |
-            build/polymesh-${{ env.POLYMESH_VERSION }}-Linux.tar.gz
-            build/polymesh-${{ env.POLYMESH_VERSION }}-Linux.tar.gz.sha256
+            build/polymesh-${{ env.POLYMESH_VERSION }}-linux-x86_64.tar.gz
+            build/polymesh-${{ env.POLYMESH_VERSION }}-linux-x86_64.tar.gz.sha256
+
+  windows-package:
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      # vcpkg builds OpenCASCADE from source. Keeping its binary packages in
+      # the Actions cache turns a ~45 min dependency build into a download on
+      # every run after the first.
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\vcpkg-binary-cache
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Validate release identity
+        shell: bash
+        run: |
+          version="$(sed -nE 's/^project\(polymesh VERSION ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt)"
+          test -n "$version"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME}" != "v${version}" ]]; then
+            echo "tag ${GITHUB_REF_NAME} does not match CMake version ${version}" >&2
+            exit 1
+          fi
+          echo "POLYMESH_VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Pin the vcpkg revision
+        run: |
+          $root = $env:VCPKG_INSTALLATION_ROOT
+          if (-not $root) { throw "the runner image has no preinstalled vcpkg" }
+          $rev = (git -C $root rev-parse HEAD).Trim()
+          "VCPKG_ROOT=$root"     | Out-File -FilePath $env:GITHUB_ENV -Append
+          "VCPKG_REVISION=$rev"  | Out-File -FilePath $env:GITHUB_ENV -Append
+          "vcpkg $rev"
+
+      - name: Cache vcpkg binary packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}\vcpkg-binary-cache
+          key: vcpkg-x64-windows-${{ env.VCPKG_REVISION }}-occ
+          restore-keys: vcpkg-x64-windows-${{ env.VCPKG_REVISION }}-
+
+      - name: Install build dependencies
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:VCPKG_DEFAULT_BINARY_CACHE | Out-Null
+          # opencascade is the STEP/B-rep backend (POLYMESH_WITH_OCC): its
+          # default feature set is freetype only, no VTK and no FreeImage.
+          # glad is required by apps/gui on Windows -- the system opengl32 is
+          # 1.1 and the renderer needs 3.3 entry points.
+          & "$env:VCPKG_ROOT\vcpkg.exe" install --triplet x64-windows `
+            eigen3 nlohmann-json glad opencascade
+          if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed" }
+
+      - name: Build package
+        run: |
+          # Visual Studio generator, so the job needs no vcvars shell. OCC is
+          # ON: a Windows release without STEP input is not the product.
+          cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows `
+            -DPOLYMESH_BUILD_TESTS=OFF `
+            -DPOLYMESH_WITH_GUI=ON `
+            -DPOLYMESH_WITH_OCC=ON `
+            -DPOLYMESH_WITH_ADVISOR=ON `
+            -DPOLYMESH_WITH_CUDA=OFF
+          if ($LASTEXITCODE -ne 0) { throw "configure failed" }
+          cmake --build build --config Release --parallel 4 `
+            --target polymesh polymesh-gui polymesh-webd
+          if ($LASTEXITCODE -ne 0) { throw "build failed" }
+          cmake --install build --config Release --prefix "$PWD\build\stage"
+          if ($LASTEXITCODE -ne 0) { throw "install failed" }
+          scripts\bundle_windows.ps1 `
+            -Prefix "$PWD\build\stage" `
+            -Stage "$PWD\build\bundle" `
+            -SearchPath @(
+              "$env:VCPKG_ROOT\installed\x64-windows\bin",
+              "$PWD\build\apps\cli\Release",
+              "$PWD\build\apps\gui\Release",
+              "$PWD\build\apps\webd\Release")
+
+      - name: Validate installed runtime
+        run: |
+          $bundle = "$PWD\build\bundle"
+          foreach ($binary in @('polymesh.exe', 'polymesh-gui.exe', 'polymesh-webd.exe')) {
+            if (-not (Test-Path -LiteralPath "$bundle\bin\$binary")) {
+              throw "missing $binary in the bundle"
+            }
+          }
+          # Strip the build environment off PATH: anything the bundle still
+          # needs from the vcpkg tree would silently work otherwise, and then
+          # fail on a user's machine. The bundler already proved the import
+          # closure statically; this proves it against the real loader.
+          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+          $reported = (& "$bundle\bin\polymesh.exe" --version | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0) { throw "polymesh --version failed" }
+          if ($reported -ne "polymesh $env:POLYMESH_VERSION") {
+            throw "polymesh --version said '$reported'"
+          }
+          & "$bundle\bin\polymesh.exe" backend
+          if ($LASTEXITCODE -ne 0) { throw "polymesh backend failed" }
+          & "$bundle\bin\polymesh-webd.exe" --help | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "polymesh-webd --help failed" }
+          # polymesh-gui is not launched here: Actions Windows runners have no
+          # GPU and the Microsoft Basic Display Adapter caps OpenGL at 1.1, so
+          # a window would fail for the runner's reason, not the build's. Its
+          # DLL closure is verified above and by the bundler.
+
+      - name: Archive
+        run: |
+          $name = "polymesh-$env:POLYMESH_VERSION-windows-x64"
+          Move-Item "$PWD\build\bundle" "$PWD\build\$name"
+          $archive = "$PWD\build\$name.zip"
+          Compress-Archive -Path "$PWD\build\$name" -DestinationPath $archive -CompressionLevel Optimal
+          if (-not (Test-Path -LiteralPath $archive)) { throw "no archive was produced" }
+          # sha256sum's own format, same as the Linux job's sidecar.
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash.ToLower()
+          "$hash  build/$name.zip" | Set-Content -LiteralPath "$archive.sha256" -Encoding ascii
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: polymesh-${{ env.POLYMESH_VERSION }}-windows
+          path: |
+            build/polymesh-${{ env.POLYMESH_VERSION }}-windows-x64.zip
+            build/polymesh-${{ env.POLYMESH_VERSION }}-windows-x64.zip.sha256
+
+  macos-package:
+    # macos-14 is Apple silicon. ONNX Runtime 1.28.0 publishes an osx-arm64
+    # archive and no osx-x86_64 one, so arm64 is the only macOS target that can
+    # carry the advisor.
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Validate release identity
+        run: |
+          version="$(sed -nE 's/^project\(polymesh VERSION ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt)"
+          test -n "$version"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME}" != "v${version}" ]]; then
+            echo "tag ${GITHUB_REF_NAME} does not match CMake version ${version}" >&2
+            exit 1
+          fi
+          echo "POLYMESH_VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Install build dependencies
+        run: |
+          brew update
+          # GLFW is FetchContent + Cocoa, so no window-system package is needed.
+          # libomp is AppleClang's OpenMP runtime; without it the hot paths are
+          # serial but the build still succeeds.
+          brew install ninja cmake eigen nlohmann-json opencascade libomp
+          {
+            echo "CMAKE_PREFIX_PATH=$(brew --prefix eigen):$(brew --prefix nlohmann-json):$(brew --prefix opencascade)"
+            echo "OpenMP_ROOT=$(brew --prefix libomp)"
+          } >> "$GITHUB_ENV"
+
+      - name: Build package
+        run: |
+          # POLYMESH_STATIC_RUNTIME is deliberately absent: it is a
+          # -static-libstdc++ switch that the root CMakeLists rejects on Apple.
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DPOLYMESH_BUILD_TESTS=OFF \
+            -DPOLYMESH_WITH_GUI=ON \
+            -DPOLYMESH_WITH_OCC=ON \
+            -DPOLYMESH_WITH_ADVISOR=ON \
+            -DPOLYMESH_WITH_CUDA=OFF
+          cmake --build build --target polymesh polymesh-gui polymesh-webd --parallel 3
+          cmake --install build --prefix "$PWD/build/stage"
+          scripts/bundle_macos.sh "$PWD/build/stage" \
+            "$PWD/build/polymesh-${POLYMESH_VERSION}-macos-arm64"
+
+      - name: Validate installed runtime
+        run: |
+          bundle="$PWD/build/polymesh-${POLYMESH_VERSION}-macos-arm64"
+          test "$(env -i PATH=/usr/bin:/bin HOME="$HOME" \
+            "$bundle/bin/polymesh" --version)" = "polymesh ${POLYMESH_VERSION}"
+          env -i PATH=/usr/bin:/bin HOME="$HOME" "$bundle/bin/polymesh" backend
+          env -i PATH=/usr/bin:/bin HOME="$HOME" "$bundle/bin/polymesh-webd" --help
+          for binary in polymesh polymesh-gui polymesh-webd; do
+            test -x "$bundle/bin/$binary"
+            # @loader_path is the Mach-O spelling of $ORIGIN. Every binary must
+            # find its libraries through the bundle, not through Homebrew.
+            otool -l "$bundle/bin/$binary" | grep -A2 LC_RPATH | \
+              grep -F 'path @loader_path/../lib'
+            if otool -L "$bundle/bin/$binary" | tail -n +2 | \
+                 grep -Ev '^[[:space:]]+(@rpath/|@loader_path/|/usr/lib/|/System/)'; then
+              echo "$binary still loads a host path" >&2
+              exit 1
+            fi
+          done
+          test -s "$bundle/lib/BUNDLED-LIBRARIES.txt"
+          ls "$bundle"/lib/libonnxruntime*.dylib
+          # polymesh-gui is not launched: the runner has no window server
+          # session to open a Cocoa GL context in. Its link closure is checked
+          # above like every other binary.
+
+      - name: Archive
+        run: |
+          name="polymesh-${POLYMESH_VERSION}-macos-arm64"
+          tar -czf "build/${name}.tar.gz" -C build "$name"
+          test -s "build/${name}.tar.gz"
+          tar -tzf "build/${name}.tar.gz" | grep -F 'lib/BUNDLED-LIBRARIES.txt'
+          # shasum, not sha256sum: macOS ships the Perl one. Same output format.
+          shasum -a 256 "build/${name}.tar.gz" > "build/${name}.tar.gz.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: polymesh-${{ env.POLYMESH_VERSION }}-macos
+          path: |
+            build/polymesh-${{ env.POLYMESH_VERSION }}-macos-arm64.tar.gz
+            build/polymesh-${{ env.POLYMESH_VERSION }}-macos-arm64.tar.gz.sha256
+
+  # One release, three platforms. Publishing from each build job would race
+  # three edits onto the same release and could publish a partial set when one
+  # platform fails; this job only runs once all three have produced an archive.
+  publish:
+    needs: [linux-package, windows-package, macos-package]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Validate release identity
+        run: |
+          version="$(sed -nE 's/^project\(polymesh VERSION ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt)"
+          test -n "$version"
+          if [[ "${GITHUB_REF_NAME}" != "v${version}" ]]; then
+            echo "tag ${GITHUB_REF_NAME} does not match CMake version ${version}" >&2
+            exit 1
+          fi
+          echo "POLYMESH_VERSION=$version" >> "$GITHUB_ENV"
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: polymesh-*
+          merge-multiple: true
+
+      - name: Every platform archive is present
+        run: |
+          expected=(
+            "polymesh-${POLYMESH_VERSION}-linux-x86_64.tar.gz"
+            "polymesh-${POLYMESH_VERSION}-windows-x64.zip"
+            "polymesh-${POLYMESH_VERSION}-macos-arm64.tar.gz"
+          )
+          for archive in "${expected[@]}"; do
+            test -s "dist/$archive" || { echo "missing dist/$archive" >&2; exit 1; }
+            test -s "dist/$archive.sha256" || { echo "missing dist/$archive.sha256" >&2; exit 1; }
+          done
+          ls -l dist
 
       - name: Publish GitHub release
-        if: github.ref_type == 'tag'
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           files: |
-            build/polymesh-${{ env.POLYMESH_VERSION }}-Linux.tar.gz
-            build/polymesh-${{ env.POLYMESH_VERSION }}-Linux.tar.gz.sha256
+            dist/polymesh-${{ env.POLYMESH_VERSION }}-linux-x86_64.tar.gz
+            dist/polymesh-${{ env.POLYMESH_VERSION }}-linux-x86_64.tar.gz.sha256
+            dist/polymesh-${{ env.POLYMESH_VERSION }}-windows-x64.zip
+            dist/polymesh-${{ env.POLYMESH_VERSION }}-windows-x64.zip.sha256
+            dist/polymesh-${{ env.POLYMESH_VERSION }}-macos-arm64.tar.gz
+            dist/polymesh-${{ env.POLYMESH_VERSION }}-macos-arm64.tar.gz.sha256

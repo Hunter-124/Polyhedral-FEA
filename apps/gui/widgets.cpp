@@ -243,6 +243,14 @@ void icon_face_rect(ImDrawList* dl, ImVec2 c, float h, ImU32 col, int edge) {
     }
 }
 
+/// Diagonal cross — the "stop / discard" family. `h` is the half-extent of the
+/// square the arms span.
+void icon_cross(ImDrawList* dl, ImVec2 c, float h, ImU32 col) {
+    const float stroke = icon_stroke();
+    dl->AddLine(ImVec2(c.x - h, c.y - h), ImVec2(c.x + h, c.y + h), col, stroke);
+    dl->AddLine(ImVec2(c.x - h, c.y + h), ImVec2(c.x + h, c.y - h), col, stroke);
+}
+
 } // namespace
 
 void draw_icon(ImDrawList* dl, ImVec2 center, float size, Icon icon, ImU32 color) {
@@ -356,6 +364,8 @@ void draw_icon(ImDrawList* dl, ImVec2 center, float size, Icon icon, ImU32 color
         dl->AddCircle(ImVec2(center.x, center.y + h * 0.14f), h * 0.34f, color, 0, stroke);
         break;
     }
+    // Resume restarts the same run Solve started, so it wears the same play mark.
+    case Icon::kResume:
     case Icon::kSolve:
         dl->AddTriangleFilled(ImVec2(center.x - h * 0.62f, center.y - h * 0.94f),
                               ImVec2(center.x + h * 0.94f, center.y),
@@ -432,6 +442,70 @@ void draw_icon(ImDrawList* dl, ImVec2 center, float size, Icon icon, ImU32 color
         dl->AddRectFilled(ImVec2(center.x - h * 0.28f, center.y - h * 0.28f),
                           ImVec2(center.x + h, center.y + h), color);
         break;
+    case Icon::kPause: {
+        const float bar = h * 0.30f;
+        const float inset = h * 0.22f;
+        dl->AddRectFilled(ImVec2(center.x - inset - bar, center.y - h * 0.88f),
+                          ImVec2(center.x - inset, center.y + h * 0.88f), color);
+        dl->AddRectFilled(ImVec2(center.x + inset, center.y - h * 0.88f),
+                          ImVec2(center.x + inset + bar, center.y + h * 0.88f), color);
+        break;
+    }
+    case Icon::kCancel:
+        icon_cross(dl, center, h * 0.74f, color);
+        break;
+    case Icon::kDismiss:
+        // A ringed cross, never a check: dismissing a failure discards it, and a
+        // check here would read as "this step succeeded".
+        icon_cross(dl, center, h * 0.44f, color);
+        dl->AddCircle(center, h * 0.92f, color, 0, stroke);
+        break;
+    case Icon::kOpen: {
+        // Folder: the back leaf peeks above the tab, the front leaf carries it.
+        const float top = center.y - h * 0.80f;
+        const float tab = center.y - h * 0.42f;
+        const float bottom = center.y + h * 0.80f;
+        dl->AddRect(ImVec2(center.x - h * 0.92f, top), ImVec2(center.x + h * 0.30f, tab),
+                    color, 0.0f, ImDrawFlags_None, stroke);
+        dl->AddRect(ImVec2(center.x - h * 0.92f, tab), ImVec2(center.x + h * 0.92f, bottom),
+                    color, ui_px(1.0f), ImDrawFlags_RoundCornersAll, stroke);
+        break;
+    }
+    case Icon::kFixture: {
+        // Pin pointing DOWN onto a ground line: a fully restrained support, which
+        // is what a fixture is. The line is the datum, not a measurement.
+        dl->AddTriangleFilled(ImVec2(center.x - h * 0.62f, center.y - h * 0.34f),
+                              ImVec2(center.x + h * 0.62f, center.y - h * 0.34f),
+                              ImVec2(center.x, center.y + h * 0.52f), color);
+        dl->AddLine(ImVec2(center.x, center.y - h * 0.94f),
+                    ImVec2(center.x, center.y - h * 0.34f), color, stroke);
+        dl->AddLine(ImVec2(center.x - h * 0.94f, center.y + h * 0.84f),
+                    ImVec2(center.x + h * 0.94f, center.y + h * 0.84f), color, stroke);
+        break;
+    }
+    case Icon::kAdvisor: {
+        // Three-node graph: two inputs feeding one decision. It is a network
+        // motif for the ONNX advisor, not a plotted activation. The nodes have to
+        // out-weigh the 1.6 dp edges or the whole glyph collapses into a bare
+        // chevron beside the status ring at 12 dp.
+        const ImVec2 in_a(center.x - h * 0.74f, center.y - h * 0.68f);
+        const ImVec2 in_b(center.x - h * 0.74f, center.y + h * 0.68f);
+        const ImVec2 out(center.x + h * 0.78f, center.y);
+        dl->AddLine(in_a, out, color, stroke * 0.8f);
+        dl->AddLine(in_b, out, color, stroke * 0.8f);
+        dl->AddCircleFilled(in_a, h * 0.38f, color);
+        dl->AddCircleFilled(in_b, h * 0.38f, color);
+        dl->AddCircleFilled(out, h * 0.44f, color);
+        break;
+    }
+    case Icon::kMaterial: {
+        // Cube cut by a diagonal: a sectioned solid, i.e. what it is made of.
+        const ImVec2 mn(center.x - h * 0.88f, center.y - h * 0.88f);
+        const ImVec2 mx(center.x + h * 0.88f, center.y + h * 0.88f);
+        dl->AddRect(mn, mx, color, ui_px(1.0f), ImDrawFlags_RoundCornersAll, stroke);
+        dl->AddLine(ImVec2(mn.x, mx.y), ImVec2(mx.x, mn.y), color, stroke);
+        break;
+    }
     case Icon::kNone:
         break;
     }
@@ -720,7 +794,7 @@ bool input_text(const char* label, char* buffer, size_t buffer_size, const char*
 }
 
 bool selector(const char* label, int* index, const char* const* options, int count,
-              const char* const* help, const Icon* icons) {
+              const char* const* help, const Icon* icons, Icon heading) {
     ImGui::PushID(label);
     bool changed = false;
     if (count <= 0) {
@@ -730,7 +804,7 @@ bool selector(const char* label, int* index, const char* const* options, int cou
     // One heading treatment across the whole app: uppercase, letter-spaced,
     // dim. A plain TextColored caption here was the reason "Field" read
     // title-case beside an all-caps "CAMERA" in the same rail.
-    field_label(label);
+    field_label(label, heading);
 
     const float gap = ui_px(4.0f);
     const float pad_x = ui_px(8.0f);

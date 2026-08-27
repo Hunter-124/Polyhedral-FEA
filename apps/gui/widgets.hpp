@@ -51,6 +51,16 @@ enum class Icon : int {
     // overlays
     kWire,
     kUndeformed,
+    // job control
+    kPause,
+    kCancel,
+    kResume,
+    kDismiss,
+    // study inputs
+    kOpen,
+    kFixture,
+    kAdvisor,
+    kMaterial,
 };
 
 /// Draw `icon` centered on `center`, fitted to a `size` x `size` box (pass an
@@ -92,9 +102,12 @@ bool input_text(const char* label, char* buffer, size_t buffer_size, const char*
 /// Options wrap to extra rows when they would overflow the available width.
 /// `help`, when non-null, has one hover explanation per option. `icons`, when
 /// non-null, is a parallel array of one glyph per option; the column fit
-/// measurement reserves the glyph and its gap.
+/// measurement reserves the glyph and its gap. `heading` glyphs the caption the
+/// selector prints for `label` — the caller must NOT draw its own field_label,
+/// or the heading renders twice.
 bool selector(const char* label, int* index, const char* const* options, int count,
-              const char* const* help = nullptr, const Icon* icons = nullptr);
+              const char* const* help = nullptr, const Icon* icons = nullptr,
+              Icon heading = Icon::kNone);
 
 /// Numbered, collapsible workflow step. `index` is the 1-based step number
 /// shown in the accent chip; `done` draws the chip filled and a check;

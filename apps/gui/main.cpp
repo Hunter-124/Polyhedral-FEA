@@ -1455,7 +1455,7 @@ void draw_colorbar(const char* title, float vmin, float vmax, const char* unit) 
     // glass_background bleeds a drop shadow ~5 dp outside its rect, so the frame
     // starts inboard of the cursor rather than getting clipped by the child.
     const float margin = ui_px(6.0f);
-    const float pad = ui_px(9.0f);
+    const float pad = ui_px(12.0f);
     const float bar_w = ui_px(16.0f);
     const float bar_h = ui_px(128.0f);
     const float text_gap = ui_px(8.0f);
@@ -1470,8 +1470,14 @@ void draw_colorbar(const char* title, float vmin, float vmax, const char* unit) 
     const ImVec2 frame_max(frame_min.x + 2.0f * pad + bar_w + text_gap + text_w,
                            frame_min.y + 2.0f * pad + bar_h);
     // The legend floats over the viewport, so it wears the same glass chrome as
-    // the live HUD instead of an ad-hoc white hairline.
-    glass_background(dl, frame_min, frame_max);
+    // the live HUD instead of an ad-hoc white hairline. glass_bg alone is 0.87
+    // alpha over a near-black canvas, which read as a smudge rather than a
+    // plate; an opaque surface_hi base under it gives the same step a docked
+    // card has, and the glass layer still supplies the shadow, shine and border.
+    const float rounding = 9.0f;
+    dl->AddRectFilled(frame_min, frame_max, ImGui::GetColorU32(palette.surface_hi),
+                      ui_px(rounding));
+    glass_background(dl, frame_min, frame_max, rounding, 1.0f);
 
     const ImVec2 bar_min(frame_min.x + pad, frame_min.y + pad);
     for (int i = 0; i < 32; ++i) {
@@ -1613,7 +1619,8 @@ void draw_model_step(App& app) {
     iw::input_text("Part path", app.open_path, sizeof(app.open_path), "path/to/part.step");
     if (iw::button("Open model", ImVec2(-1, 0), true,
                    "Load STEP/STP, OpenCASCADE BRep, or STL geometry. You can also drag a "
-                   "part anywhere onto the window.") &&
+                   "part anywhere onto the window.",
+                   iw::Icon::kOpen) &&
         app.open_path[0] != '\0') {
         load_model(app, app.open_path);
     }
@@ -1646,7 +1653,8 @@ void draw_material_step(App& app) {
         return;
     }
     int material = app.material_preset;
-    if (iw::selector("Preset", &material, kMaterials, 4, kMaterialHelp)) {
+    if (iw::selector("Preset", &material, kMaterials, 4, kMaterialHelp, nullptr,
+                     iw::Icon::kMaterial)) {
         app.material_preset = material;
         if (material == 0) {
             app.setup.youngs_modulus = 200e9;
@@ -1819,7 +1827,8 @@ void draw_run_step(App& app) {
         iw::Icon::kFine,
         iw::Icon::kManual,
     };
-    if (iw::selector("Mesh fidelity", &preset, kPresets, 4, kPresetHelp, kPresetIcons)) {
+    if (iw::selector("Mesh fidelity", &preset, kPresets, 4, kPresetHelp, kPresetIcons,
+                     iw::Icon::kMesh)) {
         apply_mesh_preset(app, static_cast<MeshPreset>(preset));
     }
     double h_mm = app.setup.mesh_size * 1e3;
@@ -1870,21 +1879,21 @@ void draw_run_step(App& app) {
         const float gap = ui_px(8.0f);
         const float width = (ImGui::GetContentRegionAvail().x - gap) * 0.5f;
         if (paused) {
-            if (iw::button("Resume", ImVec2(width, 0), true)) {
+            if (iw::button("Resume", ImVec2(width, 0), true, nullptr, iw::Icon::kResume)) {
                 app.job.request_resume();
             }
-        } else if (iw::button("Pause", ImVec2(width, 0))) {
+        } else if (iw::button("Pause", ImVec2(width, 0), false, nullptr, iw::Icon::kPause)) {
             app.job.request_pause();
         }
         ImGui::SameLine(0.0f, gap);
-        if (iw::button("Cancel", ImVec2(width, 0))) {
+        if (iw::button("Cancel", ImVec2(width, 0), false, nullptr, iw::Icon::kCancel)) {
             app.job.request_cancel();
         }
     } else if (state == SolveJob::State::kFailed || state == SolveJob::State::kCancelled) {
         ImGui::TextColored(state == SolveJob::State::kFailed ? palette.status_err
                                                              : palette.status_warn,
                            "%s", app.job.status_text().c_str());
-        if (iw::button("Dismiss", ImVec2(-1, 0))) {
+        if (iw::button("Dismiss", ImVec2(-1, 0), false, nullptr, iw::Icon::kDismiss)) {
             app.job.clear_failure();
             detach_live_callbacks(app);
             app.status = "ready";
@@ -2018,7 +2027,7 @@ void draw_pipeline_dock(App& app) {
     ImGui::BeginChild("##study_pipeline", size,
                       ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding,
                       ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-    iw::field_label("Study pipeline");
+    iw::field_label("Study pipeline", iw::Icon::kMesh);
 
     const auto state = app.job.state();
     const auto progress = app.job.progress();
@@ -2063,6 +2072,13 @@ void draw_pipeline_dock(App& app) {
     };
     static constexpr const char* kLabels[] = {
         "Geometry", "Study setup", "Mesh advisor", "Volume mesh", "Solve", "Results",
+    };
+    // One glyph per stage, so the rail is readable at a glance instead of six
+    // identical dots. The dot still carries the state (done / current / pending);
+    // the glyph only says which stage it is.
+    static constexpr iw::Icon kStageIcons[] = {
+        iw::Icon::kCad,  iw::Icon::kFixture, iw::Icon::kAdvisor,
+        iw::Icon::kMesh, iw::Icon::kSolve,   iw::Icon::kStress,
     };
     const std::array<bool, 6> done{
         model_done, setup_done, advisor_done, mesh_done, solve_done, solve_done,
@@ -2121,7 +2137,12 @@ void draw_pipeline_dock(App& app) {
             dl->AddCircle(ImVec2(dot_x, cy), dot_r, ImGui::GetColorU32(tone), 0,
                           ui_px(i == current ? 2.4f : 1.0f));
         }
-        const float text_x = row.x + ui_px(24.0f);
+        // Stage glyph sits between the state dot and the label and shares the
+        // dot's tone, so one read gives both "which stage" and "how far".
+        const float glyph = ui_px(12.0f);
+        iw::draw_icon(dl, ImVec2(row.x + ui_px(23.0f), cy), glyph,
+                      kStageIcons[static_cast<std::size_t>(i)], ImGui::GetColorU32(tone));
+        const float text_x = row.x + ui_px(35.0f);
         const float budget = std::max(0.0f, text_limit - text_x);
         dl->AddText(ImVec2(text_x, row.y),
                     ImGui::GetColorU32(i == current ? palette.text : palette.text_dim),
@@ -2246,7 +2267,9 @@ void draw_analysis_panel(App& app) {
     };
     if (has_output) {
         int mode = std::clamp(static_cast<int>(app.mode), 0, 4);
-        if (iw::selector("Field", &mode, kModes, 5, kModeHelp, kModeIcons)) {
+        // The heading glyph rides the selector's own caption — a separate
+        // field_label here would print FIELD twice.
+        if (iw::selector("Field", &mode, kModes, 5, kModeHelp, kModeIcons, iw::Icon::kCad)) {
             app.mode = static_cast<DisplayMode>(mode);
             sanitize_display_mode(app);
         }
@@ -2271,7 +2294,7 @@ void draw_analysis_panel(App& app) {
             };
             int deformation = static_cast<int>(app.deformation_view);
             if (iw::selector("Deformation", &deformation, kDeformationModes, 3,
-                             kDeformationHelp, kDeformationIcons)) {
+                             kDeformationHelp, kDeformationIcons, iw::Icon::kDeflection)) {
                 app.deformation_view = static_cast<DeformationView>(deformation);
                 app.deform_scale = app.deformation_view == DeformationView::kAuto
                                        ? app.deform_auto
@@ -2313,17 +2336,23 @@ void draw_analysis_panel(App& app) {
         ImGui::Separator();
     }
     if (app.result) {
-        const auto stress = std::format("{:.4g} MPa", app.result->max_von_mises / 1e6);
-        const auto displacement = std::format("{:.4g} mm", app.result->max_displacement * 1e3);
+        // Same formatter the colorbar legend uses, so the rail and the legend
+        // never report one quantity in two unit systems (0.009419 MPa vs 9.42 kPa).
+        const auto stress =
+            format_legend_value(static_cast<float>(app.result->max_von_mises), "Pa");
+        const auto displacement =
+            format_legend_value(static_cast<float>(app.result->max_displacement), "m");
         const auto error = std::format("{:.4g}", app.result->global_eta);
         const auto nodes = std::format("{}", app.result->volume_mesh.nodes.size());
         const auto elements = std::format("{}", app.result->volume_mesh.elements.size());
         const auto dof = std::format("{}", app.dof_count);
-        iw::field_label("Results");
+        iw::field_label("Results", iw::Icon::kStress);
         iw::stat_row("Max von Mises", stress.c_str(), app.mono_font, iw::Icon::kStress);
         iw::stat_row("Max displacement", displacement.c_str(), app.mono_font,
                      iw::Icon::kDeflection);
         iw::stat_row("Global ZZ η", error.c_str(), app.mono_font, iw::Icon::kError);
+        iw::tooltip("Nodal Zienkiewicz–Zhu recovery indicator for the whole mesh. Distinct "
+                    "from the per-pass eta shown on the convergence card.");
         iw::stat_row("Nodes", nodes.c_str(), app.mono_font, iw::Icon::kNodes);
         iw::stat_row("Elements", elements.c_str(), app.mono_font, iw::Icon::kElements);
         iw::stat_row("DOF", dof.c_str(), app.mono_font, iw::Icon::kDof);
@@ -2380,7 +2409,9 @@ void draw_analysis_panel(App& app) {
         const auto nodes = std::format("{}", app.mesh_preview->mesh.nodes.size());
         const auto elements = std::format("{}", app.mesh_preview->mesh.elements.size());
         const auto dof = std::format("{}", 3 * app.mesh_preview->mesh.nodes.size());
-        iw::field_label("Results");
+        // Mesh-only branch: nothing here is a stress field, so the heading wears
+        // the mesh glyph rather than the results-field one.
+        iw::field_label("Results", iw::Icon::kMesh);
         iw::stat_row("Nodes", nodes.c_str(), app.mono_font, iw::Icon::kNodes);
         iw::stat_row("Elements", elements.c_str(), app.mono_font, iw::Icon::kElements);
         iw::stat_row("DOF", dof.c_str(), app.mono_font, iw::Icon::kDof);
@@ -2508,11 +2539,12 @@ void draw_viewport_content(App& app) {
     // below so pressing it never orbits or deselects a face.
     constexpr float kFrameBtnW = 84.0f;
     ImGui::SetCursorScreenPos(ImVec2(item_max.x - kFrameBtnW - 12.0f, item_min.y + 12.0f));
-    if (ImGui::Button("frame (F)", ImVec2(kFrameBtnW, 0))) {
+    if (iw::button("frame (F)", ImVec2(kFrameBtnW, 0), false,
+                   "Fit the current CAD, mesh, or result field to the available viewport. "
+                   "Keyboard shortcut: F.",
+                   iw::Icon::kFit)) {
         app.viewport.frame_content(render_mode);
     }
-    iw::tooltip("Fit the current CAD, mesh, or result field to the available viewport. "
-                "Keyboard shortcut: F.");
     const bool over_frame_button = ImGui::IsItemHovered();
 
     // Camera works whenever the cursor is over the 3D image (all display modes).

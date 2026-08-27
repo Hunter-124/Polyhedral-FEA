@@ -61,15 +61,17 @@ is exact to 1e-9 m across FE/VEM interfaces
 
 **Order is hierarchical, p = 1..4, with a minimum rule on conformity.** A shared
 face or edge carries the lowest order of the elements touching it, so a p=1 cell
-sits next to a p=3 cell without transition machinery. Manufactured-solution
-energy-norm convergence measures 1.02 / 1.99 / 2.98 / 3.98 against theory
-1/2/3/4 ([report](bench/reports/p1-gate1-convergence.md)).
+sits next to a p=3 cell without transition machinery. The manufactured-solution
+behavioral test measures energy-norm rates 1.02 / 1.99 / 2.98 / 3.98 against
+theory 1/2/3/4
+([test](tests/test_hp_assembly.cpp)).
 
-**Adaptivity is joint in (h, p, shape).** The driver scores a geometry utility,
-an error utility and a cost utility per element — benefit per relative DOF — and
-takes the winner, breaking ties h > p > shape. Curved and singular regions get
-smaller cells, smooth regions get higher order, awkward regions get a different
-element shape ([hp_driver.hpp](src/adapt/include/adapt/hp_driver.hpp),
+**Adaptivity coordinates h and p.** Geometry demand and ZZ error drive local
+refinement/coarsening; smooth marked regions can promote to higher order.
+The shape-scoring interface is implemented and tested in isolation, but the
+current product pipeline does not claim measured per-element shape adaptation
+until real shape-fitness signals replace its neutral inputs
+([hp_driver.hpp](src/adapt/include/adapt/hp_driver.hpp),
 [test](tests/test_hp_driver.cpp)).
 
 **Sizing fields are FFT-filtered before the mesher sees them.** CAD-edge
@@ -172,44 +174,37 @@ our side are in [docs/comparisons.md](docs/comparisons.md).
 
 ## The learned mesh advisor
 
-A compact multi-head MLP maps geometry and BC features plus a candidate mesh
-action to accuracy, B-rep fidelity, cost and failure risk
-([ADR-0027](docs/decisions/0027-learned-mesh-advisor.md)). The shipped decision
-rule is gated enumeration: score all 38 measured candidates, drop the ones the
-feasibility head expects to fail, take the argmin of predicted per-case
-accuracy. Hard runtime vetoes still run afterwards. The gate improves a choice;
-the veto refuses one. `--advisor-max-dof N` adds a budget to that gate, and a
-cap that empties the candidate set returns clamp-box defaults with every
-prediction suppressed rather than an action the caller cannot afford.
+A compact multi-head MLP maps geometry and boundary-condition features plus a
+candidate mesh action to accuracy, B-rep fidelity, portable cost, and failure
+risk ([ADR-0027](docs/decisions/0027-learned-mesh-advisor.md)). The shipped
+decision rule enumerates measured candidates, rejects predicted failures and
+hard-cap violations, then optimizes either accuracy (default) or calibrated
+efficiency. A veto refuses an unsafe choice; it never manufactures a fallback
+prediction.
 
 ![Advisor mesh choices before and after](docs/advisor/figures/mesh_before_after.png)
 
-Evaluation is leave-one-family-out over 8 geometry families with 5 seeds, under
-a DOF-primary budget, with failing actions offered and charged. Regret is log10
-distance from the best feasible measured action. At q0.5 the shipped chooser
-scores 0.3338 regret at a 27.5% pick-failure rate, ahead of the shipped default
-(0.3796), a random feasible action (0.4076) and "just mesh finer" (0.4409); the
-operating point was picked to avoid doomed choices rather than to win a median
-that sits inside the ±0.24 fold spread. The deployed model is 16,177 parameters,
-exports at ONNX opset 17 with 2.158e-06 relative C++ parity, and costs about
-1.0 ms per recommendation.
+The current procedural corpus covers 15 families × 4 regimes × 5 load
+archetypes = 300 cases. Its independent Gmsh 4.13.1 → CalculiX 2.23 truth chain
+scores strain energy and displacement, never raw peak nodal stress. The assembled
+dataset has 36,010 rows: 15,578 supervise each accuracy head, 17,707 supervise
+portable cost, and all rows supervise feasibility. Missing campaign rows remain
+missing and machine-recorded rather than extrapolated.
 
-The advisor also refuses parts it does not recognise. A Mahalanobis distance
-over 31 part-geometry columns is tested against the shipped operating point of
-5.034, the training 99th percentile. Swept live over all 44 corpus primitives,
-it refuses all 20 parts from the five families absent from training at distances
-of 11.36 to 80.19, and advises all 12 trained geometries. The refusal is
-enforced in C++, not merely measured: it falls back to defaults and suppresses
-every `predicted_*` value to NaN. The case that motivated the gate had been
-reporting a predicted mesh time of about 5,300 years beside a failure
-probability of 1e-65.
+The deployed CPU-FP32 ONNX graph has 75 inputs and 19,156 parameters. Its
+family-held-out metrics include 0.6186-decade relative-error MAE, 0.2835-decade
+mesh-work MAE, and 0.8921 failure AUC; C++ parity is 3.063e-06 relative. The
+optional efficiency objective uses host calibration and selects the lowest
+predicted mesh-plus-roofline solve cost inside a 5% predicted-accuracy envelope.
+Without calibration it explicitly falls back to accuracy.
 
-The known weak point is the feasibility head the gate is built on: its AUC on
-the shipped checkpoint's own fold is 0.5248, near chance against a cross-fold
-mean of 0.806. Full metrics, per-head accuracy, calibration and the leakage
-correction that made the older numbers look better are in the
-[model card](docs/advisor/0004-model-card.md) and
-[data card](docs/advisor/0005-data-card.md).
+The advisor remains a gated chooser, not an error-tolerance guarantee.
+Held-out-family accuracy is difficult, OOD detection is imperfect, and no
+tolerance selector ships because the measured candidate violated requested
+tolerances more often than the finest-action baseline. Full corpus, coverage,
+model, calibration, and limitation evidence is in the
+[portable-cost retrain](docs/advisor/0012-portable-cost-retrain.md) and
+[curved-geometry retrain](docs/advisor/0011-v7-curved-geometry-retrain.md).
 
 ## Limits
 
@@ -237,6 +232,21 @@ correction that made the older numbers look better are in the
   native-poly transitions are implemented and tested, but VEM is not promoted to
   the default path until it beats `hybrid_zoo` on the frozen references. Tet FE
   remains the default accuracy claim.
+- At the extreme `cylinder` graded setting h=0.005, the mesh is closed and
+  non-inverted but contains a 0.004h sliver chain that the current CG policy
+  cannot solve. This setting is outside the labelled advisor grid.
+- On `ellipsoid_boss`, 23 of 5,974 boss-boundary nodes remain 0.30–0.48h inside
+  the exact B-rep after the validity-constrained projection. Non-integrable
+  cells fail closed; the positive-quality boundary tail remains a fidelity limit.
+- Default min/max-face boundary-condition selection is only a convenience and
+  remains weak on strongly curved parts. Use explicit boxes or GUI CAD-face
+  selection for consequential runs.
+- CAD-to-mesh reverse sharp-edge coverage still has a small tail on circular
+  rims even when mesh-to-CAD distance is tight.
+- The advisor selects or refuses among measured actions; it does not guarantee a
+  requested error tolerance. Fine graded geometry passes can also be
+  non-interruptible for hours, so campaign coverage is published rather than
+  silently filled.
 
 ## Build
 
@@ -254,15 +264,27 @@ sudo apt-get install -y libocct-data-exchange-dev libocct-foundation-dev \
   libocct-ocaf-dev libocct-visualization-dev
 ```
 
-Fedora: `sudo dnf install opencascade-devel`. You need a C++20 compiler
-(GCC 12+ or Clang 16+) and CMake ≥ 3.24; Catch2, GLFW, ImGui and the advisor's
-prebuilt ONNX Runtime are fetched by CMake. CUDA is optional and OFF by default.
+Fedora 44 needs a C++20 compiler, CMake ≥ 3.24, Ninja, Eigen, nlohmann/json,
+OpenCASCADE, OpenGL/X11 development headers, and OpenMP. Catch2, GLFW, ImGui,
+and the SHA-256-pinned ONNX Runtime archive are fetched by CMake. CUDA is
+optional and OFF by default.
+
+The convenience build stages the same relocatable tree used by release packages:
+
+```sh
+./build.sh
+dist/polymesh/bin/polymesh --version
+dist/polymesh/bin/polymesh backend
+```
+
+Manual configure, verification, install, and packaging:
 
 ```sh
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPOLYMESH_WITH_GUI=ON
-cmake --build build -j
-./build/apps/cli/polymesh backend   # confirm the runtime stack
+cmake --build build --parallel 4
 ctest --test-dir build --output-on-failure --parallel 2
+cmake --install build --prefix "$PWD/dist/polymesh"
+cmake --build build --target package
 ```
 
 There is deliberately no `-ffast-math`, no `-Ofast` and no reduced precision:
@@ -277,15 +299,14 @@ OFF — leave them off unless you re-verify with `ctest`.
 also accepts Gmsh `.msh`.
 
 ```sh
-CLI=./build/apps/cli/polymesh
-BOX=bench/geometries/public/unit_box.step
+CLI=dist/polymesh/bin/polymesh
+BOX=dist/polymesh/share/polymesh/examples/unit_box.step
 
+$CLI --version
 $CLI check $BOX                                    # validate the CAD
 $CLI mesh  $BOX -o /tmp/box.vtu                    # auto h0 from bbox + features
 $CLI solve $BOX -o /tmp/box_result.vtu             # fix min-x, load +Fy on max-x
 $CLI solve $BOX --mesher graded --adapt 3 --eta-target 0.05 -o /tmp/adapt.vtu
-$CLI diag  tests/fixtures/parts/pipe.step --json /tmp/pipe.json
-$CLI render tests/fixtures/parts/sphere.step -h 0.02 -o /tmp/sphere.png --wireframe
 ```
 
 Run `$CLI` with no arguments for the full help. Meshers, sizing, boundary
@@ -294,11 +315,13 @@ conditions, resource limits and build options are documented in
 
 ![PolyMesh Studio](docs/assets/showcase/gui_studio.png)
 
-`./build/apps/gui/polymesh-gui [part.step]` opens Studio: pick a part, set
-material and element size, assign fixtures and loads on faces, then **Mesh only**
-for a preview or **Solve** for stress, deflection and the ZZ indicator η. The
-GUI needs a display, so CI covers the pipeline through Catch2 rather than the
-window.
+`dist/polymesh/bin/polymesh-gui [part.step]` opens the Study workspace: import
+CAD, set material and mesh preset, assign fixtures and loads on faces, then run
+**Mesh preview** or **Solve study**. Stress, deflection, ZZ error, deformation,
+and VTU export live in the dedicated Results inspector. Repository campaigns and
+self-improve tools remain available under **Workspace → Developer / Test Lab**
+instead of consuming the default product surface. CI also launches this installed
+GUI under Xvfb.
 
 ## Layout
 
@@ -316,11 +339,12 @@ window.
 | `examples/` | Runnable mesh/solve scripts on the public fixtures |
 | `docs/` | Spec, ADRs, progress, showcase |
 
-The benchmark harness is adversarial on purpose: holdout geometries are
-git-ignored so the implementation loop never sees them, random rigid transforms
-catch coordinate hacks, a grep audit flags numeric literals near reference
-values, and ZZ effectivity is bounded to [0.5, 2] so the loop cannot win by
-making the estimator lie ([docs/benchmarks.md](docs/benchmarks.md)).
+The benchmark boundary is adversarial by design. Private holdout geometries and
+answers stay off-repo under the owner-run protocol in
+[audits/README.md](audits/README.md); automated private-holdout, random-transform,
+and ZZ-effectivity gates are designs rather than claimed CI coverage. The
+implemented CI anti-cheat gate is a grep audit that rejects benchmark reference
+answers in product code ([workflow](.github/workflows/ci.yml)).
 
 Every non-obvious decision has an ADR under
 [docs/decisions/](docs/decisions/), written after the measurement rather than
@@ -332,3 +356,7 @@ contribution flow are in [CONTRIBUTING.md](CONTRIBUTING.md) and
 ## License
 
 [BSD-3-Clause](LICENSE).
+
+Full runtime attribution is in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and is installed with every
+binary package.

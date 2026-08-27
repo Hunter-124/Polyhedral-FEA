@@ -1,20 +1,26 @@
 #!/usr/bin/env bash
 # Solve public fixtures with cantilever-style BCs (auto h0 unless POLYMESH_H is set).
-# Usage: ./examples/run_solve_public.sh [fixture_basename] [mesher]
-#   fixture_basename: unit_box | l_domain | plate | cylinder_prism | all (default: unit_box + plate)
-#   mesher: tet | hex | graded | hexpyr | hexvem  (default: tet)
+# Usage: ./examples/run_solve_public.sh [fixture] [mesher]
+#   fixture: unit_box | plate_hole | all (default: unit_box)
+#   mesher: tet | hex | graded | hexpyr | hexvem  (default: graded)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD="${POLYMESH_BUILD_DIR:-$ROOT/build}"
-POLYMESH="${POLYMESH_BIN:-$BUILD/apps/cli/polymesh}"
+if [[ -n "${POLYMESH_BIN:-}" ]]; then
+  POLYMESH="$POLYMESH_BIN"
+elif command -v polymesh >/dev/null 2>&1; then
+  POLYMESH="$(command -v polymesh)"
+else
+  POLYMESH="$BUILD/apps/cli/polymesh"
+fi
 GEOM="${POLYMESH_GEOM_DIR:-$ROOT/bench/geometries/public}"
 OUT="${POLYMESH_EXAMPLES_OUT:-$ROOT/examples/out}"
-MESHER="${2:-tet}"
+MESHER="${2:-graded}"
 TARGET="${1:-smoke}"
 
 if [[ ! -x "$POLYMESH" ]]; then
-  echo "error: polymesh not found at $POLYMESH" >&2
+  echo "error: polymesh not found (set POLYMESH_BIN, install it, or build it)" >&2
   echo "  build first: cmake -S . -B build -G Ninja && cmake --build build -j" >&2
   exit 1
 fi
@@ -37,28 +43,36 @@ NU="${POLYMESH_NU:-0.3}"
 
 run_one() {
   local base="$1"
-  local stl="$GEOM/${base}.stl"
-  if [[ ! -f "$stl" ]]; then
-    echo "error: missing $stl" >&2
+  local fixture
+  case "$base" in
+    unit_box) fixture="unit_box.step" ;;
+    plate_hole) fixture="plate+hole.step" ;;
+    *)
+      echo "error: unknown fixture '$base' (want unit_box or plate_hole)" >&2
+      exit 1
+      ;;
+  esac
+  local cad="$GEOM/$fixture"
+  if [[ ! -f "$cad" ]]; then
+    echo "error: missing $cad" >&2
     exit 1
   fi
   local vtu="$OUT/${base}_${MESHER}_solve.vtu"
   echo "==> solve $base (mesher=$MESHER, E=$E Pa, nu=$NU)"
-  "$POLYMESH" solve "$stl" "${H_ARGS[@]}" --mesher "$MESHER" \
+  "$POLYMESH" solve "$cad" "${H_ARGS[@]}" --mesher "$MESHER" \
     -E "$E" -nu "$NU" -o "$vtu"
   echo "    wrote $vtu"
 }
 
 case "$TARGET" in
   all)
-    for base in unit_box l_domain plate cylinder_prism; do
+    for base in unit_box plate_hole; do
       run_one "$base"
     done
     ;;
   smoke)
-    # Fast default: box + thin plate only.
+    # Fast default: one BRep box.
     run_one unit_box
-    run_one plate
     ;;
   *)
     run_one "$TARGET"

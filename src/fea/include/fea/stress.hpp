@@ -3,11 +3,9 @@
 
 // Stress recovery from a displacement solution.
 //
-// v0 recovery: element stress evaluated at each node's reference position,
-// averaged over all elements sharing the node. Zienkiewicz-Zhu
-// superconvergent patch recovery replaces this as the error-estimation
-// workhorse in Phase P5 (adapt module); this simple average is fine for
-// visualization and peak-stress benchmarks.
+// Element stress is evaluated at each node's reference position and averaged
+// over incident elements for visualization. The adaptive solve path separately
+// uses Zienkiewicz–Zhu patch recovery for error estimation.
 
 #include "fea/material.hpp"
 #include "fea/nodal_mesh.hpp"

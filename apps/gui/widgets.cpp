@@ -15,13 +15,15 @@ ImU32 u32(const ImVec4& c) { return ImGui::GetColorU32(c); }
 // Interwebz-look building blocks, all read from the palette (theme.hpp).
 void draw_box(ImDrawList* dl, const ImVec2& min, const ImVec2& max, bool hovered) {
     dl->AddRectFilled(min, max, u32(hovered ? palette.frame_bg_hovered : palette.frame_bg),
-                      2.0f);
-    dl->AddRect(min, max, u32(palette.border), 2.0f);
+                      ui_px(2.0f));
+    dl->AddRect(min, max, u32(palette.border), ui_px(2.0f));
 }
 
 void draw_accent_fill(ImDrawList* dl, const ImVec2& min, const ImVec2& max) {
-    dl->AddRectFilled(min, max, u32(palette.accent), 2.0f);
-    dl->AddRectFilledMultiColor(ImVec2(min.x + 1, min.y + 1), ImVec2(max.x - 1, max.y - 1),
+    dl->AddRectFilled(min, max, u32(palette.accent), ui_px(2.0f));
+    const float inset = ui_px(1.0f);
+    dl->AddRectFilledMultiColor(ImVec2(min.x + inset, min.y + inset),
+                                ImVec2(max.x - inset, max.y - inset),
                                 u32(palette.accent_soft_top), u32(palette.accent),
                                 u32(palette.accent), u32(palette.accent_soft_top));
 }
@@ -30,9 +32,9 @@ void draw_accent_fill(ImDrawList* dl, const ImVec2& min, const ImVec2& max) {
 // WindowBg is already panel_bg, so we only paint the header strip + border after
 // measuring content (no draw-list splitter / channel gymnastics).
 
-constexpr float kGroupHeader = 22.0f;
-constexpr float kGroupPad = 10.0f;
-constexpr float kGroupGap = 10.0f; // space after each box
+float group_header() { return ui_px(22.0f); }
+float group_pad() { return ui_px(10.0f); }
+float group_gap() { return ui_px(10.0f); }
 
 struct GroupBoxFrame {
     ImVec2 start{};
@@ -45,8 +47,8 @@ struct GroupBoxFrame {
 std::vector<GroupBoxFrame> g_group_stack;
 
 // Horizontal padding inside custom buttons so labels clear the border.
-constexpr float kBtnPadX = 12.0f;
-constexpr float kBtnPadY = 6.0f;
+float button_pad_x() { return ui_px(12.0f); }
+float button_pad_y() { return ui_px(6.0f); }
 
 /// Draw label text centered in [min,max], clipped so it never spills the box.
 void draw_centered_label(ImDrawList* dl, const ImVec2& min, const ImVec2& max,
@@ -92,14 +94,14 @@ void begin_group_box(const char* title) {
     // Outer group claims the full box width; header is reserved with a Dummy so
     // layout height is correct before content is measured.
     ImGui::BeginGroup();
-    ImGui::Dummy(ImVec2(frame.width, kGroupHeader));
+    const float header = group_header();
+    const float pad = group_pad();
+    ImGui::Dummy(ImVec2(frame.width, header));
 
     // Content child with BOTH left and right padding so GetContentRegionAvail()
-    // already reserves kGroupPad on the right (PushItemWidth alone is not enough
-    // for custom widgets that use avail width, or ImGui items with -FLT_MIN).
-    const float content_w = std::max(1.0f, frame.width - 2.0f * kGroupPad);
-    ImGui::SetCursorScreenPos(
-        ImVec2(frame.start.x + kGroupPad, frame.start.y + kGroupHeader + kGroupPad));
+    // already reserves padding on the right.
+    const float content_w = std::max(1.0f, frame.width - 2.0f * pad);
+    ImGui::SetCursorScreenPos(ImVec2(frame.start.x + pad, frame.start.y + header + pad));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
     ImGui::BeginChild(title, ImVec2(content_w, 0.0f), ImGuiChildFlags_AutoResizeY,
                       ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollbar |
@@ -116,17 +118,18 @@ void begin_group_box_fill(const char* title, float outer_height) {
     frame.width = ImGui::GetContentRegionAvail().x;
     frame.title = title;
     // Header + top/bottom pad; content fills the rest.
-    const float chrome = kGroupHeader + 2.0f * kGroupPad;
+    const float header = group_header();
+    const float pad = group_pad();
+    const float chrome = header + 2.0f * pad;
     frame.fixed_content_h = std::max(1.0f, outer_height - chrome);
 
     ImGui::BeginGroup();
     // Fixed outer height so chrome bounds match the fill region.
     ImGui::Dummy(ImVec2(frame.width, std::max(outer_height, chrome)));
     // Rewind to place content under the header.
-    ImGui::SetCursorScreenPos(
-        ImVec2(frame.start.x + kGroupPad, frame.start.y + kGroupHeader + kGroupPad));
+    ImGui::SetCursorScreenPos(ImVec2(frame.start.x + pad, frame.start.y + header + pad));
 
-    const float content_w = std::max(1.0f, frame.width - 2.0f * kGroupPad);
+    const float content_w = std::max(1.0f, frame.width - 2.0f * pad);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
     ImGui::BeginChild(title, ImVec2(content_w, frame.fixed_content_h), ImGuiChildFlags_None,
                       ImGuiWindowFlags_NoBackground);
@@ -144,18 +147,18 @@ void end_group_box() {
     ImGui::PopItemWidth();
     ImGui::EndChild(); // content
 
+    const float header = group_header();
+    const float pad = group_pad();
     if (frame.fixed_content_h > 0.0f) {
         // Fixed-fill: outer Dummy already reserved full height; place cursor
         // after the box for the trailing gap.
-        ImGui::SetCursorScreenPos(
-            ImVec2(frame.start.x,
-                   frame.start.y + kGroupHeader + 2.0f * kGroupPad + frame.fixed_content_h));
+        ImGui::SetCursorScreenPos(ImVec2(frame.start.x, frame.start.y + header + 2.0f * pad +
+                                                            frame.fixed_content_h));
         ImGui::Dummy(ImVec2(frame.width, 0.0f));
     } else {
         // Auto-height: bottom padding inside the border.
         ImGui::SetCursorScreenPos(ImVec2(
-            frame.start.x,
-            std::max(ImGui::GetItemRectMax().y, frame.start.y + kGroupHeader) + kGroupPad));
+            frame.start.x, std::max(ImGui::GetItemRectMax().y, frame.start.y + header) + pad));
         ImGui::Dummy(ImVec2(frame.width, 0.0f));
     }
     ImGui::EndGroup(); // outer chrome bounds
@@ -166,19 +169,19 @@ void end_group_box() {
     // Draw chrome on the parent draw list (child is nested; outer group is parent).
     ImDrawList* dl = ImGui::GetWindowDrawList();
     // Header strip (covers the reserved Dummy only — content sits below it).
-    dl->AddRectFilled(box_min, ImVec2(box_max.x, box_min.y + kGroupHeader),
-                      u32(palette.header_bg), 3.0f, ImDrawFlags_RoundCornersTop);
-    dl->AddRect(box_min, box_max, u32(palette.border), 3.0f);
-    // 2px accent rule down the left of the header strip. Inset by 1px so the
-    // border stays visible around it, and palette-driven so it reads correctly
-    // in every theme (Studio cyan, Interwebz rose, Slate blue).
-    dl->AddRectFilled(ImVec2(box_min.x + 1.0f, box_min.y + 1.0f),
-                      ImVec2(box_min.x + 3.0f, box_min.y + kGroupHeader), u32(palette.accent));
-    dl->PushClipRect(box_min, ImVec2(box_max.x - 4.0f, box_min.y + kGroupHeader), true);
-    dl->AddText(ImVec2(box_min.x + 12.0f, box_min.y + 3.0f), u32(palette.text), frame.title);
+    dl->AddRectFilled(box_min, ImVec2(box_max.x, box_min.y + header), u32(palette.header_bg),
+                      ui_px(3.0f), ImDrawFlags_RoundCornersTop);
+    dl->AddRect(box_min, box_max, u32(palette.border), ui_px(3.0f));
+    const float inset = ui_px(1.0f);
+    dl->AddRectFilled(ImVec2(box_min.x + inset, box_min.y + inset),
+                      ImVec2(box_min.x + ui_px(3.0f), box_min.y + header),
+                      u32(palette.accent));
+    dl->PushClipRect(box_min, ImVec2(box_max.x - ui_px(4.0f), box_min.y + header), true);
+    dl->AddText(ImVec2(box_min.x + ui_px(12.0f), box_min.y + ui_px(3.0f)), u32(palette.text),
+                frame.title);
     dl->PopClipRect();
 
-    ImGui::Dummy(ImVec2(0.0f, kGroupGap));
+    ImGui::Dummy(ImVec2(0.0f, group_gap()));
 }
 
 namespace {
@@ -195,35 +198,34 @@ float fill_width() {
 } // namespace
 
 bool checkbox(const char* label, bool* value) {
-    constexpr float kBox = 15.0f;
+    const float box = ui_px(15.0f);
     ImGui::PushID(label);
     const ImVec2 pos = ImGui::GetCursorScreenPos();
     const ImVec2 label_size = ImGui::CalcTextSize(label);
-    const float hit_w = std::min(fill_width(), kBox + 8.0f + label_size.x);
-    const bool pressed = ImGui::InvisibleButton("##cb", ImVec2(hit_w, kBox + 2.0f));
+    const float hit_w = std::min(fill_width(), box + ui_px(8.0f) + label_size.x);
+    const bool pressed = ImGui::InvisibleButton("##cb", ImVec2(hit_w, box + ui_px(2.0f)));
     if (pressed) {
         *value = !*value;
     }
     const bool hovered = ImGui::IsItemHovered();
     ImDrawList* dl = ImGui::GetWindowDrawList();
-    const ImVec2 box_min(pos.x, pos.y + 1.0f);
-    const ImVec2 box_max(pos.x + kBox, pos.y + 1.0f + kBox);
+    const ImVec2 box_min(pos.x, pos.y + ui_px(1.0f));
+    const ImVec2 box_max(pos.x + box, pos.y + ui_px(1.0f) + box);
     if (*value) {
         draw_accent_fill(dl, box_min, box_max);
-        const float s = kBox;
-        dl->AddLine(ImVec2(box_min.x + 0.25f * s, box_min.y + 0.55f * s),
-                    ImVec2(box_min.x + 0.42f * s, box_min.y + 0.72f * s), u32(palette.text),
-                    1.6f);
-        dl->AddLine(ImVec2(box_min.x + 0.42f * s, box_min.y + 0.72f * s),
-                    ImVec2(box_min.x + 0.76f * s, box_min.y + 0.30f * s), u32(palette.text),
-                    1.6f);
+        dl->AddLine(ImVec2(box_min.x + 0.25f * box, box_min.y + 0.55f * box),
+                    ImVec2(box_min.x + 0.42f * box, box_min.y + 0.72f * box),
+                    u32(palette.text), ui_px(1.6f));
+        dl->AddLine(ImVec2(box_min.x + 0.42f * box, box_min.y + 0.72f * box),
+                    ImVec2(box_min.x + 0.76f * box, box_min.y + 0.30f * box),
+                    u32(palette.text), ui_px(1.6f));
     } else {
         draw_box(dl, box_min, box_max, hovered);
     }
-    const ImVec2 text_min(box_max.x + 8.0f, pos.y);
-    const ImVec2 text_max(pos.x + hit_w, pos.y + kBox + 2.0f);
+    const ImVec2 text_min(box_max.x + ui_px(8.0f), pos.y);
+    const ImVec2 text_max(pos.x + hit_w, pos.y + box + ui_px(2.0f));
     dl->PushClipRect(text_min, text_max, true);
-    dl->AddText(ImVec2(box_max.x + 8.0f, pos.y + 1.0f),
+    dl->AddText(ImVec2(box_max.x + ui_px(8.0f), pos.y + ui_px(1.0f)),
                 u32(hovered ? palette.text : palette.text_dim), label);
     dl->PopClipRect();
     ImGui::PopID();
@@ -232,7 +234,7 @@ bool checkbox(const char* label, bool* value) {
 
 bool slider_double(const char* label, double* value, double min, double max,
                    const char* format) {
-    constexpr float kBar = 10.0f;
+    const float bar = ui_px(10.0f);
     ImGui::PushID(label);
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const float width = fill_width();
@@ -243,28 +245,29 @@ bool slider_double(const char* label, double* value, double min, double max,
     const ImVec2 vsize = ImGui::CalcTextSize(value_text);
     const ImVec2 lsize = ImGui::CalcTextSize(label);
     // Clip label so it never runs into the value on the right.
-    dl->PushClipRect(pos, ImVec2(pos.x + width - vsize.x - 6.0f, pos.y + lsize.y + 2.0f),
-                     true);
+    dl->PushClipRect(
+        pos, ImVec2(pos.x + width - vsize.x - ui_px(6.0f), pos.y + lsize.y + ui_px(2.0f)),
+        true);
     dl->AddText(pos, u32(palette.text_dim), label);
     dl->PopClipRect();
     dl->AddText(ImVec2(pos.x + width - vsize.x, pos.y), u32(palette.text_dim), value_text);
-    ImGui::Dummy(ImVec2(width, lsize.y + 2.0f));
+    ImGui::Dummy(ImVec2(width, lsize.y + ui_px(2.0f)));
 
     pos = ImGui::GetCursorScreenPos();
-    ImGui::InvisibleButton("##slider", ImVec2(width, kBar + 4.0f));
+    ImGui::InvisibleButton("##slider", ImVec2(width, bar + ui_px(4.0f)));
     const bool active = ImGui::IsItemActive();
     if (active) {
         const float mouse_t =
             std::clamp((ImGui::GetIO().MousePos.x - pos.x) / width, 0.0f, 1.0f);
         *value = min + (max - min) * static_cast<double>(mouse_t);
     }
-    const ImVec2 bar_min(pos.x, pos.y + 2.0f);
-    const ImVec2 bar_max(pos.x + width, pos.y + 2.0f + kBar);
+    const ImVec2 bar_min(pos.x, pos.y + ui_px(2.0f));
+    const ImVec2 bar_max(pos.x + width, pos.y + ui_px(2.0f) + bar);
     draw_box(dl, bar_min, bar_max, ImGui::IsItemHovered());
     const float t = max > min ? static_cast<float>((*value - min) / (max - min)) : 0.0f;
     if (t > 0.0f) {
         draw_accent_fill(dl, bar_min,
-                         ImVec2(bar_min.x + std::max(3.0f, t * width), bar_max.y));
+                         ImVec2(bar_min.x + std::max(ui_px(3.0f), t * width), bar_max.y));
     }
     ImGui::PopID();
     return active;
@@ -276,10 +279,11 @@ bool button(const char* label, const ImVec2& size, bool primary) {
     // size.x < 0 → fill item width (respects group-box PushItemWidth);
     // size.x == 0 → hug label; size.x > 0 → explicit.
     const float avail = fill_width();
-    const float width = size.x < 0.0f   ? avail
-                        : size.x > 0.0f ? size.x
-                                        : std::min(avail, label_size.x + 2.0f * kBtnPadX);
-    const float height = size.y > 0.0f ? size.y : label_size.y + 2.0f * kBtnPadY;
+    const float width = size.x < 0.0f ? avail
+                        : size.x > 0.0f
+                            ? size.x
+                            : std::min(avail, label_size.x + 2.0f * button_pad_x());
+    const float height = size.y > 0.0f ? size.y : label_size.y + 2.0f * button_pad_y();
     const ImVec2 pos = ImGui::GetCursorScreenPos();
     const bool pressed = ImGui::InvisibleButton("##btn", ImVec2(width, height));
     const bool hovered = ImGui::IsItemHovered();
@@ -288,7 +292,7 @@ bool button(const char* label, const ImVec2& size, bool primary) {
     if (primary) {
         draw_accent_fill(dl, pos, max);
         if (hovered) {
-            dl->AddRect(pos, max, u32(palette.text), 2.0f);
+            dl->AddRect(pos, max, u32(palette.text), ui_px(2.0f));
         }
     } else {
         draw_box(dl, pos, max, hovered);
@@ -305,10 +309,10 @@ namespace {
 void begin_field(const char* label) {
     const float avail = fill_width();
     const float text_w = ImGui::CalcTextSize(label).x;
-    constexpr float kMinField = 96.0f;
-    constexpr float kGap = 10.0f;
+    const float min_field = ui_px(96.0f);
+    const float gap = ui_px(10.0f);
 
-    if (text_w + kGap + kMinField > avail) {
+    if (text_w + gap + min_field > avail) {
         ImGui::TextColored(palette.text_dim, "%s", label);
         ImGui::SetNextItemWidth(fill_width());
         return;
@@ -317,7 +321,7 @@ void begin_field(const char* label) {
     // Side-by-side relative to this row's start (not window origin — group boxes
     // indent via SetCursorScreenPos, so SameLine(offset) would misalign).
     const float row_start = ImGui::GetCursorPosX();
-    const float label_col = std::clamp(text_w + kGap, avail * 0.38f, avail - kMinField);
+    const float label_col = std::clamp(text_w + gap, avail * 0.38f, avail - min_field);
     ImGui::AlignTextToFramePadding();
     ImGui::TextColored(palette.text_dim, "%s", label);
     ImGui::SameLine(0.0f, 0.0f);
@@ -358,20 +362,21 @@ bool selector(const char* label, int* index, const char* const* options, int cou
         ImGui::PopID();
         return false;
     }
+    ImGui::TextColored(palette.text_dim, "%s", label);
 
-    constexpr float kGap = 4.0f;
-    constexpr float kPadX = 8.0f;
+    const float gap = ui_px(4.0f);
+    const float pad_x = ui_px(8.0f);
     // Symmetric left/right: width comes from PushItemWidth / content child.
     const float avail = fill_width();
-    const float height = ImGui::GetTextLineHeight() + 2.0f * kBtnPadY;
-    const int cols = fit_selector_columns(options, count, avail, kGap, kPadX);
+    const float height = ImGui::GetTextLineHeight() + 2.0f * button_pad_y();
+    const int cols = fit_selector_columns(options, count, avail, gap, pad_x);
     const float cell_w =
-        (avail - kGap * static_cast<float>(cols - 1)) / static_cast<float>(cols);
+        (avail - gap * static_cast<float>(cols - 1)) / static_cast<float>(cols);
 
     for (int i = 0; i < count; ++i) {
         const int col = i % cols;
         if (col > 0) {
-            ImGui::SameLine(0.0f, kGap);
+            ImGui::SameLine(0.0f, gap);
         }
 
         ImGui::PushID(i);
@@ -380,7 +385,7 @@ bool selector(const char* label, int* index, const char* const* options, int cou
         // (symmetric padding comes from the group-box content width, not cells).
         float width = cell_w;
         if (col == cols - 1) {
-            width = avail - (cell_w + kGap) * static_cast<float>(cols - 1);
+            width = avail - (cell_w + gap) * static_cast<float>(cols - 1);
         }
         width = std::max(width, 1.0f);
 

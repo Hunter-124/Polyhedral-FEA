@@ -61,7 +61,7 @@ and error, export VTU — without CLI.
 
 | ID | Task | Acceptance |
 |----|------|------------|
-| A1 | CLI argv: `polymesh-gui [path.stl\|.step]` | Opens model on launch |
+| A1 | CLI argv: `polymesh-gui [path.step\|.brep]` | Opens model on launch |
 | A2 | **Mesh preview** (no solve): Mesh button → boundary quads + element-type colors | Visible before solve |
 | A3 | Failed-job UX: clear status, re-enable Solve | Can recover after failure |
 | A4 | ZZ error field display mode (η per node or cell) | Third results mode works |
@@ -69,7 +69,7 @@ and error, export VTU — without CLI.
 | A6 | Wireframe / undeformed overlay toggle | Can see mesh edges |
 | A7 | Native file dialog or drag-drop (platform) | Open without typing path |
 | A8 | Mesh note + DOF count in UI during/after mesh | Status not empty |
-| A9 | Theme polish vs CAD reference (screenshots) | Owner sign-off ⛔ GATE 6.5 |
+| A9 | ~~Theme/UI release gate: Study-first layout, DPI scaling, compact presets~~ | Done — fixed-width 1280/1600 and forced 1.5× captures |
 | A10 | Headless GUI pipeline tests for mesh-only path | ctest covers mesh preview data |
 
 ## Track B — Mesh quality (P2 remaining)
@@ -174,12 +174,12 @@ A1 A3 ──> A2 A10 ──> A4 A5 A8 ──> A6 A7
 
 | Track | Status |
 |-------|--------|
-| A GUI | M1 core in: argv open, mesh preview, ZZ error, colorbar, failure dismiss, A6 wireframe/undeformed, A7 drag-drop open, A8 mesh note+DOF. **Results camera** (pan/orbit in σ_vm/|u|/η) + auto deformation scale. Still: A9 theme GATE. |
+| A GUI | A1–A10 done. Release workspace is Study setup + dominant viewport + FEA Results; Test Lab is opt-in. DPI-aware fonts/widgets/FBO, compact mesh presets, consolidated deformation/display controls, and responsive 1280/1600 layouts close A9. |
 | B Mesh | Grid tet/hex/graded/hexpyr; B1 documented limits (ADR-0015); B2/B3/B4/B5 done. Graded+feature now **h/4 fine** near curvature/seeds. Not true Delaunay. |
 | C Hybrid | C1/C2/C3/C4/C5 done (hex→pyramids; geometry sizing; prism fill; VEM k=2; Kirsch graded @ equal DOF). Product **geo-hp**: variable h (skin/features) + bulk p=2 / surface p=1. |
 | D Adapt | Seed remesh + η (D2) + auto h0 (D5) + p-elev (D3) + local LEB (D4) + D6 L-domain instrument (5.12× DOF / 12.2× time). Product-path Tier-3 on full public suite still open. |
 | E Verify | E1–E4 done; D6 Tier-3 scoreboard instrument on L-domain. |
 | F Perf | F1–F3 done: OpenMP assembly, auto CG above 50000 free DOFs (incomplete-Cholesky, bounded iterations), CSR SpMV + optional CUDA parity. |
-| G Release | G1–G4 done: README, examples/, header units, CI green (format+ctest+grep-audit). |
+| G Release | G1–G4 plus v0.1.0 packaging: consistent CLI/GUI version identity, relocatable CMake install/CPack TGZ, bundled ONNX Runtime + notices, desktop/AppStream/icon assets, package smoke, and tagged release workflow. |
 | H Mesher | **Active.** Graded LEB conformity (ADR-0018), stamp hybrid, snap hash, plan/scoreboard. Mesher-quality wave landed (ADR-0030–0033): pyramid quadrature domain fixed ("fan transition volume loss" retracted), quadratic faces drawn through mid-edge nodes, graded torn shells closed (14/14 watertight), jut carve requires outside-the-solid, gates now measure the cell that ships (pyramid split-tet decomposition, hex interior relaxation, snap final-sweep fixed point, graded interior-sliver relaxation). Remaining: ADR-0033's two open defects — the graded sliver chain (`cylinder` graded h=0.005 unsolvable; graded-snap re-engineering) and the `ellipsoid_boss` boundary tail (next thread is the size field, not the snap) — plus H2 true hybrid FE, octa; solver precond only partially (H-V1: incomplete-Cholesky + bounded iterations landed 2026-08-08, mesh-aware preconditioner open). |
-| Advisor | **Active program.** Learned mesh advisor (ADR-0026–0029): v4 corpus shipped — 2,752 rows, 100 % procedural self-generated (8 families × 4 sizes × 3 loads = 96 cases), external Gmsh+CalculiX truth, leave-one-family-out evaluation, feasibility-gated enumeration deployed (ONNX Runtime CPU). "Cheapest mesh within tolerance" measured and **not shippable** yet ([`advisor/0007`](advisor/0007-tolerance-selector.md) / [`0008`](advisor/0008-v4-corpus-retrain.md)). Next: corpus regeneration post-ADR-0033 (folded-hybrid element counts are stale), then retrain. Tracker: [`advisor/0003-training-log.md`](advisor/0003-training-log.md). |
+| Advisor | **Portable-cost cycle shipped.** The current corpus covers 15 families × 4 regimes × 5 archetypes (300 cases); 36,010 measured rows supervise accuracy, portable cost, and feasibility with independent Gmsh+CalculiX truths. The deployed 75-input / 19,156-parameter ONNX graph supports accuracy and calibrated-efficiency objectives with failure/OOD refusal. No tolerance-guaranteeing selector ships; missing campaign rows and fine-graded interruptibility remain published limitations ([`advisor/0011`](advisor/0011-v7-curved-geometry-retrain.md) / [`0012`](advisor/0012-portable-cost-retrain.md)). |

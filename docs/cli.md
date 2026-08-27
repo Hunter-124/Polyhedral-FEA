@@ -13,8 +13,10 @@ rejected for `.msh`. Fixture:
 (1 m axis-aligned box).
 
 ```sh
-CLI=./build/apps/cli/polymesh
+CLI="${POLYMESH_BIN:-./build/apps/cli/polymesh}"
 BOX=bench/geometries/public/unit_box.step
+
+$CLI --version
 
 # Validate CAD geometry
 $CLI check $BOX
@@ -66,20 +68,23 @@ Fixtures used above: [`tests/fixtures/parts/pipe.step`](../tests/fixtures/parts/
 ![PolyMesh Studio](assets/showcase/gui_studio.png)
 
 ```sh
-./build/apps/gui/polymesh-gui
-./build/apps/gui/polymesh-gui bench/geometries/public/unit_box.step
+dist/polymesh/bin/polymesh-gui
+dist/polymesh/bin/polymesh-gui \
+  dist/polymesh/share/polymesh/examples/unit_box.step
 ```
 
-PolyMesh Studio opens a CAD part (path field, argv, or drag-drop), sets material
-and element size (mm; 0 = the same auto h0 the CLI uses), assigns fixtures and
-loads on faces, then runs **Mesh only** for a preview or **Solve** for stress,
-deflection and the ZZ indicator η. The status strip reports the resolved
-`auto h=…`, and VTU export lives in the results panel. F12, or *File → save
-screenshot*, writes a PNG of the window to the working directory as
-`polymesh_shot_<UTC>.png`; setting `POLYMESH_GUI_SHOT=/abs/path.png` writes to
-that exact path instead, which is how the headless capture works. The GUI needs
-a display (GLFW), so CI covers the pipeline through Catch2 rather than the
-window.
+The default Study workspace keeps Model, material/mesh presets, Run, and
+fixture/load assignment on the left; the viewport owns the center; field,
+deformation, metrics, and VTU export live in the Results inspector. Advanced
+mesher/adapt/resource controls are disclosed on demand. Repository campaigns,
+raw result tables, and self-improve controls live under **Workspace → Developer
+/ Test Lab** instead of occupying the release UI.
+
+F12 or **File → Save screenshot** writes the window framebuffer to a PNG.
+`POLYMESH_GUI_SHOT=/abs/path.png` selects a fixed path and
+`POLYMESH_GUI_SCALE=0.75..3.0` overrides monitor scale for deterministic capture.
+CI launches the installed GUI under Xvfb in addition to the headless Catch2
+pipeline tests.
 
 ## Meshers
 
@@ -165,6 +170,20 @@ would breach the ceiling. Mesh and CG loops poll cancellation every iteration,
 so **Cancel** returns in milliseconds instead of at the next phase boundary. See
 [`src/fea/include/fea/resource_budget.hpp`](../src/fea/include/fea/resource_budget.hpp).
 
+## Host calibration
+
+`calibrate` measures portable FLOP, memory-bandwidth, and reference-mesh rates
+for the advisor's calibrated-efficiency objective:
+
+```sh
+$CLI calibrate --out host.json
+```
+
+Installed and build-tree binaries locate the packaged `plate_hole.step`
+calibration asset relative to the executable. `--reference part.step` and
+`--reference-h metres` deliberately override that asset; the command never
+searches repository test paths at runtime.
+
 ## Build options
 
 ```sh
@@ -202,6 +221,24 @@ bounded iteration cap so a non-converging system fails instead of grinding. The
 choice depends only on free-DOF count, never on element type. Patch tests and
 verification meshes stay on the direct path so constant-strain exactness is
 preserved. See [`src/fea/include/fea/solve.hpp`](../src/fea/include/fea/solve.hpp).
+
+## Product limits
+
+- CAD product commands accept STEP/BRep, not STL. Gmsh `.msh` is accepted only
+  as an already-generated volume mesh for `solve`.
+- Product fills are Cartesian grid based, not constrained Delaunay.
+- At the extreme `cylinder` graded setting h=0.005, a closed mesh can contain a
+  sliver chain that the current CG policy cannot solve.
+- Default min/max-face boundary conditions are a convenience for simple parts.
+  Use `--fix-box` / `--load-box` or GUI CAD-face selection on curved geometry.
+- The advisor selects or refuses among measured candidates; it does not
+  guarantee an error tolerance. Fine graded geometry work can be
+  non-interruptible for long periods.
+- VTU result export contains displacement, von Mises, ZZ η, and cell quality;
+  it does not yet export the full stress tensor or reactions.
+
+The measured evidence and precise caveats are maintained in
+[`README.md` § Limits](../README.md#limits).
 
 ## Tests and benchmarks
 

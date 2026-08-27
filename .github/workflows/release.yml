@@ -1,0 +1,83 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  linux-package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Validate release identity
+        shell: bash
+        run: |
+          version="$(sed -nE 's/^project\(polymesh VERSION ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt)"
+          test -n "$version"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME}" != "v${version}" ]]; then
+            echo "tag ${GITHUB_REF_NAME} does not match CMake version ${version}" >&2
+            exit 1
+          fi
+          echo "POLYMESH_VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ninja-build cmake g++ libeigen3-dev nlohmann-json3-dev libomp-dev \
+            libtbb-dev libfontconfig1-dev libfreetype-dev libgl1-mesa-dev \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            libxext-dev xvfb xauth desktop-file-utils appstream \
+            libocct-data-exchange-dev libocct-foundation-dev \
+            libocct-modeling-algorithms-dev libocct-modeling-data-dev \
+            libocct-ocaf-dev libocct-visualization-dev
+
+      - name: Build package
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DPOLYMESH_BUILD_TESTS=OFF \
+            -DPOLYMESH_WITH_GUI=ON \
+            -DPOLYMESH_WITH_OCC=ON \
+            -DPOLYMESH_WITH_ADVISOR=ON
+          cmake --build build --parallel 2
+          cmake --install build --prefix "$PWD/build/stage"
+          cmake --build build --target package
+
+      - name: Validate installed runtime
+        run: |
+          test "$(build/stage/bin/polymesh --version)" = "polymesh ${POLYMESH_VERSION}"
+          build/stage/bin/polymesh backend
+          desktop-file-validate \
+            build/stage/share/applications/io.github.hunter124.PolyMesh.desktop
+          appstreamcli validate --no-net \
+            build/stage/share/metainfo/io.github.hunter124.PolyMesh.metainfo.xml
+          xvfb-run -a env POLYMESH_GUI_SIZE=1280x800 \
+            build/stage/bin/polymesh-gui \
+            build/stage/share/polymesh/examples/unit_box.step \
+            --auto "shot build/stage/gui-smoke.png; quit"
+          test -s build/stage/gui-smoke.png
+          readelf -d build/stage/bin/polymesh | grep -F '$ORIGIN/../lib'
+          sha256sum "build/polymesh-${POLYMESH_VERSION}-Linux.tar.gz" \
+            > "build/polymesh-${POLYMESH_VERSION}-Linux.tar.gz.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: polymesh-${{ env.POLYMESH_VERSION }}-linux
+          path: |
+            build/polymesh-${{ env.POLYMESH_VERSION }}-Linux.tar.gz
+            build/polymesh-${{ env.POLYMESH_VERSION }}-Linux.tar.gz.sha256
+
+      - name: Publish GitHub release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            build/polymesh-${{ env.POLYMESH_VERSION }}-Linux.tar.gz
+            build/polymesh-${{ env.POLYMESH_VERSION }}-Linux.tar.gz.sha256

@@ -1,16 +1,16 @@
 # PolyMesh examples
 
-Runnable smoke scripts for the product CLI on the **public geometry fixtures**.
-Geometries live under `bench/geometries/public/` (not copied here — keep the
-tree small). A symlink `examples/geometries` points at that directory.
+Runnable smoke scripts for the product CLI on the **public CAD fixtures**.
+Geometries live under `bench/geometries/public/`; the
+`examples/geometries` symlink points at that directory.
 
 | Fixture | Shape | Typical use |
 |---------|-------|-------------|
-| `unit_box.stl` | 1 m cube | fastest mesh/solve smoke |
-| `l_domain.stl` | L-prism | re-entrant corner / graded |
-| `plate.stl` | thin plate | skin / feature options |
-| `cylinder_prism.stl` | octagonal prism | multi-face solid |
+| `unit_box.step` | 1 m cube | fastest BRep mesh/solve smoke |
+| `plate+hole.step` | curved plate with through-hole | feature grading and CAD fidelity |
 
+The legacy STLs in the fixture directory remain internal mesher regression
+assets. The released product path intentionally accepts STEP/BRep, not STL.
 Details: [`bench/geometries/public/README.md`](../bench/geometries/public/README.md).
 
 ## Prerequisites
@@ -22,11 +22,12 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPOLYMESH_WITH_GUI=OFF
 cmake --build build -j
 ```
 
-Override binary or build tree if needed:
+The scripts use `polymesh` from `PATH`, then fall back to the build tree.
+Override either location when needed:
 
 ```sh
-export POLYMESH_BUILD_DIR=/path/to/build   # default: <repo>/build
-export POLYMESH_BIN=/path/to/polymesh      # default: $POLYMESH_BUILD_DIR/apps/cli/polymesh
+export POLYMESH_BUILD_DIR=/path/to/build
+export POLYMESH_BIN=/path/to/polymesh
 ```
 
 ## Scripts
@@ -38,10 +39,10 @@ All scripts write under `examples/out/` (gitignored) unless you set
 
 ```sh
 ./examples/run_mesh_public.sh
-# optional: single fixture basename without .stl
+# optional: single fixture name without extension
 ./examples/run_mesh_public.sh unit_box
-# optional mesher: tet (default) | hex | graded | hexpyr | hexvem
-./examples/run_mesh_public.sh l_domain graded
+# optional mesher: graded (default) | tet | hex | hexpyr | hexvem
+./examples/run_mesh_public.sh plate_hole graded
 ```
 
 Omit `-h` so the CLI uses `resolve_mesh_size` (bbox + sharp-edge density).
@@ -51,7 +52,7 @@ Omit `-h` so the CLI uses `resolve_mesh_size` (bbox + sharp-edge density).
 ```sh
 ./examples/run_solve_public.sh
 # single fixture + optional mesher
-./examples/run_solve_public.sh plate tet
+./examples/run_solve_public.sh plate_hole graded
 ```
 
 Default material: \(E = 200\,\mathrm{GPa}\), \(\nu = 0.3\). VTU includes
@@ -67,16 +68,15 @@ paraview examples/out/*.vtu
 POLYMESH=./build/apps/cli/polymesh
 GEOM=bench/geometries/public
 
-$POLYMESH check $GEOM/unit_box.stl
-$POLYMESH mesh  $GEOM/unit_box.stl -o /tmp/box_mesh.vtu
-$POLYMESH mesh  $GEOM/l_domain.stl --mesher graded --feature -o /tmp/l.vtu
-$POLYMESH solve $GEOM/cylinder_prism.stl -o /tmp/cyl.vtu --mesher tet
-$POLYMESH solve $GEOM/unit_box.stl -h 0.1 -o /tmp/box.vtu -E 210e9 -nu 0.29
+$POLYMESH check $GEOM/unit_box.step
+$POLYMESH mesh  $GEOM/unit_box.step -o /tmp/box_mesh.vtu
+$POLYMESH mesh  "$GEOM/plate+hole.step" --mesher graded -h 0.008 -o /tmp/plate_hole.vtu
+$POLYMESH solve $GEOM/unit_box.step -h 0.1 -o /tmp/box.vtu -E 210e9 -nu 0.29
 ```
 
 ## Notes
 
 - Coordinates and mesh size are **metres**; stresses in VTU are **Pa**.
-- Product fills are Cartesian grid (ADR-0015), not true Delaunay — good for
-  pipeline smoke, not Tier-1 analytical tolerances.
-- GUI path: `./build/apps/gui/polymesh-gui examples/geometries/unit_box.stl`
+- Product fills are Cartesian grid based (ADR-0015), not constrained Delaunay —
+  appropriate for pipeline smoke, not a blanket analytical-accuracy claim.
+- GUI path: `polymesh-gui examples/geometries/unit_box.step`

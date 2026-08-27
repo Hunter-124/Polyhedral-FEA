@@ -19,10 +19,10 @@ struct GuiSettings {
     /// Override path to the polymesh_testlab binary. Empty → auto-discover.
     std::string testlab_binary;
 
-    /// Fixed-layout panel widths (pixels). Splitters may mutate these at runtime.
-    float testlab_width = 280.0f;
-    float sim_width = 340.0f;
-    float results_width = 300.0f;
+    /// Runtime panel widths in scaled ImGui units. Splitters mutate them.
+    float testlab_width = ui_px(280.0f);
+    float sim_width = ui_px(340.0f);
+    float results_width = ui_px(300.0f);
 
     ThemeId theme = ThemeId::kStudio;
 

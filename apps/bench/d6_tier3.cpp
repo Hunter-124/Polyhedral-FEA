@@ -357,7 +357,7 @@ json make_row(const std::string& case_id, const std::string& label,
     return json{
         {"schema_version", 1},
         {"solver", "PolyMesh"},
-        {"version", "0.1.0"},
+        {"version", POLYMESH_VERSION},
         {"case_id", case_id},
         {"dofs", s.free_dofs},
         {"wall_time_s", {{"mesh", s.mesh_s}, {"solve", s.solve_s}, {"total", s.total_s}}},

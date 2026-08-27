@@ -30,7 +30,7 @@ if(WIN32 AND CMAKE_SIZEOF_VOID_P EQUAL 8)
     set(_ort_runtime "lib/onnxruntime.dll")
 elseif(UNIX AND NOT APPLE AND CMAKE_SIZEOF_VOID_P EQUAL 8)
     set(_ort_archive "onnxruntime-linux-x64-${POLYMESH_ONNXRUNTIME_VERSION}.tgz")
-    set(_ort_hash "")
+    set(_ort_hash "SHA256=a3e1b79d7bb1bf09696ce675f49e4064e6c81f6202b8225624fff0e93f8d6407")
     set(_ort_implib "")
     set(_ort_runtime "lib/libonnxruntime.so")
 else()
@@ -44,26 +44,17 @@ if(NOT _ort_archive)
         "SHA-256 for this platform in src/advisor/CMakeLists.txt.")
 endif()
 
-# An empty URL_HASH value expands to zero arguments and makes URL_HASH swallow
-# the next keyword, so the declaration is built conditionally rather than
-# passing a hash we do not have.
 set(_ort_url
     "https://github.com/microsoft/onnxruntime/releases/download/v${POLYMESH_ONNXRUNTIME_VERSION}/${_ort_archive}")
-if(_ort_hash)
-    FetchContent_Declare(onnxruntime
-        URL "${_ort_url}"
-        URL_HASH ${_ort_hash}
-        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-    )
-else()
-    message(WARNING
-        "ONNX Runtime archive ${_ort_archive} is not SHA-256 pinned for this platform; "
-        "the downloaded binary is not reproducible. Add its hash in src/advisor/CMakeLists.txt.")
-    FetchContent_Declare(onnxruntime
-        URL "${_ort_url}"
-        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-    )
+if(NOT _ort_hash)
+    message(FATAL_ERROR
+        "ONNX Runtime archive ${_ort_archive} has no SHA-256 pin for this platform")
 endif()
+FetchContent_Declare(onnxruntime
+    URL "${_ort_url}"
+    URL_HASH ${_ort_hash}
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
 FetchContent_MakeAvailable(onnxruntime)
 
 # The release archive ships headers + import library only, with no CMake
@@ -107,4 +98,25 @@ function(polymesh_stage_onnxruntime target)
             COMMENT "Staging onnxruntime.dll next to ${target}"
             VERBATIM)
     endif()
+
 endfunction()
+if(WIN32)
+    install(FILES "${POLYMESH_ONNXRUNTIME_RUNTIME}"
+            DESTINATION "${CMAKE_INSTALL_BINDIR}")
+elseif(UNIX AND NOT APPLE)
+    install(DIRECTORY "${onnxruntime_SOURCE_DIR}/lib/"
+            DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+            FILES_MATCHING
+            PATTERN "libonnxruntime.so*"
+            PATTERN "libonnxruntime_providers_shared.so*"
+            PATTERN "cmake" EXCLUDE
+            PATTERN "pkgconfig" EXCLUDE)
+endif()
+install(FILES
+    "${onnxruntime_SOURCE_DIR}/LICENSE"
+    DESTINATION "${POLYMESH_INSTALL_DOCDIR}/licenses"
+    RENAME ONNX-Runtime-LICENSE.txt)
+install(FILES
+    "${onnxruntime_SOURCE_DIR}/ThirdPartyNotices.txt"
+    DESTINATION "${POLYMESH_INSTALL_DOCDIR}/licenses"
+    RENAME ONNX-Runtime-ThirdPartyNotices.txt)

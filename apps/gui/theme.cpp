@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "theme.hpp"
+#include <algorithm>
 
 namespace polymesh::gui {
 
 Palette palette;
 ThemeId active_theme = ThemeId::kStudio;
+float ui_scale = 1.0f;
+
+void set_ui_scale(float scale) { ui_scale = std::clamp(scale, 0.75f, 3.0f); }
 
 Palette make_interwebz_palette() {
     return Palette{}; // defaults in theme.hpp are Interwebz
@@ -105,22 +109,24 @@ void apply_theme(ThemeId id) {
     // Studio breathes a little more than the older two (softer rounding, taller
     // frames) — the rest of the metrics are shared.
     const bool studio = id == ThemeId::kStudio;
-    const float rounding = studio ? 4.0f : 2.0f;
+    const float rounding = ui_px(studio ? 4.0f : 2.0f);
     s.WindowRounding = rounding;
     s.ChildRounding = rounding;
     s.FrameRounding = rounding;
     s.PopupRounding = rounding;
     s.GrabRounding = rounding;
     s.TabRounding = rounding;
-    s.WindowBorderSize = 1.0f;
-    s.FrameBorderSize = 1.0f;
-    s.WindowPadding = {12, 12};
+    s.WindowBorderSize = ui_px(1.0f);
+    s.FrameBorderSize = ui_px(1.0f);
+    s.WindowPadding = {ui_px(12.0f), ui_px(12.0f)};
     // Enough room for frame labels without clipping.
-    s.FramePadding = studio ? ImVec2{9, 6} : ImVec2{8, 5};
-    s.ItemSpacing = studio ? ImVec2{8, 7} : ImVec2{8, 8};
-    s.ItemInnerSpacing = {6, 4};
-    s.ScrollbarSize = studio ? 13.0f : 12.0f;
-    s.WindowMinSize = {320, 240};
+    s.FramePadding =
+        studio ? ImVec2{ui_px(9.0f), ui_px(6.0f)} : ImVec2{ui_px(8.0f), ui_px(5.0f)};
+    s.ItemSpacing =
+        studio ? ImVec2{ui_px(8.0f), ui_px(7.0f)} : ImVec2{ui_px(8.0f), ui_px(8.0f)};
+    s.ItemInnerSpacing = {ui_px(6.0f), ui_px(4.0f)};
+    s.ScrollbarSize = ui_px(studio ? 13.0f : 12.0f);
+    s.WindowMinSize = {ui_px(320.0f), ui_px(240.0f)};
 
     ImVec4* c = s.Colors;
     c[ImGuiCol_WindowBg] = p.panel_bg;
@@ -160,6 +166,11 @@ void apply_theme(ThemeId id) {
     c[ImGuiCol_PlotHistogram] = p.accent;
     c[ImGuiCol_TextSelectedBg] = p.accent_soft;
     c[ImGuiCol_NavCursor] = p.accent;
+    c[ImGuiCol_TableHeaderBg] = p.header_bg;
+    c[ImGuiCol_TableBorderStrong] = p.border;
+    c[ImGuiCol_TableBorderLight] = {p.border.x, p.border.y, p.border.z, 0.55f};
+    c[ImGuiCol_TableRowBg] = p.panel_bg;
+    c[ImGuiCol_TableRowBgAlt] = {p.header_bg.x, p.header_bg.y, p.header_bg.z, 0.32f};
 }
 
 } // namespace polymesh::gui

@@ -3,6 +3,7 @@
 
 #include "fea/quadrature.hpp"
 #include "fea/shape.hpp"
+#include "mesh/cell_validity.hpp"
 #include "mesh/quality.hpp"
 
 #include <Eigen/Geometry>
@@ -254,7 +255,7 @@ double cell_quality(const NodalMesh& mesh, const NodalElement& element) {
         if (n_nodes < 4) {
             return kNaN;
         }
-        return mesh::tet4_aspect_quality(
+        return mesh::validity::tet_shape_quality(
             mesh.nodes[element.nodes[0]], mesh.nodes[element.nodes[1]],
             mesh.nodes[element.nodes[2]], mesh.nodes[element.nodes[3]]);
     case ElementType::kHex8:

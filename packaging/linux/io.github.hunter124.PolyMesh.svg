@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#182333"/>
+      <stop offset="1" stop-color="#0b111b"/>
+    </linearGradient>
+    <linearGradient id="top" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#90e8ff"/>
+      <stop offset="1" stop-color="#3bc8ef"/>
+    </linearGradient>
+    <linearGradient id="left" x1="0" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#32b8dd"/>
+      <stop offset="1" stop-color="#176b9c"/>
+    </linearGradient>
+    <linearGradient id="right" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#238fbd"/>
+      <stop offset="1" stop-color="#11476f"/>
+    </linearGradient>
+  </defs>
+  <rect x="24" y="24" width="464" height="464" rx="104" fill="url(#bg)"/>
+  <path d="M256 84 424 181 256 278 88 181Z" fill="url(#top)"/>
+  <path d="M88 181 256 278 256 440 88 343Z" fill="url(#left)"/>
+  <path d="M424 181 256 278 256 440 424 343Z" fill="url(#right)"/>
+  <g fill="none" stroke="#d9f8ff" stroke-width="7" stroke-linejoin="round" opacity="0.9">
+    <path d="M256 84 424 181 256 278 88 181Z"/>
+    <path d="M88 181v162l168 97 168-97V181"/>
+    <path d="M256 278v162"/>
+    <path d="m172 133 168 97" opacity="0.72"/>
+    <path d="m340 133-168 97" opacity="0.72"/>
+    <path d="m88 262 168 97 168-97" opacity="0.72"/>
+    <path d="m172 230v162" opacity="0.72"/>
+    <path d="m340 230v162" opacity="0.72"/>
+  </g>
+  <g fill="#eaffff">
+    <circle cx="256" cy="84" r="9"/><circle cx="424" cy="181" r="9"/>
+    <circle cx="256" cy="278" r="9"/><circle cx="88" cy="181" r="9"/>
+    <circle cx="88" cy="343" r="9"/><circle cx="256" cy="440" r="9"/>
+    <circle cx="424" cy="343" r="9"/>
+  </g>
+</svg>

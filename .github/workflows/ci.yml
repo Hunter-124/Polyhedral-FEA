@@ -17,6 +17,8 @@ jobs:
   # presentation code stays compiling, but tests only need libs.
   build-test:
     runs-on: ubuntu-latest
+    # Measured ~26 min. A hang used to sit until GitHub's 6 h ceiling.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v5
 
@@ -82,14 +84,17 @@ jobs:
             -DPOLYMESH_WITH_CUDA=OFF
 
       - name: Build (warnings are errors)
+        timeout-minutes: 15
         run: cmake --build build
 
       - name: clang-tidy first-party sources
+        timeout-minutes: 12
         run: |
           run-clang-tidy -p build -j 0 \
             '.*[/\\]Polyhedral-FEA[/\\](apps|src|tests)[/\\]'
 
       - name: Test
+        timeout-minutes: 15
         # Working directory for discovered tests is the repo root (bench/reference).
         #
         # `--parallel 2` on a 4-vCPU runner left half the machine idle. Use the
@@ -104,6 +109,7 @@ jobs:
             --parallel "$(nproc)" --timeout 900
 
       - name: Install and package smoke
+        timeout-minutes: 8
         run: |
           cmake --install build --prefix "$PWD/build/stage"
           build/stage/bin/polymesh --version | grep -Fx "polymesh 0.1.1"
@@ -128,6 +134,7 @@ jobs:
   # the report is a direct guard against the order dependence coming back.
   cross-stdlib-determinism:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
 
@@ -165,6 +172,7 @@ jobs:
 
   format:
     runs-on: ubuntu-latest
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v5
       # Pin clang-format so local + CI use the same style (apt versions drift).
@@ -186,6 +194,7 @@ jobs:
 
   grep-audit:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
       - name: No bench/reference reads outside the bench module

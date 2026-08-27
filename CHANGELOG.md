@@ -2,28 +2,24 @@
 
 ## 0.1.1 — 2026-08-27
 
-Multi-platform release. Linux, Windows, and macOS archives are all built and
-validated by the tagged release workflow.
+Linux archive. Windows and macOS jobs exist in `.github/workflows/release.yml`
+but are skipped (`if: false`): Windows was compiling OpenCASCADE from source
+for 70+ minutes, and the macOS runner pool was saturated.
 
 ### Distribution
 
-- Relocatable release archives for three hosts, published by
-  `.github/workflows/release.yml`:
-  `polymesh-<version>-linux-x86_64.tar.gz`,
-  `polymesh-<version>-windows-x64.zip`, and
-  `polymesh-<version>-macos-arm64.tar.gz`.
-- Each archive is a self-contained install tree — `polymesh`, `polymesh-gui`,
+- Relocatable Linux archive published for this tag:
+  `polymesh-<version>-linux-x86_64.tar.gz`. Bundler scripts for Windows and
+  macOS stay in the tree; those jobs are not part of this tag.
+- The archive is a self-contained install tree — `polymesh`, `polymesh-gui`,
   `polymesh-webd`, the web frontend and runtime assets under `share/`, and the
   redistributable part of the shared-library closure beside the binaries, reached
-  through `$ORIGIN`/`@loader_path` RPATHs. **None of them is a fully static
-  build**; each still links the host's system C/C++, OpenGL, and windowing
-  libraries.
-- `scripts/bundle_macos.sh` and `scripts/bundle_windows.ps1` join the existing
-  Linux bundler, and each platform job verifies `--version`, `backend`,
-  `polymesh-webd --help`, and the relative-RPATH closure of every shipped binary
-  before the archive is cut.
-- Per-platform install instructions, checksum commands, and host requirements are
-  in [docs/install.md](docs/install.md).
+  through `$ORIGIN` RPATH. **It is not a fully static build**; it still links the
+  host's glibc, OpenGL, and X11/Wayland.
+- The Linux job verifies `--version`, `backend`, `polymesh-webd --help`, and
+  the relative-RPATH closure before the archive is cut.
+- Install instructions, checksum commands, and host requirements are in
+  [docs/install.md](docs/install.md).
 
 ### Web
 
@@ -66,22 +62,13 @@ validated by the tagged release workflow.
   (`POLYMESH_STATIC_RUNTIME`) only when `libstdc++-static` is available on the
   runner. The result is still a dynamically linked executable that requires a
   host glibc, OpenGL, and X11/Wayland.
-- The Windows archive does not bundle the Microsoft C++ runtime. The binaries are
-  compiled against the dynamic MSVC runtime, so the Visual C++ 2015–2022
-  Redistributable (x64) and an OpenGL 3.3 driver must be present on the host.
-- The macOS archive is ad-hoc signed, not notarized. macOS 14 or newer on Apple
-  silicon is required, and Gatekeeper quarantine must be cleared
-  (`xattr -dr com.apple.quarantine …`) after download.
-- There is no Intel-Mac advisor build: ONNX Runtime 1.28.0 publishes an
-  `osx-arm64` archive and no `osx-x86_64` one, so arm64 is the only macOS target
-  that can carry the learned advisor.
-- This tag ships the Linux archive. Windows and macOS jobs stay in
-  `.github/workflows/release.yml` behind `if: false`: Windows was compiling
-  OpenCASCADE from source for 70+ minutes with no job timeout, and macOS
-  runners were saturated. Drop those guards when you want those archives.
-- CI and Release jobs now have `timeout-minutes` so a hang fails in tens of
+- CI and Release jobs have `timeout-minutes` so a hang fails in tens of
   minutes instead of sitting on GitHub's 6 h ceiling. Nothing in CI retrains
   the advisor; inference loads the pinned ONNX artifact.
+- Windows and macOS archives are not shipped on this tag. The jobs stay in
+  `release.yml` behind `if: false`. Drop those guards when you want those
+  archives; Windows first needs a populated vcpkg OpenCASCADE cache or it
+  will spend 45–90 minutes compiling OCC from source.
 
 ## 0.1.0 — 2026-08-26
 

@@ -311,9 +311,9 @@ jobs:
             build/polymesh-${{ env.POLYMESH_VERSION }}-macos-arm64.tar.gz
             build/polymesh-${{ env.POLYMESH_VERSION }}-macos-arm64.tar.gz.sha256
 
-  # One release, three platforms. Publishing from each build job would race
-  # three edits onto the same release and could publish a partial set when one
-  # platform fails; this job only runs once all three have produced an archive.
+  # One GitHub Release after the live platform jobs finish. Windows and macOS
+  # are skipped (`if: false`) on this tag, so the only required producer is
+  # linux-package. Re-add them to `needs` when those jobs are turned back on.
   publish:
     needs: [linux-package]
     if: github.ref_type == 'tag'

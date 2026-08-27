@@ -213,6 +213,10 @@ jobs:
             build/polymesh-${{ env.POLYMESH_VERSION }}-windows-x64.zip.sha256
 
   macos-package:
+    # Deferred: GitHub's macos-14 pool is saturated and this job is not
+    # required for 0.1.1. The job stays in the file so a later tag can drop
+    # the `if` and restore the Apple-silicon archive. Do not delete the body.
+    if: false
     # macos-14 is Apple silicon. ONNX Runtime 1.28.0 publishes an osx-arm64
     # archive and no osx-x86_64 one, so arm64 is the only macOS target that can
     # carry the advisor.
@@ -303,7 +307,7 @@ jobs:
   # three edits onto the same release and could publish a partial set when one
   # platform fails; this job only runs once all three have produced an archive.
   publish:
-    needs: [linux-package, windows-package, macos-package]
+    needs: [linux-package, windows-package]
     if: github.ref_type == 'tag'
     runs-on: ubuntu-24.04
     steps:
@@ -330,7 +334,6 @@ jobs:
           expected=(
             "polymesh-${POLYMESH_VERSION}-linux-x86_64.tar.gz"
             "polymesh-${POLYMESH_VERSION}-windows-x64.zip"
-            "polymesh-${POLYMESH_VERSION}-macos-arm64.tar.gz"
           )
           for archive in "${expected[@]}"; do
             test -s "dist/$archive" || { echo "missing dist/$archive" >&2; exit 1; }
@@ -347,5 +350,3 @@ jobs:
             dist/polymesh-${{ env.POLYMESH_VERSION }}-linux-x86_64.tar.gz.sha256
             dist/polymesh-${{ env.POLYMESH_VERSION }}-windows-x64.zip
             dist/polymesh-${{ env.POLYMESH_VERSION }}-windows-x64.zip.sha256
-            dist/polymesh-${{ env.POLYMESH_VERSION }}-macos-arm64.tar.gz
-            dist/polymesh-${{ env.POLYMESH_VERSION }}-macos-arm64.tar.gz.sha256

@@ -75,9 +75,10 @@ validated by the tagged release workflow.
 - There is no Intel-Mac advisor build: ONNX Runtime 1.28.0 publishes an
   `osx-arm64` archive and no `osx-x86_64` one, so arm64 is the only macOS target
   that can carry the learned advisor.
-- The 0.1.0 product and accuracy limits below still apply. Its last entry does
-  not: Windows and macOS are now part of the release gate, not out-of-band
-  builds.
+- This tag ships Linux and Windows archives. The macOS job stays in
+  `.github/workflows/release.yml` but is skipped (`if: false`) until the
+  macos-14 pool is free; the 0.1.0 "Linux is the signed-off target" limit is
+  otherwise superseded.
 
 ## 0.1.0 — 2026-08-26
 

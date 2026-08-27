@@ -1,4 +1,5 @@
 /build*/
+/dist/
 compile_commands.json
 .cache/
 # Holdout geometries are never committed or shown to the implementation loop

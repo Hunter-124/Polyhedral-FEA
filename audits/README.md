@@ -56,12 +56,12 @@ blind audit. Give BC intent in words; agent implements; owner compares offline.
 
 ## Agent procedure (blind)
 
-1. Receive absolute path to STL/STEP + meta (no reference folder).
+1. Receive absolute path to STEP/BRep CAD + meta (no reference folder).
 2. Mesh: CLI or GUI product path, e.g.
 
    ```sh
-   ./build/apps/cli/polymesh mesh /path/to/holdout.stl -o /tmp/holdout.msh
-   ./build/apps/cli/polymesh solve /path/to/holdout.stl -o /tmp/holdout.vtu
+   ./build/apps/cli/polymesh mesh /path/to/holdout.step -o /tmp/holdout-mesh.vtu
+   ./build/apps/cli/polymesh solve /path/to/holdout.step -o /tmp/holdout-solve.vtu
    ```
 
 3. Record **only** public metrics into a local (gitignored) result, e.g.

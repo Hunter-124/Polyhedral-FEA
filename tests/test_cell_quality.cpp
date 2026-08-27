@@ -115,6 +115,9 @@ TEST_CASE("cell_quality: regular cells score 1, degenerate cells do not") {
                                       {0.5, 0.8660254037844386, 0},
                                       {0.5, 0.28867513459481287, 0.816496580927726}});
     REQUIRE(cell_quality(reg_tet, reg_tet.elements[0]) == Approx(1.0).margin(1e-9));
+    auto inverted_tet = reg_tet;
+    std::swap(inverted_tet.elements[0].nodes[1], inverted_tet.elements[0].nodes[2]);
+    REQUIRE(cell_quality(inverted_tet, inverted_tet.elements[0]) < 0.0);
     const auto sliver =
         one_cell(ElementType::kTet4, {{0, 0, 0}, {1, 0, 0}, {0.5, 1, 0}, {0.5, 0.5, 1e-4}});
     REQUIRE(cell_quality(sliver, sliver.elements[0]) < 0.01);

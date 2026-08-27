@@ -1,6 +1,11 @@
 # SPDX-License-Identifier: BSD-3-Clause
 cmake_minimum_required(VERSION 3.24)
 project(polymesh VERSION 0.1.0 LANGUAGES CXX)
+include(GNUInstallDirs)
+
+set(POLYMESH_INSTALL_DOCDIR "${CMAKE_INSTALL_DATADIR}/doc/polymesh")
+set(POLYMESH_INSTALL_DATADIR "${CMAKE_INSTALL_DATADIR}/polymesh")
+
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -170,3 +175,55 @@ if(POLYMESH_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
+
+# --- application distribution ---
+install(FILES
+    LICENSE
+    THIRD_PARTY_NOTICES.md
+    README.md
+    CHANGELOG.md
+    docs/cli.md
+    DESTINATION "${POLYMESH_INSTALL_DOCDIR}"
+)
+install(FILES
+    third_party/geogram/LICENSE
+    DESTINATION "${POLYMESH_INSTALL_DOCDIR}/licenses"
+    RENAME Geogram-LICENSE.txt
+)
+install(FILES
+    third_party/geogram/NOTICE
+    DESTINATION "${POLYMESH_INSTALL_DOCDIR}/licenses"
+    RENAME Geogram-NOTICE.txt
+)
+install(FILES
+    tests/fixtures/parts/plate_hole.step
+    DESTINATION "${POLYMESH_INSTALL_DATADIR}/calibration"
+)
+install(FILES
+    bench/geometries/public/unit_box.step
+    bench/geometries/public/plate+hole.step
+    DESTINATION "${POLYMESH_INSTALL_DATADIR}/examples"
+)
+
+set(CPACK_PACKAGE_NAME "polymesh")
+set(CPACK_PACKAGE_VENDOR "Hunter-124")
+set(CPACK_PACKAGE_CONTACT "https://github.com/Hunter-124/Polyhedral-FEA/issues")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
+    "Adaptive polyhedral finite element analysis CLI and desktop studio")
+set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/Hunter-124/Polyhedral-FEA")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE")
+set(CPACK_GENERATOR "TGZ")
+set(CPACK_SOURCE_GENERATOR "TGZ")
+set(CPACK_SOURCE_IGNORE_FILES
+    "/\\\\.git/"
+    "/build[^/]*/"
+    "/dist/"
+    "/examples/out/"
+    "/graphify-out/cache/"
+)
+set(CPACK_RPM_PACKAGE_LICENSE "BSD-3-Clause")
+set(CPACK_RPM_PACKAGE_GROUP "Applications/Engineering")
+set(CPACK_RPM_PACKAGE_REQUIRES
+    "opencascade, libX11, libXrandr, libXinerama, libXcursor, libXi, mesa-libGL, libgomp")
+include(CPack)

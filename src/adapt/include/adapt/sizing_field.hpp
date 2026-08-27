@@ -5,8 +5,8 @@
 // (Zienkiewicz–Zhu patch recovery), Dörfler marking, and per-element
 // h-vs-p refinement decisions.
 //
-// Fills in during Phase P5. Until then this module carries only the
-// interfaces the mesher (P2/P3) codes against.
+// The implemented product path composes geometry/BC-aware size fields with
+// a-posteriori h/p decisions; consumers use this interface to evaluate h(x).
 
 #include "geom/features.hpp"
 #include "geom/indicators.hpp"

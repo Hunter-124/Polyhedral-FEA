@@ -4211,8 +4211,13 @@ MixedConversion convert_mixed_cells(std::vector<Eigen::Vector3d> nodes,
             // shipped 0.005 tets).
             splittable[ci] = static_cast<char>(
                 mesh::validity::pyramid_min_split_volume(x0, x1, x2, x3, x4) > 0.0);
-            folded[ci] = static_cast<char>(
-                mesh::validity::pyramid_corner_folded(x0, x1, x2, x3, x4, kMinShapeConvert));
+            const fea::NodalElement emitted_pyramid{fea::ElementType::kPyramid5,
+                                                    {p[0], p[1], p[2], p[3], p[4]}};
+            const bool solver_rejects =
+                !fea::element_jacobians_positive(conv.mesh, emitted_pyramid);
+            folded[ci] =
+                static_cast<char>(solver_rejects || mesh::validity::pyramid_corner_folded(
+                                                        x0, x1, x2, x3, x4, kMinShapeConvert));
         }
         for (const auto& [key, owners] : base_owners) {
             (void)key;
@@ -6165,16 +6170,38 @@ volume_mesh_impl(const Model& model, double h, VolumeMesher mesher, int skin_lay
         // mesh that would abort the solve says so in its own note instead of
         // failing later with a bare error.
         std::size_t nonintegrable = 0;
-        for (const auto& element : out.mesh.elements) {
+        std::size_t first_nonintegrable = 0;
+        std::array<std::size_t, 7> nonintegrable_by_type{};
+        for (std::size_t index = 0; index < out.mesh.elements.size(); ++index) {
+            const auto& element = out.mesh.elements[index];
             if (!fea::element_jacobians_positive(out.mesh, element)) {
+                if (nonintegrable == 0) {
+                    first_nonintegrable = index;
+                }
                 ++nonintegrable;
+                ++nonintegrable_by_type[static_cast<std::size_t>(element.type)];
             }
         }
         if (nonintegrable > 0) {
-            out.mesher_note +=
-                std::format(" | ship_gate {} non-integrable cells (det J <= 0 at a quadrature "
-                            "point)",
-                            nonintegrable);
+            std::string census;
+            for (std::size_t type = 0; type < nonintegrable_by_type.size(); ++type) {
+                if (nonintegrable_by_type[type] == 0) {
+                    continue;
+                }
+                if (!census.empty()) {
+                    census += ", ";
+                }
+                census += std::format(
+                    "{}={}", fea::element_type_name(static_cast<fea::ElementType>(type)),
+                    nonintegrable_by_type[type]);
+            }
+            const std::string message = std::format(
+                "volume mesh rejected by final ship gate: {} non-integrable cells "
+                "(det J <= 0 at a quadrature point; first={} {}; {})",
+                nonintegrable, first_nonintegrable,
+                fea::element_type_name(out.mesh.elements[first_nonintegrable].type), census);
+            out.mesher_note += " | " + message;
+            throw mesh::ValidityError(message);
         }
     }
 

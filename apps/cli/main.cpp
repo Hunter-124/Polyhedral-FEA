@@ -85,7 +85,7 @@ int usage() {
         "              [--wireframe] [--stats out.json]\n"
         "                             headless PNG of the same boundary surface the\n"
         "                             Studio viewport paints — no GL, no window\n"
-        "  calibrate --out host.json   benchmark portable FLOP/byte rates and reference mesh\n"
+        "  calibrate --out host.json [--reference part.step] [--reference-h m]\n"
         "  backend                    print compute backend + OpenMP/opt summary\n"
         "\n"
         "inputs: CAD (.step .stp .brep .brp); solve also accepts Gmsh 2.x ASCII .msh.\n"
@@ -1965,19 +1965,40 @@ double benchmark_bytes_per_second() {
     return median_sample(std::move(rates));
 }
 
-double benchmark_reference_mesh_ms() {
+std::filesystem::path default_calibration_part(std::string_view argv0) {
+    std::error_code error;
+    std::filesystem::path executable;
+#if defined(__linux__)
+    executable = std::filesystem::read_symlink("/proc/self/exe", error);
+#endif
+    if (executable.empty()) {
+        error.clear();
+        executable = std::filesystem::weakly_canonical(std::filesystem::path(argv0), error);
+    }
+    if (executable.empty()) {
+        executable = std::filesystem::path(argv0);
+    }
+    const auto candidate = executable.parent_path().parent_path() / "share" / "polymesh" /
+                           "calibration" / "plate_hole.step";
+    if (!std::filesystem::is_regular_file(candidate, error)) {
+        throw std::runtime_error(
+            "calibrate: reference mesh asset is not installed; pass --reference part.step");
+    }
+    return candidate;
+}
+
+double benchmark_reference_mesh_ms(const std::filesystem::path& reference_part,
+                                   double reference_h) {
     using clock = std::chrono::steady_clock;
-    constexpr std::string_view kReferencePart = "tests/fixtures/parts/plate_hole.step";
-    constexpr double kReferenceH = 0.004;
-    const auto model = polymesh::pipeline::Model::load(std::string(kReferencePart));
+    const auto model = polymesh::pipeline::Model::load(reference_part.string());
     std::vector<double> samples;
     samples.reserve(5);
     for (int trial = 0; trial < 5; ++trial) {
         const auto started = clock::now();
         const auto plan =
-            polymesh::pipeline::build_refinement_plan(model, kReferenceH, {}, true, true, 0);
+            polymesh::pipeline::build_refinement_plan(model, reference_h, {}, true, true, 0);
         auto volume = polymesh::pipeline::volume_mesh(
-            model, kReferenceH, polymesh::pipeline::VolumeMesher::kGradedTet, 2, true,
+            model, reference_h, polymesh::pipeline::VolumeMesher::kGradedTet, 2, true,
             plan.refine_seeds, plan.seed_band, 0.0, 0, 0, 0, {}, plan.size_field);
         volume.mesh.check_validity();
         samples.push_back(
@@ -1988,9 +2009,22 @@ double benchmark_reference_mesh_ms() {
 
 int cmd_calibrate(std::span<char*> args) {
     std::filesystem::path output_path;
+    std::filesystem::path reference_part;
+    double reference_h = 0.004;
     for (std::size_t i = 2; i < args.size(); ++i) {
         if (std::strcmp(args[i], "--out") == 0 && i + 1 < args.size()) {
             output_path = args[++i];
+        } else if (std::strcmp(args[i], "--reference") == 0 && i + 1 < args.size()) {
+            reference_part = args[++i];
+        } else if (std::strcmp(args[i], "--reference-h") == 0 && i + 1 < args.size()) {
+            char* end = nullptr;
+            reference_h = std::strtod(args[++i], &end);
+            if (end == args[i] || *end != '\0' || !std::isfinite(reference_h) ||
+                reference_h <= 0.0) {
+                std::fputs("calibrate: --reference-h wants a positive mesh size in metres\n",
+                           stderr);
+                return usage();
+            }
         } else {
             return usage();
         }
@@ -1999,12 +2033,19 @@ int cmd_calibrate(std::span<char*> args) {
         std::fputs("calibrate: --out host.json is required\n", stderr);
         return usage();
     }
+    if (reference_part.empty()) {
+        reference_part = default_calibration_part(args[0]);
+    }
+    if (!std::filesystem::is_regular_file(reference_part)) {
+        throw std::runtime_error("calibrate: reference part not found: " +
+                                 reference_part.string());
+    }
 
     polymesh::advisor::HostCalibration calibration;
     calibration.host = polymesh::advisor::local_host_name();
     calibration.flops_per_s = benchmark_flops_per_second();
     calibration.bytes_per_s = benchmark_bytes_per_second();
-    calibration.ref_mesh_ms = benchmark_reference_mesh_ms();
+    calibration.ref_mesh_ms = benchmark_reference_mesh_ms(reference_part, reference_h);
     calibration.generated_utc = polymesh::advisor::utc_timestamp();
     if (!(calibration.flops_per_s > 0.0) || !(calibration.bytes_per_s > 0.0) ||
         !(calibration.ref_mesh_ms > 0.0)) {
@@ -2035,8 +2076,13 @@ int cmd_calibrate(std::span<char*> args) {
 } // namespace
 
 int main(int argc, char** argv) {
-    polymesh::fea::init_runtime_performance();
     const std::span<char*> args(argv, static_cast<std::size_t>(argc));
+    if (args.size() == 2 &&
+        (std::strcmp(args[1], "--version") == 0 || std::strcmp(args[1], "-V") == 0)) {
+        std::printf("polymesh %s\n", POLYMESH_VERSION);
+        return 0;
+    }
+    polymesh::fea::init_runtime_performance();
     if (args.size() < 2) {
         return usage();
     }

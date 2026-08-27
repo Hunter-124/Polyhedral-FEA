@@ -46,6 +46,10 @@ jobs:
             libxcursor-dev \
             libxi-dev \
             libxext-dev \
+            xvfb \
+            xauth \
+            desktop-file-utils \
+            appstream \
             libocct-data-exchange-dev \
             libocct-foundation-dev \
             libocct-modeling-algorithms-dev \
@@ -98,6 +102,22 @@ jobs:
         run: |
           ctest --test-dir build --output-on-failure \
             --parallel "$(nproc)" --timeout 900
+
+      - name: Install and package smoke
+        run: |
+          cmake --install build --prefix "$PWD/build/stage"
+          build/stage/bin/polymesh --version | grep -Fx "polymesh 0.1.0"
+          build/stage/bin/polymesh backend
+          desktop-file-validate \
+            build/stage/share/applications/io.github.hunter124.PolyMesh.desktop
+          appstreamcli validate --no-net \
+            build/stage/share/metainfo/io.github.hunter124.PolyMesh.metainfo.xml
+          xvfb-run -a env POLYMESH_GUI_SIZE=1280x800 \
+            build/stage/bin/polymesh-gui \
+            build/stage/share/polymesh/examples/unit_box.step \
+            --auto "shot build/stage/gui-smoke.png; quit"
+          test -s build/stage/gui-smoke.png
+          cmake --build build --target package
 
   # Cross-standard-library determinism. The mesher once produced a different mesh
   # under MSVC than under gcc (5 of 24 corpus pairs, 2026-08-14) because several

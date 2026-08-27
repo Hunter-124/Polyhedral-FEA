@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "fea/boundary_faces.hpp"
+#include "fea/element_validity.hpp"
 #include "fea/solve.hpp"
 #include "geom/cad_model.hpp"
 #include "geom/step.hpp"
@@ -137,6 +138,9 @@ TEST_CASE("hybrid zoo cylinder_prism smoke: conforming FE + snap") {
     for (const auto& el : vol.mesh.elements) {
         has_fe = has_fe || el.type == fea::ElementType::kHex8 ||
                  el.type == fea::ElementType::kPyramid5 || el.type == fea::ElementType::kTet4;
+    }
+    for (const auto& element : vol.mesh.elements) {
+        REQUIRE(polymesh::fea::element_jacobians_positive(vol.mesh, element));
     }
     REQUIRE(has_fe);
 }

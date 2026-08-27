@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=PolyMesh Studio
+GenericName=Finite Element Analysis
+Comment=Mesh, solve, and inspect adaptive polyhedral FEA studies
+Exec=polymesh-gui %F
+Icon=io.github.hunter124.PolyMesh
+Terminal=false
+Categories=Science;Engineering;
+Keywords=FEA;mesh;finite element;CAD;simulation;
+StartupNotify=true

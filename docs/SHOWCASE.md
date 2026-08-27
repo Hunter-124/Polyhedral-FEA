@@ -589,15 +589,15 @@ python scripts/render_showcase.py --only architecture
 
 ![PolyMesh Studio](assets/showcase/gui_studio.png)
 
-**`gui_studio.png`** — *PolyMesh Studio* with a solved part: the live viewport,
-material and mesh setup, fixture/load selection, campaign and Test Lab state,
-the measured stress legend, and the solve summary in the status ledger. The
-capture uses the practical 8 mm Cartesian tet case shown on screen: 4,320 cells,
-22,920 unknowns and a 2.478 MPa peak. Captured in-app, **F12** (or *File → save
-screenshot*) writes the window framebuffer to a PNG, and
-`POLYMESH_GUI_SHOT=/abs/path.png` writes to a fixed path. The fully scripted run
-(load, size, mesher, solver, fixtures, load, solve, frame, capture, quit) goes
-through `--auto`, which drives the same code paths as the buttons:
+**`gui_studio.png`** — *PolyMesh Studio* with a solved part: compact Study setup
+and Run controls, fixture/load face state, a dominant live viewport, measured
+stress legend, and the dedicated FEA Results inspector. Test Lab and campaign
+tables are intentionally absent from the release workspace and remain available
+under **Workspace → Developer / Test Lab**. The capture uses the practical 8 mm
+Cartesian tet case shown on screen: 4,320 cells, 22,920 unknowns and a 2.478 MPa
+peak. Captured in-app, **F12** (or **File → Save screenshot**) writes the window
+framebuffer to a PNG. The fully scripted run drives the same code paths as the
+buttons:
 
 ```sh
 POLYMESH_GUI_SIZE=1920x1080 xvfb-run -a -s "-screen 0 1920x1080x24" \

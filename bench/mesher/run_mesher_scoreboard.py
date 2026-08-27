@@ -5,8 +5,8 @@
 Usage (from repo root, after build):
   python3 bench/mesher/run_mesher_scoreboard.py \\
       --polymesh build/apps/cli/polymesh \\
-      --geom bench/geometries/public/plate.stl \\
-      -h 0.05 --out bench/results/mesher-scoreboard.json
+      --geom bench/geometries/public/plate+hole.step \\
+      -h 0.008 --out bench/results/mesher-scoreboard.json
 """
 from __future__ import annotations
 
@@ -53,7 +53,7 @@ def run_one(polymesh: Path, geom: Path, mesher: str, h: float, feature: bool) ->
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--polymesh", type=Path, default=Path("build/apps/cli/polymesh"))
-    ap.add_argument("--geom", type=Path, default=Path("bench/geometries/public/unit_box.stl"))
+    ap.add_argument("--geom", type=Path, default=Path("bench/geometries/public/unit_box.step"))
     ap.add_argument("-H", "--h", type=float, default=0.1, dest="h")
     ap.add_argument("--feature", action="store_true")
     ap.add_argument("--out", type=Path, default=Path("bench/results/mesher-scoreboard.json"))

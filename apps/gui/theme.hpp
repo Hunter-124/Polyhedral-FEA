@@ -63,6 +63,11 @@ enum class ThemeId : int { kInterwebz = 0, kSlate = 1, kStudio = 2, kCount };
 /// Active chrome palette (read by widgets; never hardcode colors).
 extern Palette palette;
 extern ThemeId active_theme;
+/// UI density multiplier from GLFW content scale. All custom geometry uses
+/// `ui_px()`; fonts are rebuilt at the same density.
+extern float ui_scale;
+void set_ui_scale(float scale);
+inline float ui_px(float value) { return value * ui_scale; }
 
 /// Load a named palette into `palette` and push it into ImGuiStyle.
 void apply_theme(ThemeId id = ThemeId::kStudio);

@@ -2,13 +2,14 @@
 
 ## Active (read this first)
 
-**Current program (2026-08): the learned mesh advisor corpus/retrain program.**
+**Current shipped advisor evidence (2026-08): portable-cost retrain.**
 **Canonical docs:**
 [`docs/advisor/0001-architecture.md`](advisor/0001-architecture.md) ·
 [`docs/advisor/0003-training-log.md`](advisor/0003-training-log.md) (live
 tracker) ·
-[`docs/advisor/0010-v6-exterior-conformity-retrain.md`](advisor/0010-v6-exterior-conformity-retrain.md)
-(current generation)  
+[`docs/advisor/0012-portable-cost-retrain.md`](advisor/0012-portable-cost-retrain.md)
+(current generation; supersedes v7 and earlier)
+
 **ADRs:** [0026](decisions/0026-anisotropic-metric-adaptivity.md) ·
 [0027](decisions/0027-learned-mesh-advisor.md) ·
 [0028](decisions/0028-boundary-conformance-hardening.md) ·
@@ -23,6 +24,17 @@ tracker) ·
 · [`docs/training/ACCESS-hunter-pc.md`](training/ACCESS-hunter-pc.md)  
 **Roadmap:** [`docs/ROADMAP.md`](ROADMAP.md) · **Agent loop:**
 [`docs/process/agent-loop.md`](process/agent-loop.md)
+
+**v0.1.0 release preparation (2026-08-26):** A9 closed with a Study-first GUI
+(setup + dominant viewport + FEA Results), opt-in Developer/Test Lab workspace,
+Fast/Standard/Fine presets, Advanced disclosure, consolidated deformation
+controls, DPI-scaled fonts/widgets/layout, and physical-resolution viewport FBO.
+Public examples now use supported STEP inputs; final mesh handoff fails closed
+on non-integrable cells. Distribution now has one CMake version surfaced by CLI
+and GUI, relocatable install RPATH, SHA-256-pinned/bundled ONNX Runtime, complete
+runtime notices, desktop/AppStream/icon assets, CPack TGZ, package/install/GUI
+CI smoke, and a tag-gated release workflow. Current UI evidence is
+`docs/assets/showcase/gui_studio.png`; release notes are in `CHANGELOG.md`.
 
 **The 2026-07-13 measure-first / CVT board is finished and frozen.**
 [`docs/dag/PROGRAM.yaml`](dag/PROGRAM.yaml) is a historical record, not the

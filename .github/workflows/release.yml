@@ -8,6 +8,12 @@ on:
 permissions:
   contents: write
 
+# One live Release per tag. Retagging v0.1.1 (or any v*) otherwise queues
+# four Windows vcpkg jobs that starve the runners. The latest push wins.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   linux-package:
     runs-on: ubuntu-24.04
@@ -298,48 +304,5 @@ jobs:
   # platform fails; this job only runs once all three have produced an archive.
   publish:
     needs: [linux-package, windows-package, macos-package]
-    if: github.ref_type == 'tag'
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
 
-      - name: Validate release identity
-        run: |
-          version="$(sed -nE 's/^project\(polymesh VERSION ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt)"
-          test -n "$version"
-          if [[ "${GITHUB_REF_NAME}" != "v${version}" ]]; then
-            echo "tag ${GITHUB_REF_NAME} does not match CMake version ${version}" >&2
-            exit 1
-          fi
-          echo "POLYMESH_VERSION=$version" >> "$GITHUB_ENV"
-
-      - uses: actions/download-artifact@v4
-        with:
-          path: dist
-          pattern: polymesh-*
-          merge-multiple: true
-
-      - name: Every platform archive is present
-        run: |
-          expected=(
-            "polymesh-${POLYMESH_VERSION}-linux-x86_64.tar.gz"
-            "polymesh-${POLYMESH_VERSION}-windows-x64.zip"
-            "polymesh-${POLYMESH_VERSION}-macos-arm64.tar.gz"
-          )
-          for archive in "${expected[@]}"; do
-            test -s "dist/$archive" || { echo "missing dist/$archive" >&2; exit 1; }
-            test -s "dist/$archive.sha256" || { echo "missing dist/$archive.sha256" >&2; exit 1; }
-          done
-          ls -l dist
-
-      - name: Publish GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
-          files: |
-            dist/polymesh-${{ env.POLYMESH_VERSION }}-linux-x86_64.tar.gz
-            dist/polymesh-${{ env.POLYMESH_VERSION }}-linux-x86_64.tar.gz.sha256
-            dist/polymesh-${{ env.POLYMESH_VERSION }}-windows-x64.zip
-            dist/polymesh-${{ env.POLYMESH_VERSION }}-windows-x64.zip.sha256
-            dist/polymesh-${{ env.POLYMESH_VERSION }}-macos-arm64.tar.gz
-            dist/polymesh-${{ env.POLYMESH_VERSION }}-macos-arm64.tar.gz.sha256
+[Showing lines 1-300 of 346. Use :301 to continue]

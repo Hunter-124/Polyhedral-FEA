@@ -1452,9 +1452,28 @@ std::string format_legend_value(float value, const char* unit) {
 
 void draw_colorbar(const char* title, float vmin, float vmax, const char* unit) {
     ImDrawList* dl = ImGui::GetWindowDrawList();
-    const ImVec2 p0 = ImGui::GetCursorScreenPos();
-    const float w = 18.0f;
-    const float h = 140.0f;
+    // glass_background bleeds a drop shadow ~5 dp outside its rect, so the frame
+    // starts inboard of the cursor rather than getting clipped by the child.
+    const float margin = ui_px(6.0f);
+    const float pad = ui_px(9.0f);
+    const float bar_w = ui_px(16.0f);
+    const float bar_h = ui_px(128.0f);
+    const float text_gap = ui_px(8.0f);
+    const std::string maximum = format_legend_value(vmax, unit);
+    const std::string minimum = format_legend_value(vmin, unit);
+    const float text_w =
+        std::max({ImGui::CalcTextSize(title).x, ImGui::CalcTextSize(maximum.c_str()).x,
+                  ImGui::CalcTextSize(minimum.c_str()).x});
+
+    const ImVec2 cursor = ImGui::GetCursorScreenPos();
+    const ImVec2 frame_min(cursor.x + margin, cursor.y + margin);
+    const ImVec2 frame_max(frame_min.x + 2.0f * pad + bar_w + text_gap + text_w,
+                           frame_min.y + 2.0f * pad + bar_h);
+    // The legend floats over the viewport, so it wears the same glass chrome as
+    // the live HUD instead of an ad-hoc white hairline.
+    glass_background(dl, frame_min, frame_max);
+
+    const ImVec2 bar_min(frame_min.x + pad, frame_min.y + pad);
     for (int i = 0; i < 32; ++i) {
         const float t0 = static_cast<float>(i) / 32.0f;
         const float t1 = static_cast<float>(i + 1) / 32.0f;
@@ -1462,20 +1481,20 @@ void draw_colorbar(const char* title, float vmin, float vmax, const char* unit) 
         // — one source of truth so the legend can never drift from the render.
         const auto rgb = fea_colormap(0.5f * (t0 + t1));
         const ImU32 col = ImGui::ColorConvertFloat4ToU32(ImVec4(rgb[0], rgb[1], rgb[2], 1.0f));
-        dl->AddRectFilled(ImVec2(p0.x, p0.y + h * (1.0f - t1)),
-                          ImVec2(p0.x + w, p0.y + h * (1.0f - t0)), col);
+        dl->AddRectFilled(ImVec2(bar_min.x, bar_min.y + bar_h * (1.0f - t1)),
+                          ImVec2(bar_min.x + bar_w, bar_min.y + bar_h * (1.0f - t0)), col);
     }
-    dl->AddRect(p0, ImVec2(p0.x + w, p0.y + h), IM_COL32(255, 255, 255, 80));
-    ImGui::Dummy(ImVec2(w + 8, h));
-    ImGui::SameLine();
-    ImGui::BeginGroup();
-    ImGui::Text("%s", title);
-    const std::string maximum = format_legend_value(vmax, unit);
-    ImGui::TextUnformatted(maximum.c_str());
-    ImGui::Dummy(ImVec2(0, h - 48));
-    const std::string minimum = format_legend_value(vmin, unit);
-    ImGui::TextUnformatted(minimum.c_str());
-    ImGui::EndGroup();
+    dl->AddRect(bar_min, ImVec2(bar_min.x + bar_w, bar_min.y + bar_h),
+                ImGui::GetColorU32(palette.border));
+
+    const float text_x = bar_min.x + bar_w + text_gap;
+    const float line = ImGui::GetTextLineHeight();
+    dl->AddText(ImVec2(text_x, bar_min.y), ImGui::GetColorU32(palette.text), title);
+    dl->AddText(ImVec2(text_x, bar_min.y + line + ui_px(3.0f)),
+                ImGui::GetColorU32(palette.text_dim), maximum.c_str());
+    dl->AddText(ImVec2(text_x, bar_min.y + bar_h - line), ImGui::GetColorU32(palette.text_dim),
+                minimum.c_str());
+    ImGui::Dummy(ImVec2(frame_max.x - cursor.x + margin, frame_max.y - cursor.y + margin));
 }
 
 void apply_mesh_preset(App& app, MeshPreset preset) {
@@ -1794,7 +1813,13 @@ void draw_run_step(App& app) {
         "Keep the exact mesher, element size, polynomial order, and adaptivity choices "
         "shown under Advanced.",
     };
-    if (iw::selector("Mesh fidelity", &preset, kPresets, 4, kPresetHelp)) {
+    static const iw::Icon kPresetIcons[] = {
+        iw::Icon::kFast,
+        iw::Icon::kStandard,
+        iw::Icon::kFine,
+        iw::Icon::kManual,
+    };
+    if (iw::selector("Mesh fidelity", &preset, kPresets, 4, kPresetHelp, kPresetIcons)) {
         apply_mesh_preset(app, static_cast<MeshPreset>(preset));
     }
     double h_mm = app.setup.mesh_size * 1e3;
@@ -1828,13 +1853,15 @@ void draw_run_step(App& app) {
                          state != SolveJob::State::kIdle);
     if (iw::button("Build mesh only", ImVec2(-1, 0), false,
                    "Generate and inspect the volume mesh without assembling or solving "
-                   "the elasticity system. This is the fastest way to validate topology.")) {
+                   "the elasticity system. This is the fastest way to validate topology.",
+                   iw::Icon::kMeshOnly)) {
         start_interactive_job(app, true);
     }
     if (iw::button(worker_busy ? "Working…" : "Solve study", ImVec2(-1, 0), true,
                    "Run the complete study: advisor deliberation when available, volume "
                    "meshing, stiffness assembly, linear solve, ZZ error recovery, and any "
-                   "requested adaptive passes.")) {
+                   "requested adaptive passes.",
+                   iw::Icon::kSolve)) {
         start_interactive_job(app, false);
     }
     ImGui::EndDisabled();
@@ -2080,11 +2107,19 @@ void draw_pipeline_dock(App& app) {
         const ImVec4 tone = done[static_cast<std::size_t>(i)]
                                 ? palette.accent
                                 : (i == current ? palette.accent2 : palette.text_disabled);
+        const float dot_r = ui_px(6.0f);
         if (done[static_cast<std::size_t>(i)]) {
-            dl->AddCircleFilled(ImVec2(dot_x, cy), ui_px(5.0f), ImGui::GetColorU32(tone));
+            // Same check geometry the step chips use, so "done" reads identically
+            // in the left rail and in this dock.
+            dl->AddCircleFilled(ImVec2(dot_x, cy), dot_r, ImGui::GetColorU32(tone));
+            const ImU32 mark = ImGui::GetColorU32(palette.text);
+            dl->AddLine(ImVec2(dot_x - dot_r * 0.46f, cy + dot_r * 0.06f),
+                        ImVec2(dot_x - dot_r * 0.12f, cy + dot_r * 0.40f), mark, ui_px(1.5f));
+            dl->AddLine(ImVec2(dot_x - dot_r * 0.12f, cy + dot_r * 0.40f),
+                        ImVec2(dot_x + dot_r * 0.50f, cy - dot_r * 0.36f), mark, ui_px(1.5f));
         } else {
-            dl->AddCircle(ImVec2(dot_x, cy), ui_px(5.0f), ImGui::GetColorU32(tone), 0,
-                          ui_px(i == current ? 2.0f : 1.0f));
+            dl->AddCircle(ImVec2(dot_x, cy), dot_r, ImGui::GetColorU32(tone), 0,
+                          ui_px(i == current ? 2.4f : 1.0f));
         }
         const float text_x = row.x + ui_px(24.0f);
         const float budget = std::max(0.0f, text_limit - text_x);
@@ -2137,31 +2172,34 @@ std::vector<pipeline::PassTrace> pass_trace_snapshot(App& app) {
 }
 
 void draw_camera_actions(App& app) {
-    iw::field_label("Camera");
+    iw::field_label("Camera", iw::Icon::kCamera);
     const float gap = ui_px(4.0f);
     const float width =
         std::max(ui_px(42.0f), (ImGui::GetContentRegionAvail().x - 3.0f * gap) / 4.0f);
     constexpr float kPi = 3.14159265358979323846f;
     if (iw::button("Iso", ImVec2(width, 0), false,
-                   "Isometric engineering view, then fit the current field to the pane.")) {
+                   "Isometric engineering view, then fit the current field to the pane.",
+                   iw::Icon::kIso)) {
         app.viewport.camera.set_orbit(0.70f, 0.50f);
         app.viewport.frame_content(app.mode);
     }
     ImGui::SameLine(0.0f, gap);
     if (iw::button("Front", ImVec2(width, 0), false,
-                   "Look square-on from the front, then fit the current field.")) {
+                   "Look square-on from the front, then fit the current field.",
+                   iw::Icon::kFront)) {
         app.viewport.camera.set_orbit(0.0f, 0.0f);
         app.viewport.frame_content(app.mode);
     }
     ImGui::SameLine(0.0f, gap);
     if (iw::button("Right", ImVec2(width, 0), false,
-                   "Look square-on from the right, then fit the current field.")) {
+                   "Look square-on from the right, then fit the current field.",
+                   iw::Icon::kRight)) {
         app.viewport.camera.set_orbit(0.5f * kPi, 0.0f);
         app.viewport.frame_content(app.mode);
     }
     ImGui::SameLine(0.0f, gap);
     if (iw::button("Top", ImVec2(width, 0), false,
-                   "Look down from above, then fit the current field.")) {
+                   "Look down from above, then fit the current field.", iw::Icon::kTop)) {
         app.viewport.camera.set_orbit(0.0f, 0.5f * kPi - 0.01f);
         app.viewport.frame_content(app.mode);
     }
@@ -2171,19 +2209,30 @@ void draw_camera_actions(App& app) {
         std::max(ui_px(92.0f), (ImGui::GetContentRegionAvail().x - action_gap) * 0.5f);
     if (iw::button("Fit field", ImVec2(action_width, 0), false,
                    "Keep the current orientation and fit the active CAD, mesh, or result "
-                   "field to the pane. Keyboard shortcut: F.")) {
+                   "field to the pane. Keyboard shortcut: F.",
+                   iw::Icon::kFit)) {
         app.viewport.frame_content(app.mode);
     }
     ImGui::SameLine(0.0f, action_gap);
     if (iw::button("Save image", ImVec2(action_width, 0), false,
-                   "Capture the complete studio window as a PNG. Keyboard shortcut: F12.")) {
+                   "Capture the complete studio window as a PNG. Keyboard shortcut: F12.",
+                   iw::Icon::kSave)) {
         app.shot_countdown = 0;
     }
 }
 
 void draw_analysis_panel(App& app) {
+    // This rail is a bare child, not a group box, so nothing had ever set an
+    // item width: every iw:: control fell back to ImGui's default ~65% and
+    // stopped roughly 90 px short of the child's right edge. Claim the full
+    // content width once, here, and the whole rail lines up with its own border.
+    ImGui::PushItemWidth(-FLT_MIN);
     const bool has_output = app.result.has_value() || app.mesh_preview.has_value();
     static const char* kModes[] = {"CAD", "Mesh", "Stress", "Deflection", "Error η"};
+    static const iw::Icon kModeIcons[] = {
+        iw::Icon::kCad,        iw::Icon::kMesh,  iw::Icon::kStress,
+        iw::Icon::kDeflection, iw::Icon::kError,
+    };
     static const char* kModeHelp[] = {
         "Original CAD boundary. Use this view to pick face ids for fixtures and loads.",
         "Volume-mesh boundary coloured by element family. Turn on edges to inspect "
@@ -2197,15 +2246,15 @@ void draw_analysis_panel(App& app) {
     };
     if (has_output) {
         int mode = std::clamp(static_cast<int>(app.mode), 0, 4);
-        if (iw::selector("Field", &mode, kModes, 5, kModeHelp)) {
+        if (iw::selector("Field", &mode, kModes, 5, kModeHelp, kModeIcons)) {
             app.mode = static_cast<DisplayMode>(mode);
             sanitize_display_mode(app);
         }
-        iw::checkbox("Wireframe edges", &app.show_wireframe);
+        iw::checkbox("Wireframe edges", &app.show_wireframe, iw::Icon::kWire);
         iw::tooltip("Overlay boundary element edges. Useful for topology inspection; dense "
                     "meshes can obscure a scalar field, so it defaults off.");
         if (app.result) {
-            iw::checkbox("Undeformed reference", &app.show_undeformed);
+            iw::checkbox("Undeformed reference", &app.show_undeformed, iw::Icon::kUndeformed);
             iw::tooltip("Draw the original, unloaded boundary behind the deformed result.");
             static const char* kDeformationModes[] = {"Auto", "True 1×", "Custom"};
             static const char* kDeformationHelp[] = {
@@ -2215,9 +2264,14 @@ void draw_analysis_panel(App& app) {
                 "Choose an explicit visual magnification. This changes geometry display "
                 "only, never the computed displacement.",
             };
+            static const iw::Icon kDeformationIcons[] = {
+                iw::Icon::kAuto,
+                iw::Icon::kTrueScale,
+                iw::Icon::kCustom,
+            };
             int deformation = static_cast<int>(app.deformation_view);
             if (iw::selector("Deformation", &deformation, kDeformationModes, 3,
-                             kDeformationHelp)) {
+                             kDeformationHelp, kDeformationIcons)) {
                 app.deformation_view = static_cast<DeformationView>(deformation);
                 app.deform_scale = app.deformation_view == DeformationView::kAuto
                                        ? app.deform_auto
@@ -2265,16 +2319,19 @@ void draw_analysis_panel(App& app) {
         const auto nodes = std::format("{}", app.result->volume_mesh.nodes.size());
         const auto elements = std::format("{}", app.result->volume_mesh.elements.size());
         const auto dof = std::format("{}", app.dof_count);
-        iw::stat_row("Max von Mises", stress.c_str(), app.mono_font);
-        iw::stat_row("Max displacement", displacement.c_str(), app.mono_font);
-        iw::stat_row("Global ZZ η", error.c_str(), app.mono_font);
-        iw::stat_row("Nodes", nodes.c_str(), app.mono_font);
-        iw::stat_row("Elements", elements.c_str(), app.mono_font);
-        iw::stat_row("DOF", dof.c_str(), app.mono_font);
+        iw::field_label("Results");
+        iw::stat_row("Max von Mises", stress.c_str(), app.mono_font, iw::Icon::kStress);
+        iw::stat_row("Max displacement", displacement.c_str(), app.mono_font,
+                     iw::Icon::kDeflection);
+        iw::stat_row("Global ZZ η", error.c_str(), app.mono_font, iw::Icon::kError);
+        iw::stat_row("Nodes", nodes.c_str(), app.mono_font, iw::Icon::kNodes);
+        iw::stat_row("Elements", elements.c_str(), app.mono_font, iw::Icon::kElements);
+        iw::stat_row("DOF", dof.c_str(), app.mono_font, iw::Icon::kDof);
 
         const auto traces = pass_trace_snapshot(app);
         if (!traces.empty() && !traces.back().solve_method.empty()) {
-            iw::stat_row("Solver", traces.back().solve_method.c_str(), app.mono_font);
+            iw::stat_row("Solver", traces.back().solve_method.c_str(), app.mono_font,
+                         iw::Icon::kSolver);
         }
         // The full per-pass table is a luxury; the docked plot is the instrument.
         // When both cannot fit, the table collapses to its one honest summary row
@@ -2286,7 +2343,7 @@ void draw_analysis_panel(App& app) {
         if (traces.size() > 1 && after_table < instrument_reserve) {
             const auto span = std::format("{} passes · η {:.3g} → {:.3g}", traces.size(),
                                           traces.front().global_eta, traces.back().global_eta);
-            iw::stat_row("Adaptive history", span.c_str(), app.mono_font);
+            iw::stat_row("Adaptive history", span.c_str(), app.mono_font, iw::Icon::kFine);
         } else if (traces.size() > 1 &&
                    ImGui::BeginTable("##convergence", 4,
                                      ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerH)) {
@@ -2310,7 +2367,8 @@ void draw_analysis_panel(App& app) {
         }
         if (iw::button("Export result · VTU", ImVec2(-1, 0), true,
                        "Write the volume mesh and current result fields for ParaView: "
-                       "displacement, von Mises stress, and element quality.")) {
+                       "displacement, von Mises stress, and element quality.",
+                       iw::Icon::kExport)) {
             const std::string output =
                 app.model ? (app.model->name + "_result.vtu") : "result.vtu";
             std::string error_text;
@@ -2322,10 +2380,12 @@ void draw_analysis_panel(App& app) {
         const auto nodes = std::format("{}", app.mesh_preview->mesh.nodes.size());
         const auto elements = std::format("{}", app.mesh_preview->mesh.elements.size());
         const auto dof = std::format("{}", 3 * app.mesh_preview->mesh.nodes.size());
-        iw::stat_row("Nodes", nodes.c_str(), app.mono_font);
-        iw::stat_row("Elements", elements.c_str(), app.mono_font);
-        iw::stat_row("DOF", dof.c_str(), app.mono_font);
-        iw::stat_row("Mesher", pipeline::mesher_name(app.setup.mesher).data(), app.mono_font);
+        iw::field_label("Results");
+        iw::stat_row("Nodes", nodes.c_str(), app.mono_font, iw::Icon::kNodes);
+        iw::stat_row("Elements", elements.c_str(), app.mono_font, iw::Icon::kElements);
+        iw::stat_row("DOF", dof.c_str(), app.mono_font, iw::Icon::kDof);
+        iw::stat_row("Mesher", pipeline::mesher_name(app.setup.mesher).data(), app.mono_font,
+                     iw::Icon::kMeshOnly);
     }
 
     if (advisor_instrument || convergence_instrument) {
@@ -2374,6 +2434,7 @@ void draw_analysis_panel(App& app) {
             ImGui::EndChild();
         }
     }
+    ImGui::PopItemWidth();
 }
 
 void draw_viewport_content(App& app) {
@@ -2427,8 +2488,9 @@ void draw_viewport_content(App& app) {
         (app.mode == DisplayMode::kResultsVonMises ||
          app.mode == DisplayMode::kResultsDisplacement ||
          app.mode == DisplayMode::kResultsError)) {
-        ImGui::SetCursorScreenPos(ImVec2(item_min.x + 12, item_min.y + 12));
-        ImGui::BeginChild("##cbar", ImVec2(148, 170), false,
+        ImGui::SetCursorScreenPos(
+            ImVec2(item_min.x + ui_px(10.0f), item_min.y + ui_px(10.0f)));
+        ImGui::BeginChild("##cbar", ImVec2(ui_px(196.0f), ui_px(172.0f)), false,
                           ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoInputs |
                               ImGuiWindowFlags_NoScrollbar);
         if (app.mode == DisplayMode::kResultsVonMises) {
@@ -3068,9 +3130,13 @@ void draw_frame(App& app) {
                                   app.live.has_convergence_content();
         const float left =
             std::floor(std::clamp(content_width * 0.235f, ui_px(292.0f), ui_px(372.0f)));
+        // The results rail carries a five-way Field selector, a four-way camera
+        // row and right-aligned statistics, so it needs more width than the
+        // study rail: at 388 dp the Field row could only wrap 2+2+1 and stranded
+        // "Error η" alone on a full-width row.
         float right =
             show_results
-                ? std::floor(std::clamp(content_width * 0.235f, ui_px(310.0f), ui_px(388.0f)))
+                ? std::floor(std::clamp(content_width * 0.28f, ui_px(340.0f), ui_px(460.0f)))
                 : 0.0f;
         const float minimum_canvas = ui_px(300.0f);
         const float overflow =
@@ -3099,7 +3165,10 @@ void draw_frame(App& app) {
         if (show_results) {
             ImGui::SameLine(0.0f, gap);
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, panel_padding);
-            ImGui::BeginChild("results", ImVec2(0.0f, row_height),
+            // Pass the computed width instead of 0: the rail's own layout math
+            // (and every full-width control in it) has to match the child it is
+            // actually drawn into.
+            ImGui::BeginChild("results", ImVec2(right, row_height),
                               ImGuiChildFlags_AlwaysUseWindowPadding);
             draw_analysis_panel(app);
             ImGui::EndChild();

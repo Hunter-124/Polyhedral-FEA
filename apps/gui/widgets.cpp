@@ -61,36 +61,71 @@ std::vector<GroupBoxFrame> g_group_stack;
 float button_pad_x() { return ui_px(12.0f); }
 float button_pad_y() { return ui_px(6.0f); }
 
-/// Draw label text centered in [min,max], clipped so it never spills the box.
+/// Glyph box and glyph-to-text gap shared by every icon-bearing control, so a
+/// selector cell, a button and a stat row all reserve the same 18 dp.
+float icon_box() { return ui_px(12.0f); }
+float icon_gap() { return ui_px(6.0f); }
+
+/// Draw an optional glyph plus label as ONE centered unit, clipped so neither
+/// spills the box. Centering the pair (not the text alone) is what keeps an
+/// icon button from looking hung off its left edge.
 void draw_centered_label(ImDrawList* dl, const ImVec2& min, const ImVec2& max,
-                         const char* text, ImU32 col) {
+                         const char* text, ImU32 col, Icon icon = Icon::kNone) {
     const ImVec2 tsize = ImGui::CalcTextSize(text);
+    const float glyph = icon == Icon::kNone ? 0.0f : icon_box();
+    const float gap = icon == Icon::kNone ? 0.0f : icon_gap();
     const float box_w = max.x - min.x;
     const float box_h = max.y - min.y;
-    const ImVec2 tpos(min.x + 0.5f * (box_w - tsize.x), min.y + 0.5f * (box_h - tsize.y));
+    float x = min.x + 0.5f * (box_w - (glyph + gap + tsize.x));
     dl->PushClipRect(min, max, true);
-    dl->AddText(tpos, col, text);
+    if (icon != Icon::kNone) {
+        draw_icon(dl, ImVec2(x + 0.5f * glyph, min.y + 0.5f * box_h), glyph, icon, col);
+        x += glyph + gap;
+    }
+    dl->AddText(ImVec2(x, min.y + 0.5f * (box_h - tsize.y)), col, text);
     dl->PopClipRect();
 }
 
-/// Choose how many columns fit so every option's text + padding is readable.
-int fit_selector_columns(const char* const* options, int count, float avail, float gap,
-                         float pad_x) {
-    for (int cols = count; cols >= 1; --cols) {
-        const float cell =
-            (avail - gap * static_cast<float>(cols - 1)) / static_cast<float>(cols);
-        bool ok = true;
-        for (int i = 0; i < count; ++i) {
-            if (ImGui::CalcTextSize(options[i]).x + 2.0f * pad_x > cell + 0.5f) {
-                ok = false;
-                break;
-            }
+/// True when every option's text + glyph + padding fits a `cols`-wide row.
+bool selector_columns_fit(const char* const* options, int count, float avail, float gap,
+                          float pad_x, float icon_extra, int cols) {
+    const float cell = (avail - gap * static_cast<float>(cols - 1)) / static_cast<float>(cols);
+    for (int i = 0; i < count; ++i) {
+        if (ImGui::CalcTextSize(options[i]).x + icon_extra + 2.0f * pad_x > cell + 0.5f) {
+            return false;
         }
-        if (ok) {
+    }
+    return true;
+}
+
+/// Choose how many columns fit so every option's text + padding is readable.
+/// `icon_extra` is the per-option glyph reservation (0 when the selector has
+/// no icons) — without it an iconised selector picks a column count that then
+/// clips every label it measured as fitting.
+///
+/// Among the counts that fit, prefer one whose final row holds at least two
+/// options. The widest fit is not the best fit: four options in three columns
+/// strands the fourth alone on a full-width row (the "Error η" / "Manual"
+/// defect), while 2x2 reads as a block. The plain widest fit stays the
+/// fallback so a genuinely narrow rail never collapses to one column just to
+/// satisfy the balance rule.
+int fit_selector_columns(const char* const* options, int count, float avail, float gap,
+                         float pad_x, float icon_extra) {
+    int widest = 1;
+    for (int cols = count; cols >= 2; --cols) {
+        if (selector_columns_fit(options, count, avail, gap, pad_x, icon_extra, cols)) {
+            widest = cols;
+            break;
+        }
+    }
+    for (int cols = widest; cols >= 2; --cols) {
+        const int last_row = count % cols;
+        if ((last_row == 0 || last_row >= 2) &&
+            selector_columns_fit(options, count, avail, gap, pad_x, icon_extra, cols)) {
             return cols;
         }
     }
-    return 1;
+    return widest;
 }
 
 } // namespace
@@ -127,6 +162,279 @@ const char* fit_text(char* buffer, size_t capacity, const char* text, float max_
     std::memcpy(buffer, text, kept);
     std::memcpy(buffer + kept, kEllipsis, kEllipsisBytes + 1);
     return buffer;
+}
+
+namespace {
+
+constexpr float kIconTau = 6.28318530718f;
+
+/// Icon stroke weight: heavy enough to read at 12 dp, light enough that a
+/// glyph never out-weighs the label beside it.
+float icon_stroke() { return ui_px(1.6f); }
+
+/// Square outline subdivided `divisions` times each way — the mesh/wireframe
+/// family.
+void icon_grid(ImDrawList* dl, ImVec2 c, float h, ImU32 col, int divisions) {
+    const float stroke = icon_stroke();
+    dl->AddRect(ImVec2(c.x - h, c.y - h), ImVec2(c.x + h, c.y + h), col, 0.0f,
+                ImDrawFlags_None, stroke);
+    for (int i = 1; i < divisions; ++i) {
+        const float offset =
+            -h + 2.0f * h * static_cast<float>(i) / static_cast<float>(divisions);
+        dl->AddLine(ImVec2(c.x + offset, c.y - h), ImVec2(c.x + offset, c.y + h), col, stroke);
+        dl->AddLine(ImVec2(c.x - h, c.y + offset), ImVec2(c.x + h, c.y + offset), col, stroke);
+    }
+}
+
+/// Isometric cube: hexagon silhouette plus the three interior edges meeting at
+/// the near corner, which is what reads as "three visible faces".
+void icon_cube(ImDrawList* dl, ImVec2 c, float h, ImU32 col) {
+    const float stroke = icon_stroke();
+    const float w = h * 0.88f;
+    const ImVec2 hexagon[6] = {
+        ImVec2(c.x, c.y - h), ImVec2(c.x + w, c.y - h * 0.5f), ImVec2(c.x + w, c.y + h * 0.5f),
+        ImVec2(c.x, c.y + h), ImVec2(c.x - w, c.y + h * 0.5f), ImVec2(c.x - w, c.y - h * 0.5f),
+    };
+    dl->AddPolyline(hexagon, 6, col, ImDrawFlags_Closed, stroke);
+    dl->AddLine(c, hexagon[0], col, stroke);
+    dl->AddLine(c, hexagon[2], col, stroke);
+    dl->AddLine(c, hexagon[4], col, stroke);
+}
+
+/// Solid arrowhead at `tip` pointing along `dir` (need not be normalised).
+void icon_arrow_head(ImDrawList* dl, ImVec2 tip, ImVec2 dir, float length, ImU32 col) {
+    const float norm = std::sqrt(dir.x * dir.x + dir.y * dir.y);
+    if (norm <= 0.0f) {
+        return;
+    }
+    const ImVec2 unit(dir.x / norm, dir.y / norm);
+    const ImVec2 base(tip.x - unit.x * length, tip.y - unit.y * length);
+    const float wing = length * 0.58f;
+    dl->AddTriangleFilled(tip, ImVec2(base.x - unit.y * wing, base.y + unit.x * wing),
+                          ImVec2(base.x + unit.y * wing, base.y - unit.x * wing), col);
+}
+
+/// `count` right-pointing chevrons — the mesh-fidelity speed family.
+void icon_chevrons(ImDrawList* dl, ImVec2 c, float h, ImU32 col, int count) {
+    const float stroke = icon_stroke();
+    const float pitch = h * 0.62f;
+    const float x0 = c.x - pitch * (static_cast<float>(count) - 1.0f) * 0.5f - h * 0.28f;
+    for (int i = 0; i < count; ++i) {
+        const float x = x0 + pitch * static_cast<float>(i);
+        dl->AddLine(ImVec2(x, c.y - h * 0.72f), ImVec2(x + h * 0.52f, c.y), col, stroke);
+        dl->AddLine(ImVec2(x + h * 0.52f, c.y), ImVec2(x, c.y + h * 0.72f), col, stroke);
+    }
+}
+
+/// Rectangle with ONE edge drawn heavy: the face a standard view looks at.
+/// `edge` 0 = bottom (front), 1 = right, 2 = top.
+void icon_face_rect(ImDrawList* dl, ImVec2 c, float h, ImU32 col, int edge) {
+    const float stroke = icon_stroke();
+    const ImVec2 mn(c.x - h, c.y - h);
+    const ImVec2 mx(c.x + h, c.y + h);
+    dl->AddRect(mn, mx, col, 0.0f, ImDrawFlags_None, stroke);
+    const float heavy = stroke * 2.3f;
+    if (edge == 0) {
+        dl->AddLine(ImVec2(mn.x, mx.y), mx, col, heavy);
+    } else if (edge == 1) {
+        dl->AddLine(ImVec2(mx.x, mn.y), mx, col, heavy);
+    } else {
+        dl->AddLine(mn, ImVec2(mx.x, mn.y), col, heavy);
+    }
+}
+
+} // namespace
+
+void draw_icon(ImDrawList* dl, ImVec2 center, float size, Icon icon, ImU32 color) {
+    if (dl == nullptr || icon == Icon::kNone || size <= 0.0f) {
+        return;
+    }
+    const float h = size * 0.5f;
+    const float stroke = icon_stroke();
+    switch (icon) {
+    case Icon::kCad:
+        icon_cube(dl, center, h, color);
+        break;
+    case Icon::kIso:
+        icon_cube(dl, center, h * 0.92f, color);
+        break;
+    case Icon::kMesh:
+        icon_grid(dl, center, h * 0.92f, color, 2);
+        break;
+    case Icon::kWire:
+        icon_grid(dl, center, h * 0.92f, color, 3);
+        break;
+    case Icon::kStress: {
+        // Three stacked bars: the colormap read as a legend strip. It is chrome,
+        // not a plotted value — no bar length encodes a number.
+        const float bar_h = size * 0.18f;
+        const float pitch = size * 0.29f;
+        float y = center.y - pitch - bar_h * 0.5f;
+        for (int i = 0; i < 3; ++i) {
+            dl->AddRectFilled(ImVec2(center.x - h * 0.92f, y),
+                              ImVec2(center.x + h * 0.92f, y + bar_h), color);
+            y += pitch;
+        }
+        break;
+    }
+    case Icon::kDeflection: {
+        const ImVec2 heel(center.x - h, center.y + h * 0.78f);
+        const ImVec2 knee(center.x - h * 0.15f, center.y + h * 0.78f);
+        const ImVec2 tip(center.x + h * 0.72f, center.y - h * 0.86f);
+        dl->AddLine(heel, knee, color, stroke);
+        dl->AddLine(knee, tip, color, stroke);
+        icon_arrow_head(dl, tip, ImVec2(tip.x - knee.x, tip.y - knee.y), h * 0.62f, color);
+        break;
+    }
+    case Icon::kError:
+        dl->AddTriangle(ImVec2(center.x, center.y - h * 0.94f),
+                        ImVec2(center.x + h * 0.96f, center.y + h * 0.74f),
+                        ImVec2(center.x - h * 0.96f, center.y + h * 0.74f), color, stroke);
+        dl->AddLine(ImVec2(center.x, center.y - h * 0.20f),
+                    ImVec2(center.x, center.y + h * 0.36f), color, stroke);
+        break;
+    case Icon::kAuto:
+        dl->AddLine(ImVec2(center.x - h * 0.85f, center.y),
+                    ImVec2(center.x + h * 0.85f, center.y), color, stroke);
+        icon_arrow_head(dl, ImVec2(center.x + h, center.y), ImVec2(1.0f, 0.0f), h * 0.60f,
+                        color);
+        icon_arrow_head(dl, ImVec2(center.x - h, center.y), ImVec2(-1.0f, 0.0f), h * 0.60f,
+                        color);
+        break;
+    case Icon::kTrueScale: {
+        // Ruler: the scale is exactly 1, so the glyph is a measure, not an arrow.
+        const float baseline = center.y + h * 0.58f;
+        dl->AddLine(ImVec2(center.x - h, baseline), ImVec2(center.x + h, baseline), color,
+                    stroke);
+        for (int i = 0; i < 3; ++i) {
+            const float x = center.x - h + h * static_cast<float>(i);
+            const float length = i == 1 ? h * 0.98f : h * 0.62f;
+            dl->AddLine(ImVec2(x, baseline), ImVec2(x, baseline - length), color, stroke);
+        }
+        break;
+    }
+    case Icon::kCustom:
+    case Icon::kManual:
+        dl->AddLine(ImVec2(center.x - h, center.y), ImVec2(center.x + h, center.y), color,
+                    stroke);
+        dl->AddLine(ImVec2(center.x + h * 0.34f, center.y - h * 0.66f),
+                    ImVec2(center.x + h * 0.34f, center.y + h * 0.66f), color, stroke * 1.4f);
+        break;
+    case Icon::kFront:
+        icon_face_rect(dl, center, h * 0.86f, color, 0);
+        break;
+    case Icon::kRight:
+        icon_face_rect(dl, center, h * 0.86f, color, 1);
+        break;
+    case Icon::kTop:
+        icon_face_rect(dl, center, h * 0.86f, color, 2);
+        break;
+    case Icon::kFit: {
+        const float arm = h * 0.56f;
+        const ImVec2 corner[4] = {
+            ImVec2(center.x - h, center.y - h),
+            ImVec2(center.x + h, center.y - h),
+            ImVec2(center.x + h, center.y + h),
+            ImVec2(center.x - h, center.y + h),
+        };
+        const float step_x[4] = {1.0f, -1.0f, -1.0f, 1.0f};
+        const float step_y[4] = {1.0f, 1.0f, -1.0f, -1.0f};
+        for (int i = 0; i < 4; ++i) {
+            dl->AddLine(corner[i], ImVec2(corner[i].x + step_x[i] * arm, corner[i].y), color,
+                        stroke);
+            dl->AddLine(corner[i], ImVec2(corner[i].x, corner[i].y + step_y[i] * arm), color,
+                        stroke);
+        }
+        break;
+    }
+    case Icon::kCamera: {
+        const ImVec2 mn(center.x - h, center.y - h * 0.52f);
+        const ImVec2 mx(center.x + h, center.y + h * 0.78f);
+        dl->AddRect(mn, mx, color, ui_px(2.0f), ImDrawFlags_RoundCornersAll, stroke);
+        dl->AddLine(ImVec2(center.x - h * 0.42f, mn.y - stroke),
+                    ImVec2(center.x + h * 0.02f, mn.y - stroke), color, stroke * 1.6f);
+        dl->AddCircle(ImVec2(center.x, center.y + h * 0.14f), h * 0.34f, color, 0, stroke);
+        break;
+    }
+    case Icon::kSolve:
+        dl->AddTriangleFilled(ImVec2(center.x - h * 0.62f, center.y - h * 0.94f),
+                              ImVec2(center.x + h * 0.94f, center.y),
+                              ImVec2(center.x - h * 0.62f, center.y + h * 0.94f), color);
+        break;
+    case Icon::kMeshOnly: {
+        ImVec2 hexagon[6];
+        for (int i = 0; i < 6; ++i) {
+            const float angle = kIconTau * (static_cast<float>(i) / 6.0f - 0.25f);
+            hexagon[i] =
+                ImVec2(center.x + h * std::cos(angle), center.y + h * std::sin(angle));
+        }
+        dl->AddPolyline(hexagon, 6, color, ImDrawFlags_Closed, stroke);
+        break;
+    }
+    case Icon::kExport: {
+        const float lip = center.y + h * 0.08f;
+        dl->AddLine(ImVec2(center.x - h, lip), ImVec2(center.x - h, center.y + h), color,
+                    stroke);
+        dl->AddLine(ImVec2(center.x - h, center.y + h), ImVec2(center.x + h, center.y + h),
+                    color, stroke);
+        dl->AddLine(ImVec2(center.x + h, lip), ImVec2(center.x + h, center.y + h), color,
+                    stroke);
+        dl->AddLine(ImVec2(center.x, center.y + h * 0.46f),
+                    ImVec2(center.x, center.y - h * 0.46f), color, stroke);
+        icon_arrow_head(dl, ImVec2(center.x, center.y - h), ImVec2(0.0f, -1.0f), h * 0.58f,
+                        color);
+        break;
+    }
+    case Icon::kSave: {
+        const ImVec2 mn(center.x - h, center.y - h);
+        const ImVec2 mx(center.x + h, center.y + h);
+        dl->AddRect(mn, mx, color, ui_px(2.0f), ImDrawFlags_RoundCornersAll, stroke);
+        dl->AddRectFilled(ImVec2(center.x - h * 0.40f, mn.y + stroke),
+                          ImVec2(center.x + h * 0.40f, center.y - h * 0.26f), color);
+        dl->AddRect(ImVec2(center.x - h * 0.56f, center.y + h * 0.18f),
+                    ImVec2(center.x + h * 0.56f, mx.y - stroke), color, 0.0f, ImDrawFlags_None,
+                    stroke);
+        break;
+    }
+    case Icon::kFast:
+        icon_chevrons(dl, center, h, color, 1);
+        break;
+    case Icon::kStandard:
+        icon_chevrons(dl, center, h, color, 2);
+        break;
+    case Icon::kFine:
+        icon_chevrons(dl, center, h, color, 3);
+        break;
+    case Icon::kNodes:
+        dl->AddCircleFilled(center, h * 0.52f, color);
+        break;
+    case Icon::kElements:
+        dl->AddTriangle(ImVec2(center.x, center.y - h * 0.94f),
+                        ImVec2(center.x + h * 0.92f, center.y + h * 0.72f),
+                        ImVec2(center.x - h * 0.92f, center.y + h * 0.72f), color, stroke);
+        break;
+    case Icon::kDof:
+        for (int i = -1; i <= 1; ++i) {
+            dl->AddCircleFilled(ImVec2(center.x + static_cast<float>(i) * h * 0.68f, center.y),
+                                h * 0.26f, color);
+        }
+        break;
+    case Icon::kSolver:
+        dl->AddLine(ImVec2(center.x - h * 0.88f, center.y - h * 0.34f),
+                    ImVec2(center.x + h * 0.88f, center.y - h * 0.34f), color, stroke);
+        dl->AddLine(ImVec2(center.x - h * 0.88f, center.y + h * 0.34f),
+                    ImVec2(center.x + h * 0.88f, center.y + h * 0.34f), color, stroke);
+        break;
+    case Icon::kUndeformed:
+        dl->AddRect(ImVec2(center.x - h, center.y - h),
+                    ImVec2(center.x + h * 0.28f, center.y + h * 0.28f), color, 0.0f,
+                    ImDrawFlags_None, stroke);
+        dl->AddRectFilled(ImVec2(center.x - h * 0.28f, center.y - h * 0.28f),
+                          ImVec2(center.x + h, center.y + h), color);
+        break;
+    case Icon::kNone:
+        break;
+    }
 }
 
 void begin_group_box(const char* title) {
@@ -244,12 +552,13 @@ float fill_width() {
 
 } // namespace
 
-bool checkbox(const char* label, bool* value) {
+bool checkbox(const char* label, bool* value, Icon icon) {
     const float box = ui_px(15.0f);
     ImGui::PushID(label);
     const ImVec2 pos = ImGui::GetCursorScreenPos();
     const ImVec2 label_size = ImGui::CalcTextSize(label);
-    const float hit_w = std::min(fill_width(), box + ui_px(8.0f) + label_size.x);
+    const float glyph = icon == Icon::kNone ? 0.0f : icon_box() + icon_gap();
+    const float hit_w = std::min(fill_width(), box + ui_px(8.0f) + glyph + label_size.x);
     const bool pressed = ImGui::InvisibleButton("##cb", ImVec2(hit_w, box + ui_px(2.0f)));
     if (pressed) {
         *value = !*value;
@@ -269,11 +578,16 @@ bool checkbox(const char* label, bool* value) {
     } else {
         draw_box(dl, box_min, box_max, hovered);
     }
-    const ImVec2 text_min(box_max.x + ui_px(8.0f), pos.y);
-    const ImVec2 text_max(pos.x + hit_w, pos.y + box + ui_px(2.0f));
-    dl->PushClipRect(text_min, text_max, true);
-    dl->AddText(ImVec2(box_max.x + ui_px(8.0f), pos.y + ui_px(1.0f)),
-                u32(hovered ? palette.text : palette.text_dim), label);
+    const float glyph_x = box_max.x + ui_px(8.0f);
+    const float text_x = glyph_x + glyph;
+    const ImU32 label_color = u32(hovered ? palette.text : palette.text_dim);
+    if (icon != Icon::kNone) {
+        draw_icon(dl, ImVec2(glyph_x + 0.5f * icon_box(), pos.y + ui_px(1.0f) + 0.5f * box),
+                  icon_box(), icon, label_color);
+    }
+    dl->PushClipRect(ImVec2(text_x, pos.y), ImVec2(pos.x + hit_w, pos.y + box + ui_px(2.0f)),
+                     true);
+    dl->AddText(ImVec2(text_x, pos.y + ui_px(1.0f)), label_color, label);
     dl->PopClipRect();
     ImGui::PopID();
     return pressed;
@@ -320,16 +634,15 @@ bool slider_double(const char* label, double* value, double min, double max,
     return active;
 }
 
-bool button(const char* label, const ImVec2& size, bool primary, const char* help) {
+bool button(const char* label, const ImVec2& size, bool primary, const char* help, Icon icon) {
     ImGui::PushID(label);
     const ImVec2 label_size = ImGui::CalcTextSize(label);
     // size.x < 0 → fill item width (respects group-box PushItemWidth);
     // size.x == 0 → hug label; size.x > 0 → explicit.
     const float avail = fill_width();
-    const float width = size.x < 0.0f ? avail
-                        : size.x > 0.0f
-                            ? size.x
-                            : std::min(avail, label_size.x + 2.0f * button_pad_x());
+    const float hug = label_size.x + 2.0f * button_pad_x() +
+                      (icon == Icon::kNone ? 0.0f : icon_box() + icon_gap());
+    const float width = size.x < 0.0f ? avail : size.x > 0.0f ? size.x : std::min(avail, hug);
     const float height = size.y > 0.0f ? size.y : label_size.y + 2.0f * button_pad_y();
     const ImVec2 pos = ImGui::GetCursorScreenPos();
     const bool pressed = ImGui::InvisibleButton("##btn", ImVec2(width, height));
@@ -345,7 +658,7 @@ bool button(const char* label, const ImVec2& size, bool primary, const char* hel
     } else {
         draw_box(dl, pos, max, hovered);
     }
-    draw_centered_label(dl, pos, max, label, u32(palette.text));
+    draw_centered_label(dl, pos, max, label, u32(palette.text), icon);
     if (help != nullptr && help[0] != '\0') {
         tooltip(help);
     }
@@ -407,21 +720,25 @@ bool input_text(const char* label, char* buffer, size_t buffer_size, const char*
 }
 
 bool selector(const char* label, int* index, const char* const* options, int count,
-              const char* const* help) {
+              const char* const* help, const Icon* icons) {
     ImGui::PushID(label);
     bool changed = false;
     if (count <= 0) {
         ImGui::PopID();
         return false;
     }
-    ImGui::TextColored(palette.text_dim, "%s", label);
+    // One heading treatment across the whole app: uppercase, letter-spaced,
+    // dim. A plain TextColored caption here was the reason "Field" read
+    // title-case beside an all-caps "CAMERA" in the same rail.
+    field_label(label);
 
     const float gap = ui_px(4.0f);
     const float pad_x = ui_px(8.0f);
     // Symmetric left/right: width comes from PushItemWidth / content child.
     const float avail = fill_width();
     const float height = ImGui::GetTextLineHeight() + 2.0f * button_pad_y();
-    const int cols = fit_selector_columns(options, count, avail, gap, pad_x);
+    const float icon_extra = icons == nullptr ? 0.0f : icon_box() + icon_gap();
+    const int cols = fit_selector_columns(options, count, avail, gap, pad_x, icon_extra);
 
     for (int i = 0; i < count; ++i) {
         const int col = i % cols;
@@ -458,7 +775,8 @@ bool selector(const char* label, int* index, const char* const* options, int cou
             draw_box(dl, pos, max, hovered);
         }
         draw_centered_label(dl, pos, max, options[i],
-                            u32(*index == i ? palette.text : palette.text_dim));
+                            u32(*index == i ? palette.text : palette.text_dim),
+                            icons != nullptr ? icons[i] : Icon::kNone);
         if (pressed && *index != i) {
             *index = i;
             changed = true;
@@ -681,7 +999,7 @@ void end_step() {
     ImGui::Dummy(ImVec2(ui_px(0.0f), ui_px(5.0f)));
 }
 
-void stat_row(const char* label, const char* value, ImFont* mono) {
+void stat_row(const char* label, const char* value, ImFont* mono, Icon icon) {
     const char* label_text = label != nullptr ? label : "";
     const char* value_text = value != nullptr ? value : "";
     const float width = fill_width();
@@ -700,10 +1018,16 @@ void stat_row(const char* label, const char* value, ImFont* mono) {
     const float height = std::max(label_size.y, value_size.y) + ui_px(2.0f);
     ImGui::Dummy(ImVec2(width, height));
     ImDrawList* dl = ImGui::GetWindowDrawList();
+    const float glyph = icon == Icon::kNone ? 0.0f : icon_box();
+    const float label_x = pos.x + (icon == Icon::kNone ? 0.0f : glyph + icon_gap());
     const float value_x = pos.x + width - value_size.x;
-    const float label_max_x = std::max(pos.x, value_x - ui_px(8.0f));
-    dl->PushClipRect(pos, ImVec2(label_max_x, pos.y + height), true);
-    dl->AddText(pos, u32(palette.text_dim), label_text);
+    const float label_max_x = std::max(label_x, value_x - ui_px(8.0f));
+    if (icon != Icon::kNone) {
+        draw_icon(dl, ImVec2(pos.x + 0.5f * glyph, pos.y + 0.5f * height), glyph, icon,
+                  u32(palette.text_dim));
+    }
+    dl->PushClipRect(ImVec2(label_x, pos.y), ImVec2(label_max_x, pos.y + height), true);
+    dl->AddText(ImVec2(label_x, pos.y), u32(palette.text_dim), label_text);
     dl->PopClipRect();
     dl->PushClipRect(pos, ImVec2(pos.x + width, pos.y + height), true);
     if (mono != nullptr) {
@@ -734,15 +1058,22 @@ void chip(const char* text, int tone) {
     dl->AddText(ImVec2(pos.x + pad_x, pos.y + pad_y), u32(tone_color), chip_text);
 }
 
-void field_label(const char* text) {
+void field_label(const char* text, Icon icon) {
     const char* source = text != nullptr ? text : "";
     const ImVec2 pos = ImGui::GetCursorScreenPos();
     const float max_x = pos.x + fill_width();
     const float spacing = ui_px(1.5f);
     const float word_gap = ui_px(5.0f);
-    float x = pos.x;
+    const float line = ImGui::GetTextLineHeight();
     ImDrawList* dl = ImGui::GetWindowDrawList();
-    dl->PushClipRect(pos, ImVec2(max_x, pos.y + ImGui::GetTextLineHeight()), true);
+    float x = pos.x;
+    if (icon != Icon::kNone) {
+        const float glyph = icon_box();
+        draw_icon(dl, ImVec2(x + 0.5f * glyph, pos.y + 0.5f * line), glyph, icon,
+                  u32(palette.text_dim));
+        x += glyph + icon_gap();
+    }
+    dl->PushClipRect(pos, ImVec2(max_x, pos.y + line), true);
     for (const char* cursor = source; *cursor != '\0'; ++cursor) {
         const unsigned char ch = static_cast<unsigned char>(*cursor);
         if (ch == ' ') {
@@ -754,7 +1085,7 @@ void field_label(const char* text) {
         x += ImGui::CalcTextSize(glyph).x + spacing;
     }
     dl->PopClipRect();
-    ImGui::Dummy(ImVec2(std::min(max_x - pos.x, x - pos.x), ImGui::GetTextLineHeight()));
+    ImGui::Dummy(ImVec2(std::min(max_x - pos.x, x - pos.x), line));
 }
 
 bool disclosure(const char* label, bool* open) {

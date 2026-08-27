@@ -596,11 +596,14 @@ Eigen::VectorXd build_loads(const polymesh::fea::NodalMesh& mesh,
                                     : "total force",
                  total.norm(), spec.dir.x(), spec.dir.y(), spec.dir.z(), resultant.x(),
                  resultant.y(), resultant.z(), conservation_error);
-    if (conservation_error > 1e-9) {
+    const double conservation_tol = polymesh::fea::load_conservation_tolerance(
+        total.norm(), node_fallback ? fallback_nodes.size() : faces.size());
+    if (conservation_error > conservation_tol) {
         throw std::runtime_error(
-            std::format("{}: load assembly lost {:.3g} N of the requested {:.6g} N resultant "
+            std::format("{}: load assembly lost {:.3g} N of the requested {:.6g} N resultant, "
+                        "above the {:.3g} N round-off ceiling "
                         "(total-force conservation check failed)",
-                        what, conservation_error, total.norm()));
+                        what, conservation_error, total.norm(), conservation_tol));
     }
     return loads;
 }

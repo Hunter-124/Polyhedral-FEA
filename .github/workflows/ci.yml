@@ -106,7 +106,7 @@ jobs:
       - name: Install and package smoke
         run: |
           cmake --install build --prefix "$PWD/build/stage"
-          build/stage/bin/polymesh --version | grep -Fx "polymesh 0.1.0"
+          build/stage/bin/polymesh --version | grep -Fx "polymesh 0.1.1"
           build/stage/bin/polymesh backend
           desktop-file-validate \
             build/stage/share/applications/io.github.hunter124.PolyMesh.desktop

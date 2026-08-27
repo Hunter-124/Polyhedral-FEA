@@ -715,6 +715,18 @@ ConsistentLoad consistent_face_load(const NodalMesh& mesh,
     return consistent_load(mesh, faces, nullptr, total_force);
 }
 
+double load_conservation_tolerance(double requested_newtons, std::size_t n_terms) {
+    constexpr double kAbsoluteFloorN = 1e-9;
+    constexpr double kSafetyFactor = 8.0;
+    const double magnitude = std::abs(requested_newtons);
+    if (!std::isfinite(magnitude)) {
+        return kAbsoluteFloorN;
+    }
+    const double terms = static_cast<double>(std::max<std::size_t>(n_terms, 1));
+    return kAbsoluteFloorN +
+           kSafetyFactor * terms * std::numeric_limits<double>::epsilon() * magnitude;
+}
+
 ConsistentLoad consistent_region_load(const NodalMesh& mesh,
                                       const std::vector<SurfaceFace>& faces,
                                       const LoadRegion& region,

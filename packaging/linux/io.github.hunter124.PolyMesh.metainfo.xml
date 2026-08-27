@@ -1,25 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
   <id>io.github.hunter124.PolyMesh</id>
-  <name>PolyMesh Studio</name>
+  <name>PolyMesh</name>
   <developer id="io.github.hunter124">
     <name>Hunter-124</name>
   </developer>
-  <summary>Adaptive polyhedral finite element analysis</summary>
+  <summary>Adaptive polyhedral FEA for desktop, CLI, and web</summary>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>BSD-3-Clause</project_license>
   <description>
-    <p>PolyMesh Studio imports STEP and BRep CAD, creates geometry-aware volume meshes, applies face fixtures and loads, solves linear elasticity, and displays von Mises stress, displacement, and ZZ error estimates.</p>
-    <p>The command-line companion supports repeatable mesh, solve, diagnostic, render, and advisor workflows.</p>
+    <p>PolyMesh imports STEP and BRep CAD, creates geometry-aware volume meshes, applies face fixtures and loads, solves linear elasticity, and displays von Mises stress, displacement, and ZZ error estimates.</p>
+    <p>The command-line and browser companions support repeatable mesh, solve, diagnostic, render, and advisor workflows.</p>
   </description>
   <launchable type="desktop-id">io.github.hunter124.PolyMesh.desktop</launchable>
   <url type="homepage">https://github.com/Hunter-124/Polyhedral-FEA</url>
   <url type="bugtracker">https://github.com/Hunter-124/Polyhedral-FEA/issues</url>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.1" date="2026-08-27">
+      <description>
+        <p>Multi-platform release: relocatable Linux x86-64, Windows x64, and macOS Apple-silicon archives.</p>
+        <p>Adds the polymesh-webd local web server and browser client, the Chudware desktop theme with a guided study flow, live mesh-growth and advisor activation rails, and real residual and ZZ convergence plots.</p>
+      </description>
+    </release>
     <release version="0.1.0" date="2026-08-26">
       <description>
-        <p>First public Linux release of the PolyMesh CLI and Studio desktop application.</p>
+        <p>First public Linux release of the PolyMesh CLI, desktop, and web applications.</p>
       </description>
     </release>
   </releases>

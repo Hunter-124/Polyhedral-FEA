@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# CPack runs this after installing into its temporary tree and before archiving it.
+if(NOT EXISTS "${CPACK_TEMPORARY_INSTALL_DIRECTORY}/bin"
+   OR NOT EXISTS "${CPACK_TEMPORARY_INSTALL_DIRECTORY}/share")
+    return()
+endif()
+
+set(_polymesh_unbundled "${CPACK_TEMPORARY_INSTALL_DIRECTORY}")
+set(_polymesh_bundled "${CPACK_TEMPORARY_INSTALL_DIRECTORY}-bundle")
+execute_process(
+    COMMAND bash "@CMAKE_SOURCE_DIR@/scripts/bundle_linux.sh"
+            "${_polymesh_unbundled}" "${_polymesh_bundled}"
+    RESULT_VARIABLE _polymesh_bundle_result
+)
+if(NOT _polymesh_bundle_result EQUAL 0)
+    message(FATAL_ERROR
+        "Failed to create the relocatable Linux payload for CPack (exit ${_polymesh_bundle_result})")
+endif()
+
+file(REMOVE_RECURSE "${_polymesh_unbundled}")
+file(RENAME "${_polymesh_bundled}" "${_polymesh_unbundled}")

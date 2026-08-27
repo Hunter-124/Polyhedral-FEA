@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
 cmake_minimum_required(VERSION 3.24)
-project(polymesh VERSION 0.1.0 LANGUAGES CXX)
+project(polymesh VERSION 0.1.1 LANGUAGES CXX)
 include(GNUInstallDirs)
 
 set(POLYMESH_INSTALL_DOCDIR "${CMAKE_INSTALL_DATADIR}/doc/polymesh")
@@ -38,6 +38,19 @@ option(POLYMESH_NATIVE_ARCH "x86-64-v3 / AVX2 host tuning (OFF = portable + Eige
 # LTO is OFF by default: Eigen + -flto has known ODR/miscompile issues on GCC
 # (patch tests SEGV). Enable only for local experiments after ctest.
 option(POLYMESH_ENABLE_LTO "Link-time optimization for Release (OFF: Eigen-safe)" OFF)
+option(POLYMESH_STATIC_RUNTIME
+    "Link the GNU C++ and GCC support runtimes statically into release executables" OFF)
+
+if(POLYMESH_STATIC_RUNTIME)
+    if(NOT UNIX OR APPLE OR NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        message(FATAL_ERROR
+            "POLYMESH_STATIC_RUNTIME requires a GNU-compatible C++ toolchain on Linux")
+    endif()
+    add_link_options(
+        "$<$<LINK_LANGUAGE:CXX>:-static-libstdc++>"
+        "$<$<LINK_LANGUAGE:CXX>:-static-libgcc>"
+    )
+endif()
 
 if(POLYMESH_WITH_CUDA)
     # native = detect local GPU(s). Override e.g. -DCMAKE_CUDA_ARCHITECTURES=86
@@ -160,6 +173,7 @@ add_subdirectory(src/advisor)
 add_subdirectory(apps/cli)
 add_subdirectory(apps/bench)
 add_subdirectory(apps/testlab)
+add_subdirectory(apps/webd)
 if(POLYMESH_WITH_GUI)
     add_subdirectory(apps/gui)
 endif()
@@ -183,6 +197,7 @@ install(FILES
     README.md
     CHANGELOG.md
     docs/cli.md
+    docs/install.md
     DESTINATION "${POLYMESH_INSTALL_DOCDIR}"
 )
 install(FILES
@@ -204,15 +219,24 @@ install(FILES
     bench/geometries/public/plate+hole.step
     DESTINATION "${POLYMESH_INSTALL_DATADIR}/examples"
 )
+install(DIRECTORY assets/fonts/
+    DESTINATION "${POLYMESH_INSTALL_DATADIR}/fonts"
+    FILES_MATCHING PATTERN "*.ttf"
+)
+install(FILES assets/fonts/OFL.txt
+    DESTINATION "${POLYMESH_INSTALL_DATADIR}/fonts"
+)
 
 set(CPACK_PACKAGE_NAME "polymesh")
 set(CPACK_PACKAGE_VENDOR "Hunter-124")
 set(CPACK_PACKAGE_CONTACT "https://github.com/Hunter-124/Polyhedral-FEA/issues")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
-    "Adaptive polyhedral finite element analysis CLI and desktop studio")
+    "Adaptive polyhedral finite element analysis for CLI, desktop, and web")
 set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/Hunter-124/Polyhedral-FEA")
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE")
+set(CPACK_PACKAGE_FILE_NAME
+    "polymesh-${PROJECT_VERSION}-linux-x86_64")
 set(CPACK_GENERATOR "TGZ")
 set(CPACK_SOURCE_GENERATOR "TGZ")
 set(CPACK_SOURCE_IGNORE_FILES
@@ -222,8 +246,13 @@ set(CPACK_SOURCE_IGNORE_FILES
     "/examples/out/"
     "/graphify-out/cache/"
 )
-set(CPACK_RPM_PACKAGE_LICENSE "BSD-3-Clause")
-set(CPACK_RPM_PACKAGE_GROUP "Applications/Engineering")
-set(CPACK_RPM_PACKAGE_REQUIRES
-    "opencascade, libX11, libXrandr, libXinerama, libXcursor, libXi, mesa-libGL, libgomp")
+if(UNIX AND NOT APPLE)
+    configure_file(
+        packaging/linux/bundle_for_cpack.cmake.in
+        "${CMAKE_CURRENT_BINARY_DIR}/bundle_for_cpack.cmake"
+        @ONLY
+    )
+    set(CPACK_PRE_BUILD_SCRIPTS
+        "${CMAKE_CURRENT_BINARY_DIR}/bundle_for_cpack.cmake")
+endif()
 include(CPack)

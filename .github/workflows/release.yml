@@ -17,6 +17,7 @@ concurrency:
 jobs:
   linux-package:
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
 
@@ -90,7 +91,13 @@ jobs:
             build/polymesh-${{ env.POLYMESH_VERSION }}-linux-x86_64.tar.gz.sha256
 
   windows-package:
+    # Deferred: vcpkg builds OpenCASCADE from source (~45-90 min on a
+    # cache miss). Previous tags never finished that compile, so the binary
+    # cache never populated, and every retag started from zero. The job stays
+    # in the file; drop `if: false` when you want a Windows archive.
+    if: false
     runs-on: windows-2022
+    timeout-minutes: 30
     defaults:
       run:
         shell: pwsh
@@ -221,6 +228,7 @@ jobs:
     # archive and no osx-x86_64 one, so arm64 is the only macOS target that can
     # carry the advisor.
     runs-on: macos-14
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
 
@@ -307,9 +315,10 @@ jobs:
   # three edits onto the same release and could publish a partial set when one
   # platform fails; this job only runs once all three have produced an archive.
   publish:
-    needs: [linux-package, windows-package]
+    needs: [linux-package]
     if: github.ref_type == 'tag'
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
 
@@ -333,7 +342,6 @@ jobs:
         run: |
           expected=(
             "polymesh-${POLYMESH_VERSION}-linux-x86_64.tar.gz"
-            "polymesh-${POLYMESH_VERSION}-windows-x64.zip"
           )
           for archive in "${expected[@]}"; do
             test -s "dist/$archive" || { echo "missing dist/$archive" >&2; exit 1; }
@@ -348,5 +356,3 @@ jobs:
           files: |
             dist/polymesh-${{ env.POLYMESH_VERSION }}-linux-x86_64.tar.gz
             dist/polymesh-${{ env.POLYMESH_VERSION }}-linux-x86_64.tar.gz.sha256
-            dist/polymesh-${{ env.POLYMESH_VERSION }}-windows-x64.zip
-            dist/polymesh-${{ env.POLYMESH_VERSION }}-windows-x64.zip.sha256

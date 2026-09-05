@@ -126,7 +126,15 @@ struct Model {
     /// and once more in the curved promotion.
     mesh::MirrorFrame mirror;
 
-    static Model load(const std::string& path, double sharp_angle_deg = 30.0);
+    /// Import a CAD part. `scale` is a uniform factor applied to the exact
+    /// geometry immediately after the STEP/BREP read and before anything is
+    /// derived from it, so the tessellation, bbox, region growing and mirror
+    /// frame all describe the scaled part and every downstream length (h, BC
+    /// boxes, exported coordinates) is in scaled units. The library works in
+    /// metres, so a millimetre STEP is imported with `scale = 0.001`.
+    /// Must be finite and positive; 1.0 (the default) imports as authored.
+    static Model load(const std::string& path, double sharp_angle_deg = 30.0,
+                      double scale = 1.0);
 };
 
 /// A force applied to a region: total force vector in newtons.

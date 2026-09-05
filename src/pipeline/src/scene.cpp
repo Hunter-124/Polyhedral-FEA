@@ -77,7 +77,7 @@ Eigen::Vector3d triangle_normal(const geom::TriSurface& s, std::size_t t) {
 
 } // namespace
 
-Model Model::load(const std::string& path, double sharp_angle_deg) {
+Model Model::load(const std::string& path, double sharp_angle_deg, double scale) {
     Model model;
     const auto lower = [&] {
         std::string s = path;
@@ -88,26 +88,34 @@ Model Model::load(const std::string& path, double sharp_angle_deg) {
     model.source_path = path;
     const auto slash = path.find_last_of("/\\");
     model.name = slash == std::string::npos ? path : path.substr(slash + 1);
+    if (!(scale > 0.0) || !std::isfinite(scale)) {
+        throw std::runtime_error(
+            std::format("import scale must be finite and positive (got {:.6g})", scale));
+    }
 
     // CAD-only inputs (ADR-0020): STEP/BREP retain the live CadModel; the
     // tessellation is derived for regions, viewport, and legacy hybrid fill.
     // STL is no longer an accepted input — provide a STEP/BREP CAD file.
     if (lower.ends_with(".step") || lower.ends_with(".stp")) {
         model.cad = geom::CadModel::load_step(path);
-        model.surface = model.cad->tessellate();
-        model.bbox_min = model.cad->bbox_min();
-        model.bbox_max = model.cad->bbox_max();
     } else if (lower.ends_with(".brep") || lower.ends_with(".brp")) {
         model.cad = geom::CadModel::load_brep(path);
-        model.surface = model.cad->tessellate();
-        model.bbox_min = model.cad->bbox_min();
-        model.bbox_max = model.cad->bbox_max();
     } else {
         throw std::runtime_error(
             std::format("unsupported input '{}': only CAD files are accepted "
                         "(.step, .stp, .brep, .brp). STL inputs are no longer supported.",
                         path));
     }
+    // Unit conversion happens on the exact geometry, before a single derived
+    // quantity exists: the tessellation, bbox, regions and mirror frame below
+    // are all computed from the scaled BRep, so no consumer can observe a mix
+    // of authored and scaled lengths.
+    if (scale != 1.0) {
+        model.cad = model.cad->scaled(scale);
+    }
+    model.surface = model.cad->tessellate();
+    model.bbox_min = model.cad->bbox_min();
+    model.bbox_max = model.cad->bbox_max();
     model.surface.validate();
     // Reflection symmetry of the exact geometry, once per load. Detected from the
     // BRep when there is one; the tessellation path is for OCC-disabled builds,

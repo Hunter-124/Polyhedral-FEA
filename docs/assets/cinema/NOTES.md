@@ -405,9 +405,12 @@ constitutive matrix.
 The recorder prints a `solver` token and the manifest records it.
 
 `fea::SolveOptions::on_note` is the authoritative channel. CG names itself and
-its convergence there; direct solves emit `direct LDLT selected for N free
-DOFs`. That note lives on the `SolveResult` it describes, so the final quadratic
-re-solve replaces the linear pass's provenance instead of inheriting or losing it.
+its convergence there; a direct solve emits `direct solve selected for N free
+DOFs (estimated footprint …, cap …)` followed by the factorization rung that
+actually produced the answer (`direct solve: CholmodSupernodalLLT`, or the
+`SimplicialLDLT(AMD)` / `SparseLU(COLAMD)` fallback it fell through to). That
+note lives on the `SolveResult` it describes, so the final quadratic re-solve
+replaces the linear pass's provenance instead of inheriting or losing it.
 
 ## The active-equation graph
 

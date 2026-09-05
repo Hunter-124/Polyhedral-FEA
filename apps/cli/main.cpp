@@ -15,6 +15,7 @@
 #include "fea/material.hpp"
 #include "fea/msh.hpp"
 #include "fea/p_elevate.hpp"
+#include "fea/resource_budget.hpp"
 #include "fea/solve.hpp"
 #include "fea/traction.hpp"
 #include "fea/vtu.hpp"
@@ -72,6 +73,7 @@ int usage() {
         "              [--max-elems N] [--max-dof N] [--max-mem GB]\n"
         "              [--fix-box ...6] [--load-box ...6] [--bc-grade]\n"
         "              [--load-dir x y z] [--force N] [--traction Pa]\n"
+        "              [--solver auto|direct|cg] [--threads N]\n"
         "              [--advisor <model_dir>] [--advisor-objective accuracy|efficiency]\n"
         "                             CAD: mesh + BCs + VTU; Gmsh: solve the imported\n"
         "                             volume mesh directly. Default BCs fix min-x and\n"
@@ -784,6 +786,56 @@ int cmd_mesh(std::span<char*> args) {
     return 0;
 }
 
+// Wall-clock account of one `solve` invocation. Every number printed on the
+// `phases:` line is measured here or inside `solve_elastostatics`; nothing is
+// derived by subtraction, so the phases sum to slightly less than the total and
+// the remainder is honest un-instrumented overhead rather than a fudge.
+struct SolvePhaseLog {
+    using Clock = std::chrono::steady_clock;
+
+    double import_s = 0.0;
+    double refine_s = 0.0;
+    double mesh_s = 0.0;
+    double bc_s = 0.0;
+    double preflight_s = 0.0;
+    double assemble_s = 0.0;
+    double reduce_s = 0.0;
+    double order_s = 0.0;
+    double factor_s = 0.0;
+    double backsolve_s = 0.0;
+    double stress_s = 0.0;
+    double export_s = 0.0;
+    int n_solves = 0;
+    Clock::time_point start = Clock::now();
+
+    static double since(Clock::time_point t) {
+        return std::chrono::duration<double>(Clock::now() - t).count();
+    }
+
+    void add(const polymesh::fea::SolvePhaseTimings& p) {
+        constexpr double kMsToS = 1e-3;
+        preflight_s += p.preflight_ms * kMsToS;
+        assemble_s += p.assemble_ms * kMsToS;
+        reduce_s += p.reduce_ms * kMsToS;
+        order_s += p.analyze_ms * kMsToS;
+        factor_s += p.factorize_ms * kMsToS;
+        backsolve_s += p.backsolve_ms * kMsToS;
+        ++n_solves;
+    }
+
+    void report() const {
+        const auto peak = polymesh::fea::peak_resident_bytes();
+        std::printf("phases: import=%.2f refine=%.2f mesh=%.2f bc=%.2f preflight=%.2f "
+                    "assemble=%.2f reduce=%.2f order=%.2f factor=%.2f backsolve=%.2f "
+                    "stress=%.2f export=%.2f s | solves=%d | total=%.2f s | peak RSS=%s | %s\n",
+                    import_s, refine_s, mesh_s, bc_s, preflight_s, assemble_s, reduce_s,
+                    order_s, factor_s, backsolve_s, stress_s, export_s, n_solves, since(start),
+                    peak > 0 ? polymesh::fea::format_memory_bytes(peak).c_str()
+                             : "not reported by this OS",
+                    polymesh::fea::performance_description().c_str());
+    }
+};
+
 int cmd_solve(std::span<char*> args) {
     if (args.size() < 3) {
         return usage();
@@ -813,6 +865,8 @@ int cmd_solve(std::span<char*> args) {
     std::size_t advisor_max_dof = 0; // 0 = no advisor budget (ADR-0034)
     bool advisor_efficiency = false;
     double scale = 1.0;
+    auto solve_method = polymesh::fea::SolveMethod::kAuto;
+    int threads = 0; // 0 = process default
     for (std::size_t i = 3; i < args.size(); ++i) {
         if (std::strcmp(args[i], "-h") == 0 && i + 1 < args.size()) {
             h = std::atof(args[++i]);
@@ -866,6 +920,23 @@ int cmd_solve(std::span<char*> args) {
             }
         } else if (std::strcmp(args[i], "--max-mem") == 0 && i + 1 < args.size()) {
             max_mem_gb = std::max(0.0, std::atof(args[++i]));
+        } else if (std::strcmp(args[i], "--solver") == 0 && i + 1 < args.size()) {
+            const std::string_view name = args[++i];
+            if (name == "auto") {
+                solve_method = polymesh::fea::SolveMethod::kAuto;
+            } else if (name == "direct") {
+                solve_method = polymesh::fea::SolveMethod::kDirect;
+            } else if (name == "cg") {
+                solve_method = polymesh::fea::SolveMethod::kCG;
+            } else {
+                std::fputs("solve: --solver must be auto, direct or cg\n", stderr);
+                return 2;
+            }
+        } else if (std::strcmp(args[i], "--threads") == 0 && i + 1 < args.size()) {
+            threads = std::atoi(args[++i]);
+            if (threads < 0) {
+                threads = 0;
+            }
         } else if (std::strcmp(args[i], "--adapt") == 0 && i + 1 < args.size()) {
             adapt_passes = std::atoi(args[++i]);
             if (adapt_passes < 0) {
@@ -920,6 +991,13 @@ int cmd_solve(std::span<char*> args) {
         std::fputs("solve: -o out.vtu is required\n", stderr);
         return 2;
     }
+    // A thread cap is applied before any parallel stage runs, and it covers the
+    // mesher, assembly, recovery and (where SuiteSparse is present) the
+    // factorization's own BLAS, because they all read the same OpenMP limit.
+    if (threads > 0) {
+        polymesh::fea::set_openmp_threads(threads);
+    }
+    SolvePhaseLog phase_log;
 
     const bool msh_input = is_msh_path(path);
     if (msh_input && !advisor_dir.empty()) {
@@ -941,6 +1019,7 @@ int cmd_solve(std::span<char*> args) {
     std::optional<polymesh::fea::MshModel> msh_model;
     Eigen::Vector3d bbox_min;
     Eigen::Vector3d bbox_max;
+    const auto import_start = SolvePhaseLog::Clock::now();
     if (msh_input) {
         msh_model.emplace(polymesh::fea::load_msh(path));
         bbox_min = msh_model->mesh.nodes.front();
@@ -955,6 +1034,7 @@ int cmd_solve(std::span<char*> args) {
         bbox_min = model->bbox_min;
         bbox_max = model->bbox_max;
     }
+    phase_log.import_s = SolvePhaseLog::since(import_start);
 
     // Learned mesh advisor (ADR-0027). It runs before size resolution and
     // grading so its action is the one that actually meshes: h, mesher, adapt
@@ -1130,8 +1210,10 @@ int cmd_solve(std::span<char*> args) {
             hi[0] = xmin + slab;
             regions.push_back({lo, hi, 0.5});
         }
+        const auto refine_start = SolvePhaseLog::Clock::now();
         const auto plan = polymesh::pipeline::build_refinement_plan(*model, h_use, regions,
                                                                     feature, spectral, 0);
+        phase_log.refine_s = SolvePhaseLog::since(refine_start);
         seeds = plan.refine_seeds;
         seed_band = plan.seed_band;
         size_field = plan.size_field;
@@ -1155,10 +1237,15 @@ int cmd_solve(std::span<char*> args) {
             throw std::runtime_error("solve: --adapt requires CAD geometry for remeshing and "
                                      "is unavailable for .msh");
         }
-        return polymesh::pipeline::volume_mesh(*model, h_use, m, skin, feature, seeds,
-                                               seed_band, element_tendency,
-                                               resolved.element_ceiling, resolved.dof_ceiling,
-                                               resolved.auto_chosen ? 3 : 0, {}, size_field);
+        const auto mesh_start = SolvePhaseLog::Clock::now();
+        auto out = polymesh::pipeline::volume_mesh(*model, h_use, m, skin, feature, seeds,
+                                                   seed_band, element_tendency,
+                                                   resolved.element_ceiling,
+                                                   resolved.dof_ceiling,
+                                                   resolved.auto_chosen ? 3 : 0, {},
+                                                   size_field);
+        phase_log.mesh_s += SolvePhaseLog::since(mesh_start);
+        return out;
     };
     polymesh::pipeline::VolumeMeshOutput vol;
     if (msh_input) {
@@ -1193,6 +1280,7 @@ int cmd_solve(std::span<char*> args) {
 
     const polymesh::fea::Material mat{.youngs_modulus = E, .poissons_ratio = nu};
     auto make_bc_loads = [&](const polymesh::pipeline::VolumeMeshOutput& v) {
+        const auto bc_start = SolvePhaseLog::Clock::now();
         const double xmin = bbox_min[0];
         const double xmax = bbox_max[0];
         const double tol = 0.51 * h_use;
@@ -1223,10 +1311,12 @@ int cmd_solve(std::span<char*> args) {
         }
         auto loads = build_loads(v.mesh, load_faces, load_sel.nodes, load_spec, "solve",
                                  stdout, load_sel.region, exact_pressure_area);
+        phase_log.bc_s += SolvePhaseLog::since(bc_start);
         return std::pair{std::move(bc), std::move(loads)};
     };
 
     polymesh::fea::SolveOptions solve_options;
+    solve_options.method = solve_method;
     solve_options.max_mem_gb = max_mem_gb;
     solve_options.on_note = [](std::string_view note) {
         std::printf("solve: %.*s\n", static_cast<int>(note.size()), note.data());
@@ -1285,6 +1375,20 @@ int cmd_solve(std::span<char*> args) {
         report_p_elevate(shaped.n_promoted, n0);
         return true;
     };
+    // One place where a solve happens, so the phase account and the stress
+    // recovery that always follows it cannot drift apart between the two
+    // call sites (adaptive pass and final promoted geometry).
+    const auto run_solve = [&](const polymesh::fea::Dirichlet& bc,
+                               const Eigen::VectorXd& loads,
+                               const polymesh::fea::LinearConstraints* mpc) {
+        auto result = polymesh::fea::solve_elastostatics(vol.mesh, mat, bc, loads,
+                                                         solve_options, mpc);
+        phase_log.add(result.phases);
+        u = std::move(result.u);
+        const auto stress_start = SolvePhaseLog::Clock::now();
+        zz = polymesh::fea::recover_zz(vol.mesh, mat, u);
+        phase_log.stress_s += SolvePhaseLog::since(stress_start);
+    };
     const auto solve_with_final_geometry = [&]() {
         bool promoted = curve_final_geometry();
         if (!promoted && p_elevate) {
@@ -1308,12 +1412,30 @@ int cmd_solve(std::span<char*> args) {
         if (model) {
             polymesh::pipeline::update_solved_geometry_volume(*model, vol);
         }
-        u = polymesh::fea::solve_elastostatics(
-                vol.mesh, mat, bc2, loads2, solve_options,
-                curved_constraints.empty() ? nullptr : &curved_constraints)
-                .u;
-        zz = polymesh::fea::recover_zz(vol.mesh, mat, u);
+        run_solve(bc2, loads2, curved_constraints.empty() ? nullptr : &curved_constraints);
     };
+    // The default CAD path solved the mesh TWICE: once linear, then again on
+    // the promoted curved-quadratic mesh whose answer is the only one reported.
+    // The first solve and its ZZ recovery exist to choose p-elevation targets
+    // and to drive `--adapt`; when promotion is unconditional (curved CAD, or
+    // uniform p-elevation with promotable cells) and there is no adaptive pass
+    // or η target to serve, nothing ever reads them. Measured on plate_hole at
+    // h = 6 mm: 8.9 s of solve + 3.4 s of recovery, thrown away.
+    const bool promotion_is_unconditional = [&] {
+        if (curved && model && model->cad) {
+            return true;
+        }
+        if (!p_elevate || !p_elevate_uniform) {
+            return false; // selective p-elevation picks targets from ZZ η
+        }
+        return std::any_of(vol.mesh.elements.begin(), vol.mesh.elements.end(),
+                           [](const polymesh::fea::NodalElement& el) {
+                               return el.type == polymesh::fea::ElementType::kTet4 ||
+                                      el.type == polymesh::fea::ElementType::kHex8;
+                           });
+    }();
+    const bool skip_linear_presolve =
+        adapt_passes == 0 && eta_target == 0.0 && promotion_is_unconditional;
     for (int pass = 0; pass <= adapt_passes; ++pass) {
         if (pass > 0) {
             auto m = mesher;
@@ -1322,6 +1444,10 @@ int cmd_solve(std::span<char*> args) {
             }
             vol = mesh_now(m);
             vol.mesh.check_validity();
+        }
+        if (skip_linear_presolve) {
+            solve_with_final_geometry();
+            break;
         }
         auto [bc, loads] = make_bc_loads(vol);
         if (bc.dof_values.empty()) {
@@ -1332,8 +1458,7 @@ int cmd_solve(std::span<char*> args) {
             polymesh::pipeline::update_solved_geometry_volume(*model, vol);
         }
 
-        u = polymesh::fea::solve_elastostatics(vol.mesh, mat, bc, loads, solve_options).u;
-        zz = polymesh::fea::recover_zz(vol.mesh, mat, u);
+        run_solve(bc, loads, nullptr);
         const bool last_pass =
             (pass == adapt_passes) || (eta_target > 0.0 && zz.global_eta <= eta_target);
         if (last_pass) {
@@ -1397,7 +1522,9 @@ int cmd_solve(std::span<char*> args) {
     const auto quality = polymesh::fea::tet4_cell_quality(vol.mesh);
     std::vector<polymesh::fea::VtuCellData> cdata;
     cdata.push_back({.name = "quality", .scalars = quality});
+    const auto export_start = SolvePhaseLog::Clock::now();
     polymesh::fea::write_vtu(out_path, vol.mesh, pdata, cdata);
+    phase_log.export_s = SolvePhaseLog::since(export_start);
 
     std::printf("solve: %zu nodes, %zu elems | max von Mises %.4g Pa | max |u| %.4g m | "
                 "ZZ η %.4g | h=%.4g | seeds=%zu\n%s\n%s\n",
@@ -1408,6 +1535,7 @@ int cmd_solve(std::span<char*> args) {
                 max_principal, max_principal_dir.x(), max_principal_dir.y(),
                 max_principal_dir.z(), sigma_zz_share);
     std::printf("wrote %s\n", out_path.c_str());
+    phase_log.report();
     return 0;
 }
 

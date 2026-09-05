@@ -11,7 +11,9 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <map>
+#include <span>
 #include <vector>
 
 #if defined(POLYMESH_WITH_OPENMP)
@@ -143,11 +145,28 @@ ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
         el_stress[eu] = stress_at(el, x, u, d, xi);
     }
 
-    // Node → incident elements (serial — graph build).
-    std::vector<std::vector<std::size_t>> incident(n_nodes);
-    for (std::size_t e = 0; e < n_elem; ++e) {
-        for (const auto node : mesh.elements[e].nodes) {
-            incident[node].push_back(e);
+    // Node → incident elements, in compressed form: counting pass, then fill
+    // in ascending element order so each patch is ordered exactly as the
+    // previous vector-of-vectors produced it (the patch mean and the
+    // least-squares fit below are order-sensitive at roundoff level). One
+    // allocation instead of n_nodes, and ~4x less memory: a 78k-node tet10
+    // mesh spent 40 MB on 78k heap-allocated vectors of std::size_t.
+    std::vector<std::uint32_t> incident_offsets(n_nodes + 1, 0);
+    for (const auto& element : mesh.elements) {
+        for (const auto node : element.nodes) {
+            ++incident_offsets[node + 1];
+        }
+    }
+    for (std::size_t i = 0; i < n_nodes; ++i) {
+        incident_offsets[i + 1] += incident_offsets[i];
+    }
+    std::vector<std::uint32_t> incident_elements(incident_offsets.back());
+    {
+        std::vector<std::uint32_t> cursor(incident_offsets.begin(), incident_offsets.end() - 1);
+        for (std::size_t e = 0; e < n_elem; ++e) {
+            for (const auto node : mesh.elements[e].nodes) {
+                incident_elements[cursor[node]++] = static_cast<std::uint32_t>(e);
+            }
         }
     }
 
@@ -185,7 +204,9 @@ ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
 #endif
     for (std::ptrdiff_t n = 0; n < static_cast<std::ptrdiff_t>(n_nodes); ++n) {
         const auto nu = static_cast<std::size_t>(n);
-        const auto& patch = incident[nu];
+        const std::span<const std::uint32_t> patch(
+            incident_elements.data() + incident_offsets[nu],
+            incident_offsets[nu + 1] - incident_offsets[nu]);
         if (patch.empty()) {
             continue;
         }

@@ -119,11 +119,41 @@ selection.
 | `--force N` | total resultant force over the loaded faces (default 1000), applied as a consistent traction ∫Nᵗt dS |
 | `--traction Pa` | pressure magnitude instead of a total force; load faces are filtered by normal alignment with `--load-dir` and the resultant is Pa × their area. The last of `--force` / `--traction` wins |
 | `--max-elems N` / `--max-dof N` | pre-flight ceilings; `0` selects the defaults |
+| `--solver auto\|direct\|cg` | linear-solver policy. `auto` (default) takes the sparse direct ladder for every system that fits the memory budget and falls back to CG only above `SolveOptions::cg_threshold` or when the estimated factor does not fit; `direct` and `cg` force one path. See [the solver ladder](solver-core.md#6-what-the-linear-solve-costs) |
+| `--threads N` | cap OpenMP parallelism for meshing, assembly and stress recovery. `0` (default) uses the process default; a value above the hardware default is clamped to it. The direct factorization additionally caps itself at 8 threads whatever this says, because CHOLMOD's OpenMP loops nest over an OpenMP BLAS ([measured](solver-core.md#61a-how-many-threads-the-factorization-gets)) |
 | `--max-mem GB` | enforced pre-flight solve cap; `0` = auto (70% of currently available memory) |
 | `--advisor DIR` | pick mesher / h / adapt / p-order with the learned mesh advisor (`DIR` holds `model.onnx`, `normalization.json`, `clamps.json`); every value is clamped and the decision is logged as JSON. CAD input only |
 | `--advisor-objective accuracy\|efficiency` | `accuracy` (default), or calibrated `efficiency`, which minimises predicted mesh+solve time inside a 5% accuracy envelope |
 | `--advisor-max-dof N` | with `--advisor`, drop candidate actions whose predicted DOF exceeds N; falls back to the defaults if none fit |
 | `--scale f` | uniform import scale, CAD input only (see [Units](#units)) |
+
+#### The `phases:` line
+
+Every `solve` closes with one measured line, so a slow run never has to be
+guessed at:
+
+```
+phases: import=0.13 refine=0.05 mesh=24.84 bc=0.19 preflight=2.55 assemble=0.73
+  reduce=0.16 order=2.29 factor=3.46 backsolve=0.11 stress=0.09 export=0.24 s
+  | solves=1 | total=40.43 s | peak RSS=1.31 GiB | cpu | OpenMP 4 threads | Eigen serial
+```
+
+`preflight` is the symbolic factor-count analysis and the memory decision;
+`order` is the symbolic factorization (or the CG preconditioner build);
+`factor` is the numeric factorization (or the CG iteration loop); `stress` is
+ZZ recovery. Each is measured where it happens — nothing is derived by
+subtraction, so the phases sum to slightly less than `total` and the remainder
+is un-instrumented overhead rather than a fudge. `peak RSS` is the kernel's own
+high-water mark (`VmHWM`), not an estimate. `solves` is how many linear systems
+the run actually factorized: a CAD run with no `--adapt` and no η target is
+**1**, because the pre-promotion linear solve whose answer the quadratic
+re-solve overwrites is skipped.
+
+`POLYMESH_FEA_DIRECT=cholmod|ldlt|lu` promotes one rung of the direct ladder to
+the front, which is how the comparison table in
+[solver-core.md §6](solver-core.md#6-what-the-linear-solve-costs) is
+reproduced. The remaining rungs stay as fallbacks, so forcing a rung cannot
+turn a solvable system into a failure.
 
 ### `diag <part> [flags]`
 

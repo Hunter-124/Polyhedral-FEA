@@ -294,7 +294,7 @@ TEST_CASE("the p-elevated authoritative solve reports its own solver provenance"
     // The emitted pass solved the linear mesh; its note belongs to that solve.
     const auto pass_counts = fea::count_element_types(stages.front().result.volume_mesh);
     CHECK(pass_counts.tet10 + pass_counts.hex20 == 0);
-    CHECK(stages.front().result.solver_note.find("direct LDLT selected") !=
+    CHECK(stages.front().result.solver_note.find("direct solve selected") !=
           std::string::npos);
 
     // The authoritative result is the later quadratic re-solve. Before the
@@ -302,7 +302,7 @@ TEST_CASE("the p-elevated authoritative solve reports its own solver provenance"
     // was empty even though the real backend had named its method.
     const auto promoted_counts = fea::count_element_types(promoted->volume_mesh);
     REQUIRE(promoted_counts.tet10 + promoted_counts.hex20 > 0);
-    CHECK(promoted->solver_note.find("direct LDLT selected") != std::string::npos);
+    CHECK(promoted->solver_note.find("direct solve selected") != std::string::npos);
     CHECK(promoted->solver_note != stages.front().result.solver_note);
 }
 

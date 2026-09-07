@@ -78,8 +78,8 @@ int usage() {
         "                             CAD: mesh + BCs + VTU; Gmsh: solve the imported\n"
         "                             volume mesh directly. Default BCs fix min-x and\n"
         "                             load max-x; boxes override selection.\n"
-        "  diag  <part> [-h m] [--mesher name] [--json out.json] [--no-solve] [--scale f]\n"
-        "              [--max-elems N] [--max-dof N] [--max-mem GB]\n"
+        "  diag  <part> [-h m] [-E Pa] [-nu r] [--mesher name] [--json out.json] [--no-solve]\n"
+        "              [--scale f] [--max-elems N] [--max-dof N] [--max-mem GB]\n"
         "              [--fix-box ...6] [--load-box ...6]\n"
         "              [--load-dir x y z] [--force N] [--traction Pa]\n"
         "                             JSON diagnostics: fidelity, quality, timings\n"
@@ -1548,6 +1548,8 @@ int cmd_diag(std::span<char*> args) {
     }
     const std::string path = args[2];
     double h = 0.0;
+    double E = 200e9;
+    double nu = 0.3;
     auto mesher = polymesh::pipeline::VolumeMesher::kVaryhedron;
     bool do_solve = true;
     bool spectral = true; // spectral sizing on by default (ADR-0034)
@@ -1562,6 +1564,10 @@ int cmd_diag(std::span<char*> args) {
     for (std::size_t i = 3; i < args.size(); ++i) {
         if (std::strcmp(args[i], "-h") == 0 && i + 1 < args.size()) {
             h = std::atof(args[++i]);
+        } else if (std::strcmp(args[i], "-E") == 0 && i + 1 < args.size()) {
+            E = std::atof(args[++i]);
+        } else if (std::strcmp(args[i], "-nu") == 0 && i + 1 < args.size()) {
+            nu = std::atof(args[++i]);
         } else if (std::strcmp(args[i], "--mesher") == 0 && i + 1 < args.size()) {
             if (!parse_mesher_arg(args[++i], mesher)) {
                 std::fprintf(stderr, "unknown --mesher '%s'\n", args[i]);
@@ -1794,7 +1800,7 @@ int cmd_diag(std::span<char*> args) {
             Eigen::VectorXd loads =
                 build_loads(vol.mesh, load_faces, load_sel.nodes, load_spec, "diag", stderr,
                             load_sel.region, exact_pressure_area);
-            const polymesh::fea::Material mat{.youngs_modulus = 200e9, .poissons_ratio = 0.3};
+            const polymesh::fea::Material mat{.youngs_modulus = E, .poissons_ratio = nu};
             t0 = clock::now();
             polymesh::fea::SolveOptions solve_options;
             solve_options.max_mem_gb = max_mem_gb;
@@ -1896,7 +1902,8 @@ int cmd_diag(std::span<char*> args) {
         "  \"timing_ms\": {{ \"import\": {:.3f}, \"mesh\": {:.3f}, \"solve\": {:.3f} }},\n"
         "  \"mesh_throughput_elem_per_s\": {:.1f},\n"
         "  \"fidelity\": {},\n"
-        "  \"solve\": {{ \"ran\": {}, \"dof\": {}, \"max_von_mises\": {:.6g}, "
+        "  \"solve\": {{ \"ran\": {}, \"dof\": {}, \"youngs_modulus_pa\": {:.6g}, "
+        "\"poissons_ratio\": {:.6g}, \"max_von_mises\": {:.6g}, "
         "\"max_disp\": {:.6g}, \"global_eta\": {:.6g} }},\n"
         "  \"mesh_size_note\": \"{}\",\n"
         "  \"mesher_note\": \"{}\"\n"
@@ -1907,8 +1914,8 @@ int cmd_diag(std::span<char*> args) {
         vol.mesh.nodes.size(), vol.mesh.elements.size(), q_min, q_min_type, n_inverted,
         vol.n_cells_below_shape_floor, q_mean, plan.n_geometry_seeds, plan.n_bc_seeds,
         plan.geometry_curvature_from_brep ? "brep" : "tessellation", spectral_json, import_ms,
-        mesh_ms, solve_ms, mesh_throughput, fidelity_json, solved ? "true" : "false", dof,
-        max_vm, max_u, global_eta, mesh_size_note, vol.mesher_note);
+        mesh_ms, solve_ms, mesh_throughput, fidelity_json, solved ? "true" : "false", dof, E,
+        nu, max_vm, max_u, global_eta, mesh_size_note, vol.mesher_note);
 
     if (!json_path.empty()) {
         std::FILE* f = std::fopen(json_path.c_str(), "w");

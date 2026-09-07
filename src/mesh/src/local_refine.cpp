@@ -8,6 +8,7 @@
 #include <array>
 #include <cmath>
 #include <format>
+#include <limits>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -248,7 +249,8 @@ struct FreeFaceHash {
 TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
                                 std::vector<std::array<std::uint32_t, 4>> tets,
                                 std::span<const std::size_t> marked, LocalRefineStats* stats,
-                                const geom::TriSurface* surface, const MirrorFrame* mirror) {
+                                const geom::TriSurface* surface, const MirrorFrame* mirror,
+                                double max_sag_fraction) {
     LocalRefineStats local_stats;
     local_stats.n_input_tets = tets.size();
     local_stats.n_marked = marked.size();
@@ -546,14 +548,45 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
             (projected - nodes[edge.first]).squaredNorm() <= projected_child_limit2 &&
             (projected - nodes[edge.second]).squaredNorm() <= projected_child_limit2;
 
-        // A global surface closest-point can land arbitrarily near one endpoint
-        // when the chord crosses a hole. Such a "midpoint" lets an LEPP keep
-        // splitting an unchanged longest edge forever. Keep surface projection
-        // only when both child edges contract; the Euclidean midpoint halves
-        // the parent and therefore restores the propagation progress invariant.
-        bool can_split = projected_contracts && children_ok(projected);
-        if (!can_split && (projected - chord).squaredNorm() > 1e-30) {
+        // ── Two independent gates on the surface projection ──────────────────
+        // (1) A global surface closest-point can land arbitrarily near one
+        //     endpoint when the chord crosses a hole. Such a "midpoint" lets an
+        //     LEPP keep splitting an unchanged longest edge forever, so keep the
+        //     projection only when both child edges contract; the Euclidean
+        //     midpoint halves the parent and therefore restores the propagation
+        //     progress invariant.
+        // (2) CURVATURE. `|projected - chord|` *is* the chord sag of the surface
+        //     the two endpoints sit on — for an arc of curvature k over a chord
+        //     of length L it is L^2*k/8 — measured rather than estimated from a
+        //     normal field. Following it is only worth a shape risk while that
+        //     sag is small against the CHILD size (L/2) the split is creating.
+        //     Past that the closest point is no longer describing the curve this
+        //     edge belongs to: on a Ø12.7 keyway bore held 0.35 mm off a Ø12.0
+        //     bolt barrel, the *global* closest point crosses the clearance onto
+        //     the other body and drags the new node through the wall, which is
+        //     how a refinement wave folded a child on the live FRAME-PEDAL-BRAKE
+        //     isolate. Under the gate the node goes on the chord and is left for
+        //     the caller's boundary-aware smoothing pass, which slides it back
+        //     out onto the face one node at a time — an accept/reject decision
+        //     per node instead of per wave.
+        //     Off (`max_sag_fraction` 0) for the Cartesian fills: their parent
+        //     edges are a whole lattice cell, so the sag on a coarse curved wall
+        //     is legitimately large and their own snap passes own the residual.
+        const double sag_limit = max_sag_fraction > 0.0
+                                     ? max_sag_fraction * 0.5 * std::sqrt(parent_len2)
+                                     : std::numeric_limits<double>::infinity();
+        const bool was_projected = (projected - chord).squaredNorm() > 1e-30;
+        const bool sag_ok = !(max_sag_fraction > 0.0) ||
+                            (projected - chord).norm() <= sag_limit;
+        bool can_split = sag_ok && projected_contracts && children_ok(projected);
+        if (!can_split && was_projected) {
             can_split = children_ok(chord); // leaves nodes[mid]=chord when true
+            if (can_split) {
+                ++local_stats.n_chord_mids;
+                // midpoint_of counted the projection when it made it; this edge
+                // is not keeping it, so the two counters stay a partition.
+                if (local_stats.n_surface_mids > 0) --local_stats.n_surface_mids;
+            }
         }
         if (!can_split) {
             nodes[mid] = projected; // orphan midpoint node compacted downstream
@@ -629,8 +662,9 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
 
 TetFillOutput local_refine_tets(const TetFillOutput& mesh, std::span<const std::size_t> marked,
                                 LocalRefineStats* stats, const geom::TriSurface* surface,
-                                const MirrorFrame* mirror) {
-    return local_refine_tets(mesh.nodes, mesh.tets, marked, stats, surface, mirror);
+                                const MirrorFrame* mirror, double max_sag_fraction) {
+    return local_refine_tets(mesh.nodes, mesh.tets, marked, stats, surface, mirror,
+                             max_sag_fraction);
 }
 
 } // namespace polymesh::mesh

@@ -48,15 +48,27 @@ inline double max_edge(const Eigen::Vector3d& a, const Eigen::Vector3d& b,
                      (b - d).norm(), (c - d).norm()});
 }
 
+/// The same longest edge, SQUARED — one square root instead of six wherever the
+/// caller is going to raise it to an even power or cube it anyway.
+inline double max_edge_squared(const Eigen::Vector3d& a, const Eigen::Vector3d& b,
+                               const Eigen::Vector3d& c, const Eigen::Vector3d& d) {
+    return std::max({(a - b).squaredNorm(), (a - c).squaredNorm(), (a - d).squaredNorm(),
+                     (b - c).squaredNorm(), (b - d).squaredNorm(), (c - d).squaredNorm()});
+}
+
 /// 6·√2·V / L_max³ — 1.0 for a regular tet, 0 for a flat one, negative when
 /// inverted. Same metric the hybrid fan-tet gate already used, made signed.
 inline double tet_shape_quality(const Eigen::Vector3d& a, const Eigen::Vector3d& b,
                                 const Eigen::Vector3d& c, const Eigen::Vector3d& d) {
-    const double emax = max_edge(a, b, c, d);
-    if (!(emax > 0.0)) {
+    // L_max³ = (L_max²)^(3/2): one square root, not six. This is the mesher's
+    // and Chudware's inner-loop shape test — every refinement-wave gate and
+    // every candidate node move judges a whole star with it — so the five
+    // saved roots are measured time, not micro-optimisation.
+    const double e2max = max_edge_squared(a, b, c, d);
+    if (!(e2max > 0.0)) {
         return 0.0;
     }
-    return 8.485281374238570 * tet_signed_volume(a, b, c, d) / (emax * emax * emax);
+    return 8.485281374238570 * tet_signed_volume(a, b, c, d) / (e2max * std::sqrt(e2max));
 }
 
 /// A quad base admits two tet splits: diagonal 0-2 → (0,1,2,4)+(0,2,3,4),

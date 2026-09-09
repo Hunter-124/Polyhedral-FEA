@@ -3990,7 +3990,7 @@ void replace_geometry_volume_note(std::string& note, std::string_view stage,
                  replacement);
 }
 
-void enforce_feature_resolution(const Model& model, const VolumeMeshOutput& output,
+void enforce_feature_resolution(const Model& model, VolumeMeshOutput& output,
                                 double requested_h, double delivered_h) {
     if (!model.cad || model.cad->empty() || output.boundary_quads.empty() ||
         !(requested_h > 0.0) || !(delivered_h > 0.0)) {
@@ -4075,6 +4075,23 @@ void enforce_feature_resolution(const Model& model, const VolumeMeshOutput& outp
     bool unresolved = false;
     for (std::size_t face_id = 0; face_id < feature_face.size(); ++face_id) {
         if (!feature_face[face_id] || face_has_patch[face_id]) {
+            continue;
+        }
+        // Projection collision repair cannot preserve a separate skin across
+        // less than 5% of a fine lattice spacing. Account for that dimensional
+        // absorption explicitly, rather than demanding an impossible normal
+        // patch. Distance fidelity remains mandatory, and ordinary holes still
+        // need aligned walls. A plane's intrinsic extent excludes its normal.
+        const double absorption_limit = 0.05 * std::min(requested_h, delivered_h);
+        if (face_id < topology.faces.size() && sampled[face_id] &&
+            topology.faces[face_id].min_extent > 0.0 &&
+            topology.faces[face_id].min_extent < absorption_limit &&
+            face_distance[face_id] <= limit) {
+            output.mesher_note += std::format(
+                " | feature_absorbed face={} extent={:.6g} area={:.6g} "
+                "scale={:.6g} distance={:.6g}",
+                face_id, topology.faces[face_id].min_extent,
+                topology.faces[face_id].area, absorption_limit, face_distance[face_id]);
             continue;
         }
         unresolved = true;

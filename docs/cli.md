@@ -69,6 +69,17 @@ summary (geometry seeds, BC seeds, band, `h_fine`, whether curvature came from t
 or the tessellation), the mesh-size note, the mesher note, and — when spectral sizing
 fired — the retained mode count and energy fraction.
 
+Small or curved CAD faces normally require an aligned delivered boundary patch
+(centroid distance ≤ `0.3h`, absolute normal dot product ≥ `0.5`). A face below
+the projection-collapse scale may instead be reported as
+`feature_absorbed face=… extent=… area=… scale=… distance=…`: its exact minimum
+intrinsic extent is below `0.05 × min(h, h_fine)` and its sampled surface remains
+within the same `0.3h` distance limit. Planar faces use their in-plane extent,
+not their zero thickness. This means the sub-resolution detail was absorbed,
+not that a separate aligned patch was delivered. Resolvable missing walls still
+refuse; size floors and volume-fidelity tolerances are unchanged. Values use the
+imported model's units (area uses squared units).
+
 | Flag | Meaning |
 |---|---|
 | `-h m` | target element size in (scaled) metres; omit or `0` for auto h0 from bbox + feature density |

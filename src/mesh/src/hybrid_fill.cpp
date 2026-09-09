@@ -787,6 +787,21 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             run_leb_for_min_level(3);
         }
     }
+    // The regular parent/LEB spacing, before any CAD projection. A corner
+    // driven through 95% of this spacing toward its neighbour must be merged,
+    // not left on the snap ladder's last near-coincident retreat.
+    std::vector<double> original_spacing(out.mesh.nodes.size(),
+                                         std::numeric_limits<double>::infinity());
+    for (const auto& tet : out.mesh.tets) {
+        for (int a = 0; a < 4; ++a) {
+            for (int b = a + 1; b < 4; ++b) {
+                const double length = (out.mesh.nodes[tet[a]] - out.mesh.nodes[tet[b]]).norm();
+                original_spacing[tet[a]] = std::min(original_spacing[tet[a]], length);
+                original_spacing[tet[b]] = std::min(original_spacing[tet[b]], length);
+            }
+        }
+    }
+
     // Project at the field's resolution, not at the background resolution.
     // Warping coarse parents first leaves their locally refined children with
     // unrecoverable boundary slivers at tightly curved seating surfaces.
@@ -1418,7 +1433,23 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     // reopening the residual. Collapse the cap's shortest edge (conforming;
     // the dead node merges into the survivor) when every incident tet stays
     // valid and no new cap appears.
-    const auto repair_round = [&]() {
+    const auto repair_round = [&](bool collisions_only = false) {
+        const auto projected_collision = [&](const std::array<std::uint32_t, 4>& tet) {
+            constexpr double kProjectionTravelFraction = 0.95;
+            for (int a = 0; a < 4; ++a) {
+                for (int b = a + 1; b < 4; ++b) {
+                    const double spacing = std::min(original_spacing[tet[a]],
+                                                     original_spacing[tet[b]]);
+                    if ((out.mesh.nodes[tet[a]] - out.mesh.nodes[tet[b]]).norm() <
+                        (1.0 - kProjectionTravelFraction) * spacing)
+                        return true;
+                }
+            }
+            return false;
+        };
+        if (collisions_only &&
+            std::none_of(out.mesh.tets.begin(), out.mesh.tets.end(), projected_collision))
+            return;
         constexpr double kCapAspect = 0.05;  // caps live far below Kuhn ~0.27
         constexpr double kKeepAspect = 0.04; // incident tets must stay above
         constexpr int kCollapsePasses = 5;
@@ -1662,7 +1693,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             // Phase A — void juts: boundary nodes whose projection the snap had
             // to reject (hole-rim stair chords poking into the void) merge into
             // an adjacent on-surface boundary node instead of leaving a spike.
-            for (const auto ni : bvec) {
+            if (!collisions_only) for (const auto ni : bvec) {
                 if (node_remap[ni] != ni || !initial_juts.contains(ni)) {
                     continue;
                 }
@@ -1733,7 +1764,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             };
             std::vector<std::size_t> cap_order;
             for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
-                if (!removed[ti] && aspect_of(out.mesh.tets[ti]) < kCapAspect) {
+                if (!removed[ti] && aspect_of(out.mesh.tets[ti]) < kCapAspect &&
+                    (!collisions_only || projected_collision(out.mesh.tets[ti]))) {
                     cap_order.push_back(ti);
                 }
             }
@@ -1883,7 +1915,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         // scorecard floor): a cap that survives S4 is wedged between healthy
         // tets; with a free face it is a zero-thickness skin flake — removing
         // it exposes those healthy faces with negligible volume change.
-        {
+        if (!collisions_only) {
             constexpr int kCarvePasses = 4;
             constexpr double kPeelAspect = 0.03; // < kKeepAspect: only true flakes
             const auto aspect_peel = [&](const std::array<std::uint32_t, 4>& n) {
@@ -2217,6 +2249,10 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         repair_round();
         carve_to_clean();
         pull_buried_free_faces(out.mesh.nodes, out.mesh.tets, hc, /*max_iters=*/8, mirror);
+        // Final projection/pull is also a boundary-placement operation. The
+        // ordinary repair precedes it; close near-coincident projected corners
+        // here using the same topology/volume/quality guarded collapse only.
+        repair_round(/*collisions_only=*/true);
         if (const auto st = count_buried_free_tet_faces(out.mesh.nodes, out.mesh.tets, hc);
             st.n_buried != 0) {
             throw ValidityError(

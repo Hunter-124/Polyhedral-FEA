@@ -50,8 +50,8 @@ struct GradedTetFillOutput {
 
 /// Multi-level graded fill. `skin_layers` free-surface hops (skipped on thin
 /// parts). Feature/seed bands union with the optional scalar size field; field
-/// values are desired edge lengths in metres and are clamped at the lattice
-/// cell-budget floor before deriving L0/L1/L2.
+/// values are desired edge lengths in metres, independent of the background
+/// allocation floor. `max_refinement_tets` is the caller's memory-derived cap (0: uncapped).
 /// `curvature_turn_deg` > 0 enables the per-cell turning-angle criterion:
 /// cells where the surface turns more than that angle per bulk cell (h·κ)
 /// marks L1; more than twice it marks L2 — contiguous, inert on flats.
@@ -68,6 +68,7 @@ GradedTetFillOutput graded_tet_fill_surface(
     std::span<const geom::SharpEdge> features = {}, double feature_band = 0.0,
     std::span<const Eigen::Vector3d> refine_seeds = {}, double seed_band = 0.0,
     double curvature_turn_deg = 0.0, const BoundaryFit* fit = nullptr,
-    const SizeFieldFn& size_field = {}, const MirrorFrame* mirror = nullptr);
+    const SizeFieldFn& size_field = {}, const MirrorFrame* mirror = nullptr,
+    std::size_t max_refinement_tets = 0);
 
 } // namespace polymesh::mesh

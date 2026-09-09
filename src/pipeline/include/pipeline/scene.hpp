@@ -592,6 +592,8 @@ struct VolumeMeshOutput {
     std::string mesher_note;
     /// Effective linear edge scale used by exact curved-boundary projection.
     double geometry_h = 0.0;
+    /// Background lattice floor actually imposed by the allocation budget.
+    double size_floor = 0.0;
     /// Cells still under `mesh::validity::kCellShapeFloor` after the ship gate
     /// relaxation, measured with `fea::cell_quality` on the emitted mesh.
     std::size_t n_cells_below_shape_floor = 0;

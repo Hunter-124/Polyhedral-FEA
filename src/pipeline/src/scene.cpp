@@ -5218,12 +5218,24 @@ volume_mesh_impl(const Model& model, double h, VolumeMesher mesher, int skin_lay
                         fill.boundary_max_distance);
     } else if (mesher == VolumeMesher::kGradedTet) {
         std::vector<geom::SharpEdge> edges;
-        double graded_h = h;
-        const double curved_area_fraction =
-            cad_curved_area_fraction(cad_topology ? cad_topology.get() : nullptr);
-        if (curved_area_fraction >= kCurvedAreaLatticeFraction) {
-            graded_h = kCurvedLatticeScale * h;
+        // Interior Kuhn lattice: three axis, three face-diagonal and one
+        // body-diagonal unique edges per cell; median = sqrt(2) * pitch.
+        const double graded_h = h / std::sqrt(2.0);
+        // CAD geometry supplies a LOCAL size demand. A curved-area fraction or
+        // tessellated corner curvature is not a reason to halve the whole part.
+        mesh::SizeFieldFn graded_field = size_field;
+        if (cad_topology && !cad_topology->empty()) {
+            const auto geometry_field = feature_refine
+                ? build_refinement_plan(model, h, {}, true, false, 0).size_field
+                : mesh::SizeFieldFn{};
+            graded_field = [size_field, geometry_field, h](const Eigen::Vector3d& p) {
+                double target = geometry_field ? geometry_field(p) : h;
+                if (size_field) target = std::min(target, size_field(p));
+                return target;
+            };
         }
+        if (feature_refine)
+            edges = geom::detect_sharp_edges(model.surface, 30.0);
         double feature_band = 0.0;
         // Caller a-posteriori adapt seeds keep ball semantics; curvature is now
         // the per-cell turning-angle criterion inside the fill (no caps, no
@@ -5234,7 +5246,7 @@ volume_mesh_impl(const Model& model, double h, VolumeMesher mesher, int skin_lay
         double band = seed_band;
         double turn_deg = 0.0;
         std::size_t n_thin_seeds = 0;
-        if (feature_refine) {
+        if (feature_refine && !graded_field) {
             edges = geom::detect_sharp_edges(model.surface, 30.0);
             if (!edges.empty()) {
                 // Crease band ~ two bulk cells so hole rims get a clear L1/L2 shell.
@@ -5291,8 +5303,9 @@ volume_mesh_impl(const Model& model, double h, VolumeMesher mesher, int skin_lay
         }
         auto graded = mesh::graded_tet_fill_surface(
             model.surface, model.bbox_min, model.bbox_max, graded_h, std::max(1, skin_layers),
-            edges, feature_band, seeds, band, turn_deg, fit, size_field, mirror);
+            edges, feature_band, seeds, band, turn_deg, fit, graded_field, mirror, max_elems);
         fill_h = graded.h_fine;
+        out.size_floor = graded.h_coarse > graded_h * 1.001 ? graded.h_coarse : 0.0;
         out.mesh.nodes = std::move(graded.mesh.nodes);
         out.mesh.elements.reserve(graded.mesh.tets.size());
         for (const auto& tet : graded.mesh.tets) {
@@ -5326,13 +5339,7 @@ volume_mesh_impl(const Model& model, double h, VolumeMesher mesher, int skin_lay
             conf.max_distance, conf.mean_distance, budget_note,
             turn_deg > 0.0 ? std::format(", curv_turn≤{:.0f}°/cell", turn_deg) : std::string{},
             n_thin_seeds > 0 ? std::format(", thin_seeds={}", n_thin_seeds) : std::string{});
-        if (graded_h < h) {
-            out.mesher_note +=
-                std::format(" | curved-area={:.1f}% accuracy lattice h={:.4g} m "
-                            "(0.5x requested)",
-                            100.0 * curved_area_fraction, graded_h);
-        }
-        if (size_field) {
+        if (graded_field) {
             out.mesher_note += std::format(
                 " | size_field h_min={:.4g} h_max={:.4g} m, levels L0={} L1={} L2={}{}",
                 graded.field_h_min, graded.field_h_max, graded.n_level0_cells,

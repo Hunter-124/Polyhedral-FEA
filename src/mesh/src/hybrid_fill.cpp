@@ -366,7 +366,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                         std::span<const geom::SharpEdge> features, double feature_band,
                         std::span<const Eigen::Vector3d> refine_seeds, double seed_band,
                         double curvature_turn_deg, const BoundaryFit* fit,
-                        const SizeFieldFn& size_field, const MirrorFrame* mirror) {
+                        const SizeFieldFn& size_field, const MirrorFrame* mirror,
+                        std::size_t max_refinement_tets) {
     BoundaryProjectionContext* projection = fit != nullptr ? fit->projection : nullptr;
     if (!(h > 0.0) || !std::isfinite(h)) {
         throw ValidityError("graded_tet_fill_surface: h must be positive");
@@ -391,7 +392,9 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     // Coarse-primary lattice at target h. Multi-level LEB (ADR-0018):
     //   L0 bulk ~ h, L1 feature/skin ~ h/2, L2 high-κ seeds ~ h/4.
     constexpr int subdiv = 2; // max LEB depth (L2)
-    constexpr std::size_t kGradedMaxCells = 48 * 1024;
+    const std::size_t kGradedMaxCells =
+        max_refinement_tets > 0 ? std::max<std::size_t>(1, max_refinement_tets / 6)
+                                : 48 * 1024;
     const double h_budget =
         min_h_for_cell_budget(bbox_min, bbox_max, kGradedMaxCells, /*subdivision=*/1);
     const double h_use = (h_budget > 0.0) ? std::max(h, h_budget) : h;
@@ -476,7 +479,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     const int skin_thresh = have_geo_drivers ? 0 : std::min(skin_layers, skin_cap);
 
     // refine_level: 0=bulk, 1=L1, 2=L2, 3=deep protected-feature core.
-    // Level 3 adds bisection waves without deepening a-posteriori/BC seed balls.
+    // Level 3 adds bisection waves at protected sharp-feature cores.
     std::vector<std::uint8_t> refine_level(inside.size(), 0);
     std::vector<char> is_feature(inside.size(), 0);
     std::vector<char> is_seed(inside.size(), 0);
@@ -497,9 +500,9 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     double field_h_max = 0.0;
     std::size_t n_field_budget_clamped = 0;
     if (size_field) {
-        // h_floor is the coarse-lattice budget floor. Requests below it cannot
-        // create another lattice scale; LEB remains bounded by its own budget.
-        const double h_floor = (h_budget > 0.0) ? h_budget : hc;
+        // The Cartesian allocation floor bounds the background, not a local
+        // wall/curvature demand. Local LEB is governed by the caller's cap.
+        const double h_floor = hc / 4.0;
         for (int k = 0; k < nz; ++k) {
             for (int j = 0; j < ny; ++j) {
                 for (int i = 0; i < nx; ++i) {
@@ -745,11 +748,9 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     };
 
     // Multi-level LEB: pass 1 marks level≥1, pass 2 marks level≥2.
-    constexpr std::size_t kLebTetBudget = 200'000;
     auto run_leb_for_min_level = [&](std::uint8_t min_level) {
-        if (out.mesh.tets.size() > kLebTetBudget) {
-            return;
-        }
+        if (max_refinement_tets > 0 && out.mesh.tets.size() > max_refinement_tets)
+            throw ValidityError("graded_tet_fill_surface: memory-derived refinement ceiling exceeded");
         std::vector<std::size_t> marked;
         marked.reserve(out.mesh.tets.size() / 4 + 8);
         for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
@@ -766,15 +767,29 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             return;
         }
         LocalRefineStats st;
-        // S1: project free-surface LEB mids onto STL (avoid hole-void chords).
+        // Keep regular parents until the requested local levels exist.
         auto refined = local_refine_tets(std::move(out.mesh.nodes), std::move(out.mesh.tets),
-                                         marked, &st, &surface, mirror);
+                                         marked, &st, nullptr, mirror);
         out.mesh.nodes = std::move(refined.nodes);
         out.mesh.tets = std::move(refined.tets);
     };
 
-    // Pre-LEB snap of lattice corners so LEB mid-edges start closer to the CAD
-    // (cleaner hole rims; midpoints of two on-surface nodes ≈ on surface).
+    if (out.n_fine_cells > 0) {
+        run_leb_for_min_level(1);
+        if (any_l2) {
+            run_leb_for_min_level(2);
+        }
+        if (any_deep_feature) {
+            // A single longest-edge split halves volume, not edge length.
+            // Additional feature-only waves provide enough curve segments for
+            // exact BRep rim projection without deepening ordinary seed balls.
+            run_leb_for_min_level(3);
+            run_leb_for_min_level(3);
+        }
+    }
+    // Project at the field's resolution, not at the background resolution.
+    // Warping coarse parents first leaves their locally refined children with
+    // unrecoverable boundary slivers at tightly curved seating surfaces.
     {
         std::vector<std::uint32_t> pre_snap =
             tet_boundary_nodes(out.mesh.tets, out.mesh.nodes);
@@ -815,19 +830,6 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         }
     }
 
-    if (out.n_fine_cells > 0) {
-        run_leb_for_min_level(1);
-        if (any_l2) {
-            run_leb_for_min_level(2);
-        }
-        if (any_deep_feature) {
-            // A single longest-edge split halves volume, not edge length.
-            // Additional feature-only waves provide enough curve segments for
-            // exact BRep rim projection without deepening ordinary seed balls.
-            run_leb_for_min_level(3);
-            run_leb_for_min_level(3);
-        }
-    }
     // Is `p` on the void side of the surface? Answered by the outward normal of
     // the nearest triangle, which is the only inside/outside oracle available
     // at a scale finer than the classifier's lattice samples. A point exactly

@@ -11,6 +11,7 @@
 #include "geom/cad_model.hpp"
 #include "geom/cad_topology.hpp"
 #include "geom/tri_surface.hpp"
+#include "mesh/hybrid_fill.hpp"
 #include "mesh/mixed_fill.hpp"
 #include "mesh/surface_project.hpp"
 
@@ -662,13 +663,16 @@ inline constexpr std::array<std::string_view, 10> kMeshStageNames{
 /// knows nothing of adapt passes; `SolveJob` stamps it. A fill that hits the
 /// element/DOF ceiling and coarsens is a second fill, so its stage indices
 /// restart at 0 after the abandoned attempt's stages.
+/// @param fill_options Lightweight live graded-fill observer, independent of
+/// on_stage mesh snapshots; forwarded unchanged through auto-h retries.
 VolumeMeshOutput
 volume_mesh(const Model& model, double h, VolumeMesher mesher = VolumeMesher::kHybrid,
             int skin_layers = 2, bool feature_refine = false,
             std::span<const Eigen::Vector3d> refine_seeds = {}, double seed_band = 0.0,
             double element_tendency = 0.0, std::size_t max_elems = 0, std::size_t max_dof = 0,
             int auto_retry_budget = 0, const std::function<void()>& cancel_check = {},
-            const mesh::SizeFieldFn& size_field = {}, const MeshStageSink& on_stage = {});
+            const mesh::SizeFieldFn& size_field = {}, const MeshStageSink& on_stage = {},
+            const mesh::FillOptions& fill_options = {});
 
 /// Refresh the solved-stage assessment after the final order elevation and CAD
 /// mid-node projection. Replaces its prior mesher-note token and enforces the

@@ -19,9 +19,29 @@
 
 #include <Eigen/Core>
 
+#include <cstddef>
+#include <functional>
 #include <span>
+#include <string>
 
 namespace polymesh::mesh {
+
+/// Synchronous graded-fill work observation. Counters describe completed/total
+/// work units in sub_phase: lattice cells, then nodes/tets/candidates. Zero
+/// before work exists is intentional; elements are always live tetrahedra.
+struct FillProgress {
+    std::size_t cells_done = 0;
+    std::size_t cells_total = 0;
+    std::size_t elements_so_far = 0;
+    std::string sub_phase;
+};
+
+struct FillOptions {
+    /// Empty disables observation without clock reads or progress allocations.
+    /// Called on phase changes and at most five seconds apart in working loops.
+    /// Individual synchronous CAD/kernel calls cannot be interrupted.
+    std::function<void(const FillProgress&)> on_progress;
+};
 
 struct GradedTetFillOutput {
     TetFillOutput mesh;    // nodes + tets + boundary quads
@@ -69,6 +89,6 @@ GradedTetFillOutput graded_tet_fill_surface(
     std::span<const Eigen::Vector3d> refine_seeds = {}, double seed_band = 0.0,
     double curvature_turn_deg = 0.0, const BoundaryFit* fit = nullptr,
     const SizeFieldFn& size_field = {}, const MirrorFrame* mirror = nullptr,
-    std::size_t max_refinement_tets = 0);
+    std::size_t max_refinement_tets = 0, const FillOptions& options = {});
 
 } // namespace polymesh::mesh

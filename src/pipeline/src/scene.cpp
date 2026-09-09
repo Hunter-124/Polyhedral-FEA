@@ -29,6 +29,7 @@
 #include "mesh/cvt_export.hpp"
 #include "mesh/cvt_lloyd.hpp"
 #include "mesh/cvt_sites.hpp"
+#include "mesh/fill_progress.hpp"
 #include "mesh/geogram_clip.hpp"
 #include "mesh/grid_classify.hpp"
 #include "mesh/hex_fill.hpp"
@@ -2159,6 +2160,7 @@ std::size_t project_quadratic_boundary_mids(fea::NodalMesh& nodal_mesh,
     if (projection == nullptr || !projection->target || cad.empty() || !(h > 0.0)) {
         return 0;
     }
+    mesh::fill_progress_phase("quadratic_boundary_census");
     auto boundary_mids = quadratic_boundary_mids(nodal_mesh);
     if (boundary_mids.empty()) {
         return 0;
@@ -2194,6 +2196,7 @@ std::size_t project_quadratic_boundary_mids(fea::NodalMesh& nodal_mesh,
     }
     for (std::size_t element_index = 0; element_index < nodal_mesh.elements.size();
          ++element_index) {
+        mesh::fill_progress_poll(element_index, nodal_mesh.elements.size());
         for (const auto node : nodal_mesh.elements[element_index].nodes) {
             if (auto it = incident.find(node); it != incident.end()) {
                 it->second.push_back(element_index);
@@ -2220,7 +2223,10 @@ std::size_t project_quadratic_boundary_mids(fea::NodalMesh& nodal_mesh,
     const double volume_epsilon = 1e-14 * h * h * h;
     const double jacobian_epsilon = 1e-8 * h * h * h;
     std::size_t projected = 0;
+    mesh::fill_progress_phase("quadratic_boundary_projection");
+    std::size_t mids_done = 0;
     for (const auto& edge : boundary_mids) {
+        mesh::fill_progress_poll(mids_done++, boundary_mids.size());
         if (edge.a >= nodal_mesh.nodes.size() || edge.b >= nodal_mesh.nodes.size() ||
             edge.mid >= nodal_mesh.nodes.size()) {
             if (reverted_nodes != nullptr) {
@@ -2371,8 +2377,11 @@ std::size_t project_quadratic_boundary_mids(fea::NodalMesh& nodal_mesh,
     // a whole-cell rollback and feed those edges to the caller's h-refinement
     // fallback.
     for (int round = 0; round < 4; ++round) {
+        mesh::fill_progress_phase("quadratic_quality_pass", round + 1, 4);
+        std::size_t checked = 0;
         std::set<std::uint32_t> rollback;
         for (const auto& element : nodal_mesh.elements) {
+            mesh::fill_progress_poll(checked++, nodal_mesh.elements.size());
             const double quality = fea::cell_quality(nodal_mesh, element);
             if (fea::element_jacobians_positive(nodal_mesh, element) &&
                 std::isfinite(quality) && quality >= mesh::validity::kCellShapeFloor) {
@@ -2728,6 +2737,7 @@ relax_cells_below_shape_floor(fea::NodalMesh& mesh,
     std::vector<std::vector<std::uint32_t>> incident(mesh.nodes.size());
     std::vector<std::vector<std::uint32_t>> neighbours(mesh.nodes.size());
     for (std::size_t ei = 0; ei < mesh.elements.size(); ++ei) {
+        mesh::fill_progress_poll(ei, mesh.elements.size());
         const auto& nodes = mesh.elements[ei].nodes;
         for (const auto ni : nodes) {
             if (ni >= incident.size()) {
@@ -2763,10 +2773,12 @@ relax_cells_below_shape_floor(fea::NodalMesh& mesh,
 
     std::size_t remaining = 0;
     for (int round = 0; round < rounds; ++round) {
+        mesh::fill_progress_phase("ship_quality_pass", round + 1, rounds);
         // Ascending element index, then ascending node id: the acceptance test
         // reads the shared node array, so visit order is mutation state.
         std::vector<std::uint32_t> targets;
         for (std::size_t ei = 0; ei < mesh.elements.size(); ++ei) {
+            mesh::fill_progress_poll(ei, mesh.elements.size());
             const double q = fea::cell_quality(mesh, mesh.elements[ei]);
             if (!std::isfinite(q) || q >= floor_value) {
                 continue;
@@ -2784,7 +2796,9 @@ relax_cells_below_shape_floor(fea::NodalMesh& mesh,
             break;
         }
         bool moved_any = false;
+        std::size_t targets_done = 0;
         for (const auto ni : targets) {
+            mesh::fill_progress_poll(targets_done++, targets.size());
             Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
             for (const auto other : neighbours[ni]) {
                 centroid += mesh.nodes[other];
@@ -2808,7 +2822,10 @@ relax_cells_below_shape_floor(fea::NodalMesh& mesh,
             break;
         }
     }
+    mesh::fill_progress_phase("ship_quality_census");
+    std::size_t checked = 0;
     for (const auto& element : mesh.elements) {
+        mesh::fill_progress_poll(checked++, mesh.elements.size());
         const double q = fea::cell_quality(mesh, element);
         if (std::isfinite(q) && q < floor_value) {
             ++remaining;
@@ -2912,6 +2929,7 @@ ExteriorConformStats conform_true_exterior(
         incident.assign(mesh.nodes.size(), {});
         neighbours.assign(mesh.nodes.size(), {});
         for (std::size_t ei = 0; ei < mesh.elements.size(); ++ei) {
+            mesh::fill_progress_poll(ei, mesh.elements.size());
             const auto& nodes = mesh.elements[ei].nodes;
             for (const auto ni : nodes) {
                 if (ni >= incident.size()) {
@@ -3203,7 +3221,10 @@ ExteriorConformStats conform_true_exterior(
     const auto entry_census = mesh_quality_census();
 
     std::vector<std::uint32_t> stuck;
+    mesh::fill_progress_phase("exterior_projection");
+    std::size_t exterior_done = 0;
     for (const auto ni : exterior) {
+        mesh::fill_progress_poll(exterior_done++, exterior.size());
         const double start = free_distance(ni);
         if (start <= eps) {
             continue;
@@ -3581,7 +3602,10 @@ ExteriorConformStats conform_true_exterior(
             });
         }
         std::set<std::pair<std::uint32_t, std::uint32_t>> repaired;
+        mesh::fill_progress_phase("exterior_edge_projection");
+        std::size_t edges_done = 0;
         for (const auto& [a, b] : edge_order) {
+            mesh::fill_progress_poll(edges_done++, edge_order.size());
             if (repaired.count(std::minmax(a, b)) != 0) {
                 continue;
             }
@@ -4344,7 +4368,8 @@ volume_mesh_impl(const Model& model, double h, VolumeMesher mesher, int skin_lay
                  double seed_band, double element_tendency, std::size_t max_elems,
                  std::size_t max_dof, int auto_retry_budget,
                  const std::function<void()>& cancel_check,
-                 const mesh::SizeFieldFn& size_field, const MeshStageSink& on_stage) {
+                 const mesh::SizeFieldFn& size_field, const MeshStageSink& on_stage,
+                 const mesh::FillOptions& fill_options) {
     const auto poll_cancel = [&] {
         if (cancel_check) {
             cancel_check();
@@ -5320,7 +5345,8 @@ volume_mesh_impl(const Model& model, double h, VolumeMesher mesher, int skin_lay
         }
         auto graded = mesh::graded_tet_fill_surface(
             model.surface, model.bbox_min, model.bbox_max, graded_h, std::max(1, skin_layers),
-            edges, feature_band, seeds, band, turn_deg, fit, graded_field, mirror, max_elems);
+            edges, feature_band, seeds, band, turn_deg, fit, graded_field, mirror, max_elems,
+            fill_options);
         fill_h = graded.h_fine;
         out.size_floor = graded.h_coarse > graded_h * 1.001 ? graded.h_coarse : 0.0;
         out.mesh.nodes = std::move(graded.mesh.nodes);
@@ -6141,6 +6167,11 @@ volume_mesh_impl(const Model& model, double h, VolumeMesher mesher, int skin_lay
         out.mesher_note += mirror_note();
     }
 
+    mesh::FillProgressScope pipeline_progress(fill_options);
+    pipeline_progress.set_elements(out.mesh.elements.size());
+    pipeline_progress.set_cells(0, out.mesh.elements.size());
+    pipeline_progress.set_phase("exterior_quality");
+
     // The mesher's own output, in solver types, before any pipeline-level
     // conformity/quality/compaction step touches it. Every branch above reaches
     // here, so this is the one stage every mesher emits: for all of them except
@@ -6187,6 +6218,7 @@ volume_mesh_impl(const Model& model, double h, VolumeMesher mesher, int skin_lay
     // each mesher used internally over its own intermediate zoo. Cells under
     // the floor get interior room; whatever is left is reported, never hidden.
     {
+        mesh::fill_progress_phase("ship_quality");
         const std::size_t below_floor = relax_cells_below_shape_floor(
             out.mesh, out.boundary_quads, mesh::validity::kCellShapeFloor);
         out.n_cells_below_shape_floor = below_floor;
@@ -6200,7 +6232,10 @@ volume_mesh_impl(const Model& model, double h, VolumeMesher mesher, int skin_lay
         // mesh that would abort the solve says so in its own note instead of
         // failing later with a bare error.
         std::size_t nonintegrable = 0;
+        mesh::fill_progress_phase("ship_integrability");
+        std::size_t checked = 0;
         for (const auto& element : out.mesh.elements) {
+            mesh::fill_progress_poll(checked++, out.mesh.elements.size());
             if (!fea::element_jacobians_positive(out.mesh, element)) {
                 ++nonintegrable;
             }
@@ -6218,6 +6253,7 @@ volume_mesh_impl(const Model& model, double h, VolumeMesher mesher, int skin_lay
     // scratch whenever the node numbering changes below.
     const auto& surf = model.surface;
     auto map_boundary_regions = [&] {
+        mesh::fill_progress_phase("boundary_region_mapping");
         out.boundary_node_region.clear();
         std::size_t boundary_poll = 0;
         std::set<std::uint32_t> boundary_nodes;
@@ -6225,6 +6261,7 @@ volume_mesh_impl(const Model& model, double h, VolumeMesher mesher, int skin_lay
             boundary_nodes.insert(quad.begin(), quad.end());
         }
         for (const auto node : boundary_nodes) {
+            mesh::fill_progress_poll(boundary_poll, boundary_nodes.size());
             if ((boundary_poll++ & 255U) == 0U) {
                 poll_cancel();
             }
@@ -6364,7 +6401,8 @@ volume_mesh_impl(const Model& model, double h, VolumeMesher mesher, int skin_lay
         auto retry =
             volume_mesh(model, retry_h, requested_mesher, requested_skin_layers,
                         feature_refine, refine_seeds, seed_band, element_tendency, max_elems,
-                        max_dof, auto_retry_budget - 1, cancel_check, size_field, on_stage);
+                        max_dof, auto_retry_budget - 1, cancel_check, size_field, on_stage,
+                        fill_options);
         const std::string ceiling_note =
             elem_over ? std::format("element ceiling {}, actual {}", max_elems, actual_elems)
                       : std::format("DOF ceiling {}, actual {}", max_dof, actual_dof);
@@ -6450,11 +6488,13 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                              std::size_t max_dof, int auto_retry_budget,
                              const std::function<void()>& cancel_check,
                              const mesh::SizeFieldFn& size_field,
-                             const MeshStageSink& on_stage) {
+                             const MeshStageSink& on_stage,
+                             const mesh::FillOptions& fill_options) {
     try {
         return volume_mesh_impl(model, h, mesher, skin_layers, feature_refine, refine_seeds,
                                 seed_band, element_tendency, max_elems, max_dof,
-                                auto_retry_budget, cancel_check, size_field, on_stage);
+                                auto_retry_budget, cancel_check, size_field, on_stage,
+                                fill_options);
     } catch (const mesh::ValidityError& e) {
         // ONLY this cause is reclassified. Every other validity failure propagates
         // unchanged, so no existing campaign row status shifts.

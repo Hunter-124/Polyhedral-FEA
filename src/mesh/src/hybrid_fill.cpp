@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "mesh/hybrid_fill.hpp"
+#include "mesh/fill_progress.hpp"
 
 #include "mesh/cell_stamp.hpp"
 #include "mesh/cell_validity.hpp"
@@ -89,7 +90,8 @@ tet_boundary_nodes(const std::vector<std::array<std::uint32_t, 4>>& tets,
     std::unordered_map<FaceKey, int, FaceHash> count;
     count.reserve(tets.size() * 2);
     static constexpr int kFaces[4][3] = {{0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}};
-    for (const auto& t : tets) {
+    for (std::size_t work_done = 0; const auto& t : tets) {
+        if (active_fill_progress != nullptr) fill_progress_poll(work_done++, tets.size());
         for (const auto& f : kFaces) {
             ++count[make_key(t[static_cast<std::size_t>(f[0])],
                              t[static_cast<std::size_t>(f[1])],
@@ -98,7 +100,8 @@ tet_boundary_nodes(const std::vector<std::array<std::uint32_t, 4>>& tets,
     }
     std::unordered_set<std::uint32_t> nodes_set;
     nodes_set.reserve(count.size());
-    for (const auto& [key, c] : count) {
+    for (std::size_t work_done = 0; const auto& [key, c] : count) {
+        if (active_fill_progress != nullptr) fill_progress_poll(work_done++, count.size());
         if (c == 1) {
             nodes_set.insert(key.a);
             nodes_set.insert(key.b);
@@ -124,6 +127,7 @@ tet_boundary_nodes(const std::vector<std::array<std::uint32_t, 4>>& tets,
         Eigen::Vector3d lo = nodes[out.front()];
         Eigen::Vector3d hi = lo;
         for (const auto ni : out) {
+            fill_progress_poll();
             lo = lo.cwiseMin(nodes[ni]);
             hi = hi.cwiseMax(nodes[ni]);
         }
@@ -132,6 +136,7 @@ tet_boundary_nodes(const std::vector<std::array<std::uint32_t, 4>>& tets,
         const double inv_q = quantum > 0.0 ? 1.0 / quantum : 0.0;
         std::vector<std::array<long long, 3>> key(nodes.size());
         for (const auto ni : out) {
+            fill_progress_poll();
             const Eigen::Vector3d d = (nodes[ni] - center).cwiseAbs() * inv_q;
             key[ni] = {static_cast<long long>(d.x()), static_cast<long long>(d.y()),
                        static_cast<long long>(d.z())};
@@ -179,7 +184,8 @@ TetShellTopology tet_shell_topology(const std::vector<std::array<std::uint32_t, 
     static constexpr int kFaces[4][3] = {{0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}};
     std::unordered_map<FaceKey, int, FaceHash> face_use;
     face_use.reserve(tets.size() * 2);
-    for (const auto& t : tets) {
+    for (std::size_t work_done = 0; const auto& t : tets) {
+        if (active_fill_progress != nullptr) fill_progress_poll(work_done++, tets.size());
         for (const auto& f : kFaces) {
             ++face_use[make_key(t[static_cast<std::size_t>(f[0])],
                                 t[static_cast<std::size_t>(f[1])],
@@ -192,7 +198,8 @@ TetShellTopology tet_shell_topology(const std::vector<std::array<std::uint32_t, 
     };
     std::unordered_map<std::uint64_t, int> edge_use;
     edge_use.reserve(face_use.size());
-    for (const auto& [face, count] : face_use) {
+    for (std::size_t work_done = 0; const auto& [face, count] : face_use) {
+        if (active_fill_progress != nullptr) fill_progress_poll(work_done++, face_use.size());
         if (count != 1) {
             continue;
         }
@@ -201,7 +208,8 @@ TetShellTopology tet_shell_topology(const std::vector<std::array<std::uint32_t, 
         ++edge_use[pack(face.b, face.c)];
     }
     TetShellTopology out;
-    for (const auto& [edge, count] : edge_use) {
+    for (std::size_t work_done = 0; const auto& [edge, count] : edge_use) {
+        if (active_fill_progress != nullptr) fill_progress_poll(work_done++, edge_use.size());
         if (count != 2) {
             out.torn.insert(edge);
         }
@@ -258,6 +266,7 @@ bool restrict_kill_to_shell(const std::vector<std::array<std::uint32_t, 4>>& tet
         survivors.clear();
         survivor_index.clear();
         for (std::size_t ti = 0; ti < tets.size(); ++ti) {
+            fill_progress_poll();
             if (!kill[ti]) {
                 survivors.push_back(tets[ti]);
                 survivor_index.push_back(ti);
@@ -265,6 +274,7 @@ bool restrict_kill_to_shell(const std::vector<std::array<std::uint32_t, 4>>& tet
         }
         std::unordered_set<std::uint64_t> fresh;
         for (const auto e : tet_shell_topology(survivors).torn) {
+            fill_progress_poll();
             if (entry.torn.count(e) == 0) {
                 fresh.insert(e);
             }
@@ -285,6 +295,7 @@ bool restrict_kill_to_shell(const std::vector<std::array<std::uint32_t, 4>>& tet
 
     std::size_t killed = n_proposed;
     for (int round = 0; round < max_rounds; ++round) {
+        fill_progress_poll();
         const auto fresh = fresh_tears();
         if (fresh.empty()) {
             return true;
@@ -301,7 +312,8 @@ bool restrict_kill_to_shell(const std::vector<std::array<std::uint32_t, 4>>& tet
             h = h * 1000003U + v[2];
             return h;
         };
-        for (const auto& t : survivors) {
+        for (std::size_t work_done = 0; const auto& t : survivors) {
+            if (active_fill_progress != nullptr) fill_progress_poll(work_done++, survivors.size());
             for (const auto& f : kFaces) {
                 ++face_use[face_hash(t[static_cast<std::size_t>(f[0])],
                                      t[static_cast<std::size_t>(f[1])],
@@ -310,6 +322,7 @@ bool restrict_kill_to_shell(const std::vector<std::array<std::uint32_t, 4>>& tet
         }
         std::size_t extended = 0;
         for (std::size_t si = 0; si < survivors.size(); ++si) {
+            fill_progress_poll();
             const auto& t = survivors[si];
             if (!touches_any(t, fresh)) {
                 continue;
@@ -336,12 +349,14 @@ bool restrict_kill_to_shell(const std::vector<std::array<std::uint32_t, 4>>& tet
     // Extension did not close it. Fall back to backfilling the minimum.
     kill = proposed;
     for (int round = 0; round < max_rounds; ++round) {
+        fill_progress_poll();
         const auto fresh = fresh_tears();
         if (fresh.empty()) {
             return true;
         }
         std::size_t revived = 0;
         for (std::size_t ti = 0; ti < tets.size(); ++ti) {
+            fill_progress_poll();
             if (kill[ti] && touches_any(tets[ti], fresh)) {
                 kill[ti] = 0;
                 ++revived;
@@ -367,8 +382,11 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                         std::span<const Eigen::Vector3d> refine_seeds, double seed_band,
                         double curvature_turn_deg, const BoundaryFit* fit,
                         const SizeFieldFn& size_field, const MirrorFrame* mirror,
-                        std::size_t max_refinement_tets) {
+                        std::size_t max_refinement_tets, const FillOptions& options) {
     BoundaryProjectionContext* projection = fit != nullptr ? fit->projection : nullptr;
+    GradedTetFillOutput out;
+    FillProgressScope progress(options, &out.mesh.tets);
+    progress.set_phase("classification");
     if (!(h > 0.0) || !std::isfinite(h)) {
         throw ValidityError("graded_tet_fill_surface: h must be positive");
     }
@@ -416,6 +434,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                                             : CanonicalCellMap{};
     symmetrise_classification(classification, cell_orbit);
     const CartesianGrid& grid = classification.grid;
+    progress.set_cells(0, classification.inside.size());
+    progress.set_phase("background_grading");
     const auto& inside = classification.inside;
     const int nx = grid.nx, ny = grid.ny, nz = grid.nz;
     const double hc = grid.max_edge();
@@ -433,6 +453,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     for (int k = 0; k < nz; ++k) {
         for (int j = 0; j < ny; ++j) {
             for (int i = 0; i < nx; ++i) {
+                fill_progress_poll(idx(i, j, k), inside.size());
                 if (!inside[idx(i, j, k)]) {
                     continue;
                 }
@@ -451,6 +472,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         }
     }
     while (!q.empty()) {
+        fill_progress_poll();
         const auto c = q.front();
         q.pop();
         const int d0 = dist[idx(c[0], c[1], c[2])];
@@ -488,6 +510,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     std::vector<char> is_deep_feature(inside.size(), 0);
 
     for (std::size_t c = 0; c < inside.size(); ++c) {
+        fill_progress_poll(c, inside.size());
         if (!inside[c]) {
             continue;
         }
@@ -506,6 +529,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         for (int k = 0; k < nz; ++k) {
             for (int j = 0; j < ny; ++j) {
                 for (int i = 0; i < nx; ++i) {
+                    fill_progress_poll(idx(i, j, k), inside.size());
                     const auto id = idx(i, j, k);
                     if (!inside[id]) {
                         continue;
@@ -555,6 +579,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     }
 
     for (std::size_t c = 0; c < inside.size(); ++c) {
+        fill_progress_poll(c, inside.size());
         if (!inside[c]) {
             refine_level[c] = 0;
             is_feature[c] = 0;
@@ -595,6 +620,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         const auto feature_before = is_feature;
         const auto seed_before = is_seed;
         for (std::size_t c = 0; c < inside.size(); ++c) {
+            fill_progress_poll(c, inside.size());
             const auto source = cell_orbit.canonical[c];
             refine_level[c] = level_before[source];
             is_feature[c] = feature_before[source];
@@ -606,12 +632,12 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     bool any_l2 = false;
     bool any_deep_feature = false;
     for (auto lv : refine_level) {
+        fill_progress_poll();
         any_l1 = any_l1 || lv >= 1;
         any_l2 = any_l2 || lv >= 2;
         any_deep_feature = any_deep_feature || lv >= 3;
     }
 
-    GradedTetFillOutput out;
     out.h_coarse = hc;
     // Report the deepest active level; an all-L0 field remains at h_coarse.
     out.h_fine = any_l2 ? 0.25 * hc : (any_l1 ? 0.5 * hc : hc);
@@ -693,9 +719,12 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     };
 
     std::size_t n_l2_cells = 0;
+    progress.set_cells(0, inside.size());
+    progress.set_phase("background_lattice");
     for (int k = 0; k < nz; ++k) {
         for (int j = 0; j < ny; ++j) {
             for (int i = 0; i < nx; ++i) {
+                fill_progress_poll(idx(i, j, k), inside.size());
                 if (!inside[idx(i, j, k)]) {
                     continue;
                 }
@@ -730,6 +759,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             }
         }
     }
+    progress.set_cells(inside.size(), inside.size());
+    progress.poll(true);
     (void)n_l2_cells;
 
     if (out.mesh.tets.empty()) {
@@ -748,12 +779,17 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     };
 
     // Multi-level LEB: pass 1 marks level≥1, pass 2 marks level≥2.
+    int leb_wave = 0;
+    const int leb_waves = out.n_fine_cells > 0 ? 1 + (any_l2 ? 1 : 0) + (any_deep_feature ? 2 : 0) : 0;
     auto run_leb_for_min_level = [&](std::uint8_t min_level) {
+        progress.set_cells(0, out.mesh.tets.size());
+        progress.set_phase("leb_wave", ++leb_wave, leb_waves);
         if (max_refinement_tets > 0 && out.mesh.tets.size() > max_refinement_tets)
             throw ValidityError("graded_tet_fill_surface: memory-derived refinement ceiling exceeded");
         std::vector<std::size_t> marked;
         marked.reserve(out.mesh.tets.size() / 4 + 8);
         for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+            fill_progress_poll(ti, out.mesh.tets.size());
             const auto& n = out.mesh.tets[ti];
             const Eigen::Vector3d c = 0.25 * (out.mesh.nodes[n[0]] + out.mesh.nodes[n[1]] +
                                               out.mesh.nodes[n[2]] + out.mesh.nodes[n[3]]);
@@ -772,6 +808,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                                          marked, &st, nullptr, mirror);
         out.mesh.nodes = std::move(refined.nodes);
         out.mesh.tets = std::move(refined.tets);
+        progress.poll(true);
     };
 
     if (out.n_fine_cells > 0) {
@@ -787,12 +824,15 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             run_leb_for_min_level(3);
         }
     }
+    progress.set_cells(0, out.mesh.tets.size());
+    progress.set_phase("projection");
     // The regular parent/LEB spacing, before any CAD projection. A corner
     // driven through 95% of this spacing toward its neighbour must be merged,
     // not left on the snap ladder's last near-coincident retreat.
     std::vector<double> original_spacing(out.mesh.nodes.size(),
                                          std::numeric_limits<double>::infinity());
     for (const auto& tet : out.mesh.tets) {
+        fill_progress_poll();
         for (int a = 0; a < 4; ++a) {
             for (int b = a + 1; b < 4; ++b) {
                 const double length = (out.mesh.nodes[tet[a]] - out.mesh.nodes[tet[b]]).norm();
@@ -812,6 +852,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             std::unordered_set<std::uint32_t> bset(pre_snap.begin(), pre_snap.end());
             std::vector<std::size_t> skin_tets;
             for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+                fill_progress_poll(ti, out.mesh.tets.size());
                 const auto& n = out.mesh.tets[ti];
                 if (bset.count(n[0]) || bset.count(n[1]) || bset.count(n[2]) ||
                     bset.count(n[3])) {
@@ -823,6 +864,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 surface, out.mesh.nodes, pre_snap, hc,
                 [&](std::set<std::uint32_t>& offenders) {
                     for (const auto ti : skin_tets) {
+                        fill_progress_poll();
                         const auto& n = out.mesh.tets[ti];
                         const double v =
                             tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
@@ -882,6 +924,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     // local carve the classifier can see a bore while the emitted tet mesh
     // remains the original solid coarse cube.
     if (!classification.child_inside_mask.empty()) {
+        progress.set_phase("projection_child_carve");
         // The child mask is a cell-CENTRE parity sample on the h/2 lattice, but
         // LEB has already refined these tets to h/4 and finer. Condemning an
         // h/4 tet because one h/2 sample point landed in void is the hole
@@ -906,6 +949,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         // fixed once at the coarse level.
         std::vector<char> kill(out.mesh.tets.size(), 0);
         for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+            fill_progress_poll(ti, out.mesh.tets.size());
             const auto& tet = out.mesh.tets[ti];
             const Eigen::Vector3d centroid =
                 0.25 * (out.mesh.nodes[tet[0]] + out.mesh.nodes[tet[1]] +
@@ -939,6 +983,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         restrict_kill_to_shell(out.mesh.tets, kill);
         std::size_t write = 0;
         for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+            fill_progress_poll(ti, out.mesh.tets.size());
             if (!kill[ti]) {
                 out.mesh.tets[write++] = out.mesh.tets[ti];
             }
@@ -955,6 +1000,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     // corners after refine). Run as a reusable round: the S5 void carve below
     // exposes fresh (never-snapped) lattice faces that need a second round.
     const auto snap_round = [&]() {
+        progress.set_phase("projection_snap");
         std::vector<std::uint32_t> snap_nodes =
             tet_boundary_nodes(out.mesh.tets, out.mesh.nodes);
         if (snap_nodes.empty()) {
@@ -962,7 +1008,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         }
         const double vol_eps = 1e-14 * hc * hc * hc;
         std::vector<char> on_boundary(out.mesh.nodes.size(), 0);
-        for (const auto ni : snap_nodes) {
+        for (std::size_t work_done = 0; const auto ni : snap_nodes) {
+            if (active_fill_progress != nullptr) fill_progress_poll(work_done++, snap_nodes.size());
             on_boundary[ni] = 1;
         }
         // The bad-cell test: inverted is always bad; below the shared shape
@@ -994,6 +1041,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         // own star instead of rescanning the mesh (same wiring as tet_fill).
         std::vector<std::vector<std::size_t>> incident(out.mesh.nodes.size());
         for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+            fill_progress_poll(ti, out.mesh.tets.size());
             for (const auto ni : out.mesh.tets[ti]) {
                 incident[ni].push_back(ti);
             }
@@ -1002,6 +1050,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         {
             std::set<std::pair<std::uint32_t, std::uint32_t>> seen;
             for (const auto& n : out.mesh.tets) {
+                fill_progress_poll();
                 for (int a = 0; a < 4; ++a) {
                     for (int b = a + 1; b < 4; ++b) {
                         const auto u = n[static_cast<std::size_t>(a)];
@@ -1018,6 +1067,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         }
         const auto node_offends = [&](std::uint32_t ni) {
             for (const auto ti : incident[ni]) {
+            fill_progress_poll();
                 if (tet_is_bad(out.mesh.tets[ti])) {
                     return true;
                 }
@@ -1071,6 +1121,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             std::vector<std::uint32_t> ring;
             std::vector<std::uint32_t> wall;
             for (const auto ti : incident[seed]) {
+                fill_progress_poll();
                 for (const auto ni : out.mesh.tets[ti]) {
                     if (ni == seed || nbrs[ni].empty()) {
                         continue;
@@ -1106,6 +1157,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 saved.reserve(group.size());
                 moved.reserve(group.size());
                 for (const auto node : group) {
+                    fill_progress_poll();
                     Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
                     for (const auto other : nbrs[node]) {
                         centroid += out.mesh.nodes[other];
@@ -1142,10 +1194,12 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 }
             };
             for (const auto ni : ring) {
+                fill_progress_poll();
                 nudge(ni, /*tangential=*/false);
             }
             if (!moved_any) {
                 for (const auto ni : wall) {
+                    fill_progress_poll();
                     nudge(ni, /*tangential=*/true);
                 }
             }
@@ -1163,6 +1217,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         std::vector<std::size_t> skin_tets;
         skin_tets.reserve(snap_nodes.size() * 4);
         for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+            fill_progress_poll(ti, out.mesh.tets.size());
             const auto& n = out.mesh.tets[ti];
             if (on_boundary[n[0]] || on_boundary[n[1]] || on_boundary[n[2]] ||
                 on_boundary[n[3]]) {
@@ -1171,6 +1226,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         }
         auto collect_invert = [&](std::set<std::uint32_t>& offenders) {
             for (const auto ti : skin_tets) {
+                fill_progress_poll();
                 const auto& n = out.mesh.tets[ti];
                 const double v = tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
                                                    out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
@@ -1198,7 +1254,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         // test.stl/hole plate: composite score 0.48 -> 0.25).
         std::vector<std::uint32_t> stragglers;
         if (projection != nullptr) {
-            for (const auto ni : snap_nodes) {
+            for (std::size_t work_done = 0; const auto ni : snap_nodes) {
+                if (active_fill_progress != nullptr) fill_progress_poll(work_done++, snap_nodes.size());
                 if (ni >= out.mesh.nodes.size()) {
                     continue;
                 }
@@ -1220,7 +1277,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             // mirrored-tet fraction against the == 1.0 gate, ADR-0036 §9.2).
             mesh::sort_mirror_canonical(out.mesh.nodes, stragglers);
             std::vector<char> rescued(out.mesh.nodes.size(), 0);
-            for (const auto seed : stragglers) {
+            for (std::size_t work_done = 0; const auto seed : stragglers) {
+                if (active_fill_progress != nullptr) fill_progress_poll(work_done++, stragglers.size());
                 if (rescued[seed] != 0) {
                     continue;
                 }
@@ -1237,6 +1295,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 target_pt.reserve(group.size());
                 bool have_all = true;
                 for (const auto node : group) {
+                    fill_progress_poll();
                     const auto target = boundary_projection_target(
                         surface, out.mesh.nodes[node], node, projection, mirror);
                     if (!target) {
@@ -1353,7 +1412,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         // Full projection; keep only if no skin tet inverts.
         {
             const double thr = 0.08 * hc;
-            for (auto ni : snap_nodes) {
+            for (std::size_t work_done = 0; auto ni : snap_nodes) {
+                if (active_fill_progress != nullptr) fill_progress_poll(work_done++, snap_nodes.size());
                 if (ni >= out.mesh.nodes.size()) {
                     continue;
                 }
@@ -1387,6 +1447,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             }
         }
         for (auto& n : out.mesh.tets) {
+            fill_progress_poll();
             const double v = tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
                                                out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
             if (v < 0.0) {
@@ -1422,6 +1483,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     const double initial_jut_threshold = 0.15 * hc;
     std::unordered_set<std::uint32_t> initial_juts;
     for (const auto ni : tet_boundary_nodes(out.mesh.tets, out.mesh.nodes)) {
+        fill_progress_poll();
         const Eigen::Vector3d& p = out.mesh.nodes[ni];
         if (surface_distance(p) > initial_jut_threshold && outside_solid(p)) {
             initial_juts.insert(ni);
@@ -1473,6 +1535,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         }
         bool collapsed_any = false;
         for (int pass = 0; pass < kCollapsePasses; ++pass) {
+            progress.set_cells(0, out.mesh.tets.size());
+            progress.set_phase(collisions_only ? "quality_collision_pass" : "quality_collapse_pass", pass + 1, kCollapsePasses);
             // `try_collapse` checks that no incident tet inverts or degrades,
             // which is necessary and not sufficient: an edge collapse also has
             // to satisfy the link condition, or it welds the complex to itself
@@ -1494,6 +1558,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             const auto total_volume = [&]() {
                 double v = 0.0;
                 for (const auto& t : out.mesh.tets) {
+                    fill_progress_poll();
                     v += std::abs(tet_signed_volume(out.mesh.nodes[t[0]], out.mesh.nodes[t[1]],
                                                     out.mesh.nodes[t[2]],
                                                     out.mesh.nodes[t[3]]));
@@ -1506,11 +1571,14 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             std::unordered_map<std::uint32_t, std::vector<std::size_t>> incident;
             incident.reserve(out.mesh.nodes.size());
             for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+                fill_progress_poll(ti, out.mesh.tets.size());
                 for (const auto ni : out.mesh.tets[ti]) {
                     incident[ni].push_back(ti);
                 }
             }
             std::vector<char> removed(out.mesh.tets.size(), 0);
+            std::size_t removed_count = 0;
+            FillProgressElementsScope live_elements(out.mesh.tets, &removed_count);
             bool any = false;
             // Viability/quality of merging `dead` into `surv`, as the worst
             // post-collapse aspect over the incident star, or -infinity when the
@@ -1528,6 +1596,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 }
                 double worst = std::numeric_limits<double>::infinity();
                 for (const auto tj : it->second) {
+                fill_progress_poll();
                     if (removed[tj]) {
                         continue;
                     }
@@ -1567,6 +1636,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 }
                 const auto it = incident.find(dead);
                 for (const auto tj : it->second) {
+                    fill_progress_poll();
                     if (removed[tj]) {
                         continue;
                     }
@@ -1580,6 +1650,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                     }
                     if (has_surv) {
                         removed[tj] = 1;
+                        ++removed_count;
                         continue;
                     }
                     for (auto& nn : t) {
@@ -1693,7 +1764,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             // Phase A — void juts: boundary nodes whose projection the snap had
             // to reject (hole-rim stair chords poking into the void) merge into
             // an adjacent on-surface boundary node instead of leaving a spike.
-            if (!collisions_only) for (const auto ni : bvec) {
+            if (!collisions_only) for (std::size_t work_done = 0; const auto ni : bvec) {
+                if (active_fill_progress != nullptr) fill_progress_poll(work_done++, bvec.size());
                 if (node_remap[ni] != ni || !initial_juts.contains(ni)) {
                     continue;
                 }
@@ -1707,6 +1779,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 }
                 std::vector<std::pair<double, std::uint32_t>> cand;
                 for (const auto tj : it->second) {
+                    fill_progress_poll();
                     if (removed[tj]) {
                         continue;
                     }
@@ -1738,6 +1811,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                                        }),
                            cand.end());
                 for (const auto& [len, surv] : cand) {
+                    fill_progress_poll();
                     if (surface_distance(out.mesh.nodes[surv]) > 0.05 * hc) {
                         continue;
                     }
@@ -1764,6 +1838,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             };
             std::vector<std::size_t> cap_order;
             for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+                fill_progress_poll(ti, out.mesh.tets.size());
                 if (!removed[ti] && aspect_of(out.mesh.tets[ti]) < kCapAspect &&
                     (!collisions_only || projected_collision(out.mesh.tets[ti]))) {
                     cap_order.push_back(ti);
@@ -1779,7 +1854,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 const auto kb = mkey_b.key(tet_center_b(b));
                 return ka != kb ? ka < kb : a < b;
             });
-            for (const auto ti : cap_order) {
+            for (std::size_t work_done = 0; const auto ti : cap_order) {
+                if (active_fill_progress != nullptr) fill_progress_poll(work_done++, cap_order.size());
                 if (removed[ti] || aspect_of(out.mesh.tets[ti]) >= kCapAspect) {
                     continue;
                 }
@@ -1874,11 +1950,13 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             }
             std::size_t w = 0;
             for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+                fill_progress_poll(ti, out.mesh.tets.size());
                 if (!removed[ti]) {
                     out.mesh.tets[w++] = out.mesh.tets[ti];
                 }
             }
             out.mesh.tets.resize(w);
+            removed_count = 0;
             // 0.5% of the part per pass: three orders of magnitude more than a
             // sliver sweep needs, and far below the fill guard's 10% limit, so
             // a pass has to be visibly destructive to trip it.
@@ -1933,6 +2011,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             };
             const auto& jut = initial_juts;
             for (int pass = 0; pass < kCarvePasses; ++pass) {
+                progress.set_phase("quality_carve_pass", pass + 1, kCarvePasses);
                 // Free faces per tet (faces appearing once across the mesh).
                 struct FKey {
                     std::uint32_t a, b, c;
@@ -1960,6 +2039,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                     return FKey{v[0], v[1], v[2]};
                 };
                 for (const auto& t : out.mesh.tets) {
+                    fill_progress_poll();
                     for (const auto& f : kTFaces) {
                         ++fcount[fkey(t[static_cast<std::size_t>(f[0])],
                                       t[static_cast<std::size_t>(f[1])],
@@ -1969,6 +2049,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 std::vector<char> kill(out.mesh.tets.size(), 0);
                 std::size_t n_kill = 0;
                 for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+                    fill_progress_poll(ti, out.mesh.tets.size());
                     const auto& t = out.mesh.tets[ti];
                     bool has_jut = false;
                     for (const auto ni : t) {
@@ -2007,6 +2088,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 }
                 std::size_t w = 0;
                 for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+                    fill_progress_poll(ti, out.mesh.tets.size());
                     if (!kill[ti]) {
                         out.mesh.tets[w++] = out.mesh.tets[ti];
                     }
@@ -2027,6 +2109,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     // and re-project (crease nodes relax along the crease), reverting any move
     // that inverts a tet.
     {
+        progress.set_phase("quality_smoothing");
         struct FaceKey {
             std::uint32_t a, b, c;
             bool operator==(const FaceKey& o) const {
@@ -2053,6 +2136,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             return FaceKey{v[0], v[1], v[2]};
         };
         for (const auto& t : out.mesh.tets) {
+            fill_progress_poll();
             for (const auto& f : kTFaces) {
                 const auto k0 = t[static_cast<std::size_t>(f[0])];
                 const auto k1 = t[static_cast<std::size_t>(f[1])];
@@ -2074,6 +2158,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         std::vector<std::array<std::uint32_t, 4>> free_faces;
         free_faces.reserve(once.size() / 2);
         for (const auto& [key, tri] : once) {
+            fill_progress_poll();
             if (fcount[key] == 1) {
                 free_faces.push_back({tri[0], tri[1], tri[2], tri[2]});
             }
@@ -2086,6 +2171,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             surface, out.mesh.nodes, free_faces, hc,
             [&](std::set<std::uint32_t>& offenders) {
                 for (const auto& n : out.mesh.tets) {
+                    fill_progress_poll();
                     const double v =
                         tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
                                           out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
@@ -2096,6 +2182,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             },
             /*passes=*/3, /*relax=*/0.5, features, projection, mirror);
         for (auto& n : out.mesh.tets) {
+            fill_progress_poll();
             const double v = tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
                                                out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
             if (v < 0.0) {
@@ -2108,8 +2195,10 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         // the difference between a 90° edge and the chamfer it used to render
         // as (ADR-0035).
         if (fit != nullptr && fit->can_pin()) {
+            progress.set_phase("projection_feature_pin");
             std::unordered_map<std::uint32_t, std::vector<std::size_t>> star;
             for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+                fill_progress_poll(ti, out.mesh.tets.size());
                 for (const auto ni : out.mesh.tets[ti]) {
                     star[ni].push_back(ti);
                 }
@@ -2120,6 +2209,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                     return false;
                 }
                 for (const auto ti : it->second) {
+                    fill_progress_poll();
                     const auto& n = out.mesh.tets[ti];
                     const Eigen::Vector3d& a = out.mesh.nodes[n[0]];
                     const Eigen::Vector3d& b = out.mesh.nodes[n[1]];
@@ -2137,6 +2227,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             };
             std::vector<std::uint32_t> bnodes;
             for (const auto& f : free_faces) {
+                fill_progress_poll();
                 bnodes.insert(bnodes.end(), f.begin(), f.end());
             }
             std::sort(bnodes.begin(), bnodes.end());
@@ -2145,6 +2236,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 *fit->cad, *fit->topo, out.mesh.nodes, bnodes, hc, node_offends,
                 projection != nullptr ? projection->provenance : nullptr, mirror);
             for (auto& n : out.mesh.tets) {
+                fill_progress_poll();
                 const double v = tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
                                                    out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
                 if (v < 0.0) {
@@ -2176,6 +2268,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         constexpr int kOverlapPasses = 48;
         const auto carve_to_clean = [&]() {
             for (int pass = 0; pass < kOverlapPasses; ++pass) {
+                progress.set_phase("quality_overlap_pass", pass + 1, kOverlapPasses);
                 const auto owners =
                     buried_free_tet_face_owners(out.mesh.nodes, out.mesh.tets, hc);
                 if (owners.empty()) {
@@ -2183,6 +2276,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 }
                 std::vector<char> kill(out.mesh.tets.size(), 0);
                 for (const auto ti : owners) {
+                    fill_progress_poll();
                     kill[ti] = 1;
                 }
                 restrict_kill_to_shell(out.mesh.tets, kill);
@@ -2195,10 +2289,12 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                     // owner so the guard judges the band, not a pinch.
                     std::unordered_set<std::uint32_t> owner_nodes;
                     for (const auto ti : owners) {
+                        fill_progress_poll();
                         owner_nodes.insert(out.mesh.tets[ti].begin(), out.mesh.tets[ti].end());
                     }
                     std::fill(kill.begin(), kill.end(), static_cast<char>(0));
                     for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+                        fill_progress_poll(ti, out.mesh.tets.size());
                         for (const auto ni : out.mesh.tets[ti]) {
                             if (owner_nodes.count(ni)) {
                                 kill[ti] = 1;
@@ -2215,6 +2311,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 }
                 std::size_t w = 0;
                 for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+                    fill_progress_poll(ti, out.mesh.tets.size());
                     if (!kill[ti]) {
                         out.mesh.tets[w++] = out.mesh.tets[ti];
                     }
@@ -2248,6 +2345,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         // BEFORE the final carve + pull and the census gate stays last.
         repair_round();
         carve_to_clean();
+        progress.set_phase("quality_overlap_pull");
         pull_buried_free_faces(out.mesh.nodes, out.mesh.tets, hc, /*max_iters=*/8, mirror);
         // Final projection/pull is also a boundary-placement operation. The
         // ordinary repair precedes it; close near-coincident projected corners
@@ -2281,6 +2379,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     // boundary fidelity, and monotone acceptance means it cannot make any cell
     // worse than it found it.
     {
+        progress.set_phase("quality_relaxation_setup");
         constexpr double kSliverFloor = 0.01; // ~half kCellShapeFloor: cure, not polish
         constexpr int kRelaxPasses = 6;
         const auto aspect = [&](const std::array<std::uint32_t, 4>& n) {
@@ -2292,6 +2391,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         };
         std::vector<std::vector<std::uint32_t>> incident(out.mesh.nodes.size());
         for (std::size_t ti = 0; ti < out.mesh.tets.size(); ++ti) {
+            fill_progress_poll(ti, out.mesh.tets.size());
             for (const auto ni : out.mesh.tets[ti]) {
                 incident[ni].push_back(static_cast<std::uint32_t>(ti));
             }
@@ -2302,6 +2402,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             static constexpr int kTris[4][3] = {{0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}};
             std::map<std::array<std::uint32_t, 3>, int> face_use;
             for (const auto& t : out.mesh.tets) {
+                fill_progress_poll();
                 for (const auto& f : kTris) {
                     std::array<std::uint32_t, 3> key{{t[static_cast<std::size_t>(f[0])],
                                                       t[static_cast<std::size_t>(f[1])],
@@ -2310,7 +2411,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                     ++face_use[key];
                 }
             }
-            for (const auto& [key, uses] : face_use) {
+            for (std::size_t work_done = 0; const auto& [key, uses] : face_use) {
+                if (active_fill_progress != nullptr) fill_progress_poll(work_done++, face_use.size());
                 if (uses == 1) {
                     for (const auto ni : key) {
                         frozen[ni] = 1;
@@ -2324,6 +2426,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         {
             std::set<std::pair<std::uint32_t, std::uint32_t>> seen;
             for (const auto& t : out.mesh.tets) {
+                fill_progress_poll();
                 for (int i = 0; i < 4; ++i) {
                     for (int j = i + 1; j < 4; ++j) {
                         const auto a = t[static_cast<std::size_t>(i)];
@@ -2344,11 +2447,13 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         const auto worst_incident = [&](std::uint32_t ni) {
             double lo = 1.0;
             for (const auto ti : incident[ni]) {
+                fill_progress_poll();
                 lo = std::min(lo, aspect(out.mesh.tets[ti]));
             }
             return lo;
         };
         for (int pass = 0; pass < kRelaxPasses; ++pass) {
+            progress.set_phase("quality_relaxation_pass", pass + 1, kRelaxPasses);
             // Nodes of every sliver tet, deduplicated, visited in mirror-canonical
             // order. This is a Gauss-Seidel sweep on the shared node array — an
             // accepted move changes whether the next node's move improves its own
@@ -2356,6 +2461,7 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             // different predecessors here too (ADR-0036).
             std::set<std::uint32_t> target_set;
             for (const auto& t : out.mesh.tets) {
+                fill_progress_poll();
                 if (aspect(t) >= kSliverFloor) {
                     continue;
                 }
@@ -2371,7 +2477,8 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             std::vector<std::uint32_t> targets(target_set.begin(), target_set.end());
             sort_mirror_canonical(out.mesh.nodes, targets);
             std::size_t n_moved = 0;
-            for (const auto ni : targets) {
+            for (std::size_t work_done = 0; const auto ni : targets) {
+                if (active_fill_progress != nullptr) fill_progress_poll(work_done++, targets.size());
                 Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
                 for (const auto other : nbrs[ni]) {
                     centroid += out.mesh.nodes[other];
@@ -2402,7 +2509,10 @@ graded_tet_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     // Rebuild boundary quads as exterior tris padded for pipeline display
     // (quad[3]=quad[2] for pure tris is OK — pipeline may re-extract).
     // Keep original lattice quads when present; append nothing if already set.
+    progress.set_phase("quality_geometry_check");
     check_tet_fill_geometry(out.mesh);
+    progress.set_cells(out.mesh.tets.size(), out.mesh.tets.size());
+    progress.set_phase("complete");
     return out;
 }
 

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "mesh/local_refine.hpp"
+#include "mesh/fill_progress.hpp"
 
 #include "mesh/poly_mesh.hpp"
 #include "mesh/surface_project.hpp"
@@ -251,6 +252,7 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
                                 std::span<const std::size_t> marked, LocalRefineStats* stats,
                                 const geom::TriSurface* surface, const MirrorFrame* mirror,
                                 double max_sag_fraction) {
+    FillProgressElementsScope live_elements(tets);
     LocalRefineStats local_stats;
     local_stats.n_input_tets = tets.size();
     local_stats.n_marked = marked.size();
@@ -264,6 +266,7 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
 
     const std::size_t n_nodes0 = nodes.size();
     for (std::size_t e = 0; e < tets.size(); ++e) {
+        fill_progress_poll(e, tets.size());
         for (const auto idx : tets[e]) {
             if (idx >= nodes.size()) {
                 throw ValidityError(
@@ -283,6 +286,7 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
     std::unordered_set<std::size_t> remaining;
     remaining.reserve(marked.size() * 2 + 8);
     for (const auto m : marked) {
+        fill_progress_poll();
         if (m >= tets.size()) {
             throw ValidityError(std::format(
                 "local_refine_tets: marked index {} out of range ({})", m, tets.size()));
@@ -334,6 +338,7 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
     };
 
     for (std::size_t i = 0; i < tets.size(); ++i) {
+        fill_progress_poll(i, tets.size());
         link_tet(i);
     }
 
@@ -346,6 +351,7 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
         face_count.reserve(tets.size() * 2);
         static constexpr int kFaces[4][3] = {{0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}};
         for (const auto& t : tets) {
+            fill_progress_poll();
             for (const auto& fv : kFaces) {
                 ++face_count[make_free_face(t[static_cast<std::size_t>(fv[0])],
                                             t[static_cast<std::size_t>(fv[1])],
@@ -355,6 +361,7 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
         free_faces.reserve(face_count.size() / 2 + 8);
         free_edges.reserve(face_count.size());
         for (const auto& [fk, c] : face_count) {
+            fill_progress_poll();
             if (c != 1) {
                 continue;
             }
@@ -392,6 +399,7 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
                 free_edges.insert(make_edge(e.second, mid_id));
                 std::vector<FreeFaceKey> hit;
                 for (const auto& fk : free_faces) {
+                    fill_progress_poll();
                     const bool has_a =
                         (fk[0] == e.first || fk[1] == e.first || fk[2] == e.first);
                     const bool has_b =
@@ -425,9 +433,11 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
     // Each iteration bisects one terminal LEPP edge (all live sharers at once).
     const std::size_t max_iters = tets.size() * 64 + 1024 + remaining.size() * 8;
     for (std::size_t iter = 0; iter < max_iters && !remaining.empty(); ++iter) {
+        fill_progress_poll(local_stats.n_marked - remaining.size(), local_stats.n_marked);
         // Prefer lowest remaining index among still-live tets.
         std::size_t seed = static_cast<std::size_t>(-1);
-        for (const auto m : remaining) {
+        for (std::size_t work_done = 0; const auto m : remaining) {
+            if (active_fill_progress != nullptr) fill_progress_poll(work_done++, remaining.size());
             if (m < alive.size() && alive[m] &&
                 (seed == static_cast<std::size_t>(-1) || m < seed)) {
                 seed = m;
@@ -444,6 +454,7 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
         std::unordered_map<EdgeKey, int, EdgeHash> seen_edges;
         seen_edges.reserve(64);
         for (int lepp = 0; lepp < 4096; ++lepp) {
+            fill_progress_poll();
             const bool inserted = seen_edges.emplace(edge, lepp).second;
             if (!inserted) {
                 // A longest-edge walk can form a two- or three-edge cycle on an
@@ -462,6 +473,7 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
                 break;
             }
             for (const auto n : it->second) {
+                fill_progress_poll();
                 if (n >= alive.size() || !alive[n]) {
                     continue;
                 }
@@ -486,6 +498,7 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
         sharers.reserve(8);
         if (const auto it = edge_tets.find(edge); it != edge_tets.end()) {
             for (const auto n : it->second) {
+                fill_progress_poll();
                 if (n < alive.size() && alive[n] && tet_has_edge(tets[n], edge)) {
                     sharers.push_back(n);
                 }
@@ -507,6 +520,7 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
         auto children_ok = [&](const Eigen::Vector3d& pos) {
             nodes[mid] = pos;
             for (const auto i : sharers) {
+                fill_progress_poll();
                 if (i >= alive.size() || !alive[i] || !tet_has_edge(tets[i], edge)) {
                     continue;
                 }
@@ -599,6 +613,7 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
         // Copy sharers first — link/unlink mutates edge_tets lists.
         const std::vector<std::size_t> share_copy = sharers;
         for (const auto i : share_copy) {
+            fill_progress_poll();
             if (i >= alive.size() || !alive[i]) {
                 continue;
             }
@@ -639,6 +654,7 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
     std::vector<std::array<std::uint32_t, 4>> compact;
     compact.reserve(tets.size());
     for (std::size_t i = 0; i < tets.size(); ++i) {
+        fill_progress_poll(i, tets.size());
         if (alive[i]) {
             compact.push_back(tets[i]);
         }
@@ -647,6 +663,7 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
     TetFillOutput out;
     out.nodes = std::move(nodes);
     out.tets = std::move(compact);
+    FillProgressElementsScope compact_elements(out.tets);
     // boundary_quads intentionally empty — lattice skin invalid after LEB.
     out.h = 0.0;
 

@@ -63,4 +63,4 @@ __pycache__/
 
 
 # Locally acquired external meshing and solver executables
-tools/
+tools/.aicadvault/

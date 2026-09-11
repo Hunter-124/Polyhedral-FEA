@@ -29,6 +29,7 @@
 #include "mesh/cvt_export.hpp"
 #include "mesh/cvt_lloyd.hpp"
 #include "mesh/cvt_sites.hpp"
+#include "mesh/fill_progress.hpp"
 #include "mesh/geogram_clip.hpp"
 #include "mesh/grid_classify.hpp"
 #include "mesh/hex_fill.hpp"
@@ -77,7 +78,7 @@ Eigen::Vector3d triangle_normal(const geom::TriSurface& s, std::size_t t) {
 
 } // namespace
 
-Model Model::load(const std::string& path, double sharp_angle_deg) {
+Model Model::load(const std::string& path, double sharp_angle_deg, double scale) {
     Model model;
     const auto lower = [&] {
         std::string s = path;
@@ -88,26 +89,34 @@ Model Model::load(const std::string& path, double sharp_angle_deg) {
     model.source_path = path;
     const auto slash = path.find_last_of("/\\");
     model.name = slash == std::string::npos ? path : path.substr(slash + 1);
+    if (!(scale > 0.0) || !std::isfinite(scale)) {
+        throw std::runtime_error(
+            std::format("import scale must be finite and positive (got {:.6g})", scale));
+    }
 
     // CAD-only inputs (ADR-0020): STEP/BREP retain the live CadModel; the
     // tessellation is derived for regions, viewport, and legacy hybrid fill.
     // STL is no longer an accepted input — provide a STEP/BREP CAD file.
     if (lower.ends_with(".step") || lower.ends_with(".stp")) {
         model.cad = geom::CadModel::load_step(path);
-        model.surface = model.cad->tessellate();
-        model.bbox_min = model.cad->bbox_min();
-        model.bbox_max = model.cad->bbox_max();
     } else if (lower.ends_with(".brep") || lower.ends_with(".brp")) {
         model.cad = geom::CadModel::load_brep(path);
-        model.surface = model.cad->tessellate();
-        model.bbox_min = model.cad->bbox_min();
-        model.bbox_max = model.cad->bbox_max();
     } else {
         throw std::runtime_error(
             std::format("unsupported input '{}': only CAD files are accepted "
                         "(.step, .stp, .brep, .brp). STL inputs are no longer supported.",
                         path));
     }
+    // Unit conversion happens on the exact geometry, before a single derived
+    // quantity exists: the tessellation, bbox, regions and mirror frame below
+    // are all computed from the scaled BRep, so no consumer can observe a mix
+    // of authored and scaled lengths.
+    if (scale != 1.0) {
+        model.cad = model.cad->scaled(scale);
+    }
+    model.surface = model.cad->tessellate();
+    model.bbox_min = model.cad->bbox_min();
+    model.bbox_max = model.cad->bbox_max();
     model.surface.validate();
     // Reflection symmetry of the exact geometry, once per load. Detected from the
     // BRep when there is one; the tessellation path is for OCC-disabled builds,
@@ -2151,6 +2160,7 @@ std::size_t project_quadratic_boundary_mids(fea::NodalMesh& nodal_mesh,
     if (projection == nullptr || !projection->target || cad.empty() || !(h > 0.0)) {
         return 0;
     }
+    mesh::fill_progress_phase("quadratic_boundary_census");
     auto boundary_mids = quadratic_boundary_mids(nodal_mesh);
     if (boundary_mids.empty()) {
         return 0;
@@ -2186,6 +2196,7 @@ std::size_t project_quadratic_boundary_mids(fea::NodalMesh& nodal_mesh,
     }
     for (std::size_t element_index = 0; element_index < nodal_mesh.elements.size();
          ++element_index) {
+        mesh::fill_progress_poll(element_index, nodal_mesh.elements.size());
         for (const auto node : nodal_mesh.elements[element_index].nodes) {
             if (auto it = incident.find(node); it != incident.end()) {
                 it->second.push_back(element_index);
@@ -2212,7 +2223,10 @@ std::size_t project_quadratic_boundary_mids(fea::NodalMesh& nodal_mesh,
     const double volume_epsilon = 1e-14 * h * h * h;
     const double jacobian_epsilon = 1e-8 * h * h * h;
     std::size_t projected = 0;
+    mesh::fill_progress_phase("quadratic_boundary_projection");
+    std::size_t mids_done = 0;
     for (const auto& edge : boundary_mids) {
+        mesh::fill_progress_poll(mids_done++, boundary_mids.size());
         if (edge.a >= nodal_mesh.nodes.size() || edge.b >= nodal_mesh.nodes.size() ||
             edge.mid >= nodal_mesh.nodes.size()) {
             if (reverted_nodes != nullptr) {
@@ -2363,8 +2377,11 @@ std::size_t project_quadratic_boundary_mids(fea::NodalMesh& nodal_mesh,
     // a whole-cell rollback and feed those edges to the caller's h-refinement
     // fallback.
     for (int round = 0; round < 4; ++round) {
+        mesh::fill_progress_phase("quadratic_quality_pass", round + 1, 4);
+        std::size_t checked = 0;
         std::set<std::uint32_t> rollback;
         for (const auto& element : nodal_mesh.elements) {
+            mesh::fill_progress_poll(checked++, nodal_mesh.elements.size());
             const double quality = fea::cell_quality(nodal_mesh, element);
             if (fea::element_jacobians_positive(nodal_mesh, element) &&
                 std::isfinite(quality) && quality >= mesh::validity::kCellShapeFloor) {
@@ -2720,6 +2737,7 @@ relax_cells_below_shape_floor(fea::NodalMesh& mesh,
     std::vector<std::vector<std::uint32_t>> incident(mesh.nodes.size());
     std::vector<std::vector<std::uint32_t>> neighbours(mesh.nodes.size());
     for (std::size_t ei = 0; ei < mesh.elements.size(); ++ei) {
+        mesh::fill_progress_poll(ei, mesh.elements.size());
         const auto& nodes = mesh.elements[ei].nodes;
         for (const auto ni : nodes) {
             if (ni >= incident.size()) {
@@ -2755,10 +2773,12 @@ relax_cells_below_shape_floor(fea::NodalMesh& mesh,
 
     std::size_t remaining = 0;
     for (int round = 0; round < rounds; ++round) {
+        mesh::fill_progress_phase("ship_quality_pass", round + 1, rounds);
         // Ascending element index, then ascending node id: the acceptance test
         // reads the shared node array, so visit order is mutation state.
         std::vector<std::uint32_t> targets;
         for (std::size_t ei = 0; ei < mesh.elements.size(); ++ei) {
+            mesh::fill_progress_poll(ei, mesh.elements.size());
             const double q = fea::cell_quality(mesh, mesh.elements[ei]);
             if (!std::isfinite(q) || q >= floor_value) {
                 continue;
@@ -2776,7 +2796,9 @@ relax_cells_below_shape_floor(fea::NodalMesh& mesh,
             break;
         }
         bool moved_any = false;
+        std::size_t targets_done = 0;
         for (const auto ni : targets) {
+            mesh::fill_progress_poll(targets_done++, targets.size());
             Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
             for (const auto other : neighbours[ni]) {
                 centroid += mesh.nodes[other];
@@ -2800,7 +2822,10 @@ relax_cells_below_shape_floor(fea::NodalMesh& mesh,
             break;
         }
     }
+    mesh::fill_progress_phase("ship_quality_census");
+    std::size_t checked = 0;
     for (const auto& element : mesh.elements) {
+        mesh::fill_progress_poll(checked++, mesh.elements.size());
         const double q = fea::cell_quality(mesh, element);
         if (std::isfinite(q) && q < floor_value) {
             ++remaining;
@@ -2904,6 +2929,7 @@ ExteriorConformStats conform_true_exterior(
         incident.assign(mesh.nodes.size(), {});
         neighbours.assign(mesh.nodes.size(), {});
         for (std::size_t ei = 0; ei < mesh.elements.size(); ++ei) {
+            mesh::fill_progress_poll(ei, mesh.elements.size());
             const auto& nodes = mesh.elements[ei].nodes;
             for (const auto ni : nodes) {
                 if (ni >= incident.size()) {
@@ -3195,7 +3221,10 @@ ExteriorConformStats conform_true_exterior(
     const auto entry_census = mesh_quality_census();
 
     std::vector<std::uint32_t> stuck;
+    mesh::fill_progress_phase("exterior_projection");
+    std::size_t exterior_done = 0;
     for (const auto ni : exterior) {
+        mesh::fill_progress_poll(exterior_done++, exterior.size());
         const double start = free_distance(ni);
         if (start <= eps) {
             continue;
@@ -3573,7 +3602,10 @@ ExteriorConformStats conform_true_exterior(
             });
         }
         std::set<std::pair<std::uint32_t, std::uint32_t>> repaired;
+        mesh::fill_progress_phase("exterior_edge_projection");
+        std::size_t edges_done = 0;
         for (const auto& [a, b] : edge_order) {
+            mesh::fill_progress_poll(edges_done++, edge_order.size());
             if (repaired.count(std::minmax(a, b)) != 0) {
                 continue;
             }
@@ -3982,7 +4014,7 @@ void replace_geometry_volume_note(std::string& note, std::string_view stage,
                  replacement);
 }
 
-void enforce_feature_resolution(const Model& model, const VolumeMeshOutput& output,
+void enforce_feature_resolution(const Model& model, VolumeMeshOutput& output,
                                 double requested_h, double delivered_h) {
     if (!model.cad || model.cad->empty() || output.boundary_quads.empty() ||
         !(requested_h > 0.0) || !(delivered_h > 0.0)) {
@@ -4067,6 +4099,23 @@ void enforce_feature_resolution(const Model& model, const VolumeMeshOutput& outp
     bool unresolved = false;
     for (std::size_t face_id = 0; face_id < feature_face.size(); ++face_id) {
         if (!feature_face[face_id] || face_has_patch[face_id]) {
+            continue;
+        }
+        // Projection collision repair cannot preserve a separate skin across
+        // less than 5% of a fine lattice spacing. Account for that dimensional
+        // absorption explicitly, rather than demanding an impossible normal
+        // patch. Distance fidelity remains mandatory, and ordinary holes still
+        // need aligned walls. A plane's intrinsic extent excludes its normal.
+        const double absorption_limit = 0.05 * std::min(requested_h, delivered_h);
+        if (face_id < topology.faces.size() && sampled[face_id] &&
+            topology.faces[face_id].min_extent > 0.0 &&
+            topology.faces[face_id].min_extent < absorption_limit &&
+            face_distance[face_id] <= limit) {
+            output.mesher_note += std::format(
+                " | feature_absorbed face={} extent={:.6g} area={:.6g} "
+                "scale={:.6g} distance={:.6g}",
+                face_id, topology.faces[face_id].min_extent,
+                topology.faces[face_id].area, absorption_limit, face_distance[face_id]);
             continue;
         }
         unresolved = true;
@@ -4319,7 +4368,8 @@ volume_mesh_impl(const Model& model, double h, VolumeMesher mesher, int skin_lay
                  double seed_band, double element_tendency, std::size_t max_elems,
                  std::size_t max_dof, int auto_retry_budget,
                  const std::function<void()>& cancel_check,
-                 const mesh::SizeFieldFn& size_field, const MeshStageSink& on_stage) {
+                 const mesh::SizeFieldFn& size_field, const MeshStageSink& on_stage,
+                 const mesh::FillOptions& fill_options) {
     const auto poll_cancel = [&] {
         if (cancel_check) {
             cancel_check();
@@ -5210,12 +5260,24 @@ volume_mesh_impl(const Model& model, double h, VolumeMesher mesher, int skin_lay
                         fill.boundary_max_distance);
     } else if (mesher == VolumeMesher::kGradedTet) {
         std::vector<geom::SharpEdge> edges;
-        double graded_h = h;
-        const double curved_area_fraction =
-            cad_curved_area_fraction(cad_topology ? cad_topology.get() : nullptr);
-        if (curved_area_fraction >= kCurvedAreaLatticeFraction) {
-            graded_h = kCurvedLatticeScale * h;
+        // Interior Kuhn lattice: three axis, three face-diagonal and one
+        // body-diagonal unique edges per cell; median = sqrt(2) * pitch.
+        const double graded_h = h / std::sqrt(2.0);
+        // CAD geometry supplies a LOCAL size demand. A curved-area fraction or
+        // tessellated corner curvature is not a reason to halve the whole part.
+        mesh::SizeFieldFn graded_field = size_field;
+        if (cad_topology && !cad_topology->empty()) {
+            const auto geometry_field = feature_refine
+                ? build_refinement_plan(model, h, {}, true, false, 0).size_field
+                : mesh::SizeFieldFn{};
+            graded_field = [size_field, geometry_field, h](const Eigen::Vector3d& p) {
+                double target = geometry_field ? geometry_field(p) : h;
+                if (size_field) target = std::min(target, size_field(p));
+                return target;
+            };
         }
+        if (feature_refine)
+            edges = geom::detect_sharp_edges(model.surface, 30.0);
         double feature_band = 0.0;
         // Caller a-posteriori adapt seeds keep ball semantics; curvature is now
         // the per-cell turning-angle criterion inside the fill (no caps, no
@@ -5226,7 +5288,7 @@ volume_mesh_impl(const Model& model, double h, VolumeMesher mesher, int skin_lay
         double band = seed_band;
         double turn_deg = 0.0;
         std::size_t n_thin_seeds = 0;
-        if (feature_refine) {
+        if (feature_refine && !graded_field) {
             edges = geom::detect_sharp_edges(model.surface, 30.0);
             if (!edges.empty()) {
                 // Crease band ~ two bulk cells so hole rims get a clear L1/L2 shell.
@@ -5283,8 +5345,10 @@ volume_mesh_impl(const Model& model, double h, VolumeMesher mesher, int skin_lay
         }
         auto graded = mesh::graded_tet_fill_surface(
             model.surface, model.bbox_min, model.bbox_max, graded_h, std::max(1, skin_layers),
-            edges, feature_band, seeds, band, turn_deg, fit, size_field, mirror);
+            edges, feature_band, seeds, band, turn_deg, fit, graded_field, mirror, max_elems,
+            fill_options);
         fill_h = graded.h_fine;
+        out.size_floor = graded.h_coarse > graded_h * 1.001 ? graded.h_coarse : 0.0;
         out.mesh.nodes = std::move(graded.mesh.nodes);
         out.mesh.elements.reserve(graded.mesh.tets.size());
         for (const auto& tet : graded.mesh.tets) {
@@ -5318,13 +5382,7 @@ volume_mesh_impl(const Model& model, double h, VolumeMesher mesher, int skin_lay
             conf.max_distance, conf.mean_distance, budget_note,
             turn_deg > 0.0 ? std::format(", curv_turn≤{:.0f}°/cell", turn_deg) : std::string{},
             n_thin_seeds > 0 ? std::format(", thin_seeds={}", n_thin_seeds) : std::string{});
-        if (graded_h < h) {
-            out.mesher_note +=
-                std::format(" | curved-area={:.1f}% accuracy lattice h={:.4g} m "
-                            "(0.5x requested)",
-                            100.0 * curved_area_fraction, graded_h);
-        }
-        if (size_field) {
+        if (graded_field) {
             out.mesher_note += std::format(
                 " | size_field h_min={:.4g} h_max={:.4g} m, levels L0={} L1={} L2={}{}",
                 graded.field_h_min, graded.field_h_max, graded.n_level0_cells,
@@ -6109,6 +6167,11 @@ volume_mesh_impl(const Model& model, double h, VolumeMesher mesher, int skin_lay
         out.mesher_note += mirror_note();
     }
 
+    mesh::FillProgressScope pipeline_progress(fill_options);
+    pipeline_progress.set_elements(out.mesh.elements.size());
+    pipeline_progress.set_cells(0, out.mesh.elements.size());
+    pipeline_progress.set_phase("exterior_quality");
+
     // The mesher's own output, in solver types, before any pipeline-level
     // conformity/quality/compaction step touches it. Every branch above reaches
     // here, so this is the one stage every mesher emits: for all of them except
@@ -6155,6 +6218,7 @@ volume_mesh_impl(const Model& model, double h, VolumeMesher mesher, int skin_lay
     // each mesher used internally over its own intermediate zoo. Cells under
     // the floor get interior room; whatever is left is reported, never hidden.
     {
+        mesh::fill_progress_phase("ship_quality");
         const std::size_t below_floor = relax_cells_below_shape_floor(
             out.mesh, out.boundary_quads, mesh::validity::kCellShapeFloor);
         out.n_cells_below_shape_floor = below_floor;
@@ -6168,7 +6232,10 @@ volume_mesh_impl(const Model& model, double h, VolumeMesher mesher, int skin_lay
         // mesh that would abort the solve says so in its own note instead of
         // failing later with a bare error.
         std::size_t nonintegrable = 0;
+        mesh::fill_progress_phase("ship_integrability");
+        std::size_t checked = 0;
         for (const auto& element : out.mesh.elements) {
+            mesh::fill_progress_poll(checked++, out.mesh.elements.size());
             if (!fea::element_jacobians_positive(out.mesh, element)) {
                 ++nonintegrable;
             }
@@ -6186,6 +6253,7 @@ volume_mesh_impl(const Model& model, double h, VolumeMesher mesher, int skin_lay
     // scratch whenever the node numbering changes below.
     const auto& surf = model.surface;
     auto map_boundary_regions = [&] {
+        mesh::fill_progress_phase("boundary_region_mapping");
         out.boundary_node_region.clear();
         std::size_t boundary_poll = 0;
         std::set<std::uint32_t> boundary_nodes;
@@ -6193,6 +6261,7 @@ volume_mesh_impl(const Model& model, double h, VolumeMesher mesher, int skin_lay
             boundary_nodes.insert(quad.begin(), quad.end());
         }
         for (const auto node : boundary_nodes) {
+            mesh::fill_progress_poll(boundary_poll, boundary_nodes.size());
             if ((boundary_poll++ & 255U) == 0U) {
                 poll_cancel();
             }
@@ -6332,7 +6401,8 @@ volume_mesh_impl(const Model& model, double h, VolumeMesher mesher, int skin_lay
         auto retry =
             volume_mesh(model, retry_h, requested_mesher, requested_skin_layers,
                         feature_refine, refine_seeds, seed_band, element_tendency, max_elems,
-                        max_dof, auto_retry_budget - 1, cancel_check, size_field, on_stage);
+                        max_dof, auto_retry_budget - 1, cancel_check, size_field, on_stage,
+                        fill_options);
         const std::string ceiling_note =
             elem_over ? std::format("element ceiling {}, actual {}", max_elems, actual_elems)
                       : std::format("DOF ceiling {}, actual {}", max_dof, actual_dof);
@@ -6418,11 +6488,30 @@ VolumeMeshOutput volume_mesh(const Model& model, double h, VolumeMesher mesher,
                              std::size_t max_dof, int auto_retry_budget,
                              const std::function<void()>& cancel_check,
                              const mesh::SizeFieldFn& size_field,
-                             const MeshStageSink& on_stage) {
+                             const MeshStageSink& on_stage,
+                             const mesh::FillOptions& fill_options) {
     try {
         return volume_mesh_impl(model, h, mesher, skin_layers, feature_refine, refine_seeds,
                                 seed_band, element_tendency, max_elems, max_dof,
-                                auto_retry_budget, cancel_check, size_field, on_stage);
+                                auto_retry_budget, cancel_check, size_field, on_stage,
+                                fill_options);
+    } catch (const mesh::RefinementLimitError& e) {
+        if (auto_retry_budget <= 0) {
+            throw;
+        }
+        const double scale = std::cbrt(static_cast<double>(e.elements) /
+                                       static_cast<double>(e.limit));
+        const double retry_h =
+            std::nextafter(h * scale * 1.05, std::numeric_limits<double>::infinity());
+        auto retry = volume_mesh(model, retry_h, mesher, skin_layers, feature_refine,
+                                 refine_seeds, seed_band, element_tendency, max_elems,
+                                 max_dof, auto_retry_budget - 1, cancel_check, size_field,
+                                 on_stage, fill_options);
+        retry.mesher_note =
+            std::format("auto h clamped from {:.4g} to {:.4g} m "
+                        "(refinement ceiling {}, actual {}) | {}",
+                        h, retry_h, e.limit, e.elements, retry.mesher_note);
+        return retry;
     } catch (const mesh::ValidityError& e) {
         // ONLY this cause is reclassified. Every other validity failure propagates
         // unchanged, so no existing campaign row status shifts.

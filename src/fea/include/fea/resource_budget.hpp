@@ -71,6 +71,13 @@ struct EffectiveMemoryBudget {
 /// sources, use kUnknownMemoryFallbackBytes.
 [[nodiscard]] MemoryAvailability system_memory_available();
 
+/// Peak resident set size of this process, bytes — the high-water mark the
+/// operating system actually charged us, not an estimate. Linux reads
+/// `VmHWM` from /proc/self/status; Windows reads `PeakWorkingSetSize`. Returns
+/// 0 where the platform cannot report it, so a caller can tell "not measured"
+/// from "measured zero".
+[[nodiscard]] std::uint64_t peak_resident_bytes();
+
 /// Resolve max_mem_gb (decimal GB, 0 = auto) against 70% of MemAvailable.
 [[nodiscard]] EffectiveMemoryBudget effective_memory_budget(double max_mem_gb);
 

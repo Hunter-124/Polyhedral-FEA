@@ -59,6 +59,17 @@ class CadModel {
         return tessellate(deflection);
     }
 
+    /// Uniformly scaled copy of the retained BRep about the world origin.
+    ///
+    /// The single conversion point for a part authored in units other than
+    /// metres: `scaled(0.001)` turns a millimetre STEP into the metre geometry
+    /// the rest of the library assumes (see the class note above). The BRep is
+    /// deep-copied (`BRepBuilderAPI_Transform` with `Copy=true`), so the source
+    /// model — which shares its `Impl` with every other handle to it — is
+    /// untouched, and the returned model's bbox is recomputed from the scaled
+    /// shape. `factor` must be finite and positive; 1.0 returns an equal copy.
+    [[nodiscard]] CadModel scaled(double factor) const;
+
     /// Opaque OCC shape accessor for mesher code compiled with OCC.
     /// Returns nullptr when empty or without OCC.
     [[nodiscard]] const void* shape_handle() const noexcept;

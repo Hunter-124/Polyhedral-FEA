@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "mesh/feature_pin.hpp"
+#include "mesh/fill_progress.hpp"
 
 #include "geom/signal_fft.hpp"
 
@@ -143,11 +144,13 @@ FeaturePinReport pin_feature_nodes(const geom::CadModel& cad, const geom::CadTop
     // that a sharp edge would also want is correct precedence.
     std::unordered_set<std::uint32_t> claimed;
     claimed.reserve(candidates.size());
-    for (const auto& vertex : topo.vertices) {
+    for (std::size_t work_done = 0; const auto& vertex : topo.vertices) {
+        if (active_fill_progress != nullptr) fill_progress_poll(work_done++, topo.vertices.size());
         std::uint32_t best = 0;
         double best_d = 0.75 * h;
         bool found = false;
-        for (const auto ni : candidates) {
+        for (std::size_t work_done = 0; const auto ni : candidates) {
+            if (active_fill_progress != nullptr) fill_progress_poll(work_done++, candidates.size());
             if (claimed.count(ni) != 0) {
                 continue;
             }
@@ -317,7 +320,8 @@ FeaturePinReport pin_feature_nodes(const geom::CadModel& cad, const geom::CadTop
     };
     std::unordered_map<std::uint32_t, ChainPin> chain_target;
     std::size_t n_chains = 0;
-    for (const auto& edge : topo.edges) {
+    for (std::size_t work_done = 0; const auto& edge : topo.edges) {
+        if (active_fill_progress != nullptr) fill_progress_poll(work_done++, topo.edges.size());
         if (edge.feature != geom::CadEdgeFeature::kSharp || edge.samples.size() < 2) {
             continue;
         }
@@ -331,7 +335,8 @@ FeaturePinReport pin_feature_nodes(const geom::CadModel& cad, const geom::CadTop
             double t;
         };
         std::vector<Pinned> chain;
-        for (const auto ni : candidates) {
+        for (std::size_t work_done = 0; const auto ni : candidates) {
+            if (active_fill_progress != nullptr) fill_progress_poll(work_done++, candidates.size());
             if (claimed.count(ni) != 0) {
                 continue;
             }
@@ -390,7 +395,8 @@ FeaturePinReport pin_feature_nodes(const geom::CadModel& cad, const geom::CadTop
         }
 
         bool contributed = false;
-        for (const auto& pin : chain) {
+        for (std::size_t work_done = 0; const auto& pin : chain) {
+            if (active_fill_progress != nullptr) fill_progress_poll(work_done++, chain.size());
             const Eigen::Vector3d seed = polyline_point(edge.samples, stations, pin.t);
             const auto exact = geom::project_point_on_edge(cad, edge.id, seed);
             if (!exact) {
@@ -443,7 +449,8 @@ FeaturePinReport pin_feature_nodes(const geom::CadModel& cad, const geom::CadTop
     }
     // Apply in orbit groups so a validity refusal takes the whole group.
     std::unordered_set<std::uint32_t> applied;
-    for (const auto ni : candidates) {
+    for (std::size_t work_done = 0; const auto ni : candidates) {
+        if (active_fill_progress != nullptr) fill_progress_poll(work_done++, candidates.size());
         const auto target_it = chain_target.find(ni);
         if (target_it == chain_target.end() || applied.count(ni) != 0) {
             continue;
@@ -506,7 +513,8 @@ FeaturePinReport pin_feature_nodes(const geom::CadModel& cad, const geom::CadTop
     // and who owns it. This is the number the fidelity metric will report, so
     // measuring it here with the owner attached is what turns "the mesh is off
     // the CAD" into "this owner class could not be reached".
-    for (const auto ni : candidates) {
+    for (std::size_t work_done = 0; const auto ni : candidates) {
+        if (active_fill_progress != nullptr) fill_progress_poll(work_done++, candidates.size());
         const auto exact = geom::project_point_on_surface(cad, nodes[ni]);
         if (!exact || exact->distance <= report.worst_node_distance) {
             continue;

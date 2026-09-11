@@ -40,3 +40,11 @@ if(POLYMESH_OPENMP_FOUND)
     target_link_libraries(polymesh_fea PUBLIC OpenMP::OpenMP_CXX)
     target_compile_definitions(polymesh_fea PUBLIC POLYMESH_WITH_OPENMP)
 endif()
+
+# SuiteSparse CHOLMOD: supernodal Cholesky for the direct solve (see the
+# measured ladder in src/solve.cpp). PUBLIC because the compile definition
+# changes what `solver_ladder_description()` reports to callers.
+if(POLYMESH_CHOLMOD_FOUND)
+    target_link_libraries(polymesh_fea PUBLIC polymesh_cholmod)
+    target_compile_definitions(polymesh_fea PUBLIC POLYMESH_WITH_CHOLMOD)
+endif()

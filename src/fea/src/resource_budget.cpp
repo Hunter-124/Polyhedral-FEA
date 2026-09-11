@@ -6,12 +6,15 @@
 #include <format>
 #include <fstream>
 #include <limits>
+#include <sstream>
 #include <string>
+#include <string_view>
 
 #if defined(__linux__)
 #include <sys/sysinfo.h>
 #elif defined(_WIN32)
 #include <windows.h>
+#include <psapi.h>
 #endif
 
 namespace polymesh::fea {
@@ -116,6 +119,35 @@ MemoryAvailability system_memory_available() {
             .source = MemoryAvailabilitySource::kConservativeDefault};
 }
 
+std::uint64_t peak_resident_bytes() {
+#if defined(__linux__)
+    // VmHWM is the kernel's own high-water mark for this process, so it
+    // survives the free() that follows a factorization and needs no sampling
+    // loop to catch the peak. /proc/self/status mixes textual and numeric
+    // fields, so it is read a line at a time rather than word by word.
+    std::ifstream status("/proc/self/status");
+    std::string line;
+    while (std::getline(status, line)) {
+        constexpr std::string_view kKey = "VmHWM:";
+        if (line.compare(0, kKey.size(), kKey) != 0) {
+            continue;
+        }
+        std::istringstream fields(line.substr(kKey.size()));
+        std::uint64_t value_kib = 0;
+        if (fields >> value_kib) {
+            return sat_mul(value_kib, kKiB);
+        }
+        return 0;
+    }
+#elif defined(_WIN32)
+    PROCESS_MEMORY_COUNTERS counters{};
+    if (::GetProcessMemoryInfo(::GetCurrentProcess(), &counters, sizeof(counters)) != 0) {
+        return static_cast<std::uint64_t>(counters.PeakWorkingSetSize);
+    }
+#endif
+    return 0;
+}
+
 EffectiveMemoryBudget effective_memory_budget(double max_mem_gb) {
     EffectiveMemoryBudget out;
     out.available = system_memory_available();
@@ -171,11 +203,23 @@ SolveResourceEstimate estimate_solve_resources(const NodalMesh& mesh, Eigen::Ind
     const auto reduced_csr = csr_bytes(free_nnz, out.nfree);
     out.sparse_system_bytes = sat_add(global_csr, reduced_csr);
 
-    // At reduced-system construction the assembled global CSR, reduced
-    // Triplet vector, and compressed K_ff coexist.  Eigen::Triplet<double>
-    // stores one value and two default int indices (16 bytes on this ABI).
-    const auto reduced_triplets = sat_mul(free_nnz, sizeof(double) + 2 * sizeof(int));
-    out.assembly_workspace_bytes = sat_add(sat_add(global_csr, reduced_triplets), reduced_csr);
+    // Peak during assembly + reduction: the assembled global CSR, the
+    // connectivity pattern scratch that builds it, the bounded element-matrix
+    // chunk, and the compressed K_ff, all live at once. The pattern scratch is
+    // one uint32 per element node pair (a ninth of the DOF-level nonzero
+    // bound) plus two node-length offset arrays. This term used to carry a
+    // 16-byte Eigen::Triplet for every reduced nonzero instead — 36x the
+    // pattern's cost — which the fixed-pattern assembler removed.
+    const auto node_pairs = out.csr_nnz_upper / 9;
+    const auto n_nodes_u = index_as_u64(out.ndof) / 3;
+    const auto pattern_scratch =
+        sat_add(sat_mul(node_pairs, sizeof(std::uint32_t)),
+                sat_mul(sat_add(n_nodes_u, 1), 2 * sizeof(std::uint64_t)));
+    // `assemble_stiffness` sizes its element-matrix scratch to this budget.
+    constexpr std::uint64_t kAssemblyChunkBytes = 32ULL << 20;
+    out.assembly_workspace_bytes =
+        sat_add(sat_add(global_csr, pattern_scratch),
+                sat_add(kAssemblyChunkBytes, reduced_csr));
 
     const auto ndof_u = index_as_u64(out.ndof);
     const auto nfree_u = index_as_u64(out.nfree);

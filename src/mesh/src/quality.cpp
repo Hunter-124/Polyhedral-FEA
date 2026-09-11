@@ -43,15 +43,23 @@ double tet4_aspect_quality(const Eigen::Vector3d& a, const Eigen::Vector3d& b,
     if (v <= 0.0) {
         return 0.0;
     }
-    const std::array<double, 6> e{(a - b).norm(), (a - c).norm(), (a - d).norm(),
-                                  (b - c).norm(), (b - d).norm(), (c - d).norm()};
-    const double emax = *std::max_element(e.begin(), e.end());
-    if (emax <= 0.0) {
+    // Only the LONGEST edge is used, so compare SQUARED lengths and take the one
+    // square root at the end: l_max^3 = (l_max^2)^(3/2) = e2max * sqrt(e2max).
+    // Algebraically identical, five square roots fewer. This predicate is the
+    // pipeline's inner loop — the exterior-conform pass evaluates a node's whole
+    // star before and after every candidate move, and on Chudware's pin-in-bore
+    // contact ctest this function alone was 14.9% of the entire mesh+solve run,
+    // the hottest symbol in the profile.
+    const std::array<double, 6> e2{(a - b).squaredNorm(), (a - c).squaredNorm(),
+                                   (a - d).squaredNorm(), (b - c).squaredNorm(),
+                                   (b - d).squaredNorm(), (c - d).squaredNorm()};
+    const double e2max = *std::max_element(e2.begin(), e2.end());
+    if (e2max <= 0.0) {
         return 0.0;
     }
     // 6√2 V / l_max³ = 1 for the regular tet.
     constexpr double kNorm = 6.0 * 1.4142135623730951;
-    return std::min(1.0, kNorm * v / (emax * emax * emax));
+    return std::min(1.0, kNorm * v / (e2max * std::sqrt(e2max)));
 }
 
 double polygon_corner_quality(const Eigen::Vector3d& prev, const Eigen::Vector3d& corner,

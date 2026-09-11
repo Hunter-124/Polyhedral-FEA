@@ -1,5 +1,36 @@
 # PROGRESS
 
+## 2026-09-11 — CAD integration dependency release
+
+The `cad-fill-progress` branch publishes the CAD-required source update from the
+already-public `9554579` baseline without replacing the separate product-release
+history on `master`. Project-specific commentary and private commit metadata are
+not part of this source-only update.
+
+Release verification found and repaired three integration hazards:
+
+- SparseLU's status is queried only after numeric factorization; querying it
+  after symbolic analysis aborts assertion-enabled Eigen builds. The original
+  two-element direct solve reproduced that abort. It now passes, and
+  `direct_sparselu_cantilever` retains an isolated forced-LU numerical regression.
+- The complete CHOLMOD rung declaration is conditional, so strict builds without
+  SuiteSparse do not fail on an unused lambda.
+- An early graded-refinement ceiling now carries its measured count through
+  `RefinementLimitError`. Automatic sizing can use its existing bounded coarsening
+  policy; explicit sizing still refuses. The retained regression failed without
+  this catch and now preserves a unit cube's volume within a 2,000-element budget.
+
+Assertion-enabled verification passed the budget regression plus eight focused
+solver, local-refinement, protected-rim and bore-preservation cases. A real fill
+smoke also proved identical geometry with observation on/off, same-thread
+callbacks, propagated callback cancellation, and nested observer restoration.
+
+The CHOLMOD/advisor-enabled CLI also solved the STEP plate-with-hole fixture:
+31,808 quadratic tetrahedra, 146,205 free DOFs, and the supernodal direct rung.
+Every numeric array in the exported 49,176-point VTU was finite. The budget test
+file now checks refusal and delivered mesh behavior instead of incidental log
+wording; its message-only adapt case and unused setup helpers were removed.
+
 ## Active (read this first)
 
 **Current program (2026-08): the learned mesh advisor corpus/retrain program.**
@@ -332,6 +363,49 @@ GATE 1 deliverables ready:
 GATE 0 was approved by owner on 2026-07-09.
 
 ## Done
+- 2026-09-05: **`polymesh solve` made usable as a cross-check lane
+  ([docs/solver-core.md §6](solver-core.md#6-what-the-linear-solve-costs))** —
+  `solve` at h ≤ 8 mm on a 100 mm part took hours, which is why external tools
+  could not use the CLI to cross-check a real case. Four measured causes, none
+  of them the mathematics. (1) `free_dof_pattern` called
+  `entries.reserve(entries.size() + local.size()^2)` inside its element loop,
+  which defeats geometric growth and makes the *preflight* quadratic in element
+  count: **183 s of a 187 s `smoke_bar` h = 20 mm run**, now 0.02 s. (2) The
+  default CAD path solved twice — once linear, then again on the promoted
+  curved-quadratic mesh — and discarded the first answer and its ZZ recovery;
+  `solve` now reports `solves=1` when promotion is unconditional and no
+  `--adapt`/η target needs the indicator. (3) Global assembly and the Dirichlet
+  reduction both went through `Eigen::Triplet` lists (750 MB on a 52k-cell
+  tet10 mesh, twice over during the thread merge); assembly now computes the
+  block pattern from node adjacency and accumulates in place, in **chunks**
+  computed in parallel and scattered **serially in element order** — so K is
+  bit-for-bit identical on any thread count, and identical to what the old
+  merge produced. (4) `kAuto` handed everything above 50,000 free DOF to CG,
+  which on these sparsities never reached `cg_tol`. SuiteSparse CHOLMOD is now
+  an optional dependency (`POLYMESH_WITH_CHOLMOD`, auto-detected) and leads a
+  direct ladder `CholmodSupernodalLLT` → `SimplicialLDLT(AMD)` →
+  `SparseLU(COLAMD)`; `POLYMESH_FEA_DIRECT` reproduces the comparison.
+  **Measured** (`--threads 4`, Release, one process per point, peak RSS from
+  `VmHWM`): `plate_hole` h = 6 mm, 52,080 curved tet10 cells / 233,820 DOF —
+  **40.4 s total / 1.31 GiB**, of which factorization 3.46 s and meshing
+  24.8 s; the same solve on the simplicial rung is 233.8 s / 2.43 GiB
+  (**56× slower factorization**), and the shipped CG path had not finished
+  after 48 minutes. `plate_hole` h = 8 mm, 242,781 free DOF: 41.6 s / 1.44 GiB.
+  `cylinder` h = 12 mm, 145,000 cells / 628,095 DOF: 88.4 s / 5.74 GiB
+  (factorization 27.6 s). The two direct rungs agree to 3.2e-11 relative to the
+  field scale. (5) CHOLMOD's OpenMP loops nest over an OpenMP system BLAS, so
+  giving the factorization every hardware thread oversubscribes an SMT host:
+  the same factorize measures 3.46 s at 4 threads, 3.23 s at 8 and **102.83 s
+  at 12** on this 6-core/12-thread box, so the ladder now caps OpenMP at 8 and
+  restores the caller's limit afterwards. **Default invocation, no flags:
+  31.6 s total / 1.30 GiB / 4.20 s factorize** on `plate_hole` h = 6 mm, which
+  is the cross-check number external tools get. New CLI surface:
+  `--solver auto|direct|cg`, `--threads N`, and a measured `phases:` line
+  carrying per-phase wall time and peak RSS.
+  **Open:** meshing is now the largest phase, and `perf` puts 29.6% of
+  `polymesh mesh` on `plate_hole` h = 6 mm inside
+  `pipeline::conform_true_exterior` (ADR-0035 boundary conformance,
+  `edge_pass=10423 ms`), with `element_jacobians_positive` as its inner loop.
 - 2026-08-21: **GLM evaluated as a math library and rejected
   ([ADR-0044](decisions/0044-glm-cannot-be-the-math-library.md),
   [`bench/mathlib/`](../bench/mathlib/README.md))** — the question was whether

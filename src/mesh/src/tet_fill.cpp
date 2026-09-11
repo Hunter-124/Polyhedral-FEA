@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "mesh/tet_fill.hpp"
+#include "mesh/fill_progress.hpp"
 
 #include "mesh/cell_validity.hpp"
 #include "mesh/grid_classify.hpp"
@@ -34,6 +35,7 @@ double tet_signed_volume(const Eigen::Vector3d& a, const Eigen::Vector3d& b,
 
 void check_tet_fill_geometry(const TetFillOutput& out, double min_volume) {
     for (std::size_t e = 0; e < out.tets.size(); ++e) {
+        fill_progress_poll(e, out.tets.size());
         const auto& n = out.tets[e];
         for (const auto idx : n) {
             if (idx >= out.nodes.size()) {
@@ -66,6 +68,7 @@ std::vector<FreeTetFace> free_tet_faces(std::span<const std::array<std::uint32_t
     static constexpr int kTF[4][3] = {{0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}};
     std::map<std::array<std::uint32_t, 3>, std::pair<int, std::uint32_t>> census;
     for (std::size_t ti = 0; ti < tets.size(); ++ti) {
+        fill_progress_poll(ti, tets.size());
         for (const auto& f : kTF) {
             std::array<std::uint32_t, 3> key{{tets[ti][static_cast<std::size_t>(f[0])],
                                               tets[ti][static_cast<std::size_t>(f[1])],
@@ -78,6 +81,7 @@ std::vector<FreeTetFace> free_tet_faces(std::span<const std::array<std::uint32_t
     }
     std::vector<FreeTetFace> free;
     for (const auto& [key, slot] : census) {
+        fill_progress_poll();
         if (slot.first == 1) {
             free.push_back({key, slot.second});
         }
@@ -92,6 +96,7 @@ class TetGrid {
             std::span<const std::array<std::uint32_t, 4>> tets, double cell)
         : nodes_(nodes), tets_(tets), cell_(cell) {
         for (std::size_t ti = 0; ti < tets.size(); ++ti) {
+            fill_progress_poll(ti, tets.size());
             Eigen::Vector3d lo = nodes[tets[ti][0]];
             Eigen::Vector3d hi = lo;
             for (int k = 1; k < 4; ++k) {
@@ -103,6 +108,7 @@ class TetGrid {
             for (long long i = a[0]; i <= b[0]; ++i) {
                 for (long long j = a[1]; j <= b[1]; ++j) {
                     for (long long k = a[2]; k <= b[2]; ++k) {
+                        fill_progress_poll();
                         buckets_[pack(i, j, k)].push_back(static_cast<std::uint32_t>(ti));
                     }
                 }
@@ -126,6 +132,7 @@ class TetGrid {
             return SIZE_MAX;
         }
         for (const auto ti : it->second) {
+            fill_progress_poll();
             if (ti == owner) {
                 continue;
             }
@@ -186,6 +193,7 @@ buried_face_ids(std::span<const Eigen::Vector3d> nodes, const std::vector<FreeTe
                 const TetGrid& grid) {
     std::vector<std::pair<std::size_t, std::size_t>> out;
     for (std::size_t fi = 0; fi < free.size(); ++fi) {
+        fill_progress_poll(fi, free.size());
         const auto& f = free[fi];
         const Eigen::Vector3d c =
             (nodes[f.nodes[0]] + nodes[f.nodes[1]] + nodes[f.nodes[2]]) / 3.0;
@@ -238,12 +246,14 @@ std::size_t pull_buried_free_faces(std::vector<Eigen::Vector3d>& nodes,
     const auto free = free_tet_faces(tets);
     std::unordered_map<std::uint32_t, std::vector<std::uint32_t>> star;
     for (std::size_t ti = 0; ti < tets.size(); ++ti) {
+        fill_progress_poll(ti, tets.size());
         for (const auto ni : tets[ti]) {
             star[ni].push_back(static_cast<std::uint32_t>(ti));
         }
     }
     const auto star_ok = [&](std::uint32_t ni) {
         for (const auto ti : star[ni]) {
+            fill_progress_poll();
             const auto& t = tets[ti];
             if (tet_signed_volume_impl(nodes[t[0]], nodes[t[1]], nodes[t[2]], nodes[t[3]]) <=
                 0.0) {
@@ -267,6 +277,7 @@ std::size_t pull_buried_free_faces(std::vector<Eigen::Vector3d>& nodes,
         Eigen::Vector3d target = Eigen::Vector3d::Zero();
         std::size_t n_used = 0;
         for (const auto ti : star[ni]) {
+            fill_progress_poll();
             for (const auto o : tets[ti]) {
                 target += nodes[o];
                 ++n_used;
@@ -282,6 +293,7 @@ std::size_t pull_buried_free_faces(std::vector<Eigen::Vector3d>& nodes,
         return target;
     };
     for (int iter = 0; iter < max_iters; ++iter) {
+        fill_progress_phase("quality_overlap_pull_pass", iter + 1, max_iters);
         const TetGrid grid(nodes, tets, h);
         const auto buried = buried_face_ids(nodes, free, grid);
         if (buried.empty()) {
@@ -289,6 +301,7 @@ std::size_t pull_buried_free_faces(std::vector<Eigen::Vector3d>& nodes,
         }
         bool any_moved = false;
         for (const auto& [fi, buryer] : buried) {
+            fill_progress_poll();
             for (const auto ni : free[fi].nodes) {
                 std::vector<std::uint32_t> group{ni};
                 if (orbit.active()) {

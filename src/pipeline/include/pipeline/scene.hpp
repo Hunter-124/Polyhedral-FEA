@@ -11,6 +11,7 @@
 #include "geom/cad_model.hpp"
 #include "geom/cad_topology.hpp"
 #include "geom/tri_surface.hpp"
+#include "mesh/hybrid_fill.hpp"
 #include "mesh/mixed_fill.hpp"
 #include "mesh/surface_project.hpp"
 
@@ -126,7 +127,15 @@ struct Model {
     /// and once more in the curved promotion.
     mesh::MirrorFrame mirror;
 
-    static Model load(const std::string& path, double sharp_angle_deg = 30.0);
+    /// Import a CAD part. `scale` is a uniform factor applied to the exact
+    /// geometry immediately after the STEP/BREP read and before anything is
+    /// derived from it, so the tessellation, bbox, region growing and mirror
+    /// frame all describe the scaled part and every downstream length (h, BC
+    /// boxes, exported coordinates) is in scaled units. The library works in
+    /// metres, so a millimetre STEP is imported with `scale = 0.001`.
+    /// Must be finite and positive; 1.0 (the default) imports as authored.
+    static Model load(const std::string& path, double sharp_angle_deg = 30.0,
+                      double scale = 1.0);
 };
 
 /// A force applied to a region: total force vector in newtons.
@@ -584,6 +593,8 @@ struct VolumeMeshOutput {
     std::string mesher_note;
     /// Effective linear edge scale used by exact curved-boundary projection.
     double geometry_h = 0.0;
+    /// Background lattice floor actually imposed by the allocation budget.
+    double size_floor = 0.0;
     /// Cells still under `mesh::validity::kCellShapeFloor` after the ship gate
     /// relaxation, measured with `fea::cell_quality` on the emitted mesh.
     std::size_t n_cells_below_shape_floor = 0;
@@ -652,13 +663,16 @@ inline constexpr std::array<std::string_view, 10> kMeshStageNames{
 /// knows nothing of adapt passes; `SolveJob` stamps it. A fill that hits the
 /// element/DOF ceiling and coarsens is a second fill, so its stage indices
 /// restart at 0 after the abandoned attempt's stages.
+/// @param fill_options Lightweight live graded-fill observer, independent of
+/// on_stage mesh snapshots; forwarded unchanged through auto-h retries.
 VolumeMeshOutput
 volume_mesh(const Model& model, double h, VolumeMesher mesher = VolumeMesher::kHybrid,
             int skin_layers = 2, bool feature_refine = false,
             std::span<const Eigen::Vector3d> refine_seeds = {}, double seed_band = 0.0,
             double element_tendency = 0.0, std::size_t max_elems = 0, std::size_t max_dof = 0,
             int auto_retry_budget = 0, const std::function<void()>& cancel_check = {},
-            const mesh::SizeFieldFn& size_field = {}, const MeshStageSink& on_stage = {});
+            const mesh::SizeFieldFn& size_field = {}, const MeshStageSink& on_stage = {},
+            const mesh::FillOptions& fill_options = {});
 
 /// Refresh the solved-stage assessment after the final order elevation and CAD
 /// mid-node projection. Replaces its prior mesher-note token and enforces the

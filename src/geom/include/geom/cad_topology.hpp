@@ -57,6 +57,10 @@ struct CadFace {
     std::uint32_t id = 0;
     CadSurfaceKind kind = CadSurfaceKind::kOther;
     double area = 0.0;
+    /// Smallest intrinsic extent of the exact trimmed face's oriented bounds.
+    /// For planes, excludes the zero-thickness normal direction.
+    /// Infinity means unavailable; such a face must not be absorbed by a mesh.
+    double min_extent = std::numeric_limits<double>::infinity();
     std::vector<std::uint32_t> edge_ids;
     /// Sample points strictly inside the trimmed face, in model coordinates
     /// (metres): the face's TopLoc_Location is applied. Empty for kPlane (a

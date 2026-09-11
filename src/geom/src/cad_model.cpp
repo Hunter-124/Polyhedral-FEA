@@ -15,6 +15,7 @@
 
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepBndLib.hxx>
+#include <BRepBuilderAPI_Transform.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepClass_FaceClassifier.hxx>
 #include <BRepExtrema_DistShapeShape.hxx>
@@ -205,6 +206,38 @@ TriSurface CadModel::tessellate(double deflection, double angular_deflection) co
     TriSurface surface = detail::weld(soup);
     surface.validate();
     return surface;
+}
+
+CadModel CadModel::scaled(double factor) const {
+    if (!(factor > 0.0) || !std::isfinite(factor)) {
+        throw GeomError(std::format("CadModel::scaled: factor must be finite and positive "
+                                    "(got {:.6g})",
+                                    factor));
+    }
+    CadModel out;
+    out.name_ = name_;
+    if (empty()) {
+        out.impl_ = impl_;
+        out.bbox_min_ = bbox_min_ * factor;
+        out.bbox_max_ = bbox_max_ * factor;
+        return out;
+    }
+    gp_Trsf trsf;
+    trsf.SetScale(gp_Pnt(0.0, 0.0, 0.0), factor);
+    BRepBuilderAPI_Transform transform(impl_->shape, trsf, /*Copy=*/Standard_True);
+    if (!transform.IsDone()) {
+        throw GeomError(std::format("CadModel::scaled: transform by {:.6g} failed", factor));
+    }
+    const TopoDS_Shape shape = transform.Shape();
+    if (shape.IsNull()) {
+        throw GeomError(
+            std::format("CadModel::scaled: transform by {:.6g} produced an empty shape",
+                        factor));
+    }
+    out.impl_ = std::make_shared<Impl>();
+    out.impl_->shape = shape;
+    fill_bbox(out.impl_->shape, out.bbox_min_, out.bbox_max_);
+    return out;
 }
 
 const void* CadModel::shape_handle() const noexcept {
@@ -1016,6 +1049,22 @@ double CadModel::bbox_diagonal() const noexcept { return (bbox_max_ - bbox_min_)
 
 TriSurface CadModel::tessellate(double /*deflection*/, double /*angular_deflection*/) const {
     throw GeomError("OpenCASCADE not enabled");
+}
+
+CadModel CadModel::scaled(double factor) const {
+    // No BRep exists in this build, so there is nothing to transform; only the
+    // stored (zero) bbox scales. Rejecting a bad factor stays identical.
+    if (!(factor > 0.0) || !std::isfinite(factor)) {
+        throw GeomError(std::format("CadModel::scaled: factor must be finite and positive "
+                                    "(got {:.6g})",
+                                    factor));
+    }
+    CadModel out;
+    out.name_ = name_;
+    out.impl_ = impl_;
+    out.bbox_min_ = bbox_min_ * factor;
+    out.bbox_max_ = bbox_max_ * factor;
+    return out;
 }
 
 const void* CadModel::shape_handle() const noexcept { return nullptr; }

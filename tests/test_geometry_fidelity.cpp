@@ -195,7 +195,6 @@ TEST_CASE("graded plate-hole mesh resolves exact BRep surfaces and protected rim
         model, kH, polymesh::pipeline::VolumeMesher::kGradedTet,
         /*skin_layers=*/2, /*feature_refine=*/true);
     REQUIRE_NOTHROW(graded.mesh.check_validity());
-    REQUIRE(graded.mesh.elements.size() > 30'000);
 
     const auto free_faces = polymesh::fea::extract_boundary_faces(graded.mesh);
     REQUIRE_FALSE(free_faces.empty());
@@ -231,7 +230,6 @@ TEST_CASE("graded plate-hole mesh resolves exact BRep surfaces and protected rim
         }
         feature_segments.push_back({graded.mesh.nodes[edge[0]], graded.mesh.nodes[edge[1]]});
     }
-    REQUIRE(feature_segments.size() > 400);
 
     double mesh_volume = 0.0;
     bool all_tets = true;

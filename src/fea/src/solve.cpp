@@ -6,12 +6,21 @@
 
 #include <Eigen/IterativeLinearSolvers>
 #include <Eigen/SparseCholesky>
+#include <Eigen/SparseLU>
+#if defined(POLYMESH_WITH_CHOLMOD)
+// Eigen::CholmodSupernodalLLT — SuiteSparse's BLAS3 supernodal Cholesky.
+#include <Eigen/CholmodSupport>
+#endif
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <format>
+#include <functional>
 #include <limits>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -61,7 +70,8 @@ SolveDecision decide_solve_method(Eigen::Index nfree, const SolveOptions& option
         estimate.cg_peak_bytes <= effective_cap_bytes) {
         decision.method = SolveMethod::kCG;
         decision.note =
-            std::format("memory budget: LDLT estimate {} exceeds cap {}; using CG estimate {}",
+            std::format("memory budget: direct-factor estimate {} exceeds cap {}; "
+                        "using CG estimate {}",
                         format_memory_bytes(estimate.direct_peak_bytes),
                         format_memory_bytes(effective_cap_bytes),
                         format_memory_bytes(estimate.cg_peak_bytes));
@@ -132,7 +142,14 @@ struct CgAttempt {
 struct ReducedSolveResult {
     Eigen::VectorXd u;
     SolveCostMeasured cost;
+    SolvePhaseTimings phases;
 };
+
+using SolveClock = std::chrono::steady_clock;
+
+double elapsed_ms(SolveClock::time_point since) {
+    return std::chrono::duration<double, std::milli>(SolveClock::now() - since).count();
+}
 
 
 std::string_view cg_stop_text(CgStop stop) {
@@ -281,6 +298,7 @@ ReducedSolveResult solve_reduced(const Eigen::SparseMatrix<double>& kff,
                                  const SolveCostEstimate& symbolic_cost) {
     const Eigen::Index nfree = kff.rows();
     const SolveMethod method = select_solve_method(nfree, options);
+    SolvePhaseTimings phases;
 
     if (method == SolveMethod::kCG) {
         const int max_iters = cg_iteration_budget(nfree, options);
@@ -308,6 +326,7 @@ ReducedSolveResult solve_reduced(const Eigen::SparseMatrix<double>& kff,
         Eigen::VectorXd scaling; // empty = not equilibrated
         Eigen::SparseMatrix<double> kff_hat;
         Eigen::VectorXd rhs_hat;
+        const auto equilibrate_start = SolveClock::now();
         try {
             scaling = symmetric_diagonal_scaling(kff);
             kff_hat = kff; // same sparsity pattern; values equilibrated in one pass
@@ -325,6 +344,7 @@ ReducedSolveResult solve_reduced(const Eigen::SparseMatrix<double>& kff,
                                   "solving the unscaled system",
                                   e.what()));
         }
+        phases.analyze_ms += elapsed_ms(equilibrate_start);
         const bool equilibrated = scaling.size() > 0;
         const Eigen::SparseMatrix<double>& a = equilibrated ? kff_hat : kff;
         const Eigen::VectorXd& b = equilibrated ? rhs_hat : rhs;
@@ -341,8 +361,10 @@ ReducedSolveResult solve_reduced(const Eigen::SparseMatrix<double>& kff,
             emit_note(std::format("CG using {} (target tol={}, acceptance tol={}, "
                                   "max iterations={})",
                                   name, options.cg_tol, options.cg_accept_tol, max_iters));
+            const auto attempt_start = SolveClock::now();
             CgAttempt attempt = run_cg(a, b, preconditioner, options.cg_tol, max_iters,
                                        report_every, options.on_progress);
+            phases.factorize_ms += elapsed_ms(attempt_start);
             total_iterations += attempt.iterations;
             if (equilibrated) {
                 // The honesty contract measures the physical system: unscale
@@ -466,17 +488,178 @@ ReducedSolveResult solve_reduced(const Eigen::SparseMatrix<double>& kff,
             static_cast<double>(measured.cg_iterations) * symbolic_cost.cg_flops_per_iter;
         measured.bytes =
             static_cast<double>(measured.cg_iterations) * symbolic_cost.cg_bytes_per_iter;
-        return {.u = std::move(selected_attempt.x), .cost = std::move(measured)};
+        return {.u = std::move(selected_attempt.x),
+                .cost = std::move(measured),
+                .phases = phases};
     }
 
-    Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> ldlt(kff);
-    if (ldlt.info() != Eigen::Success) {
-        throw FeaError("solve_elastostatics: factorization failed — system is singular "
-                       "(insufficient constraints?)");
+    // Direct ladder. K_ff for linear elastostatics with enough constraints to
+    // remove the rigid-body modes is symmetric positive definite, so the right
+    // tool is a Cholesky-family factorization, and *which* Cholesky is not a
+    // matter of taste. Measured on this project's own fixtures (see
+    // docs/solver-core.md §6 for the full table):
+    //
+    //   plate_hole h=6 mm, 231,849 free DOF curved tet10, 4 threads
+    //     CholmodSupernodalLLT     3.46 s factorize, 1.31 GiB peak
+    //     SimplicialLDLT(AMD)    193.66 s factorize, 2.43 GiB peak
+    //     ichol-preconditioned CG  did not reach cg_tol=1e-8 in over an hour
+    //
+    // A scalar simplicial factorization never amortizes its fill into dense
+    // supernodes, so on a quadratic 3-D mesh it loses to the supernodal
+    // factorization on BOTH time and memory. Do not re-order these rungs on
+    // the "LDLT is lighter than an LU" rule of thumb: that is true against
+    // SparseLU and irrelevant next to a BLAS3 supernodal factorization.
+    //
+    // SparseLU is last and exists only for a genuinely indefinite reduced
+    // matrix, where partial pivoting is the only thing that can carry it.
+    //
+    // Threads are capped for the factorization only. CHOLMOD's own OpenMP
+    // loops call an OpenMP system BLAS, so two nested pools sized to every
+    // hardware thread oversubscribe badly on an SMT host. Measured on the same
+    // plate at h = 6 mm (6 physical cores / 12 SMT threads): 3.46 s at 4
+    // threads, 9.70 s at 6, 3.23 s at 8, and 102.83 s at 12 — a 30x penalty
+    // for using every thread. The cap is applied around the ladder and the
+    // previous limit restored afterwards, so the mesher and the recovery keep
+    // whatever the caller asked for.
+    constexpr int kMaxFactorizationThreads = 8;
+    const int caller_threads = openmp_max_threads();
+    const bool cap_threads = caller_threads > kMaxFactorizationThreads;
+    if (cap_threads) {
+        set_openmp_threads(kMaxFactorizationThreads);
     }
-    const Eigen::VectorXd uf = ldlt.solve(rhs);
-    if (ldlt.info() != Eigen::Success) {
-        throw FeaError("solve_elastostatics: back-substitution failed");
+    struct ThreadLimitRestore {
+        bool active;
+        int previous;
+        ~ThreadLimitRestore() {
+            if (active) {
+                set_openmp_threads(previous);
+            }
+        }
+    } restore_threads{cap_threads, caller_threads};
+    auto emit_note = [&](std::string note) {
+        if (options.on_note) {
+            options.on_note(note);
+        }
+    };
+    std::vector<std::string> rungs;
+    Eigen::VectorXd uf;
+    std::string factorization;
+
+    const auto try_rung = [&](std::string_view label, auto&& factorize) {
+        if (!factorization.empty()) {
+            return;
+        }
+        SolvePhaseTimings attempt;
+        if (factorize(attempt, uf)) {
+            factorization = label;
+            phases.analyze_ms += attempt.analyze_ms;
+            phases.factorize_ms += attempt.factorize_ms;
+            phases.backsolve_ms += attempt.backsolve_ms;
+            return;
+        }
+        // A failed rung's time is real time spent and stays in the account.
+        phases.analyze_ms += attempt.analyze_ms;
+        phases.factorize_ms += attempt.factorize_ms;
+        rungs.emplace_back(label);
+        emit_note(std::format("direct solve: {} failed on this system; trying the next rung",
+                              label));
+    };
+
+    // One shape for every rung: symbolic analysis, numeric factorization, one
+    // triangular back-substitution, each timed separately so the phase table
+    // shows where a direct solve actually spends its seconds.
+    const auto run = [&kff, &rhs](auto& solver, SolvePhaseTimings& attempt,
+                                  Eigen::VectorXd& out) {
+        const auto analyze_start = SolveClock::now();
+        solver.analyzePattern(kff);
+        attempt.analyze_ms = elapsed_ms(analyze_start);
+        // SparseLU initializes its status only in factorize(), unlike the
+        // Cholesky solvers. Querying it after analysis asserts in Eigen.
+        using Solver = std::remove_cvref_t<decltype(solver)>;
+        if constexpr (!std::is_same_v<Solver,
+                                     Eigen::SparseLU<Eigen::SparseMatrix<double>>>) {
+            if (solver.info() != Eigen::Success) {
+                return false;
+            }
+        }
+        const auto factorize_start = SolveClock::now();
+        solver.factorize(kff);
+        attempt.factorize_ms = elapsed_ms(factorize_start);
+        if (solver.info() != Eigen::Success) {
+            return false;
+        }
+        const auto backsolve_start = SolveClock::now();
+        Eigen::VectorXd solved = solver.solve(rhs);
+        attempt.backsolve_ms = elapsed_ms(backsolve_start);
+        if (solver.info() != Eigen::Success || !solved.allFinite()) {
+            return false;
+        }
+        out = std::move(solved);
+        return true;
+    };
+
+    // Rung order. The canonical order is supernodal → simplicial → LU, and
+    // POLYMESH_FEA_DIRECT=cholmod|ldlt|lu promotes one rung to the front so the
+    // measured comparison table above is reproducible from a shipped build
+    // without recompiling. An unknown value is ignored (canonical order), and
+    // requesting `cholmod` in a build without SuiteSparse simply has no rung to
+    // promote. The remaining rungs still act as fallbacks in canonical order,
+    // so forcing a rung can never turn a solvable system into a failure.
+#if defined(POLYMESH_WITH_CHOLMOD)
+    const auto cholmod_rung = [&](SolvePhaseTimings& attempt, Eigen::VectorXd& out) {
+        Eigen::CholmodSupernodalLLT<Eigen::SparseMatrix<double>> chol;
+        return run(chol, attempt, out);
+    };
+#endif
+    const auto ldlt_rung = [&](SolvePhaseTimings& attempt, Eigen::VectorXd& out) {
+        Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> ldlt;
+        return run(ldlt, attempt, out);
+    };
+    const auto lu_rung = [&](SolvePhaseTimings& attempt, Eigen::VectorXd& out) {
+        Eigen::SparseLU<Eigen::SparseMatrix<double>> lu;
+        return run(lu, attempt, out);
+    };
+    struct Rung {
+        std::string_view label;
+        std::function<bool(SolvePhaseTimings&, Eigen::VectorXd&)> factorize;
+    };
+    std::vector<Rung> ladder;
+    ladder.reserve(3);
+#if defined(POLYMESH_WITH_CHOLMOD)
+    ladder.push_back({"CholmodSupernodalLLT", cholmod_rung});
+#endif
+    ladder.push_back({"SimplicialLDLT(AMD)", ldlt_rung});
+    ladder.push_back({"SparseLU(COLAMD)", lu_rung});
+    if (const char* requested = std::getenv("POLYMESH_FEA_DIRECT"); requested != nullptr) {
+        const std::string_view want = requested;
+        const auto matches = [&](std::string_view label) {
+            return (want == "cholmod" && label.starts_with("Cholmod")) ||
+                   (want == "ldlt" && label.starts_with("Simplicial")) ||
+                   (want == "lu" && label.starts_with("SparseLU"));
+        };
+        const auto it = std::find_if(ladder.begin(), ladder.end(),
+                                     [&](const Rung& r) { return matches(r.label); });
+        if (it != ladder.end()) {
+            std::rotate(ladder.begin(), it, it + 1);
+            emit_note(std::format("direct solve: POLYMESH_FEA_DIRECT={} leads the ladder",
+                                  want));
+        }
+    }
+    for (const auto& rung : ladder) {
+        try_rung(rung.label, rung.factorize);
+    }
+
+    if (factorization.empty()) {
+        throw FeaError(std::format(
+            "solve_elastostatics: factorization failed — system is singular "
+            "(insufficient constraints?); rungs tried: [{}]",
+            join_attempts(rungs)));
+    }
+    if (!rungs.empty()) {
+        emit_note(std::format("direct solve: {} produced the answer after [{}]", factorization,
+                              join_attempts(rungs)));
+    } else {
+        emit_note(std::format("direct solve: {}", factorization));
     }
     SolveCostMeasured measured;
     measured.method = "direct";
@@ -484,7 +667,7 @@ ReducedSolveResult solve_reduced(const Eigen::SparseMatrix<double>& kff,
     measured.flops =
         symbolic_cost.factor_flops + 4.0 * static_cast<double>(symbolic_cost.factor_nnz);
     measured.bytes = estimate_direct_solve_bytes(symbolic_cost);
-    return {.u = uf, .cost = std::move(measured)};
+    return {.u = std::move(uf), .cost = std::move(measured), .phases = phases};
 }
 
 } // namespace
@@ -494,6 +677,7 @@ LinearSolveResult solve_elastostatics(const NodalMesh& mesh, const Material& mat
                                       const Eigen::VectorXd& loads,
                                       const SolveOptions& options,
                                     const LinearConstraints* constraints) {
+    const auto call_start = SolveClock::now();
     const Eigen::Index ndof = 3 * static_cast<Eigen::Index>(mesh.nodes.size());
     if (loads.size() != ndof) {
         throw FeaError(std::format("solve_elastostatics: load vector size {} != 3N = {}",
@@ -555,7 +739,8 @@ LinearSolveResult solve_elastostatics(const NodalMesh& mesh, const Material& mat
             std::format("solve_elastostatics: estimated {} solve footprint {} exceeds "
                         "effective memory cap "
                         "{} (limiting term: {}); raise --max-mem <GB> or free system memory",
-                        direct ? "LDLT" : "CG", format_memory_bytes(decision.estimated_bytes),
+                        direct ? "direct" : "CG",
+                        format_memory_bytes(decision.estimated_bytes),
                         format_memory_bytes(budget.effective_cap_bytes),
                         limiting_resource_term(estimate, direct)));
     }
@@ -563,7 +748,12 @@ LinearSolveResult solve_elastostatics(const NodalMesh& mesh, const Material& mat
         if (!decision.note.empty()) {
             options.on_note(decision.note);
         } else if (decision.method == SolveMethod::kDirect) {
-            options.on_note(std::format("direct LDLT selected for {} free DOFs", nfree));
+            // The concrete rung is reported by the ladder itself once it has
+            // run; this note is the budget decision, so it names neither.
+            options.on_note(std::format(
+                "direct solve selected for {} free DOFs (estimated footprint {}, cap {})",
+                nfree, format_memory_bytes(decision.estimated_bytes),
+                format_memory_bytes(budget.effective_cap_bytes)));
         }
     }
     init_runtime_performance();
@@ -584,7 +774,11 @@ LinearSolveResult solve_elastostatics(const NodalMesh& mesh, const Material& mat
         system_dirichlet.emplace(original_to_system[static_cast<std::size_t>(dof)], value);
     }
 
+    const double preflight_ms = elapsed_ms(call_start);
+    const auto assemble_start = SolveClock::now();
     auto k = assemble_stiffness(mesh, material);
+    const double assemble_ms = elapsed_ms(assemble_start);
+    const auto reduce_start = SolveClock::now();
     Eigen::SparseMatrix<double> k_system;
     Eigen::VectorXd f_system;
     if (has_linear_constraints) {
@@ -614,26 +808,71 @@ LinearSolveResult solve_elastostatics(const NodalMesh& mesh, const Material& mat
             rhs[r] = f_system[dof];
         }
     }
-    std::vector<Eigen::Triplet<double>> triplets;
-    for (int outer = 0; outer < k_system.outerSize(); ++outer) {
+    // K_ff is a SELECTION of K_system's entries, not a sum of them, so it is
+    // built straight into compressed storage: one pass to count the surviving
+    // entries per free column and to fold the prescribed columns into the rhs,
+    // one pass to copy. The Triplet vector this replaces cost 16 bytes per
+    // surviving nonzero plus a full counting sort, for a matrix whose rows
+    // were already in ascending order per column.
+    Eigen::SparseMatrix<double> kff(reduced_count, reduced_count);
+    std::vector<int> column_counts(static_cast<std::size_t>(reduced_count) + 1, 0);
+    std::uint64_t kept = 0;
+    for (Eigen::Index outer = 0; outer < k_system.outerSize(); ++outer) {
+        const auto col = reduced[static_cast<std::size_t>(outer)];
         for (Eigen::SparseMatrix<double>::InnerIterator it(k_system, outer); it; ++it) {
             const auto row = reduced[static_cast<std::size_t>(it.row())];
-            const auto col = reduced[static_cast<std::size_t>(it.col())];
-            if (row >= 0 && col >= 0) {
-                triplets.emplace_back(row, col, it.value());
-            } else if (row >= 0 && col < 0) {
-                rhs[row] -= it.value() * system_dirichlet.at(it.col());
+            if (row < 0) {
+                continue;
+            }
+            if (col >= 0) {
+                ++column_counts[static_cast<std::size_t>(col) + 1];
+                ++kept;
+            } else {
+                rhs[row] -= it.value() * system_dirichlet.at(outer);
             }
         }
     }
-    Eigen::SparseMatrix<double> kff(reduced_count, reduced_count);
-    kff.setFromTriplets(triplets.begin(), triplets.end());
+    if (kept > static_cast<std::uint64_t>(std::numeric_limits<int>::max())) {
+        throw FeaError(std::format(
+            "solve_elastostatics: {} reduced-system nonzeros exceed the {} that Eigen's "
+            "int sparse index can address; coarsen the mesh",
+            kept, std::numeric_limits<int>::max()));
+    }
+    kff.resizeNonZeros(static_cast<Eigen::Index>(kept));
+    {
+        int* const kff_outer = kff.outerIndexPtr();
+        int* const kff_inner = kff.innerIndexPtr();
+        double* const kff_values = kff.valuePtr();
+        for (std::size_t c = 0; c < static_cast<std::size_t>(reduced_count); ++c) {
+            column_counts[c + 1] += column_counts[c];
+            kff_outer[c] = column_counts[c];
+        }
+        kff_outer[static_cast<std::size_t>(reduced_count)] = static_cast<int>(kept);
+        for (Eigen::Index outer = 0; outer < k_system.outerSize(); ++outer) {
+            const auto col = reduced[static_cast<std::size_t>(outer)];
+            if (col < 0) {
+                continue;
+            }
+            auto at = column_counts[static_cast<std::size_t>(col)];
+            for (Eigen::SparseMatrix<double>::InnerIterator it(k_system, outer); it; ++it) {
+                const auto row = reduced[static_cast<std::size_t>(it.row())];
+                if (row < 0) {
+                    continue;
+                }
+                kff_inner[at] = static_cast<int>(row);
+                kff_values[at] = it.value();
+                ++at;
+            }
+        }
+    }
+    const double reduce_ms = elapsed_ms(reduce_start);
 
     // The allocation-free preflight above uses the post-constraint free count;
     // kAuto may downgrade LDLT to CG when only the iterative footprint fits.
     ReducedSolveResult reduced_solve =
         solve_reduced(kff, rhs, selected_options, symbolic_cost);
 
+    const auto recover_start = SolveClock::now();
     Eigen::VectorXd u_system(system_dofs);
     for (Eigen::Index dof = 0; dof < system_dofs; ++dof) {
         const auto r = reduced[static_cast<std::size_t>(dof)];
@@ -641,7 +880,14 @@ LinearSolveResult solve_elastostatics(const NodalMesh& mesh, const Material& mat
     }
     Eigen::VectorXd u = has_linear_constraints ? constraints->recover(u_system, ndof)
                                                : std::move(u_system);
-    return {.u = std::move(u), .cost = std::move(reduced_solve.cost)};
+
+    SolvePhaseTimings phases = reduced_solve.phases;
+    phases.preflight_ms = preflight_ms;
+    phases.assemble_ms = assemble_ms;
+    phases.reduce_ms = reduce_ms;
+    phases.backsolve_ms += elapsed_ms(recover_start);
+    phases.total_ms = elapsed_ms(call_start);
+    return {.u = std::move(u), .cost = std::move(reduced_solve.cost), .phases = phases};
 }
 
 double strain_energy(const NodalMesh& mesh, const Material& material,

@@ -15,6 +15,7 @@
 #include "fea/material.hpp"
 #include "fea/msh.hpp"
 #include "fea/p_elevate.hpp"
+#include "fea/resource_budget.hpp"
 #include "fea/solve.hpp"
 #include "fea/traction.hpp"
 #include "fea/vtu.hpp"
@@ -58,29 +59,31 @@ int usage() {
         "usage: polymesh <command> [args]\n"
         "\n"
         "commands:\n"
-        "  check <part.step|.brep>    validate CAD geometry\n"
-        "  mesh  <part> [-h m] [-o out.vtu] [--mesher name] [--skin n]\n"
+        "  check <part.step|.brep> [--scale f]\n"
+        "                             validate CAD geometry\n"
+        "  mesh  <part> [-h m] [-o out.vtu] [--mesher name] [--skin n] [--scale f]\n"
         "              [--no-feature] [--element-tendency t] [--no-spectral]\n"
         "              [--max-elems N] [--max-dof N]\n"
         "              [--fix-box x0 y0 z0 x1 y1 z1] [--load-box x0 y0 z0 x1 y1 z1]\n"
         "                             geometry+BC-aware volume mesh; optional VTU\n"
-        "  solve <part.step|.brep|.msh> -o out.vtu [-h m] [-E Pa] [-nu r]\n"
+        "  solve <part.step|.brep|.msh> -o out.vtu [-h m] [-E Pa] [-nu r] [--scale f]\n"
         "              [--mesher name] [--skin n] [--no-feature] [--adapt n]\n"
         "              [--eta-target η] [--no-curved] [--p-elevate-uniform]\n"
         "              [--element-tendency t] [--no-spectral]\n"
         "              [--max-elems N] [--max-dof N] [--max-mem GB]\n"
         "              [--fix-box ...6] [--load-box ...6] [--bc-grade]\n"
         "              [--load-dir x y z] [--force N] [--traction Pa]\n"
+        "              [--solver auto|direct|cg] [--threads N]\n"
         "              [--advisor <model_dir>] [--advisor-objective accuracy|efficiency]\n"
         "                             CAD: mesh + BCs + VTU; Gmsh: solve the imported\n"
         "                             volume mesh directly. Default BCs fix min-x and\n"
         "                             load max-x; boxes override selection.\n"
-        "  diag  <part> [-h m] [--mesher name] [--json out.json] [--no-solve]\n"
-        "              [--max-elems N] [--max-dof N] [--max-mem GB]\n"
+        "  diag  <part> [-h m] [-E Pa] [-nu r] [--mesher name] [--json out.json] [--no-solve]\n"
+        "              [--scale f] [--max-elems N] [--max-dof N] [--max-mem GB]\n"
         "              [--fix-box ...6] [--load-box ...6]\n"
         "              [--load-dir x y z] [--force N] [--traction Pa]\n"
         "                             JSON diagnostics: fidelity, quality, timings\n"
-        "  render <part> -o out.png [-h m] [--mesher name] [--no-curved]\n"
+        "  render <part> -o out.png [-h m] [--mesher name] [--no-curved] [--scale f]\n"
         "              [--subdiv N] [--size WxH] [--azimuth DEG] [--elevation DEG]\n"
         "              [--wireframe] [--stats out.json]\n"
         "                             headless PNG of the same boundary surface the\n"
@@ -90,6 +93,12 @@ int usage() {
         "\n"
         "inputs: CAD (.step .stp .brep .brp); solve also accepts Gmsh 2.x ASCII .msh.\n"
         "mesh size: omit -h (or -h 0) for auto h0 from bbox + feature density\n"
+        "--scale f: uniform factor applied to the loaded geometry immediately after\n"
+        "              the STEP/BREP read, before check/mesh/solve/diag/render do\n"
+        "              anything with it. The solver treats coordinates as metres, so\n"
+        "              a millimetre STEP needs --scale 0.001; every other value —\n"
+        "              -h, --fix-box/--load-box, VTU/PNG geometry, diag bbox — is\n"
+        "              then in scaled units. Not accepted for a Gmsh .msh input\n"
         "mesher names: hybrid|zoo (default), varyhedron|vary (CAD packing),\n"
         "              hybridvem, cvt_poly|cvt (experimental packed-poly VEM),\n"
         "              tet, hex, hexvem|vem, graded, hexpyr|transition,\n"
@@ -180,6 +189,34 @@ bool parse_ceiling(std::span<char*> args, std::size_t& i, std::size_t& value) {
     }
     value = static_cast<std::size_t>(parsed);
     return true;
+}
+
+/// `--scale <factor>`: the unit conversion. Applied to the exact geometry by
+/// `pipeline::Model::load` before anything is derived from it, so `-h`, the BC
+/// boxes, the exported coordinates and the diag bbox are all in scaled units.
+/// The solver's lengths are metres, hence `--scale 0.001` for a millimetre part.
+/// A non-positive or non-finite factor is an error rather than a silent 1.0:
+/// silently importing at authored size would make every length below wrong by
+/// three orders of magnitude with nothing in the output to show it.
+bool parse_scale(std::span<char*> args, std::size_t& i, double& scale) {
+    if (i + 1 >= args.size()) {
+        return false;
+    }
+    const double parsed = std::atof(args[++i]);
+    if (!(parsed > 0.0) || !std::isfinite(parsed)) {
+        std::fputs("--scale: factor must be finite and positive\n", stderr);
+        return false;
+    }
+    scale = parsed;
+    return true;
+}
+
+/// One line, only when the import was rescaled, so a log reader can see that
+/// every number that follows is in converted units.
+void report_scale(double scale) {
+    if (scale != 1.0) {
+        std::printf("scale: %.6g (model units x factor)\n", scale);
+    }
 }
 
 /// `--mesher` accepts every spelling in `pipeline::mesher_from_name`, which is
@@ -605,12 +642,27 @@ Eigen::VectorXd build_loads(const polymesh::fea::NodalMesh& mesh,
     return loads;
 }
 
-int cmd_check(std::string_view input) {
-    const auto model = polymesh::pipeline::Model::load(std::string(input));
+int cmd_check(std::span<char*> args) {
+    if (args.size() < 3) {
+        return usage();
+    }
+    const std::string path = args[2];
+    double scale = 1.0;
+    for (std::size_t i = 3; i < args.size(); ++i) {
+        if (std::strcmp(args[i], "--scale") == 0) {
+            if (!parse_scale(args, i, scale)) {
+                return usage();
+            }
+        } else {
+            return usage();
+        }
+    }
+    const auto model = polymesh::pipeline::Model::load(path, 30.0, scale);
     const auto& surface = model.surface;
     surface.validate();
-    std::printf("%.*s: OK — %zu vertices, %zu triangles%s\n", static_cast<int>(input.size()),
-                input.data(), surface.vertices.size(), surface.triangles.size(),
+    report_scale(scale);
+    std::printf("%s: OK — %zu vertices, %zu triangles%s\n", path.c_str(),
+                surface.vertices.size(), surface.triangles.size(),
                 model.cad ? " (CAD BRep retained)" : "");
     return 0;
 }
@@ -631,6 +683,7 @@ int cmd_mesh(std::span<char*> args) {
     std::size_t max_elems = 0;
     std::size_t max_dof = 0;
     BoxSel fix_box, load_box;
+    double scale = 1.0;
     for (std::size_t i = 3; i < args.size(); ++i) {
         if (std::strcmp(args[i], "-h") == 0 && i + 1 < args.size()) {
             h = std::atof(args[++i]);
@@ -656,6 +709,10 @@ int cmd_mesh(std::span<char*> args) {
             spectral = true; // accepted for symmetry (now the default)
         } else if (std::strcmp(args[i], "--no-spectral") == 0) {
             spectral = false;
+        } else if (std::strcmp(args[i], "--scale") == 0) {
+            if (!parse_scale(args, i, scale)) {
+                return usage();
+            }
         } else if (std::strcmp(args[i], "--element-tendency") == 0 && i + 1 < args.size()) {
             element_tendency = std::atof(args[++i]);
         } else if (std::strcmp(args[i], "--max-elems") == 0) {
@@ -678,7 +735,8 @@ int cmd_mesh(std::span<char*> args) {
             return usage();
         }
     }
-    const auto model = polymesh::pipeline::Model::load(path);
+    const auto model = polymesh::pipeline::Model::load(path, 30.0, scale);
+    report_scale(scale);
     const auto resolved =
         polymesh::pipeline::resolve_mesh_size(model, h, 30.0, max_elems, max_dof);
     h = resolved.h;
@@ -728,6 +786,56 @@ int cmd_mesh(std::span<char*> args) {
     return 0;
 }
 
+// Wall-clock account of one `solve` invocation. Every number printed on the
+// `phases:` line is measured here or inside `solve_elastostatics`; nothing is
+// derived by subtraction, so the phases sum to slightly less than the total and
+// the remainder is honest un-instrumented overhead rather than a fudge.
+struct SolvePhaseLog {
+    using Clock = std::chrono::steady_clock;
+
+    double import_s = 0.0;
+    double refine_s = 0.0;
+    double mesh_s = 0.0;
+    double bc_s = 0.0;
+    double preflight_s = 0.0;
+    double assemble_s = 0.0;
+    double reduce_s = 0.0;
+    double order_s = 0.0;
+    double factor_s = 0.0;
+    double backsolve_s = 0.0;
+    double stress_s = 0.0;
+    double export_s = 0.0;
+    int n_solves = 0;
+    Clock::time_point start = Clock::now();
+
+    static double since(Clock::time_point t) {
+        return std::chrono::duration<double>(Clock::now() - t).count();
+    }
+
+    void add(const polymesh::fea::SolvePhaseTimings& p) {
+        constexpr double kMsToS = 1e-3;
+        preflight_s += p.preflight_ms * kMsToS;
+        assemble_s += p.assemble_ms * kMsToS;
+        reduce_s += p.reduce_ms * kMsToS;
+        order_s += p.analyze_ms * kMsToS;
+        factor_s += p.factorize_ms * kMsToS;
+        backsolve_s += p.backsolve_ms * kMsToS;
+        ++n_solves;
+    }
+
+    void report() const {
+        const auto peak = polymesh::fea::peak_resident_bytes();
+        std::printf("phases: import=%.2f refine=%.2f mesh=%.2f bc=%.2f preflight=%.2f "
+                    "assemble=%.2f reduce=%.2f order=%.2f factor=%.2f backsolve=%.2f "
+                    "stress=%.2f export=%.2f s | solves=%d | total=%.2f s | peak RSS=%s | %s\n",
+                    import_s, refine_s, mesh_s, bc_s, preflight_s, assemble_s, reduce_s,
+                    order_s, factor_s, backsolve_s, stress_s, export_s, n_solves, since(start),
+                    peak > 0 ? polymesh::fea::format_memory_bytes(peak).c_str()
+                             : "not reported by this OS",
+                    polymesh::fea::performance_description().c_str());
+    }
+};
+
 int cmd_solve(std::span<char*> args) {
     if (args.size() < 3) {
         return usage();
@@ -756,6 +864,9 @@ int cmd_solve(std::span<char*> args) {
     std::string advisor_dir;
     std::size_t advisor_max_dof = 0; // 0 = no advisor budget (ADR-0034)
     bool advisor_efficiency = false;
+    double scale = 1.0;
+    auto solve_method = polymesh::fea::SolveMethod::kAuto;
+    int threads = 0; // 0 = process default
     for (std::size_t i = 3; i < args.size(); ++i) {
         if (std::strcmp(args[i], "-h") == 0 && i + 1 < args.size()) {
             h = std::atof(args[++i]);
@@ -785,6 +896,10 @@ int cmd_solve(std::span<char*> args) {
             spectral = true; // accepted for symmetry (now the default)
         } else if (std::strcmp(args[i], "--no-spectral") == 0) {
             spectral = false;
+        } else if (std::strcmp(args[i], "--scale") == 0) {
+            if (!parse_scale(args, i, scale)) {
+                return usage();
+            }
         } else if (std::strcmp(args[i], "--fix-box") == 0) {
             if (!parse_box6(args, i, fix_box)) {
                 return usage();
@@ -805,6 +920,23 @@ int cmd_solve(std::span<char*> args) {
             }
         } else if (std::strcmp(args[i], "--max-mem") == 0 && i + 1 < args.size()) {
             max_mem_gb = std::max(0.0, std::atof(args[++i]));
+        } else if (std::strcmp(args[i], "--solver") == 0 && i + 1 < args.size()) {
+            const std::string_view name = args[++i];
+            if (name == "auto") {
+                solve_method = polymesh::fea::SolveMethod::kAuto;
+            } else if (name == "direct") {
+                solve_method = polymesh::fea::SolveMethod::kDirect;
+            } else if (name == "cg") {
+                solve_method = polymesh::fea::SolveMethod::kCG;
+            } else {
+                std::fputs("solve: --solver must be auto, direct or cg\n", stderr);
+                return 2;
+            }
+        } else if (std::strcmp(args[i], "--threads") == 0 && i + 1 < args.size()) {
+            threads = std::atoi(args[++i]);
+            if (threads < 0) {
+                threads = 0;
+            }
         } else if (std::strcmp(args[i], "--adapt") == 0 && i + 1 < args.size()) {
             adapt_passes = std::atoi(args[++i]);
             if (adapt_passes < 0) {
@@ -859,10 +991,26 @@ int cmd_solve(std::span<char*> args) {
         std::fputs("solve: -o out.vtu is required\n", stderr);
         return 2;
     }
+    // A thread cap is applied before any parallel stage runs, and it covers the
+    // mesher, assembly, recovery and (where SuiteSparse is present) the
+    // factorization's own BLAS, because they all read the same OpenMP limit.
+    if (threads > 0) {
+        polymesh::fea::set_openmp_threads(threads);
+    }
+    SolvePhaseLog phase_log;
 
     const bool msh_input = is_msh_path(path);
     if (msh_input && !advisor_dir.empty()) {
         std::fputs("solve: --advisor requires CAD input and cannot be used with .msh\n",
+                   stderr);
+        return 2;
+    }
+    if (msh_input && scale != 1.0) {
+        // A Gmsh mesh is already discretised: rescaling it here would move the
+        // nodes out from under the element sizes the mesh was built with, and
+        // there is no exact geometry left to re-derive them from. Convert the
+        // units in the mesher that wrote it.
+        std::fputs("solve: --scale applies to CAD input only, not a .msh volume mesh\n",
                    stderr);
         return 2;
     }
@@ -871,6 +1019,7 @@ int cmd_solve(std::span<char*> args) {
     std::optional<polymesh::fea::MshModel> msh_model;
     Eigen::Vector3d bbox_min;
     Eigen::Vector3d bbox_max;
+    const auto import_start = SolvePhaseLog::Clock::now();
     if (msh_input) {
         msh_model.emplace(polymesh::fea::load_msh(path));
         bbox_min = msh_model->mesh.nodes.front();
@@ -880,10 +1029,12 @@ int cmd_solve(std::span<char*> args) {
             bbox_max = bbox_max.cwiseMax(node);
         }
     } else {
-        model.emplace(polymesh::pipeline::Model::load(path));
+        model.emplace(polymesh::pipeline::Model::load(path, 30.0, scale));
+        report_scale(scale);
         bbox_min = model->bbox_min;
         bbox_max = model->bbox_max;
     }
+    phase_log.import_s = SolvePhaseLog::since(import_start);
 
     // Learned mesh advisor (ADR-0027). It runs before size resolution and
     // grading so its action is the one that actually meshes: h, mesher, adapt
@@ -1059,8 +1210,10 @@ int cmd_solve(std::span<char*> args) {
             hi[0] = xmin + slab;
             regions.push_back({lo, hi, 0.5});
         }
+        const auto refine_start = SolvePhaseLog::Clock::now();
         const auto plan = polymesh::pipeline::build_refinement_plan(*model, h_use, regions,
                                                                     feature, spectral, 0);
+        phase_log.refine_s = SolvePhaseLog::since(refine_start);
         seeds = plan.refine_seeds;
         seed_band = plan.seed_band;
         size_field = plan.size_field;
@@ -1084,10 +1237,15 @@ int cmd_solve(std::span<char*> args) {
             throw std::runtime_error("solve: --adapt requires CAD geometry for remeshing and "
                                      "is unavailable for .msh");
         }
-        return polymesh::pipeline::volume_mesh(*model, h_use, m, skin, feature, seeds,
-                                               seed_band, element_tendency,
-                                               resolved.element_ceiling, resolved.dof_ceiling,
-                                               resolved.auto_chosen ? 3 : 0, {}, size_field);
+        const auto mesh_start = SolvePhaseLog::Clock::now();
+        auto out = polymesh::pipeline::volume_mesh(*model, h_use, m, skin, feature, seeds,
+                                                   seed_band, element_tendency,
+                                                   resolved.element_ceiling,
+                                                   resolved.dof_ceiling,
+                                                   resolved.auto_chosen ? 3 : 0, {},
+                                                   size_field);
+        phase_log.mesh_s += SolvePhaseLog::since(mesh_start);
+        return out;
     };
     polymesh::pipeline::VolumeMeshOutput vol;
     if (msh_input) {
@@ -1122,6 +1280,7 @@ int cmd_solve(std::span<char*> args) {
 
     const polymesh::fea::Material mat{.youngs_modulus = E, .poissons_ratio = nu};
     auto make_bc_loads = [&](const polymesh::pipeline::VolumeMeshOutput& v) {
+        const auto bc_start = SolvePhaseLog::Clock::now();
         const double xmin = bbox_min[0];
         const double xmax = bbox_max[0];
         const double tol = 0.51 * h_use;
@@ -1152,10 +1311,12 @@ int cmd_solve(std::span<char*> args) {
         }
         auto loads = build_loads(v.mesh, load_faces, load_sel.nodes, load_spec, "solve",
                                  stdout, load_sel.region, exact_pressure_area);
+        phase_log.bc_s += SolvePhaseLog::since(bc_start);
         return std::pair{std::move(bc), std::move(loads)};
     };
 
     polymesh::fea::SolveOptions solve_options;
+    solve_options.method = solve_method;
     solve_options.max_mem_gb = max_mem_gb;
     solve_options.on_note = [](std::string_view note) {
         std::printf("solve: %.*s\n", static_cast<int>(note.size()), note.data());
@@ -1214,6 +1375,20 @@ int cmd_solve(std::span<char*> args) {
         report_p_elevate(shaped.n_promoted, n0);
         return true;
     };
+    // One place where a solve happens, so the phase account and the stress
+    // recovery that always follows it cannot drift apart between the two
+    // call sites (adaptive pass and final promoted geometry).
+    const auto run_solve = [&](const polymesh::fea::Dirichlet& bc,
+                               const Eigen::VectorXd& loads,
+                               const polymesh::fea::LinearConstraints* mpc) {
+        auto result = polymesh::fea::solve_elastostatics(vol.mesh, mat, bc, loads,
+                                                         solve_options, mpc);
+        phase_log.add(result.phases);
+        u = std::move(result.u);
+        const auto stress_start = SolvePhaseLog::Clock::now();
+        zz = polymesh::fea::recover_zz(vol.mesh, mat, u);
+        phase_log.stress_s += SolvePhaseLog::since(stress_start);
+    };
     const auto solve_with_final_geometry = [&]() {
         bool promoted = curve_final_geometry();
         if (!promoted && p_elevate) {
@@ -1237,12 +1412,30 @@ int cmd_solve(std::span<char*> args) {
         if (model) {
             polymesh::pipeline::update_solved_geometry_volume(*model, vol);
         }
-        u = polymesh::fea::solve_elastostatics(
-                vol.mesh, mat, bc2, loads2, solve_options,
-                curved_constraints.empty() ? nullptr : &curved_constraints)
-                .u;
-        zz = polymesh::fea::recover_zz(vol.mesh, mat, u);
+        run_solve(bc2, loads2, curved_constraints.empty() ? nullptr : &curved_constraints);
     };
+    // The default CAD path solved the mesh TWICE: once linear, then again on
+    // the promoted curved-quadratic mesh whose answer is the only one reported.
+    // The first solve and its ZZ recovery exist to choose p-elevation targets
+    // and to drive `--adapt`; when promotion is unconditional (curved CAD, or
+    // uniform p-elevation with promotable cells) and there is no adaptive pass
+    // or η target to serve, nothing ever reads them. Measured on plate_hole at
+    // h = 6 mm: 8.9 s of solve + 3.4 s of recovery, thrown away.
+    const bool promotion_is_unconditional = [&] {
+        if (curved && model && model->cad) {
+            return true;
+        }
+        if (!p_elevate || !p_elevate_uniform) {
+            return false; // selective p-elevation picks targets from ZZ η
+        }
+        return std::any_of(vol.mesh.elements.begin(), vol.mesh.elements.end(),
+                           [](const polymesh::fea::NodalElement& el) {
+                               return el.type == polymesh::fea::ElementType::kTet4 ||
+                                      el.type == polymesh::fea::ElementType::kHex8;
+                           });
+    }();
+    const bool skip_linear_presolve =
+        adapt_passes == 0 && eta_target == 0.0 && promotion_is_unconditional;
     for (int pass = 0; pass <= adapt_passes; ++pass) {
         if (pass > 0) {
             auto m = mesher;
@@ -1251,6 +1444,10 @@ int cmd_solve(std::span<char*> args) {
             }
             vol = mesh_now(m);
             vol.mesh.check_validity();
+        }
+        if (skip_linear_presolve) {
+            solve_with_final_geometry();
+            break;
         }
         auto [bc, loads] = make_bc_loads(vol);
         if (bc.dof_values.empty()) {
@@ -1261,8 +1458,7 @@ int cmd_solve(std::span<char*> args) {
             polymesh::pipeline::update_solved_geometry_volume(*model, vol);
         }
 
-        u = polymesh::fea::solve_elastostatics(vol.mesh, mat, bc, loads, solve_options).u;
-        zz = polymesh::fea::recover_zz(vol.mesh, mat, u);
+        run_solve(bc, loads, nullptr);
         const bool last_pass =
             (pass == adapt_passes) || (eta_target > 0.0 && zz.global_eta <= eta_target);
         if (last_pass) {
@@ -1326,7 +1522,9 @@ int cmd_solve(std::span<char*> args) {
     const auto quality = polymesh::fea::tet4_cell_quality(vol.mesh);
     std::vector<polymesh::fea::VtuCellData> cdata;
     cdata.push_back({.name = "quality", .scalars = quality});
+    const auto export_start = SolvePhaseLog::Clock::now();
     polymesh::fea::write_vtu(out_path, vol.mesh, pdata, cdata);
+    phase_log.export_s = SolvePhaseLog::since(export_start);
 
     std::printf("solve: %zu nodes, %zu elems | max von Mises %.4g Pa | max |u| %.4g m | "
                 "ZZ η %.4g | h=%.4g | seeds=%zu\n%s\n%s\n",
@@ -1337,6 +1535,7 @@ int cmd_solve(std::span<char*> args) {
                 max_principal, max_principal_dir.x(), max_principal_dir.y(),
                 max_principal_dir.z(), sigma_zz_share);
     std::printf("wrote %s\n", out_path.c_str());
+    phase_log.report();
     return 0;
 }
 
@@ -1349,6 +1548,8 @@ int cmd_diag(std::span<char*> args) {
     }
     const std::string path = args[2];
     double h = 0.0;
+    double E = 200e9;
+    double nu = 0.3;
     auto mesher = polymesh::pipeline::VolumeMesher::kVaryhedron;
     bool do_solve = true;
     bool spectral = true; // spectral sizing on by default (ADR-0034)
@@ -1359,9 +1560,14 @@ int cmd_diag(std::span<char*> args) {
     std::string json_path;
     BoxSel fix_box, load_box;
     LoadSpec load_spec;
+    double scale = 1.0;
     for (std::size_t i = 3; i < args.size(); ++i) {
         if (std::strcmp(args[i], "-h") == 0 && i + 1 < args.size()) {
             h = std::atof(args[++i]);
+        } else if (std::strcmp(args[i], "-E") == 0 && i + 1 < args.size()) {
+            E = std::atof(args[++i]);
+        } else if (std::strcmp(args[i], "-nu") == 0 && i + 1 < args.size()) {
+            nu = std::atof(args[++i]);
         } else if (std::strcmp(args[i], "--mesher") == 0 && i + 1 < args.size()) {
             if (!parse_mesher_arg(args[++i], mesher)) {
                 std::fprintf(stderr, "unknown --mesher '%s'\n", args[i]);
@@ -1371,6 +1577,10 @@ int cmd_diag(std::span<char*> args) {
             json_path = args[++i];
         } else if (std::strcmp(args[i], "--no-solve") == 0) {
             do_solve = false;
+        } else if (std::strcmp(args[i], "--scale") == 0) {
+            if (!parse_scale(args, i, scale)) {
+                return usage();
+            }
         } else if (std::strcmp(args[i], "--no-curved") == 0) {
             curved = false;
         } else if (std::strcmp(args[i], "--spectral") == 0) {
@@ -1411,11 +1621,12 @@ int cmd_diag(std::span<char*> args) {
     };
 
     auto t0 = clock::now();
-    const auto model = polymesh::pipeline::Model::load(path);
+    const auto model = polymesh::pipeline::Model::load(path, 30.0, scale);
     const auto exact_pressure_area = load_spec.traction_mode
                                          ? cad_pressure_area(model, load_box, load_spec.dir)
                                          : std::nullopt;
     const double import_ms = ms(clock::now() - t0);
+    report_scale(scale);
     const double bbox_diag = (model.bbox_max - model.bbox_min).norm();
 
     const auto resolved =
@@ -1589,7 +1800,7 @@ int cmd_diag(std::span<char*> args) {
             Eigen::VectorXd loads =
                 build_loads(vol.mesh, load_faces, load_sel.nodes, load_spec, "diag", stderr,
                             load_sel.region, exact_pressure_area);
-            const polymesh::fea::Material mat{.youngs_modulus = 200e9, .poissons_ratio = 0.3};
+            const polymesh::fea::Material mat{.youngs_modulus = E, .poissons_ratio = nu};
             t0 = clock::now();
             polymesh::fea::SolveOptions solve_options;
             solve_options.max_mem_gb = max_mem_gb;
@@ -1680,6 +1891,7 @@ int cmd_diag(std::span<char*> args) {
         "{{\n"
         "  \"part\": \"{}\",\n"
         "  \"mesher\": \"{}\",\n"
+        "  \"scale\": {:.6g},\n"
         "  \"import\": {{ \"vertices\": {}, \"triangles\": {}, \"bbox_diag\": {:.6g}, "
         "\"cad_brep\": {} }},\n"
         "  \"mesh\": {{ \"h\": {:.6g}, \"nodes\": {}, \"elements\": {}, "
@@ -1690,18 +1902,20 @@ int cmd_diag(std::span<char*> args) {
         "  \"timing_ms\": {{ \"import\": {:.3f}, \"mesh\": {:.3f}, \"solve\": {:.3f} }},\n"
         "  \"mesh_throughput_elem_per_s\": {:.1f},\n"
         "  \"fidelity\": {},\n"
-        "  \"solve\": {{ \"ran\": {}, \"dof\": {}, \"max_von_mises\": {:.6g}, "
+        "  \"solve\": {{ \"ran\": {}, \"dof\": {}, \"youngs_modulus_pa\": {:.6g}, "
+        "\"poissons_ratio\": {:.6g}, \"max_von_mises\": {:.6g}, "
         "\"max_disp\": {:.6g}, \"global_eta\": {:.6g} }},\n"
         "  \"mesh_size_note\": \"{}\",\n"
         "  \"mesher_note\": \"{}\"\n"
         "}}\n",
-        model.name, polymesh::pipeline::mesher_name(mesher), model.surface.vertices.size(),
-        model.surface.triangles.size(), bbox_diag, model.cad ? "true" : "false", h,
+        model.name, polymesh::pipeline::mesher_name(mesher), scale,
+        model.surface.vertices.size(), model.surface.triangles.size(), bbox_diag,
+        model.cad ? "true" : "false", h,
         vol.mesh.nodes.size(), vol.mesh.elements.size(), q_min, q_min_type, n_inverted,
         vol.n_cells_below_shape_floor, q_mean, plan.n_geometry_seeds, plan.n_bc_seeds,
         plan.geometry_curvature_from_brep ? "brep" : "tessellation", spectral_json, import_ms,
-        mesh_ms, solve_ms, mesh_throughput, fidelity_json, solved ? "true" : "false", dof,
-        max_vm, max_u, global_eta, mesh_size_note, vol.mesher_note);
+        mesh_ms, solve_ms, mesh_throughput, fidelity_json, solved ? "true" : "false", dof, E,
+        nu, max_vm, max_u, global_eta, mesh_size_note, vol.mesher_note);
 
     if (!json_path.empty()) {
         std::FILE* f = std::fopen(json_path.c_str(), "w");
@@ -1749,6 +1963,7 @@ int cmd_render(std::span<char*> args) {
     bool spectral = true;
     int subdiv = 8; // the subdivision count the Studio viewport tessellates with
     polymesh::pipeline::RenderView view;
+    double scale = 1.0;
     for (std::size_t i = 3; i < args.size(); ++i) {
         if (std::strcmp(args[i], "-h") == 0 && i + 1 < args.size()) {
             h = std::atof(args[++i]);
@@ -1765,6 +1980,10 @@ int cmd_render(std::span<char*> args) {
             feature = false;
         } else if (std::strcmp(args[i], "--no-spectral") == 0) {
             spectral = false;
+        } else if (std::strcmp(args[i], "--scale") == 0) {
+            if (!parse_scale(args, i, scale)) {
+                return usage();
+            }
         } else if (std::strcmp(args[i], "--subdiv") == 0 && i + 1 < args.size()) {
             // Clamped to the tessellator's own range so --stats reports the
             // subdivision count that was actually used.
@@ -1790,7 +2009,8 @@ int cmd_render(std::span<char*> args) {
         return usage();
     }
 
-    const auto model = polymesh::pipeline::Model::load(path);
+    const auto model = polymesh::pipeline::Model::load(path, 30.0, scale);
+    report_scale(scale);
     const auto resolved = polymesh::pipeline::resolve_mesh_size(model, h, 30.0, 0, 0);
     h = resolved.h;
 
@@ -2042,8 +2262,8 @@ int main(int argc, char** argv) {
     }
     const std::string_view command = args[1];
     try {
-        if (command == "check" && args.size() == 3) {
-            return cmd_check(args[2]);
+        if (command == "check") {
+            return cmd_check(args);
         }
         if (command == "mesh") {
             return cmd_mesh(args);

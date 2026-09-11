@@ -83,7 +83,7 @@ TEST_CASE("tiny explicit memory cap refuses before solve allocation") {
         FAIL("tiny memory cap should reject the solve");
     } catch (const FeaError& e) {
         const std::string message = e.what();
-        CHECK(message.find("estimated LDLT solve footprint") != std::string::npos);
+        CHECK(message.find("estimated direct solve footprint") != std::string::npos);
         CHECK(message.find("effective memory cap 1000 B") != std::string::npos);
         CHECK(message.find("limiting term:") != std::string::npos);
         CHECK(message.find("raise --max-mem <GB>") != std::string::npos);
@@ -104,10 +104,10 @@ TEST_CASE("auto solve records LDLT to CG downgrade when only CG fits") {
 
     SolveOptions options;
     options.method = SolveMethod::kAuto;
-    options.cg_threshold = nfree + 1; // threshold policy would choose LDLT
+    options.cg_threshold = nfree + 1; // threshold policy would choose the direct ladder
     const auto decision = decide_solve_method(nfree, options, estimate, cap);
     REQUIRE(decision.method == SolveMethod::kCG);
-    CHECK(decision.note.find("LDLT estimate") != std::string::npos);
+    CHECK(decision.note.find("direct-factor estimate") != std::string::npos);
     CHECK(decision.note.find("using CG estimate") != std::string::npos);
 
     std::vector<std::string> recorded_notes;

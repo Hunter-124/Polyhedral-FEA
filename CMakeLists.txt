@@ -33,6 +33,14 @@ option(POLYMESH_NATIVE_ARCH "x86-64-v3 / AVX2 host tuning (OFF = portable + Eige
 # LTO is OFF by default: Eigen + -flto has known ODR/miscompile issues on GCC
 # (patch tests SEGV). Enable only for local experiments after ctest.
 option(POLYMESH_ENABLE_LTO "Link-time optimization for Release (OFF: Eigen-safe)" OFF)
+# SuiteSparse CHOLMOD supplies the supernodal (BLAS3) sparse Cholesky Eigen
+# wraps as CholmodSupernodalLLT. It is what makes a direct solve viable on a
+# quadratic 3-D mesh: a scalar simplicial factorization of the same matrix runs
+# tens of times slower and no lighter, because its fill is never amortized into
+# dense supernodes. Optional, auto-detected, with an explicit fallback: without
+# it the solver ladder starts at SimplicialLDLT and `polymesh backend` says so.
+option(POLYMESH_WITH_CHOLMOD
+    "Use SuiteSparse CHOLMOD's supernodal Cholesky for the direct solve when available" ON)
 
 if(POLYMESH_WITH_CUDA)
     # native = detect local GPU(s). Override e.g. -DCMAKE_CUDA_ARCHITECTURES=86
@@ -131,6 +139,48 @@ if(POLYMESH_WITH_OPENMP)
         message(STATUS "OpenMP: enabled (assembly, mesh classify, ZZ, SpMV; Eigen stays serial)")
     else()
         message(STATUS "OpenMP: not found — serial hot paths (build still OK)")
+    endif()
+endif()
+
+# Resolve SuiteSparse CHOLMOD once. Two discovery routes because distributions
+# disagree: pkg-config (`CHOLMOD.pc`) and a CMake config package
+# (SuiteSparse >= 7 installs `CHOLMOD::CHOLMOD`). Neither found is not an
+# error — the solver ladder simply starts one rung lower.
+#
+# pkg-config is tried FIRST on purpose. Fedora 44's `CHOLMODConfig.cmake`
+# find_dependency chain reaches `CCOLAMDConfig.cmake`, which unconditionally
+# includes a `CCOLAMDTargets_static.cmake` the distribution does not ship, and
+# a fatal `include()` inside a found config file is NOT suppressed by QUIET —
+# it aborts the whole configure, including any superbuild that adds this
+# project with add_subdirectory. There is no way to catch that from here, so
+# the working route runs first and the config probe is only reached on hosts
+# where pkg-config could not answer.
+set(POLYMESH_CHOLMOD_FOUND FALSE)
+if(POLYMESH_WITH_CHOLMOD)
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(POLYMESH_PC_CHOLMOD QUIET CHOLMOD)
+    endif()
+    if(POLYMESH_PC_CHOLMOD_FOUND)
+        set(POLYMESH_CHOLMOD_FOUND TRUE)
+        add_library(polymesh_cholmod INTERFACE)
+        target_include_directories(polymesh_cholmod SYSTEM INTERFACE
+                                   ${POLYMESH_PC_CHOLMOD_INCLUDE_DIRS})
+        target_link_libraries(polymesh_cholmod INTERFACE ${POLYMESH_PC_CHOLMOD_LINK_LIBRARIES})
+        message(STATUS "CHOLMOD: enabled via pkg-config ${POLYMESH_PC_CHOLMOD_VERSION} "
+                       "(supernodal direct solve)")
+    else()
+        find_package(CHOLMOD QUIET CONFIG)
+        if(TARGET CHOLMOD::CHOLMOD)
+            set(POLYMESH_CHOLMOD_FOUND TRUE)
+            add_library(polymesh_cholmod INTERFACE)
+            target_link_libraries(polymesh_cholmod INTERFACE CHOLMOD::CHOLMOD)
+            message(STATUS
+                "CHOLMOD: enabled via SuiteSparse CMake config (supernodal direct solve)")
+        else()
+            message(STATUS "CHOLMOD: not found — direct solve falls back to "
+                           "Eigen SimplicialLDLT (install suitesparse / libsuitesparse-dev)")
+        endif()
     endif()
 endif()
 

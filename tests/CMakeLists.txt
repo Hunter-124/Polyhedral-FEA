@@ -122,3 +122,11 @@ endif()
 include(Catch)
 # Working directory = repo root so the bench harness can load bench/reference/.
 catch_discover_tests(polymesh_tests WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+# Exercise the LU rung in its own process; Eigen assertions catch premature
+# status queries before numeric factorization.
+add_test(NAME direct_sparselu_cantilever
+    COMMAND polymesh_tests "forced CG matches direct LDLT on small cantilever")
+set_tests_properties(direct_sparselu_cantilever PROPERTIES
+    ENVIRONMENT "POLYMESH_FEA_DIRECT=lu"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

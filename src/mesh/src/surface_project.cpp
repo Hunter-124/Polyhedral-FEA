@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "mesh/surface_project.hpp"
+#include "mesh/fill_progress.hpp"
 
 #include <Eigen/Geometry>
 
@@ -65,6 +66,7 @@ struct SurfaceGrid {
         Eigen::Vector3d bmin = surface.vertices[0];
         Eigen::Vector3d bmax = surface.vertices[0];
         for (const auto& v : surface.vertices) {
+            fill_progress_poll();
             bmin = bmin.cwiseMin(v);
             bmax = bmax.cwiseMax(v);
         }
@@ -88,6 +90,7 @@ struct SurfaceGrid {
         bins.assign(static_cast<std::size_t>(nx * ny * nz), {});
 
         for (std::size_t t = 0; t < ntri; ++t) {
+            fill_progress_poll(t, ntri);
             const auto& tri = surface.triangles[t];
             const Eigen::Vector3d& A = surface.vertices[tri[0]];
             const Eigen::Vector3d& B = surface.vertices[tri[1]];
@@ -105,6 +108,7 @@ struct SurfaceGrid {
             for (int k = k0; k <= k1; ++k) {
                 for (int j = j0; j <= j1; ++j) {
                     for (int i = i0; i <= i1; ++i) {
+                        fill_progress_poll();
                         bins[static_cast<std::size_t>(flat(i, j, k))].push_back(t);
                     }
                 }
@@ -120,6 +124,7 @@ struct SurfaceGrid {
         }
 
         auto consider = [&](std::size_t t) {
+            fill_progress_poll();
             const auto& tri = surface.triangles[t];
             const Eigen::Vector3d q =
                 closest_on_triangle(p, surface.vertices[tri[0]], surface.vertices[tri[1]],
@@ -140,12 +145,14 @@ struct SurfaceGrid {
         // Expanding shell until the best distance cannot improve.
         const int max_r = std::max({nx, ny, nz});
         for (int r = 0; r <= max_r; ++r) {
+            fill_progress_poll();
             const int i0 = std::max(0, ic - r), i1 = std::min(nx - 1, ic + r);
             const int j0 = std::max(0, jc - r), j1 = std::min(ny - 1, jc + r);
             const int k0 = std::max(0, kc - r), k1 = std::min(nz - 1, kc + r);
             for (int k = k0; k <= k1; ++k) {
                 for (int j = j0; j <= j1; ++j) {
                     for (int i = i0; i <= i1; ++i) {
+                        fill_progress_poll();
                         // Only the shell at radius r (avoid re-scanning inner cubes).
                         if (r > 0) {
                             const bool on_shell = (i == i0 || i == i1 || j == j0 || j == j1 ||
@@ -213,6 +220,7 @@ ClosestPoint closest_on_surface_brute(const geom::TriSurface& surface,
     ClosestPoint best;
     best.distance = std::numeric_limits<double>::infinity();
     for (std::size_t t = 0; t < surface.triangles.size(); ++t) {
+        fill_progress_poll();
         const auto& tri = surface.triangles[t];
         const Eigen::Vector3d q = closest_on_triangle(
             p, surface.vertices[tri[0]], surface.vertices[tri[1]], surface.vertices[tri[2]]);
@@ -270,6 +278,7 @@ owned_boundary_projection_target(const Eigen::Vector3d& p, std::uint32_t node,
     // its mirror image own the face (ADR-0036 §7).
     const Eigen::Vector3d query = mirror_fold(mirror, p);
     auto target = context->target(query, *support);
+    fill_progress_poll();
     // A classified owner is immutable. In particular, vertex and protected
     // edge ownership can never silently fall back to a face.
     if (owner.kind != BoundarySupportKind::kUnknown &&
@@ -329,6 +338,7 @@ MirrorKeyFrame mirror_key_frame(const std::vector<Eigen::Vector3d>& nodes) {
     Eigen::Vector3d lo = nodes.front();
     Eigen::Vector3d hi = lo;
     for (const auto& p : nodes) {
+        fill_progress_poll();
         lo = lo.cwiseMin(p);
         hi = hi.cwiseMax(p);
     }
@@ -348,6 +358,7 @@ void sort_mirror_canonical(const std::vector<Eigen::Vector3d>& nodes,
         Eigen::Vector3d lo = nodes[ids.front()];
         Eigen::Vector3d hi = lo;
         for (const auto ni : ids) {
+            fill_progress_poll();
             lo = lo.cwiseMin(nodes[ni]);
             hi = hi.cwiseMax(nodes[ni]);
         }
@@ -359,6 +370,7 @@ void sort_mirror_canonical(const std::vector<Eigen::Vector3d>& nodes,
     // not recompute a key per comparison.
     std::vector<std::array<long long, 3>> key(nodes.size());
     for (const auto ni : ids) {
+        fill_progress_poll();
         key[ni] = frame.key(nodes[ni]);
     }
     std::sort(ids.begin(), ids.end(), [&](std::uint32_t a, std::uint32_t b) {
@@ -399,7 +411,9 @@ snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d
     stats.n_candidates = boundary_nodes.size();
 
     for (int pass = 0; pass < passes; ++pass) {
-        for (auto ni : boundary_nodes) {
+        fill_progress_phase("projection_pass", pass + 1, passes);
+        for (std::size_t work_done = 0; auto ni : boundary_nodes) {
+            if (active_fill_progress != nullptr) fill_progress_poll(work_done++, boundary_nodes.size());
             if (ni >= nodes.size()) {
                 continue;
             }
@@ -493,6 +507,7 @@ snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d
         std::unordered_map<std::uint32_t, double> fraction;
         fraction.reserve(original.size());
         for (const auto& [ni, _] : original) {
+            fill_progress_poll();
             snapped.emplace(ni, nodes[ni]);
             fraction.emplace(ni, 1.0);
         }
@@ -522,11 +537,13 @@ snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d
         // keeps the other (ADR-0036).
         const MirrorKeyFrame mkey = mirror_key_frame(nodes);
         for (std::size_t step = 0; step < max_steps && !original.empty(); ++step) {
+            fill_progress_poll(step, max_steps);
             const auto pick_worst = [&](bool skip_deferred) {
                 std::uint32_t picked = 0xffffffffu;
                 double picked_move = -1.0;
                 std::array<long long, 3> picked_key{};
                 for (const auto ni : offenders) {
+                    fill_progress_poll();
                     const auto it = moved.find(ni);
                     if (it == moved.end() || (skip_deferred && deferred.count(ni) != 0) ||
                         !node_offends(ni)) {
@@ -679,6 +696,7 @@ snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d
         for (int cleanup = 0; cleanup < 2 && !offenders.empty(); ++cleanup) {
             bool restored = false;
             for (const auto ni : offenders) {
+                fill_progress_poll();
                 const auto oit = original.find(ni);
                 if (oit == original.end()) {
                     continue;
@@ -714,7 +732,8 @@ snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d
                                  const auto kb = mkey.key(b.original);
                                  return ka != kb ? ka < kb : a.node < b.node;
                              });
-            for (const auto& r : recover) {
+            for (std::size_t work_done = 0; const auto& r : recover) {
+                if (active_fill_progress != nullptr) fill_progress_poll(work_done++, recover.size());
                 if (node_offends(r.node)) {
                     nodes[r.node] = r.original;
                     continue;
@@ -771,6 +790,7 @@ snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d
             std::unordered_map<std::uint32_t, Eigen::Vector3d> recovered_origin;
             recovered_origin.reserve(recover.size());
             for (const auto& r : recover) {
+                fill_progress_poll();
                 recovered_origin.emplace(r.node, r.original);
             }
             offenders.clear();
@@ -778,6 +798,7 @@ snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d
             while (!offenders.empty()) {
                 bool retreated = false;
                 for (const auto ni : offenders) {
+                    fill_progress_poll();
                     const auto it = recovered_origin.find(ni);
                     if (it == recovered_origin.end()) {
                         continue; // not something this recovery pass moved
@@ -801,6 +822,7 @@ snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d
         // It is intentionally boring; the former 12-step culprit loop made
         // every existing callsite pay for an incident map it did not have.
         while (!original.empty()) {
+            fill_progress_poll(stats.n_unsnapped, stats.n_candidates);
             std::set<std::uint32_t> offenders;
             collect_offenders(offenders);
             std::uint32_t worst = 0xffffffffu;
@@ -841,7 +863,8 @@ snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d
     }
 
     stats.max_residual = 0.0;
-    for (auto ni : boundary_nodes) {
+    for (std::size_t work_done = 0; auto ni : boundary_nodes) {
+        if (active_fill_progress != nullptr) fill_progress_poll(work_done++, boundary_nodes.size());
         if (ni >= nodes.size()) {
             continue;
         }
@@ -889,6 +912,7 @@ smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector
             nbr[b].push_back(a);
         };
         for (const auto& q : boundary_faces) {
+            fill_progress_poll();
             for (int e = 0; e < 4; ++e) {
                 add_edge(q[static_cast<std::size_t>(e)],
                          q[static_cast<std::size_t>((e + 1) % 4)]);
@@ -901,6 +925,7 @@ smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector
     // themselves and not just the edge graph.
     std::unordered_map<std::uint32_t, std::vector<std::uint32_t>> inc;
     for (std::size_t fi = 0; fi < boundary_faces.size(); ++fi) {
+        fill_progress_poll(fi, boundary_faces.size());
         for (int c = 0; c < 4; ++c) {
             const auto ni = boundary_faces[fi][static_cast<std::size_t>(c)];
             if (ni >= nodes.size()) {
@@ -921,6 +946,7 @@ smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector
     std::vector<std::pair<double, Eigen::Vector3d>> face_measure(boundary_faces.size());
     auto refresh_face_measures = [&] {
         for (std::size_t fi = 0; fi < boundary_faces.size(); ++fi) {
+            fill_progress_poll(fi, boundary_faces.size());
             const auto& q = boundary_faces[fi];
             Eigen::Vector3d moment = Eigen::Vector3d::Zero();
             double area = 0.0;
@@ -961,6 +987,7 @@ smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector
     std::vector<std::uint32_t> nbr_ids;
     nbr_ids.reserve(nbr.size());
     for (const auto& [ni, _] : nbr) {
+        fill_progress_poll();
         nbr_ids.push_back(ni);
     }
     // Each adjacency list is sorted on the same key, so a node and its mirror
@@ -969,6 +996,7 @@ smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector
     // which is harmless for the centroid but not for the comparisons downstream
     // of it.
     for (auto& [ni, list] : nbr) {
+        fill_progress_poll();
         (void)ni;
         sort_mirror_canonical(nodes, list);
     }
@@ -983,6 +1011,7 @@ smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector
         const MirrorKeyFrame frame = mirror_key_frame(nodes);
         std::vector<std::array<long long, 3>> node_key(nodes.size());
         for (std::size_t i = 0; i < nodes.size(); ++i) {
+            fill_progress_poll(i, nodes.size());
             node_key[i] = frame.key(nodes[i]);
         }
         // One key per face, built once: a comparator that rebuilt them would sort
@@ -993,6 +1022,7 @@ smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector
         };
         std::vector<FaceOrder> order(boundary_faces.size());
         for (std::size_t fi = 0; fi < boundary_faces.size(); ++fi) {
+            fill_progress_poll(fi, boundary_faces.size());
             for (int c = 0; c < 4; ++c) {
                 const auto ni = boundary_faces[fi][static_cast<std::size_t>(c)];
                 order[fi].key[static_cast<std::size_t>(c)] =
@@ -1003,6 +1033,7 @@ smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector
             std::sort(order[fi].ids.begin(), order[fi].ids.end());
         }
         for (auto& [ni, list] : inc) {
+            fill_progress_poll();
             (void)ni;
             std::sort(list.begin(), list.end(), [&](std::uint32_t a, std::uint32_t b) {
                 return order[a].key != order[b].key ? order[a].key < order[b].key
@@ -1011,7 +1042,8 @@ smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector
         }
     }
     const bool exact_owners = projection != nullptr && projection->target;
-    for (const auto ni : nbr_ids) {
+    for (std::size_t work_done = 0; const auto ni : nbr_ids) {
+        if (active_fill_progress != nullptr) fill_progress_poll(work_done++, nbr_ids.size());
         Kind k = Kind::kFree;
         if (exact_owners) {
             // Classification is a side effect of the first exact target query;
@@ -1044,6 +1076,7 @@ smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector
         std::unordered_map<std::uint32_t, Eigen::Vector3d> first_n;
         std::unordered_set<std::uint32_t> frozen;
         for (const auto& q : boundary_faces) {
+            fill_progress_poll();
             const Eigen::Vector3d e1 = nodes[q[1]] - nodes[q[0]];
             const Eigen::Vector3d e2 = nodes[q[2]] - nodes[q[0]];
             const Eigen::Vector3d n = e1.cross(e2);
@@ -1067,11 +1100,13 @@ smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector
 
     std::unordered_map<std::uint32_t, Eigen::Vector3d> moved; // pre-pass position
     for (int pass = 0; pass < passes; ++pass) {
+        fill_progress_phase("quality_smoothing_pass", pass + 1, passes);
         refresh_face_measures();
         // Jacobi targets from the current state.
         std::vector<std::pair<std::uint32_t, Eigen::Vector3d>> targets;
         targets.reserve(nbr.size());
-        for (const auto ni : nbr_ids) {
+        for (std::size_t work_done = 0; const auto ni : nbr_ids) {
+            if (active_fill_progress != nullptr) fill_progress_poll(work_done++, nbr_ids.size());
             const auto& nb = nbr.at(ni);
             const Kind k = kind[ni];
             if (k == Kind::kFrozen || nb.empty()) {
@@ -1188,7 +1223,8 @@ smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector
         if (targets.empty()) {
             break;
         }
-        for (const auto& [ni, p] : targets) {
+        for (std::size_t work_done = 0; const auto& [ni, p] : targets) {
+            if (active_fill_progress != nullptr) fill_progress_poll(work_done++, targets.size());
             moved.try_emplace(ni, nodes[ni]);
             nodes[ni] = p;
         }
@@ -1201,10 +1237,12 @@ smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector
         // inside other cells). Termination is guaranteed: every iteration
         // erases at least one node from `moved`, and each node reverts once.
         while (true) {
+            fill_progress_poll(stats.n_reverted, nbr_ids.size());
             std::set<std::uint32_t> offenders;
             collect_offenders(offenders);
             bool reverted = false;
             for (const auto ni : offenders) {
+                fill_progress_poll();
                 const auto it = moved.find(ni);
                 if (it == moved.end()) {
                     continue;
@@ -1221,7 +1259,8 @@ smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector
         }
     }
     stats.n_moved = moved.size();
-    for (const auto& [ni, _] : nbr) {
+    for (std::size_t work_done = 0; const auto& [ni, _] : nbr) {
+        if (active_fill_progress != nullptr) fill_progress_poll(work_done++, nbr.size());
         stats.max_residual =
             std::max(stats.max_residual, closest_on_surface(surface, nodes[ni]).distance);
     }

@@ -26,25 +26,18 @@ option(POLYMESH_WITH_GEOGRAM
 option(POLYMESH_BUILD_TESTS "Build the test suite" ON)
 option(POLYMESH_WITH_ADVISOR
     "Build the learned polymesh::mesh polymesh::advisor inference module (ADR-0027; prebuilt ONNX Runtime)" ON)
-# Host CPU ISA tuning. Default OFF: on some GCC+Eigen combos, -march=x86-64-v3
-# or -march=native has corrupted heaps (double free) in patch/Tier-0 tests.
-# Safe speed comes from -O3 (Release) + OpenMP. Enable only after ctest is green.
+# Host ISA tuning stays OFF: -march=x86-64-v3/native has corrupted heaps in
+# Eigen patch tests under GCC, and v3 made Eigen's Vector3d cross slower (ADR-0044).
 option(POLYMESH_NATIVE_ARCH "x86-64-v3 / AVX2 host tuning (OFF = portable + Eigen-safe)" OFF)
-# LTO is OFF by default: Eigen + -flto has known ODR/miscompile issues on GCC
-# (patch tests SEGV). Enable only for local experiments after ctest.
+# LTO stays OFF: Eigen + GCC -flto has produced ODR/miscompile SEGVs in patch tests.
 option(POLYMESH_ENABLE_LTO "Link-time optimization for Release (OFF: Eigen-safe)" OFF)
-# SuiteSparse CHOLMOD supplies the supernodal (BLAS3) sparse Cholesky Eigen
-# wraps as CholmodSupernodalLLT. It is what makes a direct solve viable on a
-# quadratic 3-D mesh: a scalar simplicial factorization of the same matrix runs
-# tens of times slower and no lighter, because its fill is never amortized into
-# dense supernodes. Optional, auto-detected, with an explicit fallback: without
-# it the solver ladder starts at SimplicialLDLT and `polymesh backend` says so.
+# Supernodal CHOLMOD makes a quadratic 3-D direct solve viable; without it the
+# solver ladder starts at SimplicialLDLT (docs/solver-core.md §6).
 option(POLYMESH_WITH_CHOLMOD
     "Use SuiteSparse CHOLMOD's supernodal Cholesky for the direct solve when available" ON)
 
 if(POLYMESH_WITH_CUDA)
-    # native = detect local GPU(s). Override e.g. -DCMAKE_CUDA_ARCHITECTURES=86
-    # if cross-building or the default arch (often 75) fails to JIT on newer cards.
+    # native = detect local GPU(s); override with -DCMAKE_CUDA_ARCHITECTURES=86 etc.
     if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
         set(CMAKE_CUDA_ARCHITECTURES native)
     endif()
@@ -54,13 +47,9 @@ if(POLYMESH_WITH_CUDA)
     set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 endif()
 
-# Shared warning flags; every target links this.
-# COMPILE_LANGUAGE:CXX — do not pass host -W* flags to nvcc (it mis-parses -Werror).
-# POLYMESH_WERROR stays ON for CI and for every product build. It exists as a
-# switch because a *second* standard library is now part of verification: the
-# mesher's cross-toolchain determinism is proven by building with clang+libc++
-# and diffing the mesh, and libc++ raises a different -Wconversion set that has
-# nothing to do with the property under test.
+# Shared warning flags; every target links this. CXX-only: nvcc mis-parses host -W flags.
+# POLYMESH_WERROR stays ON for CI and releases; only CI's libc++ determinism
+# build turns it off, because libc++ raises an unrelated -Wconversion set.
 option(POLYMESH_WERROR "Treat warnings as errors (keep ON for CI and releases)" ON)
 add_library(polymesh_warnings INTERFACE)
 target_compile_options(polymesh_warnings INTERFACE
@@ -68,15 +57,12 @@ target_compile_options(polymesh_warnings INTERFACE
     $<$<AND:$<BOOL:${POLYMESH_WERROR}>,$<COMPILE_LANGUAGE:CXX>,$<CXX_COMPILER_ID:GNU,Clang>>:-Werror>
 )
 
-# Accuracy-preserving performance flags applied to all product libraries/apps.
-# Release already gets -O3 -DNDEBUG from CMake; we add host tuning + optional LTO.
-# Never -ffast-math / -Ofast (breaks patch tests and Tier-1 double accuracy).
+# Accuracy-preserving performance flags for product targets: optional host
+# tuning only. Never -ffast-math / -Ofast (patch tests and Tier-1 need exact double).
 add_library(polymesh_perf INTERFACE)
 if(POLYMESH_NATIVE_ARCH)
     include(CheckCXXCompilerFlag)
-    # Prefer x86-64-v3 (AVX2/FMA/BMI) over bare -march=native: on AVX-512 hosts,
-    # Eigen's AVX-512 kernels have produced heap corruption (double free) under
-    # GCC -O3 in our patch tests. v3 is fast and stable; portable CI can set OFF.
+    # Prefer x86-64-v3 over -march=native: Eigen's AVX-512 kernels corrupted heaps under GCC -O3.
     set(_polymesh_arch_flag "")
     check_cxx_compiler_flag("-march=x86-64-v3" _polymesh_has_v3)
     if(_polymesh_has_v3)
@@ -92,7 +78,7 @@ if(POLYMESH_NATIVE_ARCH)
             message(STATUS "CPU tuning: -mtune=native only")
         endif()
     endif()
-    # split flags for INTERFACE options
+    # Split flags for INTERFACE options.
     separate_arguments(_polymesh_arch_flag_list NATIVE_COMMAND "${_polymesh_arch_flag}")
     target_compile_options(polymesh_perf INTERFACE
         $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CXX_COMPILER_ID:GNU,Clang>>:${_polymesh_arch_flag_list}>
@@ -101,9 +87,7 @@ if(POLYMESH_NATIVE_ARCH)
 endif()
 
 if(WIN32)
-    # windows.h's min/max macros break every `std::max(...)` compiled after it
-    # (MSVC C2589). Any transitive include of windows.h anywhere in the tree
-    # must not be able to do that.
+    # windows.h min/max macros break std::max (MSVC C2589) in any TU that includes it.
     add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
 endif()
 
@@ -119,10 +103,8 @@ if(POLYMESH_ENABLE_LTO)
     endif()
 endif()
 
-# Prefer multi-threaded Eigen dense kernels when OpenMP is present (still double).
-# An embedding host may already provide these imported targets. Re-resolving
-# dependencies can mix Eigen versions across the static-library boundary, which
-# is undefined behavior, and can similarly select a conflicting JSON package.
+# An embedding host (add_subdirectory) may already provide these targets; do not
+# re-resolve them, or Eigen/JSON versions can mix across the static-library boundary.
 if(NOT TARGET Eigen3::Eigen)
     find_package(Eigen3 REQUIRED)
 endif()
@@ -142,19 +124,10 @@ if(POLYMESH_WITH_OPENMP)
     endif()
 endif()
 
-# Resolve SuiteSparse CHOLMOD once. Two discovery routes because distributions
-# disagree: pkg-config (`CHOLMOD.pc`) and a CMake config package
-# (SuiteSparse >= 7 installs `CHOLMOD::CHOLMOD`). Neither found is not an
-# error — the solver ladder simply starts one rung lower.
-#
-# pkg-config is tried FIRST on purpose. Fedora 44's `CHOLMODConfig.cmake`
-# find_dependency chain reaches `CCOLAMDConfig.cmake`, which unconditionally
-# includes a `CCOLAMDTargets_static.cmake` the distribution does not ship, and
-# a fatal `include()` inside a found config file is NOT suppressed by QUIET —
-# it aborts the whole configure, including any superbuild that adds this
-# project with add_subdirectory. There is no way to catch that from here, so
-# the working route runs first and the config probe is only reached on hosts
-# where pkg-config could not answer.
+# Resolve SuiteSparse CHOLMOD once: pkg-config (CHOLMOD.pc) first, then the
+# SuiteSparse >= 7 CMake config. Neither found is not an error. pkg-config goes
+# first because a broken distro config chain (Fedora 44: CCOLAMD's missing
+# *Targets_static.cmake) aborts configure even under QUIET, superbuilds included.
 set(POLYMESH_CHOLMOD_FOUND FALSE)
 if(POLYMESH_WITH_CHOLMOD)
     find_package(PkgConfig QUIET)

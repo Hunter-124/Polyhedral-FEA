@@ -1,123 +1,88 @@
 @echo off
 REM SPDX-License-Identifier: BSD-3-Clause
-REM Build PolyMesh (CLI + GUI) and copy binaries into the repo root.
-REM Usage:  build.bat
-REM         build.bat Debug
-REM Requires: CMake >= 3.24, a C++20 compiler (MSVC 2022/2026 OK), Ninja recommended.
-REM Windows deps (vcpkg): eigen3, nlohmann-json; for GUI also glad.
-setlocal EnableExtensions EnableDelayedExpansion
+REM Build PolyMesh (CLI + GUI) with the CMake presets and copy the binaries into
+REM the repo root.
+REM Usage:  build.bat          preset windows-msvc       (build\)
+REM         build.bat Debug    preset windows-msvc-debug (build-debug\)
+REM Needs: CMake 3.25+, Ninja, MSVC 2022/2026, and a classic-mode vcpkg with
+REM eigen3, nlohmann-json, glad and opencascade (x64-windows).
+setlocal EnableExtensions
 
 set "ROOT=%~dp0"
 cd /d "%ROOT%" || exit /b 1
 
-set "BUILD_TYPE=Release"
-if /I "%~1"=="Debug" set "BUILD_TYPE=Debug"
-if /I "%~1"=="debug" set "BUILD_TYPE=Debug"
-
-REM --- locate cmake / ninja (PATH first, then VS bundled tools) ---
-set "CMAKE=cmake"
-where cmake >nul 2>&1
-if errorlevel 1 (
-  if exist "%ProgramFiles%\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" (
-    set "CMAKE=%ProgramFiles%\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
-  ) else if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" (
-    set "CMAKE=%ProgramFiles%\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
-  ) else (
-    echo [polymesh] cmake not found. Install CMake or Visual Studio C++ workload.
-    exit /b 1
-  )
-)
-
-set "GEN=Ninja"
-where ninja >nul 2>&1
-if errorlevel 1 (
-  if exist "%ProgramFiles%\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe" (
-    set "PATH=%ProgramFiles%\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja;%PATH%"
-  ) else if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe" (
-    set "PATH=%ProgramFiles%\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja;%PATH%"
-  ) else (
-    set "GEN=Visual Studio 17 2022"
-  )
-)
-
-REM Load MSVC env when using Ninja (needs cl.exe on PATH).
+REM No compiler on PATH: re-run inside the MSVC x64 environment. msvcbuild.bat
+REM owns Visual Studio discovery; its vcvars also puts VS's cmake/ninja on PATH.
 where cl >nul 2>&1
 if errorlevel 1 (
-  if exist "%ProgramFiles%\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat" (
-    call "%ProgramFiles%\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat" >nul
-  ) else if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat" (
-    call "%ProgramFiles%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat" >nul
+  if defined POLYMESH_IN_MSVCBUILD (
+    echo [polymesh] cl.exe not on PATH even after vcvars64.bat
+    exit /b 1
   )
+  set "POLYMESH_IN_MSVCBUILD=1"
+  call "%ROOT%scripts\msvcbuild.bat" call "%~f0" %*
+  exit /b
 )
 
-REM vcpkg toolchain (Eigen, nlohmann_json, glad on Windows)
-set "VCPKG_TOOLCHAIN="
-if defined CMAKE_TOOLCHAIN_FILE set "VCPKG_TOOLCHAIN=-DCMAKE_TOOLCHAIN_FILE=%CMAKE_TOOLCHAIN_FILE%"
-if not defined VCPKG_TOOLCHAIN if exist "%USERPROFILE%\vcpkg\scripts\buildsystems\vcpkg.cmake" (
-  set "VCPKG_TOOLCHAIN=-DCMAKE_TOOLCHAIN_FILE=%USERPROFILE%\vcpkg\scripts\buildsystems\vcpkg.cmake"
-)
-if not defined VCPKG_TOOLCHAIN if exist "C:\vcpkg\scripts\buildsystems\vcpkg.cmake" (
-  set "VCPKG_TOOLCHAIN=-DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake"
-)
-
-echo [polymesh] configure (%BUILD_TYPE%, generator=%GEN%)...
-if /I "%GEN%"=="Ninja" (
-  "%CMAKE%" -S . -B build -G Ninja ^
-    -DCMAKE_BUILD_TYPE=%BUILD_TYPE% ^
-    %VCPKG_TOOLCHAIN% ^
-    -DPOLYMESH_WITH_GUI=ON ^
-    -DPOLYMESH_WITH_OCC=OFF ^
-    -DPOLYMESH_WITH_CUDA=OFF ^
-    -DPOLYMESH_WITH_OPENMP=ON ^
-    -DPOLYMESH_NATIVE_ARCH=OFF ^
-    -DPOLYMESH_ENABLE_LTO=OFF
-) else (
-  "%CMAKE%" -S . -B build -G "%GEN%" -A x64 ^
-    -DCMAKE_BUILD_TYPE=%BUILD_TYPE% ^
-    %VCPKG_TOOLCHAIN% ^
-    -DPOLYMESH_WITH_GUI=ON ^
-    -DPOLYMESH_WITH_OCC=OFF ^
-    -DPOLYMESH_WITH_CUDA=OFF ^
-    -DPOLYMESH_WITH_OPENMP=ON ^
-    -DPOLYMESH_NATIVE_ARCH=OFF ^
-    -DPOLYMESH_ENABLE_LTO=OFF
-)
+where cmake >nul 2>&1
 if errorlevel 1 (
-  echo [polymesh] configure failed
-  echo [polymesh] On Windows, install deps with vcpkg:
-  echo   vcpkg install eigen3:x64-windows nlohmann-json:x64-windows glad:x64-windows
+  echo [polymesh] cmake not found. Install CMake or the Visual Studio "C++ CMake tools" component.
+  exit /b 1
+)
+where ninja >nul 2>&1
+if errorlevel 1 (
+  echo [polymesh] ninja not found. Install Ninja or the Visual Studio "C++ CMake tools" component.
   exit /b 1
 )
 
+REM The windows-msvc preset takes its toolchain from VCPKG_ROOT. vcvars points
+REM VCPKG_ROOT at VS's bundled manifest-mode vcpkg, so pick the classic install
+REM here; an explicit CMAKE_TOOLCHAIN_FILE in the environment wins.
+set "TOOLCHAIN_ARG="
+if defined CMAKE_TOOLCHAIN_FILE set "TOOLCHAIN_ARG=-DCMAKE_TOOLCHAIN_FILE=%CMAKE_TOOLCHAIN_FILE%"
+set "VCPKG_ROOT="
+if exist "%USERPROFILE%\vcpkg\scripts\buildsystems\vcpkg.cmake" set "VCPKG_ROOT=%USERPROFILE%\vcpkg"
+if not defined VCPKG_ROOT if exist "C:\vcpkg\scripts\buildsystems\vcpkg.cmake" set "VCPKG_ROOT=C:\vcpkg"
+if not defined VCPKG_ROOT if not defined TOOLCHAIN_ARG (
+  echo [polymesh] vcpkg not found at %USERPROFILE%\vcpkg or C:\vcpkg; set CMAKE_TOOLCHAIN_FILE.
+  goto :deps_hint
+)
+
+set "PRESET=windows-msvc"
+set "BIN=build"
+if /I "%~1"=="Debug" (
+  set "PRESET=windows-msvc-debug"
+  set "BIN=build-debug"
+)
+
+echo [polymesh] configure (preset %PRESET%)...
+cmake --preset %PRESET% %TOOLCHAIN_ARG%
+if errorlevel 1 (
+  echo [polymesh] configure failed
+  goto :deps_hint
+)
+
 echo [polymesh] build...
-"%CMAKE%" --build build --config %BUILD_TYPE% -j
+cmake --build --preset %PRESET%
 if errorlevel 1 (
   echo [polymesh] build failed
   exit /b 1
 )
 
-REM Locate built executables (Ninja vs multi-config VS layouts).
-set "CLI="
-set "GUI="
-if exist "build\apps\cli\polymesh.exe" set "CLI=build\apps\cli\polymesh.exe"
-if exist "build\apps\cli\%BUILD_TYPE%\polymesh.exe" set "CLI=build\apps\cli\%BUILD_TYPE%\polymesh.exe"
-if exist "build\apps\gui\polymesh-gui.exe" set "GUI=build\apps\gui\polymesh-gui.exe"
-if exist "build\apps\gui\%BUILD_TYPE%\polymesh-gui.exe" set "GUI=build\apps\gui\%BUILD_TYPE%\polymesh-gui.exe"
-
-if not defined CLI (
-  echo [polymesh] could not find polymesh.exe under build\
-  exit /b 1
-)
-
-copy /Y "%CLI%" "%ROOT%polymesh.exe" >nul
-if defined GUI copy /Y "%GUI%" "%ROOT%polymesh-gui.exe" >nul
+copy /Y "%BIN%\apps\cli\polymesh.exe" "%ROOT%polymesh.exe" >nul || exit /b 1
+copy /Y "%BIN%\apps\gui\polymesh-gui.exe" "%ROOT%polymesh-gui.exe" >nul || exit /b 1
 
 echo.
 echo [polymesh] done. Binaries in repo root:
 echo   %ROOT%polymesh.exe
-if defined GUI echo   %ROOT%polymesh-gui.exe
+echo   %ROOT%polymesh-gui.exe
 echo.
 echo Try:
-echo   polymesh-gui.exe bench\geometries\public\unit_box.stl
-echo   polymesh.exe mesh bench\geometries\public\unit_box.stl -o box.vtu
+echo   polymesh-gui.exe bench\geometries\public\unit_box.step
+echo   polymesh.exe mesh bench\geometries\public\unit_box.step -o box.vtu
 exit /b 0
+
+:deps_hint
+echo [polymesh] On Windows, install deps with vcpkg:
+echo   vcpkg install eigen3:x64-windows nlohmann-json:x64-windows glad:x64-windows opencascade:x64-windows
+exit /b 1

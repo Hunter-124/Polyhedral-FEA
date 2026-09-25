@@ -32,7 +32,8 @@ tet_boundary_nodes(const std::vector<std::array<std::uint32_t, 4>>& tets,
     std::unordered_map<TriKey, int, TriKeyMixHash> count;
     count.reserve(tets.size() * 2);
     for (std::size_t work_done = 0; const auto& t : tets) {
-        if (active_fill_progress != nullptr) fill_progress_poll(work_done++, tets.size());
+        if (active_fill_progress != nullptr)
+            fill_progress_poll(work_done++, tets.size());
         for (const auto& f : kTetFaces) {
             ++count[sorted_tri_key(t[static_cast<std::size_t>(f[0])],
                                    t[static_cast<std::size_t>(f[1])],
@@ -42,7 +43,8 @@ tet_boundary_nodes(const std::vector<std::array<std::uint32_t, 4>>& tets,
     std::unordered_set<std::uint32_t> nodes_set;
     nodes_set.reserve(count.size());
     for (std::size_t work_done = 0; const auto& [key, c] : count) {
-        if (active_fill_progress != nullptr) fill_progress_poll(work_done++, count.size());
+        if (active_fill_progress != nullptr)
+            fill_progress_poll(work_done++, count.size());
         if (c == 1) {
             nodes_set.insert(key[0]);
             nodes_set.insert(key[1]);
@@ -90,7 +92,8 @@ TetShellTopology tet_shell_topology(const std::vector<std::array<std::uint32_t, 
     std::unordered_map<TriKey, int, TriKeyMixHash> face_use;
     face_use.reserve(tets.size() * 2);
     for (std::size_t work_done = 0; const auto& t : tets) {
-        if (active_fill_progress != nullptr) fill_progress_poll(work_done++, tets.size());
+        if (active_fill_progress != nullptr)
+            fill_progress_poll(work_done++, tets.size());
         for (const auto& f : kTetFaces) {
             ++face_use[sorted_tri_key(t[static_cast<std::size_t>(f[0])],
                                       t[static_cast<std::size_t>(f[1])],
@@ -100,7 +103,8 @@ TetShellTopology tet_shell_topology(const std::vector<std::array<std::uint32_t, 
     std::unordered_map<std::uint64_t, int> edge_use;
     edge_use.reserve(face_use.size());
     for (std::size_t work_done = 0; const auto& [face, count] : face_use) {
-        if (active_fill_progress != nullptr) fill_progress_poll(work_done++, face_use.size());
+        if (active_fill_progress != nullptr)
+            fill_progress_poll(work_done++, face_use.size());
         if (count != 1) {
             continue;
         }
@@ -110,7 +114,8 @@ TetShellTopology tet_shell_topology(const std::vector<std::array<std::uint32_t, 
     }
     TetShellTopology out;
     for (std::size_t work_done = 0; const auto& [edge, count] : edge_use) {
-        if (active_fill_progress != nullptr) fill_progress_poll(work_done++, edge_use.size());
+        if (active_fill_progress != nullptr)
+            fill_progress_poll(work_done++, edge_use.size());
         if (count != 2) {
             out.torn.insert(edge);
         }
@@ -183,7 +188,8 @@ bool restrict_kill_to_shell(const std::vector<std::array<std::uint32_t, 4>>& tet
             return h;
         };
         for (std::size_t work_done = 0; const auto& t : survivors) {
-            if (active_fill_progress != nullptr) fill_progress_poll(work_done++, survivors.size());
+            if (active_fill_progress != nullptr)
+                fill_progress_poll(work_done++, survivors.size());
             for (const auto& f : kTetFaces) {
                 ++face_use[face_hash(t[static_cast<std::size_t>(f[0])],
                                      t[static_cast<std::size_t>(f[1])],

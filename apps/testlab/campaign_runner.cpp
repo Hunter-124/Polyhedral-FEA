@@ -408,7 +408,8 @@ int run_campaign(const fs::path& camp_dir, bool resume, const AdvisorScorer* adv
         }
     };
     if (camp.warehouse) {
-        // mesh.vtu → wire.png for review; consumed by scripts/advisor/report_meshes.py (WIRE_NAMES).
+        // mesh.vtu → wire.png for review; consumed by scripts/advisor/report_meshes.py
+        // (WIRE_NAMES).
         run_hook("warehouse_shots", "scripts/warehouse_shots.py");
     }
     if (camp.on_finish_analyze) {

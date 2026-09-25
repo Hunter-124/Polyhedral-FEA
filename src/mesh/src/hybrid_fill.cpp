@@ -55,9 +55,8 @@ bool outside_solid(const geom::TriSurface& surface, const MirrorFrame* mirror,
         return false;
     }
     const auto& tri = surface.triangles[cp.triangle];
-    const Eigen::Vector3d n =
-        (surface.vertices[tri[1]] - surface.vertices[tri[0]])
-            .cross(surface.vertices[tri[2]] - surface.vertices[tri[0]]);
+    const Eigen::Vector3d n = (surface.vertices[tri[1]] - surface.vertices[tri[0]])
+                                  .cross(surface.vertices[tri[2]] - surface.vertices[tri[0]]);
     return (p - cp.point).dot(n) > 0.0;
 }
 
@@ -76,9 +75,9 @@ build_graded_lattice(const geom::TriSurface& surface, const Eigen::Vector3d& bbo
     // Coarse-primary lattice at target h. Multi-level LEB (ADR-0018):
     //   L0 bulk ~ h, L1 feature/skin ~ h/2, L2 high-κ seeds ~ h/4.
     constexpr int subdiv = 2; // max LEB depth (L2)
-    const std::size_t kGradedMaxCells =
-        max_refinement_tets > 0 ? std::max<std::size_t>(1, max_refinement_tets / 6)
-                                : 48 * 1024;
+    const std::size_t kGradedMaxCells = max_refinement_tets > 0
+                                            ? std::max<std::size_t>(1, max_refinement_tets / 6)
+                                            : 48 * 1024;
     const double h_budget =
         min_h_for_cell_budget(bbox_min, bbox_max, kGradedMaxCells, /*subdivision=*/1);
     const double h_use = (h_budget > 0.0) ? std::max(h, h_budget) : h;
@@ -441,7 +440,8 @@ build_graded_lattice(const geom::TriSurface& surface, const Eigen::Vector3d& bbo
 
     // Multi-level LEB: pass 1 marks level≥1, pass 2 marks level≥2.
     int leb_wave = 0;
-    const int leb_waves = out.n_fine_cells > 0 ? 1 + (any_l2 ? 1 : 0) + (any_deep_feature ? 2 : 0) : 0;
+    const int leb_waves =
+        out.n_fine_cells > 0 ? 1 + (any_l2 ? 1 : 0) + (any_deep_feature ? 2 : 0) : 0;
     auto run_leb_for_min_level = [&](std::uint8_t min_level) {
         progress.set_cells(0, out.mesh.tets.size());
         progress.set_phase("leb_wave", ++leb_wave, leb_waves);

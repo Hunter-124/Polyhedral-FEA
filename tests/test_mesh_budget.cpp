@@ -27,8 +27,9 @@ TEST_CASE("mesh budget: auto h respects the predicted element ceiling") {
 
 TEST_CASE("mesh budget: explicit tiny ceiling refuses before fill") {
     const auto model = polymesh::testsupport::box_model(1.0, 1.0, 1.0);
-    REQUIRE_THROWS_AS(volume_mesh(model, 0.05, VolumeMesher::kHybrid, 2, false,
-                                  {}, 0.0, 0.0, 5000, 1000000), std::runtime_error);
+    REQUIRE_THROWS_AS(
+        volume_mesh(model, 0.05, VolumeMesher::kHybrid, 2, false, {}, 0.0, 0.0, 5000, 1000000),
+        std::runtime_error);
 }
 
 TEST_CASE("mesh budget: generous explicit ceiling preserves exact mesh") {
@@ -77,8 +78,8 @@ TEST_CASE("mesh budget: early graded refinement retries only when allowed") {
     const std::array<Eigen::Vector3d, 1> seeds{Eigen::Vector3d{0.5, 0.5, 0.5}};
     constexpr std::size_t ceiling = 2000;
     const auto fill = [&](int retries) {
-        return volume_mesh(model, 0.25, VolumeMesher::kGradedTet, 2, false,
-                           seeds, 1.0, 0.0, ceiling, 0, retries);
+        return volume_mesh(model, 0.25, VolumeMesher::kGradedTet, 2, false, seeds, 1.0, 0.0,
+                           ceiling, 0, retries);
     };
     REQUIRE_THROWS_AS(fill(0), polymesh::mesh::RefinementLimitError);
     const auto recovered = fill(3);

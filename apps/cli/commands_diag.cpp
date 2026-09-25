@@ -282,10 +282,10 @@ int cmd_diag(std::span<char*> args) {
             vol.mesh, all_faces, n_bnd, fix_box.region(), xmin, xmax, tol, -1);
         const auto load_sel = polymesh::fea::select_cantilever_end(
             vol.mesh, all_faces, n_bnd, load_box.region(), xmin, xmax, tol, +1);
-        const auto load_faces =
-            load_spec.traction_mode
-                ? polymesh::fea::pressure_aligned_faces(vol.mesh, load_sel.faces, load_spec.dir)
-                : load_sel.faces;
+        const auto load_faces = load_spec.traction_mode
+                                    ? polymesh::fea::pressure_aligned_faces(
+                                          vol.mesh, load_sel.faces, load_spec.dir)
+                                    : load_sel.faces;
         polymesh::fea::Dirichlet bc;
         for (const auto n : fix_sel.nodes) {
             bc.fix_node(n);
@@ -411,9 +411,9 @@ int cmd_diag(std::span<char*> args) {
         "}}\n",
         model.name, polymesh::pipeline::mesher_name(mesher), scale,
         model.surface.vertices.size(), model.surface.triangles.size(), bbox_diag,
-        model.cad ? "true" : "false", h,
-        vol.mesh.nodes.size(), vol.mesh.elements.size(), q_min, q_min_type, n_inverted,
-        vol.n_cells_below_shape_floor, q_mean, plan.n_geometry_seeds, plan.n_bc_seeds,
+        model.cad ? "true" : "false", h, vol.mesh.nodes.size(), vol.mesh.elements.size(),
+        q_min, q_min_type, n_inverted, vol.n_cells_below_shape_floor, q_mean,
+        plan.n_geometry_seeds, plan.n_bc_seeds,
         plan.geometry_curvature_from_brep ? "brep" : "tessellation", spectral_json, import_ms,
         mesh_ms, solve_ms, mesh_throughput, fidelity_json, solved ? "true" : "false", dof, E,
         nu, max_vm, max_u, global_eta, mesh_size_note, vol.mesher_note);

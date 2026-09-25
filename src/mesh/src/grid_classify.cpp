@@ -90,7 +90,8 @@ std::vector<bool> classify_impl(const geom::TriSurface& surface, const Cartesian
     const auto classify_row = [&]<bool Observe>(int j) {
         for (int i = 0; i < ni; ++i) {
             if constexpr (Observe) {
-                if (observer_failed.load(std::memory_order_relaxed)) return;
+                if (observer_failed.load(std::memory_order_relaxed))
+                    return;
                 poll_observed();
             }
             const double c0 = grid.origin[a0] + (static_cast<double>(i) + 0.5) * grid.cell[a0];
@@ -99,7 +100,8 @@ std::vector<bool> classify_impl(const geom::TriSurface& surface, const Cartesian
             std::vector<double> crossings;
             crossings.reserve(surface.triangles.size() / 8 + 4);
             for (const auto& tri : surface.triangles) {
-                if constexpr (Observe) poll_observed();
+                if constexpr (Observe)
+                    poll_observed();
                 const Eigen::Vector3d& A = surface.vertices[tri[0]];
                 const Eigen::Vector3d& B = surface.vertices[tri[1]];
                 const Eigen::Vector3d& C = surface.vertices[tri[2]];
@@ -139,7 +141,8 @@ std::vector<bool> classify_impl(const geom::TriSurface& surface, const Cartesian
                 *comps[ray_axis] = k;
                 inside[grid.index(ix, iy, iz)] = 1;
             }
-            if constexpr (Observe) completed.fetch_add(nk, std::memory_order_relaxed);
+            if constexpr (Observe)
+                completed.fetch_add(nk, std::memory_order_relaxed);
         }
     };
     if (active_fill_progress != nullptr) {
@@ -148,7 +151,8 @@ std::vector<bool> classify_impl(const geom::TriSurface& surface, const Cartesian
 #pragma omp parallel
         {
 #pragma omp for schedule(dynamic, 4) nowait
-            for (int j = 0; j < nj; ++j) classify_row.template operator()<true>(j);
+            for (int j = 0; j < nj; ++j)
+                classify_row.template operator()<true>(j);
             workers_done.fetch_add(1, std::memory_order_release);
             // The caller may finish its rows before a long worker row. Keep
             // observing real completed rays while waiting for those workers.
@@ -160,15 +164,18 @@ std::vector<bool> classify_impl(const geom::TriSurface& surface, const Cartesian
             }
         }
 #else
-        for (int j = 0; j < nj; ++j) classify_row.template operator()<true>(j);
+        for (int j = 0; j < nj; ++j)
+            classify_row.template operator()<true>(j);
 #endif
-        if (observer_error) std::rethrow_exception(observer_error);
+        if (observer_error)
+            std::rethrow_exception(observer_error);
         fill_progress_poll(completed.load(std::memory_order_relaxed), inside.size());
     } else {
 #if defined(POLYMESH_WITH_OPENMP)
 #pragma omp parallel for schedule(dynamic, 4)
 #endif
-        for (int j = 0; j < nj; ++j) classify_row.template operator()<false>(j);
+        for (int j = 0; j < nj; ++j)
+            classify_row.template operator()<false>(j);
     }
     // API keeps vector<bool>; conversion is serial and cheap vs the classify.
     return std::vector<bool>(inside.begin(), inside.end());

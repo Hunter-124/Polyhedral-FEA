@@ -121,7 +121,8 @@ CantileverSolution solve_body_loaded(const fea::NodalMesh& mesh,
     fea::SolveOptions options;
     options.method = fea::SolveMethod::kDirect;
     const auto u = fea::solve_elastostatics(mesh, kMaterial, fixed_min_x(mesh), loads, options,
-                                            constraints).u;
+                                            constraints)
+                       .u;
     return {.u = u, .energy = fea::strain_energy(mesh, kMaterial, u)};
 }
 
@@ -172,8 +173,10 @@ TEST_CASE("selective p interface passes affine patch only when constrained",
     fea::SolveOptions options;
     options.method = fea::SolveMethod::kDirect;
     const auto constrained_bc = affine_boundary(elevated.mesh, extents, &elevated.constraints);
-    const auto u_constrained = fea::solve_elastostatics(
-        elevated.mesh, kMaterial, constrained_bc, loads, options, &elevated.constraints).u;
+    const auto u_constrained =
+        fea::solve_elastostatics(elevated.mesh, kMaterial, constrained_bc, loads, options,
+                                 &elevated.constraints)
+            .u;
     const double constrained_error = affine_max_error(elevated.mesh, u_constrained);
 
     const auto discontinuous_bc = affine_boundary(elevated.mesh, extents);

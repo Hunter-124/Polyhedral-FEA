@@ -220,9 +220,8 @@ Eigen::VectorXd assemble_selection_load(const NodalMesh& mesh,
     double conservation_error = total.norm();
     const bool node_fallback = !(mesh_area > 0.0);
     if (!node_fallback) {
-        auto applied = region.has_value()
-                           ? consistent_region_load(mesh, faces, *region, total)
-                           : consistent_face_load(mesh, faces, total);
+        auto applied = region.has_value() ? consistent_region_load(mesh, faces, *region, total)
+                                          : consistent_face_load(mesh, faces, total);
         loads = std::move(applied.loads);
         resultant = applied.resultant;
         conservation_error = applied.conservation_error;

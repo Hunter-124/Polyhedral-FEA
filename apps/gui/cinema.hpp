@@ -40,8 +40,8 @@
 #include <Eigen/Core>
 
 #include <array>
-#include <cstdint>
 #include <cstddef>
+#include <cstdint>
 #include <limits>
 #include <mutex>
 #include <optional>

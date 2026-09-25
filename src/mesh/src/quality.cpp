@@ -103,10 +103,9 @@ tet4_face_conformity(const std::vector<std::array<std::uint32_t, 4>>& tets) {
     std::map<detail::TriKey, int> counts;
     for (const auto& t : tets) {
         for (const auto& fv : detail::kTetFaces) {
-            const detail::TriKey key =
-                detail::sorted_tri_key(t[static_cast<std::size_t>(fv[0])],
-                                       t[static_cast<std::size_t>(fv[1])],
-                                       t[static_cast<std::size_t>(fv[2])]);
+            const detail::TriKey key = detail::sorted_tri_key(
+                t[static_cast<std::size_t>(fv[0])], t[static_cast<std::size_t>(fv[1])],
+                t[static_cast<std::size_t>(fv[2])]);
             ++counts[key];
         }
     }

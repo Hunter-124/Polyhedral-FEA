@@ -214,9 +214,8 @@ CadModel CadModel::scaled(double factor) const {
     }
     const TopoDS_Shape shape = transform.Shape();
     if (shape.IsNull()) {
-        throw GeomError(
-            std::format("CadModel::scaled: transform by {:.6g} produced an empty shape",
-                        factor));
+        throw GeomError(std::format(
+            "CadModel::scaled: transform by {:.6g} produced an empty shape", factor));
     }
     out.impl_ = std::make_shared<Impl>();
     out.impl_->shape = shape;

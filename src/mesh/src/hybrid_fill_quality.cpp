@@ -76,9 +76,8 @@ void smooth_boundary_and_pin_features(GradedFillState& s) {
         [&](std::set<std::uint32_t>& offenders) {
             for (const auto& n : out.mesh.tets) {
                 fill_progress_poll();
-                const double v =
-                    tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
-                                      out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
+                const double v = tet_signed_volume(out.mesh.nodes[n[0]], out.mesh.nodes[n[1]],
+                                                   out.mesh.nodes[n[2]], out.mesh.nodes[n[3]]);
                 if (v <= vol_eps) {
                     offenders.insert(n.begin(), n.end());
                 }
@@ -157,8 +156,7 @@ void carve_overlapped_sheets(GradedFillState& s) {
     const auto carve_to_clean = [&]() {
         for (int pass = 0; pass < kOverlapPasses; ++pass) {
             progress.set_phase("quality_overlap_pass", pass + 1, kOverlapPasses);
-            const auto owners =
-                buried_free_tet_face_owners(out.mesh.nodes, out.mesh.tets, hc);
+            const auto owners = buried_free_tet_face_owners(out.mesh.nodes, out.mesh.tets, hc);
             if (owners.empty()) {
                 return;
             }
@@ -278,7 +276,8 @@ void relax_interior_slivers(GradedFillState& s) {
             }
         }
         for (std::size_t work_done = 0; const auto& [key, uses] : face_use) {
-            if (active_fill_progress != nullptr) fill_progress_poll(work_done++, face_use.size());
+            if (active_fill_progress != nullptr)
+                fill_progress_poll(work_done++, face_use.size());
             if (uses == 1) {
                 for (const auto ni : key) {
                     frozen[ni] = 1;
@@ -344,7 +343,8 @@ void relax_interior_slivers(GradedFillState& s) {
         sort_mirror_canonical(out.mesh.nodes, targets);
         std::size_t n_moved = 0;
         for (std::size_t work_done = 0; const auto ni : targets) {
-            if (active_fill_progress != nullptr) fill_progress_poll(work_done++, targets.size());
+            if (active_fill_progress != nullptr)
+                fill_progress_poll(work_done++, targets.size());
             Eigen::Vector3d centroid = Eigen::Vector3d::Zero();
             for (const auto other : nbrs[ni]) {
                 centroid += out.mesh.nodes[other];

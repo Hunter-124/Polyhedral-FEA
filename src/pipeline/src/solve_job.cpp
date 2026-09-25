@@ -1409,8 +1409,8 @@ void SolveJob::start(const Model& model, const SimSetup& setup) {
                     auto options =
                         solve_options_with_progress(pass, pass_count, pass_solver_note);
                     options.method = setup.solve_method;
-                    auto solved = fea::solve_elastostatics(
-                        vol.mesh, material, bc, loads, options, active_p_constraints());
+                    auto solved = fea::solve_elastostatics(vol.mesh, material, bc, loads,
+                                                           options, active_p_constraints());
                     pass_solve_cost = std::move(solved.cost);
                     return std::move(solved.u);
                 };

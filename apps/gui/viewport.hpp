@@ -116,13 +116,12 @@ class Viewport {
     /// `h_after` are physical target cell widths in metres and must align with
     /// their point arrays. The viewport normalises them only for colour/marker
     /// size; no displayed number is reconstructed from that normalisation.
-    void set_cinema_sizing_samples(
-        const std::vector<Eigen::Vector3d>& field_points,
-        const std::vector<double>& field_h_before,
-        const std::vector<double>& field_h_after,
-        const std::vector<Eigen::Vector3d>& edge_points,
-        const std::vector<double>& edge_h_before,
-        const std::vector<double>& edge_h_after);
+    void set_cinema_sizing_samples(const std::vector<Eigen::Vector3d>& field_points,
+                                   const std::vector<double>& field_h_before,
+                                   const std::vector<double>& field_h_after,
+                                   const std::vector<Eigen::Vector3d>& edge_points,
+                                   const std::vector<double>& edge_h_before,
+                                   const std::vector<double>& edge_h_after);
     /// Per-element geometry for the cinema reveal: every element's own faces,
     /// tagged with its index in `mesh.elements` so the reveal order is the
     /// mesher's own emission order. Interior faces are therefore stored once per

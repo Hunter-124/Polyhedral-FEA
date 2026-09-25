@@ -58,7 +58,8 @@ void stamp_seed_cells(std::vector<char>& is_marked, std::vector<char>* is_seed_o
     const int r = std::max(1, static_cast<int>(std::ceil(seed_band / h_ref)) + 1);
     fill_progress_phase("background_seed_grading");
     for (std::size_t work_done = 0; const auto& seed : seeds) {
-        if (active_fill_progress != nullptr) fill_progress_poll(work_done++, seeds.size());
+        if (active_fill_progress != nullptr)
+            fill_progress_poll(work_done++, seeds.size());
         stamp_ball(is_marked, is_seed_out, nx, ny, nz, grid, seed, band2, r);
     }
 }
@@ -75,7 +76,8 @@ void stamp_feature_cells(std::vector<char>& is_marked, std::vector<char>* is_fea
     const int r = std::max(1, static_cast<int>(std::ceil(feature_band / h_ref)) + 1);
     fill_progress_phase("background_feature_grading");
     for (std::size_t work_done = 0; const auto& e : features) {
-        if (active_fill_progress != nullptr) fill_progress_poll(work_done++, features.size());
+        if (active_fill_progress != nullptr)
+            fill_progress_poll(work_done++, features.size());
         if (e.v0 >= surface.vertices.size() || e.v1 >= surface.vertices.size()) {
             continue;
         }
@@ -139,7 +141,8 @@ void stamp_curvature_cells(std::vector<char>& is_l1, std::vector<char>* is_l2,
     const auto turn_of = [&](double kappa_mean_abs) { return h_ref * 2.0 * kappa_mean_abs; };
 
     for (std::size_t work_done = 0; const auto& tri : surface.triangles) {
-        if (active_fill_progress != nullptr) fill_progress_poll(work_done++, surface.triangles.size());
+        if (active_fill_progress != nullptr)
+            fill_progress_poll(work_done++, surface.triangles.size());
         const Eigen::Vector3d& a = surface.vertices[tri[0]];
         const Eigen::Vector3d& b = surface.vertices[tri[1]];
         const Eigen::Vector3d& c = surface.vertices[tri[2]];

@@ -1,79 +1,36 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: BSD-3-Clause
-# Build PolyMesh (CLI + GUI) and copy binaries into the repo root.
-# Usage: ./build.sh            # Release
-#        ./build.sh Debug
+# Build PolyMesh (CLI + GUI) with the CMake presets and copy the binaries into
+# the repo root.
+# Usage: ./build.sh            # preset `release` -> build/
+#        ./build.sh Debug      # preset `debug`   -> build-debug/
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
-BUILD_TYPE="${1:-Release}"
+
+case "${1:-Release}" in
+  [Dd]ebug) PRESET=debug; BIN=build-debug ;;
+  *)        PRESET=release; BIN=build ;;
+esac
 JOBS="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 
-echo "[polymesh] configure ($BUILD_TYPE)..."
-# Performance defaults: Release ⇒ -O3; OpenMP ON; host CPU tuning; LTO.
-# Do not force POLYMESH_BUILD_TESTS=OFF — that poisons the CMake cache for
-# later ctest runs. --target below still builds only the apps we install.
-# Accuracy: never pass -ffast-math / -Ofast (patch tests + Tier-1 stay exact).
-cmake -S . -B build -G Ninja \
-  -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
-  -DPOLYMESH_WITH_GUI=ON \
-  -DPOLYMESH_WITH_OCC=ON \
-  -DPOLYMESH_WITH_CUDA=OFF \
-  -DPOLYMESH_WITH_OPENMP=ON \
-  -DPOLYMESH_NATIVE_ARCH=OFF \
-  -DPOLYMESH_ENABLE_LTO=OFF
+echo "[polymesh] configure (preset $PRESET)..."
+cmake --preset "$PRESET"
 
-# Build only the apps we install to the repo root (not the full test suite).
+# Only the two apps copied below; the preset keeps POLYMESH_BUILD_TESTS ON so a
+# later `ctest --preset $PRESET` works against the same cache.
 echo "[polymesh] build (jobs=$JOBS)..."
-cmake --build build --target polymesh polymesh-gui -j"$JOBS"
+cmake --build --preset "$PRESET" --target polymesh polymesh-gui -j"$JOBS"
 
-# Locate executables across Ninja / multi-config / legacy src/ layouts.
-find_exe() {
-  local name="$1"
-  shift
-  local p
-  for p in "$@"; do
-    if [[ -x "$p" && -f "$p" ]]; then
-      printf '%s\n' "$p"
-      return 0
-    fi
-  done
-  return 1
-}
-
-CLI="$(find_exe polymesh \
-  "build/apps/cli/polymesh" \
-  "build/apps/cli/${BUILD_TYPE}/polymesh" \
-  "build/src/cli/polymesh" \
-  "build/polymesh" || true)"
-
-if [[ -z "${CLI}" ]]; then
-  echo "[polymesh] error: built CLI binary not found under build/" >&2
-  echo "  expected e.g. build/apps/cli/polymesh" >&2
-  exit 1
-fi
-
-cp -f "$CLI" "$ROOT/polymesh"
-chmod +x "$ROOT/polymesh"
-
-GUI="$(find_exe polymesh-gui \
-  "build/apps/gui/polymesh-gui" \
-  "build/apps/gui/${BUILD_TYPE}/polymesh-gui" \
-  "build/src/gui/polymesh-gui" \
-  "build/polymesh-gui" || true)"
-
-if [[ -n "${GUI}" ]]; then
-  cp -f "$GUI" "$ROOT/polymesh-gui"
-  chmod +x "$ROOT/polymesh-gui"
-else
-  echo "[polymesh] warning: polymesh-gui not found (GUI may be disabled)" >&2
-fi
+cp -f "$BIN/apps/cli/polymesh" "$ROOT/polymesh"
+cp -f "$BIN/apps/gui/polymesh-gui" "$ROOT/polymesh-gui"
+chmod +x "$ROOT/polymesh" "$ROOT/polymesh-gui"
 
 echo
 echo "[polymesh] done. Binaries in repo root:"
-echo "  $ROOT/polymesh  (from $CLI)"
-[[ -n "${GUI}" && -x "$ROOT/polymesh-gui" ]] && echo "  $ROOT/polymesh-gui  (from $GUI)"
+echo "  $ROOT/polymesh  (from $BIN/apps/cli/polymesh)"
+echo "  $ROOT/polymesh-gui  (from $BIN/apps/gui/polymesh-gui)"
 echo
 echo "Try:"
-echo "  ./polymesh-gui bench/geometries/public/unit_box.stl"
-echo "  ./polymesh mesh bench/geometries/public/unit_box.stl -o box.vtu"
+echo "  ./polymesh-gui bench/geometries/public/unit_box.step"
+echo "  ./polymesh mesh bench/geometries/public/unit_box.step -o box.vtu"

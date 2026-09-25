@@ -1,12 +1,12 @@
 # Varyhedron packing — algorithm survey (V5)
 
 - Status: accepted for v1 path (2026-07-12); **ranking pivoted** by
-  [ADR-0023](../decisions/0023-measure-first-tet-primary-cvt-path.md)
-- **Canonical agent plan:** [docs/plans/advisor-measure-first-program.md](../plans/advisor-measure-first-program.md)
-- **Advisor answers (normative Q&A):** [ADR-0024](../decisions/0024-advisor-measure-answers.md)
-- Related: [ADR-0021](../decisions/0021-varyhedron-packing.md), [ADR-0020](../decisions/0020-brep-volume-meshing.md),
-  [ADR-0019](../decisions/0019-mixed-fe-vem-adaptive-order-core.md), [ADR-0002](../decisions/0002-license-bsd3.md)
-- Microbench: [`bench/packing/run_packing_microbench.py`](../../bench/packing/run_packing_microbench.py)
+  [ADR-0023](../../decisions/0023-measure-first-tet-primary-cvt-path.md)
+- **Canonical agent plan:** [docs/plans/advisor-measure-first-program.md](../../plans/advisor-measure-first-program.md)
+- **Advisor answers (normative Q&A):** [ADR-0024](../../decisions/0024-advisor-measure-answers.md)
+- Related: [ADR-0021](../../decisions/0021-varyhedron-packing.md), [ADR-0020](../../decisions/0020-brep-volume-meshing.md),
+  [ADR-0019](../../decisions/0019-mixed-fe-vem-adaptive-order-core.md), [ADR-0002](../../decisions/0002-license-bsd3.md)
+- Microbench: [`bench/packing/run_packing_microbench.py`](../../../bench/packing/run_packing_microbench.py)
 
 This note surveys volume-meshing *packing* families relevant to **varyhedron**
 (variable polyhedral cells driven by CAD edge/face constraints) and records the
@@ -16,7 +16,7 @@ can reimplement under BSD-3 vs wrap as optional plugins.
 ### Study / vendor path index (measure-first)
 
 Agent-facing notes that expand the advisor program (read with ADR-0023/0024 and
-[advisor-measure-first-program.md](../plans/advisor-measure-first-program.md)):
+[advisor-measure-first-program.md](../../plans/advisor-measure-first-program.md)):
 
 - **[geogram-cvt-vendoring.md](geogram-cvt-vendoring.md)** — Why Geogram BSD-3 (not clean-room clipped Voronoi); vendor vs write; M9 freeze + M10 wall before G1; dual hard-block; `third_party/` layout + license PR checklist.
 - **[protecting-balls-lfs.md](protecting-balls-lfs.md)** — CDS formula \(r=\min(\alpha h,\beta\cdot\mathrm{lfs})\), \(\alpha\approx0.45\), \(\beta\approx1/3\); corner shrink; sharp-only; plate_hole / icecream risks.
@@ -26,8 +26,8 @@ Agent-facing notes that expand the advisor program (read with ADR-0023/0024 and
 
 ## 0. Normative ranking (ADR-0023 / plan — do not ignore)
 
-**Program map:** [advisor-measure-first-program.md](../plans/advisor-measure-first-program.md)
-§4.4–4.5 and [ADR-0024](../decisions/0024-advisor-measure-answers.md). Do not
+**Program map:** [advisor-measure-first-program.md](../../plans/advisor-measure-first-program.md)
+§4.4–4.5 and [ADR-0024](../../decisions/0024-advisor-measure-answers.md). Do not
 start packing-algorithm loops until **M9 baseline freeze** and wall projection
 (M3b/M10); then vendor **Geogram** (BSD-3) for clipped Voronoi — never clean-room.
 
@@ -199,7 +199,7 @@ fillets and hole rims the same way graded lattice layers do.
 
 ## 6. Licensing notes (core vs plugin)
 
-Project license: **BSD-3-Clause** ([ADR-0002](../decisions/0002-license-bsd3.md)).
+Project license: **BSD-3-Clause** ([ADR-0002](../../decisions/0002-license-bsd3.md)).
 
 | Source / idea | Typical license | Guidance for PolyMesh |
 | --- | --- | --- |
@@ -257,7 +257,7 @@ BRep (OCC CadModel)
 
 ### Microbench (this node)
 
-[`bench/packing/run_packing_microbench.py`](../../bench/packing/run_packing_microbench.py)
+[`bench/packing/run_packing_microbench.py`](../../../bench/packing/run_packing_microbench.py)
 is a **pure-Python** seed-packing demo (no FEA, no OCC). It reports wall time,
 a fill-fraction proxy (packed ball volume / domain volume), and a **boundary
 residual placeholder** so later V6b can replace the stub with true CAD

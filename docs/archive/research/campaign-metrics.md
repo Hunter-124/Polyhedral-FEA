@@ -1,10 +1,10 @@
 # Campaign metrics — normative definitions for agents
 
 - Status: normative for Lane M campaigns and packing loops
-- Normative: [ADR-0023](../decisions/0023-measure-first-tet-primary-cvt-path.md) §5,
-  [ADR-0024](../decisions/0024-advisor-measure-answers.md) Q1/Q4/Q5,
-  [advisor-measure-first-program.md](../plans/advisor-measure-first-program.md) §3
-- Schema sketch: [docs/dag/interfaces.md](../dag/interfaces.md) scorecard / health
+- Normative: [ADR-0023](../../decisions/0023-measure-first-tet-primary-cvt-path.md) §5,
+  [ADR-0024](../../decisions/0024-advisor-measure-answers.md) Q1/Q4/Q5,
+  [advisor-measure-first-program.md](../../plans/advisor-measure-first-program.md) §3
+- Schema sketch: [docs/dag/interfaces.md](../../dag/interfaces.md) scorecard / health
 - Related: [varyhedron-packing.md](varyhedron-packing.md),
   [geogram-cvt-vendoring.md](geogram-cvt-vendoring.md),
   [protecting-balls-lfs.md](protecting-balls-lfs.md)

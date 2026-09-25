@@ -9,7 +9,7 @@ function behind it, and every disclosure that used to be stacked six deep in 13 
 grey are here.
 
 Nothing in the film is a mock-up. It is recorded from the GUI's own framebuffer by
-`polymesh-gui --auto` (`apps/gui/cinema.cpp`), driven by
+`polymesh-gui --auto` (`apps/gui/cinema_*.cpp`, `cinema_frame.cpp`, `automation.cpp`), driven by
 [`scripts/render_cinema.py`](../../../scripts/render_cinema.py), which also writes
 `manifest.json` beside the video with the exact command, the encoder, the frame
 geometry read out of the first PNG's IHDR, and every number the GUI printed on
@@ -106,8 +106,7 @@ consumer of the field just shown, not a fresh scene over an empty wireframe.
   re-implementation of the forward pass.
 - **Node radius and fill are `|a| / max|a| within each layer`**, not against one
   shared scale. Trunk and head magnitudes differ by roughly 10×, and one shared
-  scale flattens the trunk into a uniform grey column. The same reason
-  `scripts/advisor/figures.py` scales its activation heatmap per row.
+  scale flattens the trunk into a uniform grey column.
 - **Colour is the sign** of the activation, through
   `gui/colormap.hpp::signed_colormap` (ColorBrewer RdBu reversed, agreeing with
   matplotlib's `RdBu_r` to 0.0115 in unit RGB). Blue negative, near-white zero,

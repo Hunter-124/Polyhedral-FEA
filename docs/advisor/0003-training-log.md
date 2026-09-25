@@ -1,10 +1,17 @@
 # 0003 — Training log
 
-Milestone entries for the learned mesh advisor. Companions:
-[0001 — architecture](0001-architecture.md),
+Historical milestone entries M-A1 to M-A4 (2026-08-10 to 2026-08-13) for the learned
+mesh advisor. This is not a live tracker: later generations are recorded in the
+cycle reports [0006](0006-clean-data-retrain.md)–[0012](0012-portable-cost-retrain.md),
+the current generation is [0012](0012-portable-cost-retrain.md) (index:
+[README](README.md)), and project status is [docs/STATUS.md](../STATUS.md).
+Numbers below describe the models of their date, not the shipped one.
+
+Companions: [0001 — architecture](0001-architecture.md),
 [0002 — objectives and guardrails](0002-objectives-and-guardrails.md).
 
-Regenerate everything below with:
+M-A1 regeneration recipe (historical; `promote_truth.py` promotion of our own
+solves is now forbidden by ADR-0029):
 
 ```
 python scripts/gen_primitive_corpus.py

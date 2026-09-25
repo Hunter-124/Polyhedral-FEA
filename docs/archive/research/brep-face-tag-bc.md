@@ -4,9 +4,9 @@
   closed for plate_hole, cylinder, and sphere polar cap. Remaining consumer of
   this note: **icecream_cone** multi-face loads + any future geometry sweeps
   (ADR-0024 **Q7**, plan §3.5).
-- Normative: [ADR-0024](../decisions/0024-advisor-measure-answers.md) Q7,
-  [advisor-measure-first-program.md](../plans/advisor-measure-first-program.md) §3.5,
-  [interfaces.md](../dag/interfaces.md) load `select` schema.
+- Normative: [ADR-0024](../../decisions/0024-advisor-measure-answers.md) Q7,
+  [advisor-measure-first-program.md](../../plans/advisor-measure-first-program.md) §3.5,
+  [interfaces.md](../../dag/interfaces.md) load `select` schema.
 - Related: [campaign-metrics.md](campaign-metrics.md) load-area gate.
 
 ## Why boxes are temporary

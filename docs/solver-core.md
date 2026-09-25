@@ -170,7 +170,8 @@ The adaptive loop looks at three signals and turns the matching knob:
 | **Cost** (measured) | Predicted DOFs and solve time per choice, calibrated from real campaign data | picks the **shape** and trims choices that cost more than they return |
 
 The cost model is not guessed — it is fitted from the test-lab campaigns
-(`bench/campaigns/`, node `feedback-loop`). Every simulation the lab runs
+(`bench/campaigns/`, campaign analysis:
+[docs/process/feedback-loop.md](process/feedback-loop.md)). Every simulation the lab runs
 records mesh time, solve time, DOFs, and accuracy against a hand-calculated
 truth, tagged by the geometric conditions of the part. Over many runs the
 driver learns *which knob actually pays off under which conditions* instead of
@@ -193,7 +194,7 @@ and picks the max; ties break **h > p > shape**:
    casts a shape vote; majority vote becomes `global_shape` for the next
    remesh (`kHybrid`→`kHybridVem` on poly, etc.). Cost weights default to
    \(c_h{=}8\), \(c_p{=}2.5{+}0.4p\), \(c_{\mathrm{shape}}{=}3.5\) until
-   `feedback-loop` calibrates them from campaigns.
+   campaign analysis calibrates them from campaigns.
 
 Product path: `SolveJob` builds signals from ZZ η + surface κ/thickness and
 calls `drive_hp` each adapt pass (`tests/test_hp_driver.cpp` locks the
@@ -229,7 +230,7 @@ Start here and follow the includes:
 - `tests/test_fe_vem_assembly.cpp` — FE/VEM interface constant-strain gate.
 - `src/adapt/include/adapt/hp_driver.hpp` — joint (h, p, shape) decisions;
   `drive_hp` plan feeds seeds, p-elevate indices, and mesher tendency in
-  `src/pipeline/src/scene.cpp`.
+  `SolveJob` (`src/pipeline/src/solve_job.cpp`).
 - `tests/test_hp_driver.cpp` — synthetic indicator gates for the driver.
 - `docs/decisions/0019-mixed-fe-vem-adaptive-order-core.md` — the *why* behind
   every choice above, and the staging plan.
@@ -237,8 +238,8 @@ Start here and follow the includes:
   cells, including the curvature-driven h-refinement and the transition
   handling the VEM path keeps whole when native-poly is on.
 
-The current status of each piece — what is built, what is next — is always in
-`docs/dag/PROGRAM.yaml`.
+The current status of each piece — what is built, what is next — is in
+[docs/STATUS.md](STATUS.md).
 
 ---
 

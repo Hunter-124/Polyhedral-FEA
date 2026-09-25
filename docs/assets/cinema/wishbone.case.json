@@ -135,7 +135,7 @@
   "region_selection": {
     "cad_faces": 15,
     "predicted_tessellation_regions": 11,
-    "method": "The GUI grows region ids by flood-filling the display tessellation across shared edges while adjacent facet normals stay within 30 degrees (src/pipeline/src/scene.cpp Model::load), over the per-face triangle soup built in TopExp face order at deflection 5e-4 * bbox diagonal and angular deflection 0.2 rad (src/geom/src/cad_model.cpp). Replaying that exact algorithm on the shipped STEP gives 11 regions from 15 CAD faces: region 3 merges the two arms, the brace and the two inboard eye annuli, because the arms now blend into those annuli tangentially (junction interior angle 150 to 203 degrees, i.e. G1-smooth, so the 30-degree fill crosses it). Region id therefore no longer equals CAD face index, and the mapping above is explicit.",
+    "method": "The GUI grows region ids by flood-filling the display tessellation across shared edges while adjacent facet normals stay within 30 degrees (src/pipeline/src/model.cpp Model::load), over the per-face triangle soup built in TopExp face order at deflection 5e-4 * bbox diagonal and angular deflection 0.2 rad (src/geom/src/cad_model.cpp). Replaying that exact algorithm on the shipped STEP gives 11 regions from 15 CAD faces: region 3 merges the two arms, the brace and the two inboard eye annuli, because the arms now blend into those annuli tangentially (junction interior angle 150 to 203 degrees, i.e. G1-smooth, so the 30-degree fill crosses it). Region id therefore no longer equals CAD face index, and the mapping above is explicit.",
     "region_id_map": {
       "0": "LOAD: boss outer cylinder",
       "1": "boss +z annulus",

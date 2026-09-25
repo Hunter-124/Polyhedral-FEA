@@ -1,23 +1,19 @@
 # Program DAG — how to pick up work
 
-> **FROZEN / HISTORICAL (2026-08-16):** this board covers the program only
-> through node G4 (2026-07-13). All later work — ADR-0026 through ADR-0033
-> and the learned-advisor v2→v4 corpus program — is tracked in
-> [docs/advisor/0003-training-log.md](../advisor/0003-training-log.md) and
-> the ADR set instead. Read those first; the claim/parallelism protocol
-> below describes how the Lane M/G board was worked, not the active program.
+> **Archived.** Frozen board through node G4 (2026-07-13); the claim protocol below is historical and no longer used.
+> Current status: [docs/STATUS.md](../../STATUS.md). Live file schemas: [docs/dag/interfaces.md](../../dag/interfaces.md).
 
 This directory is the coordination point for the adaptive-polyhedral-core
 program.
 
 **Active strategy (2026-07-12):** measure-first / tet primary / restricted CVT —
-read **[docs/plans/advisor-measure-first-program.md](../plans/advisor-measure-first-program.md)**
+read **[docs/plans/advisor-measure-first-program.md](../../plans/advisor-measure-first-program.md)**
 and ADRs **0023–0024** before claiming packing or FEA metric work.
 
 Any agent or human, in any session, resumes work like this:
 
 > For autonomous / overnight agents, paste
-> [AGENT_BOOTSTRAP.md](AGENT_BOOTSTRAP.md) into the harness — it wraps this
+> `docs/dag/AGENT_BOOTSTRAP.md` (removed from HEAD; `git show ef464dc:docs/dag/AGENT_BOOTSTRAP.md`) into the harness — it wraps this
 > protocol with the sync-first, identity, and verification steps in one block.
 
 0. **Sync from remote first — always, before anything else.** You don't know
@@ -32,7 +28,7 @@ Any agent or human, in any session, resumes work like this:
    real change, so the claim is visible.
 3. Work only inside the node's `scope` paths; nodes with disjoint scopes run
    in parallel. Cross-node communication happens ONLY through the file
-   formats in [interfaces.md](interfaces.md) — change those schemas only in
+   formats in [interfaces.md](../../dag/interfaces.md) — change those schemas only in
    the same commit as the code on both sides.
 4. `done` means: built clean (`-Werror`), full Catch2 suite green, scorecard
    not regressed, docs updated (ADR amendment or docs/ page), committed and

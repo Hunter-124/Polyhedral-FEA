@@ -1,77 +1,28 @@
 # CONTRIBUTING — Codebase map & standards
 
-**Root markdown allowed:** `README.md`, `CONTRIBUTING.md`, `CHANGES.md` only.  
-External-contributor **agent** PR policy: **[CHANGES.md](CHANGES.md)** (not for owner/`master` direct work).  
-Process/spec/phases/progress: under `docs/`. Do not reintroduce other root `.md` files.
+**Root markdown allowed:** `README.md`, `CONTRIBUTING.md`, `CHANGES.md`, and `CLAUDE.md` (agent-harness entrypoint). Other markdown lives under `docs/`, or as a `README.md` beside the data it describes (`bench/**`, `examples/`, `audits/`).  
+External-contributor PR flow: **[CHANGES.md](CHANGES.md)** (not for owner work on `master`).  
+Current state and next work: **[docs/STATUS.md](docs/STATUS.md)**.
 
-This file is the onboarding map for **fresh agents and humans**. Read it before grepping the whole tree.
+This file is the onboarding map for **humans and AI agents**. Read it before grepping the whole tree.
 
 ---
 
-## 0. Contributing with AI agents (quick start)
+## 0. Workflow (humans and AI agents)
 
-This repo is built to be worked on by AI coding agents, and agent-driven
-contributions are welcome. Point your agent (Claude Code, Codex, Cursor,
-aider, ...) at the repo and give it this bootstrap:
+Agent-driven contributions are welcome; agents follow the same rules as humans.
 
-> **Before you touch anything — sync, identity, and consent (do this first,
-> every session):**
->
-> - **Sync from remote before doing anything else.** You don't know the true
->   state of the repo until you do: `git fetch origin`, `git status`, then
->   `git pull --rebase origin master`. Never plan, read deeply, or edit on a
->   stale or dirty tree; if the rebase conflicts, resolve it (or stop and ask)
->   first. Re-run `git pull --rebase` right before you push, and never
->   force-push. (Full autonomous protocol: `docs/dag/AGENT_BOOTSTRAP.md`.)
-> - **Establish the user's true identity and make it the git author.** Ask
->   the user who the work should be attributed to (name + email). Record that
->   identity in your own working context / system prompt so you never lose it
->   mid-session, and set it in *this repository's* active git config:
->   `git config user.name "<name>"` and `git config user.email "<email>"`.
->   Then **verify** it with `git config user.name && git config user.email`
->   before your first commit — never inherit a stale, generic, or
->   session-default identity, and never guess an email. Commit and push only
->   under that verified identity, with zero AI-attribution trailers (see §4).
-> - **Double-check with the user before doing anything.** Before you create,
->   edit, delete, or push anything, state plainly what you are about to do and
->   its scope, and get an explicit go-ahead. Do not run ahead on assumptions.
->   Anything hard to reverse — pushing, rewriting history, force-pushing,
->   deleting files — requires confirmation *every* time; approval for one
->   step is not approval for the next.
-
-1. **Read the map**: this file, then `CLAUDE.md` (agent house rules — any
-   agent should follow it, not just Claude).
-2. **Ask the knowledge graph before grepping**: `graphify query "<question>"`
-   against the committed graph in `graphify-out/` (setup: §8). It knows the
-   architecture, god nodes, and file relationships.
-3. **Read the active plan, then pick work from the program board**: the
-   canonical strategy is
-   [`docs/plans/advisor-measure-first-program.md`](docs/plans/advisor-measure-first-program.md)
-   (ADRs 0023–0024). Do not invent a competing packing/FEA roadmap.
-   `docs/dag/PROGRAM.yaml` is the executable DAG — claim a node whose deps
-   are `done` by flipping it to `in_progress` in your first commit
-   (protocol: `docs/dag/README.md`). Nodes with disjoint scopes can be
-   worked in parallel. Small fixes outside the board are fine too.
-4. **Interfaces are contracts**: anything crossing the test-lab / GUI /
-   feedback-tooling boundary uses the schemas in `docs/dag/interfaces.md`.
-   Change a schema only in the same commit as both sides of the code.
-5. **Verification bar** (what `done` means): clean `-Werror` build, full
-   Catch2 suite green from the repo root, curved scorecard not regressed,
-   docs/ADR updated, `graphify update .` run if the change is structural.
-6. **Anti-cheat is sacred** (§4): never hardcode benchmark/reference answers
-   in `src/` or `apps/`; truths live only in `bench/reference/*.json`; every
-   mesh must pass validity before it is solved. Agents are notorious for
-   "fixing" a failing benchmark by nudging the expected value — PRs that do
-   this get closed.
-7. **Submit**: external contributors (human or agent) use the clone → branch
-   → PR flow in `CHANGES.md`. Commit as **yourself** (or your agent's
-   identity) — honest authorship, no impersonating other contributors.
-   Describe in the PR body what the agent did and how you verified it.
-
-A good agent prompt to start from: *"Read CONTRIBUTING.md and CLAUDE.md in
-full. Then query graphify for the subsystem you need. Claim a node from
-docs/dag/PROGRAM.yaml, work only inside its scope, and meet the §0
-verification bar before opening a PR per CHANGES.md."*
+| Step | Rule |
+|---|---|
+| Sync first | `git fetch origin`, `git status`, `git pull --rebase origin master` before reading deeply or editing (external contributors: branch setup in [CHANGES.md](CHANGES.md)). Never work on a stale or dirty tree; resolve rebase conflicts (or stop and ask) first. Pull again right before pushing; never force-push `master`. |
+| Honest authorship | Owner work commits as **Hunter-124**; external contributors commit as themselves ([CHANGES.md](CHANGES.md)). Verify with `git config user.name && git config user.email` before the first commit. No AI-attribution trailers (`Co-Authored-By`, "Generated with …"). |
+| Confirm irreversible steps | Agents state the action and scope and get an explicit go-ahead before pushing, rewriting history, or deleting files — every time. |
+| Find your way | This file (§2–3), then `graphify query "<question>"` against `graphify-out/` (§8) before full-repo greps. |
+| Pick work | [docs/STATUS.md](docs/STATUS.md) (open defects, next items). Methodology in force: [docs/plans/advisor-measure-first-program.md](docs/plans/advisor-measure-first-program.md) (ADR-0023/0024). Small fixes outside the list are fine. |
+| Interfaces are contracts | Anything crossing the test-lab / GUI / campaign-analysis boundary uses the schemas in [docs/dag/interfaces.md](docs/dag/interfaces.md). Change a schema only in the same commit as both sides of the code. |
+| Anti-cheat | §4. Never "fix" a failing benchmark by nudging the expected value; PRs that do this are closed. |
+| Verification bar | Clean `-Werror` build; full Catch2 suite green, run from the repo root; docs/ADR updated; `graphify update .` run and committed if the change is structural. |
+| Submit | External contributors: clone → branch → PR per [CHANGES.md](CHANGES.md); say in the PR body what was changed and how it was verified. |
 
 ---
 
@@ -79,15 +30,23 @@ verification bar before opening a PR per CHANGES.md."*
 
 **PolyMesh** — adaptive hybrid polyhedral mesher co-designed with a linear-elastostatics FEA solver (C++20). Mesher and solver are optimized for each other; element zoo includes tets/hexes/prisms/pyramids/polyhedra (VEM).
 
-| Build | Command |
-|---|---|
-| Configure | `cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug` |
-| Build | `cmake --build build` |
-| Test | `ctest --test-dir build` (CWD for tests is **repo root**) |
-| GUI | `./build/apps/gui/polymesh-gui` |
-| CLI | `./build/apps/cli/polymesh` |
+Presets live in [CMakePresets.json](CMakePresets.json) (CMake ≥ 3.25; `cmake --list-presets`).
 
-Options: `POLYMESH_WITH_OCC`, `POLYMESH_WITH_CUDA`, `POLYMESH_WITH_GUI`, `POLYMESH_BUILD_TESTS`.
+| Build | Preset command | Plain CMake equivalent |
+|---|---|---|
+| Configure | `cmake --preset debug` (`release`, `no-gui`, `relwithdebinfo-ci`; Windows: `windows-msvc`) | `cmake -S . -B build-debug -G Ninja -DCMAKE_BUILD_TYPE=Debug` |
+| Build | `cmake --build --preset debug` | `cmake --build build-debug` |
+| Test | `ctest --preset debug` (tests run from the **repo root**) | `ctest --test-dir build-debug --output-on-failure` |
+| GUI | `./build-debug/apps/gui/polymesh-gui` | |
+| CLI | `./build-debug/apps/cli/polymesh` | |
+
+`release` and `relwithdebinfo-ci` (the CI `build-test` flags) build into `build/`;
+`debug` into `build-debug/`, `no-gui` into `build-no-gui/`. `build.sh` / `build.bat`
+wrap `release` / `windows-msvc` (or the debug presets with `Debug`) and copy the
+binaries to the repo root. Presets only set values when used; the option defaults
+in the root `CMakeLists.txt` are unchanged for `add_subdirectory` consumers.
+
+Options: `POLYMESH_WITH_OCC`, `POLYMESH_WITH_CUDA`, `POLYMESH_WITH_GUI`, `POLYMESH_BUILD_TESTS` (full table in [README](README.md#build-ubuntu)).
 
 **Product / campaign builds** need **`-DPOLYMESH_WITH_OCC=ON`** (STEP/B-rep;
 ADR-0020). Package names: Ubuntu `libocct-*-dev` set in README; Fedora
@@ -101,11 +60,14 @@ ADR-0020). Package names: Ubuntu `libocct-*-dev` set in README; Fedora
 
 ```text
 .
-├── README.md                 # product + build + bench scoreboard
+├── README.md                 # product + build + measured evidence
 ├── CONTRIBUTING.md           # THIS FILE — map & standards
-├── CHANGES.md                # external-agent PR workflow (clone → branch → PR)
+├── CHANGES.md                # external-contributor PR workflow (clone → branch → PR)
+├── CLAUDE.md                 # agent-harness entrypoint (links here + docs/STATUS.md)
 ├── LICENSE                   # BSD-3-Clause
-├── CMakeLists.txt            # root build; add_subdirectory only
+├── CMakeLists.txt            # root build: options, dependency resolution, add_subdirectory
+├── CMakePresets.json         # configure/build/test presets (release, debug, CI, Windows)
+├── build.sh, build.bat       # preset wrappers: build CLI + GUI, copy to repo root
 ├── .clang-format
 ├── .github/workflows/        # CI
 │
@@ -126,12 +88,28 @@ ADR-0020). Package names: Ubuntu `libocct-*-dev` set in README; Fedora
 │   └── pipeline/             # headless study: import → mesh → solve job
 │
 ├── tests/                    # Catch2; support/ helpers; no production logic
-├── bench/                    # reference/*.json, geometries, reports, peer harness
-├── docs/                     # all other markdown
-│   ├── spec.md, phases.md, benchmarks.md, progress.md
-│   ├── decisions/            # ADRs (short)
-│   ├── process/              # agent notes, historical
-│   └── gui/                  # theme/layout notes (when present)
+├── bench/                    # reference/*.json, geometries, campaigns, reports,
+│                             #   shipped advisor model (advisor/), peer harness
+├── scripts/                  # Python/shell tooling (fixtures, corpus, analysis, gates);
+│                             #   never in the product path
+├── examples/                 # public-geometry mesh/solve example scripts
+├── audits/                   # blind holdout-audit protocol (no private assets)
+├── third_party/              # vendored deps (geogram; ADR-0025)
+├── docs/
+│   ├── STATUS.md             # single current-status page: state, defects, next
+│   ├── progress.md           # short recent-change summary
+│   ├── cli.md, solver-core.md, benchmarks.md, SHOWCASE.md
+│   ├── decisions/            # ADRs — bodies frozen; index in decisions/README.md
+│   ├── advisor/              # numbered advisor reports + model/data cards
+│   ├── plans/                # methodology in force (advisor-measure-first-program.md)
+│   ├── dag/interfaces.md     # test-lab / GUI / campaign schemas (contract)
+│   ├── process/feedback-loop.md  # campaign analysis how-to
+│   ├── training/             # advisor corpus/training guide
+│   ├── validation/           # hand calcs, field verification
+│   ├── bench/                # dated benchmark reports
+│   ├── gui/                  # theme/layout notes
+│   ├── assets/               # showcase / cinema media + provenance
+│   └── archive/              # frozen history (old plans, phases, board, research)
 │
 └── graphify-out/             # committed knowledge graph for agents
 ```
@@ -144,7 +122,8 @@ apps/cli     ──► pipeline / fea / mesh / geom / adapt
 apps/bench   ──► fea / bench_harness
 apps/testlab ──► geom / mesh / adapt / fea / pipeline / bench_harness / advisor
 advisor      ──► pipeline (public) + onnxruntime (private); never the reverse
-tests        ──► same libraries as apps (never apps/* sources)
+tests        ──► same libraries as apps, plus gui_testlab_data (ImGui-free) and
+                 header-only apps/testlab helpers; never app entry points or UI
 fea may use CUDA backend; CPU path always exists
 bench_harness loads bench/reference/* — ONLY module allowed to
 ```
@@ -153,7 +132,7 @@ bench_harness loads bench/reference/* — ONLY module allowed to
 
 1. **`apps/` never implements physics or meshing.** UI calls `pipeline` / libs.
 2. **`src/pipeline` has no GLFW/ImGui/OpenGL.** Headless-safe; used by GUI + tests.
-3. **Libraries do not include files from `apps/`.**
+3. **Libraries do not include files from `apps/`.** Tests may link the ImGui-free app-private library `gui_testlab_data` and include the header-only testlab helpers (`apps/testlab/load_area.hpp`, `probe_util.hpp`, `run_artifacts.hpp`); never app entry points (`main.cpp`) or UI code.
 4. **New code goes in the smallest library that owns the concept.** Prefer extend over new top-level folders.
 5. **Public headers:** `src/<lib>/include/<lib>/...hpp`. Implementation in `src/<lib>/src/`.
 
@@ -178,7 +157,7 @@ bench_harness loads bench/reference/* — ONLY module allowed to
 | Verification tests | `tests/test_*.cpp` |
 | Field-level verification of shipped solves | `scripts/verify_fields.py` + `docs/validation/field-verification.md` |
 | Physics/math decisions | `docs/decisions/NNNN-*.md` (ADR) |
-| Phase plan / progress | `docs/phases.md`, `docs/progress.md` |
+| Current status / next work | `docs/STATUS.md` |
 | Agent knowledge graph | `graphify-out/` + `/graphify` skill |
 
 ---
@@ -209,9 +188,6 @@ bench_harness loads bench/reference/* — ONLY module allowed to
 - **BSD-3-Clause.** SPDX: `// SPDX-License-Identifier: BSD-3-Clause`.
 - Deps: MIT/Apache/BSD/LGPL-compatible only.
 
-### Git identity (owner agents)
-- Owner agents: commit as configured identity (**Hunter-124**), often on `master`. No AI attribution. External agents: **CHANGES.md**.
-
 ### CUDA
 - Optional (`POLYMESH_WITH_CUDA`). Use GPU only where f64 parallel work wins.
 - Every CUDA kernel needs a **CPU parity test**. CPU path always compiles.
@@ -222,30 +198,34 @@ bench_harness loads bench/reference/* — ONLY module allowed to
 
 | Put | Where |
 |---|---|
-| Product pitch + build + scoreboard | `README.md` |
-| Map + standards (agents) | `CONTRIBUTING.md` (this file) |
-| External agent PR / clone / merge | `CHANGES.md` |
-| Spec / phases / benches / progress | `docs/*.md` |
-| One decision = one short ADR | `docs/decisions/` |
+| Product pitch + build + measured evidence | `README.md` |
+| Map + standards | `CONTRIBUTING.md` (this file) |
+| Agent-harness entrypoint (links only) | `CLAUDE.md` |
+| External-contributor PR / clone / merge | `CHANGES.md` |
+| Current state, open defects, next work | `docs/STATUS.md` (the only status page) |
+| Reference (CLI, solver core, benchmarks) | `docs/*.md` |
+| One decision = one short ADR (body frozen once accepted) | `docs/decisions/` |
 | GUI theme tokens / layout rules | `docs/gui/` |
+| Superseded plans, logs, research | `docs/archive/` (frozen) |
 
 - Prefer **tables and short commands** over essays.
-- Update `docs/progress.md` when benchmarks or phase status change.
+- Update `docs/STATUS.md` when benchmarks, defects, or subsystem state change; add a line to `docs/progress.md` for notable landed changes.
 - Do **not** duplicate the same policy in three files; link once.
-- Do **not** leave TODO novels in headers — fix or file a one-line open issue in progress.
+- Do **not** leave TODO novels in headers — fix, or add a one-line open item to `docs/STATUS.md`.
+- Cite files and symbols, not source line numbers.
 
 ---
 
 ## 6. How to add a feature (agent checklist)
 
-1. Read this file + relevant ADR + `docs/phases.md` for the phase you touch.
+1. Read this file + relevant ADR + `docs/STATUS.md` for the subsystem you touch.
 2. Put code in the correct layer (§2–3). No new root clutter.
 3. Unit test in `tests/`; if physics, use `bench/reference` via harness.
 4. `clang-format`, full build, full `ctest` green.
 5. Grep audit: no `bench/reference` reads outside `src/bench` / tests.
 6. Short ADR if you chose among real design alternatives.
-7. Update `docs/progress.md` benchmark table if results move.
-8. If graph-worthy structure change: refresh `graphify-out/` (or leave a note for the orchestrator).
+7. Update `docs/STATUS.md` (and the evidence doc it links) if results move.
+8. If graph-worthy structure change: `graphify update .` and commit `graphify-out/` (§8).
 
 ---
 
@@ -319,7 +299,7 @@ If your PR changes public structure (new libs, renames, major call graph), inclu
 |---|---|
 | Don’t know folder | §2 layout + §3 table |
 | External PR / wrong clone | `CHANGES.md` (agents) |
-| Don’t know phase | `docs/phases.md` + `docs/progress.md` |
+| Don’t know current state / what to work on | `docs/STATUS.md` |
 | Don’t know why a choice | `docs/decisions/` |
 | Don’t know who calls what | `graphify-out/` / graphify query |
 | Touching Eigen inverse | §4 Eigen traps |

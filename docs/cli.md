@@ -1,6 +1,7 @@
 # `polymesh` command-line reference
 
-The `polymesh` binary (`apps/cli/main.cpp`) is the headless face of the library: it
+The `polymesh` binary (`apps/cli/`: dispatcher in `main.cpp`, one `commands_*.cpp` per
+command group) is the headless face of the library: it
 imports a CAD part, meshes it, solves it, and writes VTU / PNG / JSON artifacts. It is
 also the lane external tools use as an independent cross-check of an in-process solve
 (Chudware's `polymesh_cli` MCP tool shells out to exactly this binary).

@@ -245,7 +245,7 @@ the elements went, not how many there are. Same principle as the Kirsch
 equal-DOF result, which had the
 finer control of a structured annular mesh: at an identical 648 free DOFs,
 logarithmic radial grading cut SCF error from **3.06%** to **0.70%**
-([docs/progress.md](progress.md)).
+([docs/archive/progress-history.md](archive/progress-history.md)).
 
 ```sh
 python scripts/render_showcase.py --only compare_grading
@@ -442,8 +442,8 @@ no-op in mesh output while emitting a smaller, denoised source set. The payoff
 is on noisy real-world curvature; these fixtures are not where it shows, and the
 page says so rather than implying otherwise.
 
-`diag --json` carries the same numbers as a `spectral` block for the
-self-improve loop, and campaigns opt in per run with `"spectral_smooth": true`.
+`diag --json` carries the same numbers as a `spectral` block, and campaigns opt
+in per run with `"spectral_smooth": true`.
 
 ```sh
 polymesh mesh tests/fixtures/parts/icecream_cone.step -h 0.008          # on by default
@@ -520,7 +520,7 @@ hierarchical p-basis:
 | hierarchical p = 3 | 3 | **2.98** |
 | hierarchical p = 4 | 4 | **3.98** |
 
-Source: [docs/progress.md](progress.md),
+Source: [docs/archive/progress-history.md](archive/progress-history.md),
 [`bench/reports/p1-gate1-convergence.md`](../bench/reports/p1-gate1-convergence.md).
 The manufactured field is generated from a randomized seed at test time so its
 coefficients cannot be memorized or hardcoded
@@ -783,5 +783,5 @@ Useful `render_showcase.py` flags:
 | `--mesh MESH.vtu --out X.png` | Single mesh render from an existing mesh VTU |
 
 Prerequisite: a Release build with OCC enabled (see
-[README § Quickstart](../README.md#quickstart-ubuntu)), since every render
+[README § Build (Ubuntu)](../README.md#build-ubuntu)), since every render
 starts from a STEP import.

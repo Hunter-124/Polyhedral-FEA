@@ -1,8 +1,8 @@
 # Variable-everything meshing + learned mesh advisor
 
 **Status:** active program (2026-08-09). Supersedes ad-hoc "turn on the variable
-knobs" work. Companion ADRs: [0026](../decisions/0026-anisotropic-metric-adaptivity.md),
-[0027](../decisions/0027-learned-mesh-advisor.md).
+knobs" work. Companion ADRs: [0026](../../decisions/0026-anisotropic-metric-adaptivity.md),
+[0027](../../decisions/0027-learned-mesh-advisor.md).
 Raw research: [`docs/research/ideabank/`](../research/ideabank/).
 
 ## Why this program exists

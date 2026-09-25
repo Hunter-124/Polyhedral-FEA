@@ -4,12 +4,15 @@
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
+#include <utility>
 
 namespace polymesh::adapt {
 namespace {
 
 double clamp_size(double h, double h_min, double h_max) { return std::clamp(h, h_min, h_max); }
 
+/// Linear ramp from `h_local` at dist 0 to `h_max` at dist >= blend (metres);
+/// non-positive or non-finite dist returns `h_local`.
 double blend_to_max(double h_local, double h_max, double dist, double blend) {
     if (!(dist > 0.0) || !std::isfinite(dist)) {
         return h_local;
@@ -33,15 +36,7 @@ FeatureSizing::FeatureSizing(double h_min, double h_max, double blend_distance,
 }
 
 double FeatureSizing::size_at(const Eigen::Vector3d& point) const {
-    const double d = dist_(point);
-    if (!(d > 0.0) || !std::isfinite(d)) {
-        return h_min_;
-    }
-    if (d >= blend_) {
-        return h_max_;
-    }
-    const double t = d / blend_;
-    return h_min_ + t * (h_max_ - h_min_);
+    return blend_to_max(h_min_, h_max_, dist_(point), blend_);
 }
 
 std::unique_ptr<SizingField> make_feature_sizing(double h_min, double h_max,
@@ -100,14 +95,7 @@ double GeometrySizing::size_at(const Eigen::Vector3d& point) const {
     // Sharp-edge crease field (independent distance-to-edge blend).
     if (!edges_.empty()) {
         const double d_feat = geom::distance_to_features(point, surface_, edges_);
-        double h_feat = h_max_;
-        if (!(d_feat > 0.0) || !std::isfinite(d_feat)) {
-            h_feat = h_min_;
-        } else if (d_feat < blend_) {
-            const double t = d_feat / blend_;
-            h_feat = h_min_ + t * (h_max_ - h_min_);
-        }
-        h = std::min(h, h_feat);
+        h = std::min(h, blend_to_max(h_min_, h_max_, d_feat, blend_));
     }
 
     return clamp_size(h, h_min_, h_max_);

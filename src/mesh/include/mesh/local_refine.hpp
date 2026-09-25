@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-// True local h-refine for tet4 meshes (ADR-0016 / ROADMAP D4).
+// True local h-refine for tet4 meshes (ADR-0016).
 //
 // Strategy: Rivara longest-edge bisection (LEB) with longest-edge propagation
 // path (LEPP) closure. Every edge that is split is bisected in *all* tets that

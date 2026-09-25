@@ -274,7 +274,7 @@ owned_boundary_projection_target(const Eigen::Vector3d& p, std::uint32_t node,
     // The oracle sees the folded query, so ownership is classified in the
     // canonical octant: a node and its mirror image latch the SAME face/edge/
     // vertex id and are then projected onto mirrored points of it. Classifying
-    // each in its own octant is what let a sphere's seam edge own one node and
+    // each in its own octant would let a sphere's seam edge own one node and
     // its mirror image own the face (ADR-0036 §7).
     const Eigen::Vector3d query = mirror_fold(mirror, p);
     auto target = context->target(query, *support);
@@ -492,13 +492,9 @@ snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d
 
     // Line-search projected nodes back toward their original lattice sites.
     //
-    // The culprit-aware implementation used to call the GLOBAL offender
-    // collector at every scan and every one of twelve bisection steps. On the
-    // hybrid sphere that is ~O(boundary nodes × 16 × 47k cells): 3.1 s became
-    // 240.5 s, and icecream hybrid-VEM did not finish in 19 minutes.
-    //
     // Callers that provide `node_offends` inspect only the cells incident to
-    // the trial node. A cached global snapshot selects candidates; it is
+    // the trial node; calling the GLOBAL offender collector at every trial is
+    // quadratic. A cached global snapshot selects candidates; it is
     // refreshed only after coupled restores and at the final proof, preserving
     // whole-mesh validity without the quadratic global-rescan loop.
     if (node_offends) {
@@ -629,10 +625,8 @@ snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d
             };
             run_ladder(/*include_full=*/false);
             // Relax whenever the projection cannot be kept WHOLE, not only
-            // when every fraction fails. The common case on a curved wall is
-            // not a full retreat (measured: 9 of 584 nodes on icecream_cone)
-            // but a partial keep — the ladder settles at 0.25 of the move and
-            // leaves the node 0.6 h off the CAD while reporting nothing. The
+            // when every fraction fails: a partial keep (e.g. 0.25 of the move)
+            // leaves the node well off the CAD while reporting nothing. The
             // cell that blocks it is a stair fold whose other corners are
             // interior and unconstrained, so open that room and retry; the
             // relaxation is validity-gated and touches interior nodes only,
@@ -776,17 +770,11 @@ snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d
             // The recovery above is a sequence of LOCAL decisions: each node is
             // re-pushed while its own incident star is valid, but a later node's
             // push can re-break a cell an earlier node shares, and that earlier
-            // node is never revisited. This whole-mesh sweep used to be computed
-            // and then thrown away — "mandatory final whole-mesh proof" that
-            // proved nothing, because no caller of this function reads the
-            // offender set. Measured 2026-08-15 on ellipsoid_boss_s1 hybrid at
-            // auto h: 4 hex8 cells left the snap at fea::cell_quality -0.99 with
-            // 7 of 8 nodes recovered to 0.5-0.7 h of travel.
-            //
-            // So act on it: retreat every recovered node that still participates
-            // in a bad cell, all the way back, and re-prove. Each iteration
-            // permanently drops at least one node from `recovered_span`, so this
-            // terminates in at most one pass per recovered node.
+            // node is never revisited. So this whole-mesh sweep retreats every
+            // recovered node that still participates in a bad cell, all the way
+            // back, and re-proves. Each iteration permanently drops at least one
+            // node from `recovered_origin`, so this terminates in at most one
+            // pass per recovered node.
             std::unordered_map<std::uint32_t, Eigen::Vector3d> recovered_origin;
             recovered_origin.reserve(recover.size());
             for (const auto& r : recover) {
@@ -817,10 +805,8 @@ snap_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector3d
             }
         }
     } else {
-        // Compatibility path for legacy fill callers: the old bounded
+        // Compatibility path for fill callers without `node_offends`: a bounded
         // 0.75/0.5/0.25 ladder (at most four global scans per restored node).
-        // It is intentionally boring; the former 12-step culprit loop made
-        // every existing callsite pay for an incident map it did not have.
         while (!original.empty()) {
             fill_progress_poll(stats.n_unsnapped, stats.n_candidates);
             std::set<std::uint32_t> offenders;
@@ -885,12 +871,9 @@ smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector
         return stats;
     }
     // Capped at 10: the pass count is shared with the crease-chain relaxation
-    // above, which slides nodes ALONG a sharp edge and is not idempotent.
-    // Measured on cantilever.step at h = 10 mm with the wall relaxation below
-    // held fixed, raising the graded mesher's 3 passes to 8 dropped the worst
-    // cell shape quality from 0.135 to 0.093, and 20 passes to 0.058 — on a box,
-    // whose planar walls had no spacing left to win. More passes are only worth
-    // it on a part that is all curved wall, and nothing here is.
+    // above, which slides nodes ALONG a sharp edge and is not idempotent; more
+    // passes degrade worst cell shape quality on planar-walled parts and only
+    // pay off on a part that is all curved wall.
     passes = std::clamp(passes, 1, 10);
     relax = std::clamp(relax, 0.05, 1.0);
     (void)grid_for(surface);
@@ -980,10 +963,8 @@ smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector
     // and the re-projection at the Jacobi step both write shared per-node
     // provenance through the exact oracle, so the visit sequence is mesh-level
     // mutation state rather than a private scan: `nbr` bucket order differs
-    // between libstdc++ and MSVC (measured 2026-08-14: 5 of 24 corpus pairs
-    // disagreed, worst 264 vs 200 elements). Ascending node id fixed that but is
-    // not mirror-equivariant, and this pass was the single largest symmetry loss
-    // in the graded fill — see `sort_mirror_canonical` (ADR-0036).
+    // between standard libraries, and ascending node id is not
+    // mirror-equivariant — see `sort_mirror_canonical` (ADR-0032, ADR-0036).
     std::vector<std::uint32_t> nbr_ids;
     nbr_ids.reserve(nbr.size());
     for (const auto& [ni, _] : nbr) {
@@ -1147,27 +1128,13 @@ smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector
                 // when every incident face has the same area and otherwise pulls
                 // the node INTO the oversized face, shrinking it. The second is
                 // plain regularisation toward the 1-ring. Their sum is what gets
-                // both properties, and each alone is measurably worse. Measured
-                // on sphere.step at h = 8 mm (5776 skin triangles, equivalent
-                // equilateral edge length, and the min triangle angle at the 1st
-                // percentile):
-                //
-                //   neighbour centroid (the old target) p95/p05 2.15, max/min
-                //     3.46, azimuthal size spread in the loaded band 14.5%,
-                //     min-angle p01 26.7 deg
-                //   area imbalance alone      1.67 / 2.11 / 10.3% / 20.3 deg
-                //   equal edge lengths        1.77 / 2.38 / 10.6% / 22.2 deg
-                //   area-weighted centroid    1.78 / 2.52 / 10.6% / 26.4 deg
-                //
-                // So the two size-only objectives buy their uniformity by
-                // skewing triangles (min-angle p01 down a quarter, and the
-                // surface-normal p99 against the exact sphere 1.9 -> 4.2 deg),
-                // while the area-weighted centroid buys the same uniformity at
-                // the baseline's shape. The old target is also not merely weaker:
-                // it gets WORSE with more passes (p95/p05 2.15 at 3 passes, 2.20
-                // at 8, 2.33 at 20) because the neighbour centroid's fixed point
-                // is not equal spacing, so iterating it converges to the wrong
-                // configuration rather than slowly to the right one.
+                // both properties, and each alone is measurably worse: the two
+                // size-only objectives (area imbalance alone, equal edge
+                // lengths) buy their uniformity by skewing triangles, while the
+                // area-weighted centroid buys the same uniformity at the plain
+                // neighbour centroid's shape. The plain neighbour centroid also
+                // gets WORSE with more passes, because its fixed point is not
+                // equal spacing.
                 const auto it = inc.find(ni);
                 if (it == inc.end()) {
                     continue;
@@ -1231,11 +1198,9 @@ smooth_boundary_nodes(const geom::TriSurface& surface, std::vector<Eigen::Vector
         // Inversion guard: revert moved offenders until the mesh is clean.
         // The cascade MUST run to a fixed point: at a concave crease, reverting
         // one node routinely inverts a neighbour's tet, and an iteration cap
-        // here once left 920 inverted tets behind on icecream_cone.step — which
-        // the caller then "fixed" by re-winding them, producing watertight,
-        // positive-volume, mutually OVERLAPPING tets (9 boundary faces buried
-        // inside other cells). Termination is guaranteed: every iteration
-        // erases at least one node from `moved`, and each node reverts once.
+        // would leave inverted tets behind for the caller. Termination is
+        // guaranteed: every iteration erases at least one node from `moved`,
+        // and each node reverts once.
         while (true) {
             fill_progress_poll(stats.n_reverted, nbr_ids.size());
             std::set<std::uint32_t> offenders;

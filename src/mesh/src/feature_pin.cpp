@@ -22,9 +22,7 @@ constexpr double kChainEnergyFraction = 0.995;
 ///
 /// A partial pin is worse than no pin: the node ends up neither on its feature
 /// curve nor on the surface it came from, which is exactly the off-CAD
-/// outlier this pass exists to remove (measured on plate_hole: partial pins
-/// left the worst boundary node 0.31 h off the BRep, three times the
-/// pre-pin figure). Features are all-or-nothing.
+/// outlier this pass exists to remove. Features are all-or-nothing.
 bool try_pin(std::vector<Eigen::Vector3d>& nodes, std::uint32_t node,
              const Eigen::Vector3d& target, const NodeOffendsFn& node_offends) {
     const Eigen::Vector3d from = nodes[node];
@@ -172,11 +170,9 @@ FeaturePinReport pin_feature_nodes(const geom::CadModel& cad, const geom::CadTop
             mirror != nullptr ? mirror->clamp_to_planes(exact->point, nodes[best])
                               : exact->point;
         // The whole orbit of the claimed node is pinned together. A CAD vertex and
-        // its mirror image are two separate topology entries visited in kernel
-        // order, so pinning each one when its own turn came let the validity gate
-        // accept one and refuse the other. Measured on plate_hole at h = 6 mm with
-        // every other stage exact: two box-corner/edge nodes lost their mirror
-        // image and took 8 tets with them.
+        // its mirror image are separate topology entries, so pinning each on its
+        // own turn could let the validity gate accept one and refuse the other,
+        // breaking the symmetry (ADR-0036).
         std::vector<std::uint32_t> group{best};
         if (orbit != nullptr) {
             for (unsigned mask = 1; mask <= orbit->reflection_count(); ++mask) {
@@ -253,10 +249,7 @@ FeaturePinReport pin_feature_nodes(const geom::CadModel& cad, const geom::CadTop
         // Owner ids are canonical, not per-node: every later projection folds its
         // query into the low octant (mesh/mirror.hpp), so an owner recorded as the
         // node's OWN nearest CAD vertex would be projected from a folded query and
-        // answer with a point in the wrong octant. Measured on plate_hole at
-        // h = 6 mm: the very next snap round pulled such a node 2.4 mm — 0.4 h —
-        // off the corner it had just been pinned to, while its mirror image stayed,
-        // and those two nodes were the last 8 unmirrored tets in the part.
+        // answer with a point in the wrong octant (ADR-0036).
         std::uint32_t canonical_owner = group_target.front().second;
         if (orbit != nullptr) {
             const auto [source, mask] = orbit->canonical(best);
@@ -283,22 +276,19 @@ FeaturePinReport pin_feature_nodes(const geom::CadModel& cad, const geom::CadTop
     //
     // `travel_r` decides who is actually *moved*. Without it the pass drags
     // wall nodes half a cell onto the rim and their incident faces come with
-    // them — visible in the compare_meshers tet tile as triangular flaps
-    // standing off the hole. A node further than this from the curve is not a
-    // crease node that drifted; it is a wall node, and its own face owns it.
+    // them as triangular flaps standing off the wall. A node further than this
+    // from the curve is not a crease node that drifted; it is a wall node, and
+    // its own face owns it.
     const double capture_r = 0.5 * h;
     const double travel_r = 0.35 * h;
     // Targets for EVERY sharp edge are collected first, then symmetrised across
     // reflection orbits, and only then applied.
     //
     // Collecting globally is what makes the symmetrisation possible at all: a
-    // node's reflection orbit routinely spans several CAD edges. The two rim
+    // node's reflection orbit routinely spans several CAD edges (the two rim
     // circles of a cylinder are one orbit under the z mirror but two topological
-    // edges, and the four vertical edges of a plate are one orbit under x and y.
-    // Symmetrising inside a single edge's chain therefore refused almost every
-    // pin it should have made — measured on cylinder.step at h = 8 mm, rim chains
-    // pinned dropped to zero and the shipped facet-normal p99 rose from 0.35° to
-    // 1.28°.
+    // edges), so symmetrising inside a single edge's chain would refuse almost
+    // every pin it should make.
     //
     // Two properties are wanted from the symmetrisation, and both come from using
     // the canonical orbit member as the single source of truth:
@@ -311,9 +301,7 @@ FeaturePinReport pin_feature_nodes(const geom::CadModel& cad, const geom::CadTop
     //   * The recorded OWNER must be the canonical member's edge, because every
     //     later projection folds its query into the low octant: an owner recorded
     //     as the node's own edge would then be projected from a folded query and
-    //     answer in the wrong octant. Measured on plate_hole at h = 6 mm, that
-    //     inconsistency let the next snap round pull a freshly pinned box-corner
-    //     node 2.4 mm (0.4 h) off its corner while its mirror image stayed put.
+    //     answer in the wrong octant (ADR-0036).
     struct ChainPin {
         Eigen::Vector3d point = Eigen::Vector3d::Zero();
         std::uint32_t edge_id = 0;
@@ -353,13 +341,11 @@ FeaturePinReport pin_feature_nodes(const geom::CadModel& cad, const geom::CadTop
         // Equal parameters are not hypothetical, and which way a tie falls is not
         // cosmetic: for a closed chain the re-spacing below hands each node the
         // target at its INDEX in this order, so transposing two tied nodes moves
-        // both of them. std::sort is unstable and libstdc++ and libc++ transpose
-        // a tie differently — measured on plate_hole hybrid at h = 4 mm, that
-        // flipped one pin from accepted to rejected (edge_pinned 1868 vs 1867)
-        // and the two standard libraries wrote different meshes. `chain` is built
-        // by walking `candidates`, which is already in mirror-canonical order, so
-        // a stable sort keeps that order for ties: platform-independent, and a
-        // node and its mirror image stay adjacent (ADR-0032, ADR-0036).
+        // both of them, and std::sort transposes ties differently across standard
+        // libraries. `chain` is built by walking `candidates`, which is already in
+        // mirror-canonical order, so a stable sort keeps that order for ties:
+        // platform-independent, and a node and its mirror image stay adjacent
+        // (ADR-0032, ADR-0036).
         std::stable_sort(chain.begin(), chain.end(),
                          [](const Pinned& a, const Pinned& b) { return a.t < b.t; });
 

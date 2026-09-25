@@ -7,8 +7,9 @@
 //   - Interior lattice cells (all 6 face-neighbors inside) → hex8
 //   - Boundary lattice cells → six pyramid5 (apex = cell center, bases = faces)
 // Interior hex–pyramid faces are conforming quads. Optional limited surface
-// snap (≤0.35 h) pulls boundary lattice nodes toward the STL; nodes that would
-// invert a hex (center J) or pyramid (tet-split volume) are unsnapped (B3).
+// snap (≤0.75 h) pulls boundary lattice nodes toward the STL; a node move that
+// would invert a hex (Gauss-point detJ) or pyramid (split-tet volume) or drop
+// it below the shared shape floor is undone.
 
 #include "geom/tri_surface.hpp"
 
@@ -41,7 +42,7 @@ struct TransitionFillOutput {
 };
 
 /// Hex core + pyramid skin. `h` and bbox in metres. If `snap_boundary`, lattice
-/// nodes on the free surface are pulled toward the STL by at most 0.35 h.
+/// nodes on the free surface are pulled toward the STL by at most 0.75 h.
 TransitionFillOutput transition_fill_surface(const geom::TriSurface& surface,
                                              const Eigen::Vector3d& bbox_min,
                                              const Eigen::Vector3d& bbox_max, double h,

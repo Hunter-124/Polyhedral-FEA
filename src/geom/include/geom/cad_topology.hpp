@@ -9,6 +9,7 @@
 #include <Eigen/Core>
 
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <vector>
 
@@ -67,17 +68,10 @@ struct CadFace {
     /// plane has zero curvature everywhere, so the grid would cost without
     /// telling anyone anything) and empty when OCC is disabled.
     ///
-    /// These are *exact* surface properties evaluated on the BRep, deliberately
-    /// independent of any triangulation. That independence is the whole point:
-    /// OCC's tessellation of a mirror-symmetric part is itself not
-    /// mirror-symmetric, so any curvature estimated from it cannot be either.
-    /// Measured at the product's own deflection (5e-4·bbox_diag, 0.2 rad), the
-    /// fraction of tessellation vertices with an exact mirror partner is
-    /// sphere x 0.00% / y 99.69% / z 1.33%, plate_hole x 5.97% (cylinder is the
-    /// only 100%); the sphere's seam meridian and poles put facets in entirely
-    /// different places on the two sides of the yz-plane. A uv grid on the
-    /// analytic surface has no such seam bias, so a mesh decision sized from
-    /// `kappa_samples` can be mirror-symmetric where one sized from
+    /// These are *exact* surface properties evaluated on the BRep, independent
+    /// of any triangulation: OCC's tessellation of a mirror-symmetric part is
+    /// not itself mirror-symmetric (seams, poles), so sizing from
+    /// `kappa_samples` can be symmetric where sizing from
     /// `geom::estimate_vertex_curvature` cannot (ADR-0036 §6).
     std::vector<Eigen::Vector3d> samples;
     /// max(|κ_max|, |κ_min|) principal curvature magnitude (1/m) at each

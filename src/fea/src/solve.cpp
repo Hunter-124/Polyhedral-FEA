@@ -29,7 +29,7 @@ namespace polymesh::fea {
 namespace {
 
 // Eigen exposes IncompleteCholesky::shift() only from 5.0 on; 3.4 (Ubuntu LTS,
-// and the version Chudware pins) keeps the escalated shift private. The value is
+// still supported) keeps the escalated shift private. The value is
 // diagnostic only, so report the exact final shift where the accessor exists and
 // the requested initial shift otherwise, labelled so a log is never misread.
 template <class T>
@@ -293,234 +293,217 @@ CgAttempt run_cg(const Eigen::SparseMatrix<double>& a, const Eigen::VectorXd& rh
     return result;
 }
 
-ReducedSolveResult solve_reduced(const Eigen::SparseMatrix<double>& kff,
-                                 const Eigen::VectorXd& rhs, const SolveOptions& options,
-                                 const SolveCostEstimate& symbolic_cost) {
+/// Preconditioned CG path: diagonal equilibration, then incomplete Cholesky
+/// (with one shifted retry) and a Jacobi fallback. Success and degraded
+/// acceptance are judged only on the recomputed physical true residual.
+ReducedSolveResult solve_reduced_cg(const Eigen::SparseMatrix<double>& kff,
+                                    const Eigen::VectorXd& rhs, const SolveOptions& options,
+                                    const SolveCostEstimate& symbolic_cost) {
     const Eigen::Index nfree = kff.rows();
-    const SolveMethod method = select_solve_method(nfree, options);
     SolvePhaseTimings phases;
+    const int max_iters = cg_iteration_budget(nfree, options);
+    const int report_every = std::max(options.cg_progress_chunk, 0);
+    constexpr double kIcRetryInitialShift = 0.5;
 
-    if (method == SolveMethod::kCG) {
-        const int max_iters = cg_iteration_budget(nfree, options);
-        const int report_every = std::max(options.cg_progress_chunk, 0);
-        constexpr double kIcRetryInitialShift = 0.5;
-
-        auto emit_note = [&](std::string note) {
-            if (options.on_note) {
-                options.on_note(note);
-            }
-        };
-        auto attempt_summary = [](std::string_view preconditioner, const CgAttempt& attempt) {
-            return std::format("{}: {}, {} iterations, true relative residual={}, "
-                               "reliable restarts={}",
-                               preconditioner, cg_stop_text(attempt.stop), attempt.iterations,
-                               attempt.true_relative_residual, attempt.reliable_restarts);
-        };
-
-        // Symmetric diagonal equilibration: MPC transforms and graded meshes
-        // spread the K_ff diagonal over orders of magnitude, which degrades
-        // incomplete Cholesky. Solve the exact congruence K_hat = S·K·S,
-        // rhs_hat = S·rhs (unit diagonal) and unscale x = S·x_hat afterwards.
-        // A non-positive diagonal means the system is not SPD; keep the
-        // historical unscaled behaviour in that case.
-        Eigen::VectorXd scaling; // empty = not equilibrated
-        Eigen::SparseMatrix<double> kff_hat;
-        Eigen::VectorXd rhs_hat;
-        const auto equilibrate_start = SolveClock::now();
-        try {
-            scaling = symmetric_diagonal_scaling(kff);
-            kff_hat = kff; // same sparsity pattern; values equilibrated in one pass
-            for (Eigen::Index col = 0; col < kff_hat.outerSize(); ++col) {
-                for (Eigen::SparseMatrix<double>::InnerIterator it(kff_hat, col); it; ++it) {
-                    it.valueRef() *= scaling[it.row()] * scaling[it.col()];
-                }
-            }
-            rhs_hat = scaling.cwiseProduct(rhs);
-            emit_note("CG system equilibrated by symmetric diagonal scaling "
-                      "(S·K_ff·S has unit diagonal)");
-        } catch (const FeaError& e) {
-            scaling.resize(0);
-            emit_note(std::format("CG diagonal equilibration unavailable ({}); "
-                                  "solving the unscaled system",
-                                  e.what()));
+    auto emit_note = [&](std::string note) {
+        if (options.on_note) {
+            options.on_note(note);
         }
-        phases.analyze_ms += elapsed_ms(equilibrate_start);
-        const bool equilibrated = scaling.size() > 0;
-        const Eigen::SparseMatrix<double>& a = equilibrated ? kff_hat : kff;
-        const Eigen::VectorXd& b = equilibrated ? rhs_hat : rhs;
+    };
+    auto attempt_summary = [](std::string_view preconditioner, const CgAttempt& attempt) {
+        return std::format("{}: {}, {} iterations, true relative residual={}, "
+                           "reliable restarts={}",
+                           preconditioner, cg_stop_text(attempt.stop), attempt.iterations,
+                           attempt.true_relative_residual, attempt.reliable_restarts);
+    };
 
-        std::vector<std::string> attempts;
-        attempts.reserve(3);
-        CgAttempt selected_attempt;
-        std::string selected_preconditioner;
-        int total_iterations = 0;
-        bool have_attempt = false;
-        bool target_met = false;
+    // Symmetric diagonal equilibration: MPC transforms and graded meshes
+    // spread the K_ff diagonal over orders of magnitude, which degrades
+    // incomplete Cholesky. Solve the exact congruence K_hat = S·K·S,
+    // rhs_hat = S·rhs (unit diagonal) and unscale x = S·x_hat afterwards.
+    // A non-positive diagonal means the system is not SPD; solve the unscaled
+    // system in that case.
+    Eigen::VectorXd scaling; // empty = not equilibrated
+    Eigen::SparseMatrix<double> kff_hat;
+    Eigen::VectorXd rhs_hat;
+    const auto equilibrate_start = SolveClock::now();
+    try {
+        scaling = symmetric_diagonal_scaling(kff);
+        kff_hat = kff; // same sparsity pattern; values equilibrated in one pass
+        for (Eigen::Index col = 0; col < kff_hat.outerSize(); ++col) {
+            for (Eigen::SparseMatrix<double>::InnerIterator it(kff_hat, col); it; ++it) {
+                it.valueRef() *= scaling[it.row()] * scaling[it.col()];
+            }
+        }
+        rhs_hat = scaling.cwiseProduct(rhs);
+        emit_note("CG system equilibrated by symmetric diagonal scaling "
+                  "(S·K_ff·S has unit diagonal)");
+    } catch (const FeaError& e) {
+        scaling.resize(0);
+        emit_note(std::format("CG diagonal equilibration unavailable ({}); "
+                              "solving the unscaled system",
+                              e.what()));
+    }
+    phases.analyze_ms += elapsed_ms(equilibrate_start);
+    const bool equilibrated = scaling.size() > 0;
+    const Eigen::SparseMatrix<double>& a = equilibrated ? kff_hat : kff;
+    const Eigen::VectorXd& b = equilibrated ? rhs_hat : rhs;
 
-        auto run_attempt = [&](std::string_view name, const auto& preconditioner) {
-            emit_note(std::format("CG using {} (target tol={}, acceptance tol={}, "
-                                  "max iterations={})",
-                                  name, options.cg_tol, options.cg_accept_tol, max_iters));
-            const auto attempt_start = SolveClock::now();
-            CgAttempt attempt = run_cg(a, b, preconditioner, options.cg_tol, max_iters,
-                                       report_every, options.on_progress);
-            phases.factorize_ms += elapsed_ms(attempt_start);
-            total_iterations += attempt.iterations;
-            if (equilibrated) {
-                // The honesty contract measures the physical system: unscale
-                // x = S·x_hat, then independently recompute ‖b−K·x‖/‖b‖ in the
-                // original space for the summary, acceptance, and throw paths.
-                attempt.x = scaling.cwiseProduct(attempt.x);
-                const double rhs_norm = rhs.norm();
-                if (rhs_norm > 0.0) {
-                    const Eigen::VectorXd r = rhs - kff * attempt.x;
-                    attempt.true_relative_residual = r.norm() / rhs_norm;
-                } else {
-                    attempt.true_relative_residual = 0.0;
-                }
-                // Never claim target convergence the physical residual did not
-                // reach, and never withhold it when it did.
-                if (attempt.true_relative_residual <= options.cg_tol) {
-                    attempt.stop = CgStop::kConverged;
-                } else if (attempt.stop == CgStop::kConverged) {
-                    attempt.stop = CgStop::kAttainableAccuracy;
-                }
+    std::vector<std::string> attempts;
+    attempts.reserve(3);
+    CgAttempt selected_attempt;
+    std::string selected_preconditioner;
+    int total_iterations = 0;
+    bool have_attempt = false;
+    bool target_met = false;
+
+    auto run_attempt = [&](std::string_view name, const auto& preconditioner) {
+        emit_note(std::format("CG using {} (target tol={}, acceptance tol={}, "
+                              "max iterations={})",
+                              name, options.cg_tol, options.cg_accept_tol, max_iters));
+        const auto attempt_start = SolveClock::now();
+        CgAttempt attempt = run_cg(a, b, preconditioner, options.cg_tol, max_iters,
+                                   report_every, options.on_progress);
+        phases.factorize_ms += elapsed_ms(attempt_start);
+        total_iterations += attempt.iterations;
+        if (equilibrated) {
+            // The honesty contract measures the physical system: unscale
+            // x = S·x_hat, then independently recompute ‖b−K·x‖/‖b‖ in the
+            // original space for the summary, acceptance, and throw paths.
+            attempt.x = scaling.cwiseProduct(attempt.x);
+            const double rhs_norm = rhs.norm();
+            if (rhs_norm > 0.0) {
+                const Eigen::VectorXd r = rhs - kff * attempt.x;
+                attempt.true_relative_residual = r.norm() / rhs_norm;
+            } else {
+                attempt.true_relative_residual = 0.0;
             }
-            attempts.push_back(attempt_summary(name, attempt));
-            const bool converged = attempt.stop == CgStop::kConverged;
-            if (!have_attempt || converged ||
-                attempt.true_relative_residual < selected_attempt.true_relative_residual) {
-                selected_attempt = std::move(attempt);
-                selected_preconditioner = name;
-                have_attempt = true;
+            // Never claim target convergence the physical residual did not
+            // reach, and never withhold it when it did.
+            if (attempt.true_relative_residual <= options.cg_tol) {
+                attempt.stop = CgStop::kConverged;
+            } else if (attempt.stop == CgStop::kConverged) {
+                attempt.stop = CgStop::kAttainableAccuracy;
             }
-            target_met = converged;
-        };
-        // Eigen's modified incomplete Cholesky is the primary preconditioner.
-        // Its default initial shift (1e-3) makes ten attempts ending near
-        // 0.256 on the scaled matrix. Continue at the next shift scale before
-        // giving up on IC and falling back to Jacobi. Preconditioners are
-        // built on the equilibrated matrix when equilibration succeeded.
-        const std::string_view eq = equilibrated ? "equilibrated " : "";
-        constexpr double kIcDefaultInitialShift = 1e-3;
-        Eigen::IncompleteCholesky<double> ichol;
-        ichol.compute(a);
+        }
+        attempts.push_back(attempt_summary(name, attempt));
+        const bool converged = attempt.stop == CgStop::kConverged;
+        if (!have_attempt || converged ||
+            attempt.true_relative_residual < selected_attempt.true_relative_residual) {
+            selected_attempt = std::move(attempt);
+            selected_preconditioner = name;
+            have_attempt = true;
+        }
+        target_met = converged;
+    };
+    // Eigen's modified incomplete Cholesky is the primary preconditioner.
+    // Its default initial shift (1e-3) makes ten attempts ending near
+    // 0.256 on the scaled matrix. Continue at the next shift scale before
+    // giving up on IC and falling back to Jacobi. Preconditioners are
+    // built on the equilibrated matrix when equilibration succeeded.
+    const std::string_view eq = equilibrated ? "equilibrated " : "";
+    constexpr double kIcDefaultInitialShift = 1e-3;
+    Eigen::IncompleteCholesky<double> ichol;
+    ichol.compute(a);
+    if (ichol.info() == Eigen::Success) {
+        const std::string name =
+            std::format("{}incomplete Cholesky (shift={})", eq,
+                        ichol_shift_text(ichol, kIcDefaultInitialShift));
+        run_attempt(name, ichol);
+    } else {
+        const std::string failed_shift = ichol_shift_text(ichol, kIcDefaultInitialShift);
+        attempts.push_back(
+            std::format("{}incomplete Cholesky: factorization failed after shift {}", eq,
+                        failed_shift));
+        emit_note(
+            std::format("CG incomplete Cholesky factorization failed after shift {}; "
+                        "retrying with initial shift {}",
+                        failed_shift, kIcRetryInitialShift));
+
+        ichol.setInitialShift(kIcRetryInitialShift);
+        ichol.factorize(a); // reuse the already-computed AMD ordering
         if (ichol.info() == Eigen::Success) {
-            const std::string name =
-                std::format("{}incomplete Cholesky (shift={})", eq,
-                            ichol_shift_text(ichol, kIcDefaultInitialShift));
+            const std::string name = std::format(
+                "{}shifted incomplete Cholesky (initial shift={}, final shift={})", eq,
+                kIcRetryInitialShift, ichol_shift_text(ichol, kIcRetryInitialShift));
             run_attempt(name, ichol);
         } else {
-            const std::string failed_shift = ichol_shift_text(ichol, kIcDefaultInitialShift);
-            attempts.push_back(
-                std::format("{}incomplete Cholesky: factorization failed after shift {}", eq,
-                            failed_shift));
-            emit_note(
-                std::format("CG incomplete Cholesky factorization failed after shift {}; "
-                            "retrying with initial shift {}",
-                            failed_shift, kIcRetryInitialShift));
-
-            ichol.setInitialShift(kIcRetryInitialShift);
-            ichol.factorize(a); // reuse the already-computed AMD ordering
-            if (ichol.info() == Eigen::Success) {
-                const std::string name = std::format(
-                    "{}shifted incomplete Cholesky (initial shift={}, final shift={})", eq,
-                    kIcRetryInitialShift, ichol_shift_text(ichol, kIcRetryInitialShift));
-                run_attempt(name, ichol);
-            } else {
-                const std::string retry_shift = ichol_shift_text(ichol, kIcRetryInitialShift);
-                attempts.push_back(std::format(
-                    "{}shifted incomplete Cholesky: factorization failed after shift {}", eq,
-                    retry_shift));
-                emit_note(std::format(
-                    "CG shifted incomplete Cholesky factorization failed after shift {}; "
-                    "using Jacobi",
-                    retry_shift));
-            }
-        }
-
-        if (!target_met) {
-            if (!attempts.empty() && ichol.info() == Eigen::Success) {
-                emit_note("CG incomplete Cholesky target not met; using Jacobi");
-            }
-            const Eigen::DiagonalPreconditioner<double> jacobi(a);
-            run_attempt(equilibrated ? "equilibrated Jacobi" : "Jacobi", jacobi);
-        }
-
-        const std::string provenance = join_attempts(attempts);
-        if (!target_met && (!have_attempt ||
-                            selected_attempt.true_relative_residual > options.cg_accept_tol)) {
-            throw FeaError(std::format(
-                "solve_elastostatics: CG failed (target tol={}, acceptance tol={}, "
-                "max iterations per attempt={}, total iterations={}, best preconditioner={}, "
-                "best true relative residual={}, preconditioner attempts=[{}])",
-                options.cg_tol, options.cg_accept_tol, max_iters, total_iterations,
-                selected_preconditioner, selected_attempt.true_relative_residual, provenance));
-        }
-        if (options.on_progress) {
-            options.on_progress(selected_attempt.iterations, max_iters,
-                                selected_attempt.true_relative_residual);
-        }
-        if (target_met) {
-            emit_note(
-                std::format("CG converged with {} after {} iterations ({} total; "
-                            "true relative residual={}; reliable restarts={}); attempts=[{}]",
-                            selected_preconditioner, selected_attempt.iterations,
-                            total_iterations, selected_attempt.true_relative_residual,
-                            selected_attempt.reliable_restarts, provenance));
-        } else {
+            const std::string retry_shift = ichol_shift_text(ichol, kIcRetryInitialShift);
+            attempts.push_back(std::format(
+                "{}shifted incomplete Cholesky: factorization failed after shift {}", eq,
+                retry_shift));
             emit_note(std::format(
-                "CG TARGET NOT MET: accepted {} after {} iterations ({} total; "
-                "target tol={}; acceptance tol={}; achieved true relative residual={}; "
-                "reliable restarts={}); attempts=[{}]",
-                selected_preconditioner, selected_attempt.iterations, total_iterations,
-                options.cg_tol, options.cg_accept_tol, selected_attempt.true_relative_residual,
-                selected_attempt.reliable_restarts, provenance));
+                "CG shifted incomplete Cholesky factorization failed after shift {}; "
+                "using Jacobi",
+                retry_shift));
         }
-        SolveCostMeasured measured;
-        measured.method = selected_preconditioner.find("Jacobi") != std::string::npos
-                              ? "cg-jacobi"
-                              : "cg-ichol";
-        measured.cg_iterations = selected_attempt.iterations;
-        measured.cg_restarts = selected_attempt.reliable_restarts;
-        measured.factor_nnz = symbolic_cost.factor_nnz;
-        measured.flops =
-            static_cast<double>(measured.cg_iterations) * symbolic_cost.cg_flops_per_iter;
-        measured.bytes =
-            static_cast<double>(measured.cg_iterations) * symbolic_cost.cg_bytes_per_iter;
-        return {.u = std::move(selected_attempt.x),
-                .cost = std::move(measured),
-                .phases = phases};
     }
 
-    // Direct ladder. K_ff for linear elastostatics with enough constraints to
-    // remove the rigid-body modes is symmetric positive definite, so the right
-    // tool is a Cholesky-family factorization, and *which* Cholesky is not a
-    // matter of taste. Measured on this project's own fixtures (see
-    // docs/solver-core.md §6 for the full table):
-    //
-    //   plate_hole h=6 mm, 231,849 free DOF curved tet10, 4 threads
-    //     CholmodSupernodalLLT     3.46 s factorize, 1.31 GiB peak
-    //     SimplicialLDLT(AMD)    193.66 s factorize, 2.43 GiB peak
-    //     ichol-preconditioned CG  did not reach cg_tol=1e-8 in over an hour
-    //
-    // A scalar simplicial factorization never amortizes its fill into dense
-    // supernodes, so on a quadratic 3-D mesh it loses to the supernodal
-    // factorization on BOTH time and memory. Do not re-order these rungs on
-    // the "LDLT is lighter than an LU" rule of thumb: that is true against
-    // SparseLU and irrelevant next to a BLAS3 supernodal factorization.
-    //
-    // SparseLU is last and exists only for a genuinely indefinite reduced
-    // matrix, where partial pivoting is the only thing that can carry it.
-    //
-    // Threads are capped for the factorization only. CHOLMOD's own OpenMP
-    // loops call an OpenMP system BLAS, so two nested pools sized to every
-    // hardware thread oversubscribe badly on an SMT host. Measured on the same
-    // plate at h = 6 mm (6 physical cores / 12 SMT threads): 3.46 s at 4
-    // threads, 9.70 s at 6, 3.23 s at 8, and 102.83 s at 12 — a 30x penalty
-    // for using every thread. The cap is applied around the ladder and the
-    // previous limit restored afterwards, so the mesher and the recovery keep
-    // whatever the caller asked for.
+    if (!target_met) {
+        if (!attempts.empty() && ichol.info() == Eigen::Success) {
+            emit_note("CG incomplete Cholesky target not met; using Jacobi");
+        }
+        const Eigen::DiagonalPreconditioner<double> jacobi(a);
+        run_attempt(equilibrated ? "equilibrated Jacobi" : "Jacobi", jacobi);
+    }
+
+    const std::string provenance = join_attempts(attempts);
+    if (!target_met && (!have_attempt ||
+                        selected_attempt.true_relative_residual > options.cg_accept_tol)) {
+        throw FeaError(std::format(
+            "solve_elastostatics: CG failed (target tol={}, acceptance tol={}, "
+            "max iterations per attempt={}, total iterations={}, best preconditioner={}, "
+            "best true relative residual={}, preconditioner attempts=[{}])",
+            options.cg_tol, options.cg_accept_tol, max_iters, total_iterations,
+            selected_preconditioner, selected_attempt.true_relative_residual, provenance));
+    }
+    if (options.on_progress) {
+        options.on_progress(selected_attempt.iterations, max_iters,
+                            selected_attempt.true_relative_residual);
+    }
+    if (target_met) {
+        emit_note(
+            std::format("CG converged with {} after {} iterations ({} total; "
+                        "true relative residual={}; reliable restarts={}); attempts=[{}]",
+                        selected_preconditioner, selected_attempt.iterations,
+                        total_iterations, selected_attempt.true_relative_residual,
+                        selected_attempt.reliable_restarts, provenance));
+    } else {
+        emit_note(std::format(
+            "CG TARGET NOT MET: accepted {} after {} iterations ({} total; "
+            "target tol={}; acceptance tol={}; achieved true relative residual={}; "
+            "reliable restarts={}); attempts=[{}]",
+            selected_preconditioner, selected_attempt.iterations, total_iterations,
+            options.cg_tol, options.cg_accept_tol, selected_attempt.true_relative_residual,
+            selected_attempt.reliable_restarts, provenance));
+    }
+    SolveCostMeasured measured;
+    measured.method = selected_preconditioner.find("Jacobi") != std::string::npos
+                          ? "cg-jacobi"
+                          : "cg-ichol";
+    measured.cg_iterations = selected_attempt.iterations;
+    measured.cg_restarts = selected_attempt.reliable_restarts;
+    measured.factor_nnz = symbolic_cost.factor_nnz;
+    measured.flops =
+        static_cast<double>(measured.cg_iterations) * symbolic_cost.cg_flops_per_iter;
+    measured.bytes =
+        static_cast<double>(measured.cg_iterations) * symbolic_cost.cg_bytes_per_iter;
+    return {.u = std::move(selected_attempt.x),
+            .cost = std::move(measured),
+            .phases = phases};
+}
+
+/// Direct ladder for SPD K_ff (rigid-body modes removed): CholmodSupernodalLLT
+/// where compiled in, then SimplicialLDLT(AMD), then SparseLU(COLAMD), which
+/// exists only for a genuinely indefinite reduced matrix. The supernodal rung
+/// wins on both time and memory for quadratic 3-D meshes, so do not reorder on
+/// an "LDLT is lighter" rule of thumb. OpenMP is capped for the ladder only:
+/// nested CHOLMOD/BLAS pools oversubscribe SMT hosts; the caller's limit is
+/// restored on exit. Measurements: docs/solver-core.md §6.1 and §6.1a.
+ReducedSolveResult solve_reduced_direct(const Eigen::SparseMatrix<double>& kff,
+                                        const Eigen::VectorXd& rhs, const SolveOptions& options,
+                                        const SolveCostEstimate& symbolic_cost) {
+    SolvePhaseTimings phases;
     constexpr int kMaxFactorizationThreads = 8;
     const int caller_threads = openmp_max_threads();
     const bool cap_threads = caller_threads > kMaxFactorizationThreads;
@@ -598,13 +581,9 @@ ReducedSolveResult solve_reduced(const Eigen::SparseMatrix<double>& kff,
         return true;
     };
 
-    // Rung order. The canonical order is supernodal → simplicial → LU, and
-    // POLYMESH_FEA_DIRECT=cholmod|ldlt|lu promotes one rung to the front so the
-    // measured comparison table above is reproducible from a shipped build
-    // without recompiling. An unknown value is ignored (canonical order), and
-    // requesting `cholmod` in a build without SuiteSparse simply has no rung to
-    // promote. The remaining rungs still act as fallbacks in canonical order,
-    // so forcing a rung can never turn a solvable system into a failure.
+    // Canonical rung order: supernodal → simplicial → LU. A promoted rung still
+    // leaves the others as fallbacks in canonical order, so forcing a rung can
+    // never turn a solvable system into a failure.
 #if defined(POLYMESH_WITH_CHOLMOD)
     const auto cholmod_rung = [&](SolvePhaseTimings& attempt, Eigen::VectorXd& out) {
         Eigen::CholmodSupernodalLLT<Eigen::SparseMatrix<double>> chol;
@@ -630,6 +609,7 @@ ReducedSolveResult solve_reduced(const Eigen::SparseMatrix<double>& kff,
 #endif
     ladder.push_back({"SimplicialLDLT(AMD)", ldlt_rung});
     ladder.push_back({"SparseLU(COLAMD)", lu_rung});
+    // Supported override: POLYMESH_FEA_DIRECT=cholmod|ldlt|lu leads the ladder; else ignored.
     if (const char* requested = std::getenv("POLYMESH_FEA_DIRECT"); requested != nullptr) {
         const std::string_view want = requested;
         const auto matches = [&](std::string_view label) {
@@ -668,6 +648,17 @@ ReducedSolveResult solve_reduced(const Eigen::SparseMatrix<double>& kff,
         symbolic_cost.factor_flops + 4.0 * static_cast<double>(symbolic_cost.factor_nnz);
     measured.bytes = estimate_direct_solve_bytes(symbolic_cost);
     return {.u = std::move(uf), .cost = std::move(measured), .phases = phases};
+}
+
+ReducedSolveResult solve_reduced(const Eigen::SparseMatrix<double>& kff,
+                                 const Eigen::VectorXd& rhs, const SolveOptions& options,
+                                 const SolveCostEstimate& symbolic_cost) {
+    const Eigen::Index nfree = kff.rows();
+    const SolveMethod method = select_solve_method(nfree, options);
+    if (method == SolveMethod::kCG) {
+        return solve_reduced_cg(kff, rhs, options, symbolic_cost);
+    }
+    return solve_reduced_direct(kff, rhs, options, symbolic_cost);
 }
 
 } // namespace
@@ -811,9 +802,7 @@ LinearSolveResult solve_elastostatics(const NodalMesh& mesh, const Material& mat
     // K_ff is a SELECTION of K_system's entries, not a sum of them, so it is
     // built straight into compressed storage: one pass to count the surviving
     // entries per free column and to fold the prescribed columns into the rhs,
-    // one pass to copy. The Triplet vector this replaces cost 16 bytes per
-    // surviving nonzero plus a full counting sort, for a matrix whose rows
-    // were already in ascending order per column.
+    // one pass to copy (rows are already ascending per column; no sort needed).
     Eigen::SparseMatrix<double> kff(reduced_count, reduced_count);
     std::vector<int> column_counts(static_cast<std::size_t>(reduced_count) + 1, 0);
     std::uint64_t kept = 0;
@@ -868,7 +857,7 @@ LinearSolveResult solve_elastostatics(const NodalMesh& mesh, const Material& mat
     const double reduce_ms = elapsed_ms(reduce_start);
 
     // The allocation-free preflight above uses the post-constraint free count;
-    // kAuto may downgrade LDLT to CG when only the iterative footprint fits.
+    // kAuto may downgrade direct to CG when only the iterative footprint fits.
     ReducedSolveResult reduced_solve =
         solve_reduced(kff, rhs, selected_options, symbolic_cost);
 

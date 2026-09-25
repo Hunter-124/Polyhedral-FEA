@@ -3,7 +3,7 @@
 
 // Zienkiewicz–Zhu superconvergent patch recovery (nodal) and a *relative*
 // energy-norm error indicator per element. Used for visualization quality and
-// adapt marking (P5). Double precision only.
+// adapt marking. Double precision only.
 //
 // Energy norm: ‖σ‖²_e = ∫_e σᵀ D⁻¹ σ dV (units J — the element's complementary
 // strain energy). The indicator compares the recovered stress σ* to the FE

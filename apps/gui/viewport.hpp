@@ -162,15 +162,9 @@ class Viewport {
         /// pass only, and the GL line width that pass draws at.
         ///
         /// Both exist because element COUNT decides whether cell edges are
-        /// information or noise. On the 568-element case this reveal was first
-        /// tuned for, 1.5 px at full opacity drew a readable cell diagram. On
-        /// dense five-figure cell counts, the same settings were measured to put
-        /// 22-50% of the part's painted pixels into near-black outline, against
-        /// 3.4-8.9% at 1.0 px and 0.30 opacity.
-        /// At half the part being outline, the fill's shading and reveal front
-        /// are gone: a front made of dark lines cannot read against a dark background.
-        /// The defaults here stay the old values, so a caller that does not set
-        /// them gets exactly the previous behaviour.
+        /// information or noise: dense meshes need thinner, fainter edges so the
+        /// fill's shading and reveal front stay readable. Defaults keep the
+        /// sparse-mesh look (1.5 px, full opacity).
         float edge_alpha = 1.0f;
         float edge_width = 1.5f;
         /// When true, `transition_progress` drives the structural old→new cell

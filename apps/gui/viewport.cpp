@@ -658,8 +658,8 @@ void Camera::fit_oriented(const Eigen::Vector3d& bbox_min, const Eigen::Vector3d
     // Solve the perspective inequalities on the eight AABB corners themselves:
     //   |x| <= (distance + f·d) tan_x
     //   |y| <= (distance + f·d) tan_y
-    // The old support-function bound maximised numerator and depth on different
-    // corners, discarding roughly half the frame on the previous hero.
+    // Per-corner evaluation is required: a support-function bound maximises the
+    // numerator and the depth on different corners and wastes frame.
     for (int ix = -1; ix <= 1; ix += 2) {
         for (int iy = -1; iy <= 1; iy += 2) {
             for (int iz = -1; iz <= 1; iz += 2) {
@@ -1581,15 +1581,10 @@ void Viewport::bake_result(DisplayMode mode, float deform_scale, float result_ma
         // Empty when the caller passed no extra field, and `emit` reads out of
         // range as zero, so the mode bakes a flat floor instead of borrowing
         // whichever field happens to be loaded.
-        //
-        // A zero INSIDE a field the caller did supply is a different thing and
-        // is drawn as what it is: fea::nodal_scalar_gradient_magnitude returns
-        // an exact 0.0 for a rank-deficient node patch as well as for a
-        // genuinely flat field, and only its n_unresolved counter separates
-        // them. So an isolated dark spot here can be legitimate -- measured
-        // none on any structured hex or Kuhn-tet lattice, all 132,651 nodes of
-        // a 50^3 lattice resolved -- and this viewport cannot tell the two
-        // apart. Anything that needs to must read n_unresolved at the source.
+        // A zero INSIDE a supplied field is drawn as-is:
+        // fea::nodal_scalar_gradient_magnitude returns exact 0.0 both for a
+        // rank-deficient node patch and a flat field; only its n_unresolved
+        // counter (read at the source) tells them apart.
         scalars = &result_scalar_extra_;
     }
 

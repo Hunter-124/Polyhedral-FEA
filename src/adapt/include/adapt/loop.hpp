@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-// Adaptive remesh suggestions from ZZ indicators (P5).
+// Adaptive remesh suggestions from ZZ indicators.
 // Uniform h shrink for all meshers; Dörfler centroids as local refine seeds
 // for graded Cartesian fill.
 

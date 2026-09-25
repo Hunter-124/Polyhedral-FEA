@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-// Deterministic prism6 fill of a closed triangle surface (ROADMAP C3).
+// Deterministic prism6 fill of a closed triangle surface.
 // Cartesian lattice over the AABB; each inside voxel is split into two
 // wedges (right-triangle bases extruded along the dominant axis). Stair-cased
 // boundary like hex/tet fills with optional limited surface snap — NOT CAD

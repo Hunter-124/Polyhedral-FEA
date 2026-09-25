@@ -272,40 +272,6 @@ ResultRow parse_result_line(const std::string& line) {
     }
 }
 
-HandoffInfo parse_handoff(const std::string& json_text) {
-    try {
-        const json j = json::parse(json_text);
-        HandoffInfo out;
-        out.campaign = opt_string(j, "campaign");
-        out.git_head = opt_string(j, "git_head");
-        out.finished_utc = opt_string(j, "finished_utc");
-        out.mode = opt_string(j, "mode");
-        out.checkpoint_state = opt_string(j, "checkpoint_state");
-        if (j.contains("open_program_nodes") && j["open_program_nodes"].is_array()) {
-            for (const auto& n : j["open_program_nodes"]) {
-                if (n.is_string()) {
-                    out.open_program_nodes.push_back(n.get<std::string>());
-                }
-            }
-        }
-        return out;
-    } catch (const json::exception& e) {
-        throw std::runtime_error(std::format("malformed handoff JSON: {}", e.what()));
-    }
-}
-
-std::optional<HandoffInfo> load_handoff(const std::filesystem::path& dir) {
-    const auto path = dir / "handoff.json";
-    if (!std::filesystem::is_regular_file(path)) {
-        return std::nullopt;
-    }
-    try {
-        return parse_handoff(read_file_text(path));
-    } catch (...) {
-        return std::nullopt;
-    }
-}
-
 bool is_measure_first_baseline(const std::string& campaign_name) {
     // Match folder or campaign.json name containing baseline-m9 (M9 freeze).
     return campaign_name.find("baseline-m9") != std::string::npos;

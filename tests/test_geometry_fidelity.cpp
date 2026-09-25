@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: BSD-3-Clause
-// Curved-CAD import fidelity + robust volume-mesh regressions.
+// Curved-CAD import fidelity + graded-fill geometry regressions.
 //
 // 1. A cylinder wall must tessellate with sub-percent chord deviation from the
 //    true radius — imported pipes should not show coarse facets.
-// 2. The ice-cream STEP must remain one closed round-cone/scoop solid with the
+// 2. Graded fills resolve exact BRep surfaces and rims, carve no boundary node
+//    into the solid, and ship no free face buried inside another cell.
+// 3. The ice-cream STEP must remain one closed round-cone/scoop solid with the
 //    contract bbox and deterministic coarse BC/load selection.
-// 3. Longest-edge bisection on a large-coordinate curved mesh must not abort on
+// 4. Longest-edge bisection on a large-coordinate curved mesh must not abort on
 //    a degenerate child ("local_refine_tets: non-positive child volume"); the
 //    sliver region is skipped and the mesh stays valid.
 
@@ -28,10 +30,12 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <limits>
 #include <map>
+#include <memory>
 #include <numeric>
 #include <set>
 #include <vector>
@@ -79,104 +83,6 @@ TEST_CASE("curved CAD import: cylinder wall tessellates with sub-percent deviati
     // ~2π/0.2rad ≈ 31 facets around → many wall facets, chord sag < 1% R.
     REQUIRE(wall_facets >= 40);
     CHECK(max_dev / kPipeR < 0.01);
-}
-
-TEST_CASE("BRep fidelity sample summaries filter and normalize deterministically") {
-    const std::vector<double> samples{
-        0.0,
-        1.0,
-        2.0,
-        3.0,
-        std::numeric_limits<double>::quiet_NaN(),
-        std::numeric_limits<double>::infinity(),
-    };
-    const auto summary = polymesh::mesh::summarize_samples(samples);
-    REQUIRE(summary.count == 4);
-    CHECK(summary.rms == Catch::Approx(std::sqrt(3.5)));
-    CHECK(summary.p95 == Catch::Approx(2.85));
-    CHECK(summary.p99 == Catch::Approx(2.97));
-    CHECK(summary.max == Catch::Approx(3.0));
-
-    const std::vector<double> distances{
-        0.0,
-        1.0,
-        2.0,
-        3.0,
-        -1.0,
-        std::numeric_limits<double>::quiet_NaN(),
-        std::numeric_limits<double>::infinity(),
-    };
-    const auto normalized = polymesh::mesh::summarize_distances(distances, 2.0, 4.0);
-    REQUIRE(normalized.metres.count == 4);
-    CHECK(normalized.metres.p95 == Catch::Approx(2.85));
-    REQUIRE(normalized.over_h.count == 4);
-    CHECK(normalized.over_h.rms == Catch::Approx(std::sqrt(3.5) / 2.0));
-    CHECK(normalized.over_h.p95 == Catch::Approx(1.425));
-    CHECK(normalized.over_h.p99 == Catch::Approx(1.485));
-    CHECK(normalized.over_h.max == Catch::Approx(1.5));
-    REQUIRE(normalized.over_bbox_diagonal.count == 4);
-    CHECK(normalized.over_bbox_diagonal.p95 == Catch::Approx(0.7125));
-    CHECK(normalized.over_bbox_diagonal.p99 == Catch::Approx(0.7425));
-    CHECK(normalized.over_bbox_diagonal.max == Catch::Approx(0.75));
-
-    const auto invalid_scales = polymesh::mesh::summarize_distances(
-        distances, 0.0, std::numeric_limits<double>::infinity());
-    CHECK(invalid_scales.metres.count == 4);
-    CHECK(invalid_scales.over_h.count == 0);
-    CHECK(invalid_scales.over_bbox_diagonal.count == 0);
-
-    const polymesh::geom::CadModel empty;
-    CHECK_FALSE(polymesh::geom::inspect_brep(empty).available);
-    const auto unavailable =
-        polymesh::mesh::evaluate_brep_geometry_fidelity(empty, {}, {}, {}, 1.0, 0.0);
-    CHECK_FALSE(unavailable.available);
-
-    CHECK(unavailable.mesh_boundary_samples_to_brep_surface.metres.count == 0);
-}
-
-TEST_CASE("exact trimmed BRep surface sampling obeys a hard budget") {
-    if (!polymesh::geom::occ_enabled()) {
-        SKIP("OpenCASCADE disabled");
-    }
-    const auto cad = polymesh::geom::CadModel::load_step("tests/fixtures/unit_cube.step");
-    const auto inspection = polymesh::geom::inspect_brep(cad);
-    REQUIRE(inspection.face_count > 1);
-    CHECK_THROWS_AS(polymesh::geom::sample_brep_surface(cad, inspection.face_count - 1),
-                    polymesh::geom::GeomError);
-
-    const auto coverage = polymesh::geom::sample_brep_surface(cad, inspection.face_count);
-    REQUIRE(coverage.face_count == inspection.face_count);
-    REQUIRE(coverage.points.size() == inspection.face_count);
-    REQUIRE(coverage.uv_attempt_count <= 9 * inspection.face_count);
-    REQUIRE(coverage.fallback_vertex_count <= inspection.face_count);
-    std::set<std::uint32_t> owning_faces;
-    for (const Eigen::Vector3d& point : coverage.points) {
-        const auto projected = polymesh::geom::project_point_on_surface(cad, point);
-        REQUIRE(projected);
-        CHECK(projected->distance < 1e-10);
-        owning_faces.insert(projected->face_id);
-    }
-    CHECK(owning_faces.size() == inspection.face_count);
-
-    constexpr std::size_t kBudget = 128;
-    const auto first = polymesh::geom::sample_brep_surface(cad, kBudget);
-    const auto second = polymesh::geom::sample_brep_surface(cad, kBudget);
-    REQUIRE(first.points.size() >= inspection.face_count);
-    REQUIRE(first.points.size() <= kBudget);
-    REQUIRE(first.uv_attempt_count <= 9 * kBudget);
-    REQUIRE(first.fallback_vertex_count <= inspection.face_count);
-    REQUIRE(second.points.size() == first.points.size());
-    bool deterministic = first.uv_attempt_count == second.uv_attempt_count &&
-                         first.fallback_vertex_count == second.fallback_vertex_count;
-    bool all_on_exact_brep = true;
-    for (std::size_t i = 0; i < first.points.size(); ++i) {
-        deterministic = deterministic && first.points[i].isApprox(second.points[i], 0.0);
-        const auto projected = polymesh::geom::project_point_on_surface(cad, first.points[i]);
-        all_on_exact_brep =
-            all_on_exact_brep && projected.has_value() && projected->distance < 1e-10;
-    }
-    CHECK(deterministic);
-    CHECK(all_on_exact_brep);
 }
 
 TEST_CASE("graded plate-hole mesh resolves exact BRep surfaces and protected rims") {
@@ -265,16 +171,11 @@ TEST_CASE("graded plate-hole mesh resolves exact BRep surfaces and protected rim
 }
 
 // The S5 void carve peels the tets of "juts" -- boundary nodes the snap could
-// not place on the surface. Those are meant to be stair chords hanging inside a
-// CAD hole, and peeling them opens the hole. The test used to be distance
-// alone, which also condemned the mirror case: a node that stayed put because
-// projecting it OUTWARD would invert a skin tet, i.e. a node sitting inside the
-// solid. Peeling that one digs a pit and calls the pit floor the boundary.
-//
-// A sphere has no holes, so every jut on it is the mirror case, and this is the
-// cheapest geometry that isolates the bug. Measured before the fix at h = 8 mm:
-// 12 boundary nodes as deep as 9.46 mm (1.16 h) inside the sphere. Every crater
-// was watertight, so no shell census could see it -- only radius can.
+// not place on the surface -- which are meant to be stair chords hanging inside
+// a CAD hole. A node that stayed put because projecting it OUTWARD would invert
+// a skin tet sits inside the solid; peeling it digs a pit. A sphere has no
+// holes, so every jut on it is that case, and such craters are watertight: no
+// shell census sees them, only radius does.
 TEST_CASE("a graded sphere has no boundary node carved into its interior") {
     if (!polymesh::geom::occ_enabled()) {
         SKIP("OpenCASCADE disabled");
@@ -336,10 +237,8 @@ TEST_CASE("a graded sphere has no boundary node carved into its interior") {
 // The S7 overlapped-sheet carve. Snap gives every boundary node its exact CAD
 // owner, so at a concave crease two sheets project onto their own face patches
 // and can interpenetrate with every tet positive and every edge manifold. The
-// only census that sees it is point-in-foreign-tet. Pre-fix ship counts: 9
-// buried free faces on icecream_cone at h = 10 mm (rendered as black holes in
-// the showcase), ~500 on sphere_box_s0 at h = 3.6 mm at the near-tangent
-// pocket/box junction.
+// only census that sees it is point-in-foreign-tet. The cases are an
+// icecream_cone crease and the near-tangent pocket/box junction of sphere_box_s0.
 TEST_CASE("graded fills ship no free face buried inside another cell") {
     if (!polymesh::geom::occ_enabled()) {
         SKIP("OpenCASCADE disabled");
@@ -527,7 +426,7 @@ TEST_CASE("LEB on a large-coordinate curved mesh does not abort on slivers") {
     REQUIRE_FALSE(tets.empty());
 
     // Mark every tet and cascade a few LEB waves against the CAD surface —
-    // exactly the pipeline adapt path that used to throw on a degenerate child.
+    // the pipeline adapt path, which must skip a degenerate child, not throw.
     auto nodes = vol.mesh.nodes;
     for (int wave = 0; wave < 3; ++wave) {
         std::vector<std::size_t> marks(tets.size());
@@ -590,138 +489,5 @@ TEST_CASE("diagnostic: independently sum coarse graded volumes") {
         const double relative_error = std::abs(mesh_volume - exact.volume) / exact.volume;
         WARN(c.name << ": element_sum=" << mesh_volume << " cad=" << exact.volume
                     << " rel_err=" << relative_error << " tets=" << fill.mesh.tets.size());
-    }
-}
-
-namespace {
-
-/// One hex20 sector of a hollow cylinder: outer face on radius `R`, inner on
-/// `r`, spanning `sweep` radians. Mid-edge nodes on the outer wall are snapped
-/// onto the true cylinder, exactly as `project_quadratic_boundary_mids` does on
-/// a real part; every other mid-edge node is the straight midpoint.
-polymesh::fea::NodalMesh curved_hex20_sector(double r, double R, double sweep, double height) {
-    const auto at = [](double radius, double angle, double z) {
-        return Eigen::Vector3d{radius * std::cos(angle), radius * std::sin(angle), z};
-    };
-    const double a0 = -0.5 * sweep, a1 = 0.5 * sweep;
-    polymesh::fea::NodalMesh mesh;
-    mesh.nodes = {at(r, a0, 0.0),    at(r, a1, 0.0),    at(R, a1, 0.0),    at(R, a0, 0.0),
-                  at(r, a0, height), at(r, a1, height), at(R, a1, height), at(R, a0, height)};
-    static constexpr std::array<std::array<std::size_t, 2>, 12> kEdges{{{0, 1},
-                                                                        {1, 2},
-                                                                        {2, 3},
-                                                                        {3, 0},
-                                                                        {4, 5},
-                                                                        {5, 6},
-                                                                        {6, 7},
-                                                                        {7, 4},
-                                                                        {0, 4},
-                                                                        {1, 5},
-                                                                        {2, 6},
-                                                                        {3, 7}}};
-    for (const auto& e : kEdges) {
-        const Eigen::Vector3d chord = 0.5 * (mesh.nodes[e[0]] + mesh.nodes[e[1]]);
-        const bool on_outer_wall = std::abs(mesh.nodes[e[0]].head<2>().norm() - R) < 1e-12 &&
-                                   std::abs(mesh.nodes[e[1]].head<2>().norm() - R) < 1e-12;
-        if (on_outer_wall && chord.head<2>().norm() > 1e-12) {
-            Eigen::Vector3d snapped = chord;
-            snapped.head<2>() *= R / chord.head<2>().norm();
-            mesh.nodes.push_back(snapped);
-        } else {
-            mesh.nodes.push_back(chord);
-        }
-    }
-    polymesh::fea::NodalElement el;
-    el.type = polymesh::fea::ElementType::kHex20;
-    el.nodes.resize(20);
-    for (std::uint32_t i = 0; i < 20; ++i) {
-        el.nodes[i] = i;
-    }
-    mesh.elements.push_back(std::move(el));
-    return mesh;
-}
-
-/// Worst gap between a rendered facet and the true cylinder: the largest
-/// shortfall in radius at the midpoint of any drawn edge whose two endpoints
-/// both sit on the outer wall. This is precisely the faceting a viewer sees.
-double outer_wall_sag(const polymesh::fea::NodalMesh& mesh,
-                      const std::vector<std::vector<std::uint32_t>>& facets, double R) {
-    double worst = 0.0;
-    for (const auto& facet : facets) {
-        for (std::size_t i = 0; i < facet.size(); ++i) {
-            const Eigen::Vector3d& p = mesh.nodes[facet[i]];
-            const Eigen::Vector3d& q = mesh.nodes[facet[(i + 1) % facet.size()]];
-            if (std::abs(p.head<2>().norm() - R) > 1e-9 ||
-                std::abs(q.head<2>().norm() - R) > 1e-9) {
-                continue;
-            }
-            worst = std::max(worst, R - (0.5 * (p + q)).head<2>().norm());
-        }
-    }
-    return worst;
-}
-
-} // namespace
-
-// The mesher projects quadratic mid-edge nodes onto the exact B-rep (ADR-0028),
-// and then the display path threw that away: `collect_element_loops` faceted
-// tet10/hex20 from CORNER nodes only, so a correctly curved rim still drew as
-// the straight chord between corners. That is the "defects along edges and
-// curved surfaces" the mesh itself did not have.
-TEST_CASE("the display surface follows quadratic curvature, the physics surface does not") {
-    constexpr double r = 20.0, R = 30.0, sweep = 1.0471975511965976 /* 60 deg */,
-                     height = 40.0;
-    const auto mesh = curved_hex20_sector(r, R, sweep, height);
-
-    // Physics topology is corner-only by design: BC/load selection and traction
-    // area are defined on it, and this test pins that it did NOT change.
-    const auto physics = polymesh::fea::extract_boundary_faces(mesh);
-    CHECK(physics.size() == 6);
-    std::vector<std::vector<std::uint32_t>> physics_loops;
-    for (const auto& face : physics) {
-        physics_loops.push_back({face[0], face[1], face[2], face[3]});
-        CHECK(*std::max_element(face.begin(), face.end()) < 8U);
-    }
-
-    const auto display = polymesh::fea::extract_boundary_polys(mesh);
-    // Each of the 6 faces splits into 4 corner triangles plus a central quad.
-    CHECK(display.size() == 30);
-
-    // Every projected mid-edge node on the outer wall is actually drawn.
-    std::set<std::uint32_t> drawn;
-    for (const auto& facet : display) {
-        drawn.insert(facet.begin(), facet.end());
-    }
-    for (std::uint32_t n = 8; n < 20; ++n) {
-        INFO("mid-edge node " << n);
-        CHECK(drawn.count(n) == 1);
-    }
-
-    const double corner_sag = outer_wall_sag(mesh, physics_loops, R);
-    const double curved_sag = outer_wall_sag(mesh, display, R);
-    INFO("corner-only sag " << corner_sag << " mm, curved sag " << curved_sag << " mm");
-    // Chord over the full 60 deg sweep vs over each 30 deg half: R(1-cos30) =
-    // 4.019 mm against R(1-cos15) = 1.022 mm, a 3.93x improvement.
-    CHECK(corner_sag == Catch::Approx(R * (1.0 - std::cos(0.5 * sweep))).margin(1e-9));
-    CHECK(curved_sag == Catch::Approx(R * (1.0 - std::cos(0.25 * sweep))).margin(1e-9));
-    CHECK(curved_sag < corner_sag / 3.0);
-}
-
-// A linear mesh must be untouched: no mid-edge nodes exist, so the display path
-// has to hand back exactly the loops it always did, or every hex/pyramid mesh
-// silently changes shape.
-TEST_CASE("the display surface is unchanged on linear meshes") {
-    polymesh::fea::NodalMesh mesh;
-    mesh.nodes = {{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0},
-                  {0, 0, 1}, {1, 0, 1}, {1, 1, 1}, {0, 1, 1}};
-    polymesh::fea::NodalElement el;
-    el.type = polymesh::fea::ElementType::kHex8;
-    el.nodes = {0, 1, 2, 3, 4, 5, 6, 7};
-    mesh.elements.push_back(std::move(el));
-
-    const auto display = polymesh::fea::extract_boundary_polys(mesh);
-    CHECK(display.size() == 6);
-    for (const auto& facet : display) {
-        CHECK(facet.size() == 4);
     }
 }

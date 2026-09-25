@@ -55,8 +55,7 @@ class DisjointSet {
 /// would produce: structurally symmetric with every diagonal entry present.
 /// One pass with a binary search per entry, no allocation — worth checking
 /// because the solver's own reduced pattern always satisfies it, and
-/// symmetrizing it through a Triplet vector costs 16 bytes per entry twice
-/// over (576 MB on a 233,820-DOF curved tet10 plate).
+/// symmetrizing through a Triplet list costs 16 bytes per entry twice over.
 bool already_normalized(const Eigen::SparseMatrix<double>& m) {
     if (!m.isCompressed()) {
         return false;
@@ -323,17 +322,9 @@ Eigen::SparseMatrix<double> free_dof_pattern(const NodalMesh& mesh, const Dirich
     };
 
     // Per-element free-DOF images, then the union of their local x local
-    // blocks, built by counting straight into compressed storage.
-    //
-    // The previous shape appended one Eigen::Triplet per (row, col) pair and
-    // called `entries.reserve(entries.size() + local.size() * local.size())`
-    // INSIDE the element loop. Reserving exactly the new size defeats the
-    // vector's geometric growth: capacity rose by one element's worth each
-    // iteration, so every element reallocated and copied the whole buffer.
-    // That is quadratic in element count, and it ran on every solve before
-    // assembly: 183 s of a 187 s smoke_bar solve at h = 20 mm (6144 tet10
-    // cells, 26,640 free DOF) was this one line. The direct build below is
-    // 0.02 s on the same mesh.
+    // blocks, built by counting straight into compressed storage. Linear in
+    // element count: no per-element exact-size reserve (which defeats geometric
+    // growth and goes quadratic) and no Triplet list.
     std::vector<int> flat_locals;
     std::vector<std::size_t> local_offsets;
     local_offsets.reserve(mesh.elements.size() + 1);

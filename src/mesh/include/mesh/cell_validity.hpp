@@ -3,21 +3,11 @@
 
 // Sign-aware cell validity + scale-free shape quality for every fill path.
 //
-// The mesher gates used to ask `std::abs(volume) <= 1e-14 * h^3`. That single
-// expression hides two independent defects:
-//
-//   * `std::abs` makes the test sign-blind, so a *fully inverted* cell passes
-//     as valid. Inverted pyramids therefore shipped to the solver and the VTU
-//     (the FE assembly quietly re-flipped the negative halves, so nothing ever
-//     complained) — 1712/44536 pyramids on sphere @ h=0.008.
-//   * `1e-14 * h^3` is ~13 orders of magnitude below a healthy cell volume
-//     (h=0.008 → eps≈5e-21 vs. a healthy tet at ~8.5e-8), so it is a
-//     machine-degeneracy test, not a shape floor. Slivers of quality 1e-17
-//     were accepted and the snap line-search never unsnapped them.
-//
 // Everything here is signed (negative ⇒ inverted) and every `*_shape_quality`
 // is normalized so that 1.0 is the ideal cell of that kind — one dimensionless
-// floor (`kCellShapeFloor`) is therefore meaningful across the whole zoo.
+// floor (`kCellShapeFloor`) is therefore meaningful across the whole zoo. A
+// sign-blind `std::abs(volume) <= 1e-14 * h^3` test is a machine-degeneracy
+// check, not a shape floor: it admits inverted cells and slivers (ADR-0033).
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
@@ -32,8 +22,8 @@ namespace polymesh::mesh::validity {
 
 /// Minimum normalized shape quality a cell must keep through boundary snapping
 /// and smoothing. Well below every nominal lattice cell (tet fans ≈ 0.1-0.2,
-/// lattice pyramids/prisms/hexes ≈ 0.8-1.0) but far above the sliver band the
-/// machine-epsilon gates used to accept.
+/// lattice pyramids/prisms/hexes ≈ 0.8-1.0) but far above the sliver band a
+/// machine-epsilon volume gate admits.
 inline constexpr double kCellShapeFloor = 0.02;
 
 /// Signed volume of tet (a,b,c,d); positive for a right-handed ordering.
@@ -60,10 +50,8 @@ inline double max_edge_squared(const Eigen::Vector3d& a, const Eigen::Vector3d& 
 /// inverted. Same metric the hybrid fan-tet gate already used, made signed.
 inline double tet_shape_quality(const Eigen::Vector3d& a, const Eigen::Vector3d& b,
                                 const Eigen::Vector3d& c, const Eigen::Vector3d& d) {
-    // L_max³ = (L_max²)^(3/2): one square root, not six. This is the mesher's
-    // and Chudware's inner-loop shape test — every refinement-wave gate and
-    // every candidate node move judges a whole star with it — so the five
-    // saved roots are measured time, not micro-optimisation.
+    // L_max³ = (L_max²)^(3/2): one square root, not six. This is the inner-loop
+    // shape test of every refinement-wave gate and every candidate node move.
     const double e2max = max_edge_squared(a, b, c, d);
     if (!(e2max > 0.0)) {
         return 0.0;
@@ -101,9 +89,8 @@ inline double pyramid_best_split_volume(const Eigen::Vector3d& p0, const Eigen::
 ///
 /// Two pyramids sharing a quad face MUST split it along the same diagonal or
 /// the implied face triangulations mismatch and the assembled field goes
-/// non-conforming (measured: constant-strain patch test degrades from <1e-12
-/// to ~2e-5 when the choice is made per-cell from apex-dependent volumes).
-/// The choice therefore depends ONLY on the four base nodes: the Newell mean
+/// non-conforming (the constant-strain patch test fails). The choice therefore
+/// depends ONLY on the four base nodes: the Newell mean
 /// normal n̄ of the quad is compared against each triangulation's two triangle
 /// normals, and the diagonal whose worst-aligned triangle is better aligned
 /// wins. The metric is invariant under winding reversal (n̄ and every triangle
@@ -242,12 +229,10 @@ inline double pyramid_volume_collapse(const Eigen::Vector3d& p0, const Eigen::Ve
 /// (`pyramid_split_diagonal`), so the gate and the integrator always agree.
 ///
 /// This is the snapping/smoothing gate. It deliberately does NOT include the
-/// volume-collapse or base-corner terms: adding either makes the gate stricter
-/// than the mesh can satisfy while still reaching the wall, and the snap then
-/// buys cell shape by retreating boundary nodes — measured 2026-08-15, folding
-/// the collapse term in here took the hybrid sphere's M1max from 1.7e-16 to
-/// 0.037 at h=0.15*extent. A corner fold is instead cured at conversion, for
-/// free, by `pyramid_corner_folded`.
+/// volume-collapse or base-corner terms: either makes the gate stricter than
+/// the mesh can satisfy while still reaching the wall, so the snap would buy
+/// cell shape by retreating boundary nodes (ADR-0033 §2). A corner fold is
+/// instead cured at conversion, for free, by `pyramid_corner_folded`.
 inline double pyramid_split_shape_quality(const Eigen::Vector3d& p0, const Eigen::Vector3d& p1,
                                           const Eigen::Vector3d& p2, const Eigen::Vector3d& p3,
                                           const Eigen::Vector3d& p4) {
@@ -263,19 +248,13 @@ inline double pyramid_split_shape_quality(const Eigen::Vector3d& p0, const Eigen
 /// `fea::cell_quality` reports for a kPyramid5.
 ///
 /// The two differ on exactly one defect: a base quad that boundary snapping
-/// warped until one of its corners folded. Measured 2026-08-15 on
-/// icecream_cone h=0.008 hybrid, 960 of 24286 shipped pyramids scored < 0 under
-/// `fea::cell_quality` (every one corner-driven) while the representation
-/// measure rated all of them >= 0.0608 — so no offender collector ever saw
-/// them and 4% of the product mesh went out with a folded isoparametric map.
-///
-/// Unsnapping the wall is the wrong cure (measured: icecream_cone h=0.008 exact
-/// BRep p99/h 0.019 → 0.107 when this measure gates the snap). A corner-folded
-/// pyramid whose split halves are healthy is the union of those two healthy
-/// tets, which is also exactly the stiffness the assembly builds from it — so
-/// `mesh_from_mixed_cells` ships it AS those two tets: same geometry, same
-/// stiffness, no folded cell. This measure is therefore the honest report and
-/// the decomposition trigger, never a reason to move a boundary node.
+/// warped until one of its corners folded. Unsnapping the wall is the wrong
+/// cure. A corner-folded pyramid whose split halves are healthy is the union of
+/// those two healthy tets, which is also exactly the stiffness the assembly
+/// builds from it — so `mesh_from_mixed_cells` ships it AS those two tets: same
+/// geometry, same stiffness, no folded cell (ADR-0033 §1). This measure is
+/// therefore the honest report and the decomposition trigger, never a reason
+/// to move a boundary node.
 inline double pyramid_shape_quality(const Eigen::Vector3d& p0, const Eigen::Vector3d& p1,
                                     const Eigen::Vector3d& p2, const Eigen::Vector3d& p3,
                                     const Eigen::Vector3d& p4) {

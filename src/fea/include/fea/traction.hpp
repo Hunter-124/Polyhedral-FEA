@@ -133,22 +133,10 @@ std::vector<SurfaceFace> faces_touching(const NodalMesh& mesh,
 ///
 /// A box selection names a region of the boundary SURFACE, so a fixture applied
 /// through one constrains surface nodes; it is not a volume of material to
-/// freeze. Constraining every interior node inside the box embeds a rigid
-/// inclusion, and an element whose nodes all fall inside it then has identically
-/// zero strain, hence identically zero stress. The union of those elements ends
-/// on a one-element staircase whose height varies with the local tiling, so the
-/// zero-stress region has a ragged boundary that is a property of the mesh
-/// rather than of the problem. Measured on the showcase parts before this rule
-/// existed, as the fully-constrained fraction of all elements: cylinder 30.7%
-/// (49,660 of 161,976), sphere 6.7%, icecream_cone 6.1%, plate_hole 2.9%,
-/// cantilever 1.7% — visible in every gallery render as a jagged flat-coloured
-/// blob against the clamp. Restricted to the boundary, four of the five drop to
-/// zero fully-constrained elements and the stress field is continuous into the
-/// clamp. The cone keeps 8 of 86,512 (0.009%): its foot is a 6 mm-radius disc and
-/// the corner between that disc and the wall above it is thinner than one
-/// element, so those elements have all ten nodes on the boundary surface and are
-/// strain-free by geometry rather than by selection. Any fixture patch enclosing
-/// a region thinner than an element does that, and resolution is the only fix.
+/// freeze. Constraining interior nodes would embed a rigid inclusion whose
+/// zero-stress region ends on a mesh-dependent staircase of elements. A patch
+/// enclosing a region thinner than one element still leaves elements with every
+/// node on the boundary, strain-free by geometry; resolution is the only fix.
 std::vector<std::uint32_t> boundary_nodes_within(const NodalMesh& mesh,
                                                  const std::vector<SurfaceFace>& faces,
                                                  const LoadRegion& region);
@@ -164,10 +152,7 @@ double integrated_region_area(const NodalMesh& mesh, const std::vector<SurfaceFa
 /// A box selection names a REGION of the boundary surface, not a set of faces.
 /// Accepting whole faces stops the loaded patch on a staircase of element edges
 /// instead of on the box plane, which makes the applied traction a function of
-/// the tiling: on the showcase sphere at h = 8 mm with `--load-box z >= 40 mm`
-/// the accepted-face patch edge wandered by 1.06 mm rms and 4.63 mm
-/// peak-to-peak in z (0.28 h and 1.20 h) and under-covered the cap by 6.2% of
-/// its area. Clipping the quadrature to the region removes that dependence: the
+/// the tiling. Clipping the quadrature to the region removes that dependence: the
 /// patch ends on the plane, and the resultant is still exactly `total_force`.
 ConsistentLoad consistent_region_load(const NodalMesh& mesh,
                                       const std::vector<SurfaceFace>& faces,

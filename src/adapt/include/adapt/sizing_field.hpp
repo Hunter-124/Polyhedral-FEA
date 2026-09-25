@@ -1,12 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-// Adaptivity: sizing fields, a posteriori error estimation
-// (Zienkiewicz–Zhu patch recovery), Dörfler marking, and per-element
-// h-vs-p refinement decisions.
-//
-// Fills in during Phase P5. Until then this module carries only the
-// interfaces the mesher (P2/P3) codes against.
+// Scalar sizing fields: uniform, sharp-feature blend, and geometry-aware
+// (curvature / thin-wall) edge-length targets.
 
 #include "geom/features.hpp"
 #include "geom/indicators.hpp"
@@ -22,8 +18,8 @@ namespace polymesh::adapt {
 
 /// Target element size as a field over space, metres.
 ///
-/// Produced by geometric feature analysis (a priori, Phase P3) and updated by
-/// error estimation (a posteriori, Phase P5).
+/// Produced a priori by geometric feature analysis or a posteriori from error
+/// estimation.
 class SizingField {
   public:
     virtual ~SizingField() = default;

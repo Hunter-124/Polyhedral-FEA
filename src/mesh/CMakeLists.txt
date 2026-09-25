@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 add_library(polymesh_mesh
     src/poly_mesh.cpp
+    src/poly_mesh_geometry.cpp
     src/mirror.cpp
     src/tet_fill.cpp
     src/hex_fill.cpp
@@ -13,7 +14,14 @@ add_library(polymesh_mesh
     src/grid_classify.cpp
     src/cell_stamp.cpp
     src/hybrid_fill.cpp
+    src/hybrid_fill_shell.cpp
+    src/hybrid_fill_snap.cpp
+    src/hybrid_fill_repair.cpp
+    src/hybrid_fill_quality.cpp
     src/mixed_fill.cpp
+    src/mixed_fill_lattice.cpp
+    src/mixed_fill_emit.cpp
+    src/mixed_fill_snap.cpp
     src/octa_fill.cpp
     src/transition_fill.cpp
     src/local_refine.cpp
@@ -23,6 +31,8 @@ add_library(polymesh_mesh
     src/cvt_lloyd.cpp
     src/cvt_sites.cpp
     src/cvt_export.cpp
+    src/cvt_rvd_cells.cpp
+    src/cvt_rvd_faces.cpp
 )
 add_library(polymesh::mesh ALIAS polymesh_mesh)
 target_include_directories(polymesh_mesh PUBLIC include)

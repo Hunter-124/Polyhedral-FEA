@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "fea/assembly.hpp"
 
+#include "strain_displacement.hpp"
+
 #include "fea/backend.hpp"
 #include "fea/quadrature.hpp"
 #include "fea/shape.hpp"
@@ -33,29 +35,6 @@ Eigen::Matrix<double, Eigen::Dynamic, 3> element_coords(const NodalMesh& mesh,
     return x;
 }
 
-/// Strain-displacement matrix B (6 x 3n) in Voigt order
-/// (xx, yy, zz, yz, xz, xy) with engineering shear strains, from physical
-/// shape-function gradients (n x 3).
-Eigen::MatrixXd b_matrix(const Eigen::Matrix<double, Eigen::Dynamic, 3>& dndx) {
-    const Eigen::Index n = dndx.rows();
-    Eigen::MatrixXd b = Eigen::MatrixXd::Zero(6, 3 * n);
-    for (Eigen::Index a = 0; a < n; ++a) {
-        const double dx = dndx(a, 0);
-        const double dy = dndx(a, 1);
-        const double dz = dndx(a, 2);
-        b(0, 3 * a + 0) = dx;
-        b(1, 3 * a + 1) = dy;
-        b(2, 3 * a + 2) = dz;
-        b(3, 3 * a + 1) = dz; // gamma_yz = dv/dz + dw/dy
-        b(3, 3 * a + 2) = dy;
-        b(4, 3 * a + 0) = dz; // gamma_xz = du/dz + dw/dx
-        b(4, 3 * a + 2) = dx;
-        b(5, 3 * a + 0) = dy; // gamma_xy = du/dy + dv/dx
-        b(5, 3 * a + 1) = dx;
-    }
-    return b;
-}
-
 } // namespace
 
 Eigen::MatrixXd element_stiffness(const NodalMesh& mesh, const NodalElement& element,
@@ -67,10 +46,9 @@ Eigen::MatrixXd element_stiffness(const NodalMesh& mesh, const NodalElement& ele
         return vem_poly_stiffness(mesh, cell, material);
     }
     // Pyramid5: two tet4s split along the base diagonal chosen by
-    // mesh::validity::pyramid_split_diagonal — a base-quad-only rule (apex-
-    // dependent per-cell choices made the shared-face triangulations mismatch:
-    // non-conforming field, constant-strain patch test 1e-12 → 2e-5). The snap
-    // validity gates use the same function, so gate and integrator agree.
+    // mesh::validity::pyramid_split_diagonal — a base-quad-only rule, so
+    // neighbours sharing the base face triangulate it identically (conforming
+    // field). The snap validity gates use the same function.
     if (element.type == ElementType::kPyramid5 && element.nodes.size() == 5) {
         const auto& n = element.nodes;
         Eigen::MatrixXd k = Eigen::MatrixXd::Zero(15, 15);
@@ -100,7 +78,6 @@ Eigen::MatrixXd element_stiffness(const NodalMesh& mesh, const NodalElement& ele
                 }
             }
         };
-        // TEMP-DIAG removed; choose the shared-face-consistent diagonal.
         if (mesh::validity::pyramid_split_diagonal(mesh.nodes[n[0]], mesh.nodes[n[1]],
                                                    mesh.nodes[n[2]], mesh.nodes[n[3]]) == 1) {
             add_tet({{1, 2, 3, 4}});
@@ -111,9 +88,8 @@ Eigen::MatrixXd element_stiffness(const NodalMesh& mesh, const NodalElement& ele
         }
         return k;
     }
-    // Hex8: always GATE-1 isoparametric trilinear. Hybrid zoo product FE expands
-    // lattice hex → pyramids (ADR-0012 v3 / ADR-0013) so mixed meshes no longer
-    // force Kuhn-PL assembly of bulk hex.
+    // Isoparametric Gauss integration; Hex8 is always trilinear isoparametric
+    // (hybrid meshes expand lattice hex to pyramids, ADR-0012 / ADR-0013).
     const auto x = element_coords(mesh, element);
     const auto d = material.d_matrix();
     const Eigen::Index ndof = 3 * x.rows();
@@ -132,7 +108,7 @@ Eigen::MatrixXd element_stiffness(const NodalMesh& mesh, const NodalElement& ele
         // expression (stack overflow).
         const Eigen::Matrix3d jac_inv = jac.inverse();
         const Eigen::Matrix<double, Eigen::Dynamic, 3> dndx = shape.dn * jac_inv.transpose();
-        const auto b = b_matrix(dndx);
+        const auto b = detail::strain_displacement(dndx);
         k.noalias() += b.transpose() * d * b * (det * qp.weight);
     }
     return k;
@@ -209,12 +185,8 @@ Eigen::SparseMatrix<double> assemble_stiffness(const NodalMesh& mesh,
     const auto ne = static_cast<std::ptrdiff_t>(mesh.elements.size());
 
     // The pattern is built first, from connectivity alone, and the element
-    // matrices are accumulated straight into it. The alternative — one
-    // Eigen::Triplet per local entry — costs 16 bytes for every one of the
-    // sum(3n * 3n) contributions before a single value is summed: 750 MB of
-    // triplets on a 52k-cell tet10 mesh, twice over during the merge, plus the
-    // counting sort inside setFromTriplets. The pattern is 12 MB for the same
-    // mesh and the sum happens in place.
+    // matrices are accumulated straight into it — no per-entry Eigen::Triplet
+    // storage (16 bytes x sum(3n * 3n)) and no setFromTriplets merge.
     const auto adj = build_node_adjacency(mesh);
     const auto n_nodes = mesh.nodes.size();
     Eigen::SparseMatrix<double> global(ndof, ndof);
@@ -271,9 +243,7 @@ Eigen::SparseMatrix<double> assemble_stiffness(const NodalMesh& mesh,
     // bounded scratch buffer, then scattered SERIALLY in element order. Two
     // consequences: peak scratch is one chunk instead of one dense matrix per
     // element, and each matrix entry is summed in element order regardless of
-    // thread count, so the assembled K is bit-for-bit identical on any host —
-    // and identical to what the previous triplet merge produced, since that
-    // merge also summed in element order.
+    // thread count, so the assembled K is bit-for-bit identical on any host.
     std::size_t max_edof = 0;
     for (const auto& element : mesh.elements) {
         max_edof = std::max(max_edof, 3 * element.nodes.size());

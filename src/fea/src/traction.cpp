@@ -3,6 +3,8 @@
 
 #include "fea/boundary_faces.hpp"
 
+#include "gauss_legendre.hpp"
+
 #include <Eigen/Geometry> // cross()
 
 #include <algorithm>
@@ -113,30 +115,27 @@ const std::vector<FaceQp>& face_rule(FaceType type) {
     // x = s, y = t(1-s), jacobian (1-s), 4x4 points. Weights sum to 1/2, the
     // area of the unit triangle, so they are a parameter-domain measure.
     static const std::vector<FaceQp> tri = [] {
-        static constexpr std::array<double, 4> x{-0.8611363115940526, -0.3399810435848563,
-                                                 0.3399810435848563, 0.8611363115940526};
-        static constexpr std::array<double, 4> w{0.3478548451374538, 0.6521451548625461,
-                                                 0.6521451548625461, 0.3478548451374538};
+        const auto g = detail::gauss_1d(4);
         std::vector<FaceQp> rule;
         rule.reserve(16);
         for (std::size_t i = 0; i < 4; ++i) {
-            const double s = 0.5 * (x[i] + 1.0);
+            const double s = 0.5 * (g.nodes[i] + 1.0);
             for (std::size_t j = 0; j < 4; ++j) {
-                const double t = 0.5 * (x[j] + 1.0);
-                rule.push_back({s, t * (1.0 - s), 0.25 * w[i] * w[j] * (1.0 - s)});
+                const double t = 0.5 * (g.nodes[j] + 1.0);
+                rule.push_back(
+                    {s, t * (1.0 - s), 0.25 * g.weights[i] * g.weights[j] * (1.0 - s)});
             }
         }
         return rule;
     }();
     // 3x3 Gauss on [-1,1]^2; weights sum to 4, that domain's area.
     static const std::vector<FaceQp> quad = [] {
-        static constexpr std::array<double, 3> x{-0.7745966692414834, 0.0, 0.7745966692414834};
-        static constexpr std::array<double, 3> w{5.0 / 9.0, 8.0 / 9.0, 5.0 / 9.0};
+        const auto g = detail::gauss_1d(3);
         std::vector<FaceQp> rule;
         rule.reserve(9);
         for (std::size_t i = 0; i < 3; ++i) {
             for (std::size_t j = 0; j < 3; ++j) {
-                rule.push_back({x[i], x[j], w[i] * w[j]});
+                rule.push_back({g.nodes[i], g.nodes[j], g.weights[i] * g.weights[j]});
             }
         }
         return rule;
@@ -151,7 +150,7 @@ const std::vector<FaceQp>& face_rule(FaceType type) {
 // whole faces stops the loaded patch on a staircase of element edges, so the
 // applied traction becomes a function of the tiling rather than of the region.
 // Clipping the face quadrature to the region instead is what makes the load
-// mesh-independent; see `consistent_region_load` for the measured motivation.
+// mesh-independent; see `consistent_region_load`.
 // --------------------------------------------------------------------------
 
 // One reference triangle of a face's parameter domain.
@@ -176,18 +175,10 @@ std::span<const RefTriangle> reference_triangles(FaceType type) {
 // Uniform subdivision of each reference triangle into 4^kClipLevels pieces. A
 // cut is located by interpolating the box plane's value linearly along a
 // sub-triangle edge, so its error is the surface's deviation from that chord:
-// the face's own curvature deviation divided by 4^kClipLevels. Measured on the
-// showcase sphere's tet10 skin (h = 8 mm, --load-box z >= 40 mm, 1312 candidate
-// faces) the clipped patch area in m^2 converges as level 0 3.137614e-3, 1
-// 3.140484e-3, 2 3.141320e-3, 3 3.141527e-3, 4 3.141575e-3, 5 3.141588e-3 —
-// relative to level 5 that is -1.3e-3, -3.5e-4, -8.5e-5, -1.9e-5, -3.9e-6, a
-// clean factor of four per level, and level 5 sits 1.5e-6 under the analytic cap
-// area 2*pi*R*(R - 40 mm) = 3.1415927e-3. Level 3 spreads that 1.9e-5 of area
-// over a 0.188 m patch edge, i.e. 3.2e-7 m or 1.8e-6 of the bounding-box
-// diagonal of cut-position error: 55 times inside the 1e-4-of-bbox surface
-// fidelity bar the mesher itself is held to, for 64 sub-triangles paid only on
-// the faces the region actually cuts. The whole-face rule this replaces put the
-// same patch at 2.948e-3 m^2, 6.2% short.
+// the face's own curvature deviation divided by 4^kClipLevels, so clipped area
+// converges by a factor of four per level. Level 3 keeps cut-position error far
+// inside the 1e-4-of-bbox surface fidelity bar the mesher is held to, for 64
+// sub-triangles paid only on the faces the region actually cuts.
 constexpr int kClipLevels = 3;
 constexpr int kClipSpan = 1 << kClipLevels;
 // Barycentric lattice nodes per reference triangle, and over a whole domain.

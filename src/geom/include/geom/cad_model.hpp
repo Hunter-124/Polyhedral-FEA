@@ -54,7 +54,7 @@ class CadModel {
     [[nodiscard]] TriSurface tessellate(double deflection = 0.0,
                                         double angular_deflection = 0.0) const;
 
-    /// Alias used by hybrid_zoo until it is fully BRep-native (ADR-0020).
+    /// Alias for `tessellate(deflection)` kept for legacy hybrid-fill callers (ADR-0020).
     [[nodiscard]] TriSurface boundary_surface_for_legacy_fill(double deflection = 0.0) const {
         return tessellate(deflection);
     }
@@ -80,8 +80,6 @@ class CadModel {
     std::string name_;
     Eigen::Vector3d bbox_min_ = Eigen::Vector3d::Zero();
     Eigen::Vector3d bbox_max_ = Eigen::Vector3d::Zero();
-
-    void compute_bbox();
 };
 /// Stable topological owner of an exact BRep projection. IDs are zero-based
 /// and follow the same TopExp::MapShapes order used by CadTopology. Degenerate

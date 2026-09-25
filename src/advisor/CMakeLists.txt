@@ -80,6 +80,10 @@ endif()
 
 add_library(polymesh_advisor
     src/advisor.cpp
+    src/advisor_activations.cpp
+    src/advisor_artifacts.cpp
+    src/advisor_decide.cpp
+    src/advisor_features.cpp
 )
 add_library(polymesh::advisor ALIAS polymesh_advisor)
 target_include_directories(polymesh_advisor PUBLIC include)

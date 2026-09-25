@@ -11,7 +11,7 @@
 #include <complex>
 #include <limits>
 #include <stdexcept>
-#include <utility>
+#include <string>
 
 namespace polymesh::adapt {
 namespace {

@@ -21,16 +21,10 @@ Eigen::Matrix<double, Eigen::Dynamic, 3> coords_of(const NodalMesh& mesh,
     return x;
 }
 
-// A tet4's isoparametric map is AFFINE, so its Jacobian is the same 3x3 matrix
-// at every quadrature point and its determinant is exactly 6*V_signed:
-// eval_tet4's dn is the constant [-1,-1,-1; 1,0,0; 0,1,0; 0,0,1], so
-// dn^T * x has rows (x1-x0), (x2-x0), (x3-x0). Going through the generic
-// `rule_positive` therefore costs one dynamic 4x3 coordinate matrix plus a
-// heap-allocating `eval_shape` per Gauss point to recompute a constant — and
-// this predicate is the fill's inner loop (graded_tet_fill_surface calls it per
-// cell, per repair candidate, per relaxation step). Measured on the pin-in-bore
-// contact ctest, the generic path was 6.7% of the whole mesh+solve run.
-// Identical verdict, no allocation.
+// A tet4's isoparametric map is affine: eval_tet4's dn is the constant
+// [-1,-1,-1; 1,0,0; 0,1,0; 0,0,1], so det J = 6*V_signed at every quadrature
+// point. Same verdict as `rule_positive` without the per-point allocation —
+// this predicate sits in the tet fill's repair/relaxation inner loop.
 bool tet4_positive(const NodalMesh& mesh, const NodalElement& element) {
     const auto& n = element.nodes;
     return mesh::validity::tet_signed_volume(mesh.nodes[n[0]], mesh.nodes[n[1]],
@@ -62,9 +56,7 @@ bool element_jacobians_positive(const NodalMesh& mesh, const NodalElement& eleme
     if (element.type == ElementType::kPolyVem) {
         // A polyhedral cell carries no isoparametric map, so "integrable" here
         // means the divergence-theorem volume its VEM projector integrates over
-        // is positive. Reporting these unconditionally valid is what let a
-        // repair pass move nodes freely inside a packed-poly mesh: cvt_poly's
-        // worst boundary node went from 0.503 h to 1.799 h with no gate at all.
+        // is positive (repair passes on packed-poly meshes gate on this).
         if (element.faces.empty()) {
             return false;
         }

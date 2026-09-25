@@ -22,8 +22,7 @@
 //     concentrates (see point_size_sources).
 //
 // The same field feeds every variable-density mesher through `SizeFieldFn`;
-// `seed_plan` remains available for the legacy ball-grading path and for
-// a-posteriori refinement marks.
+// `seed_plan` serves the ball-grading path and a-posteriori refinement marks.
 
 #include "adapt/sizing_field.hpp"
 #include "geom/tri_surface.hpp"
@@ -104,15 +103,11 @@ std::vector<SizeSource> thickness_size_sources(const geom::TriSurface& surface, 
 /// vertices emit no source, keeping the source set sparse (only the
 /// geometrically interesting regions cost anything downstream).
 ///
-/// The per-vertex `min` is what this returns, not the concatenation of
-/// `curvature_size_sources` and `thickness_size_sources`. Those two source sets
-/// induce the *same* size field — `size_at` already takes a min over sources
-/// and both sets are pinned to the same vertex, so
-/// min(h_a + βd, h_b + βd) = min(h_a, h_b) + βd — but not the same source
-/// *count*, and the count is reported (RefinementPlan::n_geometry_seeds, the
-/// diag JSON `geometry_seeds`). Keeping the min form keeps that observable
-/// byte-identical while all three functions share one implementation of each
-/// rule.
+/// Returns one source per vertex carrying the per-vertex `min`, not the
+/// concatenation of `curvature_size_sources` and `thickness_size_sources`:
+/// both induce the same size field (min(h_a + βd, h_b + βd) = min(h_a, h_b) + βd)
+/// but the source count is reported (RefinementPlan::n_geometry_seeds, diag JSON
+/// `geometry_seeds`), so it must stay one per vertex.
 std::vector<SizeSource> geometry_size_sources(const geom::TriSurface& surface, double h_min,
                                               double h_max, double curvature_fraction = 0.25,
                                               double thickness_fraction = 0.35);

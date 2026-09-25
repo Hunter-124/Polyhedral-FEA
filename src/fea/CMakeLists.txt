@@ -5,16 +5,22 @@ add_library(polymesh_fea
     src/spmv.cpp
     src/nodal_mesh.cpp
     src/boundary_faces.cpp
+    src/boundary_loops.cpp
+    src/boundary_partition.cpp
+    src/boundary_polygon.cpp
     src/quadrature.cpp
     src/shape.cpp
     src/hierarchical.cpp
     src/hp_assembly.cpp
+    src/hp_topology.cpp
     src/assembly.cpp
     src/constraints.cpp
     src/solve_cost.cpp
     src/solve.cpp
+    src/solve_health.cpp
     src/resource_budget.cpp
     src/traction.cpp
+    src/bc_selection.cpp
     src/stress.cpp
     src/cell_quality.cpp
     src/element_validity.cpp

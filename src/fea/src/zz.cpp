@@ -2,9 +2,11 @@
 #include "fea/zz.hpp"
 
 #include "fea/backend.hpp"
+#include "fea/cell_quality.hpp"
 #include "fea/quadrature.hpp"
 #include "fea/shape.hpp"
 #include "fea/vem.hpp"
+#include "recovered_strain.hpp"
 
 #include <Eigen/Dense>
 
@@ -12,7 +14,6 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
-#include <map>
 #include <span>
 #include <vector>
 
@@ -30,18 +31,7 @@ Stress stress_at(const NodalElement& element,
     const Eigen::Matrix3d jac = shape.dn.transpose() * x;
     const Eigen::Matrix3d jac_inv = jac.inverse();
     const Eigen::Matrix<double, Eigen::Dynamic, 3> dndx = shape.dn * jac_inv.transpose();
-    Eigen::Matrix<double, 6, 1> eps = Eigen::Matrix<double, 6, 1>::Zero();
-    for (std::size_t b = 0; b < element.nodes.size(); ++b) {
-        const auto bi = static_cast<Eigen::Index>(b);
-        const Eigen::Vector3d ub =
-            u.segment<3>(3 * static_cast<Eigen::Index>(element.nodes[b]));
-        eps[0] += dndx(bi, 0) * ub[0];
-        eps[1] += dndx(bi, 1) * ub[1];
-        eps[2] += dndx(bi, 2) * ub[2];
-        eps[3] += dndx(bi, 2) * ub[1] + dndx(bi, 1) * ub[2];
-        eps[4] += dndx(bi, 2) * ub[0] + dndx(bi, 0) * ub[2];
-        eps[5] += dndx(bi, 1) * ub[0] + dndx(bi, 0) * ub[1];
-    }
+    const Eigen::Matrix<double, 6, 1> eps = detail::strain_from_gradients(element, dndx, u);
     return d * eps;
 }
 
@@ -53,26 +43,13 @@ Eigen::Vector3d element_centroid(const NodalMesh& mesh, const NodalElement& el) 
     return c / static_cast<double>(el.nodes.size());
 }
 
-/// Element volume, m³. FEM types integrate |det J| with the same rule the
-/// stiffness uses; polyhedral (VEM) cells use the divergence theorem over their
-/// outward faces. Volume is what turns the raw stress-jump norm into an energy,
-/// so it must be a real volume, not a reference-space proxy.
-double element_volume(const NodalMesh& mesh, const NodalElement& el,
-                      const std::vector<QuadraturePoint>& rule) {
+/// Element volume, m³: the weight that turns the stress-jump norm into an energy.
+/// Unlike `fea::element_volume`, FEM types integrate |det J| with the stiffness
+/// rule (`default_rule`), not the over-integrated curved-cell rule.
+double recovery_volume(const NodalMesh& mesh, const NodalElement& el,
+                       const std::vector<QuadraturePoint>& rule) {
     if (el.type == ElementType::kPolyVem) {
-        double volume = 0.0;
-        for (const auto& face : el.faces) {
-            if (face.size() < 3) {
-                continue;
-            }
-            const Eigen::Vector3d& a = mesh.nodes[el.nodes[face[0]]];
-            for (std::size_t k = 1; k + 1 < face.size(); ++k) {
-                const Eigen::Vector3d& b = mesh.nodes[el.nodes[face[k]]];
-                const Eigen::Vector3d& c = mesh.nodes[el.nodes[face[k + 1]]];
-                volume += a.dot(b.cross(c)) / 6.0;
-            }
-        }
-        return std::abs(volume);
+        return element_volume(mesh, el);
     }
     Eigen::Matrix<double, Eigen::Dynamic, 3> x(el.nodes.size(), 3);
     for (std::size_t a = 0; a < el.nodes.size(); ++a) {
@@ -115,10 +92,10 @@ ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
         const auto eu = static_cast<std::size_t>(e);
         const auto& el = mesh.elements[eu];
         el_cent[eu] = element_centroid(mesh, el);
-        el_vol[eu] = element_volume(mesh, el, rules[static_cast<std::size_t>(el.type)]);
+        el_vol[eu] = recovery_volume(mesh, el, rules[static_cast<std::size_t>(el.type)]);
         if (el.type == ElementType::kPolyVem) {
-            // Constant/centroid VEM projected strain → stress (same projector
-            // as the stiffness). Was previously zeroed, giving von Mises = 0.
+            // Constant/centroid VEM projected strain → stress (same projector as
+            // the stiffness).
             const int order = vem_infer_order(el.nodes.size(), el.faces);
             std::vector<Eigen::Vector3d> coords;
             coords.reserve(el.nodes.size());
@@ -145,12 +122,9 @@ ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
         el_stress[eu] = stress_at(el, x, u, d, xi);
     }
 
-    // Node → incident elements, in compressed form: counting pass, then fill
-    // in ascending element order so each patch is ordered exactly as the
-    // previous vector-of-vectors produced it (the patch mean and the
-    // least-squares fit below are order-sensitive at roundoff level). One
-    // allocation instead of n_nodes, and ~4x less memory: a 78k-node tet10
-    // mesh spent 40 MB on 78k heap-allocated vectors of std::size_t.
+    // Node → incident elements, in compressed form: counting pass, then fill in
+    // ascending element order so each patch keeps element order (the patch mean
+    // and the least-squares fit below are order-sensitive at roundoff level).
     std::vector<std::uint32_t> incident_offsets(n_nodes + 1, 0);
     for (const auto& element : mesh.elements) {
         for (const auto node : element.nodes) {
@@ -174,18 +148,12 @@ ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
     //
     // The fit is written in the patch's OWN frame — coordinates measured from
     // the patch's mean sample point and divided by the patch radius — not in
-    // absolute metres. That is not cosmetic. In absolute coordinates the design
-    // matrix [1, x, y, z] of a patch of diameter h sitting at distance R from
-    // the origin has columns that are constant to within h/R, so A is
-    // numerically rank-deficient by construction (measured on plate+hole at
-    // h = 8 mm: AᵀA eigenvalues 6e-18 … 4.0), the unpivoted LDLᵀ that used to
-    // solve it returned an arbitrary point of the null space, and evaluating
-    // that at |x| ≈ R multiplied the excursion by R/h. Every node on a flat
-    // lattice face makes it EXACTLY singular — its incident element centroids
-    // are coplanar, so the column normal to that plane is a multiple of the
-    // constant column. Result: von Mises 1.6e12 Pa and ZZ η 4793 on a mesh
-    // whose true recovered maximum is 1.7e7 Pa, on a perfectly conforming
-    // well-shaped hex lattice with a sane displacement field.
+    // absolute metres. In absolute coordinates the design matrix [1, x, y, z] of
+    // a patch of diameter h at distance R from the origin has columns constant
+    // to within h/R, so it is numerically rank-deficient by construction and
+    // extrapolating its null-space slope to |x| ≈ R amplifies it by R/h. Every
+    // node on a flat lattice face makes it EXACTLY singular: its incident
+    // element centroids are coplanar.
     //
     // In the patch frame the constant column is orthogonal to the three
     // coordinate columns, so a0 is the patch mean whatever the rank is, and the
@@ -194,8 +162,8 @@ ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
     // patches: four or five samples can formally span the four-coefficient
     // basis while leaving an extrapolation with enormous statistical leverage.
     // Bound the L2 gain from sample noise to the recovered node; a fit that
-    // would amplify it by more than two falls back to the same honest patch
-    // average as the existing no-linear-part path.
+    // would amplify it by more than two falls back to the same patch average as
+    // the no-linear-part path.
     constexpr double kMaxExtrapolationGain = 2.0;
     ZzRecovery out;
     out.nodal_stress.assign(n_nodes, Stress::Zero());
@@ -243,11 +211,8 @@ ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
         // Rank tolerance, relative to the largest singular value: a direction
         // counts as sampled only when the patch spreads in it by ~1% of its own
         // radius. Anything thinner is the flat-face / thin-layer null space and
-        // its slope is pure noise divided by ~0 — retaining it is what produced
-        // the 1e12 Pa readings. Measured on plate+hole h=8 mm: 1e-8 → 1.6e12 Pa
-        // (η 4790), 1e-6 → 1.8e10, 1e-4 → 1.2e9, 1e-3 and 1e-2 → 1.52e7
-        // (η 0.208, matching the h/2-refined answer), 5e-2 → starts discarding
-        // real slopes. The 1e-3…1e-2 plateau is the safe operating point.
+        // its slope is noise divided by ~0. Thresholds of 1e-3…1e-2 are stable;
+        // from 5e-2 real slopes start being discarded.
         svd.setThreshold(1e-2);
         // For A = UΣVᵀ, the node prediction's sample weights are
         // row·VΣ⁻¹Uᵀ. U does not change their L2 norm, so evaluate the gain in
@@ -275,7 +240,6 @@ ZzRecovery recover_zz(const NodalMesh& mesh, const Material& material,
     // divided by the same norm of the FE stress itself so both the per-element
     // indicator and the global number are dimensionless *relative* errors:
     //   η_e = sqrt(η_e² / Σ_f V_f σ_hᵀ D⁻¹ σ_h),  η = sqrt(Σ_e η_e²).
-    // Volume weighting is what removes the old bias toward small elements, and
     // Dörfler marking is invariant to the common denominator, so the marking
     // ordering stays a pure energy-share ranking.
     const Eigen::Matrix<double, 6, 6> d_inv = d.inverse();

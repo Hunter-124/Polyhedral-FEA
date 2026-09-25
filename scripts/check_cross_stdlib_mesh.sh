@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # CI / local gate: the mesh must not depend on which standard library built it.
 #
-# Why this gate exists. On 2026-08-14 the same commit built with MSVC and with
-# gcc produced different meshes on 5 of 24 corpus pairs — stepped_shaft_s2_c0
+# Why this gate exists. The same commit built with MSVC and with gcc once
+# produced different meshes on 5 of 24 corpus pairs — stepped_shaft_s2_c0
 # hybrid_zoo came out 264 elements one way and 200 the other, and one pair
 # flipped solve_fail -> ok. Floating point was ruled out: the gcc build was
 # bit-identical across reruns and thread counts, and -ffp-contract=off changed

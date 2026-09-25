@@ -14,28 +14,29 @@ Run from the repo root::
 
 Testlab invocation encoded here (``apps/testlab/main.cpp``)::
 
-    usage: polymesh_testlab run|resume|validate|pause-status <campaign_dir>   # main.cpp:2237
-    if (cmd == "resume") return run_campaign(camp_dir, /*resume=*/true);      # main.cpp:2498
+    usage: polymesh_testlab run|resume|validate|pause-status <campaign_dir>   # usage()
+    if (cmd == "resume") return tl::run_campaign(camp_dir, /*resume=*/true, advisor.get());
 
-``resume`` is used for every launch, never ``run``: the fresh path truncates
-``results.jsonl`` (``std::ofstream trunc(results_path, std::ios::trunc)``,
-main.cpp:2327) and seeds ``survivors`` with the *whole* grid, while the resume
-path keeps existing rows and honours the hand-written ``checkpoint.json``
-(main.cpp:2308-2323).  Both paths then skip any ``cfg_id|part|tier`` already in
-``results.jsonl`` (main.cpp:2343 + 2397-2400), which gives pair-level restart
+``resume`` is used for every launch, never ``run``: the fresh path of
+``run_campaign`` (apps/testlab/campaign_runner.cpp) truncates ``results.jsonl``
+(``std::ofstream trunc(results_path, std::ios::trunc)``) and seeds ``survivors``
+with the *whole* grid, while the resume path keeps existing rows and honours the
+hand-written ``checkpoint.json``.  Both paths then skip any ``cfg_id|part|tier``
+already in ``results.jsonl`` (``completed_keys``), which gives pair-level restart
 safety inside a campaign directory for free.
 
 Config-subset control therefore comes from ``checkpoint.json.survivors``
-(main.cpp:2378-2382), and part-subset control from ``campaign.json.parts``.  A
+(the per-tier survivor loop in ``run_campaign``), and part-subset control from
+``campaign.json.parts``.  A
 campaign is always a full ``configs x parts`` rectangle, so the missing-pair set
 is decomposed into rectangles by grouping configs that miss exactly the same
 parts; in the common case (nothing done yet, or whole configs done) that is a
 single group and each shard gets exactly one campaign directory.
 
-``cfg_id`` strings are mirrored from ``cfg_id_of`` (main.cpp:117-134) rather than
-invented: testlab derives them itself from the grid, and a mismatch would make
-``survivors`` empty, which testlab silently expands back to the full grid
-(main.cpp:2383-2387).  :func:`verify_cfg_id_mirror` re-proves the mirror against
+``cfg_id`` strings are mirrored from ``cfg_id_of`` (apps/testlab/campaign_config.cpp)
+rather than invented: testlab derives them itself from the grid, and a mismatch
+would make ``survivors`` empty, which ``run_campaign`` silently expands back to the
+full grid.  :func:`verify_cfg_id_mirror` re-proves the mirror against
 every recorded row on every invocation and aborts on the first disagreement.
 """
 from __future__ import annotations
@@ -52,22 +53,28 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
-ROOT = Path(__file__).resolve().parents[2]
-CAMPAIGNS = ROOT / "bench" / "campaigns"
-ADVISOR_DIR = ROOT / "bench" / "advisor"
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from advisor.paths import ADVISOR_DIR, CAMPAIGNS_DIR, REPO_ROOT  # noqa: E402
+
 THROUGHPUT_PATH = ADVISOR_DIR / "throughput.json"
-TESTLAB_DIR = ROOT / "build" / "apps" / "testlab"
-DATASET_BUILDER = ROOT / "scripts" / "build_advisor_dataset.py"
-PROMOTE_TRUTH = ROOT / "scripts" / "advisor" / "promote_truth.py"
+TESTLAB_DIR = REPO_ROOT / "build" / "apps" / "testlab"
+DATASET_BUILDER = REPO_ROOT / "scripts" / "build_advisor_dataset.py"
+PROMOTE_TRUTH = REPO_ROOT / "scripts" / "advisor" / "promote_truth.py"
 
 TRUTH_CAMPAIGN = "advisor-truth-0"
-DEFAULT_TEMPLATE = "bench/campaigns/advisor-pilot-1/campaign.json"
+#: The batch-1 template (docs/advisor/0003-training-log.md); later stages pass
+#: their own ``advisor-batch-<N>-template``.
+DEFAULT_TEMPLATE = "bench/campaigns/advisor-batch-template/campaign.json"
 DEFAULT_PARTS_GLOB = "bench/geometries/corpus/primitives/*.case.json"
 
-# Fixed for this 6-core / 12-thread machine (plan step 3): 4 workers x 2 OpenMP
-# threads = 8 busy threads, leaving OS headroom. Not discovered dynamically.
+# Host/resource defaults, shared with regenerate_campaign.py. Sized for the
+# 6-core / 12-thread labelling box: 4 workers x 2 OpenMP threads = 8 busy
+# threads, leaving OS headroom. Not discovered dynamically; override per host
+# with --shards / --omp-threads, and set --host-tag whenever more than one
+# machine labels into the same repo.
 SHARDS = 4
 OMP_THREADS_PER_SHARD = 2
+HOST_TAG = ""
 
 # Step-3 contingency trigger: mesh time above this fraction of mesh+solve time
 # means p-order-only variants are paying for remeshing, so a mesh cache would
@@ -81,7 +88,7 @@ MESH_CACHE_FRAC_THRESHOLD = 0.30
 def cfg_id_of(config: dict[str, Any]) -> str:
     """FNV-1a 64 over the canonical JSON dump of a config object.
 
-    Mirror of ``cfg_id_of`` in apps/testlab/main.cpp:117-134::
+    Mirror of ``cfg_id_of`` in apps/testlab/campaign_config.cpp::
 
         std::map<std::string, json> ordered;   // key-sorted
         const std::string s = canon.dump();    // compact, no spaces
@@ -98,7 +105,7 @@ def cfg_id_of(config: dict[str, Any]) -> str:
 
 
 def expand_grid(grid: dict[str, list[Any]]) -> list[tuple[str, dict[str, Any]]]:
-    """Full-factorial expansion, mirroring expand_grid (main.cpp:480-504).
+    """Full-factorial expansion, mirroring expand_grid (apps/testlab/campaign_config.cpp).
 
     nlohmann's default object is a ``std::map``, so testlab walks the grid keys
     in sorted order; we do the same to keep the emitted run order identical.
@@ -169,7 +176,7 @@ def count_lines(path: Path) -> int:
 def rel(path: Path) -> str:
     """Repo-relative POSIX path for logs, falling back to the absolute path."""
     try:
-        return path.resolve().relative_to(ROOT).as_posix()
+        return path.resolve().relative_to(REPO_ROOT).as_posix()
     except ValueError:
         return str(path)
 
@@ -180,9 +187,9 @@ def rel(path: Path) -> str:
 def verify_cfg_id_mirror() -> int:
     """Re-derive cfg_id for every recorded row; abort on any disagreement."""
     checked = 0
-    if not CAMPAIGNS.is_dir():
+    if not CAMPAIGNS_DIR.is_dir():
         return 0
-    for results in sorted(CAMPAIGNS.glob("*/results.jsonl")):
+    for results in sorted(CAMPAIGNS_DIR.glob("*/results.jsonl")):
         for row in iter_rows(results):
             config = row.get("config")
             recorded = row.get("cfg_id")
@@ -194,7 +201,7 @@ def verify_cfg_id_mirror() -> int:
                 raise SystemExit(
                     f"cfg_id mirror broken: {results} recorded {recorded}, "
                     f"this script derives {derived} for {config}. "
-                    "Re-check cfg_id_of() against apps/testlab/main.cpp before running."
+                    "Re-check cfg_id_of() against apps/testlab/campaign_config.cpp before running."
                 )
     return checked
 
@@ -224,9 +231,9 @@ def completed_pairs() -> tuple[set[tuple[str, str]], list[Path]]:
     """
     done: set[tuple[str, str]] = set()
     scanned: list[Path] = []
-    if not CAMPAIGNS.is_dir():
+    if not CAMPAIGNS_DIR.is_dir():
         return done, scanned
-    for campaign_dir in sorted(CAMPAIGNS.glob("advisor-*")):
+    for campaign_dir in sorted(CAMPAIGNS_DIR.glob("advisor-*")):
         results = campaign_dir / "results.jsonl"
         if not results.is_file():
             continue
@@ -250,9 +257,9 @@ def truth_results_paths(campaign: str = TRUTH_CAMPAIGN) -> list[Path]:
     already does for the batch campaigns.
     """
     paths: list[Path] = []
-    if not CAMPAIGNS.is_dir():
+    if not CAMPAIGNS_DIR.is_dir():
         return paths
-    for directory in [CAMPAIGNS / campaign, *sorted(CAMPAIGNS.glob(f"{campaign}-s*"))]:
+    for directory in [CAMPAIGNS_DIR / campaign, *sorted(CAMPAIGNS_DIR.glob(f"{campaign}-s*"))]:
         results = directory / "results.jsonl"
         if results.is_file():
             paths.append(results)
@@ -278,7 +285,7 @@ class Rect:
 
     @property
     def directory(self) -> Path:
-        return CAMPAIGNS / self.name
+        return CAMPAIGNS_DIR / self.name
 
 
 @dataclass
@@ -317,15 +324,15 @@ def load_parts(parts_glob: str | None, template: dict[str, Any]) -> tuple[list[t
     """
     template_parts = [entry for entry in template.get("parts", []) if isinstance(entry, str)]
     if parts_glob is not None:
-        matches = sorted(ROOT.glob(parts_glob))
+        matches = sorted(REPO_ROOT.glob(parts_glob))
         source = f"glob {parts_glob}"
         if not matches:
-            raise SystemExit(f"--parts-glob {parts_glob} matched no case json under {ROOT}")
+            raise SystemExit(f"--parts-glob {parts_glob} matched no case json under {REPO_ROOT}")
     elif template_parts:
-        matches = [ROOT / entry for entry in template_parts]
+        matches = [REPO_ROOT / entry for entry in template_parts]
         source = "template parts"
     else:
-        matches = sorted(ROOT.glob(DEFAULT_PARTS_GLOB))
+        matches = sorted(REPO_ROOT.glob(DEFAULT_PARTS_GLOB))
         source = f"default glob {DEFAULT_PARTS_GLOB}"
         if not matches:
             raise SystemExit(
@@ -341,7 +348,7 @@ def load_parts(parts_glob: str | None, template: dict[str, Any]) -> tuple[list[t
         part_id = case.get("part")
         if not isinstance(part_id, str) or not part_id:
             raise SystemExit(f"{path}: case json has no string 'part' field")
-        case_rel = path.relative_to(ROOT).as_posix()
+        case_rel = path.relative_to(REPO_ROOT).as_posix()
         if part_id in seen:
             raise SystemExit(f"duplicate part id {part_id!r} in {seen[part_id]} and {case_rel}")
         seen[part_id] = case_rel
@@ -414,7 +421,7 @@ def build_rects(batch: int, plan: Plan, shards: int, host_tag: str = "") -> list
 
 
 def make_plan(args: argparse.Namespace) -> Plan:
-    template_path = (ROOT / args.campaign_template).resolve()
+    template_path = (REPO_ROOT / args.campaign_template).resolve()
     if not template_path.is_file():
         raise SystemExit(f"campaign template not found: {template_path}")
     template = read_json(template_path)
@@ -465,7 +472,7 @@ def campaign_json(name: str, plan: Plan, case_paths: Iterable[str], comment: str
 
 
 def write_checkpoint(path: Path, name: str, survivors: Iterable[str]) -> None:
-    """checkpoint.json in the exact shape load_checkpoint reads (main.cpp:598-612)."""
+    """checkpoint.json in the exact shape load_checkpoint reads (apps/testlab/campaign_config.cpp)."""
     now = utc_now()
     payload = {
         "campaign": name,
@@ -512,7 +519,7 @@ def launch(directory: Path, omp_threads: int) -> tuple[int, float]:
         log.flush()
         try:
             completed = subprocess.run(
-                command, cwd=str(ROOT), env=env, stdout=log, stderr=subprocess.STDOUT, check=False
+                command, cwd=str(REPO_ROOT), env=env, stdout=log, stderr=subprocess.STDOUT, check=False
             )
             code = completed.returncode
         except OSError as exc:  # missing binary, permission, ...
@@ -557,7 +564,7 @@ def run_truth_gate(dry_run: bool, skip: bool = False) -> bool:
     would train on provisional truth, which is why this is a flag and not a
     default.
     """
-    directory = CAMPAIGNS / TRUTH_CAMPAIGN
+    directory = CAMPAIGNS_DIR / TRUTH_CAMPAIGN
     campaign_path = directory / "campaign.json"
     if skip:
         print(f"truth gate: skipped by request — another host owns {TRUTH_CAMPAIGN}")
@@ -578,7 +585,7 @@ def run_truth_gate(dry_run: bool, skip: bool = False) -> bool:
     # with provisional seeds and makes the campaign useful again the same day.
     promotable = subprocess.run(
         [sys.executable, rel(PROMOTE_TRUTH), "--check-promotable"],
-        cwd=str(ROOT), check=False,
+        cwd=str(REPO_ROOT), check=False,
     )
     if promotable.returncode == 3:
         print("truth gate: skipped — no corpus reference is promotable "
@@ -591,7 +598,7 @@ def run_truth_gate(dry_run: bool, skip: bool = False) -> bool:
     configs = expand_grid(truth.get("grid", {}))
     truth_parts: list[str] = []
     for entry in truth.get("parts", []):
-        case = read_json(ROOT / entry)
+        case = read_json(REPO_ROOT / entry)
         part_id = case.get("part")
         if not isinstance(part_id, str):
             raise SystemExit(f"{entry}: case json has no string 'part' field")
@@ -640,7 +647,7 @@ def run_truth_gate(dry_run: bool, skip: bool = False) -> bool:
     # provisional after promotion, i.e. the batch would train on fake truth.
     promote = subprocess.run(
         [sys.executable, rel(PROMOTE_TRUTH), "--require-all"],
-        cwd=str(ROOT),
+        cwd=str(REPO_ROOT),
         check=False,
     )
     if promote.returncode != 0:
@@ -774,7 +781,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--shards", type=int, default=SHARDS, help=f"concurrent testlab processes (default {SHARDS})")
     parser.add_argument("--omp-threads", type=int, default=OMP_THREADS_PER_SHARD,
                         help=f"OMP_NUM_THREADS per shard (default {OMP_THREADS_PER_SHARD})")
-    parser.add_argument("--host-tag", default="",
+    parser.add_argument("--host-tag", default=HOST_TAG,
                         help="suffix for campaign directory names, e.g. --host-tag hunter-pc. "
                              "Set it when more than one machine labels into the same repo so "
                              "their campaign directories cannot collide on merge")
@@ -845,7 +852,7 @@ def main(argv: list[str] | None = None) -> int:
 
     print("rebuilding bench/advisor/dataset.csv ...")
     build = subprocess.run(
-        [sys.executable, rel(DATASET_BUILDER)], cwd=str(ROOT), check=False
+        [sys.executable, rel(DATASET_BUILDER)], cwd=str(REPO_ROOT), check=False
     )
     if build.returncode != 0:
         print(f"error: build_advisor_dataset.py exited {build.returncode}", file=sys.stderr)

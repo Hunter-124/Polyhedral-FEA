@@ -5,7 +5,7 @@
     "advisor-row-v4"
   ],
   "truth": {
-    "rederived_from": "row answers[] via probe kinds mirrored from apps/testlab/main.cpp",
+    "rederived_from": "row answers[] via probe kinds mirrored from apps/testlab/probe_selection.cpp",
     "rows_rescored": 17155,
     "rows_unscored": 18855,
     "unscored_reasons": {

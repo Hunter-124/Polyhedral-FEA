@@ -6,12 +6,11 @@
 
 Why
 ---
-The advisor's 44-column input vector advertises geometric awareness it does not
-have. Measured on the v3 corpus, ten of those columns are constant across all
+The v3 advisor's 44-column input vector advertised geometric awareness it did
+not have. Measured on the v3 corpus, ten of those columns were constant across all
 3,456 rows, and the worst offender is ``curved_frac``, which is **1.0 in every
-single row**: ``geom_class_of`` computes it as ``(ntri - 12) / ntri``
-(``apps/testlab/main.cpp:1709``), which saturates to 1 for any real
-triangulation. ``diag`` is 1.0 by construction, and ``kappa_max_h`` /
+single row**: at the time ``geom_class_of`` (apps/testlab) computed it as
+``(ntri - 12) / ntri``, which saturates to 1 for any real triangulation. ``diag`` is 1.0 by construction, and ``kappa_max_h`` /
 ``kappa_mean_h`` are derived from the same tessellation.
 
 That matters most for exactly the question the model was measured to fail:
@@ -76,9 +75,10 @@ if __package__ in (None, ""):  # direct invocation
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     __package__ = "advisor"
 
-from .dataset import ADVISOR_DIR, ROOT  # noqa: E402
+from .features import GEOMETRY_TABLE_COLUMNS  # noqa: E402
+from .paths import ADVISOR_DIR, CORPUS_PRIMITIVES_DIR  # noqa: E402
 
-STEP_DIR = ROOT / "bench" / "geometries" / "corpus" / "primitives"
+STEP_DIR = CORPUS_PRIMITIVES_DIR
 FEATURES_CSV = ADVISOR_DIR / "geometry_features.csv"
 
 #: A face whose sqrt(area) is below this fraction of the bbox diagonal counts as
@@ -87,7 +87,7 @@ SMALL_FACE_FRACTION = 0.05
 
 #: A face below this fraction of the total surface AREA is a "salient feature":
 #: a hole wall, a boss wall, a rib flank, a fillet strip. Mirrors
-#: ``kSalientFaceAreaFraction`` in ``src/pipeline/src/scene.cpp``.
+#: ``kSalientFaceAreaFraction`` in ``src/pipeline/src/case_features.cpp``.
 SALIENT_FACE_AREA_FRACTION = 0.05
 
 #: uv / curve sampling density. Mirrors ``kFeatureTopologySamples``: the C++
@@ -97,7 +97,7 @@ SALIENT_FACE_AREA_FRACTION = 0.05
 FEATURE_TOPOLOGY_SAMPLES = 4
 
 #: Relative length tolerances, mirroring ``kGeometryRelTol`` /
-#: ``kOnSurfaceRelTol`` / ``kParallelTol`` in ``src/pipeline/src/scene.cpp``.
+#: ``kOnSurfaceRelTol`` / ``kParallelTol`` in ``src/pipeline/src/case_features.cpp``.
 GEOMETRY_REL_TOL = 1e-7
 ON_SURFACE_REL_TOL = 1e-6
 PARALLEL_TOL = 1e-9
@@ -109,28 +109,20 @@ MAX_CREASE_PROBES = 256
 #: ``geom::extract_topology`` classifies with (25 degrees).
 SHARP_FROM_FLAT_RAD = 25.0 * math.pi / 180.0
 
-#: Column order of the emitted table (after ``part``).
+#: Column order of the emitted table (after ``part``): the exact-BRep
+#: descriptors, then the proximity / crease / singularity block of the
+#: portable-cost retrain, mirroring ``pipeline::CaseFeatures`` field for field
+#: (``features.GEOMETRY_TABLE_COLUMNS``).
 #:
-#: The last ten are the proximity / crease / singularity block of the
-#: portable-cost retrain, mirroring ``pipeline::CaseFeatures`` field for field.
-#: The contract's other three columns -- ``load_to_feature_dist_min_rel``,
-#: ``fix_to_feature_dist_min_rel`` and ``case_load_multiaxiality`` -- are
-#: deliberately absent: they are properties of a LOAD CASE, not of a solid, so
-#: they come per row from ``pipeline::extract_case_features`` through the testlab
-#: row's ``features`` object, exactly as ``fix_area_frac`` and
-#: ``load_axis_alignment`` already do. Putting a per-case number in a per-part
-#: table would silently average two load cases of one solid together.
-FEATURE_NAMES: list[str] = [
-    "geo_curved_area_frac", "geo_cyl_area_frac", "geo_plane_area_frac",
-    "geo_other_area_frac", "geo_min_curv_radius_rel", "geo_log_curv_radius_mean",
-    "geo_log_curv_radius_std", "geo_n_faces", "geo_n_edges",
-    "geo_face_area_cv", "geo_aspect_max", "geo_aspect_mid", "geo_volume_frac",
-    "geo_area_over_v23", "geo_min_face_size_rel",
-    "geo_n_inner_loops", "geo_hole_spacing_min_rel", "geo_hole_spacing_p10_rel",
-    "geo_feat_pair_dist_min_rel", "geo_feat_pair_dist_p10_rel",
-    "geo_feat_pair_dist_mean_rel", "geo_dihedral_p10", "geo_dihedral_p50",
-    "geo_dihedral_p90", "geo_singular_lambda_min",
-]
+#: The per-case columns of that block -- ``features.BC_INTERACTION_COLUMNS``:
+#: ``load_to_feature_dist_min_rel``, ``fix_to_feature_dist_min_rel`` and
+#: ``case_load_multiaxiality`` -- are deliberately absent: they are properties
+#: of a LOAD CASE, not of a solid, so they come per row from
+#: ``pipeline::extract_case_features`` through the testlab row's ``features``
+#: object, exactly as ``fix_area_frac`` and ``load_axis_alignment`` already do.
+#: Putting a per-case number in a per-part table would silently average two
+#: load cases of one solid together.
+FEATURE_NAMES: list[str] = list(GEOMETRY_TABLE_COLUMNS)
 
 
 def _occ():
@@ -177,7 +169,7 @@ def _occ():
 
 # --- proximity / crease / singularity mirror ---------------------------------
 #
-# Everything below reproduces `src/pipeline/src/scene.cpp` operation for
+# Everything below reproduces `src/pipeline/src/case_features.cpp` operation for
 # operation, because the whole point of these ten columns is that the offline
 # table and the shipped C++ extractor agree to roundoff on the same STEP. Where
 # the C++ has to derive something the OCC kernel already knows analytically (a
@@ -202,7 +194,7 @@ def _quantile_floor(ascending: list[float], q: float) -> float:
 def _williams_lambda(omega: float) -> float:
     """Smallest Williams eigenvalue in (0,1) for a traction-free wedge of
     material opening angle ``omega``; see ``williams_lambda`` in
-    ``src/pipeline/src/scene.cpp`` for the equations and the citations. Same
+    ``src/pipeline/src/case_features.cpp`` for the equations and the citations. Same
     fixed 4096-interval scan and 100 bisections, so the two sides agree to the
     last few bits rather than to a tolerance."""
     scan = 4096

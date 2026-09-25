@@ -62,13 +62,8 @@ import figstyle as fs  # noqa: E402
 from make_compare_grid import PanelSpec, matched_panels  # noqa: E402
 
 
-# ---------------------------------------------------------------------------
-# Theme -- every colour in this file comes from figstyle. 3D renders and the
-# composites around them keep the dark stage.
-# ---------------------------------------------------------------------------
-def theme() -> fs.Theme:
-    t = fs.theme()
-    return t if t.name == "dark" else fs.use("dark")
+# Every colour in this file comes from figstyle; 3D renders and the composites
+# around them keep the dark stage (fs.dark_stage).
 
 
 # ---------------------------------------------------------------------------
@@ -94,29 +89,14 @@ CLI = REPO / "build/apps/cli/polymesh"
 SOLVE_TIMEOUT = 300
 
 
-def rel(path: Path) -> str:
-    """Repo-relative string when possible, absolute otherwise.
-
-    The single-image modes accept an arbitrary --out, which may live outside the
-    repository; Path.relative_to would raise on those.
-    """
-    try:
-        return str(path.resolve().relative_to(REPO))
-    except ValueError:
-        return str(path)
-
-
 def cli_path() -> Path:
     """The CLI to render with, chosen by MTIME and announced.
 
-    This used to take the first name that existed, preferring the extensionless
-    `build/apps/cli/polymesh`. On Windows the build target is `polymesh.exe`,
-    so an extensionless leftover from an earlier configuration sat there
-    unchanged and won every time: the showcase was regenerated for hours
-    against a 15-hour-old engine and came back "bit-identical", which read as
-    evidence that a mesher fix had changed nothing. It was evidence that the
-    fix had never been run. Pick the newest candidate and print it, so a stale
-    binary announces itself instead of quietly producing the old answer.
+    On Windows the build target is `polymesh.exe`, so an extensionless leftover
+    `build/apps/cli/polymesh` from an earlier configuration can sit beside it
+    unchanged; taking the first name that exists would render against a stale
+    engine and report "bit-identical" output for a fix that never ran. Pick
+    the newest candidate and print it, so a stale binary announces itself.
     """
     candidates = [
         cand
@@ -132,10 +112,10 @@ def cli_path() -> Path:
         newest.stat().st_mtime, _dt.timezone.utc
     ).strftime("%Y-%m-%d %H:%M:%SZ")
     if not getattr(cli_path, "_announced", False):
-        print(f"  cli: {rel(newest)} (built {stamp})")
+        print(f"  cli: {fs.rel(newest)} (built {stamp})")
         for other in candidates:
             if other != newest:
-                print(f"       ignoring older {rel(other)}")
+                print(f"       ignoring older {fs.rel(other)}")
         cli_path._announced = True  # type: ignore[attr-defined]
     return newest
 
@@ -190,10 +170,9 @@ PARTS: list[Part] = [
         title="Plate with hole",
         step="plate_hole.step",
         mesher="graded",
-        # h was 3 mm when the shipped mesh was straight-edged and only a fine
-        # lattice could round the hole. ADR-0035 puts the boundary on the exact
-        # BRep instead, so 6 mm now renders a smoother hole than 3 mm ever did —
-        # at ~1/8 the cells, which keeps this figure reproducible in minutes.
+        # ADR-0035 puts the boundary on the exact BRep, so 6 mm renders a
+        # smooth hole at a cell count that keeps this figure reproducible in
+        # minutes.
         h=0.006,
         E=2.1e11,
         nu=0.3,
@@ -245,18 +224,16 @@ PARTS: list[Part] = [
         view=(1.00, -0.95, 0.30),
         up=(0.0, 0.0, 1.0),
         margin=1.04,
-        # The base FACE, not a 15 mm slab of the wall. A selection box names a
-        # region of the boundary surface (ADR-0037, extended to fixtures), so
-        # z <= 15 mm used to clamp the outer wall up to 15 mm as well, and the
+        # The base FACE, not a slab of the wall. A selection box names a
+        # region of the boundary surface (ADR-0037, extended to fixtures), so a
+        # z <= 15 mm box would clamp the outer wall up to 15 mm as well, and the
         # upper edge of that strip is an artificial clamped-patch boundary with a
-        # genuine stress singularity on it: at h = 12 mm it showed as a ring of
-        # one-element hot spots a fifteenth of the way up the wall, which no real
-        # fixture produces. 2 mm still contains the whole z = 0 face (its nodes
-        # snap to z = 0 exactly), and the mesh does not move at all: `polymesh
-        # mesh` at h = 12 mm with this box and with the old 15 mm one both emit
-        # 234,533 nodes / 161,976 cells from the same 124 BC seeds, and the two
-        # VTUs are bit-identical (sha256 68d2c65498704034 both). So this changes
-        # the boundary condition and nothing else.
+        # genuine stress singularity on it (a ring of one-element hot spots at
+        # h = 12 mm that no real fixture produces). 2 mm still contains the whole
+        # z = 0 face (its nodes snap to z = 0 exactly), and the mesh is
+        # identical either way (234,533 nodes / 161,976 cells, bit-identical VTUs
+        # at h = 12 mm), so the box changes the boundary condition and nothing
+        # else.
         fix_box=(-1, -1, -1, 1, 1, 0.002),
         load_box=(-1, -1, 0.195, 1, 1, 1),
         # The box reaches 5 mm down the wall, and since ADR-0037 the traction is
@@ -468,9 +445,9 @@ def solve_argv(part: Part, out: Path) -> list[str]:
     argv = [
         str(cli_path()),
         "solve",
-        rel(PARTS_DIR / part.step),
+        fs.rel(PARTS_DIR / part.step),
         "-o",
-        rel(out),
+        fs.rel(out),
         "-h",
         f"{part.h:g}",
         "--mesher",
@@ -497,13 +474,13 @@ def mesh_argv(tile: MeshTile, out: Path) -> list[str]:
     argv = [
         str(cli_path()),
         "mesh",
-        rel(PARTS_DIR / f"{tile.part}.step"),
+        fs.rel(PARTS_DIR / f"{tile.part}.step"),
         "-h",
         f"{tile.h:g}",
         "--mesher",
         tile.mesher,
         "-o",
-        rel(out),
+        fs.rel(out),
     ]
     if tile.no_feature:
         argv.append("--no-feature")
@@ -585,7 +562,7 @@ def fit_camera(
 # ---------------------------------------------------------------------------
 def gradient_canvas(w: int, h: int) -> Image.Image:
     """Vertical viewport gradient, panel at the top easing to page at the foot."""
-    t = theme()
+    t = fs.dark_stage()
     top = np.array(mix(t.panel, t.grid, 0.25), dtype=float)
     mid = np.array(mix(t.panel, t.bg, 0.5), dtype=float)
     bot = np.array(hex_to_rgb(t.bg), dtype=float)
@@ -628,10 +605,10 @@ def draw_colorbar(
     bar_w = 54 * s
     f_title = _font("panel", out_w, s, bold=True)
     f_tick = _font("label", out_w, s)
-    t = theme()
+    t = fs.dark_stage()
 
     # Two lines: one line of "von Mises stress" would run past the right edge
-    # of the bar zone at this type size. The unit lives on the ticks now.
+    # of the bar zone at this type size. The unit lives on the ticks.
     head_px = fs.font_px("panel", out_w)
     for i, line in enumerate(("von Mises", "stress")):
         fs.assert_glyphs(line)
@@ -707,7 +684,7 @@ def compose(
     canvas.paste(layer, (inset[0] * s, inset[1] * s), layer)
     draw = ImageDraw.Draw(canvas)
 
-    t = theme()
+    t = fs.dark_stage()
     out_w = out_size[0]
     # Readability scrims: a soft vignette toward the page colour behind each
     # text band, so a bright stress lobe reaching the band edge can never sit
@@ -794,7 +771,7 @@ def _shot(p) -> np.ndarray:
 # cylinder, sphere and cone all move along their own long axis (tension /
 # compression), so the warp changes the silhouette by 2-5% of the bbox diagonal
 # and reads as *nothing*; on the cantilever, 4% of droop read as camera tilt.
-# Every stress render now draws the rest shape as a reference, which is the
+# Every stress render draws the rest shape as a reference, which is the
 # same thing the Studio viewport's "undeformed outline" toggle draws.
 #
 # It is the view SILHOUETTE of the rest surface, not its wireframe: the GUI can
@@ -841,7 +818,7 @@ def rest_outline(rest, cam: dict, width: int, height: int,
     if edges.n_cells == 0:
         p.close()
         return np.zeros((height, width, 4), dtype=np.uint8)
-    p.add_mesh(edges, color=theme().ink, line_width=line_width, lighting=False)
+    p.add_mesh(edges, color=fs.dark_stage().ink, line_width=line_width, lighting=False)
     p.renderer.ResetCameraClippingRange()
     img = _shot(p)
     p.close()
@@ -958,11 +935,11 @@ def render_stress(
         scalars="von_Mises",
         # von Mises is a magnitude anchored at zero: viridis. The GUI's own
         # blue-cyan-green-yellow-red ramp is not perceptually uniform and not
-        # colour-blind safe, and now lives in figstyle for gui_studio.png only.
+        # colour-blind safe; figstyle keeps it for gui_studio.png only.
         cmap=fs.field_cmap("magnitude"),
         clim=(lo, hi),
         show_edges=True,
-        edge_color=theme().bg,
+        edge_color=fs.dark_stage().bg,
         line_width=0.9 * s,
         show_scalar_bar=False,
         ambient=0.34,
@@ -975,7 +952,7 @@ def render_stress(
         # the lit far wall shows through and the hole looks like a hole.
         culling="back",
     )
-    # Frame the union: the rest outline is part of the picture now, and on a
+    # Frame the union: the rest outline is part of the picture, and on a
     # cantilever it is the half that sits *above* the warped body, so fitting
     # the warped points alone would crop the reference the caption points at.
     pts = np.vstack([np.asarray(surf.points), np.asarray(rest.points)])
@@ -998,12 +975,11 @@ def render_stress(
                    GHOST_ALPHA)
 
     if clipped:
-        # Do not assert WHAT the peak sits on. This caption used to say "at
-        # the clamped-face stress singularity", and that is false on the
-        # cylinder (the peak sits at the load rim) and on the plate (the peak
-        # is the Kirsch concentration at the hole rim, a free surface — no BC
-        # acts there at all). Print where the peak actually is and let the
-        # reader match it against the stated BCs.
+        # Do not assert WHAT the peak sits on: it is not the clamped-face
+        # singularity on the cylinder (the peak sits at the load rim) or on the
+        # plate (the Kirsch concentration at the hole rim, a free surface with
+        # no BC). Print where the peak actually is and let the reader match it
+        # against the stated BCs.
         peak_at = np.asarray(grid.points)[int(np.argmax(vm))] * 1e3
         clip_note = (
             f"colour range 0 \u2013 {fs.si(hi, 'Pa')} ({clip_rule_text()}); "
@@ -1038,7 +1014,7 @@ def render_stress(
     )
     out.parent.mkdir(parents=True, exist_ok=True)
     canvas.save(out)
-    print(f"    wrote {rel(out)}  ({OUT_W}x{OUT_H})")
+    print(f"    wrote {fs.rel(out)}  ({OUT_W}x{OUT_H})")
     return {
         "nodes": int(grid.n_points),
         "elems": int(grid.n_cells),
@@ -1078,7 +1054,7 @@ def render_mesh(
     s = SUPERSAMPLE
     w, h = size
     p = _plotter(w * s, h * s, "none")
-    t = theme()
+    t = fs.dark_stage()
     p.add_mesh(
         surf,
         color=t.muted,
@@ -1135,7 +1111,7 @@ def render_mesh(
     )
     out.parent.mkdir(parents=True, exist_ok=True)
     canvas.save(out)
-    print(f"    wrote {rel(out)}  ({w}x{h})")
+    print(f"    wrote {fs.rel(out)}  ({w}x{h})")
     return {"nodes": int(grid.n_points), "elems": int(grid.n_cells)}
 
 
@@ -1214,7 +1190,7 @@ def render_architecture(out: Path) -> None:
     """Pipeline diagram: two rows, tight feedback lane, subordinate taps."""
     from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 
-    t = theme()
+    t = fs.dark_stage()
     bw, bh = ARCH_BOX
     fig, axes = fs.figure(
         "PolyMesh pipeline",
@@ -1246,9 +1222,9 @@ def render_architecture(out: Path) -> None:
               detail_ink: str = "") -> None:
         """Centre label and detail as one block inside a box.
 
-        The old code offset the label by a fixed 0.022 and pinned the detail
-        0.032 above the floor, which only balanced for a 1-line label with a
-        1-line detail; a wrapped detail then sat off-centre in its box.
+        A fixed label offset and a detail pinned above the floor only balance
+        for a 1-line label with a 1-line detail; a wrapped detail would sit
+        off-centre in its box, so both are measured and centred together.
         """
         fs.assert_glyphs(label, detail)
         h_label = _arch_line_h(label_pt, label.count("\n") + 1)
@@ -1307,8 +1283,8 @@ def render_architecture(out: Path) -> None:
     arrow((sx, lane), (sx, sy - bh / 2), color=t.accent, dashed=True)
     feedback = "refine / coarsen / p-elevate"
     fs.assert_glyphs(feedback)
-    # Above the lane, not on it: the old plate sat on the dashed run *and* on
-    # the advisor diagonal that crossed it. At 0.022 the label clears the lane
+    # Above the lane, not on it, so it does not also sit on the advisor
+    # diagonal that crosses the run. At 0.022 the label clears the lane
     # by 13 px and the row-0 boxes above it by 31 px at 164 dpi, so it reads as
     # the lane's label rather than as a caption under "feature analysis".
     ax.text((fx + sx) / 2, lane + 0.022, feedback, ha="center", va="bottom",
@@ -1338,14 +1314,14 @@ def tile_grid(images: list[Path], labels: list[str], out: Path, title: str,
     fs.assert_glyphs(title, footer, *labels)
     argv = [
         sys.executable,
-        rel(REPO / "scripts/make_compare_grid.py"),
-        "--out", rel(out),
+        fs.rel(REPO / "scripts/make_compare_grid.py"),
+        "--out", fs.rel(out),
         "--title", title,
         "--labels", ",".join(labels),
         "--footer", footer,
         "--tile-width", str(tile_width),
         "--cols", str(cols),
-        *[rel(p) for p in images],
+        *[fs.rel(p) for p in images],
     ]
     print("    $ " + " ".join(argv))
     proc = subprocess.run(argv, cwd=REPO, capture_output=True, text=True)
@@ -1397,7 +1373,7 @@ def build_mesh_tiles(tiles: list[MeshTile], force: bool) -> list[Path]:
                 refused.append((tile, declined.message))
                 continue
         else:
-            print(f"    reusing {rel(vtu)} (use --force to remesh)")
+            print(f"    reusing {fs.rel(vtu)} (use --force to remesh)")
         tile.stats = {"cmd": " ".join(argv)}
         kept.append(tile)
         vtus.append(vtu)
@@ -1573,7 +1549,7 @@ def main(argv: list[str] | None = None) -> int:
                 json.dumps({**parsed, "wall_time_s": wall, "cmd": cmd}, indent=2)
             )
         else:
-            print(f"    reusing {rel(vtu)} (use --force to re-solve)")
+            print(f"    reusing {fs.rel(vtu)} (use --force to re-solve)")
         meta_file = CACHE / f"{part.name}.meta.json"
         meta = json.loads(meta_file.read_text()) if meta_file.is_file() else {}
         wall = meta.get("wall_time_s")
@@ -1852,7 +1828,7 @@ def main(argv: list[str] | None = None) -> int:
         print("[benchmark charts]")
         chart_argv = [
             sys.executable, "scripts/plot_benchmarks.py",
-            "--outdir", rel(outdir),
+            "--outdir", fs.rel(outdir),
         ]
         for _, key, _ in chart_wanted:
             chart_argv += ["--only", key]
@@ -1910,7 +1886,7 @@ def main(argv: list[str] | None = None) -> int:
         "images": sorted(merged.values(), key=lambda d: d["file"]),
     }
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
-    print(f"\nwrote {rel(manifest_path)}  ({len(manifest['images'])} records)")
+    print(f"\nwrote {fs.rel(manifest_path)}  ({len(manifest['images'])} records)")
 
     if timings:
         print("\nsolve summary:")

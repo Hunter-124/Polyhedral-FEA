@@ -3,7 +3,7 @@
 """Accumulating outlier pruning for the advisor training loop.
 
 After every training run the worst 5 % of training-split residuals per accuracy
-head (``rel_err``, ``geo_chamfer``, ``geo_p99``) are unioned and appended to a
+head (``dataset.ACCURACY_HEADS``) are unioned and appended to a
 persistent ledger, ``bench/advisor/runs/pruned_rows.json``. Subsequent runs
 train without those rows, so pruning accumulates instead of restarting.
 

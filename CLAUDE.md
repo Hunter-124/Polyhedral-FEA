@@ -1,20 +1,23 @@
 # Polyhedral-FEA — agent notes
 
-Human standards, layout, anti-cheat, and Eigen traps: **[CONTRIBUTING.md](CONTRIBUTING.md)**.  
-Phases / work items: **[docs/ROADMAP.md](docs/ROADMAP.md)** · progress: **[docs/progress.md](docs/progress.md)**.
+Harness entrypoint only; policy lives in the linked files.
 
-## Active program (do not skip)
+| Need | Read |
+|---|---|
+| Map, layering, standards, workflow, anti-cheat, Eigen traps | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| Current state, open defects, next work | [docs/STATUS.md](docs/STATUS.md) |
+| Current advisor cycle | [docs/advisor/0012-portable-cost-retrain.md](docs/advisor/0012-portable-cost-retrain.md) |
+| External-contributor PR flow | [CHANGES.md](CHANGES.md) |
 
-**Learned mesh advisor — corpus and retrain program.**  
-**Design:** [docs/advisor/0001-architecture.md](docs/advisor/0001-architecture.md) · **live log:** [docs/advisor/0003-training-log.md](docs/advisor/0003-training-log.md) · **latest model:** [docs/advisor/0008-v4-corpus-retrain.md](docs/advisor/0008-v4-corpus-retrain.md)  
-**ADRs:** [0026](docs/decisions/0026-anisotropic-metric-adaptivity.md) · [0027](docs/decisions/0027-learned-mesh-advisor.md) · [0028](docs/decisions/0028-boundary-conformance-hardening.md) · [0029](docs/decisions/0029-independent-truth-and-honest-gates.md) · [0030](docs/decisions/0030-the-ruler-was-wrong.md)–[0033](docs/decisions/0033-a-gate-must-measure-what-ships.md)  
-**Training box:** [docs/training/HANDOFF-3080ti.md](docs/training/HANDOFF-3080ti.md)
+## Methodology in force
 
-Methodology still in force from the measure-first program ([plan](docs/plans/advisor-measure-first-program.md), ADR-0023/0024): measure before claiming, no dual-first, no frame-field core, **never score raw nodal max stress**, and a gate must measure the cell that ships (ADR-0033).
+- Measure before claiming; no dual-first, no frame-field core ([ADR-0023](docs/decisions/0023-measure-first-tet-primary-cvt-path.md), [ADR-0024](docs/decisions/0024-advisor-measure-answers.md), [plan](docs/plans/advisor-measure-first-program.md)).
+- Never score raw nodal max stress ([ADR-0027](docs/decisions/0027-learned-mesh-advisor.md)).
+- Truth is independent of the thing measured; a gate measures the cell that ships ([ADR-0029](docs/decisions/0029-independent-truth-and-honest-gates.md), [ADR-0033](docs/decisions/0033-a-gate-must-measure-what-ships.md)).
 
-[docs/dag/PROGRAM.yaml](docs/dag/PROGRAM.yaml) is a **frozen historical board** (through node G4, 2026-07-13), not the live tracker.
+Open mesher defects (ADR-0033): the graded sliver chain (`cylinder` graded h=0.005 builds a mesh CG cannot solve) and the `ellipsoid_boss` boundary tail (next thread is the size field, not the snap). Status: [docs/STATUS.md](docs/STATUS.md).
 
-Open defects worth knowing before touching the meshers (ADR-0033): the graded sliver chain (`cylinder` graded h=0.005 builds a mesh CG cannot solve) and the `ellipsoid_boss` boundary tail (binding constraint is `hex8_shape_quality >= 0.02` vs required wall travel — the next thread is the size field, not the snap).
+The completed DAG board is frozen history: [docs/archive/dag/PROGRAM.yaml](docs/archive/dag/PROGRAM.yaml).
 
 ## graphify
 

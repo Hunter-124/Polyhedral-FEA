@@ -9,7 +9,7 @@ constrained sites, clipped export). Dual-of-tet remains hard-blocked until G4.
 
 - [ADR-0025](../../docs/decisions/0025-geogram-cvt-vendor.md)
 - [ADR-0024](../../docs/decisions/0024-advisor-measure-answers.md) Q3 / Q8
-- [docs/research/geogram-cvt-vendoring.md](../../docs/research/geogram-cvt-vendoring.md)
+- [docs/archive/research/geogram-cvt-vendoring.md](../../docs/archive/research/geogram-cvt-vendoring.md)
 - [README.polymesh.md](README.polymesh.md) — included vs stripped, upgrade path
 - [NOTICE](NOTICE) — pinned commits / tags
 

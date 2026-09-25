@@ -2,8 +2,8 @@
 
 > **Historical plan (2026-07).** P0 through P6.5 are complete — GATE 0 ratified
 > D1–D5 on 2026-07-09 ([docs/spec.md](spec.md) §Decisions) and the GUI shipped.
-> Live status is [docs/progress.md](progress.md); the current program is
-> [docs/plans/advisor-measure-first-program.md](plans/advisor-measure-first-program.md).
+> Live status is [docs/STATUS.md](../STATUS.md); the current program is
+> [docs/plans/advisor-measure-first-program.md](../plans/advisor-measure-first-program.md).
 
 Legend: ⛔ GATE = stop, summarize, wait for human approval before proceeding.
 Each phase runs the `/loop` command internally and must pass `/audit` at its gate.
@@ -16,7 +16,7 @@ P0 ──> P1 ──> P2 ──┬──> P3 ──> P5 ──> P6 ──> P6.5 
 ## P0 — Decisions & scaffolding
 - Resolve Open Decisions D1–D5 in [docs/spec.md](spec.md) (human input required).
 - CMake workspace, CI (format, warnings-as-errors build, tests), VTU export
-  stub, [docs/progress.md](progress.md).
+  stub, [docs/progress.md](../progress.md).
 - ⛔ GATE 0: decisions ratified, repo skeleton reviewed.
 
 ## P1 — Reference solver on standard elements (the trustworthy baseline)

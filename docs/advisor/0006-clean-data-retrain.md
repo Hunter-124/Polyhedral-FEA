@@ -1,3 +1,5 @@
+> Superseded by [0012](0012-portable-cost-retrain.md); historical record.
+
 # 0006 — The clean-data retrain, and what it cost the advisor's claims
 
 Status: measured 2026-08-14 at `b27b0e6`, on the campaign regenerated after the

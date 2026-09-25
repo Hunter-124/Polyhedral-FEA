@@ -1,5 +1,12 @@
 # Training handoff — 3080 Ti box bring-up and run plan
 
+> **Archived.** Historical run plan for the 2026-08 v4 regeneration; superseded.
+> Current host-agnostic procedure: [training/README.md](../../training/README.md).
+> Host names below are campaign `--host-tag` labels; machine access details were
+> removed from the repository. Paths under `bench/campaigns/archive-v*/` and
+> `bench/advisor/archive-v*/` were removed from HEAD; recover them with
+> `git show ef464dc:<path>`.
+
 Written 2026-08-13, at HEAD `91e08b4`. Read this before the first training run
 starts. The mesher is now stable enough to label against: the tangle fix
 (S7 overlapped-sheet carve, `6822ea7` + `798ef79`) was the last known

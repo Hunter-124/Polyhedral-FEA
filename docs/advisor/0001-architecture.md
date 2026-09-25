@@ -1,10 +1,13 @@
 # 0001 — Advisor architecture
 
-Status: implemented (2026-08-10). Realises [ADR-0027](../decisions/0027-learned-mesh-advisor.md)
-§1–§3 for the first trained milestone.
+Status: implemented (2026-08-10); realises [ADR-0027](../decisions/0027-learned-mesh-advisor.md)
+§1–§3. The contract described here is the current one, shipped by the
+portable-cost cycle ([0012](0012-portable-cost-retrain.md)); the series index is
+[README](README.md).
 
 Companion documents: [0002 — objectives and guardrails](0002-objectives-and-guardrails.md),
-[0003 — training log](0003-training-log.md).
+[0003 — training log](0003-training-log.md) (historical),
+[0004 — model card](0004-model-card.md), [0005 — data card](0005-data-card.md).
 
 ## What the advisor is
 
@@ -31,8 +34,8 @@ action it recommends.
 | Ground truth | `bench/reference/corpus/*.json` (300: 8 analytic, 256 external, 36 pre-existing provisional) | closed form where it exists, else **Gmsh 4.13.1 -> CalculiX 2.23** via `bench/reference/external_truth.py` (ADR-0029 §1). The portable-cost retrain added 168 independently solved c3/c4/new-family truths; promotion from our own solves remains forbidden |
 | Campaign rows | `bench/campaigns/advisor-batch-*/results.jsonl` (`advisor-row-v4`, with v3 accepted for legacy rows) | `apps/testlab` via `scripts/advisor/run_batch.py` |
 | Flat table | `bench/advisor/dataset.csv` | `scripts/build_advisor_dataset.py` |
-| Model | `bench/advisor/{model.onnx,normalization.json,clamps.json}` | `scripts/advisor/export_onnx.py` |
-| Inference | `src/advisor` + `--advisor` on `polymesh solve` / `polymesh_testlab` | this milestone |
+| Model | `bench/advisor/{model.onnx,normalization.json,clamps.json,ood.json,activation_layout.json}` | `scripts/advisor/export_onnx.py` |
+| Inference | `src/advisor` + `--advisor` on `polymesh solve` / `polymesh_testlab` | `advisor::Advisor` |
 
 Three admission rules apply between the campaign rows and the flat table:
 
@@ -47,8 +50,8 @@ Three admission rules apply between the campaign rows and the flat table:
 - **Unhealthy and untrusted rows are kept.** They are the feasibility head's
   only supervision, and `scripts/advisor/dataset.py` masks them out of every
   regression head. `dataset.py::load_dataset` then drops anything whose `schema`
-  is not `advisor-row-v3` and refuses to build a model at all if no advisor rows
-  survive, or if a Stage-A head has no unmasked training row.
+  is not `advisor-row-v3` or `advisor-row-v4` and refuses to build a model at all
+  if no advisor rows survive, or if a Stage-A head has no unmasked training row.
 
 `export_onnx.py` writes `normalization.json` / `clamps.json` **from the
 checkpoint payload**, never from a fresh `load_dataset()`: the graph was trained
@@ -59,27 +62,39 @@ statistics the export aborts and asks for a retrain.
 ## Feature and action schema
 
 `input_columns` in `normalization.json` is the single source of truth for the
-input layout; nothing about it is hardcoded in C++. It currently has **44**
-columns:
+input layout; nothing about it is hardcoded in C++. The current contract has
+**75** columns, in this order (`scripts/advisor/dataset.py` groups):
 
-- **26 geometry + BC features** — the `pipeline::CaseFeatures` struct
-  (`src/pipeline/include/pipeline/scene.hpp`). Every geometric measure is
-  normalized by the bbox diagonal, so `diag` is 1 for any non-degenerate model
-  and the features are scale free.
-- **7 case-context columns** (`case_poisson`, region counts, load direction,
-  traction magnitude) derived from the case JSON.
-- **9 continuous action columns** — `h_rel`, `eta_target`, `adapt_passes`,
-  `p_elevate`, `element_tendency`, `skin_layers`, `feature_refine`,
-  `bc_grading`, `adapt_leb_waves`.
-- **2 categorical index columns** — `order_idx`, `mesher_idx`, each looked up in
-  the vocabulary persisted in `normalization.json` and embedded (dim 4) inside
-  the network.
+| Group | Count | Columns | Source |
+| --- | ---: | --- | --- |
+| Geometry + BC features | 26 | `bbox_dx` … `poisson` | `pipeline::CaseFeatures` via `pipeline::extract_case_features` |
+| Proximity / crease / singularity | 13 | `geo_n_inner_loops` … `case_load_multiaxiality` | `pipeline::CaseFeatures`, appended for [0012](0012-portable-cost-retrain.md) |
+| Exact-BRep descriptors | 15 | `geo_curved_area_frac` … `geo_min_face_size_rel` | `scripts/advisor/geometry_features.py` offline; `CaseFeatures::geo_*` (when `geo_available`) at inference |
+| Case context | 7 | `case_poisson`, region counts, load direction, `case_traction_magnitude` | case JSON |
+| Continuous action | 8 | `h_rel`, `eta_target`, `adapt_passes`, `element_tendency`, `skin_layers`, `feature_refine`, `bc_grading`, `adapt_leb_waves` | campaign config / chosen action |
+| Scale law | 4 | `log10_volume`, `log10_diag`, `log10_h`, `log10_cells` | derived per row and per candidate |
+| Categorical index | 2 | `order_idx`, `mesher_idx` | vocabularies in `normalization.json`, embedded (dim 4) |
+
+Every geometric measure is normalized by the bbox diagonal, so `diag` is 1 for
+any non-degenerate model and the features are scale free. Columns are appended,
+never inserted: C++ reads inputs by name, but the ONNX graph is positional.
+`p_elevate` is not an input; `order >= 2` is the same actuator.
 
 Inputs are standardized with train-split mean/std. `order_idx` and `mesher_idx`
 are passthrough (mean 0, std 1) so a single `(x - mean) / std` loop is correct
 for every column on both sides. Any column a caller cannot supply is filled from
 `impute` — the per-column training median — so a partially known row is well
-defined instead of quietly wrong.
+defined instead of quietly wrong. The OOD test is the exception: it never
+imputes (see [Inference](#inference)).
+
+### Feature families
+
+The part/case inputs are geometry plus **geometric** boundary-condition and
+load-region descriptors: which faces are fixed or loaded, their area fractions,
+the load direction, fix/load/feature distances, multiaxiality and traction
+magnitude — the fields of `pipeline::CaseFeatures` and the case context block.
+Loading-condition signal beyond these descriptors is not an input to the
+advisor or to meshing; adding it is future work and would change this contract.
 
 ## Heads
 
@@ -149,41 +164,59 @@ exactly those.
 
 ### Policy head layout
 
-`clamps.json:action_dims` defines it, in this order:
+`clamps.json:action_dims` defines it, in this order (width 9 today):
 
 1. `h_rel`, `adapt_passes`, `eta_target` — continuous, in **physical units**
-2. `p_elevate_logit` — positive means elevate
-3. one `order_logit_<v>` per entry of `order_choices`, argmax wins
-4. one `mesher_logit_<name>` per entry of `mesher_choices`, argmax wins
+2. one `order_logit_<v>` per entry of `order_choices` (`[1, 2]`), argmax wins
+3. one `mesher_logit_<name>` per entry of `mesher_choices`, argmax wins
 
 `mesher_choices` is the set of mesher names actually present in the training
-data, using the canonical vocabulary emitted by `testlab`'s `mesher_name()`
-(`graded_tet`, `hybrid_zoo`, `hex`, `hybrid_vem`, ...). The plan's placeholder
-`{hybrid, tet, mixed}` does not exist anywhere in this codebase and was not
-used.
+data, using the canonical vocabulary emitted by `testlab`'s `mesher_name()`;
+the current set is `graded_tet`, `hex`, `hybrid_vem`, `hybrid_zoo`. The plan's
+placeholder `{hybrid, tet, mixed}` does not exist anywhere in this codebase and
+was not used.
 
-## Two-pass inference
+## Inference
 
-The trunk consumes an action, so the policy head needs a query point. The C++
-`Advisor::recommend` therefore runs **two** forward passes:
+The shipped `clamps.json` carries an explicit `candidate_grid` (108 action tuples
+the campaign actually ran), so `Advisor::recommend` is a gated enumeration, not
+a policy-head read:
 
 ```mermaid
 flowchart LR
-    F[case features] --> Q[row @ default action]
-    Q --> P[pass 1: policy head]
-    P --> C[clamp to box + argmax categoricals]
-    C --> S[row @ recommended action]
-    S --> O[pass 2: outcome heads + failure logit]
-    O --> V{failure_prob > threshold}
-    V -- yes --> D[return defaults, vetoed = true]
-    V -- no --> R[return recommendation + predictions]
+    F[case features] --> E[score every candidate_grid action]
+    E --> G[drop failure_prob > gate_threshold and over max_dof]
+    G --> R[argmin predicted rel_err_rel]
+    R --> S[re-score chosen action]
+    S --> O{OOD distance > ood.json threshold?}
+    O -- yes --> D[refuse: defaults]
+    O -- no --> B{every candidate over max_dof?}
+    B -- yes --> D
+    B -- no --> V{failure_prob > veto_threshold}
+    V -- yes --> D
+    V -- no --> A[return recommendation + predictions]
 ```
 
-Pass 1 is evaluated at the clamp-box default action — the one action that is
-always legal. Pass 2 re-evaluates at the action about to be recommended, so the
-feasibility veto and the reported `predicted_*` values describe the
-recommendation itself rather than the default. Scoring feasibility at the
-default would be the cheaper thing to do and would also be a lie.
+- **Gate** (`gate_threshold`, 0.05) filters candidates before ranking; if every
+  candidate fails it, the best-ranked action is passed to the veto rather than
+  the chooser abstaining silently.
+- **Efficiency objective** (`--advisor-objective efficiency`, host calibration
+  present) keeps survivors within 5% of the best accuracy score and takes the
+  lowest predicted mesh-plus-roofline time; see [CLI](#cli).
+- **OOD refusal** uses a Mahalanobis distance over raw part columns with its own
+  `center`/`scale` from `ood.json` (never `normalization.json`), threshold at the
+  training q0.99. A missing descriptor refuses rather than imputes.
+- **Veto** (`veto_threshold`, 0.5) discards the recommendation after the fact.
+- Every refusal (OOD, budget, veto) returns the clamp-box defaults with
+  `vetoed = true` and suppresses every `predicted_*` value and `failure_prob` to
+  NaN; `ood_distance` is kept because it is the measurement behind the refusal.
+
+The final re-score means the veto and the reported `predicted_*` values
+describe the recommendation itself, not the default or some other candidate.
+An artifact without `candidate_grid` still loads and falls back to the retired
+single-shot policy read (policy head at the clamp-box default); measured on
+held-out families that rule is the worst deployable chooser
+([0004](0004-model-card.md#the-shipped-decision-rule)).
 
 ## Deployment
 
@@ -213,7 +246,7 @@ solve_flops, solve_bytes, mesh_work, failure_logit, policy
 ```
 
 — and an input width matching `input_columns`. `kOutputNames` in
-`src/advisor/src/advisor.cpp` mirrors `dataset.py:OUTPUT_NAMES`, and the check is
+`src/advisor/src/advisor_internal.hpp` mirrors `dataset.py:OUTPUT_NAMES`, and the check is
 positional as well as by name, so inserting a head anywhere but the end is a
 load-time error rather than a silent relabelling of every prediction. A mismatch
 throws `AdvisorError` at construction rather than producing plausible nonsense at

@@ -1,9 +1,9 @@
 # Geogram / restricted CVT — vendoring study path
 
 - Status: G1–G4 implemented; opt-in `cvt_poly` remains experimental (2026-08-09)
-- Normative: [ADR-0023](../decisions/0023-measure-first-tet-primary-cvt-path.md),
-  [ADR-0024](../decisions/0024-advisor-measure-answers.md) Q3/Q8/Q10
-- Program: [docs/plans/advisor-measure-first-program.md](../plans/advisor-measure-first-program.md)
+- Normative: [ADR-0023](../../decisions/0023-measure-first-tet-primary-cvt-path.md),
+  [ADR-0024](../../decisions/0024-advisor-measure-answers.md) Q3/Q8/Q10
+- Program: [docs/plans/advisor-measure-first-program.md](../../plans/advisor-measure-first-program.md)
   §4.5, §5; board nodes **G0–G4**, deps **M9**, **M10**
 - Related research: [varyhedron-packing.md](varyhedron-packing.md),
   [protecting-balls-lfs.md](protecting-balls-lfs.md),
@@ -189,7 +189,7 @@ pipeline. Exact-rounding compiler flags are scoped to these third-party targets.
 
 ## 6. License and integration record
 
-Project license: **BSD-3-Clause** ([ADR-0002](../decisions/0002-license-bsd3.md)).
+Project license: **BSD-3-Clause** ([ADR-0002](../../decisions/0002-license-bsd3.md)).
 
 - [x] Upstream BSD-3 `LICENSE` is present at the subset root and in both PSM
   directories.

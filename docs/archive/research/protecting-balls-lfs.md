@@ -1,9 +1,9 @@
 # Protecting balls + local feature size (LFS)
 
 - Status: normative formula (ADR-0024 Q6); implementation node **M8**
-- Normative: [ADR-0023](../decisions/0023-measure-first-tet-primary-cvt-path.md) §4,
-  [ADR-0024](../decisions/0024-advisor-measure-answers.md) Q6
-- Program: [advisor-measure-first-program.md](../plans/advisor-measure-first-program.md) §4.2
+- Normative: [ADR-0023](../../decisions/0023-measure-first-tet-primary-cvt-path.md) §4,
+  [ADR-0024](../../decisions/0024-advisor-measure-answers.md) Q6
+- Program: [advisor-measure-first-program.md](../../plans/advisor-measure-first-program.md) §4.2
 - Related: [varyhedron-packing.md](varyhedron-packing.md) §5,
   [geogram-cvt-vendoring.md](geogram-cvt-vendoring.md) (constrained sharp sites),
   [campaign-metrics.md](campaign-metrics.md)
@@ -66,7 +66,7 @@ Primary theory/reference line:
 
 Related practice: CGAL Mesh_3 protecting-ball ideas; TetGen-style CDT recovery
 papers (Si TOMS 2015) for *algorithms* only — **do not** vendor AGPL/GPL code
-into core ([ADR-0023](../decisions/0023-measure-first-tet-primary-cvt-path.md) §6).
+into core ([ADR-0023](../../decisions/0023-measure-first-tet-primary-cvt-path.md) §6).
 
 ---
 

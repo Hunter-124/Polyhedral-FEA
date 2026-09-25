@@ -1,11 +1,13 @@
 # Test-lab interfaces (normative)
 
+> The program board this directory once served is archived at [docs/archive/dag/](../archive/dag/README.md); these schemas are live.
+
 These file formats are the contract between the test-lab harness
-(`apps/testlab`), the GUI (`apps/gui`), and the analysis/feedback tooling.
+(`apps/testlab`), the GUI (`apps/gui`), and the campaign analysis tooling.
 Change them only by editing this file in the same commit as the code change.
 All units SI (m, Pa, N, kg, s); all times in milliseconds wall clock.
 
-**Agent strategy:** [docs/plans/advisor-measure-first-program.md](../plans/advisor-measure-first-program.md)
+**Measurement strategy:** [docs/plans/advisor-measure-first-program.md](../plans/advisor-measure-first-program.md)
 (ADRs [0023](../decisions/0023-measure-first-tet-primary-cvt-path.md),
 [0024](../decisions/0024-advisor-measure-answers.md)). Reward = scorecard +
 honest accuracy probes — never wire PNG, never raw nodal max stress.
@@ -87,7 +89,7 @@ sends SIGINT) is always safe; `resume` continues from here.
 ## 3. Results — `bench/campaigns/<name>/results.jsonl`
 
 Append-only, one line per (config, part, tier) run. Committed to the repo —
-this is the accumulated simulation data the feedback loop mines. Current row
+this is the accumulated simulation data that campaign analysis and advisor training mine. Current row
 format is `schema: "advisor-row-v3"`; a real production row is
 `bench/campaigns/advisor-truth-0/results.jsonl` line 1.
 
@@ -281,8 +283,8 @@ zeroed (measured values still recorded for debug). Analyze should filter on
 - Hard DOF/elem resource kill → `"budget"`.
 - Per-run wall-clock exceeded (M14) → `"wall_clock"`.
 
-`geom_class` is computed from the part geometry (not the config) so the
-feedback loop can learn per-condition presets: fraction of surface area with
+`geom_class` is computed from the part geometry (not the config) so
+campaign analysis can group results per geometry condition: fraction of surface area with
 per-cell turning angle > 15°, thin-wall flag (t < 2.5 h_ref), smallest
 feature size in units of bulk h, plus **M11** `n_features_below_h_min` (count of
 sharp CAD edges with \(L < 2h\); `feature_flags` lists edges with
@@ -291,7 +293,7 @@ no OCC defeaturing.
 
 ## 3b. Pareto analysis — `bench/campaigns/<name>/PARETO.{md,json}`
 
-Written by `scripts/analyze_campaign.py` (feedback-loop tooling). Safe on
+Written by `scripts/analyze_campaign.py` ([how-to](../process/feedback-loop.md)). Safe on
 **partial** `results.jsonl` while a campaign is still `running`; re-run when
 `checkpoint.state` becomes `finished`.
 
@@ -304,7 +306,7 @@ Written by `scripts/analyze_campaign.py` (feedback-loop tooling). Safe on
 
 Does not modify checkpoint or results. Product defaults change only when
 `recommendations.apply_code_defaults` is true (finished + solid ok-rate);
-see `docs/process/feedback-loop.md`.
+see [docs/process/feedback-loop.md](../process/feedback-loop.md).
 
 ## 4. Part case — `tests/fixtures/parts/<part>.case.json`
 
@@ -413,7 +415,6 @@ bench/campaigns/<name>/
   progress.json
   results.jsonl
   PARETO.md / PARETO.json          # after analyze_campaign.py
-  HANDOFF.md / handoff.json        # after write_grok_handoff.py
   runs/<cfg_id>/<part>/t<tier>/
     mesh.vtu                       # volume mesh (git-LFS)
     wire.png                       # wireframe preview (git-LFS when large)
@@ -440,49 +441,15 @@ bench/campaigns/<name>/
 ```jsonc
 {
   "warehouse": true,
-  "on_finish": { "analyze": true, "grok_handoff": true }
+  "on_finish": { "analyze": true }
 }
 ```
+
+Post-campaign hooks run after `checkpoint.state` becomes `finished`, with the
+interpreter from `$POLYMESH_PYTHON` when set. `warehouse: true` runs
+`scripts/warehouse_shots.py <name>` (renders `wire.png` from each `mesh.vtu`);
+`on_finish.analyze` runs `scripts/analyze_campaign.py <name>` (§3b). A hook
+failure is reported in the run summary but never touches `results.jsonl`.
 
 Large binaries: track `*.vtu` and large `*.png` with git-LFS (see
 `.gitattributes`). Pull requires `git lfs install` once per machine.
-
-## 8. Grok handoff — `HANDOFF.md` / `handoff.json`
-
-Written by `scripts/write_grok_handoff.py` after analyze (ADR-0022,
-`docs/process/grok-loop.md`).
-
-### 8a. `handoff.json` (machine)
-
-```jsonc
-{
-  "campaign": "varyhedron-short-1",
-  "git_head": "abc123…",
-  "finished_utc": "2026-07-12T12:00:00Z",
-  "pareto": "bench/campaigns/varyhedron-short-1/PARETO.md",
-  "results": "bench/campaigns/varyhedron-short-1/results.jsonl",
-  "shots": ["runs/cfg-…/plate_hole/t0/wire.png"],
-  "open_program_nodes": ["M6", "M7", "M8", "M9", "M10", "M11", "M12", "M13", "M14", "M5", "G0", "G1", "G2", "G3", "G4", "V6d", "V6e", "V10c", "V11"],
-  "mode": "autonomous",           // autonomous | supervised
-  "max_turns": 80
-}
-```
-
-### 8b. `HANDOFF.md` (human / agent prompt)
-
-Markdown body consumed by:
-
-```bash
-grok -p --yolo --permission-mode bypassPermissions \
-  --cwd <repo> --max-turns 80 \
-  --prompt-file bench/campaigns/<name>/HANDOFF.md
-```
-
-Must embed bootstrap sync rules, trend tables, shot paths, and the next
-experiment instruction. Schema changes to handoff fields require this section
-and the writer script in the same commit.
-
-`open_program_nodes` should list open measure / Geogram / follow-on nodes as
-applicable: **M6–M14**, **G0–G4**, **V6d**, **V6e**, **V10c**, **V11** (plus
-any other still-open board IDs). Do not invent packing-loop work before **M9**
-baseline freeze — see agent strategy plan above.

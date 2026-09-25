@@ -1,6 +1,10 @@
 # Portable-cost advisor retrain
 
-**Status:** shipped evidence for the 2026-08 portable-cost cycle.
+**Status:** shipped evidence for the 2026-08 portable-cost cycle — the current
+advisor generation. It supersedes [0006](0006-clean-data-retrain.md)–[0011](0011-v7-curved-geometry-retrain.md);
+the series index and artifact list are in [README](README.md), project status in
+[docs/STATUS.md](../STATUS.md). "v3"/"v4" below are campaign row schemas
+(`advisor-row-v3`/`-v4`), not corpus generations.
 
 This cycle removes host wall time from the advisor's optimization objective.
 The network now predicts hardware-portable solve FLOPs, structural byte traffic,

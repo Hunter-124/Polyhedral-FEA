@@ -1,7 +1,7 @@
 # Geogram subset — what PolyMesh takes
 
 See also [ADR-0025](../../docs/decisions/0025-geogram-cvt-vendor.md) and
-[docs/research/geogram-cvt-vendoring.md](../../docs/research/geogram-cvt-vendoring.md).
+[docs/archive/research/geogram-cvt-vendoring.md](../../docs/archive/research/geogram-cvt-vendoring.md).
 
 ## Included
 

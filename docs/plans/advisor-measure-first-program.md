@@ -1,22 +1,16 @@
-# Advisor measure-first program (canonical agent plan)
+# Advisor measure-first program
 
-**Status:** board complete / frozen (re-dated 2026-08-16; opened 2026-07-12)  
+**Status:** methodology in force; execution board complete (opened 2026-07-12; marked complete 2026-08-16)  
 **Normative decisions:** [ADR-0023](../decisions/0023-measure-first-tet-primary-cvt-path.md),
 [ADR-0024](../decisions/0024-advisor-measure-answers.md)  
-**Board:** [docs/dag/PROGRAM.yaml](../dag/PROGRAM.yaml) Lane **M** (+ CVT/G nodes)  
-**Bootstrap:** [docs/dag/AGENT_BOOTSTRAP.md](../dag/AGENT_BOOTSTRAP.md)
+**Board:** ran to completion (M0–M13, G0–G4 all `done`); archived at [docs/archive/dag/PROGRAM.yaml](../archive/dag/PROGRAM.yaml).
 
-> **2026-08-16 status.** The *methodology* below (five-number scorecard,
-> anti-cheat truth layers, never-score-raw-nodal-max) is still in force and
-> still normative for any new campaign. The *program board* this plan drove is
-> finished: M0–M13 and G0–G4 are all `done` in `docs/dag/PROGRAM.yaml`, and
-> the M5 VEM-gate campaign is concluded with its verdict recorded in
-> `bench/campaigns/vem-gate-m5/GATE.md`. This file is therefore **no longer
-> the single map of what to build next.** The active program is the learned
-> mesh advisor corpus/retrain work — ADR-0026/0027, ADR-0028–0033, and
-> `docs/advisor/` (live tracker: `docs/advisor/0003-training-log.md`).
-> Read those first; read this plan for the measurement rules they still
-> inherit. Do **not** re-open ranked decisions without new evidence.
+> The *methodology* below (five-number scorecard, anti-cheat truth layers,
+> never-score-raw-nodal-max) is binding for any new campaign. The execution
+> order in §5 is history: the M5 VEM-gate verdict is recorded in
+> `bench/campaigns/vem-gate-m5/GATE.md`. Current status and next work:
+> [docs/STATUS.md](../STATUS.md). Do **not** re-open ranked decisions without
+> new evidence.
 
 ---
 
@@ -55,7 +49,7 @@ near-term core bet.
 |-------|------|
 | **Default accuracy** | Tet FE |
 | **Poly / VEM** | “Also ships polyhedra” until **M5**: beats `hybrid_zoo` on energy/DOF **and** SCF on frozen `plate_hole` + `cylinder` |
-| **Varyhedron** | Packing path name; still exports tet scaffold until CVT cells land |
+| **Varyhedron** | Core variable-polyhedron packing direction (ADR-0021). Current `kVaryhedron` output is a CAD-edge-seeded tet scaffold, so its accuracy claims fall under the tet-FE rule |
 | **Reward signal** | Scorecard + accuracy metrics — **never** wire PNG, never residual alone |
 
 ---
@@ -201,9 +195,7 @@ Shewchuk predicates public domain OK. Verdict BSD for quality. fTetWild MPL plug
 | **later** | BRep face tags; sphere Legendre ref (~1 day); p>1 + curved edges; frame fields research | … | not two-week core |
 
 **2026-08-16:** the M + G lanes above are complete; this table is historical.
-The live execution order is the advisor corpus/retrain program —
-`docs/advisor/0003-training-log.md` and `docs/dag/PROGRAM.yaml` are the
-current board.
+Current status and next work: [docs/STATUS.md](../STATUS.md).
 
 ---
 
@@ -245,19 +237,17 @@ Anti-cheat: truths only in `bench/reference/` + `docs/validation/hand-calcs.md`.
 
 ---
 
-## 9. Agent anti-confusion checklist
+## 9. Measurement checklist
 
-Before claiming work:
+Before starting campaign, packing, or metric work:
 
 1. [ ] Read this plan + ADR-0023 + ADR-0024  
-2. [ ] `docs/dag/PROGRAM.yaml` — claim a `todo` whose deps are `done`  
-3. [ ] Do not optimize residual alone or wireframes  
-4. [ ] Do not score raw nodal max stress  
-5. [ ] Do not start dual-of-tet or frame fields as product path  
-6. [ ] Do not run packing “wins” until **M9 baseline** exists and health_ok  
-7. [ ] CVT density uses **same** \(h(x)\) as N_pred  
-8. [ ] OCC product builds: `-DPOLYMESH_WITH_OCC=ON`  
-9. [ ] Commit + push master; no AI attribution trailers  
+2. [ ] Do not optimize residual alone or wireframes  
+3. [ ] Do not score raw nodal max stress  
+4. [ ] Do not start dual-of-tet or frame fields as product path  
+5. [ ] Measure packing changes against the frozen M9 baseline with health_ok  
+6. [ ] CVT density uses **same** \(h(x)\) as N_pred  
+7. [ ] OCC product builds: `-DPOLYMESH_WITH_OCC=ON`  
 
 ---
 
@@ -267,8 +257,7 @@ Before claiming work:
 |------|------|
 | `docs/decisions/0023-…` | Strategy ADR |
 | `docs/decisions/0024-…` | Concrete advisor Q&A rules |
-| `docs/research/varyhedron-packing.md` | Algorithm ranking detail |
-| `docs/dag/PROGRAM.yaml` | Executable board |
-| `docs/dag/interfaces.md` | results.jsonl / scorecard schema |
-| `docs/process/grok-loop.md` | Headless improve loop |
+| [`docs/archive/research/varyhedron-packing.md`](../archive/research/varyhedron-packing.md) | Algorithm ranking detail |
+| [`docs/archive/dag/PROGRAM.yaml`](../archive/dag/PROGRAM.yaml) | Completed board (frozen) |
+| [`docs/dag/interfaces.md`](../dag/interfaces.md) | results.jsonl / scorecard schema |
 | `bench/campaigns/*` | Frozen baselines + short packs |

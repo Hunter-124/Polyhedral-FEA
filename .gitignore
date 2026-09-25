@@ -5,9 +5,8 @@ compile_commands.json
 # (BENCHMARKS.md anti-cheat rule 1). See audits/README.md for protocol.
 /bench/geometries/holdout/
 /audits/local/
-# VTU dumps generally ignored; campaign warehouse is tracked (git-LFS).
+# VTU dumps are scratch everywhere, campaign warehouses included.
 *.vtu
-!bench/campaigns/**/runs/**/mesh.vtu
 /polymesh-setup/
 
 # Machine-local editor/tooling config, never part of the published tree.
@@ -15,12 +14,15 @@ compile_commands.json
 /.claude/
 
 # machine-local graphify artifacts (committed: graph.json, GRAPH_REPORT.md,
-# .graphify_labels.json, manifest.json — see CONTRIBUTING.md §8)
+# .graphify_labels.json, manifest.json — see CONTRIBUTING.md §8). Dated
+# subdirectories are per-run snapshots of those same four files.
 graphify-out/.graphify_python
 graphify-out/.graphify_root
+graphify-out/.graphify_labels.json.sig
 graphify-out/cache/
 graphify-out/cost.json
 graphify-out/graph.html
+graphify-out/20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/
 imgui.ini
 
 # Accidental local CAD/smoke dumps at repo root (fixtures live under bench/, examples/)
@@ -36,25 +38,21 @@ examples/out/
 /polymesh-gui
 /polymesh-gui.exe
 
-# Self-improve loop run outputs (machine-local)
-bench/self_improve/
-
-
 # Training corpora for the learned mesh advisor (ADR-0027). Multi-GB; licence
 # provenance lives in bench/advisor/corpus_manifest.json, never committed.
+# The shipped artifacts (model.onnx, normalization.json, clamps.json, ood.json,
+# activation_layout.json) are tracked so `--advisor bench/advisor` works from a clone.
 /bench/geometries/corpus/
 /bench/advisor/dataset.csv
 /bench/advisor/runs/
-/bench/advisor/model.onnx
-/bench/advisor/dashboard.html
 /bench/advisor/.cache/
 # Python bytecode from scripts/
 __pycache__/
 *.pyc
 
 # Advisor campaign warehouses. The rows (results.jsonl) and the provenance
-# (campaign.json, checkpoint.json) are tracked; raw per-run meshes/renders and
-# previews are not, wherever a campaign is located (including archive-v2/).
+# (campaign.json, checkpoint.json) are tracked. Per-run output under runs/ is
+# scratch; the few per-run result.json files already in git stay tracked.
 /bench/campaigns/**/runs/
 /bench/campaigns/**/mesh_preview.pmp
 
@@ -63,4 +61,4 @@ __pycache__/
 
 
 # Locally acquired external meshing and solver executables
-tools/.aicadvault/
+tools/

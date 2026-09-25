@@ -400,7 +400,7 @@ def _ring_radius(pts, used, axis, centre, span, bins=48):
 #: jittered dimensions and crosses ANY fixed fraction you pick -- channel_s0
 #: passed a 75% sector floor while channel_s1 failed it, on the same family.
 #:
-#: So enclosure is no longer measured as a fraction of anything. It is decided
+#: So enclosure is not measured as a fraction of anything. It is decided
 #: topologically: in the plane normal to the candidate axis, a bore's void does
 #: not reach the outside world, and an open pocket does. Flood fill from the
 #: border of the slab decides it, and there is no threshold left to tune.
@@ -588,12 +588,11 @@ def detect_hole_roi(pts, edges, pad_frac=0.55, cells=None):
 
     Two things this deliberately does not assume:
 
-    * **The bore axis.** The previous version sampled radii in xy while taking
-      its slab from the LONGEST bbox axis -- two different axes, and neither
-      derived. On a plate the bore runs through the THINNEST axis, so the
-      radial histogram measured across the bore instead of around it. All
-      three axes are now tried and the one with the strongest void evidence
-      wins, so the answer does not depend on how the part was exported.
+    * **The bore axis.** On a plate the bore runs through the THINNEST axis,
+      so a slab taken from any fixed axis can measure the radial histogram
+      across the bore instead of around it. All three axes are tried and the
+      one with the strongest void evidence wins, so the answer does not
+      depend on how the part was exported.
     * **That a ring is a hole.** The densest inner radial band exists on a
       solid box too. A bore has no material inside it, and that is measured.
 

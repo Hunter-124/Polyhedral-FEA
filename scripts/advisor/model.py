@@ -12,19 +12,20 @@ remaining ``D - 2`` continuous columns are concatenated with the two 4-dim
 embeddings to form the trunk input of width ``D_eff = (D - 2) + 8``.
 
     trunk : Linear(D_eff -> H) -> GELU -> Linear(H -> H) -> GELU
-    heads : 7 x Linear(H -> 1) regressors (log10 targets)
+    heads : one Linear(H -> 1) regressor per ``REGRESSION_HEADS`` (log10 targets)
             1 x Linear(H -> 1) failure logit
             1 x Linear(H -> A) policy (continuous dims in physical units)
 
-which is the nine named C6 graph outputs, in ``OUTPUT_NAMES`` order. With the
-production schema (D = 47, A = 9, H = 96) this is 16 177 parameters, small
-enough that the dashboard's per-neuron activation view stays legible.
+which are the named C6 graph outputs, in ``OUTPUT_NAMES`` order. ``D`` and ``A``
+come from the data (``normalization.json:input_columns`` / ``action_dims`` for a
+shipped model), so the parameter count follows the artifact; at ``H = 96`` it
+stays small enough that the dashboard's per-neuron activation view is legible.
 
 Activation taps
 ---------------
 ``forward_tuple_explain`` appends the trunk's own three tensors -- the
-post-embedding concat and the two post-GELU hidden layers -- to the nine
-contract outputs, and that is the signature the shipped graph is exported
+post-embedding concat and the two post-GELU hidden layers -- to the C6
+outputs, and that is the signature the shipped graph is exported
 with. They are intermediates the heads already consume rather than a second
 evaluation, so a consumer that never names them pays nothing for their
 existence. ``network_layout`` describes the same graph statically (widths,

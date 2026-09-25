@@ -379,7 +379,7 @@ def main(argv: Iterable[str] | None = None) -> int:
             "boundary-edge constrained seed packing + dual poly from refined "
             "tet scaffold with CAD edge protect; VEM on polys (ADR-0021)"
         ),
-        "research_doc": "docs/research/varyhedron-packing.md",
+        "research_doc": "docs/archive/research/varyhedron-packing.md",
         "spacing": args.spacing,
         "relax_iters": args.relax_iters,
         "cases": cases,

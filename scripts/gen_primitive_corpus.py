@@ -132,8 +132,8 @@ FAMILIES = (
     # which at six families is unmeasurable (slope CI [-0.051, +0.043]).
     "tube",
     "perforated_plate",
-    # Added 2026-08-15: every curved surface in the eight families above is a
-    # plane, a circular cylinder, a circular cone or a sphere, so curvature is
+    # Non-analytic curvature: every curved surface in the eight families above
+    # is a plane, a circular cylinder, a circular cone or a sphere, so curvature is
     # zero, constant, or constant along one principal direction, and a curved
     # wall is always a surface of revolution. These three break that:
     # `ellipsoid_boss` has two continuously varying principal curvatures,
@@ -142,12 +142,12 @@ FAMILIES = (
     "ellipsoid_boss",
     "lobed_shaft",
     "twisted_loft",
-    # Added 2026-08-22 for the portable-cost retrain. The eleven families above
-    # are all single-load-path solids: one prismatic or revolved body, features
-    # that either weaken it (holes, notches) or hang off it (bosses). None of
-    # them is REINFORCED, and none puts two features close enough to interact,
-    # so the proximity and load-interaction features the retrain adds have no
-    # variance to learn from on the old corpus:
+    # Reinforcement / proximity families. The eleven families above are all
+    # single-load-path solids: one prismatic or revolved body, features that
+    # either weaken it (holes, notches) or hang off it (bosses). None of them is
+    # REINFORCED, and none puts two features close enough to interact, so the
+    # proximity and load-interaction features would have no variance to learn
+    # from without these:
     #   `ribbed_plate`     parallel stiffening ribs -- a second load path, and
     #                      1-3 re-entrant rib/plate junctions per part.
     #   `gusset_bracket`   an l_bracket whose corner is braced by a triangular
@@ -565,7 +565,7 @@ class Geometry:
     ``curved``          planar loaded face with a CURVED BOUNDARY (a disc or an
                         annulus). The mesh under-resolves the area by a chordal
                         deficit, so the traction is rescaled onto the CAD rule
-                        area (``apps/testlab/load_area.hpp:18-28``).
+                        area (``cad_rule_area``, ``apps/testlab/load_area.hpp``).
     ``curved_surface``  the loaded face is itself curved (a spherical cap).
     """
 
@@ -764,7 +764,7 @@ def build_tube(name: str, scale: float, rng: random.Random) -> Geometry:
     condition ``expected_area`` exists for: the authored value is the exact
     analytic annulus area, and testlab cross-checks it against the CAD rule area
     and rescales the traction onto the latter
-    (``apps/testlab/load_area.hpp:54-91``). This family therefore exercises the
+    (``check_authored_area``, ``apps/testlab/load_area.hpp``). This family therefore exercises the
     rescaling path deliberately, unlike ``sphere_box`` and ``stepped_shaft``
     which reached it by omitting the guard altogether.
     """
@@ -800,9 +800,9 @@ def build_tube(name: str, scale: float, rng: random.Random) -> Geometry:
         #
         # It matters asymmetrically. For c1/c2 the CAD-side rule substitutes the
         # slab's thin axis at min_dot 0.7 and so drops the walls
-        # (apps/testlab/main.cpp:1865-1875), but the MESH-side selector honours
-        # normal_min_dot = -1 literally and keeps every face in the box
-        # (main.cpp:937-975). The traction is then rescaled onto the smaller CAD
+        # (with_exact_cad_selections, apps/testlab/probe_selection.cpp), but the
+        # MESH-side selector honours normal_min_dot = -1 literally and keeps every
+        # face in the box (select_load_faces, same file). The traction is then rescaled onto the smaller CAD
         # area, so the resultant stays right while the DISTRIBUTION smears onto
         # the walls -- the same class of defect as the sphere_box under-loads,
         # just silent because the rescale hides it in the resultant.
@@ -829,9 +829,9 @@ def build_perforated_plate(name: str, scale: float, rng: random.Random) -> Geome
     The second widening family, chosen for the opposite extreme: many small
     features on an otherwise prismatic solid. It is the only corpus part whose
     smallest feature is far below the plate thickness, which is precisely the
-    scale at which the corrected engine now refuses to alias a feature away
-    rather than silently meshing through it -- so it probes the new dominant
-    failure mode directly instead of by luck.
+    scale at which the engine refuses to alias a feature away rather than
+    silently meshing through it -- so it probes that failure mode directly
+    instead of by luck.
 
     The loaded end face is a plain rectangle with straight edges: planar, exact
     area, no chordal deficit. Paired with ``tube`` it separates "curved loaded
@@ -1082,7 +1082,7 @@ def build_gusset_bracket(name: str, scale: float, rng: random.Random) -> Geometr
     `l_bracket` is the corpus's re-entrant-corner family: its inner corner is a
     stress singularity whose exponent depends only on the opening angle. Bracing
     it changes that -- the web carries the corner in direct tension, so the same
-    opening angle now sits on a stiffer support and the corner's contribution to
+    opening angle sits on a stiffer support and the corner's contribution to
     the solution is smaller. It is the one family where the singularity strength
     and the geometry that produces it move independently, which is exactly what
     a learned regularity feature must be able to tell apart.
@@ -1956,7 +1956,7 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
 #:
 #: The plan's single ``h_rel = 0.005`` cannot produce a reference at all: testlab
 #: refuses a run when ``predict_elem_count = 6 * bbox_volume / h^3`` exceeds
-#: ``2 * kMaxCampaignElems = 120000`` (apps/testlab/main.cpp:1812-1821), and at
+#: ``2 * kMaxCampaignElems = 120000`` (``run_one``, apps/testlab/run_one.cpp), and at
 #: ``h_rel = 0.005`` the boxiest corpus part predicts 6.28e6 elements -- every one of the
 #: 72 runs would return ``status = "over_budget"`` with no ``answers``. The compiled caps
 #: (``kMaxCampaignElems = 60000``, ``kMaxCampaignDof = 80000``) put the order-2 ceiling
@@ -2121,7 +2121,7 @@ def _boxes_intersect(box: list[list[float]],
 
 
 ACCEPTED_PROBE_KINDS = frozenset({
-    # apps/testlab/main.cpp evaluate_probe(), lines 1582-1631.
+    # evaluate_probe() in apps/testlab/probe_selection.cpp.
     "mean_vm", "mean_von_mises", "face_mean_vm",
     "mean_vm_over_nominal", "scf_mean", "scf",
     "max_von_mises", "max_vm", "max_vm_over_nominal",
@@ -2317,11 +2317,11 @@ def check_coverage(new_families: tuple[str, ...] = RETRAIN_FAMILIES, *,
                    csv_path: Path | None = None) -> int:
     """Is every new family at least as far from the corpus as the corpus is wide?
 
-    The gate the `perforated_plate` lesson earned: that family landed CLOSER to an
-    existing one than the existing families were to each other, which makes it a
-    weaker test of transfer, and nothing in the generator noticed. Now the
-    generator refuses to call a family a widening until its standardized
-    descriptor centroid clears the corpus's own minimum pairwise distance.
+    A family that lands CLOSER to an existing one than the existing families
+    are to each other is a weaker test of transfer (as `perforated_plate`
+    did). The generator refuses to call a family a widening until its
+    standardized descriptor centroid clears the corpus's own minimum pairwise
+    distance.
 
     ``duplicate_of`` is the negative test: it injects a near-duplicate of an
     existing family (its own descriptor rows, nudged by one part in a million) and

@@ -48,9 +48,6 @@ import math
 from pathlib import Path
 from typing import Any, Iterable
 
-ROOT = Path(__file__).resolve().parents[2]
-CAMPAIGNS = ROOT / "bench" / "campaigns"
-REFERENCE_DIR = ROOT / "bench" / "reference" / "corpus"
 
 #: Tolerance stamped on a promoted metric. The provisional seeds carry ``tol = 1.0``,
 #: which makes the campaign accuracy *score* nearly insensitive (``rel_err``, the thing
@@ -70,32 +67,20 @@ _SCRIPTS_DIR = Path(__file__).resolve().parents[1]
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 from truth_guard import SELF_GENERATED_SOURCES, protected_source  # noqa: E402
+from advisor.paths import REFERENCE_DIR, REPO_ROOT  # noqa: E402
+#: The truth run is sharded into ``<campaign>-s0..-sN`` (disjoint part lists, one
+#: ``results.jsonl`` each) and nothing merges them back; run_batch owns that scan.
+from advisor.run_batch import truth_results_paths  # noqa: E402
+
+CORPUS_REFERENCE_DIR = REFERENCE_DIR / "corpus"
 
 
 def rel(path: Path) -> str:
     """Repo-relative POSIX path for logs and derivation strings."""
     try:
-        return path.relative_to(ROOT).as_posix()
+        return path.relative_to(REPO_ROOT).as_posix()
     except ValueError:
         return str(path)
-
-
-def truth_results_paths(campaign: str) -> list[Path]:
-    """Every ``results.jsonl`` of the truth run: the campaign plus its shards.
-
-    The truth run is sharded into ``<campaign>-s0..-sN`` (same grid, disjoint part
-    lists, one ``results.jsonl`` each) and nothing merges them back, so reading only
-    the parent directory reports parts as provisional that were in fact solved. Same
-    glob style as ``run_batch.completed_pairs``/``run_batch.truth_results_paths``.
-    """
-    paths: list[Path] = []
-    if not CAMPAIGNS.is_dir():
-        return paths
-    for directory in [CAMPAIGNS / campaign, *sorted(CAMPAIGNS.glob(f"{campaign}-s*"))]:
-        results = directory / "results.jsonl"
-        if results.is_file():
-            paths.append(results)
-    return paths
 
 
 def parse_args(argv: list[str] | None) -> argparse.Namespace:
@@ -138,7 +123,7 @@ def read_rows(results: Path) -> list[dict[str, Any]]:
 def usable(row: dict[str, Any]) -> bool:
     """Only converged, health-passing runs may define truth.
 
-    testlab status vocabulary (apps/testlab/main.cpp): ok | solve_suspect | over_budget
+    testlab status vocabulary (apps/testlab/run_one.cpp): ok | solve_suspect | over_budget
     | solve_fail | mesh_fail. Only "ok" (health gates all passed) can define a truth.
     """
     if row.get("status") != "ok":
@@ -275,7 +260,7 @@ def check_promotable() -> int:
     """
     total = 0
     promotable: list[tuple[str, str]] = []
-    for path in sorted(REFERENCE_DIR.glob("*.json")):
+    for path in sorted(CORPUS_REFERENCE_DIR.glob("*.json")):
         reference = json.loads(path.read_text(encoding="utf-8"))
         for metric in reference.get("metrics", []):
             total += 1
@@ -305,8 +290,8 @@ def main(argv: list[str] | None = None) -> int:
               f"[-s*]; run the {args.campaign} campaign before promoting truth",
               file=sys.stderr)
         return 1
-    if not REFERENCE_DIR.is_dir():
-        print(f"error: {rel(REFERENCE_DIR)} not found; run "
+    if not CORPUS_REFERENCE_DIR.is_dir():
+        print(f"error: {rel(CORPUS_REFERENCE_DIR)} not found; run "
               "scripts/gen_primitive_corpus.py first", file=sys.stderr)
         return 1
 
@@ -325,7 +310,7 @@ def main(argv: list[str] | None = None) -> int:
     refused: dict[str, list[tuple[str, str]]] = {}
 
     references = [(path, json.loads(path.read_text(encoding="utf-8")))
-                  for path in sorted(REFERENCE_DIR.glob("*.json"))]
+                  for path in sorted(CORPUS_REFERENCE_DIR.glob("*.json"))]
 
     # Pre-pass: with --force-overwrite-external the user is about to destroy
     # independent truth, so name every reference BEFORE writing anything.

@@ -28,7 +28,7 @@ ADVISOR = REPO / "bench/advisor"
 OUT = REPO / "bench/results/advisor-budget-sweep.json"
 VTU_DIR = Path("/tmp/advisor_budget_sweep")
 
-# In-distribution families from the v4 corpus (the shipped model refuses OOD
+# In-distribution families of the training corpus (the shipped model refuses OOD
 # parts, which is correct behaviour but makes an empty chart).
 PARTS = [
     "bench/geometries/corpus/primitives/box_hole_s0.step",

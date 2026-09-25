@@ -59,12 +59,12 @@ if __package__ in (None, ""):  # direct invocation
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     __package__ = "advisor"
 
-from .dataset import ADVISOR_DIR, ROOT, provenance  # noqa: E402
+from .dataset import provenance  # noqa: E402
 from .geometry_features import FEATURES_CSV  # noqa: E402
+from .paths import ADVISOR_DIR, CORPUS_PRIMITIVES_DIR, REPO_ROOT  # noqa: E402
 
 REPORT_JSON = ADVISOR_DIR / "corpus_evidence.json"
 LEARNING_CURVE_JSON = ADVISOR_DIR / "learning_curve.json"
-CASE_DIR = ROOT / "bench" / "geometries" / "corpus" / "primitives"
 
 #: Families present before the widening. Everything is reported relative to
 #: these so "distant from the existing corpus" has a fixed referent.
@@ -240,7 +240,7 @@ def tube_load_slab() -> dict[str, Any]:
     the ratio is exactly ``2*d/t``, independent of the geometry.
     """
     try:
-        sys.path.insert(0, str(ROOT / "scripts"))
+        sys.path.insert(0, str(REPO_ROOT / "scripts"))
         from gen_primitive_corpus import build_geometry  # noqa: PLC0415
     except ImportError as error:  # pragma: no cover - OCP guard
         return {"available": False, "reason": str(error)}
@@ -266,7 +266,7 @@ def tube_load_slab() -> dict[str, Any]:
         # Cross-check the closed form against what the generator actually wrote,
         # so a change to LOAD_SLAB_FRAC or to build_tube cannot silently
         # invalidate this record.
-        case_path = CASE_DIR / f"tube_s{regime}_c0.case.json"
+        case_path = CORPUS_PRIMITIVES_DIR / f"tube_s{regime}_c0.case.json"
         if case_path.is_file():
             case = json.loads(case_path.read_text(encoding="utf-8"))
             box = case["loads"][0]["select"]["box"]
@@ -299,9 +299,10 @@ def tube_load_slab() -> dict[str, Any]:
         "within_authored_area_tolerance": bool(max(ratios) < 0.01),
         "note": ("For the transverse and oblique archetypes the CAD-side rule "
                  "substitutes the slab's thin axis at min_dot 0.7 and drops the "
-                 "walls (apps/testlab/main.cpp:1865-1875), while the mesh-side "
-                 "selector honours normal_min_dot = -1 literally and keeps every "
-                 "in-box face (main.cpp:937-975). The traction is then rescaled "
+                 "walls (with_exact_cad_selections, apps/testlab/probe_selection.cpp), "
+                 "while the mesh-side selector honours normal_min_dot = -1 literally "
+                 "and keeps every in-box face (select_load_faces, same file). The "
+                 "traction is then rescaled "
                  "onto the smaller CAD area, so the resultant stays correct while "
                  "the distribution smears onto the walls. A thin slab is what "
                  "prevents that; a normal filter cannot, because the filter is "
@@ -425,7 +426,7 @@ def learning_curve_fit(path: Path) -> dict[str, Any]:
 
     return {
         "available": True,
-        "source": str(path.relative_to(ROOT)).replace("\\", "/"),
+        "source": str(path.relative_to(REPO_ROOT)).replace("\\", "/"),
         "source_provenance": payload.get("provenance"),
         "objective": payload.get("objective"),
         "bootstrap_draws": BOOTSTRAP_DRAWS,

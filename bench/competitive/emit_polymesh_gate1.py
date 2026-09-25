@@ -64,7 +64,7 @@ def gate1_rows() -> list[dict]:
     lame_nodes = hex20_node_count(4, 12, 1)
     kirsch_nodes = hex20_node_count(6, 10, 1)
 
-    # Metrics from docs/progress.md / bench/reports/p1-gate1-convergence.md.
+    # Metrics from docs/archive/progress-history.md / bench/reports/p1-gate1-convergence.md.
     # Wall times are approximate ctest walls retained from the original snapshot.
     ts = "2026-07-10T00:00:00Z"
     common = {

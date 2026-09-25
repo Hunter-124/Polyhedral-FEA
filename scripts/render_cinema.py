@@ -88,7 +88,7 @@ FPS = 60
 DEFAULT_FRAMES = 3600
 #: The Xvfb screen AND, via ``POLYMESH_GUI_SIZE``, the GUI window itself: the
 #: window otherwise opens at the interactive default it has always had
-#: (``kDefaultWindowW``/``H`` = 1600x1000 in ``apps/gui/main.cpp``) whatever the
+#: (``kDefaultWindowW``/``H`` = 1600x1000 in ``apps/gui/app_state.hpp``) whatever the
 #: screen is, which shows up as a 1600x1000 film rather than an error. 1080p
 #: without paying for a 4K framebuffer.
 DEFAULT_SCREEN = (1920, 1080)
@@ -119,14 +119,13 @@ H264_LADDER: tuple[tuple[str, tuple[str, ...]], ...] = (
 #: GIF ladder, tried in order until one lands under the byte budget: width and
 #: frame rate only, never content.
 #:
-#: It starts wider than the 960 px this used to open at, because the film's text
-#: is what the ladder is really trading against. The composition sets its
-#: headline at 40 px and its numbers at 27 px in a 1080-line frame, so a 1100 px
-#: GIF delivers them at 23 and 15 px -- readable at the ~870 CSS px GitHub gives
-#: a full-width README image, and readable again on a 2x display. At the old
-#: 960/15 the same rows arrived at 20 and 13 px, which was the top of the range
-#: where they were still legible; below 720 px the numbers stop being readable at
-#: all, which is why the ladder ends there rather than continuing down.
+#: The film's text is what the ladder is really trading against. The
+#: composition sets its headline at 40 px and its numbers at 27 px in a
+#: 1080-line frame, so a 1100 px GIF delivers them at 23 and 15 px -- readable
+#: at the ~870 CSS px GitHub gives a full-width README image, and readable again
+#: on a 2x display. At 960/15 the same rows arrive at 20 and 13 px, the top of
+#: the range where they are still legible; below 720 px the numbers stop being
+#: readable at all, which is why the ladder ends there.
 #:
 #: Frame rate is spent before width for the same reason: the take is mostly
 #: still holds and slow sweeps, so 10 fps costs almost nothing visually while
@@ -137,21 +136,10 @@ GIF_MAX_BYTES = 8 * 1024 * 1024
 #: The whole take, unless asked otherwise. The film's payload is spread across
 #: all of it -- the mesh completing and being held, stress arriving, the stress
 #: gradient, the refinement, the load ramp, the final freeze -- and any slice
-#: short enough to be a "loop" drops most of them. This is a change of policy
-#: from the act-derived window that used to live here: that window existed
-#: because a 20 s take could not be shown whole inside 8 MB, and it showed the
-#: deliberation and the start of the fill. It cannot show a result the film did
-#: not used to have.
+#: short enough to be a "loop" drops most of them. The byte budget is met by the
+#: ladder above, in width and frame rate, not by cutting content.
 GIF_START_FRACTION = 0.0
 GIF_DURATION_FRACTION = 1.0
-
-
-def rel(path: Path) -> str:
-    """Repo-relative string when possible, absolute otherwise."""
-    try:
-        return str(path.resolve().relative_to(REPO))
-    except ValueError:
-        return str(path)
 
 
 # ---------------------------------------------------------------------------
@@ -295,7 +283,7 @@ CASES: dict[str, Case] = {
     # against the shipped 5.034 operating point and is advised (hybrid_zoo,
     # h_rel 0.2, order 2, 0 adapt passes, failure_prob 5.3e-06).
     #
-    # It is 568 elements, which is why it is no longer the default: the fill lane
+    # It is 568 elements, which is why it is not the default: the fill lane
     # runs out of geometry to build long before the pass lane runs out of
     # candidates to score.
     "box_hole_s0_c0": Case(
@@ -343,7 +331,7 @@ def stamp_text(model_dir: Path) -> str:
     onnx = model_onnx(model_dir)
     sha, _ = fs.digest(onnx)
     if not sha:
-        raise SystemExit(f"no model to stamp: {rel(onnx)} does not exist")
+        raise SystemExit(f"no model to stamp: {fs.rel(onnx)} does not exist")
     return f"git {fs.git_revision()} · model.onnx sha256 {sha[:fs.DIGEST_CHARS]}"
 
 
@@ -361,7 +349,7 @@ def auto_spec(case: Case, part: Path, model_dir: Path, frames_dir: Path,
     """
     fx, fy, fz = case.load
     actions = [
-        f"load {rel(part)}",
+        f"load {fs.rel(part)}",
         f"h {case.h_mm:g}",
         f"material {case.youngs_gpa:.9g} {case.poisson:.9g}",
         f"mesher {case.mesher}",
@@ -376,7 +364,7 @@ def auto_spec(case: Case, part: Path, model_dir: Path, frames_dir: Path,
         # physical case for display.
         f"loadface {case.load_face} {fx:.9g} {fy:.9g} {fz:.9g}",
         "cinema on",
-        f"cinema advisor {rel(model_dir)}",
+        f"cinema advisor {fs.rel(model_dir)}",
     ])
     if case.adapt_passes is not None:
         # Deliberately after `cinema advisor`: an accepted action normally owns
@@ -651,7 +639,7 @@ def png_size(path: Path) -> tuple[int, int]:
     with path.open("rb") as stream:
         head = stream.read(24)
     if len(head) < 24 or head[:8] != b"\x89PNG\r\n\x1a\n":
-        raise SystemExit(f"{rel(path)} is not a PNG; the capture is unusable")
+        raise SystemExit(f"{fs.rel(path)} is not a PNG; the capture is unusable")
     return (int.from_bytes(head[16:20], "big"),
             int.from_bytes(head[20:24], "big"))
 
@@ -670,7 +658,7 @@ def verify_frames(frames_dir: Path, expected: int) -> tuple[int, int]:
     """
     present = sorted(frames_dir.glob("frame_*.png"))
     if not present:
-        raise SystemExit(f"no frames in {rel(frames_dir)}; expected {expected}")
+        raise SystemExit(f"no frames in {fs.rel(frames_dir)}; expected {expected}")
     missing = [i for i in range(expected)
                if not frame_path(frames_dir, i).is_file()]
     if missing:
@@ -678,19 +666,19 @@ def verify_frames(frames_dir: Path, expected: int) -> tuple[int, int]:
         more = f" (+{len(missing) - 8} more)" if len(missing) > 8 else ""
         raise SystemExit(
             f"{len(missing)} of {expected} frames missing from "
-            f"{rel(frames_dir)}: {shown}{more}")
+            f"{fs.rel(frames_dir)}: {shown}{more}")
     wanted = {frame_path(frames_dir, i) for i in range(expected)}
     extra = sorted(p.name for p in present if p not in wanted)
     if extra:
         raise SystemExit(
             f"{len(extra)} file(s) beyond the expected {expected} frames in "
-            f"{rel(frames_dir)} (first: {extra[0]}); frames from an earlier "
+            f"{fs.rel(frames_dir)} (first: {extra[0]}); frames from an earlier "
             "take would be encoded into this one")
     empty = [i for i in range(expected)
              if frame_path(frames_dir, i).stat().st_size == 0]
     if empty:
         raise SystemExit(
-            f"{len(empty)} zero-byte frame(s) in {rel(frames_dir)}, first at "
+            f"{len(empty)} zero-byte frame(s) in {fs.rel(frames_dir)}, first at "
             f"index {empty[0]}; the capture is incomplete")
     size = png_size(frame_path(frames_dir, 0))
     if size[0] % 2 or size[1] % 2:
@@ -791,7 +779,7 @@ def encode_mp4(frames_dir: Path, out: Path, fps: int,
             "rate_control": list(rate), "pix_fmt": "yuv420p",
             "faststart": True, "fps": fps,
             "bytes": out.stat().st_size, "sha256": sha}
-    print(f"    wrote {rel(out)}  ({info['bytes'] / 1e6:.1f} MB, {name})")
+    print(f"    wrote {fs.rel(out)}  ({info['bytes'] / 1e6:.1f} MB, {name})")
     return info
 
 
@@ -799,15 +787,12 @@ def gif_window(report: GuiReport, total_s: float, start_arg: float | None,
                duration_arg: float | None) -> tuple[float, float, str]:
     """Which slice of the take the inline GIF shows, and where that came from.
 
-    The default is all of it. The act-table rules that used to live here picked
-    a four-second window around the deliberation, and they were the right answer
-    to a different film: one where the payload was the network deciding and the
-    fill starting, and where showing the whole 20 s inside 8 MB was not
-    affordable. This film's payload is the sequence -- the mesh finishing and
-    being held, the stress arriving, the gradient of it, the refinement, the
-    ramp, the final freeze -- and no window narrow enough to be a loop contains
-    more than one of those. The byte budget is met by the ladder instead, in
-    width and frame rate, which costs sharpness rather than content.
+    The default is all of it. The film's payload is the sequence -- the mesh
+    finishing and being held, the stress arriving, the gradient of it, the
+    refinement, the ramp, the final freeze -- and no window narrow enough to be
+    a loop contains more than one of those. The byte budget is met by the
+    ladder instead, in width and frame rate, which costs sharpness rather than
+    content.
 
     ``--gif-start`` / ``--gif-duration`` still cut a slice, and the source string
     records which rule produced the window so the manifest never carries two
@@ -858,7 +843,7 @@ def encode_gif(frames_dir: Path, out: Path, *, fps: int, start_s: float,
         ])
         size = out.stat().st_size
         attempts.append({"width": width, "fps": gif_fps, "bytes": size})
-        print(f"    {rel(out)} at {width} px {gif_fps} fps: {size / 1e6:.2f} MB "
+        print(f"    {fs.rel(out)} at {width} px {gif_fps} fps: {size / 1e6:.2f} MB "
               f"(budget {max_bytes / 1e6:.1f} MB)")
         if size <= max_bytes:
             palette.unlink(missing_ok=True)
@@ -888,16 +873,16 @@ def write_poster(frames_dir: Path, out: Path, index: int) -> dict:
     """
     src = frame_path(frames_dir, index)
     if not src.is_file():
-        raise SystemExit(f"poster frame {index} ({rel(src)}) does not exist")
+        raise SystemExit(f"poster frame {index} ({fs.rel(src)}) does not exist")
     run_ffmpeg(["-i", str(src), "-compression_level", "100", str(out)])
     sha, _ = fs.digest(out)
     width, height = png_size(out)
     src_bytes = src.stat().st_size
     out_bytes = out.stat().st_size
     if (width, height) != png_size(src):
-        raise SystemExit(f"poster re-encode changed geometry: {rel(src)} is "
-                         f"{png_size(src)}, {rel(out)} is {(width, height)}")
-    print(f"    wrote {rel(out)}  (frame {index}, {width}x{height}, "
+        raise SystemExit(f"poster re-encode changed geometry: {fs.rel(src)} is "
+                         f"{png_size(src)}, {fs.rel(out)} is {(width, height)}")
+    print(f"    wrote {fs.rel(out)}  (frame {index}, {width}x{height}, "
           f"{out_bytes / 1e3:.0f} kB from {src_bytes / 1e6:.1f} MB uncompressed)")
     return {"file": out.name, "source_frame": index, "width": width,
             "height": height, "bytes": out_bytes,
@@ -1004,8 +989,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"    h         configured before inference; accepted advice "
                   f"overrides it, abstention keeps the baseline")
             print(f"    why       {case.why}")
-        print(f"\noutputs land in {rel(OUT_DIR)}; frames in "
-              f"{rel(FRAMES_DIR)} (gitignored by the repo-root /build*/ rule)")
+        print(f"\noutputs land in {fs.rel(OUT_DIR)}; frames in "
+              f"{fs.rel(FRAMES_DIR)} (gitignored by the repo-root /build*/ rule)")
         return 0
 
     unknown = [name for name in args.only if name not in STAGES]
@@ -1065,14 +1050,14 @@ def main(argv: list[str] | None = None) -> int:
     if "frames" in wanted:
         if not args.gui.is_file():
             raise SystemExit(
-                f"{rel(args.gui)} does not exist; build the GUI first "
+                f"{fs.rel(args.gui)} does not exist; build the GUI first "
                 "(cmake --build build --target polymesh-gui)")
         if not part.is_file():
             # The primitive corpus is generated, not committed (.gitignore keeps
             # /bench/geometries/corpus/ out of the tree), so a missing part is a
             # missing generation step rather than a broken checkout.
             raise SystemExit(
-                f"{rel(part)} does not exist; generate the primitive corpus "
+                f"{fs.rel(part)} does not exist; generate the primitive corpus "
                 "first (python scripts/gen_primitive_corpus.py)")
         if shutil.which("xvfb-run") is None:
             raise SystemExit("xvfb-run is not installed; cannot drive the GUI "
@@ -1137,7 +1122,7 @@ def main(argv: list[str] | None = None) -> int:
             report.acts = prior_acts
             acts_from_manifest = True
             print(f"    read {len(prior_acts)} acts back from "
-                  f"{rel(manifest_path)} (this run drove no GUI)")
+                  f"{fs.rel(manifest_path)} (this run drove no GUI)")
 
     # ---- verify, then encode -----------------------------------------------
     frame_size = None
@@ -1196,7 +1181,7 @@ def main(argv: list[str] | None = None) -> int:
         "stages_run": sorted(wanted),
         "case": {
             "part": case.name,
-            "step": rel(part),
+            "step": fs.rel(part),
             "case_json": case.case_json,
             "fix_faces": list(case.fix_faces),
             "load_face": case.load_face,
@@ -1216,19 +1201,19 @@ def main(argv: list[str] | None = None) -> int:
             "why": case.why,
         },
         "model": {
-            "dir": rel(args.model_dir),
-            "onnx": rel(onnx),
+            "dir": fs.rel(args.model_dir),
+            "onnx": fs.rel(onnx),
             "onnx_sha256": onnx_sha,
         },
         "capture": {
-            "gui": rel(args.gui),
+            "gui": fs.rel(args.gui),
             "command": argv_gui,
             "auto_spec": spec,
             "env": {"POLYMESH_CINEMA_STAMP": stamp},
             "xvfb_screen": f"{screen[0]}x{screen[1]}",
             "frame_size": (f"{frame_size[0]}x{frame_size[1]}"
                            if frame_size else None),
-            "frames_dir": rel(frames_dir),
+            "frames_dir": fs.rel(frames_dir),
             "frame_count": args.frames,
             "fps": FPS,
             "duration_s": round(args.frames / FPS, 6),
@@ -1291,7 +1276,7 @@ def main(argv: list[str] | None = None) -> int:
     }
     _merge_existing(manifest_path, manifest, out_dir)
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
-    print(f"\nwrote {rel(manifest_path)}")
+    print(f"\nwrote {fs.rel(manifest_path)}")
     return 0
 
 

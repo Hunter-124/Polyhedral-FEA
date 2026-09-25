@@ -56,16 +56,28 @@ from matplotlib.font_manager import FontProperties  # noqa: E402
 ROOT = Path(__file__).resolve().parents[1]
 
 __all__ = [
-    "use", "theme", "figure", "finish", "panel_title", "axes_off",
+    "use", "theme", "dark_stage", "figure", "finish", "panel_title", "axes_off",
     "series", "series_handles", "SERIES_ORDER", "register_series",
     "field_cmap", "field_lut", "colorbar",
     "loglim", "share_y", "annotate_n", "tolerance_band",
     "convergence", "si", "unit_formatter", "footer_source",
-    "provenance", "git_revision", "digest",
+    "provenance", "git_revision", "digest", "rel",
     "font_path", "assert_glyphs", "GLYPHS_REQUIRED",
     "QUANTITY_LABELS", "quantity_label", "metric_label",
     "times_off", "DECADES_NOTE",
 ]
+
+
+def rel(path: Path) -> str:
+    """Repo-relative string when possible, absolute otherwise.
+
+    Paths may live outside the repository (an arbitrary --out, say);
+    Path.relative_to would raise on those.
+    """
+    try:
+        return str(path.resolve().relative_to(ROOT))
+    except ValueError:
+        return str(path)
 
 
 # ---------------------------------------------------------------------------
@@ -375,13 +387,10 @@ QUANTITY_LABELS: dict[str, str] = {
 #: one over statistics covers every legend entry the dashboard draws, so a new
 #: head needs no new legend string.
 #:
-#: The statistics are spelled out rather than abbreviated. The abbreviations
-#: used to stand here on the grounds that "MAE and AUC are the words a reader
-#: of an error plot expects" -- true of a reader who already trains models, and
-#: the people these figures get shown to are not that reader. "MAE" on an axis
-#: explains nothing to them, while "average miss" costs the trained reader
-#: nothing: the identifier is still in the footer, the manifest and every
-#: record, so nothing became less traceable by the axis becoming readable.
+#: The statistics are spelled out rather than abbreviated: "MAE" on an axis
+#: explains nothing to a reader who does not train models, while "average
+#: miss" costs the trained reader nothing -- the identifier is still in the
+#: footer, the manifest and every record.
 _METRIC_STATS: dict[str, str] = {
     "mae": "average miss",
     "rmse": "average miss, RMS",
@@ -483,8 +492,8 @@ FONT_PT = {
     "footer": 8.5,
 }
 
-#: figure presets: (width_in, height_in). Nothing wider than 2.2:1 -- the 4:1
-#: letterboxes in the old showcase were unreadable at README width.
+#: figure presets: (width_in, height_in). Nothing wider than 2.2:1 -- wider
+#: letterboxes are unreadable at README width.
 SIZES = {
     "half": (6.4, 4.4),
     "full": (10.0, 6.0),
@@ -563,6 +572,12 @@ def use(name: str = "light") -> Theme:
         "figure.dpi": 110,
     })
     return t
+
+
+def dark_stage() -> Theme:
+    """The dark stage 3D renders and the composites around them sit on."""
+    t = theme()
+    return t if t.name == "dark" else use("dark")
 
 
 #: A PIL composite has no dpi: it has a pixel canvas. Point sizes are declared
@@ -690,7 +705,7 @@ def unit_formatter(unit: str, reference: float | None = None) -> FuncFormatter:
 # ---------------------------------------------------------------------------
 # Provenance
 # ---------------------------------------------------------------------------
-#: This repository now holds figures produced under three different reference
+#: This repository holds figures produced under three different reference
 #: truth regimes (self-generated truth, the corrected engine, and the
 #: independent Gmsh -> CalculiX chain). A reader cannot tell them apart from
 #: the pixels, and a wrong-regime figure is indistinguishable from a wrong
@@ -916,7 +931,7 @@ def footer_source(*paths: Path | str, note: str = "", n: int | None = None,
     """Provenance line: POSIX slashes, repo-relative, record count.
 
     A second line stamps the code revision and a content digest per input,
-    because figures from three different truth regimes now coexist in this
+    because figures from three different truth regimes coexist in this
     repository and only the stamp tells them apart. ``stamp=False`` exists for
     figures with no data inputs at all (a drawn diagram); it is never the
     right choice for a figure carrying a number.

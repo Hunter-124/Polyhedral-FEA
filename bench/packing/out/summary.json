@@ -2,7 +2,7 @@
   "bench": "varyhedron-packing-microbench",
   "node": "V5",
   "v1_algorithm": "boundary-edge constrained seed packing + dual poly from refined tet scaffold with CAD edge protect; VEM on polys (ADR-0021)",
-  "research_doc": "docs/research/varyhedron-packing.md",
+  "research_doc": "docs/archive/research/varyhedron-packing.md",
   "spacing": 0.1,
   "relax_iters": 8,
   "cases": [

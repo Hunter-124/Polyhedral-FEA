@@ -18,14 +18,32 @@ from typing import Any, Iterable
 
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[1]
-CAMPAIGNS = ROOT / "bench" / "campaigns"
-CASE_DIR = ROOT / "tests" / "fixtures" / "parts"
+SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+from advisor.features import (  # noqa: E402
+    ACTION_COLUMNS,
+    ADVISOR_ROW_SCHEMAS,
+    CASE_COLUMNS,
+    FEATURE_COLUMNS,
+    IDENTITY_COLUMNS,
+)
+from advisor.paths import (  # noqa: E402
+    ADVISOR_DIR,
+    CAMPAIGNS_DIR,
+    CORPUS_PRIMITIVES_DIR,
+    FIXTURE_PARTS_DIR,
+    REPO_ROOT,
+)
+
+ROOT = REPO_ROOT
+CAMPAIGNS = CAMPAIGNS_DIR
+CASE_DIR = FIXTURE_PARTS_DIR
 # Procedural advisor corpus (scripts/gen_primitive_corpus.py) keeps its case JSON next
 # to the generated STEP, so both directories must be scanned.
-CORPUS_CASE_DIR = ROOT / "bench" / "geometries" / "corpus" / "primitives"
+CORPUS_CASE_DIR = CORPUS_PRIMITIVES_DIR
 CASE_DIRS = (CASE_DIR, CORPUS_CASE_DIR)
-OUTPUT_DIR = ROOT / "bench" / "advisor"
+OUTPUT_DIR = ADVISOR_DIR
 
 # promote_truth.py DEFINES each case's reference truth from the rows of the
 # advisor-truth-* campaigns, so their own accuracy_rel_err is ~0 by
@@ -88,31 +106,6 @@ def has_engine_marker(row: dict[str, Any]) -> bool:
     return isinstance(answers, dict) and "load_area_status" in answers
 
 
-ADVISOR_ROW_SCHEMAS = frozenset({"advisor-row-v3", "advisor-row-v4"})
-
-FEATURE_COLUMNS = [
-    "bbox_dx", "bbox_dy", "bbox_dz", "diag", "volume", "surface_area",
-    "sa_over_v23", "n_faces", "n_sharp_edges", "sharp_edge_len_total",
-    "curved_frac", "kappa_max_h", "kappa_mean_h", "thin_min_over_diag",
-    "thin_p10_over_diag", "min_feature_h", "n_fix_faces", "n_load_faces",
-    "fix_area_frac", "load_area_frac", "load_dir_x", "load_dir_y", "load_dir_z",
-    "fix_load_dist_over_diag", "load_axis_alignment", "poisson",
-    "geo_n_inner_loops", "geo_hole_spacing_min_rel", "geo_hole_spacing_p10_rel",
-    "geo_feat_pair_dist_min_rel", "geo_feat_pair_dist_p10_rel",
-    "geo_feat_pair_dist_mean_rel", "geo_dihedral_p10", "geo_dihedral_p50",
-    "geo_dihedral_p90", "geo_singular_lambda_min", "load_to_feature_dist_min_rel",
-    "fix_to_feature_dist_min_rel", "case_load_multiaxiality",
-]
-ACTION_COLUMNS = [
-    "h", "h_rel", "mesher", "element_tendency", "skin_layers", "feature_refine",
-    "bc_grading", "adapt_passes", "eta_target", "p_elevate", "adapt_leb_waves",
-    "cost_only", "order",
-]
-IDENTITY_COLUMNS = ["schema", "campaign", "cfg_id", "part", "tier"]
-CASE_COLUMNS = [
-    "case_poisson", "case_n_fix_regions", "case_n_load_regions", "case_load_dir_x",
-    "case_load_dir_y", "case_load_dir_z", "case_traction_magnitude",
-]
 # ``error`` is the row's top-level failure string; it is the first signal
 # dataset.py::_failure_flag looks at, so it has to reach the CSV.
 TOP_OUTCOMES = [
@@ -252,10 +245,10 @@ def case_context(case: dict[str, Any] | None) -> dict[str, Any]:
 # already contains. We therefore IGNORE the stored ``accuracy`` and re-derive it
 # from ``answers`` against the CURRENT references on every build.
 #
-# The re-derivation below mirrors apps/testlab/main.cpp exactly:
-#   load_metrics()   ~line 359  -> load_reference_metrics()
-#   evaluate_probe() ~line 1491 -> probe_measured()
-#   accuracy loop    ~line 2492 -> rederive_accuracy()
+# The re-derivation below mirrors apps/testlab exactly:
+#   load_metrics()   campaign_config.cpp -> load_reference_metrics()
+#   evaluate_probe() probe_selection.cpp -> probe_measured()
+#   accuracy loop    run_one.cpp         -> rederive_accuracy()
 # Any drift between them is a correctness bug, not a style difference.
 
 # probe.kind -> the ProbeAnswers field it scores, and whether evaluate_probe
@@ -293,7 +286,7 @@ _PROBE_AXIS = {"mean_ux_on_face": (0, "mean_ux"), "mean_uz_on_face": (2, "mean_u
 
 
 def load_reference_metrics(path: Path) -> list[dict[str, Any]]:
-    """Mirror of ``load_metrics`` (apps/testlab/main.cpp:359).
+    """Mirror of ``load_metrics`` (apps/testlab/campaign_config.cpp).
 
     Requires the interfaces.md ``metrics[]`` form; the legacy values-only format
     is rejected there and here. ``tol`` defaults to 0.05, ``nominal`` to 0.0.
@@ -322,7 +315,7 @@ def load_reference_metrics(path: Path) -> list[dict[str, Any]]:
 
 
 def probe_measured(probe: dict[str, Any], answers: dict[str, Any]) -> tuple[float | None, str]:
-    """Mirror of ``evaluate_probe`` (apps/testlab/main.cpp:1491).
+    """Mirror of ``evaluate_probe`` (apps/testlab/probe_selection.cpp).
 
     Returns ``(value, "")`` when the probe can be scored from the recorded
     answers, or ``(None, reason)`` when the field it needs was never written to
@@ -363,7 +356,8 @@ def rederive_accuracy(
 ) -> tuple[dict[str, Any] | None, str]:
     """Recompute a row's ``accuracy`` block from raw ``answers`` + current truth.
 
-    Mirror of apps/testlab/main.cpp:2492-2525, including the health gate: when
+    Mirror of the accuracy loop in ``run_one`` (apps/testlab/run_one.cpp),
+    including the health gate: when
     the solve failed its residual/reaction/orphan gates, rel_err is still
     recorded but every score is zeroed and ``trusted`` is false, so ranking never
     trusts a singular solve. Returns ``(None, reason)`` when the row cannot be
@@ -831,7 +825,7 @@ def main() -> int:
         # reference set is the supported way to re-score, and this block is how a
         # consumer tells two such datasets apart.
         "truth": {
-            "rederived_from": "row answers[] via probe kinds mirrored from apps/testlab/main.cpp",
+            "rederived_from": "row answers[] via probe kinds mirrored from apps/testlab/probe_selection.cpp",
             "rows_rescored": rescored_rows,
             "rows_unscored": sum(unscoreable.values()),
             "unscored_reasons": dict(sorted(unscoreable.items())),

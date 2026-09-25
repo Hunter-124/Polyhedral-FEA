@@ -495,7 +495,7 @@
     "authored_area_tolerance": 0.01,
     "load_area_health_tolerance": 0.05,
     "within_authored_area_tolerance": true,
-    "note": "For the transverse and oblique archetypes the CAD-side rule substitutes the slab's thin axis at min_dot 0.7 and drops the walls (apps/testlab/main.cpp:1865-1875), while the mesh-side selector honours normal_min_dot = -1 literally and keeps every in-box face (main.cpp:937-975). The traction is then rescaled onto the smaller CAD area, so the resultant stays correct while the distribution smears onto the walls. A thin slab is what prevents that; a normal filter cannot, because the filter is relative to the traction, which is transverse in those cases and can never select an axial annulus."
+    "note": "For the transverse and oblique archetypes the CAD-side rule substitutes the slab's thin axis at min_dot 0.7 and drops the walls (with_exact_cad_selections, apps/testlab/probe_selection.cpp), while the mesh-side selector honours normal_min_dot = -1 literally and keeps every in-box face (select_load_faces, same file). The traction is then rescaled onto the smaller CAD area, so the resultant stays correct while the distribution smears onto the walls. A thin slab is what prevents that; a normal filter cannot, because the filter is relative to the traction, which is transverse in those cases and can never select an axial annulus."
   },
   "family_recovery": {
     "method": "leave-one-out 1-nearest-neighbour in standardized descriptor space",

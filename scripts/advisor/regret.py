@@ -275,7 +275,7 @@ def gated_score_chooser(scores: dict[str, np.ndarray],
 
     The advisor already has a trained feasibility head, and today it is spent on
     a single 0.5 veto applied *after* the action is chosen
-    (``src/advisor/src/advisor.cpp:437``). That ordering cannot prevent a bad
+    (``Advisor::decide``, ``src/advisor/src/advisor_decide.cpp``). That ordering cannot prevent a bad
     pick, only refuse it wholesale and fall back to defaults. Measured, the
     ungated argmin selects an action that fails outright 22.7 % of the time at a
     median DOF budget, against 3.3 % for the trivial "go finer" rule -- so the

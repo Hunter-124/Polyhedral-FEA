@@ -3,29 +3,11 @@
 
 // Mirror-symmetric tetrahedral decomposition of a Cartesian lattice cell.
 //
-// The historical product split was single-orientation Kuhn/Freudenthal: six tets
-// sharing the same cube main diagonal (corner 0 to corner 6). That tiling is
-// translation invariant but has **no mirror symmetry** — every cell leans the
-// same way, so a mirror-symmetric part meshed on a mirror-symmetric lattice comes
-// out with a visibly slanted, asymmetric element pattern. Measured on
-// `cantilever.step` (a plain box) at h = 10 mm: 100% of lattice nodes had an
-// exact mirror partner about all three bbox mid-planes, yet **0%** of the 73326
-// tets did.
-//
-// The fix keeps Kuhn's six-tet cell and rotates its main diagonal per cell — see
-// `kLatticeTetsKuhn` for the conformity algebra that fixes the pattern.
-//
-// Rejected alternative, measured rather than argued: the alternating five-tet
-// ("checkerboard BCC") split, one regular central tet plus four corner tets,
-// picked by (i+j+k) parity. It is equally mirror-symmetric and much better shaped
-// (q = 1.0 / 0.5 against Kuhn's uniform 0.2722), and it did improve fidelity —
-// sphere q_min 0.0254 → 0.0637, plate-hole surface p99 4.8e-5 → 3.5e-6. But its
-// central tet is regular, so all six of its edges tie for longest and
-// longest-edge bisection loses its cell-local terminal edge: on a 4³ unit box,
-// doubling the level-1 cell count (16 → 32) produced a bit-identical 768-tet mesh,
-// i.e. any local mark refined the entire lattice. Element counts rose 2.4× on the
-// sphere at matched h for that reason. Grading locality is worth more than the
-// base shape quality, so the six-tet cell stays.
+// Kuhn's six-tet cell with its main diagonal rotated per cell, so a
+// mirror-symmetric part on a mirror-symmetric lattice gets a mirror-symmetric
+// tiling. The six-tet cell is kept over the better-shaped five-tet
+// ("checkerboard BCC") split because its unique longest edge keeps
+// longest-edge bisection cell-local (ADR-0036).
 
 #include <array>
 #include <cstddef>
@@ -52,8 +34,8 @@ namespace polymesh::mesh {
 /// sign, and with even cell counts the index parity negates it too, so the
 /// reflected cell receives exactly the reflected variant.
 ///
-/// Variant 0 is the legacy single-orientation table, so a cell whose index sums
-/// are both even reproduces the historical decomposition exactly.
+/// Variant 0 is the single-orientation table (main diagonal corner 0 to
+/// corner 6), used by cells whose index sums are both even.
 inline constexpr std::array<std::array<std::array<int, 4>, 6>, 4> kLatticeTetsKuhn{{
     // variant 0: main diagonal (0,0,0)-(1,1,1)
     {{{{0, 1, 2, 6}},

@@ -2,13 +2,14 @@
 #include "mesh/wall_project.hpp"
 #include "mesh/cell_validity.hpp"
 
+#include "topology_keys.hpp"
+
 #include <Eigen/Geometry>
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
 #include <set>
-#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -16,32 +17,6 @@
 
 namespace polymesh::mesh {
 namespace {
-
-struct FaceKey {
-    std::uint32_t a, b, c;
-    bool operator==(const FaceKey& o) const { return a == o.a && b == o.b && c == o.c; }
-};
-
-struct FaceHash {
-    std::size_t operator()(const FaceKey& f) const {
-        return (static_cast<std::size_t>(f.a) * 73856093u) ^
-               (static_cast<std::size_t>(f.b) * 19349663u) ^
-               (static_cast<std::size_t>(f.c) * 83492791u);
-    }
-};
-
-FaceKey sorted_face(std::uint32_t i, std::uint32_t j, std::uint32_t k) {
-    if (i > j) {
-        std::swap(i, j);
-    }
-    if (j > k) {
-        std::swap(j, k);
-    }
-    if (i > j) {
-        std::swap(i, j);
-    }
-    return FaceKey{i, j, k};
-}
 
 bool tet_bad(const std::vector<Eigen::Vector3d>& nodes,
              const std::array<std::uint32_t, 4>& t) {
@@ -88,18 +63,18 @@ WallProjectStats wall_tangential_project(const geom::CadModel& cad,
     };
 
     // Free-face map (count == 1) and undirected boundary graph.
-    std::unordered_map<FaceKey, int, FaceHash> fcounts;
-    std::unordered_map<FaceKey, std::array<std::uint32_t, 3>, FaceHash> forient;
-    const int quads[4][3] = {{0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}};
+    std::unordered_map<detail::TriKey, int, detail::TriKeyXorHash> fcounts;
+    std::unordered_map<detail::TriKey, std::array<std::uint32_t, 3>, detail::TriKeyXorHash>
+        forient;
     for (const auto& t : tets) {
-        for (const auto& f : quads) {
+        for (const auto& f : detail::kTetFaces) {
             const std::uint32_t i0 = t[static_cast<std::size_t>(f[0])];
             const std::uint32_t i1 = t[static_cast<std::size_t>(f[1])];
             const std::uint32_t i2 = t[static_cast<std::size_t>(f[2])];
             if (i0 >= nodes.size() || i1 >= nodes.size() || i2 >= nodes.size()) {
                 continue;
             }
-            const FaceKey sk = sorted_face(i0, i1, i2);
+            const detail::TriKey sk = detail::sorted_tri_key(i0, i1, i2);
             fcounts[sk]++;
             forient[sk] = {i0, i1, i2};
         }
@@ -124,19 +99,16 @@ WallProjectStats wall_tangential_project(const geom::CadModel& cad,
         };
         // fcounts iteration order decides the order neighbors are appended to
         // nbr[a]; the centroid below sums those neighbor positions in list order,
-        // so an STL-dependent bucket walk changes the relaxed position in the last
-        // FP bits and can flip a Jacobian-guard revert. Walk free faces in sorted
-        // key order (MSVC vs gcc disagreed on 5/24 corpus pairs, 2026-08-14).
-        std::vector<FaceKey> free_keys;
+        // so walk free faces in sorted key order to keep the FP accumulation
+        // (and every Jacobian-guard revert) independent of the STL bucket walk.
+        std::vector<detail::TriKey> free_keys;
         free_keys.reserve(fcounts.size() / 2 + 8);
         for (const auto& [key, count] : fcounts) {
             if (count == 1) {
                 free_keys.push_back(key);
             }
         }
-        std::sort(free_keys.begin(), free_keys.end(), [](const FaceKey& x, const FaceKey& y) {
-            return std::tie(x.a, x.b, x.c) < std::tie(y.a, y.b, y.c);
-        });
+        std::sort(free_keys.begin(), free_keys.end());
         for (const auto& key : free_keys) {
             const auto& tri = forient[key];
             add_edge(tri[0], tri[1]);

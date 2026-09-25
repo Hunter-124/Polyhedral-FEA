@@ -5,6 +5,7 @@
 #include "fea/nodal_mesh.hpp"
 #include "geom/tri_surface.hpp"
 #include "pipeline/scene.hpp"
+#include "support/box_model.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -20,21 +21,9 @@ using polymesh::pipeline::VolumeMesher;
 
 namespace {
 
-polymesh::geom::TriSurface unit_box_surface() {
-    polymesh::geom::TriSurface s;
-    s.vertices = {
-        {0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}, {0, 0, 1}, {1, 0, 1}, {1, 1, 1}, {0, 1, 1},
-    };
-    s.triangles = {
-        {0, 1, 2}, {0, 2, 3}, {4, 6, 5}, {4, 7, 6}, {0, 4, 5}, {0, 5, 1},
-        {1, 5, 6}, {1, 6, 2}, {2, 6, 7}, {2, 7, 3}, {3, 7, 4}, {3, 4, 0},
-    };
-    return s;
-}
-
 Model unit_box_model() {
     Model m;
-    m.surface = unit_box_surface();
+    m.surface = polymesh::testsupport::box_surface(1.0, 1.0, 1.0);
     m.bbox_min = {-0.05, -0.05, -0.05};
     m.bbox_max = {1.05, 1.05, 1.05};
     m.triangle_region.assign(12, 0);

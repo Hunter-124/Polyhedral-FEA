@@ -18,7 +18,8 @@
 namespace polymesh::testsupport {
 
 /// Welded surface of an axis-aligned box [0,lx]×[0,ly]×[0,lz] (12 triangles,
-/// outward winding). Face order: z-min, z-max, y-min, x-max, y-max, x-min.
+/// inward winding: every triangle normal points into the box).
+/// Face order: z-min, z-max, y-min, x-max, y-max, x-min.
 inline geom::TriSurface box_surface(double lx, double ly, double lz) {
     geom::TriSurface s;
     s.vertices = {

@@ -6,11 +6,13 @@
 // guardrailed mesh action.
 //
 // The model directory is the training package's output directory and must
-// contain `model.onnx`, `normalization.json`, `clamps.json`, and `ood.json`.
-// Those four files are the single source of truth shared with
-// scripts/advisor/ — nothing about the feature order, the clamp box, the
-// mesher vocabulary, or the out-of-distribution operating point is duplicated
-// as a C++ constant.
+// contain `model.onnx`, `normalization.json`, `clamps.json`, and `ood.json`;
+// `activation_layout.json` (network drawing) and `hosts/<host>.json`
+// (efficiency-objective calibration) are optional. The input column order and
+// width, clamp box, action vocabularies, candidate grid, and OOD operating
+// point come from those artifacts. The output head names and order, the
+// activation-tap names, and the `CaseFeatures` -> column mapping (`to_columns`)
+// are C++ constants that must match scripts/advisor/ (dataset.py, export_onnx.py).
 
 #include "pipeline/scene.hpp"
 
@@ -90,8 +92,7 @@ struct AdvisorDecision {
     /// distribution" or "the feasibility head vetoed".
     ///
     /// Treat the budget as a feasibility filter, not a guarantee: the dof head
-    /// is a learned predictor whose held-out MAE is ~0.5 in log10 (about a 3x
-    /// factor in linear dof), so a candidate just under the budget can land
+    /// is a learned predictor, so a candidate just under the budget can land
     /// over it in reality.
     bool budget_refusal = false;
 
@@ -137,24 +138,16 @@ using FeatureColumns = std::map<std::string, double>;
 
 // --- what the network did (ADR-0027 C8, deployed side) ----------------------
 //
-// The types below exist so a reader can be shown the network that actually ran,
-// and they are deliberately built out of the DEPLOYED graph's own tensors. The
-// activations are extra ONNX outputs of `model.onnx` -- taps on the trunk --
-// and not a C++ re-implementation of `scripts/advisor/model.py:trunk`. A second
-// forward-pass implementation is free to disagree with the first: a different
-// GELU approximation, a different embedding lookup rounding rule, or simply a
-// weight file that has moved on, and the drawing would then be a picture of a
-// network nobody deployed. Every value here is read off the same `Session::Run`
-// that produced the decision it explains.
+// Built from the DEPLOYED graph's own tensors: the activations are extra ONNX
+// outputs of `model.onnx` (taps on the trunk), read off the same `Session::Run`
+// that produced the decision they explain -- never a C++ re-implementation of
+// `scripts/advisor/model.py:trunk`, which would be free to disagree with it.
 //
 // The static half (layer sizes, labels, weight blocks) comes from
 // `activation_layout.json`, written next to `model.onnx` by the same export
 // call. When that sidecar is absent or disagrees with the graph,
-// `Advisor::has_activations()` is false and there is nothing to draw. That is
-// the intended degradation: a layout guessed from the graph alone would still
-// render circles and lines, and every edge in it would be attributed to the
-// wrong pair of neurons -- a confident, wrong picture, which is worse than no
-// picture at all.
+// `Advisor::has_activations()` is false and there is nothing to draw, rather
+// than a layout guessed from the graph with edges on the wrong neurons.
 
 /// One layer of the deployed graph, for drawing it.
 struct NetworkLayer {
@@ -237,19 +230,22 @@ class Advisor {
     Advisor(const Advisor&) = delete;
     Advisor& operator=(const Advisor&) = delete;
 
-    /// Two passes: the policy head is queried at the default action, then the
-    /// outcome heads are re-evaluated at the action the policy proposed, so
-    /// `failure_prob` scores the action actually being recommended. Action
-    /// columns present in `columns` are overwritten by the queried action.
+    /// Scores every `clamps.json:candidate_grid` action, drops candidates the
+    /// feasibility gate rejects, ranks the survivors by `rel_err_rel` (under
+    /// `kEfficiency` with a host calibration: lowest predicted cost within 5% of
+    /// the best accuracy), then re-scores the chosen action so the reported
+    /// predictions and `failure_prob` describe the action actually recommended.
+    /// An artifact without a candidate grid instead reads the policy head once
+    /// at the default action. Action columns present in `columns` are
+    /// overwritten by the queried action.
     ///
     /// The `max_dof` overloads add a budget to the gated-enumeration chooser:
     /// after the feasibility gate and before the accuracy ranking, every
     /// candidate whose dof head (`10^dof_log10`) exceeds `max_dof` is dropped.
-    /// `max_dof == 0` disables the budget and reproduces the historical
-    /// decision exactly. A budget that empties the candidate set is a refusal
-    /// (`budget_refusal`), never a relaxation: the advisor does not answer an
-    /// affordability question with an unaffordable action. The budget applies
-    /// to the enumerated candidate grid only; a legacy artifact without
+    /// `max_dof == 0` disables the budget. A budget that empties the candidate
+    /// set is a refusal (`budget_refusal`), never a relaxation: the advisor does
+    /// not answer an affordability question with an unaffordable action. The
+    /// budget applies to the enumerated candidate grid only; an artifact without
     /// `clamps.json:candidate_grid` has no enumeration to filter and ignores it.
     [[nodiscard]] AdvisorDecision recommend(const FeatureColumns& columns) const;
     [[nodiscard]] AdvisorDecision recommend(const FeatureColumns& columns,
@@ -275,19 +271,16 @@ class Advisor {
     /// True when `model.onnx` exports the trunk taps and `activation_layout.json`
     /// loaded, so `explain` can report what the network did.
     [[nodiscard]] bool has_activations() const;
-    /// The deployed network's shape and weights. Empty when `has_activations()`.
+    /// The deployed network's shape and weights. Empty unless `has_activations()`.
     [[nodiscard]] const NetworkLayout& layout() const;
     /// `recommend`, plus the internal state of every forward pass it ran.
     /// Throws `AdvisorError` when `has_activations()` is false.
     ///
-    /// Not the hot path, and deliberately a separate entry point: `recommend`
-    /// keeps requesting exactly the twelve contract outputs, so a campaign run
-    /// pays nothing for a facility only the drawing uses. `explain` asks the
-    /// same session for the three extra tap tensors as well, which is a
-    /// different `Run` -- graph optimization may fuse the trunk differently
-    /// when an intermediate is also an output -- so the numbers reported here
-    /// are the numbers of the pass `explain` itself ran, and every frame is
-    /// consistent with the decision returned beside it.
+    /// A separate entry point so `recommend` keeps requesting only the twelve
+    /// contract outputs. `explain` also requests the three tap tensors, which is
+    /// a different `Run` (graph optimization may fuse the trunk differently when
+    /// an intermediate is also an output), so every frame reports the pass
+    /// `explain` itself ran and is consistent with the decision returned beside it.
     [[nodiscard]] AdvisorExplanation explain(const FeatureColumns& columns,
                                              double max_dof = 0.0) const;
     [[nodiscard]] AdvisorExplanation explain(const pipeline::CaseFeatures& features,
@@ -307,13 +300,10 @@ class Advisor {
     [[nodiscard]] ActivationTaps taps(const FeatureColumns& columns) const;
 
   private:
-    /// The one chooser. `recommend` and `explain` are both this function; the
-    /// only difference is whether `trace` is non-null, in which case every
-    /// forward pass it runs also records its own internals. Duplicating the
-    /// ranking, the gate, the budget bookkeeping or the veto rules into a
-    /// second "explaining" copy would let the picture and the shipped decision
-    /// drift apart, which is the one failure this whole facility exists to
-    /// avoid.
+    /// The one chooser behind `recommend` and `explain`; a non-null `trace` only
+    /// records each forward pass's internals. A second "explaining" copy of the
+    /// ranking, gate, budget bookkeeping or veto rules could let the picture and
+    /// the shipped decision drift apart.
     [[nodiscard]] AdvisorDecision decide(const FeatureColumns& columns, double max_dof,
                                          AdvisorExplanation* trace) const;
 

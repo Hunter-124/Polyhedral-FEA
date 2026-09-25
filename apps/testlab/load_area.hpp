@@ -1,45 +1,21 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-// The load-area policy for polymesh_testlab, kept header-only so unit tests can
-// exercise it without linking the campaign runner.
+// Load-area policy for polymesh_testlab, header-only so unit tests can exercise
+// it without linking the campaign runner.
 //
-// WHY THIS EXISTS. The original check was worse than no check. It compared the
-// selected load-face area against an expected area ONLY when the case supplied
-// select.expected_area, and otherwise left load_area_rel_err at its 0.0 default
-// with load_area_ok true. A zero relative error reads as a perfect match, so
-// meshes missing 14-66% of their loaded face recorded a flawless area check and
-// passed the health gate. Because a case traction is a pressure, those meshes
-// applied a proportionally smaller force: they solved the WRONG problem while
-// being labelled healthy. Exactly the two families with curved loaded surfaces
-// (sphere_box, stepped_shaft) are the ones that omit expected_area, so the
-// blindness landed precisely where it did the most damage.
+// `cad_rule_area` is the area obtained by applying the case's OWN selection rule
+// (load box + |n.t_hat| > normal_min_dot) to the exact CAD tessellation: the
+// mesh-independent continuum limit of that rule. It is
+//   1. the load target: the traction is rescaled by
+//      cad_rule_area / mesh_selected_area, so the applied RESULTANT is correct
+//      on any mesh; and
+//   2. the basis of the reported mesh fidelity deficit.
 //
-// WHAT REPLACED IT. `cad_rule_area` is the area of the loaded region computed by
-// applying the case's OWN selection rule (load box + |n.t_hat| > normal_min_dot)
-// to the exact CAD tessellation rather than to the candidate mesh. It is the
-// continuum limit of the same rule, so it is mesh-independent and directly
-// comparable with what the mesh managed to select. It is used twice:
-//
-//   1. As the load target. The traction is rescaled by
-//      cad_rule_area / mesh_selected_area so the applied RESULTANT is correct by
-//      construction on any mesh. This generalises the pre-existing exact-CAD
-//      fallback from "the selection came back empty" to "the selected area
-//      deviates", reusing machinery that was already there.
-//   2. As the reported fidelity measure. The residual deficit is recorded on
-//      every row so analysis can filter on it.
-//
-// WHY A DEFICIT IS NOT A HEALTH FAILURE. Once the resultant is rescaled, a large
-// deficit no longer means the run applied the wrong force; it means the traction
-// DISTRIBUTION is coarse. The campaign probes are predominantly far-field (tip
-// deflection, strain energy, and an SCF at a hole remote from the load), where
-// Saint-Venant makes a corrected resultant with an imperfect distribution a
-// legitimate measurement. So those rows stay usable and stay flagged. Fixing the
-// distribution needs more facets on curved loaded surfaces -- a sizing policy,
-// deliberately not folded in here.
-//
-// An area that cannot be established at all is reported as `unverified` with an
-// EMPTY rel_err. Never 0.0, which reads as a pass; never treated as verified.
+// After the rescale a deficit means a coarse traction DISTRIBUTION, not a wrong
+// force, so it is reported and not a health failure (the campaign probes are
+// predominantly far-field; Saint-Venant). An area that cannot be established is
+// `unverified` with an EMPTY rel_err -- never 0.0, which reads as a pass.
 
 #include <Eigen/Core>
 
@@ -53,17 +29,10 @@ namespace polymesh::testlab {
 /// resultant is genuinely wrong (i.e. nothing could be rescaled onto).
 inline constexpr double kLoadAreaTol = 0.05;
 
-/// Does the case's own load rule keep a face with this outward normal?
-///
-/// THE ONE definition of the normal test, called by both sides that need it: the
-/// mesh selector in select_load_faces and the CAD-tessellation rule area in
-/// with_exact_cad_selections. They used to implement it separately and drifted --
-/// the CAD side silently substituted the selector slab's thin axis at min_dot 0.7
-/// whenever a case asked for `normal_min_dot = -1`, so it measured a 0.7-filtered
-/// cap while the mesh loaded every in-box face. cad_rule_area then rescaled the
-/// traction onto a region the case never asked for: on sphere_box_s2_c1 the two
-/// sides disagreed by 130.7% and the resultant was scaled down 2.3x. One function
-/// makes that class of divergence structurally impossible.
+/// Does the case's own load rule keep a face with this outward normal? THE ONE
+/// definition of the normal test, shared by the mesh selector (select_load_faces)
+/// and the CAD-tessellation rule area (with_exact_cad_selections) so they cannot
+/// drift apart.
 ///
 /// `normal_min_dot <= -1` means "no normal filter, load every in-box face", and a
 /// null traction has no direction to filter on, so both keep everything. Otherwise
@@ -94,22 +63,14 @@ inline bool load_rule_filters(double normal_min_dot, const Eigen::Vector3d& trac
 }
 
 /// Drift tolerance between an authored `expected_area` and `cad_rule_area`. Both
-/// describe the SAME loaded region by construction -- one hand-authored from the
-/// generator's formula, one measured from the CAD by the case's own rule -- and
-/// across the 48 corpus cases that author a value they agree to 4.6e-10. This
-/// threshold is therefore seven orders of magnitude looser than observed
-/// agreement: it fires only on real drift, never on numerical noise.
+/// describe the SAME loaded region by construction, so the threshold sits orders
+/// of magnitude above their observed agreement: it fires only on real drift.
 inline constexpr double kAuthoredAreaTol = 0.01;
 
-/// Mesh-INDEPENDENT cross-check of the case definition against the CAD.
-///
-/// Rescaling the traction onto `cad_rule_area` would otherwise quietly retire the
-/// authored `expected_area` guard, since the authored value stops being consulted
-/// once a rule area exists. Comparing the two keeps that guard alive in the only
-/// form that still means something: a disagreement here is a case-definition or
-/// geometry bug (the STEP changed, or the authored formula is wrong), NOT a mesh
-/// quality problem. It is reported separately from the mesh deficit so the two are
-/// never conflated -- they have different causes and different remedies.
+/// Mesh-INDEPENDENT cross-check of the case definition against the CAD. It keeps
+/// the authored `expected_area` guard alive once the traction is rescaled onto
+/// `cad_rule_area`. A disagreement is a case-definition or geometry bug, NOT mesh
+/// quality, so it is reported separately from the mesh deficit.
 struct AuthoredAreaCheck {
     /// True only when both an authored and a CAD-rule area were available.
     bool checked = false;

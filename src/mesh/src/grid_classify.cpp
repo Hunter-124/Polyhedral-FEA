@@ -364,7 +364,7 @@ classify_cells_feature_aware(const geom::TriSurface& surface, const Eigen::Vecto
 
     FeatureAwareClassification out;
     // Even cell counts (opt-in) put every bbox mid-plane on a lattice plane, as
-    // the alternating 5-tet split in mesh/lattice_split.hpp requires.
+    // the alternating Kuhn split in mesh/lattice_split.hpp requires.
     out.grid = even_cells
                    ? make_bbox_grid_even(bbox_min, bbox_max, h, /*min_cells=*/2, max_cells)
                    : make_bbox_grid(bbox_min, bbox_max, h, max_cells);

@@ -2,7 +2,7 @@
 #pragma once
 
 // Linear elastostatics solve: assemble, apply optional homogeneous multi-point
-// constraints, partition Dirichlet DOFs, then sparse direct LDLT or iterative CG.
+// constraints, partition Dirichlet DOFs, then the sparse direct ladder or iterative CG.
 
 #include "fea/assembly.hpp"
 #include "fea/constraints.hpp"
@@ -73,11 +73,8 @@ struct SolveOptions {
     ///
     /// The selection is deliberately cell-type independent: what makes a system
     /// hard for CG is its conditioning, and every mesher this project ships
-    /// produces systems bad enough that preconditioned CG loses to a sparse
-    /// Cholesky factorisation by two orders of magnitude at these sizes
-    /// (measured: 11040-DOF plate-with-hole hex, 179 s CG vs 0.9 s LDLT;
-    /// 233,820-DOF curved tet10 plate, hours of CG that never reached 1e-8 vs
-    /// 19.6 s of supernodal factorization).
+    /// produces systems on which preconditioned CG loses to sparse Cholesky by
+    /// orders of magnitude at these sizes (measurements: docs/solver-core.md §6.1).
     Eigen::Index cg_threshold = kDefaultCgThreshold;
 
     /// CG true relative residual tolerance: return only when
@@ -178,7 +175,7 @@ symmetric_diagonal_scaling(const Eigen::SparseMatrix<double>& spd);
                                               const SolveOptions& options = {});
 
 /// Apply the normal DOF threshold plus the effective memory cap. Explicit
-/// kDirect/kCG requests remain authoritative; only kAuto may downgrade LDLT to
+/// kDirect/kCG requests remain authoritative; only kAuto may downgrade direct to
 /// CG when the direct footprint does not fit and CG does.
 [[nodiscard]] SolveDecision decide_solve_method(Eigen::Index nfree,
                                                 const SolveOptions& options,
@@ -192,8 +189,9 @@ symmetric_diagonal_scaling(const Eigen::SparseMatrix<double>& spd);
 /// also be a slave. Throws FeaError if the reduced system is singular
 /// (insufficient constraints leave rigid-body modes) or CG fails.
 ///
-/// Default `options` use sparse LDLT for nfree ≤ `cg_threshold` (50000) and
-/// bounded CG above that; the choice never depends on element type.
+/// Default `options` use the sparse direct ladder for nfree ≤ `cg_threshold`
+/// (see `kDefaultCgThreshold`) and bounded CG above that, subject to the memory
+/// budget in `decide_solve_method`; the choice never depends on element type.
 /// Force `SolveMethod::kDirect` for exact patch-test path; force `kCG` to
 /// exercise the iterative solver on small systems.
 [[nodiscard]] LinearSolveResult

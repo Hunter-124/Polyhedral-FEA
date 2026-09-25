@@ -2,19 +2,14 @@
 #pragma once
 
 // Durable artifact writing for polymesh_testlab (result.json / quality.json /
-// checkpoint.json). Kept header-only so unit tests can exercise the two
-// contracts that matter without linking the full campaign runner:
+// checkpoint.json), header-only so unit tests can exercise its two contracts
+// without linking the campaign runner:
 //
-//   1. atomic_write() survives a TRANSIENT reader holding the destination open.
-//      On Windows fs::rename is MoveFileExW(REPLACE_EXISTING), which fails with
-//      a sharing violation while any other process has the target open. Our own
-//      campaign monitoring -- peer agents reading result.json to compute
-//      progress statistics -- was enough to make this fire in production.
-//   2. write_run_json() NEVER throws. It is called from run_one()'s exception
-//      handlers, where a throw would escape run_one entirely, past its own
-//      catch-all, and abort the whole campaign process via main() -- losing the
-//      status row that the handler exists to produce. An artifact is optional
-//      and regenerable; the summary row is neither.
+//   1. atomic_write() survives a TRANSIENT reader holding the destination open
+//      (on Windows fs::rename fails with a sharing violation meanwhile).
+//   2. write_run_json() NEVER throws: it runs inside run_one()'s exception
+//      handlers, where a throw would abort the campaign and lose the status row.
+//      An artifact is optional and regenerable; the summary row is neither.
 
 #include <nlohmann/json.hpp>
 

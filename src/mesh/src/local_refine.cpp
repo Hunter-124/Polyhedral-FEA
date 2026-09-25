@@ -5,6 +5,8 @@
 #include "mesh/poly_mesh.hpp"
 #include "mesh/surface_project.hpp"
 
+#include "topology_keys.hpp"
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -18,22 +20,7 @@
 namespace polymesh::mesh {
 namespace {
 
-using EdgeKey = std::pair<std::uint32_t, std::uint32_t>;
-
-struct EdgeHash {
-    std::size_t operator()(const EdgeKey& e) const noexcept {
-        // Splitmix-style mix of endpoint indices.
-        std::size_t x = static_cast<std::size_t>(e.first);
-        x ^= static_cast<std::size_t>(e.second) + 0x9e3779b97f4a7c15ULL + (x << 6) + (x >> 2);
-        return x;
-    }
-};
-
-EdgeKey make_edge(std::uint32_t a, std::uint32_t b) {
-    return a < b ? EdgeKey{a, b} : EdgeKey{b, a};
-}
-
-bool tet_has_edge(const std::array<std::uint32_t, 4>& tet, EdgeKey e) {
+bool tet_has_edge(const std::array<std::uint32_t, 4>& tet, detail::EdgeKey e) {
     bool has_a = false;
     bool has_b = false;
     for (const auto v : tet) {
@@ -52,9 +39,9 @@ bool tet_has_edge(const std::array<std::uint32_t, 4>& tet, EdgeKey e) {
 /// A lattice tet has several equal-longest edges — the central tet of the
 /// alternating 5-tet split (mesh/lattice_split.hpp) is regular, so all six tie —
 /// which means the tie-break, not the lengths, decides the whole refinement
-/// pattern. Node indices do not mirror, so breaking ties on them handed
-/// mirror-image tets non-mirror-image edges and left graded meshes visibly
-/// asymmetric on symmetric parts (measured: 22–76% of tets had a mirror image).
+/// pattern. Node indices do not mirror, so breaking ties on them hands
+/// mirror-image tets non-mirror-image edges and leaves graded meshes
+/// asymmetric on symmetric parts.
 ///
 /// Folding every candidate into the octant of its own tet's centroid removes the
 /// reflection: a tet and its mirror image fold to the *same* point set, so the
@@ -84,8 +71,9 @@ MirrorFold make_mirror_fold(const std::vector<Eigen::Vector3d>& nodes) {
 
 /// Longest edge; ties → the edge that is lexicographically smallest in the
 /// tet's own folded octant frame (see `MirrorFold`).
-EdgeKey longest_edge(const std::array<std::uint32_t, 4>& tet,
-                     const std::vector<Eigen::Vector3d>& nodes, const MirrorFold& fold) {
+detail::EdgeKey longest_edge(const std::array<std::uint32_t, 4>& tet,
+                             const std::vector<Eigen::Vector3d>& nodes,
+                             const MirrorFold& fold) {
     const Eigen::Vector3d centroid =
         0.25 * (nodes[tet[0]] + nodes[tet[1]] + nodes[tet[2]] + nodes[tet[3]]);
     Eigen::Vector3d sign;
@@ -93,7 +81,7 @@ EdgeKey longest_edge(const std::array<std::uint32_t, 4>& tet,
         sign[d] = centroid[d] >= fold.center[d] ? 1.0 : -1.0;
     }
     using EdgeCoords = std::array<Eigen::Vector3d, 2>;
-    const auto folded_edge = [&](const EdgeKey& e) {
+    const auto folded_edge = [&](const detail::EdgeKey& e) {
         EdgeCoords p{(nodes[e.first] - fold.center).cwiseProduct(sign),
                      (nodes[e.second] - fold.center).cwiseProduct(sign)};
         for (int d = 0; d < 3; ++d) {
@@ -121,13 +109,14 @@ EdgeKey longest_edge(const std::array<std::uint32_t, 4>& tet,
         return false;
     };
 
-    EdgeKey best = make_edge(tet[0], tet[1]);
+    detail::EdgeKey best = detail::sorted_edge_key(tet[0], tet[1]);
     double best_len2 = (nodes[tet[0]] - nodes[tet[1]]).squaredNorm();
     EdgeCoords best_key = folded_edge(best);
     for (int i = 0; i < 4; ++i) {
         for (int j = i + 1; j < 4; ++j) {
-            const EdgeKey e =
-                make_edge(tet[static_cast<std::size_t>(i)], tet[static_cast<std::size_t>(j)]);
+            const detail::EdgeKey e =
+                detail::sorted_edge_key(tet[static_cast<std::size_t>(i)],
+                                        tet[static_cast<std::size_t>(j)]);
             const double len2 = (nodes[e.first] - nodes[e.second]).squaredNorm();
             // Relative slack: mirrored edges have equal lengths only to a few
             // ulp, and an absolute epsilon on squared lengths would rank one of
@@ -163,7 +152,7 @@ std::array<std::uint32_t, 4> orient_positive(const std::array<std::uint32_t, 4>&
 
 /// Bisect tet along edge e at midpoint node `mid`.
 std::array<std::array<std::uint32_t, 4>, 2>
-bisect_tet(const std::array<std::uint32_t, 4>& tet, EdgeKey e, std::uint32_t mid,
+bisect_tet(const std::array<std::uint32_t, 4>& tet, detail::EdgeKey e, std::uint32_t mid,
            const std::vector<Eigen::Vector3d>& nodes) {
     std::uint32_t c = 0;
     std::uint32_t d = 0;
@@ -200,13 +189,13 @@ bisect_tet(const std::array<std::uint32_t, 4>& tet, EdgeKey e, std::uint32_t mid
     return children;
 }
 
-void tet_edges(const std::array<std::uint32_t, 4>& t, EdgeKey out[6]) {
-    out[0] = make_edge(t[0], t[1]);
-    out[1] = make_edge(t[0], t[2]);
-    out[2] = make_edge(t[0], t[3]);
-    out[3] = make_edge(t[1], t[2]);
-    out[4] = make_edge(t[1], t[3]);
-    out[5] = make_edge(t[2], t[3]);
+void tet_edges(const std::array<std::uint32_t, 4>& t, detail::EdgeKey out[6]) {
+    out[0] = detail::sorted_edge_key(t[0], t[1]);
+    out[1] = detail::sorted_edge_key(t[0], t[2]);
+    out[2] = detail::sorted_edge_key(t[0], t[3]);
+    out[3] = detail::sorted_edge_key(t[1], t[2]);
+    out[4] = detail::sorted_edge_key(t[1], t[3]);
+    out[5] = detail::sorted_edge_key(t[2], t[3]);
 }
 
 void erase_tet_from_edge(std::vector<std::size_t>& list, std::size_t ti) {
@@ -218,32 +207,6 @@ void erase_tet_from_edge(std::vector<std::size_t>& list, std::size_t ti) {
         }
     }
 }
-
-// Sorted free-surface triangle key (unpaired tet faces).
-using FreeFaceKey = std::array<std::uint32_t, 3>;
-
-FreeFaceKey make_free_face(std::uint32_t a, std::uint32_t b, std::uint32_t c) {
-    FreeFaceKey f{{a, b, c}};
-    if (f[0] > f[1]) {
-        std::swap(f[0], f[1]);
-    }
-    if (f[1] > f[2]) {
-        std::swap(f[1], f[2]);
-    }
-    if (f[0] > f[1]) {
-        std::swap(f[0], f[1]);
-    }
-    return f;
-}
-
-struct FreeFaceHash {
-    std::size_t operator()(const FreeFaceKey& f) const noexcept {
-        std::size_t h = f[0];
-        h ^= static_cast<std::size_t>(f[1]) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
-        h ^= static_cast<std::size_t>(f[2]) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
-        return h;
-    }
-};
 
 } // namespace
 
@@ -310,20 +273,20 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
     // stay live; we only ever append child1 — no kill-without-replace path).
     std::vector<char> alive(tets.size(), 1);
 
-    // Edge → incident live tet indices. O(degree) updates per bisection instead of
-    // O(n) full-mesh scans (old path rebuilt the entire tet list every split).
-    std::unordered_map<EdgeKey, std::vector<std::size_t>, EdgeHash> edge_tets;
+    // Edge → incident live tet indices: O(degree) updates per bisection.
+    std::unordered_map<detail::EdgeKey, std::vector<std::size_t>, detail::EdgeKeyMixHash>
+        edge_tets;
     edge_tets.reserve(tets.size() * 3);
 
     auto link_tet = [&](std::size_t ti) {
-        EdgeKey es[6];
+        detail::EdgeKey es[6];
         tet_edges(tets[ti], es);
         for (const auto& e : es) {
             edge_tets[e].push_back(ti);
         }
     };
     auto unlink_tet = [&](std::size_t ti) {
-        EdgeKey es[6];
+        detail::EdgeKey es[6];
         tet_edges(tets[ti], es);
         for (const auto& e : es) {
             auto it = edge_tets.find(e);
@@ -344,18 +307,17 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
 
     // Free-surface faces (count==1) for optional surface-aware midpoints.
     // Projecting only free edges avoids collapsing interior chords near thin walls.
-    std::unordered_set<FreeFaceKey, FreeFaceHash> free_faces;
-    std::unordered_set<EdgeKey, EdgeHash> free_edges;
+    std::unordered_set<detail::TriKey, detail::TriKeyMixHash> free_faces;
+    std::unordered_set<detail::EdgeKey, detail::EdgeKeyMixHash> free_edges;
     if (surface != nullptr && !surface->triangles.empty()) {
-        std::unordered_map<FreeFaceKey, int, FreeFaceHash> face_count;
+        std::unordered_map<detail::TriKey, int, detail::TriKeyMixHash> face_count;
         face_count.reserve(tets.size() * 2);
-        static constexpr int kFaces[4][3] = {{0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}};
         for (const auto& t : tets) {
             fill_progress_poll();
-            for (const auto& fv : kFaces) {
-                ++face_count[make_free_face(t[static_cast<std::size_t>(fv[0])],
-                                            t[static_cast<std::size_t>(fv[1])],
-                                            t[static_cast<std::size_t>(fv[2])])];
+            for (const auto& fv : detail::kTetFaces) {
+                ++face_count[detail::sorted_tri_key(t[static_cast<std::size_t>(fv[0])],
+                                                    t[static_cast<std::size_t>(fv[1])],
+                                                    t[static_cast<std::size_t>(fv[2])])];
             }
         }
         free_faces.reserve(face_count.size() / 2 + 8);
@@ -366,15 +328,15 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
                 continue;
             }
             free_faces.insert(fk);
-            free_edges.insert(make_edge(fk[0], fk[1]));
-            free_edges.insert(make_edge(fk[1], fk[2]));
-            free_edges.insert(make_edge(fk[0], fk[2]));
+            free_edges.insert(detail::sorted_edge_key(fk[0], fk[1]));
+            free_edges.insert(detail::sorted_edge_key(fk[1], fk[2]));
+            free_edges.insert(detail::sorted_edge_key(fk[0], fk[2]));
         }
     }
 
-    std::unordered_map<EdgeKey, std::uint32_t, EdgeHash> midpoints;
+    std::unordered_map<detail::EdgeKey, std::uint32_t, detail::EdgeKeyMixHash> midpoints;
     midpoints.reserve(remaining.size() * 4 + 16);
-    auto midpoint_of = [&](EdgeKey e) -> std::uint32_t {
+    auto midpoint_of = [&](detail::EdgeKey e) -> std::uint32_t {
         const auto [it, inserted] =
             midpoints.try_emplace(e, static_cast<std::uint32_t>(nodes.size()));
         if (inserted) {
@@ -395,9 +357,9 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
             // Split free faces that used this edge: (a,b,c) → (a,m,c)+(m,b,c).
             if (on_free) {
                 free_edges.erase(e);
-                free_edges.insert(make_edge(e.first, mid_id));
-                free_edges.insert(make_edge(e.second, mid_id));
-                std::vector<FreeFaceKey> hit;
+                free_edges.insert(detail::sorted_edge_key(e.first, mid_id));
+                free_edges.insert(detail::sorted_edge_key(e.second, mid_id));
+                std::vector<detail::TriKey> hit;
                 for (const auto& fk : free_faces) {
                     fill_progress_poll();
                     const bool has_a =
@@ -417,9 +379,9 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
                     if (c == e.first || c == e.second) {
                         c = fk[2];
                     }
-                    free_faces.insert(make_free_face(e.first, mid_id, c));
-                    free_faces.insert(make_free_face(mid_id, e.second, c));
-                    free_edges.insert(make_edge(mid_id, c));
+                    free_faces.insert(detail::sorted_tri_key(e.first, mid_id, c));
+                    free_faces.insert(detail::sorted_tri_key(mid_id, e.second, c));
+                    free_edges.insert(detail::sorted_edge_key(mid_id, c));
                 }
             }
         }
@@ -450,8 +412,8 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
 
         // LEPP walk to a terminal edge (edge whose all live sharers have it as longest).
         std::size_t walk = seed;
-        EdgeKey edge = longest_edge(tets[walk], nodes, fold);
-        std::unordered_map<EdgeKey, int, EdgeHash> seen_edges;
+        detail::EdgeKey edge = longest_edge(tets[walk], nodes, fold);
+        std::unordered_map<detail::EdgeKey, int, detail::EdgeKeyMixHash> seen_edges;
         seen_edges.reserve(64);
         for (int lepp = 0; lepp < 4096; ++lepp) {
             fill_progress_poll();
@@ -463,8 +425,7 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
                 // ALL of its live sharers is still face-conforming: conformity
                 // depends on every owner of that edge receiving the same
                 // midpoint, not on that edge being longest in every owner.
-                // Progressing here is the general Rivara fallback; aborting
-                // discarded an otherwise valid dense wishbone solve.
+                // Progressing here is the general Rivara fallback.
                 break;
             }
             bool moved = false;
@@ -480,7 +441,7 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
                 if (!tet_has_edge(tets[n], edge)) {
                     continue; // stale index safety
                 }
-                const EdgeKey en = longest_edge(tets[n], nodes, fold);
+                const detail::EdgeKey en = longest_edge(tets[n], nodes, fold);
                 if (en != edge) {
                     walk = n;
                     edge = en;
@@ -562,29 +523,16 @@ TetFillOutput local_refine_tets(std::vector<Eigen::Vector3d> nodes,
             (projected - nodes[edge.first]).squaredNorm() <= projected_child_limit2 &&
             (projected - nodes[edge.second]).squaredNorm() <= projected_child_limit2;
 
-        // ── Two independent gates on the surface projection ──────────────────
-        // (1) A global surface closest-point can land arbitrarily near one
-        //     endpoint when the chord crosses a hole. Such a "midpoint" lets an
-        //     LEPP keep splitting an unchanged longest edge forever, so keep the
-        //     projection only when both child edges contract; the Euclidean
-        //     midpoint halves the parent and therefore restores the propagation
-        //     progress invariant.
-        // (2) CURVATURE. `|projected - chord|` *is* the chord sag of the surface
-        //     the two endpoints sit on — for an arc of curvature k over a chord
-        //     of length L it is L^2*k/8 — measured rather than estimated from a
-        //     normal field. Following it is only worth a shape risk while that
-        //     sag is small against the CHILD size (L/2) the split is creating.
-        //     Past that the closest point is no longer describing the curve this
-        //     edge belongs to: across a narrow clearance the global closest
-        //     point can cross onto another body and drag the new node through
-        //     the wall, folding a child. Under the gate the node goes on the
-        //     chord and is left for
-        //     the caller's boundary-aware smoothing pass, which slides it back
-        //     out onto the face one node at a time — an accept/reject decision
-        //     per node instead of per wave.
-        //     Off (`max_sag_fraction` 0) for the Cartesian fills: their parent
-        //     edges are a whole lattice cell, so the sag on a coarse curved wall
-        //     is legitimately large and their own snap passes own the residual.
+        // Two independent gates on the surface projection:
+        // (1) Both child edges must contract: a closest point near one endpoint
+        //     (chord across a hole) would let LEPP split the same edge forever;
+        //     the Euclidean midpoint restores the progress invariant.
+        // (2) Curvature: `|projected - chord|` is the measured chord sag (L^2*k/8
+        //     for an arc). Past `max_sag_fraction` of the child size (L/2) the
+        //     closest point has left this edge's curve (e.g. across a clearance)
+        //     and can fold a child, so the node stays on the chord for the
+        //     caller's per-node smoothing pass. Off (0) for the Cartesian fills,
+        //     whose own snap passes own the residual (see local_refine.hpp).
         const double sag_limit = max_sag_fraction > 0.0
                                      ? max_sag_fraction * 0.5 * std::sqrt(parent_len2)
                                      : std::numeric_limits<double>::infinity();

@@ -32,6 +32,7 @@ add_executable(polymesh_tests
     test_l_domain.cpp
     test_msh.cpp
     test_gui_pipeline.cpp
+    test_solve_job_lifecycle.cpp
     test_product_mesh_tier1.cpp
     test_tet_fill.cpp
     test_local_refine.cpp
@@ -43,10 +44,15 @@ add_executable(polymesh_tests
     test_vtu.cpp
     test_vem.cpp
     test_fe_vem_assembly.cpp
+    test_poly_boundary_extraction.cpp
     test_element_tendency.cpp
     test_refinement_plan.cpp
     test_geometry_fidelity.cpp
     test_brep_fidelity.cpp
+    test_geometry_volume_policy.cpp
+    test_curved_pipeline_geometry.cpp
+    test_mesher_boundary_gates.cpp
+    test_geometry_display_surface.cpp
     test_quality.cpp
     test_cell_quality.cpp
     test_hex_vem_pipeline.cpp
@@ -84,8 +90,12 @@ add_executable(polymesh_tests
 
     support/structured_mesh.cpp
     support/mms.cpp
+    support/solve_job_setup.cpp
 )
-# Headless pipeline is tested via libpipeline — no GUI / display required.
+# Layering contract (CONTRIBUTING.md §2): tests link the product libraries, the
+# ImGui-free app-private library gui_testlab_data, and include the header-only
+# testlab helpers in apps/testlab (load_area.hpp, probe_util.hpp,
+# run_artifacts.hpp). Never app entry points or UI code; no display required.
 target_include_directories(polymesh_tests PRIVATE .
     ${CMAKE_SOURCE_DIR}/apps/testlab
 )
@@ -95,9 +105,8 @@ target_link_libraries(polymesh_tests
             Catch2::Catch2WithMain polymesh_warnings
 )
 
-
-# gui_testlab_data is built under apps/gui when POLYMESH_WITH_GUI=ON. When GUI
-# is off, compile the same unit into the test binary so selfcheck still runs.
+# gui_testlab_data is defined in apps/gui, which only exists with
+# POLYMESH_WITH_GUI=ON; otherwise compile its single ImGui-free unit here.
 if(TARGET gui_testlab_data)
     target_link_libraries(polymesh_tests PRIVATE gui_testlab_data)
 else()
@@ -106,10 +115,16 @@ else()
     target_link_libraries(polymesh_tests PRIVATE nlohmann_json::nlohmann_json)
 endif()
 
-# Advisor inference needs the ONNX Runtime module; the test is only meaningful
-# in a build that has it.
+# Advisor inference needs the ONNX Runtime module; these tests are only
+# meaningful in a build that has it.
 if(TARGET polymesh::advisor)
-    target_sources(polymesh_tests PRIVATE test_advisor_inference.cpp)
+    target_sources(polymesh_tests PRIVATE
+        test_advisor_config.cpp
+        test_advisor_inference.cpp
+        test_advisor_explain.cpp
+        test_advisor_guardrails.cpp
+        support/advisor_fixture.cpp
+    )
     target_link_libraries(polymesh_tests PRIVATE polymesh::advisor nlohmann_json::nlohmann_json)
     polymesh_stage_onnxruntime(polymesh_tests)
 endif()

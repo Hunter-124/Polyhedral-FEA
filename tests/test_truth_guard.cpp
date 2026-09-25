@@ -1,74 +1,34 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
-// bench/reference/corpus/*.json is the truth every campaign is scored against, and
-// most of it is now INDEPENDENT of this engine: 64 references come from Gmsh
-// meshing the STEP plus CalculiX solving it, 8 are closed-form. That independence
-// is the whole value of the corpus.
-//
-// Two scripts write those files (scripts/advisor/promote_truth.py and
-// scripts/gen_primitive_corpus.py). promote_truth.py used to protect a metric only
-// when its source was exactly "analytic" -- a denylist keyed on the sources that
-// existed when it was written. Every externally sourced metric was therefore one
-// command away from being silently replaced by this repo's own overkill-mesher
-// value, with its measured tolerance reset to the promoted default. These cases pin
-// the inverted rule: an ALLOWLIST of sources we generated ourselves, so anything
-// third-party is protected the moment it lands, without editing either script.
+// bench/reference/corpus/*.json is the truth every campaign is scored against,
+// and most of it is independent of this engine (Gmsh + CalculiX, or closed
+// form). scripts/truth_guard.py lets promotion overwrite only an ALLOWLIST of
+// self-generated sources, so any third-party source is protected on arrival.
+
+#include "support/python_test.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <cstdlib>
-#include <filesystem>
-#include <fstream>
-#include <sstream>
 #include <string>
 
 namespace {
 
-namespace fs = std::filesystem;
-
-const char* python_exe() {
-#if defined(_WIN32)
-    if (std::system("python -c \"import sys\" >nul 2>&1") == 0) {
-        return "python";
-    }
-    return "python3";
-#else
-    return "python3";
-#endif
-}
-
 /// Runs `body` with scripts/truth_guard.py imported as `guard` and
-/// scripts/advisor/promote_truth.py as `pt`. A failed assert inside the payload
-/// exits non-zero and surfaces its output here.
+/// scripts/advisor/promote_truth.py as `pt`.
 void run_python(const std::string& name, const std::string& body) {
-    const fs::path script = fs::temp_directory_path() / (name + ".py");
-    const fs::path out = fs::temp_directory_path() / (name + ".txt");
-    {
-        std::ofstream stream(script);
-        REQUIRE(stream.good());
-        stream << "import importlib.util, sys\n"
-                  "from pathlib import Path\n"
-                  "sys.path.insert(0, str(Path('scripts').resolve()))\n"
-                  "def _load(alias, path):\n"
-                  "    spec = importlib.util.spec_from_file_location(\n"
-                  "        alias, Path(path).resolve())\n"
-                  "    mod = importlib.util.module_from_spec(spec)\n"
-                  "    spec.loader.exec_module(mod)\n"
-                  "    return mod\n"
-                  "guard = _load('truth_guard', 'scripts/truth_guard.py')\n"
-                  "pt = _load('promote_truth', 'scripts/advisor/promote_truth.py')\n"
-               << body;
-    }
-    // Working directory is the repo root (catch_discover_tests WORKING_DIRECTORY).
-    const std::string cmd = std::string(python_exe()) + " \"" + script.string() + "\" > \"" +
-                            out.string() + "\" 2>&1";
-    const int rc = std::system(cmd.c_str());
-    if (rc != 0) {
-        std::ifstream in(out);
-        std::ostringstream text;
-        text << in.rdbuf();
-        FAIL("python payload failed:\n" << text.str());
-    }
+    std::string source = "import importlib.util, sys\n"
+                         "from pathlib import Path\n"
+                         "sys.path.insert(0, str(Path('scripts').resolve()))\n"
+                         "def _load(alias, path):\n"
+                         "    spec = importlib.util.spec_from_file_location(\n"
+                         "        alias, Path(path).resolve())\n"
+                         "    mod = importlib.util.module_from_spec(spec)\n"
+                         "    spec.loader.exec_module(mod)\n"
+                         "    return mod\n"
+                         "guard = _load('truth_guard', 'scripts/truth_guard.py')\n"
+                         "pt = _load('promote_truth', 'scripts/advisor/promote_truth.py')\n";
+    source += body;
+    polymesh::testsupport::run_python_script(name, source);
 }
 
 } // namespace
@@ -96,10 +56,9 @@ print("ok")
 }
 
 TEST_CASE("truth guard: promotion refuses to overwrite an external reference") {
-    // THE REGRESSION. A reference sourced from the external chain, with a fresh
-    // overkill row measuring a different value, must come back untouched: same
-    // value, same measured tol, same source. If this fails, promote_truth.py has
-    // gone back to silently replacing independent truth with our own answer.
+    // A reference sourced from the external chain, with a fresh overkill row
+    // measuring a different value, must come back untouched: same value, same
+    // measured tol, same source.
     run_python("polymesh_guard_refuses_external", R"PY(
 from pathlib import Path
 

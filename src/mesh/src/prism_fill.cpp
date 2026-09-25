@@ -17,20 +17,6 @@
 namespace polymesh::mesh {
 namespace {
 
-double tet_signed_volume_impl(const Eigen::Vector3d& a, const Eigen::Vector3d& b,
-                              const Eigen::Vector3d& c, const Eigen::Vector3d& d) {
-    return (b - a).dot((c - a).cross(d - a)) / 6.0;
-}
-
-// Linear prism 0,1,2 bottom / 3,4,5 top → three tets (positive when base is CCW
-// from the top and extrusion is outward from the base plane).
-double prism_signed_volume_impl(const Eigen::Vector3d& p0, const Eigen::Vector3d& p1,
-                                const Eigen::Vector3d& p2, const Eigen::Vector3d& p3,
-                                const Eigen::Vector3d& p4, const Eigen::Vector3d& p5) {
-    return tet_signed_volume_impl(p0, p1, p2, p4) + tet_signed_volume_impl(p0, p2, p3, p4) +
-           tet_signed_volume_impl(p2, p3, p4, p5);
-}
-
 int pick_sweep_axis(const Eigen::Vector3d& extent) {
     // Longest side; ties prefer z (2), then y (1), then x (0).
     int axis = 2;
@@ -47,10 +33,14 @@ int pick_sweep_axis(const Eigen::Vector3d& extent) {
 
 } // namespace
 
+// Linear prism 0,1,2 bottom / 3,4,5 top → three tets (positive when base is CCW
+// from the top and extrusion is outward from the base plane).
 double prism_signed_volume(const Eigen::Vector3d& p0, const Eigen::Vector3d& p1,
                            const Eigen::Vector3d& p2, const Eigen::Vector3d& p3,
                            const Eigen::Vector3d& p4, const Eigen::Vector3d& p5) {
-    return prism_signed_volume_impl(p0, p1, p2, p3, p4, p5);
+    return validity::tet_signed_volume(p0, p1, p2, p4) +
+           validity::tet_signed_volume(p0, p2, p3, p4) +
+           validity::tet_signed_volume(p2, p3, p4, p5);
 }
 
 void check_prism_fill_geometry(const PrismFillOutput& out, double min_volume) {
@@ -67,8 +57,8 @@ void check_prism_fill_geometry(const PrismFillOutput& out, double min_volume) {
             }
         }
         const double v =
-            prism_signed_volume_impl(out.nodes[n[0]], out.nodes[n[1]], out.nodes[n[2]],
-                                     out.nodes[n[3]], out.nodes[n[4]], out.nodes[n[5]]);
+            prism_signed_volume(out.nodes[n[0]], out.nodes[n[1]], out.nodes[n[2]],
+                                out.nodes[n[3]], out.nodes[n[4]], out.nodes[n[5]]);
         if (v <= min_volume) {
             throw ValidityError(std::format(
                 "check_prism_fill_geometry: prism {} non-positive volume {:.3e}", e, v));
@@ -150,9 +140,9 @@ PrismFillOutput prism_fill_surface(const geom::TriSurface& surface,
                 }};
 
                 auto push_prism = [&](std::array<std::uint32_t, 6> n) {
-                    double v = prism_signed_volume_impl(out.nodes[n[0]], out.nodes[n[1]],
-                                                        out.nodes[n[2]], out.nodes[n[3]],
-                                                        out.nodes[n[4]], out.nodes[n[5]]);
+                    double v =
+                        prism_signed_volume(out.nodes[n[0]], out.nodes[n[1]], out.nodes[n[2]],
+                                            out.nodes[n[3]], out.nodes[n[4]], out.nodes[n[5]]);
                     if (v < 0.0) {
                         // Flip base and top triangle orientation.
                         std::swap(n[1], n[2]);
@@ -221,18 +211,17 @@ PrismFillOutput prism_fill_surface(const geom::TriSurface& surface,
         // Hard validity: everything `check_prism_fill_geometry` and the assembly
         // Gauss loop insist on. Per-corner detJ alone is not enough — the summed
         // volume can already be negative while all six corner dets are (barely)
-        // positive, and that cell used to slip past the snap offender set.
+        // positive.
         const auto prism_sound = [&](const std::array<Eigen::Vector3d, 6>& p) {
             return validity::prism_min_corner_jacobian(p) > 0.0 &&
-                   prism_signed_volume_impl(p[0], p[1], p[2], p[3], p[4], p[5]) > vol_eps;
+                   prism_signed_volume(p[0], p[1], p[2], p[3], p[4], p[5]) > vol_eps;
         };
 
         // Node -> incident prisms, so the snap line-searches ONE node against
         // its own star. Without it `snap_boundary_nodes` falls back to a
         // 0.75/0.5/0.25 ladder and, when none of the three is valid, retreats
         // the node all the way to its raw lattice site — a spike on any curved
-        // wall. Measured on plate_hole at h=3 mm before this: 33 near-bore
-        // boundary nodes off the exact CAD by up to 1.99 mm (0.67 h).
+        // wall.
         std::unordered_map<std::uint32_t, std::vector<std::size_t>> incident;
         incident.reserve(out.nodes.size());
         for (std::size_t pi = 0; pi < out.prisms.size(); ++pi) {
@@ -285,8 +274,8 @@ PrismFillOutput prism_fill_surface(const geom::TriSurface& surface,
         // NOTE: no re-orientation pass here. Swapping 1↔2 / 4↔5 mirrors a
         // *lattice* prism exactly, but for a snapped, warped one it re-cuts the
         // three-tet decomposition and can turn a marginally negative cell into a
-        // badly inverted one (icecream_cone h=0.008: v=-1.1e-9 → -8.8e-8). A
-        // negative volume after snapping means folded, not mis-labelled.
+        // badly inverted one. A negative volume after snapping means folded, not
+        // mis-labelled.
         std::size_t n_relaxed = 0;
         for (;;) {
             bool changed = false;

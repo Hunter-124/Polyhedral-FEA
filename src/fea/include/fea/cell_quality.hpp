@@ -17,8 +17,7 @@
 //
 // Measures:
 //  - kTet4 / kTet10 — normalized volume/edge³ aspect 6√2·V/l_max³ over the four
-//    corner nodes (`mesh::tet4_aspect_quality`); 1 for the regular tet. Same
-//    number tet meshes always reported, so tet diagnostics do not move.
+//    corner nodes (`mesh::tet4_aspect_quality`); 1 for the regular tet.
 //  - kHex8 / kHex20 / kPrism6 / kPyramid5 — the **worse of two** measures, both
 //    normalized so the regular cell of the type scores 1. A cell must be sound
 //    in its angles *and* in its thickness; neither term subsumes the other.
@@ -37,12 +36,9 @@
 //       cubed, over the value the regular cell attains (cube 1, equilateral
 //       prism √3/4, all-edges-equal pyramid 1/(3√2)). Term 1 structurally
 //       cannot see this: every corner of a 1×1×1e-4 pancake hex is a perfect
-//       right angle, so the corner measure alone rated that cell exactly 1.0 —
-//       a fabricated perfect score for a cell whose FE map is conditioned 1e-4,
-//       and precisely the sliver the stress-sample quality floor exists to
-//       exclude. Measured 2026-08-08: pancake hex 1.0 → 3.4e-4, 45°-sheared
-//       cube 0.707 → 0.678, 1:2 box 1.0 → 0.844, cube/equilateral prism/regular
-//       pyramid unchanged at 1.0.
+//       right angle, so the corner measure alone rates it 1.0 although its FE
+//       map is conditioned 1e-4 — precisely the sliver the stress-sample
+//       quality floor exists to exclude.
 //  - kPolyVem — a polyhedral cell has no parametric map, so quality is the
 //    minimum face-corner quality (`mesh::polygon_corner_quality`) over the
 //    cell's boundary faces: 1 only when every face is a regular polygon, → 0 for
@@ -84,11 +80,8 @@ CellQualityStats summarize_cell_quality(const NodalMesh& mesh);
 /// the stiffness rule, so the number is insensitive to the solver's
 /// integration shortcut.
 ///
-/// This is the ONE definition of "how much solid is this cell". The fill-volume
-/// guard and the advisor's per-element samples both come through here. They did
-/// not, once: `stress.cpp` used a bare |det J| at a single reference point,
-/// which drops the reference-domain measure and reports 0.125x the true volume
-/// of a hex and ~0.09x that of a pyramid.
+/// The canonical "how much solid is this cell": the fill-volume guard and the
+/// advisor's per-element samples both come through here.
 double element_volume(const NodalMesh& mesh, const NodalElement& element);
 
 /// Sum of `element_volume` over every cell, in m³.

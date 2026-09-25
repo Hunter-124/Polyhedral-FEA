@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #pragma once
 
-// Deterministic tet4 fill of a closed triangle surface (P2 v1 mesher).
-// Cartesian grid over the bbox; each inside voxel is split into 6 tets along
-// the space diagonal so shared faces match. Boundary is stair-cased; optional
-// limited multi-pass surface snap (≤0.75 h) with Jacobian safety (unsnap if a
-// tet would invert). NOT constrained Delaunay / frontal — see ADR-0015. Fully
+// Deterministic tet4 fill of a closed triangle surface.
+// Cartesian grid over the bbox; each inside voxel is split into 6 Kuhn tets
+// (mesh/lattice_split.hpp) so shared faces match. Boundary is stair-cased;
+// optional multi-pass surface snap gated on tet validity and the shared shape
+// floor. NOT constrained Delaunay / frontal — see ADR-0015. Fully
 // deterministic for (surface, h, snap flag).
 //
 // Lives in mesh/ (not fea/) so library deps stay acyclic: mesh → geom only.
@@ -83,7 +83,7 @@ BuriedFaceStats count_buried_free_tet_faces(std::span<const Eigen::Vector3d> nod
 /// volume — the same material is inside another cell too — so the remedy is
 /// deletion (shell-guarded, then re-snap), not node motion: pulling nodes at a
 /// near-tangent crease piles both sheets onto the crease and multiplies the
-/// crossings (measured: 299 → 706 buried on sphere_box_s0 at h = 3.6 mm).
+/// crossings.
 std::vector<std::uint32_t>
 buried_free_tet_face_owners(std::span<const Eigen::Vector3d> nodes,
                             std::span<const std::array<std::uint32_t, 4>> tets, double h);

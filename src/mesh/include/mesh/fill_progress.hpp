@@ -12,6 +12,11 @@ namespace polymesh::mesh {
 using FillProgressTets = std::vector<std::array<std::uint32_t, 4>>;
 
 class FillProgressScope;
+/// Innermost live observer for the calling thread, or null (the disabled path).
+/// Installed/restored only by `FillProgressScope` (LIFO). A thread that never
+/// installed a scope (e.g. an OpenMP worker) sees null, so its polls are no-ops.
+/// The callback runs on the installing thread with this pointer cleared (no
+/// re-entrant polling).
 inline thread_local FillProgressScope* active_fill_progress = nullptr;
 
 /// Observe synchronous fill helpers on this thread. Nested scopes restore their

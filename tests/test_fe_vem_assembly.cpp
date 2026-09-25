@@ -2,9 +2,9 @@
 // Gate for DAG node fe-vem-assembly (ADR-0019 §1):
 // Mixed FE tet/hex + VEM PolyCells assemble into ONE global K; constant-strain
 // (linear displacement) patch test is exact across the FE/VEM interface.
+// Poly boundary extraction cases live in test_poly_boundary_extraction.cpp.
 
 #include "fea/assembly.hpp"
-#include "fea/boundary_faces.hpp"
 #include "fea/solve.hpp"
 #include "fea/vem.hpp"
 #include "geom/features.hpp"
@@ -64,7 +64,9 @@ Eigen::Matrix3d sample_strain_gradient() {
     return g;
 }
 
-polymesh::geom::TriSurface unit_box_surface() {
+/// Unit cube with every triangle wound outward. Not testsupport::box_surface:
+/// that helper's winding and face order differ, and these fills consume both.
+polymesh::geom::TriSurface outward_unit_box_surface() {
     polymesh::geom::TriSurface s;
     s.vertices = {
         {0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}, {0, 0, 1}, {1, 0, 1}, {1, 1, 1}, {0, 1, 1},
@@ -107,198 +109,6 @@ TEST_CASE("FE/VEM interface patch test: checkerboard hex FE + hex-as-poly VEM") 
     REQUIRE(max_err < 1e-9);
 }
 
-TEST_CASE("poly boundary extraction cancels shared faces before triangulation") {
-    NodalMesh mesh;
-    constexpr double kSqrt3Over2 = 0.86602540378443864676;
-    const std::array<Eigen::Vector2d, 6> ring{{
-        {1.0, 0.0},
-        {0.5, kSqrt3Over2},
-        {-0.5, kSqrt3Over2},
-        {-1.0, 0.0},
-        {-0.5, -kSqrt3Over2},
-        {0.5, -kSqrt3Over2},
-    }};
-    for (double z : {0.0, 1.0, 2.0}) {
-        for (const auto& xy : ring) {
-            mesh.nodes.emplace_back(xy.x(), xy.y(), z);
-        }
-    }
-
-    auto prism = [](std::uint32_t lower) {
-        std::vector<std::uint32_t> nodes;
-        nodes.reserve(12);
-        for (std::uint32_t i = 0; i < 12; ++i) {
-            nodes.push_back(lower + i);
-        }
-        std::vector<std::vector<std::uint32_t>> faces;
-        faces.push_back({5, 4, 3, 2, 1, 0});
-        faces.push_back({6, 7, 8, 9, 10, 11});
-        for (std::uint32_t i = 0; i < 6; ++i) {
-            const std::uint32_t next = (i + 1) % 6;
-            faces.push_back({i, next, next + 6, i + 6});
-        }
-        return NodalElement{ElementType::kPolyVem, std::move(nodes), std::move(faces)};
-    };
-    mesh.elements.push_back(prism(0));
-    mesh.elements.push_back(prism(6));
-    REQUIRE_NOTHROW(mesh.check_validity());
-
-    const auto boundary = extract_boundary_faces(mesh);
-    REQUIRE(boundary.size() == 20);
-    for (const auto& face : boundary) {
-        bool lies_on_shared_plane = true;
-        for (const std::uint32_t node : face) {
-            REQUIRE(node < mesh.nodes.size());
-            lies_on_shared_plane =
-                lies_on_shared_plane && std::abs(mesh.nodes[node].z() - 1.0) < 1e-12;
-        }
-        CHECK_FALSE(lies_on_shared_plane);
-    }
-}
-
-TEST_CASE("poly boundary extraction cross-cancels an n-gon and its triangle fan") {
-    NodalMesh mesh;
-    constexpr double kSqrt3Over2 = 0.86602540378443864676;
-    mesh.nodes = {
-        {1.0, 0.0, 0.0},  {0.5, kSqrt3Over2, 0.0},   {-0.5, kSqrt3Over2, 0.0},
-        {-1.0, 0.0, 0.0}, {-0.5, -kSqrt3Over2, 0.0}, {0.5, -kSqrt3Over2, 0.0},
-    };
-    const std::vector<std::uint32_t> nodes{0, 1, 2, 3, 4, 5};
-    mesh.elements.emplace_back(ElementType::kPolyVem, nodes,
-                               std::vector<std::vector<std::uint32_t>>{{0, 1, 2, 3, 4, 5}});
-    mesh.elements.emplace_back(
-        ElementType::kPolyVem, nodes,
-        std::vector<std::vector<std::uint32_t>>{{2, 1, 0}, {2, 0, 5}, {2, 5, 4}, {2, 4, 3}});
-    CHECK(extract_boundary_faces(mesh).empty());
-    CHECK(extract_boundary_polys(mesh).empty());
-}
-
-TEST_CASE("poly boundary extraction cross-cancels a quad and two triangles") {
-    NodalMesh mesh;
-    mesh.nodes = {
-        {0.0, 0.0, 0.0},
-        {1.0, 0.0, 0.0},
-        {1.0, 1.0, 0.0},
-        {0.0, 1.0, 0.0},
-    };
-    const std::vector<std::uint32_t> nodes{0, 1, 2, 3};
-    mesh.elements.emplace_back(ElementType::kPolyVem, nodes,
-                               std::vector<std::vector<std::uint32_t>>{{0, 1, 2, 3}});
-    mesh.elements.emplace_back(ElementType::kPolyVem, nodes,
-                               std::vector<std::vector<std::uint32_t>>{{0, 2, 1}, {0, 3, 2}});
-
-    CHECK(extract_boundary_faces(mesh).empty());
-    CHECK(extract_boundary_polys(mesh).empty());
-}
-
-TEST_CASE("poly boundary extraction suppresses non-manifold exact owner groups") {
-    NodalMesh mesh;
-    mesh.nodes = {
-        {0.0, 0.0, 0.0},
-        {1.0, 0.0, 0.0},
-        {0.0, 1.0, 0.0},
-    };
-    for (int owner = 0; owner < 3; ++owner) {
-        mesh.elements.emplace_back(ElementType::kPolyVem, std::vector<std::uint32_t>{0, 1, 2},
-                                   std::vector<std::vector<std::uint32_t>>{{0, 1, 2}});
-    }
-
-    CHECK(extract_boundary_faces(mesh).empty());
-    CHECK(extract_boundary_polys(mesh).empty());
-}
-
-TEST_CASE("poly boundary extraction atomizes collinear split boundary edges") {
-    NodalMesh mesh;
-    mesh.nodes = {
-        {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {2.0, 0.0, 0.0}, {2.0, 1.0, 0.0}, {0.0, 1.0, 0.0},
-    };
-    const std::vector<std::uint32_t> nodes{0, 1, 2, 3, 4};
-    mesh.elements.emplace_back(ElementType::kPolyVem, nodes,
-                               std::vector<std::vector<std::uint32_t>>{{0, 1, 2, 3, 4}});
-    mesh.elements.emplace_back(ElementType::kPolyVem, nodes,
-                               std::vector<std::vector<std::uint32_t>>{{0, 4, 3, 2}});
-
-    CHECK(extract_boundary_faces(mesh).empty());
-    CHECK(extract_boundary_polys(mesh).empty());
-}
-
-TEST_CASE("poly boundary extraction cross-cancels a split coarse triangle") {
-    NodalMesh mesh;
-    mesh.nodes = {
-        {0.0, 0.0, 0.0},
-        {1.0, 0.0, 0.0},
-        {2.0, 0.0, 0.0},
-        {0.0, 1.0, 0.0},
-    };
-    const std::vector<std::uint32_t> nodes{0, 1, 2, 3};
-    mesh.elements.emplace_back(ElementType::kPolyVem, nodes,
-                               std::vector<std::vector<std::uint32_t>>{{0, 2, 3}});
-    mesh.elements.emplace_back(ElementType::kPolyVem, nodes,
-                               std::vector<std::vector<std::uint32_t>>{{0, 3, 1}, {1, 3, 2}});
-
-    CHECK(extract_boundary_faces(mesh).empty());
-    CHECK(extract_boundary_polys(mesh).empty());
-}
-
-TEST_CASE("poly boundary extraction rejects a folded square partition") {
-    NodalMesh mesh;
-    mesh.nodes = {
-        {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {1.0, 1.0, 0.0}, {0.0, 1.0, 0.0}, {0.5, 0.5, 0.0},
-    };
-    const std::vector<std::uint32_t> nodes{0, 1, 2, 3, 4};
-    mesh.elements.emplace_back(ElementType::kPolyVem, nodes,
-                               std::vector<std::vector<std::uint32_t>>{{0, 1, 2, 3}});
-    mesh.elements.emplace_back(
-        ElementType::kPolyVem, nodes,
-        std::vector<std::vector<std::uint32_t>>{{0, 1, 4}, {1, 4, 2}, {2, 4, 3}, {3, 4, 0}});
-
-    CHECK(extract_boundary_faces(mesh).size() == 5);
-    CHECK(extract_boundary_polys(mesh).size() == 5);
-}
-
-TEST_CASE(
-    "poly boundary extraction sanitizes adjacent duplicates and rejects repeated nodes") {
-    NodalMesh mesh;
-    mesh.nodes = {
-        {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {1.5, 0.5, 0.0}, {0.5, 1.0, 0.0}, {-0.5, 0.5, 0.0},
-    };
-    mesh.elements.emplace_back(
-        ElementType::kPolyVem, std::vector<std::uint32_t>{0, 1, 2, 3, 4},
-        std::vector<std::vector<std::uint32_t>>{{0, 1, 2, 2, 3, 4}, {0, 1, 2, 1, 3, 4}});
-    const auto boundary = extract_boundary_faces(mesh);
-    REQUIRE(boundary.size() == 3);
-    for (const auto& tri : boundary) {
-        CHECK(tri[0] != tri[1]);
-        CHECK(tri[1] != tri[2]);
-        CHECK(tri[0] != tri[2]);
-    }
-}
-
-TEST_CASE("poly boundary triangulation skips a distinct collinear mid-edge corner") {
-    NodalMesh mesh;
-    mesh.nodes = {
-        {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {2.0, 0.0, 0.0}, {2.0, 1.0, 0.0}, {0.0, 1.0, 0.0},
-    };
-    mesh.elements.emplace_back(ElementType::kPolyVem,
-                               std::vector<std::uint32_t>{0, 1, 2, 3, 4},
-                               std::vector<std::vector<std::uint32_t>>{{0, 1, 2, 3, 4}});
-
-    const auto boundary = extract_boundary_faces(mesh);
-    REQUIRE(boundary.size() == 3);
-    double area_sum = 0.0;
-    for (const auto& tri : boundary) {
-        REQUIRE(tri[0] != tri[1]);
-        REQUIRE(tri[1] != tri[2]);
-        REQUIRE(tri[0] != tri[2]);
-        const Eigen::Vector3d ab = mesh.nodes[tri[1]] - mesh.nodes[tri[0]];
-        const Eigen::Vector3d ac = mesh.nodes[tri[2]] - mesh.nodes[tri[0]];
-        const double area = 0.5 * ab.cross(ac).norm();
-        CHECK(area > 0.0);
-        area_sum += area;
-    }
-    CHECK(area_sum == Catch::Approx(2.0).margin(1e-12));
-}
-
 TEST_CASE("FE/VEM interface patch test: tet FE + hex VEM sharing a mid-plane") {
     // 2×1×1 hex grid: left cell Kuhn-split to tet4 FE, right cell as VEM poly.
     // Shared face at x=0.5 carries identical vertex DOFs → H¹ conformity.
@@ -325,7 +135,7 @@ TEST_CASE("FE/VEM interface patch test: tet FE + hex VEM sharing a mid-plane") {
 }
 
 TEST_CASE("hybrid native-poly fill emits unsplit VEM transitions (no fan apex)") {
-    const auto s = unit_box_surface();
+    const auto s = outward_unit_box_surface();
     // Seed ball sized to leave a transition ring (too small stamps nothing on this
     // lattice; too large floods every cell to fine).
     const std::vector<Eigen::Vector3d> seeds{{0.5, 0.5, 0.5}};
@@ -367,7 +177,7 @@ TEST_CASE("hybrid native-poly fill emits unsplit VEM transitions (no fan apex)")
 
 TEST_CASE("pipeline hybrid-VEM volume mesh is mixed hex FE + poly VEM") {
     pipeline::Model m;
-    m.surface = unit_box_surface();
+    m.surface = outward_unit_box_surface();
     m.bbox_min = {-0.05, -0.05, -0.05};
     m.bbox_max = {1.05, 1.05, 1.05};
     m.triangle_region.assign(12, 0);

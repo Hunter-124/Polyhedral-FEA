@@ -7,6 +7,8 @@
 #include "mesh/surface_project.hpp"
 #include "mesh/wall_project.hpp"
 
+#include "topology_keys.hpp"
+
 #include <Eigen/Geometry>
 
 #include <algorithm>
@@ -21,53 +23,27 @@
 namespace polymesh::mesh {
 namespace {
 
-/// Collect free-boundary node indices from unpaired tet faces.
+/// Collect free-boundary node indices from unpaired tet faces, sorted ascending
+/// by node id (the order is part of the contract: sharp snapping and the
+/// Hausdorff sample set consume it, so it must not depend on the STL).
 std::vector<std::uint32_t> boundary_nodes(const TetFillOutput& mesh) {
-    struct FaceKey {
-        std::uint32_t a, b, c;
-        bool operator==(const FaceKey& o) const { return a == o.a && b == o.b && c == o.c; }
-    };
-    struct FaceHash {
-        std::size_t operator()(const FaceKey& f) const {
-            return (static_cast<std::size_t>(f.a) * 73856093u) ^
-                   (static_cast<std::size_t>(f.b) * 19349663u) ^
-                   (static_cast<std::size_t>(f.c) * 83492791u);
-        }
-    };
-    std::unordered_map<FaceKey, int, FaceHash> faces;
-    auto sorted = [](std::uint32_t i, std::uint32_t j, std::uint32_t k) {
-        if (i > j) {
-            std::swap(i, j);
-        }
-        if (j > k) {
-            std::swap(j, k);
-        }
-        if (i > j) {
-            std::swap(i, j);
-        }
-        return FaceKey{i, j, k};
-    };
-    const int quads[4][3] = {{0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}};
+    std::unordered_map<detail::TriKey, int, detail::TriKeyXorHash> faces;
     for (const auto& t : mesh.tets) {
-        for (const auto& f : quads) {
-            faces[sorted(t[static_cast<std::size_t>(f[0])], t[static_cast<std::size_t>(f[1])],
-                         t[static_cast<std::size_t>(f[2])])]++;
+        for (const auto& f : detail::kTetFaces) {
+            faces[detail::sorted_tri_key(t[static_cast<std::size_t>(f[0])],
+                                         t[static_cast<std::size_t>(f[1])],
+                                         t[static_cast<std::size_t>(f[2])])]++;
         }
     }
     std::unordered_set<std::uint32_t> bset;
     for (const auto& [key, count] : faces) {
         if (count == 1) {
-            bset.insert(key.a);
-            bset.insert(key.b);
-            bset.insert(key.c);
+            bset.insert(key[0]);
+            bset.insert(key[1]);
+            bset.insert(key[2]);
         }
     }
     std::vector<std::uint32_t> out(bset.begin(), bset.end());
-    // bset iteration order is the libstdc++/MSVC bucket layout, so the free-
-    // boundary node list this function hands to sharp-edge snapping and to the
-    // Hausdorff sample set was STL-dependent. Sort ascending by node id: the
-    // list order is this function's contract, and any consumer that ever
-    // becomes order-sensitive must not silently fork the mesh per toolchain.
     std::sort(out.begin(), out.end());
     return out;
 }
@@ -120,7 +96,7 @@ bool far_enough_protect(const Eigen::Vector3d& p, double r_p,
 /// Min squared distance from p to samples whose edge id ≠ exclude_edge_id.
 /// Samples within `skip_endpoint_eps2` of either current-edge endpoint are
 /// ignored so shared vertices on incident edges do not force lfs→0 at corners
-/// (sampled approximation; true medial-axis lfs deferred).
+/// (sampled lfs approximation, not a medial-axis computation).
 double min_dist2_other_edges(const Eigen::Vector3d& p, std::uint32_t exclude_edge_id,
                              const std::vector<Eigen::Vector3d>& samples,
                              const std::vector<std::uint32_t>& sample_edge_ids,
@@ -559,9 +535,8 @@ varyhedron_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
                 const Eigen::Vector3d& p = e.samples[i];
                 acc += (p - prev).norm();
                 const double r_here = protect_radius_at(p, e);
-                // Documented choice: spacing = max(0.35h, min(0.75h, r)).
-                // Since r ≤ 0.45h this is max(0.35h, r) — denser only when
-                // lfs forces r below 0.35h is impossible; floor at 0.35h.
+                // Spacing = max(0.35h, min(0.75h, r)); since r ≤ 0.45h this
+                // is max(0.35h, r) — never denser than 0.35h.
                 const double target = std::max(0.35 * hh, std::min(0.75 * hh, r_here));
                 if (acc >= target) {
                     try_add(p);
@@ -576,7 +551,7 @@ varyhedron_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         }
     }
 
-    // --- Interior packing seeds (V6c packing engine; dual deferred to V11) ---
+    // --- Interior packing seeds (volume bubbles) ---
     // Jittered lattice on interior cells of a coarse classify grid, then bubble
     // relax so volume bubbles clear CAD edge protecting balls.
     {
@@ -707,7 +682,7 @@ varyhedron_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         seed_band = 1.8 * std::max(h, 1e-12);
     }
 
-    // --- Scaffold: multi-level graded tet (dual-poly clustering → V11) ---
+    // --- Scaffold: multi-level graded tet on edge + volume seeds ---
     BoundaryFit fit;
     fit.cad = cad;
     fit.topo = topo;
@@ -721,13 +696,9 @@ varyhedron_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
     out.n_tets = out.mesh.tets.size();
 
     // --- Hard feature pin: CAD vertices and sharp edge curves ---
-    //
-    // This replaces the old 35 %-weighted "edge attraction" blend. A blend can
-    // only ever move a node PART of the way onto a crease, so a 90° edge came
-    // out as a chamfer of the remaining 65 % — visible in every showcase
-    // render of a curved-to-planar transition. The pin puts the node on the
-    // exact OCC curve or not at all, and the same shape-floor gate that
-    // guarded the blend guards each pin (ADR-0035).
+    // A pinned node lands exactly on the OCC curve/vertex or stays put (a
+    // partial blend would leave creases chamfered); each pin is guarded by the
+    // cell shape-floor gate (ADR-0035).
     if (topo != nullptr && !topo->edges.empty()) {
         const auto bnodes = boundary_nodes(out.mesh);
         auto tet_bad = [&](const std::array<std::uint32_t, 4>& t) {
@@ -776,80 +747,43 @@ varyhedron_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
         out.edge_profile_hausdorff_max =
             geom::edge_profile_hausdorff_filtered(*topo, poly, /*sharp_only=*/true);
 
-        // Unique undirected edges of unpaired tet faces (true mesh segments).
-        struct EdgeKey {
-            std::uint32_t a, b;
-            bool operator==(const EdgeKey& o) const { return a == o.a && b == o.b; }
-        };
-        struct EdgeHash {
-            std::size_t operator()(const EdgeKey& e) const {
-                return (static_cast<std::size_t>(e.a) * 73856093u) ^
-                       (static_cast<std::size_t>(e.b) * 19349663u);
-            }
-        };
-        auto canon = [](std::uint32_t i, std::uint32_t j) {
-            return (i < j) ? EdgeKey{i, j} : EdgeKey{j, i};
-        };
-        // Re-walk free faces (count==1) to collect boundary edges.
+        // Unique undirected edges of unpaired (count==1) tet faces — the true
+        // mesh segments. Hashers are fixed: segs follows the bedges bucket walk.
         {
-            struct FaceKey {
-                std::uint32_t a, b, c;
-                bool operator==(const FaceKey& o) const {
-                    return a == o.a && b == o.b && c == o.c;
-                }
-            };
-            struct FaceHash {
-                std::size_t operator()(const FaceKey& f) const {
-                    return (static_cast<std::size_t>(f.a) * 73856093u) ^
-                           (static_cast<std::size_t>(f.b) * 19349663u) ^
-                           (static_cast<std::size_t>(f.c) * 83492791u);
-                }
-            };
-            std::unordered_map<FaceKey, int, FaceHash> fcounts;
-            auto sorted_f = [](std::uint32_t i, std::uint32_t j, std::uint32_t k) {
-                if (i > j) {
-                    std::swap(i, j);
-                }
-                if (j > k) {
-                    std::swap(j, k);
-                }
-                if (i > j) {
-                    std::swap(i, j);
-                }
-                return FaceKey{i, j, k};
-            };
+            std::unordered_map<detail::TriKey, int, detail::TriKeyXorHash> fcounts;
             // Store one oriented triple per face key for edge extraction.
-            std::unordered_map<FaceKey, std::array<std::uint32_t, 3>, FaceHash> forient;
-            const int quads[4][3] = {{0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}};
+            std::unordered_map<detail::TriKey, std::array<std::uint32_t, 3>,
+                               detail::TriKeyXorHash>
+                forient;
             for (const auto& t : out.mesh.tets) {
-                for (const auto& f : quads) {
+                for (const auto& f : detail::kTetFaces) {
                     const std::uint32_t i0 = t[static_cast<std::size_t>(f[0])];
                     const std::uint32_t i1 = t[static_cast<std::size_t>(f[1])];
                     const std::uint32_t i2 = t[static_cast<std::size_t>(f[2])];
-                    const FaceKey sk = sorted_f(i0, i1, i2);
+                    const detail::TriKey sk = detail::sorted_tri_key(i0, i1, i2);
                     fcounts[sk]++;
                     forient[sk] = {i0, i1, i2};
                 }
             }
-            std::unordered_set<EdgeKey, EdgeHash> bedges;
+            std::unordered_set<detail::EdgeKey, detail::EdgeKeyXorHash> bedges;
             for (const auto& [key, count] : fcounts) {
                 if (count != 1) {
                     continue;
                 }
                 const auto& tri = forient[key];
-                bedges.insert(canon(tri[0], tri[1]));
-                bedges.insert(canon(tri[1], tri[2]));
-                bedges.insert(canon(tri[2], tri[0]));
+                bedges.insert(detail::sorted_edge_key(tri[0], tri[1]));
+                bedges.insert(detail::sorted_edge_key(tri[1], tri[2]));
+                bedges.insert(detail::sorted_edge_key(tri[2], tri[0]));
             }
             const double near_band = 0.75 * std::max(h, 1e-12);
             std::vector<geom::MeshEdgeSegment> segs;
             segs.reserve(bedges.size());
-            for (const EdgeKey& ek : bedges) {
-                if (ek.a >= out.mesh.nodes.size() || ek.b >= out.mesh.nodes.size()) {
+            for (const detail::EdgeKey& ek : bedges) {
+                if (ek.first >= out.mesh.nodes.size() || ek.second >= out.mesh.nodes.size()) {
                     continue;
                 }
-                const Eigen::Vector3d& pa = out.mesh.nodes[ek.a];
-                const Eigen::Vector3d& pb = out.mesh.nodes[ek.b];
+                const Eigen::Vector3d& pa = out.mesh.nodes[ek.first];
+                const Eigen::Vector3d& pb = out.mesh.nodes[ek.second];
                 // Keep only segments with both endpoints near a sharp CAD edge.
                 const auto qa = geom::closest_edge(*topo, pa, /*sharp_only=*/true);
                 const auto qb = geom::closest_edge(*topo, pb, /*sharp_only=*/true);
@@ -881,9 +815,9 @@ varyhedron_fill_surface(const geom::TriSurface& surface, const Eigen::Vector3d& 
             (char_len > 0.0) ? (out.edge_profile_hausdorff_max / char_len) : 0.0;
     }
 
-    // --- M10 wall free-slide: tangential smooth + OCC surface re-project ---
-    // After scaffold + sharp snap. Wall nodes = free boundary far from sharp
-    // CAD edges. Requires live CadModel; STL-only path leaves the mesh as-is.
+    // --- Wall free-slide (ADR-0024 Q2a): tangential smooth + OCC re-project ---
+    // After the scaffold and feature pin. Wall nodes = free boundary far from
+    // sharp CAD edges. Requires a live CadModel; STL-only leaves the mesh as-is.
     if (cad != nullptr && !cad->empty() && wall_smooth_iters > 0 && !out.mesh.tets.empty()) {
         const auto wall = wall_tangential_project(
             *cad, topo, out.mesh.nodes, out.mesh.tets, h, wall_smooth_iters,

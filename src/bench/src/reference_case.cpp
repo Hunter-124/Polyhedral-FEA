@@ -5,6 +5,9 @@
 
 #include <format>
 #include <fstream>
+#include <iterator>
+#include <map>
+#include <string>
 
 namespace polymesh::bench {
 
